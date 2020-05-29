@@ -10,10 +10,12 @@
 
 pub mod clarity;
 pub mod repl;
+pub mod frontend;
 
 use repl::Session;
+use frontend::CommandLine;
 
 fn main() {
-    let mut session = Session::new();
-    session.start();
+    let mut cli_frontend = CommandLine::new();
+    cli_frontend.start();
 }
