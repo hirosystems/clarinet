@@ -1,11 +1,13 @@
 
 use crate::repl::Session;
 
-use termion::event::{Key, Event, MouseEvent};
-use termion::input::{TermRead, MouseTerminal};
-use termion::raw::IntoRawMode;
+// use termion::event::{Key, Event, MouseEvent};
+// use termion::input::{TermRead, MouseTerminal};
+// use termion::raw::IntoRawMode;
 use std::io::{Write, stdout, stdin};
 use termion::{color, style};
+use rustyline::error::ReadlineError;
+use rustyline::Editor;
 
 pub struct CommandLine {
     session: Session,
@@ -20,27 +22,40 @@ impl CommandLine {
 
     pub fn start(&mut self) {
         println!("{}clarity-repl v0.1{}", color::Fg(color::Green), color::Fg(color::White));
-        let stdin = stdin();
-        let mut stdout = stdout().into_raw_mode().unwrap();
-
-        for c in stdin.events() {
-            let evt = c.unwrap();
-            match evt {
-                Event::Key(Key::Ctrl('c')) | Event::Key(Key::Ctrl('d')) => break,
-                Event::Key(Key::Char(k)) => {
-                    write!(stdout,"{}", k).unwrap();
+        let mut rl = Editor::<()>::new();
+        if rl.load_history("history.txt").is_err() {
+            println!("No previous history.");
+        }
+        let mut ctrl_c_acc = 0;
+        loop {
+            let readline = rl.readline(">> ");
+            match readline {
+                Ok(command) => {
+                    ctrl_c_acc = 0;
+                    rl.add_history_entry(command.as_str());
+                    let res = self.session.interpret(command);
+                    println!("{}", res);
                 },
-                Event::Key(Key::Backspace) => {
-                    
-                    // write!(stdout,"{}", k).unwrap();
-                }
-                e => {
-                    println!("=> {:?}", e);
+                Err(ReadlineError::Interrupted) => {
+                    ctrl_c_acc += 1;
+                    if ctrl_c_acc == 2 {
+                        break
+                    } else {
+                        println!("Hit CTRL-C a second time to quit.");
+                    }
+                },
+                Err(ReadlineError::Eof) => {
+                    println!("CTRL-D");
+                    break
+                },
+                Err(err) => {
+                    println!("Error: {:?}", err);
+                    break
                 }
             }
-            stdout.flush().unwrap();
         }
-    }
+        rl.save_history("history.txt").unwrap();
+        }
 }
 
 
