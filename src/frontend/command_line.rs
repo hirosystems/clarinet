@@ -1,9 +1,6 @@
 
 use crate::repl::Session;
 
-// use termion::event::{Key, Event, MouseEvent};
-// use termion::input::{TermRead, MouseTerminal};
-// use termion::raw::IntoRawMode;
 use std::io::{Write, stdout, stdin};
 use termion::{color, style};
 use rustyline::error::ReadlineError;
@@ -21,20 +18,25 @@ impl CommandLine {
     }
 
     pub fn start(&mut self) {
-        println!("{}clarity-repl v0.1{}", color::Fg(color::Green), color::Fg(color::White));
+        println!("{}clarity-repl v1.0{}", color::Fg(color::LightGreen), color::Fg(color::LightBlack));
+        println!("Enter \".help\" for usage hints.");
+        println!("Connected to a transient in-memory database.{}", color::Fg(color::White));
+
         let mut rl = Editor::<()>::new();
-        if rl.load_history("history.txt").is_err() {
-            println!("No previous history.");
-        }
         let mut ctrl_c_acc = 0;
         loop {
             let readline = rl.readline(">> ");
             match readline {
                 Ok(command) => {
+                    match command.as_str() {
+                        ".help" => self.display_help(),
+                        snippet => {
+                            let res = self.session.interpret(snippet.to_string());
+                            println!("{}", res);        
+                        }
+                    }
                     ctrl_c_acc = 0;
                     rl.add_history_entry(command.as_str());
-                    let res = self.session.interpret(command);
-                    println!("{}", res);
                 },
                 Err(ReadlineError::Interrupted) => {
                     ctrl_c_acc += 1;
@@ -55,55 +57,11 @@ impl CommandLine {
             }
         }
         rl.save_history("history.txt").unwrap();
-        }
+    }
+
+    pub fn display_help(&self) {
+        let help = 
+".help\tDisplay help";
+        println!("{}", help);
+    }
 }
-
-
-        // for c in stdin.keys() {
-        //     write!(stdout,
-        //            "{}{}",
-        //            termion::cursor::Goto(1, 1),
-        //            termion::clear::CurrentLine)
-        //             .unwrap();
-    
-        //     match c.unwrap() {
-        //         Key::Char('q') => break,
-        //         Key::Char(c) => println!("{}", c),
-        //         Key::Alt(c) => println!("^{}", c),
-        //         Key::Ctrl(c) => println!("*{}", c),
-        //         Key::Esc => println!("ESC"),
-        //         Key::Left => println!("←"),
-        //         Key::Right => println!("→"),
-        //         Key::Up => println!("↑"),
-        //         Key::Down => println!("↓"),
-        //         Key::Backspace => println!("×"),
-        //         _ => {}
-        //     }
-        //     stdout.flush().unwrap();
-        // }
-    
-    
-
-        // let stdin = io::stdin();
-        // for line in stdin.lock().lines() {
-        //     let snippet = line.unwrap();
-
-        //     let contract_identifier = QualifiedContractIdentifier::transient();
-        //     let mut contract_ast = match ast::build_ast(&contract_identifier, &snippet, &mut ()) {
-        //         Ok(res) => res,
-        //         Err(parse_error) => {
-        //             println!("Parse error: {:?}", parse_error);
-        //             continue
-        //         }
-        //     };
-    
-        //     let mut db = AnalysisDatabase::new();
-        //     let result = analysis::run_analysis(
-        //         &contract_identifier, 
-        //         &mut contract_ast.expressions,
-        //         &mut db, 
-        //         false,
-        //         LimitedCostTracker::new_max_limit());
-        
-        //     println!("{:?}", result);
-        // }
