@@ -9,7 +9,10 @@ use crate::clarity::representations::SymbolicExpressionType::{AtomValue, Atom, L
 use crate::clarity::types::{TypeSignature, TupleTypeSignature, FunctionArg,
                 FunctionType, FixedFunction, parse_name_type_pairs, Value, PrincipalData};
 use crate::clarity::types::signatures::{FunctionSignature};
-use crate::clarity::functions::{NativeFunctions, DefineFunctionsParsed, NativeVariables, handle_binding_list};
+use crate::clarity::variables::NativeVariables;
+use crate::clarity::functions::{NativeFunctions, handle_binding_list};
+use crate::clarity::functions::define::{DefineFunctionsParsed};
+
 use crate::clarity::costs::{CostTracker, ExecutionCost, LimitedCostTracker, CostErrors,
                 cost_functions, analysis_typecheck_cost, CostOverflowingMath};
 use crate::clarity::analysis::AnalysisDatabase;
@@ -174,7 +177,7 @@ fn trait_type_size(trait_sig: &BTreeMap<ClarityName, FunctionSignature>) -> Chec
 
 fn type_reserved_variable(variable_name: &str) -> Option<TypeSignature> {
     if let Some(variable) = NativeVariables::lookup_by_name(variable_name) {
-        use crate::clarity::functions::NativeVariables::*;
+        use crate::clarity::variables::NativeVariables::*;
         let var_type = match variable {
             TxSender => TypeSignature::PrincipalType,
             ContractCaller => TypeSignature::PrincipalType,

@@ -7,7 +7,7 @@ use crate::clarity::representations::{SymbolicExpression, ClarityName};
 use crate::clarity::representations::SymbolicExpressionType::{AtomValue, Atom, List, LiteralValue};
 use crate::clarity::types::{Value, TraitIdentifier, TypeSignature, FunctionType};
 use crate::clarity::functions::NativeFunctions;
-use crate::clarity::functions::{DefineFunctions, DefineFunctionsParsed};
+use crate::clarity::functions::define::{DefineFunctions, DefineFunctionsParsed};
 
 pub struct TraitChecker {
 }

@@ -3,7 +3,7 @@ use std::iter::FromIterator;
 use crate::clarity::representations::{SymbolicExpression, PreSymbolicExpression, ClarityName};
 use crate::clarity::representations::PreSymbolicExpressionType::{AtomValue, Atom, List, TraitReference, Tuple, FieldIdentifier, SugaredContractIdentifier, SugaredFieldIdentifier};
 use crate::clarity::functions::NativeFunctions;
-use crate::clarity::functions::DefineFunctions;
+use crate::clarity::functions::define::DefineFunctions;
 use crate::clarity::ast::types::{ContractAST, BuildASTPass, PreExpressionsDrain};
 use crate::clarity::ast::errors::{ParseResult, ParseError, ParseErrors};
 use crate::clarity::types::{Value};

@@ -5,16 +5,20 @@ use crate::clarity::types::signatures::FunctionSignature;
 use crate::clarity::analysis::errors::{CheckError, CheckErrors, CheckResult};
 use crate::clarity::analysis::type_checker::{ContractAnalysis};
 use crate::clarity::representations::{ClarityName};
+use crate::clarity::database::Datastore;
 use std::marker::PhantomData;
 
+
 pub struct AnalysisDatabase <'a> {
-    phantom: &'a str
+    phantom: &'a str,
+    store: Datastore
 }
 
 impl <'a> AnalysisDatabase <'a> {
-    pub fn new() -> AnalysisDatabase<'a> {
+    pub fn new(store: Datastore) -> AnalysisDatabase<'a> {
         AnalysisDatabase {
-            phantom: &"phantom"
+            phantom: &"phantom",
+            store: store
         }
     }
 

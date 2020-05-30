@@ -19,6 +19,9 @@
 
 use super::HexError;
 use super::pair::*;
+use ripemd160::Ripemd160;
+use sha2::{Sha256, Sha512, Sha512Trunc256, Digest};
+use sha3::Keccak256;
 
 // borrowed from Andrew Poelstra's rust-bitcoin library
 /// Convert a hexadecimal-encoded string to its corresponding bytes
@@ -52,4 +55,110 @@ pub fn to_hex(s: &[u8]) -> String {
 /// Convert a vec of u8 to a hex string
 pub fn bytes_to_hex(s: &Vec<u8>) -> String {
     to_hex(&s[..])
+}
+
+pub struct Hash160(
+    pub [u8; 20]);
+impl_array_newtype!(Hash160, u8, 20);
+impl_array_hexstring_fmt!(Hash160);
+impl_byte_array_newtype!(Hash160, u8, 20);
+
+pub struct Keccak256Hash(
+    pub [u8; 32]);
+impl_array_newtype!(Keccak256Hash, u8, 32);
+impl_array_hexstring_fmt!(Keccak256Hash);
+impl_byte_array_newtype!(Keccak256Hash, u8, 32);
+
+pub struct Sha256Sum(
+    pub [u8; 32]);
+impl_array_newtype!(Sha256Sum, u8, 32);
+impl_array_hexstring_fmt!(Sha256Sum);
+impl_byte_array_newtype!(Sha256Sum, u8, 32);
+
+pub struct Sha512Sum(
+    pub [u8; 64]);
+impl_array_newtype!(Sha512Sum, u8, 64);
+impl_array_hexstring_fmt!(Sha512Sum);
+impl_byte_array_newtype!(Sha512Sum, u8, 64);
+
+pub struct Sha512Trunc256Sum(
+    pub [u8; 32]);
+impl_array_newtype!(Sha512Trunc256Sum, u8, 32);
+impl_array_hexstring_fmt!(Sha512Trunc256Sum);
+impl_byte_array_newtype!(Sha512Trunc256Sum, u8, 32);
+
+pub struct DoubleSha256(
+    pub [u8; 32]);
+impl_array_newtype!(DoubleSha256, u8, 32);
+impl_array_hexstring_fmt!(DoubleSha256);
+impl_byte_array_newtype!(DoubleSha256, u8, 32);
+
+
+impl Hash160 {
+    pub fn from_sha256(sha256_hash: &[u8; 32]) -> Hash160 {
+        let mut rmd = Ripemd160::new();
+        let mut ret = [0u8; 20];
+        rmd.input(sha256_hash);
+        ret.copy_from_slice(rmd.result().as_slice());
+        Hash160(ret)
+    }
+    
+    /// Create a hash by hashing some data
+    /// (borrwed from Andrew Poelstra)
+    pub fn from_data(data: &[u8]) -> Hash160 {
+        let sha2_result = Sha256::digest(data);
+        let ripe_160_result = Ripemd160::digest(sha2_result.as_slice());
+        Hash160::from(ripe_160_result.as_slice())
+    }
+}
+
+impl Sha512Sum {
+    pub fn from_data(data: &[u8]) -> Sha512Sum {
+        Sha512Sum::from(Sha512::digest(data).as_slice())
+    }
+}
+
+impl Sha512Trunc256Sum {
+    pub fn from_data(data: &[u8]) -> Sha512Trunc256Sum {
+        Sha512Trunc256Sum::from(Sha512Trunc256::digest(data).as_slice())
+    }
+    pub fn from_hasher(hasher: Sha512Trunc256) -> Sha512Trunc256Sum {
+        Sha512Trunc256Sum::from(hasher.result().as_slice())
+    }
+}
+
+impl Keccak256Hash {
+    pub fn from_data(data: &[u8]) -> Keccak256Hash {
+        let mut tmp = [0u8; 32];
+        let mut digest = Keccak256::new();
+        digest.input(data);
+        tmp.copy_from_slice(digest.result().as_slice());
+        Keccak256Hash(tmp)
+    }
+}
+
+impl Sha256Sum {
+    pub fn from_data(data: &[u8]) -> Sha256Sum {
+        let mut tmp = [0u8; 32];
+        let mut sha2_1 = Sha256::new();
+        sha2_1.input(data);
+        tmp.copy_from_slice(sha2_1.result().as_slice());
+        Sha256Sum(tmp)
+    }
+}
+
+impl DoubleSha256 {
+    pub fn from_data(data: &[u8]) -> DoubleSha256 {
+        let mut tmp = [0u8; 32];
+        
+        let mut sha2 = Sha256::new();
+        sha2.input(data);
+        tmp.copy_from_slice(sha2.result().as_slice());
+
+        let mut sha2_2 = Sha256::new();
+        sha2_2.input(&tmp);
+        tmp.copy_from_slice(sha2_2.result().as_slice());
+
+        DoubleSha256(tmp)
+    }
 }

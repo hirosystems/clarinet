@@ -4,7 +4,7 @@ use crate::clarity::analysis::AnalysisDatabase;
 use crate::clarity::representations::{SymbolicExpression, PreSymbolicExpression, ClarityName, TraitDefinition};
 use crate::clarity::types::{Value, TraitIdentifier, QualifiedContractIdentifier};
 use crate::clarity::functions::NativeFunctions;
-use crate::clarity::functions::{DefineFunctions, DefineFunctionsParsed};
+use crate::clarity::functions::define::{DefineFunctions, DefineFunctionsParsed};
 use crate::clarity::ast::types::{ContractAST, BuildASTPass, PreExpressionsDrain};
 use crate::clarity::ast::errors::{ParseResult, ParseError, ParseErrors};
 use crate::clarity::representations::PreSymbolicExpressionType::{AtomValue, Atom, List, TraitReference, SugaredFieldIdentifier, FieldIdentifier};            

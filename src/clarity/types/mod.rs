@@ -7,9 +7,9 @@ use serde::{Serialize, Deserialize};
 
 use super::util::c32;
 use super::representations::{ClarityName, ContractName, SymbolicExpression, SymbolicExpressionType};
-use super::errors::{RuntimeErrorType, CheckErrors, InterpreterResult as Result};
+use super::errors::{RuntimeErrorType, CheckErrors, InterpreterError, InterpreterResult as Result};
 use super::util::hash;
-use super::functions::{BlockInfoProperty, DefineFunctions};
+use super::functions::define::{DefineFunctions};
 
 pub use super::types::signatures::{
     TupleTypeSignature, AssetIdentifier, FixedFunction,
@@ -21,38 +21,6 @@ pub const MAX_VALUE_SIZE: u32 = 1024 * 1024; // 1MB
 pub const BOUND_VALUE_SERIALIZATION_BYTES: u32 = MAX_VALUE_SIZE * 2;
 pub const BOUND_VALUE_SERIALIZATION_HEX: u32 = BOUND_VALUE_SERIALIZATION_BYTES * 2;
 
-#[derive(Clone, Serialize, Deserialize, PartialEq)]
-pub enum DefineType {
-    ReadOnly,
-    Public,
-    Private
-}
-
-#[derive(Clone,Serialize, Deserialize)]
-pub struct DefinedFunction {
-    identifier: FunctionIdentifier,
-    name: ClarityName,
-    arg_types: Vec<TypeSignature>,
-    pub define_type: DefineType,
-    arguments: Vec<ClarityName>,
-    body: SymbolicExpression
-}
-
-
-impl DefineFunctions {
-    pub fn try_parse(expression: &SymbolicExpression) -> Option<(DefineFunctions, &[SymbolicExpression])> {
-        let expression = expression.match_list()?;
-        let (function_name, args) = expression.split_first()?;
-        let function_name = function_name.match_atom()?;
-        let define_type = DefineFunctions::lookup_by_name(function_name)?;
-        Some((define_type, args))
-    }
-}
-
-#[derive(Clone, PartialEq, Eq, Hash, Debug, Serialize, Deserialize)]
-pub struct FunctionIdentifier {
-    identifier: String
-}
 pub const MAX_TYPE_DEPTH: u8 = 32;
 // this is the charged size for wrapped values, i.e., response or optionals
 pub const WRAPPER_VALUE_SIZE: u32 = 1;
@@ -215,6 +183,15 @@ pub enum Value {
     Response(ResponseData),
 }
 
+define_named_enum!(BlockInfoProperty {
+    Time("time"),
+    VrfSeed("vrf-seed"),
+    HeaderHash("header-hash"),
+    IdentityHeaderHash("id-header-hash"),
+    BurnchainHeaderHash("burnchain-header-hash"),
+    MinerAddress("miner-address"),
+});
+
 impl OptionalData {
     pub fn type_signature(&self) -> TypeSignature {
         let type_result = match self.data {
@@ -320,6 +297,30 @@ impl Value {
 
     pub fn depth(&self) -> u8 {
         TypeSignature::type_of(self).depth()
+    }
+
+    /// Invariant: the supplied Values have already been "checked", i.e., it's a valid Value object
+    ///  this invariant is enforced through the Value constructors, each of which checks to ensure
+    ///  that any typing data is correct.
+    pub fn list_with_type(list_data: Vec<Value>, expected_type: ListTypeData) -> Result<Value> {
+        // Constructors for TypeSignature ensure that the size of the Value cannot
+        //   be greater than MAX_VALUE_SIZE (they error on such constructions)
+        //   so we do not need to perform that check here.
+        if (expected_type.get_max_len() as usize) < list_data.len() {
+            return Err(InterpreterError::FailureConstructingListWithType.into())
+        }
+
+        {
+            let expected_item_type = expected_type.get_list_item_type();
+
+            for item in &list_data {
+                if !expected_item_type.admits(&item) {
+                    return Err(InterpreterError::FailureConstructingListWithType.into())
+                }
+            }
+        }
+
+        Ok(Value::List(ListData { data: list_data, type_signature: expected_type }))
     }
 
     pub fn list_from(list_data: Vec<Value>) -> Result<Value> {
@@ -549,6 +550,19 @@ impl TupleData {
         }
 
         Self::new(TupleTypeSignature::try_from(type_map)?, data_map)
+    }
+
+    pub fn from_data_typed(mut data: Vec<(ClarityName, Value)>, expected: &TupleTypeSignature) -> Result<TupleData> {
+        let mut data_map = BTreeMap::new();
+        for (name, value) in data.drain(..) {
+            let expected_type = expected.field_type(&name)
+                .ok_or(InterpreterError::FailureConstructingTupleWithType)?;
+            if !expected_type.admits(&value) {
+                return Err(InterpreterError::FailureConstructingTupleWithType.into());
+            }
+            data_map.insert(name, value);
+        }
+        Self::new(expected.clone(), data_map)
     }
 
     pub fn get(&self, name: &str) -> Result<&Value> {

@@ -1,8 +1,9 @@
 use crate::clarity::errors::{Error as InterpError, RuntimeErrorType};
 use crate::clarity::functions::{NativeFunctions};
 use crate::clarity::{ClarityName, SymbolicExpression, SymbolicExpressionType};
-use crate::clarity::functions::{BlockInfoProperty, FunctionSignature, handle_binding_list};
-use crate::clarity::types::{BUFF_32, BUFF_20, BUFF_64, TypeSignature, TupleTypeSignature, Value, PrincipalData, MAX_VALUE_SIZE, FunctionArg, FunctionType, FixedFunction};
+use crate::clarity::functions::{handle_binding_list};
+use crate::clarity::types::signatures::FunctionSignature;
+use crate::clarity::types::{BUFF_32, BUFF_20, BUFF_64, TypeSignature, BlockInfoProperty, TupleTypeSignature, Value, PrincipalData, MAX_VALUE_SIZE, FunctionArg, FunctionType, FixedFunction};
 use super::{TypeChecker, TypingContext, TypeResult, no_type, check_argument_count, check_arguments_at_least}; 
 use crate::clarity::analysis::errors::{CheckError, CheckErrors, CheckResult};
 use std::convert::TryFrom;

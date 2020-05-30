@@ -2,11 +2,11 @@ use crate::clarity::representations::{SymbolicExpressionType, SymbolicExpression
 use crate::clarity::representations::SymbolicExpressionType::{AtomValue, Atom, List, LiteralValue, TraitReference, Field};
 use crate::clarity::types::{Value, PrincipalData, get_definition_type_of_tuple_argument};
 use crate::clarity::functions::NativeFunctions;
-use crate::clarity::functions::DefineFunctionsParsed;
+use crate::clarity::functions::define::DefineFunctionsParsed;
 use crate::clarity::types::TupleDefinitionType::{Implicit, Explicit};
 use crate::clarity::analysis::types::{ContractAnalysis, AnalysisPass};
 
-use crate::clarity::functions::NativeVariables;
+use crate::clarity::variables::NativeVariables;
 use std::collections::HashMap;
 
 use crate::clarity::analysis::AnalysisDatabase;
@@ -62,7 +62,7 @@ impl <'a, 'b> ReadOnlyChecker <'a, 'b> {
     }
 
     fn check_reads_only_valid(&mut self, expr: &SymbolicExpression) -> CheckResult<()> {
-        use crate::clarity::functions::DefineFunctionsParsed::*;
+        use crate::clarity::functions::define::DefineFunctionsParsed::*;
         if let Some(define_type) = DefineFunctionsParsed::try_parse(expr)? {
             match define_type {
                 // The _arguments_ to Constant, PersistedVariable, FT defines must be checked to ensure that

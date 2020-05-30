@@ -1,6 +1,5 @@
 use crate::clarity::representations::{SymbolicExpression};
-use crate::clarity::functions::BlockInfoProperty;
-use crate::clarity::types::{TypeSignature, TupleTypeSignature, MAX_VALUE_SIZE};
+use crate::clarity::types::{TypeSignature, TupleTypeSignature, MAX_VALUE_SIZE, BlockInfoProperty};
 use super::{TypeChecker, TypingContext, TypeResult, FunctionType, no_type}; 
 use crate::clarity::analysis::errors::{CheckError, CheckErrors, CheckResult, check_argument_count};
 use crate::clarity::costs::{cost_functions};

@@ -17,6 +17,8 @@
  along with Blockstack. If not, see <http://www.gnu.org/licenses/>.
 */
 
+#[macro_use] pub mod macros;
+
 pub mod hash;
 pub mod c32;
 pub mod pair;
@@ -72,4 +74,10 @@ impl error::Error for HexError {
             HexError::BadCharacter(_) => "sha256d bad hex character"
         }
     }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Copy, Hash)]
+pub struct StacksAddress {
+    pub version: u8,
+    pub bytes: hash::Hash160
 }

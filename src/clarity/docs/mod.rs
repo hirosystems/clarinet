@@ -1,4 +1,6 @@
-use super::functions::{NativeFunctions, NativeVariables, DefineFunctions};
+use super::variables::NativeVariables;
+use super::functions::NativeFunctions;
+use super::functions::define::DefineFunctions;
 use super::types::{FunctionType, FixedFunction};
 use super::analysis::type_checker::{TypedNativeFunction};
 use super::analysis::type_checker::natives::SimpleNativeFunction;

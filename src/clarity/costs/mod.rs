@@ -29,6 +29,16 @@ macro_rules! runtime_cost {
     }
 }   
 
+macro_rules! finally_drop_memory {
+    ( $env: expr, $used_mem:expr; $exec:expr ) => {
+        {
+            let result = (|| { $exec })();
+            $env.drop_memory($used_mem);
+            result
+        }
+    }
+}
+
 pub fn analysis_typecheck_cost<T: CostTracker>(track: &mut T, t1: &TypeSignature, t2: &TypeSignature) -> Result<()> {
     let t1_size = t1.type_size()
         .map_err(|_| CostErrors::CostOverflow)?;
