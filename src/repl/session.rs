@@ -11,18 +11,18 @@ enum Command {
     CloseSession,
 }
 
-pub struct Session {
+pub struct Session <'a> {
     session_id: u32,
     started_at: u32,
     commands: VecDeque<Command>,
     defined_functions: VecDeque<Command>,
     defined_contracts: VecDeque<Command>,
-    interpreter: ClarityInterpreter,
+    interpreter: ClarityInterpreter<'a>,
 }
 
-impl Session {
+impl <'a> Session <'a> {
 
-    pub fn new() -> Session {
+    pub fn new() -> Session<'a> {
         Session {
             session_id: 0,
             started_at: 0,
@@ -33,7 +33,7 @@ impl Session {
         }
     }
 
-    pub fn interpret(&mut self, snippet: String) -> String {
+    pub fn interpret(&mut self, snippet: String) -> Result<String, String> {
     
         let contract_identifier = QualifiedContractIdentifier::transient();
 

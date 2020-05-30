@@ -6,12 +6,12 @@ use termion::{color, style};
 use rustyline::error::ReadlineError;
 use rustyline::Editor;
 
-pub struct CommandLine {
-    session: Session,
+pub struct CommandLine <'a> {
+    session: Session<'a>,
 }
 
-impl CommandLine {
-    pub fn new() -> CommandLine {
+impl <'a> CommandLine <'a> {
+    pub fn new() -> CommandLine<'a> {
         CommandLine {
             session: Session::new()
         }
@@ -22,21 +22,24 @@ impl CommandLine {
         println!("Enter \".help\" for usage hints.");
         println!("Connected to a transient in-memory database.{}", color::Fg(color::White));
 
-        let mut rl = Editor::<()>::new();
+        let mut editor = Editor::<()>::new();
         let mut ctrl_c_acc = 0;
         loop {
-            let readline = rl.readline(">> ");
+            let readline = editor.readline(">> ");
             match readline {
                 Ok(command) => {
                     match command.as_str() {
                         ".help" => self.display_help(),
                         snippet => {
-                            let res = self.session.interpret(snippet.to_string());
-                            println!("{}", res);        
+                            let result = self.session.interpret(snippet.to_string());
+                            match result {
+                                Ok(result) => println!("{}", result),
+                                Err(error) => println!("{}{}{}", color::Fg(color::LightRed), error, color::Fg(color::LightBlack))
+                            }
                         }
                     }
                     ctrl_c_acc = 0;
-                    rl.add_history_entry(command.as_str());
+                    editor.add_history_entry(command.as_str());
                 },
                 Err(ReadlineError::Interrupted) => {
                     ctrl_c_acc += 1;
@@ -56,7 +59,7 @@ impl CommandLine {
                 }
             }
         }
-        rl.save_history("history.txt").unwrap();
+        editor.save_history("history.txt").unwrap();
     }
 
     pub fn display_help(&self) {

@@ -6,6 +6,7 @@
 #![allow(non_upper_case_globals)]
 // todo(ludo): would love to eliminate these directives at some point.
 
+#[macro_use] extern crate serde_json;
 #[macro_use] extern crate lazy_static;
 
 pub mod clarity;
