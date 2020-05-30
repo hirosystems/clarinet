@@ -11,7 +11,7 @@ A read–eval–print loop (REPL), also termed an interactive toplevel or langua
 
 ## Quick Start
 
-### Building From Source
+### Building the CLI from source
 
 The first step is to ensure that you have Rust and the support software installed.
 
@@ -30,13 +30,21 @@ cd clarity-repl
 Then build and install:
 
 ```bash
-cargo install --path .
+cargo install --bin clarity-repl --path .
+```
+
+### Building the WASM library
+
+```bash
+cargo install wasm-pack
+cargo build --lib --release --no-default-features --features wasm --target wasm32-unknown-unknown
 ```
 
 
 ## Initial feature set
 - [x] Eval clarity expressions (arithmetic, logic, hash functions)
 - [x] Display formatted errors
+- [x] Ability to produce WASM builds
 
 ## Additional desired features (not exhaustive, not prioritized)
 - [ ] Display documentation
@@ -44,6 +52,8 @@ cargo install --path .
 - [ ] Display cost analysis
 - [ ] Display events
 - [ ] Save snippets as contracts that can be `contract-call?` when public functions or traits are detected
-- [ ] Explore and run WASM builds in browser 
 - [ ] Ability to seed stx balances
+- [ ] Test WASM builds in browser
+- [ ] Easier installation (via brew, etc)
+
 
