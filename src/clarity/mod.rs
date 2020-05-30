@@ -32,9 +32,9 @@ use crate::clarity::contexts::{ContractContext, LocalContext, Environment, CallS
 use crate::clarity::contexts::{GlobalContext};
 use crate::clarity::functions::define::DefineResult;
 use crate::clarity::errors::{Error, InterpreterError, RuntimeErrorType, CheckErrors, InterpreterResult as Result};
-use crate::clarity::database::MemoryBackingStore;
 use crate::clarity::types::{QualifiedContractIdentifier, TraitIdentifier, PrincipalData, TypeSignature};
 use crate::clarity::costs::{cost_functions, CostOverflowingMath, LimitedCostTracker, MemoryConsumer, CostTracker};
+use crate::clarity::database::Datastore;
 
 pub use crate::clarity::representations::{SymbolicExpression, SymbolicExpressionType, ClarityName, ContractName};
 
@@ -207,7 +207,7 @@ pub fn is_reserved(name: &str) -> bool {
 /* This function evaluates a list of expressions, sharing a global context.
  * It returns the final evaluated result.
  */
-fn eval_all (expressions: &[SymbolicExpression],
+pub fn eval_all (expressions: &[SymbolicExpression],
              contract_context: &mut ContractContext,
              global_context: &mut GlobalContext) -> Result<Option<Value>> {
     let mut last_executed = None;
@@ -303,23 +303,5 @@ fn eval_all (expressions: &[SymbolicExpression],
 
         contract_context.data_size = total_memory_use;
         Ok(last_executed)
-    })
-}
-
-/* Run provided program in a brand new environment, with a transient, empty
- *  database.
- *
- *  Only used by CLI.
- */
-pub fn execute(program: &str) -> Result<Option<Value>> {
-    let contract_id = QualifiedContractIdentifier::transient();
-    let mut contract_context = ContractContext::new(contract_id.clone());
-    let mut marf = MemoryBackingStore::new();
-    let conn = marf.as_clarity_db();
-    let mut global_context = GlobalContext::new(conn, LimitedCostTracker::new_max_limit());
-    global_context.execute(|g| {
-        let parsed = ast::build_ast(&contract_id, program, &mut ())?
-            .expressions;
-        eval_all(&parsed, &mut contract_context, g)
     })
 }

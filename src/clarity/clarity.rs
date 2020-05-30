@@ -1,7 +1,7 @@
 use crate::clarity::representations::SymbolicExpression;
 use crate::clarity::types::{Value, AssetIdentifier, PrincipalData, QualifiedContractIdentifier, TypeSignature};
 use crate::clarity::contexts::{OwnedEnvironment, AssetMap, Environment};
-use crate::clarity::database::{MarfedKV, ClarityBackingStore, ClarityDatabase, HeadersDB, RollbackWrapper, RollbackWrapperPersistedLog};
+use crate::clarity::database::{ClarityBackingStore, ClarityDatabase, HeadersDB, RollbackWrapper, RollbackWrapperPersistedLog};
 use crate::clarity::database::{Datastore};
 use crate::clarity::analysis::{AnalysisDatabase};
 use crate::clarity::errors::{Error as InterpreterError};
@@ -248,7 +248,7 @@ impl ClarityConnection for ClarityBlockConnection <'_> {
     /// Do something with ownership of the underlying DB that involves only reading.
     fn with_clarity_db_readonly_owned<F, R>(&mut self, to_do: F) -> R
     where F: FnOnce(ClarityDatabase) -> (R, ClarityDatabase) {
-        let mut db = ClarityDatabase::new(&mut self.datastore, &self.header_db);
+        let mut db = ClarityDatabase::new(&mut self.datastore, self.header_db);
         db.begin();
         let (result, mut db) = to_do(db);
         db.roll_back();
@@ -269,7 +269,7 @@ impl ClarityConnection for ClarityReadOnlyConnection <'_> {
     /// Do something with ownership of the underlying DB that involves only reading.
     fn with_clarity_db_readonly_owned<F, R>(&mut self, to_do: F) -> R
     where F: FnOnce(ClarityDatabase) -> (R, ClarityDatabase) {
-        let mut db = ClarityDatabase::new(&mut self.datastore, &self.header_db);
+        let mut db = ClarityDatabase::new(&mut self.datastore, self.header_db);
         db.begin();
         let (result, mut db) = to_do(db);
         db.roll_back();
@@ -308,15 +308,6 @@ impl <'a> ClarityBlockConnection <'a> {
     /// Commits all changes in the current block by
     /// (1) committing the current MARF tip to storage,
     /// (2) committing side-storage.
-    #[cfg(test)]
-    pub fn commit_block(mut self) -> LimitedCostTracker {
-        println!("Commit Clarity datastore");
-        self.datastore.test_commit();
-
-        self.parent.datastore.replace(self.datastore);
-
-        self.cost_track.unwrap()
-    }
     
     /// Commits all changes in the current block by
     /// (1) committing the current MARF tip to storage,
@@ -351,7 +342,7 @@ impl <'a> ClarityBlockConnection <'a> {
     pub fn start_transaction_processing <'b> (&'b mut self) -> ClarityTransactionConnection <'b> {
         let store = &mut self.datastore;
         let cost_track = &mut self.cost_track;
-        let header_db = &self.header_db;
+        let header_db = self.header_db;
         let mut log = RollbackWrapperPersistedLog::new();
         log.nest();
         ClarityTransactionConnection {
@@ -374,7 +365,7 @@ impl ClarityConnection for ClarityTransactionConnection <'_> {
     where F: FnOnce(ClarityDatabase) -> (R, ClarityDatabase) {
         using!(self.log, "log", |log| {
             let rollback_wrapper = RollbackWrapper::from_persisted_log(self.store, log);
-            let mut db = ClarityDatabase::new_with_rollback_wrapper(rollback_wrapper, &self.header_db);
+            let mut db = ClarityDatabase::new_with_rollback_wrapper(rollback_wrapper, self.header_db);
             db.begin();
             let (r, mut db) = to_do(db);
             db.roll_back();
@@ -417,7 +408,7 @@ impl <'a> ClarityTransactionConnection <'a> {
     where F: FnOnce(&mut ClarityDatabase) -> Result<R, Error> {
         using!(self.log, "log", |log| {
             let rollback_wrapper = RollbackWrapper::from_persisted_log(self.store, log);
-            let mut db = ClarityDatabase::new_with_rollback_wrapper(rollback_wrapper, &self.header_db);
+            let mut db = ClarityDatabase::new_with_rollback_wrapper(rollback_wrapper, self.header_db);
 
             db.begin();
             let result = to_do(&mut db);
@@ -476,7 +467,7 @@ impl <'a> ClarityTransactionConnection <'a> {
         using!(self.log, "log", |log| {
             using!(self.cost_track, "cost tracker", |cost_track| {
                 let rollback_wrapper = RollbackWrapper::from_persisted_log(self.store, log);
-                let mut db = ClarityDatabase::new_with_rollback_wrapper(rollback_wrapper, &self.header_db);
+                let mut db = ClarityDatabase::new_with_rollback_wrapper(rollback_wrapper, self.header_db);
 
                 // wrap the whole contract-call in a claritydb transaction,
                 //   so we can abort on call_back's boolean retun

@@ -6,12 +6,12 @@ use termion::{color, style};
 use rustyline::error::ReadlineError;
 use rustyline::Editor;
 
-pub struct CommandLine <'a> {
-    session: Session<'a>,
+pub struct CommandLine {
+    session: Session,
 }
 
-impl <'a> CommandLine <'a> {
-    pub fn new() -> CommandLine<'a> {
+impl CommandLine {
+    pub fn new() -> CommandLine {
         CommandLine {
             session: Session::new()
         }
@@ -34,7 +34,7 @@ impl <'a> CommandLine <'a> {
                             let result = self.session.interpret(snippet.to_string());
                             match result {
                                 Ok(result) => println!("{}", result),
-                                Err(error) => println!("{}{}{}", color::Fg(color::LightRed), error, color::Fg(color::LightBlack))
+                                Err(error) => println!("{}{}{}", color::Fg(color::LightRed), error, color::Fg(color::White))
                             }
                         }
                     }

@@ -894,7 +894,6 @@ impl <'a> GlobalContext<'a> {
     }
 
     pub fn commit(&mut self) -> Result<(Option<AssetMap>, Option<EventBatch>)> {
-        println!("Calling commit");
         self.read_only.pop();
         let asset_map = self.asset_maps.pop()
             .expect("ERROR: Committed non-nested context.");

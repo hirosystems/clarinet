@@ -1,5 +1,5 @@
 use std::collections::{HashMap};
-use super::{MarfedKV, ClarityBackingStore, ClarityDeserializable};
+use super::{ClarityBackingStore, ClarityDeserializable};
 use crate::clarity::Value;
 use crate::clarity::errors::{ InterpreterResult as Result };
 use crate::clarity::StacksBlockId;
@@ -197,10 +197,12 @@ impl <'a> RollbackWrapper <'a> {
                 self.store.put_all(all_edits);
             }
 
-            let metadata_edits = rollback_check_pre_bottom_commit(
+            let mut metadata_edits = rollback_check_pre_bottom_commit(
                 last_item.metadata_edits, &mut self.metadata_lookup_map);
             if metadata_edits.len() > 0 {
-                self.store.put_all_metadata(metadata_edits);
+                for ((contract, key), value) in metadata_edits.drain(..) {
+                    self.store.insert_metadata(&contract, &key, &value);
+                }
             }
         } else {
             // bubble up to the next item in the stack
@@ -237,28 +239,30 @@ impl <'a> RollbackWrapper <'a> {
         self.store.set_block_hash(bhh)
     }
 
-    pub fn get<T>(&mut self, key: &str) -> Option<T> where T: ClarityDeserializable<T> {
+    pub fn get<T>(&mut self, key: &str) -> Option<T> {
         self.stack.last()
             .expect("ERROR: Clarity VM attempted GET on non-nested context.");
 
-        let lookup_result = self.lookup_map.get(key)
-            .and_then(|x| x.last())
-            .map(|x| T::deserialize(x));
+        // let lookup_result = self.lookup_map.get(key)
+        //     .and_then(|x| x.last())
+        //     .map(|x| T::deserialize(x));
 
-        lookup_result
-            .or_else(|| self.store.get(key).map(|x| T::deserialize(&x)))
+        // lookup_result
+        //     .or_else(|| self.store.get(key).map(|x| T::deserialize(&x)))
+        None
     }
 
     pub fn get_value(&mut self, key: &str, expected: &TypeSignature) -> Option<Value> {
-        self.stack.last()
-            .expect("ERROR: Clarity VM attempted GET on non-nested context.");
+        // self.stack.last()
+        //     .expect("ERROR: Clarity VM attempted GET on non-nested context.");
 
-        let lookup_result = self.lookup_map.get(key)
-            .and_then(|x| x.last())
-            .map(|x| Value::deserialize(x, expected));
+        // let lookup_result = self.lookup_map.get(key)
+        //     .and_then(|x| x.last())
+        //     .map(|x| Value::deserialize(x, expected));
 
-        lookup_result
-            .or_else(|| self.store.get(key).map(|x| Value::deserialize(&x, expected)))
+        // lookup_result
+        //     .or_else(|| self.store.get(key).map(|x| Value::deserialize(&x, expected)))
+        None
     }
 
     pub fn get_current_block_height(&mut self) -> u32 {
@@ -270,9 +274,9 @@ impl <'a> RollbackWrapper <'a> {
     }
 
     pub fn prepare_for_contract_metadata(&mut self, contract: &QualifiedContractIdentifier, content_hash: Sha512Trunc256Sum) {
-        let key = MarfedKV::make_contract_hash_key(contract);
-        let value = self.store.make_contract_commitment(content_hash);
-        self.put(&key, &value)
+        // let key = MarfedKV::make_contract_hash_key(contract);
+        // let value = self.store.make_contract_commitment(content_hash);
+        // self.put(&key, &value)
     }
 
     pub fn insert_metadata(&mut self, contract: &QualifiedContractIdentifier, key: &str, value: &str) {

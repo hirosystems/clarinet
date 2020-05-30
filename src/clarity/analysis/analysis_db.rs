@@ -5,21 +5,22 @@ use crate::clarity::types::signatures::FunctionSignature;
 use crate::clarity::analysis::errors::{CheckError, CheckErrors, CheckResult};
 use crate::clarity::analysis::type_checker::{ContractAnalysis};
 use crate::clarity::representations::{ClarityName};
-use crate::clarity::database::Datastore;
-use std::marker::PhantomData;
+use crate::clarity::database::{Datastore, RollbackWrapper, ClarityBackingStore};
 
 
 pub struct AnalysisDatabase <'a> {
-    phantom: &'a str,
-    store: Datastore
+    store: RollbackWrapper<'a>
 }
 
 impl <'a> AnalysisDatabase <'a> {
-    pub fn new(store: Datastore) -> AnalysisDatabase<'a> {
+    pub fn new(store: &'a mut dyn ClarityBackingStore) -> AnalysisDatabase<'a> {
         AnalysisDatabase {
-            phantom: &"phantom",
-            store: store
+            store: RollbackWrapper::new(store)
         }
+    }
+
+    pub fn new_with_rollback_wrapper(store: RollbackWrapper<'a>) -> AnalysisDatabase<'a> {
+        AnalysisDatabase { store }
     }
 
     pub fn execute <F, T, E> (&mut self, f: F) -> Result<T,E> where F: FnOnce(&mut Self) -> Result<T,E>, {
@@ -71,5 +72,9 @@ impl <'a> AnalysisDatabase <'a> {
 
     pub fn get_map_type(&mut self, contract_identifier: &QualifiedContractIdentifier, map_name: &str) -> CheckResult<(TypeSignature, TypeSignature)> {
         Ok((TypeSignature::NoType, TypeSignature::NoType))
+    }
+
+    pub fn destroy(self) -> RollbackWrapper<'a> {
+        self.store
     }
 }

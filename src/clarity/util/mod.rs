@@ -29,6 +29,9 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use std::fmt;
 use std::error;
 
+use hash::Hash160;
+use crate::clarity::types::StandardPrincipalData;
+
 pub fn get_epoch_time_secs() -> u64 {
     let start = SystemTime::now();
     let since_the_epoch = start.duration_since(UNIX_EPOCH)
@@ -80,4 +83,13 @@ impl error::Error for HexError {
 pub struct StacksAddress {
     pub version: u8,
     pub bytes: hash::Hash160
+}
+
+impl From<StandardPrincipalData> for StacksAddress {
+    fn from(o: StandardPrincipalData) -> StacksAddress {
+        StacksAddress {
+            version: o.0,
+            bytes: Hash160(o.1),
+        }
+    }
 }

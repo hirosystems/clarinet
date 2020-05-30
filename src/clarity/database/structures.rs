@@ -23,37 +23,37 @@ impl ClarityDeserializable<String> for String {
     }
 }
 
-macro_rules! clarity_serializable {
-    ($Name:ident) =>
-    {
-        impl ClaritySerializable for $Name {
-            fn serialize(&self) -> String {
-                serde_json::to_string(self)
-                    .expect("Failed to serialize vm.Value")
-            }
-        }
-        impl ClarityDeserializable<$Name> for $Name {
-            fn deserialize(json: &str) -> Self {
-                serde_json::from_str(json)
-                    .expect("Failed to serialize vm.Value")
-            }
-        }
-    }
-}
+// macro_rules! clarity_serializable {
+//     ($Name:ident) =>
+//     {
+//         impl ClaritySerializable for $Name {
+//             fn serialize(&self) -> String {
+//                 serde_json::to_string(self)
+//                     .expect("Failed to serialize vm.Value")
+//             }
+//         }
+//         impl ClarityDeserializable<$Name> for $Name {
+//             fn deserialize(json: &str) -> Self {
+//                 serde_json::from_str(json)
+//                     .expect("Failed to serialize vm.Value")
+//             }
+//         }
+//     }
+// }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct FungibleTokenMetadata {
     pub total_supply: Option<u128>
 }
 
-clarity_serializable!(FungibleTokenMetadata);
+// clarity_serializable!(FungibleTokenMetadata);
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct NonFungibleTokenMetadata {
     pub key_type: TypeSignature
 }
 
-clarity_serializable!(NonFungibleTokenMetadata);
+// clarity_serializable!(NonFungibleTokenMetadata);
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct DataMapMetadata {
@@ -61,20 +61,20 @@ pub struct DataMapMetadata {
     pub value_type: TypeSignature
 }
 
-clarity_serializable!(DataMapMetadata);
+// clarity_serializable!(DataMapMetadata);
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct DataVariableMetadata {
     pub value_type: TypeSignature
 }
 
-clarity_serializable!(DataVariableMetadata);
+// clarity_serializable!(DataVariableMetadata);
 
 pub struct ContractMetadata {
     pub contract: Contract
 }
 
-clarity_serializable!(ContractMetadata);
+// clarity_serializable!(ContractMetadata);
 
 
 pub struct SimmedBlock {
@@ -85,10 +85,10 @@ pub struct SimmedBlock {
     pub vrf_seed: [u8; 32],
 }
 
-clarity_serializable!(SimmedBlock);
+// clarity_serializable!(SimmedBlock);
 
-clarity_serializable!(PrincipalData);
-clarity_serializable!(i128);
-clarity_serializable!(u128);
-clarity_serializable!(u64);
-clarity_serializable!(Contract);
+// clarity_serializable!(PrincipalData);
+// clarity_serializable!(i128);
+// clarity_serializable!(u128);
+// clarity_serializable!(u64);
+// clarity_serializable!(Contract);

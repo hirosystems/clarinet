@@ -11,18 +11,18 @@ enum Command {
     CloseSession,
 }
 
-pub struct Session <'a> {
+pub struct Session {
     session_id: u32,
     started_at: u32,
     commands: VecDeque<Command>,
     defined_functions: VecDeque<Command>,
     defined_contracts: VecDeque<Command>,
-    interpreter: ClarityInterpreter<'a>,
+    interpreter: ClarityInterpreter,
 }
 
-impl <'a> Session <'a> {
+impl Session {
 
-    pub fn new() -> Session<'a> {
+    pub fn new() -> Session {
         Session {
             session_id: 0,
             started_at: 0,
