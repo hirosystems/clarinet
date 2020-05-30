@@ -1,6 +1,7 @@
 use std::collections::VecDeque;
 use crate::clarity::types::QualifiedContractIdentifier;
 use super::ClarityInterpreter;
+use crate::clarity::diagnostic::Diagnostic;
 
 enum Command {
     LoadLocalContract(String),
@@ -33,7 +34,7 @@ impl Session {
         }
     }
 
-    pub fn interpret(&mut self, snippet: String) -> Result<String, String> {
+    pub fn interpret(&mut self, snippet: String) -> Result<String, (String, Option<Diagnostic>)> {
     
         let contract_identifier = QualifiedContractIdentifier::transient();
 
