@@ -77,7 +77,7 @@ impl ClarityInterpreter {
             eval_all(&contract_ast.expressions, &mut contract_context, g)
         });
         match result {
-            Ok(Some(value)) => Ok(format!("{:?}", value)),
+            Ok(Some(value)) => Ok(format!("{}", value)),
             Ok(None) => Ok(format!("()")),
             Err(error) => {
                 let error = format!("Error while running snippet: {:?}", error);
