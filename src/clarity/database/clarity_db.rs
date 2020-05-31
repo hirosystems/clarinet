@@ -109,7 +109,7 @@ impl <'a> ClarityDatabase <'a> {
         self.store.put(&key, &value.serialize());
     }
 
-    fn get <T> (&mut self, key: &str) -> Option<T> {
+    fn get <T> (&mut self, key: &str) -> Option<T> where T: ClarityDeserializable<T> {
         self.store.get::<T>(key)
     }
 
@@ -150,19 +150,19 @@ impl <'a> ClarityDatabase <'a> {
         self.fetch_metadata(contract_identifier, &key).ok().flatten()
     }
 
-    fn insert_metadata <T> (&mut self, contract_identifier: &QualifiedContractIdentifier, key: &str, data: &T) {
+    fn insert_metadata <T: ClaritySerializable> (&mut self, contract_identifier: &QualifiedContractIdentifier, key: &str, data: &T) {
         if self.store.has_metadata_entry(contract_identifier, key) {
             panic!("Metadata entry '{}' already exists for contract: {}", key, contract_identifier);
         } else {
-            // self.store.insert_metadata(contract_identifier, key, &data.serialize());
+            self.store.insert_metadata(contract_identifier, key, &data.serialize());
         }
     }
 
     fn fetch_metadata <T> (&mut self, contract_identifier: &QualifiedContractIdentifier, key: &str) -> Result<Option<T>>
+    where T: ClarityDeserializable<T>
     {
-        // self.store.get_metadata(contract_identifier, key)
-        //     .map(|x_opt| x_opt.map(|x| T::deserialize(&x)))
-        Ok(None)
+        self.store.get_metadata(contract_identifier, key)
+            .map(|x_opt| x_opt.map(|x| T::deserialize(&x)))
     }
 
     pub fn get_contract_size(&mut self, contract_identifier: &QualifiedContractIdentifier) -> Result<u64> {
@@ -292,16 +292,14 @@ impl <'a> ClarityDatabase <'a> {
 
         let key = ClarityDatabase::make_key_for_trip(contract_identifier, StoreType::Variable, variable_name);
 
-        // self.put(&key, &value);
+        self.put(&key, &value);
 
         return Ok(Value::Bool(true))
     }
 
     pub fn lookup_variable(&mut self, contract_identifier: &QualifiedContractIdentifier, variable_name: &str) -> Result<Value>  {
         let variable_descriptor = self.load_variable(contract_identifier, variable_name)?;
-
         let key = ClarityDatabase::make_key_for_trip(contract_identifier, StoreType::Variable, variable_name);
-
         let result = self.get_value(&key, &variable_descriptor.value_type);
 
         match result {
@@ -332,8 +330,7 @@ impl <'a> ClarityDatabase <'a> {
     }
 
     pub fn make_key_for_data_map_entry(contract_identifier: &QualifiedContractIdentifier, map_name: &str, key_value: &Value) -> String {
-        // ClarityDatabase::make_key_for_quad(contract_identifier, StoreType::DataMap, map_name, key_value.serialize())
-        "Key_for_data_nap".to_string()
+        ClarityDatabase::make_key_for_quad(contract_identifier, StoreType::DataMap, map_name, key_value.serialize())
     }
 
     pub fn fetch_entry(&mut self, contract_identifier: &QualifiedContractIdentifier, map_name: &str, key_value: &Value) -> Result<Value> {
@@ -378,15 +375,15 @@ impl <'a> ClarityDatabase <'a> {
             return Err(CheckErrors::TypeValueError(map_descriptor.value_type, value).into())
         }
 
-        // let key = ClarityDatabase::make_key_for_quad(contract_identifier, StoreType::DataMap, map_name, key_value.serialize());
-        // let stored_type = TypeSignature::new_option(map_descriptor.value_type)?;
+        let key = ClarityDatabase::make_key_for_quad(contract_identifier, StoreType::DataMap, map_name, key_value.serialize());
+        let stored_type = TypeSignature::new_option(map_descriptor.value_type)?;
 
-        // if return_if_exists && self.data_map_entry_exists(&key, &stored_type)? {
-        //     return Ok(Value::Bool(false))
-        // }
+        if return_if_exists && self.data_map_entry_exists(&key, &stored_type)? {
+            return Ok(Value::Bool(false))
+        }
 
-        // let placed_value = Value::some(value)?;
-        // self.put(&key, &placed_value);
+        let placed_value = Value::some(value)?;
+        self.put(&key, &placed_value);
 
         return Ok(Value::Bool(true))
     }
@@ -397,13 +394,13 @@ impl <'a> ClarityDatabase <'a> {
             return Err(CheckErrors::TypeValueError(map_descriptor.key_type, (*key_value).clone()).into())
         }
 
-        // let key = ClarityDatabase::make_key_for_quad(contract_identifier, StoreType::DataMap, map_name, key_value.serialize());
-        // let stored_type = TypeSignature::new_option(map_descriptor.value_type)?;
-        // if !self.data_map_entry_exists(&key, &stored_type)? {
-        //     return Ok(Value::Bool(false))
-        // }
+        let key = ClarityDatabase::make_key_for_quad(contract_identifier, StoreType::DataMap, map_name, key_value.serialize());
+        let stored_type = TypeSignature::new_option(map_descriptor.value_type)?;
+        if !self.data_map_entry_exists(&key, &stored_type)? {
+            return Ok(Value::Bool(false))
+        }
 
-        // self.put(&key, &(Value::none()));
+        self.put(&key, &(Value::none()));
 
         return Ok(Value::Bool(true))
     }
@@ -421,7 +418,7 @@ impl <'a> ClarityDatabase <'a> {
         // total supply _is_ included in the consensus hash
         if total_supply.is_some() {
             let supply_key = ClarityDatabase::make_key_for_trip(contract_identifier, StoreType::CirculatingSupply, token_name);
-            // self.put(&supply_key, &(0 as u128));
+            self.put(&supply_key, &(0 as u128));
         }
     }
 
@@ -461,7 +458,7 @@ impl <'a> ClarityDatabase <'a> {
             if new_supply > total_supply {
                 Err(RuntimeErrorType::SupplyOverflow(new_supply, total_supply).into())
             } else {
-                // self.put(&key, &new_supply);
+                self.put(&key, &new_supply);
                 Ok(())
             }
         } else {
@@ -472,7 +469,7 @@ impl <'a> ClarityDatabase <'a> {
     pub fn get_ft_balance(&mut self, contract_identifier: &QualifiedContractIdentifier, token_name: &str, principal: &PrincipalData) -> Result<u128> {
         self.load_ft(contract_identifier, token_name)?;
 
-        let key = "get_ft_balance"; // ClarityDatabase::make_key_for_quad(contract_identifier, StoreType::FungibleToken, token_name, principal.serialize());
+        let key = ClarityDatabase::make_key_for_quad(contract_identifier, StoreType::FungibleToken, token_name, principal.serialize());
 
         let result = self.get(&key);
         match result {
@@ -482,8 +479,8 @@ impl <'a> ClarityDatabase <'a> {
     }
 
     pub fn set_ft_balance(&mut self, contract_identifier: &QualifiedContractIdentifier, token_name: &str, principal: &PrincipalData, balance: u128) -> Result<()> {
-        // let key =  ClarityDatabase::make_key_for_quad(contract_identifier, StoreType::FungibleToken, token_name, principal.serialize());
-        // self.put(&key, &balance);
+        let key =  ClarityDatabase::make_key_for_quad(contract_identifier, StoreType::FungibleToken, token_name, principal.serialize());
+        self.put(&key, &balance);
 
         Ok(())
     }
@@ -494,7 +491,7 @@ impl <'a> ClarityDatabase <'a> {
             return Err(CheckErrors::TypeValueError(descriptor.key_type, (*asset).clone()).into())
         }
 
-        let key = ""; // ClarityDatabase::make_key_for_quad(contract_identifier, StoreType::NonFungibleToken, asset_name, asset.serialize());
+        let key = ClarityDatabase::make_key_for_quad(contract_identifier, StoreType::NonFungibleToken, asset_name, asset.serialize());
 
         let result = self.get(&key);
         result.ok_or(RuntimeErrorType::NoSuchToken.into())
@@ -511,9 +508,9 @@ impl <'a> ClarityDatabase <'a> {
             return Err(CheckErrors::TypeValueError(descriptor.key_type, (*asset).clone()).into())
         }
 
-        // let key = ClarityDatabase::make_key_for_quad(contract_identifier, StoreType::NonFungibleToken, asset_name, asset.serialize());
+        let key = ClarityDatabase::make_key_for_quad(contract_identifier, StoreType::NonFungibleToken, asset_name, asset.serialize());
 
-        // self.put(&key, principal);
+        self.put(&key, principal);
 
         Ok(())
     }
@@ -544,7 +541,7 @@ impl<'a> ClarityDatabase<'a> {
 
     pub fn set_account_stx_balance(&mut self, principal: &PrincipalData, balance: u128) {
         let key = ClarityDatabase::make_key_for_account_balance(principal);
-        // self.put(&key, &balance);
+        self.put(&key, &balance);
     }
 
     pub fn get_account_nonce(&mut self, principal: &PrincipalData) -> u64 {
@@ -558,6 +555,6 @@ impl<'a> ClarityDatabase<'a> {
 
     pub fn set_account_nonce(&mut self, principal: &PrincipalData, nonce: u64) {
         let key = ClarityDatabase::make_key_for_account_nonce(principal);
-        // self.put(&key, &nonce);
+        self.put(&key, &nonce);
     }
 }

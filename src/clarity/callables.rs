@@ -20,14 +20,14 @@ pub enum CallableType {
     SpecialFunction(&'static str, &'static dyn Fn(&[SymbolicExpression], &mut Environment, &LocalContext) -> Result<Value>)
 }
 
-#[derive(Clone, PartialEq)]
+#[derive(Clone, PartialEq, Serialize, Deserialize)]
 pub enum DefineType {
     ReadOnly,
     Public,
     Private
 }
 
-#[derive(Clone)]
+#[derive(Clone, Serialize, Deserialize)]
 pub struct DefinedFunction {
     identifier: FunctionIdentifier,
     name: ClarityName,
@@ -63,7 +63,7 @@ impl NativeHandle {
     }
 }
 
-#[derive(Clone, PartialEq, Eq, Hash, Debug)]
+#[derive(Clone, PartialEq, Eq, Hash, Debug, Serialize, Deserialize)]
 pub struct FunctionIdentifier {
     identifier: String
 }

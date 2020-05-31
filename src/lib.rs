@@ -10,6 +10,7 @@ extern crate wasm_bindgen;
 
 #[macro_use] extern crate serde_json;
 #[macro_use] extern crate lazy_static;
+#[macro_use] extern crate serde_derive;
 
 #[cfg(feature = "wasm")]
 use wasm_bindgen::prelude::*;

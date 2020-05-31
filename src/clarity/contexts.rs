@@ -78,6 +78,7 @@ pub struct GlobalContext<'a> {
     pub cost_track: LimitedCostTracker,
 }
 
+#[derive(Serialize, Deserialize)]
 pub struct ContractContext {
     pub contract_identifier: QualifiedContractIdentifier,
     pub variables: HashMap<ClarityName, Value>,

@@ -7,6 +7,7 @@ use crate::clarity::contexts::{Environment, LocalContext, ContractContext, Globa
 use crate::clarity::ast::ContractAST;
 use crate::clarity::types::QualifiedContractIdentifier;
 
+#[derive(Serialize, Deserialize)]
 pub struct Contract {
     pub contract_context: ContractContext,
 }

@@ -22,6 +22,7 @@
 pub mod hash;
 pub mod c32;
 pub mod pair;
+pub mod retry;
 
 use std::time;
 use std::thread;

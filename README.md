@@ -45,10 +45,11 @@ cargo build --lib --release --no-default-features --features wasm --target wasm3
 - [x] Eval clarity expressions (arithmetic, logic, hash functions)
 - [x] Display formatted errors
 - [x] Ability to produce WASM builds
+- [x] Full support of persisted data (define-map, define-data-var, define-fungible-token, define-non-fungible-token)
 
 ## Additional desired features (not exhaustive, not prioritized)
+- [ ] Make displayed values more readable
 - [ ] Display documentation
-- [ ] Full support of persisted data (define-map, define-data-var, define-fungible-token, define-non-fungible-token)
 - [ ] Display cost analysis
 - [ ] Display events
 - [ ] Save snippets as contracts that can be `contract-call?` when public functions or traits are detected

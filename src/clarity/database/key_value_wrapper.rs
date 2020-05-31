@@ -239,30 +239,28 @@ impl <'a> RollbackWrapper <'a> {
         self.store.set_block_hash(bhh)
     }
 
-    pub fn get<T>(&mut self, key: &str) -> Option<T> {
+    pub fn get<T>(&mut self, key: &str) -> Option<T> where T: ClarityDeserializable<T>  {
         self.stack.last()
             .expect("ERROR: Clarity VM attempted GET on non-nested context.");
 
-        // let lookup_result = self.lookup_map.get(key)
-        //     .and_then(|x| x.last())
-        //     .map(|x| T::deserialize(x));
+        let lookup_result = self.lookup_map.get(key)
+            .and_then(|x| x.last())
+            .map(|x| T::deserialize(x));
 
-        // lookup_result
-        //     .or_else(|| self.store.get(key).map(|x| T::deserialize(&x)))
-        None
+        lookup_result
+            .or_else(|| self.store.get(key).map(|x| T::deserialize(&x)))
     }
 
     pub fn get_value(&mut self, key: &str, expected: &TypeSignature) -> Option<Value> {
-        // self.stack.last()
-        //     .expect("ERROR: Clarity VM attempted GET on non-nested context.");
+        self.stack.last()
+            .expect("ERROR: Clarity VM attempted GET on non-nested context.");
 
-        // let lookup_result = self.lookup_map.get(key)
-        //     .and_then(|x| x.last())
-        //     .map(|x| Value::deserialize(x, expected));
+        let lookup_result = self.lookup_map.get(key)
+            .and_then(|x| x.last())
+            .map(|x| Value::deserialize(x, expected));
 
-        // lookup_result
-        //     .or_else(|| self.store.get(key).map(|x| Value::deserialize(&x, expected)))
-        None
+        lookup_result
+            .or_else(|| self.store.get(key).map(|x| Value::deserialize(&x, expected)))
     }
 
     pub fn get_current_block_height(&mut self) -> u32 {

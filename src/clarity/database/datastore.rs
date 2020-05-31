@@ -8,6 +8,7 @@ use crate::clarity::analysis::AnalysisDatabase;
 
 pub struct Datastore {
     store: HashMap<String, String>,
+    metadata: HashMap<(String, String), String>,
     chain_tip: StacksBlockId,
 }
 
@@ -16,6 +17,7 @@ impl Datastore {
     pub fn new() -> Datastore {
         Datastore {
             store: HashMap::new(),
+            metadata: HashMap::new(),
             chain_tip: StacksBlockId([255u8; 32])
         }
     }
@@ -28,7 +30,10 @@ impl ClarityBackingStore for Datastore {
 
     /// fetch K-V out of the committed datastore
     fn get(&mut self, key: &str) -> Option<String> {
-        None
+        match self.store.get(key) {
+            Some(value) => Some(value.clone()),
+            None => None
+        }
     }
 
     fn has_entry(&mut self, key: &str) -> bool {
@@ -70,12 +75,18 @@ impl ClarityBackingStore for Datastore {
     fn insert_metadata(&mut self, contract: &QualifiedContractIdentifier, key: &str, value: &str) {
         // let bhh = self.get_open_chain_tip();
         // self.get_side_store().insert_metadata(&bhh, &contract.to_string(), key, value)
+        self.metadata.insert((contract.to_string(), key.to_string()), value.to_string());
     }
 
     fn get_metadata(&mut self, contract: &QualifiedContractIdentifier, key: &str) -> Result<Option<String>> {
         // let (bhh, _) = self.get_contract_hash(contract)?;
         // Ok(self.get_side_store().get_metadata(&bhh, &contract.to_string(), key))
-        Ok(None)
+        let key = &(contract.to_string(), key.to_string());
+
+        match self.metadata.get(key) {
+            Some(result) => Ok(Some(result.to_string())),
+            None => Ok(None)
+        }
     }
 }
 
@@ -151,6 +162,7 @@ impl Datastore {
 
         // self.marf.insert(key, marf_value)
         //     .expect("ERROR: Unexpected MARF Failure")
+        self.store.insert(key.to_string(), value.to_string());
     }
 
     pub fn make_contract_hash_key(contract: &QualifiedContractIdentifier) -> String {
