@@ -7,7 +7,7 @@ A programming language is decidable if you can know, with certainty, from the co
 
 A read–eval–print loop (REPL), also termed an interactive toplevel or language shell, is a simple, interactive computer programming environment that takes single user inputs (i.e., single expressions), evaluates (executes) them, and returns the result to the user; a program written in a REPL environment is executed piecewise.
 
-![screenshot](doc/images/screenshot.png)
+![screenshot](docs/images/screenshot.png)
 
 ## Quick Start
 

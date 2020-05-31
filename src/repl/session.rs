@@ -33,45 +33,6 @@ pub struct Session {
 impl Session {
 
     pub fn new() -> Session {
-
-        // Build documentation once
-        let mut api_reference = HashMap::new();
-        for func in NativeFunctions::ALL.iter() {
-            let api = make_api_reference(&func);
-            let description = {
-                let mut s = api.description.to_string();
-                s = s.replace("\n", " ");
-                s
-            };
-            let doc = format!("Usage\n{}\n\nDescription\n{}\n\nExamples\n{}",
-                api.signature, description, api.example);
-            api_reference.insert(api.name, doc);
-        }
-
-        for func in DefineFunctions::ALL.iter() {
-            let api = make_define_reference(&func);
-            let description = {
-                let mut s = api.description.to_string();
-                s = s.replace("\n", " ");
-                s
-            };
-            let doc = format!("Usage\n{}\n\nDescription\n{}\n\nExamples\n{}",
-                api.signature, description, api.example);
-            api_reference.insert(api.name, doc);
-        }
-
-        for func in NativeVariables::ALL.iter() {
-            let api = make_keyword_reference(&func);
-            let description = {
-                let mut s = api.description.to_string();
-                s = s.replace("\n", " ");
-                s
-            };
-            let doc = format!("Description\n{}\n\nExamples\n{}",
-                description, api.example);
-            api_reference.insert(api.name.to_string(), doc);
-        }
-
         Session {
             session_id: 0,
             started_at: 0,
@@ -79,7 +40,7 @@ impl Session {
             defined_functions: VecDeque::new(),
             defined_contracts: VecDeque::new(),
             interpreter: ClarityInterpreter::new(),
-            api_reference,
+            api_reference: build_api_reference(),
         }
     }
 
@@ -101,5 +62,44 @@ impl Session {
         keys.sort();
         keys
     }
+}
 
+fn build_api_reference() -> HashMap<String, String> {
+    let mut api_reference = HashMap::new();
+    for func in NativeFunctions::ALL.iter() {
+        let api = make_api_reference(&func);
+        let description = {
+            let mut s = api.description.to_string();
+            s = s.replace("\n", " ");
+            s
+        };
+        let doc = format!("Usage\n{}\n\nDescription\n{}\n\nExamples\n{}",
+            api.signature, description, api.example);
+        api_reference.insert(api.name, doc);
+    }
+
+    for func in DefineFunctions::ALL.iter() {
+        let api = make_define_reference(&func);
+        let description = {
+            let mut s = api.description.to_string();
+            s = s.replace("\n", " ");
+            s
+        };
+        let doc = format!("Usage\n{}\n\nDescription\n{}\n\nExamples\n{}",
+            api.signature, description, api.example);
+        api_reference.insert(api.name, doc);
+    }
+
+    for func in NativeVariables::ALL.iter() {
+        let api = make_keyword_reference(&func);
+        let description = {
+            let mut s = api.description.to_string();
+            s = s.replace("\n", " ");
+            s
+        };
+        let doc = format!("Description\n{}\n\nExamples\n{}",
+            description, api.example);
+        api_reference.insert(api.name.to_string(), doc);
+    }
+    api_reference
 }

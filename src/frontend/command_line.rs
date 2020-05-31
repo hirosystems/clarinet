@@ -30,7 +30,7 @@ impl CommandLine {
         let mut editor = Editor::<()>::new();
         let mut ctrl_c_acc = 0;
         loop {
-            let readline = editor.readline(">> ");
+            let readline = editor.readline("◇ ");
             match readline {
                 Ok(command) => {
                     match command.as_str() {

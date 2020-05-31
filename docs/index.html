@@ -1,0 +1,39 @@
+<!doctype html>
+  <html>
+    <head>
+        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/xterm/2.9.2/xterm.css" />
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto+Mono">
+        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/github-fork-ribbon-css/0.2.3/gh-fork-ribbon.min.css" />
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/xterm/2.9.2/xterm.js"></script>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/xterm/2.9.2/addons/fit/fit.js"></script>
+        <script src="https://cdn.rawgit.com/wavesoft/local-echo/7ee165d2c955fe07623b5d74f6dda3ae18815ba4/dist/local-echo.js"></script>
+    </head>
+    <body style="background-color: black;">
+      <a class="github-fork-ribbon" href="http://github.com/lgalabru/clarity-repl" data-ribbon="Fork me on GitHub" title="Fork me on GitHub">Fork me on GitHub</a> 
+      <div id="terminal"></div>
+      <script>
+        var term = new Terminal({
+            fontFamily: "'Roboto Mono', monospace",
+            fontSize: 12,
+            cols: 150,
+            rows: 50
+        });
+        term.open(document.getElementById('terminal'));
+        term.writeln('\x1B[1;3;32mclarity-repl v1.0')
+        term.writeln('\x1B[1;3;30mEnter \".help\" for usage hints.')
+        term.writeln('\x1B[1;3;30mConnected to a transient in-memory database.\x1B[1;3;37m')
+
+        const editor = new LocalEchoController(term);
+
+        const promptCommand = function() {
+            editor.read("◇ ")
+                .then(input => {
+                    term.writeln(`${input}`);
+                    promptCommand();
+                })
+                .catch(error => alert(`Error reading: ${error}`));
+        }
+        promptCommand();
+      </script> 
+    </body>
+  </html>
