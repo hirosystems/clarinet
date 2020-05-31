@@ -35,10 +35,12 @@ impl CommandLine {
                 Ok(command) => {
                     match command.as_str() {
                         ".help" => self.display_help(),
+                        cmd if cmd.starts_with(".functions") => self.display_functions(),
+                        cmd if cmd.starts_with(".doc") => self.display_doc(cmd),
                         snippet => {
                             let result = self.session.interpret(snippet.to_string());
                             match result {
-                                Ok(result) => println!("{}", result),
+                                Ok(result) => println!("{}", light_green.paint(result)),
                                 Err((message, diagnostic)) => {
                                     println!("{}", light_red.paint(message));
                                     if let Some(diagnostic) = diagnostic {
@@ -100,8 +102,35 @@ impl CommandLine {
     }
 
     pub fn display_help(&self) {
-        let help = 
-".help\tDisplay help";
-        println!("{}", help);
+        let help_colour = Colour::Yellow;
+        let coming_soon_colour = Colour::Black.bold();
+
+        println!("{}", help_colour.paint(".help\t\t\t\tDisplay help"));
+        println!("{}", help_colour.paint(".functions\t\t\t\tDisplay all the native functions available in clarity"));
+        println!("{}", help_colour.paint(".doc <function> \t\tDisplay documentation for a given native function fn-name"));
+        println!("{}", coming_soon_colour.paint(".mint-stx <principal>\t\tMint STX balance for a given principal [coming soon]"));
+        println!("{}", coming_soon_colour.paint(".get-block-height\t\tGet current block height [coming soon]"));
+        println!("{}", coming_soon_colour.paint(".set-block-height <number>\tSet current block height [coming soon]"));
+    }
+
+    pub fn display_functions(&self) {
+        let help_colour = Colour::Yellow;
+        let api_reference_index = self.session.get_api_reference_index();
+        println!("{}", help_colour.paint(api_reference_index.join("\n")));
+    }
+
+    pub fn display_doc(&self, command: &str) {
+        let help_colour = Colour::Yellow;
+        let help_accent_colour = Colour::Yellow.bold();
+        let keyword = {
+            let mut s = command.to_string();
+            s = s.replace(".doc", "");
+            s = s.replace(" ", "");
+            s
+        };
+        match self.session.lookup_api_reference(&keyword) {
+            Some(doc) => println!("{}", help_colour.paint(doc)),
+            None => println!("{}", help_colour.paint("Function unknown")),
+        };
     }
 }

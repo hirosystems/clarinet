@@ -19,8 +19,8 @@ pub mod contexts;
 pub mod database;
 pub mod clarity;
 
-mod functions;
-mod variables;
+pub mod functions;
+pub mod variables;
 mod callables;
 
 pub mod docs;

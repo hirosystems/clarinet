@@ -134,7 +134,7 @@ const FALSE_KEYWORD: KeywordAPI = KeywordAPI {
 
 
 const TO_UINT_API: SimpleFunctionAPI = SimpleFunctionAPI {
-    name: None,
+    name: Some("to-uint"),
     snippet: "(to-uint ${1:int})",
     signature: "(to-uint i)",
     description: "Tries to convert the `int` argument to a `uint`. Will cause a runtime error and abort if the supplied argument is negative.",
@@ -142,7 +142,7 @@ const TO_UINT_API: SimpleFunctionAPI = SimpleFunctionAPI {
 };
 
 const TO_INT_API: SimpleFunctionAPI = SimpleFunctionAPI {
-    name: None,
+    name: Some("none"),
     snippet: "none",
     signature: "(to-int u)",
     description: "Tries to convert the `uint` argument to an `int`. Will cause a runtime error and abort if the supplied argument is >= `pow(2, 127)`",
@@ -150,7 +150,7 @@ const TO_INT_API: SimpleFunctionAPI = SimpleFunctionAPI {
 };
 
 const ADD_API: SimpleFunctionAPI = SimpleFunctionAPI {
-    name: Some("+ (add)"),
+    name: Some("+"),
     snippet: "(+ ${1:expr-1} ${2:expr-2})",
     signature: "(+ i1 i2...)",
     description: "Adds a variable number of integer inputs and returns the result. In the event of an _overflow_, throws a runtime error.",
@@ -158,7 +158,7 @@ const ADD_API: SimpleFunctionAPI = SimpleFunctionAPI {
 };
 
 const SUB_API: SimpleFunctionAPI = SimpleFunctionAPI {
-    name: Some("- (subtract)"),
+    name: Some("-"),
     snippet: "(- ${1:expr-1} ${2:expr-2})",
     signature: "(- i1 i2...)",
     description: "Subtracts a variable number of integer inputs and returns the result. In the event of an _underflow_, throws a runtime error.",
@@ -168,7 +168,7 @@ const SUB_API: SimpleFunctionAPI = SimpleFunctionAPI {
 };
 
 const DIV_API: SimpleFunctionAPI = SimpleFunctionAPI {
-    name: Some("/ (divide)"),
+    name: Some("/"),
     snippet: "(/ ${1:expr-1} ${2:expr-2})",
     signature: "(/ i1 i2...)",
     description: "Integer divides a variable number of integer inputs and returns the result. In the event of division by zero, throws a runtime error.",
@@ -179,7 +179,7 @@ const DIV_API: SimpleFunctionAPI = SimpleFunctionAPI {
 };
 
 const MUL_API: SimpleFunctionAPI = SimpleFunctionAPI {
-    name: Some("* (multiply)"),
+    name: Some("*"),
     snippet: "(* ${1:expr-1} ${2:expr-2})",
     signature: "(* i1 i2...)",
     description: "Multiplies a variable number of integer inputs and returns the result. In the event of an _overflow_, throws a runtime error.",
@@ -190,7 +190,7 @@ const MUL_API: SimpleFunctionAPI = SimpleFunctionAPI {
 };
 
 const MOD_API: SimpleFunctionAPI = SimpleFunctionAPI {
-    name: None,
+    name: Some("mod"),
     snippet: "(mod ${1:expr-1} ${2:expr-2})",
     signature: "(mod i1 i2)",
     description: "Returns the integer remainder from integer dividing `i1` by `i2`. In the event of a division by zero, throws a runtime error.",
@@ -201,7 +201,7 @@ const MOD_API: SimpleFunctionAPI = SimpleFunctionAPI {
 };
 
 const POW_API: SimpleFunctionAPI = SimpleFunctionAPI {
-    name: None,
+    name: Some("pow"),
     snippet: "(pow ${1:expr-1} ${2:expr-2})",
     signature: "(pow i1 i2)",
     description: "Returns the result of raising `i1` to the power of `i2`. In the event of an _overflow_, throws a runtime error.",
@@ -212,7 +212,7 @@ const POW_API: SimpleFunctionAPI = SimpleFunctionAPI {
 };
 
 const XOR_API: SimpleFunctionAPI = SimpleFunctionAPI {
-    name: None,
+    name: Some("xor"),
     snippet: "(xor ${1:expr-1} ${2:expr-2})",
     signature: "(xor i1 i2)",
     description: "Returns the result of bitwise exclusive or'ing `i1` with `i2`.",
@@ -222,7 +222,7 @@ const XOR_API: SimpleFunctionAPI = SimpleFunctionAPI {
 };
 
 const AND_API: SimpleFunctionAPI = SimpleFunctionAPI {
-    name: None,
+    name: Some("and"),
     snippet: "(and ${1:expr-1} ${2:expr-2})",
     signature: "(and b1 b2 ...)",
     description: "Returns `true` if all boolean inputs are `true`. Importantly, the supplied arguments are evaluated in-order and lazily. Lazy evaluation means that if one of the arguments returns `false`, the function short-circuits, and no subsequent arguments are evaluated.",
@@ -233,7 +233,7 @@ const AND_API: SimpleFunctionAPI = SimpleFunctionAPI {
 };
 
 const OR_API: SimpleFunctionAPI = SimpleFunctionAPI {
-    name: None,
+    name: Some("or"),
     snippet: "(or ${1:expr-1} ${2:expr-2})",
     signature: "(or b1 b2 ...)",
     description: "Returns `true` if any boolean inputs are `true`. Importantly, the supplied arguments are evaluated in-order and lazily. Lazy evaluation means that if one of the arguments returns `false`, the function short-circuits, and no subsequent arguments are evaluated.",
@@ -245,7 +245,7 @@ const OR_API: SimpleFunctionAPI = SimpleFunctionAPI {
 };
 
 const NOT_API: SimpleFunctionAPI = SimpleFunctionAPI {
-    name: None,
+    name: Some("not"),
     snippet: "(not ${1:expr-1})",
     signature: "(not b1)",
     description: "Returns the inverse of the boolean input.",
@@ -255,7 +255,7 @@ const NOT_API: SimpleFunctionAPI = SimpleFunctionAPI {
 };
 
 const GEQ_API: SimpleFunctionAPI = SimpleFunctionAPI {
-    name: Some(">= (greater than or equal)"),
+    name: Some(">="),
     snippet: "(>= ${1:expr-1} ${2:expr-2})",
     signature: "(>= i1 i2)",
     description: "Compares two integers, returning `true` if `i1` is greater than or equal to `i2` and `false` otherwise.",
@@ -265,7 +265,7 @@ const GEQ_API: SimpleFunctionAPI = SimpleFunctionAPI {
 };
 
 const LEQ_API: SimpleFunctionAPI = SimpleFunctionAPI {
-    name: Some("<= (less than or equal)"),
+    name: Some("<="),
     snippet: "(<= ${1:expr-1} ${2:expr-2})",
     signature: "(<= i1 i2)",
     description: "Compares two integers, returning true if `i1` is less than or equal to `i2` and `false` otherwise.",
@@ -275,7 +275,7 @@ const LEQ_API: SimpleFunctionAPI = SimpleFunctionAPI {
 };
 
 const GREATER_API: SimpleFunctionAPI = SimpleFunctionAPI {
-    name: Some("> (greater than)"),
+    name: Some(">"),
     snippet: "(> ${1:expr-1} ${2:expr-2})",
     signature: "(> i1 i2)",
     description: "Compares two integers, returning `true` if `i1` is greater than `i2` and false otherwise.",
@@ -285,7 +285,7 @@ const GREATER_API: SimpleFunctionAPI = SimpleFunctionAPI {
 };
 
 const LESS_API: SimpleFunctionAPI = SimpleFunctionAPI {
-    name: Some("< (less than)"),
+    name: Some("<"),
     snippet: "(< ${1:expr-1} ${2:expr-2})",
     signature: "(< i1 i2)",
     description: "Compares two integers, returning `true` if `i1` is less than `i2` and `false` otherwise.",
@@ -1284,7 +1284,7 @@ one of the following error codes:
 };
 
 const STX_GET_BALANCE: SimpleFunctionAPI = SimpleFunctionAPI {
-    name: None,
+    name: Some("stx-get-balance"),
     snippet: "(stx-get-balance ${2:owner})",
     signature: "(stx-get-balance owner)",
     description: "`stx-get-balance` is used to query the STX balance of the `owner` principal.
@@ -1298,7 +1298,7 @@ principal isn't materialized, it returns 0.
 };
 
 const STX_TRANSFER: SimpleFunctionAPI = SimpleFunctionAPI {
-    name: None,
+    name: Some("stx-transfer?"),
     snippet: "(stx-transfer? ${1:amount} ${2:sender} ${3:recipient})",
     signature: "(stx-transfer? amount sender recipient)",
     description: "`stx-transfer?` is used to increase the STX balance for the `recipient` principal
@@ -1319,7 +1319,7 @@ one of the following error codes:
 };
 
 const STX_BURN: SimpleFunctionAPI = SimpleFunctionAPI {
-    name: None,
+    name: Some("stx-burn?"),
     snippet: "(stx-burn? ${1:amount} ${2:sender})",
     signature: "(stx-burn? amount sender)",
     description: "`stx-burn?` debits the `sender` principal's STX holdings by `amount`, destroying
