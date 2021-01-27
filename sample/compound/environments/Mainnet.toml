@@ -1,0 +1,5 @@
+
+[network]
+name = "mainnet"
+node_rpc_address = "mainnet.blockstack.org:20443"
+

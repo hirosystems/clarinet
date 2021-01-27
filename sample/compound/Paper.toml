@@ -1,0 +1,8 @@
+[project]
+name = "compound"
+
+[contracts]
+bns = { path = "contracts/bns.clar" }
+
+[notebooks]
+test = { path = "notebooks/bns.clar" }
