@@ -7,7 +7,7 @@ use std::path::PathBuf;
 pub struct PaperConfigFile {
     project: ProjectConfig,
     contracts: Value,
-    drafts: Value,
+    notebooks: Value,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -19,7 +19,7 @@ pub struct ProjectConfigFile {
 pub struct PaperConfig {
     pub project: ProjectConfig,
     pub contracts: Vec<ContractConfig>,
-    pub drafts: Vec<DraftConfig>,
+    pub notebooks: Vec<NotebookConfig>,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -34,7 +34,7 @@ pub struct ContractConfig {
 }
 
 #[derive(Serialize, Deserialize, Debug)]
-pub struct DraftConfig {
+pub struct NotebookConfig {
     pub name: String,
     pub path: String,
 }
@@ -55,7 +55,7 @@ impl PaperConfig {
         let mut config = PaperConfig {
             project: config_file.project,
             contracts: vec![],
-            drafts: vec![],
+            notebooks: vec![],
         };
 
         match config_file.contracts {
@@ -81,19 +81,19 @@ impl PaperConfig {
             _ => {},
         };
 
-        match config_file.drafts {
-            Value::Table(drafts) => {
-                for (draft_name, draft_settings) in drafts.iter() {
-                    match draft_settings {
-                        Value::Table(draft_settings) => {
-                            let draft_path = match draft_settings.get("path") {
+        match config_file.notebooks {
+            Value::Table(notebooks) => {
+                for (notebook_name, notebook_settings) in notebooks.iter() {
+                    match notebook_settings {
+                        Value::Table(notebook_settings) => {
+                            let notebook_path = match notebook_settings.get("path") {
                                 Some(Value::String(path)) => path.to_string(),
                                 _ => continue,
                             };
-                            config.drafts.push(
-                                DraftConfig {
-                                    name: draft_name.to_string(),
-                                    path: draft_path,
+                            config.notebooks.push(
+                                NotebookConfig {
+                                    name: notebook_name.to_string(),
+                                    path: notebook_path,
                                 }
                             );
                         }

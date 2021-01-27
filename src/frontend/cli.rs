@@ -8,6 +8,8 @@ use clarity_repl::repl;
 use crate::generators::{self, changes::Changes};
 use crate::types::{PaperConfig};
 
+// use deno_core::{JsRuntime, RuntimeOptions};
+
 #[derive(Clap)]
 #[clap(version = "1.0")]
 struct Opts {
@@ -25,7 +27,10 @@ enum Command {
     Generate(Generate),
     /// Console subcommand
     #[clap(name = "console")]
-    Console(Console),   
+    Console(Console),
+    // /// Test subcommand
+    // #[clap(name = "test")]
+    // Test(Test),
 }
 
 #[derive(Clap)]
@@ -33,9 +38,9 @@ enum Generate {
     /// Generate contract subcommand
     #[clap(name = "contract")]
     Contract(GenerateContract),
-    /// Generate draft subcommand
-    #[clap(name = "draft")]
-    Draft(GenerateDraft),    
+    /// Generate notebook subcommand
+    #[clap(name = "notebook")]
+    Notebook(GenerateNotebook),    
 }
 
 #[derive(Clap)]
@@ -43,7 +48,7 @@ struct GenerateProject {
     /// Project's name
     pub name: String,
     /// Print debug info
-    #[clap(short = "d")]
+    #[clap(short = 'd')]
     pub debug: bool
 }
 
@@ -52,23 +57,30 @@ struct GenerateContract {
     /// Contract's name
     pub name: String,
     /// Print debug info
-    #[clap(short = "d")]
+    #[clap(short = 'd')]
     pub debug: bool
 }
 
 #[derive(Clap)]
-struct GenerateDraft {
-    /// Draft's name
+struct GenerateNotebook {
+    /// Notebook's name
     pub name: String,
     /// Print debug info
-    #[clap(short = "d")]
+    #[clap(short = 'd')]
     pub debug: bool
 }
 
 #[derive(Clap)]
 struct Console {
     /// Print debug info
-    #[clap(short = "d")]
+    #[clap(short = 'd')]
+    pub debug: bool
+}
+
+#[derive(Clap)]
+struct Test {
+    /// Print debug info
+    #[clap(short = 'd')]
     pub debug: bool
 }
 
@@ -92,8 +104,8 @@ pub fn main() {
                     let changes = generators::get_changes_for_new_contract(current_path, contract_opts.name);
                     execute_changes(changes);        
                 },
-                Generate::Draft(draft_opts) => {
-                    let changes = generators::get_changes_for_new_draft(current_path, draft_opts.name);
+                Generate::Notebook(notebook_opts) => {
+                    let changes = generators::get_changes_for_new_notebook(current_path, notebook_opts.name);
                     execute_changes(changes);        
                 },
             }
@@ -131,6 +143,40 @@ pub fn main() {
             let res = session.start();
             println!("{}", res);
         }
+        // Command::Test(t) => {
+//             let js_filename = "./tests/bns/registration.ts";
+//             let js_source: String = fs::read_to_string(js_filename).unwrap();
+
+//             let runtime_options = RuntimeOptions::default();
+//             let mut runtime = JsRuntime::new(runtime_options);
+//             let pre = r#"
+// // @deno-types="https://unpkg.com/@types/mocha@7.0.2/index.d.ts"
+// import "https://unpkg.com/mocha@7.2.0/mocha.js";
+// import { expect } from "https://deno.land/x/expect@v0.2.1/mod.ts";
+
+// function onCompleted(failures: number): void {
+//   if (failures > 0) {
+//       Deno.exit(1);
+//   } else {
+//       Deno.exit(0);
+//   }
+// }
+
+// (window as any).location = new URL("http://localhost:0");
+
+// mocha.setup({ ui: "bdd", reporter: "spec" });
+
+// mocha.checkLeaks();
+//             "#;
+
+//             let post = r#"
+// mocha.run(onCompleted).globals(["onerror"])
+//             "#;
+//             let js_source = format!("{}\n{}\n{}", pre, js_source, post);
+//             println!("-> \n {}", js_source);
+//             let res = runtime.execute(js_filename, &js_source);
+//             println!("{:?}", res);
+        // }
     }
 }
 

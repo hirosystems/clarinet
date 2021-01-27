@@ -5,8 +5,9 @@ authors = ["Ludo Galabru <ludovic@galabru.com>"]
 edition = "2018"
 
 [dependencies]
-clap = { version = "3.0.0-beta.1" }
+clap = { version = "3.0.0-beta.2" }
 toml = { version = "0.5.6", features = ["preserve_order"] }
 serde = "1"
 serde_derive = "1"
+# deno_core = "0.77.0"
 clarity_repl = { package = "clarity-repl", path = "../clarity-repl" }

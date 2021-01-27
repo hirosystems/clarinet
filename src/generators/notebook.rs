@@ -1,17 +1,17 @@
 use super::changes::{Changes, DirectoryCreation, FileCreation, TOMLEdition};
 
-pub struct GetChangesForNewDraft {
+pub struct GetChangesForNewNotebook {
     project_path: String, 
-    draft_name: String,
+    notebook_name: String,
     changes: Vec<Changes>
 }
 
-impl GetChangesForNewDraft {
+impl GetChangesForNewNotebook {
 
-    pub fn new(project_path: String, draft_name: String) -> Self {
+    pub fn new(project_path: String, notebook_name: String) -> Self {
         Self {
             project_path,
-            draft_name,
+            notebook_name,
             changes: vec![],
         }
     }

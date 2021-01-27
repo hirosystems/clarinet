@@ -20,7 +20,7 @@ impl GetChangesForNewProject {
         self.create_root_directory();
         self.create_clients_directory();
         self.create_contracts_directory();
-        self.create_drafts_directory();
+        self.create_notebooks_directory();
         self.create_scripts_directory();
         self.create_environments_directory();
         self.create_tests_directory();
@@ -50,8 +50,8 @@ impl GetChangesForNewProject {
         self.changes.push(self.get_changes_for_new_root_dir(format!("contracts")));
     }
 
-    fn create_drafts_directory(&mut self) {
-        self.changes.push(self.get_changes_for_new_root_dir(format!("drafts")));
+    fn create_notebooks_directory(&mut self) {
+        self.changes.push(self.get_changes_for_new_root_dir(format!("notebooks")));
     }
 
     fn create_scripts_directory(&mut self) {
@@ -73,7 +73,7 @@ name = "{}"
 
 [contracts]
 
-[drafts]
+[notebooks]
 "#, self.project_name);
         let name = format!("Paper.toml");
         let path = format!("{}/{}/{}", self.project_path, self.project_name, name);
