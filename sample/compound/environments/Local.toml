@@ -1,4 +1,0 @@
-
-[network]
-name = "local"
-node_rpc_address = "127.0.0.1:20443"

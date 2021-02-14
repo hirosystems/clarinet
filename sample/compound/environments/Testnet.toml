@@ -1,7 +1,0 @@
-
-[network]
-name = "testnet"
-node_rpc_address = "argon.blockstack.org:20443"
-        
-[keychain]
-default = { seed = "0x00000000000000000000000000000000" }

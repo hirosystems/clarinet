@@ -1,0 +1,6 @@
+[project]
+name = "bbtc"
+
+[contracts.bbtc]
+path = "contracts/bbtc.clar"
+version = 1

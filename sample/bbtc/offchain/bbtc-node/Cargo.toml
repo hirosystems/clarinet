@@ -1,0 +1,12 @@
+[package]
+name = "bbtc-node"
+version = "0.1.0"
+authors = ["Ludo Galabru <ludovic@blockstack.com>"]
+edition = "2018"
+
+[dependencies]
+libp2p = "0.34.0"
+clap = "2.33.3"
+daemonize = "0.4.1"
+async-std = "1.9.0"
+futures = "0.3.12"
