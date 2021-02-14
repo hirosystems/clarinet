@@ -4,9 +4,9 @@ mod notebook;
 mod project;
 
 pub use changes::{Changes, DirectoryCreation, FileCreation, TOMLEdition};
-use project::GetChangesForNewProject;
 use contract::GetChangesForNewContract;
 use notebook::GetChangesForNewNotebook;
+use project::GetChangesForNewProject;
 
 pub fn get_changes_for_new_project(project_path: String, project_name: String) -> Vec<Changes> {
     let mut command = GetChangesForNewProject::new(project_path, project_name);

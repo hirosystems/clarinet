@@ -1,3 +1,3 @@
 mod config;
 
-pub use config::{PaperConfig};
+pub use config::{PaperConfig, PaperConfigFile};

@@ -26,5 +26,5 @@ pub struct TOMLEdition {
 pub enum Changes {
     AddFile(FileCreation),
     AddDirectory(DirectoryCreation),
-    EditTOML(TOMLEdition)
+    EditTOML(TOMLEdition),
 }
