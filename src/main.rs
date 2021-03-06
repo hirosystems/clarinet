@@ -7,6 +7,7 @@ mod frontend;
 mod generators;
 mod publish;
 mod types;
+mod utils;
 
 use frontend::cli;
 

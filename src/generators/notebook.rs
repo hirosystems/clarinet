@@ -1,4 +1,4 @@
-use super::changes::{Changes, DirectoryCreation, FileCreation, TOMLEdition};
+use super::changes::{Changes};
 
 pub struct GetChangesForNewNotebook {
     project_path: String,

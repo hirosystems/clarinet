@@ -3,9 +3,9 @@ use std::fs::{self, File};
 use std::io::{prelude::*, BufReader, Read};
 
 use crate::generators::{self, changes::Changes};
-use crate::types::{PaperConfig, PaperConfigFile};
+use crate::types::{MainConfig, MainConfigFile, ChainConfig};
 use clap::Clap;
-use clarity_repl::repl;
+use clarity_repl::{repl, Terminal};
 use toml;
 
 // use deno_core::{JsRuntime, RuntimeOptions};
@@ -113,19 +113,17 @@ pub fn main() {
             let mut settings = repl::SessionSettings::default();
 
             let root_path = env::current_dir().unwrap();
-            let mut config_path = root_path.clone();
-            config_path.push("Paper.toml");
+            let mut project_config_path = root_path.clone();
+            project_config_path.push("Clarinette.toml");
 
-            let config = PaperConfig::from_path(&config_path);
+            let mut chain_config_path = root_path.clone();
+            chain_config_path.push("settings");
+            chain_config_path.push("Local.toml");
 
-            settings
-                .initial_balances
-                .push(repl::settings::InitialBalance {
-                    amount: 10000,
-                    address: "ST1D0XTBR7WVNSYBJ7M26XSJAXMDJGJQKNEXAM6JH".to_string(),
-                });
+            let project_config = MainConfig::from_path(&project_config_path);
+            let chain_config = ChainConfig::from_path(&chain_config_path);
 
-            for (name, config) in config.contracts.iter() {
+            for (name, config) in project_config.contracts.iter() {
                 let mut contract_path = root_path.clone();
                 contract_path.push(&config.path);
 
@@ -140,9 +138,20 @@ pub fn main() {
                     });
             }
 
-            let mut session = repl::Session::new(settings);
+            for (name, account) in chain_config.accounts.iter() {
+                settings
+                    .initial_accounts
+                    .push(repl::settings::Account {
+                        name: name.clone(),
+                        balance: account.balance,
+                        address: account.address.clone(),
+                        mnemonic: account.mnemonic.clone(),
+                        derivation_path: account.derivation_path.clone(),
+                    });
+            }
+
+            let mut session = Terminal::new(settings);
             let res = session.start();
-            println!("{}", res);
         } // Command::Test(t) => {
           //             let js_filename = "./tests/bns/registration.ts";
           //             let js_source: String = fs::read_to_string(js_filename).unwrap();
@@ -198,8 +207,8 @@ fn execute_changes(changes: Vec<Changes>) {
                 let mut config_file_reader = BufReader::new(path);
                 let mut config_file = vec![];
                 config_file_reader.read_to_end(&mut config_file).unwrap();
-                let config_file: PaperConfigFile = toml::from_slice(&config_file[..]).unwrap();
-                let config: PaperConfig = PaperConfig::from_config_file(config_file);
+                let config_file: MainConfigFile = toml::from_slice(&config_file[..]).unwrap();
+                let config: MainConfig = MainConfig::from_config_file(config_file);
                 println!("{:?}", config);
             }
         }

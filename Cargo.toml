@@ -1,5 +1,5 @@
 [package]
-name = "paper"
+name = "clarinette"
 version = "0.1.0"
 authors = ["Ludo Galabru <ludovic@galabru.com>"]
 edition = "2018"
@@ -10,4 +10,18 @@ toml = { version = "0.5.6", features = ["preserve_order"] }
 serde = "1"
 serde_derive = "1"
 # deno_core = "0.77.0"
-clarity_repl = { package = "clarity-repl", path = "../clarity-repl" }
+clarity_repl = { package = "clarity-repl", path = "../clarity-repl", features = ["cli"] }
+bip39 = "1.0.0-rc1"
+aes = "0.6.0"
+base64 = "0.13.0"
+block-modes = "0.7.0"
+bs58 = "0.4.0"
+rand = "0.8.3"
+ring = "0.16.20"
+ripemd160 = "0.9.1"
+libsecp256k1 = "0.3.5"
+sha2 = "0.9.3"
+uuid = { version = "0.8.2", features = ["v4"] }
+hmac = "0.10.1"
+pbkdf2 = { version = "0.7.3", features=["parallel"], default-features = false }
+hex = "0.4.3"
