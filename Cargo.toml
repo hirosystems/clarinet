@@ -1,5 +1,5 @@
 [package]
-name = "clarinette"
+name = "clarinet"
 version = "0.1.0"
 authors = ["Ludo Galabru <ludovic@galabru.com>"]
 edition = "2018"

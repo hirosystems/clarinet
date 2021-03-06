@@ -1,6 +1,6 @@
-# clarinette
+# clarinet
 
-Clarinette is a command line tool designed to facilitate smart contract notebooking, testing, development and deployments. 
+Clarinet is a command line tool designed to facilitate smart contract notebooking, testing, development and deployments. 
 
 ### Installation
 
@@ -8,23 +8,23 @@ Clarinette is a command line tool designed to facilitate smart contract notebook
 
 Note: when installing from source, you should also handle the installation the jupyter kernel for clarity
 
-### Getting started with clarinette
+### Getting started with clarinet
 
 Once installed, you can generate a new project:
 
 ```bash
-clarinette new <project>
+clarinet new <project>
 ```
 
 ```bash
 cd compound
-clarinette generate notebook whitepaper
+clarinet generate notebook whitepaper
 ```
 
 ```bash
-clarinette generate contract test
+clarinet generate contract test
 ```
 
 ```bash
-clarinette console
+clarinet console
 ```

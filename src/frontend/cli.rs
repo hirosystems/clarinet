@@ -114,7 +114,7 @@ pub fn main() {
 
             let root_path = env::current_dir().unwrap();
             let mut project_config_path = root_path.clone();
-            project_config_path.push("Clarinette.toml");
+            project_config_path.push("Clarinet.toml");
 
             let mut chain_config_path = root_path.clone();
             chain_config_path.push("settings");

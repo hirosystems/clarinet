@@ -265,7 +265,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "clarinette"
+name = "clarinet"
 version = "0.1.0"
 dependencies = [
  "aes",

@@ -24,7 +24,7 @@ impl GetChangesForNewProject {
         self.create_environments_directory();
         self.create_tests_directory();
 
-        self.create_clarinette_toml();
+        self.create_clarinet_toml();
         self.create_environment_mainnet_toml();
         self.create_environment_testnet_toml();
         self.create_environment_local_toml();
@@ -71,7 +71,7 @@ impl GetChangesForNewProject {
             .push(self.get_changes_for_new_root_dir(format!("tests")));
     }
 
-    fn create_clarinette_toml(&mut self) {
+    fn create_clarinet_toml(&mut self) {
         let content = format!(
             r#"
 [project]
@@ -83,7 +83,7 @@ name = "{}"
 "#,
             self.project_name
         );
-        let name = format!("Clarinette.toml");
+        let name = format!("Clarinet.toml");
         let path = format!("{}/{}/{}", self.project_path, self.project_name, name);
         let change = FileCreation {
             comment: format!("Creating file {}/{}", self.project_name, name),
