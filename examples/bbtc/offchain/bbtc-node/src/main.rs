@@ -1,4 +1,5 @@
 mod net;
+mod stacks;
 
 use clap::{App, Arg, SubCommand};
 use libp2p::identity::Keypair;
@@ -43,7 +44,7 @@ fn main() -> Result<(), Box<dyn Error>> {
             }
             None => None,
         };
-
+        stacks::start_events_listener();
         net::start_networking(&local_key, bootstrap_node)
     } else {
         Ok(())
