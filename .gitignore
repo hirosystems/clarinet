@@ -1,4 +1,4 @@
 /target
 .DS_Store
-sample/bbtc/offchain/bbtc-node/target
+examples/bbtc/offchain/bbtc-node/target
 

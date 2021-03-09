@@ -4,16 +4,16 @@ node_rpc_address = "http://127.0.0.1:20443"
 
 [accounts.deployer]
 mnemonic = "one someone safe master brick keep level door warrior license south fiction"
-derivation_path = "m/44'/5757'/0'/0/0"
+derivation = "m/44'/5757'/0'/0/0"
 balance = 1_000_000
 
 [accounts.user_1]
 mnemonic = "employ violin vessel kiwi garage cook food fire easy boy art denial"
-derivation_path = "m/44'/5757'/0'/0/0"
+derivation = "m/44'/5757'/0'/0/0"
 balance = 1_000_000
 
 [accounts.user_2]
 mnemonic = "want aspect flame drift fever fade delay trophy boat cake same cruel loop credit roof social mimic vital lazy axis capital truly afraid magnet"
-derivation_path = "m/44'/5757'/0'/0/0"
+derivation = "m/44'/5757'/0'/0/0"
 balance = 1_000_000
 

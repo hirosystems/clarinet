@@ -4,11 +4,11 @@ use std::io::{prelude::*, BufReader, Read};
 
 use crate::generators::{self, changes::Changes};
 use crate::types::{MainConfig, MainConfigFile, ChainConfig};
-use clap::Clap;
-use clarity_repl::{repl, Terminal};
-use toml;
+use crate::console::run_console;
+use crate::test::run_tests;
 
-// use deno_core::{JsRuntime, RuntimeOptions};
+use clap::Clap;
+use toml;
 
 #[derive(Clap)]
 #[clap(version = "1.0")]
@@ -28,9 +28,9 @@ enum Command {
     /// Console subcommand
     #[clap(name = "console")]
     Console(Console),
-    // /// Test subcommand
-    // #[clap(name = "test")]
-    // Test(Test),
+    /// Test subcommand
+    #[clap(name = "test")]
+    Test(Test),
 }
 
 #[derive(Clap)]
@@ -110,85 +110,14 @@ pub fn main() {
             }
         },
         Command::Console(t) => {
-            let mut settings = repl::SessionSettings::default();
-
-            let root_path = env::current_dir().unwrap();
-            let mut project_config_path = root_path.clone();
-            project_config_path.push("Clarinet.toml");
-
-            let mut chain_config_path = root_path.clone();
-            chain_config_path.push("settings");
-            chain_config_path.push("Local.toml");
-
-            let project_config = MainConfig::from_path(&project_config_path);
-            let chain_config = ChainConfig::from_path(&chain_config_path);
-
-            for (name, config) in project_config.contracts.iter() {
-                let mut contract_path = root_path.clone();
-                contract_path.push(&config.path);
-
-                let code = fs::read_to_string(&contract_path).unwrap();
-
-                settings
-                    .initial_contracts
-                    .push(repl::settings::InitialContract {
-                        code: code,
-                        name: Some(name.clone()),
-                        deployer: Some("ST1D0XTBR7WVNSYBJ7M26XSJAXMDJGJQKNEXAM6JH".to_string()),
-                    });
-            }
-
-            for (name, account) in chain_config.accounts.iter() {
-                settings
-                    .initial_accounts
-                    .push(repl::settings::Account {
-                        name: name.clone(),
-                        balance: account.balance,
-                        address: account.address.clone(),
-                        mnemonic: account.mnemonic.clone(),
-                        derivation_path: account.derivation_path.clone(),
-                    });
-            }
-
-            let mut session = Terminal::new(settings);
-            let res = session.start();
-        } // Command::Test(t) => {
-          //             let js_filename = "./tests/bns/registration.ts";
-          //             let js_source: String = fs::read_to_string(js_filename).unwrap();
-
-          //             let runtime_options = RuntimeOptions::default();
-          //             let mut runtime = JsRuntime::new(runtime_options);
-          //             let pre = r#"
-          // // @deno-types="https://unpkg.com/@types/mocha@7.0.2/index.d.ts"
-          // import "https://unpkg.com/mocha@7.2.0/mocha.js";
-          // import { expect } from "https://deno.land/x/expect@v0.2.1/mod.ts";
-
-          // function onCompleted(failures: number): void {
-          //   if (failures > 0) {
-          //       Deno.exit(1);
-          //   } else {
-          //       Deno.exit(0);
-          //   }
-          // }
-
-          // (window as any).location = new URL("http://localhost:0");
-
-          // mocha.setup({ ui: "bdd", reporter: "spec" });
-
-          // mocha.checkLeaks();
-          //             "#;
-
-          //             let post = r#"
-          // mocha.run(onCompleted).globals(["onerror"])
-          //             "#;
-          //             let js_source = format!("{}\n{}\n{}", pre, js_source, post);
-          //             println!("-> \n {}", js_source);
-          //             let res = runtime.execute(js_filename, &js_source);
-          //             println!("{:?}", res);
-          // }
-    }
+            run_console();
+        },
+        Command::Test(t) => {
+            run_tests();
+        }
+    };
 }
-
+  
 fn execute_changes(changes: Vec<Changes>) {
     for change in changes.iter() {
         match change {

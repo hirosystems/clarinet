@@ -28,7 +28,7 @@ pub struct NetworkConfigFile {
 #[derive(Serialize, Deserialize, Debug)]
 pub struct AccountConfigFile {
     mnemonic: Option<String>,
-    derivation_path: Option<String>,
+    derivation: Option<String>,
     balance: Option<u64>,
     is_mainnet: Option<bool>,
 }
@@ -48,7 +48,7 @@ pub struct NetworkConfig {
 #[derive(Serialize, Deserialize, Debug)]
 pub struct AccountConfig {
     pub mnemonic: String,
-    pub derivation_path: String,
+    pub derivation: String,
     pub balance: u64,
     pub address: String,
     pub is_mainnet: bool
@@ -101,8 +101,8 @@ impl ChainConfig {
                                 }
                             };
 
-                            let derivation_path = match account_settings.get("derivation_path") {
-                                Some(Value::String(derivation_path)) => derivation_path.to_string(),
+                            let derivation = match account_settings.get("derivation") {
+                                Some(Value::String(derivation)) => derivation.to_string(),
                                 _ => DEFAULT_DERIVATION_PATH.to_string(),
                             }; // todo(ludo): use derivation path
 
@@ -126,7 +126,7 @@ impl ChainConfig {
                                 account_name.to_string(),
                                 AccountConfig {
                                     mnemonic,
-                                    derivation_path,
+                                    derivation,
                                     balance,
                                     address,
                                     is_mainnet,

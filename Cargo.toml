@@ -17,9 +17,12 @@ clap = { version = "3.0.0-beta.2" }
 toml = { version = "0.5.6", features = ["preserve_order"] }
 serde = "1"
 serde_derive = "1"
-# deno_core = "0.77.0"
-# clarity_repl = { package = "clarity-repl", path = "../clarity-repl", features = ["cli"] }
-clarity_repl = { package = "clarity-repl", version = "0.4.0" }
+
+deno_core = { path = "../deno/core", version = "0.80.1" }
+deno_runtime = { path = "../deno/runtime", version = "0.9.1" }
+rusty_v8 = { git = "https://github.com/denoland/rusty_v8", branch = "main" }
+clarity_repl = { package = "clarity-repl", path = "../clarity-repl", features = ["cli"] }
+# clarity_repl = { package = "clarity-repl", version = "0.4.0" }
 bip39 = "1.0.0-rc1"
 aes = "0.6.0"
 base64 = "0.13.0"
@@ -34,3 +37,6 @@ uuid = { version = "0.8.2", features = ["v4"] }
 hmac = "0.10.1"
 pbkdf2 = { version = "0.7.3", features=["parallel"], default-features = false }
 hex = "0.4.3"
+futures = "0.3.12"
+tokio = { version = "1.2.0", features = ["full"] }
+lazy_static = "1.4.0"
