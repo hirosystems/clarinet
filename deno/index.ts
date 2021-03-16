@@ -1,28 +1,21 @@
-// export function mineBlock(transactions: Array<Transaction>): void;
-
-export class Transaction {
+export interface Transaction {
     output: any;
 }
 
-export class Block {
+export interface Block {
     transactions: Array<Transaction>;
 }
 
-
-export class Account {
-    label: string;
+export interface Account {
+    address: string;
+    balance: number;
+    name: string;
+    mnemonic: string;
+    derivation: string;
 }
 
-export class Chain {
-    name: string;
-
-    constructor(name: string) {
-      this.name = name;
-    }
-  
-    mineBlock(transactions: Array<Transaction>) {
-      return globalThis.mineBlock(transactions);
-    }
+export interface Chain {
+    sessionId: number;
 }
 
 type TestFunction = (chain: Chain, accounts: Array<Account>) => void | Promise<void>;
@@ -38,8 +31,13 @@ export class Clarinet {
         Deno.test({
             name: options.name,
             async fn() {
-                let result: any = await globalThis.setupChain();
-                await options.fn(result.chain, result.accounts);
+                (Deno as any).core.ops();
+                let result = (Deno as any).core.jsonOpSync("setup_chain", {});
+                let chain: Chain = {
+                    sessionId: result['session_id']
+                };
+                let accounts: Array<Account> = result['accounts'];
+                await options.fn(chain, accounts);
             },
         })
     }
