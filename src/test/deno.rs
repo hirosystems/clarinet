@@ -1,17 +1,27 @@
 use deno_core::serde_json::{json, Value};
 use deno_core::json_op_sync;
 use deno_core::error::AnyError;
-use deno_core::FsModuleLoader;
-use deno_core::url::Url;
 use deno_runtime::permissions::Permissions;
 use deno_runtime::worker::MainWorker;
 use deno_runtime::worker::WorkerOptions;
-use std::path::Path;
 use std::rc::Rc;
 use std::sync::Arc;
 use serde::Serialize;
 use serde::de::DeserializeOwned;
 use deno_core::{OpFn};
+use super::source_maps::apply_source_map;
+use super::file_fetcher::File;
+use super::media_type::MediaType;
+use super::flags::Flags;
+use super::program_state::ProgramState;
+use super::tools;
+use super::ops;
+use super::fmt_errors::PrettyJsError;
+use super::module_loader::CliModuleLoader;
+use deno_core::ModuleSpecifier;
+use deno_runtime::web_worker::WebWorkerOptions;
+use deno_runtime::ops::worker_host::CreateWebWorkerCb;
+use deno_runtime::web_worker::WebWorker;
 
 mod sessions {
     use std::sync::Mutex;
@@ -80,53 +90,53 @@ mod sessions {
     }
 }
 
-
 pub async fn run_tests() -> Result<(), AnyError> {
-    let module_loader = Rc::new(FsModuleLoader);
-    let create_web_worker_cb = Arc::new(|_| {
-      todo!("Web workers are not supported in the example");
-    });
+
+    let fail_fast = true;
+    let quiet = false;
+    let filter = None;
+
+    let mut flags = Flags::default();
+    flags.unstable = true;
+    let program_state = ProgramState::build(flags.clone()).await?;
+    let permissions = Permissions::from_options(&flags.clone().into());
+    let cwd = std::env::current_dir().expect("No current directory");
+    let include = vec![".".to_string()];
+    let test_modules =
+      tools::test_runner::prepare_test_modules_urls(include, &cwd)?;
   
-    let options = WorkerOptions {
-      apply_source_maps: false,
-      args: vec![],
-      debug_flag: false,
-      unstable: false,
-      ca_data: None,
-      user_agent: "Clarinet".to_string(),
-      seed: None,   
-      js_error_create_fn: None,
-      create_web_worker_cb,
-      attach_inspector: false,
-      maybe_inspector_server: None,
-      should_break_on_first_statement: false,
-      module_loader,
-      runtime_version: "1.8.0".to_string(),
-      ts_version: "4.1.3".to_string(),
-      no_color: false,
-      get_error_class_fn: Some(&get_error_class_name),
-      location: None,
+    if test_modules.is_empty() {
+      println!("No matching test modules found");
+      return Ok(());
+    }
+    let main_module = deno_core::resolve_path("$deno$test.ts")?;
+    // Create a dummy source file.
+
+    let source = tools::test_runner::render_test_file(
+      test_modules.clone(),
+      fail_fast,
+      quiet,
+      filter,
+    );
+
+    let source_file = File {
+      local: main_module.to_file_path().unwrap(),
+      maybe_types: None,
+      media_type: MediaType::TypeScript,
+      source,
+      specifier: main_module.clone(),
     };
 
-    let js_path =
-      Path::new(env!("CARGO_MANIFEST_DIR")).join("examples/bbtc/tests/bbtc_test.ts");
-    let main_module = deno_core::resolve_path(&js_path.to_string_lossy())?;
-    let permissions = Permissions::allow_all();
+    // Save our fake file into file fetcher cache
+    // to allow module access by TS compiler
+    program_state.file_fetcher.insert_cached(source_file);
   
     let mut worker =
-      MainWorker::from_options(main_module.clone(), permissions, &options);
-    worker.bootstrap(&options);
-    let root_module = deno_core::resolve_path("$deno$test.ts")?;
-    let root_body = render_clarinet_root_file(
-        vec![main_module],
-        true,
-        false,
-        None,
-    );
+      create_main_worker(&program_state, main_module.clone(), permissions);
+
     worker.js_runtime.register_op("setup_chain", op(setup_chain));
-    let mod_identifier = worker.js_runtime.load_module(&root_module, Some(root_body)).await;
-    println!("-> {:?}", mod_identifier);
-    worker.js_runtime.mod_evaluate(mod_identifier.unwrap());
+
+    worker.execute_module(&main_module).await?;
     worker.execute("window.dispatchEvent(new Event('load'))")?;
     worker.run_event_loop().await?;
     worker.execute("window.dispatchEvent(new Event('unload'))")?;
@@ -135,34 +145,143 @@ pub async fn run_tests() -> Result<(), AnyError> {
     Ok(())
 }
 
-pub fn render_clarinet_root_file(
-    modules: Vec<Url>,
-    fail_fast: bool,
-    quiet: bool,
-    filter: Option<String>,
-  ) -> String {
-    let mut test_file = "".to_string();
+fn create_web_worker_callback(
+    program_state: Arc<ProgramState>,
+  ) -> Arc<CreateWebWorkerCb> {
+    Arc::new(move |args| {
+      let global_state_ = program_state.clone();
+      let js_error_create_fn = Rc::new(move |core_js_error| {
+        let source_mapped_error =
+          apply_source_map(&core_js_error, global_state_.clone());
+        PrettyJsError::create(source_mapped_error)
+      });
   
-    for module in modules {
-        test_file.push_str(&format!("import \"{}\";\n", module.to_string()));
-    }
+      let attach_inspector = program_state.maybe_inspector_server.is_some()
+        || program_state.coverage_dir.is_some();
+      let maybe_inspector_server = program_state.maybe_inspector_server.clone();
   
-    let options = if let Some(filter) = filter {
-      json!({ "failFast": fail_fast, "reportToConsole": !quiet, "disableLog": quiet, "filter": filter })
-    } else {
-      json!({ "failFast": fail_fast, "reportToConsole": !quiet, "disableLog": quiet })
-    };
+      let module_loader = CliModuleLoader::new_for_worker(
+        program_state.clone(),
+        args.parent_permissions.clone(),
+      );
+      let create_web_worker_cb =
+        create_web_worker_callback(program_state.clone());
   
-    test_file.push_str("// @ts-ignore\n");
+      let options = WebWorkerOptions {
+        args: program_state.flags.argv.clone(),
+        apply_source_maps: true,
+        debug_flag: false,
+        unstable: program_state.flags.unstable,
+        ca_data: program_state.ca_data.clone(),
+        user_agent: super::version::get_user_agent(),
+        seed: program_state.flags.seed,
+        module_loader,
+        create_web_worker_cb,
+        js_error_create_fn: Some(js_error_create_fn),
+        use_deno_namespace: args.use_deno_namespace,
+        attach_inspector,
+        maybe_inspector_server,
+        runtime_version: super::version::deno(),
+        ts_version: super::version::TYPESCRIPT.to_string(),
+        no_color: !super::colors::use_color(),
+        get_error_class_fn: None,
+      };
   
-    test_file.push_str(&format!(
-      "await Deno[Deno.internal].runTests({});\n",
-      options
-    ));
+      let mut worker = WebWorker::from_options(
+        args.name,
+        args.permissions,
+        args.main_module,
+        args.worker_id,
+        &options,
+      );
   
-    test_file
+      // This block registers additional ops and state that
+      // are only available in the CLI
+      {
+        let js_runtime = &mut worker.js_runtime;
+        js_runtime
+          .op_state()
+          .borrow_mut()
+          .put::<Arc<ProgramState>>(program_state.clone());
+        // Applies source maps - works in conjuction with `js_error_create_fn`
+        // above
+        ops::errors::init(js_runtime);
+        if args.use_deno_namespace {
+          ops::runtime_compiler::init(js_runtime);
+        }
+      }
+      worker.bootstrap(&options);
+  
+      worker
+    })
   }
 
+pub fn create_main_worker(
+    program_state: &Arc<ProgramState>,
+    main_module: ModuleSpecifier,
+    permissions: Permissions,
+  ) -> MainWorker {
+    let module_loader = CliModuleLoader::new(program_state.clone());
+  
+    let global_state_ = program_state.clone();
+  
+    let js_error_create_fn = Rc::new(move |core_js_error| {
+      let source_mapped_error =
+        apply_source_map(&core_js_error, global_state_.clone());
+      PrettyJsError::create(source_mapped_error)
+    });
+  
+    let attach_inspector = program_state.maybe_inspector_server.is_some()
+      || program_state.flags.repl
+      || program_state.coverage_dir.is_some();
+    let maybe_inspector_server = program_state.maybe_inspector_server.clone();
+    let should_break_on_first_statement =
+      program_state.flags.inspect_brk.is_some();
+  
+    let create_web_worker_cb = create_web_worker_callback(program_state.clone());
+  
+    let options = WorkerOptions {
+      apply_source_maps: true,
+      args: program_state.flags.argv.clone(),
+      debug_flag: false,
+      unstable: program_state.flags.unstable,
+      ca_data: program_state.ca_data.clone(),
+      user_agent: super::version::get_user_agent(),
+      seed: program_state.flags.seed,
+      js_error_create_fn: Some(js_error_create_fn),
+      create_web_worker_cb,
+      attach_inspector,
+      maybe_inspector_server,
+      should_break_on_first_statement,
+      module_loader,
+      runtime_version: super::version::deno(),
+      ts_version: super::version::TYPESCRIPT.to_string(),
+      no_color: !super::colors::use_color(),
+      get_error_class_fn: None,
+      location: program_state.flags.location.clone(),
+    };
+  
+    let mut worker = MainWorker::from_options(main_module, permissions, &options);
+  
+    // This block registers additional ops and state that
+    // are only available in the CLI
+    {
+      let js_runtime = &mut worker.js_runtime;
+      js_runtime
+        .op_state()
+        .borrow_mut()
+        .put::<Arc<ProgramState>>(program_state.clone());
+      // Applies source maps - works in conjuction with `js_error_create_fn`
+      // above
+      ops::errors::init(js_runtime);
+      ops::runtime_compiler::init(js_runtime);
+    }
+    worker.bootstrap(&options);
+  
+    worker
+  }
+
+  
 fn get_error_class_name(e: &AnyError) -> &'static str {
     deno_runtime::errors::get_error_class_name(e).unwrap_or("Error")
 }
@@ -188,10 +307,10 @@ struct SetupChainArgs {
 }
 
 fn setup_chain(args: SetupChainArgs) -> Result<Value, AnyError> {
-    let (chain_id, accounts) = sessions::handle_setup_chain()?;
+    let (session_id, accounts) = sessions::handle_setup_chain()?;
 
     Ok(json!({
-        "chainId": chain_id,
+        "session_id": session_id,
         "accounts": accounts,
     }))
 }

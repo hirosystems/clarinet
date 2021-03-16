@@ -12,6 +12,12 @@ homepage = "https://github.com/lgalabru/clarinet"
 repository = "https://github.com/lgalabru/clarinet"
 categories = ["command-line-utilities", "development-tools", "development-tools::build-utils"]
 
+[build-dependencies]
+deno_core = { path = "../deno/core", version = "0.80.1" }
+deno_runtime = { path = "../deno/runtime", version = "0.9.1" }
+regex = "1.4.3"
+serde = { version = "1.0.123", features = ["derive"] }
+
 [dependencies]
 clap = { version = "3.0.0-beta.2" }
 toml = { version = "0.5.6", features = ["preserve_order"] }
@@ -40,3 +46,21 @@ hex = "0.4.3"
 futures = "0.3.12"
 tokio = { version = "1.2.0", features = ["full"] }
 lazy_static = "1.4.0"
+atty = "0.2.14"
+jsonc-parser = "0.15.1"
+notify = "5.0.0-pre.4"
+sourcemap = "6.0.1"
+swc_bundler = "0.25.1"
+swc_common = { version = "0.10.12", features = ["sourcemap"] }
+swc_ecmascript = { version = "0.24.1", features = ["codegen", "dep_graph", "parser", "proposal", "react", "transforms", "typescript", "visit"] }
+tempfile = "3.2.0"
+termcolor = "1.1.2"
+text-size = "1.1.0"
+walkdir = "2.3.1"
+regex = "1.4.3"
+libc = "0.2.86"
+encoding_rs = "0.8.28"
+percent-encoding = "2.1.0"
+pin-project = "1.0.5"
+indexmap = { version = "1.6.1", features = ["serde"] }
+shell-escape = "0.1.5"

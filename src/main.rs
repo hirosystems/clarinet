@@ -12,7 +12,7 @@ mod publish;
 mod types;
 mod utils;
 mod console;
-mod test;
+pub mod test;
 
 use frontend::cli;
 

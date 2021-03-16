@@ -1,3 +1,39 @@
+mod ast;
+mod auth_tokens;
+mod checksum;
+mod colors;
+mod deno_dir;
+mod diagnostics;
+// mod diff;
+mod disk_cache;
+// mod errors;
+mod file_fetcher;
+mod file_watcher;
+mod flags;
+// mod flags_allow_net;
+mod fmt_errors;
+mod fs_util;
+mod http_cache;
+mod http_util;
+mod import_map;
+mod info;
+mod lockfile;
+mod media_type;
+mod module_graph;
+mod module_loader;
+mod ops;
+mod program_state;
+mod source_maps;
+mod specifier_handler;
+// mod standalone;
+mod text_encoding;
+// mod tokio_util;
+mod tools;
+mod tsc;
+mod tsc_config;
+mod version;
+
+
 mod deno;
 
 pub fn run_tests() {
