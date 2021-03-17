@@ -1,5 +1,4 @@
-// import { Clarinet, Block, Chain, Account } from 'https://deno.land/x/clarinet@v0.1.1/index.ts';
-import { Clarinet, Tx, Chain, Account, types } from './index.ts';
+import { Clarinet, Tx, Chain, Account, types } from 'https://deno.land/x/clarinet@v0.1.2/index.ts';
 
 Clarinet.test({
     name: "Ensure that test 1 are being executed",
