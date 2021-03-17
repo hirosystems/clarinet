@@ -22,7 +22,7 @@ pub struct ProjectConfigFile {
 pub struct MainConfig {
     pub project: ProjectConfig,
     pub contracts: HashMap<String, ContractConfig>,
-    pub notebooks: Vec<NotebookConfig>,
+    // pub notebooks: Vec<NotebookConfig>,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -30,7 +30,7 @@ pub struct ProjectConfig {
     pub name: String,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct ContractConfig {
     pub version: u64,
     pub path: String,
@@ -65,7 +65,7 @@ impl MainConfig {
         let mut config = MainConfig {
             project,
             contracts: HashMap::new(),
-            notebooks: vec![],
+            // notebooks: vec![],
         };
 
         match config_file.contracts {
@@ -101,10 +101,10 @@ impl MainConfig {
                                 Some(Value::String(path)) => path.to_string(),
                                 _ => continue,
                             };
-                            config.notebooks.push(NotebookConfig {
-                                name: notebook_name.to_string(),
-                                path: notebook_path,
-                            });
+                            // config.notebooks.push(NotebookConfig {
+                            //     name: notebook_name.to_string(),
+                            //     path: notebook_path,
+                            // });
                         }
                         _ => {}
                     }

@@ -22,7 +22,13 @@ pub fn run_console() {
         let mut contract_path = root_path.clone();
         contract_path.push(&config.path);
 
-        let code = fs::read_to_string(&contract_path).unwrap();
+        let code = match fs::read_to_string(&contract_path) {
+            Ok(code) => code,
+            Err(err) => {
+                println!("Error: unable to read {:?}: {}", contract_path, err);
+                return
+            }
+        };
 
         settings
             .initial_contracts

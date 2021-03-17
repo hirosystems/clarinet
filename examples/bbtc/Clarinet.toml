@@ -1,6 +1,5 @@
 [project]
 name = "bbtc"
-
 [contracts.bbtc]
-path = "contracts/bbtc.clar"
 version = 1
+path = "contracts/bbtc.clar"

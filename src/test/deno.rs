@@ -64,7 +64,7 @@ mod sessions {
                 .push(repl::settings::InitialContract {
                     code: code,
                     name: Some(name.clone()),
-                    deployer: Some("ST1D0XTBR7WVNSYBJ7M26XSJAXMDJGJQKNEXAM6JH".to_string()),
+                    deployer: None,
                 });
         }
     
@@ -80,13 +80,21 @@ mod sessions {
                 });
         }
 
-        let session = Session::new(settings.clone());
+        let mut session = Session::new(settings.clone());
+        session.start();
         sessions.insert(session_id, session);
         Ok((session_id, settings.initial_accounts))
     }
 
-    pub fn get_session() -> Result<(), AnyError> {
-        Ok(())
+    pub fn perform_block<F, R>(session_id: u32, handler: F) -> Result<R, AnyError> where F: FnOnce(&mut Session) -> Result<R, AnyError> {
+        let mut sessions = SESSIONS.lock().unwrap();
+        match sessions.get_mut(&session_id) {
+            None => {
+                println!("Error: unable to retrieve session");
+                unreachable!()
+            }
+            Some(ref mut session) => handler(session),
+        }
     }
 }
 
@@ -135,7 +143,10 @@ pub async fn run_tests() -> Result<(), AnyError> {
       create_main_worker(&program_state, main_module.clone(), permissions);
 
     worker.js_runtime.register_op("setup_chain", op(setup_chain));
-
+    worker.js_runtime.register_op("mine_block", op(mine_block));
+    worker.js_runtime.register_op("mine_empty_blocks", op(mine_empty_blocks));
+    worker.js_runtime.register_op("call_read_only_fn", op(call_read_only_fn));
+    
     worker.execute_module(&main_module).await?;
     worker.execute("window.dispatchEvent(new Event('load'))")?;
     worker.run_event_loop().await?;
@@ -300,10 +311,6 @@ where
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct SetupChainArgs {
-//   specifier: String,
-//   version: String,
-//   start: usize,
-//   end: usize,
 }
 
 fn setup_chain(args: SetupChainArgs) -> Result<Value, AnyError> {
@@ -315,14 +322,65 @@ fn setup_chain(args: SetupChainArgs) -> Result<Value, AnyError> {
     }))
 }
 
-fn mine_block() {
-
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct MineBlockArgs {
+  session_id: u32,
+  transactions: Vec<TransactionArgs>
 }
 
-fn set_tx_sender() {
-
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct TransactionArgs {
+  sender: String,
+  contract: String,
+  method: String,
+  args: Vec<String>,
 }
 
-fn get_accounts() {
-    
+fn mine_block(args: MineBlockArgs) -> Result<Value, AnyError> {
+  let receipts = sessions::perform_block(args.session_id, |session| {
+      let initial_tx_sender = session.get_tx_sender();
+      let mut receipts = vec![];
+      for tx in args.transactions.iter() {
+        let snippet = format!("(contract-call? '{}.{} {} {})", initial_tx_sender, tx.contract, tx.method, tx.args.join(" "));
+        session.set_tx_sender(tx.sender.clone());
+        let (_, res) = session.interpret(snippet, None).unwrap(); // todo(ludo)
+        receipts.push(res);
+      }
+      session.set_tx_sender(initial_tx_sender);
+      Ok(receipts)
+  })?;
+  Ok(json!({
+    "session_id": args.session_id,
+    "receipts": receipts,
+  }))
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct MineEmptyBlocksArgs {
+  session_id: u32,
+  count: u32,
+}
+
+fn mine_empty_blocks(args: MineEmptyBlocksArgs) -> Result<Value, AnyError> {
+  println!("{:?}", args);
+  Ok(json!({
+    "session_id": args.session_id,
+  }))
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct CallReadOnlyFnArgs {
+  session_id: u32,
+  params: TransactionArgs,
+}
+
+fn call_read_only_fn(args: CallReadOnlyFnArgs) -> Result<Value, AnyError> {
+  println!("{:?}", args);
+  Ok(json!({
+    "session_id": args.session_id,
+  }))
 }

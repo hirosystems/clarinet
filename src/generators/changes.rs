@@ -1,3 +1,6 @@
+use crate::types::ContractConfig;
+use std::collections::HashMap;
+
 #[derive(Clone, Debug)]
 pub struct FileCreation {
     pub comment: String,
@@ -17,9 +20,8 @@ pub struct DirectoryCreation {
 pub struct TOMLEdition {
     pub comment: String,
     pub path: String,
-    pub section: String,
-    pub content: String,
-    pub index: i16,
+    pub contracts_to_add: HashMap<String, ContractConfig>,
+    pub notebooks_to_add: HashMap<String, ContractConfig>
 }
 
 #[derive(Clone, Debug)]

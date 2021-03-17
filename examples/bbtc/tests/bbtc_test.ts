@@ -1,9 +1,14 @@
-import { Clarinet, Block, Chain, Account } from 'https://deno.land/x/clarinet@v0.1.1/index.ts';
+// import { Clarinet, Block, Chain, Account } from 'https://deno.land/x/clarinet@v0.1.1/index.ts';
+import { Clarinet, Tx, Chain, Account, types } from './index.ts';
 
 Clarinet.test({
     name: "Ensure that test 1 are being executed",
     async fn(chain: Chain, accounts: Array<Account>) {
-        console.log(`Test initialized with Chain::${chain.sessionId} and accounts ${JSON.stringify(accounts)}`);
+        let [alice, bob, charlie] = accounts;
+        let block = chain.mineBlock([
+            new Tx("bbtc", "create-box", [types.uint(12), types.uint(12)], alice.address)
+        ]);
+        console.log(block);
     },
 });
 

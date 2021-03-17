@@ -41,7 +41,7 @@
         ;; Get some randomness
         (randomness (get-some-randomness box-id))
         ;; Create a valid sealing committee, with enough collateral
-        (sealing-committee (new-sealing-commitees-id box-size box-id tx-id randomness)))
+        (sealing-committee (new-sealing-commitees-id))) ;; box-size box-id tx-id randomness)))
         ;; Take a fee: will be used for rewarding sealers once the signature is submitted
         (unwrap! (stx-transfer? fee tx-sender (as-contract tx-sender)) 
             (err ERR_INSUFFICIENT_FUNDS))

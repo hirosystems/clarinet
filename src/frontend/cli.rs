@@ -132,13 +132,19 @@ fn execute_changes(changes: Vec<Changes>) {
                 fs::create_dir_all(options.path.clone()).expect("Unable to create directory");
             }
             Changes::EditTOML(options) => {
-                let path = File::open(options.path.clone()).unwrap();
-                let mut config_file_reader = BufReader::new(path);
+                let file = File::open(options.path.clone()).unwrap();
+                let mut config_file_reader = BufReader::new(file);
                 let mut config_file = vec![];
                 config_file_reader.read_to_end(&mut config_file).unwrap();
                 let config_file: MainConfigFile = toml::from_slice(&config_file[..]).unwrap();
-                let config: MainConfig = MainConfig::from_config_file(config_file);
-                println!("{:?}", config);
+                let mut config: MainConfig = MainConfig::from_config_file(config_file);
+                for (contract_name, contract_config) in options.contracts_to_add.iter() {
+                    config.contracts.insert(contract_name.clone(), contract_config.clone());
+                }
+                let toml = toml::to_string(&config).unwrap();
+                let mut file = File::create(options.path.clone()).unwrap();
+                file.write_all(&toml.as_bytes()).unwrap();
+                println!("{}", options.comment);
             }
         }
     }
