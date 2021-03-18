@@ -464,6 +464,7 @@ dependencies = [
  "deno_runtime",
  "encoding_rs",
  "futures",
+ "fwdansi",
  "hex",
  "hmac 0.10.1",
  "indexmap",
@@ -495,6 +496,8 @@ dependencies = [
  "toml",
  "uuid",
  "walkdir",
+ "winapi",
+ "winres",
 ]
 
 [[package]]
