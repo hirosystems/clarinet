@@ -71,16 +71,16 @@ Clarinet.test({{
              * Tx.contractCall(...)
             */
         ]);
-        assertEquals(block.receipts, 0);
+        assertEquals(block.receipts.length, 0);
         assertEquals(block.height, 2);
 
-        let block = chain.mineBlock([
+        block = chain.mineBlock([
             /* 
              * Add transactions with: 
              * Tx.contractCall(...)
             */
         ]);
-        assertEquals(block.receipts, 0);
+        assertEquals(block.receipts.length, 0);
         assertEquals(block.height, 3);
     }},
 }});

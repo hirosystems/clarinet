@@ -19,9 +19,9 @@ impl GetChangesForNewProject {
         self.create_root_directory();
         self.create_clients_directory();
         self.create_contracts_directory();
-        self.create_notebooks_directory();
-        self.create_scripts_directory();
-        self.create_environments_directory();
+        // self.create_notebooks_directory();
+        // self.create_scripts_directory();
+        self.create_settings_directory();
         self.create_tests_directory();
 
         self.create_clarinet_toml();
@@ -51,17 +51,19 @@ impl GetChangesForNewProject {
             .push(self.get_changes_for_new_root_dir(format!("contracts")));
     }
 
+    #[allow(dead_code)]
     fn create_notebooks_directory(&mut self) {
         self.changes
             .push(self.get_changes_for_new_root_dir(format!("notebooks")));
     }
 
+    #[allow(dead_code)]
     fn create_scripts_directory(&mut self) {
         self.changes
             .push(self.get_changes_for_new_root_dir(format!("scripts")));
     }
 
-    fn create_environments_directory(&mut self) {
+    fn create_settings_directory(&mut self) {
         self.changes
             .push(self.get_changes_for_new_root_dir(format!("environments")));
     }
@@ -104,11 +106,11 @@ node_rpc_address = "http://stacks-node-api.blockstack.org:20443"
         );
         let name = format!("Mainnet.toml");
         let path = format!(
-            "{}/{}/environments/{}",
+            "{}/{}/settings/{}",
             self.project_path, self.project_name, name
         );
         let change = FileCreation {
-            comment: format!("Creating file {}/environments/{}", self.project_name, name),
+            comment: format!("Creating file {}/settings/{}", self.project_name, name),
             name,
             content,
             path,
