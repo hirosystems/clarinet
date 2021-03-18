@@ -13,7 +13,7 @@ pub fn run_console() {
 
     let mut chain_config_path = root_path.clone();
     chain_config_path.push("settings");
-    chain_config_path.push("Local.toml");
+    chain_config_path.push("Development.toml");
 
     let project_config = MainConfig::from_path(&project_config_path);
     let chain_config = ChainConfig::from_path(&chain_config_path);
@@ -52,5 +52,5 @@ pub fn run_console() {
     }
 
     let mut session = Terminal::new(settings);
-    let res = session.start();
+    session.start();
 }

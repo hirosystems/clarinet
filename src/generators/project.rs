@@ -25,9 +25,9 @@ impl GetChangesForNewProject {
         self.create_tests_directory();
 
         self.create_clarinet_toml();
-        self.create_environment_mainnet_toml();
-        self.create_environment_testnet_toml();
-        self.create_environment_local_toml();
+        // self.create_environment_mainnet_toml();
+        // self.create_environment_testnet_toml();
+        self.create_environment_dev_toml();
         self.changes.clone()
     }
 
@@ -94,6 +94,7 @@ name = "{}"
         self.changes.push(Changes::AddFile(change));
     }
 
+    #[allow(dead_code)]
     fn create_environment_mainnet_toml(&mut self) {
         let content = format!(
             r#"[network]
@@ -115,6 +116,7 @@ node_rpc_address = "http://stacks-node-api.blockstack.org:20443"
         self.changes.push(Changes::AddFile(change));
     }
 
+    #[allow(dead_code)]
     fn create_environment_testnet_toml(&mut self) {
         let content = format!(
             r#"[network]
@@ -136,14 +138,53 @@ node_rpc_address = "http://xenon.blockstack.org:20443"
         self.changes.push(Changes::AddFile(change));
     }
 
-    fn create_environment_local_toml(&mut self) {
+    fn create_environment_dev_toml(&mut self) {
         let content = format!(
             r#"[network]
-name = "local"
-node_rpc_address = "http://127.0.0.1:20443"
+name = "Development"
+
+[accounts.wallet_1]
+mnemonic = "dance news bachelor pink hammer clerk solve lake mushroom warm draw cousin forest shock believe smoke lift spin laundry couch gloom hold hurry decline"
+balance = 1_000_000
+
+[accounts.wallet_2]
+mnemonic = "apology together shy taxi glare struggle hip camp engage lion possible during squeeze hen exotic marriage misery kiwi once quiz enough exhibit immense tooth"
+balance = 1_000_000
+
+[accounts.wallet_3]
+mnemonic = "replace swing shove congress smoke banana tired term blanket nominee leave club myself swing egg virus answer bulk useful start decrease family energy february"
+balance = 1_000_000
+
+[accounts.wallet_4]
+mnemonic = "fetch outside black test wash cover just actual execute nice door want airport betray quantum stamp fish act pen trust portion fatigue scissors vague"
+balance = 1_000_000
+
+[accounts.wallet_5]
+mnemonic = "east load echo merit ignore hip tag obvious truly adjust smart panther deer aisle north hotel process frown lock property catch bless notice topple"
+balance = 1_000_000
+
+[accounts.wallet_6]
+mnemonic = "pulp when detect fun unaware reduce promote tank success lecture cool cheese object amazing hunt plug wing month hello tunnel detect connect floor brush"
+balance = 1_000_000
+
+[accounts.wallet_7]
+mnemonic = "glide clown kitchen picnic basket hidden asset beyond kid plug carbon talent drama wet pet rhythm hero nest purity baby bicycle ghost sponsor dragon"
+balance = 1_000_000
+
+[accounts.wallet_8]
+mnemonic = "antenna bitter find rely gadget father exact excuse cross easy elbow alcohol injury loud silk bird crime cabbage winter fit wide screen update october"
+balance = 1_000_000
+
+[accounts.wallet_9]
+mnemonic = "market ocean tortoise venue vivid coach machine category conduct enable insect jump fog file test core book chaos crucial burst version curious prosper fever"
+balance = 1_000_000
+
+[accounts.wallet_10]
+mnemonic = "recall also where motion brave sketch grass belt attract vapor whip ski apple force pear width slot ocean slide piece rail excite learn gain"
+balance = 1_000_000
 "#
         );
-        let name = format!("Local.toml");
+        let name = format!("Development.toml");
         let path = format!(
             "{}/{}/environments/{}",
             self.project_path, self.project_name, name

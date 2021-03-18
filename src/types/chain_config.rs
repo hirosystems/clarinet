@@ -5,11 +5,10 @@ use std::{
     io::{BufReader, Read},
 };
 use toml::value::Value;
-use bip39::{Language, Mnemonic};
+use bip39::{Mnemonic};
 use crate::utils::mnemonic;
 use clarity_repl::clarity::util::StacksAddress;
 use clarity_repl::clarity::util::secp256k1::Secp256k1PublicKey;
-use secp256k1::{PublicKey};
 
 const DEFAULT_DERIVATION_PATH: &str = "m/44'/5757'/0'/0/0";
 
@@ -68,7 +67,7 @@ impl ChainConfig {
 
     pub fn from_config_file(config_file: ChainConfigFile) -> ChainConfig {
 
-        let mut network = NetworkConfig {
+        let network = NetworkConfig {
             name: config_file.network.name.clone(),
             node_rpc_address: config_file.network.node_rpc_address.clone(),
         };

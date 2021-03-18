@@ -21,7 +21,6 @@ use deno_core::ModuleSpecifier;
 use deno_core::OpFn;
 use deno_core::RuntimeOptions;
 use deno_core::Snapshot;
-use deno_runtime::js;
 use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -29,11 +28,10 @@ use std::sync::Mutex;
 
 
 // Declaration files
-
-pub static SHARED_GLOBALS_LIB: &str =
-  include_str!("dts/lib.deno.shared_globals.d.ts");
-pub static WINDOW_LIB: &str = include_str!("dts/lib.deno.window.d.ts");
-pub static UNSTABLE_NS_LIB: &str = include_str!("dts/lib.deno.unstable.d.ts");
+// pub static SHARED_GLOBALS_LIB: &str =
+//   include_str!("dts/lib.deno.shared_globals.d.ts");
+// pub static WINDOW_LIB: &str = include_str!("dts/lib.deno.window.d.ts");
+// pub static UNSTABLE_NS_LIB: &str = include_str!("dts/lib.deno.unstable.d.ts");
 
 pub static COMPILER_SNAPSHOT: &[u8] =
   include_bytes!(concat!(env!("OUT_DIR"), "/COMPILER_SNAPSHOT.bin"));

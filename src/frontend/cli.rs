@@ -3,7 +3,7 @@ use std::fs::{self, File};
 use std::io::{prelude::*, BufReader, Read};
 
 use crate::generators::{self, changes::Changes};
-use crate::types::{MainConfig, MainConfigFile, ChainConfig};
+use crate::types::{MainConfig, MainConfigFile};
 use crate::console::run_console;
 use crate::test::run_tests;
 
@@ -109,10 +109,10 @@ pub fn main() {
                 execute_changes(changes);
             }
         },
-        Command::Console(t) => {
+        Command::Console(_console) => {
             run_console();
         },
-        Command::Test(t) => {
+        Command::Test(_test) => {
             run_tests();
         }
     };

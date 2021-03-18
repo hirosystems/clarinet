@@ -94,10 +94,10 @@ impl MainConfig {
 
         match config_file.notebooks {
             Some(Value::Table(notebooks)) => {
-                for (notebook_name, notebook_settings) in notebooks.iter() {
+                for (_notebook_name, notebook_settings) in notebooks.iter() {
                     match notebook_settings {
                         Value::Table(notebook_settings) => {
-                            let notebook_path = match notebook_settings.get("path") {
+                            let _notebook_path = match notebook_settings.get("path") {
                                 Some(Value::String(path)) => path.to_string(),
                                 _ => continue,
                             };

@@ -1,8 +1,8 @@
 use super::changes::{Changes};
 
 pub struct GetChangesForNewNotebook {
-    project_path: String,
-    notebook_name: String,
+    pub project_path: String,
+    pub notebook_name: String,
     changes: Vec<Changes>,
 }
 

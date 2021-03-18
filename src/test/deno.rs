@@ -48,7 +48,7 @@ mod sessions {
     
         let mut chain_config_path = root_path.clone();
         chain_config_path.push("settings");
-        chain_config_path.push("Local.toml");
+        chain_config_path.push("Development.toml");
     
         let project_config = MainConfig::from_path(&project_config_path);
         let chain_config = ChainConfig::from_path(&chain_config_path);
@@ -82,6 +82,7 @@ mod sessions {
 
         let mut session = Session::new(settings.clone());
         session.start();
+        session.advance_chain_tip(1);
         sessions.insert(session_id, session);
         Ok((session_id, settings.initial_accounts))
     }
@@ -313,7 +314,7 @@ where
 struct SetupChainArgs {
 }
 
-fn setup_chain(args: SetupChainArgs) -> Result<Value, AnyError> {
+fn setup_chain(_args: SetupChainArgs) -> Result<Value, AnyError> {
     let (session_id, accounts) = sessions::handle_setup_chain()?;
 
     Ok(json!({
@@ -333,26 +334,44 @@ struct MineBlockArgs {
 #[serde(rename_all = "camelCase")]
 struct TransactionArgs {
   sender: String,
+  contract_call: Option<ContractCallArgs>,
+  transfer_stx: Option<TransferSTXArgs>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct ContractCallArgs {
   contract: String,
   method: String,
   args: Vec<String>,
 }
 
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct TransferSTXArgs {
+  amount: u64,
+  recipient: String,
+}
+
 fn mine_block(args: MineBlockArgs) -> Result<Value, AnyError> {
-  let receipts = sessions::perform_block(args.session_id, |session| {
+  let (block_height, receipts) = sessions::perform_block(args.session_id, |session| {
       let initial_tx_sender = session.get_tx_sender();
       let mut receipts = vec![];
       for tx in args.transactions.iter() {
-        let snippet = format!("(contract-call? '{}.{} {} {})", initial_tx_sender, tx.contract, tx.method, tx.args.join(" "));
         session.set_tx_sender(tx.sender.clone());
-        let (_, res) = session.interpret(snippet, None).unwrap(); // todo(ludo)
-        receipts.push(res);
+        if let Some(ref contract_call) = tx.contract_call {
+          let snippet = format!("(contract-call? '{}.{} {} {})", initial_tx_sender, contract_call.contract, contract_call.method, contract_call.args.join(" "));
+          let (_, res) = session.interpret(snippet, None).unwrap(); // todo(ludo)
+          receipts.push(res);
+        }
       }
       session.set_tx_sender(initial_tx_sender);
-      Ok(receipts)
+      let block_height = session.advance_chain_tip(1);
+      Ok((block_height, receipts))
   })?;
   Ok(json!({
     "session_id": args.session_id,
+    "block_height": block_height,
     "receipts": receipts,
   }))
 }

@@ -4,7 +4,7 @@ use hmac::Hmac;
 use pbkdf2::pbkdf2;
 use ring::hmac::{Context, Key, HMAC_SHA512};
 use ripemd160::Ripemd160;
-use secp256k1::{PublicKey, PublicKeyFormat, SecretKey};
+use secp256k1::{PublicKey, SecretKey};
 use sha2::{Digest, Sha256};
 
 pub fn get_bip39_seed_from_mnemonic(mnemonic: &str, password: &str) -> Result<Vec<u8>, String> {
@@ -85,6 +85,7 @@ pub fn get_hardened_derivation(
     Ok((parent_key, parent_chain_code))
 }
 
+#[allow(dead_code)]
 pub fn get_address_from_public_key(public_key: &str) -> Result<String, String> {
     let pub_key_hex = hex::decode(&public_key).unwrap();
 

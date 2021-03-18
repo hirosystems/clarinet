@@ -19,6 +19,6 @@ pub fn get_changes_for_new_contract(project_path: String, contract_name: String)
 }
 
 pub fn get_changes_for_new_notebook(project_path: String, notebook_name: String) -> Vec<Changes> {
-    let mut command = GetChangesForNewNotebook::new(project_path, notebook_name);
+    let command = GetChangesForNewNotebook::new(project_path, notebook_name);
     command.run()
 }

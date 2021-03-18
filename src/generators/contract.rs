@@ -59,12 +59,29 @@ impl GetChangesForNewContract {
     fn create_template_test(&mut self) {
         let content = format!(
             r#"
-import {{ Clarinet, Block, Chain, Account }} from 'https://deno.land/x/clarinet@v0.1.2/index.ts';
+import {{ Clarinet, Tx, Chain, Account, types }} from 'https://deno.land/x/clarinet@v0.1.3/index.ts';
+import {{ assertEquals }} from 'https://deno.land/std@0.90.0/testing/asserts.ts';
 
 Clarinet.test({{
-    name: "Ensure that test 1 are being executed",
+    name: "Ensure that <...>",
     async fn(chain: Chain, accounts: Array<Account>) {{
-        console.log(`Test initialized with Chain::${{chain.sessionId}} and accounts ${{JSON.stringify(accounts)}}`);
+        let block = chain.mineBlock([
+            /* 
+             * Add transactions with: 
+             * Tx.contractCall(...)
+            */
+        ]);
+        assertEquals(block.receipts, 0);
+        assertEquals(block.height, 2);
+
+        let block = chain.mineBlock([
+            /* 
+             * Add transactions with: 
+             * Tx.contractCall(...)
+            */
+        ]);
+        assertEquals(block.receipts, 0);
+        assertEquals(block.height, 3);
     }},
 }});
 "#
@@ -82,7 +99,6 @@ Clarinet.test({{
 
     fn index_contract_in_clarinet_toml(&mut self) {
         let contract_file_name = format!("{}.clar", self.contract_name);
-        let contract_file_path = format!("{}/contracts/{}", self.project_path, contract_file_name);
         let path = format!("{}/Clarinet.toml", self.project_path);
 
         let contract_config = ContractConfig {
