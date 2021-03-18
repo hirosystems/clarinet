@@ -1,0 +1,134 @@
+name: CI
+on:
+  pull_request:
+  push:
+    branches:
+    - master
+    - staging
+    - trying
+
+env:
+  CARGO_INCREMENTAL: 0
+  CARGO_NET_RETRY: 10
+  RUN_SLOW_TESTS: 1
+  RUST_BACKTRACE: short
+  RUSTFLAGS: -D warnings
+  RUSTUP_MAX_RETRIES: 10
+
+jobs:
+  rust-audit:
+    name: Audit Rust vulnerabilities
+    runs-on: ubuntu-latest
+    steps:
+    - name: Install Rust toolchain
+      uses: actions-rs/toolchain@v1
+      with:
+        toolchain: stable
+        profile: minimal
+        override: true
+
+    - name: Checkout repository
+      uses: actions/checkout@v2
+
+    - run: sudo chown -R $(whoami):$(id -ng) ~/.cargo/
+
+    - name: Cache cargo
+      uses: actions/cache@v1
+      with:
+        path: ~/.cargo/
+        key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+
+    - run: cargo install cargo-audit
+    - run: cargo audit
+
+  rust:
+    name: Rust
+    runs-on: ${{ matrix.os }}
+    # Related upstream issue:
+    # https://github.com/nagisa/rust_libloading/issues/61#issuecomment-607941377
+    # 
+    # env:
+    #  CC: deny_c
+
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v2
+
+    # We need to disable the existing toolchain to avoid updating rust-docs
+    # which takes a long time. The fastest way to do this is to rename the
+    # existing folder, as deleting it takes about as much time as not doing
+    # anything and just updating rust-docs.
+    - name: Rename existing rust toolchain (Windows)
+      if: matrix.os == 'windows-latest'
+      run: Rename-Item C:\Users\runneradmin\.rustup\toolchains\stable-x86_64-pc-windows-msvc C:\Users\runneradmin\.rustup\toolchains\stable-x86_64-pc-windows-msvc.old
+
+    - name: Install Rust toolchain
+      uses: actions-rs/toolchain@v1
+      with:
+        toolchain: stable
+        profile: minimal
+        override: true
+        components: rustfmt, rust-src
+
+    - if: matrix.os == 'ubuntu-latest'
+      run: sudo chown -R $(whoami):$(id -ng) ~/.cargo/
+
+    - name: Cache cargo registry
+      uses: actions/cache@v1
+      with:
+        path: ~/.cargo/registry
+        key: ${{ runner.os }}-cargo-registry-${{ hashFiles('**/Cargo.lock') }}
+
+    - name: Cache cargo index
+      uses: actions/cache@v1
+      with:
+        path: ~/.cargo/git
+        key: ${{ runner.os }}-cargo-index-${{ hashFiles('**/Cargo.lock') }}
+
+    - name: Cache cargo target dir
+      uses: actions/cache@v1
+      with:
+        path: target
+        key: ${{ runner.os }}-cargo-build-target-${{ hashFiles('**/Cargo.lock') }}
+
+    - name: Compile
+      run: cargo build
+
+    # - name: Test
+    #   run: cargo test
+
+    - name: Prepare cache
+      run: cargo xtask pre-cache
+
+    - name: Prepare cache 2
+      if: matrix.os == 'windows-latest'
+      run: Remove-Item ./target/debug/xtask.exe, ./target/debug/deps/xtask.exe
+
+  typescript:
+    name: TypeScript
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v2
+
+    - name: Install Nodejs
+      uses: actions/setup-node@v1
+      with:
+        node-version: 12.x
+
+    - run: npm ci
+      working-directory: ./editors/code
+
+    - run: npm audit || { sleep 10 && npm audit; } || { sleep 30 && npm audit; }
+      working-directory: ./editors/code
+
+    # - run: npm run lint
+    #   working-directory: ./editors/code
+
+    - run: npm run package --scripts-prepend-node-path
+      working-directory: ./editors/code

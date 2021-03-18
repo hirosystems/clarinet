@@ -1,4 +1,4 @@
 /target
+/xtask/target
 .DS_Store
-examples/bbtc/offchain/bbtc-node/target
 clarinet.code-workspace

@@ -17,7 +17,7 @@ impl GetChangesForNewProject {
 
     pub fn run(&mut self) -> Vec<Changes> {
         self.create_root_directory();
-        self.create_clients_directory();
+        // self.create_clients_directory();
         self.create_contracts_directory();
         // self.create_notebooks_directory();
         // self.create_scripts_directory();
@@ -41,6 +41,7 @@ impl GetChangesForNewProject {
         self.changes.push(Changes::AddDirectory(change));
     }
 
+    #[allow(dead_code)]
     fn create_clients_directory(&mut self) {
         self.changes
             .push(self.get_changes_for_new_root_dir(format!("clients")));
@@ -65,7 +66,7 @@ impl GetChangesForNewProject {
 
     fn create_settings_directory(&mut self) {
         self.changes
-            .push(self.get_changes_for_new_root_dir(format!("environments")));
+            .push(self.get_changes_for_new_root_dir(format!("settings")));
     }
 
     fn create_tests_directory(&mut self) {
