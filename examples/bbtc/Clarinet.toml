@@ -1,5 +1,0 @@
-[project]
-name = "bbtc"
-[contracts.bbtc]
-version = 1
-path = "contracts/bbtc.clar"

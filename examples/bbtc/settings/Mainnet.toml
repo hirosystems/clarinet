@@ -1,3 +1,0 @@
-[network]
-name = "mainnet"
-node_rpc_address = "http://stacks-node-api.blockstack.org:20443"

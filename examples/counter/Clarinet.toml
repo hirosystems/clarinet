@@ -1,0 +1,5 @@
+[project]
+name = "counter"
+
+[contracts.counter]
+path = "contracts/counter.clar"
