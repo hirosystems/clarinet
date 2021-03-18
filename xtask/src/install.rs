@@ -1,10 +1,10 @@
 //! Installs clarinet.
 
-use std::{env, path::PathBuf, str};
+use std::str;
 
-use anyhow::{bail, format_err, Context, Result};
+use anyhow::{Context, Result};
 
-use crate::not_bash::{pushd, run};
+use crate::not_bash::run;
 
 // Latest stable, feel free to send a PR if this lags behind.
 const REQUIRED_RUST_VERSION: u32 = 41;

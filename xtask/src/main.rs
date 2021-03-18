@@ -12,7 +12,7 @@ use std::env;
 
 use pico_args::Arguments;
 use xtask::{
-    dist::{run_dist, ClientOpts},
+    dist::run_dist,
     install::{ClarinetOpt, InstallCmd},
     not_bash::pushd,
     pre_commit, project_root, run_pre_cache, run_release,
@@ -48,7 +48,6 @@ FLAGS:
                 );
                 return Ok(());
             }
-            let server = args.contains("--clarinet");
             let jemalloc = args.contains("--jemalloc");
 
             args.finish()?;
@@ -73,7 +72,7 @@ FLAGS:
         }
         "dist" => {
             args.finish()?;
-            run_dist(None)
+            run_dist()
         }
         _ => {
             eprintln!(

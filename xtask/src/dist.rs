@@ -1,9 +1,7 @@
-use std::path::PathBuf;
-
 use anyhow::Result;
 
 use crate::{
-    not_bash::{fs2, pushd, rm_rf, run},
+    not_bash::{fs2, rm_rf, run},
     project_root,
 };
 
@@ -12,7 +10,7 @@ pub struct ClientOpts {
     pub release_tag: String,
 }
 
-pub fn run_dist(client_opts: Option<ClientOpts>) -> Result<()> {
+pub fn run_dist() -> Result<()> {
     let dist = project_root().join("dist");
     rm_rf(&dist)?;
     fs2::create_dir_all(&dist)?;
@@ -49,33 +47,4 @@ fn dist_clarinet() -> Result<()> {
     fs2::copy(src, dst)?;
 
     Ok(())
-}
-
-struct Patch {
-    path: PathBuf,
-    original_contents: String,
-    contents: String,
-}
-
-impl Patch {
-    fn new(path: impl Into<PathBuf>) -> Result<Patch> {
-        let path = path.into();
-        let contents = fs2::read_to_string(&path)?;
-        Ok(Patch { path, original_contents: contents.clone(), contents })
-    }
-
-    fn replace(&mut self, from: &str, to: &str) -> &mut Patch {
-        self.contents = self.contents.replace(from, to);
-        self
-    }
-
-    fn commit(&self) -> Result<()> {
-        fs2::write(&self.path, &self.contents)
-    }
-}
-
-impl Drop for Patch {
-    fn drop(&mut self) {
-        fs2::write(&self.path, &self.original_contents).unwrap();
-    }
 }
