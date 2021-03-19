@@ -1,13 +1,19 @@
 # clarinet
 
-![screenshot](docs/images/clarinet.png)
-
 Clarinet is a clarity runtime packaged as a command line tool, designed to facilitate smart contract understanding, development, testing and deployment. 
 
 Clarity is a **decidable** smart contract language that optimizes for predictability and security, designed by Blockstack. Smart contracts allow developers to encode essential business logic on a blockchain. 
 
+![screenshot](docs/images/demo.gif)
 
 ## Installation
+
+### Install from brew
+
+```bash
+$ brew tap lgalabru/clarinet
+$ brew install clarinet
+```
 
 Assuming you have a working installation of Rust, Clarinet can be installed from Cargo as a crate, or from source.
 
@@ -25,9 +31,6 @@ $ cd clarinet
 $ cargo install --path .
 ```
 
-### Install from brew
-
-*available soon*
 
 ## Getting started with clarinet
 

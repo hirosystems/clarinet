@@ -21,7 +21,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        os: [ubuntu-latest, windows-latest, macos-latest]
+        os: [macos-latest]
 
     steps:
     - name: Checkout repository
@@ -43,14 +43,7 @@ jobs:
         target: x86_64-unknown-linux-musl
         override: true
 
-    - name: Install Nodejs
-      if: matrix.os == 'ubuntu-latest'
-      uses: actions/setup-node@v1
-      with:
-        node-version: 12.x
-
     - name: Dist
-      if: matrix.os != 'ubuntu-latest'
       run: cargo xtask dist
 
     - name: Upload artifacts
@@ -76,21 +69,13 @@ jobs:
     - run: echo "::set-env name=TAG::nightly"
       if: github.ref != 'refs/heads/release'
     - run: 'echo "TAG: $TAG"'
-
+    
     - name: Checkout repository
       uses: actions/checkout@v2
 
     - uses: actions/download-artifact@v1
       with:
         name: dist-macos-latest
-        path: dist
-    - uses: actions/download-artifact@v1
-      with:
-        name: dist-ubuntu-latest
-        path: dist
-    - uses: actions/download-artifact@v1
-      with:
-        name: dist-windows-latest
         path: dist
     - run: ls -all ./dist
 

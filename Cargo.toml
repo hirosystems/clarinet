@@ -1,6 +1,6 @@
 [package]
 name = "clarinet"
-version = "0.2.2"
+version = "0.2.3"
 authors = ["Ludo Galabru <ludovic@galabru.com>"]
 edition = "2018"
 description = "Clarinet is a clarity runtime packaged as a command line tool, designed to facilitate smart contract understanding, development, testing and deployment."
@@ -20,6 +20,10 @@ deno_core = "0.80.1"
 deno_runtime = "0.9.1"
 regex = "1.4.3"
 serde = { version = "1.0.123", features = ["derive"] }
+
+[target.'cfg(windows)'.build-dependencies]
+winapi = "0.3.9"
+winres = "0.1.11"
 
 [dependencies]
 clap = { version = "3.0.0-beta.2" }
@@ -65,3 +69,13 @@ percent-encoding = "2.1.0"
 pin-project = "1.0.5"
 indexmap = { version = "1.6.1", features = ["serde"] }
 shell-escape = "0.1.5"
+
+[target.'cfg(windows)'.dependencies]
+fwdansi = "1.1.0"
+winapi = { version = "0.3.9", features = ["knownfolders", "mswsock", "objbase", "shlobj", "tlhelp32", "winbase", "winerror", "winsock2"] }
+
+[package.metadata.winres]
+OriginalFilename = "clarinet.exe"
+LegalCopyright = ""
+ProductName = "Clarinet"
+FileDescription = ""
