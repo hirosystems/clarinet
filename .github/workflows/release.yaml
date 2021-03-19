@@ -59,6 +59,17 @@ jobs:
     runs-on: ubuntu-latest
     needs: ['dist']
     steps:
+    - name: Install Nodejs
+      uses: actions/setup-node@v1
+      with:
+        node-version: 12.x
+
+    - run: echo "::set-env name=TAG::$(date --iso --utc)"
+      if: github.ref == 'refs/heads/release'
+    - run: echo "::set-env name=TAG::nightly"
+      if: github.ref != 'refs/heads/release'
+    - run: 'echo "TAG: $TAG"'
+    
     - name: Checkout repository
       uses: actions/checkout@v2
 

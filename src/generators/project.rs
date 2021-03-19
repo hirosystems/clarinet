@@ -129,11 +129,11 @@ node_rpc_address = "http://xenon.blockstack.org:20443"
         );
         let name = format!("Testnet.toml");
         let path = format!(
-            "{}/{}/environments/{}",
+            "{}/{}/settings/{}",
             self.project_path, self.project_name, name
         );
         let change = FileCreation {
-            comment: format!("Creating file {}/environments/{}", self.project_name, name),
+            comment: format!("Creating file {}/settings/{}", self.project_name, name),
             name,
             content,
             path,
@@ -189,11 +189,11 @@ balance = 1_000_000
         );
         let name = format!("Development.toml");
         let path = format!(
-            "{}/{}/environments/{}",
+            "{}/{}/settings/{}",
             self.project_path, self.project_name, name
         );
         let change = FileCreation {
-            comment: format!("Creating file {}/environments/{}", self.project_name, name),
+            comment: format!("Creating file {}/settings/{}", self.project_name, name),
             name,
             content,
             path,
