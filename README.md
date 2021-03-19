@@ -11,9 +11,10 @@ Clarity is a **decidable** smart contract language that optimizes for predictabi
 ### Install from brew
 
 ```bash
-$ brew tap lgalabru/clarinet
-$ brew install clarinet
+$ brew install lgalabru/clarinet/clarinet
 ```
+
+Feel free to ⭐️ this repo! With 50+ stars, this package becomes eligible to `homebrew-core`. 
 
 Assuming you have a working installation of Rust, Clarinet can be installed from Cargo as a crate, or from source.
 
