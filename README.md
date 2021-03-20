@@ -16,6 +16,13 @@ $ brew install lgalabru/clarinet/clarinet
 
 Feel free to ⭐️ this repo! With 50+ stars, this package becomes eligible to `homebrew-core`. 
 
+If you need to upgrade to the latest / greatest:
+
+```bash
+$ brew upgrade lgalabru/clarinet/clarinet
+```
+
+
 ### Install from cargo
 
 Assuming you have a working installation of Rust, Clarinet can be also be installed from Cargo as a crate, or from source.
