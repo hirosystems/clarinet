@@ -11,9 +11,9 @@ Clarinet.test({
             Tx.contractCall("counter", "increment", [types.uint(10)], accounts[2].address)
         ]);
         assertEquals(block.height, 2);
-        assertEquals(block.receipts[0], "(ok u2)");
-        assertEquals(block.receipts[1], "(ok u6)");
-        assertEquals(block.receipts[2], "(ok u16)");
+        assertEquals(block.receipts[0].result, "(ok u2)");
+        assertEquals(block.receipts[1].result, "(ok u6)");
+        assertEquals(block.receipts[2].result, "(ok u16)");
         console.log(block);
         
         block = chain.mineBlock([
@@ -22,9 +22,9 @@ Clarinet.test({
             Tx.contractCall("counter", "increment", [types.uint(10)], accounts[0].address)
         ]);
         assertEquals(block.height, 3);
-        assertEquals(block.receipts[0], "(ok u17)");
-        assertEquals(block.receipts[1], "(ok u21)");
-        assertEquals(block.receipts[2], "(ok u31)");
+        assertEquals(block.receipts[0].result, "(ok u17)");
+        assertEquals(block.receipts[1].result, "(ok u21)");
+        assertEquals(block.receipts[2].result, "(ok u31)");
         console.log(block);
     },
 });

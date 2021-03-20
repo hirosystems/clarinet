@@ -41,7 +41,8 @@ export interface TxTransfer {
 }
 
 export interface TxReceipt {
-    output: string;
+    result: string;
+    events: Array<any>;
 }
 
 export interface Block {

@@ -361,8 +361,8 @@ fn mine_block(args: MineBlockArgs) -> Result<Value, AnyError> {
         session.set_tx_sender(tx.sender.clone());
         if let Some(ref contract_call) = tx.contract_call {
           let snippet = format!("(contract-call? '{}.{} {} {})", initial_tx_sender, contract_call.contract, contract_call.method, contract_call.args.join(" "));
-          let (_, res) = session.interpret(snippet, None).unwrap(); // todo(ludo)
-          receipts.push(res);
+          let (_, res, events) = session.interpret(snippet, None).unwrap(); // todo(ludo)
+          receipts.push((res, events));
         }
       }
       session.set_tx_sender(initial_tx_sender);
@@ -372,7 +372,12 @@ fn mine_block(args: MineBlockArgs) -> Result<Value, AnyError> {
   Ok(json!({
     "session_id": args.session_id,
     "block_height": block_height,
-    "receipts": receipts,
+    "receipts":  receipts.iter().map(|r| {
+      json!({
+        "result": r.0,
+        "events": r.1,
+      })
+    }).collect::<Vec<_>>()
   }))
 }
 
