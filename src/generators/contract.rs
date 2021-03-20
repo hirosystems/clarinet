@@ -102,7 +102,7 @@ Clarinet.test({{
         let path = format!("{}/Clarinet.toml", self.project_path);
 
         let contract_config = ContractConfig {
-            version: 1,
+            depends_on: vec![],
             path: format!("contracts/{}", contract_file_name),
         };
         let mut contracts_to_add = HashMap::new();

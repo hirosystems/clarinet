@@ -18,7 +18,7 @@ pub fn run_console() {
     let project_config = MainConfig::from_path(&project_config_path);
     let chain_config = ChainConfig::from_path(&chain_config_path);
 
-    for (name, config) in project_config.contracts.iter() {
+    for (name, config) in project_config.ordered_contracts().iter() {
         let mut contract_path = root_path.clone();
         contract_path.push(&config.path);
 

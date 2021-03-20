@@ -3,3 +3,4 @@ name = "counter"
 
 [contracts.counter]
 path = "contracts/counter.clar"
+depends_on = []

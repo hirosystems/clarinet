@@ -1,7 +1,6 @@
-use std::fs::File;
+use std::{collections::BTreeMap, fs::File};
 use std::path::PathBuf;
 use std::{
-    collections::HashMap,
     io::{BufReader, Read},
 };
 use toml::value::Value;
@@ -35,7 +34,7 @@ pub struct AccountConfigFile {
 #[derive(Serialize, Deserialize, Debug)]
 pub struct ChainConfig {
     pub network: NetworkConfig,
-    pub accounts: HashMap<String, AccountConfig>,
+    pub accounts: BTreeMap<String, AccountConfig>,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -74,7 +73,7 @@ impl ChainConfig {
 
         let mut config = ChainConfig {
             network,
-            accounts: HashMap::new(),
+            accounts: BTreeMap::new(),
         };
 
         match config_file.accounts {
