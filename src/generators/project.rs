@@ -181,10 +181,6 @@ balance = 1_000_000
 [accounts.wallet_9]
 mnemonic = "market ocean tortoise venue vivid coach machine category conduct enable insect jump fog file test core book chaos crucial burst version curious prosper fever"
 balance = 1_000_000
-
-[accounts.wallet_10]
-mnemonic = "recall also where motion brave sketch grass belt attract vapor whip ski apple force pear width slot ocean slide piece rail excite learn gain"
-balance = 1_000_000
 "#
         );
         let name = format!("Development.toml");
