@@ -1,0 +1,43 @@
+
+[project]
+name = "arkadiko"
+
+[contracts.arkadiko-token]
+depends_on = []
+path = "contracts/arkadiko-token.clar"
+
+[contracts.auction-engine]
+depends_on = ["oracle", "xusd-token", "freddie"]
+path = "contracts/auction-engine.clar"
+
+[contracts.dao]
+depends_on = ["arkadiko-token"]
+path = "contracts/dao.clar"
+
+[contracts.freddie]
+depends_on = ["stx-reserve"]
+path = "contracts/freddie.clar"
+
+[contracts.liquidator]
+depends_on = ["freddie", "dao", "auction-engine"]
+path = "contracts/liquidator.clar"
+
+[contracts.oracle]
+depends_on = []
+path = "contracts/oracle.clar"
+
+[contracts.stacker-registry]
+depends_on = []
+path = "contracts/stacker-registry.clar"
+
+[contracts.stx-reserve]
+depends_on = ["oracle", "dao", "xusd-token"]
+path = "contracts/stx-reserve.clar"
+
+[contracts.vault-trait]
+depends_on = []
+path = "contracts/vault-trait.clar"
+
+[contracts.xusd-token]
+depends_on = []
+path = "contracts/xusd-token.clar"
