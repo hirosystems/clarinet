@@ -399,12 +399,24 @@ fn mine_empty_blocks(args: MineEmptyBlocksArgs) -> Result<Value, AnyError> {
 #[serde(rename_all = "camelCase")]
 struct CallReadOnlyFnArgs {
   session_id: u32,
-  params: TransactionArgs,
+  sender: String,
+  contract: String,
+  method: String,
+  args: Vec<String>,
 }
 
 fn call_read_only_fn(args: CallReadOnlyFnArgs) -> Result<Value, AnyError> {
-  println!("{:?}", args);
+  let (result, events) = sessions::perform_block(args.session_id, |session| {
+    let initial_tx_sender = session.get_tx_sender();
+    session.set_tx_sender(args.sender.clone());    
+    let snippet = format!("(contract-call? '{}.{} {} {})", initial_tx_sender, args.contract, args.method, args.args.join(" "));
+    let (_, result, events) = session.interpret(snippet, None).unwrap(); // todo(ludo)
+    session.set_tx_sender(initial_tx_sender);
+    Ok((result, events))
+  })?;
   Ok(json!({
     "session_id": args.session_id,
+    "result": result,
+    "events": events,
   }))
 }

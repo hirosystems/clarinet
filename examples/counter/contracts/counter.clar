@@ -7,3 +7,6 @@
     (let ((new-val (+ step (var-get counter)))) 
         (var-set counter new-val)
         (ok new-val)))
+
+(define-read-only (read-counter)
+    (ok (var-get counter)))

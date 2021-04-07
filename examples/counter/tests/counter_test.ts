@@ -26,5 +26,7 @@ Clarinet.test({
         assertEquals(block.receipts[1].result, "(ok u21)");
         assertEquals(block.receipts[2].result, "(ok u31)");
         console.log(block);
+
+        console.log(chain.callReadOnlyFn("counter", "read-counter", [], accounts[0].address));
     },
 });
