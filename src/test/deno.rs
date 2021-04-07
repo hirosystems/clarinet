@@ -148,11 +148,25 @@ pub async fn run_tests() -> Result<(), AnyError> {
     worker.js_runtime.register_op("mine_empty_blocks", op(mine_empty_blocks));
     worker.js_runtime.register_op("call_read_only_fn", op(call_read_only_fn));
     
-    worker.execute_module(&main_module).await?;
-    worker.execute("window.dispatchEvent(new Event('load'))")?;
-    worker.run_event_loop().await?;
+    let res = worker.execute_module(&main_module).await;
+    if let Err(e) = res {
+      println!("{}", e);
+      return Err(e);
+    }
+  
+    worker.execute("window.dispatchEvent(new Event('load'))");
+    let res = worker.run_event_loop().await;
+    if let Err(e) = res {
+      println!("{}", e);
+      return Err(e);
+    }
+
     worker.execute("window.dispatchEvent(new Event('unload'))")?;
-    worker.run_event_loop().await?;
+    let res = worker.run_event_loop().await;
+    if let Err(e) = res {
+      println!("{}", e);
+      return Err(e);
+    }
 
     Ok(())
 }

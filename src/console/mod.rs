@@ -4,7 +4,7 @@ use crate::types::{MainConfig, ChainConfig};
 use clarity_repl::{repl, Terminal};
 
 
-pub fn run_console() {
+pub fn load_session(start_repl: bool) -> Result<(), String> {
     let mut settings = repl::SessionSettings::default();
 
     let root_path = env::current_dir().unwrap();
@@ -25,8 +25,7 @@ pub fn run_console() {
         let code = match fs::read_to_string(&contract_path) {
             Ok(code) => code,
             Err(err) => {
-                println!("Error: unable to read {:?}: {}", contract_path, err);
-                return
+                return Err(format!("Error: unable to read {:?}: {}", contract_path, err))
             }
         };
 
@@ -51,6 +50,12 @@ pub fn run_console() {
             });
     }
 
-    let mut session = Terminal::new(settings);
-    session.start();
+    if start_repl {
+        let mut terminal = Terminal::new(settings);
+        terminal.start();
+    } else {
+        let mut session = repl::Session::new(settings);
+        session.check()?;
+    }
+    Ok(())
 }

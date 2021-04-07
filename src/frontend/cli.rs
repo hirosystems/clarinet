@@ -4,7 +4,7 @@ use std::io::{prelude::*, BufReader, Read};
 
 use crate::generators::{self, changes::Changes};
 use crate::types::{MainConfig, MainConfigFile};
-use crate::console::run_console;
+use crate::console::load_session;
 use crate::test::run_tests;
 
 use clap::Clap;
@@ -31,6 +31,9 @@ enum Command {
     /// Test subcommand
     #[clap(name = "test")]
     Test(Test),
+    /// Check subcommand
+    #[clap(name = "check")]
+    Check(Check),
 }
 
 #[derive(Clap)]
@@ -84,6 +87,13 @@ struct Test {
     pub debug: bool,
 }
 
+#[derive(Clap)]
+struct Check {
+    /// Print debug info
+    #[clap(short = 'd')]
+    pub debug: bool,
+}
+
 pub fn main() {
     let opts: Opts = Opts::parse();
 
@@ -109,10 +119,25 @@ pub fn main() {
                 execute_changes(changes);
             }
         },
-        Command::Console(_console) => {
-            run_console();
+        Command::Console(_) => {
+            let start_repl = true;
+            load_session(start_repl).expect("Unable to start REPL");
+        },
+        Command::Check(_) => {
+            let start_repl = false;
+            let res = load_session(start_repl);
+            if let Err(e) = res {
+                println!("{}", e);
+                return;
+            }
         },
         Command::Test(_test) => {
+            let start_repl = false;
+            let res = load_session(start_repl);
+            if let Err(e) = res {
+                println!("{}", e);
+                return;
+            }
             run_tests();
         }
     };

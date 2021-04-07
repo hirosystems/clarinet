@@ -850,9 +850,6 @@ impl Graph {
     // point where we know we are actually going to check the program.  If we
     // moved it out of here, we wouldn't know until after the check has already
     // happened, which isn't informative to the users.
-    for specifier in &self.roots {
-        println!("{} {}", colors::green("Check"), specifier);
-    }
 
     let root_names = self.get_root_names(!config.get_check_js())?;
     let maybe_tsbuildinfo = self.maybe_tsbuildinfo.clone();
