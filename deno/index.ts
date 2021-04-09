@@ -150,6 +150,22 @@ export namespace types {
         return typeof obj === 'object' && !Array.isArray(obj);
     }
 
+    export function ok(val: string) {
+        return `(ok ${val})`;
+    }
+
+    export function err(val: string) {
+        return `(err ${val})`;
+    }
+
+    export function some(val: string) {
+        return `(some ${val})`;
+    }
+
+    export function none() {
+        return `none`;
+    }
+
     export function bool(val: boolean) {
         return `${val}`;
     }
@@ -191,4 +207,235 @@ export namespace types {
     export function tuple(val: Object) {
         return `{ ${serializeTuple(val)} }`;
     }
+}
+
+declare global {
+    interface String {
+        /**
+         * Lorem ipsum
+         * @param value
+         */
+        expectOk(): String;
+        expectErr(): String;
+        expectSome(): String;
+        expectNone(): void;
+        expectBool(value: boolean): boolean;
+        expectUint(value: number): number;
+        expectInt(value: number): number;
+        expectBuff(value: ArrayBuffer): ArrayBuffer;
+        expectAscii(value: String): String;
+        expectUtf8(value: String): String;
+        expectPrincipal(value: String): String;
+        expectList(): Array<String>;
+        expectTuple(): Object;
+    }
+}
+
+function consume(src: String, token: String, wrapped: boolean) {
+    let dst = (' ' + src).slice(1);
+    let size = token.length;
+    if (wrapped) {
+        size += 2;
+    }
+    if (dst.length < size) {
+        throw new Error(`Expected ${green(token.toString())}, got ${red(src.toString())}`);
+    }
+    if (wrapped) {
+        dst = dst.substring(1, dst.length - 1);
+    }
+    let res = dst.slice(0, token.length);
+    if (res !== token) {
+        throw new Error(`Expected ${green(token.toString())}, got ${red(src.toString())}`);
+    }
+    let leftPad = 0;
+    if (dst.charAt(token.length) === ' ') {
+        leftPad = 1;
+    }
+    let remainder = dst.substring(token.length + leftPad);
+    return remainder;
+}
+  
+String.prototype.expectOk = function () {
+    return consume(this, "ok", true);
+};
+  
+String.prototype.expectErr = function () {
+    return consume(this, "err", true);
+};
+
+String.prototype.expectSome = function () {
+    return consume(this, "some", true);
+};
+
+String.prototype.expectNone = function () {
+    return consume(this, "none", false);
+};
+
+String.prototype.expectBool = function (value: boolean) {
+    try {
+        consume(this, `${value}`, false)
+    } catch (error) {
+        throw error;
+    }
+    return value;
+};
+
+String.prototype.expectUint = function (value: number) {
+    try {
+        consume(this, `u${value}`, false)
+    } catch (error) {
+        throw error;
+    }
+    return value;
+};
+  
+String.prototype.expectInt = function (value: number) {
+    try {
+        consume(this, `${value}`, false)
+    } catch (error) {
+        throw error;
+    }
+    return value;
+};
+
+String.prototype.expectBuff = function (value: ArrayBuffer) {
+    return value;
+};
+
+String.prototype.expectAscii = function (value: string) {
+    try {
+        consume(this, `"${value}"`, false)
+    } catch (error) {
+        throw error;
+    }
+    return value;
+};
+
+String.prototype.expectUtf8 = function (value: string) {
+    try {
+        consume(this, `u"${value}"`, false)
+    } catch (error) {
+        throw error;
+    }
+    return value;
+};
+
+String.prototype.expectPrincipal = function (value: string) {
+    try {
+        consume(this, `'"${value}"`, false)
+    } catch (error) {
+        throw error;
+    }
+    return value;
+};
+
+String.prototype.expectList = function () {
+    if (this.charAt(0) !== "[" || this.charAt(this.length - 1) !== "]") {
+        throw new Error(`Expected ${green("(list ...)")}, got ${red(this.toString())}`);
+    }
+
+    let stack = [];
+    let elements = [];
+    let start = 1;
+    for (var i = 0; i < this.length; i++) {
+        if (this.charAt(i) === "," && stack.length == 1) {
+            elements.push(this.substring(start, i));
+            start = i + 2;
+        }
+        if (["(", "[", "{"].includes(this.charAt(i))) {
+            stack.push(this.charAt(i));
+        }
+        if (this.charAt(i) === ")" && stack[stack.length - 1] === "(") {
+            stack.pop();
+        }
+        if (this.charAt(i) === "}" && stack[stack.length - 1] === "{") {
+            stack.pop();
+        }
+        if (this.charAt(i) === "]" && stack[stack.length - 1] === "[") {
+            stack.pop();
+        }
+    }
+    let remainder = this.substring(start, this.length-1);
+    if (remainder.length > 0) {
+        elements.push(remainder);
+    }
+    return elements;
+};
+
+String.prototype.expectTuple = function () {
+    if (this.charAt(0) !== "{" || this.charAt(this.length - 1) !== "}") {
+        throw new Error(`Expected ${green("(tuple ...)")}, got ${red(this.toString())}`);
+    }
+
+    let start = 1;
+    let stack = [];
+    let elements = [];
+    for (var i = 0; i < this.length; i++) {
+        if (this.charAt(i) === "," && stack.length == 1) {
+            elements.push(this.substring(start, i));
+            start = i + 2;
+        }
+        if (["(", "[", "{"].includes(this.charAt(i))) {
+            stack.push(this.charAt(i));
+        }
+        if (this.charAt(i) === ")" && stack[stack.length - 1] === "(") {
+            stack.pop();
+        }
+        if (this.charAt(i) === "}" && stack[stack.length - 1] === "{") {
+            stack.pop();
+        }
+        if (this.charAt(i) === "]" && stack[stack.length - 1] === "[") {
+            stack.pop();
+        }
+    }
+    let remainder = this.substring(start, this.length-1);
+    if (remainder.length > 0) {
+        elements.push(remainder);
+    }
+    
+    let tuple: {[key: string]: String} = {};
+    for (let element of elements) {
+        for (var i = 0; i < element.length; i++) {
+            if (element.charAt(i) === ":") {
+                let key: string = element.substring(0, i);
+                let value: string = element.substring(i + 2, element.length);
+                tuple[key] = value;
+                break;
+            }
+        }
+    }
+
+    return tuple;
+};
+
+const noColor = globalThis.Deno?.noColor ?? true;
+
+interface Code {
+  open: string;
+  close: string;
+  regexp: RegExp;
+}
+
+let enabled = !noColor;
+
+function code(open: number[], close: number): Code {
+  return {
+    open: `\x1b[${open.join(";")}m`,
+    close: `\x1b[${close}m`,
+    regexp: new RegExp(`\\x1b\\[${close}m`, "g"),
+  };
+}
+
+function run(str: string, code: Code): string {
+  return enabled
+    ? `${code.open}${str.replace(code.regexp, code.open)}${code.close}`
+    : str;
+}
+
+export function red(str: string): string {
+  return run(str, code([31], 39));
+}
+
+export function green(str: string): string {
+  return run(str, code([32], 39));
 }

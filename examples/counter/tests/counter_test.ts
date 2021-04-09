@@ -1,5 +1,4 @@
-
-import { Clarinet, Tx, Chain, Account, types } from 'https://deno.land/x/clarinet@v0.3.0/index.ts';
+import { Clarinet, Tx, Chain, Account, types } from 'https://deno.land/x/clarinet@v0.4.0/index.ts';
 import { assertEquals } from "https://deno.land/std@0.90.0/testing/asserts.ts";
 
 Clarinet.test({
@@ -11,9 +10,15 @@ Clarinet.test({
             Tx.contractCall("counter", "increment", [types.uint(10)], accounts[2].address)
         ]);
         assertEquals(block.height, 2);
-        assertEquals(block.receipts[0].result, "(ok u2)");
-        assertEquals(block.receipts[1].result, "(ok u6)");
-        assertEquals(block.receipts[2].result, "(ok u16)");
+        block.receipts[0].result
+            .expectOk()
+            .expectUint(2);
+        block.receipts[1].result
+            .expectOk()
+            .expectUint(6);
+        block.receipts[2].result
+            .expectOk()
+            .expectUint(16);
         console.log(block);
         
         block = chain.mineBlock([
@@ -22,11 +27,18 @@ Clarinet.test({
             Tx.contractCall("counter", "increment", [types.uint(10)], accounts[0].address)
         ]);
         assertEquals(block.height, 3);
-        assertEquals(block.receipts[0].result, "(ok u17)");
-        assertEquals(block.receipts[1].result, "(ok u21)");
-        assertEquals(block.receipts[2].result, "(ok u31)");
+        block.receipts[0].result
+            .expectOk()
+            .expectUint(17);
+        block.receipts[1].result
+            .expectOk()
+            .expectUint(21);
+        block.receipts[2].result
+            .expectOk()
+            .expectUint(31);
         console.log(block);
 
         console.log(chain.callReadOnlyFn("counter", "read-counter", [], accounts[0].address));
+        // console.log(chain.callReadOnlyFn("counter", "read-counter", accounts[0].address));
     },
 });
