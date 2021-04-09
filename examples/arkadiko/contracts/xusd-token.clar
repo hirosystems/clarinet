@@ -1,49 +1,50 @@
+(impl-trait .mock-ft-trait.mock-ft-trait)
+
 ;; Defines the xUSD Stablecoin according to the SRC20 Standard
 (define-fungible-token xusd)
 
-(define-constant mint-owner 'ST31HHVBKYCYQQJ5AQ25ZHA6W2A548ZADDQ6S16GP)
 (define-constant err-burn-failed u1)
 
-(define-read-only (total-supply)
+(define-read-only (get-total-supply)
   (ok (ft-get-supply xusd))
 )
 
-(define-read-only (name)
+(define-read-only (get-name)
   (ok "xUSD")
 )
 
-(define-read-only (symbol)
+(define-read-only (get-symbol)
   (ok "xUSD")
 )
 
-(define-read-only (decimals)
+(define-read-only (get-decimals)
   (ok u6)
 )
 
-(define-read-only (balance-of (account principal))
+(define-read-only (get-balance-of (account principal))
   (ok (ft-get-balance xusd account))
 )
 
-(define-public (transfer (recipient principal) (amount uint))
+;; TODO - finalize before mainnet deployment
+(define-read-only (get-token-uri)
+  (ok none)
+)
+
+(define-public (transfer (amount uint) (sender principal) (recipient principal))
   (begin
-    (print "xusd.transfer")
-    (print amount)
-    (print tx-sender)
-    (print recipient)
-    (ft-transfer? xusd amount tx-sender recipient)
+    (ft-transfer? xusd amount sender recipient)
   )
 )
 
 (define-public (mint (amount uint) (recipient principal))
   (begin
-    (print recipient)
-    (print amount)
-    (print tx-sender)
-    (print contract-caller)
-    (print mint-owner)
     (if
       (and
-        (is-eq contract-caller 'ST31HHVBKYCYQQJ5AQ25ZHA6W2A548ZADDQ6S16GP.stx-reserve)
+        (or
+          (is-eq contract-caller .freddie)
+          (is-eq contract-caller .stx-reserve)
+          (is-eq contract-caller .sip10-reserve)
+        )
         (is-ok (ft-mint? xusd amount recipient))
       )
       (ok amount)
@@ -53,18 +54,9 @@
 )
 
 (define-public (burn (amount uint) (sender principal))
-  ;; burn the xusd stablecoin and return STX
-  (begin
-    (if 
-      (and
-        (is-eq contract-caller 'ST31HHVBKYCYQQJ5AQ25ZHA6W2A548ZADDQ6S16GP.stx-reserve)
-        (is-ok (ft-transfer? xusd amount sender mint-owner))
-      )
-      ;; TODO: burn does not work, so we will transfer for now. Burn tx gets stuck at "pending"
-      ;; (ok (as-contract (ft-burn? xusd amount mint-owner)))
-      (ok true)
-      (err err-burn-failed)
-    )
+  (if (is-eq contract-caller .freddie)
+    (ok (unwrap! (ft-burn? xusd amount sender) (err err-burn-failed)))
+    (err err-burn-failed)
   )
 )
 
