@@ -44,6 +44,6 @@ Clarinet.test({
             .expectOk()
             .expectUint(31);
 
-        "0x0001020304".expectBuff(new Uint8Array([0, 1, 2, 3, 5]));
+        "0x0001020304".expectBuff(new Uint8Array([0, 1, 2, 3, 4]));
     },
 });
