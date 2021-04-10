@@ -99,6 +99,13 @@ export class Chain {
         });
         return result;
     }
+
+    getAssetsMaps() {
+        let result = (Deno as any).core.jsonOpSync("get_assets_maps", {
+            sessionId: this.sessionId,
+        });
+        return result;
+    }
 }
 
 type TestFunction = (chain: Chain, accounts: Array<Account>) => void | Promise<void>;
@@ -299,6 +306,10 @@ String.prototype.expectInt = function (value: number) {
 };
 
 String.prototype.expectBuff = function (value: ArrayBuffer) {
+    let buffer = types.buff(value);
+    if (this !== buffer) {
+        throw new Error(`Expected ${green(buffer)}, got ${red(this.toString())}`);
+    }
     return value;
 };
 
@@ -322,7 +333,7 @@ String.prototype.expectUtf8 = function (value: string) {
 
 String.prototype.expectPrincipal = function (value: string) {
     try {
-        consume(this, `'"${value}"`, false)
+        consume(this, `'${value}`, false)
     } catch (error) {
         throw error;
     }

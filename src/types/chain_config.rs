@@ -8,6 +8,8 @@ use bip39::{Mnemonic};
 use crate::utils::mnemonic;
 use clarity_repl::clarity::util::StacksAddress;
 use clarity_repl::clarity::util::secp256k1::Secp256k1PublicKey;
+use tiny_hderive::bip32::ExtendedPrivKey;
+use secp256k1::{SecretKey, PublicKey};
 
 const DEFAULT_DERIVATION_PATH: &str = "m/44'/5757'/0'/0/0";
 
@@ -108,15 +110,11 @@ impl ChainConfig {
                                 Ok(bip39_seed) => bip39_seed,
                                 Err(_) => panic!(),
                             };
-                        
-                            let (_, public_key) = match mnemonic::get_hardened_child_keypair(&bip39_seed, &[888, 0, 0]) {
-                                Ok(result) => result,
-                                Err(_) => panic!(),
-                            };
 
-                            let public_key_hex = hex::decode(&public_key).unwrap();
-
-                            let pub_key = Secp256k1PublicKey::from_slice(&public_key_hex, false).unwrap();
+                            let ext = ExtendedPrivKey::derive(&bip39_seed[..], DEFAULT_DERIVATION_PATH).unwrap();
+                            let secret_key = SecretKey::parse_slice(&ext.secret()).unwrap();
+                            let public_key = PublicKey::from_secret_key(&secret_key);
+                            let pub_key = Secp256k1PublicKey::from_slice(&public_key.serialize_compressed(), true).unwrap();
                             let version = 26; // todo(ludo): un-hardcode this
                             let address = StacksAddress::from_public_key(version, pub_key).unwrap().to_string();
 

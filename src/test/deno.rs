@@ -147,6 +147,7 @@ pub async fn run_tests() -> Result<(), AnyError> {
     worker.js_runtime.register_op("mine_block", op(mine_block));
     worker.js_runtime.register_op("mine_empty_blocks", op(mine_empty_blocks));
     worker.js_runtime.register_op("call_read_only_fn", op(call_read_only_fn));
+    worker.js_runtime.register_op("get_assets_maps", op(get_assets_maps));
     
     let res = worker.execute_module(&main_module).await;
     if let Err(e) = res {
@@ -432,5 +433,23 @@ fn call_read_only_fn(args: CallReadOnlyFnArgs) -> Result<Value, AnyError> {
     "session_id": args.session_id,
     "result": result,
     "events": events,
+  }))
+}
+
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct GetAssetsMapsArgs {
+  session_id: u32,
+}
+
+fn get_assets_maps(args: GetAssetsMapsArgs) -> Result<Value, AnyError> {
+  let assets_maps = sessions::perform_block(args.session_id, |session| {
+    let assets_maps = session.get_assets_maps();    
+    Ok(assets_maps)
+  })?;
+  Ok(json!({
+    "session_id": args.session_id,
+    "assets": assets_maps,
   }))
 }

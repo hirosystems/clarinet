@@ -17,17 +17,14 @@ impl GetChangesForNewProject {
 
     pub fn run(&mut self) -> Vec<Changes> {
         self.create_root_directory();
-        // self.create_clients_directory();
         self.create_contracts_directory();
-        // self.create_notebooks_directory();
-        // self.create_scripts_directory();
         self.create_settings_directory();
         self.create_tests_directory();
-
         self.create_clarinet_toml();
         // self.create_environment_mainnet_toml();
         // self.create_environment_testnet_toml();
         self.create_environment_dev_toml();
+        self.create_vscode_directory();
         self.changes.clone()
     }
 
@@ -72,6 +69,26 @@ impl GetChangesForNewProject {
     fn create_tests_directory(&mut self) {
         self.changes
             .push(self.get_changes_for_new_root_dir(format!("tests")));
+    }
+
+    fn create_vscode_directory(&mut self) {
+        self.changes
+            .push(self.get_changes_for_new_root_dir(format!(".vscode")));
+        let content = format!(r#"
+{{
+    "deno.enable": true,
+}}
+"#
+        );
+        let name = format!("settings.json");
+        let path = format!("{}/{}/.vscode/{}", self.project_path, self.project_name, name);
+        let change = FileCreation {
+            comment: format!("Creating file {}/.vscode/{}", self.project_name, name),
+            name,
+            content,
+            path,
+        };
+        self.changes.push(Changes::AddFile(change));
     }
 
     fn create_clarinet_toml(&mut self) {
@@ -146,36 +163,40 @@ node_rpc_address = "http://xenon.blockstack.org:20443"
             r#"[network]
 name = "Development"
 
-[accounts.wallet_1]
-mnemonic = "dance news bachelor pink hammer clerk solve lake mushroom warm draw cousin forest shock believe smoke lift spin laundry couch gloom hold hurry decline"
-balance = 1_000_000
-
-[accounts.wallet_2]
-mnemonic = "apology together shy taxi glare struggle hip camp engage lion possible during squeeze hen exotic marriage misery kiwi once quiz enough exhibit immense tooth"
-balance = 1_000_000
-
-[accounts.wallet_3]
-mnemonic = "replace swing shove congress smoke banana tired term blanket nominee leave club myself swing egg virus answer bulk useful start decrease family energy february"
-balance = 1_000_000
-
-[accounts.wallet_4]
+[accounts.deployer]
 mnemonic = "fetch outside black test wash cover just actual execute nice door want airport betray quantum stamp fish act pen trust portion fatigue scissors vague"
 balance = 1_000_000
 
-[accounts.wallet_5]
-mnemonic = "east load echo merit ignore hip tag obvious truly adjust smart panther deer aisle north hotel process frown lock property catch bless notice topple"
+[accounts.wallet_1]
+mnemonic = "spoil sock coyote include verify comic jacket gain beauty tank flush victory illness edge reveal shallow plug hobby usual juice harsh pact wreck eight"
 balance = 1_000_000
 
-[accounts.wallet_6]
-mnemonic = "pulp when detect fun unaware reduce promote tank success lecture cool cheese object amazing hunt plug wing month hello tunnel detect connect floor brush"
+[accounts.wallet_2]
+mnemonic = "arrange scale orient half ugly kid bike twin magnet joke hurt fiber ethics super receive version wreck media fluid much abstract reward street alter"
 balance = 1_000_000
 
-[accounts.wallet_7]
+[accounts.wallet_3]
 mnemonic = "glide clown kitchen picnic basket hidden asset beyond kid plug carbon talent drama wet pet rhythm hero nest purity baby bicycle ghost sponsor dragon"
 balance = 1_000_000
 
-[accounts.wallet_8]
+[accounts.wallet_4]
+mnemonic = "pulp when detect fun unaware reduce promote tank success lecture cool cheese object amazing hunt plug wing month hello tunnel detect connect floor brush"
+balance = 1_000_000
+
+[accounts.wallet_5]
+mnemonic = "replace swing shove congress smoke banana tired term blanket nominee leave club myself swing egg virus answer bulk useful start decrease family energy february"
+balance = 1_000_000
+
+[accounts.wallet_6]
+mnemonic = "apology together shy taxi glare struggle hip camp engage lion possible during squeeze hen exotic marriage misery kiwi once quiz enough exhibit immense tooth"
+balance = 1_000_000
+
+[accounts.wallet_7]
 mnemonic = "antenna bitter find rely gadget father exact excuse cross easy elbow alcohol injury loud silk bird crime cabbage winter fit wide screen update october"
+balance = 1_000_000
+
+[accounts.wallet_8]
+mnemonic = "east load echo merit ignore hip tag obvious truly adjust smart panther deer aisle north hotel process frown lock property catch bless notice topple"
 balance = 1_000_000
 
 [accounts.wallet_9]

@@ -18,6 +18,22 @@ pub fn load_session(start_repl: bool) -> Result<(), String> {
     let project_config = MainConfig::from_path(&project_config_path);
     let chain_config = ChainConfig::from_path(&chain_config_path);
 
+    let mut deployer = None;
+    for (name, account) in chain_config.accounts.iter() {
+        settings
+            .initial_accounts
+            .push(repl::settings::Account {
+                name: name.clone(),
+                balance: account.balance,
+                address: account.address.clone(),
+                mnemonic: account.mnemonic.clone(),
+                derivation: account.derivation.clone(),
+            });
+        if name == "deployer" {
+            deployer = Some(account.address.clone());
+        }
+    }
+
     for (name, config) in project_config.ordered_contracts().iter() {
         let mut contract_path = root_path.clone();
         contract_path.push(&config.path);
@@ -34,19 +50,7 @@ pub fn load_session(start_repl: bool) -> Result<(), String> {
             .push(repl::settings::InitialContract {
                 code: code,
                 name: Some(name.clone()),
-                deployer: Some("ST1D0XTBR7WVNSYBJ7M26XSJAXMDJGJQKNEXAM6JH".to_string()),
-            });
-    }
-
-    for (name, account) in chain_config.accounts.iter() {
-        settings
-            .initial_accounts
-            .push(repl::settings::Account {
-                name: name.clone(),
-                balance: account.balance,
-                address: account.address.clone(),
-                mnemonic: account.mnemonic.clone(),
-                derivation: account.derivation.clone(),
+                deployer: deployer.clone(),
             });
     }
 
