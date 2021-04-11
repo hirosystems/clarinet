@@ -336,7 +336,7 @@ String.prototype.expectUtf8 = function (value: string) {
 
 String.prototype.expectPrincipal = function (value: string) {
     try {
-        consume(this, `'${value}`, false)
+        consume(this, `${value}`, false)
     } catch (error) {
         throw error;
     }
