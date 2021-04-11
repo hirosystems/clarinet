@@ -1,10 +1,11 @@
-import { Clarinet, Tx, Chain, Account, types } from 'https://deno.land/x/clarinet@v0.5.0/index.ts';
+import { Clarinet, Tx, Chain, Account, types } from 'https://deno.land/x/clarinet@v0.5.1/index.ts';
 
 import { assertEquals } from "https://deno.land/std@0.90.0/testing/asserts.ts";
 
 Clarinet.test({
   name: "Returns the correct name of the Arkadiko Token",
-  async fn(chain: Chain, accounts: Array<Account>) {
+  async fn(chain: Chain, accounts: Map<string, Account>) {
+    let wallet_1 = accounts.get("wallet_1")!;
     let block = chain.mineBlock([
       // Initialize price of STX to 77 cents in the oracle
       // Q: should prices be hardcoded in cents?
@@ -14,19 +15,19 @@ Clarinet.test({
           types.ascii("STX"), 
           types.uint(77)
         ],
-        accounts[0].address),
+        wallet_1.address),
       // Provide a collateral of 5000000 STX, so 1925000 stx-a can be minted
       // Q: why do we need to provide sender in the arguments?
       Tx.contractCall("freddie", "collateralize-and-mint", [
           types.uint(5000000),
           types.uint(1925000),
-          types.principal(accounts[0].address),
+          types.principal(wallet_1.address),
           types.ascii("stx-a"),
           types.ascii("STX"),
           types.principal("ST000000000000000000002AMW42H.stx-reserve"),
           types.principal("ST000000000000000000002AMW42H.arkadiko-token"),
         ], 
-        accounts[0].address),
+        wallet_1.address),
     ]);
 
     block.receipts[0].result
@@ -43,13 +44,13 @@ Clarinet.test({
           types.ascii("STX"), 
           types.uint(55)
         ],
-        accounts[0].address),
+        wallet_1.address),
       // Notify liquidator
       // Q: How are we supposed to guess the vault-id?
       Tx.contractCall("liquidator", "notify-risky-vault", [
           types.uint(1),
         ], 
-        accounts[0].address),
+        wallet_1.address),
     ]);
     block.receipts[0].result
       .expectOk()
@@ -58,7 +59,7 @@ Clarinet.test({
       .expectOk()
       .expectUint(200);
 
-    let call = await chain.callReadOnlyFn("auction-engine", "get-auctions", [], accounts[0].address);
+    let call = await chain.callReadOnlyFn("auction-engine", "get-auctions", [], wallet_1.address);
     let auctions = call.result
       .expectOk()
       .expectList()

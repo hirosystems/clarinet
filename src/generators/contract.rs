@@ -59,12 +59,12 @@ impl GetChangesForNewContract {
     fn create_template_test(&mut self) {
         let content = format!(
             r#"
-import {{ Clarinet, Tx, Chain, Account, types }} from 'https://deno.land/x/clarinet@v0.5.0/index.ts';
+import {{ Clarinet, Tx, Chain, Account, types }} from 'https://deno.land/x/clarinet@v0.5.1/index.ts';
 import {{ assertEquals }} from 'https://deno.land/std@0.90.0/testing/asserts.ts';
 
 Clarinet.test({{
     name: "Ensure that <...>",
-    async fn(chain: Chain, accounts: Array<Account>) {{
+    async fn(chain: Chain, accounts: Map<string, Account>) {{
         let block = chain.mineBlock([
             /* 
              * Add transactions with: 

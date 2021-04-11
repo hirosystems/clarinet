@@ -108,7 +108,7 @@ export class Chain {
     }
 }
 
-type TestFunction = (chain: Chain, accounts: Array<Account>) => void | Promise<void>;
+type TestFunction = (chain: Chain, accounts: Map<string, Account>) => void | Promise<void>;
 
 interface UnitTestOptions {
     name: string;
@@ -124,7 +124,10 @@ export class Clarinet {
                 (Deno as any).core.ops();
                 let result = (Deno as any).core.jsonOpSync("setup_chain", {});
                 let chain = new Chain(result['session_id']);
-                let accounts: Array<Account> = result['accounts'];
+                let accounts: Map<string, Account> = new Map();
+                for (let account of result['accounts']) {
+                    accounts.set(account.name, account);
+                } 
                 await options.fn(chain, accounts);
             },
         })

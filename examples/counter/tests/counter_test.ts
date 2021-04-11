@@ -1,13 +1,14 @@
-import { Clarinet, Tx, Chain, Account, types } from 'https://deno.land/x/clarinet@v0.5.0/index.ts';
+import { Clarinet, Tx, Chain, Account, types } from 'https://deno.land/x/clarinet@v0.5.1/index.ts';
 import { assertEquals } from "https://deno.land/std@0.90.0/testing/asserts.ts";
 
 Clarinet.test({
     name: "Ensure that counter can be incremented multiples per block, accross multiple blocks",
-    async fn(chain: Chain, accounts: Array<Account>) {
+    async fn(chain: Chain, accounts: Map<string, Account>) {
+        let wallet_1 = accounts.get("wallet_1")!;
         let block = chain.mineBlock([
-            Tx.contractCall("counter", "increment", [types.uint(1)], accounts[0].address),
-            Tx.contractCall("counter", "increment", [types.uint(4)], accounts[1].address),
-            Tx.contractCall("counter", "increment", [types.uint(10)], accounts[2].address)
+            Tx.contractCall("counter", "increment", [types.uint(1)], wallet_1.address),
+            Tx.contractCall("counter", "increment", [types.uint(4)], wallet_1.address),
+            Tx.contractCall("counter", "increment", [types.uint(10)], wallet_1.address)
         ]);
         assertEquals(block.height, 2);
         block.receipts[0].result
@@ -21,9 +22,9 @@ Clarinet.test({
             .expectUint(16);
         
         block = chain.mineBlock([
-            Tx.contractCall("counter", "increment", [types.uint(1)], accounts[0].address),
-            Tx.contractCall("counter", "increment", [types.uint(4)], accounts[0].address),
-            Tx.contractCall("counter", "increment", [types.uint(10)], accounts[0].address)
+            Tx.contractCall("counter", "increment", [types.uint(1)], wallet_1.address),
+            Tx.contractCall("counter", "increment", [types.uint(4)], wallet_1.address),
+            Tx.contractCall("counter", "increment", [types.uint(10)], wallet_1.address)
         ]);
         assertEquals(block.height, 3);
         block.receipts[0].result
@@ -37,9 +38,9 @@ Clarinet.test({
             .expectUint(31);
 
         let result = chain.getAssetsMaps();
-        assertEquals(result.assets["STX"][accounts[0].address], 1000000);
+        assertEquals(result.assets["STX"][wallet_1.address], 1000000);
 
-        let call = chain.callReadOnlyFn("counter", "read-counter", [], accounts[0].address)
+        let call = chain.callReadOnlyFn("counter", "read-counter", [], wallet_1.address)
         call.result
             .expectOk()
             .expectUint(31);
