@@ -1,4 +1,4 @@
-import { Clarinet, Tx, Chain, Account, types } from 'https://deno.land/x/clarinet@v0.5.1/index.ts';
+import { Clarinet, Tx, Chain, Account, types } from 'https://deno.land/x/clarinet@v0.5.2/index.ts';
 import { assertEquals } from "https://deno.land/std@0.90.0/testing/asserts.ts";
 
 Clarinet.test({
@@ -46,5 +46,6 @@ Clarinet.test({
             .expectUint(31);
 
         "0x0001020304".expectBuff(new Uint8Array([0, 1, 2, 3, 4]));
+        "ST1HTBVD3JG9C05J7HBJTHGR0GGW7KXW28M5JS8QE.plaid-token".expectPrincipal('ST1HTBVD3JG9C05J7HBJTHGR0GGW7KXW28M5JS8QE.plaid-token');
     },
 });
