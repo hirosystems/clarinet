@@ -53,6 +53,26 @@ mod sessions {
         let project_config = MainConfig::from_path(&project_config_path);
         let chain_config = ChainConfig::from_path(&chain_config_path);
     
+        let mut deployer_address = None;
+        let mut initial_deployer = None;
+
+        for (name, account) in chain_config.accounts.iter() {
+            let account = repl::settings::Account {
+                name: name.clone(),
+                balance: account.balance,
+                address: account.address.clone(),
+                mnemonic: account.mnemonic.clone(),
+                derivation: account.derivation.clone(),
+            };
+            if name == "deployer" {
+                initial_deployer = Some(account.clone());
+                deployer_address = Some(account.address.clone());
+            }
+            settings
+                .initial_accounts
+                .push(account);
+        }
+
         for (name, config) in project_config.ordered_contracts().iter() {
             let mut contract_path = root_path.clone();
             contract_path.push(&config.path);
@@ -64,22 +84,10 @@ mod sessions {
                 .push(repl::settings::InitialContract {
                     code: code,
                     name: Some(name.clone()),
-                    deployer: None,
+                    deployer: deployer_address.clone(),
                 });
         }
-    
-        for (name, account) in chain_config.accounts.iter() {
-            settings
-                .initial_accounts
-                .push(repl::settings::Account {
-                    name: name.clone(),
-                    balance: account.balance,
-                    address: account.address.clone(),
-                    mnemonic: account.mnemonic.clone(),
-                    derivation: account.derivation.clone(),
-                });
-        }
-
+        settings.initial_deployer = initial_deployer;
         let mut session = Session::new(settings.clone());
         session.start();
         session.advance_chain_tip(1);
