@@ -32,12 +32,13 @@ mod sessions {
     use clarity_repl::repl::{self, Session};
     use clarity_repl::repl::settings::Account;
     use crate::types::{ChainConfig, MainConfig};
+    use super::TransactionArgs;
 
     lazy_static! {
         static ref SESSIONS: Mutex<HashMap<u32, Session>> = Mutex::new(HashMap::new());
     }
 
-    pub fn handle_setup_chain() -> Result<(u32, Vec<Account>), AnyError> {
+    pub fn handle_setup_chain(transactions: Vec<TransactionArgs>) -> Result<(u32, Vec<Account>), AnyError> {
         let mut sessions = SESSIONS.lock().unwrap();
         let session_id = sessions.len() as u32;
 
@@ -71,6 +72,31 @@ mod sessions {
             settings
                 .initial_accounts
                 .push(account);
+        }
+
+        for tx in transactions.iter() {
+          let deployer = Some(tx.sender.clone());
+          if let Some(ref deploy_contract) = tx.deploy_contract {
+            settings
+              .initial_contracts
+              .push(repl::settings::InitialContract {
+                  code: deploy_contract.code.clone(),
+                  name: Some(deploy_contract.name.clone()),
+                  deployer,
+              });
+          }
+
+          // if let Some(ref contract_call) tx.contract_call {
+          // TODO: initial_tx_sender
+          //   let code = format!("(contract-call? '{}.{} {} {})", initial_tx_sender, contract_call.contract, contract_call.method, contract_call.args.join(" "));
+          //   settings
+          //     .initial_contracts
+          //     .push(repl::settings::InitialContract {
+          //         code: code,
+          //         name: Some(name.clone()),
+          //         deployer: tx.sender.clone(),
+          //     });
+          // }
         }
 
         for (name, config) in project_config.ordered_contracts().iter() {
@@ -335,10 +361,11 @@ where
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct SetupChainArgs {
+  transactions: Vec<TransactionArgs>
 }
 
-fn setup_chain(_args: SetupChainArgs) -> Result<Value, AnyError> {
-    let (session_id, accounts) = sessions::handle_setup_chain()?;
+fn setup_chain(args: SetupChainArgs) -> Result<Value, AnyError> {
+    let (session_id, accounts) = sessions::handle_setup_chain(args.transactions)?;
 
     Ok(json!({
         "session_id": session_id,
@@ -355,9 +382,10 @@ struct MineBlockArgs {
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
-struct TransactionArgs {
+pub struct TransactionArgs {
   sender: String,
   contract_call: Option<ContractCallArgs>,
+  deploy_contract: Option<DeployContractArgs>,
   transfer_stx: Option<TransferSTXArgs>,
 }
 
@@ -367,6 +395,13 @@ struct ContractCallArgs {
   contract: String,
   method: String,
   args: Vec<String>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct DeployContractArgs {
+  name: String,
+  code: String,
 }
 
 #[derive(Debug, Deserialize)]
@@ -382,9 +417,21 @@ fn mine_block(args: MineBlockArgs) -> Result<Value, AnyError> {
       let mut receipts = vec![];
       for tx in args.transactions.iter() {
         session.set_tx_sender(tx.sender.clone());
-        if let Some(ref contract_call) = tx.contract_call {
-          let snippet = format!("(contract-call? '{}.{} {} {})", initial_tx_sender, contract_call.contract, contract_call.method, contract_call.args.join(" "));
+        if let Some(ref args) = tx.contract_call {
+
+          // Kludge for handling fully qualified contract_id vs sugared syntax
+          let first_char = args.contract.chars().next().unwrap();
+          let snippet = if first_char.to_string() == "S" {
+            format!("(contract-call? '{} {} {})", args.contract, args.method, args.args.join(" "))
+          } else {
+            format!("(contract-call? '{}.{} {} {})", initial_tx_sender, args.contract, args.method, args.args.join(" "))
+          };
           let (_, res, events) = session.interpret(snippet, None).unwrap(); // todo(ludo)
+          receipts.push((res, events));
+        }
+
+        if let Some(ref args) = tx.deploy_contract {
+          let (_, res, events) = session.interpret(args.code.clone(), Some(args.name.clone())).unwrap(); // todo(ludo)
           receipts.push((res, events));
         }
       }
@@ -412,9 +459,14 @@ struct MineEmptyBlocksArgs {
 }
 
 fn mine_empty_blocks(args: MineEmptyBlocksArgs) -> Result<Value, AnyError> {
-  println!("{:?}", args);
+  let block_height = sessions::perform_block(args.session_id, |session| {
+    let block_height = session.advance_chain_tip(args.count);
+    Ok(block_height)
+  })?;
+
   Ok(json!({
     "session_id": args.session_id,
+    "block_height": block_height,
   }))
 }
 
@@ -431,8 +483,16 @@ struct CallReadOnlyFnArgs {
 fn call_read_only_fn(args: CallReadOnlyFnArgs) -> Result<Value, AnyError> {
   let (result, events) = sessions::perform_block(args.session_id, |session| {
     let initial_tx_sender = session.get_tx_sender();
-    session.set_tx_sender(args.sender.clone());    
-    let snippet = format!("(contract-call? '{}.{} {} {})", initial_tx_sender, args.contract, args.method, args.args.join(" "));
+    session.set_tx_sender(args.sender.clone());
+
+    // Kludge for handling fully qualified contract_id vs sugared syntax
+    let first_char = args.contract.chars().next().unwrap();
+    let snippet = if first_char.to_string() == "S" {
+      format!("(contract-call? '{} {} {})", args.contract, args.method, args.args.join(" "))
+    } else {
+      format!("(contract-call? '{}.{} {} {})", initial_tx_sender, args.contract, args.method, args.args.join(" "))
+    };
+
     let (_, result, events) = session.interpret(snippet, None).unwrap(); // todo(ludo)
     session.set_tx_sender(initial_tx_sender);
     Ok((result, events))
