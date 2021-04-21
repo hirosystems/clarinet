@@ -2,7 +2,7 @@ export class Tx {
   type: number;
   sender: string;
   contractCall?: TxContractCall;
-  trasnferStx?: TxTransfer;
+  transferStx?: TxTransfer;
   deployContract?: TxDeployContract;
 
   constructor(type: number, sender: string) {
@@ -12,7 +12,7 @@ export class Tx {
 
   static transferSTX(amount: number, recipient: string, sender: string) {
     let tx = new Tx(1, sender);
-    tx.trasnferStx = {
+    tx.transferStx = {
       recipient,
       amount,
     };
