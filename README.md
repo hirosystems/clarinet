@@ -18,14 +18,6 @@ $ brew install lgalabru/clarinet/clarinet
 
 Feel free to ⭐️ this repo! With 50+ stars, this package becomes eligible to `homebrew-core`, and I'll work on the automation to make sure that the brew is always pointing to the latest and greatest version.
 
-**
-
-If you need to upgrade to the latest / greatest:
-
-```bash
-$ brew upgrade lgalabru/clarinet/clarinet
-```
-
 
 ### Install from cargo
 
