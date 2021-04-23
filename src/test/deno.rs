@@ -114,6 +114,8 @@ mod sessions {
                 });
         }
         settings.initial_deployer = initial_deployer;
+        settings.include_boot_contracts = true;
+  
         let mut session = Session::new(settings.clone());
         session.start();
         session.advance_chain_tip(1);
@@ -426,13 +428,13 @@ fn mine_block(args: MineBlockArgs) -> Result<Value, AnyError> {
           } else {
             format!("(contract-call? '{}.{} {} {})", initial_tx_sender, args.contract, args.method, args.args.join(" "))
           };
-          let (_, res, events) = session.interpret(snippet, None).unwrap(); // todo(ludo)
-          receipts.push((res, events));
+          let execution = session.interpret(snippet, None).unwrap(); // todo(ludo)
+          receipts.push((execution.result, execution.events));
         }
 
         if let Some(ref args) = tx.deploy_contract {
-          let (_, res, events) = session.interpret(args.code.clone(), Some(args.name.clone())).unwrap(); // todo(ludo)
-          receipts.push((res, events));
+          let execution = session.interpret(args.code.clone(), Some(args.name.clone())).unwrap(); // todo(ludo)
+          receipts.push((execution.result, execution.events));
         }
       }
       session.set_tx_sender(initial_tx_sender);
@@ -493,9 +495,9 @@ fn call_read_only_fn(args: CallReadOnlyFnArgs) -> Result<Value, AnyError> {
       format!("(contract-call? '{}.{} {} {})", initial_tx_sender, args.contract, args.method, args.args.join(" "))
     };
 
-    let (_, result, events) = session.interpret(snippet, None).unwrap(); // todo(ludo)
+    let execution = session.interpret(snippet, None).unwrap(); // todo(ludo)
     session.set_tx_sender(initial_tx_sender);
-    Ok((result, events))
+    Ok((execution.result, execution.events))
   })?;
   Ok(json!({
     "session_id": args.session_id,

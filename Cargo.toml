@@ -1,6 +1,6 @@
 [package]
 name = "clarinet"
-version = "0.6.0"
+version = "0.7.0"
 authors = ["Ludo Galabru <ludovic@galabru.com>"]
 edition = "2018"
 description = "Clarinet is a clarity runtime packaged as a command line tool, designed to facilitate smart contract understanding, development, testing and deployment."
@@ -36,7 +36,7 @@ deno_runtime = "=0.9.3"
 # deno_web = "=0.31.0"
 rusty_v8 = "=0.20.0"
 # clarity_repl = { package = "clarity-repl", path = "../../clarity-repl", features = ["cli"] }
-clarity_repl = { package = "clarity-repl", version = "0.8.0" }
+clarity_repl = { package = "clarity-repl", version = "0.9.0" }
 bip39 = "1.0.0-rc1"
 aes = "0.6.0"
 base64 = "0.13.0"

@@ -57,6 +57,7 @@ pub fn load_session(start_repl: bool) -> Result<(), String> {
                 deployer: deployer_address.clone(),
             });
     }
+    settings.include_boot_contracts = true;
     settings.initial_deployer = initial_deployer;
 
     if start_repl {
