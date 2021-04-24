@@ -2,10 +2,10 @@ use std::env;
 use std::fs::{self, File};
 use std::io::{prelude::*, BufReader, Read};
 
-use crate::generators::{self, changes::Changes};
-use crate::types::{MainConfig, MainConfigFile};
 use crate::console::load_session;
+use crate::generators::{self, changes::Changes};
 use crate::test::run_tests;
+use crate::types::{MainConfig, MainConfigFile};
 
 use clap::Clap;
 use toml;
@@ -34,6 +34,9 @@ enum Command {
     /// Check subcommand
     #[clap(name = "check")]
     Check(Check),
+    /// Fork subcommand
+    #[clap(name = "fork")]
+    Fork(Fork),
 }
 
 #[derive(Clap)]
@@ -94,6 +97,17 @@ struct Check {
     pub debug: bool,
 }
 
+#[derive(Clap)]
+struct Fork {
+    /// Project's name
+    pub name: String,
+    /// Contract id
+    pub id: String,
+    /// Print debug info
+    #[clap(short = 'd')]
+    pub debug: bool,
+}
+
 pub fn main() {
     let opts: Opts = Opts::parse();
 
@@ -122,7 +136,7 @@ pub fn main() {
         Command::Console(_) => {
             let start_repl = true;
             load_session(start_repl).expect("Unable to start REPL");
-        },
+        }
         Command::Check(_) => {
             let start_repl = false;
             let res = load_session(start_repl);
@@ -130,7 +144,7 @@ pub fn main() {
                 println!("{}", e);
                 return;
             }
-        },
+        }
         Command::Test(_test) => {
             let start_repl = false;
             let res = load_session(start_repl);
@@ -140,9 +154,17 @@ pub fn main() {
             }
             run_tests();
         }
+        Command::Fork(fork_opts) => {
+            let changes = generators::get_changes_for_forked_contract(
+                current_path,
+                fork_opts.name,
+                fork_opts.id,
+            );
+            execute_changes(changes);
+        }
     };
 }
-  
+
 fn execute_changes(changes: Vec<Changes>) {
     for change in changes.iter() {
         match change {
@@ -164,7 +186,9 @@ fn execute_changes(changes: Vec<Changes>) {
                 let config_file: MainConfigFile = toml::from_slice(&config_file[..]).unwrap();
                 let mut config: MainConfig = MainConfig::from_config_file(config_file);
                 for (contract_name, contract_config) in options.contracts_to_add.iter() {
-                    config.contracts.insert(contract_name.clone(), contract_config.clone());
+                    config
+                        .contracts
+                        .insert(contract_name.clone(), contract_config.clone());
                 }
                 let toml = toml::to_string(&config).unwrap();
                 let mut file = File::create(options.path.clone()).unwrap();
