@@ -85,6 +85,7 @@ struct Test {
     /// Print debug info
     #[clap(short = 'd')]
     pub debug: bool,
+    pub files: Vec<String>,
 }
 
 #[derive(Clap)]
@@ -131,14 +132,14 @@ pub fn main() {
                 return;
             }
         },
-        Command::Test(_test) => {
+        Command::Test(test) => {
             let start_repl = false;
             let res = load_session(start_repl);
             if let Err(e) = res {
                 println!("{}", e);
                 return;
             }
-            run_tests();
+            run_tests(test.files);
         }
     };
 }

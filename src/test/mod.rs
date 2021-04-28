@@ -44,8 +44,8 @@ mod version;
 
 mod deno;
 
-pub fn run_tests() {
-    block_on(deno::run_tests());
+pub fn run_tests(files: Vec<String>) {
+    block_on(deno::run_tests(files));
 }
 
 pub fn create_basic_runtime() -> tokio::runtime::Runtime {

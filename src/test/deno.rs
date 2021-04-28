@@ -135,7 +135,7 @@ mod sessions {
     }
 }
 
-pub async fn run_tests() -> Result<(), AnyError> {
+pub async fn run_tests(files: Vec<String>) -> Result<(), AnyError> {
 
     let fail_fast = true;
     let quiet = false;
@@ -146,7 +146,12 @@ pub async fn run_tests() -> Result<(), AnyError> {
     let program_state = ProgramState::build(flags.clone()).await?;
     let permissions = Permissions::from_options(&flags.clone().into());
     let cwd = std::env::current_dir().expect("No current directory");
-    let include = vec![".".to_string()];
+
+    let include = if files.len() > 0 {
+      files.clone()
+    } else {
+      vec!["./tests/".to_string()]
+    };
     let test_modules =
       tools::test_runner::prepare_test_modules_urls(include, &cwd)?;
   
