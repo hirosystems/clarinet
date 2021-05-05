@@ -57,14 +57,14 @@ lazy_static = "1.4.0"
 atty = "0.2.14"
 jsonc-parser = "0.15.1"
 notify = "=5.0.0-pre.4"
-sourcemap = "6.0.1"
-swc_bundler = "0.25.1"
-swc_common = { version = "0.10.12", features = ["sourcemap"] }
-swc_ecmascript = { version = "0.24.1", features = ["codegen", "dep_graph", "parser", "proposal", "react", "transforms", "typescript", "visit"] }
-tempfile = "3.2.0"
+sourcemap = "=6.0.1"
+swc_bundler = "=0.25.1"
+swc_common = { version = "=0.10.12", features = ["sourcemap"] }
+swc_ecmascript = { version = "=0.24.1", features = ["codegen", "dep_graph", "parser", "proposal", "react", "transforms", "typescript", "visit"] }
+tempfile = "=3.2.0"
 termcolor = "1.1.2"
-text-size = "1.1.0"
-walkdir = "2.3.1"
+text-size = "=1.1.0"
+walkdir = "=2.3.1"
 regex = "1.4.3"
 libc = "0.2.86"
 encoding_rs = "0.8.28"

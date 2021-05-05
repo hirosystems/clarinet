@@ -14,7 +14,7 @@ Assuming you have a working installation of Rust, Clarinet can be also be instal
 
 
 ```bash
-$ cargo install clarinet
+$ cargo install clarinet --locked
 ```
 
 ### Install from source
@@ -22,7 +22,7 @@ $ cargo install clarinet
 ```bash
 $ git clone git@github.com:lgalabru/clarinet.git
 $ cd clarinet
-$ cargo install --path .
+$ cargo install --path . --locked
 ```
 
 ### Install from brew
