@@ -68,7 +68,7 @@ $ tree .
 New contracts can be added manually, or with the following command:
 
 ```bash
-$ clarinet generate contract bbtc
+$ clarinet contract new bbtc
 ```
 
 ### Execute test suite
