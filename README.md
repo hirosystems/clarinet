@@ -8,17 +8,6 @@ Clarity is a **decidable** smart contract language that optimizes for predictabi
 
 ## Installation
 
-### Install from brew
-
-Not recommended at this point, but you can install an outdated version with:
-
-```bash
-$ brew install lgalabru/clarinet/clarinet
-```
-
-Feel free to ⭐️ this repo! With 50+ stars, this package becomes eligible to `homebrew-core`, and I'll work on the automation to make sure that the brew is always pointing to the latest and greatest version.
-
-
 ### Install from cargo
 
 Assuming you have a working installation of Rust, Clarinet can be also be installed from Cargo as a crate, or from source.
@@ -35,6 +24,16 @@ $ git clone git@github.com:lgalabru/clarinet.git
 $ cd clarinet
 $ cargo install --path .
 ```
+
+### Install from brew
+
+Not recommended at this point, but you can install an outdated version with:
+
+```bash
+$ brew install lgalabru/clarinet/clarinet
+```
+
+Feel free to ⭐️ this repo! With 50+ stars, this package becomes eligible to `homebrew-core`, and I'll work on the automation to make sure that the brew is always pointing to the latest and greatest version.
 
 
 ## Getting started with clarinet
@@ -59,6 +58,7 @@ $ tree .
 │   └── bbtc.clar
 ├── settings
 │   └── Development.toml
+│   └── Mocknet.toml
 └── tests
     └── bbtc_test.ts
 ```
@@ -68,10 +68,16 @@ $ tree .
 New contracts can be added manually, or with the following command:
 
 ```bash
-$ clarinet generate contract bbtc
+$ clarinet contract new bbtc
 ```
 
-### Execute test suite
+### Check the syntax of your contracts
+
+```bash
+$ clarinet check
+```
+
+### Execute a test suite
 
 ```bash
 $ clarinet test
@@ -81,4 +87,10 @@ $ clarinet test
 
 ```bash
 $ clarinet console
+```
+
+### Deploy contracts to mocknet
+
+```bash
+$ clarinet deploy --mocknet
 ```

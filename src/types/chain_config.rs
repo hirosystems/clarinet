@@ -56,7 +56,13 @@ pub struct AccountConfig {
 
 impl ChainConfig {
     pub fn from_path(path: &PathBuf) -> ChainConfig {
-        let path = File::open(path).unwrap();
+        let path = match File::open(path) {
+            Ok(path) => path,
+            Err(_) => {
+                let error = format!("Unable to open file {:?}", path.to_str());
+                panic!(error)
+            }
+        };
         let mut config_file_reader = BufReader::new(path);
         let mut config_file_buffer = vec![];
         config_file_reader
@@ -114,7 +120,7 @@ impl ChainConfig {
                             let ext = ExtendedPrivKey::derive(&bip39_seed[..], DEFAULT_DERIVATION_PATH).unwrap();
                             let secret_key = SecretKey::parse_slice(&ext.secret()).unwrap();
                             let public_key = PublicKey::from_secret_key(&secret_key);
-                            let pub_key = Secp256k1PublicKey::from_slice(&public_key.serialize_compressed(), true).unwrap();
+                            let pub_key = Secp256k1PublicKey::from_slice(&public_key.serialize_compressed()).unwrap();
                             let version = 26; // todo(ludo): un-hardcode this
                             let address = StacksAddress::from_public_key(version, pub_key).unwrap().to_string();
 
