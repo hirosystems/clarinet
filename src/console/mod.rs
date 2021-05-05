@@ -4,7 +4,7 @@ use crate::types::{MainConfig, ChainConfig};
 use clarity_repl::{repl, Terminal};
 
 
-pub fn load_session(start_repl: bool) -> Result<(), String> {
+pub fn load_session(start_repl: bool, env: String) -> Result<repl::SessionSettings, String> {
     let mut settings = repl::SessionSettings::default();
 
     let root_path = env::current_dir().unwrap();
@@ -13,9 +13,16 @@ pub fn load_session(start_repl: bool) -> Result<(), String> {
 
     let mut chain_config_path = root_path.clone();
     chain_config_path.push("settings");
-    chain_config_path.push("Development.toml");
 
-    let project_config = MainConfig::from_path(&project_config_path);
+    chain_config_path.push(if env == "mocknet" {
+        "Mocknet.toml"
+    } else if env == "testnet" {
+        "Testnet.toml"
+    } else {
+        "Development.toml"
+    });
+
+    let mut project_config = MainConfig::from_path(&project_config_path);
     let chain_config = ChainConfig::from_path(&chain_config_path);
 
     let mut deployer_address = None;
@@ -57,15 +64,31 @@ pub fn load_session(start_repl: bool) -> Result<(), String> {
                 deployer: deployer_address.clone(),
             });
     }
+
+    let links = match project_config.links.take() {
+        Some(links) => links,
+        None => vec![],
+    };
+
+    for link_config in links.iter() {
+        settings
+            .initial_links
+            .push(repl::settings::InitialLink {
+                contract_id: link_config.contract_id.clone(),
+                stacks_node_addr: None,
+                cache: None,
+        });
+    }
+
     settings.include_boot_contracts = true;
     settings.initial_deployer = initial_deployer;
 
     if start_repl {
-        let mut terminal = Terminal::new(settings);
+        let mut terminal = Terminal::new(settings.clone());
         terminal.start();
     } else {
-        let mut session = repl::Session::new(settings);
+        let mut session = repl::Session::new(settings.clone());
         session.check()?;
     }
-    Ok(())
+    Ok(settings)
 }

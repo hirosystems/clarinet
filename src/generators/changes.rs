@@ -1,4 +1,4 @@
-use crate::types::ContractConfig;
+use crate::types::{ContractConfig, LinkConfig};
 use std::collections::HashMap;
 
 #[derive(Clone, Debug)]
@@ -21,7 +21,7 @@ pub struct TOMLEdition {
     pub comment: String,
     pub path: String,
     pub contracts_to_add: HashMap<String, ContractConfig>,
-    pub notebooks_to_add: HashMap<String, ContractConfig>
+    pub links_to_add: Vec<LinkConfig>
 }
 
 #[derive(Clone, Debug)]

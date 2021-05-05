@@ -24,6 +24,7 @@ impl GetChangesForNewProject {
         // self.create_environment_mainnet_toml();
         // self.create_environment_testnet_toml();
         self.create_environment_dev_toml();
+        self.create_environment_mocknet_toml();
         self.create_vscode_directory();
         self.changes.clone()
     }
@@ -136,6 +137,30 @@ node_rpc_address = "http://stacks-node-api.blockstack.org:20443"
         self.changes.push(Changes::AddFile(change));
     }
 
+    fn create_environment_mocknet_toml(&mut self) {
+        let content = format!(
+            r#"[network]
+name = "mocknet"
+node_rpc_address = "http://localhost:20443"
+
+[accounts.deployer]
+mnemonic = "point approve language letter cargo rough similar wrap focus edge polar task olympic tobacco cinnamon drop lawn boring sort trade senior screen tiger climb"
+"#
+        );
+        let name = format!("Mocknet.toml");
+        let path = format!(
+            "{}/{}/settings/{}",
+            self.project_path, self.project_name, name
+        );
+        let change = FileCreation {
+            comment: format!("Creating file {}/settings/{}", self.project_name, name),
+            name,
+            content,
+            path,
+        };
+        self.changes.push(Changes::AddFile(change));
+    }
+
     #[allow(dead_code)]
     fn create_environment_testnet_toml(&mut self) {
         let content = format!(
@@ -157,6 +182,7 @@ node_rpc_address = "http://xenon.blockstack.org:20443"
         };
         self.changes.push(Changes::AddFile(change));
     }
+
 
     fn create_environment_dev_toml(&mut self) {
         let content = format!(

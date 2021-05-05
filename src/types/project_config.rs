@@ -11,8 +11,8 @@ use toml::value::Value;
 #[derive(Serialize, Deserialize, Debug)]
 pub struct MainConfigFile {
     project: ProjectConfigFile,
+    links: Option<Value>,
     contracts: Option<Value>,
-    // notebooks: Option<Value>,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -23,13 +23,20 @@ pub struct ProjectConfigFile {
 #[derive(Serialize, Deserialize, Debug)]
 pub struct MainConfig {
     pub project: ProjectConfig,
-    pub contracts: BTreeMap<String, ContractConfig>,
-    // pub notebooks: Vec<NotebookConfig>,
+    // #[serde(skip)]
+    pub links: Option<Vec<LinkConfig>>,
+    // #[serde(serialize_with = "toml::ser::tables_last")]
+    pub contracts: Option<BTreeMap<String, ContractConfig>>,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct ProjectConfig {
     pub name: String,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
+pub struct LinkConfig {
+    pub contract_id: String,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -62,14 +69,19 @@ impl MainConfig {
         let mut reverse_lookup = BTreeMap::new();
 
         let mut index: usize = 0;
-        for (contract, _) in self.contracts.iter() {
+        let contracts = match self.contracts {
+            Some(ref contracts) => contracts.clone(),
+            None => return vec![]
+        };
+
+        for (contract, _) in contracts.iter() {
             lookup.insert(contract, index);
             reverse_lookup.insert(index, contract.clone());
             index += 1;
         }
 
         let mut graph = Graph::new();
-        for (contract, contract_config) in self.contracts.iter() {
+        for (contract, contract_config) in contracts.iter() {
             let contract_id = lookup.get(contract).unwrap();
             graph.add_node(*contract_id);
             for deps in contract_config.depends_on.iter() {
@@ -100,7 +112,7 @@ impl MainConfig {
                 let entry = reverse_lookup.get(index).unwrap();
                 entry.clone()
             };
-            let config = self.contracts.get(&contract).unwrap();
+            let config = contracts.get(&contract).unwrap();
             dst.push((contract, config.clone()))
         }
         dst
@@ -112,11 +124,34 @@ impl MainConfig {
             name: config_file.project.name.clone(),
         };
 
-
         let mut config = MainConfig {
             project,
-            contracts: BTreeMap::new(),
-            // notebooks: vec![],
+            links: None,
+            contracts: None,
+        };
+        let mut config_contracts = BTreeMap::new();
+        let mut config_links: Vec<LinkConfig> = Vec::new();
+
+        match config_file.links {
+            Some(Value::Array(links)) => {
+                for link_settings in links.iter() {
+                    match link_settings {
+                        Value::Table(link_settings) => {
+                            let contract_id = match link_settings.get("contract_id") {
+                                Some(Value::String(contract_id)) => contract_id.to_string(),
+                                _ => continue,
+                            };
+                            config_links.push(
+                                LinkConfig {
+                                    contract_id
+                                }
+                            );
+                        }
+                        _ => {}
+                    }
+                }
+            }
+            _ => {}
         };
 
         match config_file.contracts {
@@ -134,8 +169,7 @@ impl MainConfig {
                                 },
                                 _ => continue,
                             };
-
-                            config.contracts.insert(
+                            config_contracts.insert(
                                 contract_name.to_string(),
                                 ContractConfig {
                                     path,
@@ -149,7 +183,8 @@ impl MainConfig {
             }
             _ => {}
         };
-
+        config.contracts = Some(config_contracts);
+        config.links = Some(config_links);
         config
     }
 }
