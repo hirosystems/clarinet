@@ -82,6 +82,26 @@ export interface Chain {
   sessionId: number;
 }
 
+export interface ReadOnlyFn {
+  session_id: number;
+  result: string;
+  events: Array<any>;
+}
+
+export interface EmptyBlock {
+  session_id: number;
+  block_height: number;
+}
+
+export interface AssetsMaps {
+  session_id: number,
+  assets: {
+    [name: string]: {
+      [owner: string]: number
+    }
+  }
+}
+
 export class Chain {
   sessionId: number;
 
@@ -89,7 +109,7 @@ export class Chain {
     this.sessionId = sessionId;
   }
 
-  mineBlock(transactions: Array<Tx>) {
+  mineBlock(transactions: Array<Tx>): Block {
     let result = (Deno as any).core.jsonOpSync("mine_block", {
       sessionId: this.sessionId,
       transactions: transactions,
@@ -101,12 +121,16 @@ export class Chain {
     return block;
   }
 
-  mineEmptyBlock(count: number) {
+  mineEmptyBlock(count: number): EmptyBlock {
     let result = (Deno as any).core.jsonOpSync("mine_empty_blocks", {
       sessionId: this.sessionId,
       count: count,
     });
-    return result;
+    let emptyBlock: EmptyBlock = {
+      session_id: result.session_id,
+      block_height: result.block_height
+    }
+    return emptyBlock;
   }
 
   callReadOnlyFn(
@@ -114,22 +138,31 @@ export class Chain {
     method: string,
     args: Array<any>,
     sender: string,
-  ) {
+  ): ReadOnlyFn {
     let result = (Deno as any).core.jsonOpSync("call_read_only_fn", {
       sessionId: this.sessionId,
       contract: contract,
       method: method,
       args: args,
       sender: sender,
-    });
-    return result;
+    });    
+    let readOnlyFn: ReadOnlyFn = {
+      session_id: result.session_id,
+      result: result.result,
+      events: result.events
+    }
+    return readOnlyFn;
   }
 
-  getAssetsMaps() {
+  getAssetsMaps(): AssetsMaps {
     let result = (Deno as any).core.jsonOpSync("get_assets_maps", {
       sessionId: this.sessionId,
     });
-    return result;
+    let assetsMaps: AssetsMaps = {
+      session_id: result.session_id,
+      assets: result.assets
+    }
+    return assetsMaps;
   }
 }
 
