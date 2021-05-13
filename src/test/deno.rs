@@ -433,12 +433,12 @@ fn mine_block(args: MineBlockArgs) -> Result<Value, AnyError> {
           } else {
             format!("(contract-call? '{}.{} {} {})", initial_tx_sender, args.contract, args.method, args.args.join(" "))
           };
-          let execution = session.interpret(snippet, None).unwrap(); // todo(ludo)
+          let execution = session.interpret(snippet, None, true).unwrap(); // todo(ludo)
           receipts.push((execution.result, execution.events));
         }
 
         if let Some(ref args) = tx.deploy_contract {
-          let execution = session.interpret(args.code.clone(), Some(args.name.clone())).unwrap(); // todo(ludo)
+          let execution = session.interpret(args.code.clone(), Some(args.name.clone()), true).unwrap(); // todo(ludo)
           receipts.push((execution.result, execution.events));
         }
       }
@@ -500,7 +500,7 @@ fn call_read_only_fn(args: CallReadOnlyFnArgs) -> Result<Value, AnyError> {
       format!("(contract-call? '{}.{} {} {})", initial_tx_sender, args.contract, args.method, args.args.join(" "))
     };
 
-    let execution = session.interpret(snippet, None).unwrap(); // todo(ludo)
+    let execution = session.interpret(snippet, None, true).unwrap(); // todo(ludo)
     session.set_tx_sender(initial_tx_sender);
     Ok((execution.result, execution.events))
   })?;
