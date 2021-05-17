@@ -55,6 +55,8 @@ pub struct AccountConfig {
 }
 
 impl ChainConfig {
+
+    #[allow(non_fmt_panic)]
     pub fn from_path(path: &PathBuf) -> ChainConfig {
         let path = match File::open(path) {
             Ok(path) => path,

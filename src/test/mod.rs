@@ -16,7 +16,6 @@ mod diagnostics;
 mod disk_cache;
 // mod errors;
 mod file_fetcher;
-mod file_watcher;
 mod flags;
 // mod flags_allow_net;
 mod fmt_errors;
