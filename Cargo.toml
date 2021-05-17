@@ -1,6 +1,6 @@
 [package]
 name = "clarinet"
-version = "0.9.1"
+version = "0.9.2"
 authors = ["Ludo Galabru <ludovic@galabru.com>"]
 edition = "2018"
 description = "Clarinet is a clarity runtime packaged as a command line tool, designed to facilitate smart contract understanding, development, testing and deployment."
@@ -56,6 +56,7 @@ tokio = { version = "1.2.0", features = ["full"] }
 lazy_static = "1.4.0"
 atty = "0.2.14"
 jsonc-parser = "0.15.1"
+notify = "=5.0.0-pre.4"
 sourcemap = "=6.0.1"
 swc_bundler = "=0.25.1"
 swc_common = { version = "=0.10.12", features = ["sourcemap"] }
