@@ -138,6 +138,9 @@ export class Chain {
 
   mineEmptyBlockUntil(targetBlockHeight: number): EmptyBlock {
     let count = targetBlockHeight - this.blockHeight;
+    if (count < 0) {
+      throw new Error(`Chain tip cannot be moved from ${this.blockHeight} to ${targetBlockHeight}`);
+    }
     return this.mineEmptyBlock(count);
   }
 
