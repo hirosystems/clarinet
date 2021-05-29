@@ -4,7 +4,7 @@ use std::collections::{HashMap, BTreeMap};
 use std::io::{prelude::*, BufReader, Read};
 
 use crate::{generators::{self, changes::{Changes, TOMLEdition}}, utils::mnemonic};
-use crate::types::{MainConfig, MainConfigFile, LinkConfig};
+use crate::types::{MainConfig, MainConfigFile, RequirementConfig};
 use crate::console::load_session;
 use crate::test::run_tests;
 
@@ -52,7 +52,7 @@ enum Contract {
     #[clap(name = "new")]
     NewContract(NewContract),
     /// Import contract subcommand
-    #[clap(name = "link")]
+    #[clap(name = "requirement")]
     LinkContract(LinkContract),
     /// Fork contract subcommand
     #[clap(name = "fork")]
@@ -152,15 +152,15 @@ pub fn main() {
                     generators::get_changes_for_new_contract(current_path, new_contract.name, None, true, vec![]);
                 execute_changes(changes);
             }
-            Contract::LinkContract(link_contract) => {
+            Contract::LinkContract(required_contract) => {
                 let path = format!("{}/Clarinet.toml", current_path);
 
                 let change = TOMLEdition {
-                    comment: format!("Indexing link {} in Clarinet.toml", link_contract.contract_id),
+                    comment: format!("Adding {} as a requirement to Clarinet.toml", required_contract.contract_id),
                     path,
                     contracts_to_add: HashMap::new(),
-                    links_to_add: vec![LinkConfig {
-                        contract_id: link_contract.contract_id.clone(),
+                    requirements_to_add: vec![RequirementConfig {
+                        contract_id: required_contract.contract_id.clone(),
                     }],
                 };
                 execute_changes(vec![Changes::EditTOML(change)]);
@@ -173,11 +173,18 @@ pub fn main() {
                 let settings = repl::SessionSettings::default();
                 let mut session = repl::Session::new(settings);
 
-                let res = session.resolve_link(&repl::settings::InitialLink {
+                let rt = tokio::runtime::Builder::new_current_thread()
+                    .enable_io()
+                    .enable_time()
+                    .max_blocking_threads(32)
+                    .build()
+                    .unwrap();
+
+                let res = rt.block_on(session.resolve_link(&repl::settings::InitialLink {
                     contract_id: fork_contract.contract_id.clone(),
                     stacks_node_addr: None,
                     cache: None,
-                });
+                }));
                 let contracts = res.unwrap();
                 let mut changes = vec![];
                 for (contract_id, code, deps) in contracts.into_iter() {
@@ -252,9 +259,14 @@ pub fn main() {
                 nonce_proof: String,               
             }
 
+            let host = if mode == "mocknet" {
+                "http://localhost:20443"
+            } else {
+                "https://stacks-node-api.testnet.stacks.co"
+            };
+
             for initial_contract in settings.initial_contracts.iter() {
                 let contract_name = initial_contract.name.clone().unwrap();
-                let host = "http://localhost:20443";
 
                 let payload = TransactionSmartContract {
                     name: contract_name.as_str().into(),
@@ -365,6 +377,9 @@ pub fn main() {
 }
   
 fn execute_changes(changes: Vec<Changes>) {
+    let mut shared_config = None;
+    let mut path = "".to_string();
+
     for mut change in changes.into_iter() {
         match change {
             Changes::AddFile(options) => {
@@ -378,48 +393,45 @@ fn execute_changes(changes: Vec<Changes>) {
                 fs::create_dir_all(options.path.clone()).expect("Unable to create directory");
             }
             Changes::EditTOML(ref mut options) => {
-                let file = File::open(options.path.clone()).unwrap();
-                let mut config_file_reader = BufReader::new(file);
-                let mut config_file = vec![];
-                config_file_reader.read_to_end(&mut config_file).unwrap();
-                let config_file: MainConfigFile = toml::from_slice(&config_file[..]).unwrap();
-                let mut config: MainConfig = MainConfig::from_config_file(config_file);
-                let mut dirty = false;
-                println!("BEFORE: {:?}", config);
 
-                let mut links = match config.links.take() {
-                    Some(links) => links,
+                let mut config = match shared_config.take() {
+                    Some(config) => config,
+                    None => {
+                        path = options.path.clone();
+                        let file = File::open(path.clone()).unwrap();
+                        let mut config_file_reader = BufReader::new(file);
+                        let mut config_file = vec![];
+                        config_file_reader.read_to_end(&mut config_file).unwrap();
+                        let config_file: MainConfigFile = toml::from_slice(&config_file[..]).unwrap();
+                        MainConfig::from_config_file(config_file)
+                    }
+                };
+
+                let mut requirements = match config.project.requirements.take() {
+                    Some(requirements) => requirements,
                     None => vec![],
                 };
-                for link in options.links_to_add.drain(..) {
-                    if links.contains(&link) {
-                        links.push(link);
-                        dirty = true;
+                for requirement in options.requirements_to_add.drain(..) {
+                    if !requirements.contains(&requirement) {
+                        requirements.push(requirement);
                     }
                 }
-                config.links = Some(links);
+                config.project.requirements = Some(requirements);
 
-                let mut contracts = match config.contracts.take() {
-                    Some(contracts) => contracts,
-                    None => BTreeMap::new(),
-                };
-                for (contract_name, contract_config) in options.contracts_to_add.iter() {
-                    let res = contracts.insert(contract_name.clone(), contract_config.clone());
-                    if res.is_none() {
-                        dirty = true;
-                    }
+                for (contract_name, contract_config) in options.contracts_to_add.drain() {
+                    config.contracts.insert(contract_name, contract_config);
                 }
-                config.contracts = Some(contracts);
 
-                println!("AFTER: {:?}", config);
-
-                if dirty {
-                    let toml = toml::to_string(&config).unwrap();
-                    let mut file = File::create(options.path.clone()).unwrap();
-                    file.write_all(&toml.as_bytes()).unwrap();    
-                } 
+                shared_config = Some(config);
                 println!("{}", options.comment);
             }
         }
     }
+
+    if let Some(config) = shared_config {
+        let toml = toml::to_string(&config).unwrap();
+        let mut file = File::create(path).unwrap();
+        file.write_all(&toml.as_bytes()).unwrap();
+        file.sync_all().unwrap();
+    } 
 }

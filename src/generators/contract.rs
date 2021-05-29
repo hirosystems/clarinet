@@ -119,7 +119,7 @@ Clarinet.test({{
             comment: format!("Adding contract {} to Clarinet.toml", self.contract_name),
             path,
             contracts_to_add,
-            links_to_add: vec![],
+            requirements_to_add: vec![],
         };
         self.changes.push(Changes::EditTOML(change));
     }

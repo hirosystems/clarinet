@@ -65,7 +65,7 @@ pub fn load_session(start_repl: bool, env: String) -> Result<repl::SessionSettin
             });
     }
 
-    let links = match project_config.links.take() {
+    let links = match project_config.project.requirements.take() {
         Some(links) => links,
         None => vec![],
     };
@@ -80,7 +80,7 @@ pub fn load_session(start_repl: bool, env: String) -> Result<repl::SessionSettin
         });
     }
 
-    settings.include_boot_contracts = true;
+    settings.include_boot_contracts = vec!["pox".to_string(), "costs".to_string(), "bns".to_string()];
     settings.initial_deployer = initial_deployer;
 
     if start_repl {

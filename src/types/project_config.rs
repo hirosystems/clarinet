@@ -11,31 +11,30 @@ use toml::value::Value;
 #[derive(Serialize, Deserialize, Debug)]
 pub struct MainConfigFile {
     project: ProjectConfigFile,
-    links: Option<Value>,
     contracts: Option<Value>,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct ProjectConfigFile {
     name: String,
+    requirements: Option<Value>,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct MainConfig {
     pub project: ProjectConfig,
-    // #[serde(skip)]
-    pub links: Option<Vec<LinkConfig>>,
-    // #[serde(serialize_with = "toml::ser::tables_last")]
-    pub contracts: Option<BTreeMap<String, ContractConfig>>,
+    #[serde(serialize_with = "toml::ser::tables_last")]
+    pub contracts: BTreeMap<String, ContractConfig>,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct ProjectConfig {
     pub name: String,
+    pub requirements: Option<Vec<RequirementConfig>>,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
-pub struct LinkConfig {
+pub struct RequirementConfig {
     pub contract_id: String,
 }
 
@@ -69,10 +68,11 @@ impl MainConfig {
         let mut reverse_lookup = BTreeMap::new();
 
         let mut index: usize = 0;
-        let contracts = match self.contracts {
-            Some(ref contracts) => contracts.clone(),
-            None => return vec![]
-        };
+        let contracts = self.contracts.clone();
+
+        if contracts.is_empty() {
+            return vec![]
+        }
 
         for (contract, _) in contracts.iter() {
             lookup.insert(contract, index);
@@ -122,27 +122,27 @@ impl MainConfig {
 
         let project = ProjectConfig {
             name: config_file.project.name.clone(),
+            requirements: None,
         };
 
         let mut config = MainConfig {
             project,
-            links: None,
-            contracts: None,
+            contracts: BTreeMap::new(),
         };
         let mut config_contracts = BTreeMap::new();
-        let mut config_links: Vec<LinkConfig> = Vec::new();
+        let mut config_requirements: Vec<RequirementConfig> = Vec::new();
 
-        match config_file.links {
-            Some(Value::Array(links)) => {
-                for link_settings in links.iter() {
+        match config_file.project.requirements {
+            Some(Value::Array(requirements)) => {
+                for link_settings in requirements.iter() {
                     match link_settings {
                         Value::Table(link_settings) => {
                             let contract_id = match link_settings.get("contract_id") {
                                 Some(Value::String(contract_id)) => contract_id.to_string(),
                                 _ => continue,
                             };
-                            config_links.push(
-                                LinkConfig {
+                            config_requirements.push(
+                                RequirementConfig {
                                     contract_id
                                 }
                             );
@@ -183,8 +183,8 @@ impl MainConfig {
             }
             _ => {}
         };
-        config.contracts = Some(config_contracts);
-        config.links = Some(config_links);
+        config.contracts = config_contracts;
+        config.project.requirements = Some(config_requirements);
         config
     }
 }

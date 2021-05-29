@@ -8,7 +8,7 @@ use contract::GetChangesForNewContract;
 use notebook::GetChangesForNewNotebook;
 use project::GetChangesForNewProject;
 use std::collections::HashMap;
-use crate::types::LinkConfig;
+use crate::types::RequirementConfig;
 
 pub fn get_changes_for_new_project(project_path: String, project_name: String) -> Vec<Changes> {
     let mut command = GetChangesForNewProject::new(project_path, project_name);
@@ -22,10 +22,10 @@ pub fn get_changes_for_new_contract(project_path: String, contract_name: String,
 
 pub fn get_changes_for_new_link(project_path: String, contract_id: String, _source: Option<String>) -> Vec<Changes> {
     let change = TOMLEdition {
-        comment: format!("Indexing link {} in Clarinet.toml", contract_id),
+        comment: format!("Adding {} as a requirement in Clarinet.toml", contract_id),
         path: project_path,
         contracts_to_add: HashMap::new(),
-        links_to_add: vec![LinkConfig {
+        requirements_to_add: vec![RequirementConfig {
             contract_id: contract_id.clone(),
         }],
     };

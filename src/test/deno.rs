@@ -114,7 +114,7 @@ mod sessions {
                 });
         }
         settings.initial_deployer = initial_deployer;
-        settings.include_boot_contracts = true;
+        settings.include_boot_contracts = vec!["pox".to_string(), "costs".to_string(), "bns".to_string()];
   
         let mut session = Session::new(settings.clone());
         session.start();
