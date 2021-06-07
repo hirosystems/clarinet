@@ -104,6 +104,7 @@ export interface AssetsMaps {
 
 export class Chain {
   sessionId: number;
+  blockHeight: number = 1;
 
   constructor(sessionId: number) {
     this.sessionId = sessionId;
@@ -114,6 +115,7 @@ export class Chain {
       sessionId: this.sessionId,
       transactions: transactions,
     });
+    this.blockHeight = result.block_height;
     let block: Block = {
       height: result.block_height,
       receipts: result.receipts,
@@ -126,11 +128,20 @@ export class Chain {
       sessionId: this.sessionId,
       count: count,
     });
+    this.blockHeight = result.block_height;
     let emptyBlock: EmptyBlock = {
       session_id: result.session_id,
       block_height: result.block_height
     }
     return emptyBlock;
+  }
+
+  mineEmptyBlockUntil(targetBlockHeight: number): EmptyBlock {
+    let count = targetBlockHeight - this.blockHeight;
+    if (count < 0) {
+      throw new Error(`Chain tip cannot be moved from ${this.blockHeight} to ${targetBlockHeight}`);
+    }
+    return this.mineEmptyBlock(count);
   }
 
   callReadOnlyFn(
