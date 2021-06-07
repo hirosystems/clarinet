@@ -190,6 +190,7 @@ export class Clarinet {
           transactions = options.preSetup()!;
         }
         let result = (Deno as any).core.jsonOpSync("setup_chain", {
+          name: options.name,
           transactions: transactions,
         });
         let chain = new Chain(result["session_id"]);
