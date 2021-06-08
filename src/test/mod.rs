@@ -43,8 +43,13 @@ mod version;
 
 mod deno;
 
-pub fn run_tests(files: Vec<String>) {
-    block_on(deno::run_tests(files));
+pub fn run_tests(files: Vec<String>, include_coverage: bool) {
+    match block_on(deno::run_tests(files, include_coverage)) {
+      Err(e) => {
+        std::process::exit(1)
+      }
+      _ => {}
+    };
 }
 
 pub fn create_basic_runtime() -> tokio::runtime::Runtime {

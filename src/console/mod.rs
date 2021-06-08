@@ -60,6 +60,7 @@ pub fn load_session(start_repl: bool, env: String) -> Result<repl::SessionSettin
             .initial_contracts
             .push(repl::settings::InitialContract {
                 code: code,
+                path: contract_path.to_str().unwrap().into(),
                 name: Some(name.clone()),
                 deployer: deployer_address.clone(),
             });

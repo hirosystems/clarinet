@@ -22,6 +22,7 @@ use deno_core::ModuleSpecifier;
 use deno_runtime::web_worker::WebWorkerOptions;
 use deno_runtime::ops::worker_host::CreateWebWorkerCb;
 use deno_runtime::web_worker::WebWorker;
+use clarity_repl::clarity::coverage::CoverageReporter;
 
 mod sessions {
     use std::sync::Mutex;
@@ -35,10 +36,10 @@ mod sessions {
     use super::TransactionArgs;
 
     lazy_static! {
-        static ref SESSIONS: Mutex<HashMap<u32, Session>> = Mutex::new(HashMap::new());
+        pub static ref SESSIONS: Mutex<HashMap<u32, (String, Session)>> = Mutex::new(HashMap::new());
     }
 
-    pub fn handle_setup_chain(transactions: Vec<TransactionArgs>) -> Result<(u32, Vec<Account>), AnyError> {
+    pub fn handle_setup_chain(name: String, transactions: Vec<TransactionArgs>) -> Result<(u32, Vec<Account>), AnyError> {
         let mut sessions = SESSIONS.lock().unwrap();
         let session_id = sessions.len() as u32;
 
@@ -81,11 +82,11 @@ mod sessions {
               .initial_contracts
               .push(repl::settings::InitialContract {
                   code: deploy_contract.code.clone(),
+                  path: "".into(),
                   name: Some(deploy_contract.name.clone()),
                   deployer,
               });
           }
-
           // if let Some(ref contract_call) tx.contract_call {
           // TODO: initial_tx_sender
           //   let code = format!("(contract-call? '{}.{} {} {})", initial_tx_sender, contract_call.contract, contract_call.method, contract_call.args.join(" "));
@@ -99,6 +100,7 @@ mod sessions {
           // }
         }
 
+
         for (name, config) in project_config.ordered_contracts().iter() {
             let mut contract_path = root_path.clone();
             contract_path.push(&config.path);
@@ -109,33 +111,33 @@ mod sessions {
                 .initial_contracts
                 .push(repl::settings::InitialContract {
                     code: code,
+                    path: contract_path.to_str().unwrap().into(),
                     name: Some(name.clone()),
                     deployer: deployer_address.clone(),
                 });
         }
         settings.initial_deployer = initial_deployer;
         settings.include_boot_contracts = vec!["pox".to_string(), "costs".to_string(), "bns".to_string()];
-  
         let mut session = Session::new(settings.clone());
         session.start();
         session.advance_chain_tip(1);
-        sessions.insert(session_id, session);
+        sessions.insert(session_id, (name, session));
         Ok((session_id, settings.initial_accounts))
     }
 
-    pub fn perform_block<F, R>(session_id: u32, handler: F) -> Result<R, AnyError> where F: FnOnce(&mut Session) -> Result<R, AnyError> {
+    pub fn perform_block<F, R>(session_id: u32, handler: F) -> Result<R, AnyError> where F: FnOnce(&str, &mut Session) -> Result<R, AnyError> {
         let mut sessions = SESSIONS.lock().unwrap();
         match sessions.get_mut(&session_id) {
             None => {
                 println!("Error: unable to retrieve session");
                 unreachable!()
             }
-            Some(ref mut session) => handler(session),
+            Some((name , ref mut session)) => handler(name.as_str(), session),
         }
     }
 }
 
-pub async fn run_tests(files: Vec<String>) -> Result<(), AnyError> {
+pub async fn run_tests(files: Vec<String>, include_coverage: bool) -> Result<(), AnyError> {
 
     let fail_fast = true;
     let quiet = false;
@@ -210,6 +212,24 @@ pub async fn run_tests(files: Vec<String>) -> Result<(), AnyError> {
       return Err(e);
     }
 
+    if include_coverage {
+      let mut coverage_reporter = CoverageReporter::new();
+      let sessions = sessions::SESSIONS.lock().unwrap();
+      for (session_id, (name, session)) in sessions.iter() {
+        
+        for contract in session.settings.initial_contracts.iter() {
+          if let Some(ref name) = contract.name {
+            if contract.path != "" {
+              coverage_reporter.register_contract(name.clone(), contract.path.clone());
+            }
+          }
+        }
+        coverage_reporter.add_reports(&session.coverage_reports);
+        coverage_reporter.add_asts(&session.asts);
+      }
+  
+      coverage_reporter.write_lcov_file("coverage.lcov");  
+    }
     Ok(())
 }
 
@@ -368,11 +388,12 @@ where
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct SetupChainArgs {
+  name: String,
   transactions: Vec<TransactionArgs>
 }
 
 fn setup_chain(args: SetupChainArgs) -> Result<Value, AnyError> {
-    let (session_id, accounts) = sessions::handle_setup_chain(args.transactions)?;
+    let (session_id, accounts) = sessions::handle_setup_chain(args.name, args.transactions)?;
 
     Ok(json!({
         "session_id": session_id,
@@ -419,7 +440,7 @@ struct TransferSTXArgs {
 }
 
 fn mine_block(args: MineBlockArgs) -> Result<Value, AnyError> {
-  let (block_height, receipts) = sessions::perform_block(args.session_id, |session| {
+  let (block_height, receipts) = sessions::perform_block(args.session_id, |name, session| {
       let initial_tx_sender = session.get_tx_sender();
       let mut receipts = vec![];
       for tx in args.transactions.iter() {
@@ -433,12 +454,12 @@ fn mine_block(args: MineBlockArgs) -> Result<Value, AnyError> {
           } else {
             format!("(contract-call? '{}.{} {} {})", initial_tx_sender, args.contract, args.method, args.args.join(" "))
           };
-          let execution = session.interpret(snippet, None, true).unwrap(); // todo(ludo)
+          let execution = session.interpret(snippet, None, true, Some(name.into())).unwrap(); // todo(ludo)
           receipts.push((execution.result, execution.events));
         }
 
         if let Some(ref args) = tx.deploy_contract {
-          let execution = session.interpret(args.code.clone(), Some(args.name.clone()), true).unwrap(); // todo(ludo)
+          let execution = session.interpret(args.code.clone(), Some(args.name.clone()), true, Some(name.into())).unwrap(); // todo(ludo)
           receipts.push((execution.result, execution.events));
         }
       }
@@ -466,7 +487,7 @@ struct MineEmptyBlocksArgs {
 }
 
 fn mine_empty_blocks(args: MineEmptyBlocksArgs) -> Result<Value, AnyError> {
-  let block_height = sessions::perform_block(args.session_id, |session| {
+  let block_height = sessions::perform_block(args.session_id, |name, session| {
     let block_height = session.advance_chain_tip(args.count);
     Ok(block_height)
   })?;
@@ -488,7 +509,7 @@ struct CallReadOnlyFnArgs {
 }
 
 fn call_read_only_fn(args: CallReadOnlyFnArgs) -> Result<Value, AnyError> {
-  let (result, events) = sessions::perform_block(args.session_id, |session| {
+  let (result, events) = sessions::perform_block(args.session_id, |name, session| {
     let initial_tx_sender = session.get_tx_sender();
     session.set_tx_sender(args.sender.clone());
 
@@ -500,7 +521,7 @@ fn call_read_only_fn(args: CallReadOnlyFnArgs) -> Result<Value, AnyError> {
       format!("(contract-call? '{}.{} {} {})", initial_tx_sender, args.contract, args.method, args.args.join(" "))
     };
 
-    let execution = session.interpret(snippet, None, true).unwrap(); // todo(ludo)
+    let execution = session.interpret(snippet, None, true, Some(name.into())).unwrap(); // todo(ludo)
     session.set_tx_sender(initial_tx_sender);
     Ok((execution.result, execution.events))
   })?;
@@ -519,7 +540,7 @@ struct GetAssetsMapsArgs {
 }
 
 fn get_assets_maps(args: GetAssetsMapsArgs) -> Result<Value, AnyError> {
-  let assets_maps = sessions::perform_block(args.session_id, |session| {
+  let assets_maps = sessions::perform_block(args.session_id, |name, session| {
     let assets_maps = session.get_assets_maps();    
     Ok(assets_maps)
   })?;
