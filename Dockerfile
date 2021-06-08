@@ -10,11 +10,11 @@ COPY . .
 
 RUN mkdir /out
 
-RUN apt update && apt install ca-certificates
+RUN apt update && apt install -y ca-certificates pkg-config libssl-dev
 
-RUN rustup update stable
+RUN rustup update 1.52.0
 
-RUN rustup default stable-aarch64-unknown-linux-gnu
+RUN rustup default 1.52.0
 
 RUN cargo build --release --locked
 
@@ -22,6 +22,10 @@ RUN cp target/release/clarinet /out
 
 FROM debian:stretch-slim
 
+RUN apt update && apt install -y libssl-dev
+
 COPY --from=build /out/ /bin/
+
+WORKDIR /workspace
 
 ENTRYPOINT ["clarinet"]
