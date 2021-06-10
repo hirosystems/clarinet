@@ -8,8 +8,8 @@
 
 mod deno;
 
-pub fn run_tests(files: Vec<String>, include_coverage: bool) {
-    match block_on(deno::run_tests(files, include_coverage)) {
+pub fn run_tests(files: Vec<String>, include_coverage: bool, watch: bool) {
+    match block_on(deno::do_run_tests(files, include_coverage, watch)) {
       Err(e) => {
         std::process::exit(1)
       }

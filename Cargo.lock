@@ -520,6 +520,7 @@ dependencies = [
  "serde_derive",
  "sha2 0.9.4",
  "shell-escape",
+ "swc_common",
  "termcolor",
  "text-size",
  "tiny-hderive",

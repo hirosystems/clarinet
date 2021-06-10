@@ -111,7 +111,7 @@ export class Chain {
   }
 
   mineBlock(transactions: Array<Tx>): Block {
-    let result = (Deno as any).core.jsonOpSync("mine_block", {
+    let result = (Deno as any).core.opSync("mine_block", {
       sessionId: this.sessionId,
       transactions: transactions,
     });
@@ -124,7 +124,7 @@ export class Chain {
   }
 
   mineEmptyBlock(count: number): EmptyBlock {
-    let result = (Deno as any).core.jsonOpSync("mine_empty_blocks", {
+    let result = (Deno as any).core.opSync("mine_empty_blocks", {
       sessionId: this.sessionId,
       count: count,
     });
@@ -150,7 +150,7 @@ export class Chain {
     args: Array<any>,
     sender: string,
   ): ReadOnlyFn {
-    let result = (Deno as any).core.jsonOpSync("call_read_only_fn", {
+    let result = (Deno as any).core.opSync("call_read_only_fn", {
       sessionId: this.sessionId,
       contract: contract,
       method: method,
@@ -166,7 +166,7 @@ export class Chain {
   }
 
   getAssetsMaps(): AssetsMaps {
-    let result = (Deno as any).core.jsonOpSync("get_assets_maps", {
+    let result = (Deno as any).core.opSync("get_assets_maps", {
       sessionId: this.sessionId,
     });
     let assetsMaps: AssetsMaps = {
@@ -200,7 +200,7 @@ export class Clarinet {
         if (options.preSetup) {
           transactions = options.preSetup()!;
         }
-        let result = (Deno as any).core.jsonOpSync("setup_chain", {
+        let result = (Deno as any).core.opSync("setup_chain", {
           name: options.name,
           transactions: transactions,
         });

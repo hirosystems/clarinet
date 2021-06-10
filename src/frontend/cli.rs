@@ -113,6 +113,9 @@ struct Test {
     /// Generate coverage
     #[clap(long = "coverage")]
     pub coverage: bool,
+    /// Generate coverage
+    #[clap(long = "watch")]
+    pub watch: bool,    
     /// Files to includes
     pub files: Vec<String>,
 }
@@ -229,7 +232,7 @@ pub fn main() {
                 println!("{}", e);
                 return;
             }
-            run_tests(test.files, test.coverage);
+            run_tests(test.files, test.coverage, test.watch);
         },
         Command::Deploy(deploy) => {
             let start_repl = false;

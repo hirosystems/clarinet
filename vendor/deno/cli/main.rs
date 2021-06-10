@@ -1,9 +1,9 @@
 // Copyright 2018-2021 the Deno authors. All rights reserved. MIT license.
 
-mod ast;
+pub mod ast;
 mod auth_tokens;
 mod checksum;
-mod colors;
+pub mod colors;
 mod config_file;
 mod deno_dir;
 mod diagnostics;
@@ -11,7 +11,7 @@ mod diff;
 mod disk_cache;
 mod errors;
 mod file_fetcher;
-mod file_watcher;
+pub mod file_watcher;
 mod flags;
 mod flags_allow_net;
 mod fmt_errors;
@@ -23,15 +23,15 @@ mod info;
 mod lockfile;
 mod logger;
 mod media_type;
-mod module_graph;
+pub mod module_graph;
 mod module_loader;
 mod ops;
 mod program_state;
 mod source_maps;
-mod specifier_handler;
+pub mod specifier_handler;
 mod standalone;
 mod text_encoding;
-mod tokio_util;
+pub mod tokio_util;
 pub mod tools;
 pub mod tsc;
 mod unix_util;
@@ -165,7 +165,6 @@ pub fn create_main_worker(
   let module_loader = CliModuleLoader::new(program_state.clone());
 
   let global_state_ = program_state.clone();
-
   let js_error_create_fn = Rc::new(move |core_js_error| {
     let source_mapped_error =
       apply_source_map(&core_js_error, global_state_.clone());
@@ -184,10 +183,7 @@ pub fn create_main_worker(
   let options = WorkerOptions {
     apply_source_maps: true,
     args: program_state.flags.argv.clone(),
-    debug_flag: program_state
-      .flags
-      .log_level
-      .map_or(false, |l| l == log::Level::Debug),
+    debug_flag: false,
     unstable: program_state.flags.unstable,
     ca_data: program_state.ca_data.clone(),
     user_agent: version::get_user_agent(),
@@ -238,7 +234,6 @@ pub fn create_main_worker(
     js_runtime.sync_ops_cache();
   }
   worker.bootstrap(&options);
-
   worker
 }
 
