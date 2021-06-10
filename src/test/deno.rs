@@ -1,27 +1,25 @@
-use deno_core::serde_json::{json, Value};
-use deno_core::json_op_sync;
+use deno::create_main_worker;
+use deno::File;
+use deno::MediaType;
+use deno::Flags;
+use deno::ProgramState;
+use deno::tools;
+use deno::fs_util;
+use deno::tsc::{op, State};
+use deno_core::{OpFn};
+use deno_core::serde_json::{self, json, Value};
+use deno_core::op_sync;
 use deno_core::error::AnyError;
+use deno_core::url::Url;
+use deno_runtime::web_worker::WebWorkerOptions;
+use deno_runtime::ops::worker_host::CreateWebWorkerCb;
+use deno_runtime::web_worker::WebWorker;
 use deno_runtime::permissions::Permissions;
-use deno_runtime::worker::MainWorker;
-use deno_runtime::worker::WorkerOptions;
+use deno_runtime::worker::{MainWorker, WorkerOptions};
 use std::rc::Rc;
 use std::sync::Arc;
 use serde::Serialize;
 use serde::de::DeserializeOwned;
-use deno_core::{OpFn};
-use super::source_maps::apply_source_map;
-use super::file_fetcher::File;
-use super::media_type::MediaType;
-use super::flags::Flags;
-use super::program_state::ProgramState;
-use super::tools;
-use super::ops;
-use super::fmt_errors::PrettyJsError;
-use super::module_loader::CliModuleLoader;
-use deno_core::ModuleSpecifier;
-use deno_runtime::web_worker::WebWorkerOptions;
-use deno_runtime::ops::worker_host::CreateWebWorkerCb;
-use deno_runtime::web_worker::WebWorker;
 use clarity_repl::clarity::coverage::CoverageReporter;
 
 mod sessions {
@@ -155,7 +153,7 @@ pub async fn run_tests(files: Vec<String>, include_coverage: bool) -> Result<(),
       vec!["./tests/".to_string()]
     };
     let test_modules =
-      tools::test_runner::prepare_test_modules_urls(include, &cwd)?;
+      tools::test_runner::collect_test_module_specifiers(include, &cwd, fs_util::is_supported_ext)?;
   
     if test_modules.is_empty() {
       println!("No matching test modules found");
@@ -164,7 +162,7 @@ pub async fn run_tests(files: Vec<String>, include_coverage: bool) -> Result<(),
     let main_module = deno_core::resolve_path("$deno$test.ts")?;
     // Create a dummy source file.
 
-    let source = tools::test_runner::render_test_file(
+    let source = render_test_file(
       test_modules.clone(),
       fail_fast,
       quiet,
@@ -184,7 +182,7 @@ pub async fn run_tests(files: Vec<String>, include_coverage: bool) -> Result<(),
     program_state.file_fetcher.insert_cached(source_file);
   
     let mut worker =
-      create_main_worker(&program_state, main_module.clone(), permissions);
+      create_main_worker(&program_state, main_module.clone(), permissions, false);
 
     worker.js_runtime.register_op("setup_chain", op(setup_chain));
     worker.js_runtime.register_op("mine_block", op(mine_block));
@@ -199,14 +197,14 @@ pub async fn run_tests(files: Vec<String>, include_coverage: bool) -> Result<(),
     }
   
     worker.execute("window.dispatchEvent(new Event('load'))");
-    let res = worker.run_event_loop().await;
+    let res = worker.run_event_loop(false).await;
     if let Err(e) = res {
       println!("{}", e);
       return Err(e);
     }
 
     worker.execute("window.dispatchEvent(new Event('unload'))")?;
-    let res = worker.run_event_loop().await;
+    let res = worker.run_event_loop(false).await;
     if let Err(e) = res {
       println!("{}", e);
       return Err(e);
@@ -233,157 +231,44 @@ pub async fn run_tests(files: Vec<String>, include_coverage: bool) -> Result<(),
     Ok(())
 }
 
-fn create_web_worker_callback(
-    program_state: Arc<ProgramState>,
-  ) -> Arc<CreateWebWorkerCb> {
-    Arc::new(move |args| {
-      let global_state_ = program_state.clone();
-      let js_error_create_fn = Rc::new(move |core_js_error| {
-        let source_mapped_error =
-          apply_source_map(&core_js_error, global_state_.clone());
-        PrettyJsError::create(source_mapped_error)
-      });
-  
-      let attach_inspector = program_state.maybe_inspector_server.is_some()
-        || program_state.coverage_dir.is_some();
-      let maybe_inspector_server = program_state.maybe_inspector_server.clone();
-  
-      let module_loader = CliModuleLoader::new_for_worker(
-        program_state.clone(),
-        args.parent_permissions.clone(),
-      );
-      let create_web_worker_cb =
-        create_web_worker_callback(program_state.clone());
-  
-      let options = WebWorkerOptions {
-        args: program_state.flags.argv.clone(),
-        apply_source_maps: true,
-        debug_flag: false,
-        unstable: program_state.flags.unstable,
-        ca_data: program_state.ca_data.clone(),
-        user_agent: super::version::get_user_agent(),
-        seed: program_state.flags.seed,
-        module_loader,
-        create_web_worker_cb,
-        js_error_create_fn: Some(js_error_create_fn),
-        use_deno_namespace: args.use_deno_namespace,
-        attach_inspector,
-        maybe_inspector_server,
-        runtime_version: super::version::deno(),
-        ts_version: super::version::TYPESCRIPT.to_string(),
-        no_color: !super::colors::use_color(),
-        get_error_class_fn: None,
-      };
-  
-      let mut worker = WebWorker::from_options(
-        args.name,
-        args.permissions,
-        args.main_module,
-        args.worker_id,
-        &options,
-      );
-  
-      // This block registers additional ops and state that
-      // are only available in the CLI
-      {
-        let js_runtime = &mut worker.js_runtime;
-        js_runtime
-          .op_state()
-          .borrow_mut()
-          .put::<Arc<ProgramState>>(program_state.clone());
-        // Applies source maps - works in conjuction with `js_error_create_fn`
-        // above
-        ops::errors::init(js_runtime);
-        if args.use_deno_namespace {
-          ops::runtime_compiler::init(js_runtime);
-        }
-      }
-      worker.bootstrap(&options);
-  
-      worker
-    })
+pub fn render_test_file(
+  modules: Vec<Url>,
+  fail_fast: bool,
+  quiet: bool,
+  filter: Option<String>,
+) -> String {
+  let mut test_file = "".to_string();
+
+  for module in modules {
+    test_file.push_str(&format!("import \"{}\";\n", module.to_string()));
   }
 
-pub fn create_main_worker(
-    program_state: &Arc<ProgramState>,
-    main_module: ModuleSpecifier,
-    permissions: Permissions,
-  ) -> MainWorker {
-    let module_loader = CliModuleLoader::new(program_state.clone());
-  
-    let global_state_ = program_state.clone();
-  
-    let js_error_create_fn = Rc::new(move |core_js_error| {
-      let source_mapped_error =
-        apply_source_map(&core_js_error, global_state_.clone());
-      PrettyJsError::create(source_mapped_error)
-    });
-  
-    let attach_inspector = program_state.maybe_inspector_server.is_some()
-      || program_state.flags.repl
-      || program_state.coverage_dir.is_some();
-    let maybe_inspector_server = program_state.maybe_inspector_server.clone();
-    let should_break_on_first_statement =
-      program_state.flags.inspect_brk.is_some();
-  
-    let create_web_worker_cb = create_web_worker_callback(program_state.clone());
-  
-    let options = WorkerOptions {
-      apply_source_maps: true,
-      args: program_state.flags.argv.clone(),
-      debug_flag: false,
-      unstable: program_state.flags.unstable,
-      ca_data: program_state.ca_data.clone(),
-      user_agent: super::version::get_user_agent(),
-      seed: program_state.flags.seed,
-      js_error_create_fn: Some(js_error_create_fn),
-      create_web_worker_cb,
-      attach_inspector,
-      maybe_inspector_server,
-      should_break_on_first_statement,
-      module_loader,
-      runtime_version: super::version::deno(),
-      ts_version: super::version::TYPESCRIPT.to_string(),
-      no_color: !super::colors::use_color(),
-      get_error_class_fn: None,
-      location: program_state.flags.location.clone(),
-    };
-  
-    let mut worker = MainWorker::from_options(main_module, permissions, &options);
-  
-    // This block registers additional ops and state that
-    // are only available in the CLI
-    {
-      let js_runtime = &mut worker.js_runtime;
-      js_runtime
-        .op_state()
-        .borrow_mut()
-        .put::<Arc<ProgramState>>(program_state.clone());
-      // Applies source maps - works in conjuction with `js_error_create_fn`
-      // above
-      ops::errors::init(js_runtime);
-      ops::runtime_compiler::init(js_runtime);
-    }
-    worker.bootstrap(&options);
-  
-    worker
-  }
+  let options = if let Some(filter) = filter {
+    json!({ "failFast": fail_fast, "reportToConsole": !quiet, "disableLog": quiet, "filter": filter })
+  } else {
+    json!({ "failFast": fail_fast, "reportToConsole": !quiet, "disableLog": quiet })
+  };
 
-  
-fn get_error_class_name(e: &AnyError) -> &'static str {
-    deno_runtime::errors::get_error_class_name(e).unwrap_or("Error")
+  test_file.push_str("// @ts-ignore\n");
+
+  test_file.push_str(&format!(
+    "await Deno[Deno.internal].runTests({});\n",
+    options
+  ));
+
+  test_file
 }
 
-fn op<F, V, R>(op_fn: F) -> Box<OpFn>
-where
-  F: Fn(V) -> Result<R, AnyError> + 'static,
-  V: DeserializeOwned,
-  R: Serialize,
-{
-    json_op_sync(move |s, args, _bufs| {
-        op_fn(args)
-    })    
-}
+// fn op<F, V, R>(op_fn: F) -> Box<OpFn>
+// where
+//   F: Fn(V) -> Result<R, AnyError> + 'static,
+//   V: DeserializeOwned,
+//   R: Serialize,
+// {
+//     op_sync(move |s, args, _: ()| {
+//         op_fn(args)
+//     })    
+// }
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -392,7 +277,9 @@ struct SetupChainArgs {
   transactions: Vec<TransactionArgs>
 }
 
-fn setup_chain(args: SetupChainArgs) -> Result<Value, AnyError> {
+fn setup_chain(state: &mut State, args: Value) -> Result<Value, AnyError> {
+    let args: SetupChainArgs = serde_json::from_value(args)
+      .expect("Invalid request from JavaScript for \"op_load\".");
     let (session_id, accounts) = sessions::handle_setup_chain(args.name, args.transactions)?;
 
     Ok(json!({
@@ -439,7 +326,9 @@ struct TransferSTXArgs {
   recipient: String,
 }
 
-fn mine_block(args: MineBlockArgs) -> Result<Value, AnyError> {
+fn mine_block(state: &mut State, args: Value) -> Result<Value, AnyError> {
+  let args: MineBlockArgs = serde_json::from_value(args)
+    .expect("Invalid request from JavaScript.");
   let (block_height, receipts) = sessions::perform_block(args.session_id, |name, session| {
       let initial_tx_sender = session.get_tx_sender();
       let mut receipts = vec![];
@@ -486,7 +375,9 @@ struct MineEmptyBlocksArgs {
   count: u32,
 }
 
-fn mine_empty_blocks(args: MineEmptyBlocksArgs) -> Result<Value, AnyError> {
+fn mine_empty_blocks(state: &mut State, args: Value) -> Result<Value, AnyError> {
+  let args: MineEmptyBlocksArgs = serde_json::from_value(args)
+    .expect("Invalid request from JavaScript.");
   let block_height = sessions::perform_block(args.session_id, |name, session| {
     let block_height = session.advance_chain_tip(args.count);
     Ok(block_height)
@@ -506,9 +397,11 @@ struct CallReadOnlyFnArgs {
   contract: String,
   method: String,
   args: Vec<String>,
-}
+}  
 
-fn call_read_only_fn(args: CallReadOnlyFnArgs) -> Result<Value, AnyError> {
+fn call_read_only_fn(state: &mut State, args: Value) -> Result<Value, AnyError> {
+  let args: CallReadOnlyFnArgs = serde_json::from_value(args)
+    .expect("Invalid request from JavaScript.");
   let (result, events) = sessions::perform_block(args.session_id, |name, session| {
     let initial_tx_sender = session.get_tx_sender();
     session.set_tx_sender(args.sender.clone());
@@ -539,7 +432,9 @@ struct GetAssetsMapsArgs {
   session_id: u32,
 }
 
-fn get_assets_maps(args: GetAssetsMapsArgs) -> Result<Value, AnyError> {
+fn get_assets_maps(state: &mut State, args: Value) -> Result<Value, AnyError> {
+  let args: GetAssetsMapsArgs = serde_json::from_value(args)
+    .expect("Invalid request from JavaScript.");
   let assets_maps = sessions::perform_block(args.session_id, |name, session| {
     let assets_maps = session.get_assets_maps();    
     Ok(assets_maps)
