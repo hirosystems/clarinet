@@ -44,6 +44,9 @@ enum Command {
     /// Deploy subcommand
     #[clap(name = "deploy")]
     Deploy(Deploy),
+    /// Run subcommand
+    #[clap(name = "run")]
+    Run(Run),
 }
 
 #[derive(Clap)]
@@ -115,6 +118,15 @@ struct Test {
     pub coverage: bool,
     /// Files to includes
     pub files: Vec<String>,
+}
+
+#[derive(Clap)]
+struct Run {
+    /// Print debug info
+    #[clap(short = 'd')]
+    pub debug: bool,
+    /// Script to run
+    pub script: String,
 }
 
 #[derive(Clap)]
@@ -230,6 +242,19 @@ pub fn main() {
                 return;
             }
             run_tests(test.files, test.coverage);
+        },
+        Command::Run(run) => {
+            let start_repl = false;
+            println!("Z");
+
+            let res = load_session(start_repl, "development".into());
+            if let Err(e) = res {
+                println!("{}", e);
+                return;
+            }
+            println!("X");
+
+            run_tests(vec![run.script], false);
         },
         Command::Deploy(deploy) => {
             let start_repl = false;

@@ -29,9 +29,10 @@ mod sessions {
     use std::fs;
     use std::env;
     use std::collections::HashMap;
+    use clarity_repl::clarity::analysis::ContractAnalysis;
     use deno_core::error::AnyError;
     use clarity_repl::repl::{self, Session};
-    use clarity_repl::repl::settings::Account;
+    use clarity_repl::repl::settings::{Account, InitialContract};
     use crate::types::{ChainConfig, MainConfig};
     use super::TransactionArgs;
 
@@ -39,7 +40,7 @@ mod sessions {
         pub static ref SESSIONS: Mutex<HashMap<u32, (String, Session)>> = Mutex::new(HashMap::new());
     }
 
-    pub fn handle_setup_chain(name: String, transactions: Vec<TransactionArgs>) -> Result<(u32, Vec<Account>), AnyError> {
+    pub fn handle_setup_chain(name: String, transactions: Vec<TransactionArgs>) -> Result<(u32, Vec<Account>, Vec<ContractAnalysis>), AnyError> {
         let mut sessions = SESSIONS.lock().unwrap();
         let session_id = sessions.len() as u32;
 
@@ -100,6 +101,7 @@ mod sessions {
           // }
         }
 
+        println!("1");
 
         for (name, config) in project_config.ordered_contracts().iter() {
             let mut contract_path = root_path.clone();
@@ -119,10 +121,10 @@ mod sessions {
         settings.initial_deployer = initial_deployer;
         settings.include_boot_contracts = vec!["pox".to_string(), "costs".to_string(), "bns".to_string()];
         let mut session = Session::new(settings.clone());
-        session.start();
+        let (_, contracts) = session.start();
         session.advance_chain_tip(1);
         sessions.insert(session_id, (name, session));
-        Ok((session_id, settings.initial_accounts))
+        Ok((session_id, settings.initial_accounts, contracts))
     }
 
     pub fn perform_block<F, R>(session_id: u32, handler: F) -> Result<R, AnyError> where F: FnOnce(&str, &mut Session) -> Result<R, AnyError> {
@@ -139,6 +141,7 @@ mod sessions {
 
 pub async fn run_tests(files: Vec<String>, include_coverage: bool) -> Result<(), AnyError> {
 
+    println!("A");
     let fail_fast = true;
     let quiet = false;
     let filter = None;
@@ -148,6 +151,7 @@ pub async fn run_tests(files: Vec<String>, include_coverage: bool) -> Result<(),
     let program_state = ProgramState::build(flags.clone()).await?;
     let permissions = Permissions::from_options(&flags.clone().into());
     let cwd = std::env::current_dir().expect("No current directory");
+    println!("B");
 
     let include = if files.len() > 0 {
       files.clone()
@@ -163,6 +167,7 @@ pub async fn run_tests(files: Vec<String>, include_coverage: bool) -> Result<(),
     }
     let main_module = deno_core::resolve_path("$deno$test.ts")?;
     // Create a dummy source file.
+    println!("C");
 
     let source = tools::test_runner::render_test_file(
       test_modules.clone(),
@@ -197,7 +202,8 @@ pub async fn run_tests(files: Vec<String>, include_coverage: bool) -> Result<(),
       println!("{}", e);
       return Err(e);
     }
-  
+    println!("D");
+
     worker.execute("window.dispatchEvent(new Event('load'))");
     let res = worker.run_event_loop().await;
     if let Err(e) = res {
@@ -211,6 +217,7 @@ pub async fn run_tests(files: Vec<String>, include_coverage: bool) -> Result<(),
       println!("{}", e);
       return Err(e);
     }
+    println!("E");
 
     if include_coverage {
       let mut coverage_reporter = CoverageReporter::new();
@@ -227,7 +234,7 @@ pub async fn run_tests(files: Vec<String>, include_coverage: bool) -> Result<(),
         coverage_reporter.add_reports(&session.coverage_reports);
         coverage_reporter.add_asts(&session.asts);
       }
-  
+
       coverage_reporter.write_lcov_file("coverage.lcov");  
     }
     Ok(())
@@ -393,11 +400,13 @@ struct SetupChainArgs {
 }
 
 fn setup_chain(args: SetupChainArgs) -> Result<Value, AnyError> {
-    let (session_id, accounts) = sessions::handle_setup_chain(args.name, args.transactions)?;
+    let (session_id, accounts, contracts) = sessions::handle_setup_chain(args.name, args.transactions)?;
 
     Ok(json!({
         "session_id": session_id,
         "accounts": accounts,
+        "contracts": contracts,
+        "stacks_node_url": "",
     }))
 }
 
