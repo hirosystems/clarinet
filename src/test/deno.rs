@@ -44,6 +44,7 @@ mod sessions {
     use std::fs;
     use std::env;
     use std::collections::HashMap;
+    use clarity_repl::clarity::analysis::ContractAnalysis;
     use deno_core::error::AnyError;
     use clarity_repl::repl::{self, Session};
     use clarity_repl::repl::settings::Account;
@@ -54,7 +55,7 @@ mod sessions {
         pub static ref SESSIONS: Mutex<HashMap<u32, (String, Session)>> = Mutex::new(HashMap::new());
     }
 
-    pub fn handle_setup_chain(name: String, transactions: Vec<TransactionArgs>) -> Result<(u32, Vec<Account>), AnyError> {
+    pub fn handle_setup_chain(name: String, transactions: Vec<TransactionArgs>) -> Result<(u32, Vec<Account>, Vec<(ContractAnalysis, String)>), AnyError> {
         let mut sessions = SESSIONS.lock().unwrap();
         let session_id = sessions.len() as u32;
 
@@ -133,10 +134,10 @@ mod sessions {
         settings.initial_deployer = initial_deployer;
         settings.include_boot_contracts = vec!["pox".to_string(), "costs".to_string(), "bns".to_string()];
         let mut session = Session::new(settings.clone());
-        session.start();
+        let (_, contracts) = session.start();
         session.advance_chain_tip(1);
         sessions.insert(session_id, (name, session));
-        Ok((session_id, settings.initial_accounts))
+        Ok((session_id, settings.initial_accounts, contracts))
     }
 
     pub fn perform_block<F, R>(session_id: u32, handler: F) -> Result<R, AnyError> where F: FnOnce(&str, &mut Session) -> Result<R, AnyError> {
@@ -702,11 +703,17 @@ struct SetupChainArgs {
 fn setup_chain(state: &mut OpState, args: Value, _: ()) -> Result<String, AnyError> {
     let args: SetupChainArgs = serde_json::from_value(args)
       .expect("Invalid request from JavaScript for \"op_load\".");
-    let (session_id, accounts) = sessions::handle_setup_chain(args.name, args.transactions)?;
+    let (session_id, accounts, contracts) = sessions::handle_setup_chain(args.name, args.transactions)?;
+    let serialized_contracts = contracts.iter().map(|(a, s)| json!({
+      "contract_id": a.contract_identifier.to_string(),
+      "contract_interface": a.contract_interface.clone(),
+      "source": s
+    })).collect::<Vec<_>>();
 
     Ok(json!({
         "session_id": session_id,
         "accounts": accounts,
+        "contracts": serialized_contracts,
     }).to_string())
 }
 

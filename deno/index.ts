@@ -189,6 +189,26 @@ interface UnitTestOptions {
   fn: TestFunction;
 }
 
+export interface Contract {
+  contract_id: string;
+  source: string;
+  contract_interface: any
+}
+
+export interface StacksNode {
+  url: string;
+}
+
+type ScriptFunction = (
+  accounts: Map<string, Account>,
+  contracts: Map<string, Contract>,
+  node: StacksNode,
+) => void | Promise<void>;
+
+interface ScriptOptions {
+  fn: ScriptFunction;
+}
+
 export class Clarinet {
   static test(options: UnitTestOptions) {
     Deno.test({
@@ -213,6 +233,32 @@ export class Clarinet {
       },
     });
   }
+
+  static run(options: ScriptOptions) {
+    Deno.test({
+      name: "running script",
+      async fn() {
+        (Deno as any).core.ops();
+        let result = JSON.parse((Deno as any).core.opSync("setup_chain", {
+          name: "running script",
+          transactions: [],
+        }));
+        let accounts: Map<string, Account> = new Map();
+        for (let account of result["accounts"]) {
+          accounts.set(account.name, account);
+        }
+        let contracts: Map<string, any> = new Map();
+        for (let contract of result["contracts"]) {
+          contracts.set(contract.contract_id, contract);
+        }
+        let stacks_node: StacksNode = {
+          url: result["stacks_node_url"]
+        };
+        await options.fn(accounts, contracts, stacks_node);
+      },
+    });
+  }
+
 }
 
 export namespace types {
