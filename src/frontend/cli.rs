@@ -411,6 +411,10 @@ fn execute_changes(changes: Vec<Changes>) {
     for mut change in changes.into_iter() {
         match change {
             Changes::AddFile(options) => {
+                if fs::metadata(&options.path).unwrap().is_file() {
+                    println!("File already exists at path {}", options.path);
+                    continue;
+                }
                 println!("{}", options.comment);
                 let mut file = File::create(options.path.clone()).expect("Unable to create file");
                 file.write_all(options.content.as_bytes())

@@ -52,7 +52,13 @@ pub struct NotebookConfig {
 
 impl MainConfig {
     pub fn from_path(path: &PathBuf) -> MainConfig {
-        let path = File::open(path).unwrap();
+        let path = match File::open(path) {
+            Ok(path) => path,
+            Err(_e) => {
+                println!("Error: unable to locate Clarinet.toml in current directory");
+                std::process::exit(1);
+            }
+        };
         let mut config_file_reader = BufReader::new(path);
         let mut config_file_buffer = vec![];
         config_file_reader
