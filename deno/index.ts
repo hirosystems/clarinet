@@ -180,6 +180,7 @@ export class Chain {
 type TestFunction = (
   chain: Chain,
   accounts: Map<string, Account>,
+  contracts: Map<string, Contract>,
 ) => void | Promise<void>;
 type PreSetupFunction = () => Array<Tx>;
 
@@ -220,16 +221,20 @@ export class Clarinet {
         if (options.preSetup) {
           transactions = options.preSetup()!;
         }
-        let result = (Deno as any).core.opSync("setup_chain", {
+        let result = JSON.parse((Deno as any).core.opSync("setup_chain", {
           name: options.name,
           transactions: transactions,
-        });
+        }));
         let chain = new Chain(result["session_id"]);
         let accounts: Map<string, Account> = new Map();
         for (let account of result["accounts"]) {
           accounts.set(account.name, account);
         }
-        await options.fn(chain, accounts);
+        let contracts: Map<string, any> = new Map();
+        for (let contract of result["contracts"]) {
+          contracts.set(contract.contract_id, contract);
+        }
+        await options.fn(chain, accounts, contracts);
       },
     });
   }
