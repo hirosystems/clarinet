@@ -111,10 +111,10 @@ export class Chain {
   }
 
   mineBlock(transactions: Array<Tx>): Block {
-    let result = (Deno as any).core.opSync("mine_block", {
+    let result = JSON.parse((Deno as any).core.opSync("mine_block", {
       sessionId: this.sessionId,
       transactions: transactions,
-    });
+    }));
     this.blockHeight = result.block_height;
     let block: Block = {
       height: result.block_height,
@@ -124,10 +124,10 @@ export class Chain {
   }
 
   mineEmptyBlock(count: number): EmptyBlock {
-    let result = (Deno as any).core.opSync("mine_empty_blocks", {
+    let result = JSON.parse((Deno as any).core.opSync("mine_empty_blocks", {
       sessionId: this.sessionId,
       count: count,
-    });
+    }));
     this.blockHeight = result.block_height;
     let emptyBlock: EmptyBlock = {
       session_id: result.session_id,
@@ -150,13 +150,13 @@ export class Chain {
     args: Array<any>,
     sender: string,
   ): ReadOnlyFn {
-    let result = (Deno as any).core.opSync("call_read_only_fn", {
+    let result = JSON.parse((Deno as any).core.opSync("call_read_only_fn", {
       sessionId: this.sessionId,
       contract: contract,
       method: method,
       args: args,
       sender: sender,
-    });    
+    }));  
     let readOnlyFn: ReadOnlyFn = {
       session_id: result.session_id,
       result: result.result,
@@ -166,9 +166,9 @@ export class Chain {
   }
 
   getAssetsMaps(): AssetsMaps {
-    let result = (Deno as any).core.opSync("get_assets_maps", {
+    let result = JSON.parse((Deno as any).core.opSync("get_assets_maps", {
       sessionId: this.sessionId,
-    });
+    }));
     let assetsMaps: AssetsMaps = {
       session_id: result.session_id,
       assets: result.assets

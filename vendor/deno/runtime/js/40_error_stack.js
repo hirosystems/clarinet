@@ -9,7 +9,7 @@
   }
 
   function opApplySourceMap(location) {
-    const res = core.opSync("op_apply_source_map", location);
+    const res = JSON.parse(core.opSync("op_apply_source_map", location));
     return {
       fileName: res.fileName,
       lineNumber: res.lineNumber,

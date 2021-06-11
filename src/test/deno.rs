@@ -165,7 +165,6 @@ pub async fn do_run_tests(include: Vec<String>, include_coverage: bool, watch: b
       include.clone()
     };
 
-    let doc_modules = vec![];
     let allow_none = true;
     let no_run = false;
     let concurrent_jobs = 2;
@@ -191,9 +190,9 @@ pub async fn do_run_tests(include: Vec<String>, include_coverage: bool, watch: b
         let doc_modules_result = test_runner::collect_test_module_specifiers(
           include.clone(),
           &cwd,
-          fs_util::is_supported_ext,
+          is_supported_ext,
         );
-  
+
         let test_modules_result = test_runner::collect_test_module_specifiers(
           include.clone(),
           &cwd,
@@ -207,6 +206,8 @@ pub async fn do_run_tests(include: Vec<String>, include_coverage: bool, watch: b
         let program_state = program_state.clone();
         let files_changed = changed.is_some();
         async move {
+          let doc_modules = doc_modules_result?;
+
           let test_modules = test_modules_result?;
   
           let mut paths_to_watch = paths_to_watch_clone;
@@ -284,9 +285,13 @@ pub async fn do_run_tests(include: Vec<String>, include_coverage: bool, watch: b
               for path in changed.iter().filter_map(|path| {
                 deno_core::resolve_url_or_path(&path.to_string_lossy()).ok()
               }) {
-                if modules.contains(&&path) {
-                  modules_to_reload.push(specifier);
-                  break;
+                if path.path().ends_with(".clar") {
+                  modules_to_reload.push(specifier.clone());
+                } else {
+                  if modules.contains(&&path) {
+                    modules_to_reload.push(specifier);
+                    break;
+                  }  
                 }
               }
             }
@@ -295,23 +300,17 @@ pub async fn do_run_tests(include: Vec<String>, include_coverage: bool, watch: b
           Ok((paths_to_watch, modules_to_reload))
         }
         .map(move |result| {
-          if files_changed
-            && matches!(result, Ok((_, ref modules)) if modules.is_empty())
-          {
-            ResolutionResult::Ignore
-          } else {
-            match result {
-              Ok((paths_to_watch, modules_to_reload)) => {
-                ResolutionResult::Restart {
-                  paths_to_watch,
-                  result: Ok(modules_to_reload),
-                }
-              }
-              Err(e) => ResolutionResult::Restart {
+          match result {
+            Ok((paths_to_watch, modules_to_reload)) => {
+              ResolutionResult::Restart {
                 paths_to_watch,
-                result: Err(e),
-              },
+                result: Ok(modules_to_reload),
+              }
             }
+            Err(e) => ResolutionResult::Restart {
+              paths_to_watch,
+              result: Err(e),
+            },
           }
         })
       };
@@ -338,6 +337,8 @@ pub async fn do_run_tests(include: Vec<String>, include_coverage: bool, watch: b
       )
       .await?;
     } else {
+      let doc_modules = vec![];
+
       let test_modules = test_runner::collect_test_module_specifiers(
         include.clone(),
         &cwd,
@@ -384,6 +385,14 @@ pub async fn do_run_tests(include: Vec<String>, include_coverage: bool, watch: b
     }
 
     Ok(true)
+}
+
+pub fn is_supported_ext(path: &Path) -> bool {
+  if let Some(ext) = fs_util::get_extension(path) {
+    matches!(ext.as_str(), "ts" | "js" | "clar")
+  } else {
+    false
+  }
 }
 
 #[allow(clippy::too_many_arguments)]

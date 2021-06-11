@@ -30,7 +30,7 @@ fn op_apply_source_map(
   state: &mut OpState,
   args: Value,
   _: (),
-) -> Result<Value, AnyError> {
+) -> Result<String, AnyError> {
   let args: ApplySourceMap = serde_json::from_value(args)?;
 
   let mut mappings_map: CachedMaps = HashMap::new();
@@ -49,7 +49,7 @@ fn op_apply_source_map(
     "fileName": orig_file_name,
     "lineNumber": orig_line_number as u32,
     "columnNumber": orig_column_number as u32,
-  }))
+  }).to_string())
 }
 
 fn op_format_diagnostic(
