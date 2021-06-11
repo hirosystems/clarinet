@@ -180,6 +180,7 @@ export class Chain {
 type TestFunction = (
   chain: Chain,
   accounts: Map<string, Account>,
+  contracts: Map<string, Contract>,
 ) => void | Promise<void>;
 type PreSetupFunction = () => Array<Tx>;
 
@@ -229,7 +230,11 @@ export class Clarinet {
         for (let account of result["accounts"]) {
           accounts.set(account.name, account);
         }
-        await options.fn(chain, accounts);
+        let contracts: Map<string, any> = new Map();
+        for (let contract of result["contracts"]) {
+          contracts.set(contract.contract_id, contract);
+        }
+        await options.fn(chain, accounts, contracts);
       },
     });
   }
