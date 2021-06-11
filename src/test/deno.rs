@@ -1,27 +1,42 @@
-use deno_core::serde_json::{json, Value};
-use deno_core::json_op_sync;
+use deno::create_main_worker;
+use deno::ast;
+use deno::colors;
+use deno::File;
+use deno::MediaType;
+use deno::Flags;
+use deno::ProgramState;
+use deno::tools;
+use deno::module_graph::{self, GraphBuilder, Module};
+use deno::specifier_handler::FetchHandler;
+use deno::file_watcher::{self, ResolutionResult};
+use deno::fs_util;
+use deno::tsc::{op, State};
+use deno::tools::test_runner::{self, TestEvent, TestMessage, TestResult, create_reporter};
+use deno::tools::coverage::CoverageCollector;
+use deno::tokio_util;
+use deno_core::{OpFn, OpState};
+use deno_core::serde_json::{self, json, Value};
+use deno_core::op_sync;
 use deno_core::error::AnyError;
+use deno_core::url::Url;
+use deno_core::ModuleSpecifier;
+use deno_core::futures::future;
+use deno_core::futures::stream;
+use deno_core::futures::FutureExt;
+use deno_core::futures::StreamExt;
 use deno_runtime::permissions::Permissions;
-use deno_runtime::worker::MainWorker;
-use deno_runtime::worker::WorkerOptions;
+use swc_common::comments::CommentKind;
+use regex::Regex;
+use std::path::Path;
+use std::path::PathBuf;
 use std::rc::Rc;
+use std::sync::mpsc::channel;
+use std::sync::mpsc::Sender;
 use std::sync::Arc;
+use std::sync::Mutex;
+use std::collections::HashSet;
 use serde::Serialize;
 use serde::de::DeserializeOwned;
-use deno_core::{OpFn};
-use super::source_maps::apply_source_map;
-use super::file_fetcher::File;
-use super::media_type::MediaType;
-use super::flags::Flags;
-use super::program_state::ProgramState;
-use super::tools;
-use super::ops;
-use super::fmt_errors::PrettyJsError;
-use super::module_loader::CliModuleLoader;
-use deno_core::ModuleSpecifier;
-use deno_runtime::web_worker::WebWorkerOptions;
-use deno_runtime::ops::worker_host::CreateWebWorkerCb;
-use deno_runtime::web_worker::WebWorker;
 use clarity_repl::clarity::coverage::CoverageReporter;
 
 mod sessions {
@@ -29,6 +44,7 @@ mod sessions {
     use std::fs;
     use std::env;
     use std::collections::HashMap;
+    use clarity_repl::clarity::analysis::ContractAnalysis;
     use deno_core::error::AnyError;
     use clarity_repl::repl::{self, Session};
     use clarity_repl::repl::settings::Account;
@@ -39,7 +55,7 @@ mod sessions {
         pub static ref SESSIONS: Mutex<HashMap<u32, (String, Session)>> = Mutex::new(HashMap::new());
     }
 
-    pub fn handle_setup_chain(name: String, transactions: Vec<TransactionArgs>) -> Result<(u32, Vec<Account>), AnyError> {
+    pub fn handle_setup_chain(name: String, transactions: Vec<TransactionArgs>) -> Result<(u32, Vec<Account>, Vec<(ContractAnalysis, String)>), AnyError> {
         let mut sessions = SESSIONS.lock().unwrap();
         let session_id = sessions.len() as u32;
 
@@ -100,7 +116,6 @@ mod sessions {
           // }
         }
 
-
         for (name, config) in project_config.ordered_contracts().iter() {
             let mut contract_path = root_path.clone();
             contract_path.push(&config.path);
@@ -119,10 +134,10 @@ mod sessions {
         settings.initial_deployer = initial_deployer;
         settings.include_boot_contracts = vec!["pox".to_string(), "costs".to_string(), "bns".to_string()];
         let mut session = Session::new(settings.clone());
-        session.start();
+        let (_, contracts) = session.start();
         session.advance_chain_tip(1);
         sessions.insert(session_id, (name, session));
-        Ok((session_id, settings.initial_accounts))
+        Ok((session_id, settings.initial_accounts, contracts))
     }
 
     pub fn perform_block<F, R>(session_id: u32, handler: F) -> Result<R, AnyError> where F: FnOnce(&str, &mut Session) -> Result<R, AnyError> {
@@ -137,79 +152,217 @@ mod sessions {
     }
 }
 
-pub async fn run_tests(files: Vec<String>, include_coverage: bool) -> Result<(), AnyError> {
-
-    let fail_fast = true;
-    let quiet = false;
-    let filter = None;
+pub async fn do_run_tests(include: Vec<String>, include_coverage: bool, watch: bool) -> Result<bool, AnyError> {
 
     let mut flags = Flags::default();
     flags.unstable = true;
     let program_state = ProgramState::build(flags.clone()).await?;
     let permissions = Permissions::from_options(&flags.clone().into());
     let cwd = std::env::current_dir().expect("No current directory");
-
-    let include = if files.len() > 0 {
-      files.clone()
+    let include = if include.is_empty() {
+      vec![".".into()]
     } else {
-      vec!["./tests/".to_string()]
-    };
-    let test_modules =
-      tools::test_runner::prepare_test_modules_urls(include, &cwd)?;
-  
-    if test_modules.is_empty() {
-      println!("No matching test modules found");
-      return Ok(());
-    }
-    let main_module = deno_core::resolve_path("$deno$test.ts")?;
-    // Create a dummy source file.
-
-    let source = tools::test_runner::render_test_file(
-      test_modules.clone(),
-      fail_fast,
-      quiet,
-      filter,
-    );
-
-    let source_file = File {
-      local: main_module.to_file_path().unwrap(),
-      maybe_types: None,
-      media_type: MediaType::TypeScript,
-      source,
-      specifier: main_module.clone(),
+      include.clone()
     };
 
-    // Save our fake file into file fetcher cache
-    // to allow module access by TS compiler
-    program_state.file_fetcher.insert_cached(source_file);
+    let allow_none = true;
+    let no_run = false;
+    let concurrent_jobs = 2;
+    let quiet = false;
+    let filter: Option<String> = None;
+    let fail_fast = true;
+    let lib = if flags.unstable {
+      module_graph::TypeLib::UnstableDenoWindow
+    } else {
+      module_graph::TypeLib::DenoWindow
+    };
   
-    let mut worker =
-      create_main_worker(&program_state, main_module.clone(), permissions);
+    if watch {
+      let handler = Arc::new(Mutex::new(FetchHandler::new(
+        &program_state,
+        Permissions::allow_all(),
+        Permissions::allow_all(),
+      )?));
+  
+      let paths_to_watch: Vec<_> = include.iter().map(PathBuf::from).collect();
+  
+      let resolver = |changed: Option<Vec<PathBuf>>| {
+        let doc_modules_result = test_runner::collect_test_module_specifiers(
+          include.clone(),
+          &cwd,
+          is_supported_ext,
+        );
 
-    worker.js_runtime.register_op("setup_chain", op(setup_chain));
-    worker.js_runtime.register_op("mine_block", op(mine_block));
-    worker.js_runtime.register_op("mine_empty_blocks", op(mine_empty_blocks));
-    worker.js_runtime.register_op("call_read_only_fn", op(call_read_only_fn));
-    worker.js_runtime.register_op("get_assets_maps", op(get_assets_maps));
+        let test_modules_result = test_runner::collect_test_module_specifiers(
+          include.clone(),
+          &cwd,
+          test_runner::is_supported,
+        );
+  
+        let paths_to_watch = paths_to_watch.clone();
+        let paths_to_watch_clone = paths_to_watch.clone();
+  
+        let handler = handler.clone();
+        let program_state = program_state.clone();
+        let files_changed = changed.is_some();
+        async move {
+          let doc_modules = doc_modules_result?;
+
+          let test_modules = test_modules_result?;
+  
+          let mut paths_to_watch = paths_to_watch_clone;
+          let mut modules_to_reload = if files_changed {
+            Vec::new()
+          } else {
+            test_modules
+              .iter()
+              .filter_map(|url| deno_core::resolve_url(url.as_str()).ok())
+              .collect()
+          };
+  
+          let mut builder = GraphBuilder::new(
+            handler,
+            program_state.maybe_import_map.clone(),
+            program_state.lockfile.clone(),
+          );
+          for specifier in test_modules.iter() {
+            builder.add(specifier, false).await?;
+          }
+          let graph = builder.get_graph();
     
-    let res = worker.execute_module(&main_module).await;
-    if let Err(e) = res {
-      println!("{}", e);
-      return Err(e);
-    }
+          for specifier in test_modules {
+            fn get_dependencies<'a>(
+              graph: &'a module_graph::Graph,
+              module: &'a Module,
+              // This needs to be accessible to skip getting dependencies if they're already there,
+              // otherwise this will cause a stack overflow with circular dependencies
+              output: &mut HashSet<&'a ModuleSpecifier>,
+            ) -> Result<(), AnyError> {
+              for dep in module.dependencies.values() {
+                if let Some(specifier) = &dep.maybe_code {
+                  if !output.contains(specifier) {
+                    output.insert(specifier);
   
-    worker.execute("window.dispatchEvent(new Event('load'))");
-    let res = worker.run_event_loop().await;
-    if let Err(e) = res {
-      println!("{}", e);
-      return Err(e);
-    }
+                    get_dependencies(
+                      &graph,
+                      graph.get_specifier(specifier)?,
+                      output,
+                    )?;
+                  }
+                }
+                if let Some(specifier) = &dep.maybe_type {
+                  if !output.contains(specifier) {
+                    output.insert(specifier);
+  
+                    get_dependencies(
+                      &graph,
+                      graph.get_specifier(specifier)?,
+                      output,
+                    )?;
+                  }
+                }
+              }
+  
+              Ok(())
+            }
+  
+            // This test module and all it's dependencies
+            let mut modules = HashSet::new();
+            modules.insert(&specifier);
+            get_dependencies(
+              &graph,
+              graph.get_specifier(&specifier)?,
+              &mut modules,
+            )?;
+  
+            paths_to_watch.extend(
+              modules
+                .iter()
+                .filter_map(|specifier| specifier.to_file_path().ok()),
+            );
+  
+            if let Some(changed) = &changed {
+              for path in changed.iter().filter_map(|path| {
+                deno_core::resolve_url_or_path(&path.to_string_lossy()).ok()
+              }) {
+                if path.path().ends_with(".clar") {
+                  modules_to_reload.push(specifier.clone());
+                } else {
+                  if modules.contains(&&path) {
+                    modules_to_reload.push(specifier);
+                    break;
+                  }  
+                }
+              }
+            }
+          }
+  
+          Ok((paths_to_watch, modules_to_reload))
+        }
+        .map(move |result| {
+          match result {
+            Ok((paths_to_watch, modules_to_reload)) => {
+              ResolutionResult::Restart {
+                paths_to_watch,
+                result: Ok(modules_to_reload),
+              }
+            }
+            Err(e) => ResolutionResult::Restart {
+              paths_to_watch,
+              result: Err(e),
+            },
+          }
+        })
+      };
+  
+      file_watcher::watch_func(
+        resolver,
+        |modules_to_reload| {
+          run_tests(
+            program_state.clone(),
+            permissions.clone(),
+            lib.clone(),
+            modules_to_reload.clone(),
+            modules_to_reload,
+            no_run,
+            fail_fast,
+            quiet,
+            true,
+            filter.clone(),
+            concurrent_jobs,
+          )
+          .map(|res| res.map(|_| ()))
+        },
+        "Test",
+      )
+      .await?;
+    } else {
+      let doc_modules = vec![];
 
-    worker.execute("window.dispatchEvent(new Event('unload'))")?;
-    let res = worker.run_event_loop().await;
-    if let Err(e) = res {
-      println!("{}", e);
-      return Err(e);
+      let test_modules = test_runner::collect_test_module_specifiers(
+        include.clone(),
+        &cwd,
+        tools::test_runner::is_supported,
+      )?;
+  
+      let failed = run_tests(
+        program_state.clone(),
+        permissions,
+        lib,
+        doc_modules,
+        test_modules,
+        no_run,
+        fail_fast,
+        quiet,
+        allow_none,
+        filter,
+        concurrent_jobs,
+      )
+      .await?;
+  
+      if failed {
+        std::process::exit(1);
+      }
     }
 
     if include_coverage {
@@ -230,159 +383,323 @@ pub async fn run_tests(files: Vec<String>, include_coverage: bool) -> Result<(),
   
       coverage_reporter.write_lcov_file("coverage.lcov");  
     }
-    Ok(())
+
+    Ok(true)
 }
 
-fn create_web_worker_callback(
-    program_state: Arc<ProgramState>,
-  ) -> Arc<CreateWebWorkerCb> {
-    Arc::new(move |args| {
-      let global_state_ = program_state.clone();
-      let js_error_create_fn = Rc::new(move |core_js_error| {
-        let source_mapped_error =
-          apply_source_map(&core_js_error, global_state_.clone());
-        PrettyJsError::create(source_mapped_error)
+pub fn is_supported_ext(path: &Path) -> bool {
+  if let Some(ext) = fs_util::get_extension(path) {
+    matches!(ext.as_str(), "ts" | "js" | "clar")
+  } else {
+    false
+  }
+}
+
+#[allow(clippy::too_many_arguments)]
+pub async fn run_tests(
+  program_state: Arc<ProgramState>,
+  permissions: Permissions,
+  lib: module_graph::TypeLib,
+  doc_modules: Vec<ModuleSpecifier>,
+  test_modules: Vec<ModuleSpecifier>,
+  no_run: bool,
+  fail_fast: bool,
+  quiet: bool,
+  allow_none: bool,
+  filter: Option<String>,
+  concurrent_jobs: usize,
+) -> Result<bool, AnyError> {
+  if !doc_modules.is_empty() {
+    let mut test_programs = Vec::new();
+
+    let blocks_regex = Regex::new(r"```([^\n]*)\n([\S\s]*?)```")?;
+    let lines_regex = Regex::new(r"(?:\* ?)(?:\# ?)?(.*)")?;
+
+    for specifier in &doc_modules {
+      let mut fetch_permissions = Permissions::allow_all();
+      let file = program_state
+        .file_fetcher
+        .fetch(&specifier, &mut fetch_permissions)
+        .await?;
+
+      let parsed_module =
+        ast::parse(&file.specifier.as_str(), &file.source, &file.media_type)?;
+
+      let mut comments = parsed_module.get_comments();
+      comments.sort_by_key(|comment| {
+        let location = parsed_module.get_location(&comment.span);
+        location.line
       });
-  
-      let attach_inspector = program_state.maybe_inspector_server.is_some()
-        || program_state.coverage_dir.is_some();
-      let maybe_inspector_server = program_state.maybe_inspector_server.clone();
-  
-      let module_loader = CliModuleLoader::new_for_worker(
-        program_state.clone(),
-        args.parent_permissions.clone(),
-      );
-      let create_web_worker_cb =
-        create_web_worker_callback(program_state.clone());
-  
-      let options = WebWorkerOptions {
-        args: program_state.flags.argv.clone(),
-        apply_source_maps: true,
-        debug_flag: false,
-        unstable: program_state.flags.unstable,
-        ca_data: program_state.ca_data.clone(),
-        user_agent: super::version::get_user_agent(),
-        seed: program_state.flags.seed,
-        module_loader,
-        create_web_worker_cb,
-        js_error_create_fn: Some(js_error_create_fn),
-        use_deno_namespace: args.use_deno_namespace,
-        attach_inspector,
-        maybe_inspector_server,
-        runtime_version: super::version::deno(),
-        ts_version: super::version::TYPESCRIPT.to_string(),
-        no_color: !super::colors::use_color(),
-        get_error_class_fn: None,
-      };
-  
-      let mut worker = WebWorker::from_options(
-        args.name,
-        args.permissions,
-        args.main_module,
-        args.worker_id,
-        &options,
-      );
-  
-      // This block registers additional ops and state that
-      // are only available in the CLI
-      {
-        let js_runtime = &mut worker.js_runtime;
-        js_runtime
-          .op_state()
-          .borrow_mut()
-          .put::<Arc<ProgramState>>(program_state.clone());
-        // Applies source maps - works in conjuction with `js_error_create_fn`
-        // above
-        ops::errors::init(js_runtime);
-        if args.use_deno_namespace {
-          ops::runtime_compiler::init(js_runtime);
+
+      for comment in comments {
+        if comment.kind != CommentKind::Block || !comment.text.starts_with('*')
+        {
+          continue;
+        }
+
+        for block in blocks_regex.captures_iter(&comment.text) {
+          let body = block.get(2).unwrap();
+          let text = body.as_str();
+
+          // TODO(caspervonb) generate an inline source map
+          let mut source = String::new();
+          for line in lines_regex.captures_iter(&text) {
+            let text = line.get(1).unwrap();
+            source.push_str(&format!("{}\n", text.as_str()));
+          }
+
+          source.push_str("export {};");
+
+          let element = block.get(0).unwrap();
+          let span = comment
+            .span
+            .from_inner_byte_pos(element.start(), element.end());
+          let location = parsed_module.get_location(&span);
+
+          let specifier = deno_core::resolve_url_or_path(&format!(
+            "{}${}-{}",
+            location.filename,
+            location.line,
+            location.line + element.as_str().split('\n').count(),
+          ))?;
+
+          let file = File {
+            local: specifier.to_file_path().unwrap(),
+            maybe_types: None,
+            media_type: MediaType::TypeScript, // media_type.clone(),
+            source: source.clone(),
+            specifier: specifier.clone(),
+          };
+
+          program_state.file_fetcher.insert_cached(file.clone());
+          test_programs.push(file.specifier.clone());
         }
       }
-      worker.bootstrap(&options);
-  
-      worker
-    })
-  }
-
-pub fn create_main_worker(
-    program_state: &Arc<ProgramState>,
-    main_module: ModuleSpecifier,
-    permissions: Permissions,
-  ) -> MainWorker {
-    let module_loader = CliModuleLoader::new(program_state.clone());
-  
-    let global_state_ = program_state.clone();
-  
-    let js_error_create_fn = Rc::new(move |core_js_error| {
-      let source_mapped_error =
-        apply_source_map(&core_js_error, global_state_.clone());
-      PrettyJsError::create(source_mapped_error)
-    });
-  
-    let attach_inspector = program_state.maybe_inspector_server.is_some()
-      || program_state.flags.repl
-      || program_state.coverage_dir.is_some();
-    let maybe_inspector_server = program_state.maybe_inspector_server.clone();
-    let should_break_on_first_statement =
-      program_state.flags.inspect_brk.is_some();
-  
-    let create_web_worker_cb = create_web_worker_callback(program_state.clone());
-  
-    let options = WorkerOptions {
-      apply_source_maps: true,
-      args: program_state.flags.argv.clone(),
-      debug_flag: false,
-      unstable: program_state.flags.unstable,
-      ca_data: program_state.ca_data.clone(),
-      user_agent: super::version::get_user_agent(),
-      seed: program_state.flags.seed,
-      js_error_create_fn: Some(js_error_create_fn),
-      create_web_worker_cb,
-      attach_inspector,
-      maybe_inspector_server,
-      should_break_on_first_statement,
-      module_loader,
-      runtime_version: super::version::deno(),
-      ts_version: super::version::TYPESCRIPT.to_string(),
-      no_color: !super::colors::use_color(),
-      get_error_class_fn: None,
-      location: program_state.flags.location.clone(),
-    };
-  
-    let mut worker = MainWorker::from_options(main_module, permissions, &options);
-  
-    // This block registers additional ops and state that
-    // are only available in the CLI
-    {
-      let js_runtime = &mut worker.js_runtime;
-      js_runtime
-        .op_state()
-        .borrow_mut()
-        .put::<Arc<ProgramState>>(program_state.clone());
-      // Applies source maps - works in conjuction with `js_error_create_fn`
-      // above
-      ops::errors::init(js_runtime);
-      ops::runtime_compiler::init(js_runtime);
     }
-    worker.bootstrap(&options);
-  
-    worker
+
+    program_state
+      .prepare_module_graph(
+        test_programs.clone(),
+        lib.clone(),
+        Permissions::allow_all(),
+        permissions.clone(),
+        program_state.maybe_import_map.clone(),
+      )
+      .await?;
+  } else if test_modules.is_empty() {
+    println!("No matching test modules found");
+    if !allow_none {
+      std::process::exit(1);
+    }
+
+    return Ok(false);
   }
 
-  
-fn get_error_class_name(e: &AnyError) -> &'static str {
-    deno_runtime::errors::get_error_class_name(e).unwrap_or("Error")
+  program_state
+    .prepare_module_graph(
+      test_modules.clone(),
+      lib.clone(),
+      Permissions::allow_all(),
+      permissions.clone(),
+      program_state.maybe_import_map.clone(),
+    )
+    .await?;
+
+  if no_run {
+    return Ok(false);
+  }
+
+  // Because scripts, and therefore worker.execute cannot detect unresolved promises at the moment
+  // we generate a module for the actual test execution.
+  let test_options = json!({
+      "disableLog": quiet,
+      "filter": filter,
+  });
+
+  let test_module = deno_core::resolve_path("$deno$test.js")?;
+  let test_source =
+    format!("await Deno[Deno.internal].runTests({});", test_options);
+  let test_file = File {
+    local: test_module.to_file_path().unwrap(),
+    maybe_types: None,
+    media_type: MediaType::JavaScript,
+    source: test_source.clone(),
+    specifier: test_module.clone(),
+  };
+
+  program_state.file_fetcher.insert_cached(test_file);
+
+  let (sender, receiver) = channel::<TestEvent>();
+
+  let join_handles = test_modules.iter().map(move |main_module| {
+    let program_state = program_state.clone();
+    let main_module = main_module.clone();
+    let test_module = test_module.clone();
+    let permissions = permissions.clone();
+    let sender = sender.clone();
+
+    tokio::task::spawn_blocking(move || {
+      let join_handle = std::thread::spawn(move || {
+        let future = run_test_file(
+          program_state,
+          main_module,
+          test_module,
+          permissions,
+          sender,
+        );
+
+        tokio_util::run_basic(future)
+      });
+
+      join_handle.join().unwrap()
+    })
+  });
+
+  let join_futures = stream::iter(join_handles)
+    .buffer_unordered(concurrent_jobs)
+    .collect::<Vec<Result<Result<(), AnyError>, tokio::task::JoinError>>>();
+
+  let mut reporter = create_reporter(concurrent_jobs > 1);
+  let handler = {
+    tokio::task::spawn_blocking(move || {
+      let mut used_only = false;
+      let mut has_error = false;
+      let mut planned = 0;
+      let mut reported = 0;
+
+      for event in receiver.iter() {
+        match event.message.clone() {
+          TestMessage::Plan {
+            pending,
+            filtered: _,
+            only,
+          } => {
+            if only {
+              used_only = true;
+            }
+
+            planned += pending;
+          }
+          TestMessage::Result {
+            name: _,
+            duration: _,
+            result,
+          } => {
+            reported += 1;
+
+            if let TestResult::Failed(_) = result {
+              has_error = true;
+            }
+          }
+          _ => {}
+        }
+
+        reporter.visit_event(event);
+
+        if has_error && fail_fast {
+          break;
+        }
+      }
+
+      if planned > reported {
+        has_error = true;
+      }
+
+      reporter.done();
+
+      if planned > reported {
+        has_error = true;
+      }
+
+      if used_only {
+        println!(
+          "{} because the \"only\" option was used\n",
+          colors::red("FAILED")
+        );
+
+        has_error = true;
+      }
+
+      has_error
+    })
+  };
+
+  let (result, join_results) = future::join(handler, join_futures).await;
+
+  let mut join_errors = join_results.into_iter().filter_map(|join_result| {
+    join_result
+      .ok()
+      .map(|handle_result| handle_result.err())
+      .flatten()
+  });
+
+  if let Some(e) = join_errors.next() {
+    Err(e)
+  } else {
+    Ok(result.unwrap_or(false))
+  }
 }
 
-fn op<F, V, R>(op_fn: F) -> Box<OpFn>
-where
-  F: Fn(V) -> Result<R, AnyError> + 'static,
-  V: DeserializeOwned,
-  R: Serialize,
-{
-    json_op_sync(move |s, args, _bufs| {
-        op_fn(args)
-    })    
+pub async fn run_test_file(
+  program_state: Arc<ProgramState>,
+  main_module: ModuleSpecifier,
+  test_module: ModuleSpecifier,
+  permissions: Permissions,
+  channel: Sender<TestEvent>,
+) -> Result<(), AnyError> {
+
+  let mut worker =
+    create_main_worker(&program_state, main_module.clone(), permissions, true);
+
+  {
+    let js_runtime = &mut worker.js_runtime;
+    js_runtime.register_op("setup_chain", deno_core::op_sync(setup_chain));
+    js_runtime.register_op("mine_block", deno_core::op_sync(mine_block));
+    js_runtime.register_op("mine_empty_blocks", deno_core::op_sync(mine_empty_blocks));
+    js_runtime.register_op("call_read_only_fn", deno_core::op_sync(call_read_only_fn));
+    js_runtime.register_op("get_assets_maps", deno_core::op_sync(get_assets_maps));
+    js_runtime.sync_ops_cache();
+    js_runtime
+      .op_state()
+      .borrow_mut()
+      .put::<Sender<TestEvent>>(channel.clone());
+  }
+
+  let mut maybe_coverage_collector = if let Some(ref coverage_dir) =
+    program_state.coverage_dir
+  {
+    let session = worker.create_inspector_session().await;
+    let coverage_dir = PathBuf::from(coverage_dir);
+    let mut coverage_collector = CoverageCollector::new(coverage_dir, session);
+    worker
+      .with_event_loop(coverage_collector.start_collecting().boxed_local())
+      .await?;
+
+    Some(coverage_collector)
+  } else {
+    None
+  };
+
+  let execute_result = worker.execute_module(&main_module).await;
+  execute_result?;
+
+  worker.execute("window.dispatchEvent(new Event('load'))")?;
+
+  let execute_result = worker.execute_module(&test_module).await;
+  execute_result?;
+
+  worker
+    .run_event_loop(maybe_coverage_collector.is_none())
+    .await?;
+  worker.execute("window.dispatchEvent(new Event('unload'))")?;
+
+  if let Some(coverage_collector) = maybe_coverage_collector.as_mut() {
+    worker
+      .with_event_loop(coverage_collector.stop_collecting().boxed_local())
+      .await?;
+  }
+
+  Ok(())
 }
 
 #[derive(Debug, Deserialize)]
@@ -392,13 +709,21 @@ struct SetupChainArgs {
   transactions: Vec<TransactionArgs>
 }
 
-fn setup_chain(args: SetupChainArgs) -> Result<Value, AnyError> {
-    let (session_id, accounts) = sessions::handle_setup_chain(args.name, args.transactions)?;
+fn setup_chain(state: &mut OpState, args: Value, _: ()) -> Result<String, AnyError> {
+    let args: SetupChainArgs = serde_json::from_value(args)
+      .expect("Invalid request from JavaScript for \"op_load\".");
+    let (session_id, accounts, contracts) = sessions::handle_setup_chain(args.name, args.transactions)?;
+    let serialized_contracts = contracts.iter().map(|(a, s)| json!({
+      "contract_id": a.contract_identifier.to_string(),
+      "contract_interface": a.contract_interface.clone(),
+      "source": s
+    })).collect::<Vec<_>>();
 
     Ok(json!({
         "session_id": session_id,
         "accounts": accounts,
-    }))
+        "contracts": serialized_contracts,
+    }).to_string())
 }
 
 #[derive(Debug, Deserialize)]
@@ -439,7 +764,9 @@ struct TransferSTXArgs {
   recipient: String,
 }
 
-fn mine_block(args: MineBlockArgs) -> Result<Value, AnyError> {
+fn mine_block(state: &mut OpState, args: Value, _: ()) -> Result<String, AnyError> {
+  let args: MineBlockArgs = serde_json::from_value(args)
+    .expect("Invalid request from JavaScript.");
   let (block_height, receipts) = sessions::perform_block(args.session_id, |name, session| {
       let initial_tx_sender = session.get_tx_sender();
       let mut receipts = vec![];
@@ -467,7 +794,8 @@ fn mine_block(args: MineBlockArgs) -> Result<Value, AnyError> {
       let block_height = session.advance_chain_tip(1);
       Ok((block_height, receipts))
   })?;
-  Ok(json!({
+
+  let payload = json!({
     "session_id": args.session_id,
     "block_height": block_height,
     "receipts":  receipts.iter().map(|r| {
@@ -476,7 +804,9 @@ fn mine_block(args: MineBlockArgs) -> Result<Value, AnyError> {
         "events": r.1,
       })
     }).collect::<Vec<_>>()
-  }))
+  });
+
+  Ok(payload.to_string())
 }
 
 #[derive(Debug, Deserialize)]
@@ -486,7 +816,9 @@ struct MineEmptyBlocksArgs {
   count: u32,
 }
 
-fn mine_empty_blocks(args: MineEmptyBlocksArgs) -> Result<Value, AnyError> {
+fn mine_empty_blocks(state: &mut OpState, args: Value, _: ()) -> Result<String, AnyError> {
+  let args: MineEmptyBlocksArgs = serde_json::from_value(args)
+    .expect("Invalid request from JavaScript.");
   let block_height = sessions::perform_block(args.session_id, |name, session| {
     let block_height = session.advance_chain_tip(args.count);
     Ok(block_height)
@@ -495,7 +827,7 @@ fn mine_empty_blocks(args: MineEmptyBlocksArgs) -> Result<Value, AnyError> {
   Ok(json!({
     "session_id": args.session_id,
     "block_height": block_height,
-  }))
+  }).to_string())
 }
 
 #[derive(Debug, Deserialize)]
@@ -506,9 +838,11 @@ struct CallReadOnlyFnArgs {
   contract: String,
   method: String,
   args: Vec<String>,
-}
+}  
 
-fn call_read_only_fn(args: CallReadOnlyFnArgs) -> Result<Value, AnyError> {
+fn call_read_only_fn(state: &mut OpState, args: Value, _: ()) -> Result<String, AnyError> {
+  let args: CallReadOnlyFnArgs = serde_json::from_value(args)
+    .expect("Invalid request from JavaScript.");
   let (result, events) = sessions::perform_block(args.session_id, |name, session| {
     let initial_tx_sender = session.get_tx_sender();
     session.set_tx_sender(args.sender.clone());
@@ -529,7 +863,7 @@ fn call_read_only_fn(args: CallReadOnlyFnArgs) -> Result<Value, AnyError> {
     "session_id": args.session_id,
     "result": result,
     "events": events,
-  }))
+  }).to_string())
 }
 
 
@@ -539,7 +873,9 @@ struct GetAssetsMapsArgs {
   session_id: u32,
 }
 
-fn get_assets_maps(args: GetAssetsMapsArgs) -> Result<Value, AnyError> {
+fn get_assets_maps(state: &mut OpState, args: Value, _: ()) -> Result<String, AnyError> {
+  let args: GetAssetsMapsArgs = serde_json::from_value(args)
+    .expect("Invalid request from JavaScript.");
   let assets_maps = sessions::perform_block(args.session_id, |name, session| {
     let assets_maps = session.get_assets_maps();    
     Ok(assets_maps)
@@ -547,5 +883,5 @@ fn get_assets_maps(args: GetAssetsMapsArgs) -> Result<Value, AnyError> {
   Ok(json!({
     "session_id": args.session_id,
     "assets": assets_maps,
-  }))
+  }).to_string())
 }

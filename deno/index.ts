@@ -111,10 +111,10 @@ export class Chain {
   }
 
   mineBlock(transactions: Array<Tx>): Block {
-    let result = (Deno as any).core.jsonOpSync("mine_block", {
+    let result = JSON.parse((Deno as any).core.opSync("mine_block", {
       sessionId: this.sessionId,
       transactions: transactions,
-    });
+    }));
     this.blockHeight = result.block_height;
     let block: Block = {
       height: result.block_height,
@@ -124,10 +124,10 @@ export class Chain {
   }
 
   mineEmptyBlock(count: number): EmptyBlock {
-    let result = (Deno as any).core.jsonOpSync("mine_empty_blocks", {
+    let result = JSON.parse((Deno as any).core.opSync("mine_empty_blocks", {
       sessionId: this.sessionId,
       count: count,
-    });
+    }));
     this.blockHeight = result.block_height;
     let emptyBlock: EmptyBlock = {
       session_id: result.session_id,
@@ -150,13 +150,13 @@ export class Chain {
     args: Array<any>,
     sender: string,
   ): ReadOnlyFn {
-    let result = (Deno as any).core.jsonOpSync("call_read_only_fn", {
+    let result = JSON.parse((Deno as any).core.opSync("call_read_only_fn", {
       sessionId: this.sessionId,
       contract: contract,
       method: method,
       args: args,
       sender: sender,
-    });    
+    }));  
     let readOnlyFn: ReadOnlyFn = {
       session_id: result.session_id,
       result: result.result,
@@ -166,9 +166,9 @@ export class Chain {
   }
 
   getAssetsMaps(): AssetsMaps {
-    let result = (Deno as any).core.jsonOpSync("get_assets_maps", {
+    let result = JSON.parse((Deno as any).core.opSync("get_assets_maps", {
       sessionId: this.sessionId,
-    });
+    }));
     let assetsMaps: AssetsMaps = {
       session_id: result.session_id,
       assets: result.assets
@@ -180,6 +180,7 @@ export class Chain {
 type TestFunction = (
   chain: Chain,
   accounts: Map<string, Account>,
+  contracts: Map<string, Contract>,
 ) => void | Promise<void>;
 type PreSetupFunction = () => Array<Tx>;
 
@@ -187,6 +188,26 @@ interface UnitTestOptions {
   name: string;
   preSetup?: PreSetupFunction;
   fn: TestFunction;
+}
+
+export interface Contract {
+  contract_id: string;
+  source: string;
+  contract_interface: any
+}
+
+export interface StacksNode {
+  url: string;
+}
+
+type ScriptFunction = (
+  accounts: Map<string, Account>,
+  contracts: Map<string, Contract>,
+  node: StacksNode,
+) => void | Promise<void>;
+
+interface ScriptOptions {
+  fn: ScriptFunction;
 }
 
 export class Clarinet {
@@ -200,19 +221,49 @@ export class Clarinet {
         if (options.preSetup) {
           transactions = options.preSetup()!;
         }
-        let result = (Deno as any).core.jsonOpSync("setup_chain", {
+        let result = JSON.parse((Deno as any).core.opSync("setup_chain", {
           name: options.name,
           transactions: transactions,
-        });
+        }));
         let chain = new Chain(result["session_id"]);
         let accounts: Map<string, Account> = new Map();
         for (let account of result["accounts"]) {
           accounts.set(account.name, account);
         }
-        await options.fn(chain, accounts);
+        let contracts: Map<string, any> = new Map();
+        for (let contract of result["contracts"]) {
+          contracts.set(contract.contract_id, contract);
+        }
+        await options.fn(chain, accounts, contracts);
       },
     });
   }
+
+  static run(options: ScriptOptions) {
+    Deno.test({
+      name: "running script",
+      async fn() {
+        (Deno as any).core.ops();
+        let result = JSON.parse((Deno as any).core.opSync("setup_chain", {
+          name: "running script",
+          transactions: [],
+        }));
+        let accounts: Map<string, Account> = new Map();
+        for (let account of result["accounts"]) {
+          accounts.set(account.name, account);
+        }
+        let contracts: Map<string, any> = new Map();
+        for (let contract of result["contracts"]) {
+          contracts.set(contract.contract_id, contract);
+        }
+        let stacks_node: StacksNode = {
+          url: result["stacks_node_url"]
+        };
+        await options.fn(accounts, contracts, stacks_node);
+      },
+    });
+  }
+
 }
 
 export namespace types {

@@ -89,7 +89,13 @@ pub fn load_session(start_repl: bool, env: String) -> Result<repl::SessionSettin
         terminal.start();
     } else {
         let mut session = repl::Session::new(settings.clone());
-        session.check()?;
+        match session.check() {
+            Err(message) => {
+                println!("Error: {}", message);
+                std::process::exit(1);
+            }
+            _ => {}
+        };
     }
     Ok(settings)
 }

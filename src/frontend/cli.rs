@@ -44,6 +44,9 @@ enum Command {
     /// Deploy subcommand
     #[clap(name = "deploy")]
     Deploy(Deploy),
+    /// Run subcommand
+    #[clap(name = "run")]
+    Run(Run),
 }
 
 #[derive(Clap)]
@@ -113,8 +116,20 @@ struct Test {
     /// Generate coverage
     #[clap(long = "coverage")]
     pub coverage: bool,
+    /// Generate coverage
+    #[clap(long = "watch")]
+    pub watch: bool,    
     /// Files to includes
     pub files: Vec<String>,
+}
+
+#[derive(Clap)]
+struct Run {
+    /// Print debug info
+    #[clap(short = 'd')]
+    pub debug: bool,
+    /// Script to run
+    pub script: String,
 }
 
 #[derive(Clap)]
@@ -229,7 +244,16 @@ pub fn main() {
                 println!("{}", e);
                 return;
             }
-            run_tests(test.files, test.coverage);
+            run_tests(test.files, test.coverage, test.watch);
+        },
+        Command::Run(run) => {
+            let start_repl = false;
+            let res = load_session(start_repl, "development".into());
+            if let Err(e) = res {
+                println!("{}", e);
+                return;
+            }
+            run_tests(vec![run.script], false, false);
         },
         Command::Deploy(deploy) => {
             let start_repl = false;
@@ -387,6 +411,10 @@ fn execute_changes(changes: Vec<Changes>) {
     for mut change in changes.into_iter() {
         match change {
             Changes::AddFile(options) => {
+                if fs::metadata(&options.path).unwrap().is_file() {
+                    println!("File already exists at path {}", options.path);
+                    continue;
+                }
                 println!("{}", options.comment);
                 let mut file = File::create(options.path.clone()).expect("Unable to create file");
                 file.write_all(options.content.as_bytes())
