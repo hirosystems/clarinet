@@ -2,8 +2,6 @@
 
 ;; error consts
 (define-constant ERR_STX_TRANSFER   u0)
-(define-constant ERR_SET_MESSAGE    u1)
-(define-constant ERR_SET_PRICE      u2)
 
 ;; data vars
 (define-data-var billboard-message (string-utf8 500) u"Hello World!")
@@ -26,10 +24,10 @@
         (unwrap! (stx-transfer? cur-price tx-sender (as-contract tx-sender)) (err ERR_STX_TRANSFER))
 
 	;; update the billboard's message
-        (asserts! (var-set billboard-message message) (err ERR_SET_MESSAGE))
+        (var-set billboard-message message)
 
         ;; update the price of setting a message
-        (asserts! (var-set price new-price) (err ERR_SET_PRICE))
+        (var-set price new-price)
 
         ;; return the updated price
 	(ok new-price)
