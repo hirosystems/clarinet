@@ -15,15 +15,6 @@ Blockstack. Smart contracts allow developers to encode essential business logic 
 The recommended way to install Clarinet is through the Rust package manager, Cargo. Other installation methods are
 provided in case Cargo is not available to you.
 
-### Install as a crate from Cargo
-
-Assuming you have a working [installation of Rust](https://www.rust-lang.org/tools/install), Clarinet can be installed
-from Cargo as a crate.
-
-```bash
-cargo install clarinet --locked
-```
-
 ### Install from source using Cargo
 
 You can build Clarinet from source using Cargo with the following commands:
