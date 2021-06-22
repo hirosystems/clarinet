@@ -484,7 +484,7 @@ dependencies = [
 
 [[package]]
 name = "clarinet"
-version = "0.12.0"
+version = "0.13.0"
 dependencies = [
  "aes",
  "atty",
@@ -531,9 +531,9 @@ dependencies = [
 
 [[package]]
 name = "clarity-repl"
-version = "0.13.0"
+version = "0.13.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d1a28b8181f7340433ab0e93ee45b18f15f255a9b006377c5580cbdecc36f0ac"
+checksum = "de23f5856caed1cf06712731587aa6dc48e4253f8971a045cd6e89fbec49697a"
 dependencies = [
  "ansi_term 0.12.1",
  "atty",

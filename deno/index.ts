@@ -398,31 +398,36 @@ declare global {
   }
 }
 
-function consume(src: String, token: String, wrapped: boolean) {
+function consume(src: String, expectation: String, wrapped: boolean) {
   let dst = (" " + src).slice(1);
-  let size = token.length;
+  let size = expectation.length;
+  if (!wrapped && src !== expectation) {
+    throw new Error(
+      `Expected ${green(expectation.toString())}, got ${red(src.toString())}`,
+    );
+  }
   if (wrapped) {
     size += 2;
   }
   if (dst.length < size) {
     throw new Error(
-      `Expected ${green(token.toString())}, got ${red(src.toString())}`,
+      `Expected ${green(expectation.toString())}, got ${red(src.toString())}`,
     );
   }
   if (wrapped) {
     dst = dst.substring(1, dst.length - 1);
   }
-  let res = dst.slice(0, token.length);
-  if (res !== token) {
+  let res = dst.slice(0, expectation.length);
+  if (res !== expectation) {
     throw new Error(
-      `Expected ${green(token.toString())}, got ${red(src.toString())}`,
+      `Expected ${green(expectation.toString())}, got ${red(src.toString())}`,
     );
   }
   let leftPad = 0;
-  if (dst.charAt(token.length) === " ") {
+  if (dst.charAt(expectation.length) === " ") {
     leftPad = 1;
   }
-  let remainder = dst.substring(token.length + leftPad);
+  let remainder = dst.substring(expectation.length + leftPad);
   return remainder;
 }
 

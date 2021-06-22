@@ -27,6 +27,7 @@ use deno_core::futures::StreamExt;
 use deno_runtime::permissions::Permissions;
 use swc_common::comments::CommentKind;
 use regex::Regex;
+use std::collections::BTreeMap;
 use std::path::Path;
 use std::path::PathBuf;
 use std::rc::Rc;
@@ -38,6 +39,7 @@ use std::collections::HashSet;
 use serde::Serialize;
 use serde::de::DeserializeOwned;
 use clarity_repl::clarity::coverage::CoverageReporter;
+use std::convert::TryFrom;
 
 mod sessions {
     use std::sync::Mutex;
@@ -877,8 +879,16 @@ fn get_assets_maps(state: &mut OpState, args: Value, _: ()) -> Result<String, An
   let args: GetAssetsMapsArgs = serde_json::from_value(args)
     .expect("Invalid request from JavaScript.");
   let assets_maps = sessions::perform_block(args.session_id, |name, session| {
-    let assets_maps = session.get_assets_maps();    
-    Ok(assets_maps)
+    let assets_maps = session.get_assets_maps();
+    let mut lev1 = BTreeMap::new();
+    for (key1, map1) in assets_maps.into_iter() {
+      let mut lev2 = BTreeMap::new();
+      for (key2, val2) in map1.into_iter() {
+        lev2.insert(key2, u64::try_from(val2).expect("u128 unsupported at the moment, please open an issue."));  
+      }
+      lev1.insert(key1, lev2);
+    }
+    Ok(lev1)
   })?;
   Ok(json!({
     "session_id": args.session_id,

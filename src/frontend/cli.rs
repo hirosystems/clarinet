@@ -18,7 +18,7 @@ use tiny_hderive::bip32::ExtendedPrivKey;
 use toml;
 
 #[derive(Clap)]
-#[clap(version = "1.0")]
+#[clap(version = option_env!("CARGO_PKG_VERSION").expect("Unable to detect version"))]
 struct Opts {
     #[clap(subcommand)]
     command: Command,
@@ -411,9 +411,11 @@ fn execute_changes(changes: Vec<Changes>) {
     for mut change in changes.into_iter() {
         match change {
             Changes::AddFile(options) => {
-                if fs::metadata(&options.path).unwrap().is_file() {
-                    println!("File already exists at path {}", options.path);
-                    continue;
+                if let Ok(entry) = fs::metadata(&options.path) {
+                    if entry.is_file() {
+                        println!("File already exists at path {}", options.path);
+                        continue;
+                    }
                 }
                 println!("{}", options.comment);
                 let mut file = File::create(options.path.clone()).expect("Unable to create file");
