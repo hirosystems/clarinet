@@ -18359,7 +18359,6 @@ interface WindowEventHandlers {
 }
 
 interface WindowLocalStorage {
-    readonly localStorage: Storage;
 }
 
 interface WindowOrWorkerGlobalScope {
@@ -18382,7 +18381,6 @@ interface WindowOrWorkerGlobalScope {
 }
 
 interface WindowSessionStorage {
-    readonly sessionStorage: Storage;
 }
 
 interface WorkerEventMap extends AbstractWorkerEventMap {
@@ -19340,8 +19338,6 @@ declare function toString(): string;
  * Dispatches a synthetic event event to target and returns true if either event's cancelable attribute value is false or its preventDefault() method was not invoked, and false otherwise.
  */
 declare function dispatchEvent(event: Event): boolean;
-declare var sessionStorage: Storage;
-declare var localStorage: Storage;
 /**
  * Fires when the user aborts the download.
  * @param ev The event.

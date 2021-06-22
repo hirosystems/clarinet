@@ -37,7 +37,6 @@ declare class WorkerGlobalScope {
 
 declare class WorkerNavigator {
   constructor();
-  readonly gpu: GPU;
 }
 
 declare var navigator: WorkerNavigator;
