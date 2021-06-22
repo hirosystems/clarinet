@@ -1,7 +1,7 @@
 [package]
 name = "clarinet"
 version = "0.12.0"
-authors = ["Ludo Galabru <ludovic@galabru.com>"]
+authors = ["Ludo Galabru <ludo@hiro.so>"]
 edition = "2018"
 description = "Clarinet is a clarity runtime packaged as a command line tool, designed to facilitate smart contract understanding, development, testing and deployment."
 readme = "README.md"
@@ -11,9 +11,6 @@ exclude = ["examples/**"]
 homepage = "https://github.com/lgalabru/clarinet"
 repository = "https://github.com/lgalabru/clarinet"
 categories = ["command-line-utilities", "development-tools", "development-tools::build-utils"]
-
-[workspace]
-members = [".", "xtask/"]
 
 [target.'cfg(windows)'.build-dependencies]
 winapi = "0.3.9"
@@ -27,9 +24,9 @@ serde_derive = "1"
 deno_core = { path = "./vendor/deno/core" }
 deno_runtime = { path = "./vendor/deno/runtime" }
 deno = { path = "./vendor/deno/cli" }
-# clarity_repl = { package = "clarity-repl", path = "../../clarity-repl", features = ["cli"] }
-clarity_repl = { package = "clarity-repl", version = "=0.12.2" }
-bip39 = "1.0.0-rc1"
+# clarity_repl = { package = "clarity-repl", path = "../../../clarity-repl", features = ["cli"] }
+clarity_repl = { package = "clarity-repl", version = "=0.13.0" }
+bip39 = { version = "1.0.1", default-features = false }
 aes = "0.6.0"
 base64 = "0.13.0"
 block-modes = "0.7.0"
@@ -44,7 +41,7 @@ hmac = "0.10.1"
 pbkdf2 = { version = "0.7.3", features=["parallel"], default-features = false }
 hex = "0.4.3"
 futures = "0.3.12"
-tokio = { version = "=1.5.0", features = ["full"] }
+tokio = { version = "=1.6.1", features = ["full"] }
 lazy_static = "1.4.0"
 atty = "0.2.14"
 termcolor = "1.1.2"
@@ -69,3 +66,12 @@ OriginalFilename = "clarinet.exe"
 LegalCopyright = ""
 ProductName = "Clarinet"
 FileDescription = ""
+
+[workspace]
+members = [
+    ".",
+    "vendor/deno/cli/",
+    "vendor/deno/runtime/",
+    "vendor/deno/core/",
+    "xtask/"
+]

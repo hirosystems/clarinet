@@ -239,8 +239,6 @@ checksum = "b9e89470017230c38e52b82b3ee3f530db1856ba1d434e3a67a3456a8a8dec5f"
 dependencies = [
  "bitcoin_hashes",
  "rand_core 0.4.2",
- "serde",
- "unicode-normalization",
 ]
 
 [[package]]
@@ -533,9 +531,9 @@ dependencies = [
 
 [[package]]
 name = "clarity-repl"
-version = "0.12.2"
+version = "0.13.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b5bd599cda86dbe0273e4d41060fc625a878323a1ae9613221154261aebd5e5c"
+checksum = "d1a28b8181f7340433ab0e93ee45b18f15f255a9b006377c5580cbdecc36f0ac"
 dependencies = [
  "ansi_term 0.12.1",
  "atty",
@@ -3976,9 +3974,9 @@ checksum = "cda74da7e1a664f795bb1f8a87ec406fb89a02522cf6e50620d016add6dbbf5c"
 
 [[package]]
 name = "tokio"
-version = "1.5.0"
+version = "1.6.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "83f0c8e7c0addab50b663055baf787d0af7f413a46e6e7fb9559a4e4db7137a5"
+checksum = "0a38d31d7831c6ed7aad00aa4c12d9375fd225a6dd77da1d25b707346319a975"
 dependencies = [
  "autocfg",
  "bytes",

@@ -4,7 +4,7 @@ use std::{
     io::{BufReader, Read},
 };
 use toml::value::Value;
-use bip39::{Mnemonic};
+use bip39::{Mnemonic, Language};
 use crate::utils::mnemonic;
 use clarity_repl::clarity::util::StacksAddress;
 use clarity_repl::clarity::util::secp256k1::Secp256k1PublicKey;
@@ -102,7 +102,7 @@ impl ChainConfig {
                             };
 
                             let mnemonic = match account_settings.get("mnemonic") {
-                                Some(Value::String(words)) => Mnemonic::parse(words).unwrap().to_string(),
+                                Some(Value::String(words)) => Mnemonic::parse_in_normalized(Language::English, words).unwrap().to_string(),
                                 _ => {
                                     let entropy = &[0x33, 0xE4, 0x6B, 0xB1, 0x3A, 0x74, 0x6E, 0xA4, 0x1C, 0xDD, 0xE4, 0x5C, 0x90, 0x84, 0x6A, 0x79]; // todo(ludo): rand
                                     Mnemonic::from_entropy(entropy).unwrap().to_string()
@@ -129,7 +129,7 @@ impl ChainConfig {
                             config.accounts.insert(
                                 account_name.to_string(),
                                 AccountConfig {
-                                    mnemonic,
+                                    mnemonic: mnemonic.to_string(),
                                     derivation,
                                     balance,
                                     address,
