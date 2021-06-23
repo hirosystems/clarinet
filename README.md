@@ -130,7 +130,7 @@ command:
 $ clarinet test
 ```
 
-You can review the available testing commands in the [Deno Clarity library](https://deno.land/x/clarinet@v0.6.0/index.ts).
+You can review the available testing commands in the [Deno Clarity library](https://deno.land/x/clarinet@v0.13.0/index.ts).
 
 ### Load contracts in a console
 
