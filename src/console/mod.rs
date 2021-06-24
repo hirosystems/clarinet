@@ -1,17 +1,17 @@
 use std::fs;
-use std::env;
+use std::path::PathBuf;
 use crate::types::{MainConfig, ChainConfig};
 use clarity_repl::{repl, Terminal};
 
 
-pub fn load_session(start_repl: bool, env: String) -> Result<repl::SessionSettings, String> {
+pub fn load_session(manifest_path: PathBuf, start_repl: bool, env: String) -> Result<repl::SessionSettings, String> {
     let mut settings = repl::SessionSettings::default();
 
-    let root_path = env::current_dir().unwrap();
-    let mut project_config_path = root_path.clone();
-    project_config_path.push("Clarinet.toml");
+    let mut project_path = manifest_path.clone();
+    project_path.pop();
 
-    let mut chain_config_path = root_path.clone();
+    let mut chain_config_path = project_path.clone();
+    // chain_config_path.pop();
     chain_config_path.push("settings");
 
     chain_config_path.push(if env == "mocknet" {
@@ -22,7 +22,7 @@ pub fn load_session(start_repl: bool, env: String) -> Result<repl::SessionSettin
         "Development.toml"
     });
 
-    let mut project_config = MainConfig::from_path(&project_config_path);
+    let mut project_config = MainConfig::from_path(&manifest_path);
     let chain_config = ChainConfig::from_path(&chain_config_path);
 
     let mut deployer_address = None;
@@ -46,7 +46,7 @@ pub fn load_session(start_repl: bool, env: String) -> Result<repl::SessionSettin
     }
 
     for (name, config) in project_config.ordered_contracts().iter() {
-        let mut contract_path = root_path.clone();
+        let mut contract_path = project_path.clone();
         contract_path.push(&config.path);
 
         let code = match fs::read_to_string(&contract_path) {
