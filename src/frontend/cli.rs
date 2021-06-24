@@ -80,6 +80,7 @@ struct NewContract {
     #[clap(short = 'd')]
     pub debug: bool,
     /// Path to Clarinet.toml
+    #[clap(long = "manifest-path")]
     pub manifest_path: Option<String>,
 }
 
@@ -91,6 +92,7 @@ struct LinkContract {
     #[clap(short = 'd')]
     pub debug: bool,
     /// Path to Clarinet.toml
+    #[clap(long = "manifest-path")]
     pub manifest_path: Option<String>,
 }
 
@@ -102,6 +104,7 @@ struct ForkContract {
     #[clap(short = 'd')]
     pub debug: bool,
     /// Path to Clarinet.toml
+    #[clap(long = "manifest-path")]
     pub manifest_path: Option<String>,
     // /// Fork contract and all its dependencies
     // #[clap(short = 'r')]
@@ -114,6 +117,7 @@ struct Console {
     #[clap(short = 'd')]
     pub debug: bool,
     /// Path to Clarinet.toml
+    #[clap(long = "manifest-path")]
     pub manifest_path: Option<String>,
 }
 
@@ -126,6 +130,7 @@ struct Test {
     #[clap(long = "coverage")]
     pub coverage: bool,
     /// Path to Clarinet.toml
+    #[clap(long = "manifest-path")]
     pub manifest_path: Option<String>,
     /// Relaunch tests on updates
     #[clap(long = "watch")]
@@ -143,6 +148,7 @@ struct Run {
     /// Script to run
     pub script: String,
     /// Path to Clarinet.toml
+    #[clap(long = "manifest-path")]
     pub manifest_path: Option<String>,
 }
 
@@ -158,6 +164,7 @@ struct Deploy {
     #[clap(long = "testnet", conflicts_with = "mocknet")]
     pub testnet: bool,
     /// Path to Clarinet.toml
+    #[clap(long = "manifest-path")]
     pub manifest_path: Option<String>,
 }
 
@@ -167,6 +174,7 @@ struct Check {
     #[clap(short = 'd')]
     pub debug: bool,
     /// Path to Clarinet.toml
+    #[clap(long = "manifest-path")]
     pub manifest_path: Option<String>,
 }
 
