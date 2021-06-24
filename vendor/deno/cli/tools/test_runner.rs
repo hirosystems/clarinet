@@ -103,19 +103,16 @@ impl TestReporter for PrettyTestReporter {
         filtered,
         only: _,
       } => {
-        if *pending == 1 {
-          println!("running {} test from {}", pending, event.origin);
-        } else {
-          println!("running {} tests from {}", pending, event.origin);
-        }
-
+        println!("Running {}", event.origin);
         self.pending += pending;
         self.filtered_out += filtered;
       }
 
       TestMessage::Wait { name } => {
         if !self.concurrent {
-          print!("test {} ...", name);
+          if name != "running script" {
+            print!("* {} ...", name);
+          }
         }
       }
 
@@ -127,7 +124,9 @@ impl TestReporter for PrettyTestReporter {
         self.pending -= 1;
 
         if self.concurrent {
-          print!("test {} ...", name);
+          if name != "running script" {
+            print!("* {} ...", name);
+          }
         }
 
         match result {
@@ -185,7 +184,8 @@ impl TestReporter for PrettyTestReporter {
       colors::green("ok").to_string()
     };
 
-    println!(
+    if (self.passed + self.failed + self.ignored + self.filtered_out + self.measured) > 1 {
+      println!(
         "\ntest result: {}. {} passed; {} failed; {} ignored; {} measured; {} filtered out {}\n",
         status,
         self.passed,
@@ -195,6 +195,7 @@ impl TestReporter for PrettyTestReporter {
         self.filtered_out,
         colors::gray(format!("({}ms)", self.time.elapsed().as_millis())),
       );
+    }
   }
 }
 
