@@ -150,6 +150,9 @@ struct Run {
     /// Path to Clarinet.toml
     #[clap(long = "manifest-path")]
     pub manifest_path: Option<String>,
+    /// Allow access to wallets
+    #[clap(long = "allow-wallets")]
+    pub allow_wallets: bool,
 }
 
 #[derive(Clap)]
@@ -275,7 +278,7 @@ pub fn main() {
                 println!("{}", e);
                 return;
             }
-            run_tests(cmd.files, cmd.coverage, cmd.watch, manifest_path);
+            run_tests(cmd.files, cmd.coverage, cmd.watch, true, manifest_path);
         },
         Command::Run(cmd) => {
             let manifest_path = get_manifest_path_or_exit(cmd.manifest_path);
@@ -285,7 +288,7 @@ pub fn main() {
                 println!("{}", e);
                 return;
             }
-            run_tests(vec![cmd.script], false, false, manifest_path);
+            run_tests(vec![cmd.script], false, false, cmd.allow_wallets, manifest_path);
         },
         Command::Deploy(deploy) => {
             let manifest_path = get_manifest_path_or_exit(deploy.manifest_path);

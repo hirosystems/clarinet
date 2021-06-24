@@ -10,8 +10,8 @@ use std::path::PathBuf;
 
 mod deno;
 
-pub fn run_tests(files: Vec<String>, include_coverage: bool, watch: bool, manifest_path: PathBuf) {
-    match block_on(deno::do_run_tests(files, include_coverage, watch, manifest_path)) {
+pub fn run_tests(files: Vec<String>, include_coverage: bool, watch: bool, allow_wallets: bool, manifest_path: PathBuf) {
+    match block_on(deno::do_run_tests(files, include_coverage, watch, allow_wallets, manifest_path)) {
       Err(e) => {
         std::process::exit(1)
       }

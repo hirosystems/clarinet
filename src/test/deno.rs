@@ -154,7 +154,7 @@ mod sessions {
     }
 }
 
-pub async fn do_run_tests(include: Vec<String>, include_coverage: bool, watch: bool, manifest_path: PathBuf) -> Result<bool, AnyError> {
+pub async fn do_run_tests(include: Vec<String>, include_coverage: bool, watch: bool, allow_wallets: bool, manifest_path: PathBuf) -> Result<bool, AnyError> {
 
     let mut flags = Flags::default();
     flags.unstable = true;
@@ -335,6 +335,7 @@ pub async fn do_run_tests(include: Vec<String>, include_coverage: bool, watch: b
             filter.clone(),
             concurrent_jobs,
             manifest_path.clone(),
+            allow_wallets,
           )
           .map(|res| res.map(|_| ()))
         },
@@ -362,7 +363,8 @@ pub async fn do_run_tests(include: Vec<String>, include_coverage: bool, watch: b
         allow_none,
         filter,
         concurrent_jobs,
-        manifest_path
+        manifest_path,
+        allow_wallets,
       )
       .await?;
   
@@ -415,6 +417,7 @@ pub async fn run_tests(
   filter: Option<String>,
   concurrent_jobs: usize,
   manifest_path: PathBuf,
+  allow_wallets: bool,
 ) -> Result<bool, AnyError> {
   if !doc_modules.is_empty() {
     let mut test_programs = Vec::new();
@@ -555,6 +558,7 @@ pub async fn run_tests(
           permissions,
           sender,
           manifest,
+          allow_wallets
         );
 
         tokio_util::run_basic(future)
@@ -656,6 +660,7 @@ pub async fn run_test_file(
   permissions: Permissions,
   channel: Sender<TestEvent>,
   manifest_path: PathBuf,
+  allow_wallets: bool,
 ) -> Result<(), AnyError> {
 
   let mut worker =
@@ -674,6 +679,11 @@ pub async fn run_test_file(
       .op_state()
       .borrow_mut()
       .put(manifest_path);
+
+    js_runtime
+      .op_state()
+      .borrow_mut()
+      .put(allow_wallets);
 
     js_runtime
       .op_state()
@@ -735,6 +745,14 @@ fn setup_chain(state: &mut OpState, args: Value, _: ()) -> Result<String, AnyErr
       "contract_interface": a.contract_interface.clone(),
       "source": s
     })).collect::<Vec<_>>();
+
+    let allow_wallets = state.borrow::<bool>();
+    let accounts = if *allow_wallets {
+      accounts
+    } else {
+      println!("Pass the option --allow-wallets for passing the wallets declared in your settings");
+      vec![]
+    };
 
     Ok(json!({
         "session_id": session_id,
