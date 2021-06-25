@@ -234,12 +234,12 @@ jobs:
             ./target/${{ matrix.target }}/release/clarinet test --manifest-path examples/${testdir}/Clarinet.toml
           done
 
-      - name: Functional Tests (Windows)
-        if: matrix.os == 'windows-latest'
-        run: |
-          foreach($testdir in Get-ChildItem examples) {
-            ./target/${{ matrix.target }}/release/clarinet test --manifest-path "examples\${testdir}\Clarinet.toml"
-          }
+      # - name: Functional Tests (Windows)
+      #   if: matrix.os == 'windows-latest'
+      #   run: |
+      #     foreach($testdir in Get-ChildItem examples) {
+      #       ./target/${{ matrix.target }}/release/clarinet test --manifest-path examples/${testdir}/Clarinet.toml
+      #     }
 
       - name: Upload Artifacts to GH release
         uses: svenstaro/upload-release-action@v2
