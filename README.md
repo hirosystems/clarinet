@@ -17,6 +17,18 @@ provided in case Cargo is not available to you.
 
 ### Install from source using Cargo
 
+#### Prerequisites
+
+[Install Rust](https://www.rust-lang.org/tools/install) for access to `cargo`, the Rust package manager.
+
+On Debian and Ubuntu-based distributions, please install the following packages before building Clarinet.
+
+```bash
+sudo apt-get install build-essential pkg-config libssl-dev
+```
+
+#### Build Clarinet
+
 You can build Clarinet from source using Cargo with the following commands:
 
 ```bash
