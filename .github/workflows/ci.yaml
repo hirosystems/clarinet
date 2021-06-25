@@ -99,8 +99,9 @@ jobs:
 
       - name: Functional Tests
         run: |
-          cd examples/counter
-          ../../target/debug/clarinet test .
+          for testdir in $(ls examples); do
+            ./target/debug/clarinet test --manifest-path examples/${testdir}/Clarinet.toml
+          done
 
       - name: Upload coverage report
         uses: codecov/codecov-action@v1
@@ -230,18 +231,14 @@ jobs:
         if: matrix.os != 'windows-latest'
         run: |
           for testdir in $(ls examples); do
-            pushd examples/${testdir}
-              ../../target/${{ matrix.target }}/release/clarinet test .
-            popd
+            ./target/${{ matrix.target }}/release/clarinet test --manifest-path examples/${testdir}/Clarinet.toml
           done
 
       - name: Functional Tests (Windows)
         if: matrix.os == 'windows-latest'
         run: |
           foreach($testdir in Get-ChildItem examples) {
-            Push-Location $testdir.FullName
-              ../../target/${{ matrix.target }}/release/clarinet test .
-            Pop-Location
+            ./target/${{ matrix.target }}/release/clarinet test --manifest-path examples/${testdir}/Clarinet.toml
           }
 
       - name: Upload Artifacts to GH release
