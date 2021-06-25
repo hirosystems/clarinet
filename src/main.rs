@@ -6,13 +6,13 @@ extern crate serde_derive;
 #[macro_use]
 extern crate lazy_static;
 
+mod console;
 mod frontend;
 mod generators;
 mod publish;
+pub mod test;
 mod types;
 mod utils;
-mod console;
-pub mod test;
 
 use frontend::cli;
 

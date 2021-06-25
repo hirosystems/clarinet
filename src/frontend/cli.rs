@@ -1,17 +1,43 @@
-use std::{env, process};
+use std::collections::{BTreeMap, HashMap};
 use std::fs::{self, File};
-use std::collections::{HashMap, BTreeMap};
 use std::io::{prelude::*, BufReader, Read};
 use std::path::PathBuf;
+use std::{env, process};
 
-use crate::{generators::{self, changes::{Changes, TOMLEdition}}, utils::mnemonic};
-use crate::types::{MainConfig, MainConfigFile, RequirementConfig};
 use crate::console::load_session;
 use crate::test::run_tests;
+use crate::types::{MainConfig, MainConfigFile, RequirementConfig};
+use crate::{
+    generators::{
+        self,
+        changes::{Changes, TOMLEdition},
+    },
+    utils::mnemonic,
+};
 
-use clarity_repl::{clarity::{codec::{StacksString, transaction::{RecoverableSignature, SinglesigHashMode, SinglesigSpendingCondition, TransactionVersion}}, util::{StacksAddress, address::AddressHashMode, secp256k1::{Secp256k1PrivateKey, Secp256k1PublicKey}}}, repl};
-use clarity_repl::clarity::codec::transaction::{StacksTransaction, TransactionAnchorMode, TransactionSmartContract, TransactionSpendingCondition, TransactionAuth, TransactionPostConditionMode, TransactionPayload, TransactionPublicKeyEncoding, StacksTransactionSigner};
+use clarity_repl::clarity::codec::transaction::{
+    StacksTransaction, StacksTransactionSigner, TransactionAnchorMode, TransactionAuth,
+    TransactionPayload, TransactionPostConditionMode, TransactionPublicKeyEncoding,
+    TransactionSmartContract, TransactionSpendingCondition,
+};
 use clarity_repl::clarity::codec::StacksMessageCodec;
+use clarity_repl::{
+    clarity::{
+        codec::{
+            transaction::{
+                RecoverableSignature, SinglesigHashMode, SinglesigSpendingCondition,
+                TransactionVersion,
+            },
+            StacksString,
+        },
+        util::{
+            address::AddressHashMode,
+            secp256k1::{Secp256k1PrivateKey, Secp256k1PublicKey},
+            StacksAddress,
+        },
+    },
+    repl,
+};
 
 use clap::Clap;
 use secp256k1::{PublicKey, SecretKey};
@@ -137,7 +163,7 @@ struct Test {
     pub watch: bool,
     /// Files to includes
     #[clap(last = true)]
-    pub files: Vec<String>,    
+    pub files: Vec<String>,
 }
 
 #[derive(Clap)]
@@ -190,7 +216,7 @@ pub fn main() {
                 let current_dir = env::current_dir().expect("Unable to read current directory");
                 current_dir.to_str().unwrap().to_owned()
             };
-        
+
             let changes = generators::get_changes_for_new_project(current_path, project_opts.name);
             execute_changes(changes);
         }
@@ -198,15 +224,23 @@ pub fn main() {
             Contract::NewContract(new_contract) => {
                 let manifest_path = get_manifest_path_or_exit(new_contract.manifest_path);
 
-                let changes =
-                    generators::get_changes_for_new_contract(manifest_path, new_contract.name, None, true, vec![]);
+                let changes = generators::get_changes_for_new_contract(
+                    manifest_path,
+                    new_contract.name,
+                    None,
+                    true,
+                    vec![],
+                );
                 execute_changes(changes);
             }
             Contract::LinkContract(required_contract) => {
                 let manifest_path = get_manifest_path_or_exit(required_contract.manifest_path);
 
                 let change = TOMLEdition {
-                    comment: format!("Adding {} as a requirement to Clarinet.toml", required_contract.contract_id),
+                    comment: format!(
+                        "Adding {} as a requirement to Clarinet.toml",
+                        required_contract.contract_id
+                    ),
                     manifest_path,
                     contracts_to_add: HashMap::new(),
                     requirements_to_add: vec![RequirementConfig {
@@ -218,7 +252,10 @@ pub fn main() {
             Contract::ForkContract(fork_contract) => {
                 let manifest_path = get_manifest_path_or_exit(fork_contract.manifest_path);
 
-                println!("Resolving {} and its dependencies...", fork_contract.contract_id);
+                println!(
+                    "Resolving {} and its dependencies...",
+                    fork_contract.contract_id
+                );
 
                 let settings = repl::SessionSettings::default();
                 let mut session = repl::Session::new(settings);
@@ -242,13 +279,21 @@ pub fn main() {
                     let contract_name = components.last().unwrap();
 
                     if &contract_id == &fork_contract.contract_id {
-                        let mut change_set =
-                            generators::get_changes_for_new_contract(manifest_path.clone(), contract_name.to_string(), Some(code), false, vec![]);
+                        let mut change_set = generators::get_changes_for_new_contract(
+                            manifest_path.clone(),
+                            contract_name.to_string(),
+                            Some(code),
+                            false,
+                            vec![],
+                        );
                         changes.append(&mut change_set);
 
                         for dep in deps.iter() {
-                            let mut change_set =
-                                generators::get_changes_for_new_link(manifest_path.clone(), dep.clone(), None);
+                            let mut change_set = generators::get_changes_for_new_link(
+                                manifest_path.clone(),
+                                dep.clone(),
+                                None,
+                            );
                             changes.append(&mut change_set);
                         }
                     }
@@ -259,8 +304,9 @@ pub fn main() {
         Command::Console(cmd) => {
             let manifest_path = get_manifest_path_or_exit(cmd.manifest_path);
             let start_repl = true;
-            load_session(manifest_path, start_repl, "development".into()).expect("Unable to start REPL");
-        },
+            load_session(manifest_path, start_repl, "development".into())
+                .expect("Unable to start REPL");
+        }
         Command::Check(cmd) => {
             let manifest_path = get_manifest_path_or_exit(cmd.manifest_path);
             let start_repl = false;
@@ -269,7 +315,7 @@ pub fn main() {
                 println!("{}", e);
                 return;
             }
-        },
+        }
         Command::Test(cmd) => {
             let manifest_path = get_manifest_path_or_exit(cmd.manifest_path);
             let start_repl = false;
@@ -279,7 +325,7 @@ pub fn main() {
                 return;
             }
             run_tests(cmd.files, cmd.coverage, cmd.watch, true, manifest_path);
-        },
+        }
         Command::Run(cmd) => {
             let manifest_path = get_manifest_path_or_exit(cmd.manifest_path);
             let start_repl = false;
@@ -288,8 +334,14 @@ pub fn main() {
                 println!("{}", e);
                 return;
             }
-            run_tests(vec![cmd.script], false, false, cmd.allow_wallets, manifest_path);
-        },
+            run_tests(
+                vec![cmd.script],
+                false,
+                false,
+                cmd.allow_wallets,
+                manifest_path,
+            );
+        }
         Command::Deploy(deploy) => {
             let manifest_path = get_manifest_path_or_exit(deploy.manifest_path);
             let start_repl = false;
@@ -320,7 +372,7 @@ pub fn main() {
                 balance: String,
                 nonce: u64,
                 balance_proof: String,
-                nonce_proof: String,               
+                nonce_proof: String,
             }
 
             let host = if mode == "mocknet" {
@@ -334,39 +386,40 @@ pub fn main() {
 
                 let payload = TransactionSmartContract {
                     name: contract_name.as_str().into(),
-                    code_body: StacksString::from_string(&initial_contract.code).unwrap()
+                    code_body: StacksString::from_string(&initial_contract.code).unwrap(),
                 };
 
                 let deployer = match deployers_lookup.get(contract_name.as_str()) {
                     Some(deployer) => deployer,
-                    None => deployers_lookup.get("*").unwrap()
+                    None => deployers_lookup.get("*").unwrap(),
                 };
 
-                let bip39_seed = match mnemonic::get_bip39_seed_from_mnemonic(&deployer.mnemonic, "") {
-                    Ok(bip39_seed) => bip39_seed,
-                    Err(_) => panic!(),
-                };
-                let ext = ExtendedPrivKey::derive(&bip39_seed[..], deployer.derivation.as_str()).unwrap();
+                let bip39_seed =
+                    match mnemonic::get_bip39_seed_from_mnemonic(&deployer.mnemonic, "") {
+                        Ok(bip39_seed) => bip39_seed,
+                        Err(_) => panic!(),
+                    };
+                let ext =
+                    ExtendedPrivKey::derive(&bip39_seed[..], deployer.derivation.as_str()).unwrap();
                 let secret_key = SecretKey::parse_slice(&ext.secret()).unwrap();
                 let public_key = PublicKey::from_secret_key(&secret_key);
-                
-                let wrapped_public_key = Secp256k1PublicKey::from_slice(&public_key.serialize_compressed()).unwrap();
+
+                let wrapped_public_key =
+                    Secp256k1PublicKey::from_slice(&public_key.serialize_compressed()).unwrap();
                 let wrapped_secret_key = Secp256k1PrivateKey::from_slice(&ext.secret()).unwrap();
 
                 let anchor_mode = TransactionAnchorMode::Any;
                 let tx_fee = 200 + initial_contract.code.len() as u64;
 
                 let nonce = match deployers_nonces.get(&deployer.name) {
-                    Some(nonce) => {
-                        *nonce
-                    },
+                    Some(nonce) => *nonce,
                     None => {
                         let request_url = format!(
                             "{host}/v2/accounts/{addr}",
                             host = host,
                             addr = deployer.address,
                         );
-                
+
                         let response: Balance = reqwest::blocking::get(&request_url)
                             .expect("Unable to retrieve account")
                             .json()
@@ -377,18 +430,23 @@ pub fn main() {
                     }
                 };
 
-                let signer_addr = StacksAddress::from_public_keys(0, &AddressHashMode::SerializeP2PKH, 1, &vec![wrapped_public_key]).unwrap();
-        
-                let spending_condition = TransactionSpendingCondition::Singlesig(
-                    SinglesigSpendingCondition {
+                let signer_addr = StacksAddress::from_public_keys(
+                    0,
+                    &AddressHashMode::SerializeP2PKH,
+                    1,
+                    &vec![wrapped_public_key],
+                )
+                .unwrap();
+
+                let spending_condition =
+                    TransactionSpendingCondition::Singlesig(SinglesigSpendingCondition {
                         signer: signer_addr.bytes.clone(),
                         nonce: nonce,
                         tx_fee: tx_fee,
                         hash_mode: SinglesigHashMode::P2PKH,
                         key_encoding: TransactionPublicKeyEncoding::Compressed,
                         signature: RecoverableSignature::empty(),
-                    },
-                );
+                    });
 
                 let auth = TransactionAuth::Standard(spending_condition);
                 let unsigned_tx = StacksTransaction {
@@ -400,7 +458,7 @@ pub fn main() {
                     post_conditions: vec![],
                     payload: TransactionPayload::SmartContract(payload),
                 };
-            
+
                 let mut unsigned_tx_bytes = vec![];
                 unsigned_tx
                     .consensus_serialize(&mut unsigned_tx_bytes)
@@ -419,14 +477,17 @@ pub fn main() {
                     .body(tx_bytes)
                     .send()
                     .unwrap();
-        
+
                 if !res.status().is_success() {
                     println!("{}", res.text().unwrap());
                     panic!()
-                }        
+                }
                 let txid: String = res.json().unwrap();
 
-                println!("Deploying {} (txid: {}, nonce: {})", contract_name, txid, nonce);
+                println!(
+                    "Deploying {} (txid: {}, nonce: {})",
+                    contract_name, txid, nonce
+                );
                 deployers_nonces.insert(deployer.name.clone(), nonce + 1);
             }
 
@@ -455,7 +516,7 @@ fn get_manifest_path_or_exit(path: Option<String>) -> PathBuf {
             current_dir.push("Clarinet.toml");
 
             if current_dir.exists() {
-                break current_dir
+                break current_dir;
             }
             current_dir.pop();
 
@@ -490,7 +551,6 @@ fn execute_changes(changes: Vec<Changes>) {
                 fs::create_dir_all(options.path.clone()).expect("Unable to create directory");
             }
             Changes::EditTOML(ref mut options) => {
-
                 let mut config = match shared_config.take() {
                     Some(config) => config,
                     None => {
@@ -499,7 +559,8 @@ fn execute_changes(changes: Vec<Changes>) {
                         let mut config_file_reader = BufReader::new(file);
                         let mut config_file = vec![];
                         config_file_reader.read_to_end(&mut config_file).unwrap();
-                        let config_file: MainConfigFile = toml::from_slice(&config_file[..]).unwrap();
+                        let config_file: MainConfigFile =
+                            toml::from_slice(&config_file[..]).unwrap();
                         MainConfig::from_config_file(config_file)
                     }
                 };
@@ -530,5 +591,5 @@ fn execute_changes(changes: Vec<Changes>) {
         let mut file = File::create(path).unwrap();
         file.write_all(&toml.as_bytes()).unwrap();
         file.sync_all().unwrap();
-    } 
+    }
 }

@@ -75,14 +75,18 @@ impl GetChangesForNewProject {
     fn create_vscode_directory(&mut self) {
         self.changes
             .push(self.get_changes_for_new_root_dir(format!(".vscode")));
-        let content = format!(r#"
+        let content = format!(
+            r#"
 {{
     "deno.enable": true,
 }}
 "#
         );
         let name = format!("settings.json");
-        let path = format!("{}/{}/.vscode/{}", self.project_path, self.project_name, name);
+        let path = format!(
+            "{}/{}/.vscode/{}",
+            self.project_path, self.project_name, name
+        );
         let change = FileCreation {
             comment: format!("Creating file {}/.vscode/{}", self.project_name, name),
             name,
@@ -182,7 +186,6 @@ node_rpc_address = "http://xenon.blockstack.org:20443"
         };
         self.changes.push(Changes::AddFile(change));
     }
-
 
     fn create_environment_dev_toml(&mut self) {
         let content = format!(

@@ -1,10 +1,8 @@
+use std::collections::{BTreeMap, HashSet};
 use std::fs::File;
-use std::collections::{HashSet, BTreeMap};
-use std::path::PathBuf;
+use std::io::{BufReader, Read};
 use std::iter::FromIterator;
-use std::{
-    io::{BufReader, Read},
-};
+use std::path::PathBuf;
 use std::process;
 use toml::value::Value;
 
@@ -77,7 +75,7 @@ impl MainConfig {
         let contracts = self.contracts.clone();
 
         if contracts.is_empty() {
-            return vec![]
+            return vec![];
         }
 
         for (contract, _) in contracts.iter() {
@@ -125,7 +123,6 @@ impl MainConfig {
     }
 
     pub fn from_config_file(config_file: MainConfigFile) -> MainConfig {
-
         let project = ProjectConfig {
             name: config_file.project.name.clone(),
             requirements: None,
@@ -147,11 +144,7 @@ impl MainConfig {
                                 Some(Value::String(contract_id)) => contract_id.to_string(),
                                 _ => continue,
                             };
-                            config_requirements.push(
-                                RequirementConfig {
-                                    contract_id
-                                }
-                            );
+                            config_requirements.push(RequirementConfig { contract_id });
                         }
                         _ => {}
                     }
@@ -170,17 +163,15 @@ impl MainConfig {
                                 _ => continue,
                             };
                             let depends_on = match contract_settings.get("depends_on") {
-                                Some(Value::Array(depends_on)) => {
-                                    depends_on.iter().map(|v| v.as_str().unwrap().to_string()).collect::<Vec<String>>()
-                                },
+                                Some(Value::Array(depends_on)) => depends_on
+                                    .iter()
+                                    .map(|v| v.as_str().unwrap().to_string())
+                                    .collect::<Vec<String>>(),
                                 _ => continue,
                             };
                             config_contracts.insert(
                                 contract_name.to_string(),
-                                ContractConfig {
-                                    path,
-                                    depends_on,
-                                }
+                                ContractConfig { path, depends_on },
                             );
                         }
                         _ => {}

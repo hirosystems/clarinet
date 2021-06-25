@@ -1,10 +1,13 @@
+use crate::types::{ChainConfig, MainConfig};
+use clarity_repl::{repl, Terminal};
 use std::fs;
 use std::path::PathBuf;
-use crate::types::{MainConfig, ChainConfig};
-use clarity_repl::{repl, Terminal};
 
-
-pub fn load_session(manifest_path: PathBuf, start_repl: bool, env: String) -> Result<repl::SessionSettings, String> {
+pub fn load_session(
+    manifest_path: PathBuf,
+    start_repl: bool,
+    env: String,
+) -> Result<repl::SessionSettings, String> {
     let mut settings = repl::SessionSettings::default();
 
     let mut project_path = manifest_path.clone();
@@ -40,9 +43,7 @@ pub fn load_session(manifest_path: PathBuf, start_repl: bool, env: String) -> Re
             initial_deployer = Some(account.clone());
             deployer_address = Some(account.address.clone());
         }
-        settings
-            .initial_accounts
-            .push(account);
+        settings.initial_accounts.push(account);
     }
 
     for (name, config) in project_config.ordered_contracts().iter() {
@@ -52,7 +53,10 @@ pub fn load_session(manifest_path: PathBuf, start_repl: bool, env: String) -> Re
         let code = match fs::read_to_string(&contract_path) {
             Ok(code) => code,
             Err(err) => {
-                return Err(format!("Error: unable to read {:?}: {}", contract_path, err))
+                return Err(format!(
+                    "Error: unable to read {:?}: {}",
+                    contract_path, err
+                ))
             }
         };
 
@@ -72,16 +76,15 @@ pub fn load_session(manifest_path: PathBuf, start_repl: bool, env: String) -> Re
     };
 
     for link_config in links.iter() {
-        settings
-            .initial_links
-            .push(repl::settings::InitialLink {
-                contract_id: link_config.contract_id.clone(),
-                stacks_node_addr: None,
-                cache: None,
+        settings.initial_links.push(repl::settings::InitialLink {
+            contract_id: link_config.contract_id.clone(),
+            stacks_node_addr: None,
+            cache: None,
         });
     }
 
-    settings.include_boot_contracts = vec!["pox".to_string(), "costs".to_string(), "bns".to_string()];
+    settings.include_boot_contracts =
+        vec!["pox".to_string(), "costs".to_string(), "bns".to_string()];
     settings.initial_deployer = initial_deployer;
 
     if start_repl {

@@ -25,9 +25,8 @@ fn dist_clarinet() -> Result<()> {
         run!(
             "cargo build --manifest-path ./Cargo.toml --bin clarinet --release
              --target x86_64-unknown-linux-musl
-            "
-            // We'd want to add, but that requires setting the right linker somehow
-            // --features=jemalloc
+            " // We'd want to add, but that requires setting the right linker somehow
+              // --features=jemalloc
         )?;
         run!("strip ./target/x86_64-unknown-linux-musl/release/clarinet")?;
     } else {
@@ -35,9 +34,15 @@ fn dist_clarinet() -> Result<()> {
     }
 
     let (src, dst) = if cfg!(target_os = "linux") {
-        ("./target/x86_64-unknown-linux-musl/release/clarinet", "./dist/clarinet-linux")
+        (
+            "./target/x86_64-unknown-linux-musl/release/clarinet",
+            "./dist/clarinet-linux",
+        )
     } else if cfg!(target_os = "windows") {
-        ("./target/release/clarinet.exe", "./dist/clarinet-windows.exe")
+        (
+            "./target/release/clarinet.exe",
+            "./dist/clarinet-windows.exe",
+        )
     } else if cfg!(target_os = "macos") {
         ("./target/release/clarinet", "./dist/clarinet-mac")
     } else {

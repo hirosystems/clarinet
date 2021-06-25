@@ -3,3 +3,5 @@
 .DS_Store
 clarinet.code-workspace
 history.txt
+node_modules
+package-lock.json

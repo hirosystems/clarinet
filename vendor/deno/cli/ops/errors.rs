@@ -45,11 +45,14 @@ fn op_apply_source_map(
       program_state,
     );
 
-  Ok(json!({
-    "fileName": orig_file_name,
-    "lineNumber": orig_line_number as u32,
-    "columnNumber": orig_column_number as u32,
-  }).to_string())
+  Ok(
+    json!({
+      "fileName": orig_file_name,
+      "lineNumber": orig_line_number as u32,
+      "columnNumber": orig_column_number as u32,
+    })
+    .to_string(),
+  )
 }
 
 fn op_format_diagnostic(

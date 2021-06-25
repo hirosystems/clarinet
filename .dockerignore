@@ -1,2 +1,7 @@
 target/
 examples/
+Dockerfile
+.dockerignore
+.git*
+node_modules
+package-lock.json

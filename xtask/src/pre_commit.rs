@@ -7,7 +7,6 @@ use anyhow::{bail, Result};
 use crate::{not_bash::run, project_root};
 
 pub fn run_hook() -> Result<()> {
-
     let diff = run!("git diff --diff-filter=MAR --name-only --cached")?;
 
     let root = project_root();
