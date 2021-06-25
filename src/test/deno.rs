@@ -743,6 +743,7 @@ fn setup_chain(state: &mut OpState, args: Value, _: ()) -> Result<String, AnyErr
     let serialized_contracts = contracts.iter().map(|(a, s)| json!({
       "contract_id": a.contract_identifier.to_string(),
       "contract_interface": a.contract_interface.clone(),
+      "dependencies": a.dependencies.clone().into_iter().map(|c| c.to_string()).collect::<Vec<String>>(),
       "source": s
     })).collect::<Vec<_>>();
 
