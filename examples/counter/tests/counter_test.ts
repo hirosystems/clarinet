@@ -5,6 +5,8 @@ Clarinet.test({
     name: "Ensure that counter can be incremented multiples per block, accross multiple blocks",
     async fn(chain: Chain, accounts: Map<string, Account>, contracts: Map<string, Contract>) {
         let wallet_1 = accounts.get("wallet_1")!;
+        let wallet_2 = accounts.get("wallet_2")!;
+
         let block = chain.mineBlock([
             Tx.contractCall("counter", "increment", [types.uint(1)], wallet_1.address),
             Tx.contractCall("counter", "increment", [types.uint(4)], wallet_1.address),
@@ -24,7 +26,8 @@ Clarinet.test({
         block = chain.mineBlock([
             Tx.contractCall("counter", "increment", [types.uint(1)], wallet_1.address),
             Tx.contractCall("counter", "increment", [types.uint(4)], wallet_1.address),
-            Tx.contractCall("counter", "increment", [types.uint(10)], wallet_1.address)
+            Tx.contractCall("counter", "increment", [types.uint(10)], wallet_1.address),
+            Tx.transferSTX(1, wallet_2.address, wallet_1.address),
         ]);
 
         assertEquals(block.height, 3);
@@ -39,7 +42,7 @@ Clarinet.test({
             .expectUint(31);
 
         let result = chain.getAssetsMaps();
-        assertEquals(result.assets["STX"][wallet_1.address], 1000000);
+        assertEquals(result.assets["STX"][wallet_1.address], 999999);
 
         let call = chain.callReadOnlyFn("counter", "read-counter", [], wallet_1.address)
         call.result
