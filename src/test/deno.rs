@@ -820,9 +820,13 @@ fn mine_block(state: &mut OpState, args: Value, _: ()) -> Result<String, AnyErro
           let execution = session.interpret(snippet, None, true, Some(name.into())).unwrap(); // todo(ludo)
           receipts.push((execution.result, execution.events));
         }
-
         if let Some(ref args) = tx.deploy_contract {
           let execution = session.interpret(args.code.clone(), Some(args.name.clone()), true, Some(name.into())).unwrap(); // todo(ludo)
+          receipts.push((execution.result, execution.events));
+        }
+        if let Some(ref args) = tx.transfer_stx {
+          let snippet = format!("(stx-transfer? u{} tx-sender '{})", args.amount, args.recipient);
+          let execution = session.interpret(snippet, None, true, Some(name.into())).unwrap(); // todo(ludo)
           receipts.push((execution.result, execution.events));
         }
       }
