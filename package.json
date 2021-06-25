@@ -1,0 +1,54 @@
+{
+    "name": "@hiro/clarinet",
+    "description": "Clarinet is a Clarity runtime packaged as a command line tool, designed to facilitate smart contract understanding, development, testing and deployment.",
+    "commitlint": {
+        "extends": [
+            "@commitlint/config-conventional"
+        ]
+    },
+    "husky": {
+        "hooks": {
+            "commit-msg": "commitlint -E HUSKY_GIT_PARAMS"
+        }
+    },
+    "release": {
+        "branches": [
+            {
+                "name": "develop",
+                "prerelease": true
+            },
+            "main"
+        ],
+        "plugins": [
+            "@semantic-release/commit-analyzer",
+            "@semantic-release/release-notes-generator",
+            [
+                "@semantic-release/exec",
+                {
+                    "prepareCmd": "sed -i -e '1h;2,$H;$!d;g' -e 's@name = \"clarinet\"\\nversion = \"${lastRelease.version}\"@name = \"clarinet\"\\nversion = \"${nextRelease.version}\"@g' Cargo.toml Cargo.lock"
+                }
+            ],
+            "@semantic-release/github",
+            "@semantic-release/changelog",
+            [
+                "@semantic-release/git",
+                {
+                    "message": "chore(release): ${nextRelease.version}\n\n${nextRelease.notes}",
+                    "assets": [
+                        "CHANGELOG.md",
+                        "Cargo.toml",
+                        "Cargo.lock"
+                    ]
+                }
+            ]
+        ]
+    },
+    "devDependencies": {
+        "@commitlint/cli": "^12.1.4",
+        "@commitlint/config-conventional": "^12.1.4",
+        "husky": "^6.0.0"
+    },
+    "scripts": {
+        "prepare": "husky install"
+    }
+}
