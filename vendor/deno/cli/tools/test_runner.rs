@@ -184,7 +184,13 @@ impl TestReporter for PrettyTestReporter {
       colors::green("ok").to_string()
     };
 
-    if (self.passed + self.failed + self.ignored + self.filtered_out + self.measured) > 1 {
+    if (self.passed
+      + self.failed
+      + self.ignored
+      + self.filtered_out
+      + self.measured)
+      > 1
+    {
       println!(
         "\ntest result: {}. {} passed; {} failed; {} ignored; {} measured; {} filtered out {}\n",
         status,

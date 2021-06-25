@@ -1,6 +1,6 @@
 use std::path::PathBuf;
 
-use super::changes::{Changes};
+use super::changes::Changes;
 
 #[allow(dead_code)]
 pub struct GetChangesForNewNotebook {
@@ -10,7 +10,6 @@ pub struct GetChangesForNewNotebook {
 }
 
 impl GetChangesForNewNotebook {
-
     #[allow(dead_code)]
     pub fn new(manifest_path: PathBuf, notebook_name: String) -> Self {
         Self {
