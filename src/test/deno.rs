@@ -42,6 +42,7 @@ use clarity_repl::clarity::coverage::CoverageReporter;
 use std::convert::TryFrom;
 
 mod sessions {
+    use std::path::PathBuf;
     use std::sync::Mutex;
     use std::fs;
     use std::env;
@@ -57,20 +58,19 @@ mod sessions {
         pub static ref SESSIONS: Mutex<HashMap<u32, (String, Session)>> = Mutex::new(HashMap::new());
     }
 
-    pub fn handle_setup_chain(name: String, transactions: Vec<TransactionArgs>) -> Result<(u32, Vec<Account>, Vec<(ContractAnalysis, String)>), AnyError> {
+    pub fn handle_setup_chain(manifest_path: &PathBuf, name: String, transactions: Vec<TransactionArgs>) -> Result<(u32, Vec<Account>, Vec<(ContractAnalysis, String)>), AnyError> {
         let mut sessions = SESSIONS.lock().unwrap();
         let session_id = sessions.len() as u32;
 
         let mut settings = repl::SessionSettings::default();
-        let root_path = env::current_dir().unwrap();
-        let mut project_config_path = root_path.clone();
-        project_config_path.push("Clarinet.toml");
-    
-        let mut chain_config_path = root_path.clone();
+        let mut project_path = manifest_path.clone();
+        project_path.pop();
+        
+        let mut chain_config_path = project_path.clone();
         chain_config_path.push("settings");
         chain_config_path.push("Development.toml");
     
-        let project_config = MainConfig::from_path(&project_config_path);
+        let project_config = MainConfig::from_path(manifest_path);
         let chain_config = ChainConfig::from_path(&chain_config_path);
     
         let mut deployer_address = None;
@@ -119,7 +119,7 @@ mod sessions {
         }
 
         for (name, config) in project_config.ordered_contracts().iter() {
-            let mut contract_path = root_path.clone();
+            let mut contract_path = project_path.clone();
             contract_path.push(&config.path);
     
             let code = fs::read_to_string(&contract_path).unwrap();
@@ -154,13 +154,15 @@ mod sessions {
     }
 }
 
-pub async fn do_run_tests(include: Vec<String>, include_coverage: bool, watch: bool) -> Result<bool, AnyError> {
+pub async fn do_run_tests(include: Vec<String>, include_coverage: bool, watch: bool, allow_wallets: bool, manifest_path: PathBuf) -> Result<bool, AnyError> {
 
     let mut flags = Flags::default();
     flags.unstable = true;
     let program_state = ProgramState::build(flags.clone()).await?;
     let permissions = Permissions::from_options(&flags.clone().into());
-    let cwd = std::env::current_dir().expect("No current directory");
+    let mut project_path = manifest_path.clone();
+    project_path.pop();
+    let cwd = Path::new(&project_path);
     let include = if include.is_empty() {
       vec![".".into()]
     } else {
@@ -332,6 +334,8 @@ pub async fn do_run_tests(include: Vec<String>, include_coverage: bool, watch: b
             true,
             filter.clone(),
             concurrent_jobs,
+            manifest_path.clone(),
+            allow_wallets,
           )
           .map(|res| res.map(|_| ()))
         },
@@ -359,6 +363,8 @@ pub async fn do_run_tests(include: Vec<String>, include_coverage: bool, watch: b
         allow_none,
         filter,
         concurrent_jobs,
+        manifest_path,
+        allow_wallets,
       )
       .await?;
   
@@ -410,6 +416,8 @@ pub async fn run_tests(
   allow_none: bool,
   filter: Option<String>,
   concurrent_jobs: usize,
+  manifest_path: PathBuf,
+  allow_wallets: bool,
 ) -> Result<bool, AnyError> {
   if !doc_modules.is_empty() {
     let mut test_programs = Vec::new();
@@ -540,6 +548,7 @@ pub async fn run_tests(
     let permissions = permissions.clone();
     let sender = sender.clone();
 
+    let manifest = manifest_path.clone();
     tokio::task::spawn_blocking(move || {
       let join_handle = std::thread::spawn(move || {
         let future = run_test_file(
@@ -548,6 +557,8 @@ pub async fn run_tests(
           test_module,
           permissions,
           sender,
+          manifest,
+          allow_wallets
         );
 
         tokio_util::run_basic(future)
@@ -648,6 +659,8 @@ pub async fn run_test_file(
   test_module: ModuleSpecifier,
   permissions: Permissions,
   channel: Sender<TestEvent>,
+  manifest_path: PathBuf,
+  allow_wallets: bool,
 ) -> Result<(), AnyError> {
 
   let mut worker =
@@ -661,6 +674,17 @@ pub async fn run_test_file(
     js_runtime.register_op("call_read_only_fn", deno_core::op_sync(call_read_only_fn));
     js_runtime.register_op("get_assets_maps", deno_core::op_sync(get_assets_maps));
     js_runtime.sync_ops_cache();
+    
+    js_runtime
+      .op_state()
+      .borrow_mut()
+      .put(manifest_path);
+
+    js_runtime
+      .op_state()
+      .borrow_mut()
+      .put(allow_wallets);
+
     js_runtime
       .op_state()
       .borrow_mut()
@@ -712,14 +736,24 @@ struct SetupChainArgs {
 }
 
 fn setup_chain(state: &mut OpState, args: Value, _: ()) -> Result<String, AnyError> {
+    let manifest_path = state.borrow::<PathBuf>();
     let args: SetupChainArgs = serde_json::from_value(args)
       .expect("Invalid request from JavaScript for \"op_load\".");
-    let (session_id, accounts, contracts) = sessions::handle_setup_chain(args.name, args.transactions)?;
+    let (session_id, accounts, contracts) = sessions::handle_setup_chain(manifest_path, args.name, args.transactions)?;
     let serialized_contracts = contracts.iter().map(|(a, s)| json!({
       "contract_id": a.contract_identifier.to_string(),
       "contract_interface": a.contract_interface.clone(),
+      "dependencies": a.dependencies.clone().into_iter().map(|c| c.to_string()).collect::<Vec<String>>(),
       "source": s
     })).collect::<Vec<_>>();
+
+    let allow_wallets = state.borrow::<bool>();
+    let accounts = if *allow_wallets {
+      accounts
+    } else {
+      println!("Pass the option --allow-wallets for passing the wallets declared in your settings");
+      vec![]
+    };
 
     Ok(json!({
         "session_id": session_id,

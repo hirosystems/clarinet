@@ -1,7 +1,8 @@
-use std::env;
+use std::{env, process};
 use std::fs::{self, File};
 use std::collections::{HashMap, BTreeMap};
 use std::io::{prelude::*, BufReader, Read};
+use std::path::PathBuf;
 
 use crate::{generators::{self, changes::{Changes, TOMLEdition}}, utils::mnemonic};
 use crate::types::{MainConfig, MainConfigFile, RequirementConfig};
@@ -78,6 +79,9 @@ struct NewContract {
     /// Print debug info
     #[clap(short = 'd')]
     pub debug: bool,
+    /// Path to Clarinet.toml
+    #[clap(long = "manifest-path")]
+    pub manifest_path: Option<String>,
 }
 
 #[derive(Clap)]
@@ -87,6 +91,9 @@ struct LinkContract {
     /// Print debug info
     #[clap(short = 'd')]
     pub debug: bool,
+    /// Path to Clarinet.toml
+    #[clap(long = "manifest-path")]
+    pub manifest_path: Option<String>,
 }
 
 #[derive(Clap, Debug)]
@@ -96,6 +103,9 @@ struct ForkContract {
     /// Print debug info
     #[clap(short = 'd')]
     pub debug: bool,
+    /// Path to Clarinet.toml
+    #[clap(long = "manifest-path")]
+    pub manifest_path: Option<String>,
     // /// Fork contract and all its dependencies
     // #[clap(short = 'r')]
     // pub recursive: bool,
@@ -106,6 +116,9 @@ struct Console {
     /// Print debug info
     #[clap(short = 'd')]
     pub debug: bool,
+    /// Path to Clarinet.toml
+    #[clap(long = "manifest-path")]
+    pub manifest_path: Option<String>,
 }
 
 #[derive(Clap)]
@@ -116,11 +129,15 @@ struct Test {
     /// Generate coverage
     #[clap(long = "coverage")]
     pub coverage: bool,
-    /// Generate coverage
+    /// Path to Clarinet.toml
+    #[clap(long = "manifest-path")]
+    pub manifest_path: Option<String>,
+    /// Relaunch tests on updates
     #[clap(long = "watch")]
-    pub watch: bool,    
+    pub watch: bool,
     /// Files to includes
-    pub files: Vec<String>,
+    #[clap(last = true)]
+    pub files: Vec<String>,    
 }
 
 #[derive(Clap)]
@@ -130,6 +147,12 @@ struct Run {
     pub debug: bool,
     /// Script to run
     pub script: String,
+    /// Path to Clarinet.toml
+    #[clap(long = "manifest-path")]
+    pub manifest_path: Option<String>,
+    /// Allow access to wallets
+    #[clap(long = "allow-wallets")]
+    pub allow_wallets: bool,
 }
 
 #[derive(Clap)]
@@ -143,6 +166,9 @@ struct Deploy {
     /// Deploy contracts on mocknet, using settings/Testnet.toml
     #[clap(long = "testnet", conflicts_with = "mocknet")]
     pub testnet: bool,
+    /// Path to Clarinet.toml
+    #[clap(long = "manifest-path")]
+    pub manifest_path: Option<String>,
 }
 
 #[derive(Clap)]
@@ -150,33 +176,38 @@ struct Check {
     /// Print debug info
     #[clap(short = 'd')]
     pub debug: bool,
+    /// Path to Clarinet.toml
+    #[clap(long = "manifest-path")]
+    pub manifest_path: Option<String>,
 }
 
 pub fn main() {
     let opts: Opts = Opts::parse();
 
-    let current_path = {
-        let current_dir = env::current_dir().expect("Unable to read current directory");
-        current_dir.to_str().unwrap().to_owned()
-    };
-
     match opts.command {
         Command::New(project_opts) => {
+            let current_path = {
+                let current_dir = env::current_dir().expect("Unable to read current directory");
+                current_dir.to_str().unwrap().to_owned()
+            };
+        
             let changes = generators::get_changes_for_new_project(current_path, project_opts.name);
             execute_changes(changes);
         }
         Command::Contract(subcommand) => match subcommand {
             Contract::NewContract(new_contract) => {
+                let manifest_path = get_manifest_path_or_exit(new_contract.manifest_path);
+
                 let changes =
-                    generators::get_changes_for_new_contract(current_path, new_contract.name, None, true, vec![]);
+                    generators::get_changes_for_new_contract(manifest_path, new_contract.name, None, true, vec![]);
                 execute_changes(changes);
             }
             Contract::LinkContract(required_contract) => {
-                let path = format!("{}/Clarinet.toml", current_path);
+                let manifest_path = get_manifest_path_or_exit(required_contract.manifest_path);
 
                 let change = TOMLEdition {
                     comment: format!("Adding {} as a requirement to Clarinet.toml", required_contract.contract_id),
-                    path,
+                    manifest_path,
                     contracts_to_add: HashMap::new(),
                     requirements_to_add: vec![RequirementConfig {
                         contract_id: required_contract.contract_id.clone(),
@@ -185,7 +216,7 @@ pub fn main() {
                 execute_changes(vec![Changes::EditTOML(change)]);
             }
             Contract::ForkContract(fork_contract) => {
-                let path = format!("{}/Clarinet.toml", current_path);
+                let manifest_path = get_manifest_path_or_exit(fork_contract.manifest_path);
 
                 println!("Resolving {} and its dependencies...", fork_contract.contract_id);
 
@@ -212,12 +243,12 @@ pub fn main() {
 
                     if &contract_id == &fork_contract.contract_id {
                         let mut change_set =
-                            generators::get_changes_for_new_contract(current_path.clone(), contract_name.to_string(), Some(code), false, vec![]);
+                            generators::get_changes_for_new_contract(manifest_path.clone(), contract_name.to_string(), Some(code), false, vec![]);
                         changes.append(&mut change_set);
 
                         for dep in deps.iter() {
                             let mut change_set =
-                                generators::get_changes_for_new_link(path.clone(), dep.clone(), None);
+                                generators::get_changes_for_new_link(manifest_path.clone(), dep.clone(), None);
                             changes.append(&mut change_set);
                         }
                     }
@@ -225,37 +256,42 @@ pub fn main() {
                 execute_changes(changes);
             }
         },
-        Command::Console(_) => {
+        Command::Console(cmd) => {
+            let manifest_path = get_manifest_path_or_exit(cmd.manifest_path);
             let start_repl = true;
-            load_session(start_repl, "development".into()).expect("Unable to start REPL");
+            load_session(manifest_path, start_repl, "development".into()).expect("Unable to start REPL");
         },
-        Command::Check(_) => {
+        Command::Check(cmd) => {
+            let manifest_path = get_manifest_path_or_exit(cmd.manifest_path);
             let start_repl = false;
-            let res = load_session(start_repl, "development".into());
+            let res = load_session(manifest_path, start_repl, "development".into());
             if let Err(e) = res {
                 println!("{}", e);
                 return;
             }
         },
-        Command::Test(test) => {
+        Command::Test(cmd) => {
+            let manifest_path = get_manifest_path_or_exit(cmd.manifest_path);
             let start_repl = false;
-            let res = load_session(start_repl, "development".into());
+            let res = load_session(manifest_path.clone(), start_repl, "development".into());
             if let Err(e) = res {
                 println!("{}", e);
                 return;
             }
-            run_tests(test.files, test.coverage, test.watch);
+            run_tests(cmd.files, cmd.coverage, cmd.watch, true, manifest_path);
         },
-        Command::Run(run) => {
+        Command::Run(cmd) => {
+            let manifest_path = get_manifest_path_or_exit(cmd.manifest_path);
             let start_repl = false;
-            let res = load_session(start_repl, "development".into());
+            let res = load_session(manifest_path.clone(), start_repl, "development".into());
             if let Err(e) = res {
                 println!("{}", e);
                 return;
             }
-            run_tests(vec![run.script], false, false);
+            run_tests(vec![cmd.script], false, false, cmd.allow_wallets, manifest_path);
         },
         Command::Deploy(deploy) => {
+            let manifest_path = get_manifest_path_or_exit(deploy.manifest_path);
             let start_repl = false;
             let mode = if deploy.mocknet == true {
                 "mocknet"
@@ -264,7 +300,7 @@ pub fn main() {
             } else {
                 panic!("Target deployment must be specified with --mocknet or --testnet")
             };
-            let res = load_session(start_repl, mode.into());
+            let res = load_session(manifest_path, start_repl, mode.into());
             if let Err(e) = res {
                 println!("{}", e);
                 return;
@@ -403,10 +439,37 @@ pub fn main() {
         }
     };
 }
-  
+
+fn get_manifest_path_or_exit(path: Option<String>) -> PathBuf {
+    println!("");
+    if let Some(path) = path {
+        let manifest_path = PathBuf::from(path);
+        if !manifest_path.exists() {
+            println!("Could not find Clarinet.toml");
+            process::exit(1);
+        }
+        manifest_path
+    } else {
+        let mut current_dir = env::current_dir().unwrap();
+        loop {
+            current_dir.push("Clarinet.toml");
+
+            if current_dir.exists() {
+                break current_dir
+            }
+            current_dir.pop();
+
+            if !current_dir.pop() {
+                println!("Could not find Clarinet.toml");
+                process::exit(1);
+            }
+        }
+    }
+}
+
 fn execute_changes(changes: Vec<Changes>) {
     let mut shared_config = None;
-    let mut path = "".to_string();
+    let mut path = PathBuf::new();
 
     for mut change in changes.into_iter() {
         match change {
@@ -431,7 +494,7 @@ fn execute_changes(changes: Vec<Changes>) {
                 let mut config = match shared_config.take() {
                     Some(config) => config,
                     None => {
-                        path = options.path.clone();
+                        path = options.manifest_path.clone();
                         let file = File::open(path.clone()).unwrap();
                         let mut config_file_reader = BufReader::new(file);
                         let mut config_file = vec![];

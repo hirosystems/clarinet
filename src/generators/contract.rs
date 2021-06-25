@@ -1,18 +1,18 @@
 use super::changes::{Changes, FileCreation, TOMLEdition};
-use std::collections::HashMap;
+use std::{collections::HashMap, path::PathBuf};
 use crate::types::ContractConfig;
 
 pub struct GetChangesForNewContract {
-    project_path: String,
+    manifest_path: PathBuf,
     contract_name: String,
     source: Option<String>,
     changes: Vec<Changes>,
 }
 
 impl GetChangesForNewContract {
-    pub fn new(project_path: String, contract_name: String, source: Option<String>) -> Self {
+    pub fn new(manifest_path: PathBuf, contract_name: String, source: Option<String>) -> Self {
         Self {
-            project_path,
+            manifest_path,
             contract_name,
             source,
             changes: vec![],
@@ -53,7 +53,7 @@ impl GetChangesForNewContract {
         };
             
         let name = format!("{}.clar", self.contract_name);
-        let path = format!("{}/contracts/{}", self.project_path, name);
+        let path = format!("{:?}/contracts/{}", self.manifest_path, name);
         let change = FileCreation {
             comment: format!("Creating file contracts/{}", name),
             name,
@@ -93,8 +93,13 @@ Clarinet.test({{
 }});
 "#
         );
+        let project_path = {
+            let mut p = self.manifest_path.clone();
+            p.pop();
+            p
+        };
         let name = format!("{}_test.ts", self.contract_name);
-        let path = format!("{}/tests/{}", self.project_path, name);
+        let path = format!("{:?}/tests/{}", project_path, name);
         let change = FileCreation {
             comment: format!("Creating file tests/{}", name),
             name,
@@ -106,7 +111,7 @@ Clarinet.test({{
 
     fn index_contract_in_clarinet_toml(&mut self, deps: Vec<String>) {
         let contract_file_name = format!("{}.clar", self.contract_name);
-        let path = format!("{}/Clarinet.toml", self.project_path);
+        let manifest_path = self.manifest_path.clone();
 
         let contract_config = ContractConfig {
             depends_on: deps,
@@ -117,7 +122,7 @@ Clarinet.test({{
 
         let change = TOMLEdition {
             comment: format!("Adding contract {} to Clarinet.toml", self.contract_name),
-            path,
+            manifest_path,
             contracts_to_add,
             requirements_to_add: vec![],
         };

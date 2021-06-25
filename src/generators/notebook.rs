@@ -1,8 +1,10 @@
+use std::path::PathBuf;
+
 use super::changes::{Changes};
 
 #[allow(dead_code)]
 pub struct GetChangesForNewNotebook {
-    pub project_path: String,
+    pub manifest_path: PathBuf,
     pub notebook_name: String,
     changes: Vec<Changes>,
 }
@@ -10,9 +12,9 @@ pub struct GetChangesForNewNotebook {
 impl GetChangesForNewNotebook {
 
     #[allow(dead_code)]
-    pub fn new(project_path: String, notebook_name: String) -> Self {
+    pub fn new(manifest_path: PathBuf, notebook_name: String) -> Self {
         Self {
-            project_path,
+            manifest_path,
             notebook_name,
             changes: vec![],
         }
