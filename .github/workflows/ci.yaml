@@ -7,6 +7,8 @@ on:
     paths-ignore:
       - '**/CHANGELOG.md'
       - '**/package.json'
+      - '**/Cargo.toml'
+      - '**/Cargo.lock'
     branches:
       - main
       - develop
@@ -234,12 +236,12 @@ jobs:
             ./target/${{ matrix.target }}/release/clarinet test --manifest-path examples/${testdir}/Clarinet.toml
           done
 
-      # - name: Functional Tests (Windows)
-      #   if: matrix.os == 'windows-latest'
-      #   run: |
-      #     foreach($testdir in Get-ChildItem examples) {
-      #       ./target/${{ matrix.target }}/release/clarinet test --manifest-path examples/${testdir}/Clarinet.toml
-      #     }
+      - name: Functional Tests (Windows)
+        if: matrix.os == 'windows-latest'
+        run: |
+          foreach($testdir in Get-ChildItem examples) {
+            ./target/${{ matrix.target }}/release/clarinet test --manifest-path ${testdir}/Clarinet.toml
+          }
 
       - name: Upload Artifacts to GH release
         uses: svenstaro/upload-release-action@v2
@@ -247,7 +249,7 @@ jobs:
         with:
           repo_token: ${{ secrets.GITHUB_TOKEN }}
           file: ${{ matrix.platform }}.zip
-          asset_name: ${{ matrix.platform }}
+          asset_name: clarinet-${{ matrix.platform }}.zip
           tag: ${{ github.ref }}
 
       # Cleans the `./target` dir after the build such that only dependencies are cached on CI
