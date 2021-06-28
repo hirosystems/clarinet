@@ -249,7 +249,7 @@ jobs:
         with:
           repo_token: ${{ secrets.GITHUB_TOKEN }}
           file: ${{ matrix.platform }}.zip
-          asset_name: ${{ matrix.platform }}
+          asset_name: clarity-${{ matrix.platform }}.zip
           tag: ${{ github.ref }}
 
       # Cleans the `./target` dir after the build such that only dependencies are cached on CI
