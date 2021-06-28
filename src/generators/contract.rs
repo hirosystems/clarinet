@@ -1,6 +1,6 @@
 use super::changes::{Changes, FileCreation, TOMLEdition};
-use std::{collections::HashMap, path::PathBuf};
 use crate::types::ContractConfig;
+use std::{collections::HashMap, path::PathBuf};
 
 pub struct GetChangesForNewContract {
     manifest_path: PathBuf,
@@ -48,10 +48,11 @@ impl GetChangesForNewContract {
 
 ;; public functions
 ;;
-"#, self.contract_name
+"#,
+                self.contract_name
             )
         };
-            
+
         let name = format!("{}.clar", self.contract_name);
         let project_path = {
             let mut p = self.manifest_path.clone();

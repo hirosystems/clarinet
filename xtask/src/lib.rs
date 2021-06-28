@@ -2,9 +2,9 @@
 //!
 //! See https://github.com/matklad/cargo-xtask/
 
-pub mod not_bash;
-pub mod install;
 pub mod dist;
+pub mod install;
+pub mod not_bash;
 pub mod pre_commit;
 
 use std::{
@@ -13,9 +13,7 @@ use std::{
 };
 use walkdir::{DirEntry, WalkDir};
 
-use crate::{
-    not_bash::{fs2, rm_rf, run},
-};
+use crate::not_bash::{fs2, rm_rf, run};
 
 pub use anyhow::Result;
 
@@ -40,7 +38,11 @@ pub fn rust_files(path: &Path) -> impl Iterator<Item = PathBuf> {
         .filter(|path| path.extension().map(|it| it == "rs").unwrap_or(false));
 
     fn is_hidden(entry: &DirEntry) -> bool {
-        entry.file_name().to_str().map(|s| s.starts_with('.')).unwrap_or(false)
+        entry
+            .file_name()
+            .to_str()
+            .map(|s| s.starts_with('.'))
+            .unwrap_or(false)
     }
 }
 
@@ -62,7 +64,10 @@ pub fn run_pre_cache() -> Result<()> {
     for &dir in ["./target/debug/deps", "target/debug/.fingerprint"].iter() {
         for entry in Path::new(dir).read_dir()? {
             let entry = entry?;
-            if to_delete.iter().any(|&it| entry.path().display().to_string().contains(it)) {
+            if to_delete
+                .iter()
+                .any(|&it| entry.path().display().to_string().contains(it))
+            {
                 // Can't delete yourself on windows :-(
                 if !entry.path().ends_with("xtask.exe") {
                     rm_rf(&entry.path())?
@@ -112,10 +117,17 @@ Release: release:{}[]
     let path = changelog_dir.join(format!("{}-changelog-{}.adoc", today, changelog_n));
     fs2::write(&path, &contents)?;
 
-    fs2::copy(project_root().join("./docs/user/readme.adoc"), website_root.join("manual.adoc"))?;
+    fs2::copy(
+        project_root().join("./docs/user/readme.adoc"),
+        website_root.join("manual.adoc"),
+    )?;
 
     let tags = run!("git tag --list"; echo = false)?;
-    let prev_tag = tags.lines().filter(|line| is_release_tag(line)).last().unwrap();
+    let prev_tag = tags
+        .lines()
+        .filter(|line| is_release_tag(line))
+        .last()
+        .unwrap();
 
     println!("\n    git log {}..HEAD --merges --reverse", prev_tag);
 

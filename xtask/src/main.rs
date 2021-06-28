@@ -15,8 +15,7 @@ use xtask::{
     dist::run_dist,
     install::{ClarinetOpt, InstallCmd},
     not_bash::pushd,
-    pre_commit, project_root, run_pre_cache, run_release,
-    Result,
+    pre_commit, project_root, run_pre_cache, run_release, Result,
 };
 
 fn main() -> Result<()> {

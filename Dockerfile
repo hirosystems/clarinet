@@ -1,16 +1,10 @@
 FROM rust:stretch as build
 
-ARG STACKS_NODE_VERSION="No Version Info"
-ARG GIT_BRANCH='No Branch Info'
-ARG GIT_COMMIT='No Commit Info'
-
 WORKDIR /src
 
 RUN apt update && apt install -y ca-certificates pkg-config libssl-dev
 
-RUN rustup update 1.52.0
-
-RUN rustup default 1.52.0
+RUN rustup update 1.52.1 && rustup default 1.52.1
 
 COPY . .
 

@@ -41,7 +41,11 @@ fn install_clarinet(opts: ClarinetOpt) -> Result<()> {
         )
     }
 
-    let jemalloc = if opts.jemalloc { "--features jemalloc" } else { "" };
+    let jemalloc = if opts.jemalloc {
+        "--features jemalloc"
+    } else {
+        ""
+    };
     let res = run!("cargo install --path . --locked --force {}", jemalloc);
 
     if res.is_err() && old_rust {
@@ -57,7 +61,10 @@ fn install_clarinet(opts: ClarinetOpt) -> Result<()> {
 fn check_version(version_output: &str, min_minor_version: u32) -> bool {
     // Parse second the number out of
     //      cargo 1.39.0-beta (1c6ec66d5 2019-09-30)
-    let minor: Option<u32> = version_output.split('.').nth(1).and_then(|it| it.parse().ok());
+    let minor: Option<u32> = version_output
+        .split('.')
+        .nth(1)
+        .and_then(|it| it.parse().ok());
     match minor {
         None => true,
         Some(minor) => minor >= min_minor_version,

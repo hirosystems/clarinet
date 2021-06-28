@@ -21,7 +21,7 @@ pub struct TOMLEdition {
     pub comment: String,
     pub manifest_path: PathBuf,
     pub contracts_to_add: HashMap<String, ContractConfig>,
-    pub requirements_to_add: Vec<RequirementConfig>
+    pub requirements_to_add: Vec<RequirementConfig>,
 }
 
 #[derive(Clone, Debug)]
