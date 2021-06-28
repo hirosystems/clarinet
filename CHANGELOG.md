@@ -1,3 +1,12 @@
+## [0.14.1](https://github.com/hirosystems/clarinet/compare/v0.14.0...v0.14.1) (2021-06-28)
+
+
+### Bug Fixes
+
+* display typescript errors ([e7af34b](https://github.com/hirosystems/clarinet/commit/e7af34b3061f8afa42d0788d5a47a149fb3885d6))
+* new contract generator ([b8e39d7](https://github.com/hirosystems/clarinet/commit/b8e39d7aac1e8943f1c1a9ebb93f630688e9067a))
+* remove required -- for clarinet test ([0182b07](https://github.com/hirosystems/clarinet/commit/0182b07a051001073f12573d2676e54fc833fca0))
+
 # [0.14.0](https://github.com/hirosystems/clarinet/compare/v0.13.0...v0.14.0) (2021-06-25)
 
 
