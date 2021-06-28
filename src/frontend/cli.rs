@@ -162,7 +162,6 @@ struct Test {
     #[clap(long = "watch")]
     pub watch: bool,
     /// Files to includes
-    #[clap(last = true)]
     pub files: Vec<String>,
 }
 
