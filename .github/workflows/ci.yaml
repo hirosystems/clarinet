@@ -240,9 +240,7 @@ jobs:
         if: matrix.os == 'windows-latest'
         run: |
           foreach($testdir in Get-ChildItem examples) {
-            ls
-            ls $testdir
-            ./target/${{ matrix.target }}/release/clarinet test --manifest-path examples/${testdir}/Clarinet.toml
+            ./target/${{ matrix.target }}/release/clarinet test --manifest-path ${testdir}/Clarinet.toml
           }
 
       - name: Upload Artifacts to GH release
