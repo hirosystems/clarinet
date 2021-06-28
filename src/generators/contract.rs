@@ -53,7 +53,12 @@ impl GetChangesForNewContract {
         };
             
         let name = format!("{}.clar", self.contract_name);
-        let path = format!("{:?}/contracts/{}", self.manifest_path, name);
+        let project_path = {
+            let mut p = self.manifest_path.clone();
+            p.pop();
+            p
+        };
+        let path = format!("{}/contracts/{}", project_path.to_string_lossy(), name);
         let change = FileCreation {
             comment: format!("Creating file contracts/{}", name),
             name,
@@ -66,7 +71,7 @@ impl GetChangesForNewContract {
     fn create_template_test(&mut self) {
         let content = format!(
             r#"
-import {{ Clarinet, Tx, Chain, Account, types }} from 'https://deno.land/x/clarinet@v0.13.0/index.ts';
+import {{ Clarinet, Tx, Chain, Account, types }} from 'https://deno.land/x/clarinet@v0.14.0/index.ts';
 import {{ assertEquals }} from 'https://deno.land/std@0.90.0/testing/asserts.ts';
 
 Clarinet.test({{
@@ -99,7 +104,7 @@ Clarinet.test({{
             p
         };
         let name = format!("{}_test.ts", self.contract_name);
-        let path = format!("{:?}/tests/{}", project_path, name);
+        let path = format!("{}/tests/{}", project_path.to_string_lossy(), name);
         let change = FileCreation {
             comment: format!("Creating file tests/{}", name),
             name,
