@@ -505,7 +505,7 @@ pub async fn run_tests(
     return Ok(false);
   }
 
-  program_state
+  let execution_result = program_state
     .prepare_module_graph(
       test_modules.clone(),
       lib.clone(),
@@ -513,7 +513,11 @@ pub async fn run_tests(
       permissions.clone(),
       program_state.maybe_import_map.clone(),
     )
-    .await?;
+    .await;
+  if let Err(e) = execution_result {
+    println!("{}", e);
+    return Err(e);
+  }
 
   if no_run {
     return Ok(false);
@@ -706,23 +710,47 @@ pub async fn run_test_file(
     None
   };
 
+  
   let execute_result = worker.execute_module(&main_module).await;
-  execute_result?;
+  if let Err(e) = execute_result {
+    println!("{}", e);
+    return Err(e);
+  }
 
-  worker.execute("window.dispatchEvent(new Event('load'))")?;
+  let execute_result = worker.execute("window.dispatchEvent(new Event('load'))");
+  if let Err(e) = execute_result {
+    println!("{}", e);
+    return Err(e);
+  }
 
   let execute_result = worker.execute_module(&test_module).await;
-  execute_result?;
+  if let Err(e) = execute_result {
+    println!("{}", e);
+    return Err(e);
+  }
 
-  worker
+  let execute_result = worker
     .run_event_loop(maybe_coverage_collector.is_none())
-    .await?;
-  worker.execute("window.dispatchEvent(new Event('unload'))")?;
+    .await;
+  if let Err(e) = execute_result {
+    println!("{}", e);
+    return Err(e);
+  }
+
+  let execute_result = worker.execute("window.dispatchEvent(new Event('unload'))");
+  if let Err(e) = execute_result {
+    println!("{}", e);
+    return Err(e);
+  }
 
   if let Some(coverage_collector) = maybe_coverage_collector.as_mut() {
-    worker
+    let execute_result = worker
       .with_event_loop(coverage_collector.stop_collecting().boxed_local())
-      .await?;
+      .await;
+    if let Err(e) = execute_result {
+      println!("{}", e);
+      return Err(e);
+    }
   }
 
   Ok(())
