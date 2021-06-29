@@ -7,7 +7,7 @@ name: Open Develop PR
 on:
   release:
     types:
-      - published
+      - released
   workflow_dispatch:
 
 jobs:      
