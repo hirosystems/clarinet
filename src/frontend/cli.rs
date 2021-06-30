@@ -5,6 +5,7 @@ use std::path::PathBuf;
 use std::{env, process};
 
 use crate::console::load_session;
+use crate::devnet::{self, DevnetOrchestrator};
 use crate::test::run_tests;
 use crate::types::{MainConfig, MainConfigFile, RequirementConfig};
 use crate::{
@@ -74,6 +75,9 @@ enum Command {
     /// Run subcommand
     #[clap(name = "run")]
     Run(Run),
+    /// Devnet subcommand
+    #[clap(name = "devnet")]
+    Devnet(Devnet),
 }
 
 #[derive(Clap)]
@@ -139,6 +143,23 @@ struct ForkContract {
 
 #[derive(Clap)]
 struct Console {
+    /// Print debug info
+    #[clap(short = 'd')]
+    pub debug: bool,
+    /// Path to Clarinet.toml
+    #[clap(long = "manifest-path")]
+    pub manifest_path: Option<String>,
+}
+
+#[derive(Clap)]
+enum Devnet {
+    /// Start Devnet subcommand
+    #[clap(name = "start")]
+    Start(StartDevnet),
+}
+
+#[derive(Clap)]
+struct StartDevnet {
     /// Print debug info
     #[clap(short = 'd')]
     pub debug: bool,
@@ -489,13 +510,23 @@ pub fn main() {
                 );
                 deployers_nonces.insert(deployer.name.clone(), nonce + 1);
             }
-
             // If mocknet, we should be pulling all the links.
             // Get ordered list of contracts
             // For each contract, get the nonce of the account deploying (if unknown)
             // Create a StacksTransaction with the contract, the name.
             // Sign the transaction
             // Send the transaction
+        }
+        Command::Devnet(cmd) => match cmd {
+            Devnet::Start(sub_cmd) => {
+                let manifest_path = get_manifest_path_or_exit(sub_cmd.manifest_path);
+                println!(
+                    "Start orchestrating stacks-node, stacks-blockchain-api, bitcoind, bitcoin explorer, stacks-explorer"
+                );
+                let mut devnet = DevnetOrchestrator::new(manifest_path);
+                let devnet_event_tx = devnet.event_tx.clone();
+                devnet::run_devnet(&mut devnet);    
+            }
         }
     };
 }

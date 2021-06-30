@@ -13,6 +13,7 @@ mod publish;
 pub mod test;
 mod types;
 mod utils;
+mod devnet;
 
 use frontend::cli;
 
