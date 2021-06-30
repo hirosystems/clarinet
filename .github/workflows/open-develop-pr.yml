@@ -16,6 +16,7 @@ jobs:
     steps:
       - name: Checkout Clarinet
         uses: actions/checkout@v2
+        with:
           ref: main
 
       - name: Create Pull Request
