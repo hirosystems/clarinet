@@ -13,7 +13,7 @@ use bollard::network::{ConnectNetworkOptions, CreateNetworkOptions};
 use bollard::image::CreateImageOptions;
 use deno_core::futures::TryStreamExt;
 
-pub const STACKS_BLOCKCHAIN_IMAGE: &str = "blockstack/stacks-blockchain:latest";
+pub const STACKS_BLOCKCHAIN_IMAGE: &str = "blockstack/stacks-blockchain:feat-miner-control";
 // pub const STACKS_BLOCKCHAIN_API_IMAGE: &str = "blockstack/stacks-blockchain-api:latest";
 // pub const STACKS_EXPLORER_IMAGE: &str = "blockstack/explorer:latest";
 pub const BITCOIN_BLOCKCHAIN_IMAGE: &str = "blockstack/bitcoind:puppet-chain"; // "nginxdemos/hello:latest";
@@ -223,23 +223,6 @@ impl DevnetOrchestrator {
         // Start local observer
         // TODO
     }
-
-
-    // [devnet]
-    // bitcoind_p2p_port
-    // bitcoind_rpc_port
-    // stacks_p2p_port
-    // stacks_rpc_port
-    // bitcoin_explorer_port
-    // stacks_explorer_port
-    // bitcoin_controller_port
-    // bitcoind_username
-    // bitcoind_password
-    // bitcoin_miner_address
-    // stacks_miner_mnemonic
-    // bitcoin_block_time
-    // working_dir
-    // event_observers
 
     // if working_dir empty:
     //      -> write config files
@@ -455,12 +438,12 @@ ignore_txs = false
         let stacks_conf = format!(r#"
 [node]
 working_dir = "/devnet"
-rpc_bind = "127.0.0.1:{}"
-p2p_bind = "127.0.0.1:{}"
+rpc_bind = "0.0.0.0:{}"
+p2p_bind = "0.0.0.0:{}"
 miner = true
 seed = "{}"
 local_peer_seed = "{}"
-
+wait_time_for_microblocks = 1000
 
 # [[events_observer]]
 # endpoint = "127.0.0.1:{}"
@@ -469,8 +452,8 @@ local_peer_seed = "{}"
 
 [burnchain]
 chain = "bitcoin"
-mode = "xenon"
-peer_host = "0.0.0.0"
+mode = "krypton"
+peer_host = "{}"
 username = "{}"
 password = "{}"
 rpc_port = {}
@@ -482,13 +465,12 @@ peer_port = {}
             devnet_config.miner_secret_key_hex,
             devnet_config.miner_secret_key_hex,
             devnet_config.stacks_api_port,
+            format!("bitcoin.{}", self.network_name),
             devnet_config.bitcoind_username,
             devnet_config.bitcoind_password,
             devnet_config.bitcoin_controller_port,
             devnet_config.bitcoind_p2p_port
         );
-
-
 
         let mut stacks_conf_path = PathBuf::from(&devnet_config.working_dir);
         stacks_conf_path.push("conf/Config.toml");
@@ -507,7 +489,7 @@ peer_port = {}
             entrypoint: Some(vec!["stacks-node".into(), "start".into(), "--config=/src/stacks-node/Config.toml".into()]),
             env: Some(vec![
                 "STACKS_LOG_PP=1".to_string(),
-                "STACKS_LOG_DEBUG=1".to_string(),
+                "BLOCKSTACK_USE_TEST_GENESIS_CHAINSTATE=1".to_string(),
             ]),
             host_config: Some(HostConfig {
                 port_bindings: Some(port_bindings),
