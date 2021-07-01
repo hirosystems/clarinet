@@ -14,11 +14,11 @@ use bollard::image::CreateImageOptions;
 use deno_core::futures::TryStreamExt;
 
 pub const STACKS_BLOCKCHAIN_IMAGE: &str = "blockstack/stacks-blockchain:feat-miner-control";
+pub const POSTGRES_IMAGE: &str = "postgres:alpine";
 pub const STACKS_BLOCKCHAIN_API_IMAGE: &str = "blockstack/stacks-blockchain-api:latest";
-// pub const STACKS_EXPLORER_IMAGE: &str = "blockstack/explorer:latest";
+pub const STACKS_EXPLORER_IMAGE: &str = "blockstack/explorer:latest";
 pub const BITCOIN_BLOCKCHAIN_IMAGE: &str = "blockstack/bitcoind:puppet-chain"; // "nginxdemos/hello:latest";
 // pub const BITCOIN_EXPLORER_IMAGE: &str  = "blockstack/bitcoind:puppet-chain";
-pub const POSTGRES_IMAGE: &str = "postgres:alpine";
 
 pub fn run_devnet(devnet: &mut DevnetOrchestrator) {
     match block_on(do_run_devnet(devnet)) {
@@ -198,15 +198,15 @@ impl DevnetOrchestrator {
             }
         };
 
-        // // Start stacks-explorer
-        // let stacks_explorer_container_id = match self.boot_stacks_explorer_container().await {
-        //     Ok(id) => id,
-        //     Err(message) => {
-        //         println!("{}", message);
-        //         self.terminate().await;
-        //         std::process::exit(1);
-        //     }
-        // };
+        // Start stacks-explorer
+        match self.boot_stacks_explorer_container().await {
+            Ok(_) => {},
+            Err(message) => {
+                println!("{}", message);
+                self.terminate().await;
+                std::process::exit(1);
+            }
+        };
         
         // // Start bitcoin-explorer
         // let bitcoin_explorer_container_id = match self.boot_bitcoin_explorer_container().await {
@@ -443,10 +443,10 @@ seed = "{}"
 local_peer_seed = "{}"
 wait_time_for_microblocks = 1000
 
-# [[events_observer]]
-# endpoint = "127.0.0.1:{}"
-# retry_count = 255
-# events_keys = ["*"]
+[[events_observer]]
+endpoint = "{}"
+retry_count = 255
+events_keys = ["*"]
 
 [burnchain]
 chain = "bitcoin"
@@ -462,7 +462,7 @@ peer_port = {}
             devnet_config.stacks_p2p_port,
             devnet_config.miner_secret_key_hex,
             devnet_config.miner_secret_key_hex,
-            devnet_config.stacks_api_port,
+            format!("stacks-api.{}:{}", self.network_name, devnet_config.stacks_api_events_port),
             format!("bitcoin.{}", self.network_name),
             devnet_config.bitcoind_username,
             devnet_config.bitcoind_password,
@@ -566,15 +566,15 @@ amount = {}
     
         let mut port_bindings = HashMap::new();
         port_bindings.insert(
-            format!("{}/tcp", devnet_config.stacks_explorer_port),
+            format!("{}/tcp", devnet_config.stacks_api_port),
             Some(vec![PortBinding {
                 host_ip: Some(String::from("0.0.0.0")),
-                host_port: Some(format!("{}/tcp", devnet_config.stacks_explorer_port)),
+                host_port: Some(format!("{}/tcp", devnet_config.stacks_api_port)),
             }]),
         );
 
         let mut exposed_ports = HashMap::new();
-        exposed_ports.insert(format!("{}/tcp", devnet_config.stacks_explorer_port), HashMap::new());
+        exposed_ports.insert(format!("{}/tcp", devnet_config.stacks_api_port), HashMap::new());
 
         let config = Config {
             image: Some(STACKS_BLOCKCHAIN_API_IMAGE.to_string()),
@@ -584,8 +584,10 @@ amount = {}
             env: Some(vec![
                 format!("STACKS_CORE_RPC_HOST=stacks.{}", self.network_name),
                 format!("STACKS_BLOCKCHAIN_API_DB=pg"),
-                format!("STACKS_BLOCKCHAIN_API_PORT={}", devnet_config.stacks_explorer_port),
+                format!("STACKS_BLOCKCHAIN_API_PORT={}", devnet_config.stacks_api_port),
                 format!("STACKS_BLOCKCHAIN_API_HOST=0.0.0.0"),
+                format!("STACKS_CORE_EVENT_PORT={}", devnet_config.stacks_api_events_port),
+                format!("STACKS_CORE_EVENT_HOST=0.0.0.0"),
                 format!("PG_HOST=postgres.{}", self.network_name),
                 format!("PG_PORT={}", devnet_config.postgres_port),
                 format!("PG_USER={}", devnet_config.postgres_username),
@@ -710,16 +712,19 @@ amount = {}
         Ok(())
     }
 
-    pub async fn boot_stacks_explorer_container(&mut self) -> Result<String, String> {
-        let docker = match self.docker_client {
-            Some(ref docker) => docker,
-            None => return Err("Unable to get Docker client".into())
+    pub async fn boot_stacks_explorer_container(&mut self) -> Result<(), String> {
+        let (docker, _, devnet_config) = match (&self.docker_client, &self.network_config) {
+            (Some(ref docker), Some(ref network_config)) => match network_config.devnet {
+                Some(ref devnet_config) => (docker, network_config, devnet_config),
+                _ => return Err("Unable to get devnet configuration".into())
+            }
+            _ => return Err("Unable to get Docker client".into())
         };
     
         let _info = docker
             .create_image(
                 Some(CreateImageOptions {
-                    from_image: BITCOIN_BLOCKCHAIN_IMAGE,
+                    from_image: STACKS_EXPLORER_IMAGE,
                     ..Default::default()
                 }),
                 None,
@@ -727,27 +732,66 @@ amount = {}
             )
             .try_collect::<Vec<_>>()
             .await
-            .map_err(|_| "Unable to create image".to_string())?;
+            .map_err(|e| format!("Unable to create image: {}", e))?;
     
-        let bitcoin_config = Config {
-            image: Some(BITCOIN_BLOCKCHAIN_IMAGE),
+        let mut port_bindings = HashMap::new();
+        port_bindings.insert(
+            format!("{}/tcp", 3000),
+            Some(vec![PortBinding {
+                host_ip: Some(String::from("0.0.0.0")),
+                host_port: Some(format!("{}/tcp", devnet_config.stacks_explorer_port)),
+            }]),
+        );
+
+        let mut exposed_ports = HashMap::new();
+        exposed_ports.insert(format!("{}/tcp", 3000), HashMap::new());
+
+        let config = Config {
+            image: Some(STACKS_EXPLORER_IMAGE.to_string()),
+            domainname: Some(self.network_name.to_string()),
             tty: Some(true),
+            exposed_ports: Some(exposed_ports),
+            env: Some(vec![
+                format!("NEXT_PUBLIC_MAINNET_API_SERVER=http://stacks-api.{}:{}", self.network_name, devnet_config.stacks_api_port),
+                format!("NEXT_PUBLIC_TESTNET_API_SERVER=http://stacks-api.{}:{}", self.network_name, devnet_config.stacks_api_port),
+                format!("MOCKNET_API_SERVER=http://stacks-api.{}:{}", self.network_name, devnet_config.stacks_api_port),
+                format!("TESTNET_API_SERVER=http://stacks-api.{}:{}", self.network_name, devnet_config.stacks_api_port),
+            ]),
+            host_config: Some(HostConfig {
+                port_bindings: Some(port_bindings),                
+                ..Default::default()
+            }),
             ..Default::default()
         };
-    
-        let id = docker
-            .create_container::<&str, &str>(None, bitcoin_config)
+        
+        let options = CreateContainerOptions {
+            name: format!("stacks-explorer.{}", self.network_name)
+        };
+
+        let container = docker
+            .create_container::<String, String>(Some(options), config)
             .await
-            .map_err(|_| "Unable to create container".to_string())?
+            .map_err(|e| format!("Unable to create container: {}", e))?
             .id;
         
-        docker.start_container::<String>(&id, None)
-            .await
-            .map_err(|_| "Unable to start container".to_string())?;
-        
-        self.bitcoin_blockchain_container_id = Some(id.clone());
+        self.stacks_explorer_container_id = Some(container.clone());
 
-        Ok(id)
+        docker.start_container::<String>(&container, None)
+            .await
+            .map_err(|e| format!("Unable to create container: {}", e))?;
+        
+        let res = docker.connect_network(&self.network_name, ConnectNetworkOptions {
+            container,
+            ..Default::default()
+        }).await;
+
+        if let Err(e) = res {
+            let err = format!("Error connecting container: {}", e);
+            println!("{}", err);
+            return Err(err)
+        }
+
+        Ok(())
     }
 
     pub async fn boot_bitcoin_explorer_container(&mut self) -> Result<String, String> {
