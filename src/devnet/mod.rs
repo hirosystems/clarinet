@@ -1,3 +1,5 @@
+mod ui;
+
 use crate::types::{ChainConfig, MainConfig};
 
 use std::collections::HashMap;
@@ -9,7 +11,6 @@ use bollard::Docker;
 use bollard::container::{Config, KillContainerOptions, CreateContainerOptions, StartContainerOptions, LogsOptions};
 use bollard::models::{HostConfig, PortBinding};
 use bollard::network::{ConnectNetworkOptions, CreateNetworkOptions};
-// use bollard::exec::{CreateExecOptions, StartExecResults};
 use bollard::image::CreateImageOptions;
 use deno_core::futures::TryStreamExt;
 
@@ -17,7 +18,7 @@ pub const STACKS_BLOCKCHAIN_IMAGE: &str = "blockstack/stacks-blockchain:feat-min
 pub const POSTGRES_IMAGE: &str = "postgres:alpine";
 pub const STACKS_BLOCKCHAIN_API_IMAGE: &str = "blockstack/stacks-blockchain-api:latest";
 pub const STACKS_EXPLORER_IMAGE: &str = "blockstack/explorer:latest";
-pub const BITCOIN_BLOCKCHAIN_IMAGE: &str = "blockstack/bitcoind:puppet-chain"; // "nginxdemos/hello:latest";
+pub const BITCOIN_BLOCKCHAIN_IMAGE: &str = "blockstack/bitcoind:puppet-chain";
 // pub const BITCOIN_EXPLORER_IMAGE: &str  = "blockstack/bitcoind:puppet-chain";
 
 pub fn run_devnet(devnet: &mut DevnetOrchestrator) {
@@ -882,7 +883,7 @@ amount = {}
             let _ = docker.kill_container(stacks_blockchain_container_id, options).await;
         }
 
-        docker.remove_network(&self.network_name).await;
+        let _ = docker.remove_network(&self.network_name).await;
 
         println!("Ended termination sequence");
         if let Some(ref tx) = self.termination_success_tx {
