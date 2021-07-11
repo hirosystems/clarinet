@@ -4,12 +4,12 @@ use std::io::{prelude::*, BufReader, Read};
 use std::path::PathBuf;
 use std::{env, process};
 
-use crate::console::load_session;
-use crate::devnet::{self, DevnetOrchestrator};
+use crate::poke::load_session;
+use crate::integrate::{self, DevnetOrchestrator};
 use crate::test::run_tests;
 use crate::types::{MainConfig, MainConfigFile, RequirementConfig};
 use crate::{
-    generators::{
+    generate::{
         self,
         changes::{Changes, TOMLEdition},
     },
@@ -54,30 +54,30 @@ struct Opts {
 
 #[derive(Clap)]
 enum Command {
-    /// New subcommand
+    /// Create and scaffold a new project
     #[clap(name = "new")]
     New(GenerateProject),
     /// Contract subcommand
     #[clap(name = "contract")]
     Contract(Contract),
-    /// Console subcommand
-    #[clap(name = "console")]
-    Console(Console),
-    /// Test subcommand
+    /// Load contracts in a REPL for interactions
+    #[clap(name = "poke")]
+    Poke(Poke),
+    /// Execute test suite
     #[clap(name = "test")]
     Test(Test),
-    /// Check subcommand
+    /// Check contracts syntax
     #[clap(name = "check")]
     Check(Check),
-    /// Deploy subcommand
-    #[clap(name = "deploy")]
-    Deploy(Deploy),
-    /// Run subcommand
+    /// Publish contracts on chain 
+    #[clap(name = "publish")]
+    Publish(Publish),
+    /// Execute Clarinet Extension
     #[clap(name = "run")]
     Run(Run),
     /// Devnet subcommand
-    #[clap(name = "devnet")]
-    Devnet(Devnet),
+    #[clap(name = "integrate")]
+    Integrate(Integrate),
 }
 
 #[derive(Clap)]
@@ -142,7 +142,7 @@ struct ForkContract {
 }
 
 #[derive(Clap)]
-struct Console {
+struct Poke {
     /// Print debug info
     #[clap(short = 'd')]
     pub debug: bool,
@@ -152,14 +152,7 @@ struct Console {
 }
 
 #[derive(Clap)]
-enum Devnet {
-    /// Start Devnet subcommand
-    #[clap(name = "start")]
-    Start(StartDevnet),
-}
-
-#[derive(Clap)]
-struct StartDevnet {
+struct Integrate {
     /// Print debug info
     #[clap(short = 'd')]
     pub debug: bool,
@@ -202,7 +195,7 @@ struct Run {
 }
 
 #[derive(Clap)]
-struct Deploy {
+struct Publish {
     /// Print debug info
     #[clap(short = 'd')]
     pub debug: bool,
@@ -237,14 +230,14 @@ pub fn main() {
                 current_dir.to_str().unwrap().to_owned()
             };
 
-            let changes = generators::get_changes_for_new_project(current_path, project_opts.name);
+            let changes = generate::get_changes_for_new_project(current_path, project_opts.name);
             execute_changes(changes);
         }
         Command::Contract(subcommand) => match subcommand {
             Contract::NewContract(new_contract) => {
                 let manifest_path = get_manifest_path_or_exit(new_contract.manifest_path);
 
-                let changes = generators::get_changes_for_new_contract(
+                let changes = generate::get_changes_for_new_contract(
                     manifest_path,
                     new_contract.name,
                     None,
@@ -299,7 +292,7 @@ pub fn main() {
                     let contract_name = components.last().unwrap();
 
                     if &contract_id == &fork_contract.contract_id {
-                        let mut change_set = generators::get_changes_for_new_contract(
+                        let mut change_set = generate::get_changes_for_new_contract(
                             manifest_path.clone(),
                             contract_name.to_string(),
                             Some(code),
@@ -309,7 +302,7 @@ pub fn main() {
                         changes.append(&mut change_set);
 
                         for dep in deps.iter() {
-                            let mut change_set = generators::get_changes_for_new_link(
+                            let mut change_set = generate::get_changes_for_new_link(
                                 manifest_path.clone(),
                                 dep.clone(),
                                 None,
@@ -321,7 +314,7 @@ pub fn main() {
                 execute_changes(changes);
             }
         },
-        Command::Console(cmd) => {
+        Command::Poke(cmd) => {
             let manifest_path = get_manifest_path_or_exit(cmd.manifest_path);
             let start_repl = true;
             load_session(manifest_path, start_repl, "development".into())
@@ -362,7 +355,7 @@ pub fn main() {
                 manifest_path,
             );
         }
-        Command::Deploy(deploy) => {
+        Command::Publish(deploy) => {
             let manifest_path = get_manifest_path_or_exit(deploy.manifest_path);
             let start_repl = false;
             let mode = if deploy.mocknet == true {
@@ -370,6 +363,8 @@ pub fn main() {
             } else if deploy.testnet == true {
                 "testnet"
             } else {
+                // TODO(ludo): before supporting mainnet deployments, we want to add a pass
+                // making sure that addresses are consistent.
                 panic!("Target deployment must be specified with --mocknet or --testnet")
             };
             let res = load_session(manifest_path, start_repl, mode.into());
@@ -517,16 +512,14 @@ pub fn main() {
             // Sign the transaction
             // Send the transaction
         }
-        Command::Devnet(cmd) => match cmd {
-            Devnet::Start(sub_cmd) => {
-                let manifest_path = get_manifest_path_or_exit(sub_cmd.manifest_path);
-                println!(
-                    "Start orchestrating stacks-node, stacks-blockchain-api, bitcoind, bitcoin explorer, stacks-explorer"
-                );
-                let mut devnet = DevnetOrchestrator::new(manifest_path);
-                let devnet_event_tx = devnet.event_tx.clone();
-                devnet::run_devnet(&mut devnet);    
-            }
+        Command::Integrate(cmd) => {
+            let manifest_path = get_manifest_path_or_exit(cmd.manifest_path);
+            println!(
+                "Start orchestrating stacks-node, stacks-blockchain-api, bitcoind, bitcoin explorer, stacks-explorer"
+            );
+            let mut devnet = DevnetOrchestrator::new(manifest_path);
+            let devnet_event_tx = devnet.event_tx.clone();
+            integrate::run_devnet(&mut devnet);    
         }
     };
 }
