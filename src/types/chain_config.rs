@@ -11,6 +11,11 @@ use tiny_hderive::bip32::ExtendedPrivKey;
 use toml::value::Value;
 
 const DEFAULT_DERIVATION_PATH: &str = "m/44'/5757'/0'/0/0";
+const DEFAULT_STACKS_NODE_IMAGE: &str = "blockstack/stacks-blockchain:feat-miner-control";
+const DEFAULT_STACKS_API_IMAGE: &str = "blockstack/stacks-blockchain-api:latest";
+const DEFAULT_STACKS_EXPLORER_IMAGE: &str = "blockstack/explorer:latest";
+const DEFAULT_BITCOIND_IMAGE: &str = "blockstack/bitcoind:puppet-chain";
+const DEFAULT_POSTGRES_IMAGE: &str = "postgres:alpine";
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct ChainConfigFile {
@@ -27,25 +32,44 @@ pub struct NetworkConfigFile {
 
 #[derive(Serialize, Deserialize, Debug, Default)]
 pub struct DevnetConfigFile {
-    bitcoind_p2p_port: Option<u32>,
-    bitcoind_rpc_port: Option<u32>,
-    stacks_p2p_port: Option<u32>,
-    stacks_rpc_port: Option<u32>,
-    stacks_api_port: Option<u32>,
-    stacks_api_events_port: Option<u32>,
-    bitcoin_explorer_port: Option<u32>,
-    stacks_explorer_port: Option<u32>,
-    bitcoin_controller_port: Option<u32>,
+    orchestrator_port: Option<u16>,
+    bitcoind_p2p_port: Option<u16>,
+    bitcoind_rpc_port: Option<u16>,
+    stacks_node_p2p_port: Option<u16>,
+    stacks_node_rpc_port: Option<u16>,
+    stacks_node_events_observers: Option<Vec<String>>,
+    stacks_api_port: Option<u16>,
+    stacks_api_events_port: Option<u16>,
+    bitcoin_explorer_port: Option<u16>,
+    stacks_explorer_port: Option<u16>,
+    bitcoin_controller_port: Option<u16>,
     bitcoind_username: Option<String>,
     bitcoind_password: Option<String>,
     miner_mnemonic: Option<String>,
     miner_derivation_path: Option<String>,
     bitcoin_controller_block_time: Option<u32>,
     working_dir: Option<String>,
-    postgres_port: Option<u32>,
+    postgres_port: Option<u16>,
     postgres_username: Option<String>,
     postgres_password: Option<String>,
     postgres_database: Option<String>,
+    pox_stacking_orders: Option<Vec<PoxStackingOrder>>,
+    preflight_scripts: Option<Vec<String>>,
+    postflight_scripts: Option<Vec<String>>,
+    bitcoind_image_url: Option<String>,
+    stacks_node_image_url: Option<String>,
+    stacks_api_image_url: Option<String>,
+    stacks_explorer_image_url: Option<String>,
+    postgres_image_url: Option<String>,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct PoxStackingOrderFile {
+    pub start_at_cycle: u32,
+    pub end_at_cycle: u32,
+    pub amount_locked: u32,
+    pub wallet_label: String,
+    pub bitcoin_address: String,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -71,17 +95,19 @@ pub struct NetworkConfig {
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct DevnetConfig {
-    pub bitcoind_p2p_port: u32,
-    pub bitcoind_rpc_port: u32,
+    pub orchestrator_port: u16,
+    pub bitcoind_p2p_port: u16,
+    pub bitcoind_rpc_port: u16,
     pub bitcoind_username: String,
     pub bitcoind_password: String,
-    pub stacks_p2p_port: u32,
-    pub stacks_rpc_port: u32,
-    pub stacks_api_port: u32,
-    pub stacks_api_events_port: u32,
-    pub stacks_explorer_port: u32,
-    pub bitcoin_explorer_port: u32,
-    pub bitcoin_controller_port: u32,
+    pub stacks_node_p2p_port: u16,
+    pub stacks_node_rpc_port: u16,
+    pub stacks_node_events_observers: Vec<String>,
+    pub stacks_api_port: u16,
+    pub stacks_api_events_port: u16,
+    pub stacks_explorer_port: u16,
+    pub bitcoin_explorer_port: u16,
+    pub bitcoin_controller_port: u16,
     pub bitcoin_controller_block_time: u32,
     pub miner_stx_address: String,
     pub miner_secret_key_hex: String,
@@ -89,10 +115,27 @@ pub struct DevnetConfig {
     pub miner_mnemonic: String,
     pub miner_derivation_path: String,
     pub working_dir: String,
-    pub postgres_port: u32,
+    pub postgres_port: u16,
     pub postgres_username: String,
     pub postgres_password: String,
     pub postgres_database: String,
+    pub pox_stacking_orders: Vec<PoxStackingOrder>,
+    pub preflight_scripts: Vec<String>,
+    pub postflight_scripts: Vec<String>,
+    pub bitcoind_image_url: String,
+    pub stacks_node_image_url: String,
+    pub stacks_api_image_url: String,
+    pub stacks_explorer_image_url: String,
+    pub postgres_image_url: String,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct PoxStackingOrder {
+    pub start_at_cycle: u32,
+    pub end_at_cycle: u32,
+    pub amount_locked: u32,
+    pub wallet_label: String,
+    pub bitcoin_address: String,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -200,14 +243,16 @@ impl ChainConfig {
             let (miner_stx_address, miner_btc_address, miner_secret_key_hex) = compute_addresses(&miner_mnemonic, &miner_derivation_path);
 
             let config = DevnetConfig {
+                orchestrator_port: devnet_config.orchestrator_port.unwrap_or(20445),
                 bitcoind_p2p_port: devnet_config.bitcoind_p2p_port.unwrap_or(18444),
                 bitcoind_rpc_port: devnet_config.bitcoind_rpc_port.unwrap_or(18443),
                 bitcoind_username: devnet_config.bitcoind_username.take().unwrap_or("devnet".to_string()),
                 bitcoind_password: devnet_config.bitcoind_password.take().unwrap_or("devnet".to_string()),
                 bitcoin_controller_port: devnet_config.bitcoin_controller_port.unwrap_or(18442),
                 bitcoin_controller_block_time: devnet_config.bitcoin_controller_block_time.unwrap_or(60_000),
-                stacks_p2p_port: devnet_config.stacks_p2p_port.unwrap_or(20444),
-                stacks_rpc_port: devnet_config.stacks_rpc_port.unwrap_or(20443),
+                stacks_node_p2p_port: devnet_config.stacks_node_p2p_port.unwrap_or(20444),
+                stacks_node_rpc_port: devnet_config.stacks_node_rpc_port.unwrap_or(20443),
+                stacks_node_events_observers: devnet_config.stacks_node_events_observers.take().unwrap_or(vec![]),
                 stacks_api_port: devnet_config.stacks_api_port.unwrap_or(20080),
                 stacks_api_events_port: devnet_config.stacks_api_events_port.unwrap_or(3700),
                 stacks_explorer_port: devnet_config.stacks_explorer_port.unwrap_or(8000),
@@ -222,12 +267,19 @@ impl ChainConfig {
                 postgres_username: devnet_config.postgres_username.take().unwrap_or("postgres".to_string()),
                 postgres_password: devnet_config.postgres_password.take().unwrap_or("postgres".to_string()),
                 postgres_database: devnet_config.postgres_database.take().unwrap_or("postgres".to_string()),
+                pox_stacking_orders: devnet_config.pox_stacking_orders.take().unwrap_or(vec![]),
+                preflight_scripts: devnet_config.preflight_scripts.take().unwrap_or(vec![]),
+                postflight_scripts: devnet_config.postflight_scripts.take().unwrap_or(vec![]),
+                bitcoind_image_url: devnet_config.bitcoind_image_url.take().unwrap_or(DEFAULT_BITCOIND_IMAGE.to_string()),
+                stacks_node_image_url: devnet_config.stacks_node_image_url.take().unwrap_or(DEFAULT_STACKS_NODE_IMAGE.to_string()),
+                stacks_api_image_url: devnet_config.stacks_api_image_url.take().unwrap_or(DEFAULT_STACKS_API_IMAGE.to_string()),
+                postgres_image_url: devnet_config.postgres_image_url.take().unwrap_or(DEFAULT_POSTGRES_IMAGE.to_string()),
+                stacks_explorer_image_url: devnet_config.stacks_explorer_image_url.take().unwrap_or(DEFAULT_STACKS_EXPLORER_IMAGE.to_string()),
             };
             Some(config)
         } else {
             None
         };
-
         let config = ChainConfig {
             network,
             accounts,
