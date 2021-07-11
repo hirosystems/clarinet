@@ -20,6 +20,7 @@ winres = "0.1.11"
 clap = { version = "3.0.0-beta.2" }
 toml = { version = "0.5.6", features = ["preserve_order"] }
 serde = "1"
+serde_json = "1"
 serde_derive = "1"
 deno_core = { path = "./vendor/deno/core" }
 deno_runtime = { path = "./vendor/deno/runtime" }
@@ -41,7 +42,7 @@ hmac = "0.10.1"
 pbkdf2 = { version = "0.7.3", features=["parallel"], default-features = false }
 hex = "0.4.3"
 futures = "0.3.12"
-tokio = { version = "=1.7.1", features = ["full"] }
+tokio = { version = "=1.8.1", features = ["full"] }
 lazy_static = "1.4.0"
 atty = "0.2.14"
 termcolor = "1.1.2"
@@ -58,6 +59,18 @@ reqwest = { version = "0.11", features = ["blocking", "json", "rustls"] }
 swc_common = { version = "0.10.20", features = ["sourcemap"] }
 bollard = "0.11.0"
 ctrlc = "3.1.9"
+rocket = "0.4.4"
+crossterm = "0.20.0"
+
+[dependencies.tui]
+version = "0.15.0"
+default-features = false
+features = ["crossterm"]
+
+[dependencies.rocket_contrib]
+version = "*"
+default-features = false
+features = ["json"]
 
 [target.'cfg(windows)'.dependencies]
 fwdansi = "1.1.0"
