@@ -10,7 +10,7 @@ on:
       - released
   workflow_dispatch:
 
-jobs:      
+jobs:
   run:
     runs-on: ubuntu-latest
     steps:

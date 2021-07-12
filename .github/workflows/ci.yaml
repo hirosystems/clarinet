@@ -3,12 +3,12 @@ on:
   pull_request:
   push:
     tags:
-      - 'v*'
+      - "v*"
     paths-ignore:
-      - '**/CHANGELOG.md'
-      - '**/package.json'
-      - '**/Cargo.toml'
-      - '**/Cargo.lock'
+      - "**/CHANGELOG.md"
+      - "**/package.json"
+      - "**/Cargo.toml"
+      - "**/Cargo.lock"
     branches:
       - main
       - develop
@@ -31,7 +31,7 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v2
-      
+
       - name: Install Rust toolchain
         uses: actions-rs/toolchain@v1
         with:
@@ -199,7 +199,6 @@ jobs:
       # - name: Install ${{ matrix.platform }} linker
       #   if: matrix.platform == 'linux-arm64' || matrix.platform == 'linux-armv7' || matrix.platform == 'linux-musl-x64'
       #   run: sudo apt-get update && sudo apt-get install -y ${{ matrix.linker_package }}
-
       - name: Build
         run: cargo build --release --locked --target ${{ matrix.target }}
         # To be uncommented later when adding new distros
