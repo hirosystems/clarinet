@@ -6,10 +6,11 @@ edition = "2018"
 description = "Clarinet is a clarity runtime packaged as a command line tool, designed to facilitate smart contract understanding, development, testing and deployment."
 readme = "README.md"
 license = "GPL-3.0-only"
+license-file = "LICENSE"
 keywords = ["blockstack", "blockchain", "clarity", "smart-contract", "repl"]
 exclude = ["examples/**"]
-homepage = "https://github.com/lgalabru/clarinet"
-repository = "https://github.com/lgalabru/clarinet"
+homepage = "https://github.com/hirosystems/clarinet"
+repository = "https://github.com/hirosystems/clarinet"
 categories = ["command-line-utilities", "development-tools", "development-tools::build-utils"]
 
 [target.'cfg(windows)'.build-dependencies]
