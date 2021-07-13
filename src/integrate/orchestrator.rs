@@ -335,6 +335,11 @@ whitelisted_rpc_calls = [
     "getrawmempool",
     "getblockhash",
 ]
+
+[[blocks]]
+count = 1
+block_time = 30000
+ignore_txs = false
 "#, 
             devnet_config.bitcoin_controller_port,
             devnet_config.bitcoin_controller_block_time,

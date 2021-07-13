@@ -132,10 +132,10 @@ pub struct DevnetConfig {
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct PoxStackingOrder {
     pub start_at_cycle: u32,
-    pub end_at_cycle: u32,
-    pub amount_locked: u32,
-    pub wallet_label: String,
-    pub bitcoin_address: String,
+    pub duration: u32,
+    pub wallet: String,
+    pub slots: u32,
+    pub btc_address: String,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -268,7 +268,6 @@ impl ChainConfig {
                 postgres_username: devnet_config.postgres_username.take().unwrap_or("postgres".to_string()),
                 postgres_password: devnet_config.postgres_password.take().unwrap_or("postgres".to_string()),
                 postgres_database: devnet_config.postgres_database.take().unwrap_or("postgres".to_string()),
-                pox_stacking_orders: devnet_config.pox_stacking_orders.take().unwrap_or(vec![]),
                 preflight_scripts: devnet_config.preflight_scripts.take().unwrap_or(vec![]),
                 postflight_scripts: devnet_config.postflight_scripts.take().unwrap_or(vec![]),
                 bitcoind_image_url: devnet_config.bitcoind_image_url.take().unwrap_or(DEFAULT_BITCOIND_IMAGE.to_string()),
@@ -276,6 +275,36 @@ impl ChainConfig {
                 stacks_api_image_url: devnet_config.stacks_api_image_url.take().unwrap_or(DEFAULT_STACKS_API_IMAGE.to_string()),
                 postgres_image_url: devnet_config.postgres_image_url.take().unwrap_or(DEFAULT_POSTGRES_IMAGE.to_string()),
                 stacks_explorer_image_url: devnet_config.stacks_explorer_image_url.take().unwrap_or(DEFAULT_STACKS_EXPLORER_IMAGE.to_string()),
+                pox_stacking_orders: devnet_config.pox_stacking_orders.take().unwrap_or(vec![
+                    PoxStackingOrder {
+                        start_at_cycle: 0,
+                        duration: 12,
+                        wallet: "wallet_1".into(),
+                        slots: 2,
+                        btc_address: "mr1iPkD9N3RJZZxXRk7xF9d36gffa6exNC".into(),
+                    },
+                    PoxStackingOrder {
+                        start_at_cycle: 0,
+                        duration: 12,
+                        wallet: "wallet_2".into(),
+                        slots: 2,
+                        btc_address: "muYdXKmX9bByAueDe6KFfHd5Ff1gdN9ErG".into(),
+                    },
+                    PoxStackingOrder {
+                        start_at_cycle: 0,
+                        duration: 12,
+                        wallet: "wallet_3".into(),
+                        slots: 2,
+                        btc_address: "mvZtbibDAAA3WLpY7zXXFqRa3T4XSknBX7".into(),
+                    },
+                    PoxStackingOrder {
+                        start_at_cycle: 0,
+                        duration: 12,
+                        wallet: "wallet_4".into(),
+                        slots: 2,
+                        btc_address: "mg1C76bNTutiCDV3t9nWhZs3Dc8LzUufj8".into(),
+                    },
+                ]),
             };
             Some(config)
         } else {

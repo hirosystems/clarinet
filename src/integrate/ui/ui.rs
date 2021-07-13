@@ -194,6 +194,8 @@ where
             Constraint::Length(2),
             Constraint::Length(1),
             Constraint::Length(2),
+            Constraint::Length(1),
+            Constraint::Length(2),
         ].as_ref())
         .split(area);
 
@@ -244,6 +246,19 @@ where
         .style(Style::default().bg(Color::Black).fg(Color::White))
         .block(Block::default().borders(Borders::NONE));
     f.render_widget(paragraph, labels[8]);
+
+    let label = "Pox Cycle:".to_string();
+    let paragraph = Paragraph::new(label)
+        .style(Style::default().bg(Color::Black).fg(Color::White))
+        .block(Block::default().borders(Borders::NONE));
+    f.render_widget(paragraph, labels[9]);
+
+    let value = format!("{}", block.pox_cycle_id);
+    let paragraph = Paragraph::new(value)
+        .style(Style::default().bg(Color::Black).fg(Color::White))
+        .block(Block::default().borders(Borders::NONE));
+    f.render_widget(paragraph, labels[10]);
+
 
     // TODO(ludo): PoX informations
     // TODO(ludo): Mining informations (miner, VRF)

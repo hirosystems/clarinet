@@ -10,7 +10,7 @@ use crate::utils;
 pub use orchestrator::DevnetOrchestrator;
 use events_observer::start_events_observer;
 
-use self::events_observer::EventObserverConfig;
+use self::events_observer::{EventObserverConfig, PoxInfo};
 
 pub fn run_devnet(devnet: DevnetOrchestrator) {
     match block_on(do_run_devnet(devnet)) {
@@ -49,6 +49,7 @@ pub async fn do_run_devnet(
     let config = EventObserverConfig {
         devnet_config,
         manifest_path: devnet.manifest_path.clone(),
+        pox_info: PoxInfo::default(),
     };
     let events_observer_tx = devnet_events_tx.clone();
     let (events_observer_terminator_tx, terminator_rx) = channel();
@@ -192,6 +193,9 @@ pub struct BlockData {
     pub block_hash: String,
     pub bitcoin_block_height: u32,
     pub bitcoin_block_hash: String,
+    pub first_burnchain_block_height: u32,
+    pub pox_cycle_length: u32,
+    pub pox_cycle_id: u32,
     pub transactions: Vec<Transaction>
 }
 

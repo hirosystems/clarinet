@@ -76,10 +76,11 @@ impl<'a> App<'a> {
     }
 
     pub fn display_block(&mut self, block: BlockData) {
-        let cycle_len = 10;
-        let (start, end) = if block.block_height % cycle_len == (cycle_len - 1) {
+        let cycle_len = block.pox_cycle_length;
+        let abs_pos = (block.bitcoin_block_height - block.first_burnchain_block_height);
+        let (start, end) = if abs_pos % cycle_len == (cycle_len - 1) {
             ("", "<")
-        } else if block.block_height % cycle_len == 0 {
+        } else if abs_pos % cycle_len == 0 {
             (">", "")
         } else {
             ("", "")
