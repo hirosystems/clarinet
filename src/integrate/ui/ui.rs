@@ -1,5 +1,4 @@
-use crate::integrate::BlockData;
-use crate::integrate::LogLevel;
+use crate::integrate::{BlockData, LogLevel, Status};
 
 use super::App;
 use tui::{
@@ -43,7 +42,7 @@ where
     B: Backend,
 {
     let normal_style = Style::default().bg(Color::DarkGray);
-    let header_cells = ["", "Service", "URL"]
+    let header_cells = ["", "Service", ""]
         .iter()
         .map(|h| Cell::from(*h).style(Style::default().fg(Color::Gray)));
     let header = Row::new(header_cells)
@@ -51,17 +50,20 @@ where
         .height(1)
         .bottom_margin(0);
 
-    let services = vec![
-        vec!["🟩", "stacks-node", "http://localhost:20443"],
-        vec!["🟨", "stacks-api", "http://localhost:20443"],
-        vec!["🟩", "stacks-explorer", "http://localhost:20443"],
-        vec!["🟩", "bitcoind", "http://localhost:20443"],
-    ];
-
-    let rows = services.iter().map(|item| {
-        let cells = item.iter().map(|c| Cell::from(*c));
-        Row::new(cells).height(1).bottom_margin(0)
+    let rows = app.services.items.iter().map(|service| {
+        let status = match service.status {
+            Status::Green => "🟩",
+            Status::Yellow => "🟨",
+            Status::Red => "🟥",
+        };
+        
+        Row::new(vec![
+            Cell::from(status), 
+            Cell::from(service.name.to_string()), 
+            Cell::from(service.comment.to_string())
+        ]).height(1).bottom_margin(0)
     });
+
     let t = Table::new(rows)
         .header(header)
         .block(Block::default().borders(Borders::ALL).title("Services"))

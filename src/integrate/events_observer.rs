@@ -7,7 +7,7 @@ use rocket::State;
 use std::str;
 use std::sync::mpsc::{Receiver, Sender};
 use std::sync::{Arc, Mutex};
-use crate::integrate::{LogData, BlockData, Transaction};
+use crate::integrate::{LogData, BlockData, Transaction, ServiceStatusData, Status};
 use crate::types::{ChainConfig, DevnetConfig};
 use crate::publish::{publish_contracts, Network};
 use super::DevnetEvent;
@@ -79,6 +79,12 @@ pub fn handle_new_burn_block(config: State<Arc<Mutex<EventObserverConfig>>>, dev
     match devnet_events_tx.lock() {
         Ok(tx) => {
             let _ = tx.send(DevnetEvent::debug(format!("Bitcoin block #{} received", new_burn_block.burn_block_height)));
+            let _ = tx.send(DevnetEvent::ServiceStatus(ServiceStatusData {
+                order: 0,
+                status: Status::Green,
+                name: "bitcoin-node".into(),
+                comment: format!("mining blocks (chaintip = #{})", new_burn_block.burn_block_height),
+            }));
         }
         _ => {} 
     };
@@ -94,7 +100,13 @@ pub fn handle_new_block(config: State<Arc<Mutex<EventObserverConfig>>>, devnet_e
     let devnet_events_tx = devnet_events_tx.inner();
 
     if let Ok(tx) = devnet_events_tx.lock() {
-        let _ = tx.send(DevnetEvent::info(format!("Block #{} successfully anchored in Bitcoin block #{}, includes {} transactions", 
+        let _ = tx.send(DevnetEvent::ServiceStatus(ServiceStatusData {
+            order: 1,
+            status: Status::Green,
+            name: "stacks-node".into(),
+            comment: format!("mining blocks (chaintip = #{})", new_block.block_height),
+        }));
+        let _ = tx.send(DevnetEvent::info(format!("Block #{} anchored in Bitcoin block #{} includes {} transactions", 
             new_block.block_height, 
             new_block.burn_block_height,
             new_block.transactions.len(),
@@ -128,9 +140,6 @@ pub fn handle_new_block(config: State<Arc<Mutex<EventObserverConfig>>>, devnet_e
             };
         }
     };
-
-
-
 
     Json(json!({
         "status": 200,

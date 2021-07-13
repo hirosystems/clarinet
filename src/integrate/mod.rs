@@ -161,9 +161,15 @@ impl LogData {
     }
 }
 
+pub enum Status {
+    Red,
+    Yellow,
+    Green,
+}
+
 pub struct ServiceStatusData {
-    pub order: u8,
-    pub status: u8,
+    pub order: usize,
+    pub status: Status,
     pub name: String,
     pub comment: String,
 }

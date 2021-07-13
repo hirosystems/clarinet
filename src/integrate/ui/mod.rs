@@ -106,7 +106,7 @@ pub fn start_ui(devnet_events_tx: Sender<DevnetEvent>, devnet_events_rx: Receive
 
             },
             DevnetEvent::ServiceStatus(status) => {
-
+                app.display_service_status_update(status);
             }
             DevnetEvent::Block(block) => {
                 app.display_block(block);

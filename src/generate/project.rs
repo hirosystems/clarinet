@@ -103,7 +103,6 @@ settings/Mainnet.toml
 settings/Testnet.toml
 history.txt
 "#,
-            self.project_name
         );
         let name = format!(".gitignore");
         let path = format!("{}/{}/{}", self.project_path, self.project_name, name);

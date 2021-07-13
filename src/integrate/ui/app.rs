@@ -1,4 +1,4 @@
-use crate::integrate::{BlockData, LogData, Transaction};
+use crate::integrate::{BlockData, LogData, ServiceStatusData, Transaction};
 
 use super::util::{StatefulList, TabsState};
 use tui::text::{Span, Spans};
@@ -11,7 +11,7 @@ pub struct App<'a> {
     pub tabs: TabsState<'a>,
     pub transactions: StatefulList<Transaction>,
     pub logs: StatefulList<LogData>,
-    pub services: StatefulList<(&'a str, &'a str)>,
+    pub services: StatefulList<ServiceStatusData>,
 }
 
 impl<'a> App<'a> {
@@ -53,6 +53,16 @@ impl<'a> App<'a> {
     }
 
     pub fn on_tick(&mut self) {
+    }
+
+    pub fn display_service_status_update(&mut self, service_update: ServiceStatusData) {
+        let insertion_index = service_update.order;
+        if insertion_index == self.services.items.len() {
+            self.services.items.push(service_update)
+        } else {
+            self.services.items.remove(insertion_index);
+            self.services.items.insert(insertion_index, service_update)
+        }
     }
 
     pub fn display_log(&mut self, log: LogData) {
