@@ -68,7 +68,7 @@ impl<'a> App<'a> {
         } else {
             ("", "")
         };
-        let has_tx = if block.transactions.is_empty() {
+        let has_tx = if block.transactions.len() <= 1 {
             ""
         } else {
             "␂"

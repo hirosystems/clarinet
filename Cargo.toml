@@ -58,9 +58,9 @@ tiny-hderive = "0.3.0"
 reqwest = { version = "0.11", features = ["blocking", "json", "rustls"] }
 swc_common = { version = "0.10.20", features = ["sourcemap"] }
 bollard = "0.11.0"
-ctrlc = "3.1.9"
 rocket = "0.4.4"
 crossterm = "0.20.0"
+chrono = "0.4.19"
 
 [dependencies.tui]
 version = "0.15.0"

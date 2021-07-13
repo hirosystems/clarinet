@@ -1,7 +1,5 @@
 use std::collections::VecDeque;
 
-use rand::distributions::{Distribution, Uniform};
-use rand::rngs::ThreadRng;
 use tui::widgets::ListState;
 use tui::text::Spans;
 

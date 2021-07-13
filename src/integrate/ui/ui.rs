@@ -6,11 +6,10 @@ use tui::{
     backend::Backend,
     layout::{Constraint, Corner, Direction, Layout, Rect},
     style::{Color, Modifier, Style},
-    symbols,
     text::{Span, Spans},
     widgets::{
-        Block, Borders, Cell, Chart, Dataset, Gauge, LineGauge, List, ListItem,
-        Paragraph, Row, Table, Tabs, Wrap,
+        Block, Borders, Cell, ListItem, List,
+        Paragraph, Row, Table, Tabs,
     },
     Frame,
 };
@@ -116,19 +115,15 @@ where
                 LogLevel::Warning => (Style::default().fg(Color::LightYellow), "WARN"),
                 LogLevel::Info => (Style::default().fg(Color::LightBlue), "INFO"),
                 LogLevel::Success => (Style::default().fg(Color::LightGreen), "INFO"),
+                LogLevel::Debug => (Style::default().fg(Color::DarkGray), "DEBG"),
             };
 
-            // let header = Spans::from(vec![
-            //     Span::styled(format!("{:<9}", level), s),
-            //     Span::raw(" "),
-            //     Span::styled(
-            //         "2020-01-01 10:00:00",
-            //         Style::default().fg(Color::DarkGray),
-            //     ),
-            // ]);
-            // The event gets its own line
             let log = Spans::from(vec![
-                Span::styled(format!("{:<9}", label), style),
+                Span::styled(format!("{:<5}", label), style),
+                Span::styled(
+                    &log.occurred_at,
+                    Style::default().fg(Color::DarkGray),
+                ),
                 Span::raw(" "),
                 Span::raw(log.message.clone())]);
 
