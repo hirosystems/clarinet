@@ -11,10 +11,10 @@ use tiny_hderive::bip32::ExtendedPrivKey;
 use toml::value::Value;
 
 const DEFAULT_DERIVATION_PATH: &str = "m/44'/5757'/0'/0/0";
-const DEFAULT_STACKS_NODE_IMAGE: &str = "blockstack/stacks-blockchain:feat-miner-control";
+const DEFAULT_BITCOIND_IMAGE: &str = "quay.io/hirosystems/bitcoind:devnet";
+const DEFAULT_STACKS_NODE_IMAGE: &str = "quay.io/hirosystems/stacks-node:devnet";
 const DEFAULT_STACKS_API_IMAGE: &str = "blockstack/stacks-blockchain-api:latest";
 const DEFAULT_STACKS_EXPLORER_IMAGE: &str = "blockstack/explorer:latest";
-const DEFAULT_BITCOIND_IMAGE: &str = "blockstack/bitcoind:puppet-chain";
 const DEFAULT_POSTGRES_IMAGE: &str = "postgres:alpine";
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -80,20 +80,20 @@ pub struct AccountConfigFile {
     is_mainnet: Option<bool>,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct ChainConfig {
     pub network: NetworkConfig,
     pub accounts: BTreeMap<String, AccountConfig>,
     pub devnet: Option<DevnetConfig>,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct NetworkConfig {
     name: String,
-    node_rpc_address: Option<String>,
+    pub node_rpc_address: Option<String>,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct DevnetConfig {
     pub orchestrator_port: u16,
     pub bitcoind_p2p_port: u16,
@@ -129,7 +129,7 @@ pub struct DevnetConfig {
     pub postgres_image_url: String,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct PoxStackingOrder {
     pub start_at_cycle: u32,
     pub end_at_cycle: u32,
@@ -138,7 +138,7 @@ pub struct PoxStackingOrder {
     pub bitcoin_address: String,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct AccountConfig {
     pub mnemonic: String,
     pub derivation: String,
@@ -148,7 +148,7 @@ pub struct AccountConfig {
 }
 
 impl ChainConfig {
-    #[allow(non_fmt_panic)]
+    #[allow(non_fmt_panics)]
     pub fn from_path(path: &PathBuf) -> ChainConfig {
         let path = match File::open(path) {
             Ok(path) => path,
@@ -173,6 +173,7 @@ impl ChainConfig {
         };
         
         let mut accounts = BTreeMap::new();
+        let is_mainnet = network.name == "mainnet".to_string();
 
         match &config_file.accounts {
             Some(Value::Table(entries)) => {
@@ -209,7 +210,7 @@ impl ChainConfig {
                                 _ => DEFAULT_DERIVATION_PATH.to_string(),
                             }; // todo(ludo): use derivation path
 
-                            let (address, _, _) = compute_addresses(&mnemonic, &derivation);
+                            let (address, _, _) = compute_addresses(&mnemonic, &derivation, is_mainnet);
 
                             accounts.insert(
                                 account_name.to_string(),
@@ -229,7 +230,7 @@ impl ChainConfig {
             _ => {}
         };
 
-        let devnet = if config_file.network.name == "development" {
+        let devnet = if config_file.network.name == "devnet" {
             let mut devnet_config = match config_file.devnet.take() {
                 Some(conf) => conf,
                 _ => DevnetConfigFile::default(),
@@ -240,7 +241,7 @@ impl ChainConfig {
 
             let miner_mnemonic = devnet_config.miner_mnemonic.take().unwrap_or("fragile loan twenty basic net assault jazz absorb diet talk art shock innocent float punch travel gadget embrace caught blossom hockey surround initial reduce".to_string());
             let miner_derivation_path = devnet_config.miner_derivation_path.take().unwrap_or(DEFAULT_DERIVATION_PATH.to_string());
-            let (miner_stx_address, miner_btc_address, miner_secret_key_hex) = compute_addresses(&miner_mnemonic, &miner_derivation_path);
+            let (miner_stx_address, miner_btc_address, miner_secret_key_hex) = compute_addresses(&miner_mnemonic, &miner_derivation_path, is_mainnet);
 
             let config = DevnetConfig {
                 orchestrator_port: devnet_config.orchestrator_port.unwrap_or(20445),
@@ -249,7 +250,7 @@ impl ChainConfig {
                 bitcoind_username: devnet_config.bitcoind_username.take().unwrap_or("devnet".to_string()),
                 bitcoind_password: devnet_config.bitcoind_password.take().unwrap_or("devnet".to_string()),
                 bitcoin_controller_port: devnet_config.bitcoin_controller_port.unwrap_or(18442),
-                bitcoin_controller_block_time: devnet_config.bitcoin_controller_block_time.unwrap_or(60_000),
+                bitcoin_controller_block_time: devnet_config.bitcoin_controller_block_time.unwrap_or(20_000),
                 stacks_node_p2p_port: devnet_config.stacks_node_p2p_port.unwrap_or(20444),
                 stacks_node_rpc_port: devnet_config.stacks_node_rpc_port.unwrap_or(20443),
                 stacks_node_events_observers: devnet_config.stacks_node_events_observers.take().unwrap_or(vec![]),
@@ -290,7 +291,7 @@ impl ChainConfig {
     }
 }
 
-fn compute_addresses(mnemonic: &str, derivation_path: &str) -> (String, String, String) {
+fn compute_addresses(mnemonic: &str, derivation_path: &str, mainnet: bool) -> (String, String, String) {
 
     let bip39_seed =
         match mnemonic::get_bip39_seed_from_mnemonic(&mnemonic, "") {
@@ -313,7 +314,11 @@ fn compute_addresses(mnemonic: &str, derivation_path: &str) -> (String, String, 
     let pub_key =
         Secp256k1PublicKey::from_slice(&public_key.serialize_compressed())
             .unwrap();
-    let version = clarity_repl::clarity::util::C32_ADDRESS_VERSION_MAINNET_SINGLESIG;
+    let version = if mainnet {
+        clarity_repl::clarity::util::C32_ADDRESS_VERSION_MAINNET_SINGLESIG
+    } else {
+        clarity_repl::clarity::util::C32_ADDRESS_VERSION_TESTNET_SINGLESIG
+    };
 
     let stx_address = StacksAddress::from_public_key(version, pub_key)
         .unwrap();

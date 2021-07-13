@@ -196,15 +196,15 @@ struct Run {
 
 #[derive(Clap)]
 struct Publish {
-    /// Print debug info
-    #[clap(short = 'd')]
-    pub debug: bool,
-    /// Deploy contracts on mocknet, using settings/Mocknet.toml
-    #[clap(long = "mocknet", conflicts_with = "testnet")]
-    pub mocknet: bool,
-    /// Deploy contracts on mocknet, using settings/Testnet.toml
-    #[clap(long = "testnet", conflicts_with = "mocknet")]
+    /// Deploy contracts on devnet, using settings/Devnet.toml
+    #[clap(long = "devnet", conflicts_with = "testnet", conflicts_with = "mainnet")]
+    pub devnet: bool,
+    /// Deploy contracts on testnet, using settings/Testnet.toml
+    #[clap(long = "testnet", conflicts_with = "devnet", conflicts_with = "mainnet")]
     pub testnet: bool,
+    /// Deploy contracts on mainnet, using settings/Mainnet.toml
+    #[clap(long = "testnet", conflicts_with = "testnet", conflicts_with = "devnet")]
+    pub mainnet: bool,    
     /// Path to Clarinet.toml
     #[clap(long = "manifest-path")]
     pub manifest_path: Option<String>,
@@ -317,13 +317,13 @@ pub fn main() {
         Command::Poke(cmd) => {
             let manifest_path = get_manifest_path_or_exit(cmd.manifest_path);
             let start_repl = true;
-            load_session(manifest_path, start_repl, "development".into())
+            load_session(manifest_path, start_repl, Network::Devnet)
                 .expect("Unable to start REPL");
         }
         Command::Check(cmd) => {
             let manifest_path = get_manifest_path_or_exit(cmd.manifest_path);
             let start_repl = false;
-            let res = load_session(manifest_path, start_repl, "development".into());
+            let res = load_session(manifest_path, start_repl, Network::Devnet);
             if let Err(e) = res {
                 println!("{}", e);
                 return;
@@ -332,7 +332,7 @@ pub fn main() {
         Command::Test(cmd) => {
             let manifest_path = get_manifest_path_or_exit(cmd.manifest_path);
             let start_repl = false;
-            let res = load_session(manifest_path.clone(), start_repl, "development".into());
+            let res = load_session(manifest_path.clone(), start_repl, Network::Devnet);
             if let Err(e) = res {
                 println!("{}", e);
                 return;
@@ -342,7 +342,7 @@ pub fn main() {
         Command::Run(cmd) => {
             let manifest_path = get_manifest_path_or_exit(cmd.manifest_path);
             let start_repl = false;
-            let res = load_session(manifest_path.clone(), start_repl, "development".into());
+            let res = load_session(manifest_path.clone(), start_repl, Network::Devnet);
             if let Err(e) = res {
                 println!("{}", e);
                 return;

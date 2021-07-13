@@ -21,11 +21,11 @@ impl GetChangesForNewProject {
         self.create_settings_directory();
         self.create_tests_directory();
         self.create_clarinet_toml();
-        // self.create_environment_mainnet_toml();
-        // self.create_environment_testnet_toml();
-        self.create_environment_dev_toml();
-        self.create_environment_mocknet_toml();
+        self.create_environment_mainnet_toml();
+        self.create_environment_testnet_toml();
+        self.create_environment_devnet_toml();
         self.create_vscode_directory();
+        self.create_gitignore();
         self.changes.clone()
     }
 
@@ -96,6 +96,27 @@ impl GetChangesForNewProject {
         self.changes.push(Changes::AddFile(change));
     }
 
+    fn create_gitignore(&mut self) {
+        let content = format!(
+            r#"
+settings/Mainnet.toml
+settings/Testnet.toml
+history.txt
+"#,
+            self.project_name
+        );
+        let name = format!(".gitignore");
+        let path = format!("{}/{}/{}", self.project_path, self.project_name, name);
+        let change = FileCreation {
+            comment: format!("Creating file {}/{}", self.project_name, name),
+            name,
+            content,
+            path,
+        };
+        self.changes.push(Changes::AddFile(change));
+    }
+
+
     fn create_clarinet_toml(&mut self) {
         let content = format!(
             r#"
@@ -119,58 +140,14 @@ name = "{}"
         self.changes.push(Changes::AddFile(change));
     }
 
-    #[allow(dead_code)]
-    fn create_environment_mainnet_toml(&mut self) {
-        let content = format!(
-            r#"[network]
-name = "mainnet"
-node_rpc_address = "http://stacks-node-api.blockstack.org:20443"
-"#
-        );
-        let name = format!("Mainnet.toml");
-        let path = format!(
-            "{}/{}/settings/{}",
-            self.project_path, self.project_name, name
-        );
-        let change = FileCreation {
-            comment: format!("Creating file {}/settings/{}", self.project_name, name),
-            name,
-            content,
-            path,
-        };
-        self.changes.push(Changes::AddFile(change));
-    }
-
-    fn create_environment_mocknet_toml(&mut self) {
-        let content = format!(
-            r#"[network]
-name = "mocknet"
-node_rpc_address = "http://localhost:20443"
-
-[accounts.deployer]
-mnemonic = "point approve language letter cargo rough similar wrap focus edge polar task olympic tobacco cinnamon drop lawn boring sort trade senior screen tiger climb"
-"#
-        );
-        let name = format!("Mocknet.toml");
-        let path = format!(
-            "{}/{}/settings/{}",
-            self.project_path, self.project_name, name
-        );
-        let change = FileCreation {
-            comment: format!("Creating file {}/settings/{}", self.project_name, name),
-            name,
-            content,
-            path,
-        };
-        self.changes.push(Changes::AddFile(change));
-    }
-
-    #[allow(dead_code)]
     fn create_environment_testnet_toml(&mut self) {
         let content = format!(
             r#"[network]
 name = "testnet"
-node_rpc_address = "http://xenon.blockstack.org:20443"
+node_rpc_address = "https://stacks-node-api.testnet.stacks.co"
+
+[accounts.deployer]
+mnemonic = "<YOUR PRIVATE TESTNET MNEMONIC HERE>"
 "#
         );
         let name = format!("Testnet.toml");
@@ -187,10 +164,34 @@ node_rpc_address = "http://xenon.blockstack.org:20443"
         self.changes.push(Changes::AddFile(change));
     }
 
-    fn create_environment_dev_toml(&mut self) {
+    fn create_environment_mainnet_toml(&mut self) {
         let content = format!(
             r#"[network]
-name = "Development"
+name = "mainnet"
+node_rpc_address = "https://stacks-node-api.mainnet.stacks.co"
+
+[accounts.deployer]
+mnemonic = "<YOUR PRIVATE MAINNET MNEMONIC HERE>"
+"#
+        );
+        let name = format!("Mainnet.toml");
+        let path = format!(
+            "{}/{}/settings/{}",
+            self.project_path, self.project_name, name
+        );
+        let change = FileCreation {
+            comment: format!("Creating file {}/settings/{}", self.project_name, name),
+            name,
+            content,
+            path,
+        };
+        self.changes.push(Changes::AddFile(change));
+    }
+
+    fn create_environment_devnet_toml(&mut self) {
+        let content = format!(
+            r#"[network]
+name = "devnet"
 
 [accounts.deployer]
 mnemonic = "fetch outside black test wash cover just actual execute nice door want airport betray quantum stamp fish act pen trust portion fatigue scissors vague"
@@ -233,7 +234,7 @@ mnemonic = "market ocean tortoise venue vivid coach machine category conduct ena
 balance = 1_000_000
 "#
         );
-        let name = format!("Development.toml");
+        let name = format!("Devnet.toml");
         let path = format!(
             "{}/{}/settings/{}",
             self.project_path, self.project_name, name

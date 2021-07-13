@@ -73,7 +73,7 @@ mod sessions {
 
         let mut chain_config_path = project_path.clone();
         chain_config_path.push("settings");
-        chain_config_path.push("Development.toml");
+        chain_config_path.push("Devnet.toml");
 
         let project_config = MainConfig::from_path(manifest_path);
         let chain_config = ChainConfig::from_path(&chain_config_path);
