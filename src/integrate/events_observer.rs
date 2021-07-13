@@ -7,7 +7,7 @@ use rocket::State;
 use std::str;
 use std::sync::mpsc::{Receiver, Sender};
 use std::sync::{Arc, Mutex};
-use crate::integrate::{LogData, BlockData, Transaction, ServiceStatusData, Status};
+use crate::integrate::{BlockData, LogData, MempoolAdmissionData, ServiceStatusData, Status, Transaction};
 use crate::types::{ChainConfig, DevnetConfig};
 use crate::publish::{publish_contracts, Network};
 use super::DevnetEvent;
@@ -155,10 +155,16 @@ pub fn handle_new_microblocks(devnet_events_tx: State<Arc<Mutex<Sender<DevnetEve
     }))
 }
 
+#[post("/new_mempool_tx", format = "application/json", data = "<raw_txs>")]
+pub fn handle_new_mempool_tx(config: State<Arc<Mutex<EventObserverConfig>>>, devnet_events_tx: State<Arc<Mutex<Sender<DevnetEvent>>>>, raw_txs: Json<Vec<String>>) -> Json<Value> {
 
-#[post("/new_mempool_tx", format = "application/json")]
-pub fn handle_new_mempool_tx() -> Json<Value> {
-    println!("POST /new_mempool_tx");
+    if let Ok(tx) = devnet_events_tx.lock() {
+        for raw_tx in raw_txs.iter() {
+            let _ = tx.send(DevnetEvent::MempoolAdmission(MempoolAdmissionData {
+                txid: raw_tx.to_string()
+            }));
+        }
+    }
 
     Json(json!({
         "status": 200,

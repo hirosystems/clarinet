@@ -79,18 +79,14 @@ fn draw_mempool<B>(f: &mut Frame<B>, app: &mut App, area: Rect)
 where
     B: Backend,
 {
-    let services = vec![
-        vec!["00:00:00", "0xd08ed0fd32027fc686e7fc2b5f7474e5dbfc2ef102bba364be30c16c3ea4b860"],
-    ];
-
-    let rows = services.iter().map(|item| {
-        let cells = item.iter().map(|c| Cell::from(*c));
+    let rows = app.mempool.items.iter().map(|item| {
+        let cells = vec![Cell::from(item.txid.clone())];
         Row::new(cells).height(1).bottom_margin(0)
     });
     let t = Table::new(rows)
         .block(Block::default().borders(Borders::ALL).title("Mempool"))
         .widths(&[
-            Constraint::Length(8),
+            // Constraint::Length(8),
             Constraint::Min(1),
         ]);
     f.render_widget(t, area);

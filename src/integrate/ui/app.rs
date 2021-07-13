@@ -1,4 +1,4 @@
-use crate::integrate::{BlockData, LogData, ServiceStatusData, Transaction};
+use crate::integrate::{BlockData, LogData, ServiceStatusData, Transaction, MempoolAdmissionData};
 
 use super::util::{StatefulList, TabsState};
 use tui::text::{Span, Spans};
@@ -10,6 +10,7 @@ pub struct App<'a> {
     pub blocks: Vec<BlockData>,
     pub tabs: TabsState<'a>,
     pub transactions: StatefulList<Transaction>,
+    pub mempool: StatefulList<MempoolAdmissionData>,
     pub logs: StatefulList<LogData>,
     pub services: StatefulList<ServiceStatusData>,
 }
@@ -22,6 +23,7 @@ impl<'a> App<'a> {
             tabs: TabsState::new(),
             blocks: vec![],
             transactions: StatefulList::with_items(vec![]),
+            mempool: StatefulList::with_items(vec![]),
             logs: StatefulList::with_items(vec![]),
             services: StatefulList::with_items(vec![]),
         }
@@ -67,6 +69,10 @@ impl<'a> App<'a> {
 
     pub fn display_log(&mut self, log: LogData) {
         self.logs.items.push(log);
+    }
+
+    pub fn update_mempool(&mut self, tx: MempoolAdmissionData) {
+        self.mempool.items.push(tx);
     }
 
     pub fn display_block(&mut self, block: BlockData) {

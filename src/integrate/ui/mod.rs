@@ -115,7 +115,7 @@ pub fn start_ui(devnet_events_tx: Sender<DevnetEvent>, devnet_events_rx: Receive
 
             }
             DevnetEvent::MempoolAdmission(tx) => {
-
+                app.update_mempool(tx);
             }
         }
         if app.should_quit {

@@ -250,7 +250,7 @@ impl ChainConfig {
                 bitcoind_username: devnet_config.bitcoind_username.take().unwrap_or("devnet".to_string()),
                 bitcoind_password: devnet_config.bitcoind_password.take().unwrap_or("devnet".to_string()),
                 bitcoin_controller_port: devnet_config.bitcoin_controller_port.unwrap_or(18442),
-                bitcoin_controller_block_time: devnet_config.bitcoin_controller_block_time.unwrap_or(20_000),
+                bitcoin_controller_block_time: devnet_config.bitcoin_controller_block_time.unwrap_or(30_000),
                 stacks_node_p2p_port: devnet_config.stacks_node_p2p_port.unwrap_or(20444),
                 stacks_node_rpc_port: devnet_config.stacks_node_rpc_port.unwrap_or(20443),
                 stacks_node_events_observers: devnet_config.stacks_node_events_observers.take().unwrap_or(vec![]),
