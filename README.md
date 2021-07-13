@@ -43,7 +43,8 @@ The version of Clarinet installed by Homebrew is behind the official version ins
 recommended to install Clarinet using Homebrew.
 
 ```bash
-brew install hirosystems/clarinet/clarinet
+brew update
+brew install clarinet
 ```
 
 Feel free to ⭐️ this repo! With 50+ stars, this package becomes eligible to `homebrew-core`, at which point it will be
