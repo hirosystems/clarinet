@@ -170,6 +170,7 @@ pub async fn do_run_tests(
 ) -> Result<bool, AnyError> {
     let mut flags = Flags::default();
     flags.unstable = true;
+    flags.reload = true;
     let program_state = ProgramState::build(flags.clone()).await?;
     let permissions = Permissions::from_options(&flags.clone().into());
     let mut project_path = manifest_path.clone();
