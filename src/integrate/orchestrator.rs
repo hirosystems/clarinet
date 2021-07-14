@@ -63,6 +63,10 @@ impl DevnetOrchestrator {
             },
             _ => return,
         };
+        
+        // First, let's make sure that we pruned staled resources correctly
+        self.prune().await;
+
         let _ = event_tx.send(DevnetEvent::info(format!(
             "Initiating Devnet boot sequence (working_dir: {})",
             devnet_config.working_dir
@@ -603,6 +607,7 @@ events_keys = ["*"]
             ]),
             env: Some(vec![
                 "STACKS_LOG_PP=1".to_string(),
+                "STACKS_LOG_DEBUG=1".to_string(),
                 "BLOCKSTACK_USE_TEST_GENESIS_CHAINSTATE=1".to_string(),
             ]),
             host_config: Some(HostConfig {
@@ -1024,6 +1029,22 @@ events_keys = ["*"]
 
         // Prune network
         println!("Pruning network and containers...");
+        self.prune().await;
+        if let Some(ref tx) = self.termination_success_tx {
+            tx.send(true).expect("Unable to confirm termination");
+        }
+
+        println!("Artifacts (logs, conf, chainstates) available here: {}", devnet_config.working_dir);
+        println!("✌️");
+        std::process::exit(0);
+    }
+
+    pub async fn prune(&self) {
+        let docker = match &self.docker_client {
+            Some(ref docker) => docker,
+            _ => return,
+        };
+
         let mut filters = HashMap::new();
         filters.insert(
             "label".to_string(),
@@ -1037,11 +1058,5 @@ events_keys = ["*"]
             .prune_containers(Some(PruneContainersOptions { filters }))
             .await;
 
-        if let Some(ref tx) = self.termination_success_tx {
-            tx.send(true).expect("Unable to confirm termination");
-        }
-        println!("Artifacts (logs, conf, chainstates) available here: {}", devnet_config.working_dir);
-        println!("✌️");
-        std::process::exit(0);
     }
 }
