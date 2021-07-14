@@ -1,4 +1,5 @@
 use serde_json::Value;
+use std::collections::BTreeMap;
 use std::error::Error;
 use std::path::PathBuf;
 use rocket::config::{Config, Environment, LoggingLevel};
@@ -7,12 +8,18 @@ use rocket::State;
 use std::str;
 use std::sync::mpsc::{Receiver, Sender};
 use std::sync::{Arc, Mutex, RwLock};
-use crate::integrate::{BlockData, LogData, MempoolAdmissionData, ServiceStatusData, Status, Transaction};
-use crate::types::{ChainConfig, DevnetConfig};
+use crate::integrate::{BlockData, MempoolAdmissionData, ServiceStatusData, Status, Transaction};
+use crate::types::{self, AccountConfig, DevnetConfig};
+use crate::utils::stacks::{StacksRpc, transactions};
 use crate::publish::{publish_contracts, Network};
 use super::DevnetEvent;
+use clarity_repl::clarity::types::{BuffData, TupleData, SequenceData, Value as ClarityValue};
+use clarity_repl::clarity::util::address::AddressHashMode;
+use clarity_repl::clarity::util::hash::{hex_bytes, Hash160};
+use clarity_repl::clarity::representations::ClarityName;
+use std::convert::TryFrom;
 
-// decode request data
+#[allow(dead_code)]
 #[derive(Deserialize)]
 pub struct NewBurnBlock {
     burn_block_hash: String,
@@ -43,17 +50,26 @@ pub struct NewTransaction {
 #[derive(Clone, Debug)]
 pub struct EventObserverConfig {
     pub devnet_config: DevnetConfig,
+    pub accounts: BTreeMap<String, AccountConfig>,
     pub manifest_path: PathBuf,
     pub pox_info: PoxInfo,
 }
 
 #[derive(Deserialize, Debug, Clone, Default)]
 pub struct PoxInfo {
+    contract_id: String,
     pox_activation_threshold_ustx: u64,
     first_burnchain_block_height: u32,
     prepare_phase_block_length: u32,
     reward_phase_block_length: u32,
     reward_slots: u32,
+    total_liquid_supply_ustx: u64,
+    next_cycle: PoxCycle,
+}
+
+#[derive(Deserialize, Debug, Clone, Default)]
+pub struct PoxCycle {
+    min_threshold_ustx: u64,
 }
 
 pub async fn start_events_observer(events_config: EventObserverConfig, devnet_event_tx: Sender<DevnetEvent>, terminator_rx: Receiver<bool>) -> Result<(), Box<dyn Error>> {
@@ -69,7 +85,7 @@ pub async fn start_events_observer(events_config: EventObserverConfig, devnet_ev
     rocket::custom(config)
         .manage(RwLock::new(events_config))
         .manage(Arc::new(Mutex::new(devnet_event_tx.clone())))
-        .mount("/", routes![handle_new_burn_block, handle_new_block, handle_new_mempool_tx, handle_drop_mempool_tx])
+        .mount("/", routes![handle_new_burn_block, handle_new_block, handle_new_microblocks, handle_new_mempool_tx, handle_drop_mempool_tx])
         .launch();
 
     match terminator_rx.recv() {
@@ -83,7 +99,7 @@ pub async fn start_events_observer(events_config: EventObserverConfig, devnet_ev
 }
 
 #[post("/new_burn_block", format = "application/json", data = "<new_burn_block>")]
-pub fn handle_new_burn_block(config: State<RwLock<EventObserverConfig>>, devnet_events_tx: State<Arc<Mutex<Sender<DevnetEvent>>>>, new_burn_block: Json<NewBurnBlock>) -> Json<Value> {
+pub fn handle_new_burn_block(_config: State<RwLock<EventObserverConfig>>, devnet_events_tx: State<Arc<Mutex<Sender<DevnetEvent>>>>, new_burn_block: Json<NewBurnBlock>) -> Json<Value> {
     let devnet_events_tx = devnet_events_tx.inner();
 
     match devnet_events_tx.lock() {
@@ -133,9 +149,7 @@ pub fn handle_new_block(config: State<RwLock<EventObserverConfig>>, devnet_event
                 let url = format!("http://0.0.0.0:{}/v2/pox", updated_config.devnet_config.stacks_node_rpc_port);
                 updated_config.pox_info = match reqwest::blocking::get(url) {
                     Ok(reponse) => {
-                        let _ = tx.send(DevnetEvent::debug(format!("{:?}", reponse)));
                         let pox_info: PoxInfo = reponse.json().unwrap();
-                        let _ = tx.send(DevnetEvent::debug(format!("{:?}", pox_info)));
                         pox_info
                     },
                     Err(_) => PoxInfo::default()
@@ -146,8 +160,6 @@ pub fn handle_new_block(config: State<RwLock<EventObserverConfig>>, devnet_event
             };
 
             if let Some(updated_config) = updated_config {
-                let _ = tx.send(DevnetEvent::debug(format!("Updated config: {:?} ",  updated_config.pox_info)));
-
                 let logs = match publish_contracts(updated_config.manifest_path.clone(), Network::Devnet) {
                     Ok(res) => res.iter().map(|l| DevnetEvent::success(l.into())).collect(),
                     Err(e) => vec![DevnetEvent::error(e.into())]
@@ -182,6 +194,63 @@ pub fn handle_new_block(config: State<RwLock<EventObserverConfig>>, devnet_event
                     }
                 }).collect(),
             }));
+
+            // Every penultimate block, we check if some stacking orders should be submitted before the next 
+            // cycle starts.
+            if new_block.burn_block_height % pox_cycle_length == (pox_cycle_length - 2) {
+                for pox_stacking_order in config_reader.devnet_config.pox_stacking_orders.iter() {
+                    if pox_stacking_order.start_at_cycle == (pox_cycle_id + 1) {
+                        
+                        let account = match config_reader.accounts.get(&pox_stacking_order.wallet) {
+                            None => continue,
+                            Some(account) => account,
+                        };
+                        let url = format!("http://0.0.0.0:{}", config_reader.devnet_config.stacks_node_rpc_port);
+                        let stacks_rpc = StacksRpc::new(url);
+                        let default_fee = 1000;
+                        let nonce = stacks_rpc.get_nonce(account.address.to_string())
+                            .expect("Unable to retrieve nonce");
+
+                        let stx_amount = config_reader.pox_info.next_cycle.min_threshold_ustx * pox_stacking_order.slots;
+                        let (_, _, account_secret_keu) = types::compute_addresses(
+                            &account.mnemonic, 
+                            &account.derivation,
+                            account.is_mainnet);
+                        let addr_bytes = Hash160([0u8; 20]);
+                        let addr_version = AddressHashMode::SerializeP2PKH;
+                        let stack_stx_tx = transactions::build_contrat_call_transaction(
+                            config_reader.pox_info.contract_id.clone(),
+                            "stack-stx".into(),
+                            vec![
+                                ClarityValue::UInt(stx_amount.into()),
+                                ClarityValue::Tuple(
+                                    TupleData::from_data(vec![
+                                        (
+                                            ClarityName::try_from("version".to_owned()).unwrap(),
+                                            ClarityValue::buff_from_byte(addr_version as u8),
+                                        ),
+                                        (
+                                            ClarityName::try_from("hashbytes".to_owned()).unwrap(),
+                                            ClarityValue::Sequence(SequenceData::Buffer(BuffData {
+                                                data: addr_bytes.as_bytes().to_vec(),
+                                            })),
+                                        ),
+                                    ])
+                                    .unwrap(),
+                                ),
+                                ClarityValue::UInt((new_block.burn_block_height - 1).into()),
+                                ClarityValue::UInt(pox_stacking_order.duration.into()),
+                            ],
+                            nonce,
+                            default_fee,
+                            &hex_bytes(&account_secret_keu).unwrap()
+                        );
+                        let _ = stacks_rpc.post_transaction(stack_stx_tx)
+                            .expect("Unable to broadcast transaction");
+
+                    }
+                }
+            }
         }
     };
 
@@ -192,7 +261,7 @@ pub fn handle_new_block(config: State<RwLock<EventObserverConfig>>, devnet_event
 }
 
 #[post("/new_microblocks", format = "application/json")]
-pub fn handle_new_microblocks(devnet_events_tx: State<Arc<Mutex<Sender<DevnetEvent>>>>) -> Json<Value> {
+pub fn handle_new_microblocks(_devnet_events_tx: State<Arc<Mutex<Sender<DevnetEvent>>>>) -> Json<Value> {
     Json(json!({
         "status": 200,
         "result": "Ok",
@@ -200,7 +269,7 @@ pub fn handle_new_microblocks(devnet_events_tx: State<Arc<Mutex<Sender<DevnetEve
 }
 
 #[post("/new_mempool_tx", format = "application/json", data = "<raw_txs>")]
-pub fn handle_new_mempool_tx(config: State<RwLock<EventObserverConfig>>, devnet_events_tx: State<Arc<Mutex<Sender<DevnetEvent>>>>, raw_txs: Json<Vec<String>>) -> Json<Value> {
+pub fn handle_new_mempool_tx(_config: State<RwLock<EventObserverConfig>>, devnet_events_tx: State<Arc<Mutex<Sender<DevnetEvent>>>>, raw_txs: Json<Vec<String>>) -> Json<Value> {
 
     if let Ok(tx) = devnet_events_tx.lock() {
         for raw_tx in raw_txs.iter() {

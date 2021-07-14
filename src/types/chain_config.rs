@@ -134,7 +134,7 @@ pub struct PoxStackingOrder {
     pub start_at_cycle: u32,
     pub duration: u32,
     pub wallet: String,
-    pub slots: u32,
+    pub slots: u64,
     pub btc_address: String,
 }
 
@@ -277,28 +277,28 @@ impl ChainConfig {
                 stacks_explorer_image_url: devnet_config.stacks_explorer_image_url.take().unwrap_or(DEFAULT_STACKS_EXPLORER_IMAGE.to_string()),
                 pox_stacking_orders: devnet_config.pox_stacking_orders.take().unwrap_or(vec![
                     PoxStackingOrder {
-                        start_at_cycle: 0,
+                        start_at_cycle: 3,
                         duration: 12,
                         wallet: "wallet_1".into(),
                         slots: 2,
                         btc_address: "mr1iPkD9N3RJZZxXRk7xF9d36gffa6exNC".into(),
                     },
                     PoxStackingOrder {
-                        start_at_cycle: 0,
+                        start_at_cycle: 3,
                         duration: 12,
                         wallet: "wallet_2".into(),
                         slots: 2,
                         btc_address: "muYdXKmX9bByAueDe6KFfHd5Ff1gdN9ErG".into(),
                     },
                     PoxStackingOrder {
-                        start_at_cycle: 0,
+                        start_at_cycle: 3,
                         duration: 12,
                         wallet: "wallet_3".into(),
                         slots: 2,
                         btc_address: "mvZtbibDAAA3WLpY7zXXFqRa3T4XSknBX7".into(),
                     },
                     PoxStackingOrder {
-                        start_at_cycle: 0,
+                        start_at_cycle: 3,
                         duration: 12,
                         wallet: "wallet_4".into(),
                         slots: 2,
@@ -320,7 +320,7 @@ impl ChainConfig {
     }
 }
 
-fn compute_addresses(mnemonic: &str, derivation_path: &str, mainnet: bool) -> (String, String, String) {
+pub fn compute_addresses(mnemonic: &str, derivation_path: &str, mainnet: bool) -> (String, String, String) {
 
     let bip39_seed =
         match mnemonic::get_bip39_seed_from_mnemonic(&mnemonic, "") {
