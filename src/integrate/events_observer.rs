@@ -67,6 +67,21 @@ pub struct PoxInfo {
     next_cycle: PoxCycle,
 }
 
+impl PoxInfo {
+    pub fn default() -> PoxInfo {
+        PoxInfo {
+            contract_id: "ST000000000000000000002AMW42H.pox".into(),
+            pox_activation_threshold_ustx: 0,
+            first_burnchain_block_height: 100,
+            prepare_phase_block_length: 1,
+            reward_phase_block_length: 4,
+            reward_slots: 8,
+            total_liquid_supply_ustx: 1000000000000000,
+            ..Default::default()
+        }
+    }
+}
+
 #[derive(Deserialize, Debug, Clone, Default)]
 pub struct PoxCycle {
     min_threshold_ustx: u64,
@@ -174,29 +189,10 @@ pub fn handle_new_block(
         if new_block.block_height == 1 {
             // We just received the Stacks Genesis block.
             // With that, we will be:
-            // - Fetching the pox constants
             // - Publishing the contracts
-            let updated_config = if let Ok(config_reader) = config.read() {
-                let mut updated_config = config_reader.clone();
-                let url = format!(
-                    "http://0.0.0.0:{}/v2/pox",
-                    updated_config.devnet_config.stacks_node_rpc_port
-                );
-                updated_config.pox_info = match reqwest::blocking::get(url) {
-                    Ok(reponse) => {
-                        let pox_info: PoxInfo = reponse.json().unwrap();
-                        pox_info
-                    }
-                    Err(_) => PoxInfo::default(),
-                };
-                Some(updated_config)
-            } else {
-                None
-            };
-
-            if let Some(updated_config) = updated_config {
+            if let Ok(config_reader) = config.read() {
                 let logs = match publish_contracts(
-                    updated_config.manifest_path.clone(),
+                    config_reader.manifest_path.clone(),
                     Network::Devnet,
                 ) {
                     Ok(res) => res.iter().map(|l| DevnetEvent::success(l.into())).collect(),
@@ -205,12 +201,35 @@ pub fn handle_new_block(
                 for log in logs.into_iter() {
                     let _ = tx.send(log);
                 }
-
-                if let Ok(mut config_writer) = config.write() {
-                    *config_writer = updated_config;
-                }
             }
         }
+
+        let updated_config = if let Ok(config_reader) = config.read() {
+            let mut updated_config = config_reader.clone();
+            let url = format!(
+                "http://0.0.0.0:{}/v2/pox",
+                updated_config.devnet_config.stacks_node_rpc_port
+            );
+            if let Ok(reponse) = reqwest::blocking::get(url) {
+                if let Ok(pox_info) = reponse.json() {
+                    updated_config.pox_info = pox_info;
+                    Some(updated_config)
+                } else {
+                    None
+                }
+            } else {
+                None
+            }
+        } else {
+            None
+        };
+
+        if let Some(updated_config) = updated_config {
+            if let Ok(mut config_writer) = config.write() {
+                *config_writer = updated_config;
+            }
+        }
+
 
         if let Ok(config_reader) = config.read() {
             let pox_cycle_length = config_reader.pox_info.prepare_phase_block_length
