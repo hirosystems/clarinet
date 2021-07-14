@@ -14,14 +14,14 @@ extern crate rocket;
 #[macro_use]
 extern crate serde_json;
 
-mod utils;
-mod poke;
 mod frontend;
 mod generate;
+mod integrate;
+mod poke;
 mod publish;
 mod test;
 mod types;
-mod integrate;
+mod utils;
 
 use frontend::cli;
 

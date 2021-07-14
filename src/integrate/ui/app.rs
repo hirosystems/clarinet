@@ -1,8 +1,8 @@
-use crate::integrate::{BlockData, LogData, ServiceStatusData, Transaction, MempoolAdmissionData};
+use crate::integrate::{BlockData, LogData, MempoolAdmissionData, ServiceStatusData, Transaction};
 
 use super::util::{StatefulList, TabsState};
-use tui::text::{Span, Spans};
 use tui::style::{Color, Style};
+use tui::text::{Span, Spans};
 
 pub struct App<'a> {
     pub title: &'a str,
@@ -54,8 +54,7 @@ impl<'a> App<'a> {
         }
     }
 
-    pub fn on_tick(&mut self) {
-    }
+    pub fn on_tick(&mut self) {}
 
     pub fn display_service_status_update(&mut self, service_update: ServiceStatusData) {
         let insertion_index = service_update.order;
@@ -90,17 +89,17 @@ impl<'a> App<'a> {
         } else {
             "␂"
         };
-        self.tabs.titles.push_front(Spans::from(
-            Span::styled(format!("{}[{}{}]{}", end, block.block_height, has_tx, start), 
+        self.tabs.titles.push_front(Spans::from(Span::styled(
+            format!("{}[{}{}]{}", end, block.block_height, has_tx, start),
             if block.pox_cycle_id % 2 == 1 {
                 Style::default().fg(Color::Yellow)
             } else {
                 Style::default().fg(Color::LightYellow)
-            })
-        ));
+            },
+        )));
         self.blocks.push(block);
         if self.tabs.index != 0 {
             self.tabs.index += 1;
         }
-    } 
+    }
 }

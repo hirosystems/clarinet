@@ -4,17 +4,15 @@ use std::io::{prelude::*, BufReader, Read};
 use std::path::PathBuf;
 use std::{env, process};
 
-use crate::poke::load_session;
+use crate::generate::{
+    self,
+    changes::{Changes, TOMLEdition},
+};
 use crate::integrate::{self, DevnetOrchestrator};
-use crate::publish::{Network, publish_contracts};
+use crate::poke::load_session;
+use crate::publish::{publish_contracts, Network};
 use crate::test::run_tests;
 use crate::types::{MainConfig, MainConfigFile, RequirementConfig};
-use crate::{
-    generate::{
-        self,
-        changes::{Changes, TOMLEdition},
-    },
-};
 use clarity_repl::repl;
 
 use clap::Clap;
@@ -44,7 +42,7 @@ enum Command {
     /// Check contracts syntax
     #[clap(name = "check")]
     Check(Check),
-    /// Publish contracts on chain 
+    /// Publish contracts on chain
     #[clap(name = "publish")]
     Publish(Publish),
     /// Execute Clarinet Extension
@@ -148,14 +146,26 @@ struct Run {
 #[derive(Clap)]
 struct Publish {
     /// Deploy contracts on devnet, using settings/Devnet.toml
-    #[clap(long = "devnet", conflicts_with = "testnet", conflicts_with = "mainnet")]
+    #[clap(
+        long = "devnet",
+        conflicts_with = "testnet",
+        conflicts_with = "mainnet"
+    )]
     pub devnet: bool,
     /// Deploy contracts on testnet, using settings/Testnet.toml
-    #[clap(long = "testnet", conflicts_with = "devnet", conflicts_with = "mainnet")]
+    #[clap(
+        long = "testnet",
+        conflicts_with = "devnet",
+        conflicts_with = "mainnet"
+    )]
     pub testnet: bool,
     /// Deploy contracts on mainnet, using settings/Mainnet.toml
-    #[clap(long = "testnet", conflicts_with = "testnet", conflicts_with = "devnet")]
-    pub mainnet: bool,    
+    #[clap(
+        long = "testnet",
+        conflicts_with = "testnet",
+        conflicts_with = "devnet"
+    )]
+    pub mainnet: bool,
     /// Path to Clarinet.toml
     #[clap(long = "manifest-path")]
     pub manifest_path: Option<String>,
@@ -265,8 +275,7 @@ pub fn main() {
         Command::Poke(cmd) => {
             let manifest_path = get_manifest_path_or_exit(cmd.manifest_path);
             let start_repl = true;
-            load_session(manifest_path, start_repl, Network::Devnet)
-                .expect("Unable to start REPL");
+            load_session(manifest_path, start_repl, Network::Devnet).expect("Unable to start REPL");
         }
         Command::Check(cmd) => {
             let manifest_path = get_manifest_path_or_exit(cmd.manifest_path);
@@ -321,7 +330,7 @@ pub fn main() {
             };
             match publish_contracts(manifest_path, network) {
                 Ok(results) => println!("{}", results.join("\n")),
-                Err(e) => println!("{}", e)
+                Err(e) => println!("{}", e),
             };
         }
         Command::Integrate(cmd) => {
@@ -330,7 +339,7 @@ pub fn main() {
                 "Start orchestrating stacks-node, stacks-blockchain-api, bitcoind, bitcoin explorer, stacks-explorer"
             );
             let devnet = DevnetOrchestrator::new(manifest_path);
-            integrate::run_devnet(devnet);    
+            integrate::run_devnet(devnet);
         }
     };
 }

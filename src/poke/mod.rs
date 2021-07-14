@@ -18,7 +18,7 @@ pub fn load_session(
     // chain_config_path.pop();
     chain_config_path.push("settings");
 
-    chain_config_path.push( match env {
+    chain_config_path.push(match env {
         Network::Devnet => "Devnet.toml",
         Network::Testnet => "Testnet.toml",
         Network::Mainnet => "Mainnet.toml",
@@ -30,11 +30,16 @@ pub fn load_session(
     let mut deployer_address = None;
     let mut initial_deployer = None;
 
-    settings.node = chain_config.network.node_rpc_address.clone().take().unwrap_or(match env {
-        Network::Devnet => "http://127.0.0.1:20443".into(),
-        Network::Testnet => "https://stacks-node-api.testnet.stacks.co".into(),
-        Network::Mainnet => "https://stacks-node-api.mainnet.stacks.co".into(),
-    });
+    settings.node = chain_config
+        .network
+        .node_rpc_address
+        .clone()
+        .take()
+        .unwrap_or(match env {
+            Network::Devnet => "http://127.0.0.1:20443".into(),
+            Network::Testnet => "https://stacks-node-api.testnet.stacks.co".into(),
+            Network::Mainnet => "https://stacks-node-api.mainnet.stacks.co".into(),
+        });
 
     for (name, account) in chain_config.accounts.iter() {
         let account = repl::settings::Account {

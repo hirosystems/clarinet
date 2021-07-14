@@ -115,7 +115,6 @@ history.txt
         self.changes.push(Changes::AddFile(change));
     }
 
-
     fn create_clarinet_toml(&mut self) {
         let content = format!(
             r#"

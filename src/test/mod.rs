@@ -6,8 +6,8 @@
 #![allow(non_upper_case_globals)]
 #![allow(unused_must_use)]
 
-use std::path::PathBuf;
 use crate::utils;
+use std::path::PathBuf;
 
 mod deno;
 

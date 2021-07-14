@@ -5,13 +5,14 @@ mod ui;
 #[allow(dead_code)]
 mod util;
 
-use std::sync::mpsc::{Sender, Receiver};
+use super::DevnetEvent;
 use app::App;
 use crossterm::{
     event::{self, DisableMouseCapture, EnableMouseCapture, Event, KeyCode, KeyModifiers},
     execute,
     terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
 };
+use std::sync::mpsc::{Receiver, Sender};
 use std::{
     error::Error,
     io::{stdout, Stdout},
@@ -19,10 +20,14 @@ use std::{
     time::{Duration, Instant},
 };
 use tui::{backend::CrosstermBackend, Terminal};
-use super::{DevnetEvent};
 
-pub fn start_ui(devnet_events_tx: Sender<DevnetEvent>, devnet_events_rx: Receiver<DevnetEvent>, events_observer_terminator_tx: Sender<bool>, orchestrator_terminator_tx: Sender<bool>, orchestrator_terminated_rx: Receiver<bool>) -> Result<(), Box<dyn Error>> {
-
+pub fn start_ui(
+    devnet_events_tx: Sender<DevnetEvent>,
+    devnet_events_rx: Receiver<DevnetEvent>,
+    events_observer_terminator_tx: Sender<bool>,
+    orchestrator_terminator_tx: Sender<bool>,
+    orchestrator_terminated_rx: Receiver<bool>,
+) -> Result<(), Box<dyn Error>> {
     enable_raw_mode()?;
 
     let mut stdout = stdout();
@@ -66,10 +71,10 @@ pub fn start_ui(devnet_events_tx: Sender<DevnetEvent>, devnet_events_rx: Receive
                 (KeyModifiers::CONTROL, KeyCode::Char('c')) => {
                     app.display_log(DevnetEvent::log_warning("Ctrl+C received, initiating termination sequence.".into()));
                     let _ = terminate(
-                        &mut terminal, 
-                        true, 
-                        events_observer_terminator_tx, 
-                        orchestrator_terminator_tx, 
+                        &mut terminal,
+                        true,
+                        events_observer_terminator_tx,
+                        orchestrator_terminator_tx,
                         orchestrator_terminated_rx);
                     break;
                 }
@@ -115,20 +120,26 @@ pub fn start_ui(devnet_events_tx: Sender<DevnetEvent>, devnet_events_rx: Receive
     Ok(())
 }
 
-
-fn terminate(terminal: &mut Terminal<CrosstermBackend<Stdout>>, terminate: bool, events_observer_terminator_tx: Sender<bool>, orchestrator_terminator_tx: Sender<bool>, orchestrator_terminated_rx: Receiver<bool>) -> Result<(), Box<dyn Error>>  {
-
+fn terminate(
+    terminal: &mut Terminal<CrosstermBackend<Stdout>>,
+    terminate: bool,
+    events_observer_terminator_tx: Sender<bool>,
+    orchestrator_terminator_tx: Sender<bool>,
+    orchestrator_terminated_rx: Receiver<bool>,
+) -> Result<(), Box<dyn Error>> {
     disable_raw_mode()?;
     execute!(
         terminal.backend_mut(),
         LeaveAlternateScreen,
         DisableMouseCapture
     )?;
-    orchestrator_terminator_tx.send(terminate)
+    orchestrator_terminator_tx
+        .send(terminate)
         .expect("Unable to terminate devnet");
-    events_observer_terminator_tx.send(terminate)
+    events_observer_terminator_tx
+        .send(terminate)
         .expect("Unable to terminate devnet");
-    
+
     match orchestrator_terminated_rx.recv()? {
         _ => {}
     }

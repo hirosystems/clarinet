@@ -1,7 +1,7 @@
 use std::collections::VecDeque;
 
-use tui::widgets::ListState;
 use tui::text::Spans;
+use tui::widgets::ListState;
 
 #[derive(Clone)]
 
@@ -10,9 +10,12 @@ pub struct TabsState<'a> {
     pub index: usize,
 }
 
-impl <'a> TabsState <'a> {
+impl<'a> TabsState<'a> {
     pub fn new() -> TabsState<'a> {
-        TabsState { titles: VecDeque::new(), index: 0 }
+        TabsState {
+            titles: VecDeque::new(),
+            index: 0,
+        }
     }
     pub fn next(&mut self) {
         if self.titles.len() > 0 {

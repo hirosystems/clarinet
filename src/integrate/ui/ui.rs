@@ -6,18 +6,21 @@ use tui::{
     layout::{Constraint, Corner, Direction, Layout, Rect},
     style::{Color, Modifier, Style},
     text::{Span, Spans},
-    widgets::{
-        Block, Borders, Cell, ListItem, List,
-        Paragraph, Row, Table, Tabs,
-    },
+    widgets::{Block, Borders, Cell, List, ListItem, Paragraph, Row, Table, Tabs},
     Frame,
 };
 
 pub fn draw<B: Backend>(f: &mut Frame<B>, app: &mut App) {
-
     let page_components = Layout::default()
         .direction(Direction::Vertical)
-        .constraints([Constraint::Length(20), Constraint::Min(1), Constraint::Length(1)].as_ref())
+        .constraints(
+            [
+                Constraint::Length(20),
+                Constraint::Min(1),
+                Constraint::Length(1),
+            ]
+            .as_ref(),
+        )
         .split(f.size());
 
     let devnet_status_components = Layout::default()
@@ -56,12 +59,14 @@ where
             Status::Yellow => "🟨",
             Status::Red => "🟥",
         };
-        
+
         Row::new(vec![
-            Cell::from(status), 
-            Cell::from(service.name.to_string()), 
-            Cell::from(service.comment.to_string())
-        ]).height(1).bottom_margin(0)
+            Cell::from(status),
+            Cell::from(service.name.to_string()),
+            Cell::from(service.comment.to_string()),
+        ])
+        .height(1)
+        .bottom_margin(0)
     });
 
     let t = Table::new(rows)
@@ -118,18 +123,20 @@ where
 
             let log = Spans::from(vec![
                 Span::styled(format!("{:<5}", label), style),
-                Span::styled(
-                    &log.occurred_at,
-                    Style::default().fg(Color::DarkGray),
-                ),
+                Span::styled(&log.occurred_at, Style::default().fg(Color::DarkGray)),
                 Span::raw(" "),
-                Span::raw(log.message.clone())]);
+                Span::raw(log.message.clone()),
+            ]);
 
             ListItem::new(vec![log])
         })
         .collect();
     let logs_component = List::new(logs)
-        .block(Block::default().borders(Borders::ALL).title("Stacks Devnet"))
+        .block(
+            Block::default()
+                .borders(Borders::ALL)
+                .title("Stacks Devnet"),
+        )
         .start_corner(Corner::BottomLeft);
     f.render_widget(logs_component, area);
 }
@@ -178,25 +185,31 @@ fn draw_block_details<B>(f: &mut Frame<B>, _app: &mut App, area: Rect, block: &B
 where
     B: Backend,
 {
-    let paragraph = Paragraph::new(String::new())
-        .block(Block::default().borders(Borders::RIGHT).title("Block Informations"));
+    let paragraph = Paragraph::new(String::new()).block(
+        Block::default()
+            .borders(Borders::RIGHT)
+            .title("Block Informations"),
+    );
     f.render_widget(paragraph, area);
 
     let labels = Layout::default()
         .direction(Direction::Vertical)
-        .constraints([
-            Constraint::Length(2),
-            Constraint::Length(1),
-            Constraint::Length(2),
-            Constraint::Length(1),
-            Constraint::Length(2),
-            Constraint::Length(1),
-            Constraint::Length(2),
-            Constraint::Length(1),
-            Constraint::Length(2),
-            Constraint::Length(1),
-            Constraint::Length(2),
-        ].as_ref())
+        .constraints(
+            [
+                Constraint::Length(2),
+                Constraint::Length(1),
+                Constraint::Length(2),
+                Constraint::Length(1),
+                Constraint::Length(2),
+                Constraint::Length(1),
+                Constraint::Length(2),
+                Constraint::Length(1),
+                Constraint::Length(2),
+                Constraint::Length(1),
+                Constraint::Length(2),
+            ]
+            .as_ref(),
+        )
         .split(area);
 
     let label = "Block height:".to_string();
@@ -259,7 +272,6 @@ where
         .block(Block::default().borders(Borders::NONE));
     f.render_widget(paragraph, labels[10]);
 
-
     // TODO(ludo): PoX informations
     // TODO(ludo): Mining informations (miner, VRF)
 }
@@ -268,25 +280,22 @@ fn draw_transactions<B>(f: &mut Frame<B>, _app: &mut App, area: Rect, block: &Bl
 where
     B: Backend,
 {
-    let transactions: Vec<ListItem> = block.transactions.iter().map(|t| {
+    let transactions: Vec<ListItem> = block
+        .transactions
+        .iter()
+        .map(|t| {
             let tx_info = Spans::from(vec![
                 Span::styled(
                     match t.success {
                         true => "🟩",
-                        false => "🟥"
+                        false => "🟥",
                     },
                     Style::default(),
                 ),
                 Span::raw(" "),
-                Span::styled(
-                    t.txid.clone(),
-                    Style::default(),
-                ),
+                Span::styled(t.txid.clone(), Style::default()),
                 Span::raw(" "),
-                Span::styled(
-                    t.result.clone(),
-                    Style::default(),
-                ),
+                Span::styled(t.result.clone(), Style::default()),
             ]);
             ListItem::new(vec![
                 tx_info,
@@ -296,7 +305,11 @@ where
         .collect();
 
     let list = List::new(transactions)
-        .block(Block::default().borders(Borders::NONE).title("Transactions"))
+        .block(
+            Block::default()
+                .borders(Borders::NONE)
+                .title("Transactions"),
+        )
         .highlight_style(
             Style::default()
                 .bg(Color::LightGreen)
@@ -306,14 +319,14 @@ where
         .highlight_symbol("* ");
 
     f.render_widget(list, area);
-
 }
 
 fn draw_help<B>(f: &mut Frame<B>, _app: &mut App, area: Rect)
 where
     B: Backend,
 {
-    let help = " ⬅️  ➡️  Explore blocks          ⬆️  ⬇️  Explore transactions          0️⃣  Genesis Reset";
+    let help =
+        " ⬅️  ➡️  Explore blocks          ⬆️  ⬇️  Explore transactions          0️⃣  Genesis Reset";
     let paragraph = Paragraph::new(help.clone())
         .style(Style::default().bg(Color::Black).fg(Color::White))
         .block(Block::default().borders(Borders::NONE));

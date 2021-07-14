@@ -1,14 +1,24 @@
 use std::convert::TryInto;
 
 use clarity_repl::clarity::codec::transaction::*;
-use clarity_repl::clarity::types::{QualifiedContractIdentifier, Value};
-use clarity_repl::clarity::util::{StacksAddress, address::AddressHashMode, secp256k1::{Secp256k1PrivateKey, Secp256k1PublicKey}};
 use clarity_repl::clarity::codec::StacksMessageCodec;
+use clarity_repl::clarity::types::{QualifiedContractIdentifier, Value};
+use clarity_repl::clarity::util::{
+    address::AddressHashMode,
+    secp256k1::{Secp256k1PrivateKey, Secp256k1PublicKey},
+    StacksAddress,
+};
 
-pub fn build_contrat_call_transaction(contract_id: String, function_name: String, args: Vec<Value>, nonce: u64, fee: u64, sender_secret_key: &[u8]) -> StacksTransaction {
-
-    let contract_id = QualifiedContractIdentifier::parse(&contract_id)
-        .expect("Contract identifier invalid");
+pub fn build_contrat_call_transaction(
+    contract_id: String,
+    function_name: String,
+    args: Vec<Value>,
+    nonce: u64,
+    fee: u64,
+    sender_secret_key: &[u8],
+) -> StacksTransaction {
+    let contract_id =
+        QualifiedContractIdentifier::parse(&contract_id).expect("Contract identifier invalid");
 
     let payload = TransactionContractCall {
         address: contract_id.issuer.into(),
@@ -22,22 +32,18 @@ pub fn build_contrat_call_transaction(contract_id: String, function_name: String
     public_key.set_compressed(true);
 
     let anchor_mode = TransactionAnchorMode::Any;
-    let signer_addr = StacksAddress::from_public_keys(
-        0,
-        &AddressHashMode::SerializeP2PKH, 
-        1, 
-        &vec![public_key]).unwrap();
+    let signer_addr =
+        StacksAddress::from_public_keys(0, &AddressHashMode::SerializeP2PKH, 1, &vec![public_key])
+            .unwrap();
 
-    let spending_condition = TransactionSpendingCondition::Singlesig(
-        SinglesigSpendingCondition {
-            signer: signer_addr.bytes.clone(),
-            nonce: nonce,
-            tx_fee: fee,
-            hash_mode: SinglesigHashMode::P2PKH,
-            key_encoding: TransactionPublicKeyEncoding::Compressed,
-            signature: RecoverableSignature::empty(),
-        },
-    );
+    let spending_condition = TransactionSpendingCondition::Singlesig(SinglesigSpendingCondition {
+        signer: signer_addr.bytes.clone(),
+        nonce: nonce,
+        tx_fee: fee,
+        hash_mode: SinglesigHashMode::P2PKH,
+        key_encoding: TransactionPublicKeyEncoding::Compressed,
+        signature: RecoverableSignature::empty(),
+    });
 
     let auth = TransactionAuth::Standard(spending_condition);
     let unsigned_tx = StacksTransaction {

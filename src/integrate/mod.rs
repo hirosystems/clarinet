@@ -1,14 +1,14 @@
-mod ui;
 mod events_observer;
 mod orchestrator;
+mod ui;
 
-use std::sync::mpsc::{channel};
+use std::sync::mpsc::channel;
 
 use chrono::prelude::*;
 
 use crate::utils;
-pub use orchestrator::DevnetOrchestrator;
 use events_observer::start_events_observer;
+pub use orchestrator::DevnetOrchestrator;
 
 use self::events_observer::{EventObserverConfig, PoxInfo};
 
@@ -27,21 +27,18 @@ where
     rt.block_on(future)
 }
 
-pub async fn do_run_devnet(
-    mut devnet: DevnetOrchestrator,
-) -> Result<bool, String> {
-
+pub async fn do_run_devnet(mut devnet: DevnetOrchestrator) -> Result<bool, String> {
     let (devnet_events_tx, devnet_events_rx) = channel();
     let (termination_success_tx, orchestrator_terminated_rx) = channel();
-    
+
     devnet.termination_success_tx = Some(termination_success_tx);
 
     let (devnet_config, accounts) = match devnet.network_config {
         Some(ref network_config) => match &network_config.devnet {
             Some(devnet_config) => Ok((devnet_config.clone(), network_config.accounts.clone())),
-            _ => Err("Unable to retrieve config")
-        }
-        _ => Err("Unable to retrieve config")
+            _ => Err("Unable to retrieve config"),
+        },
+        _ => Err("Unable to retrieve config"),
     }?;
 
     // The event observer should be able to send some events to the UI thread,
@@ -71,11 +68,12 @@ pub async fn do_run_devnet(
     });
 
     let _ = ui::start_ui(
-        devnet_events_tx, 
-        devnet_events_rx, 
+        devnet_events_tx,
+        devnet_events_rx,
         events_observer_terminator_tx,
         orchestrator_terminator_tx,
-        orchestrator_terminated_rx);
+        orchestrator_terminated_rx,
+    );
 
     events_observer_handle.join().unwrap();
     orchestrator_handle.join().unwrap();
@@ -96,7 +94,6 @@ pub enum DevnetEvent {
 }
 
 impl DevnetEvent {
-
     pub fn error(message: String) -> DevnetEvent {
         DevnetEvent::Log(Self::log_error(message))
     }
@@ -194,7 +191,7 @@ pub struct BlockData {
     pub first_burnchain_block_height: u32,
     pub pox_cycle_length: u32,
     pub pox_cycle_id: u32,
-    pub transactions: Vec<Transaction>
+    pub transactions: Vec<Transaction>,
 }
 
 // pub struct MicroblockData {

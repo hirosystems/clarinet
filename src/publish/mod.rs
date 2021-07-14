@@ -1,31 +1,28 @@
-use std::path::PathBuf;
-use std::collections::BTreeMap;
+use crate::poke::load_session;
+use crate::utils::mnemonic;
 use clarity_repl::clarity::codec::transaction::{
     StacksTransaction, StacksTransactionSigner, TransactionAnchorMode, TransactionAuth,
     TransactionPayload, TransactionPostConditionMode, TransactionPublicKeyEncoding,
     TransactionSmartContract, TransactionSpendingCondition,
 };
 use clarity_repl::clarity::codec::StacksMessageCodec;
-use clarity_repl::{
-    clarity::{
-        codec::{
-            transaction::{
-                RecoverableSignature, SinglesigHashMode, SinglesigSpendingCondition,
-                TransactionVersion,
-            },
-            StacksString,
+use clarity_repl::clarity::{
+    codec::{
+        transaction::{
+            RecoverableSignature, SinglesigHashMode, SinglesigSpendingCondition, TransactionVersion,
         },
-        util::{
-            address::AddressHashMode,
-            secp256k1::{Secp256k1PrivateKey, Secp256k1PublicKey},
-            StacksAddress,
-        },
+        StacksString,
+    },
+    util::{
+        address::AddressHashMode,
+        secp256k1::{Secp256k1PrivateKey, Secp256k1PublicKey},
+        StacksAddress,
     },
 };
 use secp256k1::{PublicKey, SecretKey};
+use std::collections::BTreeMap;
+use std::path::PathBuf;
 use tiny_hderive::bip32::ExtendedPrivKey;
-use crate::poke::load_session;
-use crate::utils::mnemonic;
 
 #[derive(Deserialize, Debug)]
 struct Balance {
@@ -67,13 +64,11 @@ pub fn publish_contracts(manifest_path: PathBuf, network: Network) -> Result<Vec
             None => deployers_lookup.get("*").unwrap(),
         };
 
-        let bip39_seed =
-            match mnemonic::get_bip39_seed_from_mnemonic(&deployer.mnemonic, "") {
-                Ok(bip39_seed) => bip39_seed,
-                Err(_) => panic!(),
-            };
-        let ext =
-            ExtendedPrivKey::derive(&bip39_seed[..], deployer.derivation.as_str()).unwrap();
+        let bip39_seed = match mnemonic::get_bip39_seed_from_mnemonic(&deployer.mnemonic, "") {
+            Ok(bip39_seed) => bip39_seed,
+            Err(_) => panic!(),
+        };
+        let ext = ExtendedPrivKey::derive(&bip39_seed[..], deployer.derivation.as_str()).unwrap();
         let secret_key = SecretKey::parse_slice(&ext.secret()).unwrap();
         let public_key = PublicKey::from_secret_key(&secret_key);
 

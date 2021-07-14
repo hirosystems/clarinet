@@ -171,7 +171,7 @@ impl ChainConfig {
             name: config_file.network.name.clone(),
             node_rpc_address: config_file.network.node_rpc_address.clone(),
         };
-        
+
         let mut accounts = BTreeMap::new();
         let is_mainnet = network.name == "mainnet".to_string();
 
@@ -210,7 +210,8 @@ impl ChainConfig {
                                 _ => DEFAULT_DERIVATION_PATH.to_string(),
                             }; // todo(ludo): use derivation path
 
-                            let (address, _, _) = compute_addresses(&mnemonic, &derivation, is_mainnet);
+                            let (address, _, _) =
+                                compute_addresses(&mnemonic, &derivation, is_mainnet);
 
                             accounts.insert(
                                 account_name.to_string(),
@@ -240,20 +241,35 @@ impl ChainConfig {
             let default_working_dir = format!("/tmp/stacks-devnet-{}", now);
 
             let miner_mnemonic = devnet_config.miner_mnemonic.take().unwrap_or("fragile loan twenty basic net assault jazz absorb diet talk art shock innocent float punch travel gadget embrace caught blossom hockey surround initial reduce".to_string());
-            let miner_derivation_path = devnet_config.miner_derivation_path.take().unwrap_or(DEFAULT_DERIVATION_PATH.to_string());
-            let (miner_stx_address, miner_btc_address, miner_secret_key_hex) = compute_addresses(&miner_mnemonic, &miner_derivation_path, is_mainnet);
+            let miner_derivation_path = devnet_config
+                .miner_derivation_path
+                .take()
+                .unwrap_or(DEFAULT_DERIVATION_PATH.to_string());
+            let (miner_stx_address, miner_btc_address, miner_secret_key_hex) =
+                compute_addresses(&miner_mnemonic, &miner_derivation_path, is_mainnet);
 
             let config = DevnetConfig {
                 orchestrator_port: devnet_config.orchestrator_port.unwrap_or(20445),
                 bitcoind_p2p_port: devnet_config.bitcoind_p2p_port.unwrap_or(18444),
                 bitcoind_rpc_port: devnet_config.bitcoind_rpc_port.unwrap_or(18443),
-                bitcoind_username: devnet_config.bitcoind_username.take().unwrap_or("devnet".to_string()),
-                bitcoind_password: devnet_config.bitcoind_password.take().unwrap_or("devnet".to_string()),
+                bitcoind_username: devnet_config
+                    .bitcoind_username
+                    .take()
+                    .unwrap_or("devnet".to_string()),
+                bitcoind_password: devnet_config
+                    .bitcoind_password
+                    .take()
+                    .unwrap_or("devnet".to_string()),
                 bitcoin_controller_port: devnet_config.bitcoin_controller_port.unwrap_or(18442),
-                bitcoin_controller_block_time: devnet_config.bitcoin_controller_block_time.unwrap_or(30_000),
+                bitcoin_controller_block_time: devnet_config
+                    .bitcoin_controller_block_time
+                    .unwrap_or(30_000),
                 stacks_node_p2p_port: devnet_config.stacks_node_p2p_port.unwrap_or(20444),
                 stacks_node_rpc_port: devnet_config.stacks_node_rpc_port.unwrap_or(20443),
-                stacks_node_events_observers: devnet_config.stacks_node_events_observers.take().unwrap_or(vec![]),
+                stacks_node_events_observers: devnet_config
+                    .stacks_node_events_observers
+                    .take()
+                    .unwrap_or(vec![]),
                 stacks_api_port: devnet_config.stacks_api_port.unwrap_or(20080),
                 stacks_api_events_port: devnet_config.stacks_api_events_port.unwrap_or(3700),
                 stacks_explorer_port: devnet_config.stacks_explorer_port.unwrap_or(8000),
@@ -263,18 +279,45 @@ impl ChainConfig {
                 miner_mnemonic,
                 miner_secret_key_hex,
                 miner_derivation_path,
-                working_dir: devnet_config.working_dir.take().unwrap_or(default_working_dir),
+                working_dir: devnet_config
+                    .working_dir
+                    .take()
+                    .unwrap_or(default_working_dir),
                 postgres_port: devnet_config.postgres_port.unwrap_or(5432),
-                postgres_username: devnet_config.postgres_username.take().unwrap_or("postgres".to_string()),
-                postgres_password: devnet_config.postgres_password.take().unwrap_or("postgres".to_string()),
-                postgres_database: devnet_config.postgres_database.take().unwrap_or("postgres".to_string()),
+                postgres_username: devnet_config
+                    .postgres_username
+                    .take()
+                    .unwrap_or("postgres".to_string()),
+                postgres_password: devnet_config
+                    .postgres_password
+                    .take()
+                    .unwrap_or("postgres".to_string()),
+                postgres_database: devnet_config
+                    .postgres_database
+                    .take()
+                    .unwrap_or("postgres".to_string()),
                 preflight_scripts: devnet_config.preflight_scripts.take().unwrap_or(vec![]),
                 postflight_scripts: devnet_config.postflight_scripts.take().unwrap_or(vec![]),
-                bitcoind_image_url: devnet_config.bitcoind_image_url.take().unwrap_or(DEFAULT_BITCOIND_IMAGE.to_string()),
-                stacks_node_image_url: devnet_config.stacks_node_image_url.take().unwrap_or(DEFAULT_STACKS_NODE_IMAGE.to_string()),
-                stacks_api_image_url: devnet_config.stacks_api_image_url.take().unwrap_or(DEFAULT_STACKS_API_IMAGE.to_string()),
-                postgres_image_url: devnet_config.postgres_image_url.take().unwrap_or(DEFAULT_POSTGRES_IMAGE.to_string()),
-                stacks_explorer_image_url: devnet_config.stacks_explorer_image_url.take().unwrap_or(DEFAULT_STACKS_EXPLORER_IMAGE.to_string()),
+                bitcoind_image_url: devnet_config
+                    .bitcoind_image_url
+                    .take()
+                    .unwrap_or(DEFAULT_BITCOIND_IMAGE.to_string()),
+                stacks_node_image_url: devnet_config
+                    .stacks_node_image_url
+                    .take()
+                    .unwrap_or(DEFAULT_STACKS_NODE_IMAGE.to_string()),
+                stacks_api_image_url: devnet_config
+                    .stacks_api_image_url
+                    .take()
+                    .unwrap_or(DEFAULT_STACKS_API_IMAGE.to_string()),
+                postgres_image_url: devnet_config
+                    .postgres_image_url
+                    .take()
+                    .unwrap_or(DEFAULT_POSTGRES_IMAGE.to_string()),
+                stacks_explorer_image_url: devnet_config
+                    .stacks_explorer_image_url
+                    .take()
+                    .unwrap_or(DEFAULT_STACKS_EXPLORER_IMAGE.to_string()),
                 pox_stacking_orders: devnet_config.pox_stacking_orders.take().unwrap_or(vec![
                     PoxStackingOrder {
                         start_at_cycle: 3,
@@ -320,38 +363,35 @@ impl ChainConfig {
     }
 }
 
-pub fn compute_addresses(mnemonic: &str, derivation_path: &str, mainnet: bool) -> (String, String, String) {
+pub fn compute_addresses(
+    mnemonic: &str,
+    derivation_path: &str,
+    mainnet: bool,
+) -> (String, String, String) {
+    let bip39_seed = match mnemonic::get_bip39_seed_from_mnemonic(&mnemonic, "") {
+        Ok(bip39_seed) => bip39_seed,
+        Err(_) => panic!(),
+    };
 
-    let bip39_seed =
-        match mnemonic::get_bip39_seed_from_mnemonic(&mnemonic, "") {
-            Ok(bip39_seed) => bip39_seed,
-            Err(_) => panic!(),
-        };
-
-    let ext =
-        ExtendedPrivKey::derive(&bip39_seed[..], derivation_path)
-            .unwrap();
+    let ext = ExtendedPrivKey::derive(&bip39_seed[..], derivation_path).unwrap();
 
     let secret_key = SecretKey::parse_slice(&ext.secret()).unwrap();
-    
-    // Enforce a 33 bytes secret key format, expected by Stacks 
+
+    // Enforce a 33 bytes secret key format, expected by Stacks
     let mut secret_key_bytes = secret_key.serialize().to_vec();
     secret_key_bytes.push(1);
     let miner_secret_key_hex = bytes_to_hex(&secret_key_bytes);
 
     let public_key = PublicKey::from_secret_key(&secret_key);
-    let pub_key =
-        Secp256k1PublicKey::from_slice(&public_key.serialize_compressed())
-            .unwrap();
+    let pub_key = Secp256k1PublicKey::from_slice(&public_key.serialize_compressed()).unwrap();
     let version = if mainnet {
         clarity_repl::clarity::util::C32_ADDRESS_VERSION_MAINNET_SINGLESIG
     } else {
         clarity_repl::clarity::util::C32_ADDRESS_VERSION_TESTNET_SINGLESIG
     };
 
-    let stx_address = StacksAddress::from_public_key(version, pub_key)
-        .unwrap();
-    
+    let stx_address = StacksAddress::from_public_key(version, pub_key).unwrap();
+
     // TODO(ludo): de-hardcode this
     let btc_address = "n3GRiDLKWuKLCw1DZmV75W1mE35qmW2tQm".to_string();
 
