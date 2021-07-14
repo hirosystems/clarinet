@@ -21,7 +21,6 @@ use clarity_repl::{
             StacksAddress,
         },
     },
-    repl,
 };
 use secp256k1::{PublicKey, SecretKey};
 use tiny_hderive::bip32::ExtendedPrivKey;
@@ -36,13 +35,14 @@ struct Balance {
     nonce_proof: String,
 }
 
+#[allow(dead_code)]
 pub enum Network {
     Devnet,
     Testnet,
     Mainnet,
 }
 
-pub fn publish_contracts(manifest_path: PathBuf, network: Network) -> Result<(Vec<String>), String> {
+pub fn publish_contracts(manifest_path: PathBuf, network: Network) -> Result<Vec<String>, String> {
     let start_repl = false;
     let settings = load_session(manifest_path, start_repl, network)?;
     let mut results = vec![];

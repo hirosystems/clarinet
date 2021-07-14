@@ -1,7 +1,6 @@
 use crate::integrate::{ServiceStatusData, Status};
 use crate::types::{ChainConfig, MainConfig};
 use deno_core::futures::TryStreamExt;
-use reqwest::StatusCode;
 use super::DevnetEvent;
 use std::collections::HashMap;
 use std::fs::{File, self};
@@ -9,7 +8,7 @@ use std::io::Write;
 use std::path::PathBuf;
 use std::sync::mpsc::{Receiver, Sender};
 use bollard::Docker;
-use bollard::container::{Config, KillContainerOptions, CreateContainerOptions, StartContainerOptions, LogsOptions};
+use bollard::container::{Config, KillContainerOptions, CreateContainerOptions};
 use bollard::models::{HostConfig, PortBinding};
 use bollard::network::{ConnectNetworkOptions, CreateNetworkOptions, PruneNetworksOptions};
 use bollard::image::CreateImageOptions;
@@ -65,7 +64,7 @@ impl DevnetOrchestrator {
             }
             _ => return
         };
-        event_tx.send(DevnetEvent::info(format!("Initiating Devnet boot sequence (working_dir: {})", devnet_config.working_dir)));
+        let _ = event_tx.send(DevnetEvent::info(format!("Initiating Devnet boot sequence (working_dir: {})", devnet_config.working_dir)));
 
         fs::create_dir(format!("{}", devnet_config.working_dir)).expect("Unable to create working dir");
         fs::create_dir(format!("{}/conf", devnet_config.working_dir)).expect("Unable to create working dir");
@@ -104,7 +103,7 @@ impl DevnetOrchestrator {
             comment: "initializing".into(),
         }));
 
-        event_tx.send(DevnetEvent::info(format!("Creating network {}", self.network_name)));
+        let _ = event_tx.send(DevnetEvent::info(format!("Creating network {}", self.network_name)));
         let _network = docker.create_network(CreateNetworkOptions {
             name: self.network_name.clone(),
             driver: "bridge".to_string(),
@@ -112,7 +111,7 @@ impl DevnetOrchestrator {
         }).await.expect("Unable to create network");
 
         // Start bitcoind
-        event_tx.send(DevnetEvent::info(format!("Starting bitcoind")));
+        let _ = event_tx.send(DevnetEvent::info(format!("Starting bitcoind")));
         let _ = event_tx.send(DevnetEvent::ServiceStatus(ServiceStatusData {
             order: 0,
             status: Status::Yellow,
@@ -141,7 +140,7 @@ impl DevnetOrchestrator {
             name: "stacks-api".into(),
             comment: "preparing postgres container".into(),
         }));
-        event_tx.send(DevnetEvent::info(format!("Starting postgres")));
+        let _ = event_tx.send(DevnetEvent::info(format!("Starting postgres")));
         match self.boot_postgres_container().await {
             Ok(_) => {},
             Err(message) => {
@@ -158,7 +157,7 @@ impl DevnetOrchestrator {
             name: "stacks-api".into(),
             comment: "preparing container".into(),
         }));
-        event_tx.send(DevnetEvent::info(format!("Starting stacks-api")));
+        let _ = event_tx.send(DevnetEvent::info(format!("Starting stacks-api")));
         match self.boot_stacks_blockchain_api_container().await {
             Ok(_) => {},
             Err(message) => {
@@ -175,7 +174,7 @@ impl DevnetOrchestrator {
         }));
 
         // Start stacks-blockchain
-        event_tx.send(DevnetEvent::info(format!("Starting stacks-node")));
+        let _ = event_tx.send(DevnetEvent::info(format!("Starting stacks-node")));
         let _ = event_tx.send(DevnetEvent::ServiceStatus(ServiceStatusData {
             order: 1,
             status: Status::Yellow,
@@ -204,7 +203,7 @@ impl DevnetOrchestrator {
             name: "stacks-explorer".into(),
             comment: "preparing container".into(),
         }));
-        event_tx.send(DevnetEvent::info(format!("Starting stacks-explorer")));
+        let _ = event_tx.send(DevnetEvent::info(format!("Starting stacks-explorer")));
         match self.boot_stacks_explorer_container().await {
             Ok(_) => {},
             Err(message) => {
@@ -225,7 +224,7 @@ impl DevnetOrchestrator {
                 self.terminate().await;
             },
             Ok(false) => {
-                self.restart();
+                self.restart().await;
             }
             _ => {}
         }
@@ -892,7 +891,7 @@ events_keys = ["*"]
         println!("Pruning network {}", self.network_name);
         let mut filters = HashMap::new();
         filters.insert("label".to_string(), vec![format!("label={}", self.network_name)]);
-        docker.prune_networks(Some(PruneNetworksOptions { filters })).await;
+        let _ = docker.prune_networks(Some(PruneNetworksOptions { filters })).await;
 
         let _ = docker.remove_network(&self.network_name).await;
 
@@ -900,5 +899,6 @@ events_keys = ["*"]
         if let Some(ref tx) = self.termination_success_tx {
             tx.send(true).expect("Unable to confirm termination");
         }
+        std::process::exit(0);
     }
 }

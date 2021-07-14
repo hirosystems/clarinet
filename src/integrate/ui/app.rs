@@ -16,7 +16,7 @@ pub struct App<'a> {
 }
 
 impl<'a> App<'a> {
-    pub fn new(title: &'a str, enhanced_graphics: bool) -> App<'a> {
+    pub fn new(title: &'a str) -> App<'a> {
         App {
             title,
             should_quit: false,
@@ -77,7 +77,7 @@ impl<'a> App<'a> {
 
     pub fn display_block(&mut self, block: BlockData) {
         let cycle_len = block.pox_cycle_length;
-        let abs_pos = (block.bitcoin_block_height - block.first_burnchain_block_height);
+        let abs_pos = block.bitcoin_block_height - block.first_burnchain_block_height;
         let (start, end) = if abs_pos % cycle_len == (cycle_len - 1) {
             ("", "<")
         } else if abs_pos % cycle_len == 0 {
@@ -92,7 +92,11 @@ impl<'a> App<'a> {
         };
         self.tabs.titles.push_front(Spans::from(
             Span::styled(format!("{}[{}{}]{}", end, block.block_height, has_tx, start), 
-            Style::default().fg(Color::LightMagenta))
+            if block.pox_cycle_id % 2 == 1 {
+                Style::default().fg(Color::Yellow)
+            } else {
+                Style::default().fg(Color::LightYellow)
+            })
         ));
         self.blocks.push(block);
         if self.tabs.index != 0 {

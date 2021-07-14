@@ -174,7 +174,7 @@ where
     draw_transactions(f, app, block_details_components[1], &selected_block);
 }
 
-fn draw_block_details<B>(f: &mut Frame<B>, app: &mut App, area: Rect, block: &BlockData)
+fn draw_block_details<B>(f: &mut Frame<B>, _app: &mut App, area: Rect, block: &BlockData)
 where
     B: Backend,
 {
@@ -264,19 +264,10 @@ where
     // TODO(ludo): Mining informations (miner, VRF)
 }
 
-fn draw_transactions<B>(f: &mut Frame<B>, app: &mut App, area: Rect, block: &BlockData)
+fn draw_transactions<B>(f: &mut Frame<B>, _app: &mut App, area: Rect, block: &BlockData)
 where
     B: Backend,
 {
-    let normal_style = Style::default().bg(Color::DarkGray);
-    let header_cells = ["", "Txid", "Result"]
-        .iter()
-        .map(|h| Cell::from(*h).style(Style::default().fg(Color::Gray)));
-    let header = Row::new(header_cells)
-        .style(normal_style)
-        .height(1)
-        .bottom_margin(0);
-
     let transactions: Vec<ListItem> = block.transactions.iter().map(|t| {
             let tx_info = Spans::from(vec![
                 Span::styled(
@@ -318,7 +309,7 @@ where
 
 }
 
-fn draw_help<B>(f: &mut Frame<B>, app: &mut App, area: Rect)
+fn draw_help<B>(f: &mut Frame<B>, _app: &mut App, area: Rect)
 where
     B: Backend,
 {

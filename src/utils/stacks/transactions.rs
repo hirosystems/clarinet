@@ -4,9 +4,6 @@ use clarity_repl::clarity::codec::transaction::*;
 use clarity_repl::clarity::types::{QualifiedContractIdentifier, Value};
 use clarity_repl::clarity::util::{StacksAddress, address::AddressHashMode, secp256k1::{Secp256k1PrivateKey, Secp256k1PublicKey}};
 use clarity_repl::clarity::codec::StacksMessageCodec;
-use hmac::Hmac;
-use pbkdf2::pbkdf2;
-use secp256k1::{PublicKey, SecretKey};
 
 pub fn build_contrat_call_transaction(contract_id: String, function_name: String, args: Vec<Value>, nonce: u64, fee: u64, sender_secret_key: &[u8]) -> StacksTransaction {
 
@@ -63,8 +60,4 @@ pub fn build_contrat_call_transaction(contract_id: String, function_name: String
     let signed_tx = tx_signer.get_tx().unwrap();
 
     signed_tx
-}
-
-pub fn sponsor_transaction() -> Option<StacksTransaction> {
-    None
 }

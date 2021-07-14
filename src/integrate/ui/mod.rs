@@ -1,15 +1,3 @@
-// Mockup
-// Section 1 (10 lines)
-// | Devnet orchestration (75%)      | Endpoints (25%)                 |
-// | Gauge (boot, yellow or green)   | Table (Name | Address | Status) |
-// | Logs                            |                                 |
-// Section 2 (5 lines)
-// | Blocks Tab + PoX Tab (100%)               |
-// Section 3 (Else)
-// | Details about block, Transactions, Asset map.
-// Section 4
-// | Mempool state
-
 #[allow(dead_code)]
 mod app;
 #[allow(dead_code)]
@@ -31,7 +19,7 @@ use std::{
     time::{Duration, Instant},
 };
 use tui::{backend::CrosstermBackend, Terminal};
-use super::{DevnetEvent, LogData, LogLevel};
+use super::{DevnetEvent};
 
 pub fn start_ui(devnet_events_tx: Sender<DevnetEvent>, devnet_events_rx: Receiver<DevnetEvent>, events_observer_terminator_tx: Sender<bool>, orchestrator_terminator_tx: Sender<bool>, orchestrator_terminated_rx: Receiver<bool>) -> Result<(), Box<dyn Error>> {
 
@@ -45,7 +33,6 @@ pub fn start_ui(devnet_events_tx: Sender<DevnetEvent>, devnet_events_rx: Receive
     let mut terminal = Terminal::new(backend)?;
 
     // Setup input handling
-    let enhanced_graphics = false;
     let tick_rate = Duration::from_millis(500);
     thread::spawn(move || {
         let mut last_tick = Instant::now();
@@ -60,13 +47,15 @@ pub fn start_ui(devnet_events_tx: Sender<DevnetEvent>, devnet_events_rx: Receive
                 }
             }
             if last_tick.elapsed() >= tick_rate {
-                devnet_events_tx.send(DevnetEvent::Tick).unwrap();
+                if let Err(_) = devnet_events_tx.send(DevnetEvent::Tick) {
+                    break;
+                }
                 last_tick = Instant::now();
             }
         }
     });
 
-    let mut app = App::new("Clarinet", enhanced_graphics);
+    let mut app = App::new("Clarinet");
     terminal.clear()?;
 
     loop {
@@ -76,7 +65,7 @@ pub fn start_ui(devnet_events_tx: Sender<DevnetEvent>, devnet_events_rx: Receive
             DevnetEvent::KeyEvent(event) => match (event.modifiers, event.code) {
                 (KeyModifiers::CONTROL, KeyCode::Char('c')) => {
                     app.display_log(DevnetEvent::log_warning("Ctrl+C received, initiating termination sequence.".into()));
-                    terminate(
+                    let _ = terminate(
                         &mut terminal, 
                         true, 
                         events_observer_terminator_tx, 
@@ -99,24 +88,24 @@ pub fn start_ui(devnet_events_tx: Sender<DevnetEvent>, devnet_events_rx: Receive
             DevnetEvent::Log(log) => {
                 app.display_log(log);
             },
-            DevnetEvent::Terminate => {
-
-            },
-            DevnetEvent::Restart => {
-
-            },
             DevnetEvent::ServiceStatus(status) => {
                 app.display_service_status_update(status);
             }
             DevnetEvent::Block(block) => {
                 app.display_block(block);
             }
-            DevnetEvent::Microblock(microblock) => {
-
-            }
             DevnetEvent::MempoolAdmission(tx) => {
                 app.update_mempool(tx);
             }
+            // DevnetEvent::Microblock(microblock) => {
+
+            // }
+            // DevnetEvent::Terminate => {
+
+            // },
+            // DevnetEvent::Restart => {
+
+            // },
         }
         if app.should_quit {
             break;

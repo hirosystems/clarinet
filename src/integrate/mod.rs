@@ -36,9 +36,9 @@ pub async fn do_run_devnet(
     
     devnet.termination_success_tx = Some(termination_success_tx);
 
-    let devnet_config = match devnet.network_config {
+    let (devnet_config, accounts) = match devnet.network_config {
         Some(ref network_config) => match &network_config.devnet {
-            Some(devnet_config) => Ok(devnet_config.clone()),
+            Some(devnet_config) => Ok((devnet_config.clone(), network_config.accounts.clone())),
             _ => Err("Unable to retrieve config")
         }
         _ => Err("Unable to retrieve config")
@@ -48,6 +48,7 @@ pub async fn do_run_devnet(
     // and should be able to be terminated
     let config = EventObserverConfig {
         devnet_config,
+        accounts,
         manifest_path: devnet.manifest_path.clone(),
         pox_info: PoxInfo::default(),
     };
@@ -56,7 +57,7 @@ pub async fn do_run_devnet(
     let events_observer_handle = std::thread::spawn(move || {
         let future = start_events_observer(config, events_observer_tx, terminator_rx);
         let rt = utils::create_basic_runtime();
-        rt.block_on(future);
+        let _ = rt.block_on(future);
     });
 
     // The devnet orchestrator should be able to send some events to the UI thread,
@@ -69,7 +70,7 @@ pub async fn do_run_devnet(
         rt.block_on(future);
     });
 
-    ui::start_ui(
+    let _ = ui::start_ui(
         devnet_events_tx, 
         devnet_events_rx, 
         events_observer_terminator_tx,
@@ -86,12 +87,12 @@ pub enum DevnetEvent {
     Log(LogData),
     KeyEvent(crossterm::event::KeyEvent),
     Tick,
-    Restart,
-    Terminate,
     ServiceStatus(ServiceStatusData),
     Block(BlockData),
-    Microblock(MicroblockData),
     MempoolAdmission(MempoolAdmissionData),
+    // Restart,
+    // Terminate,
+    // Microblock(MicroblockData),
 }
 
 impl DevnetEvent {
@@ -100,6 +101,7 @@ impl DevnetEvent {
         DevnetEvent::Log(Self::log_error(message))
     }
 
+    #[allow(dead_code)]
     pub fn warning(message: String) -> DevnetEvent {
         DevnetEvent::Log(Self::log_warning(message))
     }
@@ -183,10 +185,6 @@ pub struct Transaction {
     pub events: Vec<String>,
 }
 
-pub struct Event {
-    pub content: String,
-}
-
 #[derive(Clone)]
 pub struct BlockData {
     pub block_height: u32,
@@ -199,10 +197,10 @@ pub struct BlockData {
     pub transactions: Vec<Transaction>
 }
 
-pub struct MicroblockData {
-    pub seq: u32,
-    pub transactions: Vec<Transaction>
-}
+// pub struct MicroblockData {
+//     pub seq: u32,
+//     pub transactions: Vec<Transaction>
+// }
 
 pub struct MempoolAdmissionData {
     pub txid: String,

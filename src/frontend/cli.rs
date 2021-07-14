@@ -6,7 +6,7 @@ use std::{env, process};
 
 use crate::poke::load_session;
 use crate::integrate::{self, DevnetOrchestrator};
-use crate::publish::{self, Network, publish_contracts};
+use crate::publish::{Network, publish_contracts};
 use crate::test::run_tests;
 use crate::types::{MainConfig, MainConfigFile, RequirementConfig};
 use crate::{
@@ -329,7 +329,7 @@ pub fn main() {
             println!(
                 "Start orchestrating stacks-node, stacks-blockchain-api, bitcoind, bitcoin explorer, stacks-explorer"
             );
-            let mut devnet = DevnetOrchestrator::new(manifest_path);
+            let devnet = DevnetOrchestrator::new(manifest_path);
             integrate::run_devnet(devnet);    
         }
     };
