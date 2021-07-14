@@ -1,7 +1,7 @@
 use super::DevnetEvent;
 use crate::integrate::{ServiceStatusData, Status};
 use crate::types::{ChainConfig, MainConfig};
-use bollard::container::{Config, CreateContainerOptions, KillContainerOptions};
+use bollard::container::{Config, CreateContainerOptions, KillContainerOptions, PruneContainersOptions};
 use bollard::image::CreateImageOptions;
 use bollard::models::{HostConfig, PortBinding};
 use bollard::network::{ConnectNetworkOptions, CreateNetworkOptions, PruneNetworksOptions};
@@ -114,10 +114,14 @@ impl DevnetOrchestrator {
             "Creating network {}",
             self.network_name
         )));
+        let mut labels = HashMap::new();
+        labels.insert("project".to_string(), self.network_name.to_string()); 
+
         let _network = docker
             .create_network(CreateNetworkOptions {
                 name: self.network_name.clone(),
                 driver: "bridge".to_string(),
+                labels,
                 ..Default::default()
             })
             .await
@@ -385,7 +389,11 @@ ignore_txs = false
             HashMap::new(),
         );
 
+        let mut labels = HashMap::new();
+        labels.insert("project".to_string(), self.network_name.to_string()); 
+
         let config = Config {
+            labels: Some(labels),
             image: Some(devnet_config.bitcoind_image_url.clone()),
             domainname: Some(self.network_name.to_string()),
             tty: Some(true),
@@ -579,7 +587,11 @@ events_keys = ["*"]
             HashMap::new(),
         );
 
+        let mut labels = HashMap::new();
+        labels.insert("project".to_string(), self.network_name.to_string()); 
+
         let config = Config {
+            labels: Some(labels),
             image: Some(devnet_config.stacks_node_image_url.clone()),
             domainname: Some(self.network_name.to_string()),
             tty: Some(true),
@@ -678,7 +690,11 @@ events_keys = ["*"]
             HashMap::new(),
         );
 
+        let mut labels = HashMap::new();
+        labels.insert("project".to_string(), self.network_name.to_string()); 
+
         let config = Config {
+            labels: Some(labels),
             image: Some(devnet_config.stacks_api_image_url.clone()),
             domainname: Some(self.network_name.to_string()),
             tty: Some(true),
@@ -784,7 +800,11 @@ events_keys = ["*"]
             HashMap::new(),
         );
 
+        let mut labels = HashMap::new();
+        labels.insert("project".to_string(), self.network_name.to_string()); 
+
         let config = Config {
+            labels: Some(labels),
             image: Some(devnet_config.postgres_image_url.clone()),
             domainname: Some(self.network_name.to_string()),
             tty: Some(true),
@@ -870,7 +890,11 @@ events_keys = ["*"]
         let mut exposed_ports = HashMap::new();
         exposed_ports.insert(format!("{}/tcp", 3000), HashMap::new());
 
+        let mut labels = HashMap::new();
+        labels.insert("project".to_string(), self.network_name.to_string()); 
+
         let config = Config {
+            labels: Some(labels),
             image: Some(devnet_config.stacks_explorer_image_url.clone()),
             domainname: Some(self.network_name.to_string()),
             tty: Some(true),
@@ -939,9 +963,12 @@ events_keys = ["*"]
     pub async fn restart(&mut self) {}
 
     pub async fn terminate(&mut self) {
-        let docker = match self.docker_client {
-            Some(ref docker) => docker,
-            None => std::process::exit(1),
+        let (docker, devnet_config) = match (&self.docker_client, &self.network_config) {
+            (Some(ref docker), Some(ref network_config)) => match network_config.devnet {
+                Some(ref devnet_config) => (docker, devnet_config),
+                _ => return,
+            },
+            _ => return,
         };
 
         println!("Initiating termination sequence");
@@ -950,7 +977,7 @@ events_keys = ["*"]
 
         // Terminate containers
         if let Some(ref bitcoin_explorer_container_id) = self.bitcoin_explorer_container_id {
-            println!("Terminating bitcoin_explorer");
+            println!("Terminating bitcoin_explorer...");
             let _ = docker
                 .kill_container(bitcoin_explorer_container_id, options.clone())
                 .await;
@@ -958,14 +985,14 @@ events_keys = ["*"]
         }
 
         if let Some(ref stacks_explorer_container_id) = self.stacks_explorer_container_id {
-            println!("Terminating stacks_explorer");
+            println!("Terminating stacks_explorer...");
             let _ = docker
                 .kill_container(stacks_explorer_container_id, options.clone())
                 .await;
         }
 
         if let Some(ref bitcoin_blockchain_container_id) = self.bitcoin_blockchain_container_id {
-            println!("Terminating bitcoin_blockchain");
+            println!("Terminating bitcoin_blockchain...");
             let _ = docker
                 .kill_container(bitcoin_blockchain_container_id, options.clone())
                 .await;
@@ -975,43 +1002,46 @@ events_keys = ["*"]
         if let Some(ref stacks_blockchain_api_container_id) =
             self.stacks_blockchain_api_container_id
         {
-            println!("Terminating stacks_blockchain_api");
+            println!("Terminating stacks_blockchain_api...");
             let _ = docker
                 .kill_container(stacks_blockchain_api_container_id, options.clone())
                 .await;
         }
 
         if let Some(ref postgres_container_id) = self.postgres_container_id {
-            println!("Terminating postgres");
+            println!("Terminating postgres...");
             let _ = docker
                 .kill_container(postgres_container_id, options.clone())
                 .await;
         }
 
         if let Some(ref stacks_blockchain_container_id) = self.stacks_blockchain_container_id {
-            println!("Terminating stacks_blockchain");
+            println!("Terminating stacks_blockchain...");
             let _ = docker
                 .kill_container(stacks_blockchain_container_id, options)
                 .await;
         }
 
         // Prune network
-        println!("Pruning network {}", self.network_name);
+        println!("Pruning network and containers...");
         let mut filters = HashMap::new();
         filters.insert(
             "label".to_string(),
-            vec![format!("label={}", self.network_name)],
+            vec![format!("project={}", self.network_name)],
         );
         let _ = docker
-            .prune_networks(Some(PruneNetworksOptions { filters }))
+            .prune_networks(Some(PruneNetworksOptions { filters: filters.clone() }))
             .await;
 
-        let _ = docker.remove_network(&self.network_name).await;
+        let _ = docker
+            .prune_containers(Some(PruneContainersOptions { filters }))
+            .await;
 
-        println!("Ended termination sequence");
         if let Some(ref tx) = self.termination_success_tx {
             tx.send(true).expect("Unable to confirm termination");
         }
+        println!("Artifacts (logs, conf, chainstates) available here: {}", devnet_config.working_dir);
+        println!("✌️");
         std::process::exit(0);
     }
 }
