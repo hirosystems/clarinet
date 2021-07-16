@@ -204,8 +204,7 @@ jobs:
       #   if: matrix.platform == 'linux-arm64' || matrix.platform == 'linux-armv7' || matrix.platform == 'linux-musl-x64'
       #   run: sudo apt-get update && sudo apt-get install -y ${{ matrix.linker_package }}
 
-      - name: Build (Not Windows)
-        if: matrix.os != 'windows-latest'
+      - name: Build
         run: cargo build --release --locked --target ${{ matrix.target }}
         # To be uncommented later when adding new distros
         # env:
@@ -217,7 +216,7 @@ jobs:
         #   CARGO_TARGET_ARMV7_UNKNOWN_LINUX_GNUEABIHF_LINKER: ${{ matrix.cc }}
         #   CARGO_TARGET_X86_64_UNKNOWN_LINUX_MUSL_LINKER: ${{ matrix.cc }}
 
-      - name: Build (Windows)
+      - name: Build Installer (Windows)
         if: matrix.os == 'windows-latest'
         run: cargo wix -v
 
