@@ -173,17 +173,6 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v2
 
-      - name: copy wix dir
-        run: cp -R wix ..
-
-      - name: Checkout repository
-        uses: actions/checkout@v2
-        with:
-          ref: refs/tags/v0.14.1
-
-      - name: copy wix dir
-        run: cp -R ../wix .
-
       - name: Install Rust toolchain
         uses: actions-rs/toolchain@v1
         with:
@@ -214,6 +203,7 @@ jobs:
       # - name: Install ${{ matrix.platform }} linker
       #   if: matrix.platform == 'linux-arm64' || matrix.platform == 'linux-armv7' || matrix.platform == 'linux-musl-x64'
       #   run: sudo apt-get update && sudo apt-get install -y ${{ matrix.linker_package }}
+
       - name: Build (Not Windows)
         if: matrix.os != 'windows-latest'
         run: cargo build --release --locked --target ${{ matrix.target }}
@@ -256,7 +246,7 @@ jobs:
         if: matrix.os != 'windows-latest'
         run: zip --junk-paths ${{ matrix.platform }} ./target/${{ matrix.target }}/release/clarinet
 
-      # Separate uploads to prevent paths from being saved
+      # Separate uploads to prevent paths from being preserved
       - name: Upload artifact (Not Windows)
         if: matrix.os != 'windows-latest'
         uses: actions/upload-artifact@v2
@@ -295,6 +285,7 @@ jobs:
           repo_token: ${{ secrets.GITHUB_TOKEN }}
           file: ${{ matrix.platform }}.zip
           asset_name: clarinet-${{ matrix.platform }}.zip
+          overwrite: true
           tag: ${{ github.ref }}
 
       - name: Upload Artifacts to GH release (Windows)
