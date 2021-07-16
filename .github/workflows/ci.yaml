@@ -16,13 +16,15 @@ on:
 
 jobs:
   pre_run:
-    name: Cancel previous runs
-    runs-on: ubuntu-latest
-    steps:
-      - name: Cancel Previous Runs
-        uses: styfle/cancel-workflow-action@ad6cb1b847ffb509a69b745b6ee2f1d14dfe14b8
-        with:
-          access_token: ${{ github.token }}
+    # name: Cancel previous runs
+    # runs-on: ubuntu-latest
+    # steps:
+    #   - name: Cancel Previous Runs
+    #     uses: styfle/cancel-workflow-action@ad6cb1b847ffb509a69b745b6ee2f1d14dfe14b8
+    #     with:
+    #       access_token: ${{ github.token }}
+      - name: Checkout repository
+        uses: actions/checkout@v2
 
   audit:
     name: Audit and format
@@ -222,7 +224,7 @@ jobs:
       #   run: sudo apt-get update && sudo apt-get install -y ${{ matrix.linker_package }}
 
       - name: Build (Not Windows)
-        if: matrix.os != 'windows-latest'
+        # if: matrix.os != 'windows-latest'
         run: cargo build --release --locked --target ${{ matrix.target }}
         # To be uncommented later when adding new distros
         # env:
@@ -236,7 +238,7 @@ jobs:
 
       - name: Build (Windows)
         if: matrix.os == 'windows-latest'
-        run: cargo wix -v
+        run: cargo wix --no-build -v
 
       - name: Code Sign (Windows)
         if: matrix.os == 'windows-latest'
