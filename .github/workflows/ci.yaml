@@ -173,6 +173,21 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v2
 
+      - name: copy wix dir
+        run: |
+          cp -R wix ..
+          cp -Rf docs/images ..
+
+      - name: Checkout repository
+        uses: actions/checkout@v2
+        with:
+          ref: refs/tags/v0.14.1
+
+      - name: copy wix dir
+        run: |
+          cp -R ../wix .
+          cp -Rf ../docs/images docs/
+
       - name: Install Rust toolchain
         uses: actions-rs/toolchain@v1
         with:
