@@ -177,6 +177,7 @@ jobs:
         run: |
           cp -R wix ..
           cp docs/images/clarinet.ico ..
+          cp docs/images/clarinet.bmp ..
 
       - name: Checkout repository
         uses: actions/checkout@v2
@@ -187,6 +188,7 @@ jobs:
         run: |
           cp -R ../wix .
           cp ../clarinet.ico docs/images/clarinet.ico
+          cp ../clarinet.bmp docs/images/clarinet.bmp
 
       - name: Install Rust toolchain
         uses: actions-rs/toolchain@v1
