@@ -331,7 +331,7 @@ jobs:
         id: docker_meta
         uses: docker/metadata-action@v3
         with:
-          images: blockstack/${{ github.event.repository.name }}
+          images: ${{ github.repository }}
           tags: |
             type=ref,event=branch
             type=ref,event=pr
