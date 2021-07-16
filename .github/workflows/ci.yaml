@@ -263,7 +263,11 @@ jobs:
       # Don't compress for Windows because winget can't yet unzip files
       - name: Compress artifact (Not Windows)
         if: matrix.os != 'windows-latest'
-        run: zip --junk-paths ${{ matrix.platform }} ./target/${{ matrix.target }}/release/clarinet
+        run: zip --junk-paths clarinet-${{ matrix.platform }} ./target/${{ matrix.target }}/release/clarinet
+
+      - name: Rename artifact (Windows)
+        if: matrix.os == 'windows-latest'
+        run: ./target/wix/*.msi clarinet-${{ matrix.platform }}.msi
 
       # Separate uploads to prevent paths from being preserved
       - name: Upload artifact (Not Windows)
@@ -271,14 +275,14 @@ jobs:
         uses: actions/upload-artifact@v2
         with:
           name: clarinet-${{ matrix.platform }}
-          path: ./target/${{ matrix.target }}/release/clarinet
+          path: clarinet-${{ matrix.platform }}.zip
 
       - name: Upload artifact (Windows)
         if: matrix.os == 'windows-latest'
         uses: actions/upload-artifact@v2
         with:
           name: clarinet-${{ matrix.platform }}
-          path: ./target/wix/*.msi
+          path: clarinet-${{ matrix.platform }}.msi
 
       - name: Unit Tests
         run: cargo test --release --locked --target ${{ matrix.target }}
@@ -302,8 +306,7 @@ jobs:
         if: startsWith(github.ref, 'refs/tags/v') && matrix.os != 'windows-latest'
         with:
           repo_token: ${{ secrets.GITHUB_TOKEN }}
-          file: ${{ matrix.platform }}.zip
-          asset_name: clarinet-${{ matrix.platform }}.zip
+          file: clarinet-${{ matrix.platform }}.zip
           tag: ${{ github.ref }}
 
       - name: Upload Artifacts to GH release (Windows)
@@ -311,9 +314,7 @@ jobs:
         if: startsWith(github.ref, 'refs/tags/v') && matrix.os == 'windows-latest'
         with:
           repo_token: ${{ secrets.GITHUB_TOKEN }}
-          file: ./target/wix/*.msi
-          file_glob: true
-          asset_name: clarinet-${{ matrix.platform }}.msi
+          file: clarinet-${{ matrix.platform }}.msi
           tag: ${{ github.ref }}
 
       # Cleans the `./target` dir after the build such that only dependencies are cached on CI

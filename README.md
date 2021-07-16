@@ -12,8 +12,18 @@ Blockstack. Smart contracts allow developers to encode essential business logic 
 
 ## Installation
 
-The recommended way to install Clarinet is by downloading a release from this repository. Other installation methods are
-provided if you want to build from source or install through the Homebrew package manager.
+
+### Install from Homebrew (MacOS)
+
+```bash
+brew install clarinet
+```
+
+### Install from winget (Windows)
+
+```powershell
+winget install clarinet
+```
 
 ### Install from a binary release
 
@@ -53,18 +63,6 @@ You can build Clarinet from source using Cargo with the following commands:
 git clone git@github.com:hirosystems/clarinet.git
 cd clarinet
 cargo install --path . --locked
-```
-
-### Install from Homebrew (MacOS)
-
-```bash
-brew install clarinet
-```
-
-### Install from winget (Windows)
-
-```powershell
-winget install clarinet
 ```
 
 ## Getting started with Clarinet
