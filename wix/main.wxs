@@ -34,8 +34,8 @@
     <Product
         Id='*'
         Name='clarinet'
-        UpgradeCode='AA3C701C-2141-4EE2-AA71-5543062B4421'
-        Manufacturer='Blockstack PBC'
+        UpgradeCode='2F3D9AF3-4DED-4E8B-AB5C-2E06CB0CCECA'
+        Manufacturer='Hiro Systems'
         Language='1033'
         Codepage='1252'
         Version='$(var.Version)'>
@@ -43,7 +43,7 @@
         <Package Id='*'
             Keywords='Installer'
             Description='Clarinet is a clarity runtime packaged as a command line tool, designed to facilitate smart contract understanding, development, testing and deployment.'
-            Manufacturer='Blockstack PBC'
+            Manufacturer='Hiro Systems'
             InstallerVersion='450'
             Languages='1033'
             Compressed='yes'
@@ -70,14 +70,14 @@
                     -->
                     <Component Id='License' Guid='*' Win64='$(var.Win64)'>
                         <File Id='LicenseFile'
-                            Name='LICENSE'
+                            Name='License.rtf'
                             DiskId='1'
-                            Source='LICENSE'
+                            Source='wix/License.rtf'
                             KeyPath='yes'/>
                     </Component>
                     
                     <Directory Id='Bin' Name='bin'>
-                        <Component Id='Path' Guid='79ECDF19-6999-41B5-A038-DAB80D7FA712' Win64='$(var.Win64)' KeyPath='yes'>
+                        <Component Id='Path' Guid='2A37E760-16A9-4A80-A955-4DE2DB768FB7' Win64='$(var.Win64)' KeyPath='yes'>
                             <Environment
                                 Id='PATH'
                                 Name='PATH'
@@ -129,44 +129,36 @@
 
         <SetProperty Id='ARPINSTALLLOCATION' Value='[APPLICATIONFOLDER]' After='CostFinalize'/>
 
-        
         <!--
-          Uncomment the following `Icon` and `Property` tags to change the product icon.
-
-          The product icon is the graphic that appears in the Add/Remove
-          Programs control panel for the application.
+          Disabling the custom product icon for the application in the
+          Add/Remove Programs control panel requires commenting out or
+          removing the following `Icon` and `Property` tags.
         -->
-        <!--<Icon Id='ProductICO' SourceFile='wix\Product.ico'/>-->
-        <!--<Property Id='ARPPRODUCTICON' Value='ProductICO' />-->
-
+        <Icon Id='ProductICO' SourceFile='docs/images/clarinet.ico'/>
+        <Property Id='ARPPRODUCTICON' Value='ProductICO' />
+        
         <Property Id='ARPHELPLINK' Value='https://github.com/hirosystems/clarinet'/>
         
         <UI>
             <UIRef Id='WixUI_FeatureTree'/>
-            
             <!--
-              Enabling the EULA dialog in the installer is a three step process:
+              Disabling the EULA dialog in the installer is a two step process:
 
-                1. Comment out or remove the two `Publish` tags that follow the
-                   `WixVariable` tag.
-                2. Uncomment the `<WixVariable Id='WixUILicenseRtf' Value='Path\to\Eula.rft'>` tag futher down
-                3. Replace the `Value` attribute of the `WixVariable` tag with
-                   the path to a RTF file that will be used as the EULA and
-                   displayed in the license agreement dialog.
+                 1. Uncomment the following two `Publish` tags
+                 2. Comment out or remove the `<WiXVariable Id='WixUILicenseRtf'...` tag further down
+
             -->
-            <Publish Dialog='WelcomeDlg' Control='Next' Event='NewDialog' Value='CustomizeDlg' Order='99'>1</Publish>
-            <Publish Dialog='CustomizeDlg' Control='Back' Event='NewDialog' Value='WelcomeDlg' Order='99'>1</Publish>
-
+            <!--<Publish Dialog='WelcomeDlg' Control='Next' Event='NewDialog' Value='CustomizeDlg' Order='99'>1</Publish>-->
+            <!--<Publish Dialog='CustomizeDlg' Control='Back' Event='NewDialog' Value='WelcomeDlg' Order='99'>1</Publish>-->
+            
         </UI>
 
-        
         <!--
-          Enabling the EULA dialog in the installer requires uncommenting
-          the following `WixUILicenseRTF` tag and changing the `Value`
-          attribute.
+          Disabling the EULA dialog in the installer requires commenting out
+          or removing the following `WixVariable` tag
         -->
-        <!-- <WixVariable Id='WixUILicenseRtf' Value='Relative\Path\to\Eula.rtf'/> -->
-
+        <WixVariable Id='WixUILicenseRtf' Value='wix/License.rtf'/>
+        
         
         <!--
           Uncomment the next `WixVaraible` tag to customize the installer's
