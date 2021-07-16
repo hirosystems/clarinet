@@ -469,7 +469,7 @@ pub fn main() {
 
                 let tx_bytes = signed_tx.serialize_to_vec();
                 let client = reqwest::blocking::Client::new();
-                let path = format!("{}/v2/transactions", "http://localhost:20443");
+                let path = format!("{}/v2/transactions", host);
                 let res = client
                     .post(&path)
                     .header("Content-Type", "application/octet-stream")
