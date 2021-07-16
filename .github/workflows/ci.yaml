@@ -216,11 +216,31 @@ jobs:
         #   CARGO_TARGET_ARMV7_UNKNOWN_LINUX_GNUEABIHF_LINKER: ${{ matrix.cc }}
         #   CARGO_TARGET_X86_64_UNKNOWN_LINUX_MUSL_LINKER: ${{ matrix.cc }}
 
+      - name: Code sign bin (Windows)
+        if: matrix.os == 'windows-latest'
+        run: |
+          $certificate_file_name = "${env:TEMP}\certificate.pfx"
+
+          $bytes_cert = [Convert]::FromBase64String('${{ secrets.WINDOWS_CODE_SIGNING_CERTIFICATE }}')
+          [IO.File]::WriteAllBytes(${certificate_file_name}, ${bytes_cert})
+
+          $signtool_path = ((Resolve-Path -Path "${env:ProgramFiles(x86)}/Windows Kits/10/bin/10*/x86").Path[-1]) + "/signtool.exe"
+          $bin_path = (Resolve-Path -Path "target/${{ matrix.target }}/release/*.exe").Path
+          & ${signtool_path} sign `
+            /d "Clarinet is a clarity runtime packaged as a command line tool, designed to facilitate smart contract understanding, development, testing and deployment." `
+            /du "https://github.com/hirosystems/clarinet" `
+            /tr http://timestamp.digicert.com `
+            /td sha256 `
+            /fd sha256 `
+            -f "${certificate_file_name}" `
+            -p "${{ secrets.WINDOWS_CODE_SIGNING_PASSWORD }}" `
+            "${bin_path}"
+
       - name: Build Installer (Windows)
         if: matrix.os == 'windows-latest'
-        run: cargo wix -v
+        run: cargo wix -v --no-build
 
-      - name: Code Sign (Windows)
+      - name: Code sign installer (Windows)
         if: matrix.os == 'windows-latest'
         run: |
           $certificate_file_name = "${env:TEMP}\certificate.pfx"
