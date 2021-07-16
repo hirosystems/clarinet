@@ -285,7 +285,6 @@ jobs:
           repo_token: ${{ secrets.GITHUB_TOKEN }}
           file: ${{ matrix.platform }}.zip
           asset_name: clarinet-${{ matrix.platform }}.zip
-          overwrite: true
           tag: ${{ github.ref }}
 
       - name: Upload Artifacts to GH release (Windows)
@@ -296,7 +295,6 @@ jobs:
           file: ./target/wix/*.msi
           file_glob: true
           asset_name: clarinet-${{ matrix.platform }}.msi
-          overwrite: true
           tag: ${{ github.ref }}
 
       # Cleans the `./target` dir after the build such that only dependencies are cached on CI
