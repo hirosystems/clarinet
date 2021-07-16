@@ -61,6 +61,12 @@ cargo install --path . --locked
 brew install clarinet
 ```
 
+### Install from winget (Windows)
+
+```powershell
+winget install clarinet
+```
+
 ## Getting started with Clarinet
 
 The following sections describe how to create a new project in Clarinet and populate it with smart contracts. Clarinet
