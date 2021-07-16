@@ -267,7 +267,7 @@ jobs:
 
       - name: Rename artifact (Windows)
         if: matrix.os == 'windows-latest'
-        run: ./target/wix/*.msi clarinet-${{ matrix.platform }}.msi
+        run: mv target/wix/*.msi clarinet-${{ matrix.platform }}.msi
 
       # Separate uploads to prevent paths from being preserved
       - name: Upload artifact (Not Windows)
