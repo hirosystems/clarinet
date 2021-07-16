@@ -92,7 +92,7 @@
                                 Id='exe0'
                                 Name='clarinet.exe'
                                 DiskId='1'
-                                Source='target/$(var.Profile)/clarinet.exe'
+                                Source='target/x86_64-pc-windows-msvc/$(var.Profile)/clarinet.exe'
                                 KeyPath='yes'/>
                         </Component>
                     </Directory>
