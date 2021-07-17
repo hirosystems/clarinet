@@ -11,8 +11,9 @@ use tiny_hderive::bip32::ExtendedPrivKey;
 use toml::value::Value;
 
 const DEFAULT_DERIVATION_PATH: &str = "m/44'/5757'/0'/0/0";
-const DEFAULT_BITCOIND_IMAGE: &str = "quay.io/hirosystems/bitcoind:devnet";
+const DEFAULT_BITCOIN_NODE_IMAGE: &str = "quay.io/hirosystems/bitcoind:devnet";
 const DEFAULT_STACKS_NODE_IMAGE: &str = "quay.io/hirosystems/stacks-node:devnet";
+const DEFAULT_BITCOIN_EXPLORER_IMAGE: &str = "quay.io/hirosystems/bitcoin-explorer:devnet";
 const DEFAULT_STACKS_API_IMAGE: &str = "blockstack/stacks-blockchain-api:latest";
 const DEFAULT_STACKS_EXPLORER_IMAGE: &str = "blockstack/explorer:latest";
 const DEFAULT_POSTGRES_IMAGE: &str = "postgres:alpine";
@@ -33,8 +34,8 @@ pub struct NetworkConfigFile {
 #[derive(Serialize, Deserialize, Debug, Default)]
 pub struct DevnetConfigFile {
     orchestrator_port: Option<u16>,
-    bitcoind_p2p_port: Option<u16>,
-    bitcoind_rpc_port: Option<u16>,
+    bitcoin_node_p2p_port: Option<u16>,
+    bitcoin_node_rpc_port: Option<u16>,
     stacks_node_p2p_port: Option<u16>,
     stacks_node_rpc_port: Option<u16>,
     stacks_node_events_observers: Option<Vec<String>>,
@@ -43,8 +44,8 @@ pub struct DevnetConfigFile {
     bitcoin_explorer_port: Option<u16>,
     stacks_explorer_port: Option<u16>,
     bitcoin_controller_port: Option<u16>,
-    bitcoind_username: Option<String>,
-    bitcoind_password: Option<String>,
+    bitcoin_node_username: Option<String>,
+    bitcoin_node_password: Option<String>,
     miner_mnemonic: Option<String>,
     miner_derivation_path: Option<String>,
     bitcoin_controller_block_time: Option<u32>,
@@ -56,11 +57,15 @@ pub struct DevnetConfigFile {
     pox_stacking_orders: Option<Vec<PoxStackingOrder>>,
     preflight_scripts: Option<Vec<String>>,
     postflight_scripts: Option<Vec<String>>,
-    bitcoind_image_url: Option<String>,
+    bitcoin_node_image_url: Option<String>,
+    bitcoin_explorer_image_url: Option<String>,
     stacks_node_image_url: Option<String>,
     stacks_api_image_url: Option<String>,
     stacks_explorer_image_url: Option<String>,
     postgres_image_url: Option<String>,
+    disable_bitcoin_explorer: Option<bool>,
+    disable_stacks_explorer: Option<bool>,
+    disable_stacks_api: Option<bool>,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -96,10 +101,10 @@ pub struct NetworkConfig {
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct DevnetConfig {
     pub orchestrator_port: u16,
-    pub bitcoind_p2p_port: u16,
-    pub bitcoind_rpc_port: u16,
-    pub bitcoind_username: String,
-    pub bitcoind_password: String,
+    pub bitcoin_node_p2p_port: u16,
+    pub bitcoin_node_rpc_port: u16,
+    pub bitcoin_node_username: String,
+    pub bitcoin_node_password: String,
     pub stacks_node_p2p_port: u16,
     pub stacks_node_rpc_port: u16,
     pub stacks_node_events_observers: Vec<String>,
@@ -122,11 +127,15 @@ pub struct DevnetConfig {
     pub pox_stacking_orders: Vec<PoxStackingOrder>,
     pub preflight_scripts: Vec<String>,
     pub postflight_scripts: Vec<String>,
-    pub bitcoind_image_url: String,
+    pub bitcoin_node_image_url: String,
     pub stacks_node_image_url: String,
     pub stacks_api_image_url: String,
     pub stacks_explorer_image_url: String,
     pub postgres_image_url: String,
+    pub bitcoin_explorer_image_url: String,
+    pub disable_bitcoin_explorer: bool,
+    pub disable_stacks_explorer: bool,
+    pub disable_stacks_api: bool,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -250,14 +259,14 @@ impl ChainConfig {
 
             let config = DevnetConfig {
                 orchestrator_port: devnet_config.orchestrator_port.unwrap_or(20445),
-                bitcoind_p2p_port: devnet_config.bitcoind_p2p_port.unwrap_or(18444),
-                bitcoind_rpc_port: devnet_config.bitcoind_rpc_port.unwrap_or(18443),
-                bitcoind_username: devnet_config
-                    .bitcoind_username
+                bitcoin_node_p2p_port: devnet_config.bitcoin_node_p2p_port.unwrap_or(18444),
+                bitcoin_node_rpc_port: devnet_config.bitcoin_node_rpc_port.unwrap_or(18443),
+                bitcoin_node_username: devnet_config
+                    .bitcoin_node_username
                     .take()
                     .unwrap_or("devnet".to_string()),
-                bitcoind_password: devnet_config
-                    .bitcoind_password
+                bitcoin_node_password: devnet_config
+                    .bitcoin_node_password
                     .take()
                     .unwrap_or("devnet".to_string()),
                 bitcoin_controller_port: devnet_config.bitcoin_controller_port.unwrap_or(18442),
@@ -298,10 +307,10 @@ impl ChainConfig {
                     .unwrap_or("postgres".to_string()),
                 preflight_scripts: devnet_config.preflight_scripts.take().unwrap_or(vec![]),
                 postflight_scripts: devnet_config.postflight_scripts.take().unwrap_or(vec![]),
-                bitcoind_image_url: devnet_config
-                    .bitcoind_image_url
+                bitcoin_node_image_url: devnet_config
+                    .bitcoin_node_image_url
                     .take()
-                    .unwrap_or(DEFAULT_BITCOIND_IMAGE.to_string()),
+                    .unwrap_or(DEFAULT_BITCOIN_NODE_IMAGE.to_string()),
                 stacks_node_image_url: devnet_config
                     .stacks_node_image_url
                     .take()
@@ -318,7 +327,14 @@ impl ChainConfig {
                     .stacks_explorer_image_url
                     .take()
                     .unwrap_or(DEFAULT_STACKS_EXPLORER_IMAGE.to_string()),
+                bitcoin_explorer_image_url: devnet_config
+                    .bitcoin_explorer_image_url
+                    .take()
+                    .unwrap_or(DEFAULT_BITCOIN_EXPLORER_IMAGE.to_string()),
                 pox_stacking_orders: devnet_config.pox_stacking_orders.take().unwrap_or(vec![]),
+                disable_bitcoin_explorer: devnet_config.disable_bitcoin_explorer.unwrap_or(false),
+                disable_stacks_api: devnet_config.disable_stacks_api.unwrap_or(false),
+                disable_stacks_explorer: devnet_config.disable_stacks_explorer.unwrap_or(false),
             };
             Some(config)
         } else {

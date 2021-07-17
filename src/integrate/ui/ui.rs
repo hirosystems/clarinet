@@ -30,7 +30,7 @@ pub fn draw<B: Backend>(f: &mut Frame<B>, app: &mut App) {
 
     let top_right_components = Layout::default()
         .direction(Direction::Vertical)
-        .constraints([Constraint::Length(7), Constraint::Min(1)].as_ref())
+        .constraints([Constraint::Length(8), Constraint::Min(1)].as_ref())
         .split(devnet_status_components[1]);
 
     draw_devnet_status(f, app, devnet_status_components[0]);

@@ -336,7 +336,7 @@ pub fn main() {
         Command::Integrate(cmd) => {
             let manifest_path = get_manifest_path_or_exit(cmd.manifest_path);
             println!(
-                "Start orchestrating stacks-node, stacks-blockchain-api, bitcoind, bitcoin explorer, stacks-explorer"
+                "Starting Devnet..."
             );
             let devnet = DevnetOrchestrator::new(manifest_path);
             integrate::run_devnet(devnet);
