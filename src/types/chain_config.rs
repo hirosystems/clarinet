@@ -318,36 +318,7 @@ impl ChainConfig {
                     .stacks_explorer_image_url
                     .take()
                     .unwrap_or(DEFAULT_STACKS_EXPLORER_IMAGE.to_string()),
-                pox_stacking_orders: devnet_config.pox_stacking_orders.take().unwrap_or(vec![
-                    PoxStackingOrder {
-                        start_at_cycle: 3,
-                        duration: 12,
-                        wallet: "wallet_1".into(),
-                        slots: 2,
-                        btc_address: "mr1iPkD9N3RJZZxXRk7xF9d36gffa6exNC".into(),
-                    },
-                    PoxStackingOrder {
-                        start_at_cycle: 3,
-                        duration: 12,
-                        wallet: "wallet_2".into(),
-                        slots: 2,
-                        btc_address: "muYdXKmX9bByAueDe6KFfHd5Ff1gdN9ErG".into(),
-                    },
-                    PoxStackingOrder {
-                        start_at_cycle: 3,
-                        duration: 12,
-                        wallet: "wallet_3".into(),
-                        slots: 2,
-                        btc_address: "mvZtbibDAAA3WLpY7zXXFqRa3T4XSknBX7".into(),
-                    },
-                    PoxStackingOrder {
-                        start_at_cycle: 3,
-                        duration: 12,
-                        wallet: "wallet_4".into(),
-                        slots: 2,
-                        btc_address: "mg1C76bNTutiCDV3t9nWhZs3Dc8LzUufj8".into(),
-                    },
-                ]),
+                pox_stacking_orders: devnet_config.pox_stacking_orders.take().unwrap_or(vec![]),
             };
             Some(config)
         } else {

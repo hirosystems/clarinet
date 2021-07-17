@@ -577,6 +577,7 @@ version = "0.14.1"
 dependencies = [
  "aes",
  "atty",
+ "base58",
  "base64 0.13.0",
  "bip39",
  "block-modes",

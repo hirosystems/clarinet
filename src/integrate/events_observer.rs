@@ -18,6 +18,7 @@ use std::path::PathBuf;
 use std::str;
 use std::sync::mpsc::{Receiver, Sender};
 use std::sync::{Arc, Mutex, RwLock};
+use base58::FromBase58;
 
 #[allow(dead_code)]
 #[derive(Deserialize)]
@@ -283,7 +284,10 @@ pub fn handle_new_block(
                             &account.derivation,
                             account.is_mainnet,
                         );
-                        let addr_bytes = Hash160([0u8; 20]);
+                        let addr_bytes = pox_stacking_order.btc_address.from_base58()
+                            .expect("Unable to get bytes from btc address");
+
+                        let addr_bytes = Hash160::from_bytes(&addr_bytes[1..21]).unwrap();
                         let addr_version = AddressHashMode::SerializeP2PKH;
                         let stack_stx_tx = transactions::build_contrat_call_transaction(
                             config_reader.pox_info.contract_id.clone(),
@@ -368,3 +372,145 @@ pub fn handle_drop_mempool_tx() -> Json<Value> {
         "result": "Ok",
     }))
 }
+
+/*
+export interface CoreNodeTxMessage {
+    raw_tx: string;
+    result: NonStandardClarityValue;
+    status: CoreNodeTxStatus;
+    raw_result: string;
+    txid: string;
+    tx_index: number;
+    contract_abi: ClarityAbi | null;
+  }
+
+  export interface CoreNodeBlockMessage {
+    block_hash: string;
+    block_height: number;
+    burn_block_time: number;
+    burn_block_hash: string;
+    burn_block_height: number;
+    miner_txid: string;
+    index_block_hash: string;
+    parent_index_block_hash: string;
+    parent_block_hash: string;
+    parent_microblock: string;
+    events: CoreNodeEvent[];
+    transactions: CoreNodeTxMessage[];
+    matured_miner_rewards: {
+      from_index_consensus_hash: string;
+      from_stacks_block_hash: string;
+      /** STX principal */
+      recipient: string;
+      /** String quoted micro-STX amount. */
+      coinbase_amount: string;
+      /** String quoted micro-STX amount. */
+      tx_fees_anchored: string;
+      /** String quoted micro-STX amount. */
+      tx_fees_streamed_confirmed: string;
+      /** String quoted micro-STX amount. */
+      tx_fees_streamed_produced: string;
+    }[];
+  }
+
+  export interface CoreNodeMessageParsed extends CoreNodeBlockMessage {
+    parsed_transactions: CoreNodeParsedTxMessage[];
+  }
+
+  export interface CoreNodeParsedTxMessage {
+    core_tx: CoreNodeTxMessage;
+    parsed_tx: Transaction;
+    raw_tx: Buffer;
+    nonce: number;
+    sender_address: string;
+    sponsor_address?: string;
+    block_hash: string;
+    index_block_hash: string;
+    block_height: number;
+    burn_block_time: number;
+  }
+
+  export interface CoreNodeBurnBlockMessage {
+    burn_block_hash: string;
+    burn_block_height: number;
+    /** Amount in BTC satoshis. */
+    burn_amount: number;
+    reward_recipients: [
+      {
+        /** Bitcoin address (b58 encoded). */
+        recipient: string;
+        /** Amount in BTC satoshis. */
+        amt: number;
+      }
+    ];
+    /**
+     * Array of the Bitcoin addresses that would validly receive PoX commitments during this block.
+     * These addresses may not actually receive rewards during this block if the block is faster
+     * than miners have an opportunity to commit.
+     */
+    reward_slot_holders: string[];
+  }
+
+  export type CoreNodeDropMempoolTxReasonType =
+    | 'ReplaceByFee'
+    | 'ReplaceAcrossFork'
+    | 'TooExpensive'
+    | 'StaleGarbageCollect';
+
+  export interface CoreNodeDropMempoolTxMessage {
+    dropped_txids: string[];
+    reason: CoreNodeDropMempoolTxReasonType;
+  }
+
+  export interface CoreNodeAttachmentMessage {
+    attachment_index: number;
+    index_block_hash: string;
+    block_height: string; // string quoted integer?
+    content_hash: string;
+    contract_id: string;
+    /** Hex serialized Clarity value */
+    metadata: string;
+    tx_id: string;
+    /* Hex encoded attachment content bytes */
+    content: string;
+  }
+  */
+
+// let join_handle = std::thread::spawn(move || {
+//     let mut i = 0;
+//     loop {
+//         std::thread::sleep(std::time::Duration::from_secs(1));
+//         event_tx_simulator.send(DevnetEvent::Log(LogData {
+//             level: LogLevel::Info,
+//             message: "Hello world".into(),
+//             occurred_at: 0
+//         })).unwrap();
+//         event_tx_simulator.send(DevnetEvent::Block(BlockData {
+//             block_height: i,
+//             bitcoin_block_height: i,
+//             block_hash: format!("{}", i),
+//             bitcoin_block_hash: format!("{}", i),
+//             transactions: vec![
+//                 Transaction {
+//                     txid: "".to_string(),
+//                     success: i % 2 == 0,
+//                     result: format!("(ok u1)"),
+//                     events: vec![],
+//                 },
+//                 Transaction {
+//                     txid: "".to_string(),
+//                     success: (i + 1) % 2 == 0,
+//                     result: format!("(err u3)"),
+//                     events: vec![],
+//                 },
+//                 Transaction {
+//                     txid: "".to_string(),
+//                     success: (i + 2) % 2 == 0,
+//                     result: format!("(ok err)"),
+//                     events: vec![],
+//                 },
+//             ]
+//         })).unwrap();
+//         i += 1;
+//     }
+// });
