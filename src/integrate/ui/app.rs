@@ -75,7 +75,7 @@ impl<'a> App<'a> {
     }
 
     pub fn display_block(&mut self, block: BlockData) {
-        let cycle_len = block.pox_cycle_length;
+        let cycle_len: u64 = block.pox_cycle_length.into();
         let abs_pos = block.bitcoin_block_height - block.first_burnchain_block_height;
         let (start, end) = if abs_pos % cycle_len == (cycle_len - 1) {
             ("", "<")

@@ -10,7 +10,7 @@ use crate::generate::{
 };
 use crate::integrate::{self, DevnetOrchestrator};
 use crate::poke::load_session;
-use crate::publish::{publish_contracts, Network};
+use crate::publish::{publish_all_contracts, Network};
 use crate::test::run_tests;
 use crate::types::{MainConfig, MainConfigFile, RequirementConfig};
 use clarity_repl::repl;
@@ -328,16 +328,13 @@ pub fn main() {
             } else {
                 panic!("Target deployment must be specified with --devnet, --testnet,  --mainnet")
             };
-            match publish_contracts(manifest_path, network) {
+            match publish_all_contracts(manifest_path, network) {
                 Ok(results) => println!("{}", results.join("\n")),
-                Err(e) => println!("{}", e),
+                Err(results) => println!("{}", results.join("\n")),
             };
         }
         Command::Integrate(cmd) => {
             let manifest_path = get_manifest_path_or_exit(cmd.manifest_path);
-            println!(
-                "Starting Devnet..."
-            );
             let devnet = DevnetOrchestrator::new(manifest_path);
             integrate::run_devnet(devnet);
         }

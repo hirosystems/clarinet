@@ -382,10 +382,22 @@ whitelisted_rpc_calls = [
     "getrawmempool",
     "getblockhash",
 ]
-
+# Expedite the key registration / genesis block
 [[blocks]]
 count = 1
 block_time = 30000
+ignore_txs = false
+
+# Expedite the key registration / genesis block
+[[blocks]]
+count = 2
+block_time = 20000
+ignore_txs = false
+
+# Give more time to the first blocks
+[[blocks]]
+count = 3
+block_time = 45000
 ignore_txs = false
 "#,
             devnet_config.bitcoin_controller_port,
@@ -631,7 +643,6 @@ events_keys = ["*"]
             ]),
             env: Some(vec![
                 "STACKS_LOG_PP=1".to_string(),
-                "STACKS_LOG_DEBUG=1".to_string(),
                 "BLOCKSTACK_USE_TEST_GENESIS_CHAINSTATE=1".to_string(),
             ]),
             host_config: Some(HostConfig {

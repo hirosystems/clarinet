@@ -10,7 +10,7 @@ use crate::utils;
 use events_observer::start_events_observer;
 pub use orchestrator::DevnetOrchestrator;
 
-use self::events_observer::{EventObserverConfig, PoxInfo};
+use self::events_observer::{EventObserverConfig};
 
 pub fn run_devnet(devnet: DevnetOrchestrator) {
     match block_on(do_run_devnet(devnet)) {
@@ -43,12 +43,7 @@ pub async fn do_run_devnet(mut devnet: DevnetOrchestrator) -> Result<bool, Strin
 
     // The event observer should be able to send some events to the UI thread,
     // and should be able to be terminated
-    let config = EventObserverConfig {
-        devnet_config,
-        accounts,
-        manifest_path: devnet.manifest_path.clone(),
-        pox_info: PoxInfo::default(),
-    };
+    let config = EventObserverConfig::new(devnet_config, devnet.manifest_path.clone(), accounts);
     let events_observer_tx = devnet_events_tx.clone();
     let (events_observer_terminator_tx, terminator_rx) = channel();
     let events_observer_handle = std::thread::spawn(move || {
@@ -56,6 +51,9 @@ pub async fn do_run_devnet(mut devnet: DevnetOrchestrator) -> Result<bool, Strin
         let rt = utils::create_basic_runtime();
         let _ = rt.block_on(future);
     });
+
+    // Let's start the orchestration
+    println!("Starting Devnet...");
 
     // The devnet orchestrator should be able to send some events to the UI thread,
     // and should be able to be restarted/terminated
@@ -184,11 +182,11 @@ pub struct Transaction {
 
 #[derive(Clone)]
 pub struct BlockData {
-    pub block_height: u32,
+    pub block_height: u64,
     pub block_hash: String,
-    pub bitcoin_block_height: u32,
+    pub bitcoin_block_height: u64,
     pub bitcoin_block_hash: String,
-    pub first_burnchain_block_height: u32,
+    pub first_burnchain_block_height: u64,
     pub pox_cycle_length: u32,
     pub pox_cycle_id: u32,
     pub transactions: Vec<Transaction>,
