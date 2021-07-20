@@ -18,6 +18,10 @@ jobs:
           git config --global user.name "Hiro DevOps"
           git config --global user.email "45208873+blockstack-devops@users.noreply.github.com"
 
-          brew bump-formula-pr --no-browse \
+          brew bump-formula-pr \
+            --no-browse \
+            --no-audit \
             --url https://github.com/${{ github.repository }}/archive/${GITHUB_REF##*/}.tar.gz \
             ${{ github.event.repository.name }}
+        env:
+          HOMEBREW_GITHUB_API_TOKEN: ${{ secrets.GH_TOKEN }}
