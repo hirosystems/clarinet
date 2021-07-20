@@ -13,10 +13,6 @@
     },
     "release": {
         "branches": [
-            {
-                "name": "develop",
-                "prerelease": true
-            },
             "main"
         ],
         "plugins": [
