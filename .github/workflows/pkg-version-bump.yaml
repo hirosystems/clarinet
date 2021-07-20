@@ -7,6 +7,11 @@ on:
   release:
     types:
       - released
+  workflow_dispatch:
+
+env:
+  GIT_USER_NAME: Hiro DevOps
+  GIT_USER_EMAIL: 45208873+blockstack-devops@users.noreply.github.com
 
 jobs:
   homebrew:
@@ -15,8 +20,8 @@ jobs:
     steps:
       - name: Homebrew version bump
         run: |
-          git config --global user.name "Hiro DevOps"
-          git config --global user.email "45208873+blockstack-devops@users.noreply.github.com"
+          git config --global user.name "${GIT_USER_NAME}"
+          git config --global user.email "${GIT_USER_EMAIL}"
 
           brew bump-formula-pr \
             --no-browse \
@@ -25,3 +30,34 @@ jobs:
             ${{ github.event.repository.name }}
         env:
           HOMEBREW_GITHUB_API_TOKEN: ${{ secrets.GH_TOKEN }}
+
+  winget:
+    name: Winget
+    runs-on: windows-latest
+    steps:
+      - name: Winget version bump
+        run: |
+          # Get version info
+          $TAG=${env:GITHUB_REF}.substring(10)
+          $VERSION=${TAG}.substring(1)
+
+          # Configure git configs
+          git config --global user.name "${env:GIT_USER_NAME}"
+          git config --global user.email "${env:GIT_USER_EMAIL}"
+
+          # Get wingetcreate
+          iwr https://aka.ms/wingetcreate/latest -OutFile wingetcreate.exe
+
+          # Fork and clone winget-pkgs repo
+          echo ${{ secrets.GH_TOKEN }} | gh auth login --with-token
+          gh repo fork microsoft/winget-pkgs --clone
+          cd winget-pkgs
+          git pull upstream master
+  
+          # Update manifest and submit PR
+          ../wingetcreate.exe update `
+            --url https://github.com/${{ github.repository }}/releases/download/${TAG}/clarinet-windows-x64.msi `
+            --version ${VERSION} `
+            --token ${{ secrets.GH_TOKEN }} `
+            --submit `
+            HiroSystems.Clarinet
