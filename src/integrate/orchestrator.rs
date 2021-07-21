@@ -192,7 +192,7 @@ impl DevnetOrchestrator {
             order: 2,
             status: Status::Green,
             name: "stacks-api".into(),
-            comment: format!("http://0.0.0.0:{}", stacks_api_port),
+            comment: format!("http://localhost:{}", stacks_api_port),
         }));
 
         // Start stacks-blockchain
@@ -238,7 +238,7 @@ impl DevnetOrchestrator {
             order: 3,
             status: Status::Green,
             name: "stacks-explorer".into(),
-            comment: format!("http://0.0.0.0:{}", stacks_explorer_port),
+            comment: format!("http://localhost:{}", stacks_explorer_port),
         }));
 
         // Start bitcoin-explorer
@@ -261,7 +261,7 @@ impl DevnetOrchestrator {
             order: 4,
             status: Status::Green,
             name: "bitcoin-explorer".into(),
-            comment: format!("http://0.0.0.0:{}", bitcoin_explorer_port),
+            comment: format!("http://localhost:{}", bitcoin_explorer_port),
         }));
 
         match terminator_rx.recv() {

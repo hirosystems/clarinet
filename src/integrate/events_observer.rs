@@ -196,7 +196,7 @@ pub fn handle_new_burn_block(
         Ok(config_reader) => {
             let pox_cycle_len: u64 = config_reader.pox_info.pox_cycle_len().into();
             let pox_url = format!(
-                "http://0.0.0.0:{}/v2/pox",
+                "http://localhost:{}/v2/pox",
                 config_reader.devnet_config.stacks_node_rpc_port
             );
             (pox_cycle_len, pox_url)
@@ -251,7 +251,7 @@ pub fn handle_new_block(
         let updated_config = if let Ok(config_reader) = config.read() {
             let mut updated_config = config_reader.clone();
             let node = format!(
-                "http://0.0.0.0:{}",
+                "http://localhost:{}",
                 config_reader.devnet_config.stacks_node_rpc_port
             );
 
@@ -346,9 +346,9 @@ pub fn handle_new_block(
             // cycle starts.
             if new_block.burn_block_height % pox_cycle_length == (pox_cycle_length - 2) {
 
-                let tx_clone = tx.clone();
+                // let tx_clone = tx.clone();
                 let node = format!(
-                    "http://0.0.0.0:{}",
+                    "http://localhost:{}",
                     config_reader.devnet_config.stacks_node_rpc_port
                 );
                 let accounts = config_reader.accounts.clone();
