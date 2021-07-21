@@ -15,6 +15,7 @@ pub fn draw<B: Backend>(f: &mut Frame<B>, app: &mut App) {
         .direction(Direction::Vertical)
         .constraints(
             [
+                Constraint::Length(1),
                 Constraint::Length(20),
                 Constraint::Min(1),
                 Constraint::Length(1),
@@ -26,7 +27,7 @@ pub fn draw<B: Backend>(f: &mut Frame<B>, app: &mut App) {
     let devnet_status_components = Layout::default()
         .direction(Direction::Horizontal)
         .constraints([Constraint::Min(1), Constraint::Length(78)].as_ref())
-        .split(page_components[0]);
+        .split(page_components[1]);
 
     let top_right_components = Layout::default()
         .direction(Direction::Vertical)
@@ -36,23 +37,14 @@ pub fn draw<B: Backend>(f: &mut Frame<B>, app: &mut App) {
     draw_devnet_status(f, app, devnet_status_components[0]);
     draw_services_status(f, app, top_right_components[0]);
     draw_mempool(f, app, top_right_components[1]);
-    draw_blocks(f, app, page_components[1]);
-    draw_help(f, app, page_components[2]);
+    draw_blocks(f, app, page_components[2]);
+    draw_help(f, app, page_components[3]);
 }
 
 fn draw_services_status<B>(f: &mut Frame<B>, app: &mut App, area: Rect)
 where
     B: Backend,
 {
-    let normal_style = Style::default().bg(Color::DarkGray);
-    let header_cells = ["", "Service", ""]
-        .iter()
-        .map(|h| Cell::from(*h).style(Style::default().fg(Color::Gray)));
-    let header = Row::new(header_cells)
-        .style(normal_style)
-        .height(1)
-        .bottom_margin(0);
-
     let rows = app.services.items.iter().map(|service| {
         let status = match service.status {
             Status::Green => "🟩",
@@ -70,8 +62,8 @@ where
     });
 
     let t = Table::new(rows)
-        .header(header)
         .block(Block::default().borders(Borders::ALL).title("Services"))
+        .style(Style::default().fg(Color::White))
         .widths(&[
             Constraint::Length(3),
             Constraint::Length(20),
@@ -88,12 +80,21 @@ where
         let cells = vec![Cell::from(item.txid.clone())];
         Row::new(cells).height(1).bottom_margin(0)
     });
+    let block = Block::default()
+        .borders(Borders::ALL).title("Mempool")
+        .style(Style::default().fg(Color::White));
+    f.render_widget(block, area);
+
     let t = Table::new(rows)
         .block(Block::default().borders(Borders::ALL).title("Mempool"))
+        .style(Style::default().fg(Color::White))
         .widths(&[
             // Constraint::Length(8),
             Constraint::Min(1),
         ]);
+    let mut inner_area = area.clone();
+    inner_area.height -= 1;
+
     f.render_widget(t, area);
 }
 
@@ -125,20 +126,23 @@ where
                 Span::styled(format!("{:<5}", label), style),
                 Span::styled(&log.occurred_at, Style::default().fg(Color::DarkGray)),
                 Span::raw(" "),
-                Span::raw(log.message.clone()),
+                Span::styled(log.message.clone(), Style::default().fg(Color::White)),
             ]);
 
             ListItem::new(vec![log])
         })
         .collect();
+    let block = Block::default()
+        .style(Style::default().fg(Color::White))
+        .borders(Borders::ALL)
+        .title("Stacks Devnet");
+    let mut inner_area = block.inner(area);
+    inner_area.height -= 1;
+    f.render_widget(block, area);
+
     let logs_component = List::new(logs)
-        .block(
-            Block::default()
-                .borders(Borders::ALL)
-                .title("Stacks Devnet"),
-        )
         .start_corner(Corner::BottomLeft);
-    f.render_widget(logs_component, area);
+    f.render_widget(logs_component, inner_area);
 }
 
 fn draw_blocks<B>(f: &mut Frame<B>, app: &mut App, area: Rect)
@@ -147,6 +151,7 @@ where
 {
     let t = Table::new(vec![])
         .block(Block::default().borders(Borders::ALL))
+        .style(Style::default().fg(Color::White))
         .widths(&[]);
     f.render_widget(t, area);
 
@@ -158,7 +163,7 @@ where
     let titles = app.tabs.titles.iter().map(|s| s.clone()).collect();
     let blocks = Tabs::new(titles)
         .divider("")
-        .style(Style::default().bg(Color::Black).fg(Color::White))
+        .style(Style::default().fg(Color::White))
         .highlight_style(Style::default().bg(Color::White).fg(Color::Black))
         .block(Block::default().borders(Borders::NONE))
         .select(app.tabs.index);
@@ -187,7 +192,8 @@ where
 {
     let paragraph = Paragraph::new(String::new()).block(
         Block::default()
-            .borders(Borders::RIGHT)
+            .borders(Borders::NONE)
+            .style(Style::default().fg(Color::White))
             .title("Block Informations"),
     );
     f.render_widget(paragraph, area);
@@ -214,61 +220,61 @@ where
 
     let label = "Block height:".to_string();
     let paragraph = Paragraph::new(label)
-        .style(Style::default().bg(Color::Black).fg(Color::White))
+        .style(Style::default().fg(Color::White))
         .block(Block::default().borders(Borders::NONE));
     f.render_widget(paragraph, labels[1]);
 
     let value = format!("{}", block.block_height);
     let paragraph = Paragraph::new(value)
-        .style(Style::default().bg(Color::Black).fg(Color::White))
+        .style(Style::default().fg(Color::White))
         .block(Block::default().borders(Borders::NONE));
     f.render_widget(paragraph, labels[2]);
 
     let label = "Block hash:".to_string();
     let paragraph = Paragraph::new(label)
-        .style(Style::default().bg(Color::Black).fg(Color::White))
+        .style(Style::default().fg(Color::White))
         .block(Block::default().borders(Borders::NONE));
     f.render_widget(paragraph, labels[3]);
 
     let value = format!("{}", block.block_hash);
     let paragraph = Paragraph::new(value)
-        .style(Style::default().bg(Color::Black).fg(Color::White))
+        .style(Style::default().fg(Color::White))
         .block(Block::default().borders(Borders::NONE));
     f.render_widget(paragraph, labels[4]);
 
     let label = "Bitcoin block height:".to_string();
     let paragraph = Paragraph::new(label)
-        .style(Style::default().bg(Color::Black).fg(Color::White))
+        .style(Style::default().fg(Color::White))
         .block(Block::default().borders(Borders::NONE));
     f.render_widget(paragraph, labels[5]);
 
     let value = format!("{}", block.bitcoin_block_height);
     let paragraph = Paragraph::new(value)
-        .style(Style::default().bg(Color::Black).fg(Color::White))
+        .style(Style::default().fg(Color::White))
         .block(Block::default().borders(Borders::NONE));
     f.render_widget(paragraph, labels[6]);
 
     let label = "Bitcoin block hash:".to_string();
     let paragraph = Paragraph::new(label)
-        .style(Style::default().bg(Color::Black).fg(Color::White))
+        .style(Style::default().fg(Color::White))
         .block(Block::default().borders(Borders::NONE));
     f.render_widget(paragraph, labels[7]);
 
     let value = format!("{}", block.bitcoin_block_hash);
     let paragraph = Paragraph::new(value)
-        .style(Style::default().bg(Color::Black).fg(Color::White))
+        .style(Style::default().fg(Color::White))
         .block(Block::default().borders(Borders::NONE));
     f.render_widget(paragraph, labels[8]);
 
     let label = "Pox Cycle:".to_string();
     let paragraph = Paragraph::new(label)
-        .style(Style::default().bg(Color::Black).fg(Color::White))
+        .style(Style::default().fg(Color::White))
         .block(Block::default().borders(Borders::NONE));
     f.render_widget(paragraph, labels[9]);
 
     let value = format!("{}", block.pox_cycle_id);
     let paragraph = Paragraph::new(value)
-        .style(Style::default().bg(Color::Black).fg(Color::White))
+        .style(Style::default().fg(Color::White))
         .block(Block::default().borders(Borders::NONE));
     f.render_widget(paragraph, labels[10]);
 
@@ -307,7 +313,8 @@ where
     let list = List::new(transactions)
         .block(
             Block::default()
-                .borders(Borders::NONE)
+                .borders(Borders::LEFT)
+                .style(Style::default().fg(Color::White))
                 .title("Transactions"),
         )
         .highlight_style(
@@ -315,20 +322,22 @@ where
                 .bg(Color::LightGreen)
                 .add_modifier(Modifier::BOLD),
         )
-        // .start_corner(Corner::BottomLeft);
         .highlight_symbol("* ");
-
-    f.render_widget(list, area);
+    let mut inner_area = area.clone();
+    inner_area.height -= 1;
+    f.render_widget(list, inner_area);
 }
 
 fn draw_help<B>(f: &mut Frame<B>, _app: &mut App, area: Rect)
 where
     B: Backend,
 {
+    // let help =
+    //     " ⬅️  ➡️  Explore blocks          ⬆️  ⬇️  Explore transactions          0️⃣  Genesis Reset";
     let help =
-        " ⬅️  ➡️  Explore blocks          ⬆️  ⬇️  Explore transactions          0️⃣  Genesis Reset";
+        " ⬅️  ➡️  Explore blocks          0️⃣  Genesis Reset";
     let paragraph = Paragraph::new(help.clone())
-        .style(Style::default().bg(Color::Black).fg(Color::White))
+        .style(Style::default().fg(Color::White))
         .block(Block::default().borders(Borders::NONE));
 
     f.render_widget(paragraph, area);
