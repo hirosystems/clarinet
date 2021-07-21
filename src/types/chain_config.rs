@@ -247,7 +247,9 @@ impl ChainConfig {
             };
 
             let now = clarity_repl::clarity::util::get_epoch_time_secs();
-            let default_working_dir = format!("/tmp/stacks-devnet-{}", now);
+            let mut dir = std::env::temp_dir();
+            dir.push(format!("stacks-devnet-{}/", now));
+            let default_working_dir = dir.display().to_string();
 
             let miner_mnemonic = devnet_config.miner_mnemonic.take().unwrap_or("fragile loan twenty basic net assault jazz absorb diet talk art shock innocent float punch travel gadget embrace caught blossom hockey surround initial reduce".to_string());
             let miner_derivation_path = devnet_config
