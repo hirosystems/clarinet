@@ -47,15 +47,9 @@ jobs:
 
           # Get wingetcreate
           iwr https://aka.ms/wingetcreate/latest -OutFile wingetcreate.exe
-
-          # Fork and clone winget-pkgs repo
-          echo ${{ secrets.GH_TOKEN }} | gh auth login --with-token
-          gh repo fork microsoft/winget-pkgs --clone
-          cd winget-pkgs
-          git pull upstream master
   
           # Update manifest and submit PR
-          ../wingetcreate.exe update `
+          ./wingetcreate.exe update `
             --url https://github.com/${{ github.repository }}/releases/download/${TAG}/clarinet-windows-x64.msi `
             --version ${VERSION} `
             --token ${{ secrets.GH_TOKEN }} `
