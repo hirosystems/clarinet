@@ -56,6 +56,14 @@ impl<'a> App<'a> {
 
     pub fn on_tick(&mut self) {}
 
+    pub fn reset(&mut self) {
+        self.tabs = TabsState::new();
+        self.blocks = vec![];
+        self.transactions = StatefulList::with_items(vec![]);
+        self.mempool = StatefulList::with_items(vec![]);
+        self.logs = StatefulList::with_items(vec![]);
+    }
+
     pub fn display_service_status_update(&mut self, service_update: ServiceStatusData) {
         let insertion_index = service_update.order;
         if insertion_index == self.services.items.len() {

@@ -126,35 +126,69 @@ pub async fn start_events_observer(
     terminator_rx: Receiver<bool>,
 ) -> Result<(), Box<dyn Error>> {
     let port = events_config.devnet_config.orchestrator_port;
+    let manifest_path = events_config.manifest_path.clone();
+    let rw_lock = Arc::new(RwLock::new(events_config));
 
+    let moved_rw_lock = rw_lock.clone();
+    let moved_tx = Arc::new(Mutex::new(devnet_event_tx.clone()));
     let config = Config::build(Environment::Production)
         .address("127.0.0.1")
         .port(port)
         .log_level(LoggingLevel::Off)
         .finalize()?;
 
-    rocket::custom(config)
-        .manage(RwLock::new(events_config))
-        .manage(Arc::new(Mutex::new(devnet_event_tx.clone())))
-        .mount(
-            "/",
-            routes![
-                handle_new_burn_block,
-                handle_new_block,
-                handle_new_microblocks,
-                handle_new_mempool_tx,
-                handle_drop_mempool_tx
-            ],
-        )
-        .launch();
+    std::thread::spawn(move || {
 
-    match terminator_rx.recv() {
-        Ok(true) => {
-            devnet_event_tx
-                .send(DevnetEvent::info("Terminating event observer".into()))
-                .expect("Unable to terminate event observer");
+        rocket::custom(config)
+            .manage(moved_rw_lock)
+            .manage(moved_tx)
+            .mount(
+                "/",
+                routes![
+                    handle_new_burn_block,
+                    handle_new_block,
+                    handle_new_microblocks,
+                    handle_new_mempool_tx,
+                    handle_drop_mempool_tx
+                ],
+            )
+            .launch();
+    });
+
+    loop {
+        match terminator_rx.recv() {
+            Ok(true) => {
+                devnet_event_tx
+                    .send(DevnetEvent::info("Terminating event observer".into()))
+                    .expect("Unable to terminate event observer");
+                break;
+            }
+            Ok(false) => {
+                // Restart
+                devnet_event_tx
+                    .send(DevnetEvent::info("Reloading contracts".into()))
+                    .expect("Unable to terminate event observer");
+
+                let session_settings = match load_session(manifest_path.clone(), false, Network::Devnet) {
+                    Ok(settings) => settings,
+                    Err(e) => {
+                        devnet_event_tx
+                            .send(DevnetEvent::error(format!("Contracts invalid: {}", e)))
+                            .expect("Unable to terminate event observer");
+                        continue;
+                    }
+                };
+                let contracts_to_deploy = VecDeque::from_iter(session_settings.initial_contracts.iter().map(|c| c.clone()));
+
+                if let Ok(mut config_writer) = rw_lock.write() {
+                    config_writer.contracts_to_deploy = contracts_to_deploy;
+                    config_writer.session_settings = session_settings;
+                }
+            }
+            Err(_) => {
+                break;
+            }
         }
-        _ => {}
     }
     Ok(())
 }
@@ -165,7 +199,7 @@ pub async fn start_events_observer(
     data = "<new_burn_block>"
 )]
 pub fn handle_new_burn_block(
-    config_state: State<RwLock<EventObserverConfig>>,
+    config: State<Arc<RwLock<EventObserverConfig>>>,
     devnet_events_tx: State<Arc<Mutex<Sender<DevnetEvent>>>>,
     new_burn_block: Json<NewBurnBlock>,
 ) -> Json<Value> {
@@ -190,8 +224,14 @@ pub fn handle_new_burn_block(
         _ => {}
     };
 
-    let config = config_state.inner();
+    if new_burn_block.burn_block_height > 110 {
+        return Json(json!({
+            "status": 200,
+            "result": "Ok",
+        }))    
+    }
 
+    let config = config.inner();
     let (pox_cycle_len, pox_url) = match config.read() {
         Ok(config_reader) => {
             let pox_cycle_len: u64 = config_reader.pox_info.pox_cycle_len().into();
@@ -227,7 +267,7 @@ pub fn handle_new_burn_block(
 
 #[post("/new_block", format = "application/json", data = "<new_block>")]
 pub fn handle_new_block(
-    config: State<RwLock<EventObserverConfig>>,
+    config: State<Arc<RwLock<EventObserverConfig>>>,
     devnet_events_tx: State<Arc<Mutex<Sender<DevnetEvent>>>>,
     new_block: Json<NewBlock>,
 ) -> Json<Value> {
@@ -427,6 +467,7 @@ pub fn handle_new_block(
 
 #[post("/new_microblocks", format = "application/json")]
 pub fn handle_new_microblocks(
+    _config: State<Arc<RwLock<EventObserverConfig>>>,
     _devnet_events_tx: State<Arc<Mutex<Sender<DevnetEvent>>>>,
 ) -> Json<Value> {
     Json(json!({
@@ -437,7 +478,7 @@ pub fn handle_new_microblocks(
 
 #[post("/new_mempool_tx", format = "application/json", data = "<raw_txs>")]
 pub fn handle_new_mempool_tx(
-    _config: State<RwLock<EventObserverConfig>>,
+    _config: State<Arc<RwLock<EventObserverConfig>>>,
     devnet_events_tx: State<Arc<Mutex<Sender<DevnetEvent>>>>,
     raw_txs: Json<Vec<String>>,
 ) -> Json<Value> {

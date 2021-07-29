@@ -70,16 +70,24 @@ pub fn start_ui(
             DevnetEvent::KeyEvent(event) => match (event.modifiers, event.code) {
                 (KeyModifiers::CONTROL, KeyCode::Char('c')) => {
                     app.display_log(DevnetEvent::log_warning("Ctrl+C received, initiating termination sequence.".into()));
+                    let _ = trigger_reset(
+                        true,
+                        &events_observer_terminator_tx,
+                        &orchestrator_terminator_tx);
+
                     let _ = terminate(
                         &mut terminal,
-                        true,
-                        events_observer_terminator_tx,
-                        orchestrator_terminator_tx,
                         orchestrator_terminated_rx);
                     break;
                 }
                 (_, KeyCode::Char('0')) => {
-                    // Reset Testnet
+                    // Reset Testnet`
+                    app.reset();
+                    app.display_log(DevnetEvent::log_warning("Reset Devnet...".into()));
+                    let _ = trigger_reset(
+                        false,
+                        &events_observer_terminator_tx,
+                        &orchestrator_terminator_tx);
                 },
                 (_, KeyCode::Left) => app.on_left(),
                 (_, KeyCode::Up) => app.on_up(),
@@ -120,30 +128,34 @@ pub fn start_ui(
     Ok(())
 }
 
+fn trigger_reset(
+    terminate: bool,
+    events_observer_terminator_tx: &Sender<bool>,
+    orchestrator_terminator_tx: &Sender<bool>,
+) -> Result<(), Box<dyn Error>> {
+    events_observer_terminator_tx
+        .send(terminate)
+        .expect("Unable to terminate devnet");
+    orchestrator_terminator_tx
+        .send(terminate)
+        .expect("Unable to terminate devnet");
+    Ok(())
+}
+
 fn terminate(
     terminal: &mut Terminal<CrosstermBackend<Stdout>>,
-    terminate: bool,
-    events_observer_terminator_tx: Sender<bool>,
-    orchestrator_terminator_tx: Sender<bool>,
     orchestrator_terminated_rx: Receiver<bool>,
 ) -> Result<(), Box<dyn Error>> {
+
     disable_raw_mode()?;
     execute!(
         terminal.backend_mut(),
         LeaveAlternateScreen,
         DisableMouseCapture
     )?;
-    orchestrator_terminator_tx
-        .send(terminate)
-        .expect("Unable to terminate devnet");
-    events_observer_terminator_tx
-        .send(terminate)
-        .expect("Unable to terminate devnet");
-
     match orchestrator_terminated_rx.recv()? {
         _ => {}
-    }
+    }    
     terminal.show_cursor()?;
-
     Ok(())
 }

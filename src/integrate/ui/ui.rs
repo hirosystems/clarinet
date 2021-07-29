@@ -335,7 +335,7 @@ where
     // let help =
     //     " ⬅️  ➡️  Explore blocks          ⬆️  ⬇️  Explore transactions          0️⃣  Genesis Reset";
     let help =
-        " ⬅️  ➡️  Explore blocks          0️⃣  Genesis Reset";
+        " ⬅️  ➡️  Explore blocks          0️⃣  Reset Devnet";
     let paragraph = Paragraph::new(help.clone())
         .style(Style::default().fg(Color::White))
         .block(Block::default().borders(Borders::NONE));
