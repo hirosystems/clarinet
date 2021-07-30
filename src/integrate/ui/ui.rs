@@ -77,7 +77,7 @@ where
     B: Backend,
 {
     let rows = app.mempool.items.iter().map(|item| {
-        let cells = vec![Cell::from(item.txid.clone())];
+        let cells = vec![Cell::from(item.tx.clone())];
         Row::new(cells).height(1).bottom_margin(0)
     });
     let block = Block::default()

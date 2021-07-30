@@ -139,6 +139,7 @@ pub async fn start_events_observer(
     let config = Config::build(Environment::Production)
         .address("127.0.0.1")
         .port(port)
+        .workers(4)
         .log_level(LoggingLevel::Off)
         .finalize()?;
 
@@ -208,7 +209,6 @@ pub async fn start_events_observer(
     data = "<new_burn_block>"
 )]
 pub fn handle_new_burn_block(
-    config: State<Arc<RwLock<EventObserverConfig>>>,
     devnet_events_tx: State<Arc<Mutex<Sender<DevnetEvent>>>>,
     new_burn_block: Json<NewBurnBlock>,
 ) -> Json<Value> {
@@ -262,195 +262,200 @@ pub fn handle_new_block(
             new_block.burn_block_height,
             new_block.transactions.len(),
         )));
+    }
 
-        let updated_config = if let Ok(config_reader) = config.read() {
+    let (updated_config, first_burnchain_block_height, prepare_phase_block_length, reward_phase_block_length, node) = if let Ok(config_reader) = config.read() {
+        let node = format!(
+            "http://localhost:{}",
+            config_reader.devnet_config.stacks_node_rpc_port
+        );
+
+        if config_reader.contracts_to_deploy.len() > 0 {
+    
             let mut updated_config = config_reader.clone();
-            let node = format!(
-                "http://localhost:{}",
-                config_reader.devnet_config.stacks_node_rpc_port
-            );
 
-            if updated_config.contracts_to_deploy.len() > 0 {
+            // How many contracts left?
+            let contracts_left = updated_config.contracts_to_deploy.len();
+            let tx_chaining_limit = 25;
+            let blocks_required = 1 + (contracts_left / tx_chaining_limit);
+            let contracts_to_deploy_in_blocks = if blocks_required == 1 {
+                contracts_left
+            } else {
+                contracts_left / blocks_required
+            };
 
-                // How many contracts left?
-                let contracts_left = updated_config.contracts_to_deploy.len();
-                let tx_chaining_limit = 25;
-                let blocks_required = 1 + (contracts_left / tx_chaining_limit);
-                let contracts_to_deploy_in_blocks = if blocks_required == 1 {
-                    contracts_left
-                } else {
-                    contracts_left / blocks_required
-                };
+            let mut contracts_to_deploy = vec![]; 
 
-                let mut contracts_to_deploy = vec![]; 
-
-                for _ in 0..contracts_to_deploy_in_blocks {
-                    let contract = updated_config.contracts_to_deploy.pop_front().unwrap();
-                    contracts_to_deploy.push(contract);
-                }
-
-                let tx_clone = tx.clone();
-                let node_clone = node.clone();
-
-                let mut deployers_lookup = BTreeMap::new();
-                for account in updated_config.session_settings.initial_accounts.iter() {
-                    if account.name == "deployer" {
-                        deployers_lookup.insert("*".into(), account.clone());
-                    }
-                }
-                // TODO(ludo): one day, we will get rid of this shortcut
-                let mut deployers_nonces = BTreeMap::new();
-                deployers_nonces.insert("deployer".to_string(), config_reader.deployer_nonce);
-                updated_config.deployer_nonce += contracts_to_deploy.len() as u64;
-
-                // Move the transactions submission to another thread, the clock on that thread is ticking,
-                // and blocking our stacks-node
-                std::thread::spawn(move || {
-
-                    for contract in contracts_to_deploy.into_iter() {
-                        match publish_contract(&contract, &deployers_lookup, &mut deployers_nonces, &node_clone) {
-                            Ok((txid, nonce)) => {
-                                let _ = tx_clone.send(DevnetEvent::success(format!(
-                                    "Contract {} broadcasted in mempool (txid: {}, nonce: {})",
-                                    contract.name.unwrap(), txid, nonce
-                                )));
-                            }
-                            Err(err) => {
-                                let _ = tx_clone.send(DevnetEvent::error(err.to_string()));
-                                break;
-                            }
-                        }    
-                    }
-                });
-
+            for _ in 0..contracts_to_deploy_in_blocks {
+                let contract = updated_config.contracts_to_deploy.pop_front().unwrap();
+                contracts_to_deploy.push(contract);
             }
 
-            Some(updated_config)
+            let node_clone = node.clone();
+
+            let mut deployers_lookup = BTreeMap::new();
+            for account in updated_config.session_settings.initial_accounts.iter() {
+                if account.name == "deployer" {
+                    deployers_lookup.insert("*".into(), account.clone());
+                }
+            }
+            // TODO(ludo): one day, we will get rid of this shortcut
+            let mut deployers_nonces = BTreeMap::new();
+            deployers_nonces.insert("deployer".to_string(), config_reader.deployer_nonce);
+            updated_config.deployer_nonce += contracts_to_deploy.len() as u64;
+
+            if let Ok(tx) = devnet_events_tx.lock() {
+                let _ = tx.send(DevnetEvent::success(format!(
+                    "Will broadcast {} transactions", contracts_to_deploy.len()
+                )));
+            }
+
+            // Move the transactions submission to another thread, the clock on that thread is ticking,
+            // and blocking our stacks-node
+            std::thread::spawn(move || {
+
+                for contract in contracts_to_deploy.into_iter() {
+                    match publish_contract(&contract, &deployers_lookup, &mut deployers_nonces, &node_clone) {
+                        Ok((txid, nonce)) => {
+                            // let _ = tx_clone.send(DevnetEvent::success(format!(
+                            //     "Contract {} broadcasted in mempool (txid: {}, nonce: {})",
+                            //     contract.name.unwrap(), txid, nonce
+                            // )));
+                        }
+                        Err(err) => {
+                            // let _ = tx_clone.send(DevnetEvent::error(err.to_string()));
+                            break;
+                        }
+                    }    
+                }
+            });
+            (Some(updated_config), config_reader.pox_info.first_burnchain_block_height, config_reader.pox_info.prepare_phase_block_length, config_reader.pox_info.reward_phase_block_length, node)
         } else {
-            None
-        };
-
-        if let Some(updated_config) = updated_config {
-            if let Ok(mut config_writer) = config.write() {
-                *config_writer = updated_config;
-            }
+            (None, config_reader.pox_info.first_burnchain_block_height, config_reader.pox_info.prepare_phase_block_length, config_reader.pox_info.reward_phase_block_length, node)
         }
-
-
-        if let Ok(config_reader) = config.read() {
-            let pox_cycle_length: u64 = (config_reader.pox_info.prepare_phase_block_length
-                + config_reader.pox_info.reward_phase_block_length).into();
-            let current_len = new_block.burn_block_height - config_reader.pox_info.first_burnchain_block_height;
-            let pox_cycle_id: u32 = (current_len / pox_cycle_length).try_into().unwrap();
-            let _ = tx.send(DevnetEvent::Block(BlockData {
-                block_height: new_block.block_height,
-                block_hash: new_block.block_hash.clone(),
-                bitcoin_block_height: new_block.burn_block_height,
-                bitcoin_block_hash: new_block.burn_block_hash.clone(),
-                first_burnchain_block_height: config_reader.pox_info.first_burnchain_block_height,
-                pox_cycle_length: pox_cycle_length.try_into().unwrap(),
-                pox_cycle_id,
-                transactions: new_block
-                    .transactions
-                    .iter()
-                    .map(|t| {
-                        let description = get_tx_description(&t.raw_tx);
-                        Transaction {
-                            txid: t.txid.clone(),
-                            success: t.status == "success",
-                            result: get_value_description(&t.raw_result),
-                            events: vec![],
-                            description,
-                        }
-                    })
-                    .collect(),
-            }));
-
-            // Every penultimate block, we check if some stacking orders should be submitted before the next
-            // cycle starts.
-            if new_block.burn_block_height % pox_cycle_length == (pox_cycle_length - 2) {
-
-                // let tx_clone = tx.clone();
-                let node = format!(
-                    "http://localhost:{}",
-                    config_reader.devnet_config.stacks_node_rpc_port
-                );
-                let accounts = config_reader.accounts.clone();
-                let mut pox_info = config_reader.pox_info.clone();
-
-                let pox_stacking_orders = config_reader.devnet_config.pox_stacking_orders.clone();
-                std::thread::spawn(move || {
-
-                    let pox_url = format!("{}/v2/pox", node);
-
-                    if let Ok(reponse) = reqwest::blocking::get(pox_url) {
-                        if let Ok(update) = reponse.json() {
-                            pox_info = update
-                        }
-                    }
-
-                    for pox_stacking_order in pox_stacking_orders.into_iter() {
-                        if pox_stacking_order.start_at_cycle == (pox_cycle_id + 1) {
-                            let account = match accounts.get(&pox_stacking_order.wallet) {
-                                None => continue,
-                                Some(account) => account,
-                            };
-                            let stacks_rpc = StacksRpc::new(node.clone());
-                            let default_fee = 1000;
-                            let nonce = stacks_rpc
-                                .get_nonce(account.address.to_string())
-                                .expect("Unable to retrieve nonce");
-    
-                            let stx_amount = pox_info.next_cycle.min_threshold_ustx
-                                * pox_stacking_order.slots;
-                            let (_, _, account_secret_keu) = types::compute_addresses(
-                                &account.mnemonic,
-                                &account.derivation,
-                                account.is_mainnet,
-                            );
-                            let addr_bytes = pox_stacking_order.btc_address.from_base58()
-                                .expect("Unable to get bytes from btc address");
-    
-                            let addr_bytes = Hash160::from_bytes(&addr_bytes[1..21]).unwrap();
-                            let addr_version = AddressHashMode::SerializeP2PKH;
-                            let stack_stx_tx = transactions::build_contrat_call_transaction(
-                                pox_info.contract_id.clone(),
-                                "stack-stx".into(),
-                                vec![
-                                    ClarityValue::UInt(stx_amount.into()),
-                                    ClarityValue::Tuple(
-                                        TupleData::from_data(vec![
-                                            (
-                                                ClarityName::try_from("version".to_owned()).unwrap(),
-                                                ClarityValue::buff_from_byte(addr_version as u8),
-                                            ),
-                                            (
-                                                ClarityName::try_from("hashbytes".to_owned()).unwrap(),
-                                                ClarityValue::Sequence(SequenceData::Buffer(
-                                                    BuffData {
-                                                        data: addr_bytes.as_bytes().to_vec(),
-                                                    },
-                                                )),
-                                            ),
-                                        ])
-                                        .unwrap(),
-                                    ),
-                                    ClarityValue::UInt((new_block.burn_block_height - 1).into()),
-                                    ClarityValue::UInt(pox_stacking_order.duration.into()),
-                                ],
-                                nonce,
-                                default_fee,
-                                &hex_bytes(&account_secret_keu).unwrap(),
-                            );
-                            let _ = stacks_rpc
-                                .post_transaction(stack_stx_tx)
-                                .expect("Unable to broadcast transaction");
-                        }
-                    }
-                });
-            }
-        }
+    } else {
+        (None, 0, 0, 0, "".into())
     };
+
+    if let Some(updated_config) = updated_config {
+        if let Ok(mut config_writer) = config.write() {
+            *config_writer = updated_config;
+        }
+    }
+
+    let pox_cycle_length: u64 = (prepare_phase_block_length
+        + reward_phase_block_length).into();
+    let current_len = new_block.burn_block_height - first_burnchain_block_height;
+    let pox_cycle_id: u32 = (current_len / pox_cycle_length).try_into().unwrap();
+    let transactions = new_block
+        .transactions
+        .iter()
+        .map(|t| {
+            let description = get_tx_description(&t.raw_tx);
+            Transaction {
+                txid: t.txid.clone(),
+                success: t.status == "success",
+                result: get_value_description(&t.raw_result),
+                events: vec![],
+                description,
+            }
+        })
+        .collect();
+
+    if let Ok(tx) = devnet_events_tx.lock() {
+        let _ = tx.send(DevnetEvent::Block(BlockData {
+            block_height: new_block.block_height,
+            block_hash: new_block.block_hash.clone(),
+            bitcoin_block_height: new_block.burn_block_height,
+            bitcoin_block_hash: new_block.burn_block_hash.clone(),
+            first_burnchain_block_height: first_burnchain_block_height,
+            pox_cycle_length: pox_cycle_length.try_into().unwrap(),
+            pox_cycle_id,
+            transactions,
+        }));
+    }
+
+    // Every penultimate block, we check if some stacking orders should be submitted before the next
+    // cycle starts.
+    if new_block.burn_block_height % pox_cycle_length == (pox_cycle_length - 2) {
+        if let Ok(config_reader) = config.read() {
+            // let tx_clone = tx.clone();
+
+            let accounts = config_reader.accounts.clone();
+            let mut pox_info = config_reader.pox_info.clone();
+
+            let pox_stacking_orders = config_reader.devnet_config.pox_stacking_orders.clone();
+            std::thread::spawn(move || {
+
+                let pox_url = format!("{}/v2/pox", node);
+
+                if let Ok(reponse) = reqwest::blocking::get(pox_url) {
+                    if let Ok(update) = reponse.json() {
+                        pox_info = update
+                    }
+                }
+
+                for pox_stacking_order in pox_stacking_orders.into_iter() {
+                    if pox_stacking_order.start_at_cycle == (pox_cycle_id + 1) {
+                        let account = match accounts.get(&pox_stacking_order.wallet) {
+                            None => continue,
+                            Some(account) => account,
+                        };
+                        let stacks_rpc = StacksRpc::new(node.clone());
+                        let default_fee = 1000;
+                        let nonce = stacks_rpc
+                            .get_nonce(account.address.to_string())
+                            .expect("Unable to retrieve nonce");
+
+                        let stx_amount = pox_info.next_cycle.min_threshold_ustx
+                            * pox_stacking_order.slots;
+                        let (_, _, account_secret_keu) = types::compute_addresses(
+                            &account.mnemonic,
+                            &account.derivation,
+                            account.is_mainnet,
+                        );
+                        let addr_bytes = pox_stacking_order.btc_address.from_base58()
+                            .expect("Unable to get bytes from btc address");
+
+                        let addr_bytes = Hash160::from_bytes(&addr_bytes[1..21]).unwrap();
+                        let addr_version = AddressHashMode::SerializeP2PKH;
+                        let stack_stx_tx = transactions::build_contrat_call_transaction(
+                            pox_info.contract_id.clone(),
+                            "stack-stx".into(),
+                            vec![
+                                ClarityValue::UInt(stx_amount.into()),
+                                ClarityValue::Tuple(
+                                    TupleData::from_data(vec![
+                                        (
+                                            ClarityName::try_from("version".to_owned()).unwrap(),
+                                            ClarityValue::buff_from_byte(addr_version as u8),
+                                        ),
+                                        (
+                                            ClarityName::try_from("hashbytes".to_owned()).unwrap(),
+                                            ClarityValue::Sequence(SequenceData::Buffer(
+                                                BuffData {
+                                                    data: addr_bytes.as_bytes().to_vec(),
+                                                },
+                                            )),
+                                        ),
+                                    ])
+                                    .unwrap(),
+                                ),
+                                ClarityValue::UInt((new_block.burn_block_height - 1).into()),
+                                ClarityValue::UInt(pox_stacking_order.duration.into()),
+                            ],
+                            nonce,
+                            default_fee,
+                            &hex_bytes(&account_secret_keu).unwrap(),
+                        );
+                        let _ = stacks_rpc
+                            .post_transaction(stack_stx_tx)
+                            .expect("Unable to broadcast transaction");
+                    }
+                }
+            });
+        }
+    }
 
     Json(json!({
         "status": 200,
@@ -471,15 +476,15 @@ pub fn handle_new_microblocks(
 
 #[post("/new_mempool_tx", format = "application/json", data = "<raw_txs>")]
 pub fn handle_new_mempool_tx(
-    _config: State<Arc<RwLock<EventObserverConfig>>>,
     devnet_events_tx: State<Arc<Mutex<Sender<DevnetEvent>>>>,
     raw_txs: Json<Vec<String>>,
 ) -> Json<Value> {
-    if let Ok(tx) = devnet_events_tx.lock() {
-        for raw_tx in raw_txs.iter() {
-            let description = get_tx_description(raw_tx);
-            let _ = tx.send(DevnetEvent::MempoolAdmission(MempoolAdmissionData {
-                txid: description,
+    let decoded_transactions = raw_txs.iter().map(|t| get_tx_description(t)).collect::<Vec<String>>();
+
+    if let Ok(tx_sender) = devnet_events_tx.lock() {
+        for tx in decoded_transactions.into_iter() {
+            let _ = tx_sender.send(DevnetEvent::MempoolAdmission(MempoolAdmissionData {
+                tx,
             }));
         }
     }

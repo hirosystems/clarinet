@@ -200,5 +200,5 @@ pub struct BlockData {
 // }
 
 pub struct MempoolAdmissionData {
-    pub txid: String,
+    pub tx: String,
 }
