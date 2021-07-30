@@ -114,10 +114,6 @@ impl PoxInfo {
             ..Default::default()
         }
     }
-
-    pub fn pox_cycle_len(&self) -> u32 {
-        self.reward_phase_block_length + self.prepare_phase_block_length
-    } 
 }
 
 #[derive(Deserialize, Debug, Clone, Default)]
@@ -316,13 +312,13 @@ pub fn handle_new_block(
 
                 for contract in contracts_to_deploy.into_iter() {
                     match publish_contract(&contract, &deployers_lookup, &mut deployers_nonces, &node_clone) {
-                        Ok((txid, nonce)) => {
+                        Ok((_txid, _nonce)) => {
                             // let _ = tx_clone.send(DevnetEvent::success(format!(
                             //     "Contract {} broadcasted in mempool (txid: {}, nonce: {})",
                             //     contract.name.unwrap(), txid, nonce
                             // )));
                         }
-                        Err(err) => {
+                        Err(_err) => {
                             // let _ = tx_clone.send(DevnetEvent::error(err.to_string()));
                             break;
                         }
