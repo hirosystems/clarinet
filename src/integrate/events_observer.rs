@@ -5,6 +5,8 @@ use crate::poke::load_session;
 use crate::publish::{publish_contract, Network};
 use crate::types::{self, AccountConfig, DevnetConfig};
 use crate::utils::stacks::{transactions, StacksRpc};
+use clarity_repl::clarity::codec::transaction::{TransactionPayload};
+use clarity_repl::clarity::codec::{StacksMessageCodec, StacksTransaction};
 use clarity_repl::clarity::representations::ClarityName;
 use clarity_repl::clarity::types::{BuffData, SequenceData, TupleData, Value as ClarityValue};
 use clarity_repl::clarity::util::address::AddressHashMode;
@@ -18,6 +20,7 @@ use serde_json::Value;
 use std::collections::{BTreeMap, VecDeque};
 use std::convert::{TryFrom, TryInto};
 use std::error::Error;
+use std::io::Cursor;
 use std::path::PathBuf;
 use std::str;
 use std::sync::mpsc::{Receiver, Sender};
@@ -50,7 +53,7 @@ pub struct NewTransaction {
     txid: String,
     status: String,
     raw_result: String,
-    // tx_index: u32,
+    raw_tx: String,
 }
 
 #[derive(Clone, Debug)]
@@ -61,6 +64,7 @@ pub struct EventObserverConfig {
     pub manifest_path: PathBuf,
     pub pox_info: PoxInfo,
     pub session_settings: SessionSettings,
+    pub deployer_nonce: u64,
 }
 
 impl EventObserverConfig {
@@ -80,6 +84,7 @@ impl EventObserverConfig {
             pox_info: PoxInfo::default(),
             contracts_to_deploy: VecDeque::from_iter(session_settings.initial_contracts.iter().map(|c| c.clone())),
             session_settings,
+            deployer_nonce: 0,
         }
     }
 }
@@ -179,10 +184,14 @@ pub async fn start_events_observer(
                     }
                 };
                 let contracts_to_deploy = VecDeque::from_iter(session_settings.initial_contracts.iter().map(|c| c.clone()));
+                devnet_event_tx
+                    .send(DevnetEvent::success(format!("{} contracts to deploy", contracts_to_deploy.len())))
+                    .expect("Unable to terminate event observer");
 
                 if let Ok(mut config_writer) = rw_lock.write() {
                     config_writer.contracts_to_deploy = contracts_to_deploy;
                     config_writer.session_settings = session_settings;
+                    config_writer.deployer_nonce = 0;
                 }
             }
             Err(_) => {
@@ -220,44 +229,10 @@ pub fn handle_new_burn_block(
                     new_burn_block.burn_block_height
                 ),
             }));
+
         }
         _ => {}
     };
-
-    if new_burn_block.burn_block_height > 110 {
-        return Json(json!({
-            "status": 200,
-            "result": "Ok",
-        }))    
-    }
-
-    let config = config.inner();
-    let (pox_cycle_len, pox_url) = match config.read() {
-        Ok(config_reader) => {
-            let pox_cycle_len: u64 = config_reader.pox_info.pox_cycle_len().into();
-            let pox_url = format!(
-                "http://localhost:{}/v2/pox",
-                config_reader.devnet_config.stacks_node_rpc_port
-            );
-            (pox_cycle_len, pox_url)
-        }
-        Err(_) => {
-            return Json(json!({
-                "status": 200,
-                "result": "Ok",
-            }))        
-        }
-    };
-
-    if new_burn_block.burn_block_height % pox_cycle_len == 1 {
-        if let Ok(reponse) = reqwest::blocking::get(pox_url) {
-            if let Ok(pox_info) = reponse.json() {
-                if let Ok(mut config_writer) = config.write() {
-                    config_writer.pox_info = pox_info;
-                }
-            }
-        }
-    }
 
     Json(json!({
         "status": 200,
@@ -314,21 +289,24 @@ pub fn handle_new_block(
                     contracts_to_deploy.push(contract);
                 }
 
+                let tx_clone = tx.clone();
+                let node_clone = node.clone();
+
                 let mut deployers_lookup = BTreeMap::new();
                 for account in updated_config.session_settings.initial_accounts.iter() {
                     if account.name == "deployer" {
                         deployers_lookup.insert("*".into(), account.clone());
                     }
                 }
-
-                let tx_clone = tx.clone();
-                let node_clone = node.clone();
+                // TODO(ludo): one day, we will get rid of this shortcut
+                let mut deployers_nonces = BTreeMap::new();
+                deployers_nonces.insert("deployer".to_string(), config_reader.deployer_nonce);
+                updated_config.deployer_nonce += contracts_to_deploy.len() as u64;
 
                 // Move the transactions submission to another thread, the clock on that thread is ticking,
                 // and blocking our stacks-node
                 std::thread::spawn(move || {
-                    let mut deployers_nonces = BTreeMap::new();
-    
+
                     for contract in contracts_to_deploy.into_iter() {
                         match publish_contract(&contract, &deployers_lookup, &mut deployers_nonces, &node_clone) {
                             Ok((txid, nonce)) => {
@@ -344,6 +322,7 @@ pub fn handle_new_block(
                         }    
                     }
                 });
+
             }
 
             Some(updated_config)
@@ -356,6 +335,7 @@ pub fn handle_new_block(
                 *config_writer = updated_config;
             }
         }
+
 
         if let Ok(config_reader) = config.read() {
             let pox_cycle_length: u64 = (config_reader.pox_info.prepare_phase_block_length
@@ -373,11 +353,15 @@ pub fn handle_new_block(
                 transactions: new_block
                     .transactions
                     .iter()
-                    .map(|t| Transaction {
-                        txid: t.txid.clone(),
-                        success: t.status == "success",
-                        result: t.raw_result.clone(),
-                        events: vec![],
+                    .map(|t| {
+                        let description = get_tx_description(&t.raw_tx);
+                        Transaction {
+                            txid: t.txid.clone(),
+                            success: t.status == "success",
+                            result: get_value_description(&t.raw_result),
+                            events: vec![],
+                            description,
+                        }
                     })
                     .collect(),
             }));
@@ -392,10 +376,19 @@ pub fn handle_new_block(
                     config_reader.devnet_config.stacks_node_rpc_port
                 );
                 let accounts = config_reader.accounts.clone();
-                let pox_info = config_reader.pox_info.clone();
+                let mut pox_info = config_reader.pox_info.clone();
 
                 let pox_stacking_orders = config_reader.devnet_config.pox_stacking_orders.clone();
                 std::thread::spawn(move || {
+
+                    let pox_url = format!("{}/v2/pox", node);
+
+                    if let Ok(reponse) = reqwest::blocking::get(pox_url) {
+                        if let Ok(update) = reponse.json() {
+                            pox_info = update
+                        }
+                    }
+
                     for pox_stacking_order in pox_stacking_orders.into_iter() {
                         if pox_stacking_order.start_at_cycle == (pox_cycle_id + 1) {
                             let account = match accounts.get(&pox_stacking_order.wallet) {
@@ -484,8 +477,9 @@ pub fn handle_new_mempool_tx(
 ) -> Json<Value> {
     if let Ok(tx) = devnet_events_tx.lock() {
         for raw_tx in raw_txs.iter() {
+            let description = get_tx_description(raw_tx);
             let _ = tx.send(DevnetEvent::MempoolAdmission(MempoolAdmissionData {
-                txid: raw_tx.to_string(),
+                txid: description,
             }));
         }
     }
@@ -498,7 +492,6 @@ pub fn handle_new_mempool_tx(
 
 #[post("/drop_mempool_tx", format = "application/json")]
 pub fn handle_drop_mempool_tx() -> Json<Value> {
-    println!("POST /drop_mempool_tx");
 
     Json(json!({
         "status": 200,
@@ -506,144 +499,65 @@ pub fn handle_drop_mempool_tx() -> Json<Value> {
     }))
 }
 
-/*
-export interface CoreNodeTxMessage {
-    raw_tx: string;
-    result: NonStandardClarityValue;
-    status: CoreNodeTxStatus;
-    raw_result: string;
-    txid: string;
-    tx_index: number;
-    contract_abi: ClarityAbi | null;
-  }
+fn get_value_description(raw_value: &str) -> String {
+    let raw_value = match raw_value.strip_prefix("0x") {
+        Some(raw_value) => raw_value,
+        _ => return raw_value.to_string()
+    };
+    let value_bytes = match hex_bytes(&raw_value) {
+        Ok(bytes) => bytes,
+        _ => return raw_value.to_string()
+    };
 
-  export interface CoreNodeBlockMessage {
-    block_hash: string;
-    block_height: number;
-    burn_block_time: number;
-    burn_block_hash: string;
-    burn_block_height: number;
-    miner_txid: string;
-    index_block_hash: string;
-    parent_index_block_hash: string;
-    parent_block_hash: string;
-    parent_microblock: string;
-    events: CoreNodeEvent[];
-    transactions: CoreNodeTxMessage[];
-    matured_miner_rewards: {
-      from_index_consensus_hash: string;
-      from_stacks_block_hash: string;
-      /** STX principal */
-      recipient: string;
-      /** String quoted micro-STX amount. */
-      coinbase_amount: string;
-      /** String quoted micro-STX amount. */
-      tx_fees_anchored: string;
-      /** String quoted micro-STX amount. */
-      tx_fees_streamed_confirmed: string;
-      /** String quoted micro-STX amount. */
-      tx_fees_streamed_produced: string;
-    }[];
-  }
+    
+    let value = match ClarityValue::consensus_deserialize(&mut Cursor::new(&value_bytes)) {
+        Ok(value) => format!("{}", value),
+        Err(e) => {
+            println!("{:?}", e);
+            return raw_value.to_string()
+        }
+    };
+    value
+}
 
-  export interface CoreNodeMessageParsed extends CoreNodeBlockMessage {
-    parsed_transactions: CoreNodeParsedTxMessage[];
-  }
-
-  export interface CoreNodeParsedTxMessage {
-    core_tx: CoreNodeTxMessage;
-    parsed_tx: Transaction;
-    raw_tx: Buffer;
-    nonce: number;
-    sender_address: string;
-    sponsor_address?: string;
-    block_hash: string;
-    index_block_hash: string;
-    block_height: number;
-    burn_block_time: number;
-  }
-
-  export interface CoreNodeBurnBlockMessage {
-    burn_block_hash: string;
-    burn_block_height: number;
-    /** Amount in BTC satoshis. */
-    burn_amount: number;
-    reward_recipients: [
-      {
-        /** Bitcoin address (b58 encoded). */
-        recipient: string;
-        /** Amount in BTC satoshis. */
-        amt: number;
-      }
-    ];
-    /**
-     * Array of the Bitcoin addresses that would validly receive PoX commitments during this block.
-     * These addresses may not actually receive rewards during this block if the block is faster
-     * than miners have an opportunity to commit.
-     */
-    reward_slot_holders: string[];
-  }
-
-  export type CoreNodeDropMempoolTxReasonType =
-    | 'ReplaceByFee'
-    | 'ReplaceAcrossFork'
-    | 'TooExpensive'
-    | 'StaleGarbageCollect';
-
-  export interface CoreNodeDropMempoolTxMessage {
-    dropped_txids: string[];
-    reason: CoreNodeDropMempoolTxReasonType;
-  }
-
-  export interface CoreNodeAttachmentMessage {
-    attachment_index: number;
-    index_block_hash: string;
-    block_height: string; // string quoted integer?
-    content_hash: string;
-    contract_id: string;
-    /** Hex serialized Clarity value */
-    metadata: string;
-    tx_id: string;
-    /* Hex encoded attachment content bytes */
-    content: string;
-  }
-  */
-
-// let join_handle = std::thread::spawn(move || {
-//     let mut i = 0;
-//     loop {
-//         std::thread::sleep(std::time::Duration::from_secs(1));
-//         event_tx_simulator.send(DevnetEvent::Log(LogData {
-//             level: LogLevel::Info,
-//             message: "Hello world".into(),
-//             occurred_at: 0
-//         })).unwrap();
-//         event_tx_simulator.send(DevnetEvent::Block(BlockData {
-//             block_height: i,
-//             bitcoin_block_height: i,
-//             block_hash: format!("{}", i),
-//             bitcoin_block_hash: format!("{}", i),
-//             transactions: vec![
-//                 Transaction {
-//                     txid: "".to_string(),
-//                     success: i % 2 == 0,
-//                     result: format!("(ok u1)"),
-//                     events: vec![],
-//                 },
-//                 Transaction {
-//                     txid: "".to_string(),
-//                     success: (i + 1) % 2 == 0,
-//                     result: format!("(err u3)"),
-//                     events: vec![],
-//                 },
-//                 Transaction {
-//                     txid: "".to_string(),
-//                     success: (i + 2) % 2 == 0,
-//                     result: format!("(ok err)"),
-//                     events: vec![],
-//                 },
-//             ]
-//         })).unwrap();
-//         i += 1;
-//     }
-// });
+pub fn get_tx_description(raw_tx: &str) -> String {
+    let raw_tx = match raw_tx.strip_prefix("0x") {
+        Some(raw_tx) => raw_tx,
+        _ => return raw_tx.to_string()
+    };
+    let tx_bytes = match hex_bytes(&raw_tx) {
+        Ok(bytes) => bytes,
+        _ => return raw_tx.to_string()
+    };
+    let tx = match StacksTransaction::consensus_deserialize(&mut Cursor::new(&tx_bytes)) {
+        Ok(bytes) => bytes,
+        Err(e) => {
+            println!("{:?}", e);
+            return raw_tx.to_string()
+        }
+    };
+    let description = match tx.payload {
+        TransactionPayload::TokenTransfer(ref addr, ref amount, ref _memo) => {
+            format!("transfered: {} µSTX from {} to {}", amount, tx.origin_address(), addr)
+        }
+        TransactionPayload::ContractCall(ref contract_call) => {
+            let formatted_args = contract_call
+                .function_args
+                .iter()
+                .map(|v| format!("{}", v))
+                .collect::<Vec<String>>()
+                .join(", ");
+            format!(
+                "invoked: {}.{}::{}({})",
+                contract_call.address, contract_call.contract_name, contract_call.function_name, formatted_args
+            )
+        }
+        TransactionPayload::SmartContract(ref smart_contract) => {
+            format!("deployed: {}.{}", tx.origin_address(), smart_contract.name)
+        }
+        _ => {
+            format!("coinbase")
+        }
+    };
+    description
+}

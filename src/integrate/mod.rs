@@ -44,6 +44,7 @@ pub async fn do_run_devnet(mut devnet: DevnetOrchestrator) -> Result<bool, Strin
     // The event observer should be able to send some events to the UI thread,
     // and should be able to be terminated
     let config = EventObserverConfig::new(devnet_config, devnet.manifest_path.clone(), accounts);
+    let contracts_to_deploy_len = config.contracts_to_deploy.len();
     let events_observer_tx = devnet_events_tx.clone();
     let (events_observer_terminator_tx, terminator_rx) = channel();
     let events_observer_handle = std::thread::spawn(move || {
@@ -60,7 +61,7 @@ pub async fn do_run_devnet(mut devnet: DevnetOrchestrator) -> Result<bool, Strin
     let orchestrator_event_tx = devnet_events_tx.clone();
     let (orchestrator_terminator_tx, terminator_rx) = channel();
     let orchestrator_handle = std::thread::spawn(move || {
-        let future = devnet.start(orchestrator_event_tx, terminator_rx);
+        let future = devnet.start(orchestrator_event_tx, terminator_rx, contracts_to_deploy_len);
         let rt = utils::create_basic_runtime();
         rt.block_on(future);
     });
@@ -178,6 +179,7 @@ pub struct Transaction {
     pub success: bool,
     pub result: String,
     pub events: Vec<String>,
+    pub description: String,
 }
 
 #[derive(Clone)]

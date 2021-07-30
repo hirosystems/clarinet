@@ -299,7 +299,7 @@ where
                     Style::default(),
                 ),
                 Span::raw(" "),
-                Span::styled(t.txid.clone(), Style::default()),
+                Span::styled(t.description.clone(), Style::default()),
                 Span::raw(" "),
                 Span::styled(t.result.clone(), Style::default()),
             ]);
