@@ -49,6 +49,11 @@ pub struct NewBlock {
 }
 
 #[derive(Deserialize)]
+pub struct NewMicroBlock {
+    transactions: Vec<NewTransaction>,
+}
+
+#[derive(Deserialize)]
 pub struct NewTransaction {
     txid: String,
     status: String,
@@ -459,11 +464,38 @@ pub fn handle_new_block(
     }))
 }
 
-#[post("/new_microblocks", format = "application/json")]
+#[post("/new_microblocks", format = "application/json", data = "<new_microblock>")]
 pub fn handle_new_microblocks(
-    _config: State<Arc<RwLock<EventObserverConfig>>>,
-    _devnet_events_tx: State<Arc<Mutex<Sender<DevnetEvent>>>>,
+    config: State<Arc<RwLock<EventObserverConfig>>>,
+    devnet_events_tx: State<Arc<Mutex<Sender<DevnetEvent>>>>,
+    new_microblock: Json<NewMicroBlock>,
 ) -> Json<Value> {
+
+    let devnet_events_tx = devnet_events_tx.inner();
+    let config = config.inner();
+
+    if let Ok(tx) = devnet_events_tx.lock() {
+        let _ = tx.send(DevnetEvent::info(format!(
+            "Microblock received including {} transactions",
+            new_microblock.transactions.len(),
+        )));
+    }
+
+    // let transactions = new_block
+    //     .transactions
+    //     .iter()
+    //     .map(|t| {
+    //         let description = get_tx_description(&t.raw_tx);
+    //         Transaction {
+    //             txid: t.txid.clone(),
+    //             success: t.status == "success",
+    //             result: get_value_description(&t.raw_result),
+    //             events: vec![],
+    //             description,
+    //         }
+    //     })
+    //     .collect();
+
     Json(json!({
         "status": 200,
         "result": "Ok",
