@@ -27,6 +27,7 @@ pub fn start_ui(
     events_observer_terminator_tx: Sender<bool>,
     orchestrator_terminator_tx: Sender<bool>,
     orchestrator_terminated_rx: Receiver<bool>,
+    devnet_path: &str,
 ) -> Result<(), Box<dyn Error>> {
     enable_raw_mode()?;
 
@@ -60,7 +61,7 @@ pub fn start_ui(
         }
     });
 
-    let mut app = App::new("Clarinet");
+    let mut app = App::new("Clarinet", devnet_path);
     terminal.clear()?;
 
     loop {

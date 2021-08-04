@@ -328,14 +328,14 @@ where
     f.render_widget(list, inner_area);
 }
 
-fn draw_help<B>(f: &mut Frame<B>, _app: &mut App, area: Rect)
+fn draw_help<B>(f: &mut Frame<B>, app: &mut App, area: Rect)
 where
     B: Backend,
 {
     // let help =
     //     " ⬅️  ➡️  Explore blocks          ⬆️  ⬇️  Explore transactions          0️⃣  Genesis Reset";
     let help =
-        " ⬅️  ➡️  Explore blocks          0️⃣  Reset Devnet";
+        format!(" ⬅️  ➡️  Explore blocks          Path: {}", app.devnet_path);
     let paragraph = Paragraph::new(help.clone())
         .style(Style::default().fg(Color::White))
         .block(Block::default().borders(Borders::NONE));

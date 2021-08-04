@@ -5,6 +5,8 @@ mod ui;
 use std::sync::mpsc::channel;
 
 use chrono::prelude::*;
+use tracing;
+use tracing_appender;
 
 use crate::utils;
 use events_observer::start_events_observer;
@@ -41,8 +43,17 @@ pub async fn do_run_devnet(mut devnet: DevnetOrchestrator) -> Result<bool, Strin
         _ => Err("Unable to retrieve config"),
     }?;
 
+    let file_appender = tracing_appender::rolling::never(&devnet_config.working_dir, "devnet.log");
+    let (non_blocking, _guard) = tracing_appender::non_blocking(file_appender);
+
+    tracing_subscriber::fmt()
+        .with_max_level(tracing::Level::INFO)
+        .with_writer(non_blocking)
+        .init();
+
     // The event observer should be able to send some events to the UI thread,
     // and should be able to be terminated
+    let devnet_path = devnet_config.working_dir.clone();
     let config = EventObserverConfig::new(devnet_config, devnet.manifest_path.clone(), accounts);
     let contracts_to_deploy_len = config.contracts_to_deploy.len();
     let events_observer_tx = devnet_events_tx.clone();
@@ -72,6 +83,7 @@ pub async fn do_run_devnet(mut devnet: DevnetOrchestrator) -> Result<bool, Strin
         events_observer_terminator_tx,
         orchestrator_terminator_tx,
         orchestrator_terminated_rx,
+        &devnet_path,
     );
 
     events_observer_handle.join().unwrap();

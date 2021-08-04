@@ -1,11 +1,11 @@
 use crate::integrate::{BlockData, LogData, MempoolAdmissionData, ServiceStatusData, Transaction};
-
 use super::util::{StatefulList, TabsState};
 use tui::style::{Color, Style};
 use tui::text::{Span, Spans};
 
 pub struct App<'a> {
     pub title: &'a str,
+    pub devnet_path: &'a str,
     pub should_quit: bool,
     pub blocks: Vec<BlockData>,
     pub tabs: TabsState<'a>,
@@ -16,9 +16,10 @@ pub struct App<'a> {
 }
 
 impl<'a> App<'a> {
-    pub fn new(title: &'a str) -> App<'a> {
+    pub fn new(title: &'a str, devnet_path: &'a str) -> App<'a> {    
         App {
             title,
+            devnet_path,
             should_quit: false,
             tabs: TabsState::new(),
             blocks: vec![],
@@ -75,6 +76,14 @@ impl<'a> App<'a> {
     }
 
     pub fn display_log(&mut self, log: LogData) {
+        use tracing::{info, error, warn, debug, };
+        use crate::integrate::LogLevel;
+        match &log.level {
+            LogLevel::Error => error!("{}", log.message),
+            LogLevel::Warning => warn!("{}", log.message),
+            LogLevel::Debug => debug!("{}", log.message),
+            LogLevel::Info | &LogLevel::Success => info!("{}", log.message),
+        }
         self.logs.items.push(log);
     }
 
