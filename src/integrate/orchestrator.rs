@@ -530,7 +530,7 @@ ignore_txs = false
             labels: Some(labels),
             image: Some(devnet_config.bitcoin_node_image_url.clone()),
             domainname: Some(self.network_name.to_string()),
-            tty: Some(true),
+            tty: None,
             exposed_ports: Some(exposed_ports),
             entrypoint: Some(vec![]),
             host_config: Some(HostConfig {
@@ -799,7 +799,7 @@ events_keys = ["*"]
             labels: Some(labels),
             image: Some(devnet_config.stacks_node_image_url.clone()),
             domainname: Some(self.network_name.to_string()),
-            tty: Some(true),
+            tty: None,
             exposed_ports: Some(exposed_ports),
             entrypoint: Some(vec![
                 "stacks-node".into(),
@@ -947,7 +947,7 @@ events_keys = ["*"]
             labels: Some(labels),
             image: Some(devnet_config.stacks_api_image_url.clone()),
             domainname: Some(self.network_name.to_string()),
-            tty: Some(true),
+            tty: None,
             exposed_ports: Some(exposed_ports),
             env: Some(vec![
                 format!("STACKS_CORE_RPC_HOST=stacks-node.{}", self.network_name),
@@ -1074,7 +1074,7 @@ events_keys = ["*"]
             labels: Some(labels),
             image: Some(devnet_config.postgres_image_url.clone()),
             domainname: Some(self.network_name.to_string()),
-            tty: Some(true),
+            tty: None,
             exposed_ports: Some(exposed_ports),
             env: Some(vec![format!(
                 "POSTGRES_PASSWORD={}",
@@ -1181,7 +1181,7 @@ events_keys = ["*"]
             labels: Some(labels),
             image: Some(devnet_config.stacks_explorer_image_url.clone()),
             domainname: Some(self.network_name.to_string()),
-            tty: Some(true),
+            tty: None,
             exposed_ports: Some(exposed_ports),
             env: Some(vec![
                 format!(
@@ -1301,7 +1301,7 @@ events_keys = ["*"]
             labels: Some(labels),
             image: Some(devnet_config.bitcoin_explorer_image_url.clone()),
             domainname: Some(self.network_name.to_string()),
-            tty: Some(true),
+            tty: None,
             exposed_ports: Some(exposed_ports),
             env: Some(vec![
                 format!(
