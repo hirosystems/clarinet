@@ -1,7 +1,7 @@
 use super::DevnetEvent;
 use crate::integrate::{ServiceStatusData, Status};
 use crate::types::{ChainConfig, MainConfig};
-use bollard::container::{Config, CreateContainerOptions, KillContainerOptions, WaitContainerOptions, PruneContainersOptions};
+use bollard::container::{Config, CreateContainerOptions, ListContainersOptions, KillContainerOptions, WaitContainerOptions, PruneContainersOptions};
 use bollard::image::CreateImageOptions;
 use bollard::models::{HostConfig, PortBinding};
 use bollard::network::{ConnectNetworkOptions, CreateNetworkOptions, PruneNetworksOptions};
@@ -65,7 +65,7 @@ impl DevnetOrchestrator {
         };
         
         // First, let's make sure that we pruned staled resources correctly
-        self.prune().await;
+        self.clean_previous_session().await;
 
         let mut boot_index = 1;
 
@@ -77,12 +77,13 @@ impl DevnetOrchestrator {
         let mut devnet_path = PathBuf::from(&devnet_config.working_dir);
         devnet_path.push("data");
 
-        fs::create_dir(format!("{}", devnet_config.working_dir))
-            .expect("Unable to create working dir");
-        fs::create_dir(format!("{}/conf", devnet_config.working_dir))
-            .expect("Unable to create working dir");
-        fs::create_dir(format!("{}/data", devnet_config.working_dir))
-            .expect("Unable to create working dir");
+        let disable_stacks_api = devnet_config.disable_stacks_api;
+        let disable_stacks_explorer = devnet_config.disable_stacks_explorer;
+        let disable_bitcoin_explorer = devnet_config.disable_bitcoin_explorer;
+
+        let _ = fs::create_dir(format!("{}", devnet_config.working_dir));
+        let _ = fs::create_dir(format!("{}/conf", devnet_config.working_dir));
+        let _ = fs::create_dir(format!("{}/data", devnet_config.working_dir));
 
         let bitcoin_explorer_port = devnet_config.bitcoin_explorer_port;
         let stacks_explorer_port = devnet_config.stacks_explorer_port;
@@ -106,14 +107,33 @@ impl DevnetOrchestrator {
             order: 2,
             status: Status::Red,
             name: "stacks-api".into(),
-            comment: "initializing".into(),
+            comment: if disable_stacks_api {
+                "disabled".into()
+            } else {
+                "initializing".into()
+            },
         }));
 
         let _ = event_tx.send(DevnetEvent::ServiceStatus(ServiceStatusData {
             order: 3,
             status: Status::Red,
             name: "stacks-explorer".into(),
-            comment: "initializing".into(),
+            comment: if disable_stacks_explorer {
+                "disabled".into()
+            } else {
+                "initializing".into()
+            },
+        }));
+
+        let _ = event_tx.send(DevnetEvent::ServiceStatus(ServiceStatusData {
+            order: 4,
+            status: Status::Red,
+            name: "bitcoin-explorer".into(),
+            comment: if disable_bitcoin_explorer {
+                "disabled".into()
+            } else {
+                "initializing".into()
+            },
         }));
 
         let _ = event_tx.send(DevnetEvent::info(format!(
@@ -164,61 +184,63 @@ impl DevnetOrchestrator {
             }
         };
 
-        // Start postgres
-        let _ = event_tx.send(DevnetEvent::ServiceStatus(ServiceStatusData {
-            order: 2,
-            status: Status::Yellow,
-            name: "stacks-api".into(),
-            comment: "preparing postgres container".into(),
-        }));
-        let _ = event_tx.send(DevnetEvent::info(format!("Starting postgres")));
-        match self.prepare_postgres_container().await {
-            Ok(_) => {}
-            Err(message) => {
-                println!("{}", message);
-                self.kill(true).await;
-                std::process::exit(1);
-            }
-        };
-        match self.boot_postgres_container().await {
-            Ok(_) => {}
-            Err(message) => {
-                println!("{}", message);
-                self.kill(true).await;
-                std::process::exit(1);
-            }
-        };
+        // Start stacks-api
+        if !disable_stacks_api {
+            // Start postgres
+            let _ = event_tx.send(DevnetEvent::ServiceStatus(ServiceStatusData {
+                order: 2,
+                status: Status::Yellow,
+                name: "stacks-api".into(),
+                comment: "preparing postgres container".into(),
+            }));
+            let _ = event_tx.send(DevnetEvent::info(format!("Starting postgres")));
+            match self.prepare_postgres_container().await {
+                Ok(_) => {}
+                Err(message) => {
+                    println!("{}", message);
+                    self.kill(true).await;
+                    std::process::exit(1);
+                }
+            };
+            match self.boot_postgres_container().await {
+                Ok(_) => {}
+                Err(message) => {
+                    println!("{}", message);
+                    self.kill(true).await;
+                    std::process::exit(1);
+                }
+            };
+            let _ = event_tx.send(DevnetEvent::ServiceStatus(ServiceStatusData {
+                order: 2,
+                status: Status::Yellow,
+                name: "stacks-api".into(),
+                comment: "preparing container".into(),
+            }));
 
-        // Start stacks-blockchain-api
-        let _ = event_tx.send(DevnetEvent::ServiceStatus(ServiceStatusData {
-            order: 2,
-            status: Status::Yellow,
-            name: "stacks-api".into(),
-            comment: "preparing container".into(),
-        }));
-        let _ = event_tx.send(DevnetEvent::info(format!("Starting stacks-api")));
-        match self.prepare_stacks_api_container().await {
-            Ok(_) => {}
-            Err(message) => {
-                println!("{}", message);
-                self.kill(true).await;
-                std::process::exit(1);
-            }
-        };
-        let _ = event_tx.send(DevnetEvent::ServiceStatus(ServiceStatusData {
-            order: 2,
-            status: Status::Green,
-            name: "stacks-api".into(),
-            comment: format!("http://localhost:{}", stacks_api_port),
-        }));
-        match self.boot_stacks_api_container().await {
-            Ok(_) => {}
-            Err(message) => {
-                println!("{}", message);
-                self.kill(true).await;
-                std::process::exit(1);
-            }
-        };
+            let _ = event_tx.send(DevnetEvent::info(format!("Starting stacks-api")));
+            match self.prepare_stacks_api_container().await {
+                Ok(_) => {}
+                Err(message) => {
+                    println!("{}", message);
+                    self.kill(true).await;
+                    std::process::exit(1);
+                }
+            };
+            let _ = event_tx.send(DevnetEvent::ServiceStatus(ServiceStatusData {
+                order: 2,
+                status: Status::Green,
+                name: "stacks-api".into(),
+                comment: format!("http://localhost:{}", stacks_api_port),
+            }));
+            match self.boot_stacks_api_container().await {
+                Ok(_) => {}
+                Err(message) => {
+                    println!("{}", message);
+                    self.kill(true).await;
+                    std::process::exit(1);
+                }
+            };
+        }
 
         // Start stacks-blockchain
         let _ = event_tx.send(DevnetEvent::info(format!("Starting stacks-node")));
@@ -252,66 +274,70 @@ impl DevnetOrchestrator {
         };
 
         // Start stacks-explorer
-        let _ = event_tx.send(DevnetEvent::ServiceStatus(ServiceStatusData {
-            order: 3,
-            status: Status::Yellow,
-            name: "stacks-explorer".into(),
-            comment: "preparing container".into(),
-        }));
-        match self.prepare_stacks_explorer_container().await {
-            Ok(_) => {}
-            Err(message) => {
-                println!("{}", message);
-                self.kill(true).await;
-                std::process::exit(1);
-            }
-        };
-        let _ = event_tx.send(DevnetEvent::info(format!("Starting stacks-explorer")));
-        match self.boot_stacks_explorer_container().await {
-            Ok(_) => {}
-            Err(message) => {
-                println!("{}", message);
-                self.kill(true).await;
-                std::process::exit(1);
-            }
-        };
-        let _ = event_tx.send(DevnetEvent::ServiceStatus(ServiceStatusData {
-            order: 3,
-            status: Status::Green,
-            name: "stacks-explorer".into(),
-            comment: format!("http://localhost:{}", stacks_explorer_port),
-        }));
+        if !disable_stacks_explorer {
+            let _ = event_tx.send(DevnetEvent::ServiceStatus(ServiceStatusData {
+                order: 3,
+                status: Status::Yellow,
+                name: "stacks-explorer".into(),
+                comment: "preparing container".into(),
+            }));
+            match self.prepare_stacks_explorer_container().await {
+                Ok(_) => {}
+                Err(message) => {
+                    println!("{}", message);
+                    self.kill(true).await;
+                    std::process::exit(1);
+                }
+            };
+            let _ = event_tx.send(DevnetEvent::info(format!("Starting stacks-explorer")));
+            match self.boot_stacks_explorer_container().await {
+                Ok(_) => {}
+                Err(message) => {
+                    println!("{}", message);
+                    self.kill(true).await;
+                    std::process::exit(1);
+                }
+            };
+            let _ = event_tx.send(DevnetEvent::ServiceStatus(ServiceStatusData {
+                order: 3,
+                status: Status::Green,
+                name: "stacks-explorer".into(),
+                comment: format!("http://localhost:{}", stacks_explorer_port),
+            }));
+        }
 
         // Start bitcoin-explorer
-        let _ = event_tx.send(DevnetEvent::ServiceStatus(ServiceStatusData {
-            order: 4,
-            status: Status::Yellow,
-            name: "bitcoin-explorer".into(),
-            comment: "preparing container".into(),
-        }));
-        match self.prepare_bitcoin_explorer_container().await {
-            Ok(_) => {}
-            Err(message) => {
-                println!("{}", message);
-                self.kill(true).await;
-                std::process::exit(1);
-            }
-        };
-        let _ = event_tx.send(DevnetEvent::info(format!("Starting bitcoin-explorer")));
-        match self.boot_bitcoin_explorer_container().await {
-            Ok(_) => {}
-            Err(message) => {
-                println!("{}", message);
-                self.kill(true).await;
-                std::process::exit(1);
-            }
-        };
-        let _ = event_tx.send(DevnetEvent::ServiceStatus(ServiceStatusData {
-            order: 4,
-            status: Status::Green,
-            name: "bitcoin-explorer".into(),
-            comment: format!("http://localhost:{}", bitcoin_explorer_port),
-        }));
+        if !disable_bitcoin_explorer {
+            let _ = event_tx.send(DevnetEvent::ServiceStatus(ServiceStatusData {
+                order: 4,
+                status: Status::Yellow,
+                name: "bitcoin-explorer".into(),
+                comment: "preparing container".into(),
+            }));
+            match self.prepare_bitcoin_explorer_container().await {
+                Ok(_) => {}
+                Err(message) => {
+                    println!("{}", message);
+                    self.kill(true).await;
+                    std::process::exit(1);
+                }
+            };
+            let _ = event_tx.send(DevnetEvent::info(format!("Starting bitcoin-explorer")));
+            match self.boot_bitcoin_explorer_container().await {
+                Ok(_) => {}
+                Err(message) => {
+                    println!("{}", message);
+                    self.kill(true).await;
+                    std::process::exit(1);
+                }
+            };
+            let _ = event_tx.send(DevnetEvent::ServiceStatus(ServiceStatusData {
+                order: 4,
+                status: Status::Green,
+                name: "bitcoin-explorer".into(),
+                comment: format!("http://localhost:{}", bitcoin_explorer_port),
+            }));
+        }
 
         loop {
             boot_index += 1;
@@ -560,6 +586,46 @@ ignore_txs = false
         Ok(())
     }
 
+    pub async fn clean_previous_session(&self) {
+
+        let mut filters = HashMap::new();
+        filters.insert(
+            "label".to_string(),
+            vec![format!("project={}", self.network_name)],
+        );
+        let options = Some(ListContainersOptions{
+            all: true,
+            filters,
+            ..Default::default()
+        });
+
+        let docker = match &self.docker_client {
+            Some(ref docker) => docker,
+            _ => panic!("Unable to get Docker client"),
+        };
+        let containers = docker.list_containers(options).await.expect("Unable to list containers");
+        let options = KillContainerOptions { signal: "SIGKILL" };
+
+        for container in containers.iter() {
+            let container_id = match &container.id {
+                Some(id) => id,
+                None => continue
+            };
+            let _ = docker
+                .kill_container(&container_id, Some(options.clone()))
+                .await;
+            
+            let _ = docker
+                .wait_container(
+                    &container_id,
+                    None::<WaitContainerOptions<String>>,
+                )
+                .try_collect::<Vec<_>>()
+                .await;
+        }
+        self.prune().await;
+    }
+
     pub async fn boot_bitcoin_node_container(&self) -> Result<(), String> {
 
         let container = match &self.bitcoin_blockchain_container_id {
@@ -644,12 +710,6 @@ password = "{}"
 rpc_port = {}
 peer_port = {}
 
-# Add stacks-api as an event observer
-[[events_observer]]
-endpoint = "{}"
-retry_count = 255
-events_keys = ["*"]
-
 # Add orchestrator (docker-host) as an event observer
 [[events_observer]]
 endpoint = "host.docker.internal:{}"
@@ -665,12 +725,24 @@ events_keys = ["*"]
             devnet_config.bitcoin_node_password,
             devnet_config.bitcoin_controller_port,
             devnet_config.bitcoin_node_p2p_port,
-            format!(
-                "stacks-api.{}:{}",
-                self.network_name, devnet_config.stacks_api_events_port
-            ),
             devnet_config.orchestrator_port,
         );
+
+        if !devnet_config.disable_stacks_api {
+            stacks_conf.push_str(&format!(
+                r#"
+# Add stacks-api as an event observer
+[[events_observer]]
+endpoint = "{}"
+retry_count = 255
+events_keys = ["*"]
+"#,
+                format!(
+                    "stacks-api.{}:{}",
+                    self.network_name, devnet_config.stacks_api_events_port
+                ),
+            ));
+        }
 
         for (_, account) in network_config.accounts.iter() {
             stacks_conf.push_str(&format!(
@@ -774,7 +846,7 @@ events_keys = ["*"]
             )
             .try_collect::<Vec<_>>()
             .await
-            .map_err(|_| "Unable to create image".to_string())?;
+            .map_err(|e| format!("Unable to create image: {}", e))?;
 
         let config = self.prepare_stacks_node_config(1)?;
 
@@ -1479,7 +1551,6 @@ events_keys = ["*"]
             }    
         }
 
-
         if let Some(ref bitcoin_blockchain_container_id) = self.bitcoin_blockchain_container_id {
             let _ = docker
                 .kill_container(bitcoin_blockchain_container_id, options.clone())
@@ -1548,11 +1619,11 @@ events_keys = ["*"]
             vec![format!("project={}", self.network_name)],
         );
         let _ = docker
-            .prune_networks(Some(PruneNetworksOptions { filters: filters.clone() }))
+            .prune_containers(Some(PruneContainersOptions { filters: filters.clone() }))
             .await;
 
         let _ = docker
-            .prune_containers(Some(PruneContainersOptions { filters }))
+            .prune_networks(Some(PruneNetworksOptions { filters }))
             .await;
     }
 }

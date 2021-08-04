@@ -259,7 +259,7 @@ impl ChainConfig {
             let (miner_stx_address, miner_btc_address, miner_secret_key_hex) =
                 compute_addresses(&miner_mnemonic, &miner_derivation_path, is_mainnet);
 
-            let config = DevnetConfig {
+            let mut config = DevnetConfig {
                 orchestrator_port: devnet_config.orchestrator_port.unwrap_or(20445),
                 bitcoin_node_p2p_port: devnet_config.bitcoin_node_p2p_port.unwrap_or(18444),
                 bitcoin_node_rpc_port: devnet_config.bitcoin_node_rpc_port.unwrap_or(18443),
@@ -338,6 +338,10 @@ impl ChainConfig {
                 disable_stacks_api: devnet_config.disable_stacks_api.unwrap_or(false),
                 disable_stacks_explorer: devnet_config.disable_stacks_explorer.unwrap_or(false),
             };
+            if !config.disable_stacks_api && config.disable_stacks_api {
+                config.disable_stacks_api = false;
+            }
+
             Some(config)
         } else {
             None
