@@ -116,6 +116,9 @@ struct Integrate {
     /// Path to Clarinet.toml
     #[clap(long = "manifest-path")]
     pub manifest_path: Option<String>,
+    /// Display streams of logs instead of terminal UI dashboard
+    #[clap(long = "no-dashboard")]
+    pub no_dashboard: bool,
 }
 
 #[derive(Clap)]
@@ -338,7 +341,7 @@ pub fn main() {
         Command::Integrate(cmd) => {
             let manifest_path = get_manifest_path_or_exit(cmd.manifest_path);
             let devnet = DevnetOrchestrator::new(manifest_path);
-            integrate::run_devnet(devnet);
+            integrate::run_devnet(devnet, None, !cmd.no_dashboard);
         }
     };
 }

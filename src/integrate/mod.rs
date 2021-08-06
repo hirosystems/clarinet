@@ -2,10 +2,10 @@ mod events_observer;
 mod orchestrator;
 mod ui;
 
-use std::sync::mpsc::channel;
+use std::sync::mpsc::{Sender, channel};
 
 use chrono::prelude::*;
-use tracing;
+use tracing::{self, debug, info, warn, error};
 use tracing_appender;
 
 use crate::utils;
@@ -14,8 +14,11 @@ pub use orchestrator::DevnetOrchestrator;
 
 use self::events_observer::{EventObserverConfig};
 
-pub fn run_devnet(devnet: DevnetOrchestrator) {
-    match block_on(do_run_devnet(devnet)) {
+pub enum NodeObserverEvent {
+}
+
+pub fn run_devnet(devnet: DevnetOrchestrator, event_tx: Option<Sender<NodeObserverEvent>>, display_dashboard: bool) {
+    match block_on(do_run_devnet(devnet, event_tx, display_dashboard)) {
         Err(_e) => std::process::exit(1),
         _ => {}
     };
@@ -29,7 +32,7 @@ where
     rt.block_on(future)
 }
 
-pub async fn do_run_devnet(mut devnet: DevnetOrchestrator) -> Result<bool, String> {
+pub async fn do_run_devnet(mut devnet: DevnetOrchestrator, event_tx: Option<Sender<NodeObserverEvent>>, display_dashboard: bool) -> Result<bool, String> {
     let (devnet_events_tx, devnet_events_rx) = channel();
     let (termination_success_tx, orchestrator_terminated_rx) = channel();
 
@@ -59,13 +62,12 @@ pub async fn do_run_devnet(mut devnet: DevnetOrchestrator) -> Result<bool, Strin
     let events_observer_tx = devnet_events_tx.clone();
     let (events_observer_terminator_tx, terminator_rx) = channel();
     let events_observer_handle = std::thread::spawn(move || {
-        let future = start_events_observer(config, events_observer_tx, terminator_rx);
+        let future = start_events_observer(config, events_observer_tx, terminator_rx, event_tx);
         let rt = utils::create_basic_runtime();
         let _ = rt.block_on(future);
     });
 
     // Let's start the orchestration
-    println!("Starting Devnet...");
 
     // The devnet orchestrator should be able to send some events to the UI thread,
     // and should be able to be restarted/terminated
@@ -77,14 +79,43 @@ pub async fn do_run_devnet(mut devnet: DevnetOrchestrator) -> Result<bool, Strin
         rt.block_on(future);
     });
 
-    let _ = ui::start_ui(
-        devnet_events_tx,
-        devnet_events_rx,
-        events_observer_terminator_tx,
-        orchestrator_terminator_tx,
-        orchestrator_terminated_rx,
-        &devnet_path,
-    );
+    if display_dashboard {
+        info!("Starting Devnet...");
+        let _ = ui::start_ui(
+            devnet_events_tx,
+            devnet_events_rx,
+            events_observer_terminator_tx,
+            orchestrator_terminator_tx,
+            orchestrator_terminated_rx,
+            &devnet_path,
+        );    
+    } else {
+        println!("Starting Devnet...");
+
+        ctrlc::set_handler(move || {
+            events_observer_terminator_tx
+                .send(true)
+                .expect("Unable to terminate devnet");
+            orchestrator_terminator_tx
+                .send(true)
+                .expect("Unable to terminate devnet");
+        }).expect("Error setting Ctrl-C handler");
+    
+        loop {
+            match devnet_events_rx.recv() {
+                Ok(DevnetEvent::Log(ref log)) => {
+                    println!("{}", log.message);
+                    match log.level {
+                        LogLevel::Debug => debug!("{}", log.message),
+                        LogLevel::Info | LogLevel::Success => info!("{}", log.message),
+                        LogLevel::Warning => warn!("{}", log.message),
+                        LogLevel::Error => error!("{}", log.message),
+                    }
+                }
+                _ => {}
+            }
+        }
+    }
 
     events_observer_handle.join().unwrap();
     orchestrator_handle.join().unwrap();

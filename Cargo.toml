@@ -65,6 +65,7 @@ base58 = "0.1.0"
 tracing = "0.1"
 tracing-subscriber = "0.2"
 tracing-appender = "0.1"
+ctrlc = "3.1.9"
 
 [dependencies.tui]
 version = "0.15.0"

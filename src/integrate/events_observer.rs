@@ -1,5 +1,5 @@
 
-use super::DevnetEvent;
+use super::{DevnetEvent, NodeObserverEvent};
 use crate::integrate::{BlockData, MempoolAdmissionData, ServiceStatusData, Status, Transaction};
 use crate::poke::load_session;
 use crate::publish::{publish_contract, Network};
@@ -17,6 +17,7 @@ use rocket::config::{Config, Environment, LoggingLevel};
 use rocket::State;
 use rocket_contrib::json::Json;
 use serde_json::Value;
+use tracing::info;
 use std::collections::{BTreeMap, VecDeque};
 use std::convert::{TryFrom, TryInto};
 use std::error::Error;
@@ -74,7 +75,7 @@ pub struct EventObserverConfig {
 
 impl EventObserverConfig {
     pub fn new(devnet_config: DevnetConfig, manifest_path: PathBuf, accounts: BTreeMap<String, AccountConfig>) -> Self {
-        println!("Checking contracts...");
+        info!("Checking contracts...");
         let session_settings = match load_session(manifest_path.clone(), false, Network::Devnet) {
             Ok(settings) => settings,
             Err(e) => {
@@ -130,6 +131,7 @@ pub async fn start_events_observer(
     events_config: EventObserverConfig,
     devnet_event_tx: Sender<DevnetEvent>,
     terminator_rx: Receiver<bool>,
+    event_tx: Option<Sender<NodeObserverEvent>>,
 ) -> Result<(), Box<dyn Error>> {
     let port = events_config.devnet_config.orchestrator_port;
     let manifest_path = events_config.manifest_path.clone();
@@ -137,6 +139,7 @@ pub async fn start_events_observer(
 
     let moved_rw_lock = rw_lock.clone();
     let moved_tx = Arc::new(Mutex::new(devnet_event_tx.clone()));
+    let moved_node_tx = Arc::new(Mutex::new(event_tx.clone()));
     let config = Config::build(Environment::Production)
         .address("127.0.0.1")
         .port(port)
@@ -149,6 +152,7 @@ pub async fn start_events_observer(
         rocket::custom(config)
             .manage(moved_rw_lock)
             .manage(moved_tx)
+            .manage(moved_node_tx)
             .mount(
                 "/",
                 routes![
@@ -212,6 +216,7 @@ pub async fn start_events_observer(
 pub fn handle_new_burn_block(
     devnet_events_tx: State<Arc<Mutex<Sender<DevnetEvent>>>>,
     new_burn_block: Json<NewBurnBlock>,
+    node_event_tx: State<Arc<Mutex<Option<Sender<NodeObserverEvent>>>>>,
 ) -> Json<Value> {
     let devnet_events_tx = devnet_events_tx.inner();
 
@@ -246,6 +251,7 @@ pub fn handle_new_block(
     config: State<Arc<RwLock<EventObserverConfig>>>,
     devnet_events_tx: State<Arc<Mutex<Sender<DevnetEvent>>>>,
     new_block: Json<NewBlock>,
+    node_event_tx: State<Arc<Mutex<Option<Sender<NodeObserverEvent>>>>>,
 ) -> Json<Value> {
     let devnet_events_tx = devnet_events_tx.inner();
     let config = config.inner();
@@ -469,6 +475,7 @@ pub fn handle_new_microblocks(
     config: State<Arc<RwLock<EventObserverConfig>>>,
     devnet_events_tx: State<Arc<Mutex<Sender<DevnetEvent>>>>,
     new_microblock: Json<NewMicroBlock>,
+    node_event_tx: State<Arc<Mutex<Option<Sender<NodeObserverEvent>>>>>,
 ) -> Json<Value> {
 
     let devnet_events_tx = devnet_events_tx.inner();
@@ -506,6 +513,7 @@ pub fn handle_new_microblocks(
 pub fn handle_new_mempool_tx(
     devnet_events_tx: State<Arc<Mutex<Sender<DevnetEvent>>>>,
     raw_txs: Json<Vec<String>>,
+    node_event_tx: State<Arc<Mutex<Option<Sender<NodeObserverEvent>>>>>,
 ) -> Json<Value> {
     let decoded_transactions = raw_txs.iter().map(|t| get_tx_description(t)).collect::<Vec<String>>();
 
