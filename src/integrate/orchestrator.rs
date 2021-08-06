@@ -9,13 +9,13 @@ use bollard::image::CreateImageOptions;
 use bollard::models::{HostConfig, PortBinding};
 use bollard::network::{ConnectNetworkOptions, CreateNetworkOptions, PruneNetworksOptions};
 use bollard::Docker;
+use crossterm::terminal::disable_raw_mode;
 use deno_core::futures::TryStreamExt;
 use std::collections::HashMap;
 use std::fs::{self, File};
 use std::io::Write;
 use std::path::PathBuf;
 use std::sync::mpsc::{Receiver, Sender};
-use crossterm::terminal::disable_raw_mode;
 use tracing::info;
 
 #[derive(Default, Debug)]
@@ -625,9 +625,7 @@ ignore_txs = false
             Some(ref docker) => docker,
             _ => panic!("Unable to get Docker client"),
         };
-        let res = docker
-            .list_containers(options)
-            .await;
+        let res = docker.list_containers(options).await;
         let containers = match res {
             Ok(containters) => containters,
             Err(_) => {

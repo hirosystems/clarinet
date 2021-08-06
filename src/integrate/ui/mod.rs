@@ -148,10 +148,7 @@ fn terminate(
     orchestrator_terminated_rx: Receiver<bool>,
 ) -> Result<(), Box<dyn Error>> {
     disable_raw_mode()?;
-    execute!(
-        terminal.backend_mut(),
-        LeaveAlternateScreen,
-    )?;
+    execute!(terminal.backend_mut(), LeaveAlternateScreen,)?;
     match orchestrator_terminated_rx.recv()? {
         _ => {}
     }
