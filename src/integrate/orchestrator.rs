@@ -15,6 +15,7 @@ use std::fs::{self, File};
 use std::io::Write;
 use std::path::PathBuf;
 use std::sync::mpsc::{Receiver, Sender};
+use crossterm::terminal::disable_raw_mode;
 
 #[derive(Default, Debug)]
 pub struct DevnetOrchestrator {
@@ -177,7 +178,7 @@ impl DevnetOrchestrator {
             Err(message) => {
                 println!("{}", message);
                 self.kill(true).await;
-                std::process::exit(1);
+                return process_exit();
             }
         };
         let _ = event_tx.send(DevnetEvent::ServiceStatus(ServiceStatusData {
@@ -191,7 +192,7 @@ impl DevnetOrchestrator {
             Err(message) => {
                 println!("{}", message);
                 self.kill(true).await;
-                std::process::exit(1);
+                return process_exit();
             }
         };
 
@@ -210,7 +211,7 @@ impl DevnetOrchestrator {
                 Err(message) => {
                     println!("{}", message);
                     self.kill(true).await;
-                    std::process::exit(1);
+                    return process_exit();
                 }
             };
             match self.boot_postgres_container().await {
@@ -218,7 +219,7 @@ impl DevnetOrchestrator {
                 Err(message) => {
                     println!("{}", message);
                     self.kill(true).await;
-                    std::process::exit(1);
+                    return process_exit();
                 }
             };
             let _ = event_tx.send(DevnetEvent::ServiceStatus(ServiceStatusData {
@@ -234,7 +235,7 @@ impl DevnetOrchestrator {
                 Err(message) => {
                     println!("{}", message);
                     self.kill(true).await;
-                    std::process::exit(1);
+                    return process_exit();
                 }
             };
             let _ = event_tx.send(DevnetEvent::ServiceStatus(ServiceStatusData {
@@ -248,7 +249,7 @@ impl DevnetOrchestrator {
                 Err(message) => {
                     println!("{}", message);
                     self.kill(true).await;
-                    std::process::exit(1);
+                    return process_exit();
                 }
             };
         }
@@ -266,7 +267,7 @@ impl DevnetOrchestrator {
             Err(message) => {
                 println!("{}", message);
                 self.kill(true).await;
-                std::process::exit(1);
+                return process_exit();
             }
         };
         let _ = event_tx.send(DevnetEvent::ServiceStatus(ServiceStatusData {
@@ -280,7 +281,7 @@ impl DevnetOrchestrator {
             Err(message) => {
                 println!("{}", message);
                 self.kill(true).await;
-                std::process::exit(1);
+                return process_exit();
             }
         };
 
@@ -297,7 +298,7 @@ impl DevnetOrchestrator {
                 Err(message) => {
                     println!("{}", message);
                     self.kill(true).await;
-                    std::process::exit(1);
+                    return process_exit();
                 }
             };
             let _ = event_tx.send(DevnetEvent::info(format!("Starting stacks-explorer")));
@@ -306,7 +307,7 @@ impl DevnetOrchestrator {
                 Err(message) => {
                     println!("{}", message);
                     self.kill(true).await;
-                    std::process::exit(1);
+                    return process_exit();
                 }
             };
             let _ = event_tx.send(DevnetEvent::ServiceStatus(ServiceStatusData {
@@ -330,7 +331,7 @@ impl DevnetOrchestrator {
                 Err(message) => {
                     println!("{}", message);
                     self.kill(true).await;
-                    std::process::exit(1);
+                    return process_exit();
                 }
             };
             let _ = event_tx.send(DevnetEvent::info(format!("Starting bitcoin-explorer")));
@@ -339,7 +340,7 @@ impl DevnetOrchestrator {
                 Err(message) => {
                     println!("{}", message);
                     self.kill(true).await;
-                    std::process::exit(1);
+                    return process_exit();
                 }
             };
             let _ = event_tx.send(DevnetEvent::ServiceStatus(ServiceStatusData {
@@ -623,10 +624,16 @@ ignore_txs = false
             Some(ref docker) => docker,
             _ => panic!("Unable to get Docker client"),
         };
-        let containers = docker
+        let res = docker
             .list_containers(options)
-            .await
-            .expect("Unable to list containers");
+            .await;
+        let containers = match res {
+            Ok(containters) => containters,
+            Err(_) => {
+                println!("Unable to start Devnet: make sure that Docker is installed on this machine and running.");
+                return process_exit();
+            }
+        };
         let options = KillContainerOptions { signal: "SIGKILL" };
 
         for container in containers.iter() {
@@ -1659,4 +1666,9 @@ events_keys = ["*"]
             .prune_networks(Some(PruneNetworksOptions { filters }))
             .await;
     }
+}
+
+fn process_exit() {
+    disable_raw_mode().unwrap();
+    std::process::exit(1);
 }
