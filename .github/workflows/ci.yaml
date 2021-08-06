@@ -35,7 +35,7 @@ jobs:
       - name: Install Rust toolchain
         uses: actions-rs/toolchain@v1
         with:
-          toolchain: stable
+          toolchain: nightly
           profile: minimal
           components: rustfmt
           override: true
@@ -94,7 +94,7 @@ jobs:
         env:
           RUSTFLAGS: "-Zinstrument-coverage"
           LLVM_PROFILE_FILE: "clarinet-%p-%m.profraw"
-        run: cargo build && cargo test
+        run: cargo +nightly build && cargo test
 
       - name: Generate coverage
         run: grcov . --binary-path ./target/debug/ -s . -t lcov --branch --ignore-not-existing --ignore "/*" -o lcov.info
@@ -176,7 +176,7 @@ jobs:
       - name: Install Rust toolchain
         uses: actions-rs/toolchain@v1
         with:
-          toolchain: stable
+          toolchain: nightly
           target: ${{ matrix.target }}
           profile: minimal
           override: true
@@ -205,7 +205,7 @@ jobs:
       #   run: sudo apt-get update && sudo apt-get install -y ${{ matrix.linker_package }}
 
       - name: Build
-        run: cargo build --release --locked --target ${{ matrix.target }}
+        run: cargo +nightly build --release --locked --target ${{ matrix.target }}
         # To be uncommented later when adding new distros
         # env:
         #   CC: ${{ matrix.cc }}
