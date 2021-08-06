@@ -46,7 +46,7 @@ fn install_clarinet(opts: ClarinetOpt) -> Result<()> {
     } else {
         ""
     };
-    let res = run!("cargo install --path . --locked --force {}", jemalloc);
+    let res = run!("cargo +nightly install --path . --locked --force {}", jemalloc);
 
     if res.is_err() && old_rust {
         eprintln!(

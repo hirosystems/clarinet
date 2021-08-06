@@ -62,7 +62,7 @@ You can build Clarinet from source using Cargo with the following commands:
 ```bash
 git clone git@github.com:hirosystems/clarinet.git
 cd clarinet
-cargo install --path . --locked
+cargo +nightly install --path . --locked
 ```
 
 ## Getting started with Clarinet
@@ -243,7 +243,7 @@ To start contributing:
       ```
 
 1. After making your changes, ensure the following:
-   1. `cargo build` runs successfully
+   1. `cargo +nightly build` runs successfully
    1. `cargo test` runs successfully
    1. You've formatted your code with `cargo fmt --all --`
    1. All functional tests in the `examples` directory pass.

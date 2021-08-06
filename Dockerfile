@@ -10,7 +10,7 @@ COPY . .
 
 RUN mkdir /out
 
-RUN cargo build --release --locked
+RUN cargo +nightly build --release --locked
 
 RUN cp target/release/clarinet /out
 
