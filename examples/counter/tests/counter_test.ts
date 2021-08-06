@@ -42,7 +42,7 @@ Clarinet.test({
             .expectUint(31);
 
         let result = chain.getAssetsMaps();
-        assertEquals(result.assets["STX"][wallet_1.address], 999999);
+        assertEquals(result.assets["STX"][wallet_1.address], 99999999999999);
 
         let call = chain.callReadOnlyFn("counter", "read-counter", [], wallet_1.address)
         call.result
