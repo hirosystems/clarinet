@@ -627,7 +627,7 @@ ignore_txs = false
         };
         let res = docker.list_containers(options).await;
         let containers = match res {
-            Ok(containters) => containters,
+            Ok(containers) => containers,
             Err(_) => {
                 println!("Unable to start Devnet: make sure that Docker is installed on this machine and running.");
                 return process_exit();
