@@ -16,6 +16,7 @@ use std::io::Write;
 use std::path::PathBuf;
 use std::sync::mpsc::{Receiver, Sender};
 use crossterm::terminal::disable_raw_mode;
+use tracing::info;
 
 #[derive(Default, Debug)]
 pub struct DevnetOrchestrator {
@@ -602,7 +603,7 @@ ignore_txs = false
             .await
             .map_err(|e| format!("Unable to create container: {}", e))?
             .id;
-
+        info!("Created container bitcoin-node: {}", container);
         self.bitcoin_blockchain_container_id = Some(container);
 
         Ok(())
@@ -884,6 +885,7 @@ events_keys = ["*"]
             .map_err(|e| format!("Unable to create container: {}", e))?
             .id;
 
+        info!("Created container stacks-node: {}", container);
         self.stacks_blockchain_container_id = Some(container.clone());
 
         Ok(())
@@ -1008,6 +1010,7 @@ events_keys = ["*"]
             .map_err(|e| format!("Unable to create container: {}", e))?
             .id;
 
+        info!("Created container stacks-api: {}", container);
         self.stacks_blockchain_api_container_id = Some(container);
 
         Ok(())
@@ -1115,6 +1118,7 @@ events_keys = ["*"]
             .map_err(|e| format!("Unable to create container: {}", e))?
             .id;
 
+        info!("Created container postgres: {}", container);
         self.postgres_container_id = Some(container);
 
         Ok(())
@@ -1233,6 +1237,7 @@ events_keys = ["*"]
             .map_err(|e| format!("Unable to create container: {}", e))?
             .id;
 
+        info!("Created container stacks-explorer: {}", container);
         self.stacks_explorer_container_id = Some(container);
 
         Ok(())
@@ -1353,6 +1358,7 @@ events_keys = ["*"]
             .map_err(|e| format!("Unable to create container: {}", e))?
             .id;
 
+        info!("Created container bitcoin-explorer: {}", container);
         self.bitcoin_explorer_container_id = Some(container);
 
         Ok(())
