@@ -277,7 +277,7 @@ pub fn main() {
                 execute_changes(changes);
             }
         },
-        Command::Poke(cmd) | Command::Console(cmd)=> {
+        Command::Poke(cmd) | Command::Console(cmd) => {
             let manifest_path = get_manifest_path_or_exit(cmd.manifest_path);
             let start_repl = true;
             load_session(manifest_path, start_repl, Network::Devnet).expect("Unable to start REPL");

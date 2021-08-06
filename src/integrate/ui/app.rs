@@ -1,5 +1,5 @@
-use crate::integrate::{BlockData, LogData, MempoolAdmissionData, ServiceStatusData, Transaction};
 use super::util::{StatefulList, TabsState};
+use crate::integrate::{BlockData, LogData, MempoolAdmissionData, ServiceStatusData, Transaction};
 use tui::style::{Color, Style};
 use tui::text::{Span, Spans};
 
@@ -16,7 +16,7 @@ pub struct App<'a> {
 }
 
 impl<'a> App<'a> {
-    pub fn new(title: &'a str, devnet_path: &'a str) -> App<'a> {    
+    pub fn new(title: &'a str, devnet_path: &'a str) -> App<'a> {
         App {
             title,
             devnet_path,
@@ -76,8 +76,8 @@ impl<'a> App<'a> {
     }
 
     pub fn display_log(&mut self, log: LogData) {
-        use tracing::{info, error, warn, debug, };
         use crate::integrate::LogLevel;
+        use tracing::{debug, error, info, warn};
         match &log.level {
             LogLevel::Error => error!("{}", log.message),
             LogLevel::Warning => warn!("{}", log.message),

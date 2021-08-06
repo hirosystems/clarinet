@@ -1,7 +1,10 @@
 use super::DevnetEvent;
 use crate::integrate::{ServiceStatusData, Status};
 use crate::types::{ChainConfig, MainConfig};
-use bollard::container::{Config, CreateContainerOptions, ListContainersOptions, KillContainerOptions, WaitContainerOptions, PruneContainersOptions};
+use bollard::container::{
+    Config, CreateContainerOptions, KillContainerOptions, ListContainersOptions,
+    PruneContainersOptions, WaitContainerOptions,
+};
 use bollard::image::CreateImageOptions;
 use bollard::models::{HostConfig, PortBinding};
 use bollard::network::{ConnectNetworkOptions, CreateNetworkOptions, PruneNetworksOptions};
@@ -55,7 +58,12 @@ impl DevnetOrchestrator {
         }
     }
 
-    pub async fn start(&mut self, event_tx: Sender<DevnetEvent>, terminator_rx: Receiver<bool>, contracts_to_deploy_len: usize) {
+    pub async fn start(
+        &mut self,
+        event_tx: Sender<DevnetEvent>,
+        terminator_rx: Receiver<bool>,
+        contracts_to_deploy_len: usize,
+    ) {
         let (docker, devnet_config) = match (&self.docker_client, &self.network_config) {
             (Some(ref docker), Some(ref network_config)) => match network_config.devnet {
                 Some(ref devnet_config) => (docker, devnet_config),
@@ -63,7 +71,7 @@ impl DevnetOrchestrator {
             },
             _ => return,
         };
-        
+
         // First, let's make sure that we pruned staled resources correctly
         self.clean_previous_session().await;
 
@@ -141,7 +149,7 @@ impl DevnetOrchestrator {
             self.network_name
         )));
         let mut labels = HashMap::new();
-        labels.insert("project".to_string(), self.network_name.to_string()); 
+        labels.insert("project".to_string(), self.network_name.to_string());
 
         let _network = docker
             .create_network(CreateNetworkOptions {
@@ -161,7 +169,10 @@ impl DevnetOrchestrator {
             name: "bitcoin-node".into(),
             comment: "preparing container".into(),
         }));
-        match self.prepare_bitcoin_node_container(contracts_to_deploy_len).await {
+        match self
+            .prepare_bitcoin_node_container(contracts_to_deploy_len)
+            .await
+        {
             Ok(_) => {}
             Err(message) => {
                 println!("{}", message);
@@ -363,8 +374,9 @@ impl DevnetOrchestrator {
                     let _ = event_tx.send(DevnetEvent::debug("Killing containers...".into()));
                     let _ = self.stop_containers().await;
 
-                    let _ = event_tx.send(DevnetEvent::debug("Restarting containers...".into()));                    
-                    let (bitcoin_node_c_id, stacks_node_c_id) = self.start_containers(boot_index, contracts_to_deploy_len)
+                    let _ = event_tx.send(DevnetEvent::debug("Restarting containers...".into()));
+                    let (bitcoin_node_c_id, stacks_node_c_id) = self
+                        .start_containers(boot_index, contracts_to_deploy_len)
                         .await
                         .expect("Unable to reboot");
                     self.bitcoin_blockchain_container_id = Some(bitcoin_node_c_id);
@@ -377,7 +389,11 @@ impl DevnetOrchestrator {
         }
     }
 
-    pub fn prepare_bitcoin_node_config(&self, boot_index: u32, contracts_to_deploy_len: usize) -> Result<Config<String>, String> {
+    pub fn prepare_bitcoin_node_config(
+        &self,
+        boot_index: u32,
+        contracts_to_deploy_len: usize,
+    ) -> Result<Config<String>, String> {
         let devnet_config = match &self.network_config {
             Some(ref network_config) => match network_config.devnet {
                 Some(ref devnet_config) => devnet_config,
@@ -448,11 +464,10 @@ rpcport={}
 
         let mut bitcoind_data_path = PathBuf::from(&devnet_config.working_dir);
         bitcoind_data_path.push("data");
-        bitcoind_data_path.push(format!("{}", boot_index));    
+        bitcoind_data_path.push(format!("{}", boot_index));
         let _ = fs::create_dir(bitcoind_data_path.clone());
-        bitcoind_data_path.push("bitcoin");    
-        fs::create_dir(bitcoind_data_path)
-            .expect("Unable to create working dir");
+        bitcoind_data_path.push("bitcoin");
+        fs::create_dir(bitcoind_data_path).expect("Unable to create working dir");
 
         let bitcoin_controller_conf = format!(
             r#"
@@ -498,7 +513,7 @@ ignore_txs = false
             devnet_config.bitcoin_node_rpc_port,
             devnet_config.bitcoin_node_username,
             devnet_config.bitcoin_node_password,
-            1 + contracts_to_deploy_len / 25 
+            1 + contracts_to_deploy_len / 25
         );
         let mut bitcoin_controller_conf_path = PathBuf::from(&devnet_config.working_dir);
         bitcoin_controller_conf_path.push("conf/puppet-chain.toml");
@@ -523,8 +538,8 @@ ignore_txs = false
         );
 
         let mut labels = HashMap::new();
-        labels.insert("project".to_string(), self.network_name.to_string()); 
-        labels.insert("reset".to_string(), "true".to_string()); 
+        labels.insert("project".to_string(), self.network_name.to_string());
+        labels.insert("reset".to_string(), "true".to_string());
 
         let config = Config {
             labels: Some(labels),
@@ -538,7 +553,10 @@ ignore_txs = false
 
                 binds: Some(vec![
                     format!("{}/conf:/etc/bitcoin", devnet_config.working_dir),
-                    format!("{}/data/{}/bitcoin:/root/.bitcoin", devnet_config.working_dir, boot_index),
+                    format!(
+                        "{}/data/{}/bitcoin:/root/.bitcoin",
+                        devnet_config.working_dir, boot_index
+                    ),
                 ]),
                 ..Default::default()
             }),
@@ -548,7 +566,10 @@ ignore_txs = false
         Ok(config)
     }
 
-    pub async fn prepare_bitcoin_node_container(&mut self, contracts_to_deploy_len: usize) -> Result<(), String> {
+    pub async fn prepare_bitcoin_node_container(
+        &mut self,
+        contracts_to_deploy_len: usize,
+    ) -> Result<(), String> {
         let (docker, devnet_config) = match (&self.docker_client, &self.network_config) {
             (Some(ref docker), Some(ref network_config)) => match network_config.devnet {
                 Some(ref devnet_config) => (docker, devnet_config),
@@ -587,13 +608,12 @@ ignore_txs = false
     }
 
     pub async fn clean_previous_session(&self) {
-
         let mut filters = HashMap::new();
         filters.insert(
             "label".to_string(),
             vec![format!("project={}", self.network_name)],
         );
-        let options = Some(ListContainersOptions{
+        let options = Some(ListContainersOptions {
             all: true,
             filters,
             ..Default::default()
@@ -603,23 +623,23 @@ ignore_txs = false
             Some(ref docker) => docker,
             _ => panic!("Unable to get Docker client"),
         };
-        let containers = docker.list_containers(options).await.expect("Unable to list containers");
+        let containers = docker
+            .list_containers(options)
+            .await
+            .expect("Unable to list containers");
         let options = KillContainerOptions { signal: "SIGKILL" };
 
         for container in containers.iter() {
             let container_id = match &container.id {
                 Some(id) => id,
-                None => continue
+                None => continue,
             };
             let _ = docker
                 .kill_container(&container_id, Some(options.clone()))
                 .await;
-            
+
             let _ = docker
-                .wait_container(
-                    &container_id,
-                    None::<WaitContainerOptions<String>>,
-                )
+                .wait_container(&container_id, None::<WaitContainerOptions<String>>)
                 .try_collect::<Vec<_>>()
                 .await;
         }
@@ -627,12 +647,9 @@ ignore_txs = false
     }
 
     pub async fn boot_bitcoin_node_container(&self) -> Result<(), String> {
-
         let container = match &self.bitcoin_blockchain_container_id {
             Some(container) => container.clone(),
-            _ => {
-                return Err(format!("Unable to boot container"))
-            }
+            _ => return Err(format!("Unable to boot container")),
         };
 
         let docker = match &self.docker_client {
@@ -665,14 +682,13 @@ ignore_txs = false
     }
 
     pub fn prepare_stacks_node_config(&self, boot_index: u32) -> Result<Config<String>, String> {
-        let (network_config, devnet_config) =
-            match &self.network_config {
-                Some(ref network_config) => match network_config.devnet {
-                    Some(ref devnet_config) => (network_config, devnet_config),
-                    _ => return Err("Unable to get devnet configuration".into()),
-                },
-                _ => return Err("Unable to get Docker client".into()),
-            };
+        let (network_config, devnet_config) = match &self.network_config {
+            Some(ref network_config) => match network_config.devnet {
+                Some(ref devnet_config) => (network_config, devnet_config),
+                _ => return Err("Unable to get devnet configuration".into()),
+            },
+            _ => return Err("Unable to get Docker client".into()),
+        };
 
         let mut port_bindings = HashMap::new();
         port_bindings.insert(
@@ -775,11 +791,10 @@ events_keys = ["*"]
 
         let mut stacks_node_data_path = PathBuf::from(&devnet_config.working_dir);
         stacks_node_data_path.push("data");
-        stacks_node_data_path.push(format!("{}", boot_index));    
+        stacks_node_data_path.push(format!("{}", boot_index));
         let _ = fs::create_dir(stacks_node_data_path.clone());
-        stacks_node_data_path.push("stacks");    
-        fs::create_dir(stacks_node_data_path)
-            .expect("Unable to create working dir");
+        stacks_node_data_path.push("stacks");
+        fs::create_dir(stacks_node_data_path).expect("Unable to create working dir");
 
         let mut exposed_ports = HashMap::new();
         exposed_ports.insert(
@@ -792,8 +807,8 @@ events_keys = ["*"]
         );
 
         let mut labels = HashMap::new();
-        labels.insert("project".to_string(), self.network_name.to_string()); 
-        labels.insert("reset".to_string(), "true".to_string()); 
+        labels.insert("project".to_string(), self.network_name.to_string());
+        labels.insert("reset".to_string(), "true".to_string());
 
         let config = Config {
             labels: Some(labels),
@@ -815,7 +830,10 @@ events_keys = ["*"]
 
                 binds: Some(vec![
                     format!("{}/conf:/src/stacks-node/", devnet_config.working_dir),
-                    format!("{}/data/{}/stacks:/devnet/", devnet_config.working_dir, boot_index),
+                    format!(
+                        "{}/data/{}/stacks:/devnet/",
+                        devnet_config.working_dir, boot_index
+                    ),
                 ]),
                 ..Default::default()
             }),
@@ -826,14 +844,13 @@ events_keys = ["*"]
     }
 
     pub async fn prepare_stacks_node_container(&mut self) -> Result<(), String> {
-        let (docker, devnet_config) =
-            match (&self.docker_client, &self.network_config) {
-                (Some(ref docker), Some(ref network_config)) => match network_config.devnet {
-                    Some(ref devnet_config) => (docker, devnet_config),
-                    _ => return Err("Unable to get devnet configuration".into()),
-                },
-                _ => return Err("Unable to get Docker client".into()),
-            };
+        let (docker, devnet_config) = match (&self.docker_client, &self.network_config) {
+            (Some(ref docker), Some(ref network_config)) => match network_config.devnet {
+                Some(ref devnet_config) => (docker, devnet_config),
+                _ => return Err("Unable to get devnet configuration".into()),
+            },
+            _ => return Err("Unable to get Docker client".into()),
+        };
 
         let _info = docker
             .create_image(
@@ -866,19 +883,16 @@ events_keys = ["*"]
     }
 
     pub async fn boot_stacks_node_container(&self) -> Result<(), String> {
-
         let container = match &self.stacks_blockchain_container_id {
             Some(container) => container.clone(),
-            _ => {
-                return Err(format!("Unable to boot container"))
-            }
+            _ => return Err(format!("Unable to boot container")),
         };
 
         let docker = match &self.docker_client {
             Some(ref docker) => docker,
             _ => return Err("Unable to get Docker client".into()),
         };
-        
+
         docker
             .start_container::<String>(&container, None)
             .await
@@ -941,7 +955,7 @@ events_keys = ["*"]
         );
 
         let mut labels = HashMap::new();
-        labels.insert("project".to_string(), self.network_name.to_string()); 
+        labels.insert("project".to_string(), self.network_name.to_string());
 
         let config = Config {
             labels: Some(labels),
@@ -993,12 +1007,9 @@ events_keys = ["*"]
     }
 
     pub async fn boot_stacks_api_container(&self) -> Result<(), String> {
-
         let container = match &self.stacks_blockchain_api_container_id {
             Some(container) => container.clone(),
-            _ => {
-                return Err(format!("Unable to boot container"))
-            }
+            _ => return Err(format!("Unable to boot container")),
         };
 
         let docker = match &self.docker_client {
@@ -1068,7 +1079,7 @@ events_keys = ["*"]
         );
 
         let mut labels = HashMap::new();
-        labels.insert("project".to_string(), self.network_name.to_string()); 
+        labels.insert("project".to_string(), self.network_name.to_string());
 
         let config = Config {
             labels: Some(labels),
@@ -1103,19 +1114,16 @@ events_keys = ["*"]
     }
 
     pub async fn boot_postgres_container(&self) -> Result<(), String> {
-
         let container = match &self.postgres_container_id {
             Some(container) => container.clone(),
-            _ => {
-                return Err(format!("Unable to boot container"))
-            }
+            _ => return Err(format!("Unable to boot container")),
         };
 
         let docker = match &self.docker_client {
             Some(ref docker) => docker,
             _ => return Err("Unable to get Docker client".into()),
         };
-    
+
         docker
             .start_container::<String>(&container, None)
             .await
@@ -1175,7 +1183,7 @@ events_keys = ["*"]
         exposed_ports.insert(format!("{}/tcp", explorer_guest_port), HashMap::new());
 
         let mut labels = HashMap::new();
-        labels.insert("project".to_string(), self.network_name.to_string()); 
+        labels.insert("project".to_string(), self.network_name.to_string());
 
         let config = Config {
             labels: Some(labels),
@@ -1226,9 +1234,7 @@ events_keys = ["*"]
     pub async fn boot_stacks_explorer_container(&self) -> Result<(), String> {
         let container = match &self.stacks_explorer_container_id {
             Some(container) => container.clone(),
-            _ => {
-                return Err(format!("Unable to boot container"))
-            }
+            _ => return Err(format!("Unable to boot container")),
         };
 
         let docker = match &self.docker_client {
@@ -1292,10 +1298,13 @@ events_keys = ["*"]
         );
 
         let mut exposed_ports = HashMap::new();
-        exposed_ports.insert(format!("{}/tcp", devnet_config.bitcoin_explorer_port), HashMap::new());
+        exposed_ports.insert(
+            format!("{}/tcp", devnet_config.bitcoin_explorer_port),
+            HashMap::new(),
+        );
 
         let mut labels = HashMap::new();
-        labels.insert("project".to_string(), self.network_name.to_string()); 
+        labels.insert("project".to_string(), self.network_name.to_string());
 
         let config = Config {
             labels: Some(labels),
@@ -1304,23 +1313,20 @@ events_keys = ["*"]
             tty: None,
             exposed_ports: Some(exposed_ports),
             env: Some(vec![
+                format!("BTCEXP_HOST=0.0.0.0",),
+                format!("BTCEXP_PORT={}", devnet_config.bitcoin_explorer_port),
+                format!("BTCEXP_BITCOIND_HOST=host.docker.internal",),
                 format!(
-                    "BTCEXP_HOST=0.0.0.0",
+                    "BTCEXP_BITCOIND_PORT={}",
+                    devnet_config.bitcoin_node_rpc_port
                 ),
                 format!(
-                    "BTCEXP_PORT={}", devnet_config.bitcoin_explorer_port
+                    "BTCEXP_BITCOIND_USER={}",
+                    devnet_config.bitcoin_node_username
                 ),
                 format!(
-                    "BTCEXP_BITCOIND_HOST=host.docker.internal",
-                ),
-                format!(
-                    "BTCEXP_BITCOIND_PORT={}", devnet_config.bitcoin_node_rpc_port
-                ),
-                format!(
-                    "BTCEXP_BITCOIND_USER={}", devnet_config.bitcoin_node_username
-                ),
-                format!(
-                    "BTCEXP_BITCOIND_PASS={}", devnet_config.bitcoin_node_password
+                    "BTCEXP_BITCOIND_PASS={}",
+                    devnet_config.bitcoin_node_password
                 ),
             ]),
             host_config: Some(HostConfig {
@@ -1348,9 +1354,7 @@ events_keys = ["*"]
     pub async fn boot_bitcoin_explorer_container(&self) -> Result<(), String> {
         let container = match &self.bitcoin_explorer_container_id {
             Some(container) => container.clone(),
-            _ => {
-                return Err(format!("Unable to boot container"))
-            }
+            _ => return Err(format!("Unable to boot container")),
         };
 
         let docker = match &self.docker_client {
@@ -1383,13 +1387,27 @@ events_keys = ["*"]
     }
 
     pub async fn stop_containers(&self) -> Result<(), String> {
-        let containers_ids = match (&self.stacks_blockchain_container_id, &self.stacks_blockchain_api_container_id, &self.stacks_explorer_container_id, &self.bitcoin_blockchain_container_id, &self.bitcoin_explorer_container_id, &self.postgres_container_id) {
-            (Some(c1), Some(c2), Some(c3), Some(c4), Some(c5), Some(c6)) => (c1, c2, c3, c4, c5, c6),
-            _ => {
-                return Err(format!("Unable to boot container"))
+        let containers_ids = match (
+            &self.stacks_blockchain_container_id,
+            &self.stacks_blockchain_api_container_id,
+            &self.stacks_explorer_container_id,
+            &self.bitcoin_blockchain_container_id,
+            &self.bitcoin_explorer_container_id,
+            &self.postgres_container_id,
+        ) {
+            (Some(c1), Some(c2), Some(c3), Some(c4), Some(c5), Some(c6)) => {
+                (c1, c2, c3, c4, c5, c6)
             }
+            _ => return Err(format!("Unable to boot container")),
         };
-        let (stacks_node_c_id, stacks_api_c_id, stacks_explorer_c_id, bitcoin_node_c_id, bitcoin_explorer_c_id, postgres_c_id) = containers_ids;
+        let (
+            stacks_node_c_id,
+            stacks_api_c_id,
+            stacks_explorer_c_id,
+            bitcoin_node_c_id,
+            bitcoin_explorer_c_id,
+            postgres_c_id,
+        ) = containers_ids;
 
         let docker = match &self.docker_client {
             Some(ref docker) => docker,
@@ -1421,26 +1439,31 @@ events_keys = ["*"]
         let _ = docker
             .kill_container(postgres_c_id, Some(options.clone()))
             .await;
-        
+
         let _ = docker
-            .wait_container(
-                stacks_node_c_id,
-                None::<WaitContainerOptions<String>>,
-            )
+            .wait_container(stacks_node_c_id, None::<WaitContainerOptions<String>>)
             .try_collect::<Vec<_>>()
             .await;
 
         Ok(())
     }
 
-    pub async fn start_containers(&self, boot_index: u32, contracts_to_deploy_len: usize) -> Result<(String, String), String> {
-        let containers_ids = match (&self.stacks_blockchain_api_container_id, &self.stacks_explorer_container_id, &self.bitcoin_explorer_container_id, &self.postgres_container_id) {
+    pub async fn start_containers(
+        &self,
+        boot_index: u32,
+        contracts_to_deploy_len: usize,
+    ) -> Result<(String, String), String> {
+        let containers_ids = match (
+            &self.stacks_blockchain_api_container_id,
+            &self.stacks_explorer_container_id,
+            &self.bitcoin_explorer_container_id,
+            &self.postgres_container_id,
+        ) {
             (Some(c1), Some(c2), Some(c3), Some(c4)) => (c1, c2, c3, c4),
-            _ => {
-                return Err(format!("Unable to boot container"))
-            }
+            _ => return Err(format!("Unable to boot container")),
         };
-        let (stacks_api_c_id, stacks_explorer_c_id, bitcoin_explorer_c_id, postgres_c_id) = containers_ids;
+        let (stacks_api_c_id, stacks_explorer_c_id, bitcoin_explorer_c_id, postgres_c_id) =
+            containers_ids;
 
         let docker = match &self.docker_client {
             Some(ref docker) => docker,
@@ -1451,14 +1474,17 @@ events_keys = ["*"]
         let mut filters = HashMap::new();
         filters.insert(
             "label".to_string(),
-            vec![format!("project={}", self.network_name), "reset=true".to_string()],
+            vec![
+                format!("project={}", self.network_name),
+                "reset=true".to_string(),
+            ],
         );
         let _ = docker
             .prune_containers(Some(PruneContainersOptions { filters }))
             .await;
 
-
-        let bitcoin_node_config = self.prepare_bitcoin_node_config(boot_index, contracts_to_deploy_len)?;
+        let bitcoin_node_config =
+            self.prepare_bitcoin_node_config(boot_index, contracts_to_deploy_len)?;
         let options = CreateContainerOptions {
             name: format!("bitcoin-node.{}", self.network_name),
         };
@@ -1477,12 +1503,14 @@ events_keys = ["*"]
             .await
             .map_err(|e| format!("Unable to create container: {}", e))?
             .id;
-    
-        // Start all the containers   
+
+        // Start all the containers
         let _ = docker
             .start_container::<String>(&bitcoin_node_c_id, None)
             .await;
-        let _ = docker.connect_network(&self.network_name,
+        let _ = docker
+            .connect_network(
+                &self.network_name,
                 ConnectNetworkOptions {
                     container: bitcoin_node_c_id.clone(),
                     ..Default::default()
@@ -1494,9 +1522,7 @@ events_keys = ["*"]
             .start_container::<String>(bitcoin_explorer_c_id, None)
             .await;
 
-        let _ = docker
-            .start_container::<String>(postgres_c_id, None)
-            .await;
+        let _ = docker.start_container::<String>(postgres_c_id, None).await;
 
         let _ = docker
             .start_container::<String>(stacks_api_c_id, None)
@@ -1509,7 +1535,9 @@ events_keys = ["*"]
         let _ = docker
             .start_container::<String>(&stacks_node_c_id, None)
             .await;
-        let _ = docker.connect_network(&self.network_name,
+        let _ = docker
+            .connect_network(
+                &self.network_name,
                 ConnectNetworkOptions {
                     container: stacks_node_c_id.clone(),
                     ..Default::default()
@@ -1540,7 +1568,7 @@ events_keys = ["*"]
                 let _ = docker.remove_container(bitcoin_explorer_container_id, None);
             }
         }
-    
+
         if let Some(ref stacks_explorer_container_id) = self.stacks_explorer_container_id {
             let _ = docker
                 .kill_container(stacks_explorer_container_id, options.clone())
@@ -1548,7 +1576,7 @@ events_keys = ["*"]
             if terminate {
                 println!("Terminating stacks-explorer...");
                 let _ = docker.remove_container(stacks_explorer_container_id, None);
-            }    
+            }
         }
 
         if let Some(ref bitcoin_blockchain_container_id) = self.bitcoin_blockchain_container_id {
@@ -1601,7 +1629,10 @@ events_keys = ["*"]
                 tx.send(true).expect("Unable to confirm termination");
             }
 
-            println!("Artifacts (logs, conf, chainstates) available here: {}", devnet_config.working_dir);
+            println!(
+                "Artifacts (logs, conf, chainstates) available here: {}",
+                devnet_config.working_dir
+            );
             println!("✌️");
             std::process::exit(0);
         }
@@ -1619,7 +1650,9 @@ events_keys = ["*"]
             vec![format!("project={}", self.network_name)],
         );
         let _ = docker
-            .prune_containers(Some(PruneContainersOptions { filters: filters.clone() }))
+            .prune_containers(Some(PruneContainersOptions {
+                filters: filters.clone(),
+            }))
             .await;
 
         let _ = docker

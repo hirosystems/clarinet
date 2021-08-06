@@ -40,7 +40,12 @@ pub enum Network {
     Mainnet,
 }
 
-pub fn publish_contract(contract: &InitialContract, deployers_lookup: &BTreeMap<String, Account>, deployers_nonces:  &mut BTreeMap<String, u64>, node: &str) -> Result<(String, u64), String> {
+pub fn publish_contract(
+    contract: &InitialContract,
+    deployers_lookup: &BTreeMap<String, Account>,
+    deployers_nonces: &mut BTreeMap<String, u64>,
+    node: &str,
+) -> Result<(String, u64), String> {
     let contract_name = contract.name.clone().unwrap();
 
     let payload = TransactionSmartContract {
@@ -95,15 +100,14 @@ pub fn publish_contract(contract: &InitialContract, deployers_lookup: &BTreeMap<
     )
     .unwrap();
 
-    let spending_condition =
-        TransactionSpendingCondition::Singlesig(SinglesigSpendingCondition {
-            signer: signer_addr.bytes.clone(),
-            nonce: nonce,
-            tx_fee: tx_fee,
-            hash_mode: SinglesigHashMode::P2PKH,
-            key_encoding: TransactionPublicKeyEncoding::Compressed,
-            signature: RecoverableSignature::empty(),
-        });
+    let spending_condition = TransactionSpendingCondition::Singlesig(SinglesigSpendingCondition {
+        signer: signer_addr.bytes.clone(),
+        nonce: nonce,
+        tx_fee: tx_fee,
+        hash_mode: SinglesigHashMode::P2PKH,
+        key_encoding: TransactionPublicKeyEncoding::Compressed,
+        signature: RecoverableSignature::empty(),
+    });
 
     let auth = TransactionAuth::Standard(spending_condition);
     let unsigned_tx = StacksTransaction {
@@ -143,11 +147,14 @@ pub fn publish_contract(contract: &InitialContract, deployers_lookup: &BTreeMap<
     Ok((txid, nonce))
 }
 
-pub fn publish_all_contracts(manifest_path: PathBuf, network: Network) -> Result<Vec<String>, Vec<String>> {
+pub fn publish_all_contracts(
+    manifest_path: PathBuf,
+    network: Network,
+) -> Result<Vec<String>, Vec<String>> {
     let start_repl = false;
     let settings = match load_session(manifest_path, start_repl, network) {
         Ok(settings) => settings,
-        Err(e) => return Err(vec![e])
+        Err(e) => return Err(vec![e]),
     };
     let mut results = vec![];
     let mut deployers_nonces = BTreeMap::new();
@@ -159,14 +166,20 @@ pub fn publish_all_contracts(manifest_path: PathBuf, network: Network) -> Result
     }
 
     for contract in settings.initial_contracts.iter() {
-
-        match publish_contract(contract, &deployers_lookup, &mut deployers_nonces, &settings.node) {
+        match publish_contract(
+            contract,
+            &deployers_lookup,
+            &mut deployers_nonces,
+            &settings.node,
+        ) {
             Ok((txid, nonce)) => {
                 results.push(format!(
                     "Contract {} broadcasted in mempool (txid: {}, nonce: {})",
-                    contract.name.as_ref().unwrap(), txid, nonce
+                    contract.name.as_ref().unwrap(),
+                    txid,
+                    nonce
                 ));
-            },
+            }
             Err(err) => {
                 results.push(err.to_string());
                 break;

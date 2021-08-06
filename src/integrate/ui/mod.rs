@@ -147,7 +147,6 @@ fn terminate(
     terminal: &mut Terminal<CrosstermBackend<Stdout>>,
     orchestrator_terminated_rx: Receiver<bool>,
 ) -> Result<(), Box<dyn Error>> {
-
     disable_raw_mode()?;
     execute!(
         terminal.backend_mut(),
@@ -156,7 +155,7 @@ fn terminate(
     )?;
     match orchestrator_terminated_rx.recv()? {
         _ => {}
-    }    
+    }
     terminal.show_cursor()?;
     Ok(())
 }

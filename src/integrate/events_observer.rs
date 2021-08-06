@@ -1,33 +1,32 @@
-
 use super::{DevnetEvent, NodeObserverEvent};
 use crate::integrate::{BlockData, MempoolAdmissionData, ServiceStatusData, Status, Transaction};
 use crate::poke::load_session;
 use crate::publish::{publish_contract, Network};
 use crate::types::{self, AccountConfig, DevnetConfig};
 use crate::utils::stacks::{transactions, StacksRpc};
-use clarity_repl::clarity::codec::transaction::{TransactionPayload};
+use base58::FromBase58;
+use clarity_repl::clarity::codec::transaction::TransactionPayload;
 use clarity_repl::clarity::codec::{StacksMessageCodec, StacksTransaction};
 use clarity_repl::clarity::representations::ClarityName;
 use clarity_repl::clarity::types::{BuffData, SequenceData, TupleData, Value as ClarityValue};
 use clarity_repl::clarity::util::address::AddressHashMode;
 use clarity_repl::clarity::util::hash::{hex_bytes, Hash160};
-use clarity_repl::repl::SessionSettings;
 use clarity_repl::repl::settings::InitialContract;
+use clarity_repl::repl::SessionSettings;
 use rocket::config::{Config, Environment, LoggingLevel};
 use rocket::State;
 use rocket_contrib::json::Json;
 use serde_json::Value;
-use tracing::info;
 use std::collections::{BTreeMap, VecDeque};
 use std::convert::{TryFrom, TryInto};
 use std::error::Error;
 use std::io::Cursor;
+use std::iter::FromIterator;
 use std::path::PathBuf;
 use std::str;
 use std::sync::mpsc::{Receiver, Sender};
 use std::sync::{Arc, Mutex, RwLock};
-use std::iter::FromIterator;
-use base58::FromBase58;
+use tracing::info;
 
 #[allow(dead_code)]
 #[derive(Deserialize)]
@@ -74,13 +73,17 @@ pub struct EventObserverConfig {
 }
 
 impl EventObserverConfig {
-    pub fn new(devnet_config: DevnetConfig, manifest_path: PathBuf, accounts: BTreeMap<String, AccountConfig>) -> Self {
+    pub fn new(
+        devnet_config: DevnetConfig,
+        manifest_path: PathBuf,
+        accounts: BTreeMap<String, AccountConfig>,
+    ) -> Self {
         info!("Checking contracts...");
         let session_settings = match load_session(manifest_path.clone(), false, Network::Devnet) {
             Ok(settings) => settings,
             Err(e) => {
                 println!("{}", e);
-                std::process::exit(1);   
+                std::process::exit(1);
             }
         };
         EventObserverConfig {
@@ -88,7 +91,9 @@ impl EventObserverConfig {
             accounts,
             manifest_path,
             pox_info: PoxInfo::default(),
-            contracts_to_deploy: VecDeque::from_iter(session_settings.initial_contracts.iter().map(|c| c.clone())),
+            contracts_to_deploy: VecDeque::from_iter(
+                session_settings.initial_contracts.iter().map(|c| c.clone()),
+            ),
             session_settings,
             deployer_nonce: 0,
         }
@@ -148,7 +153,6 @@ pub async fn start_events_observer(
         .finalize()?;
 
     std::thread::spawn(move || {
-
         rocket::custom(config)
             .manage(moved_rw_lock)
             .manage(moved_tx)
@@ -180,18 +184,24 @@ pub async fn start_events_observer(
                     .send(DevnetEvent::info("Reloading contracts".into()))
                     .expect("Unable to terminate event observer");
 
-                let session_settings = match load_session(manifest_path.clone(), false, Network::Devnet) {
-                    Ok(settings) => settings,
-                    Err(e) => {
-                        devnet_event_tx
-                            .send(DevnetEvent::error(format!("Contracts invalid: {}", e)))
-                            .expect("Unable to terminate event observer");
-                        continue;
-                    }
-                };
-                let contracts_to_deploy = VecDeque::from_iter(session_settings.initial_contracts.iter().map(|c| c.clone()));
+                let session_settings =
+                    match load_session(manifest_path.clone(), false, Network::Devnet) {
+                        Ok(settings) => settings,
+                        Err(e) => {
+                            devnet_event_tx
+                                .send(DevnetEvent::error(format!("Contracts invalid: {}", e)))
+                                .expect("Unable to terminate event observer");
+                            continue;
+                        }
+                    };
+                let contracts_to_deploy = VecDeque::from_iter(
+                    session_settings.initial_contracts.iter().map(|c| c.clone()),
+                );
                 devnet_event_tx
-                    .send(DevnetEvent::success(format!("{} contracts to deploy", contracts_to_deploy.len())))
+                    .send(DevnetEvent::success(format!(
+                        "{} contracts to deploy",
+                        contracts_to_deploy.len()
+                    )))
                     .expect("Unable to terminate event observer");
 
                 if let Ok(mut config_writer) = rw_lock.write() {
@@ -235,7 +245,6 @@ pub fn handle_new_burn_block(
                     new_burn_block.burn_block_height
                 ),
             }));
-
         }
         _ => {}
     };
@@ -271,14 +280,19 @@ pub fn handle_new_block(
         )));
     }
 
-    let (updated_config, first_burnchain_block_height, prepare_phase_block_length, reward_phase_block_length, node) = if let Ok(config_reader) = config.read() {
+    let (
+        updated_config,
+        first_burnchain_block_height,
+        prepare_phase_block_length,
+        reward_phase_block_length,
+        node,
+    ) = if let Ok(config_reader) = config.read() {
         let node = format!(
             "http://localhost:{}",
             config_reader.devnet_config.stacks_node_rpc_port
         );
 
         if config_reader.contracts_to_deploy.len() > 0 {
-    
             let mut updated_config = config_reader.clone();
 
             // How many contracts left?
@@ -291,7 +305,7 @@ pub fn handle_new_block(
                 contracts_left / blocks_required
             };
 
-            let mut contracts_to_deploy = vec![]; 
+            let mut contracts_to_deploy = vec![];
 
             for _ in 0..contracts_to_deploy_in_blocks {
                 let contract = updated_config.contracts_to_deploy.pop_front().unwrap();
@@ -313,16 +327,21 @@ pub fn handle_new_block(
 
             if let Ok(tx) = devnet_events_tx.lock() {
                 let _ = tx.send(DevnetEvent::success(format!(
-                    "Will broadcast {} transactions", contracts_to_deploy.len()
+                    "Will broadcast {} transactions",
+                    contracts_to_deploy.len()
                 )));
             }
 
             // Move the transactions submission to another thread, the clock on that thread is ticking,
             // and blocking our stacks-node
             std::thread::spawn(move || {
-
                 for contract in contracts_to_deploy.into_iter() {
-                    match publish_contract(&contract, &deployers_lookup, &mut deployers_nonces, &node_clone) {
+                    match publish_contract(
+                        &contract,
+                        &deployers_lookup,
+                        &mut deployers_nonces,
+                        &node_clone,
+                    ) {
                         Ok((_txid, _nonce)) => {
                             // let _ = tx_clone.send(DevnetEvent::success(format!(
                             //     "Contract {} broadcasted in mempool (txid: {}, nonce: {})",
@@ -333,12 +352,24 @@ pub fn handle_new_block(
                             // let _ = tx_clone.send(DevnetEvent::error(err.to_string()));
                             break;
                         }
-                    }    
+                    }
                 }
             });
-            (Some(updated_config), config_reader.pox_info.first_burnchain_block_height, config_reader.pox_info.prepare_phase_block_length, config_reader.pox_info.reward_phase_block_length, node)
+            (
+                Some(updated_config),
+                config_reader.pox_info.first_burnchain_block_height,
+                config_reader.pox_info.prepare_phase_block_length,
+                config_reader.pox_info.reward_phase_block_length,
+                node,
+            )
         } else {
-            (None, config_reader.pox_info.first_burnchain_block_height, config_reader.pox_info.prepare_phase_block_length, config_reader.pox_info.reward_phase_block_length, node)
+            (
+                None,
+                config_reader.pox_info.first_burnchain_block_height,
+                config_reader.pox_info.prepare_phase_block_length,
+                config_reader.pox_info.reward_phase_block_length,
+                node,
+            )
         }
     } else {
         (None, 0, 0, 0, "".into())
@@ -350,8 +381,7 @@ pub fn handle_new_block(
         }
     }
 
-    let pox_cycle_length: u64 = (prepare_phase_block_length
-        + reward_phase_block_length).into();
+    let pox_cycle_length: u64 = (prepare_phase_block_length + reward_phase_block_length).into();
     let current_len = new_block.burn_block_height - first_burnchain_block_height;
     let pox_cycle_id: u32 = (current_len / pox_cycle_length).try_into().unwrap();
     let transactions = new_block
@@ -393,7 +423,6 @@ pub fn handle_new_block(
 
             let pox_stacking_orders = config_reader.devnet_config.pox_stacking_orders.clone();
             std::thread::spawn(move || {
-
                 let pox_url = format!("{}/v2/pox", node);
 
                 if let Ok(reponse) = reqwest::blocking::get(pox_url) {
@@ -414,14 +443,16 @@ pub fn handle_new_block(
                             .get_nonce(account.address.to_string())
                             .expect("Unable to retrieve nonce");
 
-                        let stx_amount = pox_info.next_cycle.min_threshold_ustx
-                            * pox_stacking_order.slots;
+                        let stx_amount =
+                            pox_info.next_cycle.min_threshold_ustx * pox_stacking_order.slots;
                         let (_, _, account_secret_keu) = types::compute_addresses(
                             &account.mnemonic,
                             &account.derivation,
                             account.is_mainnet,
                         );
-                        let addr_bytes = pox_stacking_order.btc_address.from_base58()
+                        let addr_bytes = pox_stacking_order
+                            .btc_address
+                            .from_base58()
                             .expect("Unable to get bytes from btc address");
 
                         let addr_bytes = Hash160::from_bytes(&addr_bytes[1..21]).unwrap();
@@ -470,14 +501,17 @@ pub fn handle_new_block(
     }))
 }
 
-#[post("/new_microblocks", format = "application/json", data = "<new_microblock>")]
+#[post(
+    "/new_microblocks",
+    format = "application/json",
+    data = "<new_microblock>"
+)]
 pub fn handle_new_microblocks(
     _config: State<Arc<RwLock<EventObserverConfig>>>,
     devnet_events_tx: State<Arc<Mutex<Sender<DevnetEvent>>>>,
     new_microblock: Json<NewMicroBlock>,
     _node_event_tx: State<Arc<Mutex<Option<Sender<NodeObserverEvent>>>>>,
 ) -> Json<Value> {
-
     let devnet_events_tx = devnet_events_tx.inner();
 
     if let Ok(tx) = devnet_events_tx.lock() {
@@ -514,13 +548,14 @@ pub fn handle_new_mempool_tx(
     raw_txs: Json<Vec<String>>,
     _node_event_tx: State<Arc<Mutex<Option<Sender<NodeObserverEvent>>>>>,
 ) -> Json<Value> {
-    let decoded_transactions = raw_txs.iter().map(|t| get_tx_description(t)).collect::<Vec<String>>();
+    let decoded_transactions = raw_txs
+        .iter()
+        .map(|t| get_tx_description(t))
+        .collect::<Vec<String>>();
 
     if let Ok(tx_sender) = devnet_events_tx.lock() {
         for tx in decoded_transactions.into_iter() {
-            let _ = tx_sender.send(DevnetEvent::MempoolAdmission(MempoolAdmissionData {
-                tx,
-            }));
+            let _ = tx_sender.send(DevnetEvent::MempoolAdmission(MempoolAdmissionData { tx }));
         }
     }
 
@@ -532,7 +567,6 @@ pub fn handle_new_mempool_tx(
 
 #[post("/drop_mempool_tx", format = "application/json")]
 pub fn handle_drop_mempool_tx() -> Json<Value> {
-
     Json(json!({
         "status": 200,
         "result": "Ok",
@@ -542,19 +576,18 @@ pub fn handle_drop_mempool_tx() -> Json<Value> {
 fn get_value_description(raw_value: &str) -> String {
     let raw_value = match raw_value.strip_prefix("0x") {
         Some(raw_value) => raw_value,
-        _ => return raw_value.to_string()
+        _ => return raw_value.to_string(),
     };
     let value_bytes = match hex_bytes(&raw_value) {
         Ok(bytes) => bytes,
-        _ => return raw_value.to_string()
+        _ => return raw_value.to_string(),
     };
 
-    
     let value = match ClarityValue::consensus_deserialize(&mut Cursor::new(&value_bytes)) {
         Ok(value) => format!("{}", value),
         Err(e) => {
             println!("{:?}", e);
-            return raw_value.to_string()
+            return raw_value.to_string();
         }
     };
     value
@@ -563,22 +596,27 @@ fn get_value_description(raw_value: &str) -> String {
 pub fn get_tx_description(raw_tx: &str) -> String {
     let raw_tx = match raw_tx.strip_prefix("0x") {
         Some(raw_tx) => raw_tx,
-        _ => return raw_tx.to_string()
+        _ => return raw_tx.to_string(),
     };
     let tx_bytes = match hex_bytes(&raw_tx) {
         Ok(bytes) => bytes,
-        _ => return raw_tx.to_string()
+        _ => return raw_tx.to_string(),
     };
     let tx = match StacksTransaction::consensus_deserialize(&mut Cursor::new(&tx_bytes)) {
         Ok(bytes) => bytes,
         Err(e) => {
             println!("{:?}", e);
-            return raw_tx.to_string()
+            return raw_tx.to_string();
         }
     };
     let description = match tx.payload {
         TransactionPayload::TokenTransfer(ref addr, ref amount, ref _memo) => {
-            format!("transfered: {} µSTX from {} to {}", amount, tx.origin_address(), addr)
+            format!(
+                "transfered: {} µSTX from {} to {}",
+                amount,
+                tx.origin_address(),
+                addr
+            )
         }
         TransactionPayload::ContractCall(ref contract_call) => {
             let formatted_args = contract_call
@@ -589,7 +627,10 @@ pub fn get_tx_description(raw_tx: &str) -> String {
                 .join(", ");
             format!(
                 "invoked: {}.{}::{}({})",
-                contract_call.address, contract_call.contract_name, contract_call.function_name, formatted_args
+                contract_call.address,
+                contract_call.contract_name,
+                contract_call.function_name,
+                formatted_args
             )
         }
         TransactionPayload::SmartContract(ref smart_contract) => {

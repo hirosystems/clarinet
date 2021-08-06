@@ -81,7 +81,8 @@ where
         Row::new(cells).height(1).bottom_margin(0)
     });
     let block = Block::default()
-        .borders(Borders::ALL).title("Mempool")
+        .borders(Borders::ALL)
+        .title("Mempool")
         .style(Style::default().fg(Color::White));
     f.render_widget(block, area);
 
@@ -140,8 +141,7 @@ where
     inner_area.height -= 1;
     f.render_widget(block, area);
 
-    let logs_component = List::new(logs)
-        .start_corner(Corner::BottomLeft);
+    let logs_component = List::new(logs).start_corner(Corner::BottomLeft);
     f.render_widget(logs_component, inner_area);
 }
 
@@ -334,8 +334,7 @@ where
 {
     // let help =
     //     " ⬅️  ➡️  Explore blocks          ⬆️  ⬇️  Explore transactions          0️⃣  Genesis Reset";
-    let help =
-        format!(" ⬅️  ➡️  Explore blocks          Path: {}", app.devnet_path);
+    let help = format!(" ⬅️  ➡️  Explore blocks          Path: {}", app.devnet_path);
     let paragraph = Paragraph::new(help.clone())
         .style(Style::default().fg(Color::White))
         .block(Block::default().borders(Borders::NONE));
