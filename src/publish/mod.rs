@@ -20,7 +20,7 @@ use clarity_repl::clarity::{
     },
 };
 use clarity_repl::repl::settings::{Account, InitialContract};
-use secp256k1::{PublicKey, SecretKey};
+use libsecp256k1::{PublicKey, SecretKey};
 use std::collections::BTreeMap;
 use std::path::PathBuf;
 use tiny_hderive::bip32::ExtendedPrivKey;

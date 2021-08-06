@@ -1,15 +1,15 @@
 [package]
 name = "clarinet"
-version = "0.14.1"
+version = "0.14.2"
 authors = ["Ludo Galabru <ludo@hiro.so>"]
 edition = "2018"
 description = "Clarinet is a clarity runtime packaged as a command line tool, designed to facilitate smart contract understanding, development, testing and deployment."
 readme = "README.md"
-license = "GPL-3.0-only"
+license = "GPL-3.0"
 keywords = ["blockstack", "blockchain", "clarity", "smart-contract", "repl"]
 exclude = ["examples/**"]
-homepage = "https://github.com/lgalabru/clarinet"
-repository = "https://github.com/lgalabru/clarinet"
+homepage = "https://github.com/hirosystems/clarinet"
+repository = "https://github.com/hirosystems/clarinet"
 categories = ["command-line-utilities", "development-tools", "development-tools::build-utils"]
 
 [target.'cfg(windows)'.build-dependencies]
@@ -35,7 +35,7 @@ bs58 = "0.4.0"
 rand = "0.8.3"
 ring = "0.16.20"
 ripemd160 = "0.9.1"
-libsecp256k1 = "0.3.5"
+libsecp256k1 = "0.5.0"
 sha2 = "0.9.3"
 uuid = { version = "0.8.2", features = ["v4"] }
 hmac = "0.10.1"
