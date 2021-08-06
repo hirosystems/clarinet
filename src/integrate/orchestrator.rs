@@ -361,7 +361,7 @@ impl DevnetOrchestrator {
                     }));
 
                     let _ = event_tx.send(DevnetEvent::debug("Killing containers...".into()));
-                    self.stop_containers().await;
+                    let _ = self.stop_containers().await;
 
                     let _ = event_tx.send(DevnetEvent::debug("Restarting containers...".into()));                    
                     let (bitcoin_node_c_id, stacks_node_c_id) = self.start_containers(boot_index, contracts_to_deploy_len)

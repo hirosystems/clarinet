@@ -216,7 +216,7 @@ pub async fn start_events_observer(
 pub fn handle_new_burn_block(
     devnet_events_tx: State<Arc<Mutex<Sender<DevnetEvent>>>>,
     new_burn_block: Json<NewBurnBlock>,
-    node_event_tx: State<Arc<Mutex<Option<Sender<NodeObserverEvent>>>>>,
+    _node_event_tx: State<Arc<Mutex<Option<Sender<NodeObserverEvent>>>>>,
 ) -> Json<Value> {
     let devnet_events_tx = devnet_events_tx.inner();
 
@@ -251,7 +251,7 @@ pub fn handle_new_block(
     config: State<Arc<RwLock<EventObserverConfig>>>,
     devnet_events_tx: State<Arc<Mutex<Sender<DevnetEvent>>>>,
     new_block: Json<NewBlock>,
-    node_event_tx: State<Arc<Mutex<Option<Sender<NodeObserverEvent>>>>>,
+    _node_event_tx: State<Arc<Mutex<Option<Sender<NodeObserverEvent>>>>>,
 ) -> Json<Value> {
     let devnet_events_tx = devnet_events_tx.inner();
     let config = config.inner();
@@ -472,14 +472,13 @@ pub fn handle_new_block(
 
 #[post("/new_microblocks", format = "application/json", data = "<new_microblock>")]
 pub fn handle_new_microblocks(
-    config: State<Arc<RwLock<EventObserverConfig>>>,
+    _config: State<Arc<RwLock<EventObserverConfig>>>,
     devnet_events_tx: State<Arc<Mutex<Sender<DevnetEvent>>>>,
     new_microblock: Json<NewMicroBlock>,
-    node_event_tx: State<Arc<Mutex<Option<Sender<NodeObserverEvent>>>>>,
+    _node_event_tx: State<Arc<Mutex<Option<Sender<NodeObserverEvent>>>>>,
 ) -> Json<Value> {
 
     let devnet_events_tx = devnet_events_tx.inner();
-    let config = config.inner();
 
     if let Ok(tx) = devnet_events_tx.lock() {
         let _ = tx.send(DevnetEvent::info(format!(
@@ -513,7 +512,7 @@ pub fn handle_new_microblocks(
 pub fn handle_new_mempool_tx(
     devnet_events_tx: State<Arc<Mutex<Sender<DevnetEvent>>>>,
     raw_txs: Json<Vec<String>>,
-    node_event_tx: State<Arc<Mutex<Option<Sender<NodeObserverEvent>>>>>,
+    _node_event_tx: State<Arc<Mutex<Option<Sender<NodeObserverEvent>>>>>,
 ) -> Json<Value> {
     let decoded_transactions = raw_txs.iter().map(|t| get_tx_description(t)).collect::<Vec<String>>();
 
