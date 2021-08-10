@@ -4,10 +4,10 @@
 
 name: Package Version Bump
 on:
-  release:
+  workflow_dispatch:
+  repository_dispatch:
     types:
       - released
-  workflow_dispatch:
 
 env:
   GIT_USER_NAME: Hiro DevOps

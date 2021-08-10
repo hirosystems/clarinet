@@ -16,19 +16,17 @@ jobs:
     steps:
       - name: Checkout Clarinet
         uses: actions/checkout@v2
-        with:
-          ref: main
 
-      - name: Create Pull Request
-        uses: peter-evans/create-pull-request@v3
+      - name: pull-request
+        uses: repo-sync/pull-request@v2
         with:
-          token: ${{ secrets.GH_TOKEN }}
-          base: develop
-          branch: main
-          title: "chore: update develop branch"
-          body: |
+          source_branch: main
+          destination_branch: develop
+          pr_title: "chore: update develop branch"
+          pr_body: |
             :robot: This is an automated pull request created from a new release in [clarinet](https://github.com/hirosystems/clarinet/releases).
 
             Updates the develop branch from main.
-          assignees: lgalabru
-          reviewers: lgalabru
+          pr_reviewer: lgalabru
+          pr_assignee: lgalabru
+          github_token: ${{ secrets.GH_TOKEN }}
