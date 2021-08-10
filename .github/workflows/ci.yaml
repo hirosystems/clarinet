@@ -53,7 +53,7 @@ jobs:
         run: cargo install cargo-audit
 
       - name: Run audit
-        run: cargo audit --ignore RUSTSEC-2021-0076
+        run: cargo audit --ignore RUSTSEC-2021-0076 --ignore RUSTSEC-2021-0079 --ignore RUSTSEC-2021-0078
 
       - name: Run rustfmt
         run: cargo fmt --all -- --check
