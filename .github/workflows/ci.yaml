@@ -366,11 +366,15 @@ jobs:
       - test
       - build
     steps:
+      - name: Extract tag
+        run: echo "GITHUB_REF_SHORT=${GITHUB_REF##*/}" >> $GITHUB_ENV
+
       - name: Trigger pkg-version-bump workflow
         uses: peter-evans/repository-dispatch@v1
         with:
           token: ${{ secrets.GH_TOKEN }}
           event-type: released
+          client-payload: '{"tag": "${{ env.GITHUB_REF_SHORT }}"}'
 
   release:
     name: Release
