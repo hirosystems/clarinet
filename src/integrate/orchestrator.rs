@@ -552,7 +552,6 @@ ignore_txs = false
             entrypoint: Some(vec![]),
             host_config: Some(HostConfig {
                 port_bindings: Some(port_bindings),
-
                 binds: Some(vec![
                     format!("{}/conf:/etc/bitcoin", devnet_config.working_dir),
                     format!(
@@ -560,6 +559,7 @@ ignore_txs = false
                         devnet_config.working_dir, boot_index
                     ),
                 ]),
+                extra_hosts: Some(vec!["host.docker.internal:host-gateway".into()]),
                 ..Default::default()
             }),
             ..Default::default()
@@ -841,6 +841,7 @@ events_keys = ["*"]
                         devnet_config.working_dir, boot_index
                     ),
                 ]),
+                extra_hosts: Some(vec!["host.docker.internal:host-gateway".into()]),
                 ..Default::default()
             }),
             ..Default::default()
@@ -993,6 +994,7 @@ events_keys = ["*"]
             ]),
             host_config: Some(HostConfig {
                 port_bindings: Some(port_bindings),
+                extra_hosts: Some(vec!["host.docker.internal:host-gateway".into()]),
                 ..Default::default()
             }),
             ..Default::default()
@@ -1101,6 +1103,7 @@ events_keys = ["*"]
             )]),
             host_config: Some(HostConfig {
                 port_bindings: Some(port_bindings),
+                extra_hosts: Some(vec!["host.docker.internal:host-gateway".into()]),
                 ..Default::default()
             }),
             ..Default::default()
@@ -1220,6 +1223,7 @@ events_keys = ["*"]
             ]),
             host_config: Some(HostConfig {
                 port_bindings: Some(port_bindings),
+                extra_hosts: Some(vec!["host.docker.internal:host-gateway".into()]),
                 ..Default::default()
             }),
             ..Default::default()
@@ -1341,6 +1345,7 @@ events_keys = ["*"]
             ]),
             host_config: Some(HostConfig {
                 port_bindings: Some(port_bindings),
+                extra_hosts: Some(vec!["host.docker.internal:host-gateway".into()]),
                 ..Default::default()
             }),
             ..Default::default()
