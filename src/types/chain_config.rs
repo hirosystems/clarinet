@@ -281,7 +281,7 @@ impl ChainConfig {
                     .stacks_node_events_observers
                     .take()
                     .unwrap_or(vec![]),
-                stacks_api_port: devnet_config.stacks_api_port.unwrap_or(20080),
+                stacks_api_port: devnet_config.stacks_api_port.unwrap_or(3999),
                 stacks_api_events_port: devnet_config.stacks_api_events_port.unwrap_or(3700),
                 stacks_explorer_port: devnet_config.stacks_explorer_port.unwrap_or(8000),
                 bitcoin_explorer_port: devnet_config.bitcoin_explorer_port.unwrap_or(8001),
