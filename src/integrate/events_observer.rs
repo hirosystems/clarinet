@@ -3,8 +3,8 @@ use crate::integrate::{BlockData, MempoolAdmissionData, ServiceStatusData, Statu
 use crate::poke::load_session;
 use crate::publish::{publish_contract, Network};
 use crate::types::{self, AccountConfig, DevnetConfig};
-use crate::utils::stacks::{transactions, StacksRpc};
 use crate::utils;
+use crate::utils::stacks::{transactions, StacksRpc};
 use base58::FromBase58;
 use clarity_repl::clarity::codec::transaction::TransactionPayload;
 use clarity_repl::clarity::codec::{StacksMessageCodec, StacksTransaction};
@@ -15,9 +15,9 @@ use clarity_repl::clarity::util::hash::{hex_bytes, Hash160};
 use clarity_repl::repl::settings::InitialContract;
 use clarity_repl::repl::SessionSettings;
 use rocket::config::{Config, LogLevel};
+use rocket::serde::json::{json, Json, Value};
+use rocket::serde::Deserialize;
 use rocket::State;
-use rocket::serde::json::{Json, Value, json};
-use rocket::serde::{Deserialize};
 use std::collections::{BTreeMap, VecDeque};
 use std::convert::{TryFrom, TryInto};
 use std::error::Error;
@@ -224,11 +224,7 @@ pub async fn start_events_observer(
     Ok(())
 }
 
-#[post(
-    "/new_burn_block",
-    format = "json",
-    data = "<new_burn_block>"
-)]
+#[post("/new_burn_block", format = "json", data = "<new_burn_block>")]
 pub fn handle_new_burn_block(
     devnet_events_tx: &State<Arc<Mutex<Sender<DevnetEvent>>>>,
     new_burn_block: Json<NewBurnBlock>,
