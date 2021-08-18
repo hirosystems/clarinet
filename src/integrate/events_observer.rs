@@ -27,6 +27,7 @@ use std::path::PathBuf;
 use std::str;
 use std::sync::mpsc::{Receiver, Sender};
 use std::sync::{Arc, Mutex, RwLock};
+use std::net::{IpAddr, Ipv4Addr};
 use tracing::info;
 
 #[allow(dead_code)]
@@ -150,6 +151,7 @@ pub async fn start_events_observer(
     let config = Config {
         port: port,
         workers: 4,
+        address: IpAddr::V4(Ipv4Addr::new(0, 0, 0, 0)),
         keep_alive: 5,
         temp_dir: std::env::temp_dir(),
         log_level: LogLevel::Off,
