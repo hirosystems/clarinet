@@ -985,7 +985,7 @@ events_keys = ["*"]
                 ),
                 format!("STACKS_CORE_EVENT_HOST=0.0.0.0"),
                 format!("PG_HOST=postgres.{}", self.network_name),
-                format!("PG_PORT={}", devnet_config.postgres_port),
+                format!("PG_PORT=5432"),
                 format!("PG_USER={}", devnet_config.postgres_username),
                 format!("PG_PASSWORD={}", devnet_config.postgres_password),
                 format!("PG_DATABASE={}", devnet_config.postgres_database),
@@ -1075,18 +1075,14 @@ events_keys = ["*"]
 
         let mut port_bindings = HashMap::new();
         port_bindings.insert(
-            format!("{}/tcp", devnet_config.postgres_port),
+            format!("5432/tcp"),
             Some(vec![PortBinding {
                 host_ip: Some(String::from("0.0.0.0")),
                 host_port: Some(format!("{}/tcp", devnet_config.postgres_port)),
             }]),
         );
 
-        let mut exposed_ports = HashMap::new();
-        exposed_ports.insert(
-            format!("{}/tcp", devnet_config.postgres_port),
-            HashMap::new(),
-        );
+        let exposed_ports = HashMap::new();
 
         let mut labels = HashMap::new();
         labels.insert("project".to_string(), self.network_name.to_string());
