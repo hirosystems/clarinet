@@ -23,14 +23,14 @@ fn dist_clarinet() -> Result<()> {
     if cfg!(target_os = "linux") {
         std::env::set_var("CC", "clang");
         run!(
-            "cargo +nightly build --manifest-path ./Cargo.toml --bin clarinet --release
+            "cargo build --manifest-path ./Cargo.toml --bin clarinet --release
              --target x86_64-unknown-linux-musl
             " // We'd want to add, but that requires setting the right linker somehow
               // --features=jemalloc
         )?;
         run!("strip ./target/x86_64-unknown-linux-musl/release/clarinet")?;
     } else {
-        run!("cargo +nightly build --manifest-path ./Cargo.toml --bin clarinet --release")?;
+        run!("cargo build --manifest-path ./Cargo.toml --bin clarinet --release")?;
     }
 
     let (src, dst) = if cfg!(target_os = "linux") {

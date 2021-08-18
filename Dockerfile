@@ -4,7 +4,7 @@ WORKDIR /src
 
 RUN apt update && apt install -y ca-certificates pkg-config libssl-dev
 
-RUN rustup update nightly-2021-08-05 && rustup default nightly-2021-08-05
+RUN rustup update 1.53.0 && rustup default 1.53.0
 
 COPY . .
 
