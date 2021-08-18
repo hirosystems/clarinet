@@ -23,11 +23,11 @@ use std::convert::{TryFrom, TryInto};
 use std::error::Error;
 use std::io::Cursor;
 use std::iter::FromIterator;
+use std::net::{IpAddr, Ipv4Addr};
 use std::path::PathBuf;
 use std::str;
 use std::sync::mpsc::{Receiver, Sender};
 use std::sync::{Arc, Mutex, RwLock};
-use std::net::{IpAddr, Ipv4Addr};
 use tracing::info;
 
 #[allow(dead_code)]
