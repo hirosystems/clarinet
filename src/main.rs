@@ -1,5 +1,3 @@
-#![feature(plugin, decl_macro, proc_macro_hygiene)]
-
 extern crate serde;
 
 #[macro_use]

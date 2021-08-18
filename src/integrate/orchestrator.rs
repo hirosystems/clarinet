@@ -552,7 +552,6 @@ ignore_txs = false
             entrypoint: Some(vec![]),
             host_config: Some(HostConfig {
                 port_bindings: Some(port_bindings),
-
                 binds: Some(vec![
                     format!("{}/conf:/etc/bitcoin", devnet_config.working_dir),
                     format!(
@@ -560,6 +559,7 @@ ignore_txs = false
                         devnet_config.working_dir, boot_index
                     ),
                 ]),
+                extra_hosts: Some(vec!["host.docker.internal:host-gateway".into()]),
                 ..Default::default()
             }),
             ..Default::default()
@@ -841,6 +841,7 @@ events_keys = ["*"]
                         devnet_config.working_dir, boot_index
                     ),
                 ]),
+                extra_hosts: Some(vec!["host.docker.internal:host-gateway".into()]),
                 ..Default::default()
             }),
             ..Default::default()
@@ -984,7 +985,7 @@ events_keys = ["*"]
                 ),
                 format!("STACKS_CORE_EVENT_HOST=0.0.0.0"),
                 format!("PG_HOST=postgres.{}", self.network_name),
-                format!("PG_PORT={}", devnet_config.postgres_port),
+                format!("PG_PORT=5432"),
                 format!("PG_USER={}", devnet_config.postgres_username),
                 format!("PG_PASSWORD={}", devnet_config.postgres_password),
                 format!("PG_DATABASE={}", devnet_config.postgres_database),
@@ -993,6 +994,7 @@ events_keys = ["*"]
             ]),
             host_config: Some(HostConfig {
                 port_bindings: Some(port_bindings),
+                extra_hosts: Some(vec!["host.docker.internal:host-gateway".into()]),
                 ..Default::default()
             }),
             ..Default::default()
@@ -1073,18 +1075,14 @@ events_keys = ["*"]
 
         let mut port_bindings = HashMap::new();
         port_bindings.insert(
-            format!("{}/tcp", devnet_config.postgres_port),
+            format!("5432/tcp"),
             Some(vec![PortBinding {
                 host_ip: Some(String::from("0.0.0.0")),
                 host_port: Some(format!("{}/tcp", devnet_config.postgres_port)),
             }]),
         );
 
-        let mut exposed_ports = HashMap::new();
-        exposed_ports.insert(
-            format!("{}/tcp", devnet_config.postgres_port),
-            HashMap::new(),
-        );
+        let exposed_ports = HashMap::new();
 
         let mut labels = HashMap::new();
         labels.insert("project".to_string(), self.network_name.to_string());
@@ -1101,6 +1099,7 @@ events_keys = ["*"]
             )]),
             host_config: Some(HostConfig {
                 port_bindings: Some(port_bindings),
+                extra_hosts: Some(vec!["host.docker.internal:host-gateway".into()]),
                 ..Default::default()
             }),
             ..Default::default()
@@ -1220,6 +1219,7 @@ events_keys = ["*"]
             ]),
             host_config: Some(HostConfig {
                 port_bindings: Some(port_bindings),
+                extra_hosts: Some(vec!["host.docker.internal:host-gateway".into()]),
                 ..Default::default()
             }),
             ..Default::default()
@@ -1341,6 +1341,7 @@ events_keys = ["*"]
             ]),
             host_config: Some(HostConfig {
                 port_bindings: Some(port_bindings),
+                extra_hosts: Some(vec!["host.docker.internal:host-gateway".into()]),
                 ..Default::default()
             }),
             ..Default::default()

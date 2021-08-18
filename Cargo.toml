@@ -58,7 +58,7 @@ tiny-hderive = "0.3.0"
 reqwest = { version = "0.11", features = ["blocking", "json", "rustls"] }
 swc_common = { version = "0.10.20", features = ["sourcemap"] }
 bollard = "0.11.0"
-rocket = "0.4.4"
+rocket = { version = "0.5.0-rc.1", features = ["json"] }
 crossterm = "0.20.0"
 chrono = "0.4.19"
 base58 = "0.1.0"
@@ -71,11 +71,6 @@ ctrlc = "3.1.9"
 version = "0.15.0"
 default-features = false
 features = ["crossterm"]
-
-[dependencies.rocket_contrib]
-version = "*"
-default-features = false
-features = ["json"]
 
 [target.'cfg(windows)'.dependencies]
 fwdansi = "1.1.0"

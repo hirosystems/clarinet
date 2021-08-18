@@ -3,6 +3,7 @@ use crate::integrate::{BlockData, MempoolAdmissionData, ServiceStatusData, Statu
 use crate::poke::load_session;
 use crate::publish::{publish_contract, Network};
 use crate::types::{self, AccountConfig, DevnetConfig};
+use crate::utils;
 use crate::utils::stacks::{transactions, StacksRpc};
 use base58::FromBase58;
 use clarity_repl::clarity::codec::transaction::TransactionPayload;
@@ -13,15 +14,16 @@ use clarity_repl::clarity::util::address::AddressHashMode;
 use clarity_repl::clarity::util::hash::{hex_bytes, Hash160};
 use clarity_repl::repl::settings::InitialContract;
 use clarity_repl::repl::SessionSettings;
-use rocket::config::{Config, Environment, LoggingLevel};
+use rocket::config::{Config, LogLevel};
+use rocket::serde::json::{json, Json, Value};
+use rocket::serde::Deserialize;
 use rocket::State;
-use rocket_contrib::json::Json;
-use serde_json::Value;
 use std::collections::{BTreeMap, VecDeque};
 use std::convert::{TryFrom, TryInto};
 use std::error::Error;
 use std::io::Cursor;
 use std::iter::FromIterator;
+use std::net::{IpAddr, Ipv4Addr};
 use std::path::PathBuf;
 use std::str;
 use std::sync::mpsc::{Receiver, Sender};
@@ -145,15 +147,19 @@ pub async fn start_events_observer(
     let moved_rw_lock = rw_lock.clone();
     let moved_tx = Arc::new(Mutex::new(devnet_event_tx.clone()));
     let moved_node_tx = Arc::new(Mutex::new(event_tx.clone()));
-    let config = Config::build(Environment::Production)
-        .address("127.0.0.1")
-        .port(port)
-        .workers(4)
-        .log_level(LoggingLevel::Off)
-        .finalize()?;
 
-    std::thread::spawn(move || {
-        rocket::custom(config)
+    let config = Config {
+        port: port,
+        workers: 4,
+        address: IpAddr::V4(Ipv4Addr::new(0, 0, 0, 0)),
+        keep_alive: 5,
+        temp_dir: std::env::temp_dir(),
+        log_level: LogLevel::Off,
+        ..Config::default()
+    };
+
+    let _ = std::thread::spawn(move || {
+        let future = rocket::custom(config)
             .manage(moved_rw_lock)
             .manage(moved_tx)
             .manage(moved_node_tx)
@@ -168,6 +174,8 @@ pub async fn start_events_observer(
                 ],
             )
             .launch();
+        let rt = utils::create_basic_runtime();
+        rt.block_on(future).expect("Unable to spawn event observer");
     });
 
     loop {
@@ -218,15 +226,11 @@ pub async fn start_events_observer(
     Ok(())
 }
 
-#[post(
-    "/new_burn_block",
-    format = "application/json",
-    data = "<new_burn_block>"
-)]
+#[post("/new_burn_block", format = "json", data = "<new_burn_block>")]
 pub fn handle_new_burn_block(
-    devnet_events_tx: State<Arc<Mutex<Sender<DevnetEvent>>>>,
+    devnet_events_tx: &State<Arc<Mutex<Sender<DevnetEvent>>>>,
     new_burn_block: Json<NewBurnBlock>,
-    _node_event_tx: State<Arc<Mutex<Option<Sender<NodeObserverEvent>>>>>,
+    _node_event_tx: &State<Arc<Mutex<Option<Sender<NodeObserverEvent>>>>>,
 ) -> Json<Value> {
     let devnet_events_tx = devnet_events_tx.inner();
 
@@ -257,10 +261,10 @@ pub fn handle_new_burn_block(
 
 #[post("/new_block", format = "application/json", data = "<new_block>")]
 pub fn handle_new_block(
-    config: State<Arc<RwLock<EventObserverConfig>>>,
-    devnet_events_tx: State<Arc<Mutex<Sender<DevnetEvent>>>>,
+    config: &State<Arc<RwLock<EventObserverConfig>>>,
+    devnet_events_tx: &State<Arc<Mutex<Sender<DevnetEvent>>>>,
     new_block: Json<NewBlock>,
-    _node_event_tx: State<Arc<Mutex<Option<Sender<NodeObserverEvent>>>>>,
+    _node_event_tx: &State<Arc<Mutex<Option<Sender<NodeObserverEvent>>>>>,
 ) -> Json<Value> {
     let devnet_events_tx = devnet_events_tx.inner();
     let config = config.inner();
@@ -507,10 +511,10 @@ pub fn handle_new_block(
     data = "<new_microblock>"
 )]
 pub fn handle_new_microblocks(
-    _config: State<Arc<RwLock<EventObserverConfig>>>,
-    devnet_events_tx: State<Arc<Mutex<Sender<DevnetEvent>>>>,
+    _config: &State<Arc<RwLock<EventObserverConfig>>>,
+    devnet_events_tx: &State<Arc<Mutex<Sender<DevnetEvent>>>>,
     new_microblock: Json<NewMicroBlock>,
-    _node_event_tx: State<Arc<Mutex<Option<Sender<NodeObserverEvent>>>>>,
+    _node_event_tx: &State<Arc<Mutex<Option<Sender<NodeObserverEvent>>>>>,
 ) -> Json<Value> {
     let devnet_events_tx = devnet_events_tx.inner();
 
@@ -544,9 +548,9 @@ pub fn handle_new_microblocks(
 
 #[post("/new_mempool_tx", format = "application/json", data = "<raw_txs>")]
 pub fn handle_new_mempool_tx(
-    devnet_events_tx: State<Arc<Mutex<Sender<DevnetEvent>>>>,
+    devnet_events_tx: &State<Arc<Mutex<Sender<DevnetEvent>>>>,
     raw_txs: Json<Vec<String>>,
-    _node_event_tx: State<Arc<Mutex<Option<Sender<NodeObserverEvent>>>>>,
+    _node_event_tx: &State<Arc<Mutex<Option<Sender<NodeObserverEvent>>>>>,
 ) -> Json<Value> {
     let decoded_transactions = raw_txs
         .iter()
