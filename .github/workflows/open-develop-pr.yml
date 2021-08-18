@@ -12,12 +12,13 @@ on:
 
 jobs:
   run:
+    name: Upsteam develop branch
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Clarinet
         uses: actions/checkout@v2
 
-      - name: pull-request
+      - name: Open pull request
         uses: repo-sync/pull-request@v2
         with:
           source_branch: main
