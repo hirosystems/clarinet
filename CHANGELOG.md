@@ -1,3 +1,15 @@
+## [0.15.1](https://github.com/hirosystems/clarinet/compare/v0.15.0...v0.15.1) (2021-08-18)
+
+
+### Bug Fixes
+
+* attempt to address compatibility with Linux ([fdae2b2](https://github.com/hirosystems/clarinet/commit/fdae2b2930363fd6765b03ccfef7051270059ca0))
+* attempt to fix linux compatibility ([832dd16](https://github.com/hirosystems/clarinet/commit/832dd16dc2ac4b8e51f06df3e11078dfaaa991de))
+* hard code host ip address ([e81e711](https://github.com/hirosystems/clarinet/commit/e81e7113dd7fdad2bb439700c19a4e11ad1bd1b1))
+* postgres port handling ([c716669](https://github.com/hirosystems/clarinet/commit/c716669a739b99b8fdc78ac951718021885e8891))
+* use nightly for tests ([f76098d](https://github.com/hirosystems/clarinet/commit/f76098dbddda254b67953b4e9af5218dee06ea7b))
+* use stable in github actions ([31fa5e1](https://github.com/hirosystems/clarinet/commit/31fa5e1348414e03def9b5030c59cd1874374383))
+
 # [0.15.0](https://github.com/hirosystems/clarinet/compare/v0.14.2...v0.15.0) (2021-08-11)
 
 
