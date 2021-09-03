@@ -11,7 +11,7 @@ use crate::generate::{
 use crate::integrate::{self, DevnetOrchestrator};
 use crate::poke::load_session;
 use crate::publish::{publish_all_contracts, Network};
-use crate::test::run_tests;
+use crate::test::run_scripts;
 use crate::types::{MainConfig, MainConfigFile, RequirementConfig};
 use clarity_repl::repl;
 
@@ -146,6 +146,12 @@ struct Run {
     /// Allow access to wallets
     #[clap(long = "allow-wallets")]
     pub allow_wallets: bool,
+    /// Allow write access to disk
+    #[clap(long = "allow-write")]
+    pub allow_disk_write: bool,
+    /// Allow read access to disk
+    #[clap(long = "allow-read")]
+    pub allow_disk_read: bool,
 }
 
 #[derive(Clap)]
@@ -295,26 +301,42 @@ pub fn main() {
             let manifest_path = get_manifest_path_or_exit(cmd.manifest_path);
             let start_repl = false;
             let res = load_session(manifest_path.clone(), start_repl, Network::Devnet);
-            if let Err(e) = res {
-                println!("{}", e);
-                return;
-            }
-            run_tests(cmd.files, cmd.coverage, cmd.watch, true, manifest_path);
+            let session = match res {
+                Ok(session) => session,
+                Err(e) => {
+                    println!("{}", e);
+                    return;
+                }
+            };
+            run_scripts(
+                cmd.files,
+                cmd.coverage,
+                cmd.watch,
+                true,
+                false,
+                manifest_path,
+                Some(session),
+            );
         }
         Command::Run(cmd) => {
             let manifest_path = get_manifest_path_or_exit(cmd.manifest_path);
             let start_repl = false;
             let res = load_session(manifest_path.clone(), start_repl, Network::Devnet);
-            if let Err(e) = res {
-                println!("{}", e);
-                return;
-            }
-            run_tests(
+            let session = match res {
+                Ok(session) => session,
+                Err(e) => {
+                    println!("{}", e);
+                    return;
+                }
+            };
+            run_scripts(
                 vec![cmd.script],
                 false,
                 false,
                 cmd.allow_wallets,
+                cmd.allow_disk_write,
                 manifest_path,
+                Some(session),
             );
         }
         Command::Publish(deploy) => {
