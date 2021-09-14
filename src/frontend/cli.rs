@@ -11,7 +11,7 @@ use crate::generate::{
 use crate::integrate::{self, DevnetOrchestrator};
 use crate::poke::load_session;
 use crate::publish::{publish_all_contracts, Network};
-use crate::test::run_scripts;
+use crate::runnner::run_scripts;
 use crate::types::{MainConfig, MainConfigFile, RequirementConfig};
 use clarity_repl::repl;
 
@@ -126,6 +126,9 @@ struct Test {
     /// Generate coverage
     #[clap(long = "coverage")]
     pub coverage: bool,
+    /// Generate costs report
+    #[clap(long = "costs")]
+    pub costs_report: bool,
     /// Path to Clarinet.toml
     #[clap(long = "manifest-path")]
     pub manifest_path: Option<String>,
@@ -311,6 +314,7 @@ pub fn main() {
             run_scripts(
                 cmd.files,
                 cmd.coverage,
+                cmd.costs_report,
                 cmd.watch,
                 true,
                 false,
@@ -331,6 +335,7 @@ pub fn main() {
             };
             run_scripts(
                 vec![cmd.script],
+                false,
                 false,
                 false,
                 cmd.allow_wallets,
