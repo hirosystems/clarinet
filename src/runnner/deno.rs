@@ -64,6 +64,11 @@ mod sessions {
         pub static ref SESSION_TEMPLATE: Mutex<Vec<Session>> = Mutex::new(vec![]);
     }
 
+    pub fn reset() {
+        SESSION_TEMPLATE.lock().unwrap().clear();
+        SESSIONS.lock().unwrap().clear();
+    }
+
     pub fn handle_setup_chain(
         manifest_path: &PathBuf,
         name: String,
@@ -179,7 +184,7 @@ mod sessions {
         match sessions.get_mut(&session_id) {
             None => {
                 println!("Error: unable to retrieve session");
-                unreachable!()
+                panic!()
             }
             Some((name, ref mut session)) => handler(name.as_str(), session),
         }
@@ -362,6 +367,10 @@ pub async fn do_run_scripts(
         file_watcher::watch_func(
             resolver,
             |modules_to_reload| {
+                // Clear the screen
+                print!("{esc}c", esc = 27 as char);
+                // Clear eventual previous sessions
+                sessions::reset();
                 run_scripts(
                     program_state.clone(),
                     permissions.clone(),
@@ -376,9 +385,14 @@ pub async fn do_run_scripts(
                     concurrent_jobs,
                     manifest_path.clone(),
                     allow_wallets,
-                    session.clone(),
+                    None,
                 )
-                .map(|res| res.map(|_| ()))
+                .map(|res| {
+                    if include_costs_report {
+                        display_costs_report()
+                    }
+                    res.map(|_| ())
+                })
             },
             "Test",
         )
@@ -551,40 +565,37 @@ fn display_costs_report() {
     let mut table = Table::new();
     let headers = vec![
         "".to_string(),
-        "Runtime".to_string(),
+        "Runtime (units)".to_string(),
         "Read Count".to_string(),
-        "Read Length".to_string(),
+        "Read Length (bytes)".to_string(),
         "Write Count".to_string(),
-        "Write Length".to_string(),
+        "Write Length (bytes)".to_string(),
         "Tx per Block".to_string(),
     ];
     let mut headers_cells = vec![];
     for header in headers.iter() {
         headers_cells.push(Cell::new(&header));
     }
+    table.add_row(Row::new(headers_cells.clone()));
 
     for (contract_id, methods) in consolidated.iter() {
         for (method, reports) in methods.iter() {
-            table.add_row(Row::new(vec![Cell::new_align(
-                &format!("{}::{}", contract_id, method),
-                format::Alignment::LEFT,
-            )
-            .with_hspan(7)
-            .with_style(Attr::BackgroundColor(color::WHITE))
-            .with_style(Attr::ForegroundColor(color::BLACK))]));
 
             let (min, min_report, min_bottleneck) = mins.get(&(contract_id, method)).unwrap();
             let (max, max_report, max_bottleneck) = mins.get(&(contract_id, method)).unwrap();
-            table.add_row(Row::new(headers_cells.clone()));
-            if min != max {
-                table.add_row(Row::new(formatted_cost_cells(
-                    "Min",
-                    &min_report,
-                    &min_bottleneck,
-                )));
-            }
+            
+            // Not displaying the min row for now - probably not so interesting atm.
+            // if min != max {
+            //     table.add_row(Row::new(formatted_cost_cells(
+            //         "Min",
+            //         &min_report,
+            //         &min_bottleneck,
+            //     )));
+            // }
+
+            let contract_name = contract_id.split(".").last().unwrap();
             table.add_row(Row::new(formatted_cost_cells(
-                "Max",
+                &format!("{}::{}", contract_name, method),
                 &max_report,
                 &max_bottleneck,
             )));
@@ -594,21 +605,19 @@ fn display_costs_report() {
     if let Some((_, (_, report, _))) = maxs.iter().next() {
         let limit = &report.cost_result.limit;
         table.add_row(Row::new(vec![Cell::new_align(
-            &format!("Block Limits"),
+            &format!(""),
             format::Alignment::LEFT,
         )
-        .with_hspan(7)
-        .with_style(Attr::BackgroundColor(color::BRIGHT_BLACK))
-        .with_style(Attr::ForegroundColor(color::BLACK))]));
+        .with_hspan(7)]));
 
         table.add_row(Row::new(vec![
-            Cell::new("Mainnet"),
-            Cell::new(&limit.runtime.to_string()),
-            Cell::new(&limit.read_count.to_string()),
-            Cell::new(&format!("{} bytes", limit.read_length)),
-            Cell::new(&limit.write_count.to_string()),
-            Cell::new(&format!("{} bytes", limit.write_length)),
-            Cell::new("/"),
+            Cell::new("Mainnet Block Limits (Stacks 2.0)"),
+            Cell::new_align(&format!("{}", &limit.runtime.to_string()), format::Alignment::RIGHT),
+            Cell::new_align(&limit.read_count.to_string(), format::Alignment::RIGHT),
+            Cell::new_align(&format!("{}", limit.read_length), format::Alignment::RIGHT),
+            Cell::new_align(&limit.write_count.to_string(), format::Alignment::RIGHT),
+            Cell::new_align(&format!("{}", limit.write_length), format::Alignment::RIGHT),
+            Cell::new_align("/", format::Alignment::RIGHT),
         ]));
     }
 
@@ -655,16 +664,32 @@ fn formatted_cost_cells(title: &str, report: &CostsReport, bottleneck: &Bottlene
         Attr::ForegroundColor(color::GREEN)
     };
 
+    let ratios = vec![
+        (report.cost_result.total.runtime, report.cost_result.limit.runtime),
+        (report.cost_result.total.read_count, report.cost_result.limit.read_count),
+        (report.cost_result.total.read_length, report.cost_result.limit.read_length),
+        (report.cost_result.total.write_count, report.cost_result.limit.write_count),
+        (report.cost_result.total.write_length, report.cost_result.limit.write_length),
+    ];
+
+    let annotations = ratios.iter().map(|(value, limit)| {
+        if *value == 0 {
+            "".to_string()
+        } else {
+            format!(" ({:.2}%)", 100.0 * *value as f32 / *limit as f32)
+        }
+    }).collect::<Vec<String>>();
+
     vec![
         Cell::new(title),
-        Cell::new(&report.cost_result.total.runtime.to_string()).with_style(runtime_style),
-        Cell::new(&report.cost_result.total.read_count.to_string()).with_style(read_count_style),
-        Cell::new(&format!("{} bytes", report.cost_result.total.read_length))
+        Cell::new_align(&format!("{}{}", report.cost_result.total.runtime.to_string(), annotations[0]), format::Alignment::RIGHT).with_style(runtime_style),
+        Cell::new_align(&format!("{}{}", report.cost_result.total.read_count.to_string(), annotations[1]), format::Alignment::RIGHT).with_style(read_count_style),
+        Cell::new_align(&format!("{}{}", report.cost_result.total.read_length, annotations[2]), format::Alignment::RIGHT)
             .with_style(read_len_style),
-        Cell::new(&report.cost_result.total.write_count.to_string()).with_style(write_count_style),
-        Cell::new(&format!("{} bytes", report.cost_result.total.write_length))
+        Cell::new_align(&format!("{}{}", report.cost_result.total.write_count.to_string(), annotations[3]), format::Alignment::RIGHT).with_style(write_count_style),
+        Cell::new_align(&format!("{}{}", report.cost_result.total.write_length, annotations[4]), format::Alignment::RIGHT)
             .with_style(write_len_style),
-        Cell::new(&format!("{}", tx_per_block)).with_style(block_style),
+        Cell::new_align(&format!("{}", tx_per_block), format::Alignment::RIGHT).with_style(block_style),
     ]
 }
 
