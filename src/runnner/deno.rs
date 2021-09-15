@@ -580,10 +580,9 @@ fn display_costs_report() {
 
     for (contract_id, methods) in consolidated.iter() {
         for (method, reports) in methods.iter() {
-
             let (min, min_report, min_bottleneck) = mins.get(&(contract_id, method)).unwrap();
             let (max, max_report, max_bottleneck) = mins.get(&(contract_id, method)).unwrap();
-            
+
             // Not displaying the min row for now - probably not so interesting atm.
             // if min != max {
             //     table.add_row(Row::new(formatted_cost_cells(
@@ -612,7 +611,10 @@ fn display_costs_report() {
 
         table.add_row(Row::new(vec![
             Cell::new("Mainnet Block Limits (Stacks 2.0)"),
-            Cell::new_align(&format!("{}", &limit.runtime.to_string()), format::Alignment::RIGHT),
+            Cell::new_align(
+                &format!("{}", &limit.runtime.to_string()),
+                format::Alignment::RIGHT,
+            ),
             Cell::new_align(&limit.read_count.to_string(), format::Alignment::RIGHT),
             Cell::new_align(&format!("{}", limit.read_length), format::Alignment::RIGHT),
             Cell::new_align(&limit.write_count.to_string(), format::Alignment::RIGHT),
@@ -665,31 +667,83 @@ fn formatted_cost_cells(title: &str, report: &CostsReport, bottleneck: &Bottlene
     };
 
     let ratios = vec![
-        (report.cost_result.total.runtime, report.cost_result.limit.runtime),
-        (report.cost_result.total.read_count, report.cost_result.limit.read_count),
-        (report.cost_result.total.read_length, report.cost_result.limit.read_length),
-        (report.cost_result.total.write_count, report.cost_result.limit.write_count),
-        (report.cost_result.total.write_length, report.cost_result.limit.write_length),
+        (
+            report.cost_result.total.runtime,
+            report.cost_result.limit.runtime,
+        ),
+        (
+            report.cost_result.total.read_count,
+            report.cost_result.limit.read_count,
+        ),
+        (
+            report.cost_result.total.read_length,
+            report.cost_result.limit.read_length,
+        ),
+        (
+            report.cost_result.total.write_count,
+            report.cost_result.limit.write_count,
+        ),
+        (
+            report.cost_result.total.write_length,
+            report.cost_result.limit.write_length,
+        ),
     ];
 
-    let annotations = ratios.iter().map(|(value, limit)| {
-        if *value == 0 {
-            "".to_string()
-        } else {
-            format!(" ({:.2}%)", 100.0 * *value as f32 / *limit as f32)
-        }
-    }).collect::<Vec<String>>();
+    let annotations = ratios
+        .iter()
+        .map(|(value, limit)| {
+            if *value == 0 {
+                "".to_string()
+            } else {
+                format!(" ({:.2}%)", 100.0 * *value as f32 / *limit as f32)
+            }
+        })
+        .collect::<Vec<String>>();
 
     vec![
         Cell::new(title),
-        Cell::new_align(&format!("{}{}", report.cost_result.total.runtime.to_string(), annotations[0]), format::Alignment::RIGHT).with_style(runtime_style),
-        Cell::new_align(&format!("{}{}", report.cost_result.total.read_count.to_string(), annotations[1]), format::Alignment::RIGHT).with_style(read_count_style),
-        Cell::new_align(&format!("{}{}", report.cost_result.total.read_length, annotations[2]), format::Alignment::RIGHT)
-            .with_style(read_len_style),
-        Cell::new_align(&format!("{}{}", report.cost_result.total.write_count.to_string(), annotations[3]), format::Alignment::RIGHT).with_style(write_count_style),
-        Cell::new_align(&format!("{}{}", report.cost_result.total.write_length, annotations[4]), format::Alignment::RIGHT)
-            .with_style(write_len_style),
-        Cell::new_align(&format!("{}", tx_per_block), format::Alignment::RIGHT).with_style(block_style),
+        Cell::new_align(
+            &format!(
+                "{}{}",
+                report.cost_result.total.runtime.to_string(),
+                annotations[0]
+            ),
+            format::Alignment::RIGHT,
+        )
+        .with_style(runtime_style),
+        Cell::new_align(
+            &format!(
+                "{}{}",
+                report.cost_result.total.read_count.to_string(),
+                annotations[1]
+            ),
+            format::Alignment::RIGHT,
+        )
+        .with_style(read_count_style),
+        Cell::new_align(
+            &format!("{}{}", report.cost_result.total.read_length, annotations[2]),
+            format::Alignment::RIGHT,
+        )
+        .with_style(read_len_style),
+        Cell::new_align(
+            &format!(
+                "{}{}",
+                report.cost_result.total.write_count.to_string(),
+                annotations[3]
+            ),
+            format::Alignment::RIGHT,
+        )
+        .with_style(write_count_style),
+        Cell::new_align(
+            &format!(
+                "{}{}",
+                report.cost_result.total.write_length, annotations[4]
+            ),
+            format::Alignment::RIGHT,
+        )
+        .with_style(write_len_style),
+        Cell::new_align(&format!("{}", tx_per_block), format::Alignment::RIGHT)
+            .with_style(block_style),
     ]
 }
 
