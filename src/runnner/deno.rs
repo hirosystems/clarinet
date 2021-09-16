@@ -216,7 +216,7 @@ pub async fn do_run_scripts(
     let mut project_path = manifest_path.clone();
     project_path.pop();
     let cwd = Path::new(&project_path);
-    let include = if include.is_empty() {
+    let mut include = if include.is_empty() {
         vec![".".into()]
     } else {
         include.clone()
@@ -240,6 +240,8 @@ pub async fn do_run_scripts(
             Permissions::allow_all(),
             Permissions::allow_all(),
         )?));
+
+        include.push("contracts".into());
 
         let paths_to_watch: Vec<_> = include.iter().map(PathBuf::from).collect();
 
