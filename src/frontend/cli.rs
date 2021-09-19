@@ -13,7 +13,7 @@ use crate::poke::load_session;
 use crate::publish::{publish_all_contracts, Network};
 use crate::test::run_tests;
 use crate::types::{MainConfig, MainConfigFile, RequirementConfig};
-use clarity_repl::repl;
+use clarity_repl::repl::{self, OutputMode};
 
 use clap::Clap;
 use toml;
@@ -109,6 +109,9 @@ struct Poke {
     /// Path to Clarinet.toml
     #[clap(long = "manifest-path")]
     pub manifest_path: Option<String>,
+    /// Output format
+    #[clap(short = 'o', long = "output", default_value = "console")]
+    pub output_mode: OutputMode,
 }
 
 #[derive(Clap)]
@@ -132,6 +135,9 @@ struct Test {
     /// Relaunch tests on updates
     #[clap(long = "watch")]
     pub watch: bool,
+    /// Output format
+    #[clap(short = 'o', long = "output", default_value = "console")]
+    pub output_mode: OutputMode,
     /// Files to includes
     pub files: Vec<String>,
 }
@@ -146,6 +152,9 @@ struct Run {
     /// Allow access to wallets
     #[clap(long = "allow-wallets")]
     pub allow_wallets: bool,
+    /// Output format
+    #[clap(short = 'o', long = "output", default_value = "console")]
+    pub output_mode: OutputMode,
 }
 
 #[derive(Clap)]
@@ -280,21 +289,22 @@ pub fn main() {
         Command::Poke(cmd) | Command::Console(cmd) => {
             let manifest_path = get_manifest_path_or_exit(cmd.manifest_path);
             let start_repl = true;
-            load_session(manifest_path, start_repl, Network::Devnet).expect("Unable to start REPL");
+            load_session(manifest_path, start_repl, Network::Devnet, cmd.output_mode).expect("Unable to start REPL");
         }
         Command::Check(cmd) => {
             let manifest_path = get_manifest_path_or_exit(cmd.manifest_path);
             let start_repl = false;
-            let res = load_session(manifest_path, start_repl, Network::Devnet);
+            let res = load_session(manifest_path, start_repl, Network::Devnet, OutputMode::Console);
             if let Err(e) = res {
                 println!("{}", e);
                 return;
             }
         }
         Command::Test(cmd) => {
+            // println!("cmd.output_mode: {:?}",cmd.output_mode);
             let manifest_path = get_manifest_path_or_exit(cmd.manifest_path);
             let start_repl = false;
-            let res = load_session(manifest_path.clone(), start_repl, Network::Devnet);
+            let res = load_session(manifest_path.clone(), start_repl, Network::Devnet, cmd.output_mode);
             if let Err(e) = res {
                 println!("{}", e);
                 return;
@@ -304,7 +314,7 @@ pub fn main() {
         Command::Run(cmd) => {
             let manifest_path = get_manifest_path_or_exit(cmd.manifest_path);
             let start_repl = false;
-            let res = load_session(manifest_path.clone(), start_repl, Network::Devnet);
+            let res = load_session(manifest_path.clone(), start_repl, Network::Devnet, cmd.output_mode);
             if let Err(e) = res {
                 println!("{}", e);
                 return;

@@ -1,16 +1,18 @@
-use crate::publish::Network;
-use crate::types::{ChainConfig, MainConfig};
-use clarity_repl::{repl, Terminal};
 use std::fs;
 use std::path::PathBuf;
+
+use clarity_repl::{repl::{self, OutputMode}, Terminal};
+use crate::publish::Network;
+use crate::types::{ChainConfig, MainConfig};
 
 pub fn load_session(
     manifest_path: PathBuf,
     start_repl: bool,
     env: Network,
+    output_mode: OutputMode,
 ) -> Result<repl::SessionSettings, String> {
     let mut settings = repl::SessionSettings::default();
-
+    settings.output_mode = output_mode;
     let mut project_path = manifest_path.clone();
     project_path.pop();
 
@@ -54,6 +56,7 @@ pub fn load_session(
             deployer_address = Some(account.address.clone());
         }
         settings.initial_accounts.push(account);
+        settings.output_mode = output_mode;
     }
 
     for (name, config) in project_config.ordered_contracts().iter() {
@@ -73,7 +76,7 @@ pub fn load_session(
         settings
             .initial_contracts
             .push(repl::settings::InitialContract {
-                code: code,
+                code,
                 path: contract_path.to_str().unwrap().into(),
                 name: Some(name.clone()),
                 deployer: deployer_address.clone(),

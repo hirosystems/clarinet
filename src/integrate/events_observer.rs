@@ -12,9 +12,8 @@ use clarity_repl::clarity::representations::ClarityName;
 use clarity_repl::clarity::types::{BuffData, SequenceData, TupleData, Value as ClarityValue};
 use clarity_repl::clarity::util::address::AddressHashMode;
 use clarity_repl::clarity::util::hash::{hex_bytes, Hash160};
-use clarity_repl::repl::settings::InitialContract;
-use clarity_repl::repl::SessionSettings;
-use rocket::config::{Config, LogLevel};
+use clarity_repl::repl::{OutputMode, SessionSettings, settings::InitialContract};
+use rocket::{config::{Config, LogLevel}};
 use rocket::serde::json::{json, Json, Value};
 use rocket::serde::Deserialize;
 use rocket::State;
@@ -81,7 +80,7 @@ impl EventObserverConfig {
         accounts: BTreeMap<String, AccountConfig>,
     ) -> Self {
         info!("Checking contracts...");
-        let session_settings = match load_session(manifest_path.clone(), false, Network::Devnet) {
+        let session_settings = match load_session(manifest_path.clone(), false, Network::Devnet, OutputMode::Console) {
             Ok(settings) => settings,
             Err(e) => {
                 println!("{}", e);
@@ -193,7 +192,7 @@ pub async fn start_events_observer(
                     .expect("Unable to terminate event observer");
 
                 let session_settings =
-                    match load_session(manifest_path.clone(), false, Network::Devnet) {
+                    match load_session(manifest_path.clone(), false, Network::Devnet, OutputMode::Console) {
                         Ok(settings) => settings,
                         Err(e) => {
                             devnet_event_tx

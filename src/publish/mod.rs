@@ -1,25 +1,10 @@
 use crate::poke::load_session;
 use crate::utils::mnemonic;
-use clarity_repl::clarity::codec::transaction::{
-    StacksTransaction, StacksTransactionSigner, TransactionAnchorMode, TransactionAuth,
-    TransactionPayload, TransactionPostConditionMode, TransactionPublicKeyEncoding,
-    TransactionSmartContract, TransactionSpendingCondition,
-};
-use clarity_repl::clarity::codec::StacksMessageCodec;
-use clarity_repl::clarity::{
-    codec::{
-        transaction::{
-            RecoverableSignature, SinglesigHashMode, SinglesigSpendingCondition, TransactionVersion,
-        },
-        StacksString,
-    },
-    util::{
+use clarity_repl::{clarity::{codec::{StacksMessageCodec, StacksString, transaction::{RecoverableSignature, SinglesigHashMode, SinglesigSpendingCondition, StacksTransaction, StacksTransactionSigner, TransactionAnchorMode, TransactionAuth, TransactionPayload, TransactionPostConditionMode, TransactionPublicKeyEncoding, TransactionSmartContract, TransactionSpendingCondition, TransactionVersion}}, util::{
         address::AddressHashMode,
         secp256k1::{Secp256k1PrivateKey, Secp256k1PublicKey},
         StacksAddress,
-    },
-};
-use clarity_repl::repl::settings::{Account, InitialContract};
+    }}, repl::{OutputMode, settings::{Account, InitialContract}}};
 use libsecp256k1::{PublicKey, SecretKey};
 use std::collections::BTreeMap;
 use std::path::PathBuf;
@@ -152,7 +137,7 @@ pub fn publish_all_contracts(
     network: Network,
 ) -> Result<Vec<String>, Vec<String>> {
     let start_repl = false;
-    let settings = match load_session(manifest_path, start_repl, network) {
+    let settings = match load_session(manifest_path, start_repl, network, OutputMode::Console) {
         Ok(settings) => settings,
         Err(e) => return Err(vec![e]),
     };
