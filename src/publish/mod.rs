@@ -137,13 +137,14 @@ pub fn publish_all_contracts(
     network: Network,
 ) -> Result<Vec<String>, Vec<String>> {
     let start_repl = false;
-    let settings = match load_session(manifest_path, start_repl, network, OutputMode::Console) {
+    let session = match load_session(manifest_path, start_repl, network, OutputMode::Console) {
         Ok(settings) => settings,
         Err(e) => return Err(vec![e]),
     };
     let mut results = vec![];
     let mut deployers_nonces = BTreeMap::new();
     let mut deployers_lookup = BTreeMap::new();
+    let settings = session.settings;
     for account in settings.initial_accounts.iter() {
         if account.name == "deployer" {
             deployers_lookup.insert("*".into(), account.clone());

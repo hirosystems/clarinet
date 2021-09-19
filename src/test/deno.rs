@@ -1,6 +1,5 @@
 use clarity_repl::clarity::coverage::CoverageReporter;
-use clarity_repl::clarity::types::PrincipalData;
-use clarity_repl::clarity::types::StandardPrincipalData;
+use clarity_repl::repl::Session;
 use deno::ast;
 use deno::colors;
 use deno::create_main_worker;
@@ -59,93 +58,114 @@ mod sessions {
     lazy_static! {
         pub static ref SESSIONS: Mutex<HashMap<u32, (String, Session)>> =
             Mutex::new(HashMap::new());
+        pub static ref SESSION_TEMPLATE: Mutex<Vec<Session>> = Mutex::new(vec![]);
     }
 
     pub fn handle_setup_chain(
         manifest_path: &PathBuf,
         name: String,
         transactions: Vec<TransactionArgs>,
-    ) -> Result<(u32, Vec<Account>, Vec<(ContractAnalysis, String)>), AnyError> {
+    ) -> Result<(u32, Vec<Account>, Vec<(ContractAnalysis, String, String)>), AnyError> {
         let mut sessions = SESSIONS.lock().unwrap();
         let session_id = sessions.len() as u32;
+        let session_templated = {
+            let res = SESSION_TEMPLATE.lock().unwrap();
+            !res.is_empty()
+        };
+        let use_cache = transactions.is_empty() && session_templated;
 
-        let mut settings = repl::SessionSettings::default();
-        let mut project_path = manifest_path.clone();
-        project_path.pop();
+        let (mut session, contracts) = if !use_cache {
+            let mut settings = repl::SessionSettings::default();
+            let mut project_path = manifest_path.clone();
+            project_path.pop();
 
-        let mut chain_config_path = project_path.clone();
-        chain_config_path.push("settings");
-        chain_config_path.push("Devnet.toml");
+            let mut chain_config_path = project_path.clone();
+            chain_config_path.push("settings");
+            chain_config_path.push("Devnet.toml");
 
-        let project_config = MainConfig::from_path(manifest_path);
-        let chain_config = ChainConfig::from_path(&chain_config_path);
+            let project_config = MainConfig::from_path(manifest_path);
+            let chain_config = ChainConfig::from_path(&chain_config_path);
 
-        let mut deployer_address = None;
-        let mut initial_deployer = None;
+            let mut deployer_address = None;
+            let mut initial_deployer = None;
 
-        for (name, account) in chain_config.accounts.iter() {
-            let account = repl::settings::Account {
-                name: name.clone(),
-                balance: account.balance,
-                address: account.address.clone(),
-                mnemonic: account.mnemonic.clone(),
-                derivation: account.derivation.clone(),
-            };
-            if name == "deployer" {
-                initial_deployer = Some(account.clone());
-                deployer_address = Some(account.address.clone());
+            for (name, account) in chain_config.accounts.iter() {
+                let account = repl::settings::Account {
+                    name: name.clone(),
+                    balance: account.balance,
+                    address: account.address.clone(),
+                    mnemonic: account.mnemonic.clone(),
+                    derivation: account.derivation.clone(),
+                };
+                if name == "deployer" {
+                    initial_deployer = Some(account.clone());
+                    deployer_address = Some(account.address.clone());
+                }
+                settings.initial_accounts.push(account);
             }
-            settings.initial_accounts.push(account);
-        }
 
-        for tx in transactions.iter() {
-            let deployer = Some(tx.sender.clone());
-            if let Some(ref deploy_contract) = tx.deploy_contract {
+            for tx in transactions.iter() {
+                let deployer = Some(tx.sender.clone());
+                if let Some(ref deploy_contract) = tx.deploy_contract {
+                    settings
+                        .initial_contracts
+                        .push(repl::settings::InitialContract {
+                            code: deploy_contract.code.clone(),
+                            path: "".into(),
+                            name: Some(deploy_contract.name.clone()),
+                            deployer,
+                        });
+                }
+                // if let Some(ref contract_call) tx.contract_call {
+                // TODO: initial_tx_sender
+                //   let code = format!("(contract-call? '{}.{} {} {})", initial_tx_sender, contract_call.contract, contract_call.method, contract_call.args.join(" "));
+                //   settings
+                //     .initial_contracts
+                //     .push(repl::settings::InitialContract {
+                //         code: code,
+                //         name: Some(name.clone()),
+                //         deployer: tx.sender.clone(),
+                //     });
+                // }
+            }
+
+            for (name, config) in project_config.ordered_contracts().iter() {
+                let mut contract_path = project_path.clone();
+                contract_path.push(&config.path);
+
+                let code = fs::read_to_string(&contract_path).unwrap();
+
                 settings
                     .initial_contracts
                     .push(repl::settings::InitialContract {
-                        code: deploy_contract.code.clone(),
-                        path: "".into(),
-                        name: Some(deploy_contract.name.clone()),
-                        deployer,
+                        code: code,
+                        path: contract_path.to_str().unwrap().into(),
+                        name: Some(name.clone()),
+                        deployer: deployer_address.clone(),
                     });
             }
-            // if let Some(ref contract_call) tx.contract_call {
-            // TODO: initial_tx_sender
-            //   let code = format!("(contract-call? '{}.{} {} {})", initial_tx_sender, contract_call.contract, contract_call.method, contract_call.args.join(" "));
-            //   settings
-            //     .initial_contracts
-            //     .push(repl::settings::InitialContract {
-            //         code: code,
-            //         name: Some(name.clone()),
-            //         deployer: tx.sender.clone(),
-            //     });
-            // }
-        }
+            settings.initial_deployer = initial_deployer;
+            settings.include_boot_contracts =
+                vec!["pox".to_string(), "costs".to_string(), "bns".to_string()];
+            let mut session = Session::new(settings.clone());
+            let (_, contracts) = match session.start() {
+                Ok(res) => res,
+                Err(e) => {
+                    std::process::exit(1);
+                }
+            };
+            SESSION_TEMPLATE.lock().unwrap().push(session.clone());
+            (session, contracts)
+        } else {
+            let session = SESSION_TEMPLATE.lock().unwrap().last().unwrap().clone();
+            let contracts = session.initial_contracts_analysis.clone();
+            (session, contracts)
+        };
 
-        for (name, config) in project_config.ordered_contracts().iter() {
-            let mut contract_path = project_path.clone();
-            contract_path.push(&config.path);
-
-            let code = fs::read_to_string(&contract_path).unwrap();
-
-            settings
-                .initial_contracts
-                .push(repl::settings::InitialContract {
-                    code,
-                    path: contract_path.to_str().unwrap().into(),
-                    name: Some(name.clone()),
-                    deployer: deployer_address.clone(),
-                });
-        }
-        settings.initial_deployer = initial_deployer;
-        settings.include_boot_contracts =
-            vec!["pox".to_string(), "costs".to_string(), "bns".to_string()];
-        let mut session = Session::new(settings.clone());
-        let contracts = session.start();
         session.advance_chain_tip(1);
+        let accounts = session.settings.initial_accounts.clone();
         sessions.insert(session_id, (name, session));
-        Ok((session_id, settings.initial_accounts, contracts))
+        Ok((session_id, accounts, contracts))
     }
 
     pub fn perform_block<F, R>(session_id: u32, handler: F) -> Result<R, AnyError>
@@ -163,16 +183,25 @@ mod sessions {
     }
 }
 
-pub async fn do_run_tests(
+pub async fn do_run_scripts(
     include: Vec<String>,
     include_coverage: bool,
     watch: bool,
     allow_wallets: bool,
+    allow_disk_write: bool,
     manifest_path: PathBuf,
+    session: Option<Session>,
 ) -> Result<bool, AnyError> {
     let mut flags = Flags::default();
     flags.unstable = true;
     flags.reload = true;
+    if allow_disk_write {
+        let mut write_path = manifest_path.clone();
+        write_path.pop();
+        write_path.push("artifacts");
+        let _ = std::fs::create_dir_all(&write_path);
+        flags.allow_write = Some(vec![write_path])
+    }
     let program_state = ProgramState::build(flags.clone()).await?;
     let permissions = Permissions::from_options(&flags.clone().into());
     let mut project_path = manifest_path.clone();
@@ -329,7 +358,7 @@ pub async fn do_run_tests(
         file_watcher::watch_func(
             resolver,
             |modules_to_reload| {
-                run_tests(
+                run_scripts(
                     program_state.clone(),
                     permissions.clone(),
                     lib.clone(),
@@ -343,6 +372,7 @@ pub async fn do_run_tests(
                     concurrent_jobs,
                     manifest_path.clone(),
                     allow_wallets,
+                    session.clone(),
                 )
                 .map(|res| res.map(|_| ()))
             },
@@ -358,7 +388,7 @@ pub async fn do_run_tests(
             tools::test_runner::is_supported,
         )?;
 
-        let failed = run_tests(
+        let failed = run_scripts(
             program_state.clone(),
             permissions,
             lib,
@@ -372,6 +402,7 @@ pub async fn do_run_tests(
             concurrent_jobs,
             manifest_path,
             allow_wallets,
+            session,
         )
         .await?;
 
@@ -410,7 +441,7 @@ pub fn is_supported_ext(path: &Path) -> bool {
 }
 
 #[allow(clippy::too_many_arguments)]
-pub async fn run_tests(
+pub async fn run_scripts(
     program_state: Arc<ProgramState>,
     permissions: Permissions,
     lib: module_graph::TypeLib,
@@ -424,6 +455,7 @@ pub async fn run_tests(
     concurrent_jobs: usize,
     manifest_path: PathBuf,
     allow_wallets: bool,
+    session: Option<Session>,
 ) -> Result<bool, AnyError> {
     if !doc_modules.is_empty() {
         let mut test_programs = Vec::new();
@@ -555,11 +587,12 @@ pub async fn run_tests(
         let test_module = test_module.clone();
         let permissions = permissions.clone();
         let sender = sender.clone();
+        let session = session.clone();
 
         let manifest = manifest_path.clone();
         tokio::task::spawn_blocking(move || {
             let join_handle = std::thread::spawn(move || {
-                let future = run_test_file(
+                let future = run_script(
                     program_state,
                     main_module,
                     test_module,
@@ -567,6 +600,7 @@ pub async fn run_tests(
                     sender,
                     manifest,
                     allow_wallets,
+                    session,
                 );
 
                 tokio_util::run_basic(future)
@@ -667,7 +701,7 @@ pub async fn run_tests(
     }
 }
 
-pub async fn run_test_file(
+pub async fn run_script(
     program_state: Arc<ProgramState>,
     main_module: ModuleSpecifier,
     test_module: ModuleSpecifier,
@@ -675,8 +709,16 @@ pub async fn run_test_file(
     channel: Sender<TestEvent>,
     manifest_path: PathBuf,
     allow_wallets: bool,
+    session: Option<Session>,
 ) -> Result<(), AnyError> {
     let mut worker = create_main_worker(&program_state, main_module.clone(), permissions, true);
+
+    if let Some(template) = session {
+        sessions::SESSION_TEMPLATE
+            .lock()
+            .unwrap()
+            .push(template.clone());
+    }
 
     {
         let js_runtime = &mut worker.js_runtime;
@@ -768,7 +810,7 @@ fn setup_chain(state: &mut OpState, args: Value, _: ()) -> Result<String, AnyErr
         serde_json::from_value(args).expect("Invalid request from JavaScript for \"op_load\".");
     let (session_id, accounts, contracts) =
         sessions::handle_setup_chain(manifest_path, args.name, args.transactions)?;
-    let serialized_contracts = contracts.iter().map(|(a, s)| json!({
+    let serialized_contracts = contracts.iter().map(|(a, s, _)| json!({
       "contract_id": a.contract_identifier.to_string(),
       "contract_interface": a.contract_interface.clone(),
       "dependencies": a.dependencies.clone().into_iter().map(|c| c.to_string()).collect::<Vec<String>>(),
@@ -776,14 +818,7 @@ fn setup_chain(state: &mut OpState, args: Value, _: ()) -> Result<String, AnyErr
     })).collect::<Vec<_>>();
 
     let allow_wallets = state.borrow::<bool>();
-    let accounts = if *allow_wallets {
-        accounts
-    } else {
-        println!(
-            "Pass the option --allow-wallets for passing the wallets declared in your settings"
-        );
-        vec![]
-    };
+    let accounts = if *allow_wallets { accounts } else { vec![] };
 
     Ok(json!({
         "session_id": session_id,

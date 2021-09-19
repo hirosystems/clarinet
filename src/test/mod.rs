@@ -6,24 +6,30 @@
 #![allow(non_upper_case_globals)]
 #![allow(unused_must_use)]
 
+use clarity_repl::repl::Session;
+
 use crate::utils;
 use std::path::PathBuf;
 
-mod deno;
+pub mod deno;
 
-pub fn run_tests(
+pub fn run_scripts(
     files: Vec<String>,
     include_coverage: bool,
     watch: bool,
     allow_wallets: bool,
+    allow_disk_write: bool,
     manifest_path: PathBuf,
+    session: Option<Session>,
 ) {
-    match block_on(deno::do_run_tests(
+    match block_on(deno::do_run_scripts(
         files,
         include_coverage,
         watch,
         allow_wallets,
+        allow_disk_write,
         manifest_path,
+        session,
     )) {
         Err(e) => std::process::exit(1),
         _ => {}

@@ -2,6 +2,7 @@ use super::{DevnetEvent, NodeObserverEvent};
 use crate::integrate::{BlockData, MempoolAdmissionData, ServiceStatusData, Status, Transaction};
 use crate::poke::load_session;
 use crate::publish::{publish_contract, Network};
+use crate::test::deno;
 use crate::types::{self, AccountConfig, DevnetConfig};
 use crate::utils;
 use crate::utils::stacks::{transactions, StacksRpc};
@@ -12,8 +13,9 @@ use clarity_repl::clarity::representations::ClarityName;
 use clarity_repl::clarity::types::{BuffData, SequenceData, TupleData, Value as ClarityValue};
 use clarity_repl::clarity::util::address::AddressHashMode;
 use clarity_repl::clarity::util::hash::{hex_bytes, Hash160};
-use clarity_repl::repl::{OutputMode, SessionSettings, settings::InitialContract};
-use rocket::{config::{Config, LogLevel}};
+use clarity_repl::repl::settings::InitialContract;
+use clarity_repl::repl::Session;
+use rocket::config::{Config, LogLevel};
 use rocket::serde::json::{json, Json, Value};
 use rocket::serde::Deserialize;
 use rocket::State;
@@ -69,7 +71,7 @@ pub struct EventObserverConfig {
     pub contracts_to_deploy: VecDeque<InitialContract>,
     pub manifest_path: PathBuf,
     pub pox_info: PoxInfo,
-    pub session_settings: SessionSettings,
+    pub session: Session,
     pub deployer_nonce: u64,
 }
 
@@ -80,8 +82,8 @@ impl EventObserverConfig {
         accounts: BTreeMap<String, AccountConfig>,
     ) -> Self {
         info!("Checking contracts...");
-        let session_settings = match load_session(manifest_path.clone(), false, Network::Devnet, OutputMode::Console) {
-            Ok(settings) => settings,
+        let session = match load_session(manifest_path.clone(), false, Network::Devnet) {
+            Ok(session) => session,
             Err(e) => {
                 println!("{}", e);
                 std::process::exit(1);
@@ -93,10 +95,27 @@ impl EventObserverConfig {
             manifest_path,
             pox_info: PoxInfo::default(),
             contracts_to_deploy: VecDeque::from_iter(
-                session_settings.initial_contracts.iter().map(|c| c.clone()),
+                session.settings.initial_contracts.iter().map(|c| c.clone()),
             ),
-            session_settings,
+            session,
             deployer_nonce: 0,
+        }
+    }
+
+    pub async fn execute_scripts(&self) {
+        if self.devnet_config.execute_script.len() > 0 {
+            for cmd in self.devnet_config.execute_script.iter() {
+                let _ = deno::do_run_scripts(
+                    vec![cmd.script.clone()],
+                    false,
+                    false,
+                    cmd.allow_wallets,
+                    cmd.allow_write,
+                    self.manifest_path.clone(),
+                    Some(self.session.clone()),
+                )
+                .await;
+            }
         }
     }
 }
@@ -139,6 +158,8 @@ pub async fn start_events_observer(
     terminator_rx: Receiver<bool>,
     event_tx: Option<Sender<NodeObserverEvent>>,
 ) -> Result<(), Box<dyn Error>> {
+    let _ = events_config.execute_scripts().await;
+
     let port = events_config.devnet_config.orchestrator_port;
     let manifest_path = events_config.manifest_path.clone();
     let rw_lock = Arc::new(RwLock::new(events_config));
@@ -191,18 +212,17 @@ pub async fn start_events_observer(
                     .send(DevnetEvent::info("Reloading contracts".into()))
                     .expect("Unable to terminate event observer");
 
-                let session_settings =
-                    match load_session(manifest_path.clone(), false, Network::Devnet, OutputMode::Console) {
-                        Ok(settings) => settings,
-                        Err(e) => {
-                            devnet_event_tx
-                                .send(DevnetEvent::error(format!("Contracts invalid: {}", e)))
-                                .expect("Unable to terminate event observer");
-                            continue;
-                        }
-                    };
+                let session = match load_session(manifest_path.clone(), false, Network::Devnet) {
+                    Ok(settings) => settings,
+                    Err(e) => {
+                        devnet_event_tx
+                            .send(DevnetEvent::error(format!("Contracts invalid: {}", e)))
+                            .expect("Unable to terminate event observer");
+                        continue;
+                    }
+                };
                 let contracts_to_deploy = VecDeque::from_iter(
-                    session_settings.initial_contracts.iter().map(|c| c.clone()),
+                    session.settings.initial_contracts.iter().map(|c| c.clone()),
                 );
                 devnet_event_tx
                     .send(DevnetEvent::success(format!(
@@ -213,7 +233,7 @@ pub async fn start_events_observer(
 
                 if let Ok(mut config_writer) = rw_lock.write() {
                     config_writer.contracts_to_deploy = contracts_to_deploy;
-                    config_writer.session_settings = session_settings;
+                    config_writer.session = session;
                     config_writer.deployer_nonce = 0;
                 }
             }
@@ -318,7 +338,7 @@ pub fn handle_new_block(
             let node_clone = node.clone();
 
             let mut deployers_lookup = BTreeMap::new();
-            for account in updated_config.session_settings.initial_accounts.iter() {
+            for account in updated_config.session.settings.initial_accounts.iter() {
                 if account.name == "deployer" {
                     deployers_lookup.insert("*".into(), account.clone());
                 }

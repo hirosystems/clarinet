@@ -10,7 +10,7 @@ pub fn load_session(
     start_repl: bool,
     env: Network,
     output_mode: OutputMode,
-) -> Result<repl::SessionSettings, String> {
+) -> Result<repl::Session, String> {
     let mut settings = repl::SessionSettings::default();
     settings.output_mode = output_mode;
     let mut project_path = manifest_path.clone();
@@ -100,18 +100,20 @@ pub fn load_session(
         vec!["pox".to_string(), "costs".to_string(), "bns".to_string()];
     settings.initial_deployer = initial_deployer;
 
-    if start_repl {
+    let session = if start_repl {
         let mut terminal = Terminal::new(settings.clone());
         terminal.start();
+        terminal.session.clone()
     } else {
         let mut session = repl::Session::new(settings.clone());
-        match session.check() {
+        match session.start() {
             Err(message) => {
                 println!("Error: {}", message);
                 std::process::exit(1);
             }
             _ => {}
         };
-    }
-    Ok(settings)
+        session
+    };
+    Ok(session)
 }

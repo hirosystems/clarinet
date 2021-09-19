@@ -55,8 +55,7 @@ pub struct DevnetConfigFile {
     postgres_password: Option<String>,
     postgres_database: Option<String>,
     pox_stacking_orders: Option<Vec<PoxStackingOrder>>,
-    preflight_scripts: Option<Vec<String>>,
-    postflight_scripts: Option<Vec<String>>,
+    execute_script: Option<Vec<ExecuteScript>>,
     bitcoin_node_image_url: Option<String>,
     bitcoin_explorer_image_url: Option<String>,
     stacks_node_image_url: Option<String>,
@@ -75,6 +74,13 @@ pub struct PoxStackingOrderFile {
     pub amount_locked: u32,
     pub wallet_label: String,
     pub bitcoin_address: String,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct ExecuteScript {
+    pub script: String,
+    pub allow_wallets: bool,
+    pub allow_write: bool,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -125,8 +131,7 @@ pub struct DevnetConfig {
     pub postgres_password: String,
     pub postgres_database: String,
     pub pox_stacking_orders: Vec<PoxStackingOrder>,
-    pub preflight_scripts: Vec<String>,
-    pub postflight_scripts: Vec<String>,
+    pub execute_script: Vec<ExecuteScript>,
     pub bitcoin_node_image_url: String,
     pub stacks_node_image_url: String,
     pub stacks_api_image_url: String,
@@ -307,8 +312,7 @@ impl ChainConfig {
                     .postgres_database
                     .take()
                     .unwrap_or("postgres".to_string()),
-                preflight_scripts: devnet_config.preflight_scripts.take().unwrap_or(vec![]),
-                postflight_scripts: devnet_config.postflight_scripts.take().unwrap_or(vec![]),
+                execute_script: devnet_config.execute_script.take().unwrap_or(vec![]),
                 bitcoin_node_image_url: devnet_config
                     .bitcoin_node_image_url
                     .take()
