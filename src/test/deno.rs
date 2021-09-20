@@ -159,7 +159,7 @@ mod sessions {
             (session, contracts)
         };
 
-        session.advance_chain_tip(1);
+        session.interpreter.advance_chain_tip(1);
         let accounts = session.settings.initial_accounts.clone();
         sessions.insert(session_id, (name, session));
         Ok((session_id, accounts, contracts))
@@ -871,7 +871,7 @@ fn mine_block(state: &mut OpState, args: Value, _: ()) -> Result<String, AnyErro
         let mut receipts = vec![];
         for tx in args.transactions.iter() {
             
-            session.set_tx_sender(PrincipalData::parse_standard_principal(tx.sender.clone())?);
+            session.interpreter.set_tx_sender(PrincipalData::parse_standard_principal(tx.sender.clone())?);
             if let Some(ref args) = tx.contract_call {
                 // Kludge for handling fully qualified contract_id vs sugared syntax
                 let first_char = args.contract.chars().next().unwrap();
@@ -920,8 +920,8 @@ fn mine_block(state: &mut OpState, args: Value, _: ()) -> Result<String, AnyErro
                 receipts.push((execution.result, execution.events));
             }
         }
-        session.set_tx_sender(initial_tx_sender);
-        let block_height = session.advance_chain_tip(1);
+        session.interpreter.set_tx_sender(initial_tx_sender);
+        let block_height = session.interpreter.advance_chain_tip(1);
         Ok((block_height, receipts))
     })?;
 
@@ -950,7 +950,7 @@ fn mine_empty_blocks(state: &mut OpState, args: Value, _: ()) -> Result<String, 
     let args: MineEmptyBlocksArgs =
         serde_json::from_value(args).expect("Invalid request from JavaScript.");
     let block_height = sessions::perform_block(args.session_id, |name, session| {
-        let block_height = session.advance_chain_tip(args.count);
+        let block_height = session.interpreter.advance_chain_tip(args.count);
         Ok(block_height)
     })?;
 
@@ -977,7 +977,7 @@ fn call_read_only_fn(state: &mut OpState, args: Value, _: ()) -> Result<String, 
     let (result, events) = sessions::perform_block(args.session_id, |name, session| {
         let initial_tx_sender = session.interpreter.get_tx_sender();
         let address = PrincipalData::parse_standard_principal(args.sender.clone())?;
-        session.set_tx_sender(address);
+        session.interpreter.set_tx_sender(address);
 
         // Kludge for handling fully qualified contract_id vs sugared syntax
         let first_char = args.contract.chars().next().unwrap();
@@ -1001,7 +1001,7 @@ fn call_read_only_fn(state: &mut OpState, args: Value, _: ()) -> Result<String, 
         let execution = session
             .interpret(snippet, None, true, Some(name.into()))
             .unwrap(); // todo(ludo)
-        session.set_tx_sender(initial_tx_sender);
+        session.interpreter.set_tx_sender(initial_tx_sender);
         Ok((execution.result, execution.events))
     })?;
     Ok(json!({
