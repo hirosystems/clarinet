@@ -1,4 +1,6 @@
 use clarity_repl::clarity::coverage::CoverageReporter;
+use clarity_repl::clarity::types::PrincipalData;
+use clarity_repl::clarity::types::StandardPrincipalData;
 use clarity_repl::repl::Session;
 use deno::ast;
 use deno::colors;
@@ -148,12 +150,7 @@ mod sessions {
             settings.include_boot_contracts =
                 vec!["pox".to_string(), "costs".to_string(), "bns".to_string()];
             let mut session = Session::new(settings.clone());
-            let (_, contracts) = match session.start() {
-                Ok(res) => res,
-                Err(e) => {
-                    std::process::exit(1);
-                }
-            };
+            let contracts = session.start()?.1;
             SESSION_TEMPLATE.lock().unwrap().push(session.clone());
             (session, contracts)
         } else {
@@ -979,7 +976,7 @@ fn call_read_only_fn(state: &mut OpState, args: Value, _: ()) -> Result<String, 
         serde_json::from_value(args).expect("Invalid request from JavaScript.");
     let (result, events) = sessions::perform_block(args.session_id, |name, session| {
         let initial_tx_sender = session.interpreter.get_tx_sender();
-        let address = StandardPrincipalData::try_from(args.sender.clone())?;
+        let address = PrincipalData::parse_standard_principal(args.sender.clone())?;
         session.set_tx_sender(address);
 
         // Kludge for handling fully qualified contract_id vs sugared syntax
