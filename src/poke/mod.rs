@@ -105,15 +105,7 @@ pub fn load_session(
         terminal.start();
         terminal.session.clone()
     } else {
-        let mut session = repl::Session::new(settings.clone());
-        match session.start() {
-            Err(message) => {
-                println!("Error: {}", message);
-                std::process::exit(1);
-            }
-            _ => {}
-        };
-        session
+        repl::Session::new(settings.clone())
     };
     Ok(session)
 }
