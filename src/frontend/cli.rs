@@ -367,7 +367,7 @@ pub fn main() {
             };
             match publish_all_contracts(manifest_path, network) {
                 Ok(results) => println!("{}", results.join("\n")),
-                Err(results) => println!("{}", results.join("\n")),
+                Err(e) => println!("{}", e),
             };
         }
         Command::Integrate(cmd) => {

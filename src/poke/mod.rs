@@ -10,7 +10,7 @@ pub fn load_session(
     start_repl: bool,
     env: Network,
     output_mode: OutputMode,
-) -> Result<repl::Session, String> {
+) -> anyhow::Result<repl::Session> {
     let mut settings = repl::SessionSettings::default();
     settings.output_mode = output_mode;
     let mut project_path = manifest_path.clone();
@@ -63,15 +63,8 @@ pub fn load_session(
         let mut contract_path = project_path.clone();
         contract_path.push(&config.path);
 
-        let code = match fs::read_to_string(&contract_path) {
-            Ok(code) => code,
-            Err(err) => {
-                return Err(format!(
-                    "Error: unable to read {:?}: {}",
-                    contract_path, err
-                ))
-            }
-        };
+        let code =  fs::read_to_string(&contract_path)?;
+        
 
         settings
             .initial_contracts
@@ -105,7 +98,9 @@ pub fn load_session(
         terminal.start();
         terminal.session.clone()
     } else {
-        repl::Session::new(settings.clone())
+        let mut session = repl::Session::new(settings.clone());
+        let _ = session.start()?;
+        session
     };
     Ok(session)
 }

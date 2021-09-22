@@ -150,7 +150,7 @@ mod sessions {
             settings.include_boot_contracts =
                 vec!["pox".to_string(), "costs".to_string(), "bns".to_string()];
             let mut session = Session::new(settings.clone());
-            let contracts = session.start()?.1;
+            let contracts = session.start()?;
             SESSION_TEMPLATE.lock().unwrap().push(session.clone());
             (session, contracts)
         } else {

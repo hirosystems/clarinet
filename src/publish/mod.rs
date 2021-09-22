@@ -135,12 +135,9 @@ pub fn publish_contract(
 pub fn publish_all_contracts(
     manifest_path: PathBuf,
     network: Network,
-) -> Result<Vec<String>, Vec<String>> {
+) -> anyhow::Result<Vec<String>> {
     let start_repl = false;
-    let session = match load_session(manifest_path, start_repl, network, OutputMode::Console) {
-        Ok(settings) => settings,
-        Err(e) => return Err(vec![e]),
-    };
+    let session = load_session(manifest_path, start_repl, network, OutputMode::Console)?;
     let mut results = vec![];
     let mut deployers_nonces = BTreeMap::new();
     let mut deployers_lookup = BTreeMap::new();
