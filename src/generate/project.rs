@@ -121,9 +121,9 @@ history.txt
 [project]
 name = "{}"
 
-[contracts]
-
-[notebooks]
+# [contracts.counter]
+# path = "contracts/counter.clar"
+# depends_on = []
 "#,
             self.project_name
         );

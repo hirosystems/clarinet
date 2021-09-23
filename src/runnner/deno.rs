@@ -1,4 +1,6 @@
 use clarity_repl::clarity::coverage::CoverageReporter;
+use clarity_repl::prettytable::{color, format, Attr, Cell, Row, Table};
+use clarity_repl::repl::session::CostsReport;
 use clarity_repl::repl::Session;
 use deno::ast;
 use deno::colors;
@@ -30,9 +32,10 @@ use deno_runtime::permissions::Permissions;
 use regex::Regex;
 use serde::de::DeserializeOwned;
 use serde::Serialize;
-use std::collections::BTreeMap;
 use std::collections::HashSet;
+use std::collections::{btree_map::Entry, BTreeMap};
 use std::convert::TryFrom;
+use std::ops::Index;
 use std::path::Path;
 use std::path::PathBuf;
 use std::rc::Rc;
@@ -59,6 +62,11 @@ mod sessions {
         pub static ref SESSIONS: Mutex<HashMap<u32, (String, Session)>> =
             Mutex::new(HashMap::new());
         pub static ref SESSION_TEMPLATE: Mutex<Vec<Session>> = Mutex::new(vec![]);
+    }
+
+    pub fn reset() {
+        SESSION_TEMPLATE.lock().unwrap().clear();
+        SESSIONS.lock().unwrap().clear();
     }
 
     pub fn handle_setup_chain(
@@ -145,8 +153,13 @@ mod sessions {
                     });
             }
             settings.initial_deployer = initial_deployer;
-            settings.include_boot_contracts =
-                vec!["pox".to_string(), "costs".to_string(), "bns".to_string()];
+            settings.costs_version = project_config.project.costs_version;
+            settings.include_boot_contracts = vec![
+                "pox".to_string(),
+                "costs-v1".to_string(),
+                "costs-v2".to_string(),
+                "bns".to_string(),
+            ];
             let mut session = Session::new(settings.clone());
             let (_, contracts) = match session.start() {
                 Ok(res) => res,
@@ -176,7 +189,7 @@ mod sessions {
         match sessions.get_mut(&session_id) {
             None => {
                 println!("Error: unable to retrieve session");
-                unreachable!()
+                panic!()
             }
             Some((name, ref mut session)) => handler(name.as_str(), session),
         }
@@ -186,6 +199,7 @@ mod sessions {
 pub async fn do_run_scripts(
     include: Vec<String>,
     include_coverage: bool,
+    include_costs_report: bool,
     watch: bool,
     allow_wallets: bool,
     allow_disk_write: bool,
@@ -207,8 +221,8 @@ pub async fn do_run_scripts(
     let mut project_path = manifest_path.clone();
     project_path.pop();
     let cwd = Path::new(&project_path);
-    let include = if include.is_empty() {
-        vec![".".into()]
+    let mut include = if include.is_empty() {
+        vec!["tests".into()]
     } else {
         include.clone()
     };
@@ -231,6 +245,8 @@ pub async fn do_run_scripts(
             Permissions::allow_all(),
             Permissions::allow_all(),
         )?));
+
+        include.push("contracts".into());
 
         let paths_to_watch: Vec<_> = include.iter().map(PathBuf::from).collect();
 
@@ -358,6 +374,10 @@ pub async fn do_run_scripts(
         file_watcher::watch_func(
             resolver,
             |modules_to_reload| {
+                // Clear the screen
+                print!("{esc}c", esc = 27 as char);
+                // Clear eventual previous sessions
+                sessions::reset();
                 run_scripts(
                     program_state.clone(),
                     permissions.clone(),
@@ -372,9 +392,14 @@ pub async fn do_run_scripts(
                     concurrent_jobs,
                     manifest_path.clone(),
                     allow_wallets,
-                    session.clone(),
+                    None,
                 )
-                .map(|res| res.map(|_| ()))
+                .map(|res| {
+                    if include_costs_report {
+                        display_costs_report()
+                    }
+                    res.map(|_| ())
+                })
             },
             "Test",
         )
@@ -429,7 +454,304 @@ pub async fn do_run_scripts(
         coverage_reporter.write_lcov_file("coverage.lcov");
     }
 
+    if include_costs_report {
+        display_costs_report()
+    }
+
     Ok(true)
+}
+
+#[derive(Clone)]
+enum Bottleneck {
+    Unknown,
+    Runtime(u64, u64),
+    ReadCount(u64, u64),
+    ReadLength(u64, u64),
+    WriteCount(u64, u64),
+    WriteLength(u64, u64),
+}
+
+fn display_costs_report() {
+    let mut consolidated: BTreeMap<String, BTreeMap<String, Vec<CostsReport>>> = BTreeMap::new();
+    let sessions = sessions::SESSIONS.lock().unwrap();
+    let mut mins: BTreeMap<(&String, &String), (f32, CostsReport, Bottleneck)> = BTreeMap::new();
+    let mut maxs: BTreeMap<(&String, &String), (f32, CostsReport, Bottleneck)> = BTreeMap::new();
+
+    for (session_id, (name, session)) in sessions.iter() {
+        for report in session.costs_reports.iter() {
+            let key = report.contract_id.to_string();
+            match consolidated.entry(key) {
+                Entry::Occupied(ref mut entry) => {
+                    match entry.get_mut().entry(report.method.to_string()) {
+                        Entry::Occupied(entry) => entry.into_mut().push(report.clone()),
+                        Entry::Vacant(entry) => {
+                            let mut reports = Vec::new();
+                            reports.push(report.clone());
+                            entry.insert(reports);
+                        }
+                    }
+                }
+                Entry::Vacant(entry) => {
+                    let mut reports = Vec::new();
+                    reports.push(report.clone());
+                    let mut methods = BTreeMap::new();
+                    methods.insert(report.method.to_string(), reports);
+                    entry.insert(methods);
+                }
+            };
+
+            // Look for the bounding factor
+            let ratios = vec![
+                (
+                    report.cost_result.total.runtime,
+                    report.cost_result.limit.runtime,
+                ),
+                (
+                    report.cost_result.total.read_count,
+                    report.cost_result.limit.read_count,
+                ),
+                (
+                    report.cost_result.total.read_length,
+                    report.cost_result.limit.read_length,
+                ),
+                (
+                    report.cost_result.total.write_count,
+                    report.cost_result.limit.write_count,
+                ),
+                (
+                    report.cost_result.total.write_length,
+                    report.cost_result.limit.write_length,
+                ),
+            ];
+            let (bottleneck, mut max) = ratios.iter().enumerate().fold(
+                (Bottleneck::Unknown, 0 as f32),
+                |(bottleneck, max), (index, (cost, limit))| {
+                    let ratio = (*cost as f32) / (*limit as f32);
+                    if ratio > max {
+                        (
+                            match index {
+                                0 => Bottleneck::Runtime(*cost, *limit),
+                                1 => Bottleneck::ReadCount(*cost, *limit),
+                                2 => Bottleneck::ReadLength(*cost, *limit),
+                                3 => Bottleneck::WriteCount(*cost, *limit),
+                                4 => Bottleneck::WriteLength(*cost, *limit),
+                                _ => Bottleneck::Unknown,
+                            },
+                            ratio,
+                        )
+                    } else {
+                        (bottleneck, max)
+                    }
+                },
+            );
+
+            let key = (&report.contract_id, &report.method);
+
+            mins.entry(key)
+                .and_modify(|(cur_min, min_report, cur_bottleneck)| {
+                    if &mut max < cur_min {
+                        *cur_min = max;
+                        *min_report = report.clone();
+                        *cur_bottleneck = bottleneck.clone();
+                    }
+                })
+                .or_insert((max, report.clone(), bottleneck.clone()));
+            maxs.entry(key)
+                .and_modify(|(cur_max, max_report, cur_bottleneck)| {
+                    if &mut max > cur_max {
+                        *cur_max = max;
+                        *max_report = report.clone();
+                        *cur_bottleneck = bottleneck.clone();
+                    }
+                })
+                .or_insert((max, report.clone(), bottleneck.clone()));
+        }
+    }
+
+    println!("\nContract calls cost synthesis");
+    let mut table = Table::new();
+    let headers = vec![
+        "".to_string(),
+        "Runtime (units)".to_string(),
+        "Read Count".to_string(),
+        "Read Length (bytes)".to_string(),
+        "Write Count".to_string(),
+        "Write Length (bytes)".to_string(),
+        "Tx per Block".to_string(),
+    ];
+    let mut headers_cells = vec![];
+    for header in headers.iter() {
+        headers_cells.push(Cell::new(&header));
+    }
+    table.add_row(Row::new(headers_cells.clone()));
+
+    for (contract_id, methods) in consolidated.iter() {
+        for (method, reports) in methods.iter() {
+            let (min, min_report, min_bottleneck) = mins.get(&(contract_id, method)).unwrap();
+            let (max, max_report, max_bottleneck) = mins.get(&(contract_id, method)).unwrap();
+
+            // Not displaying the min row for now - probably not so interesting atm.
+            // if min != max {
+            //     table.add_row(Row::new(formatted_cost_cells(
+            //         "Min",
+            //         &min_report,
+            //         &min_bottleneck,
+            //     )));
+            // }
+
+            let contract_name = contract_id.split(".").last().unwrap();
+            table.add_row(Row::new(formatted_cost_cells(
+                &format!("{}::{}", contract_name, method),
+                &max_report,
+                &max_bottleneck,
+            )));
+        }
+    }
+
+    if let Some((_, (_, report, _))) = maxs.iter().next() {
+        let limit = &report.cost_result.limit;
+        table.add_row(Row::new(vec![Cell::new_align(
+            &format!(""),
+            format::Alignment::LEFT,
+        )
+        .with_hspan(7)]));
+
+        table.add_row(Row::new(vec![
+            Cell::new("Mainnet Block Limits (Stacks 2.0)"),
+            Cell::new_align(
+                &format!("{}", &limit.runtime.to_string()),
+                format::Alignment::RIGHT,
+            ),
+            Cell::new_align(&limit.read_count.to_string(), format::Alignment::RIGHT),
+            Cell::new_align(&format!("{}", limit.read_length), format::Alignment::RIGHT),
+            Cell::new_align(&limit.write_count.to_string(), format::Alignment::RIGHT),
+            Cell::new_align(&format!("{}", limit.write_length), format::Alignment::RIGHT),
+            Cell::new_align("/", format::Alignment::RIGHT),
+        ]));
+    }
+
+    table.printstd();
+    println!("");
+}
+
+fn formatted_cost_cells(title: &str, report: &CostsReport, bottleneck: &Bottleneck) -> Vec<Cell> {
+    let mut runtime_style = Attr::ForegroundColor(color::BRIGHT_BLACK);
+    let mut read_count_style = Attr::ForegroundColor(color::BRIGHT_BLACK);
+    let mut read_len_style = Attr::ForegroundColor(color::BRIGHT_BLACK);
+    let mut write_count_style = Attr::ForegroundColor(color::BRIGHT_BLACK);
+    let mut write_len_style = Attr::ForegroundColor(color::BRIGHT_BLACK);
+
+    let tx_per_block = match bottleneck {
+        Bottleneck::Runtime(cost, limit) => {
+            runtime_style = Attr::ForegroundColor(color::BRIGHT_WHITE);
+            limit / cost
+        }
+        Bottleneck::ReadCount(cost, limit) => {
+            read_count_style = Attr::ForegroundColor(color::BRIGHT_WHITE);
+            limit / cost
+        }
+        Bottleneck::ReadLength(cost, limit) => {
+            read_len_style = Attr::ForegroundColor(color::BRIGHT_WHITE);
+            limit / cost
+        }
+        Bottleneck::WriteCount(cost, limit) => {
+            write_count_style = Attr::ForegroundColor(color::BRIGHT_WHITE);
+            limit / cost
+        }
+        Bottleneck::WriteLength(cost, limit) => {
+            write_len_style = Attr::ForegroundColor(color::BRIGHT_WHITE);
+            limit / cost
+        }
+        _ => 0,
+    };
+
+    let block_style = if tx_per_block < 100 {
+        Attr::ForegroundColor(color::RED)
+    } else if tx_per_block < 500 {
+        Attr::ForegroundColor(color::YELLOW)
+    } else {
+        Attr::ForegroundColor(color::GREEN)
+    };
+
+    let ratios = vec![
+        (
+            report.cost_result.total.runtime,
+            report.cost_result.limit.runtime,
+        ),
+        (
+            report.cost_result.total.read_count,
+            report.cost_result.limit.read_count,
+        ),
+        (
+            report.cost_result.total.read_length,
+            report.cost_result.limit.read_length,
+        ),
+        (
+            report.cost_result.total.write_count,
+            report.cost_result.limit.write_count,
+        ),
+        (
+            report.cost_result.total.write_length,
+            report.cost_result.limit.write_length,
+        ),
+    ];
+
+    let annotations = ratios
+        .iter()
+        .map(|(value, limit)| {
+            if *value == 0 {
+                "".to_string()
+            } else {
+                format!(" ({:.2}%)", 100.0 * *value as f32 / *limit as f32)
+            }
+        })
+        .collect::<Vec<String>>();
+
+    vec![
+        Cell::new(title),
+        Cell::new_align(
+            &format!(
+                "{}{}",
+                report.cost_result.total.runtime.to_string(),
+                annotations[0]
+            ),
+            format::Alignment::RIGHT,
+        )
+        .with_style(runtime_style),
+        Cell::new_align(
+            &format!(
+                "{}{}",
+                report.cost_result.total.read_count.to_string(),
+                annotations[1]
+            ),
+            format::Alignment::RIGHT,
+        )
+        .with_style(read_count_style),
+        Cell::new_align(
+            &format!("{}{}", report.cost_result.total.read_length, annotations[2]),
+            format::Alignment::RIGHT,
+        )
+        .with_style(read_len_style),
+        Cell::new_align(
+            &format!(
+                "{}{}",
+                report.cost_result.total.write_count.to_string(),
+                annotations[3]
+            ),
+            format::Alignment::RIGHT,
+        )
+        .with_style(write_count_style),
+        Cell::new_align(
+            &format!(
+                "{}{}",
+                report.cost_result.total.write_length, annotations[4]
+            ),
+            format::Alignment::RIGHT,
+        )
+        .with_style(write_len_style),
+        Cell::new_align(&format!("{}", tx_per_block), format::Alignment::RIGHT)
+            .with_style(block_style),
+    ]
 }
 
 pub fn is_supported_ext(path: &Path) -> bool {
@@ -867,56 +1189,56 @@ fn mine_block(state: &mut OpState, args: Value, _: ()) -> Result<String, AnyErro
         let initial_tx_sender = session.get_tx_sender();
         let mut receipts = vec![];
         for tx in args.transactions.iter() {
-            session.set_tx_sender(tx.sender.clone());
             if let Some(ref args) = tx.contract_call {
-                // Kludge for handling fully qualified contract_id vs sugared syntax
-                let first_char = args.contract.chars().next().unwrap();
-                let snippet = if first_char.to_string() == "S" {
-                    format!(
-                        "(contract-call? '{} {} {})",
-                        args.contract,
-                        args.method,
-                        args.args.join(" ")
-                    )
-                } else {
-                    format!(
-                        "(contract-call? '{}.{} {} {})",
-                        initial_tx_sender,
-                        args.contract,
-                        args.method,
-                        args.args.join(" ")
-                    )
+                let execution = match session.invoke_contract_call(
+                    &args.contract,
+                    &args.method,
+                    &args.args,
+                    &tx.sender,
+                    name.into(),
+                ) {
+                    Ok(res) => res,
+                    Err((_, _, err)) => {
+                        if let Some(e) = err {
+                            // todo(ludo): if CLARINET_BACKTRACE=1
+                            // Retrieve the AST (penultimate entry), and the expression id (last entry)
+                            println!(
+                                "Runtime error: {}::{}({}) -> {:?}",
+                                args.contract,
+                                args.method,
+                                args.args.join(", "),
+                                e
+                            );
+                        }
+                        continue;
+                    }
                 };
-                let execution = session
-                    .interpret(snippet, None, true, Some(name.into()))
-                    .unwrap(); // todo(ludo)
                 receipts.push((execution.result, execution.events));
-            }
-
-            if let Some(ref args) = tx.deploy_contract {
-                let execution = session
-                    .interpret(
-                        args.code.clone(),
-                        Some(args.name.clone()),
-                        true,
-                        Some(name.into()),
-                    )
-                    .unwrap(); // todo(ludo)
-                receipts.push((execution.result, execution.events));
-            }
-
-            if let Some(ref args) = tx.transfer_stx {
-                let snippet = format!(
-                    "(stx-transfer? u{} tx-sender '{})",
-                    args.amount, args.recipient
-                );
-                let execution = session
-                    .interpret(snippet, None, true, Some(name.into()))
-                    .unwrap(); // todo(ludo)
-                receipts.push((execution.result, execution.events));
+            } else {
+                session.set_tx_sender(tx.sender.clone());
+                if let Some(ref args) = tx.deploy_contract {
+                    let execution = session
+                        .interpret(
+                            args.code.clone(),
+                            Some(args.name.clone()),
+                            true,
+                            Some(name.into()),
+                        )
+                        .unwrap(); // todo(ludo)
+                    receipts.push((execution.result, execution.events));
+                } else if let Some(ref args) = tx.transfer_stx {
+                    let snippet = format!(
+                        "(stx-transfer? u{} tx-sender '{})",
+                        args.amount, args.recipient
+                    );
+                    let execution = session
+                        .interpret(snippet, None, true, Some(name.into()))
+                        .unwrap(); // todo(ludo)
+                    receipts.push((execution.result, execution.events));
+                }
+                session.set_tx_sender(initial_tx_sender.clone());
             }
         }
-        session.set_tx_sender(initial_tx_sender);
         let block_height = session.advance_chain_tip(1);
         Ok((block_height, receipts))
     })?;
@@ -971,32 +1293,16 @@ fn call_read_only_fn(state: &mut OpState, args: Value, _: ()) -> Result<String, 
     let args: CallReadOnlyFnArgs =
         serde_json::from_value(args).expect("Invalid request from JavaScript.");
     let (result, events) = sessions::perform_block(args.session_id, |name, session| {
-        let initial_tx_sender = session.get_tx_sender();
-        session.set_tx_sender(args.sender.clone());
-
-        // Kludge for handling fully qualified contract_id vs sugared syntax
-        let first_char = args.contract.chars().next().unwrap();
-        let snippet = if first_char.to_string() == "S" {
-            format!(
-                "(contract-call? '{} {} {})",
-                args.contract,
-                args.method,
-                args.args.join(" ")
-            )
-        } else {
-            format!(
-                "(contract-call? '{}.{} {} {})",
-                initial_tx_sender,
-                args.contract,
-                args.method,
-                args.args.join(" ")
-            )
-        };
-
         let execution = session
-            .interpret(snippet, None, true, Some(name.into()))
+            .invoke_contract_call(
+                &args.contract,
+                &args.method,
+                &args.args,
+                &args.sender,
+                "readonly-calls".into(),
+            )
             .unwrap(); // todo(ludo)
-        session.set_tx_sender(initial_tx_sender);
+
         Ok((execution.result, execution.events))
     })?;
     Ok(json!({

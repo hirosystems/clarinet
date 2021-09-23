@@ -43,7 +43,7 @@
 //     ...
 // }
 
-import { Clarinet, Contract, Account, StacksNode } from './index';
+import { Clarinet, Contract, Account, StacksNode } from '../index.ts';
 
 Clarinet.run({
     async fn(accounts: Map<string, Account>, contracts: Map<string, Contract>, node: StacksNode) {

@@ -2,7 +2,7 @@ use super::{DevnetEvent, NodeObserverEvent};
 use crate::integrate::{BlockData, MempoolAdmissionData, ServiceStatusData, Status, Transaction};
 use crate::poke::load_session;
 use crate::publish::{publish_contract, Network};
-use crate::test::deno;
+use crate::runnner::deno;
 use crate::types::{self, AccountConfig, DevnetConfig};
 use crate::utils;
 use crate::utils::stacks::{transactions, StacksRpc};
@@ -107,6 +107,7 @@ impl EventObserverConfig {
             for cmd in self.devnet_config.execute_script.iter() {
                 let _ = deno::do_run_scripts(
                     vec![cmd.script.clone()],
+                    false,
                     false,
                     false,
                     cmd.allow_wallets,
