@@ -12,7 +12,7 @@
 (define-public (decrement (step uint))
     (let ((new-val (- step (var-get counter)))) 
         (var-set counter new-val)
-        (print { object: "counter", action: "incremented", value: new-val })
+        (print { object: "counter", action: "decremented", value: new-val })
         (ok new-val)))
 
 (define-read-only (read-counter)

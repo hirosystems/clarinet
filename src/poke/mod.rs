@@ -105,7 +105,7 @@ pub fn load_session(
         let mut session = repl::Session::new(settings.clone());
         match session.start() {
             Err(message) => {
-                println!("Error: {}", message);
+                println!("{}", message);
                 std::process::exit(1);
             }
             _ => {}

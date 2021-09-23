@@ -327,8 +327,10 @@ export namespace types {
     return `u"${val}"`;
   }
 
-  export function buff(val: ArrayBuffer) {
-    const buff = new Uint8Array(val);
+  export function buff(val: ArrayBuffer | string) {
+    
+    const buff =  typeof val == "string" ? new TextEncoder().encode(val) : new Uint8Array(val);
+
     const hexOctets = new Array(buff.length);
 
     for (let i = 0; i < buff.length; ++i) {

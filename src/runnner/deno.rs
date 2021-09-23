@@ -217,7 +217,7 @@ pub async fn do_run_scripts(
     project_path.pop();
     let cwd = Path::new(&project_path);
     let mut include = if include.is_empty() {
-        vec![".".into()]
+        vec!["tests".into()]
     } else {
         include.clone()
     };
@@ -1185,15 +1185,24 @@ fn mine_block(state: &mut OpState, args: Value, _: ()) -> Result<String, AnyErro
         let mut receipts = vec![];
         for tx in args.transactions.iter() {
             if let Some(ref args) = tx.contract_call {
-                let execution = session
+                let execution = match session
                     .invoke_contract_call(
                         &args.contract,
                         &args.method,
                         &args.args,
                         &tx.sender,
                         name.into(),
-                    )
-                    .unwrap(); // todo(ludo)
+                    ) {
+                        Ok(res) => res,
+                        Err((_, _, err)) => {
+                            if let Some(e) = err {
+                                // if CLARINET_BACKTRACE=1
+                                // Retrieve the AST (penultimate entry), and the expression id (last entry)
+                                println!("Runtime error: {}::{}({}) -> {:?}", args.contract, args.method, args.args.join(", "), e);
+                            }
+                            continue;
+                        }
+                    };
                 receipts.push((execution.result, execution.events));
             } else {
                 session.set_tx_sender(tx.sender.clone());
