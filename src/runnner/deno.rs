@@ -153,8 +153,9 @@ mod sessions {
                     });
             }
             settings.initial_deployer = initial_deployer;
+            settings.costs_version = project_config.project.costs_version;
             settings.include_boot_contracts =
-                vec!["pox".to_string(), "costs".to_string(), "bns".to_string()];
+                vec!["pox".to_string(), "costs-v1".to_string(), "costs-v2".to_string(), "bns".to_string()];
             let mut session = Session::new(settings.clone());
             let (_, contracts) = match session.start() {
                 Ok(res) => res,

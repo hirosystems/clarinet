@@ -94,8 +94,9 @@ pub fn load_session(
     }
 
     settings.include_boot_contracts =
-        vec!["pox".to_string(), "costs".to_string(), "bns".to_string()];
+        vec!["pox".to_string(), "costs-v1".to_string(), "costs-v2".to_string(), "bns".to_string()];
     settings.initial_deployer = initial_deployer;
+    settings.costs_version = project_config.project.costs_version;
 
     let session = if start_repl {
         let mut terminal = Terminal::new(settings.clone());
