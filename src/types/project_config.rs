@@ -16,6 +16,7 @@ pub struct MainConfigFile {
 pub struct ProjectConfigFile {
     name: String,
     requirements: Option<Value>,
+    costs_version: Option<u32>,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -29,6 +30,7 @@ pub struct MainConfig {
 pub struct ProjectConfig {
     pub name: String,
     pub requirements: Option<Vec<RequirementConfig>>,
+    pub costs_version: u32,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
@@ -126,6 +128,7 @@ impl MainConfig {
         let project = ProjectConfig {
             name: config_file.project.name.clone(),
             requirements: None,
+            costs_version: config_file.project.costs_version.unwrap_or(1),
         };
 
         let mut config = MainConfig {

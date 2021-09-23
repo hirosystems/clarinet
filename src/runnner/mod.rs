@@ -16,6 +16,7 @@ pub mod deno;
 pub fn run_scripts(
     files: Vec<String>,
     include_coverage: bool,
+    include_costs_report: bool,
     watch: bool,
     allow_wallets: bool,
     allow_disk_write: bool,
@@ -25,6 +26,7 @@ pub fn run_scripts(
     match block_on(deno::do_run_scripts(
         files,
         include_coverage,
+        include_costs_report,
         watch,
         allow_wallets,
         allow_disk_write,
