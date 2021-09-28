@@ -294,10 +294,13 @@ pub fn main() {
         Command::Check(cmd) => {
             let manifest_path = get_manifest_path_or_exit(cmd.manifest_path);
             let start_repl = false;
-            let res = load_session(manifest_path, start_repl, Network::Devnet);
-            if let Err(e) = res {
-                println!("{}", e);
-                return;
+            match load_session(manifest_path, start_repl, Network::Devnet) {
+                Err(e) => {
+                    println!("{}", e);
+                },
+                Ok(session) => {
+                    println!("Syntax of {} contract(s) successfully checked 🚀", session.settings.initial_contracts.len());
+                }
             }
         }
         Command::Test(cmd) => {
