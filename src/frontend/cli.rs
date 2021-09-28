@@ -297,9 +297,12 @@ pub fn main() {
             match load_session(manifest_path, start_repl, Network::Devnet) {
                 Err(e) => {
                     println!("{}", e);
-                },
+                }
                 Ok(session) => {
-                    println!("Syntax of {} contract(s) successfully checked 🚀", session.settings.initial_contracts.len());
+                    println!(
+                        "Syntax of {} contract(s) successfully checked 🚀",
+                        session.settings.initial_contracts.len()
+                    );
                 }
             }
         }
