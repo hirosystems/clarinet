@@ -175,7 +175,7 @@ struct Publish {
     pub testnet: bool,
     /// Deploy contracts on mainnet, using settings/Mainnet.toml
     #[clap(
-        long = "testnet",
+        long = "mainnet",
         conflicts_with = "testnet",
         conflicts_with = "devnet"
     )]
