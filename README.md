@@ -214,13 +214,23 @@ You can exit the console by pressing `Ctrl + C` twice.
 Changes to contracts are not loaded into the console while it is running. If you make any changes to your contracts you
 must exit the console and run it again.
 
-### Deploy contracts to Devnet
+### Spawn a local Devnet
 
-If you are running a local devnet, you can use Clarinet to deploy your contracts to that environment for testing and
+You can use Clarinet to deploy your contracts to your own localc, offline environment for testing and
 evaluation on a blockchain. Use the following command:
 
 ```bash
-$ clarinet deploy --devnet
+$ clarinet integrate
+```
+
+
+### Deploy contracts to Testnet
+
+You can use Clarinet to deploy your contracts to the public Testnet environment for testing and
+evaluation on a blockchain. Use the following command:
+
+```bash
+$ clarinet deploy --testnet
 ```
 
 ### Extensions
