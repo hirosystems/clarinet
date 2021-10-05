@@ -1,3 +1,16 @@
+# [0.17.0](https://github.com/hirosystems/clarinet/compare/v0.16.0...v0.17.0) (2021-10-05)
+
+
+### Features
+
+* ability to cache repl sessions ([5e086cb](https://github.com/hirosystems/clarinet/commit/5e086cbf5bf173db034eea256bf617e3ab5efdee))
+* acknowledge check ok ([f6a6143](https://github.com/hirosystems/clarinet/commit/f6a6143f7cb1ce2157ca8d0800588bee7797d428))
+* add decrement function ([#109](https://github.com/hirosystems/clarinet/issues/109)) ([56e5477](https://github.com/hirosystems/clarinet/commit/56e54770e1a6965686554e6a872715ee8f0cca85))
+* cascade changes ([fb6d9a9](https://github.com/hirosystems/clarinet/commit/fb6d9a9224417d4078c1dbbc46c7a874d623651b))
+* cost reporting via tests ([#116](https://github.com/hirosystems/clarinet/issues/116)) ([a0117aa](https://github.com/hirosystems/clarinet/commit/a0117aad7ab17e4c36c0568fb10c0b631d39c263))
+* create abi-generator extension ([e5b46c4](https://github.com/hirosystems/clarinet/commit/e5b46c4e6865adb1e6524e7865508ab7a35aa865))
+* revamp extension usage ([ec8cdfc](https://github.com/hirosystems/clarinet/commit/ec8cdfc9fb86bbc5bbdb381fa10982dd2ba82581))
+
 ## [0.15.1](https://github.com/hirosystems/clarinet/compare/v0.15.0...v0.15.1) (2021-08-18)
 
 
