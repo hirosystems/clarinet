@@ -216,12 +216,14 @@ must exit the console and run it again.
 
 ### Spawn a local Devnet
 
-You can use Clarinet to deploy your contracts to your own localc, offline environment for testing and
+You can use Clarinet to deploy your contracts to your own local offline environment for testing and
 evaluation on a blockchain. Use the following command:
 
 ```bash
 $ clarinet integrate
 ```
+
+Make sure that you have a working installation of Docker running locally.
 
 
 ### Deploy contracts to Testnet
