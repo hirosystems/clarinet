@@ -13,19 +13,23 @@ Blockstack. Smart contracts allow developers to encode essential business logic 
 ## Installation
 
 
-### Install from Homebrew (MacOS)
+### Install on macOS (Homebrew)
 
 ```bash
 brew install clarinet
 ```
 
-### Install from winget (Windows)
+### Install on Windows
+
+The easiest way to install Clarinet on Windows is to use the MSI installer, that can be downloaded from the [releases page](https://github.com/hirosystems/clarinet/releases).
+
+Clarinet is also available on Winget, the package manager that Microsoft started including in the latest Windows updates:
 
 ```powershell
 winget install clarinet
 ```
 
-### Install from a binary release
+### Install from a pre-built binary
 
 To install Clarinet from pre-built binaries, download the latest release from the [releases page](https://github.com/hirosystems/clarinet/releases).
 Unzip the binary, then copy it to a location that is already in your path, such as `/usr/local/bin`.
@@ -131,6 +135,7 @@ contracts that implement standard traits such as for fungible tokens.
 [project]
 name = "my-project"
 requirements = []
+
 [contracts.bbtc]
 path = "contracts/bbtc.clar"
 depends_on = []
@@ -160,7 +165,36 @@ command:
 $ clarinet test
 ```
 
-You can review the available testing commands in the [Deno Clarity library](https://deno.land/x/clarinet@v0.13.0/index.ts).
+#### Measure and increase cost coverage
+
+To help developers maximizing their test coverage, Clarinet can produce a `lcov` report, using the following option:
+```bash
+$ clarinet test --coverage
+```
+
+From there, developers can use the `lcov` tooling suite to produce HTML reports:
+
+```bash
+$ brew install lcov
+$ genhtml coverage.lcov
+$ open index.html
+```
+
+![lcov](docs/images/lcov.png)
+
+
+### Cost optimizations
+
+Clarinet can also be use for optimizing costs. When executing a test suite, Clarinet will keep track of all the costs being computed when executing the `contract-call`, and display the most expensive ones in a table:
+
+```bash
+$ clarinet test --cost
+```
+
+The `--cost` option can be used in conjunction with `--watch` and filters to maximize productivity, as illustrated here:
+
+![costs](docs/images/costs.gif)
+
 
 ### Load contracts in a console
 
@@ -188,6 +222,27 @@ evaluation on a blockchain. Use the following command:
 ```bash
 $ clarinet deploy --devnet
 ```
+
+### Extensions
+
+Clarinet can easily be extended by community members: open source contributions to clarinet are welcome, but developers can also write their own clarinet extensions if they want to integrate clarity contracts with their own tooling and workflow.
+
+
+| Name                          | wallet access | disk write | disk read | Deployment | Description |
+| --- | --- | --- | --- | --- | --- |
+| stacksjs-helper-generator | no | yes | no | https://deno.land/x/clarinet@v0.16.0/ext/stacksjs-helper-generator.ts | Facilitates contract integration by generating some typescript constants that can be used with stacks.js. Never hard code a stacks address again! | 
+|                               |                       |                    |                   | |
+
+#### How to use extensions
+
+Extensions are ran with the following syntax:
+
+```
+$ clarinet run --allow-write https://deno.land/x/clarinet@v0.15.4/ext/stacksjs-helper-generator.ts
+```
+
+An extension can be deployed as a standalone plugin on Deno, or can also just be a local file if it includes sensitive / private setup informations.
+As illustrated in the example above, permissions (wallet / disk read / disk write) are declared using command flags. If at runtime, the clarinet extension is trying to write to disk, read disk, or access wallets without permission, the script will end up failing. 
 
 ## Contributing
 
