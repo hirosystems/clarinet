@@ -111,7 +111,8 @@ export class Chain {
   }
 
   mineBlock(transactions: Array<Tx>): Block {
-    let result = JSON.parse((Deno as any).core.opSync("mine_block", {
+    let result = JSON.parse((Deno as any).core.opSync("op", {
+      func: "::mine_block",
       sessionId: this.sessionId,
       transactions: transactions,
     }));
@@ -124,7 +125,8 @@ export class Chain {
   }
 
   mineEmptyBlock(count: number): EmptyBlock {
-    let result = JSON.parse((Deno as any).core.opSync("mine_empty_blocks", {
+    let result = JSON.parse((Deno as any).core.opSync("op", {
+      func: "::mine_empty_blocks",
       sessionId: this.sessionId,
       count: count,
     }));
@@ -150,7 +152,8 @@ export class Chain {
     args: Array<any>,
     sender: string,
   ): ReadOnlyFn {
-    let result = JSON.parse((Deno as any).core.opSync("call_read_only_fn", {
+    let result = JSON.parse((Deno as any).core.opSync("op", {
+      func: "::call_read_only_fn",
       sessionId: this.sessionId,
       contract: contract,
       method: method,
@@ -166,7 +169,8 @@ export class Chain {
   }
 
   getAssetsMaps(): AssetsMaps {
-    let result = JSON.parse((Deno as any).core.opSync("get_assets_maps", {
+    let result = JSON.parse((Deno as any).core.opSync("op", {
+      func: "::get_assets_maps",
       sessionId: this.sessionId,
     }));
     let assetsMaps: AssetsMaps = {
@@ -221,7 +225,8 @@ export class Clarinet {
         if (options.preSetup) {
           transactions = options.preSetup()!;
         }
-        let result = JSON.parse((Deno as any).core.opSync("setup_chain", {
+        let result = JSON.parse((Deno as any).core.opSync("op", {
+          func: "::setup_chain",
           name: options.name,
           transactions: transactions,
         }));
@@ -244,7 +249,8 @@ export class Clarinet {
       name: "running script",
       async fn() {
         (Deno as any).core.ops();
-        let result = JSON.parse((Deno as any).core.opSync("setup_chain", {
+        let result = JSON.parse((Deno as any).core.opSync("op", {
+          func: "::setup_chain",
           name: "running script",
           transactions: [],
         }));
