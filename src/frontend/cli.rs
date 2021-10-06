@@ -158,7 +158,7 @@ struct Run {
     pub allow_disk_write: bool,
     /// Allow read access to disk
     #[clap(long = "allow-read")]
-    pub allow_disk_read: bool,
+    pub _allow_disk_read: bool,
     #[clap(short = 'o', long = "output", default_value = "console")]
     pub output_mode: OutputMode,
 }

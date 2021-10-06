@@ -1,6 +1,9 @@
+use anyhow::bail;
+use thiserror::Error;
 use clarity_repl::clarity::coverage::CoverageReporter;
 use clarity_repl::clarity::types::PrincipalData;
 use clarity_repl::clarity::types::StandardPrincipalData;
+use clarity_repl::repl::OutputMode;
 use clarity_repl::repl::Session;
 use deno::ast;
 use deno::colors;
@@ -29,12 +32,14 @@ use deno_core::url::Url;
 use deno_core::ModuleSpecifier;
 use deno_core::{OpFn, OpState};
 use deno_runtime::permissions::Permissions;
+use deno_runtime::worker::MainWorker;
 use regex::Regex;
 use serde::de::DeserializeOwned;
 use serde::Serialize;
 use std::collections::BTreeMap;
 use std::collections::HashSet;
 use std::convert::TryFrom;
+use std::ops::{Deref, DerefMut};
 use std::path::Path;
 use std::path::PathBuf;
 use std::rc::Rc;
@@ -274,43 +279,34 @@ pub async fn do_run_scripts(
                     builder.add(specifier, false).await?;
                 }
                 let graph = builder.get_graph();
+                fn get_dependencies<'a>(
+                    graph: &'a module_graph::Graph,
+                    module: &'a Module,
+                    // This needs to be accessible to skip getting dependencies if they're already there,
+                    // otherwise this will cause a stack overflow with circular dependencies
+                    output: &mut HashSet<&'a ModuleSpecifier>,
+                ) -> Result<(), AnyError> {
+                    for dep in module.dependencies.values() {
+                        if let Some(specifier) = &dep.maybe_code {
+                            if !output.contains(specifier) {
+                                output.insert(specifier);
 
-                for specifier in test_modules {
-                    fn get_dependencies<'a>(
-                        graph: &'a module_graph::Graph,
-                        module: &'a Module,
-                        // This needs to be accessible to skip getting dependencies if they're already there,
-                        // otherwise this will cause a stack overflow with circular dependencies
-                        output: &mut HashSet<&'a ModuleSpecifier>,
-                    ) -> Result<(), AnyError> {
-                        for dep in module.dependencies.values() {
-                            if let Some(specifier) = &dep.maybe_code {
-                                if !output.contains(specifier) {
-                                    output.insert(specifier);
-
-                                    get_dependencies(
-                                        &graph,
-                                        graph.get_specifier(specifier)?,
-                                        output,
-                                    )?;
-                                }
-                            }
-                            if let Some(specifier) = &dep.maybe_type {
-                                if !output.contains(specifier) {
-                                    output.insert(specifier);
-
-                                    get_dependencies(
-                                        &graph,
-                                        graph.get_specifier(specifier)?,
-                                        output,
-                                    )?;
-                                }
+                                get_dependencies(&graph, graph.get_specifier(specifier)?, output)?;
                             }
                         }
+                        if let Some(specifier) = &dep.maybe_type {
+                            if !output.contains(specifier) {
+                                output.insert(specifier);
 
-                        Ok(())
+                                get_dependencies(&graph, graph.get_specifier(specifier)?, output)?;
+                            }
+                        }
                     }
 
+                    Ok(())
+                }
+
+                for specifier in test_modules {
                     // This test module and all it's dependencies
                     let mut modules = HashSet::new();
                     modules.insert(&specifier);
@@ -639,13 +635,10 @@ pub async fn run_scripts(
                     } => {
                         reported += 1;
                         if let TestResult::Ok = result {
-                            info!("test {} in {}ms basariyla sonuclandi", name, duration);
+                            info!("test {} in {}ms successfull", name, duration);
                         }
                         if let TestResult::Failed(cause) = result {
-                            error!(
-                                "test {} in {}ms  \n-> failed bro: {:?}",
-                                name, duration, cause
-                            );
+                            error!("test {} in {}ms  \n-> failed: {:?}", name, duration, cause);
                             has_error = true;
                         }
                     }
@@ -698,6 +691,81 @@ pub async fn run_scripts(
     }
 }
 
+#[derive(Error,Debug)]
+pub enum DenoWrapperError {
+    #[error("Function does not exist")]
+    FunctionDoesNotExist
+}
+
+/// The small API surface for `deno` is wrapped in this type
+pub struct DenoWrapper {
+    inner: MainWorker,
+    session: Option<Session>,
+}
+
+impl DenoWrapper {
+    fn new(
+        program_state: &Arc<ProgramState>,
+        main_module: ModuleSpecifier,
+        permissions: Permissions,
+        session: Option<Session>,
+    ) -> Self {
+        let inner = create_main_worker(program_state, main_module, permissions, true);
+        Self { inner, session }
+    }
+
+    /// Setup `DenoWrapper` and return
+    fn setup(
+        mut self,
+        channel: Sender<TestEvent>,
+        manifest_path: PathBuf,
+        allow_wallets: bool,
+    ) -> Self {
+        let js_runtime = &mut self.inner.js_runtime;
+        js_runtime.register_op("op", deno_core::op_sync(Self::op));
+        js_runtime.sync_ops_cache();
+
+        js_runtime.op_state().borrow_mut().put(manifest_path);
+
+        js_runtime.op_state().borrow_mut().put(allow_wallets);
+
+        js_runtime
+            .op_state()
+            .borrow_mut()
+            .put::<Sender<TestEvent>>(channel);
+        self
+    }
+
+    fn op(state: &mut OpState, args: Value, _: ()) -> Result<String, AnyError> {
+        let output_mode = OutputMode::Json;
+        let func = &args["func"].as_str().ok_or(DenoWrapperError::FunctionDoesNotExist)?;
+        // println!("func: {}", func);
+        let result = match *func {
+            "::mine_block" => mine_block(state, args, ())?,
+            "::setup_chain" => setup_chain(state, args, ())?,
+            "::mine_empty_blocks" => mine_empty_blocks(state, args, ())?,
+            "::get_assets_maps" => get_assets_maps(state, args, ())?,
+            "::call_read_only_fn" => call_read_only_fn(state, args, ())?,
+            _ => bail!(DenoWrapperError::FunctionDoesNotExist)
+        };
+        println!("{:#}", result);
+        Ok(result)
+    }
+}
+
+impl Deref for DenoWrapper {
+    type Target = MainWorker;
+    fn deref(&self) -> &Self::Target {
+        &self.inner
+    }
+}
+
+impl DerefMut for DenoWrapper {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.inner
+    }
+}
+
 pub async fn run_script(
     program_state: Arc<ProgramState>,
     main_module: ModuleSpecifier,
@@ -708,7 +776,9 @@ pub async fn run_script(
     allow_wallets: bool,
     session: Option<Session>,
 ) -> Result<(), AnyError> {
-    let mut worker = create_main_worker(&program_state, main_module.clone(), permissions, true);
+
+    let mut deno_wrapper = DenoWrapper::new(&program_state, main_module.clone(), permissions, session.clone())
+        .setup(channel.clone(), manifest_path, allow_wallets);
 
     if let Some(template) = session {
         sessions::SESSION_TEMPLATE
@@ -717,30 +787,11 @@ pub async fn run_script(
             .push(template.clone());
     }
 
-    {
-        let js_runtime = &mut worker.js_runtime;
-        js_runtime.register_op("setup_chain", deno_core::op_sync(setup_chain));
-        js_runtime.register_op("mine_block", deno_core::op_sync(mine_block));
-        js_runtime.register_op("mine_empty_blocks", deno_core::op_sync(mine_empty_blocks));
-        js_runtime.register_op("call_read_only_fn", deno_core::op_sync(call_read_only_fn));
-        js_runtime.register_op("get_assets_maps", deno_core::op_sync(get_assets_maps));
-        js_runtime.sync_ops_cache();
-
-        js_runtime.op_state().borrow_mut().put(manifest_path);
-
-        js_runtime.op_state().borrow_mut().put(allow_wallets);
-
-        js_runtime
-            .op_state()
-            .borrow_mut()
-            .put::<Sender<TestEvent>>(channel.clone());
-    }
-
     let mut maybe_coverage_collector = if let Some(ref coverage_dir) = program_state.coverage_dir {
-        let session = worker.create_inspector_session().await;
+        let session = deno_wrapper.create_inspector_session().await;
         let coverage_dir = PathBuf::from(coverage_dir);
         let mut coverage_collector = CoverageCollector::new(coverage_dir, session);
-        worker
+        deno_wrapper
             .with_event_loop(coverage_collector.start_collecting().boxed_local())
             .await?;
 
@@ -749,25 +800,25 @@ pub async fn run_script(
         None
     };
 
-    let execute_result = worker.execute_module(&main_module).await;
+    let execute_result = deno_wrapper.execute_module(&main_module).await;
     if let Err(e) = execute_result {
         println!("{}", e);
         return Err(e);
     }
 
-    let execute_result = worker.execute("window.dispatchEvent(new Event('load'))");
+    let execute_result = deno_wrapper.execute("window.dispatchEvent(new Event('load'))");
     if let Err(e) = execute_result {
         println!("{}", e);
         return Err(e);
     }
 
-    let execute_result = worker.execute_module(&test_module).await;
+    let execute_result = deno_wrapper.execute_module(&test_module).await;
     if let Err(e) = execute_result {
         println!("{}", e);
         return Err(e);
     }
 
-    let execute_result = worker
+    let execute_result = deno_wrapper
         .run_event_loop(maybe_coverage_collector.is_none())
         .await;
     if let Err(e) = execute_result {
@@ -775,14 +826,14 @@ pub async fn run_script(
         return Err(e);
     }
 
-    let execute_result = worker.execute("window.dispatchEvent(new Event('unload'))");
+    let execute_result = deno_wrapper.execute("window.dispatchEvent(new Event('unload'))");
     if let Err(e) = execute_result {
         println!("{}", e);
         return Err(e);
     }
 
     if let Some(coverage_collector) = maybe_coverage_collector.as_mut() {
-        let execute_result = worker
+        let execute_result = deno_wrapper
             .with_event_loop(coverage_collector.stop_collecting().boxed_local())
             .await;
         if let Err(e) = execute_result {
@@ -870,8 +921,9 @@ fn mine_block(state: &mut OpState, args: Value, _: ()) -> Result<String, AnyErro
         let initial_tx_sender = session.interpreter.get_tx_sender();
         let mut receipts = vec![];
         for tx in args.transactions.iter() {
-            
-            session.interpreter.set_tx_sender(PrincipalData::parse_standard_principal(tx.sender.clone())?);
+            session
+                .interpreter
+                .set_tx_sender(PrincipalData::parse_standard_principal(tx.sender.clone())?);
             if let Some(ref args) = tx.contract_call {
                 // Kludge for handling fully qualified contract_id vs sugared syntax
                 let first_char = args.contract.chars().next().unwrap();
