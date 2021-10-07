@@ -15,7 +15,7 @@ use crate::runnner::run_scripts;
 use crate::types::{MainConfig, MainConfigFile, RequirementConfig};
 use clarity_repl::repl;
 
-use clap::{Clap};
+use clap::Clap;
 use toml;
 
 #[derive(Clap, PartialEq, Clone, Debug)]
