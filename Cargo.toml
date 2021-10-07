@@ -46,6 +46,7 @@ tokio = { version = "=1.8.1", features = ["full"] }
 lazy_static = "1.4.0"
 atty = "0.2.14"
 termcolor = "1.1.2"
+ansi_term = "0.12.1"
 text-size = "=1.1.0"
 regex = "1.4.3"
 libc = "0.2.86"

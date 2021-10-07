@@ -12,6 +12,9 @@ extern crate rocket;
 #[macro_use]
 extern crate serde_json;
 
+#[macro_use]
+mod macros;
+
 mod frontend;
 mod generate;
 mod integrate;
