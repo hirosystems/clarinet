@@ -985,7 +985,6 @@ events_keys = ["*"]
                 ),
                 format!("STACKS_CORE_EVENT_HOST=0.0.0.0"),
                 format!("STACKS_API_ENABLE_FT_METADATA=1"),
-                format!("STACKS_API_ENABLE_NFT_METADATA=1"),
                 format!("PG_HOST=postgres.{}", self.network_name),
                 format!("PG_PORT=5432"),
                 format!("PG_USER={}", devnet_config.postgres_username),
