@@ -154,6 +154,7 @@ struct Run {
     pub allow_disk_write: bool,
     /// Allow read access to disk
     #[clap(long = "allow-read")]
+    #[allow(dead_code)]
     pub allow_disk_read: bool,
 }
 
@@ -211,7 +212,7 @@ pub fn main() {
             let changes = generate::get_changes_for_new_project(current_path, project_opts.name);
             execute_changes(changes);
             if hints_enabled {
-                display_check_hint();
+                display_post_check_hint();
             }
         }
         Command::Contract(subcommand) => match subcommand {
@@ -227,7 +228,7 @@ pub fn main() {
                 );
                 execute_changes(changes);
                 if hints_enabled {
-                    display_check_hint();
+                    display_post_check_hint();
                 }
             }
             Contract::LinkContract(required_contract) => {
@@ -246,7 +247,7 @@ pub fn main() {
                 };
                 execute_changes(vec![Changes::EditTOML(change)]);
                 if hints_enabled {
-                    display_check_hint();
+                    display_post_check_hint();
                 }
             }
             Contract::ForkContract(fork_contract) => {
@@ -300,7 +301,7 @@ pub fn main() {
                 }
                 execute_changes(changes);
                 if hints_enabled {
-                    display_check_hint();
+                    display_post_check_hint();
                 }
             }
         },
@@ -309,7 +310,7 @@ pub fn main() {
             let start_repl = true;
             load_session(manifest_path, start_repl, Network::Devnet).expect("Unable to start REPL");
             if hints_enabled {
-                display_write_tests_hint();
+                display_post_poke_hint();
             }
         }
         Command::Check(cmd) => {
@@ -328,7 +329,7 @@ pub fn main() {
                 }
             }
             if hints_enabled {
-                display_write_tests_hint();
+                display_post_check_hint();
             }
         }
         Command::Test(cmd) => {
@@ -353,7 +354,7 @@ pub fn main() {
                 Some(session),
             );
             if hints_enabled {
-                display_measure_cov_hint();
+                display_tests_pro_tips_hint();
             }
         }
         Command::Run(cmd) => {
@@ -520,58 +521,110 @@ fn display_hint_footer() {
     display_separator();
 }
 
-fn display_check_hint() {
+fn display_post_check_hint() {
     println!("");
     display_hint_header();
     println!(
         "{}",
-        yellow!("Start implementing your contracts with Clarity.")
+        yellow!("Once you are ready to write TypeScript unit tests for your contract, run the following command:\n")
     );
-    println!("{}", yellow!("Documentation: https://docs.stacks.co/write-smart-contracts/hello-world-tutorial#step-3-add-code-to-the-hello-world-contract"));
-    println!("{}", yellow!("Then run the command:"));
-    println!("{}", yellow!("$ clarinet check"));
-    println!("{}", yellow!("to get the results"));
+    println!("{}", blue!("  $ clarinet test"));
+    println!(
+        "{}",
+        yellow!("    Run all run tests in the ./tests folder.\n")
+    );
+    println!("{}", yellow!("Find more information on testing with Clarinet here: https://docs.hiro.so/docs/smart-contracts/clarinet#testing-with-the-test-harness"));
     display_hint_footer();
 }
 
-fn display_write_tests_hint() {
+fn display_post_poke_hint() {
     println!("");
     display_hint_header();
     println!(
         "{}",
-        yellow!(
-            "Write unit tests for your contracts in Typescript, using the clarinet test framework."
-        )
+        yellow!("Once your are ready to write your contracts, run the following commands:\n")
     );
-    println!("{}", yellow!("Documentation: https://docs.stacks.co/write-smart-contracts/clarinet#testing-with-the-test-harness"));
-    println!("{}", yellow!("Then run the command:"));
-    println!("{}", yellow!("$ clarinet test"));
-    println!("{}", yellow!("to get the results"));
+    println!("{}", blue!("  $ clarinet contract new <contract-name>"));
+    println!(
+        "{}",
+        yellow!("    Create new contract scaffolding, including test files.\n")
+    );
+
+    println!("{}", blue!("  $ clarinet check"));
+    println!(
+        "{}",
+        yellow!("    Check contract syntax for all files in ./contracts.\n")
+    );
+
+    println!("{}", yellow!("Find more information on writing contracts with Clarinet here: https://docs.hiro.so/docs/smart-contracts/clarinet#developing-a-clarity-smart-contract"));
     display_hint_footer();
 }
 
-fn display_measure_cov_hint() {
+fn display_tests_pro_tips_hint() {
     println!("");
     display_separator();
-    println!("{}", yellow!("Pro tips:"));
-    println!("{}", yellow!("* Try the command `clarinet test --watch` to get live test results, when you save your files"));
     println!(
         "{}",
-        yellow!("* Inspect the costs of your contracts with the option `clarinet test --costs`")
+        yellow!("Check out the pro tips to improve your testing process:\n")
     );
-    println!("{}", yellow!("* Measure test coverage with the command `clarinet test --coverage` and the lcov tooling suite"));
-    println!("{}", yellow!("* Once ready, deploy your contracts to your local devnet, using the command `clarinet integrate`"));
+
+    println!("{}", blue!("  $ clarinet test --watch"));
+    println!(
+        "{}",
+        yellow!("    Watch for file changes an re-run all tests.\n")
+    );
+
+    println!("{}", blue!("  $ clarinet test --costs"));
+    println!(
+        "{}",
+        yellow!("    Run a cost analysis of the contracts covered by tests.\n")
+    );
+
+    println!("{}", blue!("  $ clarinet test --coverage"));
+    println!(
+        "{}",
+        yellow!("    Measure test coverage with the LCOV tooling suite.\n")
+    );
+
+    println!("{}", yellow!("Once you are ready to test your contracts on a local developer network, run the following:\n"));
+
+    println!("{}", blue!("  $ clarinet integrate"));
+    println!(
+        "{}",
+        yellow!("    Deploy all contracts to a local dockerized blockchain setup (Devnet).\n")
+    );
+
+    println!("{}", yellow!("Find more information on testing with Clarinet here: https://docs.hiro.so/docs/smart-contracts/clarinet#testing-with-clarinet"));
     display_hint_footer();
 }
 
 fn display_deploy_hint() {
     println!("");
     display_hint_header();
-    println!("{}", yellow!("Once timing feels right, run the command"));
-    println!("{}", yellow!("$ clarinet deploy --testnet"));
     println!(
         "{}",
-        yellow!("to deploy your contracts to Testnet / Mainnet")
+        yellow!("Once your contracts are ready to be deployed, you can run the following:")
+    );
+
+    println!("{}", blue!("  $ clarinet deploy --testnet"));
+    println!(
+        "{}",
+        yellow!("    Deploy all contracts to the testnet network.\n")
+    );
+
+    println!("{}", blue!("  $ clarinet deploy --mainnet"));
+    println!(
+        "{}",
+        yellow!("    Deploy all contracts to the mainnet network.\n")
+    );
+
+    println!(
+        "{}",
+        yellow!("Keep in mind, you can configure networks by editing the TOML files in the ./settings folder")
+    );
+    println!(
+        "{}",
+        yellow!("Find more information on the DevNet here: https://docs.hiro.so/docs/smart-contracts/devnet")
     );
     display_hint_footer();
 }
