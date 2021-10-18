@@ -143,6 +143,7 @@ name = "{}"
             r#"[network]
 name = "testnet"
 node_rpc_address = "https://stacks-node-api.testnet.stacks.co"
+deployment_fee_rate = 1
 
 [accounts.deployer]
 mnemonic = "<YOUR PRIVATE TESTNET MNEMONIC HERE>"
@@ -167,6 +168,7 @@ mnemonic = "<YOUR PRIVATE TESTNET MNEMONIC HERE>"
             r#"[network]
 name = "mainnet"
 node_rpc_address = "https://stacks-node-api.mainnet.stacks.co"
+deployment_fee_rate = 1
 
 [accounts.deployer]
 mnemonic = "<YOUR PRIVATE MAINNET MNEMONIC HERE>"

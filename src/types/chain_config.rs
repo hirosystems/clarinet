@@ -29,6 +29,7 @@ pub struct ChainConfigFile {
 pub struct NetworkConfigFile {
     name: String,
     node_rpc_address: Option<String>,
+    deployment_fee_rate: Option<u64>,
 }
 
 #[derive(Serialize, Deserialize, Debug, Default)]
@@ -102,6 +103,7 @@ pub struct ChainConfig {
 pub struct NetworkConfig {
     name: String,
     pub node_rpc_address: Option<String>,
+    pub deployment_fee_rate: u64,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -184,6 +186,7 @@ impl ChainConfig {
         let network = NetworkConfig {
             name: config_file.network.name.clone(),
             node_rpc_address: config_file.network.node_rpc_address.clone(),
+            deployment_fee_rate: config_file.network.deployment_fee_rate.unwrap_or(1),
         };
 
         let mut accounts = BTreeMap::new();
