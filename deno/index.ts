@@ -392,6 +392,10 @@ declare global {
       sender: String,
       assetId: String,
     ): Object;
+    expectPrintEvent(
+      contract_identifier: string, 
+      value: string
+    ): Object;
     // Absence of test vectors at the moment - token field could present some challenges.
     // expectNonFungibleTokenTransferEvent(token: String, sender: String, recipient: String, assetId: String): Object;
     // expectNonFungibleTokenMintEvent(token: String, recipient: String, assetId: String): Object;
@@ -692,6 +696,36 @@ Array.prototype.expectFungibleTokenBurnEvent = function (
   throw new Error(`Unable to retrieve expected FungibleTokenBurnEvent`);
 };
 
+Array.prototype.expectPrintEvent = function (
+  contract_identifier: string,
+  value: string
+) {
+  for (let event of this) {
+    try {
+      let e: any = {};
+      e["contract_identifier"] =
+        event.contract_event.contract_identifier.expectPrincipal(
+          contract_identifier
+        );
+
+      if (event.contract_event.topic.endsWith("print")) {
+        e["topic"] = event.contract_event.topic;
+      } else {
+        continue;
+      }
+
+      if (event.contract_event.value.endsWith(value)) {
+        e["value"] = event.contract_event.value;
+      } else {
+        continue;
+      }
+      return e;
+    } catch (error) {
+      continue;
+    }
+  }
+  throw new Error(`Unable to retrieve expected PrintEvent`);
+};
 // Array.prototype.expectEvent = function(sel: (e: Object) => Object) {
 //     for (let event of this) {
 //         try {

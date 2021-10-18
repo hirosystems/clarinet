@@ -5,7 +5,7 @@ macro_rules! green {
             use atty::Stream;
             use ansi_term::Colour;
             if atty::is(Stream::Stdout) {
-                let colour = Colour::Green;
+                let colour = Colour::Green.bold();
                 format!(
                     "{}",
                     colour.paint($($arg)*)
@@ -24,11 +24,20 @@ macro_rules! green {
 macro_rules! red {
     ($($arg:tt)*) => (
         {
-            use std::io::Write;
-            use termcolor::{Color, ColorChoice, ColorSpec, StandardStream, WriteColor};
-            let mut stdout = StandardStream::stdout(ColorChoice::Always);
-            stdout.set_color(ColorSpec::new().set_fg(Some(Color::Red)));
-            writeln!(&mut stdout, $($arg)*)
+            use atty::Stream;
+            use ansi_term::Colour;
+            if atty::is(Stream::Stdout) {
+                let colour = Colour::Red.bold();
+                format!(
+                    "{}",
+                    colour.paint($($arg)*)
+                )
+            } else {
+                format!(
+                    "{}",
+                    $($arg)*
+                )
+            }
         }
     )
 }
@@ -40,7 +49,7 @@ macro_rules! yellow {
             use atty::Stream;
             use ansi_term::Colour;
             if atty::is(Stream::Stdout) {
-                let colour = Colour::Yellow;
+                let colour = Colour::Yellow.bold();
                 format!(
                     "{}",
                     colour.paint($($arg)*)
@@ -62,7 +71,7 @@ macro_rules! blue {
             use atty::Stream;
             use ansi_term::Colour;
             if atty::is(Stream::Stdout) {
-                let colour = Colour::Cyan;
+                let colour = Colour::Cyan.bold();
                 format!(
                     "{}",
                     colour.paint($($arg)*)

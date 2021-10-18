@@ -18,20 +18,20 @@ use clarity_repl::repl;
 use clap::Clap;
 use toml;
 
-#[derive(Clap)]
+#[derive(Clap, PartialEq, Clone, Debug)]
 #[clap(version = option_env!("CARGO_PKG_VERSION").expect("Unable to detect version"))]
 struct Opts {
     #[clap(subcommand)]
     command: Command,
 }
 
-#[derive(Clap)]
+#[derive(Clap, PartialEq, Clone, Debug)]
 enum Command {
     /// Create and scaffold a new project
     #[clap(name = "new")]
     New(GenerateProject),
     /// Contract subcommand
-    #[clap(name = "contract")]
+    #[clap(subcommand, name = "contract")]
     Contract(Contract),
     /// Load contracts in a REPL for interactions
     #[clap(name = "poke")]
@@ -55,7 +55,7 @@ enum Command {
     Integrate(Integrate),
 }
 
-#[derive(Clap)]
+#[derive(Clap, PartialEq, Clone, Debug)]
 enum Contract {
     /// New contract subcommand
     #[clap(name = "new")]
@@ -68,13 +68,13 @@ enum Contract {
     ForkContract(ForkContract),
 }
 
-#[derive(Clap)]
+#[derive(Clap, PartialEq, Clone, Debug)]
 struct GenerateProject {
     /// Project's name
     pub name: String,
 }
 
-#[derive(Clap)]
+#[derive(Clap, PartialEq, Clone, Debug)]
 struct NewContract {
     /// Contract's name
     pub name: String,
@@ -83,7 +83,7 @@ struct NewContract {
     pub manifest_path: Option<String>,
 }
 
-#[derive(Clap)]
+#[derive(Clap, PartialEq, Clone, Debug)]
 struct LinkContract {
     /// Contract id
     pub contract_id: String,
@@ -92,7 +92,7 @@ struct LinkContract {
     pub manifest_path: Option<String>,
 }
 
-#[derive(Clap, Debug)]
+#[derive(Clap, PartialEq, Clone, Debug)]
 struct ForkContract {
     /// Contract id
     pub contract_id: String,
@@ -104,14 +104,14 @@ struct ForkContract {
     // pub recursive: bool,
 }
 
-#[derive(Clap)]
+#[derive(Clap, PartialEq, Clone, Debug)]
 struct Poke {
     /// Path to Clarinet.toml
     #[clap(long = "manifest-path")]
     pub manifest_path: Option<String>,
 }
 
-#[derive(Clap)]
+#[derive(Clap, PartialEq, Clone, Debug)]
 struct Integrate {
     /// Path to Clarinet.toml
     #[clap(long = "manifest-path")]
@@ -121,7 +121,7 @@ struct Integrate {
     pub no_dashboard: bool,
 }
 
-#[derive(Clap)]
+#[derive(Clap, PartialEq, Clone, Debug)]
 struct Test {
     /// Generate coverage
     #[clap(long = "coverage")]
@@ -139,7 +139,7 @@ struct Test {
     pub files: Vec<String>,
 }
 
-#[derive(Clap)]
+#[derive(Clap, PartialEq, Clone, Debug)]
 struct Run {
     /// Script to run
     pub script: String,
@@ -158,7 +158,7 @@ struct Run {
     pub allow_disk_read: bool,
 }
 
-#[derive(Clap)]
+#[derive(Clap, PartialEq, Clone, Debug)]
 struct Publish {
     /// Deploy contracts on devnet, using settings/Devnet.toml
     #[clap(
@@ -186,7 +186,7 @@ struct Publish {
     pub manifest_path: Option<String>,
 }
 
-#[derive(Clap)]
+#[derive(Clap, PartialEq, Clone, Debug)]
 struct Check {
     /// Path to Clarinet.toml
     #[clap(long = "manifest-path")]
@@ -320,7 +320,7 @@ pub fn main() {
                 Err(e) => {
                     println!("{}", e);
                 }
-                Ok(session) => {
+                Ok((session, _)) => {
                     println!(
                         "{} Syntax of {} contract(s) successfully checked",
                         green!("✔"),
@@ -337,7 +337,7 @@ pub fn main() {
             let start_repl = false;
             let res = load_session(manifest_path.clone(), start_repl, Network::Devnet);
             let session = match res {
-                Ok(session) => session,
+                Ok((session, _)) => session,
                 Err(e) => {
                     println!("{}", e);
                     return;
@@ -362,7 +362,7 @@ pub fn main() {
             let start_repl = false;
             let res = load_session(manifest_path.clone(), start_repl, Network::Devnet);
             let session = match res {
-                Ok(session) => session,
+                Ok((session, _)) => session,
                 Err(e) => {
                     println!("{}", e);
                     return;
@@ -391,9 +391,9 @@ pub fn main() {
                 // TODO(ludo): before supporting mainnet deployments, we want to add a pass
                 // making sure that addresses are consistent + handle other hard coded flags.
                 // Search for "mainnet handling".
-                panic!("Target deployment must be specified with --devnet, --testnet,  --mainnet")
+                panic!("Target deployment must be specified with --devnet, --testnet or --mainnet")
             } else {
-                panic!("Target deployment must be specified with --devnet, --testnet,  --mainnet")
+                panic!("Target deployment must be specified with --devnet, --testnet or --mainnet")
             };
             match publish_all_contracts(manifest_path, network) {
                 Ok(results) => println!("{}", results.join("\n")),
@@ -447,7 +447,11 @@ fn execute_changes(changes: Vec<Changes>) {
             Changes::AddFile(options) => {
                 if let Ok(entry) = fs::metadata(&options.path) {
                     if entry.is_file() {
-                        println!("File already exists at path {}", options.path);
+                        println!(
+                            "{}, file already exists at path {}",
+                            red!("Skip creating file"),
+                            options.path
+                        );
                         continue;
                     }
                 }

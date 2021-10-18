@@ -32,7 +32,7 @@ impl GetChangesForNewProject {
     fn create_root_directory(&mut self) {
         let dir = format!("{}/{}", self.project_path, self.project_name);
         let change = DirectoryCreation {
-            comment: format!("Creating directory {}", self.project_name),
+            comment: format!("{} {}", green!("Creating directory"), self.project_name),
             name: self.project_name.clone(),
             path: dir,
         };
@@ -88,7 +88,12 @@ impl GetChangesForNewProject {
             self.project_path, self.project_name, name
         );
         let change = FileCreation {
-            comment: format!("Creating file {}/.vscode/{}", self.project_name, name),
+            comment: format!(
+                "{} {}/.vscode/{}",
+                green!("Created file"),
+                self.project_name,
+                name
+            ),
             name,
             content,
             path,
@@ -107,7 +112,7 @@ history.txt
         let name = format!(".gitignore");
         let path = format!("{}/{}/{}", self.project_path, self.project_name, name);
         let change = FileCreation {
-            comment: format!("Creating file {}/{}", self.project_name, name),
+            comment: format!("{} {}/{}", green!("Created file"), self.project_name, name),
             name,
             content,
             path,
@@ -130,7 +135,7 @@ name = "{}"
         let name = format!("Clarinet.toml");
         let path = format!("{}/{}/{}", self.project_path, self.project_name, name);
         let change = FileCreation {
-            comment: format!("Creating file {}/{}", self.project_name, name),
+            comment: format!("{} {}/{}", green!("Created file"), self.project_name, name),
             name,
             content,
             path,
@@ -143,6 +148,7 @@ name = "{}"
             r#"[network]
 name = "testnet"
 node_rpc_address = "https://stacks-node-api.testnet.stacks.co"
+deployment_fee_rate = 1
 
 [accounts.deployer]
 mnemonic = "<YOUR PRIVATE TESTNET MNEMONIC HERE>"
@@ -154,7 +160,12 @@ mnemonic = "<YOUR PRIVATE TESTNET MNEMONIC HERE>"
             self.project_path, self.project_name, name
         );
         let change = FileCreation {
-            comment: format!("Creating file {}/settings/{}", self.project_name, name),
+            comment: format!(
+                "{} {}/settings/{}",
+                green!("Created file"),
+                self.project_name,
+                name
+            ),
             name,
             content,
             path,
@@ -167,6 +178,7 @@ mnemonic = "<YOUR PRIVATE TESTNET MNEMONIC HERE>"
             r#"[network]
 name = "mainnet"
 node_rpc_address = "https://stacks-node-api.mainnet.stacks.co"
+deployment_fee_rate = 1
 
 [accounts.deployer]
 mnemonic = "<YOUR PRIVATE MAINNET MNEMONIC HERE>"
@@ -178,7 +190,12 @@ mnemonic = "<YOUR PRIVATE MAINNET MNEMONIC HERE>"
             self.project_path, self.project_name, name
         );
         let change = FileCreation {
-            comment: format!("Creating file {}/settings/{}", self.project_name, name),
+            comment: format!(
+                "{} {}/settings/{}",
+                green!("Created file"),
+                self.project_name,
+                name
+            ),
             name,
             content,
             path,
@@ -322,7 +339,12 @@ btc_address = "mvZtbibDAAA3WLpY7zXXFqRa3T4XSknBX7"
             self.project_path, self.project_name, name
         );
         let change = FileCreation {
-            comment: format!("Creating file {}/settings/{}", self.project_name, name),
+            comment: format!(
+                "{} {}/settings/{}",
+                green!("Created file"),
+                self.project_name,
+                name
+            ),
             name,
             content,
             path,
@@ -333,7 +355,7 @@ btc_address = "mvZtbibDAAA3WLpY7zXXFqRa3T4XSknBX7"
     fn get_changes_for_new_root_dir(&self, name: String) -> Changes {
         let dir = format!("{}/{}", self.project_name, name);
         let change = DirectoryCreation {
-            comment: format!("Creating directory {}/{}", self.project_name, name),
+            comment: format!("{} {}/{}", green!("Created file"), self.project_name, name),
             name,
             path: dir,
         };
