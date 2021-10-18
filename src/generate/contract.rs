@@ -61,7 +61,7 @@ impl GetChangesForNewContract {
         };
         let path = format!("{}/contracts/{}", project_path.to_string_lossy(), name);
         let change = FileCreation {
-            comment: format!("Creating file contracts/{}", name),
+            comment: format!("{} contracts/{}", green!("Created file"), name),
             name,
             content,
             path,
@@ -107,7 +107,7 @@ Clarinet.test({{
         let name = format!("{}_test.ts", self.contract_name);
         let path = format!("{}/tests/{}", project_path.to_string_lossy(), name);
         let change = FileCreation {
-            comment: format!("Creating file tests/{}", name),
+            comment: format!("{} tests/{}", green!("Created file"), name),
             name,
             content,
             path,
@@ -127,7 +127,7 @@ Clarinet.test({{
         contracts_to_add.insert(self.contract_name.clone(), contract_config);
 
         let change = TOMLEdition {
-            comment: format!("Adding contract {} to Clarinet.toml", self.contract_name),
+            comment: format!("{} with contract {}", yellow!("Updated Clarinet.toml"), self.contract_name),
             manifest_path,
             contracts_to_add,
             requirements_to_add: vec![],
