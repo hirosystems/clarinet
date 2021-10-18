@@ -361,7 +361,7 @@ jobs:
     runs-on: ubuntu-latest
     if: startsWith(github.ref, 'refs/tags/v')
     needs:
-      - audit
+      # - audit
       - dist
       - test
       - build
@@ -381,7 +381,7 @@ jobs:
     runs-on: ubuntu-latest
     if: contains(github.ref, 'main')
     needs:
-      - audit
+      # - audit
       - dist
       - test
       - build
