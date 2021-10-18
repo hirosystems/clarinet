@@ -56,7 +56,7 @@ jobs:
   
           # Update manifest and submit PR
           ./wingetcreate.exe update `
-            --url https://github.com/${{ github.repository }}/releases/download/${env:TAG}/clarinet-windows-x64.msi `
+            --urls https://github.com/${{ github.repository }}/releases/download/${env:TAG}/clarinet-windows-x64.msi `
             --version ${VERSION} `
             --token ${{ secrets.GH_TOKEN }} `
             --submit `
