@@ -53,7 +53,7 @@ jobs:
         run: cargo install cargo-audit
 
       - name: Run audit
-        run: cargo audit --ignore RUSTSEC-2021-0076 --ignore RUSTSEC-2021-0079 --ignore RUSTSEC-2021-0078 --ignore RUSTSEC-2021-0093
+        run: cargo audit --ignore RUSTSEC-2021-0076 --ignore RUSTSEC-2021-0079 --ignore RUSTSEC-2021-0078 --ignore RUSTSEC-2021-0093 --ignore RUSTSEC-2020-0159 --ignore RUSTSEC-2021-0119 --ignore RUSTSEC-2020-0071
 
       - name: Run rustfmt
         run: cargo fmt --all -- --check
@@ -361,7 +361,7 @@ jobs:
     runs-on: ubuntu-latest
     if: startsWith(github.ref, 'refs/tags/v')
     needs:
-      # - audit
+      - audit
       - dist
       - test
       - build
@@ -381,7 +381,7 @@ jobs:
     runs-on: ubuntu-latest
     if: contains(github.ref, 'main')
     needs:
-      # - audit
+      - audit
       - dist
       - test
       - build
