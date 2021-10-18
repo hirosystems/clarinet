@@ -59,7 +59,7 @@ tiny-hderive = "0.3.0"
 reqwest = { version = "0.11", features = ["blocking", "json", "rustls"] }
 swc_common = { version = "0.10.20", features = ["sourcemap"] }
 bollard = "0.11.0"
-rocket = { version = "0.5.0-rc.1", features = ["json"] }
+rocket = { version = "=0.5.0-rc.1", features = ["json"] }
 crossterm = "0.20.0"
 chrono = "0.4.19"
 base58 = "0.1.0"
