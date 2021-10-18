@@ -31,6 +31,8 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v2
+        with:
+          submodules: recursive
 
       - name: Install Rust toolchain
         uses: actions-rs/toolchain@v1
@@ -53,7 +55,7 @@ jobs:
         run: cargo install cargo-audit
 
       - name: Run audit
-        run: cargo audit --ignore RUSTSEC-2021-0076 --ignore RUSTSEC-2021-0079 --ignore RUSTSEC-2021-0078 --ignore RUSTSEC-2021-0093
+        run: cargo audit --ignore RUSTSEC-2021-0076 --ignore RUSTSEC-2021-0079 --ignore RUSTSEC-2021-0078 --ignore RUSTSEC-2021-0093 --ignore RUSTSEC-2021-0119
 
       - name: Run rustfmt
         run: cargo fmt --all -- --check
@@ -65,6 +67,8 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v2
+        with:
+          submodules: recursive
 
       - name: Install Rust toolchain
         uses: actions-rs/toolchain@v1
@@ -172,6 +176,8 @@ jobs:
 
       - name: Checkout repository
         uses: actions/checkout@v2
+        with:
+          submodules: recursive
 
       - name: Install Rust toolchain
         uses: actions-rs/toolchain@v1
@@ -330,6 +336,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v2
+        with:
+          submodules: recursive
 
       - name: Docker meta
         id: docker_meta
@@ -391,6 +399,7 @@ jobs:
         with:
           # Necessary for Semantic Release
           token: ${{ secrets.GH_TOKEN }}
+          submodules: recursive
 
       - name: Semantic Release
         uses: cycjimmy/semantic-release-action@v2

@@ -17,6 +17,8 @@ jobs:
     steps:
       - name: Checkout Clarinet
         uses: actions/checkout@v2
+        with:
+          submodules: recursive
 
       - name: Open pull request
         uses: repo-sync/pull-request@v2

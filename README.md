@@ -64,7 +64,7 @@ sudo apt install build-essential pkg-config libssl-dev
 You can build Clarinet from source using Cargo with the following commands:
 
 ```bash
-git clone git@github.com:hirosystems/clarinet.git
+git clone git@github.com:hirosystems/clarinet.git --recursive
 cd clarinet
 cargo install --path . --locked
 ```
