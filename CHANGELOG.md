@@ -1,3 +1,27 @@
+# [0.18.0](https://github.com/hirosystems/clarinet/compare/v0.17.0...v0.18.0) (2021-10-18)
+
+
+### Bug Fixes
+
+* build settings ([2a0cf5f](https://github.com/hirosystems/clarinet/commit/2a0cf5f4365760c5b40ceb9bf8db9d6ebec2a80e))
+* cargo build --locked in unit tests ([5f5f428](https://github.com/hirosystems/clarinet/commit/5f5f428078fc3e7d6818ce51b4577242df9b58fe))
+* disable audits ([9036ccf](https://github.com/hirosystems/clarinet/commit/9036ccf9e63b6888228c535761e1ba5984f50623))
+* disable STACKS_API_ENABLE_NFT_METADATA ([0ce043a](https://github.com/hirosystems/clarinet/commit/0ce043a59ef8bbe014f4d15bbb479c80d8dd6741))
+* freeze nightly version ([1a88293](https://github.com/hirosystems/clarinet/commit/1a88293a20db656107528a96e3708f6c7f2d190f))
+* freeze nightly version ([ecd58f0](https://github.com/hirosystems/clarinet/commit/ecd58f066fd04d8bede19a682d5af88d25616f31))
+* freeze rocket ([bcd1e28](https://github.com/hirosystems/clarinet/commit/bcd1e289c5caaaf7697d3bd54d480e97ab9492fb))
+* re-enable audits, ignore RUSTSEC-2020-0159, RUSTSEC-2021-0119, RUSTSEC-2020-0071 ([f853221](https://github.com/hirosystems/clarinet/commit/f853221cf73fe542d309f7b6b83ba62f569e0fe7))
+
+
+### Features
+
+* add expectPrintEvent function ([e835c5a](https://github.com/hirosystems/clarinet/commit/e835c5a9c7294b420e74abac0d216deb93d1d8c9))
+* add hints ([c067cfb](https://github.com/hirosystems/clarinet/commit/c067cfb97da46f60f2b3b9783af8ab0b51a1f3d0))
+* enable ft/nft metadata ([08f0da5](https://github.com/hirosystems/clarinet/commit/08f0da5d465feb7b800a41942f42b6e0d31a5b2c))
+* introduce deployment fee rate ([225aac2](https://github.com/hirosystems/clarinet/commit/225aac2e428b8cbb025f5f224a171e4f8bfffdc2))
+* iterate on feedbacks ([dbf98c2](https://github.com/hirosystems/clarinet/commit/dbf98c214ec02836b7212ac8ac7f0edb30b5b588))
+* update colors and messages ([587671f](https://github.com/hirosystems/clarinet/commit/587671f3e40483c61207e561155f1af7864f7c74))
+
 # [0.17.0](https://github.com/hirosystems/clarinet/compare/v0.16.0...v0.17.0) (2021-10-05)
 
 
