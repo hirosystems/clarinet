@@ -298,7 +298,7 @@ pub fn main() {
                 Err(e) => {
                     println!("{}", e);
                 }
-                Ok(session) => {
+                Ok((session, _)) => {
                     println!(
                         "Syntax of {} contract(s) successfully checked 🚀",
                         session.settings.initial_contracts.len()
@@ -311,7 +311,7 @@ pub fn main() {
             let start_repl = false;
             let res = load_session(manifest_path.clone(), start_repl, Network::Devnet);
             let session = match res {
-                Ok(session) => session,
+                Ok((session, _)) => session,
                 Err(e) => {
                     println!("{}", e);
                     return;
@@ -333,7 +333,7 @@ pub fn main() {
             let start_repl = false;
             let res = load_session(manifest_path.clone(), start_repl, Network::Devnet);
             let session = match res {
-                Ok(session) => session,
+                Ok((session, _)) => session,
                 Err(e) => {
                     println!("{}", e);
                     return;
@@ -362,9 +362,9 @@ pub fn main() {
                 // TODO(ludo): before supporting mainnet deployments, we want to add a pass
                 // making sure that addresses are consistent + handle other hard coded flags.
                 // Search for "mainnet handling".
-                panic!("Target deployment must be specified with --devnet, --testnet,  --mainnet")
+                panic!("Target deployment must be specified with --devnet, --testnet or --mainnet")
             } else {
-                panic!("Target deployment must be specified with --devnet, --testnet,  --mainnet")
+                panic!("Target deployment must be specified with --devnet, --testnet or --mainnet")
             };
             match publish_all_contracts(manifest_path, network) {
                 Ok(results) => println!("{}", results.join("\n")),

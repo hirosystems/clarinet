@@ -45,6 +45,7 @@ pub fn publish_contract(
     deployers_lookup: &BTreeMap<String, Account>,
     deployers_nonces: &mut BTreeMap<String, u64>,
     node: &str,
+    deployment_fee_rate: u64,
 ) -> Result<(String, u64), String> {
     let contract_name = contract.name.clone().unwrap();
 
@@ -71,7 +72,7 @@ pub fn publish_contract(
     let wrapped_secret_key = Secp256k1PrivateKey::from_slice(&ext.secret()).unwrap();
 
     let anchor_mode = TransactionAnchorMode::Any;
-    let tx_fee = 200 + contract.code.len() as u64;
+    let tx_fee = deployment_fee_rate * contract.code.len() as u64;
 
     let nonce = match deployers_nonces.get(&deployer.name) {
         Some(nonce) => *nonce,
@@ -152,8 +153,8 @@ pub fn publish_all_contracts(
     network: Network,
 ) -> Result<Vec<String>, Vec<String>> {
     let start_repl = false;
-    let session = match load_session(manifest_path, start_repl, network) {
-        Ok(settings) => settings,
+    let (session, chain) = match load_session(manifest_path, start_repl, network) {
+        Ok((session, chain)) => (session, chain),
         Err(e) => return Err(vec![e]),
     };
     let mut results = vec![];
@@ -172,6 +173,7 @@ pub fn publish_all_contracts(
             &deployers_lookup,
             &mut deployers_nonces,
             &settings.node,
+            chain.network.deployment_fee_rate,
         ) {
             Ok((txid, nonce)) => {
                 results.push(format!(
