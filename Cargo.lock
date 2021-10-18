@@ -558,6 +558,7 @@ name = "clarinet"
 version = "0.17.0"
 dependencies = [
  "aes",
+ "ansi_term 0.12.1",
  "atty",
  "base58",
  "base64 0.13.0",

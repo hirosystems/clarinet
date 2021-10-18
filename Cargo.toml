@@ -46,6 +46,7 @@ tokio = { version = "=1.8.1", features = ["full"] }
 lazy_static = "1.4.0"
 atty = "0.2.14"
 termcolor = "1.1.2"
+ansi_term = "0.12.1"
 text-size = "=1.1.0"
 regex = "1.4.3"
 libc = "0.2.86"
@@ -58,7 +59,7 @@ tiny-hderive = "0.3.0"
 reqwest = { version = "0.11", features = ["blocking", "json", "rustls"] }
 swc_common = { version = "0.10.20", features = ["sourcemap"] }
 bollard = "0.11.0"
-rocket = { version = "0.5.0-rc.1", features = ["json"] }
+rocket = { version = "=0.5.0-rc.1", features = ["json"] }
 crossterm = "0.20.0"
 chrono = "0.4.19"
 base58 = "0.1.0"
