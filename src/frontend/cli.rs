@@ -447,7 +447,11 @@ fn execute_changes(changes: Vec<Changes>) {
             Changes::AddFile(options) => {
                 if let Ok(entry) = fs::metadata(&options.path) {
                     if entry.is_file() {
-                        println!("{}, file already exists at path {}", red!("Skip creating file"), options.path);
+                        println!(
+                            "{}, file already exists at path {}",
+                            red!("Skip creating file"),
+                            options.path
+                        );
                         continue;
                     }
                 }

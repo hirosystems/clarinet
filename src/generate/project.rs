@@ -88,7 +88,12 @@ impl GetChangesForNewProject {
             self.project_path, self.project_name, name
         );
         let change = FileCreation {
-            comment: format!("{} {}/.vscode/{}", green!("Created file"), self.project_name, name),
+            comment: format!(
+                "{} {}/.vscode/{}",
+                green!("Created file"),
+                self.project_name,
+                name
+            ),
             name,
             content,
             path,
@@ -155,7 +160,12 @@ mnemonic = "<YOUR PRIVATE TESTNET MNEMONIC HERE>"
             self.project_path, self.project_name, name
         );
         let change = FileCreation {
-            comment: format!("{} {}/settings/{}", green!("Created file"), self.project_name, name),
+            comment: format!(
+                "{} {}/settings/{}",
+                green!("Created file"),
+                self.project_name,
+                name
+            ),
             name,
             content,
             path,
@@ -180,7 +190,12 @@ mnemonic = "<YOUR PRIVATE MAINNET MNEMONIC HERE>"
             self.project_path, self.project_name, name
         );
         let change = FileCreation {
-            comment: format!("{} {}/settings/{}", green!("Created file"), self.project_name, name),
+            comment: format!(
+                "{} {}/settings/{}",
+                green!("Created file"),
+                self.project_name,
+                name
+            ),
             name,
             content,
             path,
@@ -324,7 +339,12 @@ btc_address = "mvZtbibDAAA3WLpY7zXXFqRa3T4XSknBX7"
             self.project_path, self.project_name, name
         );
         let change = FileCreation {
-            comment: format!("{} {}/settings/{}", green!("Created file"), self.project_name, name),
+            comment: format!(
+                "{} {}/settings/{}",
+                green!("Created file"),
+                self.project_name,
+                name
+            ),
             name,
             content,
             path,

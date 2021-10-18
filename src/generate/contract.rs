@@ -127,7 +127,11 @@ Clarinet.test({{
         contracts_to_add.insert(self.contract_name.clone(), contract_config);
 
         let change = TOMLEdition {
-            comment: format!("{} with contract {}", yellow!("Updated Clarinet.toml"), self.contract_name),
+            comment: format!(
+                "{} with contract {}",
+                yellow!("Updated Clarinet.toml"),
+                self.contract_name
+            ),
             manifest_path,
             contracts_to_add,
             requirements_to_add: vec![],
