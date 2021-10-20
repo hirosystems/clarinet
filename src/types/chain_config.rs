@@ -15,7 +15,7 @@ const DEFAULT_BITCOIN_NODE_IMAGE: &str = "quay.io/hirosystems/bitcoind:devnet";
 const DEFAULT_STACKS_NODE_IMAGE: &str = "quay.io/hirosystems/stacks-node:devnet";
 const DEFAULT_BITCOIN_EXPLORER_IMAGE: &str = "quay.io/hirosystems/bitcoin-explorer:devnet";
 const DEFAULT_STACKS_API_IMAGE: &str = "blockstack/stacks-blockchain-api:latest";
-const DEFAULT_STACKS_EXPLORER_IMAGE: &str = "blockstack/explorer:1.13.0";
+const DEFAULT_STACKS_EXPLORER_IMAGE: &str = "blockstack/explorer:1.16.1";
 const DEFAULT_POSTGRES_IMAGE: &str = "postgres:alpine";
 
 #[derive(Serialize, Deserialize, Debug)]
