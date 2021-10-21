@@ -33,7 +33,7 @@ jobs:
           brew bump-formula-pr \
             --no-browse \
             --no-audit \
-            --url https://github.com/${{ github.repository }}/archive/${TAG}.tar.gz \
+            --tag "${TAG}"
             ${{ github.event.repository.name }}
 
   winget:
