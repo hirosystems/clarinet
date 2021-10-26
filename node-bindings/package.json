@@ -1,6 +1,6 @@
 {
   "name": "clarinet-js",
-  "version": "0.1.5",
+  "version": "0.18.1",
   "description": "Clarinet is a simple, modern and opinionated runtime for writing, testing and integrating Clarity Smart contracts.",
   "author": "Ludo Galabru",
   "license": "ISC",
@@ -33,7 +33,7 @@
     "module_name": "index",
     "host": "https://github.com/hirosystems/clarinet/releases/download/",
     "remote_path": "{version}",
-    "package_name": "{node_abi}-{platform}-{arch}.tar.gz",
+    "package_name": "clarinet-js-{platform}-{arch}.tar.gz",
     "module_path": "./native",
     "pkg_path": "."
   }
