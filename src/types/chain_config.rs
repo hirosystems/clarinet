@@ -186,7 +186,7 @@ impl ChainConfig {
         let network = NetworkConfig {
             name: config_file.network.name.clone(),
             node_rpc_address: config_file.network.node_rpc_address.clone(),
-            deployment_fee_rate: config_file.network.deployment_fee_rate.unwrap_or(1),
+            deployment_fee_rate: config_file.network.deployment_fee_rate.unwrap_or(10),
         };
 
         let mut accounts = BTreeMap::new();
