@@ -1,0 +1,17 @@
+[package]
+name = "clarinet-js"
+version = "0.1.0"
+license = "ISC"
+edition = "2018"
+exclude = ["index.node"]
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+clarinet_lib = { package = "clarinet", path = "../", default-features = false }
+
+[dependencies.neon]
+version = "0.9"
+default-features = false
+features = ["napi-6", "event-queue-api", "try-catch-api"]

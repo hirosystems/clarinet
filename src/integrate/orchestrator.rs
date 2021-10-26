@@ -1,6 +1,6 @@
 use super::DevnetEvent;
 use crate::integrate::{ServiceStatusData, Status};
-use crate::types::{ChainConfig, MainConfig};
+use crate::types::{ChainConfig, DevnetConfigFile, MainConfig};
 use bollard::container::{
     Config, CreateContainerOptions, KillContainerOptions, ListContainersOptions,
     PruneContainersOptions, WaitContainerOptions,
@@ -10,13 +10,13 @@ use bollard::models::{HostConfig, PortBinding};
 use bollard::network::{ConnectNetworkOptions, CreateNetworkOptions, PruneNetworksOptions};
 use bollard::Docker;
 use crossterm::terminal::disable_raw_mode;
-use deno_core::futures::TryStreamExt;
 use std::collections::HashMap;
 use std::fs::{self, File};
 use std::io::Write;
 use std::path::PathBuf;
 use std::sync::mpsc::{Receiver, Sender};
 use tracing::info;
+use futures::stream::TryStreamExt;
 
 #[derive(Default, Debug)]
 pub struct DevnetOrchestrator {
@@ -35,7 +35,7 @@ pub struct DevnetOrchestrator {
 }
 
 impl DevnetOrchestrator {
-    pub fn new(manifest_path: PathBuf) -> DevnetOrchestrator {
+    pub fn new(manifest_path: PathBuf, devnet_override: Option<DevnetConfigFile>) -> DevnetOrchestrator {
         let docker_client = Docker::connect_with_socket_defaults().unwrap();
 
         let mut project_path = manifest_path.clone();
@@ -45,10 +45,19 @@ impl DevnetOrchestrator {
         network_config_path.push("settings");
         network_config_path.push("Devnet.toml");
 
-        let network_config = ChainConfig::from_path(&network_config_path);
+        let mut network_config = ChainConfig::from_path(&network_config_path);
         let project_config = MainConfig::from_path(&manifest_path);
         let name = project_config.project.name.clone();
         let network_name = format!("{}.devnet", name);
+
+        match (&mut network_config.devnet, devnet_override) {
+            (Some(ref mut devnet_config), Some(ref devnet_override)) => {
+                devnet_config.disable_stacks_api = true;
+                devnet_config.disable_bitcoin_explorer = true;
+                devnet_config.disable_stacks_explorer = true;    
+            },
+            _ => {}
+        };
 
         DevnetOrchestrator {
             name,

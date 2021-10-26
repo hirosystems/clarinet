@@ -2,7 +2,6 @@ use super::{DevnetEvent, NodeObserverEvent};
 use crate::integrate::{BlockData, MempoolAdmissionData, ServiceStatusData, Status, Transaction};
 use crate::poke::load_session;
 use crate::publish::{publish_contract, Network};
-use crate::runnner::deno;
 use crate::types::{self, AccountConfig, DevnetConfig};
 use crate::utils;
 use crate::utils::stacks::{transactions, StacksRpc};
@@ -30,6 +29,9 @@ use std::str;
 use std::sync::mpsc::{Receiver, Sender};
 use std::sync::{Arc, Mutex, RwLock};
 use tracing::info;
+
+#[cfg(feature = "cli")]
+use crate::runnner::deno;
 
 #[allow(dead_code)]
 #[derive(Deserialize)]
@@ -105,6 +107,7 @@ impl EventObserverConfig {
     pub async fn execute_scripts(&self) {
         if self.devnet_config.execute_script.len() > 0 {
             for cmd in self.devnet_config.execute_script.iter() {
+                #[cfg(feature = "cli")]
                 let _ = deno::do_run_scripts(
                     vec![cmd.script.clone()],
                     false,
@@ -250,7 +253,7 @@ pub async fn start_events_observer(
 pub fn handle_new_burn_block(
     devnet_events_tx: &State<Arc<Mutex<Sender<DevnetEvent>>>>,
     new_burn_block: Json<NewBurnBlock>,
-    _node_event_tx: &State<Arc<Mutex<Option<Sender<NodeObserverEvent>>>>>,
+    node_event_tx: &State<Arc<Mutex<Option<Sender<NodeObserverEvent>>>>>,
 ) -> Json<Value> {
     let devnet_events_tx = devnet_events_tx.inner();
 
@@ -269,6 +272,16 @@ pub fn handle_new_burn_block(
                     new_burn_block.burn_block_height
                 ),
             }));
+        }
+        _ => {}
+    };
+
+    match node_event_tx.lock() {
+        Ok(tx) => {
+            if let Some(ref tx) = *tx {
+                tx.send(NodeObserverEvent::NewBlock)
+                    .expect("Unable to broadcast event");
+            }
         }
         _ => {}
     };

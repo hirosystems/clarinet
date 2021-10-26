@@ -22,9 +22,9 @@ toml = { version = "0.5.6", features = ["preserve_order"] }
 serde = "1"
 serde_json = "1"
 serde_derive = "1"
-deno_core = { path = "./vendor/deno/core" }
-deno_runtime = { path = "./vendor/deno/runtime" }
-deno = { path = "./vendor/deno/cli" }
+deno_core = { path = "./vendor/deno/core", optional = true }
+deno_runtime = { path = "./vendor/deno/runtime", optional = true }
+deno = { path = "./vendor/deno/cli", optional = true }
 # clarity_repl = { package = "clarity-repl", path = "../../clarity-repl", features = ["cli"] }
 clarity_repl = { package = "clarity-repl", version = "=0.16.0" }
 bip39 = { version = "1.0.1", default-features = false }
@@ -57,7 +57,7 @@ indexmap = { version = "1.6.1", features = ["serde"] }
 shell-escape = "0.1.5"
 tiny-hderive = "0.3.0"
 reqwest = { version = "0.11", features = ["blocking", "json", "rustls"] }
-swc_common = { version = "0.10.20", features = ["sourcemap"] }
+swc_common = { version = "0.10.20", features = ["sourcemap"], optional = true }
 bollard = "0.11.0"
 rocket = { version = "=0.5.0-rc.1", features = ["json"] }
 crossterm = "0.20.0"
@@ -83,11 +83,25 @@ LegalCopyright = ""
 ProductName = "Clarinet"
 FileDescription = ""
 
+[lib]
+name = "clarinet_lib"
+path = "src/lib.rs"
+crate-type = ["lib"]
+
+[[bin]]
+name = "clarinet"
+path = "src/bin.rs"
+
+[features]
+default = ["cli"]
+cli = ["swc_common", "deno", "deno_runtime", "deno_core"]
+
 [workspace]
 members = [
     ".",
     "vendor/deno/cli/",
     "vendor/deno/runtime/",
     "vendor/deno/core/",
-    "xtask/"
+    "xtask/",
+    "node-bindings"
 ]

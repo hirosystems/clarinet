@@ -1,0 +1,40 @@
+{
+  "name": "clarinet-js",
+  "version": "0.1.5",
+  "description": "Clarinet is a simple, modern and opinionated runtime for writing, testing and integrating Clarity Smart contracts.",
+  "author": "Ludo Galabru",
+  "license": "ISC",
+  "main": "lib/index.js",
+  "files": [
+    "native/index.node",
+    "lib"
+  ],
+  "scripts": {
+    "build": "neon build",
+    "build-release": "neon build --release",
+    "install": "node-pre-gyp install --fallback-to-build=false || neon build",
+    "lint": "eslint .",
+    "package": "node-pre-gyp package",
+    "spec": "jest",
+    "test": "npm run build && npm run spec",
+    "upload-binary": "npm run build-release && node-pre-gyp package && node-pre-gyp-github publish",
+    "version": "npm run build-release"
+  },
+  "dependencies": {
+    "@mapbox/node-pre-gyp": "^1.0.6",
+    "neon-cli": "^0.9.1",
+    "node-pre-gyp-github": "^1.4.3"
+  },
+  "devDependencies": {
+    "@types/node": "^16.11.3",
+    "cargo-cp-artifact": "^0.1"
+  },
+  "binary": {
+    "module_name": "index",
+    "host": "https://github.com/hirosystems/clarinet/releases/download/",
+    "remote_path": "{version}",
+    "package_name": "{node_abi}-{platform}-{arch}.tar.gz",
+    "module_path": "./native",
+    "pkg_path": "."
+  }
+}

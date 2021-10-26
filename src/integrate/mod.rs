@@ -14,7 +14,9 @@ pub use orchestrator::DevnetOrchestrator;
 
 use self::events_observer::EventObserverConfig;
 
-pub enum NodeObserverEvent {}
+pub enum NodeObserverEvent {
+    NewBlock,
+}
 
 pub fn run_devnet(
     devnet: DevnetOrchestrator,
