@@ -1,18 +1,18 @@
 {
   "name": "clarinet-js",
-  "version": "0.18.1",
+  "version": "0.18.3",
   "description": "Clarinet is a simple, modern and opinionated runtime for writing, testing and integrating Clarity Smart contracts.",
   "author": "Ludo Galabru",
   "license": "ISC",
   "main": "lib/index.js",
   "files": [
-    "native/index.node",
     "lib"
   ],
   "scripts": {
-    "build": "neon build",
-    "build-release": "neon build --release",
-    "install": "node-pre-gyp install --fallback-to-build=false || neon build",
+    "build": "cargo-cp-artifact -nc native/index.node -- cargo build --message-format=json-render-diagnostics",
+    "build-debug": "npm run build --",
+    "build-release": "npm run build -- --release",
+    "install": "node-pre-gyp install --fallback-to-build=false || npm run build-release",
     "lint": "eslint .",
     "package": "node-pre-gyp package",
     "spec": "jest",
