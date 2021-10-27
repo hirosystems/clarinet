@@ -360,8 +360,8 @@ declare global {
     expectSome(): String;
     expectNone(): void;
     expectBool(value: boolean): boolean;
-    expectUint(value: number|bigint): number|bigint;
-    expectInt(value: number|bigint): number|bigint;
+    expectUint(value: number|bigint): bigint;
+    expectInt(value: number|bigint): bigint;
     expectBuff(value: ArrayBuffer): ArrayBuffer;
     expectAscii(value: String): String;
     expectUtf8(value: String): String;
@@ -462,22 +462,22 @@ String.prototype.expectBool = function (value: boolean) {
   return value;
 };
 
-String.prototype.expectUint = function (value: number) {
+String.prototype.expectUint = function (value: number|bigint):bigint {
   try {
     consume(this, `u${value}`, false);
   } catch (error) {
     throw error;
   }
-  return value;
+  return BigInt(value);
 };
 
-String.prototype.expectInt = function (value: number) {
+String.prototype.expectInt = function (value: number|bigint):bigint {
   try {
     consume(this, `${value}`, false);
   } catch (error) {
     throw error;
   }
-  return value;
+  return BigInt(value);
 };
 
 String.prototype.expectBuff = function (value: ArrayBuffer) {
