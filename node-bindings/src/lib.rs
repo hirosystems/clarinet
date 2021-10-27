@@ -107,7 +107,7 @@ impl StacksDevnet {
         Ok(cx.undefined())
     }
 
-    fn js_terminate(mut cx: FunctionContext) -> JsResult<JsUndefined> {
+    fn js_stop(mut cx: FunctionContext) -> JsResult<JsUndefined> {
         cx.this()
             .downcast_or_throw::<JsBox<StacksDevnet>, _>(&mut cx)?
             .stop(None)
@@ -127,8 +127,8 @@ impl StacksDevnet {
 
         while let Ok(message) = devnet.devnet_event_rx.recv() {
             match message {
-                _ => {
-                    println!("Hello world :)");
+                NodeObserverEvent::NewStacksBlock => {
+                    println!("New stacks block");
                     let args: Vec<Handle<JsValue>> =
                         vec![cx.null().upcast(), cx.number(1 as f64).upcast()];
                     let _res = callback.call(&mut cx, devnet, args)?;
@@ -136,6 +136,9 @@ impl StacksDevnet {
                     // if res.strict_equals(&mut cx, expected) {
                     //     break;
                     // }
+                    break;
+                }
+                _ => {
                 }
             }
         }
@@ -153,24 +156,18 @@ impl StacksDevnet {
 
         while let Ok(message) = devnet.devnet_event_rx.recv() {
             match message {
-                _ => {
-                    println!("Hello world :)");
-                    // let this = cx.undefined();
+                NodeObserverEvent::NewBitcoinBlock => {
+                    println!("New bitcoin block");
                     let args: Vec<Handle<JsValue>> =
                         vec![cx.null().upcast(), cx.number(1 as f64).upcast()];
                     let _res = callback.call(&mut cx, devnet, args)?;
+                    // let expected = cx.boolean(true);
+                    // if res.strict_equals(&mut cx, expected) {
+                    //     break;
+                    // }
                     break;
-                    //     // callback.call(&mut cx, this, vec![])?;
-
-                    // }
-                    // DevnetMessage::Callback(f) => {
-                    //     // The connection and channel are owned by the thread, but _lent_ to
-                    //     // the callback. The callback has exclusive access to the connection
-                    //     // for the duration of the callback.
-                    //     f(&channel);
-                    // }
-                    // // Immediately close the connection, even if there are pending messages
-                    // DevnetMessage::Close => break,
+                }
+                _ => {
                 }
             }
         }
@@ -181,14 +178,14 @@ impl StacksDevnet {
 
 #[neon::main]
 fn main(mut cx: ModuleContext) -> NeonResult<()> {
-    cx.export_function("stackDevnetNew", StacksDevnet::js_new)?;
-    cx.export_function("stackDevnetStart", StacksDevnet::js_start)?;
-    cx.export_function("stackDevnetOnStacksBlock", StacksDevnet::js_on_stacks_block)?;
+    cx.export_function("stacksDevnetNew", StacksDevnet::js_new)?;
+    cx.export_function("stacksDevnetStart", StacksDevnet::js_start)?;
+    cx.export_function("stacksDevnetStop", StacksDevnet::js_stop)?;
+    cx.export_function("stacksDevnetWaitForStacksBlock", StacksDevnet::js_on_stacks_block)?;
     cx.export_function(
-        "stackDevnetOnBitcoinBlock",
+        "stacksDevnetWaitForBitcoinBlock",
         StacksDevnet::js_on_bitcoin_block,
     )?;
-    cx.export_function("stackDevnetTerminate", StacksDevnet::js_terminate)?;
     Ok(())
 }
 

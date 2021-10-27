@@ -279,7 +279,7 @@ pub fn handle_new_burn_block(
     match node_event_tx.lock() {
         Ok(tx) => {
             if let Some(ref tx) = *tx {
-                tx.send(NodeObserverEvent::NewBlock)
+                tx.send(NodeObserverEvent::NewBitcoinBlock)
                     .expect("Unable to broadcast event");
             }
         }
@@ -297,8 +297,18 @@ pub fn handle_new_block(
     config: &State<Arc<RwLock<EventObserverConfig>>>,
     devnet_events_tx: &State<Arc<Mutex<Sender<DevnetEvent>>>>,
     new_block: Json<NewBlock>,
-    _node_event_tx: &State<Arc<Mutex<Option<Sender<NodeObserverEvent>>>>>,
+    node_event_tx: &State<Arc<Mutex<Option<Sender<NodeObserverEvent>>>>>,
 ) -> Json<Value> {
+    match node_event_tx.lock() {
+        Ok(tx) => {
+            if let Some(ref tx) = *tx {
+                tx.send(NodeObserverEvent::NewStacksBlock)
+                    .expect("Unable to broadcast event");
+            }
+        }
+        _ => {}
+    };
+
     let devnet_events_tx = devnet_events_tx.inner();
     let config = config.inner();
 
