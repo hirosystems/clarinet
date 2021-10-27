@@ -21,12 +21,7 @@ enum DevnetCommand {
 impl Finalize for StacksDevnet {}
 
 impl StacksDevnet {
-    // Creates a new instance of `Database`
-    //
-    // 1. Creates a connection and a channel
-    // 2. Spawns a thread and moves the channel receiver and connection to it
-    // 3. On a separate thread, read closures off the channel and execute with access
-    //    to the connection.
+
     fn new<'a, C>(cx: &mut C) -> Result<Self, String>
     where
         C: Context<'a>,
@@ -180,30 +175,6 @@ impl StacksDevnet {
             }
         }
 
-        // db.send(move |conn, channel| {
-        //     let result = conn
-        //         .execute(
-        //             "INSERT INTO person (name) VALUES (?)",
-        //             rusqlite::params![name],
-        //         )
-        //         .map(|_| conn.last_insert_rowid());
-
-        //     channel.send(move |mut cx| {
-        //         let callback = callback.into_inner(&mut cx);
-        //         let this = cx.undefined();
-        //         let args: Vec<Handle<JsValue>> = match result {
-        //             Ok(id) => vec![cx.null().upcast(), cx.number(id as f64).upcast()],
-        //             Err(err) => vec![cx.error(err.to_string())?.upcast()],
-        //         };
-
-        //         callback.call(&mut cx, this, args)?;
-
-        //         Ok(())
-        //     });
-        // })
-        // .or_else(|err| cx.throw_error(err.to_string()))?;
-
-        // This function does not have a return value
         Ok(cx.undefined())
     }
 }
