@@ -1,16 +1,16 @@
-use std::sync::mpsc;
-use std::thread;
-use std::path::PathBuf;
-use std::{env, process};
+use clarinet_lib::integrate::{self, DevnetOrchestrator, NodeObserverEvent};
 use clarinet_lib::types::DevnetConfigFile;
 use neon::prelude::*;
-use clarinet_lib::integrate::{self, DevnetOrchestrator, NodeObserverEvent};
+use std::path::PathBuf;
+use std::sync::mpsc;
+use std::thread;
+use std::{env, process};
 
 type DevnetCallback = Box<dyn FnOnce(&Channel) + Send>;
 
 struct StacksDevnet {
     tx: mpsc::Sender<DevnetCommand>,
-    devnet_event_rx: mpsc::Receiver<NodeObserverEvent>
+    devnet_event_rx: mpsc::Receiver<NodeObserverEvent>,
 }
 
 enum DevnetCommand {
@@ -42,14 +42,15 @@ impl StacksDevnet {
         let channel = cx.channel();
 
         thread::spawn(move || {
-
-            let manifest_path = get_manifest_path_or_exit(Some("/Users/ludovic/Coding/clarinet/clarinet-cli/examples/counter/Clarinet.toml".into()));
+            let manifest_path = get_manifest_path_or_exit(Some(
+                "/Users/ludovic/Coding/clarinet/clarinet-cli/examples/counter/Clarinet.toml".into(),
+            ));
             let devnet_overrides = DevnetConfigFile::default();
             let devnet = DevnetOrchestrator::new(manifest_path, Some(devnet_overrides));
 
             if let Ok(DevnetCommand::Start(callback)) = rx.recv() {
                 // Start devnet
-                integrate::run_devnet(devnet, Some(devnet_events_tx),false);
+                integrate::run_devnet(devnet, Some(devnet_events_tx), false);
                 if let Some(c) = callback {
                     c(&channel);
                 }
@@ -74,10 +75,16 @@ impl StacksDevnet {
             }
         });
 
-        Ok(Self { tx, devnet_event_rx: devnet_events_rx })
+        Ok(Self {
+            tx,
+            devnet_event_rx: devnet_events_rx,
+        })
     }
 
-    fn start(&self, callback: Option<DevnetCallback>) -> Result<(), mpsc::SendError<DevnetCommand>> {
+    fn start(
+        &self,
+        callback: Option<DevnetCallback>,
+    ) -> Result<(), mpsc::SendError<DevnetCommand>> {
         self.tx.send(DevnetCommand::Start(callback))
     }
 
@@ -87,7 +94,6 @@ impl StacksDevnet {
 }
 
 impl StacksDevnet {
-
     fn js_new(mut cx: FunctionContext) -> JsResult<JsBox<StacksDevnet>> {
         let devnet = StacksDevnet::new(&mut cx).or_else(|err| cx.throw_error(err.to_string()))?;
         Ok(cx.boxed(devnet))
@@ -116,18 +122,20 @@ impl StacksDevnet {
     }
 
     fn js_on_stacks_block(mut cx: FunctionContext) -> JsResult<JsUndefined> {
-
         // Get the first argument as a `JsFunction`
         let callback = cx.argument::<JsFunction>(0)?.root(&mut cx);
         let callback = callback.into_inner(&mut cx);
 
-        let devnet = cx.this().downcast_or_throw::<JsBox<StacksDevnet>, _>(&mut cx)?;
+        let devnet = cx
+            .this()
+            .downcast_or_throw::<JsBox<StacksDevnet>, _>(&mut cx)?;
 
         while let Ok(message) = devnet.devnet_event_rx.recv() {
             match message {
                 _ => {
                     println!("Hello world :)");
-                    let args: Vec<Handle<JsValue>> = vec![cx.null().upcast(), cx.number(1 as f64).upcast()];
+                    let args: Vec<Handle<JsValue>> =
+                        vec![cx.null().upcast(), cx.number(1 as f64).upcast()];
                     let _res = callback.call(&mut cx, devnet, args)?;
                     // let expected = cx.boolean(true);
                     // if res.strict_equals(&mut cx, expected) {
@@ -135,24 +143,26 @@ impl StacksDevnet {
                     // }
                 }
             }
-        }   
+        }
         Ok(cx.undefined())
     }
 
     fn js_on_bitcoin_block(mut cx: FunctionContext) -> JsResult<JsUndefined> {
-
         // Get the first argument as a `JsFunction`
         let callback = cx.argument::<JsFunction>(0)?.root(&mut cx);
         let callback = callback.into_inner(&mut cx);
 
-        let devnet = cx.this().downcast_or_throw::<JsBox<StacksDevnet>, _>(&mut cx)?;
+        let devnet = cx
+            .this()
+            .downcast_or_throw::<JsBox<StacksDevnet>, _>(&mut cx)?;
 
         while let Ok(message) = devnet.devnet_event_rx.recv() {
             match message {
                 _ => {
                     println!("Hello world :)");
                     // let this = cx.undefined();
-                    let args: Vec<Handle<JsValue>> = vec![cx.null().upcast(), cx.number(1 as f64).upcast()];
+                    let args: Vec<Handle<JsValue>> =
+                        vec![cx.null().upcast(), cx.number(1 as f64).upcast()];
                     let _res = callback.call(&mut cx, devnet, args)?;
                     break;
                     //     // callback.call(&mut cx, this, vec![])?;
@@ -168,7 +178,7 @@ impl StacksDevnet {
                     // DevnetMessage::Close => break,
                 }
             }
-        }   
+        }
 
         // db.send(move |conn, channel| {
         //     let result = conn
@@ -203,7 +213,10 @@ fn main(mut cx: ModuleContext) -> NeonResult<()> {
     cx.export_function("stackDevnetNew", StacksDevnet::js_new)?;
     cx.export_function("stackDevnetStart", StacksDevnet::js_start)?;
     cx.export_function("stackDevnetOnStacksBlock", StacksDevnet::js_on_stacks_block)?;
-    cx.export_function("stackDevnetOnBitcoinBlock", StacksDevnet::js_on_bitcoin_block)?;
+    cx.export_function(
+        "stackDevnetOnBitcoinBlock",
+        StacksDevnet::js_on_bitcoin_block,
+    )?;
     cx.export_function("stackDevnetTerminate", StacksDevnet::js_terminate)?;
     Ok(())
 }

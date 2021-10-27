@@ -10,13 +10,13 @@ use bollard::models::{HostConfig, PortBinding};
 use bollard::network::{ConnectNetworkOptions, CreateNetworkOptions, PruneNetworksOptions};
 use bollard::Docker;
 use crossterm::terminal::disable_raw_mode;
+use futures::stream::TryStreamExt;
 use std::collections::HashMap;
 use std::fs::{self, File};
 use std::io::Write;
 use std::path::PathBuf;
 use std::sync::mpsc::{Receiver, Sender};
 use tracing::info;
-use futures::stream::TryStreamExt;
 
 #[derive(Default, Debug)]
 pub struct DevnetOrchestrator {
@@ -35,7 +35,10 @@ pub struct DevnetOrchestrator {
 }
 
 impl DevnetOrchestrator {
-    pub fn new(manifest_path: PathBuf, devnet_override: Option<DevnetConfigFile>) -> DevnetOrchestrator {
+    pub fn new(
+        manifest_path: PathBuf,
+        devnet_override: Option<DevnetConfigFile>,
+    ) -> DevnetOrchestrator {
         let docker_client = Docker::connect_with_socket_defaults().unwrap();
 
         let mut project_path = manifest_path.clone();
@@ -54,8 +57,8 @@ impl DevnetOrchestrator {
             (Some(ref mut devnet_config), Some(ref devnet_override)) => {
                 devnet_config.disable_stacks_api = true;
                 devnet_config.disable_bitcoin_explorer = true;
-                devnet_config.disable_stacks_explorer = true;    
-            },
+                devnet_config.disable_stacks_explorer = true;
+            }
             _ => {}
         };
 
@@ -1491,6 +1494,10 @@ events_keys = ["*"]
             Some(ref docker) => docker,
             _ => return Err("Unable to get Docker client".into()),
         };
+
+        // todo(ludo): should we spawn
+        // docker run -d -p 5000:5000 --name registry registry:2.7
+        // ?
 
         // Prune
         let mut filters = HashMap::new();
