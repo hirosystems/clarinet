@@ -13,12 +13,21 @@ class StacksDevnet {
         return stackDevnetStart.call(this.handle);
     }
 
-    waitStacksBlock(predicate) {
-        return stackDevnetOnStacksBlock.call(this.handle, predicate);
+    waitForBootCompletion(callback) {
     }
 
-    waitBitcoinBlock(predicate) {
-        return stackDevnetOnBitcoinBlock.call(this.handle, predicate);
+    waitForStacksTransaction(txid, num_block_timeout = 5, callback) {
+    }
+
+    waitForStacksBlock(callback) {
+        return stackDevnetOnStacksBlock.call(this.handle, callback);
+    }
+
+    waitForBitcoinBlock(callback) {
+        return stackDevnetOnBitcoinBlock.call(this.handle, callback);
+    }
+
+    waitForAttachment(callback) {
     }
 
     stop() {

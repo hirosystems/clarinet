@@ -106,15 +106,15 @@ impl EventObserverConfig {
 
     pub async fn execute_scripts(&self) {
         if self.devnet_config.execute_script.len() > 0 {
-            for cmd in self.devnet_config.execute_script.iter() {
+            for _cmd in self.devnet_config.execute_script.iter() {
                 #[cfg(feature = "cli")]
                 let _ = deno::do_run_scripts(
-                    vec![cmd.script.clone()],
+                    vec![_cmd.script.clone()],
                     false,
                     false,
                     false,
-                    cmd.allow_wallets,
-                    cmd.allow_write,
+                    _cmd.allow_wallets,
+                    _cmd.allow_write,
                     self.manifest_path.clone(),
                     Some(self.session.clone()),
                 )
