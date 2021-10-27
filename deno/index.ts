@@ -311,11 +311,11 @@ export namespace types {
     return `${val}`;
   }
 
-  export function int(val: number) {
+  export function int(val: number|bigint) {
     return `${val}`;
   }
 
-  export function uint(val: number) {
+  export function uint(val: number|bigint) {
     return `u${val}`;
   }
 
@@ -360,8 +360,8 @@ declare global {
     expectSome(): String;
     expectNone(): void;
     expectBool(value: boolean): boolean;
-    expectUint(value: number): number;
-    expectInt(value: number): number;
+    expectUint(value: number|bigint): number|bigint;
+    expectInt(value: number|bigint): number|bigint;
     expectBuff(value: ArrayBuffer): ArrayBuffer;
     expectAscii(value: String): String;
     expectUtf8(value: String): String;
@@ -372,23 +372,23 @@ declare global {
 
   interface Array<T> {
     expectSTXTransferEvent(
-      amount: Number,
+      amount: Number|bigint,
       sender: String,
       recipient: String,
     ): Object;
     expectFungibleTokenTransferEvent(
-      amount: Number,
+      amount: Number|bigint,
       sender: String,
       recipient: String,
       assetId: String,
     ): Object;
     expectFungibleTokenMintEvent(
-      amount: Number,
+      amount: Number|bigint,
       recipient: String,
       assetId: String,
     ): Object;
     expectFungibleTokenBurnEvent(
-      amount: Number,
+      amount: Number|bigint,
       sender: String,
       assetId: String,
     ): Object;
@@ -599,7 +599,7 @@ String.prototype.expectTuple = function () {
 };
 
 Array.prototype.expectSTXTransferEvent = function (
-  amount: Number,
+  amount: Number|bigint,
   sender: String,
   recipient: String,
 ) {
@@ -651,7 +651,7 @@ Array.prototype.expectFungibleTokenTransferEvent = function (
 };
 
 Array.prototype.expectFungibleTokenMintEvent = function (
-  amount: Number,
+  amount: Number|bigint,
   recipient: String,
   assetId: String,
 ) {
@@ -674,7 +674,7 @@ Array.prototype.expectFungibleTokenMintEvent = function (
 };
 
 Array.prototype.expectFungibleTokenBurnEvent = function (
-  amount: Number,
+  amount: Number|bigint,
   sender: String,
   assetId: String,
 ) {
