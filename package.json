@@ -24,6 +24,13 @@
                     "prepareCmd": "sed -i -e '1h;2,$H;$!d;g' -e 's@name = \"clarinet\"\\nversion = \"[^\"]*\"@name = \"clarinet\"\\nversion = \"${nextRelease.version}\"@g' Cargo.toml Cargo.lock"
                 }
             ],
+            [
+                "@semantic-release/npm",
+                {
+                    "pkgRoot": "./node-bindings",
+                    "npmPublish": true
+                }
+            ],
             "@semantic-release/github",
             "@semantic-release/changelog",
             [

@@ -12,6 +12,9 @@
     "build": "cargo-cp-artifact -nc native/index.node -- cargo build --message-format=json-render-diagnostics",
     "build-debug": "npm run build --",
     "build-release": "npm run build -- --release",
+    "build-linux-x64": "npm run build-release -- --target x86_64-unknown-linux-gnu",
+    "build-windows-x64": "npm run build-release -- --target x86_64-pc-windows-msvc",
+    "build-macos-x64": "npm run build-release -- --target x86_64-apple-darwin",
     "install": "node-pre-gyp install --fallback-to-build=false || npm run build-release",
     "lint": "eslint .",
     "package": "node-pre-gyp package",
@@ -32,7 +35,7 @@
   "binary": {
     "module_name": "index",
     "host": "https://github.com/hirosystems/clarinet/releases/download/",
-    "remote_path": "{version}",
+    "remote_path": "v{version}",
     "package_name": "clarinet-js-{platform}-{arch}.tar.gz",
     "module_path": "./native",
     "pkg_path": "."
