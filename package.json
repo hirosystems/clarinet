@@ -40,7 +40,11 @@
                     "assets": [
                         "CHANGELOG.md",
                         "Cargo.toml",
-                        "Cargo.lock"
+                        "Cargo.lock",
+                        "node-bindings/package.json",
+                        "node-bindings/package-lock.json",
+                        "node-bindings/Cargo.toml",
+                        "node-bindings/Cargo.lock"
                     ]
                 }
             ]
