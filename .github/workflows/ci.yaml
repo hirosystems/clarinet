@@ -194,7 +194,7 @@ jobs:
           profile: minimal
           override: true
 
-      - name: Install Node and cache node
+      - name: Install and cache Node
         uses: actions/setup-node@v2
         with:
           node-version: '14'
@@ -225,7 +225,7 @@ jobs:
       #   if: ${{ matrix.platform }}-${{ matrix.architecture }} == 'linux-arm64' || ${{ matrix.platform }}-${{ matrix.architecture }} == 'linux-armv7' || ${{ matrix.platform }}-${{ matrix.architecture }} == 'linux-musl-x64'
       #   run: sudo apt-get update && sudo apt-get install -y ${{ matrix.linker_package }}
 
-      - name: Build cargo
+      - name: Build - Cargo
         run: cargo build --release --locked --target ${{ matrix.target }}
         # To be uncommented later when adding new distros
         # env:
@@ -237,7 +237,8 @@ jobs:
         #   CARGO_TARGET_ARMV7_UNKNOWN_LINUX_GNUEABIHF_LINKER: ${{ matrix.cc }}
         #   CARGO_TARGET_X86_64_UNKNOWN_LINUX_MUSL_LINKER: ${{ matrix.cc }}
 
-      - name: Build node.js
+      - name: Build - Node
+        working-directory: node-bindings
         run: |
           npm install --ignore-scripts
           npm run build-${{ matrix.platform }}-${{ matrix.architecture }}
@@ -321,8 +322,12 @@ jobs:
           name: clarinet-js-${{ matrix.platform }}-${{ matrix.architecture }}
           path: clarinet-js-${{ matrix.platform }}-${{ matrix.architecture }}.tar.gz
 
-      - name: Unit Tests
+      - name: Unit Tests - Cargo
         run: cargo test --release --locked --target ${{ matrix.target }}
+
+      - name: Unit Tests - Node
+        working-directory: node-bindings
+        run: npm run spec
 
       - name: Functional Tests (Not Windows)
         if: matrix.os != 'windows-latest'
