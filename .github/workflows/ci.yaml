@@ -325,9 +325,9 @@ jobs:
       - name: Unit Tests - Cargo
         run: cargo test --release --locked --target ${{ matrix.target }}
 
-      - name: Unit Tests - Node
-        working-directory: node-bindings
-        run: npm run spec
+      # - name: Unit Tests - Node
+      #   working-directory: node-bindings
+      #   run: npm run spec
 
       - name: Functional Tests (Not Windows)
         if: matrix.os != 'windows-latest'
