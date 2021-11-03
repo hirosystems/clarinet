@@ -1,12 +1,12 @@
 "use strict";
 
 const { promisify } = require("util");
-const { stacksDevnetNew, stacksDevnetStart, stacksDevnetStop, stacksDevnetWaitForStacksBlock, stacksDevnetWaitForBitcoinBlock } = require('../native/index.node');
+const { stacksDevnetNew, stacksDevnetStart, stacksDevnetStop, stacksDevnetWaitForStacksBlock, stacksDevnetWaitForBitcoinBlock, stacksDevnetOnLog } = require('../native/index.node');
 
 class StacksDevnet {
     
-    constructor() {
-        this.handle = stacksDevnetNew();
+    constructor(setup) {
+        this.handle = stacksDevnetNew(setup.config.manifestPath, setup.logger);
     }
 
     start() {
@@ -25,9 +25,6 @@ class StacksDevnet {
 
     waitForBitcoinBlock(callback) {
         return stacksDevnetWaitForBitcoinBlock.call(this.handle, callback);
-    }
-
-    waitForAttachment(callback) {
     }
 
     stop() {
