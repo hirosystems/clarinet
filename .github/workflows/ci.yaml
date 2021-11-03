@@ -299,7 +299,7 @@ jobs:
 
       - name: Compress node artifact
         shell: bash
-        run: mv target/wix/*.msi clarinet-${{ matrix.platform }}-${{ matrix.architecture }}.msi
+        run: tar -C node-bindings -zcvf clarinet-js-${{ matrix.platform }}-${{ matrix.architecture }}.tar.gz native/index.node
 
       # Separate uploads to prevent paths from being preserved
       - name: Upload cargo artifacts (Not Windows)
