@@ -54,7 +54,7 @@ impl DevnetOrchestrator {
         let network_name = format!("{}.devnet", name);
 
         match (&mut network_config.devnet, devnet_override) {
-            (Some(ref mut devnet_config), Some(ref devnet_override)) => {
+            (Some(ref mut devnet_config), Some(ref _devnet_override)) => {
                 devnet_config.disable_stacks_api = true;
                 devnet_config.disable_bitcoin_explorer = true;
                 devnet_config.disable_stacks_explorer = true;

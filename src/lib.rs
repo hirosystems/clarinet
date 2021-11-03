@@ -9,6 +9,9 @@ extern crate rocket;
 #[macro_use]
 extern crate serde_json;
 
+#[macro_use]
+extern crate lazy_static;
+
 pub mod macros;
 
 pub mod integrate;

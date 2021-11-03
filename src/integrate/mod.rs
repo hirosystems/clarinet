@@ -22,9 +22,10 @@ pub enum NodeObserverEvent {
 pub fn run_devnet(
     devnet: DevnetOrchestrator,
     event_tx: Option<Sender<NodeObserverEvent>>,
+    log_tx: Option<Sender<LogData>>,
     display_dashboard: bool,
 ) {
-    match block_on(do_run_devnet(devnet, event_tx, display_dashboard)) {
+    match block_on(do_run_devnet(devnet, event_tx, log_tx, display_dashboard)) {
         Err(_e) => std::process::exit(1),
         _ => {}
     };
@@ -41,6 +42,7 @@ where
 pub async fn do_run_devnet(
     mut devnet: DevnetOrchestrator,
     event_tx: Option<Sender<NodeObserverEvent>>,
+    log_tx: Option<Sender<LogData>>,
     display_dashboard: bool,
 ) -> Result<bool, String> {
     let (devnet_events_tx, devnet_events_rx) = channel();
@@ -104,7 +106,9 @@ pub async fn do_run_devnet(
             &devnet_path,
         );
     } else {
-        println!("Starting Devnet...");
+        if log_tx.is_some() {
+            println!("Starting Devnet...");
+        }
 
         ctrlc::set_handler(move || {
             events_observer_terminator_tx
@@ -118,13 +122,17 @@ pub async fn do_run_devnet(
 
         loop {
             match devnet_events_rx.recv() {
-                Ok(DevnetEvent::Log(ref log)) => {
-                    println!("{}", log.message);
-                    match log.level {
-                        LogLevel::Debug => debug!("{}", log.message),
-                        LogLevel::Info | LogLevel::Success => info!("{}", log.message),
-                        LogLevel::Warning => warn!("{}", log.message),
-                        LogLevel::Error => error!("{}", log.message),
+                Ok(DevnetEvent::Log(log)) => {
+                    if let Some(ref log_tx) = log_tx {
+                        let _ = log_tx.send(log.clone());
+                    } else {
+                        println!("{}", log.message);
+                        match log.level {
+                            LogLevel::Debug => debug!("{}", log.message),
+                            LogLevel::Info | LogLevel::Success => info!("{}", log.message),
+                            LogLevel::Warning => warn!("{}", log.message),
+                            LogLevel::Error => error!("{}", log.message),
+                        }    
                     }
                 }
                 _ => {}
@@ -193,6 +201,7 @@ impl DevnetEvent {
     }
 }
 
+#[derive(Clone)]
 pub enum LogLevel {
     Error,
     Warning,
@@ -201,6 +210,7 @@ pub enum LogLevel {
     Debug,
 }
 
+#[derive(Clone)]
 pub struct LogData {
     pub occurred_at: String,
     pub message: String,
