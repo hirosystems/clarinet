@@ -147,8 +147,7 @@ impl StacksDevnet {
                     // }
                     break;
                 }
-                _ => {
-                }
+                _ => {}
             }
         }
         Ok(cx.undefined())
@@ -176,8 +175,7 @@ impl StacksDevnet {
                     // }
                     break;
                 }
-                _ => {
-                }
+                _ => {}
             }
         }
 
@@ -217,7 +215,10 @@ fn main(mut cx: ModuleContext) -> NeonResult<()> {
     cx.export_function("stacksDevnetNew", StacksDevnet::js_new)?;
     cx.export_function("stacksDevnetStart", StacksDevnet::js_start)?;
     cx.export_function("stacksDevnetStop", StacksDevnet::js_stop)?;
-    cx.export_function("stacksDevnetWaitForStacksBlock", StacksDevnet::js_on_stacks_block)?;
+    cx.export_function(
+        "stacksDevnetWaitForStacksBlock",
+        StacksDevnet::js_on_stacks_block,
+    )?;
     cx.export_function(
         "stacksDevnetWaitForBitcoinBlock",
         StacksDevnet::js_on_bitcoin_block,

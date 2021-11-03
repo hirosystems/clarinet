@@ -132,7 +132,7 @@ pub async fn do_run_devnet(
                             LogLevel::Info | LogLevel::Success => info!("{}", log.message),
                             LogLevel::Warning => warn!("{}", log.message),
                             LogLevel::Error => error!("{}", log.message),
-                        }    
+                        }
                     }
                 }
                 _ => {}
