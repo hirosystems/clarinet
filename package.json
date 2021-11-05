@@ -24,6 +24,19 @@
                     "prepareCmd": "sed -i -e '1h;2,$H;$!d;g' -e 's@name = \"clarinet\"\\nversion = \"[^\"]*\"@name = \"clarinet\"\\nversion = \"${nextRelease.version}\"@g' Cargo.toml Cargo.lock"
                 }
             ],
+            [
+                "@semantic-release/exec",
+                {
+                    "prepareCmd": "sed -i -e '1h;2,$H;$!d;g' -e 's@name = \"clarinet-js\"\\nversion = \"[^\"]*\"@name = \"clarinet-js\"\\nversion = \"${nextRelease.version}\"@g' node-bindings/Cargo.toml node-bindings/Cargo.lock"
+                }
+            ],
+            [
+                "@semantic-release/npm",
+                {
+                    "pkgRoot": "./node-bindings",
+                    "npmPublish": true
+                }
+            ],
             "@semantic-release/github",
             "@semantic-release/changelog",
             [
@@ -33,7 +46,11 @@
                     "assets": [
                         "CHANGELOG.md",
                         "Cargo.toml",
-                        "Cargo.lock"
+                        "Cargo.lock",
+                        "node-bindings/package.json",
+                        "node-bindings/package-lock.json",
+                        "node-bindings/Cargo.toml",
+                        "node-bindings/Cargo.lock"
                     ]
                 }
             ]

@@ -21,7 +21,6 @@ enum DevnetCommand {
 impl Finalize for StacksDevnet {}
 
 impl StacksDevnet {
-
     fn new<'a, C>(cx: &mut C, manifest_path: String) -> Self
     where
         C: Context<'a>,
@@ -38,9 +37,7 @@ impl StacksDevnet {
         let channel = cx.channel();
 
         thread::spawn(move || {
-            let manifest_path = get_manifest_path_or_exit(Some(
-                manifest_path.into(),
-            ));
+            let manifest_path = get_manifest_path_or_exit(Some(manifest_path.into()));
             let devnet_overrides = DevnetConfigFile::default();
             let devnet = DevnetOrchestrator::new(manifest_path, Some(devnet_overrides));
 
@@ -147,8 +144,7 @@ impl StacksDevnet {
                     // }
                     break;
                 }
-                _ => {
-                }
+                _ => {}
             }
         }
         Ok(cx.undefined())
@@ -176,8 +172,7 @@ impl StacksDevnet {
                     // }
                     break;
                 }
-                _ => {
-                }
+                _ => {}
             }
         }
 
@@ -217,7 +212,10 @@ fn main(mut cx: ModuleContext) -> NeonResult<()> {
     cx.export_function("stacksDevnetNew", StacksDevnet::js_new)?;
     cx.export_function("stacksDevnetStart", StacksDevnet::js_start)?;
     cx.export_function("stacksDevnetStop", StacksDevnet::js_stop)?;
-    cx.export_function("stacksDevnetWaitForStacksBlock", StacksDevnet::js_on_stacks_block)?;
+    cx.export_function(
+        "stacksDevnetWaitForStacksBlock",
+        StacksDevnet::js_on_stacks_block,
+    )?;
     cx.export_function(
         "stacksDevnetWaitForBitcoinBlock",
         StacksDevnet::js_on_bitcoin_block,
