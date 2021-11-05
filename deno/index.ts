@@ -311,11 +311,11 @@ export namespace types {
     return `${val}`;
   }
 
-  export function int(val: number) {
+  export function int(val: number|bigint) {
     return `${val}`;
   }
 
-  export function uint(val: number) {
+  export function uint(val: number|bigint) {
     return `u${val}`;
   }
 
@@ -360,8 +360,8 @@ declare global {
     expectSome(): String;
     expectNone(): void;
     expectBool(value: boolean): boolean;
-    expectUint(value: number): number;
-    expectInt(value: number): number;
+    expectUint(value: number|bigint): bigint;
+    expectInt(value: number|bigint): bigint;
     expectBuff(value: ArrayBuffer): ArrayBuffer;
     expectAscii(value: String): String;
     expectUtf8(value: String): String;
@@ -372,23 +372,23 @@ declare global {
 
   interface Array<T> {
     expectSTXTransferEvent(
-      amount: Number,
+      amount: Number|bigint,
       sender: String,
       recipient: String,
     ): Object;
     expectFungibleTokenTransferEvent(
-      amount: Number,
+      amount: Number|bigint,
       sender: String,
       recipient: String,
       assetId: String,
     ): Object;
     expectFungibleTokenMintEvent(
-      amount: Number,
+      amount: Number|bigint,
       recipient: String,
       assetId: String,
     ): Object;
     expectFungibleTokenBurnEvent(
-      amount: Number,
+      amount: Number|bigint,
       sender: String,
       assetId: String,
     ): Object;
@@ -462,22 +462,22 @@ String.prototype.expectBool = function (value: boolean) {
   return value;
 };
 
-String.prototype.expectUint = function (value: number) {
+String.prototype.expectUint = function (value: number|bigint):bigint {
   try {
     consume(this, `u${value}`, false);
   } catch (error) {
     throw error;
   }
-  return value;
+  return BigInt(value);
 };
 
-String.prototype.expectInt = function (value: number) {
+String.prototype.expectInt = function (value: number|bigint):bigint {
   try {
     consume(this, `${value}`, false);
   } catch (error) {
     throw error;
   }
-  return value;
+  return BigInt(value);
 };
 
 String.prototype.expectBuff = function (value: ArrayBuffer) {
@@ -599,7 +599,7 @@ String.prototype.expectTuple = function () {
 };
 
 Array.prototype.expectSTXTransferEvent = function (
-  amount: Number,
+  amount: Number|bigint,
   sender: String,
   recipient: String,
 ) {
@@ -651,7 +651,7 @@ Array.prototype.expectFungibleTokenTransferEvent = function (
 };
 
 Array.prototype.expectFungibleTokenMintEvent = function (
-  amount: Number,
+  amount: Number|bigint,
   recipient: String,
   assetId: String,
 ) {
@@ -674,7 +674,7 @@ Array.prototype.expectFungibleTokenMintEvent = function (
 };
 
 Array.prototype.expectFungibleTokenBurnEvent = function (
-  amount: Number,
+  amount: Number|bigint,
   sender: String,
   assetId: String,
 ) {
