@@ -25,6 +25,12 @@
                 }
             ],
             [
+                "@semantic-release/exec",
+                {
+                    "prepareCmd": "sed -i -e '1h;2,$H;$!d;g' -e 's@name = \"clarinet-js\"\\nversion = \"[^\"]*\"@name = \"clarinet-js\"\\nversion = \"${nextRelease.version}\"@g' node-bindings/Cargo.toml node-bindings/Cargo.lock"
+                }
+            ],
+            [
                 "@semantic-release/npm",
                 {
                     "pkgRoot": "./node-bindings",

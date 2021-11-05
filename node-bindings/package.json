@@ -1,6 +1,6 @@
 {
   "name": "clarinet-js",
-  "version": "0.18.3",
+  "version": "0.18.0",
   "description": "Clarinet is a simple, modern and opinionated runtime for writing, testing and integrating Clarity Smart contracts.",
   "author": "Ludo Galabru",
   "license": "ISC",
