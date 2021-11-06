@@ -1,0 +1,12 @@
+
+[project]
+name = "simple-nft"
+
+[contracts.simple-nft]
+path = "contracts/simple-nft.clar"
+depends_on = ["sip-009-trait-ft-standard"]
+
+# EXTERNAL CONTRACTS
+[contracts.sip-009-trait-ft-standard]
+path = "contracts/external/sip-009-nft-trait-standard.clar"
+depends_on = []
