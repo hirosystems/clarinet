@@ -18,7 +18,7 @@
 //             export interface IncrementArgs {
 //                 step: ClarityValue,
 //             }
-//             export function args(args: IncrementArgs): [ClarityValue] {
+//             export function args(args: IncrementArgs): ClarityValue[] {
 //                 return [
 //                     args.step,
 //                 ];
@@ -84,7 +84,7 @@ Clarinet.run({
             `// Code generated with the stacksjs-helper-generator extension`,
             `// Manual edits will be overwritten`,
             ``,
-            `import { ClarityValue } from "@stacks/transactions"`,
+            `import { ClarityValue, BooleanCV, IntCV, UIntCV, BufferCV, OptionalCV, ResponseCV, PrincipalCV, ListCV, TupleCV, StringAsciiCV, StringUtf8CV } from "@stacks/transactions"`,
             ``,
         ]);
 
@@ -139,7 +139,7 @@ Clarinet.run({
 
                         // Generate code for helper function
                         code.push([
-                            `            export function args(args: ${kebabToCamel(capitalize(f.name))}Args): [ClarityValue] {`,
+                            `            export function args(args: ${kebabToCamel(capitalize(f.name))}Args): ClarityValue[] {`,
                             `                return [`
                         ]);
                         for (let arg of f.args) {
