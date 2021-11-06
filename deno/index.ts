@@ -396,7 +396,6 @@ declare global {
       contract_identifier: string, 
       value: string
     ): Object;
-    // Absence of test vectors at the moment - token field could present some challenges.
     expectNonFungibleTokenTransferEvent(
       tokenId: String, 
       sender: String, 
