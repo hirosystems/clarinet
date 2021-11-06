@@ -45,6 +45,38 @@
 
 import { Clarinet, Contract, Account, StacksNode } from '../index.ts';
 
+function typeToCVType(argType: any) {
+  switch (argType) {
+    case "bool":
+      return "BooleanCV";
+    case "int128":
+      return "IntCV";
+    case "uint128":
+      return "UIntCV";
+    case "principal":
+      return "PrincipalCV";
+    case "response":
+      return "ResponseCV";
+    default:
+      switch (Object.keys(argType)[0]) {
+        case "buffer":
+          return "BufferCV";
+        case "optional":
+          return "NoneCV";
+        case "list":
+          return "ListCV";
+        case "tuple":
+          return "TupleCV";
+        case "string-ascii":
+          return "StringAsciiCV";
+        case "string-utf8":
+          return "StringUtf8CV";
+        default:
+          return "ClarityValue";
+      }
+  }
+}
+
 Clarinet.run({
     async fn(accounts: Map<string, Account>, contracts: Map<string, Contract>, node: StacksNode) {
         let code = [];
@@ -97,7 +129,7 @@ Clarinet.run({
                         ]);
                         for (let arg of f.args) {
                             code.push([
-                                `                ${kebabToCamel(arg.name)}: ClarityValue,`,
+                                `                ${kebabToCamel(arg.name)}: ${typeToCVType(arg.type)},`,
                             ]);
                         }
                         code.push([
