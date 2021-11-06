@@ -410,7 +410,12 @@ declare global {
       assetAddress: String,
       assetId: String
     ): Object;
-    // expectNonFungibleTokenBurnEvent(token: String, sender: String, assetId: String): Object;
+    expectNonFungibleTokenBurnEvent(
+      tokenId: String, 
+      sender: String, 
+      assetAddress: String,
+      assetId: String
+    ): Object;
     // expectEvent(sel: (e: Object) => Object): Object;
   }
 }
@@ -806,24 +811,33 @@ Array.prototype.expectNonFungibleTokenMintEvent = function(
     throw new Error(`Unable to retrieve expected NonFungibleTokenMintEvent`);
 }
 
-// Array.prototype.expectNonFungibleTokenBurnEvent = function(token: String, sender: String, assetId: String) {
-//     for (let event of this) {
-//         try {
-//             let e: any = {};
-//             e["token"] = event.nft_burn_event.amount.expectInt(token);
-//             e["sender"] = event.nft_burn_event.sender.expectPrincipal(sender);
-//             if (event.nft_burn_event.asset_identifier.endsWith(assetId)) {
-//                 e["assetId"] = event.nft_burn_event.asset_identifier;
-//             } else {
-//                 continue;
-//             }
-//             return e;
-//         } catch (error) {
-//             continue;
-//         }
-//     }
-//     throw new Error(`Unable to retrieve expected NonFungibleTokenTransferEvent`);
-// }
+Array.prototype.expectNonFungibleTokenBurnEvent = function(
+  tokenId: String, 
+  sender: String, 
+  assetAddress: String,
+  assetId: String
+  ) {
+    for (let event of this) {
+        try {
+            let e: any = {};
+            if(event.nft_burn_event.value === tokenId) {
+              e["tokenId"] = event.nft_burn_event.value;
+            } else {
+              continue;
+            }
+            e["sender"] = event.nft_burn_event.sender.expectPrincipal(sender);
+            if (event.nft_burn_event.asset_identifier === `${assetAddress}::${assetId}`) {
+                e["assetId"] = event.nft_burn_event.asset_identifier;
+            } else {
+                continue;
+            }
+            return e;
+        } catch (error) {
+            continue;
+        }
+    }
+    throw new Error(`Unable to retrieve expected NonFungibleTokenTransferEvent`);
+}
 
 const noColor = globalThis.Deno?.noColor ?? true;
 

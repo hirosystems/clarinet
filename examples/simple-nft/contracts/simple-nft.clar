@@ -50,3 +50,10 @@
     (nft-mint? nft newId recipient)
   )
 )
+
+(define-public (test-burn (id uint) (sender principal))
+  (begin
+    (asserts! (is-eq tx-sender sender) ERR_NOT_AUTHORIZED)
+    (nft-burn? nft id sender)
+  )
+)

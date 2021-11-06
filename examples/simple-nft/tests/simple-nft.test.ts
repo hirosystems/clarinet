@@ -57,3 +57,30 @@ Clarinet.test({
         )
     },
 });
+
+Clarinet.test({
+    name: "Ensure that nft can be burned",
+    async fn(chain: Chain, accounts: Map<string, Account>, contracts: Map<string, Contract>) {
+        let deployer = accounts.get("deployer")!;
+        let wallet_1 = accounts.get("wallet_1")!;
+
+        
+        let block = chain.mineBlock([
+            Tx.contractCall("simple-nft", "test-mint", [types.principal(wallet_1.address)], wallet_1.address),
+        ]);
+
+        block.receipts[0].result.expectOk().expectBool(true);
+
+        block = chain.mineBlock([
+            Tx.contractCall("simple-nft", "test-burn", [types.uint(1), types.principal(wallet_1.address)], wallet_1.address),
+        ]);
+        block.receipts[0].result.expectOk().expectBool(true);
+
+        block.receipts[0].events.expectNonFungibleTokenBurnEvent(
+            types.uint(1),
+            wallet_1.address, 
+            `${deployer.address}.simple-nft`,
+            "nft"
+        )
+    },
+});
