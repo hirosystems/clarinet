@@ -404,7 +404,12 @@ declare global {
       assetAddress: String,
       assetId: String
     ): Object;
-    // expectNonFungibleTokenMintEvent(token: String, recipient: String, assetId: String): Object;
+    expectNonFungibleTokenMintEvent(
+      tokenId: String, 
+      recipient: String, 
+      assetAddress: String,
+      assetId: String
+    ): Object;
     // expectNonFungibleTokenBurnEvent(token: String, sender: String, assetId: String): Object;
     // expectEvent(sel: (e: Object) => Object): Object;
   }
@@ -773,24 +778,33 @@ Array.prototype.expectNonFungibleTokenTransferEvent = function(
     throw new Error(`Unable to retrieve expected NonFungibleTokenTransferEvent`);
 }
 
-// Array.prototype.expectNonFungibleTokenMintEvent = function(token: String, recipient: String, assetId: String) {
-//     for (let event of this) {
-//         try {
-//             let e: any = {};
-//             e["token"] = event.nft_mint_event.amount.expectInt(token);
-//             e["recipient"] = event.nft_mint_event.recipient.expectPrincipal(recipient);
-//             if (event.nft_mint_event.asset_identifier.endsWith(assetId)) {
-//                 e["assetId"] = event.nft_mint_event.asset_identifier;
-//             } else {
-//                 continue;
-//             }
-//             return e;
-//         } catch (error) {
-//             continue;
-//         }
-//     }
-//     throw new Error(`Unable to retrieve expected NonFungibleTokenTransferEvent`);
-// }
+Array.prototype.expectNonFungibleTokenMintEvent = function(
+  tokenId: String, 
+  recipient: String, 
+  assetAddress: String,
+  assetId: String
+  ) {
+    for (let event of this) {
+        try {
+            let e: any = {};
+            if(event.nft_mint_event.value === tokenId) {
+              e["tokenId"] = event.nft_mint_event.value;
+            } else {
+              continue;
+            }
+            e["recipient"] = event.nft_mint_event.recipient.expectPrincipal(recipient);
+            if (event.nft_mint_event.asset_identifier === `${assetAddress}::${assetId}`) {
+                e["assetId"] = event.nft_mint_event.asset_identifier;
+            } else {
+                continue;
+            }
+            return e;
+        } catch (error) {
+            continue;
+        }
+    }
+    throw new Error(`Unable to retrieve expected NonFungibleTokenMintEvent`);
+}
 
 // Array.prototype.expectNonFungibleTokenBurnEvent = function(token: String, sender: String, assetId: String) {
 //     for (let event of this) {
