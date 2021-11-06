@@ -836,7 +836,7 @@ Array.prototype.expectNonFungibleTokenBurnEvent = function(
       continue;
     }
   }
-  throw new Error(`Unable to retrieve expected NonFungibleTokenTransferEvent`);
+  throw new Error(`Unable to retrieve expected NonFungibleTokenBurnEvent`);
 }
 
 const noColor = globalThis.Deno?.noColor ?? true;
