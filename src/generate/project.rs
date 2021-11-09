@@ -25,6 +25,7 @@ impl GetChangesForNewProject {
         self.create_environment_testnet_toml();
         self.create_environment_devnet_toml();
         self.create_vscode_directory();
+        self.create_vscode_settings_json();
         self.create_gitignore();
         self.changes.clone()
     }
@@ -75,6 +76,9 @@ impl GetChangesForNewProject {
     fn create_vscode_directory(&mut self) {
         self.changes
             .push(self.get_changes_for_new_root_dir(format!(".vscode")));
+    }
+
+    fn create_vscode_settings_json(&mut self) {
         let content = format!(
             r#"
 {{
