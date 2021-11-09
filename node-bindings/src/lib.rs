@@ -1,6 +1,7 @@
-use clarinet_lib::integrate::{self, DevnetOrchestrator, LogData, NodeObserverEvent};
+use clarinet_lib::integrate::{self, BlockData, DevnetEvent, DevnetOrchestrator};
 use clarinet_lib::types::DevnetConfigFile;
 use neon::prelude::*;
+use core::panic;
 use std::path::PathBuf;
 use std::sync::mpsc;
 use std::thread;
@@ -10,7 +11,8 @@ type DevnetCallback = Box<dyn FnOnce(&Channel) + Send>;
 
 struct StacksDevnet {
     tx: mpsc::Sender<DevnetCommand>,
-    devnet_event_rx: mpsc::Receiver<NodeObserverEvent>,
+    bitcoin_block_rx: mpsc::Receiver<BlockData>,
+    stacks_block_rx: mpsc::Receiver<BlockData>,
 }
 
 enum DevnetCommand {
@@ -25,15 +27,12 @@ impl StacksDevnet {
     where
         C: Context<'a>,
     {
-        // Channel for sending callbacks to execute on the sqlite connection thread
         let (tx, rx) = mpsc::channel::<DevnetCommand>();
-        let (devnet_events_tx, devnet_events_rx) = mpsc::channel();
-        let (log_tx, log_rx) = mpsc::channel();
+        let (meta_tx, meta_rx) = mpsc::channel();
+        let (log_tx, _log_rx) = mpsc::channel();
+        let (bitcoin_block_tx, bitcoin_block_rx) = mpsc::channel();
+        let (stacks_block_tx, stacks_block_rx) = mpsc::channel();
 
-        // Create an `Channel` for calling back to JavaScript. It is more efficient
-        // to create a single channel and re-use it for all database callbacks.
-        // The JavaScript process will not exit as long as this channel has not been
-        // dropped.
         let channel = cx.channel();
 
         thread::spawn(move || {
@@ -43,7 +42,12 @@ impl StacksDevnet {
 
             if let Ok(DevnetCommand::Start(callback)) = rx.recv() {
                 // Start devnet
-                integrate::run_devnet(devnet, Some(devnet_events_tx), Some(log_tx), false);
+                let (devnet_events_rx, terminator_tx) = match integrate::run_devnet(devnet, Some(log_tx), false) {
+                    Ok((Some(devnet_events_rx), Some(terminator_tx))) => (devnet_events_rx, terminator_tx),
+                    _ => std::process::exit(1)
+                };
+                meta_tx.send(devnet_events_rx).expect("Unable to transmit event receiver");
+
                 if let Some(c) = callback {
                     c(&channel);
                 }
@@ -52,9 +56,7 @@ impl StacksDevnet {
                 while let Ok(message) = rx.recv() {
                     match message {
                         DevnetCommand::Stop(callback) => {
-                            // The connection and channel are owned by the thread, but _lent_ to
-                            // the callback. The callback has exclusive access to the connection
-                            // for the duration of the callback.
+                            terminator_tx.send(true).expect("Unable to terminate Devnet");
                             if let Some(c) = callback {
                                 c(&channel);
                             }
@@ -69,14 +71,28 @@ impl StacksDevnet {
         });
 
         thread::spawn(move || {
-            while let Ok(ref message) = log_rx.recv() {
-                println!("{:?}", message.message);
+            if let Ok(ref devnet_rx) = meta_rx.recv() {
+                while let Ok(ref event) = devnet_rx.recv() {
+                    match event {
+                        DevnetEvent::BitcoinBlock(block) => {
+                            bitcoin_block_tx.send(block.clone()).expect("Unable to transmit bitcoin block");
+                        }
+                        DevnetEvent::StacksBlock(block) => {
+                            stacks_block_tx.send(block.clone()).expect("Unable to transmit stacks block");
+                        }
+                        DevnetEvent::Log(log) => {
+                            println!("{:?}", log);
+                        }
+                        _ => {}
+                    }
+                }
             }
         });
 
         Self {
             tx,
-            devnet_event_rx: devnet_events_rx,
+            bitcoin_block_rx,
+            stacks_block_rx,
         }
     }
 
@@ -122,32 +138,29 @@ impl StacksDevnet {
         Ok(cx.undefined())
     }
 
-    fn js_on_stacks_block(mut cx: FunctionContext) -> JsResult<JsUndefined> {
+    fn js_on_stacks_block(mut cx: FunctionContext) -> JsResult<JsObject> {
         // Get the first argument as a `JsFunction`
-        let callback = cx.argument::<JsFunction>(0)?.root(&mut cx);
-        let callback = callback.into_inner(&mut cx);
+        // let callback = cx.argument::<JsFunction>(0)?.root(&mut cx);
+        // let callback = callback.into_inner(&mut cx);
 
         let devnet = cx
             .this()
             .downcast_or_throw::<JsBox<StacksDevnet>, _>(&mut cx)?;
 
-        while let Ok(message) = devnet.devnet_event_rx.recv() {
-            match message {
-                NodeObserverEvent::NewStacksBlock => {
-                    println!("New stacks block");
-                    let args: Vec<Handle<JsValue>> =
-                        vec![cx.null().upcast(), cx.number(1 as f64).upcast()];
-                    let _res = callback.call(&mut cx, devnet, args)?;
-                    // let expected = cx.boolean(true);
-                    // if res.strict_equals(&mut cx, expected) {
-                    //     break;
-                    // }
-                    break;
-                }
-                _ => {}
-            }
-        }
-        Ok(cx.undefined())
+        let block = match devnet.stacks_block_rx.recv() {
+            Ok(obj) => obj,
+            Err(err) => panic!()
+        };
+
+        let obj = cx.empty_object();
+
+        let identifier = cx.string(block.block_hash.clone());
+        obj.set(&mut cx, "identifier", identifier).unwrap();
+    
+        let number = cx.number(block.block_height as u32);
+        obj.set(&mut cx, "number", number).unwrap();
+    
+        Ok(obj)
     }
 
     fn js_on_bitcoin_block(mut cx: FunctionContext) -> JsResult<JsUndefined> {
@@ -159,21 +172,16 @@ impl StacksDevnet {
             .this()
             .downcast_or_throw::<JsBox<StacksDevnet>, _>(&mut cx)?;
 
-        while let Ok(message) = devnet.devnet_event_rx.recv() {
-            match message {
-                NodeObserverEvent::NewBitcoinBlock => {
-                    println!("New bitcoin block");
-                    let args: Vec<Handle<JsValue>> =
-                        vec![cx.null().upcast(), cx.number(1 as f64).upcast()];
-                    let _res = callback.call(&mut cx, devnet, args)?;
-                    // let expected = cx.boolean(true);
-                    // if res.strict_equals(&mut cx, expected) {
-                    //     break;
-                    // }
-                    break;
-                }
-                _ => {}
-            }
+        while let Ok(block) = devnet.bitcoin_block_rx.recv() {
+            println!("New bitcoin block");
+            let args: Vec<Handle<JsValue>> =
+                vec![cx.null().upcast(), cx.number(1 as f64).upcast()];
+            let _res = callback.call(&mut cx, devnet, args)?;
+            // let expected = cx.boolean(true);
+            // if res.strict_equals(&mut cx, expected) {
+            //     break;
+            // }
+            break;
         }
 
         Ok(cx.undefined())
@@ -248,4 +256,17 @@ fn get_manifest_path_or_exit(path: Option<String>) -> PathBuf {
             }
         }
     }
+}
+
+fn block_data_to_js_object<'a>(mut cx: FunctionContext<'a>, block: &BlockData) -> Handle<'a, JsObject> {
+
+    let obj = cx.empty_object();
+
+    let identifier = cx.string(block.block_hash.clone());
+    obj.set(&mut cx, "identifier", identifier);
+
+    let number = cx.number(block.block_height as u32);
+    obj.set(&mut cx, "number", number);
+
+    return obj;
 }

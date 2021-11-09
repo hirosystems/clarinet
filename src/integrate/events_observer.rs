@@ -1,4 +1,4 @@
-use super::{DevnetEvent, NodeObserverEvent};
+use super::DevnetEvent;
 use crate::integrate::{BlockData, MempoolAdmissionData, ServiceStatusData, Status, Transaction};
 use crate::poke::load_session;
 use crate::publish::{publish_contract, Network};
@@ -160,7 +160,6 @@ pub async fn start_events_observer(
     events_config: EventObserverConfig,
     devnet_event_tx: Sender<DevnetEvent>,
     terminator_rx: Receiver<bool>,
-    event_tx: Option<Sender<NodeObserverEvent>>,
 ) -> Result<(), Box<dyn Error>> {
     let _ = events_config.execute_scripts().await;
 
@@ -170,7 +169,6 @@ pub async fn start_events_observer(
 
     let moved_rw_lock = rw_lock.clone();
     let moved_tx = Arc::new(Mutex::new(devnet_event_tx.clone()));
-    let moved_node_tx = Arc::new(Mutex::new(event_tx.clone()));
 
     let config = Config {
         port: port,
@@ -186,7 +184,6 @@ pub async fn start_events_observer(
         let future = rocket::custom(config)
             .manage(moved_rw_lock)
             .manage(moved_tx)
-            .manage(moved_node_tx)
             .mount(
                 "/",
                 routes![
@@ -253,7 +250,6 @@ pub async fn start_events_observer(
 pub fn handle_new_burn_block(
     devnet_events_tx: &State<Arc<Mutex<Sender<DevnetEvent>>>>,
     new_burn_block: Json<NewBurnBlock>,
-    node_event_tx: &State<Arc<Mutex<Option<Sender<NodeObserverEvent>>>>>,
 ) -> Json<Value> {
     let devnet_events_tx = devnet_events_tx.inner();
 
@@ -272,16 +268,16 @@ pub fn handle_new_burn_block(
                     new_burn_block.burn_block_height
                 ),
             }));
-        }
-        _ => {}
-    };
-
-    match node_event_tx.lock() {
-        Ok(tx) => {
-            if let Some(ref tx) = *tx {
-                tx.send(NodeObserverEvent::NewBitcoinBlock)
-                    .expect("Unable to broadcast event");
-            }
+            let _ = tx.send(DevnetEvent::BitcoinBlock(BlockData {
+                block_height: new_burn_block.burn_block_height,
+                block_hash: new_burn_block.burn_block_hash.clone(),
+                bitcoin_block_height: new_burn_block.burn_block_height,
+                bitcoin_block_hash: new_burn_block.burn_block_hash.clone(),
+                first_burnchain_block_height: 0,
+                pox_cycle_length: 0,
+                pox_cycle_id: 0,
+                transactions: vec![],
+            }));
         }
         _ => {}
     };
@@ -297,17 +293,7 @@ pub fn handle_new_block(
     config: &State<Arc<RwLock<EventObserverConfig>>>,
     devnet_events_tx: &State<Arc<Mutex<Sender<DevnetEvent>>>>,
     new_block: Json<NewBlock>,
-    node_event_tx: &State<Arc<Mutex<Option<Sender<NodeObserverEvent>>>>>,
 ) -> Json<Value> {
-    match node_event_tx.lock() {
-        Ok(tx) => {
-            if let Some(ref tx) = *tx {
-                tx.send(NodeObserverEvent::NewStacksBlock)
-                    .expect("Unable to broadcast event");
-            }
-        }
-        _ => {}
-    };
 
     let devnet_events_tx = devnet_events_tx.inner();
     let config = config.inner();
@@ -448,7 +434,7 @@ pub fn handle_new_block(
         .collect();
 
     if let Ok(tx) = devnet_events_tx.lock() {
-        let _ = tx.send(DevnetEvent::Block(BlockData {
+        let _ = tx.send(DevnetEvent::StacksBlock(BlockData {
             block_height: new_block.block_height,
             block_hash: new_block.block_hash.clone(),
             bitcoin_block_height: new_block.burn_block_height,
@@ -558,7 +544,6 @@ pub fn handle_new_microblocks(
     _config: &State<Arc<RwLock<EventObserverConfig>>>,
     devnet_events_tx: &State<Arc<Mutex<Sender<DevnetEvent>>>>,
     new_microblock: Json<NewMicroBlock>,
-    _node_event_tx: &State<Arc<Mutex<Option<Sender<NodeObserverEvent>>>>>,
 ) -> Json<Value> {
     let devnet_events_tx = devnet_events_tx.inner();
 
@@ -594,7 +579,6 @@ pub fn handle_new_microblocks(
 pub fn handle_new_mempool_tx(
     devnet_events_tx: &State<Arc<Mutex<Sender<DevnetEvent>>>>,
     raw_txs: Json<Vec<String>>,
-    _node_event_tx: &State<Arc<Mutex<Option<Sender<NodeObserverEvent>>>>>,
 ) -> Json<Value> {
     let decoded_transactions = raw_txs
         .iter()

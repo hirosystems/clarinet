@@ -9,13 +9,8 @@ const devnet = new StacksDevnet({
 
 devnet.start();
 
-var i = 0;
-let block = devnet.waitForStacksBlock((block) => {
-    i += 1;
-    console.log(`${i} Hello from JS ${block}`);
-    return i > 5;
-});
+let block = devnet.waitForStacksBlock();
 
-console.log(block);
+console.log(`Hello from JS ${JSON.stringify(block)}`);
 
 devnet.stop();

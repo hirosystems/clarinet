@@ -105,15 +105,15 @@ pub fn start_ui(
             DevnetEvent::ServiceStatus(status) => {
                 app.display_service_status_update(status);
             }
-            DevnetEvent::Block(block) => {
+            DevnetEvent::StacksBlock(block) => {
                 app.display_block(block);
             }
             DevnetEvent::MempoolAdmission(tx) => {
                 app.update_mempool(tx);
             }
-            // DevnetEvent::Microblock(microblock) => {
+            DevnetEvent::BitcoinBlock(_block) => {
 
-            // }
+            }
             // DevnetEvent::Terminate => {
 
             // },

@@ -16,4 +16,4 @@ default-features = false
 [dependencies.neon]
 version = "0.9"
 default-features = false
-features = ["napi-4", "event-queue-api", "try-catch-api"]
+features = ["napi-4", "channel-api", "event-queue-api", "try-catch-api"]
