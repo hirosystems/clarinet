@@ -396,10 +396,25 @@ declare global {
       contract_identifier: string, 
       value: string
     ): Object;
-    // Absence of test vectors at the moment - token field could present some challenges.
-    // expectNonFungibleTokenTransferEvent(token: String, sender: String, recipient: String, assetId: String): Object;
-    // expectNonFungibleTokenMintEvent(token: String, recipient: String, assetId: String): Object;
-    // expectNonFungibleTokenBurnEvent(token: String, sender: String, assetId: String): Object;
+    expectNonFungibleTokenTransferEvent(
+      tokenId: String, 
+      sender: String, 
+      recipient: String, 
+      assetAddress: String,
+      assetId: String
+    ): Object;
+    expectNonFungibleTokenMintEvent(
+      tokenId: String, 
+      recipient: String, 
+      assetAddress: String,
+      assetId: String
+    ): Object;
+    expectNonFungibleTokenBurnEvent(
+      tokenId: String, 
+      sender: String, 
+      assetAddress: String,
+      assetId: String
+    ): Object;
     // expectEvent(sel: (e: Object) => Object): Object;
   }
 }
@@ -737,64 +752,91 @@ Array.prototype.expectPrintEvent = function (
 //     }
 //     throw new Error(`Unable to retrieve expected PrintEvent`);
 // }
+Array.prototype.expectNonFungibleTokenTransferEvent = function(
+  tokenId: String, 
+  sender: String, 
+  recipient: String, 
+  assetAddress: String, 
+  assetId: String
+  ) {
+  for (let event of this) {
+    try {
+      let e: any = {};
+      if(event.nft_transfer_event.value === tokenId) {
+        e["tokenId"] = event.nft_transfer_event.value;
+      } else {
+        continue;
+      }
+      e["sender"] = event.nft_transfer_event.sender.expectPrincipal(sender);
+      e["recipient"] = event.nft_transfer_event.recipient.expectPrincipal(recipient);
+      if (event.nft_transfer_event.asset_identifier === `${assetAddress}::${assetId}`) {
+        e["assetId"] = event.nft_transfer_event.asset_identifier;
+      } else {
+        continue;
+      }
+      return e;
+    } catch (error) {
+      continue;
+    }
+  }
+  throw new Error(`Unable to retrieve expected NonFungibleTokenTransferEvent`);
+}
 
-// Array.prototype.expectNonFungibleTokenTransferEvent = function(token: String, sender: String, recipient: String, assetId: String) {
-//     for (let event of this) {
-//         try {
-//             let e: any = {};
-//             e["token"] = event.nft_transfer_event.amount.expectInt(token);
-//             e["sender"] = event.nft_transfer_event.sender.expectPrincipal(sender);
-//             e["recipient"] = event.nft_transfer_event.recipient.expectPrincipal(recipient);
-//             if (event.nft_transfer_event.asset_identifier.endsWith(assetId)) {
-//                 e["assetId"] = event.nft_transfer_event.asset_identifier;
-//             } else {
-//                 continue;
-//             }
-//             return e;
-//         } catch (error) {
-//             continue;
-//         }
-//     }
-//     throw new Error(`Unable to retrieve expected NonFungibleTokenTransferEvent`);
-// }
+Array.prototype.expectNonFungibleTokenMintEvent = function(
+  tokenId: String, 
+  recipient: String, 
+  assetAddress: String,
+  assetId: String
+  ) {
+  for (let event of this) {
+    try {
+      let e: any = {};
+      if(event.nft_mint_event.value === tokenId) {
+        e["tokenId"] = event.nft_mint_event.value;
+      } else {
+        continue;
+      }
+      e["recipient"] = event.nft_mint_event.recipient.expectPrincipal(recipient);
+      if (event.nft_mint_event.asset_identifier === `${assetAddress}::${assetId}`) {
+        e["assetId"] = event.nft_mint_event.asset_identifier;
+      } else {
+        continue;
+      }
+      return e;
+    } catch (error) {
+      continue;
+    }
+  }
+  throw new Error(`Unable to retrieve expected NonFungibleTokenMintEvent`);
+}
 
-// Array.prototype.expectNonFungibleTokenMintEvent = function(token: String, recipient: String, assetId: String) {
-//     for (let event of this) {
-//         try {
-//             let e: any = {};
-//             e["token"] = event.nft_mint_event.amount.expectInt(token);
-//             e["recipient"] = event.nft_mint_event.recipient.expectPrincipal(recipient);
-//             if (event.nft_mint_event.asset_identifier.endsWith(assetId)) {
-//                 e["assetId"] = event.nft_mint_event.asset_identifier;
-//             } else {
-//                 continue;
-//             }
-//             return e;
-//         } catch (error) {
-//             continue;
-//         }
-//     }
-//     throw new Error(`Unable to retrieve expected NonFungibleTokenTransferEvent`);
-// }
-
-// Array.prototype.expectNonFungibleTokenBurnEvent = function(token: String, sender: String, assetId: String) {
-//     for (let event of this) {
-//         try {
-//             let e: any = {};
-//             e["token"] = event.nft_burn_event.amount.expectInt(token);
-//             e["sender"] = event.nft_burn_event.sender.expectPrincipal(sender);
-//             if (event.nft_burn_event.asset_identifier.endsWith(assetId)) {
-//                 e["assetId"] = event.nft_burn_event.asset_identifier;
-//             } else {
-//                 continue;
-//             }
-//             return e;
-//         } catch (error) {
-//             continue;
-//         }
-//     }
-//     throw new Error(`Unable to retrieve expected NonFungibleTokenTransferEvent`);
-// }
+Array.prototype.expectNonFungibleTokenBurnEvent = function(
+  tokenId: String, 
+  sender: String, 
+  assetAddress: String,
+  assetId: String
+  ) {
+  for (let event of this) {
+    try {
+      let e: any = {};
+      if(event.nft_burn_event.value === tokenId) {
+        e["tokenId"] = event.nft_burn_event.value;
+      } else {
+        continue;
+      }
+      e["sender"] = event.nft_burn_event.sender.expectPrincipal(sender);
+      if (event.nft_burn_event.asset_identifier === `${assetAddress}::${assetId}`) {
+        e["assetId"] = event.nft_burn_event.asset_identifier;
+      } else {
+        continue;
+      }
+      return e;
+    } catch (error) {
+      continue;
+    }
+  }
+  throw new Error(`Unable to retrieve expected NonFungibleTokenBurnEvent`);
+}
 
 const noColor = globalThis.Deno?.noColor ?? true;
 
