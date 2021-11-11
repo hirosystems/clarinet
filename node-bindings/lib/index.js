@@ -5,7 +5,15 @@ const { stacksDevnetNew, stacksDevnetStart, stacksDevnetStop, stacksDevnetWaitFo
 class StacksDevnet {
     
     constructor(setup) {
-        this.handle = stacksDevnetNew(setup.config.manifestPath, setup.logger);
+        let manifestPath = setup.manifestPath;
+        var logs = setup.logs;
+        logs ||= false;
+        var accounts = setup.settings.accounts;
+        accounts ||= [];
+        var devnet = setup.settings.devnet;
+        devnet ||= {};
+        console.log(manifestPath);
+        this.handle = stacksDevnetNew(manifestPath, logs, accounts, devnet);
     }
 
     start() {

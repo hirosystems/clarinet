@@ -403,7 +403,7 @@ pub fn main() {
         Command::Integrate(cmd) => {
             let manifest_path = get_manifest_path_or_exit(cmd.manifest_path);
             let devnet = DevnetOrchestrator::new(manifest_path, None);
-            integrate::run_devnet(devnet, None, None, !cmd.no_dashboard);
+            integrate::run_devnet(devnet, None, !cmd.no_dashboard);
             if hints_enabled {
                 display_deploy_hint();
             }

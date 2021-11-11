@@ -54,10 +54,134 @@ impl DevnetOrchestrator {
         let network_name = format!("{}.devnet", name);
 
         match (&mut network_config.devnet, devnet_override) {
-            (Some(ref mut devnet_config), Some(ref _devnet_override)) => {
-                devnet_config.disable_stacks_api = true;
-                devnet_config.disable_bitcoin_explorer = true;
-                devnet_config.disable_stacks_explorer = true;
+            (Some(ref mut devnet_config), Some(ref devnet_override)) => {
+                if let Some(val) = devnet_override.orchestrator_port {
+                    devnet_config.orchestrator_port = val; 
+                }
+
+                if let Some(val) = devnet_override.bitcoin_node_p2p_port {
+                    devnet_config.bitcoin_node_p2p_port = val; 
+                }
+
+                if let Some(val) = devnet_override.bitcoin_node_rpc_port {
+                    devnet_config.bitcoin_node_rpc_port = val; 
+                }
+
+                if let Some(val) = devnet_override.stacks_node_p2p_port {
+                    devnet_config.stacks_node_p2p_port = val; 
+                }
+
+                if let Some(val) = devnet_override.stacks_node_rpc_port {
+                    devnet_config.stacks_node_rpc_port = val; 
+                }
+
+                if let Some(ref val) = devnet_override.stacks_node_events_observers {
+                    devnet_config.stacks_node_events_observers = val.clone(); 
+                }
+
+                if let Some(val) = devnet_override.stacks_api_port {
+                    devnet_config.stacks_api_port = val; 
+                }
+
+                if let Some(val) = devnet_override.stacks_api_events_port {
+                    devnet_config.stacks_api_events_port = val; 
+                }
+
+                if let Some(val) = devnet_override.bitcoin_explorer_port {
+                    devnet_config.bitcoin_explorer_port = val; 
+                }
+
+                if let Some(val) = devnet_override.stacks_explorer_port {
+                    devnet_config.stacks_explorer_port = val; 
+                }
+
+                if let Some(val) = devnet_override.bitcoin_controller_port {
+                    devnet_config.bitcoin_controller_port = val; 
+                }
+
+                if let Some(ref val) = devnet_override.bitcoin_node_username {
+                    devnet_config.bitcoin_node_username = val.clone(); 
+                }
+
+                if let Some(ref val) = devnet_override.bitcoin_node_password {
+                    devnet_config.bitcoin_node_password = val.clone(); 
+                }
+
+                if let Some(ref val) = devnet_override.miner_mnemonic {
+                    devnet_config.miner_mnemonic = val.clone(); 
+                }
+
+                if let Some(ref val) = devnet_override.miner_derivation_path {
+                    devnet_config.miner_derivation_path = val.clone(); 
+                }
+
+                if let Some(val) = devnet_override.bitcoin_controller_block_time {
+                    devnet_config.bitcoin_controller_block_time = val; 
+                }
+
+                if let Some(ref val) = devnet_override.working_dir {
+                    devnet_config.working_dir = val.clone(); 
+                }
+
+                if let Some(val) = devnet_override.postgres_port {
+                    devnet_config.postgres_port = val; 
+                }
+
+                if let Some(ref val) = devnet_override.postgres_username {
+                    devnet_config.postgres_username = val.clone(); 
+                }
+
+                if let Some(ref val) = devnet_override.postgres_password {
+                    devnet_config.postgres_password = val.clone(); 
+                }
+
+                if let Some(ref val) = devnet_override.postgres_database {
+                    devnet_config.postgres_database = val.clone(); 
+                }
+
+                if let Some(ref val) = devnet_override.pox_stacking_orders {
+                    devnet_config.pox_stacking_orders = val.clone(); 
+                }
+
+                if let Some(ref val) = devnet_override.execute_script {
+                    devnet_config.execute_script = val.clone(); 
+                }
+
+                if let Some(ref val) = devnet_override.bitcoin_node_image_url {
+                    devnet_config.bitcoin_node_image_url = val.clone(); 
+                }
+
+                if let Some(ref val) = devnet_override.bitcoin_explorer_image_url {
+                    devnet_config.bitcoin_explorer_image_url = val.clone(); 
+                }
+
+                if let Some(ref val) = devnet_override.stacks_node_image_url {
+                    devnet_config.stacks_node_image_url = val.clone(); 
+                }
+
+                if let Some(ref val) = devnet_override.stacks_api_image_url {
+                    devnet_config.stacks_api_image_url = val.clone(); 
+                }
+
+                if let Some(ref val) = devnet_override.stacks_explorer_image_url {
+                    devnet_config.stacks_explorer_image_url = val.clone(); 
+                }
+
+                if let Some(ref val) = devnet_override.postgres_image_url {
+                    devnet_config.postgres_image_url = val.clone(); 
+                }
+
+                if let Some(val) = devnet_override.disable_bitcoin_explorer {
+                    devnet_config.disable_bitcoin_explorer = val; 
+                }
+
+                if let Some(val) = devnet_override.disable_stacks_explorer {
+                    devnet_config.disable_stacks_explorer = val; 
+                }
+
+                if let Some(val) = devnet_override.disable_stacks_api {
+                    devnet_config.disable_stacks_api = val; 
+                }
             }
             _ => {}
         };

@@ -12,6 +12,8 @@ extern crate serde_json;
 #[macro_use]
 extern crate lazy_static;
 
+pub extern crate bip39;
+
 pub mod macros;
 
 pub mod integrate;
@@ -21,7 +23,3 @@ pub mod publish;
 pub mod runnner;
 pub mod types;
 pub mod utils;
-
-pub fn hello_clarinet() -> String {
-    format!("Hello Clarinet :)")
-}
