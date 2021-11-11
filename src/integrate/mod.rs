@@ -23,10 +23,16 @@ pub fn run_devnet(
     devnet: DevnetOrchestrator,
     log_tx: Option<Sender<LogData>>,
     display_dashboard: bool,
-) -> Result<(Option<mpsc::Receiver<DevnetEvent>>, Option<mpsc::Sender<bool>>), String> {
+) -> Result<
+    (
+        Option<mpsc::Receiver<DevnetEvent>>,
+        Option<mpsc::Sender<bool>>,
+    ),
+    String,
+> {
     match block_on(do_run_devnet(devnet, log_tx, display_dashboard)) {
         Err(_e) => std::process::exit(1),
-        Ok(res) => Ok(res)
+        Ok(res) => Ok(res),
     }
 }
 
@@ -42,7 +48,13 @@ pub async fn do_run_devnet(
     mut devnet: DevnetOrchestrator,
     log_tx: Option<Sender<LogData>>,
     display_dashboard: bool,
-) -> Result<(Option<mpsc::Receiver<DevnetEvent>>, Option<mpsc::Sender<bool>>), String> {
+) -> Result<
+    (
+        Option<mpsc::Receiver<DevnetEvent>>,
+        Option<mpsc::Sender<bool>>,
+    ),
+    String,
+> {
     let (devnet_events_tx, devnet_events_rx) = channel();
     let (termination_success_tx, orchestrator_terminated_rx) = channel();
 
@@ -137,9 +149,8 @@ pub async fn do_run_devnet(
                     _ => {}
                 }
             }
-
         } else {
-            return Ok((Some(devnet_events_rx), Some(orchestrator_terminator_tx)))
+            return Ok((Some(devnet_events_rx), Some(orchestrator_terminator_tx)));
         }
     }
 

@@ -1,8 +1,10 @@
-use clarinet_lib::integrate::{self, BlockData, DevnetEvent, DevnetOrchestrator};
-use clarinet_lib::types::{AccountConfig, DevnetConfigFile, PoxStackingOrder, DEFAULT_DERIVATION_PATH, compute_addresses};
 use clarinet_lib::bip39::{Language, Mnemonic};
-use neon::prelude::*;
+use clarinet_lib::integrate::{self, BlockData, DevnetEvent, DevnetOrchestrator};
+use clarinet_lib::types::{
+    compute_addresses, AccountConfig, DevnetConfigFile, PoxStackingOrder, DEFAULT_DERIVATION_PATH,
+};
 use core::panic;
+use neon::prelude::*;
 use std::collections::BTreeMap;
 use std::path::PathBuf;
 use std::sync::mpsc;
@@ -25,7 +27,13 @@ enum DevnetCommand {
 impl Finalize for StacksDevnet {}
 
 impl StacksDevnet {
-    fn new<'a, C>(cx: &mut C, manifest_path: String, logs_enabled: bool, _accounts: BTreeMap<String, AccountConfig>, devnet_overrides: DevnetConfigFile) -> Self
+    fn new<'a, C>(
+        cx: &mut C,
+        manifest_path: String,
+        logs_enabled: bool,
+        _accounts: BTreeMap<String, AccountConfig>,
+        devnet_overrides: DevnetConfigFile,
+    ) -> Self
     where
         C: Context<'a>,
     {
@@ -43,11 +51,16 @@ impl StacksDevnet {
 
             if let Ok(DevnetCommand::Start(callback)) = rx.recv() {
                 // Start devnet
-                let (devnet_events_rx, terminator_tx) = match integrate::run_devnet(devnet, Some(log_tx), false) {
-                    Ok((Some(devnet_events_rx), Some(terminator_tx))) => (devnet_events_rx, terminator_tx),
-                    _ => std::process::exit(1)
-                };
-                meta_tx.send(devnet_events_rx).expect("Unable to transmit event receiver");
+                let (devnet_events_rx, terminator_tx) =
+                    match integrate::run_devnet(devnet, Some(log_tx), false) {
+                        Ok((Some(devnet_events_rx), Some(terminator_tx))) => {
+                            (devnet_events_rx, terminator_tx)
+                        }
+                        _ => std::process::exit(1),
+                    };
+                meta_tx
+                    .send(devnet_events_rx)
+                    .expect("Unable to transmit event receiver");
 
                 if let Some(c) = callback {
                     c(&channel);
@@ -57,7 +70,9 @@ impl StacksDevnet {
                 while let Ok(message) = rx.recv() {
                     match message {
                         DevnetCommand::Stop(callback) => {
-                            terminator_tx.send(true).expect("Unable to terminate Devnet");
+                            terminator_tx
+                                .send(true)
+                                .expect("Unable to terminate Devnet");
                             if let Some(c) = callback {
                                 c(&channel);
                             }
@@ -76,10 +91,14 @@ impl StacksDevnet {
                 while let Ok(ref event) = devnet_rx.recv() {
                     match event {
                         DevnetEvent::BitcoinBlock(block) => {
-                            bitcoin_block_tx.send(block.clone()).expect("Unable to transmit bitcoin block");
+                            bitcoin_block_tx
+                                .send(block.clone())
+                                .expect("Unable to transmit bitcoin block");
                         }
                         DevnetEvent::StacksBlock(block) => {
-                            stacks_block_tx.send(block.clone()).expect("Unable to transmit stacks block");
+                            stacks_block_tx
+                                .send(block.clone())
+                                .expect("Unable to transmit stacks block");
                         }
                         DevnetEvent::Log(log) => {
                             if logs_enabled {
@@ -114,7 +133,7 @@ impl StacksDevnet {
 impl StacksDevnet {
     fn js_new(mut cx: FunctionContext) -> JsResult<JsBox<StacksDevnet>> {
         let manifest_path = cx.argument::<JsString>(0)?.value(&mut cx);
-        
+
         let logs_enabled = cx.argument::<JsBoolean>(1)?.value(&mut cx);
 
         let accounts = cx.argument::<JsArray>(2)?.to_vec(&mut cx)?;
@@ -139,23 +158,31 @@ impl StacksDevnet {
                 .unwrap()
                 .to_string();
 
-            let balance = match account_settings.get(&mut cx, "balance")?.downcast::<JsNumber, _>(&mut cx) {
+            let balance = match account_settings
+                .get(&mut cx, "balance")?
+                .downcast::<JsNumber, _>(&mut cx)
+            {
                 Ok(res) => res.value(&mut cx),
                 _ => 0.0,
             };
-    
-            let is_mainnet = match account_settings.get(&mut cx, "is_mainnet")?.downcast::<JsBoolean, _>(&mut cx) {
+
+            let is_mainnet = match account_settings
+                .get(&mut cx, "is_mainnet")?
+                .downcast::<JsBoolean, _>(&mut cx)
+            {
                 Ok(res) => res.value(&mut cx),
                 _ => false,
             };
 
-            let derivation = match account_settings.get(&mut cx, "derivation")?.downcast::<JsString, _>(&mut cx) {
+            let derivation = match account_settings
+                .get(&mut cx, "derivation")?
+                .downcast::<JsString, _>(&mut cx)
+            {
                 Ok(res) => res.value(&mut cx),
                 _ => DEFAULT_DERIVATION_PATH.to_string(),
             };
 
-            let (address, _, _) =
-                compute_addresses(&mnemonic, &derivation, is_mainnet);
+            let (address, _, _) = compute_addresses(&mnemonic, &derivation, is_mainnet);
 
             let account = AccountConfig {
                 mnemonic,
@@ -164,139 +191,229 @@ impl StacksDevnet {
                 is_mainnet,
                 balance: balance as u64,
             };
-            genesis_accounts.insert(id, account);            
+            genesis_accounts.insert(id, account);
         }
 
         let mut overrides = DevnetConfigFile::default();
 
-        if let Ok(res) = devnet_settings.get(&mut cx, "orchestrator_port")?.downcast::<JsNumber, _>(&mut cx) {
+        if let Ok(res) = devnet_settings
+            .get(&mut cx, "orchestrator_port")?
+            .downcast::<JsNumber, _>(&mut cx)
+        {
             overrides.orchestrator_port = Some(res.value(&mut cx) as u16);
         }
-        
-        if let Ok(res) = devnet_settings.get(&mut cx, "bitcoin_node_p2p_port")?.downcast::<JsNumber, _>(&mut cx) {
+
+        if let Ok(res) = devnet_settings
+            .get(&mut cx, "bitcoin_node_p2p_port")?
+            .downcast::<JsNumber, _>(&mut cx)
+        {
             overrides.bitcoin_node_p2p_port = Some(res.value(&mut cx) as u16);
         }
-        
-        if let Ok(res) = devnet_settings.get(&mut cx, "bitcoin_node_rpc_port")?.downcast::<JsNumber, _>(&mut cx) {
+
+        if let Ok(res) = devnet_settings
+            .get(&mut cx, "bitcoin_node_rpc_port")?
+            .downcast::<JsNumber, _>(&mut cx)
+        {
             overrides.bitcoin_node_rpc_port = Some(res.value(&mut cx) as u16);
         }
-        
-        if let Ok(res) = devnet_settings.get(&mut cx, "stacks_node_p2p_port")?.downcast::<JsNumber, _>(&mut cx) {
+
+        if let Ok(res) = devnet_settings
+            .get(&mut cx, "stacks_node_p2p_port")?
+            .downcast::<JsNumber, _>(&mut cx)
+        {
             overrides.stacks_node_p2p_port = Some(res.value(&mut cx) as u16);
         }
-        
-        if let Ok(res) = devnet_settings.get(&mut cx, "stacks_node_rpc_port")?.downcast::<JsNumber, _>(&mut cx) {
+
+        if let Ok(res) = devnet_settings
+            .get(&mut cx, "stacks_node_rpc_port")?
+            .downcast::<JsNumber, _>(&mut cx)
+        {
             overrides.stacks_node_rpc_port = Some(res.value(&mut cx) as u16);
         }
-                
-        if let Ok(res) = devnet_settings.get(&mut cx, "stacks_api_port")?.downcast::<JsNumber, _>(&mut cx) {
+
+        if let Ok(res) = devnet_settings
+            .get(&mut cx, "stacks_api_port")?
+            .downcast::<JsNumber, _>(&mut cx)
+        {
             overrides.stacks_api_port = Some(res.value(&mut cx) as u16);
         }
-        
-        if let Ok(res) = devnet_settings.get(&mut cx, "stacks_api_events_port")?.downcast::<JsNumber, _>(&mut cx) {
+
+        if let Ok(res) = devnet_settings
+            .get(&mut cx, "stacks_api_events_port")?
+            .downcast::<JsNumber, _>(&mut cx)
+        {
             overrides.stacks_api_events_port = Some(res.value(&mut cx) as u16);
         }
-        
-        if let Ok(res) = devnet_settings.get(&mut cx, "bitcoin_explorer_port")?.downcast::<JsNumber, _>(&mut cx) {
+
+        if let Ok(res) = devnet_settings
+            .get(&mut cx, "bitcoin_explorer_port")?
+            .downcast::<JsNumber, _>(&mut cx)
+        {
             overrides.bitcoin_explorer_port = Some(res.value(&mut cx) as u16);
         }
-        
-        if let Ok(res) = devnet_settings.get(&mut cx, "stacks_explorer_port")?.downcast::<JsNumber, _>(&mut cx) {
+
+        if let Ok(res) = devnet_settings
+            .get(&mut cx, "stacks_explorer_port")?
+            .downcast::<JsNumber, _>(&mut cx)
+        {
             overrides.stacks_explorer_port = Some(res.value(&mut cx) as u16);
         }
-        
-        if let Ok(res) = devnet_settings.get(&mut cx, "bitcoin_controller_port")?.downcast::<JsNumber, _>(&mut cx) {
+
+        if let Ok(res) = devnet_settings
+            .get(&mut cx, "bitcoin_controller_port")?
+            .downcast::<JsNumber, _>(&mut cx)
+        {
             overrides.bitcoin_controller_port = Some(res.value(&mut cx) as u16);
         }
-        
-        if let Ok(res) = devnet_settings.get(&mut cx, "bitcoin_node_username")?.downcast::<JsString, _>(&mut cx) {
+
+        if let Ok(res) = devnet_settings
+            .get(&mut cx, "bitcoin_node_username")?
+            .downcast::<JsString, _>(&mut cx)
+        {
             overrides.bitcoin_node_username = Some(res.value(&mut cx));
         }
-        
-        if let Ok(res) = devnet_settings.get(&mut cx, "bitcoin_node_password")?.downcast::<JsString, _>(&mut cx) {
+
+        if let Ok(res) = devnet_settings
+            .get(&mut cx, "bitcoin_node_password")?
+            .downcast::<JsString, _>(&mut cx)
+        {
             overrides.bitcoin_node_password = Some(res.value(&mut cx));
         }
-        
-        if let Ok(res) = devnet_settings.get(&mut cx, "miner_mnemonic")?.downcast::<JsString, _>(&mut cx) {
+
+        if let Ok(res) = devnet_settings
+            .get(&mut cx, "miner_mnemonic")?
+            .downcast::<JsString, _>(&mut cx)
+        {
             overrides.miner_mnemonic = Some(res.value(&mut cx));
         }
-        
-        if let Ok(res) = devnet_settings.get(&mut cx, "miner_derivation_path")?.downcast::<JsString, _>(&mut cx) {
+
+        if let Ok(res) = devnet_settings
+            .get(&mut cx, "miner_derivation_path")?
+            .downcast::<JsString, _>(&mut cx)
+        {
             overrides.miner_derivation_path = Some(res.value(&mut cx));
         }
-        
-        if let Ok(res) = devnet_settings.get(&mut cx, "bitcoin_controller_block_time")?.downcast::<JsNumber, _>(&mut cx) {
+
+        if let Ok(res) = devnet_settings
+            .get(&mut cx, "bitcoin_controller_block_time")?
+            .downcast::<JsNumber, _>(&mut cx)
+        {
             overrides.bitcoin_controller_block_time = Some(res.value(&mut cx) as u32);
         }
-        
-        if let Ok(res) = devnet_settings.get(&mut cx, "working_dir")?.downcast::<JsString, _>(&mut cx) {
+
+        if let Ok(res) = devnet_settings
+            .get(&mut cx, "working_dir")?
+            .downcast::<JsString, _>(&mut cx)
+        {
             overrides.working_dir = Some(res.value(&mut cx));
         }
-        
-        if let Ok(res) = devnet_settings.get(&mut cx, "postgres_port")?.downcast::<JsNumber, _>(&mut cx) {
+
+        if let Ok(res) = devnet_settings
+            .get(&mut cx, "postgres_port")?
+            .downcast::<JsNumber, _>(&mut cx)
+        {
             overrides.postgres_port = Some(res.value(&mut cx) as u16);
         }
-        
-        if let Ok(res) = devnet_settings.get(&mut cx, "postgres_username")?.downcast::<JsString, _>(&mut cx) {
+
+        if let Ok(res) = devnet_settings
+            .get(&mut cx, "postgres_username")?
+            .downcast::<JsString, _>(&mut cx)
+        {
             overrides.postgres_username = Some(res.value(&mut cx));
         }
-        
-        if let Ok(res) = devnet_settings.get(&mut cx, "postgres_password")?.downcast::<JsString, _>(&mut cx) {
+
+        if let Ok(res) = devnet_settings
+            .get(&mut cx, "postgres_password")?
+            .downcast::<JsString, _>(&mut cx)
+        {
             overrides.postgres_password = Some(res.value(&mut cx));
         }
-        
-        if let Ok(res) = devnet_settings.get(&mut cx, "postgres_database")?.downcast::<JsString, _>(&mut cx) {
+
+        if let Ok(res) = devnet_settings
+            .get(&mut cx, "postgres_database")?
+            .downcast::<JsString, _>(&mut cx)
+        {
             overrides.postgres_database = Some(res.value(&mut cx));
         }
-        
-        if let Ok(res) = devnet_settings.get(&mut cx, "bitcoin_node_image_url")?.downcast::<JsString, _>(&mut cx) {
+
+        if let Ok(res) = devnet_settings
+            .get(&mut cx, "bitcoin_node_image_url")?
+            .downcast::<JsString, _>(&mut cx)
+        {
             overrides.bitcoin_node_image_url = Some(res.value(&mut cx));
         }
-        
-        if let Ok(res) = devnet_settings.get(&mut cx, "bitcoin_explorer_image_url")?.downcast::<JsString, _>(&mut cx) {
+
+        if let Ok(res) = devnet_settings
+            .get(&mut cx, "bitcoin_explorer_image_url")?
+            .downcast::<JsString, _>(&mut cx)
+        {
             overrides.bitcoin_explorer_image_url = Some(res.value(&mut cx));
         }
-        
-        if let Ok(res) = devnet_settings.get(&mut cx, "stacks_node_image_url")?.downcast::<JsString, _>(&mut cx) {
+
+        if let Ok(res) = devnet_settings
+            .get(&mut cx, "stacks_node_image_url")?
+            .downcast::<JsString, _>(&mut cx)
+        {
             overrides.stacks_node_image_url = Some(res.value(&mut cx));
         }
-        
-        if let Ok(res) = devnet_settings.get(&mut cx, "stacks_api_image_url")?.downcast::<JsString, _>(&mut cx) {
+
+        if let Ok(res) = devnet_settings
+            .get(&mut cx, "stacks_api_image_url")?
+            .downcast::<JsString, _>(&mut cx)
+        {
             overrides.stacks_api_image_url = Some(res.value(&mut cx));
         }
-        
-        if let Ok(res) = devnet_settings.get(&mut cx, "stacks_explorer_image_url")?.downcast::<JsString, _>(&mut cx) {
+
+        if let Ok(res) = devnet_settings
+            .get(&mut cx, "stacks_explorer_image_url")?
+            .downcast::<JsString, _>(&mut cx)
+        {
             overrides.stacks_explorer_image_url = Some(res.value(&mut cx));
         }
-        
-        if let Ok(res) = devnet_settings.get(&mut cx, "postgres_image_url")?.downcast::<JsString, _>(&mut cx) {
+
+        if let Ok(res) = devnet_settings
+            .get(&mut cx, "postgres_image_url")?
+            .downcast::<JsString, _>(&mut cx)
+        {
             overrides.postgres_image_url = Some(res.value(&mut cx));
         }
-        
+
         // Disable scripts
         overrides.execute_script = Some(vec![]);
 
         // Disable bitcoin_explorer, stacks_explorer and stacks_api by default:
-        if let Ok(res) = devnet_settings.get(&mut cx, "disable_bitcoin_explorer")?.downcast::<JsBoolean, _>(&mut cx) {
+        if let Ok(res) = devnet_settings
+            .get(&mut cx, "disable_bitcoin_explorer")?
+            .downcast::<JsBoolean, _>(&mut cx)
+        {
             overrides.disable_bitcoin_explorer = Some(res.value(&mut cx));
         } else {
             overrides.disable_bitcoin_explorer = Some(true);
         }
-        
-        if let Ok(res) = devnet_settings.get(&mut cx, "disable_stacks_explorer")?.downcast::<JsBoolean, _>(&mut cx) {
+
+        if let Ok(res) = devnet_settings
+            .get(&mut cx, "disable_stacks_explorer")?
+            .downcast::<JsBoolean, _>(&mut cx)
+        {
             overrides.disable_stacks_explorer = Some(res.value(&mut cx));
         } else {
             overrides.disable_stacks_explorer = Some(true);
         }
 
-        if let Ok(res) = devnet_settings.get(&mut cx, "disable_stacks_api")?.downcast::<JsBoolean, _>(&mut cx) {
+        if let Ok(res) = devnet_settings
+            .get(&mut cx, "disable_stacks_api")?
+            .downcast::<JsBoolean, _>(&mut cx)
+        {
             overrides.disable_stacks_api = Some(res.value(&mut cx));
         } else {
             overrides.disable_stacks_api = Some(true);
         }
-        
+
         // Retrieve stacks_node_events_observers
-        if let Ok(res) = devnet_settings.get(&mut cx, "stacks_node_events_observers")?.downcast::<JsArray, _>(&mut cx) {
+        if let Ok(res) = devnet_settings
+            .get(&mut cx, "stacks_node_events_observers")?
+            .downcast::<JsArray, _>(&mut cx)
+        {
             let raw_events_observers = res.to_vec(&mut cx)?;
             let mut events_observers = vec![];
 
@@ -310,12 +427,16 @@ impl StacksDevnet {
         }
 
         // Retrieve stacking_orders
-        if let Ok(res) = devnet_settings.get(&mut cx, "pox_stacking_orders")?.downcast::<JsArray, _>(&mut cx) {
+        if let Ok(res) = devnet_settings
+            .get(&mut cx, "pox_stacking_orders")?
+            .downcast::<JsArray, _>(&mut cx)
+        {
             let raw_stacking_orders = res.to_vec(&mut cx)?;
             let mut stacking_orders = vec![];
 
             for raw_stacking_order in raw_stacking_orders.iter() {
-                let order_settings = raw_stacking_order.downcast_or_throw::<JsObject, _>(&mut cx)?;
+                let order_settings =
+                    raw_stacking_order.downcast_or_throw::<JsObject, _>(&mut cx)?;
 
                 let start_at_cycle = order_settings
                     .get(&mut cx, "start_at_cycle")?
@@ -341,7 +462,7 @@ impl StacksDevnet {
                     .get(&mut cx, "btc_address")?
                     .downcast_or_throw::<JsString, _>(&mut cx)?
                     .value(&mut cx);
-                
+
                 stacking_orders.push(PoxStackingOrder {
                     start_at_cycle,
                     duration,
@@ -354,8 +475,14 @@ impl StacksDevnet {
         }
 
         println!("{:?}", overrides);
-        
-        let devnet = StacksDevnet::new(&mut cx, manifest_path, logs_enabled, genesis_accounts, overrides);
+
+        let devnet = StacksDevnet::new(
+            &mut cx,
+            manifest_path,
+            logs_enabled,
+            genesis_accounts,
+            overrides,
+        );
         Ok(cx.boxed(devnet))
     }
 
@@ -392,17 +519,17 @@ impl StacksDevnet {
 
         let block = match devnet.stacks_block_rx.recv() {
             Ok(obj) => obj,
-            Err(err) => panic!()
+            Err(err) => panic!(),
         };
 
         let obj = cx.empty_object();
 
         let identifier = cx.string(block.block_hash.clone());
         obj.set(&mut cx, "identifier", identifier).unwrap();
-    
+
         let number = cx.number(block.block_height as u32);
         obj.set(&mut cx, "number", number).unwrap();
-    
+
         Ok(obj)
     }
 
@@ -417,8 +544,7 @@ impl StacksDevnet {
 
         while let Ok(block) = devnet.bitcoin_block_rx.recv() {
             println!("New bitcoin block");
-            let args: Vec<Handle<JsValue>> =
-                vec![cx.null().upcast(), cx.number(1 as f64).upcast()];
+            let args: Vec<Handle<JsValue>> = vec![cx.null().upcast(), cx.number(1 as f64).upcast()];
             let _res = callback.call(&mut cx, devnet, args)?;
             // let expected = cx.boolean(true);
             // if res.strict_equals(&mut cx, expected) {
@@ -501,8 +627,10 @@ fn get_manifest_path_or_exit(path: Option<String>) -> PathBuf {
     }
 }
 
-fn block_data_to_js_object<'a>(mut cx: FunctionContext<'a>, block: &BlockData) -> Handle<'a, JsObject> {
-
+fn block_data_to_js_object<'a>(
+    mut cx: FunctionContext<'a>,
+    block: &BlockData,
+) -> Handle<'a, JsObject> {
     let obj = cx.empty_object();
 
     let identifier = cx.string(block.block_hash.clone());

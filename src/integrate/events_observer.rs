@@ -294,7 +294,6 @@ pub fn handle_new_block(
     devnet_events_tx: &State<Arc<Mutex<Sender<DevnetEvent>>>>,
     new_block: Json<NewBlock>,
 ) -> Json<Value> {
-
     let devnet_events_tx = devnet_events_tx.inner();
     let config = config.inner();
 
