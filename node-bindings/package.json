@@ -1,7 +1,7 @@
 {
-  "name": "clarinet-js",
-  "version": "0.18.0",
-  "description": "Clarinet is a simple, modern and opinionated runtime for writing, testing and integrating Clarity Smart contracts.",
+  "name": "stacks-devnet-js",
+  "version": "0.18.3",
+  "description": "stacks-devnet-js is a library for writing end to end tests for protocols interacting with the Stacks blockchain and the Bitcoin blockchain.",
   "author": "Ludo Galabru",
   "license": "ISC",
   "main": "lib/index.js",
@@ -36,7 +36,7 @@
     "module_name": "index",
     "host": "https://github.com/hirosystems/clarinet/releases/download/",
     "remote_path": "v{version}",
-    "package_name": "clarinet-js-{platform}-{arch}.tar.gz",
+    "package_name": "stacks-devnet-js-{platform}-{arch}.tar.gz",
     "module_path": "./native",
     "pkg_path": "."
   }

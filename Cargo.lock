@@ -618,14 +618,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "clarinet-js"
-version = "0.1.0"
-dependencies = [
- "clarinet",
- "neon",
-]
-
-[[package]]
 name = "clarity-repl"
 version = "0.16.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4094,6 +4086,14 @@ dependencies = [
  "libc",
  "psm",
  "winapi 0.3.9",
+]
+
+[[package]]
+name = "stacks-devnet-js"
+version = "0.1.0"
+dependencies = [
+ "clarinet",
+ "neon",
 ]
 
 [[package]]
