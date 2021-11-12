@@ -12,7 +12,7 @@ use crate::integrate::{self, DevnetOrchestrator};
 use crate::poke::load_session;
 use crate::publish::{publish_all_contracts, Network};
 use crate::runnner::run_scripts;
-use crate::types::{MainConfig, MainConfigFile, RequirementConfig};
+use crate::types::{ProjectManifest, ProjectManifestFile, RequirementConfig};
 use clarity_repl::repl;
 
 use clap::Clap;
@@ -470,12 +470,12 @@ fn execute_changes(changes: Vec<Changes>) {
                     None => {
                         path = options.manifest_path.clone();
                         let file = File::open(path.clone()).unwrap();
-                        let mut config_file_reader = BufReader::new(file);
-                        let mut config_file = vec![];
-                        config_file_reader.read_to_end(&mut config_file).unwrap();
-                        let config_file: MainConfigFile =
-                            toml::from_slice(&config_file[..]).unwrap();
-                        MainConfig::from_config_file(config_file)
+                        let mut project_manifest_file_reader = BufReader::new(file);
+                        let mut project_manifest_file = vec![];
+                        project_manifest_file_reader.read_to_end(&mut project_manifest_file).unwrap();
+                        let project_manifest_file: ProjectManifestFile =
+                            toml::from_slice(&project_manifest_file[..]).unwrap();
+                        ProjectManifest::from_project_manifest_file(project_manifest_file)
                     }
                 };
 

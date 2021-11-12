@@ -7,7 +7,7 @@ use std::process;
 use toml::value::Value;
 
 #[derive(Serialize, Deserialize, Debug)]
-pub struct MainConfigFile {
+pub struct ProjectManifestFile {
     project: ProjectConfigFile,
     contracts: Option<Value>,
 }
@@ -20,7 +20,7 @@ pub struct ProjectConfigFile {
 }
 
 #[derive(Serialize, Deserialize, Debug)]
-pub struct MainConfig {
+pub struct ProjectManifest {
     pub project: ProjectConfig,
     #[serde(serialize_with = "toml::ser::tables_last")]
     pub contracts: BTreeMap<String, ContractConfig>,
@@ -50,8 +50,8 @@ pub struct NotebookConfig {
     pub path: String,
 }
 
-impl MainConfig {
-    pub fn from_path(path: &PathBuf) -> MainConfig {
+impl ProjectManifest {
+    pub fn from_path(path: &PathBuf) -> ProjectManifest {
         let path = match File::open(path) {
             Ok(path) => path,
             Err(_e) => {
@@ -59,13 +59,13 @@ impl MainConfig {
                 std::process::exit(1);
             }
         };
-        let mut config_file_reader = BufReader::new(path);
-        let mut config_file_buffer = vec![];
-        config_file_reader
-            .read_to_end(&mut config_file_buffer)
+        let mut project_manifest_file_reader = BufReader::new(path);
+        let mut project_manifest_file_buffer = vec![];
+        project_manifest_file_reader
+            .read_to_end(&mut project_manifest_file_buffer)
             .unwrap();
-        let config_file: MainConfigFile = toml::from_slice(&config_file_buffer[..]).unwrap();
-        MainConfig::from_config_file(config_file)
+        let project_manifest_file: ProjectManifestFile = toml::from_slice(&project_manifest_file_buffer[..]).unwrap();
+        ProjectManifest::from_project_manifest_file(project_manifest_file)
     }
 
     pub fn ordered_contracts(&self) -> Vec<(String, ContractConfig)> {
@@ -124,21 +124,21 @@ impl MainConfig {
         dst
     }
 
-    pub fn from_config_file(config_file: MainConfigFile) -> MainConfig {
+    pub fn from_project_manifest_file(project_manifest_file: ProjectManifestFile) -> ProjectManifest {
         let project = ProjectConfig {
-            name: config_file.project.name.clone(),
+            name: project_manifest_file.project.name.clone(),
             requirements: None,
-            costs_version: config_file.project.costs_version.unwrap_or(1),
+            costs_version: project_manifest_file.project.costs_version.unwrap_or(1),
         };
 
-        let mut config = MainConfig {
+        let mut config = ProjectManifest {
             project,
             contracts: BTreeMap::new(),
         };
         let mut config_contracts = BTreeMap::new();
         let mut config_requirements: Vec<RequirementConfig> = Vec::new();
 
-        match config_file.project.requirements {
+        match project_manifest_file.project.requirements {
             Some(Value::Array(requirements)) => {
                 for link_settings in requirements.iter() {
                     match link_settings {
@@ -156,7 +156,7 @@ impl MainConfig {
             _ => {}
         };
 
-        match config_file.contracts {
+        match project_manifest_file.contracts {
             Some(Value::Table(contracts)) => {
                 for (contract_name, contract_settings) in contracts.iter() {
                     match contract_settings {

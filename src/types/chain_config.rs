@@ -173,26 +173,26 @@ impl ChainConfig {
                 panic!(error)
             }
         };
-        let mut config_file_reader = BufReader::new(path);
-        let mut config_file_buffer = vec![];
-        config_file_reader
-            .read_to_end(&mut config_file_buffer)
+        let mut chain_config_file_reader = BufReader::new(path);
+        let mut chain_config_file_buffer = vec![];
+        chain_config_file_reader
+            .read_to_end(&mut chain_config_file_buffer)
             .unwrap();
-        let mut config_file: ChainConfigFile = toml::from_slice(&config_file_buffer[..]).unwrap();
-        ChainConfig::from_config_file(&mut config_file)
+        let mut chain_config_file: ChainConfigFile = toml::from_slice(&chain_config_file_buffer[..]).unwrap();
+        ChainConfig::from_chain_config_file(&mut chain_config_file)
     }
 
-    pub fn from_config_file(config_file: &mut ChainConfigFile) -> ChainConfig {
+    pub fn from_chain_config_file(chain_config_file: &mut ChainConfigFile) -> ChainConfig {
         let network = NetworkConfig {
-            name: config_file.network.name.clone(),
-            node_rpc_address: config_file.network.node_rpc_address.clone(),
-            deployment_fee_rate: config_file.network.deployment_fee_rate.unwrap_or(10),
+            name: chain_config_file.network.name.clone(),
+            node_rpc_address: chain_config_file.network.node_rpc_address.clone(),
+            deployment_fee_rate: chain_config_file.network.deployment_fee_rate.unwrap_or(10),
         };
 
         let mut accounts = BTreeMap::new();
         let is_mainnet = network.name == "mainnet".to_string();
 
-        match &config_file.accounts {
+        match &chain_config_file.accounts {
             Some(Value::Table(entries)) => {
                 for (account_name, account_settings) in entries.iter() {
                     match account_settings {
@@ -248,8 +248,8 @@ impl ChainConfig {
             _ => {}
         };
 
-        let devnet = if config_file.network.name == "devnet" {
-            let mut devnet_config = match config_file.devnet.take() {
+        let devnet = if chain_config_file.network.name == "devnet" {
+            let mut devnet_config = match chain_config_file.devnet.take() {
                 Some(conf) => conf,
                 _ => DevnetConfigFile::default(),
             };
