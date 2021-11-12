@@ -84,7 +84,7 @@ impl EventObserverConfig {
         accounts: BTreeMap<String, AccountConfig>,
     ) -> Self {
         info!("Checking contracts...");
-        let session = match load_session(manifest_path.clone(), false, Network::Devnet) {
+        let session = match load_session(manifest_path.clone(), false, &Network::Devnet) {
             Ok((session, _)) => session,
             Err(e) => {
                 println!("{}", e);
@@ -213,7 +213,7 @@ pub async fn start_events_observer(
                     .send(DevnetEvent::info("Reloading contracts".into()))
                     .expect("Unable to terminate event observer");
 
-                let session = match load_session(manifest_path.clone(), false, Network::Devnet) {
+                let session = match load_session(manifest_path.clone(), false, &Network::Devnet) {
                     Ok((session, _)) => session,
                     Err(e) => {
                         devnet_event_tx
@@ -374,6 +374,7 @@ pub fn handle_new_block(
                         &mut deployers_nonces,
                         &node_clone,
                         1,
+                        &Network::Devnet,
                     ) {
                         Ok((_txid, _nonce)) => {
                             // let _ = tx_clone.send(DevnetEvent::success(format!(

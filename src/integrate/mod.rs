@@ -14,11 +14,6 @@ pub use orchestrator::DevnetOrchestrator;
 
 use self::events_observer::EventObserverConfig;
 
-pub enum NodeObserverEvent {
-    NewStacksBlock,
-    NewBitcoinBlock,
-}
-
 pub fn run_devnet(
     devnet: DevnetOrchestrator,
     log_tx: Option<Sender<LogData>>,

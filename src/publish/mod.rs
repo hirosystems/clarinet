@@ -46,6 +46,7 @@ pub fn publish_contract(
     deployers_nonces: &mut BTreeMap<String, u64>,
     node: &str,
     deployment_fee_rate: u64,
+    network: &Network,
 ) -> Result<(String, u64), String> {
     let contract_name = contract.name.clone().unwrap();
 
@@ -112,8 +113,14 @@ pub fn publish_contract(
 
     let auth = TransactionAuth::Standard(spending_condition);
     let unsigned_tx = StacksTransaction {
-        version: TransactionVersion::Testnet,
-        chain_id: 0x80000000, // MAINNET=0x00000001 TODO(ludo): mainnet handling
+        version: match network {
+            Network::Mainnet => TransactionVersion::Mainnet,
+            _ => TransactionVersion::Testnet,
+        },
+        chain_id: match network {
+            Network::Mainnet => 0x00000001,
+            _ => 0x80000000,
+        },
         auth: auth,
         anchor_mode: anchor_mode,
         post_condition_mode: TransactionPostConditionMode::Deny,
@@ -153,7 +160,7 @@ pub fn publish_all_contracts(
     network: Network,
 ) -> Result<Vec<String>, Vec<String>> {
     let start_repl = false;
-    let (session, chain) = match load_session(manifest_path, start_repl, network) {
+    let (session, chain) = match load_session(manifest_path, start_repl, &network) {
         Ok((session, chain)) => (session, chain),
         Err(e) => return Err(vec![e]),
     };
@@ -174,6 +181,7 @@ pub fn publish_all_contracts(
             &mut deployers_nonces,
             &settings.node,
             chain.network.deployment_fee_rate,
+            &network
         ) {
             Ok((txid, nonce)) => {
                 results.push(format!(

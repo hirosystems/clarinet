@@ -308,7 +308,7 @@ pub fn main() {
         Command::Poke(cmd) | Command::Console(cmd) => {
             let manifest_path = get_manifest_path_or_exit(cmd.manifest_path);
             let start_repl = true;
-            load_session(manifest_path, start_repl, Network::Devnet).expect("Unable to start REPL");
+            load_session(manifest_path, start_repl, &Network::Devnet).expect("Unable to start REPL");
             if hints_enabled {
                 display_post_poke_hint();
             }
@@ -316,7 +316,7 @@ pub fn main() {
         Command::Check(cmd) => {
             let manifest_path = get_manifest_path_or_exit(cmd.manifest_path);
             let start_repl = false;
-            match load_session(manifest_path, start_repl, Network::Devnet) {
+            match load_session(manifest_path, start_repl, &Network::Devnet) {
                 Err(e) => {
                     println!("{}", e);
                 }
@@ -335,7 +335,7 @@ pub fn main() {
         Command::Test(cmd) => {
             let manifest_path = get_manifest_path_or_exit(cmd.manifest_path);
             let start_repl = false;
-            let res = load_session(manifest_path.clone(), start_repl, Network::Devnet);
+            let res = load_session(manifest_path.clone(), start_repl, &Network::Devnet);
             let session = match res {
                 Ok((session, _)) => session,
                 Err(e) => {
@@ -360,7 +360,7 @@ pub fn main() {
         Command::Run(cmd) => {
             let manifest_path = get_manifest_path_or_exit(cmd.manifest_path);
             let start_repl = false;
-            let res = load_session(manifest_path.clone(), start_repl, Network::Devnet);
+            let res = load_session(manifest_path.clone(), start_repl, &Network::Devnet);
             let session = match res {
                 Ok((session, _)) => session,
                 Err(e) => {
@@ -387,11 +387,7 @@ pub fn main() {
             } else if deploy.testnet == true {
                 Network::Testnet
             } else if deploy.mainnet == true {
-                // Network::Mainnet
-                // TODO(ludo): before supporting mainnet deployments, we want to add a pass
-                // making sure that addresses are consistent + handle other hard coded flags.
-                // Search for "mainnet handling".
-                panic!("Target deployment must be specified with --devnet, --testnet or --mainnet")
+                Network::Mainnet
             } else {
                 panic!("Target deployment must be specified with --devnet, --testnet or --mainnet")
             };
@@ -403,7 +399,7 @@ pub fn main() {
         Command::Integrate(cmd) => {
             let manifest_path = get_manifest_path_or_exit(cmd.manifest_path);
             let devnet = DevnetOrchestrator::new(manifest_path, None);
-            integrate::run_devnet(devnet, None, !cmd.no_dashboard);
+            let _ = integrate::run_devnet(devnet, None, !cmd.no_dashboard);
             if hints_enabled {
                 display_deploy_hint();
             }

@@ -7,7 +7,7 @@ use std::path::PathBuf;
 pub fn load_session(
     manifest_path: PathBuf,
     start_repl: bool,
-    env: Network,
+    env: &Network,
 ) -> Result<(repl::Session, ChainConfig), String> {
     let mut settings = repl::SessionSettings::default();
 
