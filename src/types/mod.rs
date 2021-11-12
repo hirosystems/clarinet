@@ -10,4 +10,8 @@ pub use project_manifest::{
     ContractConfig, ProjectManifest, ProjectManifestFile, RequirementConfig,
 };
 
-pub use data::{Block, BlockIdentifier};
+pub use data::{
+    BitcoinBlockData, BitcoinBlockMetadata, BitcoinTransactionData, BitcoinTransactionMetadata,
+    BlockIdentifier, StacksBlockData, StacksBlockMetadata, StacksTransactionData,
+    StacksTransactionMetadata, TransactionIdentifier,
+};

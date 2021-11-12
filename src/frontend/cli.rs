@@ -308,7 +308,8 @@ pub fn main() {
         Command::Poke(cmd) | Command::Console(cmd) => {
             let manifest_path = get_manifest_path_or_exit(cmd.manifest_path);
             let start_repl = true;
-            load_session(manifest_path, start_repl, &Network::Devnet).expect("Unable to start REPL");
+            load_session(manifest_path, start_repl, &Network::Devnet)
+                .expect("Unable to start REPL");
             if hints_enabled {
                 display_post_poke_hint();
             }

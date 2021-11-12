@@ -181,7 +181,7 @@ pub fn publish_all_contracts(
             &mut deployers_nonces,
             &settings.node,
             chain.network.deployment_fee_rate,
-            &network
+            &network,
         ) {
             Ok((txid, nonce)) => {
                 results.push(format!(

@@ -1,8 +1,13 @@
 use super::DevnetEvent;
-use crate::integrate::{BlockData, MempoolAdmissionData, ServiceStatusData, Status, Transaction};
+use crate::integrate::{MempoolAdmissionData, ServiceStatusData, Status};
 use crate::poke::load_session;
 use crate::publish::{publish_contract, Network};
 use crate::types::{self, AccountConfig, DevnetConfig};
+use crate::types::{
+    BitcoinBlockData, BitcoinBlockMetadata, BitcoinTransactionData, BitcoinTransactionMetadata,
+    BlockIdentifier, StacksBlockData, StacksBlockMetadata, StacksTransactionData,
+    StacksTransactionMetadata, TransactionIdentifier,
+};
 use crate::utils;
 use crate::utils::stacks::{transactions, StacksRpc};
 use base58::FromBase58;
@@ -48,6 +53,9 @@ pub struct NewBlock {
     block_hash: String,
     burn_block_height: u64,
     burn_block_hash: String,
+    parent_block_hash: String,
+    index_block_hash: String,
+    parent_index_block_hash: String,
     transactions: Vec<NewTransaction>,
     // reward_slot_holders: Vec<String>,
     // burn_amount: u32,
@@ -268,14 +276,17 @@ pub fn handle_new_burn_block(
                     new_burn_block.burn_block_height
                 ),
             }));
-            let _ = tx.send(DevnetEvent::BitcoinBlock(BlockData {
-                block_height: new_burn_block.burn_block_height,
-                block_hash: new_burn_block.burn_block_hash.clone(),
-                bitcoin_block_height: new_burn_block.burn_block_height,
-                bitcoin_block_hash: new_burn_block.burn_block_hash.clone(),
-                first_burnchain_block_height: 0,
-                pox_cycle_length: 0,
-                pox_cycle_id: 0,
+            let _ = tx.send(DevnetEvent::BitcoinBlock(BitcoinBlockData {
+                block_identifier: BlockIdentifier {
+                    hash: new_burn_block.burn_block_hash.clone(),
+                    index: new_burn_block.burn_block_height,
+                },
+                parent_block_identifier: BlockIdentifier {
+                    hash: "".into(), // todo(ludo): open a PR on stacks-blockchain to get this field.
+                    index: new_burn_block.burn_block_height - 1,
+                },
+                timestamp: 0, // todo(ludo): open a PR on stacks-blockchain to get this field.
+                metadata: BitcoinBlockMetadata {},
                 transactions: vec![],
             }));
         }
@@ -423,25 +434,44 @@ pub fn handle_new_block(
         .iter()
         .map(|t| {
             let description = get_tx_description(&t.raw_tx);
-            Transaction {
-                txid: t.txid.clone(),
-                success: t.status == "success",
-                result: get_value_description(&t.raw_result),
-                events: vec![],
-                description,
+            StacksTransactionData {
+                transaction_identifier: TransactionIdentifier {
+                    hash: t.txid.clone(),
+                },
+                operations: vec![],
+                metadata: StacksTransactionMetadata {
+                    success: t.status == "success",
+                    result: get_value_description(&t.raw_result),
+                    events: vec![],
+                    description,
+                },
             }
         })
         .collect();
 
     if let Ok(tx) = devnet_events_tx.lock() {
-        let _ = tx.send(DevnetEvent::StacksBlock(BlockData {
-            block_height: new_block.block_height,
-            block_hash: new_block.block_hash.clone(),
-            bitcoin_block_height: new_block.burn_block_height,
-            bitcoin_block_hash: new_block.burn_block_hash.clone(),
-            first_burnchain_block_height: first_burnchain_block_height,
-            pox_cycle_length: pox_cycle_length.try_into().unwrap(),
-            pox_cycle_id,
+        let _ = tx.send(DevnetEvent::StacksBlock(StacksBlockData {
+            block_identifier: BlockIdentifier {
+                hash: new_block.index_block_hash.clone(),
+                index: new_block.block_height,
+            },
+            parent_block_identifier: BlockIdentifier {
+                hash: new_block.parent_index_block_hash.clone(),
+                index: new_block.block_height,
+            },
+            timestamp: 0,
+            metadata: StacksBlockMetadata {
+                bitcoin_anchor_block_identifier: BlockIdentifier {
+                    hash: new_block.burn_block_hash.clone(),
+                    index: new_block.burn_block_height,
+                },
+                bitcoin_genesis_block_identifier: BlockIdentifier {
+                    hash: "".into(),
+                    index: first_burnchain_block_height,
+                },
+                pox_cycle_index: pox_cycle_id,
+                pox_cycle_length: pox_cycle_length.try_into().unwrap(),
+            },
             transactions,
         }));
     }
@@ -559,12 +589,16 @@ pub fn handle_new_microblocks(
     //     .iter()
     //     .map(|t| {
     //         let description = get_tx_description(&t.raw_tx);
-    //         Transaction {
-    //             txid: t.txid.clone(),
-    //             success: t.status == "success",
-    //             result: get_value_description(&t.raw_result),
-    //             events: vec![],
-    //             description,
+    //         StacksTransactionData {
+    //             transaction_identifier: TransactionIdentifier {
+    //                 hash: t.txid.clone(),
+    //             },
+    //             metadata: {
+    //                 success: t.status == "success",
+    //                 result: get_value_description(&t.raw_result),
+    //                 events: vec![],
+    //                 description,
+    //             }
     //         }
     //     })
     //     .collect();

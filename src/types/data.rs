@@ -8,26 +8,52 @@ pub struct BlockIdentifier {
     pub hash: String,
 }
 
-/// Block contain an array of Transactions that occurred at a particular
+/// StacksBlock contain an array of Transactions that occurred at a particular
 /// BlockIdentifier. A hard requirement for blocks returned by Rosetta
 /// implementations is that they MUST be _inalterable_: once a client has
 /// requested and received a block identified by a specific BlockIndentifier,
 /// all future calls for that same BlockIdentifier must return the same block
 /// contents.
 #[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
-pub struct Block {
+pub struct StacksBlockData {
     pub block_identifier: BlockIdentifier,
     pub parent_block_identifier: BlockIdentifier,
     /// The timestamp of the block in milliseconds since the Unix Epoch. The
     /// timestamp is stored in milliseconds because some blockchains produce
     /// blocks more often than once a second.
     pub timestamp: i64,
-    pub transactions: Vec<Transaction>,
-    /* Rosetta Spec also optionally provides:
-     *
-     * #[serde(skip_serializing_if = "Option::is_none")]
-     * pub metadata: Option<serde_json::Value>, */
+    pub transactions: Vec<StacksTransactionData>,
+    pub metadata: StacksBlockMetadata,
 }
+
+#[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
+pub struct StacksBlockMetadata {
+    pub bitcoin_anchor_block_identifier: BlockIdentifier,
+    pub bitcoin_genesis_block_identifier: BlockIdentifier,
+    pub pox_cycle_index: u32,
+    pub pox_cycle_length: u32,
+}
+
+/// BitcoinBlock contain an array of Transactions that occurred at a particular
+/// BlockIdentifier. A hard requirement for blocks returned by Rosetta
+/// implementations is that they MUST be _inalterable_: once a client has
+/// requested and received a block identified by a specific BlockIndentifier,
+/// all future calls for that same BlockIdentifier must return the same block
+/// contents.
+#[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
+pub struct BitcoinBlockData {
+    pub block_identifier: BlockIdentifier,
+    pub parent_block_identifier: BlockIdentifier,
+    /// The timestamp of the block in milliseconds since the Unix Epoch. The
+    /// timestamp is stored in milliseconds because some blockchains produce
+    /// blocks more often than once a second.
+    pub timestamp: i64,
+    pub transactions: Vec<BitcoinTransactionData>,
+    pub metadata: BitcoinBlockMetadata,
+}
+
+#[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
+pub struct BitcoinBlockMetadata {}
 
 /// The timestamp of the block in milliseconds since the Unix Epoch. The
 /// timestamp is stored in milliseconds because some blockchains produce blocks
@@ -38,29 +64,37 @@ pub struct Timestamp(i64);
 /// Transactions contain an array of Operations that are attributable to the
 /// same TransactionIdentifier.
 #[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
-pub struct Transaction {
+pub struct StacksTransactionData {
     pub transaction_identifier: TransactionIdentifier,
     pub operations: Vec<Operation>,
     /// Transactions that are related to other transactions should include the
     /// transaction_identifier of these transactions in the metadata.
-    pub metadata: TransactionMetadata,
-}
-
-#[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
-#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
-pub enum TransactionType {
-    Block,
-    Transaction,
-    ActionReceipt,
-    DataReceipt,
+    pub metadata: StacksTransactionMetadata,
 }
 
 /// Extra data for Transaction
 #[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
-pub struct TransactionMetadata {
-    #[serde(rename = "type")]
-    pub type_: TransactionType,
+pub struct StacksTransactionMetadata {
+    pub success: bool,
+    pub result: String,
+    pub events: Vec<String>,
+    pub description: String,
 }
+
+/// Transactions contain an array of Operations that are attributable to the
+/// same TransactionIdentifier.
+#[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
+pub struct BitcoinTransactionData {
+    pub transaction_identifier: TransactionIdentifier,
+    pub operations: Vec<Operation>,
+    /// Transactions that are related to other transactions should include the
+    /// transaction_identifier of these transactions in the metadata.
+    pub metadata: BitcoinTransactionMetadata,
+}
+
+/// Extra data for Transaction
+#[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
+pub struct BitcoinTransactionMetadata {}
 
 /// The transaction_identifier uniquely identifies a transaction in a particular
 /// network and block or in the mempool.

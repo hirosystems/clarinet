@@ -1,7 +1,13 @@
+#[macro_use]
+extern crate error_chain;
+
+mod serde;
+
 use clarinet_lib::bip39::{Language, Mnemonic};
-use clarinet_lib::integrate::{self, BlockData, DevnetEvent, DevnetOrchestrator};
+use clarinet_lib::integrate::{self, DevnetEvent, DevnetOrchestrator};
 use clarinet_lib::types::{
-    compute_addresses, AccountConfig, DevnetConfigFile, PoxStackingOrder, DEFAULT_DERIVATION_PATH,
+    compute_addresses, AccountConfig, BitcoinBlockData, DevnetConfigFile, PoxStackingOrder,
+    StacksBlockData, DEFAULT_DERIVATION_PATH,
 };
 use core::panic;
 use neon::prelude::*;
@@ -15,8 +21,8 @@ type DevnetCallback = Box<dyn FnOnce(&Channel) + Send>;
 
 struct StacksDevnet {
     tx: mpsc::Sender<DevnetCommand>,
-    bitcoin_block_rx: mpsc::Receiver<BlockData>,
-    stacks_block_rx: mpsc::Receiver<BlockData>,
+    bitcoin_block_rx: mpsc::Receiver<BitcoinBlockData>,
+    stacks_block_rx: mpsc::Receiver<StacksBlockData>,
 }
 
 enum DevnetCommand {
@@ -508,11 +514,7 @@ impl StacksDevnet {
         Ok(cx.undefined())
     }
 
-    fn js_on_stacks_block(mut cx: FunctionContext) -> JsResult<JsObject> {
-        // Get the first argument as a `JsFunction`
-        // let callback = cx.argument::<JsFunction>(0)?.root(&mut cx);
-        // let callback = callback.into_inner(&mut cx);
-
+    fn js_on_stacks_block(mut cx: FunctionContext) -> JsResult<JsValue> {
         let devnet = cx
             .this()
             .downcast_or_throw::<JsBox<StacksDevnet>, _>(&mut cx)?;
@@ -522,66 +524,25 @@ impl StacksDevnet {
             Err(err) => panic!(),
         };
 
-        let obj = cx.empty_object();
+        let js_block = serde::to_value(&mut cx, &block).expect("Unable to serialize block");
 
-        let identifier = cx.string(block.block_hash.clone());
-        obj.set(&mut cx, "identifier", identifier).unwrap();
-
-        let number = cx.number(block.block_height as u32);
-        obj.set(&mut cx, "number", number).unwrap();
-
-        Ok(obj)
+        Ok(js_block)
     }
 
-    fn js_on_bitcoin_block(mut cx: FunctionContext) -> JsResult<JsUndefined> {
-        // Get the first argument as a `JsFunction`
-        let callback = cx.argument::<JsFunction>(0)?.root(&mut cx);
-        let callback = callback.into_inner(&mut cx);
-
+    fn js_on_bitcoin_block(mut cx: FunctionContext) -> JsResult<JsValue> {
         let devnet = cx
             .this()
             .downcast_or_throw::<JsBox<StacksDevnet>, _>(&mut cx)?;
 
-        while let Ok(block) = devnet.bitcoin_block_rx.recv() {
-            println!("New bitcoin block");
-            let args: Vec<Handle<JsValue>> = vec![cx.null().upcast(), cx.number(1 as f64).upcast()];
-            let _res = callback.call(&mut cx, devnet, args)?;
-            // let expected = cx.boolean(true);
-            // if res.strict_equals(&mut cx, expected) {
-            //     break;
-            // }
-            break;
-        }
+        let block = match devnet.bitcoin_block_rx.recv() {
+            Ok(obj) => obj,
+            Err(err) => panic!(),
+        };
 
-        Ok(cx.undefined())
+        let js_block = serde::to_value(&mut cx, &block).expect("Unable to serialize block");
+
+        Ok(js_block)
     }
-
-    // fn js_on_log(mut cx: FunctionContext) -> JsResult<JsUndefined> {
-    //     let callback = cx.argument::<JsFunction>(0)?.root(&mut cx);
-    //     let callback = callback.into_inner(&mut cx);
-
-    //     let devnet = cx
-    //         .this()
-    //         .downcast_or_throw::<JsBox<StacksDevnet>, _>(&mut cx)?;
-
-    //     thread::spawn(|| {
-    //         while let Ok(ref message) = devnet.log_rx.recv() {
-    //             // match message {
-    //             //     DevnetCommand::Stop(callback) => {
-    //             //         // The connection and channel are owned by the thread, but _lent_ to
-    //             //         // the callback. The callback has exclusive access to the connection
-    //             //         // for the duration of the callback.
-    //             //         if let Some(c) = callback {
-    //             //             c(&channel);
-    //             //         }
-    //             //         break;
-    //             //     }
-    //             //     DevnetCommand::Start(_) => break,
-    //             // }
-    //         }
-    //     });
-    //     Ok(cx.undefined())
-    // }
 }
 
 #[neon::main]
@@ -625,19 +586,4 @@ fn get_manifest_path_or_exit(path: Option<String>) -> PathBuf {
             }
         }
     }
-}
-
-fn block_data_to_js_object<'a>(
-    mut cx: FunctionContext<'a>,
-    block: &BlockData,
-) -> Handle<'a, JsObject> {
-    let obj = cx.empty_object();
-
-    let identifier = cx.string(block.block_hash.clone());
-    obj.set(&mut cx, "identifier", identifier);
-
-    let number = cx.number(block.block_height as u32);
-    obj.set(&mut cx, "number", number);
-
-    return obj;
 }

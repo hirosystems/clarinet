@@ -8,6 +8,7 @@ use chrono::prelude::*;
 use tracing::{self, debug, error, info, warn};
 use tracing_appender;
 
+use crate::types::{BitcoinBlockData, StacksBlockData};
 use crate::utils;
 use events_observer::start_events_observer;
 pub use orchestrator::DevnetOrchestrator;
@@ -161,8 +162,8 @@ pub enum DevnetEvent {
     KeyEvent(crossterm::event::KeyEvent),
     Tick,
     ServiceStatus(ServiceStatusData),
-    StacksBlock(BlockData),
-    BitcoinBlock(BlockData),
+    StacksBlock(StacksBlockData),
+    BitcoinBlock(BitcoinBlockData),
     MempoolAdmission(MempoolAdmissionData),
     // Restart,
     // Terminate,
@@ -252,27 +253,6 @@ pub struct ServiceStatusData {
     pub status: Status,
     pub name: String,
     pub comment: String,
-}
-
-#[derive(Clone, Debug)]
-pub struct Transaction {
-    pub txid: String,
-    pub success: bool,
-    pub result: String,
-    pub events: Vec<String>,
-    pub description: String,
-}
-
-#[derive(Clone, Debug)]
-pub struct BlockData {
-    pub block_height: u64,
-    pub block_hash: String,
-    pub bitcoin_block_height: u64,
-    pub bitcoin_block_hash: String,
-    pub first_burnchain_block_height: u64,
-    pub pox_cycle_length: u32,
-    pub pox_cycle_id: u32,
-    pub transactions: Vec<Transaction>,
 }
 
 // pub struct MicroblockData {
