@@ -178,7 +178,8 @@ impl ChainConfig {
         chain_config_file_reader
             .read_to_end(&mut chain_config_file_buffer)
             .unwrap();
-        let mut chain_config_file: ChainConfigFile = toml::from_slice(&chain_config_file_buffer[..]).unwrap();
+        let mut chain_config_file: ChainConfigFile =
+            toml::from_slice(&chain_config_file_buffer[..]).unwrap();
         ChainConfig::from_chain_config_file(&mut chain_config_file)
     }
 

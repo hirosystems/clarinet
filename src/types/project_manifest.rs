@@ -64,7 +64,8 @@ impl ProjectManifest {
         project_manifest_file_reader
             .read_to_end(&mut project_manifest_file_buffer)
             .unwrap();
-        let project_manifest_file: ProjectManifestFile = toml::from_slice(&project_manifest_file_buffer[..]).unwrap();
+        let project_manifest_file: ProjectManifestFile =
+            toml::from_slice(&project_manifest_file_buffer[..]).unwrap();
         ProjectManifest::from_project_manifest_file(project_manifest_file)
     }
 
@@ -124,7 +125,9 @@ impl ProjectManifest {
         dst
     }
 
-    pub fn from_project_manifest_file(project_manifest_file: ProjectManifestFile) -> ProjectManifest {
+    pub fn from_project_manifest_file(
+        project_manifest_file: ProjectManifestFile,
+    ) -> ProjectManifest {
         let project = ProjectConfig {
             name: project_manifest_file.project.name.clone(),
             requirements: None,

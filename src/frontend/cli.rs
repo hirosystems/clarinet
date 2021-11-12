@@ -472,7 +472,9 @@ fn execute_changes(changes: Vec<Changes>) {
                         let file = File::open(path.clone()).unwrap();
                         let mut project_manifest_file_reader = BufReader::new(file);
                         let mut project_manifest_file = vec![];
-                        project_manifest_file_reader.read_to_end(&mut project_manifest_file).unwrap();
+                        project_manifest_file_reader
+                            .read_to_end(&mut project_manifest_file)
+                            .unwrap();
                         let project_manifest_file: ProjectManifestFile =
                             toml::from_slice(&project_manifest_file[..]).unwrap();
                         ProjectManifest::from_project_manifest_file(project_manifest_file)

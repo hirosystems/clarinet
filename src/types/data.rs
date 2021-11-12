@@ -41,7 +41,7 @@ pub struct Timestamp(i64);
 pub struct Transaction {
     pub transaction_identifier: TransactionIdentifier,
     pub operations: Vec<Operation>,
-    /// Transactions that are related to other transactions should include the 
+    /// Transactions that are related to other transactions should include the
     /// transaction_identifier of these transactions in the metadata.
     pub metadata: TransactionMetadata,
 }
@@ -72,15 +72,7 @@ pub struct TransactionIdentifier {
 }
 
 #[derive(
-    Debug,
-    Clone,
-    Copy,
-    PartialEq,
-    Eq,
-    Serialize,
-    Deserialize,
-    strum::EnumIter,
-    strum::IntoStaticStr,
+    Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, strum::EnumIter, strum::IntoStaticStr,
 )]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub enum OperationType {
@@ -198,15 +190,7 @@ pub struct OperationIdentifier {
     pub network_index: Option<i64>,
 }
 
-#[derive(
-    Debug,
-    Clone,
-    Copy,
-    PartialEq,
-    serde::Serialize,
-    serde::Deserialize,
-    strum::EnumIter,
-)]
+#[derive(Debug, Clone, Copy, PartialEq, serde::Serialize, serde::Deserialize, strum::EnumIter)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub enum OperationStatusKind {
     Success,
@@ -249,7 +233,6 @@ pub struct SubAccountIdentifier {
      * #[serde(skip_serializing_if = "Option::is_none")]
      * pub metadata: Option<serde_json::Value>, */
 }
-
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
