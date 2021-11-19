@@ -58,7 +58,6 @@ impl StacksDevnet {
         let node_url = devnet.get_stacks_node_url();
 
         thread::spawn(move || {
-
             if let Ok(DevnetCommand::Start(callback)) = rx.recv() {
                 // Start devnet
                 let (devnet_events_rx, terminator_tx) =
@@ -575,7 +574,6 @@ fn main(mut cx: ModuleContext) -> NeonResult<()> {
         StacksDevnet::js_get_stacks_node_url,
     )?;
 
-    
     Ok(())
 }
 
