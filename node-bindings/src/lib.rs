@@ -23,6 +23,7 @@ struct StacksDevnet {
     tx: mpsc::Sender<DevnetCommand>,
     bitcoin_block_rx: mpsc::Receiver<BitcoinBlockData>,
     stacks_block_rx: mpsc::Receiver<StacksBlockData>,
+    node_url: String,
 }
 
 enum DevnetCommand {
@@ -51,9 +52,12 @@ impl StacksDevnet {
 
         let channel = cx.channel();
 
+        let manifest_path = get_manifest_path_or_exit(Some(manifest_path.into()));
+        let devnet = DevnetOrchestrator::new(manifest_path, Some(devnet_overrides));
+
+        let node_url = devnet.get_stacks_node_url();
+
         thread::spawn(move || {
-            let manifest_path = get_manifest_path_or_exit(Some(manifest_path.into()));
-            let devnet = DevnetOrchestrator::new(manifest_path, Some(devnet_overrides));
 
             if let Ok(DevnetCommand::Start(callback)) = rx.recv() {
                 // Start devnet
@@ -121,6 +125,7 @@ impl StacksDevnet {
             tx,
             bitcoin_block_rx,
             stacks_block_rx,
+            node_url,
         }
     }
 
@@ -480,8 +485,6 @@ impl StacksDevnet {
             overrides.pox_stacking_orders = Some(stacking_orders);
         }
 
-        println!("{:?}", overrides);
-
         let devnet = StacksDevnet::new(
             &mut cx,
             manifest_path,
@@ -543,6 +546,15 @@ impl StacksDevnet {
 
         Ok(js_block)
     }
+
+    fn js_get_stacks_node_url(mut cx: FunctionContext) -> JsResult<JsString> {
+        let devnet = cx
+            .this()
+            .downcast_or_throw::<JsBox<StacksDevnet>, _>(&mut cx)?;
+
+        let val = JsString::new(&mut cx, devnet.node_url.to_string());
+        Ok(val)
+    }
 }
 
 #[neon::main]
@@ -558,6 +570,12 @@ fn main(mut cx: ModuleContext) -> NeonResult<()> {
         "stacksDevnetWaitForBitcoinBlock",
         StacksDevnet::js_on_bitcoin_block,
     )?;
+    cx.export_function(
+        "stacksDevnetGetStacksNodeUrl",
+        StacksDevnet::js_get_stacks_node_url,
+    )?;
+
+    
     Ok(())
 }
 
