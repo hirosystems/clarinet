@@ -3,19 +3,19 @@
  * @export
  * @interface SubNetworkIdentifier
  */
- export interface SubNetworkIdentifier {
-    /**
-     *
-     * @type {string}
-     * @memberof SubNetworkIdentifier
-     */
-    network: string;
-    /**
-     *
-     * @type {object}
-     * @memberof SubNetworkIdentifier
-     */
-    metadata?: object;
+export interface SubNetworkIdentifier {
+  /**
+   *
+   * @type {string}
+   * @memberof SubNetworkIdentifier
+   */
+  network: string;
+  /**
+   *
+   * @type {object}
+   * @memberof SubNetworkIdentifier
+   */
+  metadata?: object;
 }
 
 /**
@@ -23,25 +23,25 @@
  * @export
  * @interface NetworkIdentifier
  */
- export interface NetworkIdentifier {
-    /**
-     *
-     * @type {string}
-     * @memberof NetworkIdentifier
-     */
-    blockchain: string;
-    /**
-     * If a blockchain has a specific chain-id or network identifier, it should go in this field. It is up to the client to determine which network-specific identifier is mainnet or testnet.
-     * @type {string}
-     * @memberof NetworkIdentifier
-     */
-    network: string;
-    /**
-     *
-     * @type {SubNetworkIdentifier}
-     * @memberof NetworkIdentifier
-     */
-    sub_network_identifier?: SubNetworkIdentifier;
+export interface NetworkIdentifier {
+  /**
+   *
+   * @type {string}
+   * @memberof NetworkIdentifier
+   */
+  blockchain: string;
+  /**
+   * If a blockchain has a specific chain-id or network identifier, it should go in this field. It is up to the client to determine which network-specific identifier is mainnet or testnet.
+   * @type {string}
+   * @memberof NetworkIdentifier
+   */
+  network: string;
+  /**
+   *
+   * @type {SubNetworkIdentifier}
+   * @memberof NetworkIdentifier
+   */
+  sub_network_identifier?: SubNetworkIdentifier;
 }
 
 /**
@@ -49,9 +49,9 @@
  * @export
  * @enum {string}
  */
- export enum Direction {
-    forward = 'forward',
-    backward = 'backward',
+export enum Direction {
+  forward = "forward",
+  backward = "backward",
 }
 
 /**
@@ -59,25 +59,25 @@
  * @export
  * @interface RelatedTransaction
  */
- export interface RelatedTransaction {
-    /**
-     *
-     * @type {NetworkIdentifier}
-     * @memberof RelatedTransaction
-     */
-    network_identifier?: NetworkIdentifier;
-    /**
-     *
-     * @type {TransactionIdentifier}
-     * @memberof RelatedTransaction
-     */
-    transaction_identifier: TransactionIdentifier;
-    /**
-     *
-     * @type {Direction}
-     * @memberof RelatedTransaction
-     */
-    direction: Direction;
+export interface RelatedTransaction {
+  /**
+   *
+   * @type {NetworkIdentifier}
+   * @memberof RelatedTransaction
+   */
+  network_identifier?: NetworkIdentifier;
+  /**
+   *
+   * @type {TransactionIdentifier}
+   * @memberof RelatedTransaction
+   */
+  transaction_identifier: TransactionIdentifier;
+  /**
+   *
+   * @type {Direction}
+   * @memberof RelatedTransaction
+   */
+  direction: Direction;
 }
 
 /**
@@ -85,65 +85,143 @@
  * @export
  * @interface TransactionIdentifier
  */
- export interface TransactionIdentifier {
-    /**
-     * Any transactions that are attributable only to a block (ex: a block event) should use the hash of the block as the identifier.
-     * @type {string}
-     * @memberof TransactionIdentifier
-     */
-    hash: string;
+export interface TransactionIdentifier {
+  /**
+   * Any transactions that are attributable only to a block (ex: a block event) should use the hash of the block as the identifier.
+   * @type {string}
+   * @memberof TransactionIdentifier
+   */
+  hash: string;
 }
+
+/**
+ * StacksTransactionMetadata contain an specific data about Stacks transactions.
+ * @export
+ * @interface StacksTransactionMetadata
+ */
+export interface StacksTransactionMetadata {
+  /**
+   *
+   * @type {boolean}
+   * @memberof StacksTransactionMetadata
+   */
+  success: boolean;
+  /**
+   *
+   * @type {string}
+   * @memberof StacksTransactionMetadata
+   */
+  result: string;
+  /**
+   *
+   * @type {string[]}
+   * @memberof StacksTransactionMetadata
+   */
+  events: string[];
+  /**
+   *
+   * @type {string}
+   * @memberof StacksTransactionMetadata
+   */
+  description: string;
+}
+
+/**
+ * BitcoinTransactionMetadata contain an specific data about Bitcoin transactions.
+ * @export
+ * @interface BitcoinTransactionMetadata
+ */
+export interface BitcoinTransactionMetadata {}
 
 /**
  * Transactions contain an array of Operations that are attributable to the same TransactionIdentifier.
  * @export
  * @interface Transaction
  */
- export interface Transaction {
-    /**
-     *
-     * @type {TransactionIdentifier}
-     * @memberof Transaction
-     */
-    transaction_identifier: TransactionIdentifier;
-    /**
-     *
-     * @type {Array<Operation>}
-     * @memberof Transaction
-     */
-    operations: Array<Operation>;
-    /**
-     *
-     * @type {Array<RelatedTransaction>}
-     * @memberof Transaction
-     */
-    related_transactions?: Array<RelatedTransaction>;
-    /**
-     * Transactions that are related to other transactions (like a cross-shard transaction) should include the tranaction_identifier of these transactions in the metadata.
-     * @type {object}
-     * @memberof Transaction
-     */
-    metadata?: object;
+export interface Transaction {
+  /**
+   *
+   * @type {TransactionIdentifier}
+   * @memberof Transaction
+   */
+  transaction_identifier: TransactionIdentifier;
+  /**
+   *
+   * @type {Array<Operation>}
+   * @memberof Transaction
+   */
+  operations: Array<Operation>;
+  /**
+   *
+   * @type {Array<RelatedTransaction>}
+   * @memberof Transaction
+   */
+  related_transactions?: Array<RelatedTransaction>;
+  /**
+   * Transactions that are related to other transactions (like a cross-shard transaction) should include the tranaction_identifier of these transactions in the metadata.
+   * @type {object}
+   * @memberof Transaction
+   */
+  metadata?: StacksTransactionMetadata | BitcoinTransactionMetadata;
 }
+
+/**
+ * StacksBlockMetadata contain an specific data about Stacks blocks.
+ * @export
+ * @interface StacksBlockMetadata
+ */
+export interface StacksBlockMetadata {
+  /**
+   *
+   * @type {BlockIdentifier}
+   * @memberof StacksBlockMetadata
+   */
+  bitcoin_anchor_block_identifier: BlockIdentifier;
+  /**
+   *
+   * @type {BlockIdentifier}
+   * @memberof StacksBlockMetadata
+   */
+  bitcoin_genesis_block_identifier: BlockIdentifier;
+  /**
+   *
+   * @type {number}
+   * @memberof StacksBlockMetadata
+   */
+  pox_cycle_index: number;
+  /**
+   *
+   * @type {number}
+   * @memberof StacksBlockMetadata
+   */
+  pox_cycle_length: number;
+}
+
+/**
+ * BitcoinBlockMetadata contain an specific data about Bitcoin blocks.
+ * @export
+ * @interface BitcoinBlockMetadata
+ */
+export interface BitcoinBlockMetadata {}
 
 /**
  * The block_identifier uniquely identifies a block in a particular network.
  * @export
  * @interface BlockIdentifier
  */
- export interface BlockIdentifier {
-    /**
-     * This is also known as the block height.
-     * @type {number}
-     * @memberof BlockIdentifier
-     */
-    index: number;
-    /**
-     *
-     * @type {string}
-     * @memberof BlockIdentifier
-     */
-    hash: string;
+export interface BlockIdentifier {
+  /**
+   * This is also known as the block height.
+   * @type {number}
+   * @memberof BlockIdentifier
+   */
+  index: number;
+  /**
+   *
+   * @type {string}
+   * @memberof BlockIdentifier
+   */
+  hash: string;
 }
 
 /**
@@ -151,37 +229,37 @@
  * @export
  * @interface Block
  */
- export interface Block {
-    /**
-     *
-     * @type {BlockIdentifier}
-     * @memberof Block
-     */
-    block_identifier: BlockIdentifier;
-    /**
-     *
-     * @type {BlockIdentifier}
-     * @memberof Block
-     */
-    parent_block_identifier: BlockIdentifier;
-    /**
-     * The timestamp of the block in milliseconds since the Unix Epoch. The timestamp is stored in milliseconds because some blockchains produce blocks more often than once a second.
-     * @type {number}
-     * @memberof Block
-     */
-    timestamp: number;
-    /**
-     *
-     * @type {Array<Transaction>}
-     * @memberof Block
-     */
-    transactions: Array<Transaction>;
-    /**
-     *
-     * @type {object}
-     * @memberof Block
-     */
-    metadata?: object;
+export interface Block {
+  /**
+   *
+   * @type {BlockIdentifier}
+   * @memberof Block
+   */
+  block_identifier: BlockIdentifier;
+  /**
+   *
+   * @type {BlockIdentifier}
+   * @memberof Block
+   */
+  parent_block_identifier: BlockIdentifier;
+  /**
+   * The timestamp of the block in milliseconds since the Unix Epoch. The timestamp is stored in milliseconds because some blockchains produce blocks more often than once a second.
+   * @type {number}
+   * @memberof Block
+   */
+  timestamp: number;
+  /**
+   *
+   * @type {Array<Transaction>}
+   * @memberof Block
+   */
+  transactions: Array<Transaction>;
+  /**
+   *
+   * @type {object}
+   * @memberof Block
+   */
+  metadata?: StacksBlockMetadata | BitcoinBlockMetadata;
 }
 
 /**
@@ -189,19 +267,19 @@
  * @export
  * @interface OperationIdentifier
  */
- export interface OperationIdentifier {
-    /**
-     * The operation index is used to ensure each operation has a unique identifier within a transaction. This index is only relative to the transaction and NOT GLOBAL. The operations in each transaction should start from index 0. To clarify, there may not be any notion of an operation index in the blockchain being described.
-     * @type {number}
-     * @memberof OperationIdentifier
-     */
-    index: number;
-    /**
-     * Some blockchains specify an operation index that is essential for client use. For example, Bitcoin uses a network_index to identify which UTXO was used in a transaction. network_index should not be populated if there is no notion of an operation index in a blockchain (typically most account-based blockchains).
-     * @type {number}
-     * @memberof OperationIdentifier
-     */
-    network_index?: number;
+export interface OperationIdentifier {
+  /**
+   * The operation index is used to ensure each operation has a unique identifier within a transaction. This index is only relative to the transaction and NOT GLOBAL. The operations in each transaction should start from index 0. To clarify, there may not be any notion of an operation index in the blockchain being described.
+   * @type {number}
+   * @memberof OperationIdentifier
+   */
+  index: number;
+  /**
+   * Some blockchains specify an operation index that is essential for client use. For example, Bitcoin uses a network_index to identify which UTXO was used in a transaction. network_index should not be populated if there is no notion of an operation index in a blockchain (typically most account-based blockchains).
+   * @type {number}
+   * @memberof OperationIdentifier
+   */
+  network_index?: number;
 }
 
 /**
@@ -209,25 +287,25 @@
  * @export
  * @interface AccountIdentifier
  */
- export interface AccountIdentifier {
-    /**
-     * The address may be a cryptographic public key (or some encoding of it) or a provided username.
-     * @type {string}
-     * @memberof AccountIdentifier
-     */
-    address: string;
-    /**
-     *
-     * @type {SubAccountIdentifier}
-     * @memberof AccountIdentifier
-     */
-    sub_account?: SubAccountIdentifier;
-    /**
-     * Blockchains that utilize a username model (where the address is not a derivative of a cryptographic public key) should specify the public key(s) owned by the address in metadata.
-     * @type {object}
-     * @memberof AccountIdentifier
-     */
-    metadata?: object;
+export interface AccountIdentifier {
+  /**
+   * The address may be a cryptographic public key (or some encoding of it) or a provided username.
+   * @type {string}
+   * @memberof AccountIdentifier
+   */
+  address: string;
+  /**
+   *
+   * @type {SubAccountIdentifier}
+   * @memberof AccountIdentifier
+   */
+  sub_account?: SubAccountIdentifier;
+  /**
+   * Blockchains that utilize a username model (where the address is not a derivative of a cryptographic public key) should specify the public key(s) owned by the address in metadata.
+   * @type {object}
+   * @memberof AccountIdentifier
+   */
+  metadata?: object;
 }
 
 /**
@@ -235,19 +313,19 @@
  * @export
  * @interface SubAccountIdentifier
  */
- export interface SubAccountIdentifier {
-    /**
-     * The SubAccount address may be a cryptographic value or some other identifier (ex: bonded) that uniquely specifies a SubAccount.
-     * @type {string}
-     * @memberof SubAccountIdentifier
-     */
-    address: string;
-    /**
-     * If the SubAccount address is not sufficient to uniquely specify a SubAccount, any other identifying information can be stored here. It is important to note that two SubAccounts with identical addresses but differing metadata will not be considered equal by clients.
-     * @type {object}
-     * @memberof SubAccountIdentifier
-     */
-    metadata?: object;
+export interface SubAccountIdentifier {
+  /**
+   * The SubAccount address may be a cryptographic value or some other identifier (ex: bonded) that uniquely specifies a SubAccount.
+   * @type {string}
+   * @memberof SubAccountIdentifier
+   */
+  address: string;
+  /**
+   * If the SubAccount address is not sufficient to uniquely specify a SubAccount, any other identifying information can be stored here. It is important to note that two SubAccounts with identical addresses but differing metadata will not be considered equal by clients.
+   * @type {object}
+   * @memberof SubAccountIdentifier
+   */
+  metadata?: object;
 }
 
 /**
@@ -255,55 +333,55 @@
  * @export
  * @interface Operation
  */
- export interface Operation {
-    /**
-     *
-     * @type {OperationIdentifier}
-     * @memberof Operation
-     */
-    operation_identifier: OperationIdentifier;
-    /**
-     * Restrict referenced related_operations to identifier indices < the current operation_identifier.index. This ensures there exists a clear DAG-structure of relations. Since operations are one-sided, one could imagine relating operations in a single transfer or linking operations in a call tree.
-     * @type {Array<OperationIdentifier>}
-     * @memberof Operation
-     */
-    related_operations?: Array<OperationIdentifier>;
-    /**
-     * Type is the network-specific type of the operation. Ensure that any type that can be returned here is also specified in the NetworkOptionsResponse. This can be very useful to downstream consumers that parse all block data.
-     * @type {string}
-     * @memberof Operation
-     */
-    type: string;
-    /**
-     * Status is the network-specific status of the operation. Status is not defined on the transaction object because blockchains with smart contracts may have transactions that partially apply (some operations are successful and some are not). Blockchains with atomic transactions (all operations succeed or all operations fail) will have the same status for each operation. On-chain operations (operations retrieved in the `/block` and `/block/transaction` endpoints) MUST have a populated status field (anything on-chain must have succeeded or failed). However, operations provided during transaction construction (often times called "intent" in the documentation) MUST NOT have a populated status field (operations yet to be included on-chain have not yet succeeded or failed).
-     * @type {string}
-     * @memberof Operation
-     */
-    status?: string;
-    /**
-     *
-     * @type {AccountIdentifier}
-     * @memberof Operation
-     */
-    account?: AccountIdentifier;
-    /**
-     *
-     * @type {Amount}
-     * @memberof Operation
-     */
-    amount?: Amount;
-    /**
-     *
-     * @type {CoinChange}
-     * @memberof Operation
-     */
-    coin_change?: CoinChange;
-    /**
-     *
-     * @type {object}
-     * @memberof Operation
-     */
-    metadata?: object;
+export interface Operation {
+  /**
+   *
+   * @type {OperationIdentifier}
+   * @memberof Operation
+   */
+  operation_identifier: OperationIdentifier;
+  /**
+   * Restrict referenced related_operations to identifier indices < the current operation_identifier.index. This ensures there exists a clear DAG-structure of relations. Since operations are one-sided, one could imagine relating operations in a single transfer or linking operations in a call tree.
+   * @type {Array<OperationIdentifier>}
+   * @memberof Operation
+   */
+  related_operations?: Array<OperationIdentifier>;
+  /**
+   * Type is the network-specific type of the operation. Ensure that any type that can be returned here is also specified in the NetworkOptionsResponse. This can be very useful to downstream consumers that parse all block data.
+   * @type {string}
+   * @memberof Operation
+   */
+  type: string;
+  /**
+   * Status is the network-specific status of the operation. Status is not defined on the transaction object because blockchains with smart contracts may have transactions that partially apply (some operations are successful and some are not). Blockchains with atomic transactions (all operations succeed or all operations fail) will have the same status for each operation. On-chain operations (operations retrieved in the `/block` and `/block/transaction` endpoints) MUST have a populated status field (anything on-chain must have succeeded or failed). However, operations provided during transaction construction (often times called "intent" in the documentation) MUST NOT have a populated status field (operations yet to be included on-chain have not yet succeeded or failed).
+   * @type {string}
+   * @memberof Operation
+   */
+  status?: string;
+  /**
+   *
+   * @type {AccountIdentifier}
+   * @memberof Operation
+   */
+  account?: AccountIdentifier;
+  /**
+   *
+   * @type {Amount}
+   * @memberof Operation
+   */
+  amount?: Amount;
+  /**
+   *
+   * @type {CoinChange}
+   * @memberof Operation
+   */
+  coin_change?: CoinChange;
+  /**
+   *
+   * @type {object}
+   * @memberof Operation
+   */
+  metadata?: object;
 }
 
 /**
@@ -311,25 +389,25 @@
  * @export
  * @interface Amount
  */
- export interface Amount {
-    /**
-     * Value of the transaction in atomic units represented as an arbitrary-sized signed integer. For example, 1 BTC would be represented by a value of 100000000.
-     * @type {string}
-     * @memberof Amount
-     */
-    value: string;
-    /**
-     *
-     * @type {Currency}
-     * @memberof Amount
-     */
-    currency: Currency;
-    /**
-     *
-     * @type {object}
-     * @memberof Amount
-     */
-    metadata?: object;
+export interface Amount {
+  /**
+   * Value of the transaction in atomic units represented as an arbitrary-sized signed integer. For example, 1 BTC would be represented by a value of 100000000.
+   * @type {string}
+   * @memberof Amount
+   */
+  value: string;
+  /**
+   *
+   * @type {Currency}
+   * @memberof Amount
+   */
+  currency: Currency;
+  /**
+   *
+   * @type {object}
+   * @memberof Amount
+   */
+  metadata?: object;
 }
 
 /**
@@ -337,25 +415,25 @@
  * @export
  * @interface Currency
  */
- export interface Currency {
-    /**
-     * Canonical symbol associated with a currency.
-     * @type {string}
-     * @memberof Currency
-     */
-    symbol: string;
-    /**
-     * Number of decimal places in the standard unit representation of the amount. For example, BTC has 8 decimals. Note that it is not possible to represent the value of some currency in atomic units that is not base 10.
-     * @type {number}
-     * @memberof Currency
-     */
-    decimals: number;
-    /**
-     * Any additional information related to the currency itself. For example, it would be useful to populate this object with the contract address of an ERC-20 token.
-     * @type {object}
-     * @memberof Currency
-     */
-    metadata?: object;
+export interface Currency {
+  /**
+   * Canonical symbol associated with a currency.
+   * @type {string}
+   * @memberof Currency
+   */
+  symbol: string;
+  /**
+   * Number of decimal places in the standard unit representation of the amount. For example, BTC has 8 decimals. Note that it is not possible to represent the value of some currency in atomic units that is not base 10.
+   * @type {number}
+   * @memberof Currency
+   */
+  decimals: number;
+  /**
+   * Any additional information related to the currency itself. For example, it would be useful to populate this object with the contract address of an ERC-20 token.
+   * @type {object}
+   * @memberof Currency
+   */
+  metadata?: object;
 }
 
 /**
@@ -363,33 +441,33 @@
  * @export
  * @interface CoinIdentifier
  */
- export interface CoinIdentifier {
-    /**
-     * Identifier should be populated with a globally unique identifier of a Coin. In Bitcoin, this identifier would be transaction_hash:index.
-     * @type {string}
-     * @memberof CoinIdentifier
-     */
-    identifier: string;
+export interface CoinIdentifier {
+  /**
+   * Identifier should be populated with a globally unique identifier of a Coin. In Bitcoin, this identifier would be transaction_hash:index.
+   * @type {string}
+   * @memberof CoinIdentifier
+   */
+  identifier: string;
 }
 
 /**
-* CoinChange is used to represent a change in state of a some coin identified by a coin_identifier. This object is part of the Operation model and must be populated for UTXO-based blockchains. Coincidentally, this abstraction of UTXOs allows for supporting both account-based transfers and UTXO-based transfers on the same blockchain (when a transfer is account-based, don't populate this model).
-* @export
-* @interface CoinChange
-*/
+ * CoinChange is used to represent a change in state of a some coin identified by a coin_identifier. This object is part of the Operation model and must be populated for UTXO-based blockchains. Coincidentally, this abstraction of UTXOs allows for supporting both account-based transfers and UTXO-based transfers on the same blockchain (when a transfer is account-based, don't populate this model).
+ * @export
+ * @interface CoinChange
+ */
 export interface CoinChange {
-   /**
-    *
-    * @type {CoinIdentifier}
-    * @memberof CoinChange
-    */
-   coin_identifier: CoinIdentifier;
-   /**
-    *
-    * @type {CoinAction}
-    * @memberof CoinChange
-    */
-   coin_action: CoinAction;
+  /**
+   *
+   * @type {CoinIdentifier}
+   * @memberof CoinChange
+   */
+  coin_identifier: CoinIdentifier;
+  /**
+   *
+   * @type {CoinAction}
+   * @memberof CoinChange
+   */
+  coin_action: CoinAction;
 }
 
 /**
@@ -397,7 +475,7 @@ export interface CoinChange {
  * @export
  * @enum {string}
  */
- export enum CoinAction {
-    created = 'coin_created',
-    spent = 'coin_spent',
+export enum CoinAction {
+  created = "coin_created",
+  spent = "coin_spent",
 }
