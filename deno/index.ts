@@ -616,7 +616,7 @@ Array.prototype.expectSTXTransferEvent = function (
       continue;
     }
   }
-  throw new Error(`Unable to retrieve expected NonFungibleTokenTransferEvent`);
+  throw new Error(`Unable to retrieve expected STXTransferEvent`);
 };
 
 Array.prototype.expectFungibleTokenTransferEvent = function (
