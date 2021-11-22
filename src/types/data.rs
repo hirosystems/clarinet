@@ -110,21 +110,11 @@ pub struct TransactionIdentifier {
 )]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub enum OperationType {
-    InitiateCreateAccount,
-    CreateAccount,
-    InitiateDeleteAccount,
-    DeleteAccount,
-    RefundDeleteAccount,
-    InitiateAddKey,
-    AddKey,
-    InitiateDeleteKey,
-    DeleteKey,
-    Transfer,
-    Stake,
-    InitiateDeployContract,
     DeployContract,
-    InitiateFunctionCall,
     FunctionCall,
+    Credit,
+    Debit,
+    Lock,
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Deserialize, Serialize)]
@@ -213,7 +203,7 @@ pub struct OperationIdentifier {
     /// transaction and NOT GLOBAL. The operations in each transaction should
     /// start from index 0. To clarify, there may not be any notion of an
     /// operation index in the blockchain being described.
-    pub index: i64,
+    pub index: u32,
 
     /// Some blockchains specify an operation index that is essential for
     /// client use. For example, Bitcoin uses a network_index to identify
@@ -291,29 +281,36 @@ pub struct Amount {
      * pub metadata: Option<serde_json::Value>, */
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub enum CurrencySymbol {
-    Noop,
-}
-
 /// Currency is composed of a canonical Symbol and Decimals. This Decimals value
 /// is used to convert an Amount.Value from atomic units (Satoshis) to standard
 /// units (Bitcoins).
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Currency {
     /// Canonical symbol associated with a currency.
-    pub symbol: CurrencySymbol,
+    pub symbol: String,
 
     /// Number of decimal places in the standard unit representation of the
     /// amount.  For example, BTC has 8 decimals. Note that it is not possible
     /// to represent the value of some currency in atomic units that is not base
     /// 10.
     pub decimals: u32,
-    /* Rosetta Spec also optionally provides:
-     *
-     * /// Any additional information related to the currency itself.  For example,
-     * /// it would be useful to populate this object with the contract address of
-     * /// an ERC-20 token.
-     * #[serde(skip_serializing_if = "Option::is_none")]
-     * pub metadata: Option<serde_json::Value>, */
+
+    /// Any additional information related to the currency itself.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub metadata: Option<CurrencyMetadata>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
+pub enum CurrencyStandard {
+    Sip09,
+    Sip10,
+    None,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct CurrencyMetadata {
+    pub asset_class_identifier: String,
+    pub asset_identifier: Option<String>,
+    pub standard: CurrencyStandard,
 }

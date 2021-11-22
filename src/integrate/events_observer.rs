@@ -4,9 +4,10 @@ use crate::poke::load_session;
 use crate::publish::{publish_contract, Network};
 use crate::types::{self, AccountConfig, DevnetConfig};
 use crate::types::{
-    BitcoinBlockData, BitcoinBlockMetadata, BitcoinTransactionData, BitcoinTransactionMetadata,
-    BlockIdentifier, StacksBlockData, StacksBlockMetadata, StacksTransactionData,
-    StacksTransactionMetadata, TransactionIdentifier,
+    AccountIdentifier, Amount, BitcoinBlockData, BitcoinBlockMetadata, BitcoinTransactionData,
+    BitcoinTransactionMetadata, BlockIdentifier, Currency, CurrencyMetadata, CurrencyStandard,
+    Operation, OperationIdentifier, OperationStatusKind, OperationType, StacksBlockData,
+    StacksBlockMetadata, StacksTransactionData, StacksTransactionMetadata, TransactionIdentifier,
 };
 use crate::utils;
 use crate::utils::stacks::{transactions, StacksRpc};
@@ -20,10 +21,10 @@ use clarity_repl::clarity::util::hash::{hex_bytes, Hash160};
 use clarity_repl::repl::settings::InitialContract;
 use clarity_repl::repl::Session;
 use rocket::config::{Config, LogLevel};
-use rocket::serde::json::{json, Json, Value};
+use rocket::serde::json::{json, Json, Value as JsonValue};
 use rocket::serde::Deserialize;
 use rocket::State;
-use std::collections::{BTreeMap, VecDeque};
+use std::collections::{BTreeMap, HashMap, VecDeque};
 use std::convert::{TryFrom, TryInto};
 use std::error::Error;
 use std::io::Cursor;
@@ -68,10 +69,104 @@ pub struct NewMicroBlock {
 
 #[derive(Deserialize)]
 pub struct NewTransaction {
-    txid: String,
-    status: String,
-    raw_result: String,
-    raw_tx: String,
+    pub txid: String,
+    pub status: String,
+    pub raw_result: String,
+    pub raw_tx: String,
+    pub events: Vec<NewEvent>,
+}
+
+#[derive(Deserialize)]
+pub struct NewEvent {
+    pub stx_transfer_event: Option<JsonValue>,
+    pub stx_mint_event: Option<JsonValue>,
+    pub stx_burn_event: Option<JsonValue>,
+    pub stx_lock_event: Option<JsonValue>,
+    pub nft_transfer_event: Option<JsonValue>,
+    pub nft_mint_event: Option<JsonValue>,
+    pub nft_burn_event: Option<JsonValue>,
+    pub ft_transfer_event: Option<JsonValue>,
+    pub ft_mint_event: Option<JsonValue>,
+    pub ft_burn_event: Option<JsonValue>,
+}
+
+#[derive(Debug, Clone, PartialEq, Deserialize)]
+pub struct STXTransferEventData {
+    pub sender: String,
+    pub recipient: String,
+    pub amount: u128,
+}
+
+#[derive(Debug, Clone, PartialEq, Deserialize)]
+pub struct STXMintEventData {
+    pub recipient: String,
+    pub amount: u128,
+}
+
+#[derive(Debug, Clone, PartialEq, Deserialize)]
+pub struct STXLockEventData {
+    pub locked_amount: u128,
+    pub unlock_height: u64,
+    pub locked_address: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Deserialize)]
+pub struct STXBurnEventData {
+    pub sender: String,
+    pub amount: u128,
+}
+
+#[derive(Debug, Clone, PartialEq, Deserialize)]
+pub struct NFTTransferEventData {
+    #[serde(rename = "asset_identifier")]
+    pub asset_class_identifier: String,
+    #[serde(rename = "value")]
+    pub asset_identifier: String,
+    pub sender: String,
+    pub recipient: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Deserialize)]
+pub struct NFTMintEventData {
+    #[serde(rename = "asset_identifier")]
+    pub asset_class_identifier: String,
+    #[serde(rename = "value")]
+    pub asset_identifier: String,
+    pub recipient: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Deserialize)]
+pub struct NFTBurnEventData {
+    #[serde(rename = "asset_identifier")]
+    pub asset_class_identifier: String,
+    #[serde(rename = "value")]
+    pub asset_identifier: String,
+    pub sender: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Deserialize)]
+pub struct FTTransferEventData {
+    #[serde(rename = "asset_identifier")]
+    pub asset_class_identifier: String,
+    pub sender: String,
+    pub recipient: String,
+    pub amount: u128,
+}
+
+#[derive(Debug, Clone, PartialEq, Deserialize)]
+pub struct FTMintEventData {
+    #[serde(rename = "asset_identifier")]
+    pub asset_class_identifier: String,
+    pub recipient: String,
+    pub amount: u128,
+}
+
+#[derive(Debug, Clone, PartialEq, Deserialize)]
+pub struct FTBurnEventData {
+    #[serde(rename = "asset_identifier")]
+    pub asset_class_identifier: String,
+    pub sender: String,
+    pub amount: u128,
 }
 
 #[derive(Clone, Debug)]
@@ -164,6 +259,12 @@ pub struct PoxCycle {
     min_threshold_ustx: u64,
 }
 
+#[derive(Deserialize, Debug, Clone, Default)]
+pub struct AssetClassCache {
+    symbol: String,
+    decimals: u8,
+}
+
 pub async fn start_events_observer(
     events_config: EventObserverConfig,
     devnet_event_tx: Sender<DevnetEvent>,
@@ -174,9 +275,11 @@ pub async fn start_events_observer(
     let port = events_config.devnet_config.orchestrator_port;
     let manifest_path = events_config.manifest_path.clone();
     let rw_lock = Arc::new(RwLock::new(events_config));
+    let asset_class_ids_map: HashMap<String, AssetClassCache> = HashMap::new();
 
     let moved_rw_lock = rw_lock.clone();
     let moved_tx = Arc::new(Mutex::new(devnet_event_tx.clone()));
+    let moved_cached_asset_class_ids_map = Arc::new(RwLock::new(asset_class_ids_map));
 
     let config = Config {
         port: port,
@@ -192,6 +295,7 @@ pub async fn start_events_observer(
         let future = rocket::custom(config)
             .manage(moved_rw_lock)
             .manage(moved_tx)
+            .manage(moved_cached_asset_class_ids_map)
             .mount(
                 "/",
                 routes![
@@ -199,7 +303,7 @@ pub async fn start_events_observer(
                     handle_new_block,
                     handle_new_microblocks,
                     handle_new_mempool_tx,
-                    handle_drop_mempool_tx
+                    handle_drop_mempool_tx,
                 ],
             )
             .launch();
@@ -258,7 +362,7 @@ pub async fn start_events_observer(
 pub fn handle_new_burn_block(
     devnet_events_tx: &State<Arc<Mutex<Sender<DevnetEvent>>>>,
     new_burn_block: Json<NewBurnBlock>,
-) -> Json<Value> {
+) -> Json<JsonValue> {
     let devnet_events_tx = devnet_events_tx.inner();
 
     match devnet_events_tx.lock() {
@@ -303,8 +407,9 @@ pub fn handle_new_burn_block(
 pub fn handle_new_block(
     config: &State<Arc<RwLock<EventObserverConfig>>>,
     devnet_events_tx: &State<Arc<Mutex<Sender<DevnetEvent>>>>,
+    asset_class_ids_map: &State<Arc<RwLock<HashMap<String, AssetClassCache>>>>,
     new_block: Json<NewBlock>,
-) -> Json<Value> {
+) -> Json<JsonValue> {
     let devnet_events_tx = devnet_events_tx.inner();
     let config = config.inner();
 
@@ -429,25 +534,30 @@ pub fn handle_new_block(
     let pox_cycle_length: u64 = (prepare_phase_block_length + reward_phase_block_length).into();
     let current_len = new_block.burn_block_height - first_burnchain_block_height;
     let pox_cycle_id: u32 = (current_len / pox_cycle_length).try_into().unwrap();
-    let transactions = new_block
-        .transactions
-        .iter()
-        .map(|t| {
-            let description = get_tx_description(&t.raw_tx);
-            StacksTransactionData {
-                transaction_identifier: TransactionIdentifier {
-                    hash: t.txid.clone(),
-                },
-                operations: vec![],
-                metadata: StacksTransactionMetadata {
-                    success: t.status == "success",
-                    result: get_value_description(&t.raw_result),
-                    events: vec![],
-                    description,
-                },
-            }
-        })
-        .collect();
+
+    let transactions = if let Ok(mut asset_class_ids_map) = asset_class_ids_map.inner().write() {
+        new_block
+            .transactions
+            .iter()
+            .map(|t| {
+                let description = get_tx_description(&t.raw_tx);
+                StacksTransactionData {
+                    transaction_identifier: TransactionIdentifier {
+                        hash: t.txid.clone(),
+                    },
+                    operations: get_standardized_stacks_operations(t, &mut asset_class_ids_map),
+                    metadata: StacksTransactionMetadata {
+                        success: t.status == "success",
+                        result: get_value_description(&t.raw_result),
+                        events: vec![],
+                        description,
+                    },
+                }
+            })
+            .collect()
+    } else {
+        vec![]
+    };
 
     if let Ok(tx) = devnet_events_tx.lock() {
         let _ = tx.send(DevnetEvent::StacksBlock(StacksBlockData {
@@ -574,7 +684,7 @@ pub fn handle_new_microblocks(
     _config: &State<Arc<RwLock<EventObserverConfig>>>,
     devnet_events_tx: &State<Arc<Mutex<Sender<DevnetEvent>>>>,
     new_microblock: Json<NewMicroBlock>,
-) -> Json<Value> {
+) -> Json<JsonValue> {
     let devnet_events_tx = devnet_events_tx.inner();
 
     if let Ok(tx) = devnet_events_tx.lock() {
@@ -613,7 +723,7 @@ pub fn handle_new_microblocks(
 pub fn handle_new_mempool_tx(
     devnet_events_tx: &State<Arc<Mutex<Sender<DevnetEvent>>>>,
     raw_txs: Json<Vec<String>>,
-) -> Json<Value> {
+) -> Json<JsonValue> {
     let decoded_transactions = raw_txs
         .iter()
         .map(|t| get_tx_description(t))
@@ -632,7 +742,7 @@ pub fn handle_new_mempool_tx(
 }
 
 #[post("/drop_mempool_tx", format = "application/json")]
-pub fn handle_drop_mempool_tx() -> Json<Value> {
+pub fn handle_drop_mempool_tx() -> Json<JsonValue> {
     Json(json!({
         "status": 200,
         "result": "Ok",
@@ -707,4 +817,382 @@ pub fn get_tx_description(raw_tx: &str) -> String {
         }
     };
     description
+}
+
+fn get_standardized_stacks_operations(
+    transaction: &NewTransaction,
+    asset_class_cache: &mut HashMap<String, AssetClassCache>,
+) -> Vec<Operation> {
+    let mut operations = vec![];
+    let mut operation_id = 0;
+    for event in transaction.events.iter() {
+        if let Some(ref event_data) = event.stx_mint_event {
+            let data: STXMintEventData =
+                serde_json::from_value(event_data.clone()).expect("Unable to decode event_data");
+            operations.push(Operation {
+                operation_identifier: OperationIdentifier {
+                    index: operation_id,
+                    network_index: None,
+                },
+                related_operations: None,
+                type_: OperationType::Credit,
+                status: Some(OperationStatusKind::Success),
+                account: AccountIdentifier {
+                    address: data.recipient,
+                    sub_account: None,
+                },
+                amount: Some(Amount {
+                    value: data.amount,
+                    currency: get_stacks_currency(),
+                }),
+                metadata: None,
+            });
+            operation_id += 1;
+        } else if let Some(ref event_data) = event.stx_lock_event {
+            let data: STXLockEventData =
+                serde_json::from_value(event_data.clone()).expect("Unable to decode event_data");
+            operations.push(Operation {
+                operation_identifier: OperationIdentifier {
+                    index: operation_id,
+                    network_index: None,
+                },
+                related_operations: None,
+                type_: OperationType::Lock,
+                status: Some(OperationStatusKind::Success),
+                account: AccountIdentifier {
+                    address: data.locked_address,
+                    sub_account: None,
+                },
+                amount: Some(Amount {
+                    value: data.locked_amount,
+                    currency: get_stacks_currency(),
+                }),
+                metadata: None,
+            });
+            operation_id += 1;
+        } else if let Some(ref event_data) = event.stx_burn_event {
+            let data: STXBurnEventData =
+                serde_json::from_value(event_data.clone()).expect("Unable to decode event_data");
+            operations.push(Operation {
+                operation_identifier: OperationIdentifier {
+                    index: operation_id,
+                    network_index: None,
+                },
+                related_operations: None,
+                type_: OperationType::Debit,
+                status: Some(OperationStatusKind::Success),
+                account: AccountIdentifier {
+                    address: data.sender,
+                    sub_account: None,
+                },
+                amount: Some(Amount {
+                    value: data.amount,
+                    currency: get_stacks_currency(),
+                }),
+                metadata: None,
+            });
+            operation_id += 1;
+        } else if let Some(ref event_data) = event.stx_transfer_event {
+            let data: STXTransferEventData =
+                serde_json::from_value(event_data.clone()).expect("Unable to decode event_data");
+            operations.push(Operation {
+                operation_identifier: OperationIdentifier {
+                    index: operation_id,
+                    network_index: None,
+                },
+                related_operations: Some(vec![OperationIdentifier {
+                    index: operation_id + 1,
+                    network_index: None,
+                }]),
+                type_: OperationType::Debit,
+                status: Some(OperationStatusKind::Success),
+                account: AccountIdentifier {
+                    address: data.sender,
+                    sub_account: None,
+                },
+                amount: Some(Amount {
+                    value: data.amount,
+                    currency: get_stacks_currency(),
+                }),
+                metadata: None,
+            });
+            operation_id += 1;
+            operations.push(Operation {
+                operation_identifier: OperationIdentifier {
+                    index: operation_id,
+                    network_index: None,
+                },
+                related_operations: Some(vec![OperationIdentifier {
+                    index: operation_id - 1,
+                    network_index: None,
+                }]),
+                type_: OperationType::Credit,
+                status: Some(OperationStatusKind::Success),
+                account: AccountIdentifier {
+                    address: data.recipient,
+                    sub_account: None,
+                },
+                amount: Some(Amount {
+                    value: data.amount,
+                    currency: get_stacks_currency(),
+                }),
+                metadata: None,
+            });
+            operation_id += 1;
+        } else if let Some(ref event_data) = event.nft_mint_event {
+            let data: NFTMintEventData =
+                serde_json::from_value(event_data.clone()).expect("Unable to decode event_data");
+            let currency = get_standardized_non_fungible_currency_from_asset_class_id(
+                &data.asset_class_identifier,
+                &data.asset_identifier,
+                asset_class_cache,
+            );
+            operations.push(Operation {
+                operation_identifier: OperationIdentifier {
+                    index: operation_id,
+                    network_index: None,
+                },
+                related_operations: None,
+                type_: OperationType::Credit,
+                status: Some(OperationStatusKind::Success),
+                account: AccountIdentifier {
+                    address: data.recipient,
+                    sub_account: None,
+                },
+                amount: Some(Amount { value: 1, currency }),
+                metadata: None,
+            });
+            operation_id += 1;
+        } else if let Some(ref event_data) = event.nft_burn_event {
+            let data: NFTBurnEventData =
+                serde_json::from_value(event_data.clone()).expect("Unable to decode event_data");
+            let currency = get_standardized_non_fungible_currency_from_asset_class_id(
+                &data.asset_class_identifier,
+                &data.asset_identifier,
+                asset_class_cache,
+            );
+            operations.push(Operation {
+                operation_identifier: OperationIdentifier {
+                    index: operation_id,
+                    network_index: None,
+                },
+                related_operations: None,
+                type_: OperationType::Debit,
+                status: Some(OperationStatusKind::Success),
+                account: AccountIdentifier {
+                    address: data.sender,
+                    sub_account: None,
+                },
+                amount: Some(Amount { value: 1, currency }),
+                metadata: None,
+            });
+            operation_id += 1;
+        } else if let Some(ref event_data) = event.nft_transfer_event {
+            let data: NFTTransferEventData =
+                serde_json::from_value(event_data.clone()).expect("Unable to decode event_data");
+            let currency = get_standardized_non_fungible_currency_from_asset_class_id(
+                &data.asset_class_identifier,
+                &data.asset_identifier,
+                asset_class_cache,
+            );
+            operations.push(Operation {
+                operation_identifier: OperationIdentifier {
+                    index: operation_id,
+                    network_index: None,
+                },
+                related_operations: Some(vec![OperationIdentifier {
+                    index: operation_id + 1,
+                    network_index: None,
+                }]),
+                type_: OperationType::Debit,
+                status: Some(OperationStatusKind::Success),
+                account: AccountIdentifier {
+                    address: data.sender,
+                    sub_account: None,
+                },
+                amount: Some(Amount {
+                    value: 1,
+                    currency: currency.clone(),
+                }),
+                metadata: None,
+            });
+            operation_id += 1;
+            operations.push(Operation {
+                operation_identifier: OperationIdentifier {
+                    index: operation_id,
+                    network_index: None,
+                },
+                related_operations: Some(vec![OperationIdentifier {
+                    index: operation_id - 1,
+                    network_index: None,
+                }]),
+                type_: OperationType::Credit,
+                status: Some(OperationStatusKind::Success),
+                account: AccountIdentifier {
+                    address: data.recipient,
+                    sub_account: None,
+                },
+                amount: Some(Amount { value: 1, currency }),
+                metadata: None,
+            });
+            operation_id += 1;
+        } else if let Some(ref event_data) = event.ft_mint_event {
+            let data: FTMintEventData =
+                serde_json::from_value(event_data.clone()).expect("Unable to decode event_data");
+            let currency = get_standardized_fungible_currency_from_asset_class_id(
+                &data.asset_class_identifier,
+                asset_class_cache,
+            );
+            operations.push(Operation {
+                operation_identifier: OperationIdentifier {
+                    index: operation_id,
+                    network_index: None,
+                },
+                related_operations: None,
+                type_: OperationType::Credit,
+                status: Some(OperationStatusKind::Success),
+                account: AccountIdentifier {
+                    address: data.recipient,
+                    sub_account: None,
+                },
+                amount: Some(Amount {
+                    value: data.amount,
+                    currency,
+                }),
+                metadata: None,
+            });
+            operation_id += 1;
+        } else if let Some(ref event_data) = event.ft_burn_event {
+            let data: FTBurnEventData =
+                serde_json::from_value(event_data.clone()).expect("Unable to decode event_data");
+            let currency = get_standardized_fungible_currency_from_asset_class_id(
+                &data.asset_class_identifier,
+                asset_class_cache,
+            );
+            operations.push(Operation {
+                operation_identifier: OperationIdentifier {
+                    index: operation_id,
+                    network_index: None,
+                },
+                related_operations: None,
+                type_: OperationType::Debit,
+                status: Some(OperationStatusKind::Success),
+                account: AccountIdentifier {
+                    address: data.sender,
+                    sub_account: None,
+                },
+                amount: Some(Amount {
+                    value: data.amount,
+                    currency,
+                }),
+                metadata: None,
+            });
+            operation_id += 1;
+        } else if let Some(ref event_data) = event.ft_transfer_event {
+            let data: FTTransferEventData =
+                serde_json::from_value(event_data.clone()).expect("Unable to decode event_data");
+            let currency = get_standardized_fungible_currency_from_asset_class_id(
+                &data.asset_class_identifier,
+                asset_class_cache,
+            );
+            operations.push(Operation {
+                operation_identifier: OperationIdentifier {
+                    index: operation_id,
+                    network_index: None,
+                },
+                related_operations: Some(vec![OperationIdentifier {
+                    index: operation_id + 1,
+                    network_index: None,
+                }]),
+                type_: OperationType::Debit,
+                status: Some(OperationStatusKind::Success),
+                account: AccountIdentifier {
+                    address: data.sender,
+                    sub_account: None,
+                },
+                amount: Some(Amount {
+                    value: data.amount,
+                    currency: currency.clone(),
+                }),
+                metadata: None,
+            });
+            operation_id += 1;
+            operations.push(Operation {
+                operation_identifier: OperationIdentifier {
+                    index: operation_id,
+                    network_index: None,
+                },
+                related_operations: Some(vec![OperationIdentifier {
+                    index: operation_id - 1,
+                    network_index: None,
+                }]),
+                type_: OperationType::Credit,
+                status: Some(OperationStatusKind::Success),
+                account: AccountIdentifier {
+                    address: data.recipient,
+                    sub_account: None,
+                },
+                amount: Some(Amount {
+                    value: data.amount,
+                    currency,
+                }),
+                metadata: None,
+            });
+            operation_id += 1;
+        }
+    }
+    operations
+}
+
+fn get_stacks_currency() -> Currency {
+    Currency {
+        symbol: "STX".into(),
+        decimals: 6,
+        metadata: None,
+    }
+}
+
+fn get_standardized_fungible_currency_from_asset_class_id(
+    asset_class_id: &str,
+    asset_class_cache: &mut HashMap<String, AssetClassCache>,
+) -> Currency {
+    match asset_class_cache.get(asset_class_id) {
+        None => Currency {
+            symbol: asset_class_id.into(),
+            decimals: 0,
+            metadata: None,
+        },
+        Some(entry) => Currency {
+            symbol: entry.symbol.clone(),
+            decimals: entry.decimals.into(),
+            metadata: Some(CurrencyMetadata {
+                asset_class_identifier: asset_class_id.into(),
+                asset_identifier: None,
+                standard: CurrencyStandard::Sip10,
+            }),
+        },
+    }
+}
+
+fn get_standardized_non_fungible_currency_from_asset_class_id(
+    asset_class_id: &str,
+    asset_id: &str,
+    asset_class_cache: &mut HashMap<String, AssetClassCache>,
+) -> Currency {
+    match asset_class_cache.get(asset_class_id) {
+        None => Currency {
+            symbol: asset_class_id.into(),
+            decimals: 0,
+            metadata: None,
+        },
+        Some(entry) => Currency {
+            symbol: entry.symbol.clone(),
+            decimals: 0,
+            metadata: Some(CurrencyMetadata {
+                asset_class_identifier: asset_class_id.into(),
+                asset_identifier: Some(asset_id.into()),
+                standard: CurrencyStandard::Sip10,
+            }),
+        },
+    }
 }
