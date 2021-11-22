@@ -15,7 +15,9 @@ use base58::FromBase58;
 use clarity_repl::clarity::codec::transaction::TransactionPayload;
 use clarity_repl::clarity::codec::{StacksMessageCodec, StacksTransaction};
 use clarity_repl::clarity::representations::ClarityName;
-use clarity_repl::clarity::types::{BuffData, SequenceData, TupleData, Value as ClarityValue};
+use clarity_repl::clarity::types::{
+    AssetIdentifier, BuffData, SequenceData, TupleData, Value as ClarityValue,
+};
 use clarity_repl::clarity::util::address::AddressHashMode;
 use clarity_repl::clarity::util::hash::{hex_bytes, Hash160};
 use clarity_repl::repl::settings::InitialContract;
@@ -178,6 +180,12 @@ pub struct EventObserverConfig {
     pub pox_info: PoxInfo,
     pub session: Session,
     pub deployer_nonce: u64,
+}
+
+#[derive(Deserialize, Debug)]
+struct ContractReadonlyCall {
+    okay: bool,
+    result: String,
 }
 
 impl EventObserverConfig {
@@ -433,9 +441,9 @@ pub fn handle_new_block(
         first_burnchain_block_height,
         prepare_phase_block_length,
         reward_phase_block_length,
-        node,
+        node_url,
     ) = if let Ok(config_reader) = config.read() {
-        let node = format!(
+        let node_url = format!(
             "http://localhost:{}",
             config_reader.devnet_config.stacks_node_rpc_port
         );
@@ -460,7 +468,7 @@ pub fn handle_new_block(
                 contracts_to_deploy.push(contract);
             }
 
-            let node_clone = node.clone();
+            let moved_node_url = node_url.clone();
 
             let mut deployers_lookup = BTreeMap::new();
             for account in updated_config.session.settings.initial_accounts.iter() {
@@ -488,7 +496,7 @@ pub fn handle_new_block(
                         &contract,
                         &deployers_lookup,
                         &mut deployers_nonces,
-                        &node_clone,
+                        &moved_node_url,
                         1,
                         &Network::Devnet,
                     ) {
@@ -510,7 +518,7 @@ pub fn handle_new_block(
                 config_reader.pox_info.first_burnchain_block_height,
                 config_reader.pox_info.prepare_phase_block_length,
                 config_reader.pox_info.reward_phase_block_length,
-                node,
+                node_url,
             )
         } else {
             (
@@ -518,7 +526,7 @@ pub fn handle_new_block(
                 config_reader.pox_info.first_burnchain_block_height,
                 config_reader.pox_info.prepare_phase_block_length,
                 config_reader.pox_info.reward_phase_block_length,
-                node,
+                node_url,
             )
         }
     } else {
@@ -545,7 +553,11 @@ pub fn handle_new_block(
                     transaction_identifier: TransactionIdentifier {
                         hash: t.txid.clone(),
                     },
-                    operations: get_standardized_stacks_operations(t, &mut asset_class_ids_map),
+                    operations: get_standardized_stacks_operations(
+                        t,
+                        &mut asset_class_ids_map,
+                        &node_url,
+                    ),
                     metadata: StacksTransactionMetadata {
                         success: t.status == "success",
                         result: get_value_description(&t.raw_result),
@@ -597,7 +609,7 @@ pub fn handle_new_block(
 
             let pox_stacking_orders = config_reader.devnet_config.pox_stacking_orders.clone();
             std::thread::spawn(move || {
-                let pox_url = format!("{}/v2/pox", node);
+                let pox_url = format!("{}/v2/pox", node_url);
 
                 if let Ok(reponse) = reqwest::blocking::get(pox_url) {
                     if let Ok(update) = reponse.json() {
@@ -611,7 +623,7 @@ pub fn handle_new_block(
                             None => continue,
                             Some(account) => account,
                         };
-                        let stacks_rpc = StacksRpc::new(node.clone());
+                        let stacks_rpc = StacksRpc::new(node_url.clone());
                         let default_fee = 1000;
                         let nonce = stacks_rpc
                             .get_nonce(account.address.to_string())
@@ -822,6 +834,7 @@ pub fn get_tx_description(raw_tx: &str) -> String {
 fn get_standardized_stacks_operations(
     transaction: &NewTransaction,
     asset_class_cache: &mut HashMap<String, AssetClassCache>,
+    node_url: &str,
 ) -> Vec<Operation> {
     let mut operations = vec![];
     let mut operation_id = 0;
@@ -1042,6 +1055,7 @@ fn get_standardized_stacks_operations(
             let currency = get_standardized_fungible_currency_from_asset_class_id(
                 &data.asset_class_identifier,
                 asset_class_cache,
+                node_url,
             );
             operations.push(Operation {
                 operation_identifier: OperationIdentifier {
@@ -1068,6 +1082,7 @@ fn get_standardized_stacks_operations(
             let currency = get_standardized_fungible_currency_from_asset_class_id(
                 &data.asset_class_identifier,
                 asset_class_cache,
+                node_url,
             );
             operations.push(Operation {
                 operation_identifier: OperationIdentifier {
@@ -1094,6 +1109,7 @@ fn get_standardized_stacks_operations(
             let currency = get_standardized_fungible_currency_from_asset_class_id(
                 &data.asset_class_identifier,
                 asset_class_cache,
+                node_url,
             );
             operations.push(Operation {
                 operation_identifier: OperationIdentifier {
@@ -1155,13 +1171,81 @@ fn get_stacks_currency() -> Currency {
 fn get_standardized_fungible_currency_from_asset_class_id(
     asset_class_id: &str,
     asset_class_cache: &mut HashMap<String, AssetClassCache>,
+    node_url: &str,
 ) -> Currency {
     match asset_class_cache.get(asset_class_id) {
-        None => Currency {
-            symbol: asset_class_id.into(),
-            decimals: 0,
-            metadata: None,
-        },
+        None => {
+            let comps = asset_class_id.split("::").collect::<Vec<&str>>();
+            let principal = comps[0].split(".").collect::<Vec<&str>>();
+
+            let get_symbol_request_url = format!(
+                "{}/v2/contracts/call-read/{}/{}/get-symbol",
+                node_url, principal[0], principal[1],
+            );
+
+            let symbol_res: ContractReadonlyCall = reqwest::blocking::get(&get_symbol_request_url)
+                .expect("Unable to retrieve account")
+                .json()
+                .expect("Unable to parse contract");
+
+            let raw_value = match symbol_res.result.strip_prefix("0x") {
+                Some(raw_value) => raw_value,
+                _ => panic!(),
+            };
+            let value_bytes = match hex_bytes(&raw_value) {
+                Ok(bytes) => bytes,
+                _ => panic!(),
+            };
+
+            let symbol = match ClarityValue::consensus_deserialize(&mut Cursor::new(&value_bytes)) {
+                Ok(value) => value.expect_result_ok().expect_u128(),
+                _ => panic!(),
+            };
+
+            let get_decimals_request_url = format!(
+                "{}/v2/contracts/call-read/{}/{}/get-decimals",
+                node_url, principal[0], principal[1],
+            );
+
+            let decimals_res: ContractReadonlyCall =
+                reqwest::blocking::get(&get_decimals_request_url)
+                    .expect("Unable to retrieve account")
+                    .json()
+                    .expect("Unable to parse contract");
+
+            let raw_value = match decimals_res.result.strip_prefix("0x") {
+                Some(raw_value) => raw_value,
+                _ => panic!(),
+            };
+            let value_bytes = match hex_bytes(&raw_value) {
+                Ok(bytes) => bytes,
+                _ => panic!(),
+            };
+
+            let value = match ClarityValue::consensus_deserialize(&mut Cursor::new(&value_bytes)) {
+                Ok(value) => value.expect_result_ok().expect_u128(),
+                _ => panic!(),
+            };
+
+            let entry = AssetClassCache {
+                symbol: format!("{}", symbol),
+                decimals: value as u8,
+            };
+
+            let currency = Currency {
+                symbol: entry.symbol.clone(),
+                decimals: entry.decimals.into(),
+                metadata: Some(CurrencyMetadata {
+                    asset_class_identifier: asset_class_id.into(),
+                    asset_identifier: None,
+                    standard: CurrencyStandard::Sip10,
+                }),
+            };
+
+            asset_class_cache.insert(asset_class_id.into(), entry);
+
+            currency
+        }
         Some(entry) => Currency {
             symbol: entry.symbol.clone(),
             decimals: entry.decimals.into(),
@@ -1179,20 +1263,13 @@ fn get_standardized_non_fungible_currency_from_asset_class_id(
     asset_id: &str,
     asset_class_cache: &mut HashMap<String, AssetClassCache>,
 ) -> Currency {
-    match asset_class_cache.get(asset_class_id) {
-        None => Currency {
-            symbol: asset_class_id.into(),
-            decimals: 0,
-            metadata: None,
-        },
-        Some(entry) => Currency {
-            symbol: entry.symbol.clone(),
-            decimals: 0,
-            metadata: Some(CurrencyMetadata {
-                asset_class_identifier: asset_class_id.into(),
-                asset_identifier: Some(asset_id.into()),
-                standard: CurrencyStandard::Sip10,
-            }),
-        },
+    Currency {
+        symbol: asset_class_id.into(),
+        decimals: 0,
+        metadata: Some(CurrencyMetadata {
+            asset_class_identifier: asset_class_id.into(),
+            asset_identifier: Some(asset_id.into()),
+            standard: CurrencyStandard::Sip09,
+        }),
     }
 }
