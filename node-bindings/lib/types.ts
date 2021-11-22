@@ -309,7 +309,7 @@ export interface AccountIdentifier {
 }
 
 /**
- * An account may have state specific to a contract address (ERC-20 token) and/or a stake (delegated balance). The sub_account_identifier should specify which state (if applicable) an account instantiation refers to.
+ * An account may have state specific to a contract address (SIP-10 token) and/or a stake (delegated balance). The sub_account_identifier should specify which state (if applicable) an account instantiation refers to.
  * @export
  * @interface SubAccountIdentifier
  */
@@ -429,7 +429,7 @@ export interface Currency {
    */
   decimals: number;
   /**
-   * Any additional information related to the currency itself. For example, it would be useful to populate this object with the contract address of an ERC-20 token.
+   * Any additional information related to the currency itself. For example, it would be useful to populate this object with the contract address of an SIP-10 token.
    * @type {object}
    * @memberof Currency
    */

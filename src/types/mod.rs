@@ -12,6 +12,7 @@ pub use project_manifest::{
 
 pub use data::{
     BitcoinBlockData, BitcoinBlockMetadata, BitcoinTransactionData, BitcoinTransactionMetadata,
-    BlockIdentifier, StacksBlockData, StacksBlockMetadata, StacksTransactionData,
+    BlockIdentifier, Operation, OperationIdentifier, OperationMetadata, OperationStatusKind,
+    OperationType, StacksBlockData, StacksBlockMetadata, StacksTransactionData,
     StacksTransactionMetadata, TransactionIdentifier,
 };
