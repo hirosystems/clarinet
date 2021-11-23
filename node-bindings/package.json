@@ -4,12 +4,12 @@
   "description": "stacks-devnet-js is a library for writing end to end tests for protocols interacting with the Stacks blockchain and the Bitcoin blockchain.",
   "author": "Ludo Galabru",
   "license": "ISC",
-  "main": "lib/index.ts",
+  "main": "dist/index.js",
   "files": [
     "lib"
   ],
   "scripts": {
-    "build": "cargo-cp-artifact -nc native/index.node -- cargo build --message-format=json-render-diagnostics",
+    "build": "tsc --build && cargo-cp-artifact -nc native/index.node -- cargo build --message-format=json-render-diagnostics",
     "build-debug": "npm run build --",
     "build-release": "npm run build -- --release",
     "build-linux-x64": "npm run build-release -- --target x86_64-unknown-linux-gnu",
