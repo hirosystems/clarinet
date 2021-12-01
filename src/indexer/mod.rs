@@ -1,17 +1,17 @@
 pub mod chains;
 
-use crate::types::{BitcoinBlockData, StacksBlockData, BlockIdentifier};
-use rocket::serde::json::{Value as JsonValue};
-use std::collections::{VecDeque, HashMap};
+use crate::types::{BitcoinBlockData, BlockIdentifier, StacksBlockData};
+use rocket::serde::json::Value as JsonValue;
+use std::collections::{HashMap, VecDeque};
 
 pub enum BitcoinChainEvent {
     ChainUpdatedWithBlock(BitcoinBlockData),
-    ChainUpdatedWithReorg(Vec<BitcoinBlockData>)
+    ChainUpdatedWithReorg(Vec<BitcoinBlockData>),
 }
 
 pub enum StacksChainEvent {
     ChainUpdatedWithBlock(StacksBlockData),
-    ChainUpdatedWithReorg(Vec<StacksBlockData>)
+    ChainUpdatedWithReorg(Vec<StacksBlockData>),
 }
 
 #[derive(Deserialize, Debug, Clone, Default)]
@@ -68,10 +68,10 @@ impl StacksChainContext {
 }
 
 pub struct IndexerConfig {
-    stacks_node_rpc_url: String,
-    bitcoin_node_rpc_url: String,
-    bitcoin_node_rpc_username: String,
-    bitcoin_node_rpc_password: String,
+    pub stacks_node_rpc_url: String,
+    pub bitcoin_node_rpc_url: String,
+    pub bitcoin_node_rpc_username: String,
+    pub bitcoin_node_rpc_password: String,
 }
 
 pub struct Indexer {
@@ -82,7 +82,6 @@ pub struct Indexer {
 }
 
 impl Indexer {
-
     pub fn new(config: IndexerConfig) -> Indexer {
         let stacks_last_7_blocks = VecDeque::new();
         let bitcoin_last_7_blocks = VecDeque::new();
@@ -99,7 +98,8 @@ impl Indexer {
         let block = chains::standardize_bitcoin_block(&self.config, marshalled_block);
         if let Some(tip) = self.bitcoin_last_7_blocks.back() {
             if block.block_identifier.index == tip.index + 1 {
-                self.bitcoin_last_7_blocks.push_back(block.block_identifier.clone());
+                self.bitcoin_last_7_blocks
+                    .push_back(block.block_identifier.clone());
                 if self.bitcoin_last_7_blocks.len() > 7 {
                     self.bitcoin_last_7_blocks.pop_front();
                 }
@@ -111,16 +111,22 @@ impl Indexer {
                 // TODO: deeper reorg
             }
         } else {
-            self.bitcoin_last_7_blocks.push_front(block.block_identifier.clone());
+            self.bitcoin_last_7_blocks
+                .push_front(block.block_identifier.clone());
         }
         BitcoinChainEvent::ChainUpdatedWithBlock(block)
     }
 
     pub fn handle_stacks_block(&mut self, marshalled_block: JsonValue) -> StacksChainEvent {
-        let block = chains::standardize_stacks_block(&self.config, marshalled_block, &mut self.stacks_context);
+        let block = chains::standardize_stacks_block(
+            &self.config,
+            marshalled_block,
+            &mut self.stacks_context,
+        );
         if let Some(tip) = self.stacks_last_7_blocks.back() {
             if block.block_identifier.index == tip.index + 1 {
-                self.stacks_last_7_blocks.push_back(block.block_identifier.clone());
+                self.stacks_last_7_blocks
+                    .push_back(block.block_identifier.clone());
                 if self.stacks_last_7_blocks.len() > 7 {
                     self.stacks_last_7_blocks.pop_front();
                 }
@@ -132,12 +138,22 @@ impl Indexer {
                 // TODO: deeper reorg
             }
         } else {
-            self.stacks_last_7_blocks.push_front(block.block_identifier.clone());
+            self.stacks_last_7_blocks
+                .push_front(block.block_identifier.clone());
         }
         StacksChainEvent::ChainUpdatedWithBlock(block)
     }
 
     pub fn get_updated_pox_info(&mut self) -> PoxInfo {
+        // std::thread::spawn(move || {
+        //     let pox_url = format!("{}/v2/pox", node_url);
+
+        //     if let Ok(reponse) = reqwest::blocking::get(pox_url) {
+        //         if let Ok(update) = reponse.json() {
+        //             pox_info = update
+        //         }
+        //     }
+
         self.stacks_context.pox_info.clone()
     }
 }

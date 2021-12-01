@@ -1,25 +1,21 @@
+use crate::indexer::AssetClassCache;
 use crate::indexer::{IndexerConfig, StacksChainContext};
 use crate::types::{
-    AccountIdentifier, Amount,
-    BlockIdentifier, Currency, CurrencyMetadata, CurrencyStandard,
+    AccountIdentifier, Amount, BlockIdentifier, Currency, CurrencyMetadata, CurrencyStandard,
     Operation, OperationIdentifier, OperationStatusKind, OperationType, StacksBlockData,
     StacksBlockMetadata, StacksTransactionData, StacksTransactionMetadata, TransactionIdentifier,
 };
 use crate::utils::stacks::{transactions, StacksRpc};
-use crate::indexer::AssetClassCache;
 use clarity_repl::clarity::codec::transaction::TransactionPayload;
 use clarity_repl::clarity::codec::{StacksMessageCodec, StacksTransaction};
-use clarity_repl::clarity::types::{
-    AssetIdentifier, BuffData, SequenceData, TupleData, Value as ClarityValue,
-};
-use clarity_repl::clarity::util::hash::{hex_bytes, Hash160};
-use rocket::serde::json::{Value as JsonValue};
+use clarity_repl::clarity::types::Value as ClarityValue;
+use clarity_repl::clarity::util::hash::hex_bytes;
+use rocket::serde::json::Value as JsonValue;
 use rocket::serde::Deserialize;
 use std::collections::HashMap;
+use std::convert::TryInto;
 use std::io::Cursor;
 use std::str;
-use std::convert::TryInto;
-
 
 #[allow(dead_code)]
 #[derive(Deserialize)]
@@ -162,17 +158,22 @@ struct ContractReadonlyCall {
     result: String,
 }
 
-pub fn standardize_stacks_block(indexer_config: &IndexerConfig, marshalled_block: JsonValue, ctx: &mut StacksChainContext) -> StacksBlockData {
-
+pub fn standardize_stacks_block(
+    indexer_config: &IndexerConfig,
+    marshalled_block: JsonValue,
+    ctx: &mut StacksChainContext,
+) -> StacksBlockData {
     let mut block: NewBlock = serde_json::from_value(marshalled_block).unwrap();
 
-    let pox_cycle_length: u64 = (ctx.pox_info.prepare_phase_block_length + ctx.pox_info.reward_phase_block_length).into();
+    let pox_cycle_length: u64 =
+        (ctx.pox_info.prepare_phase_block_length + ctx.pox_info.reward_phase_block_length).into();
     let current_len = block.burn_block_height - ctx.pox_info.first_burnchain_block_height;
     let pox_cycle_id: u32 = (current_len / pox_cycle_length).try_into().unwrap();
 
     let mut events = vec![];
     events.append(&mut block.events);
-    let transactions = block.transactions
+    let transactions = block
+        .transactions
         .iter()
         .map(|t| {
             let description = get_tx_description(&t.raw_tx);
@@ -216,7 +217,7 @@ pub fn standardize_stacks_block(indexer_config: &IndexerConfig, marshalled_block
             pox_cycle_length: pox_cycle_length.try_into().unwrap(),
         },
         transactions,
-    }   
+    }
 }
 
 pub fn get_value_description(raw_value: &str) -> String {
@@ -288,7 +289,6 @@ pub fn get_tx_description(raw_tx: &str) -> String {
     };
     description
 }
-
 
 pub fn get_standardized_fungible_currency_from_asset_class_id(
     asset_class_id: &str,
@@ -406,14 +406,14 @@ pub fn get_standardized_stacks_operations(
 ) -> Vec<Operation> {
     let mut operations = vec![];
     let mut operation_id = 0;
-    
+
     let mut i = 0;
     while i < events.len() {
         if events[i].txid == transaction.txid {
             let event = events.remove(i);
             if let Some(ref event_data) = event.stx_mint_event {
-                let data: STXMintEventData =
-                    serde_json::from_value(event_data.clone()).expect("Unable to decode event_data");
+                let data: STXMintEventData = serde_json::from_value(event_data.clone())
+                    .expect("Unable to decode event_data");
                 operations.push(Operation {
                     operation_identifier: OperationIdentifier {
                         index: operation_id,
@@ -434,8 +434,8 @@ pub fn get_standardized_stacks_operations(
                 });
                 operation_id += 1;
             } else if let Some(ref event_data) = event.stx_lock_event {
-                let data: STXLockEventData =
-                    serde_json::from_value(event_data.clone()).expect("Unable to decode event_data");
+                let data: STXLockEventData = serde_json::from_value(event_data.clone())
+                    .expect("Unable to decode event_data");
                 operations.push(Operation {
                     operation_identifier: OperationIdentifier {
                         index: operation_id,
@@ -449,15 +449,18 @@ pub fn get_standardized_stacks_operations(
                         sub_account: None,
                     },
                     amount: Some(Amount {
-                        value: data.locked_amount.parse::<u64>().expect("Unable to parse u64"),
+                        value: data
+                            .locked_amount
+                            .parse::<u64>()
+                            .expect("Unable to parse u64"),
                         currency: get_stacks_currency(),
                     }),
                     metadata: None,
                 });
                 operation_id += 1;
             } else if let Some(ref event_data) = event.stx_burn_event {
-                let data: STXBurnEventData =
-                    serde_json::from_value(event_data.clone()).expect("Unable to decode event_data");
+                let data: STXBurnEventData = serde_json::from_value(event_data.clone())
+                    .expect("Unable to decode event_data");
                 operations.push(Operation {
                     operation_identifier: OperationIdentifier {
                         index: operation_id,
@@ -478,8 +481,8 @@ pub fn get_standardized_stacks_operations(
                 });
                 operation_id += 1;
             } else if let Some(ref event_data) = event.stx_transfer_event {
-                let data: STXTransferEventData =
-                    serde_json::from_value(event_data.clone()).expect("Unable to decode event_data");
+                let data: STXTransferEventData = serde_json::from_value(event_data.clone())
+                    .expect("Unable to decode event_data");
                 operations.push(Operation {
                     operation_identifier: OperationIdentifier {
                         index: operation_id,
@@ -525,8 +528,8 @@ pub fn get_standardized_stacks_operations(
                 });
                 operation_id += 1;
             } else if let Some(ref event_data) = event.nft_mint_event {
-                let data: NFTMintEventData =
-                    serde_json::from_value(event_data.clone()).expect("Unable to decode event_data");
+                let data: NFTMintEventData = serde_json::from_value(event_data.clone())
+                    .expect("Unable to decode event_data");
                 let currency = get_standardized_non_fungible_currency_from_asset_class_id(
                     &data.asset_class_identifier,
                     &data.asset_identifier,
@@ -549,8 +552,8 @@ pub fn get_standardized_stacks_operations(
                 });
                 operation_id += 1;
             } else if let Some(ref event_data) = event.nft_burn_event {
-                let data: NFTBurnEventData =
-                    serde_json::from_value(event_data.clone()).expect("Unable to decode event_data");
+                let data: NFTBurnEventData = serde_json::from_value(event_data.clone())
+                    .expect("Unable to decode event_data");
                 let currency = get_standardized_non_fungible_currency_from_asset_class_id(
                     &data.asset_class_identifier,
                     &data.asset_identifier,
@@ -573,8 +576,8 @@ pub fn get_standardized_stacks_operations(
                 });
                 operation_id += 1;
             } else if let Some(ref event_data) = event.nft_transfer_event {
-                let data: NFTTransferEventData =
-                    serde_json::from_value(event_data.clone()).expect("Unable to decode event_data");
+                let data: NFTTransferEventData = serde_json::from_value(event_data.clone())
+                    .expect("Unable to decode event_data");
                 let currency = get_standardized_non_fungible_currency_from_asset_class_id(
                     &data.asset_class_identifier,
                     &data.asset_identifier,
@@ -622,8 +625,8 @@ pub fn get_standardized_stacks_operations(
                 });
                 operation_id += 1;
             } else if let Some(ref event_data) = event.ft_mint_event {
-                let data: FTMintEventData =
-                    serde_json::from_value(event_data.clone()).expect("Unable to decode event_data");
+                let data: FTMintEventData = serde_json::from_value(event_data.clone())
+                    .expect("Unable to decode event_data");
                 let currency = get_standardized_fungible_currency_from_asset_class_id(
                     &data.asset_class_identifier,
                     asset_class_cache,
@@ -649,8 +652,8 @@ pub fn get_standardized_stacks_operations(
                 });
                 operation_id += 1;
             } else if let Some(ref event_data) = event.ft_burn_event {
-                let data: FTBurnEventData =
-                    serde_json::from_value(event_data.clone()).expect("Unable to decode event_data");
+                let data: FTBurnEventData = serde_json::from_value(event_data.clone())
+                    .expect("Unable to decode event_data");
                 let currency = get_standardized_fungible_currency_from_asset_class_id(
                     &data.asset_class_identifier,
                     asset_class_cache,
@@ -676,8 +679,8 @@ pub fn get_standardized_stacks_operations(
                 });
                 operation_id += 1;
             } else if let Some(ref event_data) = event.ft_transfer_event {
-                let data: FTTransferEventData =
-                    serde_json::from_value(event_data.clone()).expect("Unable to decode event_data");
+                let data: FTTransferEventData = serde_json::from_value(event_data.clone())
+                    .expect("Unable to decode event_data");
                 let currency = get_standardized_fungible_currency_from_asset_class_id(
                     &data.asset_class_identifier,
                     asset_class_cache,

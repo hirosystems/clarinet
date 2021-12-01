@@ -93,13 +93,14 @@ impl<'a> App<'a> {
     }
 
     pub fn display_block(&mut self, block: StacksBlockData) {
-        let (start, end) = if block.metadata.pox_cycle_position == (block.metadata.pox_cycle_length - 1) {
-            ("", "<")
-        } else if block.metadata.pox_cycle_position == 0 {
-            (">", "")
-        } else {
-            ("", "")
-        };
+        let (start, end) =
+            if block.metadata.pox_cycle_position == (block.metadata.pox_cycle_length - 1) {
+                ("", "<")
+            } else if block.metadata.pox_cycle_position == 0 {
+                (">", "")
+            } else {
+                ("", "")
+            };
         let has_tx = if block.transactions.len() <= 1 {
             ""
         } else {

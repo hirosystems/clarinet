@@ -1,33 +1,24 @@
 use super::DevnetEvent;
+use crate::indexer::{chains, BitcoinChainEvent, Indexer, IndexerConfig, StacksChainEvent};
 use crate::integrate::{MempoolAdmissionData, ServiceStatusData, Status};
 use crate::poke::load_session;
 use crate::publish::{publish_contract, Network};
-use crate::types::{self, AccountConfig, DevnetConfig};
-use crate::types::{
-    AccountIdentifier, Amount, BitcoinBlockData, BitcoinBlockMetadata, BitcoinTransactionData,
-    BitcoinTransactionMetadata, BlockIdentifier, Currency, CurrencyMetadata, CurrencyStandard,
-    Operation, OperationIdentifier, OperationStatusKind, OperationType, StacksBlockData,
-    StacksBlockMetadata, StacksTransactionData, StacksTransactionMetadata, TransactionIdentifier,
-};
+use crate::types::{self, DevnetConfig};
 use crate::utils;
 use crate::utils::stacks::{transactions, StacksRpc};
 use base58::FromBase58;
-use clarity_repl::clarity::codec::transaction::TransactionPayload;
-use clarity_repl::clarity::codec::{StacksMessageCodec, StacksTransaction};
 use clarity_repl::clarity::representations::ClarityName;
-use clarity_repl::clarity::types::{
-    AssetIdentifier, BuffData, SequenceData, TupleData, Value as ClarityValue,
-};
+use clarity_repl::clarity::types::{BuffData, SequenceData, TupleData, Value as ClarityValue};
 use clarity_repl::clarity::util::address::AddressHashMode;
 use clarity_repl::clarity::util::hash::{hex_bytes, Hash160};
-use clarity_repl::repl::settings::{InitialContract, Account};
+use clarity_repl::repl::settings::{Account, InitialContract};
 use clarity_repl::repl::Session;
 use rocket::config::{Config, LogLevel};
 use rocket::serde::json::{json, Json, Value as JsonValue};
 use rocket::serde::Deserialize;
 use rocket::State;
 use std::collections::{BTreeMap, VecDeque};
-use std::convert::{TryFrom,};
+use std::convert::TryFrom;
 use std::error::Error;
 use std::iter::FromIterator;
 use std::net::{IpAddr, Ipv4Addr};
@@ -36,7 +27,6 @@ use std::str;
 use std::sync::mpsc::{Receiver, Sender};
 use std::sync::{Arc, Mutex, RwLock};
 use tracing::info;
-use crate::indexer::{chains, Indexer, StacksChainEvent, BitcoinChainEvent, IndexerConfig};
 
 #[cfg(feature = "cli")]
 use crate::runnner::deno;
@@ -76,10 +66,7 @@ struct ContractReadonlyCall {
 }
 
 impl EventObserverConfig {
-    pub fn new(
-        devnet_config: DevnetConfig,
-        manifest_path: PathBuf,
-    ) -> Self {
+    pub fn new(devnet_config: DevnetConfig, manifest_path: PathBuf) -> Self {
         info!("Checking contracts...");
         let session = match load_session(manifest_path.clone(), false, &Network::Devnet) {
             Ok((session, _)) => session,
@@ -127,15 +114,21 @@ pub async fn start_events_observer(
     let _ = config.execute_scripts().await;
 
     let indexer = Indexer::new(IndexerConfig {
-        stacks_node_rpc_url: format!("http://localhost:{}", config.devnet_config.stacks_node_rpc_port),
-        bitcoin_node_rpc_url: format!("http://localhost:{}", config.devnet_config.bitcoin_node_rpc_port),
+        stacks_node_rpc_url: format!(
+            "http://localhost:{}",
+            config.devnet_config.stacks_node_rpc_port
+        ),
+        bitcoin_node_rpc_url: format!(
+            "http://localhost:{}",
+            config.devnet_config.bitcoin_node_rpc_port
+        ),
         bitcoin_node_rpc_username: config.devnet_config.bitcoin_node_username.clone(),
         bitcoin_node_rpc_password: config.devnet_config.bitcoin_node_password.clone(),
     });
 
     let init_status = DevnetInitializationStatus {
         contracts_left_to_deploy: config.contracts_to_deploy.clone(),
-        deployer_nonce: 0
+        deployer_nonce: 0,
     };
 
     let port = config.devnet_config.orchestrator_port;
@@ -234,25 +227,29 @@ pub fn handle_new_burn_block(
 ) -> Json<JsonValue> {
     let devnet_events_tx = devnet_events_tx.inner();
 
-    // Standardize the structure of the block, and identify the 
-    // kind of update that this new block would imply, taking 
+    // Standardize the structure of the block, and identify the
+    // kind of update that this new block would imply, taking
     // into account the last 7 blocks.
     let chain_update = match indexer.inner().write() {
         Ok(mut indexer) => indexer.handle_bitcoin_block(marshalled_block.into_inner()),
-        _ => return Json(json!({
-            "status": 200,
-            "result": "Ok",
-        }))
+        _ => {
+            return Json(json!({
+                "status": 200,
+                "result": "Ok",
+            }))
+        }
     };
 
     // Contextual shortcut: Devnet is an environment under control,
     // with 1 miner. As such we will ignore Reorgs handling.
     let block = match chain_update {
         BitcoinChainEvent::ChainUpdatedWithBlock(block) => block,
-        _ => return Json(json!({
-            "status": 200,
-            "result": "Ok",
-        }))
+        _ => {
+            return Json(json!({
+                "status": 200,
+                "result": "Ok",
+            }))
+        }
     };
 
     match devnet_events_tx.lock() {
@@ -268,7 +265,8 @@ pub fn handle_new_burn_block(
                 name: "bitcoin-node".into(),
                 comment: format!(
                     "mining blocks (chaintip = #{})",
-                    block.block_identifier.index)
+                    block.block_identifier.index
+                ),
             }));
             let _ = tx.send(DevnetEvent::BitcoinBlock(block));
         }
@@ -289,29 +287,32 @@ pub fn handle_new_block(
     devnet_events_tx: &State<Arc<Mutex<Sender<DevnetEvent>>>>,
     mut marshalled_block: Json<JsonValue>,
 ) -> Json<JsonValue> {
-
-    // Standardize the structure of the block, and identify the 
-    // kind of update that this new block would imply, taking 
+    // Standardize the structure of the block, and identify the
+    // kind of update that this new block would imply, taking
     // into account the last 7 blocks.
     let (chain_update, pox_info) = match indexer.inner().write() {
         Ok(mut indexer) => {
             let chain_event = indexer.handle_stacks_block(marshalled_block.into_inner());
             (chain_event, indexer.get_updated_pox_info())
-        },
-        _ => return Json(json!({
-            "status": 200,
-            "result": "Ok",
-        }))
+        }
+        _ => {
+            return Json(json!({
+                "status": 200,
+                "result": "Ok",
+            }))
+        }
     };
 
     // Contextual: Devnet is an environment under control,
     // with 1 miner. As such we will ignore Reorgs handling.
     let block = match chain_update {
         StacksChainEvent::ChainUpdatedWithBlock(block) => block,
-        _ => return Json(json!({
-            "status": 200,
-            "result": "Ok",
-        }))
+        _ => {
+            return Json(json!({
+                "status": 200,
+                "result": "Ok",
+            }))
+        }
     };
 
     let config = config.inner();
@@ -324,7 +325,10 @@ pub fn handle_new_block(
             order: 1,
             status: Status::Green,
             name: "stacks-node".into(),
-            comment: format!("mining blocks (chaintip = #{})", block.block_identifier.index),
+            comment: format!(
+                "mining blocks (chaintip = #{})",
+                block.block_identifier.index
+            ),
         }));
         let _ = tx.send(DevnetEvent::info(format!(
             "Block #{} anchored in Bitcoin block #{} includes {} transactions",
@@ -340,7 +344,6 @@ pub fn handle_new_block(
     // defined in the devnet file config.
     if let Ok(mut init_status_writer) = init_status.inner().write() {
         if init_status_writer.contracts_left_to_deploy.len() > 0 {
-
             if let Ok(config_reader) = config.lock() {
                 let node_url = format!(
                     "http://localhost:{}",
@@ -360,7 +363,10 @@ pub fn handle_new_block(
                 let mut contracts_to_deploy = vec![];
 
                 for _ in 0..contracts_to_deploy_in_blocks {
-                    let contract = init_status_writer.contracts_left_to_deploy.pop_front().unwrap();
+                    let contract = init_status_writer
+                        .contracts_left_to_deploy
+                        .pop_front()
+                        .unwrap();
                     contracts_to_deploy.push(contract);
                 }
 
@@ -410,18 +416,13 @@ pub fn handle_new_block(
                     }
                 });
             }
-        } 
+        }
     }
-
-
-    if let Ok(tx) = devnet_events_tx.lock() {
-        let _ = tx.send(DevnetEvent::StacksBlock(block));
-    }
-
 
     // Every penultimate block, we check if some stacking orders should be submitted before the next
     // cycle starts.
-    let pox_cycle_length: u32 = pox_info.prepare_phase_block_length + pox_info.reward_phase_block_length;
+    let pox_cycle_length: u32 =
+        pox_info.prepare_phase_block_length + pox_info.reward_phase_block_length;
     if block.metadata.pox_cycle_position == (pox_cycle_length - 2) {
         if let Ok(config_reader) = config.lock() {
             // let tx_clone = tx.clone();
@@ -430,17 +431,11 @@ pub fn handle_new_block(
                 config_reader.devnet_config.stacks_node_rpc_port
             );
 
+            let bitcoin_block_height = block.metadata.bitcoin_anchor_block_identifier.index;
             let accounts = config_reader.accounts.clone();
-            
             let pox_stacking_orders = config_reader.devnet_config.pox_stacking_orders.clone();
             std::thread::spawn(move || {
                 let pox_url = format!("{}/v2/pox", node_url);
-
-                if let Ok(reponse) = reqwest::blocking::get(pox_url) {
-                    if let Ok(update) = reponse.json() {
-                        pox_info = update
-                    }
-                }
 
                 for pox_stacking_order in pox_stacking_orders.into_iter() {
                     if pox_stacking_order.start_at_cycle == (pox_info.reward_cycle_id + 1) {
@@ -463,11 +458,8 @@ pub fn handle_new_block(
 
                         let stx_amount =
                             pox_info.next_cycle.min_threshold_ustx * pox_stacking_order.slots;
-                        let (_, _, account_secret_keu) = types::compute_addresses(
-                            &account.mnemonic,
-                            &account.derivation,
-                            false,
-                        );
+                        let (_, _, account_secret_keu) =
+                            types::compute_addresses(&account.mnemonic, &account.derivation, false);
                         let addr_bytes = pox_stacking_order
                             .btc_address
                             .from_base58()
@@ -497,7 +489,7 @@ pub fn handle_new_block(
                                     ])
                                     .unwrap(),
                                 ),
-                                ClarityValue::UInt((block.metadata.bitcoin_anchor_block_identifier.index - 1).into()),
+                                ClarityValue::UInt((bitcoin_block_height - 1).into()),
                                 ClarityValue::UInt(pox_stacking_order.duration.into()),
                             ],
                             nonce,
@@ -511,6 +503,10 @@ pub fn handle_new_block(
                 }
             });
         }
+    }
+
+    if let Ok(tx) = devnet_events_tx.lock() {
+        let _ = tx.send(DevnetEvent::StacksBlock(block));
     }
 
     Json(json!({
@@ -593,10 +589,6 @@ pub fn handle_drop_mempool_tx() -> Json<JsonValue> {
     }))
 }
 
-pub fn publish_initial_contracts() {
+pub fn publish_initial_contracts() {}
 
-}
-
-pub fn submit_stacking_orders() {
-
-}
+pub fn submit_stacking_orders() {}

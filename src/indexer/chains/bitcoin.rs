@@ -1,10 +1,10 @@
-use bitcoincore_rpc::{Auth, Client, RpcApi};
-use bitcoincore_rpc::bitcoin::hashes::Hash;
-use bitcoincore_rpc::bitcoin::BlockHash;
-use clarity_repl::clarity::util::hash::{hex_bytes};
 use crate::indexer::IndexerConfig;
 use crate::types::{BitcoinBlockData, BitcoinBlockMetadata, BlockIdentifier};
-use rocket::serde::json::{Value as JsonValue};
+use bitcoincore_rpc::bitcoin::hashes::Hash;
+use bitcoincore_rpc::bitcoin::BlockHash;
+use bitcoincore_rpc::{Auth, Client, RpcApi};
+use clarity_repl::clarity::util::hash::hex_bytes;
+use rocket::serde::json::Value as JsonValue;
 
 #[allow(dead_code)]
 #[derive(Deserialize)]
@@ -15,12 +15,16 @@ pub struct NewBurnBlock {
     burn_amount: u64,
 }
 
-pub fn standardize_bitcoin_block(indexer_config: &IndexerConfig, marshalled_block: JsonValue) -> BitcoinBlockData {
+pub fn standardize_bitcoin_block(
+    indexer_config: &IndexerConfig,
+    marshalled_block: JsonValue,
+) -> BitcoinBlockData {
     let mut transactions = vec![];
 
     let auth = Auth::UserPass(
         indexer_config.bitcoin_node_rpc_username.clone(),
-        indexer_config.bitcoin_node_rpc_password.clone());
+        indexer_config.bitcoin_node_rpc_password.clone(),
+    );
 
     let rpc = Client::new(&indexer_config.bitcoin_node_rpc_url, auth).unwrap();
 
@@ -33,7 +37,7 @@ pub fn standardize_bitcoin_block(indexer_config: &IndexerConfig, marshalled_bloc
         BlockHash::from_slice(&block_hash_bytes).unwrap()
     };
     let block = rpc.get_block(&block_hash).unwrap();
-    
+
     for txdata in block.txdata.iter() {
         // let _ = tx.send(DevnetEvent::debug(format!(
         //     "Tx.out: {:?}", txdata.output
@@ -54,4 +58,3 @@ pub fn standardize_bitcoin_block(indexer_config: &IndexerConfig, marshalled_bloc
         transactions: transactions,
     }
 }
-
