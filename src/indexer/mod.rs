@@ -4,11 +4,13 @@ use crate::types::{BitcoinBlockData, BlockIdentifier, StacksBlockData};
 use rocket::serde::json::Value as JsonValue;
 use std::collections::{HashMap, VecDeque};
 
+#[allow(dead_code)]
 pub enum BitcoinChainEvent {
     ChainUpdatedWithBlock(BitcoinBlockData),
     ChainUpdatedWithReorg(Vec<BitcoinBlockData>),
 }
 
+#[allow(dead_code)]
 pub enum StacksChainEvent {
     ChainUpdatedWithBlock(StacksBlockData),
     ChainUpdatedWithReorg(Vec<StacksBlockData>),

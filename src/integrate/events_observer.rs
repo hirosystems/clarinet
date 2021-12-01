@@ -1,5 +1,7 @@
 use super::DevnetEvent;
-use crate::indexer::{chains, BitcoinChainEvent, Indexer, IndexerConfig, StacksChainEvent};
+use crate::indexer::{
+    chains, BitcoinChainEvent, Indexer, IndexerConfig, PoxInfo, StacksChainEvent,
+};
 use crate::integrate::{MempoolAdmissionData, ServiceStatusData, Status};
 use crate::poke::load_session;
 use crate::publish::{publish_contract, Network};
@@ -285,7 +287,7 @@ pub fn handle_new_block(
     init_status: &State<Arc<RwLock<DevnetInitializationStatus>>>,
     indexer: &State<Arc<RwLock<Indexer>>>,
     devnet_events_tx: &State<Arc<Mutex<Sender<DevnetEvent>>>>,
-    mut marshalled_block: Json<JsonValue>,
+    marshalled_block: Json<JsonValue>,
 ) -> Json<JsonValue> {
     // Standardize the structure of the block, and identify the
     // kind of update that this new block would imply, taking
@@ -345,76 +347,18 @@ pub fn handle_new_block(
     if let Ok(mut init_status_writer) = init_status.inner().write() {
         if init_status_writer.contracts_left_to_deploy.len() > 0 {
             if let Ok(config_reader) = config.lock() {
-                let node_url = format!(
-                    "http://localhost:{}",
-                    config_reader.devnet_config.stacks_node_rpc_port
-                );
-
-                // How many contracts left?
-                let contracts_left = init_status_writer.contracts_left_to_deploy.len();
-                let tx_chaining_limit = 25;
-                let blocks_required = 1 + (contracts_left / tx_chaining_limit);
-                let contracts_to_deploy_in_blocks = if blocks_required == 1 {
-                    contracts_left
-                } else {
-                    contracts_left / blocks_required
-                };
-
-                let mut contracts_to_deploy = vec![];
-
-                for _ in 0..contracts_to_deploy_in_blocks {
-                    let contract = init_status_writer
-                        .contracts_left_to_deploy
-                        .pop_front()
-                        .unwrap();
-                    contracts_to_deploy.push(contract);
-                }
-
-                let moved_node_url = node_url.clone();
-
-                let mut deployers_lookup = BTreeMap::new();
-                for account in config_reader.accounts.iter() {
-                    if account.name == "deployer" {
-                        deployers_lookup.insert("*".into(), account.clone());
+                if let Some(count) = publish_initial_contracts(
+                    &config_reader.devnet_config,
+                    &config_reader.accounts,
+                    &mut init_status_writer,
+                ) {
+                    if let Ok(tx) = devnet_events_tx.lock() {
+                        let _ = tx.send(DevnetEvent::success(format!(
+                            "Will publish {} contracts",
+                            count
+                        )));
                     }
                 }
-
-                let mut deployers_nonces = BTreeMap::new();
-                deployers_nonces.insert("deployer".to_string(), init_status_writer.deployer_nonce);
-                init_status_writer.deployer_nonce += contracts_to_deploy.len() as u64;
-
-                if let Ok(tx) = devnet_events_tx.lock() {
-                    let _ = tx.send(DevnetEvent::success(format!(
-                        "Will broadcast {} transactions",
-                        contracts_to_deploy.len()
-                    )));
-                }
-
-                // Move the transactions submission to another thread, the clock on that thread is ticking,
-                // and blocking our stacks-node
-                std::thread::spawn(move || {
-                    for contract in contracts_to_deploy.into_iter() {
-                        match publish_contract(
-                            &contract,
-                            &deployers_lookup,
-                            &mut deployers_nonces,
-                            &moved_node_url,
-                            1,
-                            &Network::Devnet,
-                        ) {
-                            Ok((_txid, _nonce)) => {
-                                // let _ = tx_clone.send(DevnetEvent::success(format!(
-                                //     "Contract {} broadcasted in mempool (txid: {}, nonce: {})",
-                                //     contract.name.unwrap(), txid, nonce
-                                // )));
-                            }
-                            Err(_err) => {
-                                // let _ = tx_clone.send(DevnetEvent::error(err.to_string()));
-                                break;
-                            }
-                        }
-                    }
-                });
             }
         }
     }
@@ -425,83 +369,20 @@ pub fn handle_new_block(
         pox_info.prepare_phase_block_length + pox_info.reward_phase_block_length;
     if block.metadata.pox_cycle_position == (pox_cycle_length - 2) {
         if let Ok(config_reader) = config.lock() {
-            // let tx_clone = tx.clone();
-            let node_url = format!(
-                "http://localhost:{}",
-                config_reader.devnet_config.stacks_node_rpc_port
-            );
-
             let bitcoin_block_height = block.metadata.bitcoin_anchor_block_identifier.index;
-            let accounts = config_reader.accounts.clone();
-            let pox_stacking_orders = config_reader.devnet_config.pox_stacking_orders.clone();
-            std::thread::spawn(move || {
-                let pox_url = format!("{}/v2/pox", node_url);
-
-                for pox_stacking_order in pox_stacking_orders.into_iter() {
-                    if pox_stacking_order.start_at_cycle == (pox_info.reward_cycle_id + 1) {
-                        let mut account = None;
-                        while let Some(e) = accounts.iter().next() {
-                            if e.name == pox_stacking_order.wallet {
-                                account = Some(e);
-                            }
-                        }
-                        let account = match account {
-                            Some(account) => account,
-                            _ => continue,
-                        };
-
-                        let stacks_rpc = StacksRpc::new(node_url.clone());
-                        let default_fee = 1000;
-                        let nonce = stacks_rpc
-                            .get_nonce(account.address.to_string())
-                            .expect("Unable to retrieve nonce");
-
-                        let stx_amount =
-                            pox_info.next_cycle.min_threshold_ustx * pox_stacking_order.slots;
-                        let (_, _, account_secret_keu) =
-                            types::compute_addresses(&account.mnemonic, &account.derivation, false);
-                        let addr_bytes = pox_stacking_order
-                            .btc_address
-                            .from_base58()
-                            .expect("Unable to get bytes from btc address");
-
-                        let addr_bytes = Hash160::from_bytes(&addr_bytes[1..21]).unwrap();
-                        let addr_version = AddressHashMode::SerializeP2PKH;
-                        let stack_stx_tx = transactions::build_contrat_call_transaction(
-                            pox_info.contract_id.clone(),
-                            "stack-stx".into(),
-                            vec![
-                                ClarityValue::UInt(stx_amount.into()),
-                                ClarityValue::Tuple(
-                                    TupleData::from_data(vec![
-                                        (
-                                            ClarityName::try_from("version".to_owned()).unwrap(),
-                                            ClarityValue::buff_from_byte(addr_version as u8),
-                                        ),
-                                        (
-                                            ClarityName::try_from("hashbytes".to_owned()).unwrap(),
-                                            ClarityValue::Sequence(SequenceData::Buffer(
-                                                BuffData {
-                                                    data: addr_bytes.as_bytes().to_vec(),
-                                                },
-                                            )),
-                                        ),
-                                    ])
-                                    .unwrap(),
-                                ),
-                                ClarityValue::UInt((bitcoin_block_height - 1).into()),
-                                ClarityValue::UInt(pox_stacking_order.duration.into()),
-                            ],
-                            nonce,
-                            default_fee,
-                            &hex_bytes(&account_secret_keu).unwrap(),
-                        );
-                        let _ = stacks_rpc
-                            .post_transaction(stack_stx_tx)
-                            .expect("Unable to broadcast transaction");
-                    }
+            if let Some(count) = publish_stacking_orders(
+                &config_reader.devnet_config,
+                &config_reader.accounts,
+                &pox_info,
+                bitcoin_block_height as u32,
+            ) {
+                if let Ok(tx) = devnet_events_tx.lock() {
+                    let _ = tx.send(DevnetEvent::success(format!(
+                        "Will broadcast {} stacking orders",
+                        count
+                    )));
                 }
-            });
+            }
         }
     }
 
@@ -589,6 +470,156 @@ pub fn handle_drop_mempool_tx() -> Json<JsonValue> {
     }))
 }
 
-pub fn publish_initial_contracts() {}
+pub fn publish_initial_contracts(
+    devnet_config: &DevnetConfig,
+    accounts: &Vec<Account>,
+    init_status: &mut DevnetInitializationStatus,
+) -> Option<usize> {
+    let contracts_left = init_status.contracts_left_to_deploy.len();
+    if contracts_left == 0 {
+        return None;
+    }
 
-pub fn submit_stacking_orders() {}
+    let node_url = format!("http://localhost:{}", devnet_config.stacks_node_rpc_port);
+    let tx_chaining_limit = 25;
+    let blocks_required = 1 + (contracts_left / tx_chaining_limit);
+    let contracts_to_deploy_in_blocks = if blocks_required == 1 {
+        contracts_left
+    } else {
+        contracts_left / blocks_required
+    };
+
+    let mut contracts_to_deploy = vec![];
+
+    for _ in 0..contracts_to_deploy_in_blocks {
+        let contract = init_status.contracts_left_to_deploy.pop_front().unwrap();
+        contracts_to_deploy.push(contract);
+    }
+
+    let moved_node_url = node_url.clone();
+
+    let mut deployers_lookup = BTreeMap::new();
+    for account in accounts.iter() {
+        if account.name == "deployer" {
+            deployers_lookup.insert("*".into(), account.clone());
+        }
+    }
+
+    let mut deployers_nonces = BTreeMap::new();
+    deployers_nonces.insert("deployer".to_string(), init_status.deployer_nonce);
+    let contract_to_deploy_len = contracts_to_deploy.len();
+    init_status.deployer_nonce += contract_to_deploy_len as u64;
+
+    // Move the transactions submission to another thread, the clock on that thread is ticking,
+    // and blocking our stacks-node
+    std::thread::spawn(move || {
+        for contract in contracts_to_deploy.into_iter() {
+            match publish_contract(
+                &contract,
+                &deployers_lookup,
+                &mut deployers_nonces,
+                &moved_node_url,
+                1,
+                &Network::Devnet,
+            ) {
+                Ok((_txid, _nonce)) => {
+                    // let _ = tx_clone.send(DevnetEvent::success(format!(
+                    //     "Contract {} broadcasted in mempool (txid: {}, nonce: {})",
+                    //     contract.name.unwrap(), txid, nonce
+                    // )));
+                }
+                Err(_err) => {
+                    // let _ = tx_clone.send(DevnetEvent::error(err.to_string()));
+                    break;
+                }
+            }
+        }
+    });
+
+    Some(contract_to_deploy_len)
+}
+
+pub fn publish_stacking_orders(
+    devnet_config: &DevnetConfig,
+    accounts: &Vec<Account>,
+    pox_info: &PoxInfo,
+    bitcoin_block_height: u32,
+) -> Option<usize> {
+    if devnet_config.pox_stacking_orders.len() == 0 {
+        return None;
+    }
+
+    let node_url = format!("http://localhost:{}", devnet_config.stacks_node_rpc_port);
+    let mut transactions = 0;
+
+    for pox_stacking_order in devnet_config.pox_stacking_orders.iter() {
+        if pox_stacking_order.start_at_cycle == (pox_info.reward_cycle_id + 1) {
+            let mut account = None;
+            while let Some(e) = accounts.iter().next() {
+                if e.name == pox_stacking_order.wallet {
+                    account = Some(e);
+                }
+            }
+            let account = match account {
+                Some(account) => account,
+                _ => continue,
+            };
+
+            transactions += 1;
+
+            let stacks_rpc = StacksRpc::new(node_url.clone());
+            let default_fee = 1000;
+            let nonce = stacks_rpc
+                .get_nonce(account.address.to_string())
+                .expect("Unable to retrieve nonce");
+
+            let stx_amount = pox_info.next_cycle.min_threshold_ustx * pox_stacking_order.slots;
+            let (_, _, account_secret_keu) =
+                types::compute_addresses(&account.mnemonic, &account.derivation, false);
+            let addr_bytes = pox_stacking_order
+                .btc_address
+                .from_base58()
+                .expect("Unable to get bytes from btc address");
+
+            let addr_bytes = Hash160::from_bytes(&addr_bytes[1..21]).unwrap();
+            let addr_version = AddressHashMode::SerializeP2PKH;
+            let stack_stx_tx = transactions::build_contrat_call_transaction(
+                pox_info.contract_id.clone(),
+                "stack-stx".into(),
+                vec![
+                    ClarityValue::UInt(stx_amount.into()),
+                    ClarityValue::Tuple(
+                        TupleData::from_data(vec![
+                            (
+                                ClarityName::try_from("version".to_owned()).unwrap(),
+                                ClarityValue::buff_from_byte(addr_version as u8),
+                            ),
+                            (
+                                ClarityName::try_from("hashbytes".to_owned()).unwrap(),
+                                ClarityValue::Sequence(SequenceData::Buffer(BuffData {
+                                    data: addr_bytes.as_bytes().to_vec(),
+                                })),
+                            ),
+                        ])
+                        .unwrap(),
+                    ),
+                    ClarityValue::UInt((bitcoin_block_height - 1).into()),
+                    ClarityValue::UInt(pox_stacking_order.duration.into()),
+                ],
+                nonce,
+                default_fee,
+                &hex_bytes(&account_secret_keu).unwrap(),
+            );
+            std::thread::spawn(move || {
+                let _ = stacks_rpc
+                    .post_transaction(stack_stx_tx)
+                    .expect("Unable to broadcast transaction");
+            });
+        }
+    }
+    if transactions > 0 {
+        Some(transactions)
+    } else {
+        None
+    }
+}
