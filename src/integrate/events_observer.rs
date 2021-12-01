@@ -20,16 +20,15 @@ use clarity_repl::clarity::types::{
 };
 use clarity_repl::clarity::util::address::AddressHashMode;
 use clarity_repl::clarity::util::hash::{hex_bytes, Hash160};
-use clarity_repl::repl::settings::InitialContract;
+use clarity_repl::repl::settings::{InitialContract, Account};
 use clarity_repl::repl::Session;
 use rocket::config::{Config, LogLevel};
 use rocket::serde::json::{json, Json, Value as JsonValue};
 use rocket::serde::Deserialize;
 use rocket::State;
-use std::collections::{BTreeMap, HashMap, VecDeque};
-use std::convert::{TryFrom, TryInto};
+use std::collections::{BTreeMap, VecDeque};
+use std::convert::{TryFrom,};
 use std::error::Error;
-use std::io::Cursor;
 use std::iter::FromIterator;
 use std::net::{IpAddr, Ipv4Addr};
 use std::path::PathBuf;
@@ -37,37 +36,10 @@ use std::str;
 use std::sync::mpsc::{Receiver, Sender};
 use std::sync::{Arc, Mutex, RwLock};
 use tracing::info;
-use bitcoincore_rpc::{Auth, Client, RpcApi};
-use bitcoincore_rpc::bitcoin::hashes::Hash;
-use bitcoincore_rpc::bitcoin::{Block, BlockHash};
+use crate::indexer::{chains, Indexer, StacksChainEvent, BitcoinChainEvent, IndexerConfig};
 
 #[cfg(feature = "cli")]
 use crate::runnner::deno;
-
-#[allow(dead_code)]
-#[derive(Deserialize)]
-pub struct NewBurnBlock {
-    burn_block_hash: String,
-    burn_block_height: u64,
-    reward_slot_holders: Vec<String>,
-    burn_amount: u64,
-}
-
-#[allow(dead_code)]
-#[derive(Deserialize)]
-pub struct NewBlock {
-    block_height: u64,
-    block_hash: String,
-    burn_block_height: u64,
-    burn_block_hash: String,
-    parent_block_hash: String,
-    index_block_hash: String,
-    parent_index_block_hash: String,
-    transactions: Vec<NewTransaction>,
-    events: Vec<NewEvent>,
-    // reward_slot_holders: Vec<String>,
-    // burn_amount: u32,
-}
 
 #[derive(Deserialize)]
 pub struct NewMicroBlock {
@@ -82,112 +54,18 @@ pub struct NewTransaction {
     pub raw_tx: String,
 }
 
-#[derive(Deserialize)]
-pub struct NewEvent {
-    pub txid: String,
-    pub committed: bool,
-    pub event_index: u32,
-    #[serde(rename = "type")]
-    pub event_type: String,
-    pub stx_transfer_event: Option<JsonValue>,
-    pub stx_mint_event: Option<JsonValue>,
-    pub stx_burn_event: Option<JsonValue>,
-    pub stx_lock_event: Option<JsonValue>,
-    pub nft_transfer_event: Option<JsonValue>,
-    pub nft_mint_event: Option<JsonValue>,
-    pub nft_burn_event: Option<JsonValue>,
-    pub ft_transfer_event: Option<JsonValue>,
-    pub ft_mint_event: Option<JsonValue>,
-    pub ft_burn_event: Option<JsonValue>,
-}
-
-#[derive(Debug, Clone, PartialEq, Deserialize)]
-pub struct STXTransferEventData {
-    pub sender: String,
-    pub recipient: String,
-    pub amount: String,
-}
-
-#[derive(Debug, Clone, PartialEq, Deserialize)]
-pub struct STXMintEventData {
-    pub recipient: String,
-    pub amount: String,
-}
-
-#[derive(Debug, Clone, PartialEq, Deserialize)]
-pub struct STXLockEventData {
-    pub locked_amount: String,
-    pub unlock_height: u64,
-    pub locked_address: String,
-}
-
-#[derive(Debug, Clone, PartialEq, Deserialize)]
-pub struct STXBurnEventData {
-    pub sender: String,
-    pub amount: String,
-}
-
-#[derive(Debug, Clone, PartialEq, Deserialize)]
-pub struct NFTTransferEventData {
-    #[serde(rename = "asset_identifier")]
-    pub asset_class_identifier: String,
-    #[serde(rename = "value")]
-    pub asset_identifier: String,
-    pub sender: String,
-    pub recipient: String,
-}
-
-#[derive(Debug, Clone, PartialEq, Deserialize)]
-pub struct NFTMintEventData {
-    #[serde(rename = "asset_identifier")]
-    pub asset_class_identifier: String,
-    #[serde(rename = "value")]
-    pub asset_identifier: String,
-    pub recipient: String,
-}
-
-#[derive(Debug, Clone, PartialEq, Deserialize)]
-pub struct NFTBurnEventData {
-    #[serde(rename = "asset_identifier")]
-    pub asset_class_identifier: String,
-    #[serde(rename = "value")]
-    pub asset_identifier: String,
-    pub sender: String,
-}
-
-#[derive(Debug, Clone, PartialEq, Deserialize)]
-pub struct FTTransferEventData {
-    #[serde(rename = "asset_identifier")]
-    pub asset_class_identifier: String,
-    pub sender: String,
-    pub recipient: String,
-    pub amount: String,
-}
-
-#[derive(Debug, Clone, PartialEq, Deserialize)]
-pub struct FTMintEventData {
-    #[serde(rename = "asset_identifier")]
-    pub asset_class_identifier: String,
-    pub recipient: String,
-    pub amount: String,
-}
-
-#[derive(Debug, Clone, PartialEq, Deserialize)]
-pub struct FTBurnEventData {
-    #[serde(rename = "asset_identifier")]
-    pub asset_class_identifier: String,
-    pub sender: String,
-    pub amount: String,
-}
-
 #[derive(Clone, Debug)]
 pub struct EventObserverConfig {
     pub devnet_config: DevnetConfig,
-    pub accounts: BTreeMap<String, AccountConfig>,
+    pub accounts: Vec<Account>,
     pub contracts_to_deploy: VecDeque<InitialContract>,
     pub manifest_path: PathBuf,
-    pub pox_info: PoxInfo,
     pub session: Session,
+}
+
+#[derive(Clone, Debug)]
+pub struct DevnetInitializationStatus {
+    pub contracts_left_to_deploy: VecDeque<InitialContract>,
     pub deployer_nonce: u64,
 }
 
@@ -201,7 +79,6 @@ impl EventObserverConfig {
     pub fn new(
         devnet_config: DevnetConfig,
         manifest_path: PathBuf,
-        accounts: BTreeMap<String, AccountConfig>,
     ) -> Self {
         info!("Checking contracts...");
         let session = match load_session(manifest_path.clone(), false, &Network::Devnet) {
@@ -213,14 +90,12 @@ impl EventObserverConfig {
         };
         EventObserverConfig {
             devnet_config,
-            accounts,
+            accounts: session.settings.initial_accounts.clone(),
             manifest_path,
-            pox_info: PoxInfo::default(),
             contracts_to_deploy: VecDeque::from_iter(
                 session.settings.initial_contracts.iter().map(|c| c.clone()),
             ),
             session,
-            deployer_nonce: 0,
         }
     }
 
@@ -244,59 +119,35 @@ impl EventObserverConfig {
     }
 }
 
-#[derive(Deserialize, Debug, Clone, Default)]
-pub struct PoxInfo {
-    contract_id: String,
-    pox_activation_threshold_ustx: u64,
-    first_burnchain_block_height: u64,
-    prepare_phase_block_length: u32,
-    reward_phase_block_length: u32,
-    reward_slots: u32,
-    total_liquid_supply_ustx: u64,
-    next_cycle: PoxCycle,
-}
-
-impl PoxInfo {
-    pub fn default() -> PoxInfo {
-        PoxInfo {
-            contract_id: "ST000000000000000000002AMW42H.pox".into(),
-            pox_activation_threshold_ustx: 0,
-            first_burnchain_block_height: 100,
-            prepare_phase_block_length: 1,
-            reward_phase_block_length: 4,
-            reward_slots: 8,
-            total_liquid_supply_ustx: 1000000000000000,
-            ..Default::default()
-        }
-    }
-}
-
-#[derive(Deserialize, Debug, Clone, Default)]
-pub struct PoxCycle {
-    min_threshold_ustx: u64,
-}
-
-#[derive(Deserialize, Debug, Clone, Default)]
-pub struct AssetClassCache {
-    symbol: String,
-    decimals: u8,
-}
-
 pub async fn start_events_observer(
-    events_config: EventObserverConfig,
+    config: EventObserverConfig,
     devnet_event_tx: Sender<DevnetEvent>,
     terminator_rx: Receiver<bool>,
 ) -> Result<(), Box<dyn Error>> {
-    let _ = events_config.execute_scripts().await;
+    let _ = config.execute_scripts().await;
 
-    let port = events_config.devnet_config.orchestrator_port;
-    let manifest_path = events_config.manifest_path.clone();
-    let rw_lock = Arc::new(RwLock::new(events_config));
-    let asset_class_ids_map: HashMap<String, AssetClassCache> = HashMap::new();
+    let indexer = Indexer::new(IndexerConfig {
+        stacks_node_rpc_url: format!("http://localhost:{}", config.devnet_config.stacks_node_rpc_port),
+        bitcoin_node_rpc_url: format!("http://localhost:{}", config.devnet_config.bitcoin_node_rpc_port),
+        bitcoin_node_rpc_username: config.devnet_config.bitcoin_node_username.clone(),
+        bitcoin_node_rpc_password: config.devnet_config.bitcoin_node_password.clone(),
+    });
 
-    let moved_rw_lock = rw_lock.clone();
-    let moved_tx = Arc::new(Mutex::new(devnet_event_tx.clone()));
-    let moved_cached_asset_class_ids_map = Arc::new(RwLock::new(asset_class_ids_map));
+    let init_status = DevnetInitializationStatus {
+        contracts_left_to_deploy: config.contracts_to_deploy.clone(),
+        deployer_nonce: 0
+    };
+
+    let port = config.devnet_config.orchestrator_port;
+    let manifest_path = config.manifest_path.clone();
+
+    let config_mutex = Arc::new(Mutex::new(config));
+    let init_status_rw_lock = Arc::new(RwLock::new(init_status));
+    let indexer_rw_lock = Arc::new(RwLock::new(indexer));
+
+    let moved_config_mutex = config_mutex.clone();
+    let devnet_event_tx_mutex = Arc::new(Mutex::new(devnet_event_tx.clone()));
+    let moved_init_status_rw_lock = init_status_rw_lock.clone();
 
     let config = Config {
         port: port,
@@ -310,9 +161,10 @@ pub async fn start_events_observer(
 
     let _ = std::thread::spawn(move || {
         let future = rocket::custom(config)
-            .manage(moved_rw_lock)
-            .manage(moved_tx)
-            .manage(moved_cached_asset_class_ids_map)
+            .manage(indexer_rw_lock)
+            .manage(devnet_event_tx_mutex)
+            .manage(moved_config_mutex)
+            .manage(moved_init_status_rw_lock)
             .mount(
                 "/",
                 routes![
@@ -361,9 +213,8 @@ pub async fn start_events_observer(
                     )))
                     .expect("Unable to terminate event observer");
 
-                if let Ok(mut config_writer) = rw_lock.write() {
-                    config_writer.contracts_to_deploy = contracts_to_deploy;
-                    config_writer.session = session;
+                if let Ok(mut config_writer) = init_status_rw_lock.write() {
+                    config_writer.contracts_left_to_deploy = contracts_to_deploy;
                     config_writer.deployer_nonce = 0;
                 }
             }
@@ -375,72 +226,51 @@ pub async fn start_events_observer(
     Ok(())
 }
 
-#[post("/new_burn_block", format = "json", data = "<new_burn_block>")]
+#[post("/new_burn_block", format = "json", data = "<marshalled_block>")]
 pub fn handle_new_burn_block(
-    config: &State<Arc<RwLock<EventObserverConfig>>>,
+    indexer: &State<Arc<RwLock<Indexer>>>,
     devnet_events_tx: &State<Arc<Mutex<Sender<DevnetEvent>>>>,
-    new_burn_block: Json<NewBurnBlock>,
+    marshalled_block: Json<JsonValue>,
 ) -> Json<JsonValue> {
     let devnet_events_tx = devnet_events_tx.inner();
+
+    // Standardize the structure of the block, and identify the 
+    // kind of update that this new block would imply, taking 
+    // into account the last 7 blocks.
+    let chain_update = match indexer.inner().write() {
+        Ok(mut indexer) => indexer.handle_bitcoin_block(marshalled_block.into_inner()),
+        _ => return Json(json!({
+            "status": 200,
+            "result": "Ok",
+        }))
+    };
+
+    // Contextual shortcut: Devnet is an environment under control,
+    // with 1 miner. As such we will ignore Reorgs handling.
+    let block = match chain_update {
+        BitcoinChainEvent::ChainUpdatedWithBlock(block) => block,
+        _ => return Json(json!({
+            "status": 200,
+            "result": "Ok",
+        }))
+    };
 
     match devnet_events_tx.lock() {
         Ok(tx) => {
             let _ = tx.send(DevnetEvent::debug(format!(
                 "Bitcoin block #{} received",
-                new_burn_block.burn_block_height
+                block.block_identifier.index
             )));
-            let mut transactions = vec![];
-            // match config.read() {
-            //     Ok(config_reader) => {
-            //         let node_url = format!(
-            //             "http://localhost:{}",
-            //             config_reader.devnet_config.bitcoin_node_rpc_port
-            //         );
-            //         let auth = Auth::UserPass(
-            //             config_reader.devnet_config.bitcoin_node_username.clone(),
-            //             config_reader.devnet_config.bitcoin_node_password.clone());
-            
-            //         let rpc = Client::new(&node_url, auth).unwrap();
-            //         let raw_value = new_burn_block.burn_block_hash.strip_prefix("0x").unwrap();
-            //         let mut bytes = hex_bytes(&raw_value).unwrap();
-            //         bytes.reverse();
-            //         let block_hash = BlockHash::from_slice(&bytes).unwrap();
-            //         let block = rpc.get_block(&block_hash).unwrap();
-                    
-            //         for txdata in block.txdata.iter() {
-            //             let _ = tx.send(DevnetEvent::debug(format!(
-            //                 "Tx.out: {:?}", txdata.output
-            //             )));
-            //         }
-            //     },
-            //     _ => {}
-            // };
-        
+
             let _ = tx.send(DevnetEvent::ServiceStatus(ServiceStatusData {
                 order: 0,
                 status: Status::Green,
                 name: "bitcoin-node".into(),
                 comment: format!(
                     "mining blocks (chaintip = #{})",
-                    new_burn_block.burn_block_height
-                ),
+                    block.block_identifier.index)
             }));
-            let _ = tx.send(DevnetEvent::BitcoinBlock(BitcoinBlockData {
-                block_identifier: BlockIdentifier {
-                    hash: new_burn_block.burn_block_hash.clone(),
-                    index: new_burn_block.burn_block_height,
-                },
-                parent_block_identifier: BlockIdentifier {
-                    hash: "".into(), // todo(ludo): open a PR on stacks-blockchain to get this field.
-                    index: new_burn_block.burn_block_height - 1,
-                },
-                timestamp: 0, // todo(ludo): open a PR on stacks-blockchain to get this field.
-                metadata: BitcoinBlockMetadata {},
-                transactions: transactions,
-            }));
-            let _ = tx.send(DevnetEvent::debug(format!(
-                "ACK"
-            )));
+            let _ = tx.send(DevnetEvent::BitcoinBlock(block));
         }
         _ => {}
     };
@@ -451,206 +281,157 @@ pub fn handle_new_burn_block(
     }))
 }
 
-#[post("/new_block", format = "application/json", data = "<new_block>")]
+#[post("/new_block", format = "application/json", data = "<marshalled_block>")]
 pub fn handle_new_block(
-    config: &State<Arc<RwLock<EventObserverConfig>>>,
+    config: &State<Arc<Mutex<EventObserverConfig>>>,
+    init_status: &State<Arc<RwLock<DevnetInitializationStatus>>>,
+    indexer: &State<Arc<RwLock<Indexer>>>,
     devnet_events_tx: &State<Arc<Mutex<Sender<DevnetEvent>>>>,
-    asset_class_ids_map: &State<Arc<RwLock<HashMap<String, AssetClassCache>>>>,
-    mut new_block: Json<NewBlock>,
+    mut marshalled_block: Json<JsonValue>,
 ) -> Json<JsonValue> {
 
-    let devnet_events_tx = devnet_events_tx.inner();
+    // Standardize the structure of the block, and identify the 
+    // kind of update that this new block would imply, taking 
+    // into account the last 7 blocks.
+    let (chain_update, pox_info) = match indexer.inner().write() {
+        Ok(mut indexer) => {
+            let chain_event = indexer.handle_stacks_block(marshalled_block.into_inner());
+            (chain_event, indexer.get_updated_pox_info())
+        },
+        _ => return Json(json!({
+            "status": 200,
+            "result": "Ok",
+        }))
+    };
+
+    // Contextual: Devnet is an environment under control,
+    // with 1 miner. As such we will ignore Reorgs handling.
+    let block = match chain_update {
+        StacksChainEvent::ChainUpdatedWithBlock(block) => block,
+        _ => return Json(json!({
+            "status": 200,
+            "result": "Ok",
+        }))
+    };
+
     let config = config.inner();
 
+    // Perform a partial update the UI.
+    // We will keep the block around for now.
+    let devnet_events_tx = devnet_events_tx.inner();
     if let Ok(tx) = devnet_events_tx.lock() {
         let _ = tx.send(DevnetEvent::ServiceStatus(ServiceStatusData {
             order: 1,
             status: Status::Green,
             name: "stacks-node".into(),
-            comment: format!("mining blocks (chaintip = #{})", new_block.block_height),
+            comment: format!("mining blocks (chaintip = #{})", block.block_identifier.index),
         }));
         let _ = tx.send(DevnetEvent::info(format!(
             "Block #{} anchored in Bitcoin block #{} includes {} transactions",
-            new_block.block_height,
-            new_block.burn_block_height,
-            new_block.transactions.len(),
+            block.block_identifier.index,
+            block.metadata.bitcoin_anchor_block_identifier.index,
+            block.transactions.len(),
         )));
     }
 
-    let (
-        updated_config,
-        first_burnchain_block_height,
-        prepare_phase_block_length,
-        reward_phase_block_length,
-        node_url,
-    ) = if let Ok(config_reader) = config.read() {
-        let node_url = format!(
-            "http://localhost:{}",
-            config_reader.devnet_config.stacks_node_rpc_port
-        );
+    // A few things need to be done:
+    // - Contracts deployment orchestration during the first blocks (max: 25 / block)
+    // - PoX stacking order orchestration: enable PoX with some "stack-stx" transactions
+    // defined in the devnet file config.
+    if let Ok(mut init_status_writer) = init_status.inner().write() {
+        if init_status_writer.contracts_left_to_deploy.len() > 0 {
 
-        if config_reader.contracts_to_deploy.len() > 0 {
-            let mut updated_config = config_reader.clone();
+            if let Ok(config_reader) = config.lock() {
+                let node_url = format!(
+                    "http://localhost:{}",
+                    config_reader.devnet_config.stacks_node_rpc_port
+                );
 
-            // How many contracts left?
-            let contracts_left = updated_config.contracts_to_deploy.len();
-            let tx_chaining_limit = 25;
-            let blocks_required = 1 + (contracts_left / tx_chaining_limit);
-            let contracts_to_deploy_in_blocks = if blocks_required == 1 {
-                contracts_left
-            } else {
-                contracts_left / blocks_required
-            };
+                // How many contracts left?
+                let contracts_left = init_status_writer.contracts_left_to_deploy.len();
+                let tx_chaining_limit = 25;
+                let blocks_required = 1 + (contracts_left / tx_chaining_limit);
+                let contracts_to_deploy_in_blocks = if blocks_required == 1 {
+                    contracts_left
+                } else {
+                    contracts_left / blocks_required
+                };
 
-            let mut contracts_to_deploy = vec![];
+                let mut contracts_to_deploy = vec![];
 
-            for _ in 0..contracts_to_deploy_in_blocks {
-                let contract = updated_config.contracts_to_deploy.pop_front().unwrap();
-                contracts_to_deploy.push(contract);
-            }
-
-            let moved_node_url = node_url.clone();
-
-            let mut deployers_lookup = BTreeMap::new();
-            for account in updated_config.session.settings.initial_accounts.iter() {
-                if account.name == "deployer" {
-                    deployers_lookup.insert("*".into(), account.clone());
+                for _ in 0..contracts_to_deploy_in_blocks {
+                    let contract = init_status_writer.contracts_left_to_deploy.pop_front().unwrap();
+                    contracts_to_deploy.push(contract);
                 }
-            }
-            // TODO(ludo): one day, we will get rid of this shortcut
-            let mut deployers_nonces = BTreeMap::new();
-            deployers_nonces.insert("deployer".to_string(), config_reader.deployer_nonce);
-            updated_config.deployer_nonce += contracts_to_deploy.len() as u64;
 
-            if let Ok(tx) = devnet_events_tx.lock() {
-                let _ = tx.send(DevnetEvent::success(format!(
-                    "Will broadcast {} transactions",
-                    contracts_to_deploy.len()
-                )));
-            }
+                let moved_node_url = node_url.clone();
 
-            // Move the transactions submission to another thread, the clock on that thread is ticking,
-            // and blocking our stacks-node
-            std::thread::spawn(move || {
-                for contract in contracts_to_deploy.into_iter() {
-                    match publish_contract(
-                        &contract,
-                        &deployers_lookup,
-                        &mut deployers_nonces,
-                        &moved_node_url,
-                        1,
-                        &Network::Devnet,
-                    ) {
-                        Ok((_txid, _nonce)) => {
-                            // let _ = tx_clone.send(DevnetEvent::success(format!(
-                            //     "Contract {} broadcasted in mempool (txid: {}, nonce: {})",
-                            //     contract.name.unwrap(), txid, nonce
-                            // )));
-                        }
-                        Err(_err) => {
-                            // let _ = tx_clone.send(DevnetEvent::error(err.to_string()));
-                            break;
-                        }
+                let mut deployers_lookup = BTreeMap::new();
+                for account in config_reader.accounts.iter() {
+                    if account.name == "deployer" {
+                        deployers_lookup.insert("*".into(), account.clone());
                     }
                 }
-            });
-            (
-                Some(updated_config),
-                config_reader.pox_info.first_burnchain_block_height,
-                config_reader.pox_info.prepare_phase_block_length,
-                config_reader.pox_info.reward_phase_block_length,
-                node_url,
-            )
-        } else {
-            (
-                None,
-                config_reader.pox_info.first_burnchain_block_height,
-                config_reader.pox_info.prepare_phase_block_length,
-                config_reader.pox_info.reward_phase_block_length,
-                node_url,
-            )
-        }
-    } else {
-        (None, 0, 0, 0, "".into())
-    };
 
-    if let Some(updated_config) = updated_config {
-        if let Ok(mut config_writer) = config.write() {
-            *config_writer = updated_config;
-        }
+                let mut deployers_nonces = BTreeMap::new();
+                deployers_nonces.insert("deployer".to_string(), init_status_writer.deployer_nonce);
+                init_status_writer.deployer_nonce += contracts_to_deploy.len() as u64;
+
+                if let Ok(tx) = devnet_events_tx.lock() {
+                    let _ = tx.send(DevnetEvent::success(format!(
+                        "Will broadcast {} transactions",
+                        contracts_to_deploy.len()
+                    )));
+                }
+
+                // Move the transactions submission to another thread, the clock on that thread is ticking,
+                // and blocking our stacks-node
+                std::thread::spawn(move || {
+                    for contract in contracts_to_deploy.into_iter() {
+                        match publish_contract(
+                            &contract,
+                            &deployers_lookup,
+                            &mut deployers_nonces,
+                            &moved_node_url,
+                            1,
+                            &Network::Devnet,
+                        ) {
+                            Ok((_txid, _nonce)) => {
+                                // let _ = tx_clone.send(DevnetEvent::success(format!(
+                                //     "Contract {} broadcasted in mempool (txid: {}, nonce: {})",
+                                //     contract.name.unwrap(), txid, nonce
+                                // )));
+                            }
+                            Err(_err) => {
+                                // let _ = tx_clone.send(DevnetEvent::error(err.to_string()));
+                                break;
+                            }
+                        }
+                    }
+                });
+            }
+        } 
     }
 
-    let pox_cycle_length: u64 = (prepare_phase_block_length + reward_phase_block_length).into();
-    let current_len = new_block.burn_block_height - first_burnchain_block_height;
-    let pox_cycle_id: u32 = (current_len / pox_cycle_length).try_into().unwrap();
-
-    let mut events = vec![];
-    events.append(&mut new_block.events);
-    let transactions = if let Ok(mut asset_class_ids_map) = asset_class_ids_map.inner().write() {
-        new_block
-            .transactions
-            .iter()
-            .map(|t| {
-                let description = get_tx_description(&t.raw_tx);
-                StacksTransactionData {
-                    transaction_identifier: TransactionIdentifier {
-                        hash: t.txid.clone(),
-                    },
-                    operations: get_standardized_stacks_operations(
-                        t,
-                        &mut events,
-                        &mut asset_class_ids_map,
-                        &node_url,
-                    ),
-                    metadata: StacksTransactionMetadata {
-                        success: t.status == "success",
-                        result: get_value_description(&t.raw_result),
-                        events: vec![],
-                        description,
-                    },
-                }
-            })
-            .collect()
-    } else {
-        vec![]
-    };
 
     if let Ok(tx) = devnet_events_tx.lock() {
-        let _ = tx.send(DevnetEvent::StacksBlock(StacksBlockData {
-            block_identifier: BlockIdentifier {
-                hash: new_block.index_block_hash.clone(),
-                index: new_block.block_height,
-            },
-            parent_block_identifier: BlockIdentifier {
-                hash: new_block.parent_index_block_hash.clone(),
-                index: new_block.block_height,
-            },
-            timestamp: 0,
-            metadata: StacksBlockMetadata {
-                bitcoin_anchor_block_identifier: BlockIdentifier {
-                    hash: new_block.burn_block_hash.clone(),
-                    index: new_block.burn_block_height,
-                },
-                bitcoin_genesis_block_identifier: BlockIdentifier {
-                    hash: "".into(),
-                    index: first_burnchain_block_height,
-                },
-                pox_cycle_index: pox_cycle_id,
-                pox_cycle_length: pox_cycle_length.try_into().unwrap(),
-            },
-            transactions,
-        }));
+        let _ = tx.send(DevnetEvent::StacksBlock(block));
     }
+
 
     // Every penultimate block, we check if some stacking orders should be submitted before the next
     // cycle starts.
-    if new_block.burn_block_height % pox_cycle_length == (pox_cycle_length - 2) {
-        if let Ok(config_reader) = config.read() {
+    let pox_cycle_length: u32 = pox_info.prepare_phase_block_length + pox_info.reward_phase_block_length;
+    if block.metadata.pox_cycle_position == (pox_cycle_length - 2) {
+        if let Ok(config_reader) = config.lock() {
             // let tx_clone = tx.clone();
+            let node_url = format!(
+                "http://localhost:{}",
+                config_reader.devnet_config.stacks_node_rpc_port
+            );
 
             let accounts = config_reader.accounts.clone();
-            let mut pox_info = config_reader.pox_info.clone();
-
+            
             let pox_stacking_orders = config_reader.devnet_config.pox_stacking_orders.clone();
             std::thread::spawn(move || {
                 let pox_url = format!("{}/v2/pox", node_url);
@@ -662,11 +443,18 @@ pub fn handle_new_block(
                 }
 
                 for pox_stacking_order in pox_stacking_orders.into_iter() {
-                    if pox_stacking_order.start_at_cycle == (pox_cycle_id + 1) {
-                        let account = match accounts.get(&pox_stacking_order.wallet) {
-                            None => continue,
+                    if pox_stacking_order.start_at_cycle == (pox_info.reward_cycle_id + 1) {
+                        let mut account = None;
+                        while let Some(e) = accounts.iter().next() {
+                            if e.name == pox_stacking_order.wallet {
+                                account = Some(e);
+                            }
+                        }
+                        let account = match account {
                             Some(account) => account,
+                            _ => continue,
                         };
+
                         let stacks_rpc = StacksRpc::new(node_url.clone());
                         let default_fee = 1000;
                         let nonce = stacks_rpc
@@ -678,7 +466,7 @@ pub fn handle_new_block(
                         let (_, _, account_secret_keu) = types::compute_addresses(
                             &account.mnemonic,
                             &account.derivation,
-                            account.is_mainnet,
+                            false,
                         );
                         let addr_bytes = pox_stacking_order
                             .btc_address
@@ -709,7 +497,7 @@ pub fn handle_new_block(
                                     ])
                                     .unwrap(),
                                 ),
-                                ClarityValue::UInt((new_block.burn_block_height - 1).into()),
+                                ClarityValue::UInt((block.metadata.bitcoin_anchor_block_identifier.index - 1).into()),
                                 ClarityValue::UInt(pox_stacking_order.duration.into()),
                             ],
                             nonce,
@@ -782,7 +570,7 @@ pub fn handle_new_mempool_tx(
 ) -> Json<JsonValue> {
     let decoded_transactions = raw_txs
         .iter()
-        .map(|t| get_tx_description(t))
+        .map(|t| chains::stacks::get_tx_description(t))
         .collect::<Vec<String>>();
 
     if let Ok(tx_sender) = devnet_events_tx.lock() {
@@ -805,525 +593,10 @@ pub fn handle_drop_mempool_tx() -> Json<JsonValue> {
     }))
 }
 
-fn get_value_description(raw_value: &str) -> String {
-    let raw_value = match raw_value.strip_prefix("0x") {
-        Some(raw_value) => raw_value,
-        _ => return raw_value.to_string(),
-    };
-    let value_bytes = match hex_bytes(&raw_value) {
-        Ok(bytes) => bytes,
-        _ => return raw_value.to_string(),
-    };
+pub fn publish_initial_contracts() {
 
-    let value = match ClarityValue::consensus_deserialize(&mut Cursor::new(&value_bytes)) {
-        Ok(value) => format!("{}", value),
-        Err(e) => {
-            println!("{:?}", e);
-            return raw_value.to_string();
-        }
-    };
-    value
 }
 
-pub fn get_tx_description(raw_tx: &str) -> String {
-    let raw_tx = match raw_tx.strip_prefix("0x") {
-        Some(raw_tx) => raw_tx,
-        _ => return raw_tx.to_string(),
-    };
-    let tx_bytes = match hex_bytes(&raw_tx) {
-        Ok(bytes) => bytes,
-        _ => return raw_tx.to_string(),
-    };
-    let tx = match StacksTransaction::consensus_deserialize(&mut Cursor::new(&tx_bytes)) {
-        Ok(bytes) => bytes,
-        Err(e) => {
-            println!("{:?}", e);
-            return raw_tx.to_string();
-        }
-    };
-    let description = match tx.payload {
-        TransactionPayload::TokenTransfer(ref addr, ref amount, ref _memo) => {
-            format!(
-                "transfered: {} µSTX from {} to {}",
-                amount,
-                tx.origin_address(),
-                addr
-            )
-        }
-        TransactionPayload::ContractCall(ref contract_call) => {
-            let formatted_args = contract_call
-                .function_args
-                .iter()
-                .map(|v| format!("{}", v))
-                .collect::<Vec<String>>()
-                .join(", ");
-            format!(
-                "invoked: {}.{}::{}({})",
-                contract_call.address,
-                contract_call.contract_name,
-                contract_call.function_name,
-                formatted_args
-            )
-        }
-        TransactionPayload::SmartContract(ref smart_contract) => {
-            format!("deployed: {}.{}", tx.origin_address(), smart_contract.name)
-        }
-        _ => {
-            format!("coinbase")
-        }
-    };
-    description
-}
+pub fn submit_stacking_orders() {
 
-fn get_standardized_stacks_operations(
-    transaction: &NewTransaction,
-    events: &mut Vec<NewEvent>,
-    asset_class_cache: &mut HashMap<String, AssetClassCache>,
-    node_url: &str,
-) -> Vec<Operation> {
-    let mut operations = vec![];
-    let mut operation_id = 0;
-    
-    let mut i = 0;
-    while i < events.len() {
-        if events[i].txid == transaction.txid {
-            let event = events.remove(i);
-            if let Some(ref event_data) = event.stx_mint_event {
-                let data: STXMintEventData =
-                    serde_json::from_value(event_data.clone()).expect("Unable to decode event_data");
-                operations.push(Operation {
-                    operation_identifier: OperationIdentifier {
-                        index: operation_id,
-                        network_index: None,
-                    },
-                    related_operations: None,
-                    type_: OperationType::Credit,
-                    status: Some(OperationStatusKind::Success),
-                    account: AccountIdentifier {
-                        address: data.recipient,
-                        sub_account: None,
-                    },
-                    amount: Some(Amount {
-                        value: data.amount.parse::<u64>().expect("Unable to parse u64"),
-                        currency: get_stacks_currency(),
-                    }),
-                    metadata: None,
-                });
-                operation_id += 1;
-            } else if let Some(ref event_data) = event.stx_lock_event {
-                let data: STXLockEventData =
-                    serde_json::from_value(event_data.clone()).expect("Unable to decode event_data");
-                operations.push(Operation {
-                    operation_identifier: OperationIdentifier {
-                        index: operation_id,
-                        network_index: None,
-                    },
-                    related_operations: None,
-                    type_: OperationType::Lock,
-                    status: Some(OperationStatusKind::Success),
-                    account: AccountIdentifier {
-                        address: data.locked_address,
-                        sub_account: None,
-                    },
-                    amount: Some(Amount {
-                        value: data.locked_amount.parse::<u64>().expect("Unable to parse u64"),
-                        currency: get_stacks_currency(),
-                    }),
-                    metadata: None,
-                });
-                operation_id += 1;
-            } else if let Some(ref event_data) = event.stx_burn_event {
-                let data: STXBurnEventData =
-                    serde_json::from_value(event_data.clone()).expect("Unable to decode event_data");
-                operations.push(Operation {
-                    operation_identifier: OperationIdentifier {
-                        index: operation_id,
-                        network_index: None,
-                    },
-                    related_operations: None,
-                    type_: OperationType::Debit,
-                    status: Some(OperationStatusKind::Success),
-                    account: AccountIdentifier {
-                        address: data.sender,
-                        sub_account: None,
-                    },
-                    amount: Some(Amount {
-                        value: data.amount.parse::<u64>().expect("Unable to parse u64"),
-                        currency: get_stacks_currency(),
-                    }),
-                    metadata: None,
-                });
-                operation_id += 1;
-            } else if let Some(ref event_data) = event.stx_transfer_event {
-                let data: STXTransferEventData =
-                    serde_json::from_value(event_data.clone()).expect("Unable to decode event_data");
-                operations.push(Operation {
-                    operation_identifier: OperationIdentifier {
-                        index: operation_id,
-                        network_index: None,
-                    },
-                    related_operations: Some(vec![OperationIdentifier {
-                        index: operation_id + 1,
-                        network_index: None,
-                    }]),
-                    type_: OperationType::Debit,
-                    status: Some(OperationStatusKind::Success),
-                    account: AccountIdentifier {
-                        address: data.sender,
-                        sub_account: None,
-                    },
-                    amount: Some(Amount {
-                        value: data.amount.parse::<u64>().expect("Unable to parse u64"),
-                        currency: get_stacks_currency(),
-                    }),
-                    metadata: None,
-                });
-                operation_id += 1;
-                operations.push(Operation {
-                    operation_identifier: OperationIdentifier {
-                        index: operation_id,
-                        network_index: None,
-                    },
-                    related_operations: Some(vec![OperationIdentifier {
-                        index: operation_id - 1,
-                        network_index: None,
-                    }]),
-                    type_: OperationType::Credit,
-                    status: Some(OperationStatusKind::Success),
-                    account: AccountIdentifier {
-                        address: data.recipient,
-                        sub_account: None,
-                    },
-                    amount: Some(Amount {
-                        value: data.amount.parse::<u64>().expect("Unable to parse u64"),
-                        currency: get_stacks_currency(),
-                    }),
-                    metadata: None,
-                });
-                operation_id += 1;
-            } else if let Some(ref event_data) = event.nft_mint_event {
-                let data: NFTMintEventData =
-                    serde_json::from_value(event_data.clone()).expect("Unable to decode event_data");
-                let currency = get_standardized_non_fungible_currency_from_asset_class_id(
-                    &data.asset_class_identifier,
-                    &data.asset_identifier,
-                    asset_class_cache,
-                );
-                operations.push(Operation {
-                    operation_identifier: OperationIdentifier {
-                        index: operation_id,
-                        network_index: None,
-                    },
-                    related_operations: None,
-                    type_: OperationType::Credit,
-                    status: Some(OperationStatusKind::Success),
-                    account: AccountIdentifier {
-                        address: data.recipient,
-                        sub_account: None,
-                    },
-                    amount: Some(Amount { value: 1, currency }),
-                    metadata: None,
-                });
-                operation_id += 1;
-            } else if let Some(ref event_data) = event.nft_burn_event {
-                let data: NFTBurnEventData =
-                    serde_json::from_value(event_data.clone()).expect("Unable to decode event_data");
-                let currency = get_standardized_non_fungible_currency_from_asset_class_id(
-                    &data.asset_class_identifier,
-                    &data.asset_identifier,
-                    asset_class_cache,
-                );
-                operations.push(Operation {
-                    operation_identifier: OperationIdentifier {
-                        index: operation_id,
-                        network_index: None,
-                    },
-                    related_operations: None,
-                    type_: OperationType::Debit,
-                    status: Some(OperationStatusKind::Success),
-                    account: AccountIdentifier {
-                        address: data.sender,
-                        sub_account: None,
-                    },
-                    amount: Some(Amount { value: 1, currency }),
-                    metadata: None,
-                });
-                operation_id += 1;
-            } else if let Some(ref event_data) = event.nft_transfer_event {
-                let data: NFTTransferEventData =
-                    serde_json::from_value(event_data.clone()).expect("Unable to decode event_data");
-                let currency = get_standardized_non_fungible_currency_from_asset_class_id(
-                    &data.asset_class_identifier,
-                    &data.asset_identifier,
-                    asset_class_cache,
-                );
-                operations.push(Operation {
-                    operation_identifier: OperationIdentifier {
-                        index: operation_id,
-                        network_index: None,
-                    },
-                    related_operations: Some(vec![OperationIdentifier {
-                        index: operation_id + 1,
-                        network_index: None,
-                    }]),
-                    type_: OperationType::Debit,
-                    status: Some(OperationStatusKind::Success),
-                    account: AccountIdentifier {
-                        address: data.sender,
-                        sub_account: None,
-                    },
-                    amount: Some(Amount {
-                        value: 1,
-                        currency: currency.clone(),
-                    }),
-                    metadata: None,
-                });
-                operation_id += 1;
-                operations.push(Operation {
-                    operation_identifier: OperationIdentifier {
-                        index: operation_id,
-                        network_index: None,
-                    },
-                    related_operations: Some(vec![OperationIdentifier {
-                        index: operation_id - 1,
-                        network_index: None,
-                    }]),
-                    type_: OperationType::Credit,
-                    status: Some(OperationStatusKind::Success),
-                    account: AccountIdentifier {
-                        address: data.recipient,
-                        sub_account: None,
-                    },
-                    amount: Some(Amount { value: 1, currency }),
-                    metadata: None,
-                });
-                operation_id += 1;
-            } else if let Some(ref event_data) = event.ft_mint_event {
-                let data: FTMintEventData =
-                    serde_json::from_value(event_data.clone()).expect("Unable to decode event_data");
-                let currency = get_standardized_fungible_currency_from_asset_class_id(
-                    &data.asset_class_identifier,
-                    asset_class_cache,
-                    node_url,
-                );
-                operations.push(Operation {
-                    operation_identifier: OperationIdentifier {
-                        index: operation_id,
-                        network_index: None,
-                    },
-                    related_operations: None,
-                    type_: OperationType::Credit,
-                    status: Some(OperationStatusKind::Success),
-                    account: AccountIdentifier {
-                        address: data.recipient,
-                        sub_account: None,
-                    },
-                    amount: Some(Amount {
-                        value: data.amount.parse::<u64>().expect("Unable to parse u64"),
-                        currency,
-                    }),
-                    metadata: None,
-                });
-                operation_id += 1;
-            } else if let Some(ref event_data) = event.ft_burn_event {
-                let data: FTBurnEventData =
-                    serde_json::from_value(event_data.clone()).expect("Unable to decode event_data");
-                let currency = get_standardized_fungible_currency_from_asset_class_id(
-                    &data.asset_class_identifier,
-                    asset_class_cache,
-                    node_url,
-                );
-                operations.push(Operation {
-                    operation_identifier: OperationIdentifier {
-                        index: operation_id,
-                        network_index: None,
-                    },
-                    related_operations: None,
-                    type_: OperationType::Debit,
-                    status: Some(OperationStatusKind::Success),
-                    account: AccountIdentifier {
-                        address: data.sender,
-                        sub_account: None,
-                    },
-                    amount: Some(Amount {
-                        value: data.amount.parse::<u64>().expect("Unable to parse u64"),
-                        currency,
-                    }),
-                    metadata: None,
-                });
-                operation_id += 1;
-            } else if let Some(ref event_data) = event.ft_transfer_event {
-                let data: FTTransferEventData =
-                    serde_json::from_value(event_data.clone()).expect("Unable to decode event_data");
-                let currency = get_standardized_fungible_currency_from_asset_class_id(
-                    &data.asset_class_identifier,
-                    asset_class_cache,
-                    node_url,
-                );
-                operations.push(Operation {
-                    operation_identifier: OperationIdentifier {
-                        index: operation_id,
-                        network_index: None,
-                    },
-                    related_operations: Some(vec![OperationIdentifier {
-                        index: operation_id + 1,
-                        network_index: None,
-                    }]),
-                    type_: OperationType::Debit,
-                    status: Some(OperationStatusKind::Success),
-                    account: AccountIdentifier {
-                        address: data.sender,
-                        sub_account: None,
-                    },
-                    amount: Some(Amount {
-                        value: data.amount.parse::<u64>().expect("Unable to parse u64"),
-                        currency: currency.clone(),
-                    }),
-                    metadata: None,
-                });
-                operation_id += 1;
-                operations.push(Operation {
-                    operation_identifier: OperationIdentifier {
-                        index: operation_id,
-                        network_index: None,
-                    },
-                    related_operations: Some(vec![OperationIdentifier {
-                        index: operation_id - 1,
-                        network_index: None,
-                    }]),
-                    type_: OperationType::Credit,
-                    status: Some(OperationStatusKind::Success),
-                    account: AccountIdentifier {
-                        address: data.recipient,
-                        sub_account: None,
-                    },
-                    amount: Some(Amount {
-                        value: data.amount.parse::<u64>().expect("Unable to parse u64"),
-                        currency,
-                    }),
-                    metadata: None,
-                });
-                operation_id += 1;
-            }
-        } else {
-            i += 1;
-        }
-    }
-    operations
-}
-
-fn get_stacks_currency() -> Currency {
-    Currency {
-        symbol: "STX".into(),
-        decimals: 6,
-        metadata: None,
-    }
-}
-
-fn get_standardized_fungible_currency_from_asset_class_id(
-    asset_class_id: &str,
-    asset_class_cache: &mut HashMap<String, AssetClassCache>,
-    node_url: &str,
-) -> Currency {
-    match asset_class_cache.get(asset_class_id) {
-        None => {
-            let comps = asset_class_id.split("::").collect::<Vec<&str>>();
-            let principal = comps[0].split(".").collect::<Vec<&str>>();
-
-            let get_symbol_request_url = format!(
-                "{}/v2/contracts/call-read/{}/{}/get-symbol",
-                node_url, principal[0], principal[1],
-            );
-
-            println!("get_standardized_fungible_currency_from_asset_class_id");
-
-            let symbol_res: ContractReadonlyCall = reqwest::blocking::get(&get_symbol_request_url)
-                .expect("Unable to retrieve account")
-                .json()
-                .expect("Unable to parse contract");
-
-            let raw_value = match symbol_res.result.strip_prefix("0x") {
-                Some(raw_value) => raw_value,
-                _ => panic!(),
-            };
-            let value_bytes = match hex_bytes(&raw_value) {
-                Ok(bytes) => bytes,
-                _ => panic!(),
-            };
-
-            let symbol = match ClarityValue::consensus_deserialize(&mut Cursor::new(&value_bytes)) {
-                Ok(value) => value.expect_result_ok().expect_u128(),
-                _ => panic!(),
-            };
-
-            let get_decimals_request_url = format!(
-                "{}/v2/contracts/call-read/{}/{}/get-decimals",
-                node_url, principal[0], principal[1],
-            );
-
-            let decimals_res: ContractReadonlyCall =
-                reqwest::blocking::get(&get_decimals_request_url)
-                    .expect("Unable to retrieve account")
-                    .json()
-                    .expect("Unable to parse contract");
-
-            let raw_value = match decimals_res.result.strip_prefix("0x") {
-                Some(raw_value) => raw_value,
-                _ => panic!(),
-            };
-            let value_bytes = match hex_bytes(&raw_value) {
-                Ok(bytes) => bytes,
-                _ => panic!(),
-            };
-
-            let value = match ClarityValue::consensus_deserialize(&mut Cursor::new(&value_bytes)) {
-                Ok(value) => value.expect_result_ok().expect_u128(),
-                _ => panic!(),
-            };
-
-            let entry = AssetClassCache {
-                symbol: format!("{}", symbol),
-                decimals: value as u8,
-            };
-
-            let currency = Currency {
-                symbol: entry.symbol.clone(),
-                decimals: entry.decimals.into(),
-                metadata: Some(CurrencyMetadata {
-                    asset_class_identifier: asset_class_id.into(),
-                    asset_identifier: None,
-                    standard: CurrencyStandard::Sip10,
-                }),
-            };
-
-            asset_class_cache.insert(asset_class_id.into(), entry);
-
-            currency
-        }
-        Some(entry) => Currency {
-            symbol: entry.symbol.clone(),
-            decimals: entry.decimals.into(),
-            metadata: Some(CurrencyMetadata {
-                asset_class_identifier: asset_class_id.into(),
-                asset_identifier: None,
-                standard: CurrencyStandard::Sip10,
-            }),
-        },
-    }
-}
-
-fn get_standardized_non_fungible_currency_from_asset_class_id(
-    asset_class_id: &str,
-    asset_id: &str,
-    asset_class_cache: &mut HashMap<String, AssetClassCache>,
-) -> Currency {
-    Currency {
-        symbol: asset_class_id.into(),
-        decimals: 0,
-        metadata: Some(CurrencyMetadata {
-            asset_class_identifier: asset_class_id.into(),
-            asset_identifier: Some(asset_id.into()),
-            standard: CurrencyStandard::Sip09,
-        }),
-    }
 }

@@ -93,12 +93,9 @@ impl<'a> App<'a> {
     }
 
     pub fn display_block(&mut self, block: StacksBlockData) {
-        let cycle_len: u64 = block.metadata.pox_cycle_length.into();
-        let abs_pos = block.metadata.bitcoin_anchor_block_identifier.index
-            - block.metadata.bitcoin_genesis_block_identifier.index;
-        let (start, end) = if abs_pos % cycle_len == (cycle_len - 1) {
+        let (start, end) = if block.metadata.pox_cycle_position == (block.metadata.pox_cycle_length - 1) {
             ("", "<")
-        } else if abs_pos % cycle_len == 0 {
+        } else if block.metadata.pox_cycle_position == 0 {
             (">", "")
         } else {
             ("", "")

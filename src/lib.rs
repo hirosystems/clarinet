@@ -17,6 +17,7 @@ pub extern crate bip39;
 pub mod macros;
 
 pub mod integrate;
+pub mod indexer;
 pub mod poke;
 pub mod publish;
 #[cfg(feature = "cli")]

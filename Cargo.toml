@@ -68,6 +68,7 @@ tracing-subscriber = "0.2"
 tracing-appender = "0.1"
 ctrlc = "3.1.9"
 strum = { version = "0.22", features = ["derive"] }
+bitcoincore-rpc = "0.14.0"
 
 [dependencies.tui]
 version = "0.15.0"

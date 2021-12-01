@@ -1,4 +1,4 @@
-mod events_observer;
+pub mod events_observer;
 mod orchestrator;
 mod ui;
 
@@ -56,9 +56,9 @@ pub async fn do_run_devnet(
 
     devnet.termination_success_tx = Some(termination_success_tx);
 
-    let (devnet_config, accounts) = match devnet.network_config {
+    let devnet_config = match devnet.network_config {
         Some(ref network_config) => match &network_config.devnet {
-            Some(devnet_config) => Ok((devnet_config.clone(), network_config.accounts.clone())),
+            Some(devnet_config) => Ok(devnet_config.clone()),
             _ => Err("Unable to retrieve config"),
         },
         _ => Err("Unable to retrieve config"),
@@ -75,7 +75,7 @@ pub async fn do_run_devnet(
     // The event observer should be able to send some events to the UI thread,
     // and should be able to be terminated
     let devnet_path = devnet_config.working_dir.clone();
-    let config = EventObserverConfig::new(devnet_config, devnet.manifest_path.clone(), accounts);
+    let config = EventObserverConfig::new(devnet_config, devnet.manifest_path.clone());
     let contracts_to_deploy_len = config.contracts_to_deploy.len();
     let events_observer_tx = devnet_events_tx.clone();
     let (events_observer_terminator_tx, terminator_rx) = channel();

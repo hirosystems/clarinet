@@ -179,16 +179,16 @@ export interface StacksBlockMetadata {
   bitcoin_anchor_block_identifier: BlockIdentifier;
   /**
    *
-   * @type {BlockIdentifier}
+   * @type {number}
    * @memberof StacksBlockMetadata
    */
-  bitcoin_genesis_block_identifier: BlockIdentifier;
+  pox_cycle_index: number;
   /**
    *
    * @type {number}
    * @memberof StacksBlockMetadata
    */
-  pox_cycle_index: number;
+  pox_cycle_position: number;
   /**
    *
    * @type {number}
