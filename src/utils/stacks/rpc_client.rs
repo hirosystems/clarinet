@@ -1,6 +1,7 @@
 use clarity_repl::clarity::codec::{StacksMessageCodec, StacksTransaction};
 use clarity_repl::clarity::types::Value;
 use clarity_repl::clarity::util::hash::{bytes_to_hex, hex_bytes};
+use reqwest::blocking::Client;
 use std::io::Cursor;
 
 #[derive(Debug)]
@@ -10,6 +11,7 @@ pub enum RpcError {
 
 pub struct StacksRpc {
     pub url: String,
+    pub client: Client,
 }
 
 pub struct PostTransactionResult {
@@ -48,7 +50,10 @@ struct Balance {
 
 impl StacksRpc {
     pub fn new(url: &str) -> Self {
-        Self { url: url.into() }
+        Self { 
+            url: url.into(),
+            client: Client::builder().build().unwrap(),
+        }
     }
 
     pub fn post_transaction(
@@ -56,9 +61,8 @@ impl StacksRpc {
         transaction: StacksTransaction,
     ) -> Result<PostTransactionResult, RpcError> {
         let tx = transaction.serialize_to_vec();
-        let client = reqwest::blocking::Client::new();
         let path = format!("{}/v2/transactions", self.url);
-        let res = client
+        let res = self.client
             .post(&path)
             .header("Content-Type", "application/octet-stream")
             .body(tx)
@@ -78,7 +82,8 @@ impl StacksRpc {
     pub fn get_nonce(&self, address: &str) -> Result<u64, RpcError> {
         let request_url = format!("{}/v2/accounts/{addr}", self.url, addr = address,);
 
-        let res: Balance = reqwest::blocking::get(&request_url)
+        let res: Balance = self.client.get(&request_url)
+            .send()
             .expect("Unable to retrieve account")
             .json()
             .expect("Unable to parse contract");
@@ -89,7 +94,8 @@ impl StacksRpc {
     pub fn get_pox_info(&self) -> Result<PoxInfo, RpcError> {
         let request_url = format!("{}/v2/pox", self.url);
 
-        let res: PoxInfo = reqwest::blocking::get(&request_url)
+        let res: PoxInfo = self.client.get(&request_url)
+            .send()
             .expect("Unable to retrieve account")
             .json()
             .expect("Unable to parse contract");
@@ -104,7 +110,6 @@ impl StacksRpc {
         args: Vec<Value>,
         sender: &str,
     ) -> Result<Value, RpcError> {
-        let client = reqwest::blocking::Client::new();
         let path = format!(
             "{}/v2/contracts/call-read/{}/{}/{}",
             self.url, contract_addr, contract_name, method
@@ -114,7 +119,7 @@ impl StacksRpc {
             .iter()
             .map(|a| bytes_to_hex(&a.serialize_to_vec()))
             .collect::<Vec<_>>();
-        let res = client
+        let res = self.client
             .post(&path)
             .json(&json!({
                 "sender": sender,
