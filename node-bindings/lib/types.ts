@@ -166,7 +166,7 @@ export interface Transaction {
 }
 
 /**
- * StacksBlockMetadata contain an specific data about Stacks blocks.
+ * StacksBlockMetadata contains specific data about Stacks blocks.
  * @export
  * @interface StacksBlockMetadata
  */
