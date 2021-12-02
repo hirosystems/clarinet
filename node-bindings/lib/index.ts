@@ -87,7 +87,7 @@ export interface DevnetConfig {
    */
   orchestrator_port?: number;
   /**
-   * The port that should be used by bitcoind's data plan
+   * The port that should be used by bitcoind's data plane
    * @type {number}
    * @memberof DevnetConfig
    */
