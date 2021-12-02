@@ -1,13 +1,11 @@
 use super::DevnetEvent;
-use crate::indexer::{
-    chains, BitcoinChainEvent, Indexer, IndexerConfig, PoxInfo, StacksChainEvent,
-};
+use crate::indexer::{chains, BitcoinChainEvent, Indexer, IndexerConfig, StacksChainEvent};
 use crate::integrate::{MempoolAdmissionData, ServiceStatusData, Status};
 use crate::poke::load_session;
 use crate::publish::{publish_contract, Network};
 use crate::types::{self, DevnetConfig};
 use crate::utils;
-use crate::utils::stacks::{transactions, StacksRpc};
+use crate::utils::stacks::{transactions, PoxInfo, StacksRpc};
 use base58::FromBase58;
 use clarity_repl::clarity::representations::ClarityName;
 use clarity_repl::clarity::types::{BuffData, SequenceData, TupleData, Value as ClarityValue};
@@ -292,23 +290,23 @@ pub fn handle_new_block(
     // Standardize the structure of the block, and identify the
     // kind of update that this new block would imply, taking
     // into account the last 7 blocks.
-    let (chain_update, pox_info) = match indexer.inner().write() {
+    let (pox_info, block) = match indexer.inner().write() {
         Ok(mut indexer) => {
             let chain_event = indexer.handle_stacks_block(marshalled_block.into_inner());
-            (chain_event, indexer.get_updated_pox_info())
+            // Contextual: Devnet is an environment under control,
+            // with 1 miner. As such we will ignore Reorgs handling.
+            match chain_event {
+                StacksChainEvent::ChainUpdatedWithBlock(block) => {
+                    (indexer.get_updated_pox_info(&block), block)
+                }
+                _ => {
+                    return Json(json!({
+                        "status": 200,
+                        "result": "Ok",
+                    }))
+                }
+            }
         }
-        _ => {
-            return Json(json!({
-                "status": 200,
-                "result": "Ok",
-            }))
-        }
-    };
-
-    // Contextual: Devnet is an environment under control,
-    // with 1 miner. As such we will ignore Reorgs handling.
-    let block = match chain_update {
-        StacksChainEvent::ChainUpdatedWithBlock(block) => block,
         _ => {
             return Json(json!({
                 "status": 200,
@@ -402,7 +400,8 @@ pub fn handle_new_block(
     data = "<new_microblock>"
 )]
 pub fn handle_new_microblocks(
-    _config: &State<Arc<RwLock<EventObserverConfig>>>,
+    _config: &State<Arc<Mutex<EventObserverConfig>>>,
+    _indexer: &State<Arc<RwLock<Indexer>>>,
     devnet_events_tx: &State<Arc<Mutex<Sender<DevnetEvent>>>>,
     new_microblock: Json<NewMicroBlock>,
 ) -> Json<JsonValue> {
@@ -567,10 +566,10 @@ pub fn publish_stacking_orders(
 
             transactions += 1;
 
-            let stacks_rpc = StacksRpc::new(node_url.clone());
+            let stacks_rpc = StacksRpc::new(&node_url);
             let default_fee = 1000;
             let nonce = stacks_rpc
-                .get_nonce(account.address.to_string())
+                .get_nonce(&account.address)
                 .expect("Unable to retrieve nonce");
 
             let stx_amount = pox_info.next_cycle.min_threshold_ustx * pox_stacking_order.slots;

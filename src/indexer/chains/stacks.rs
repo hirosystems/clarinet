@@ -5,7 +5,7 @@ use crate::types::{
     Operation, OperationIdentifier, OperationStatusKind, OperationType, StacksBlockData,
     StacksBlockMetadata, StacksTransactionData, StacksTransactionMetadata, TransactionIdentifier,
 };
-use crate::utils::stacks::{transactions, StacksRpc};
+use crate::utils::stacks::StacksRpc;
 use clarity_repl::clarity::codec::transaction::TransactionPayload;
 use clarity_repl::clarity::codec::{StacksMessageCodec, StacksTransaction};
 use clarity_repl::clarity::types::Value as ClarityValue;
@@ -299,62 +299,33 @@ pub fn get_standardized_fungible_currency_from_asset_class_id(
         None => {
             let comps = asset_class_id.split("::").collect::<Vec<&str>>();
             let principal = comps[0].split(".").collect::<Vec<&str>>();
+            let contract_address = principal[0];
+            let contract_name = principal[1];
 
-            let get_symbol_request_url = format!(
-                "{}/v2/contracts/call-read/{}/{}/get-symbol",
-                node_url, principal[0], principal[1],
-            );
+            let stacks_rpc = StacksRpc::new(&node_url);
+            let value = stacks_rpc
+                .call_read_only_fn(
+                    &contract_address,
+                    &contract_name,
+                    "get-symbol",
+                    vec![],
+                    contract_address,
+                )
+                .expect("Unable to retrieve symbol");
+            let symbol = value.expect_result_ok().expect_ascii();
 
-            println!("get_standardized_fungible_currency_from_asset_class_id");
+            let value = stacks_rpc
+                .call_read_only_fn(
+                    &contract_address,
+                    &contract_name,
+                    "get-decimals",
+                    vec![],
+                    &contract_address,
+                )
+                .expect("Unable to retrieve decimals");
+            let decimals = value.expect_result_ok().expect_u128() as u8;
 
-            let symbol_res: ContractReadonlyCall = reqwest::blocking::get(&get_symbol_request_url)
-                .expect("Unable to retrieve account")
-                .json()
-                .expect("Unable to parse contract");
-
-            let raw_value = match symbol_res.result.strip_prefix("0x") {
-                Some(raw_value) => raw_value,
-                _ => panic!(),
-            };
-            let value_bytes = match hex_bytes(&raw_value) {
-                Ok(bytes) => bytes,
-                _ => panic!(),
-            };
-
-            let symbol = match ClarityValue::consensus_deserialize(&mut Cursor::new(&value_bytes)) {
-                Ok(value) => value.expect_result_ok().expect_u128(),
-                _ => panic!(),
-            };
-
-            let get_decimals_request_url = format!(
-                "{}/v2/contracts/call-read/{}/{}/get-decimals",
-                node_url, principal[0], principal[1],
-            );
-
-            let decimals_res: ContractReadonlyCall =
-                reqwest::blocking::get(&get_decimals_request_url)
-                    .expect("Unable to retrieve account")
-                    .json()
-                    .expect("Unable to parse contract");
-
-            let raw_value = match decimals_res.result.strip_prefix("0x") {
-                Some(raw_value) => raw_value,
-                _ => panic!(),
-            };
-            let value_bytes = match hex_bytes(&raw_value) {
-                Ok(bytes) => bytes,
-                _ => panic!(),
-            };
-
-            let value = match ClarityValue::consensus_deserialize(&mut Cursor::new(&value_bytes)) {
-                Ok(value) => value.expect_result_ok().expect_u128(),
-                _ => panic!(),
-            };
-
-            let entry = AssetClassCache {
-                symbol: format!("{}", symbol),
-                decimals: value as u8,
-            };
+            let entry = AssetClassCache { symbol, decimals };
 
             let currency = Currency {
                 symbol: entry.symbol.clone(),
@@ -385,7 +356,7 @@ pub fn get_standardized_fungible_currency_from_asset_class_id(
 pub fn get_standardized_non_fungible_currency_from_asset_class_id(
     asset_class_id: &str,
     asset_id: &str,
-    asset_class_cache: &mut HashMap<String, AssetClassCache>,
+    _asset_class_cache: &mut HashMap<String, AssetClassCache>,
 ) -> Currency {
     Currency {
         symbol: asset_class_id.into(),

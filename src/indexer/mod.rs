@@ -1,6 +1,7 @@
 pub mod chains;
 
 use crate::types::{BitcoinBlockData, BlockIdentifier, StacksBlockData};
+use crate::utils::stacks::{PoxInfo, StacksRpc};
 use rocket::serde::json::Value as JsonValue;
 use std::collections::{HashMap, VecDeque};
 
@@ -27,19 +28,6 @@ pub struct StacksChainContext {
     pox_info: PoxInfo,
 }
 
-#[derive(Deserialize, Debug, Clone, Default)]
-pub struct PoxInfo {
-    pub contract_id: String,
-    pub pox_activation_threshold_ustx: u64,
-    pub first_burnchain_block_height: u64,
-    pub prepare_phase_block_length: u32,
-    pub reward_phase_block_length: u32,
-    pub reward_slots: u32,
-    pub reward_cycle_id: u32,
-    pub total_liquid_supply_ustx: u64,
-    pub next_cycle: PoxCycle,
-}
-
 impl PoxInfo {
     pub fn default() -> PoxInfo {
         PoxInfo {
@@ -53,11 +41,6 @@ impl PoxInfo {
             ..Default::default()
         }
     }
-}
-
-#[derive(Deserialize, Debug, Clone, Default)]
-pub struct PoxCycle {
-    pub min_threshold_ustx: u64,
 }
 
 impl StacksChainContext {
@@ -146,16 +129,15 @@ impl Indexer {
         StacksChainEvent::ChainUpdatedWithBlock(block)
     }
 
-    pub fn get_updated_pox_info(&mut self) -> PoxInfo {
-        // std::thread::spawn(move || {
-        //     let pox_url = format!("{}/v2/pox", node_url);
-
-        //     if let Ok(reponse) = reqwest::blocking::get(pox_url) {
-        //         if let Ok(update) = reponse.json() {
-        //             pox_info = update
-        //         }
-        //     }
-
+    pub fn get_updated_pox_info(&mut self, block: &StacksBlockData) -> PoxInfo {
+        let pox_cycle_len = self.stacks_context.pox_info.prepare_phase_block_length
+            + self.stacks_context.pox_info.reward_phase_block_length;
+        if block.metadata.pox_cycle_position == pox_cycle_len - 2 {
+            let stacks_rpc = StacksRpc::new(&self.config.stacks_node_rpc_url);
+            if let Ok(pox_info) = stacks_rpc.get_pox_info() {
+                self.stacks_context.pox_info = pox_info;
+            }
+        }
         self.stacks_context.pox_info.clone()
     }
 }

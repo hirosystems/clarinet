@@ -20,6 +20,24 @@ pub struct CallReadOnlyFnResult {
     pub result: Value,
 }
 
+#[derive(Deserialize, Debug, Clone, Default)]
+pub struct PoxInfo {
+    pub contract_id: String,
+    pub pox_activation_threshold_ustx: u64,
+    pub first_burnchain_block_height: u64,
+    pub prepare_phase_block_length: u32,
+    pub reward_phase_block_length: u32,
+    pub reward_slots: u32,
+    pub reward_cycle_id: u32,
+    pub total_liquid_supply_ustx: u64,
+    pub next_cycle: PoxCycle,
+}
+
+#[derive(Deserialize, Debug, Clone, Default)]
+pub struct PoxCycle {
+    pub min_threshold_ustx: u64,
+}
+
 #[derive(Deserialize, Debug)]
 struct Balance {
     balance: String,
@@ -29,8 +47,8 @@ struct Balance {
 }
 
 impl StacksRpc {
-    pub fn new(url: String) -> Self {
-        Self { url }
+    pub fn new(url: &str) -> Self {
+        Self { url: url.into() }
     }
 
     pub fn post_transaction(
@@ -57,7 +75,7 @@ impl StacksRpc {
         Ok(res)
     }
 
-    pub fn get_nonce(&self, address: String) -> Result<u64, RpcError> {
+    pub fn get_nonce(&self, address: &str) -> Result<u64, RpcError> {
         let request_url = format!("{}/v2/accounts/{addr}", self.url, addr = address,);
 
         let res: Balance = reqwest::blocking::get(&request_url)
@@ -68,13 +86,23 @@ impl StacksRpc {
         Ok(nonce)
     }
 
+    pub fn get_pox_info(&self) -> Result<PoxInfo, RpcError> {
+        let request_url = format!("{}/v2/pox", self.url);
+
+        let res: PoxInfo = reqwest::blocking::get(&request_url)
+            .expect("Unable to retrieve account")
+            .json()
+            .expect("Unable to parse contract");
+        Ok(res)
+    }
+
     pub fn call_read_only_fn(
         &self,
-        contract_addr: String,
-        contract_name: String,
-        method: String,
+        contract_addr: &str,
+        contract_name: &str,
+        method: &str,
         args: Vec<Value>,
-        sender: String,
+        sender: &str,
     ) -> Result<Value, RpcError> {
         let client = reqwest::blocking::Client::new();
         let path = format!(
@@ -106,11 +134,14 @@ impl StacksRpc {
             result: String,
         }
 
-        let mut response: ReadOnlyCallResult = res.json().unwrap();
+        let response: ReadOnlyCallResult = res.json().unwrap();
         if response.okay {
             // Removing the 0x prefix
-            let clar_val = response.result.split_off(2);
-            let bytes = hex_bytes(&clar_val).unwrap();
+            let raw_value = match response.result.strip_prefix("0x") {
+                Some(raw_value) => raw_value,
+                _ => panic!(),
+            };
+            let bytes = hex_bytes(&raw_value).unwrap();
             let mut cursor = Cursor::new(&bytes);
             let value = Value::consensus_deserialize(&mut cursor).unwrap();
             Ok(value)
