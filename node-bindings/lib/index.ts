@@ -99,7 +99,7 @@ export interface DevnetConfig {
    */
   bitcoin_node_rpc_port?: number;
   /**
-   * The port that should be used by stacks's data plan
+   * The port that should be used by stacks's data plane
    * @type {number}
    * @memberof DevnetConfig
    */
