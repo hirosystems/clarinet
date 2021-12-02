@@ -105,7 +105,7 @@ export interface DevnetConfig {
    */
   stacks_node_p2p_port?: number;
   /**
-   * The port that should be used by stacks's control plan
+   * The port that should be used by stacks's control plane
    * @type {number}
    * @memberof DevnetConfig
    */
