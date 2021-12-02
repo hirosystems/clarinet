@@ -51,6 +51,7 @@ pub struct EventObserverConfig {
     pub contracts_to_deploy: VecDeque<InitialContract>,
     pub manifest_path: PathBuf,
     pub session: Session,
+    pub deployment_fee_rate: u64,
 }
 
 #[derive(Clone, Debug)]
@@ -68,13 +69,14 @@ struct ContractReadonlyCall {
 impl EventObserverConfig {
     pub fn new(devnet_config: DevnetConfig, manifest_path: PathBuf) -> Self {
         info!("Checking contracts...");
-        let session = match load_session(manifest_path.clone(), false, &Network::Devnet) {
-            Ok((session, _)) => session,
+        let (session, config) = match load_session(manifest_path.clone(), false, &Network::Devnet) {
+            Ok((session, config)) => (session, config),
             Err(e) => {
                 println!("{}", e);
                 std::process::exit(1);
             }
         };
+
         EventObserverConfig {
             devnet_config,
             accounts: session.settings.initial_accounts.clone(),
@@ -83,6 +85,7 @@ impl EventObserverConfig {
                 session.settings.initial_contracts.iter().map(|c| c.clone()),
             ),
             session,
+            deployment_fee_rate: config.network.deployment_fee_rate,
         }
     }
 
@@ -349,6 +352,7 @@ pub fn handle_new_block(
                     &config_reader.devnet_config,
                     &config_reader.accounts,
                     &mut init_status_writer,
+                    config_reader.deployment_fee_rate,
                 ) {
                     if let Ok(tx) = devnet_events_tx.lock() {
                         let _ = tx.send(DevnetEvent::success(format!(
@@ -373,6 +377,7 @@ pub fn handle_new_block(
                 &config_reader.accounts,
                 &pox_info,
                 bitcoin_block_height as u32,
+                config_reader.deployment_fee_rate,
             ) {
                 if let Ok(tx) = devnet_events_tx.lock() {
                     let _ = tx.send(DevnetEvent::success(format!(
@@ -473,6 +478,7 @@ pub fn publish_initial_contracts(
     devnet_config: &DevnetConfig,
     accounts: &Vec<Account>,
     init_status: &mut DevnetInitializationStatus,
+    deployment_fee_rate: u64,
 ) -> Option<usize> {
     let contracts_left = init_status.contracts_left_to_deploy.len();
     if contracts_left == 0 {
@@ -518,7 +524,7 @@ pub fn publish_initial_contracts(
                 &deployers_lookup,
                 &mut deployers_nonces,
                 &moved_node_url,
-                1,
+                deployment_fee_rate,
                 &Network::Devnet,
             ) {
                 Ok((_txid, _nonce)) => {
@@ -543,6 +549,7 @@ pub fn publish_stacking_orders(
     accounts: &Vec<Account>,
     pox_info: &PoxInfo,
     bitcoin_block_height: u32,
+    fee_rate: u64,
 ) -> Option<usize> {
     if devnet_config.pox_stacking_orders.len() == 0 {
         return None;
@@ -567,7 +574,7 @@ pub fn publish_stacking_orders(
             transactions += 1;
 
             let stacks_rpc = StacksRpc::new(&node_url);
-            let default_fee = 1000;
+            let default_fee = fee_rate * 10;
             let nonce = stacks_rpc
                 .get_nonce(&account.address)
                 .expect("Unable to retrieve nonce");
