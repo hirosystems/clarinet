@@ -93,7 +93,7 @@ export interface DevnetConfig {
    */
   bitcoin_node_p2p_port?: number;
   /**
-   * The port that should be used by bitcoind's control plan
+   * The port that should be used by bitcoind's control plane
    * @type {number}
    * @memberof DevnetConfig
    */
