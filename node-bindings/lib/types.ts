@@ -166,7 +166,7 @@ export interface Transaction {
 }
 
 /**
- * StacksBlockMetadata contain an specific data about Stacks blocks.
+ * StacksBlockMetadata contains specific data about Stacks blocks.
  * @export
  * @interface StacksBlockMetadata
  */
@@ -198,7 +198,7 @@ export interface StacksBlockMetadata {
 }
 
 /**
- * BitcoinBlockMetadata contain an specific data about Bitcoin blocks.
+ * BitcoinBlockMetadata contains specific data about Bitcoin blocks.
  * @export
  * @interface BitcoinBlockMetadata
  */

@@ -87,25 +87,25 @@ export interface DevnetConfig {
    */
   orchestrator_port?: number;
   /**
-   * The port that should be used by bitcoind's data plan
+   * The port that should be used by bitcoind's data plane
    * @type {number}
    * @memberof DevnetConfig
    */
   bitcoin_node_p2p_port?: number;
   /**
-   * The port that should be used by bitcoind's control plan
+   * The port that should be used by bitcoind's control plane
    * @type {number}
    * @memberof DevnetConfig
    */
   bitcoin_node_rpc_port?: number;
   /**
-   * The port that should be used by stacks's data plan
+   * The port that should be used by stacks's data plane
    * @type {number}
    * @memberof DevnetConfig
    */
   stacks_node_p2p_port?: number;
   /**
-   * The port that should be used by stacks's control plan
+   * The port that should be used by stacks's control plane
    * @type {number}
    * @memberof DevnetConfig
    */
