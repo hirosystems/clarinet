@@ -581,9 +581,11 @@ pub async fn publish_stacking_orders(
     for pox_stacking_order in devnet_config.pox_stacking_orders.iter() {
         if pox_stacking_order.start_at_cycle == (pox_info.reward_cycle_id + 1) {
             let mut account = None;
-            while let Some(e) = accounts.iter().next() {
+            let mut accounts_iter = accounts.iter();
+            while let Some(e) = accounts_iter.next() {
                 if e.name == pox_stacking_order.wallet {
                     account = Some(e);
+                    break;
                 }
             }
             let account = match account {
@@ -600,7 +602,7 @@ pub async fn publish_stacking_orders(
                 .expect("Unable to retrieve nonce");
 
             let stx_amount = pox_info.next_cycle.min_threshold_ustx * pox_stacking_order.slots;
-            let (_, _, account_secret_keu) =
+            let (_, _, account_secret_key) =
                 types::compute_addresses(&account.mnemonic, &account.derivation, false);
             let addr_bytes = pox_stacking_order
                 .btc_address
@@ -634,7 +636,7 @@ pub async fn publish_stacking_orders(
                 ],
                 nonce,
                 default_fee,
-                &hex_bytes(&account_secret_keu).unwrap(),
+                &hex_bytes(&account_secret_key).unwrap(),
             );
             std::thread::spawn(move || {
                 let _ = stacks_rpc
