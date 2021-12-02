@@ -10,7 +10,7 @@ use tracing_appender;
 
 use crate::types::{BitcoinBlockData, StacksBlockData};
 use crate::utils;
-use events_observer::start_events_observer;
+use events_observer::{start_events_observer, EventsObserverCommand};
 pub use orchestrator::DevnetOrchestrator;
 
 use self::events_observer::EventObserverConfig;
@@ -78,9 +78,10 @@ pub async fn do_run_devnet(
     let config = EventObserverConfig::new(devnet_config, devnet.manifest_path.clone());
     let contracts_to_deploy_len = config.contracts_to_deploy.len();
     let events_observer_tx = devnet_events_tx.clone();
-    let (events_observer_terminator_tx, terminator_rx) = channel();
+    let (events_observer_commands_tx, events_observer_commands_rx) = channel();
+    let moved_events_observer_commands_tx = events_observer_commands_tx.clone();
     let events_observer_handle = std::thread::spawn(move || {
-        let future = start_events_observer(config, events_observer_tx, terminator_rx);
+        let future = start_events_observer(config, events_observer_tx, events_observer_commands_rx, moved_events_observer_commands_tx);
         let rt = utils::create_basic_runtime();
         let _ = rt.block_on(future);
     });
@@ -106,17 +107,17 @@ pub async fn do_run_devnet(
         let _ = ui::start_ui(
             devnet_events_tx,
             devnet_events_rx,
-            events_observer_terminator_tx,
+            events_observer_commands_tx,
             orchestrator_terminator_tx,
             orchestrator_terminated_rx,
             &devnet_path,
         );
     } else {
         let moved_orchestrator_terminator_tx = orchestrator_terminator_tx.clone();
-        let moved_events_observer_terminator_tx = events_observer_terminator_tx.clone();
+        let moved_events_observer_commands_tx = events_observer_commands_tx.clone();
         ctrlc::set_handler(move || {
-            moved_events_observer_terminator_tx
-                .send(true)
+            moved_events_observer_commands_tx
+                .send(EventsObserverCommand::Terminate(true))
                 .expect("Unable to terminate devnet");
             moved_orchestrator_terminator_tx
                 .send(true)

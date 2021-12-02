@@ -3,9 +3,9 @@ use crate::indexer::{chains, BitcoinChainEvent, Indexer, IndexerConfig, StacksCh
 use crate::integrate::{MempoolAdmissionData, ServiceStatusData, Status};
 use crate::poke::load_session;
 use crate::publish::{publish_contract, Network};
-use crate::types::{self, DevnetConfig};
+use crate::types::{self, DevnetConfig, BlockIdentifier};
 use crate::utils;
-use crate::utils::stacks::{transactions, PoxInfo, StacksRpc};
+use crate::utils::stacks::{transactions, StacksRpc, PoxInfo};
 use base58::FromBase58;
 use clarity_repl::clarity::representations::ClarityName;
 use clarity_repl::clarity::types::{BuffData, SequenceData, TupleData, Value as ClarityValue};
@@ -109,10 +109,18 @@ impl EventObserverConfig {
     }
 }
 
+pub enum EventsObserverCommand {
+    Terminate(bool), // Restart
+    UpdatePoxInfo,
+    PublishInitialContracts,
+    PublishPoxStackingOrders(BlockIdentifier),
+}
+
 pub async fn start_events_observer(
     config: EventObserverConfig,
     devnet_event_tx: Sender<DevnetEvent>,
-    terminator_rx: Receiver<bool>,
+    events_observer_commands_rx: Receiver<EventsObserverCommand>,
+    events_observer_commands_tx: Sender<EventsObserverCommand>,
 ) -> Result<(), Box<dyn Error>> {
     let _ = config.execute_scripts().await;
 
@@ -137,15 +145,16 @@ pub async fn start_events_observer(
     let port = config.devnet_config.orchestrator_port;
     let manifest_path = config.manifest_path.clone();
 
-    let config_mutex = Arc::new(Mutex::new(config));
+    let config_mutex = Arc::new(Mutex::new(config.clone()));
     let init_status_rw_lock = Arc::new(RwLock::new(init_status));
     let indexer_rw_lock = Arc::new(RwLock::new(indexer));
 
-    let moved_config_mutex = config_mutex.clone();
     let devnet_event_tx_mutex = Arc::new(Mutex::new(devnet_event_tx.clone()));
+    let background_job_tx_mutex = Arc::new(Mutex::new(events_observer_commands_tx.clone()));
+
     let moved_init_status_rw_lock = init_status_rw_lock.clone();
 
-    let config = Config {
+    let rocket_config = Config {
         port: port,
         workers: 4,
         address: IpAddr::V4(Ipv4Addr::new(0, 0, 0, 0)),
@@ -156,11 +165,12 @@ pub async fn start_events_observer(
     };
 
     let _ = std::thread::spawn(move || {
-        let future = rocket::custom(config)
+        let future = rocket::custom(rocket_config)
             .manage(indexer_rw_lock)
             .manage(devnet_event_tx_mutex)
-            .manage(moved_config_mutex)
+            .manage(config_mutex)
             .manage(moved_init_status_rw_lock)
+            .manage(background_job_tx_mutex)
             .mount(
                 "/",
                 routes![
@@ -176,15 +186,16 @@ pub async fn start_events_observer(
         rt.block_on(future).expect("Unable to spawn event observer");
     });
 
+    // This loop is used for handling background jobs, emitted by HTTP calls.
     loop {
-        match terminator_rx.recv() {
-            Ok(true) => {
+        match events_observer_commands_rx.recv() {
+            Ok(EventsObserverCommand::Terminate(true)) => {
                 devnet_event_tx
                     .send(DevnetEvent::info("Terminating event observer".into()))
                     .expect("Unable to terminate event observer");
                 break;
             }
-            Ok(false) => {
+            Ok(EventsObserverCommand::Terminate(false)) => {
                 // Restart
                 devnet_event_tx
                     .send(DevnetEvent::info("Reloading contracts".into()))
@@ -209,9 +220,33 @@ pub async fn start_events_observer(
                     )))
                     .expect("Unable to terminate event observer");
 
-                if let Ok(mut config_writer) = init_status_rw_lock.write() {
-                    config_writer.contracts_left_to_deploy = contracts_to_deploy;
-                    config_writer.deployer_nonce = 0;
+                if let Ok(mut init_status) = init_status_rw_lock.write() {
+                    init_status.contracts_left_to_deploy = contracts_to_deploy;
+                    init_status.deployer_nonce = 0;
+                }
+            }
+            Ok(EventsObserverCommand::UpdatePoxInfo) => {
+
+            }
+            Ok(EventsObserverCommand::PublishInitialContracts) => {
+                if let Ok(mut init_status_writer) = init_status_rw_lock.write() {
+                    let res = publish_initial_contracts(&config.devnet_config, &config.accounts, config.deployment_fee_rate, &mut init_status_writer);
+                    if let Some(tx_count) = res {
+                        let _ = devnet_event_tx.send(DevnetEvent::success(format!(
+                            "Will publish {} contracts",
+                            tx_count
+                        )));
+                    }
+                }
+            }
+            Ok(EventsObserverCommand::PublishPoxStackingOrders(block_identifier)) => {
+                let bitcoin_block_height = block_identifier.index;
+                let res = publish_stacking_orders(&config.devnet_config, &config.accounts, config.deployment_fee_rate, bitcoin_block_height as u32).await;
+                if let Some(tx_count) = res {
+                    let _ = devnet_event_tx.send(DevnetEvent::success(format!(
+                        "Will broadcast {} stacking orders",
+                        tx_count
+                    )));
                 }
             }
             Err(_) => {
@@ -283,11 +318,11 @@ pub fn handle_new_burn_block(
 }
 
 #[post("/new_block", format = "application/json", data = "<marshalled_block>")]
-pub async fn handle_new_block(
-    config: &State<Arc<Mutex<EventObserverConfig>>>,
+pub fn handle_new_block(
     init_status: &State<Arc<RwLock<DevnetInitializationStatus>>>,
     indexer_rw_lock: &State<Arc<RwLock<Indexer>>>,
     devnet_events_tx: &State<Arc<Mutex<Sender<DevnetEvent>>>>,
+    background_job_tx_mutex: &State<Arc<Mutex<Sender<EventsObserverCommand>>>>,
     marshalled_block: Json<JsonValue>,
 ) -> Json<JsonValue> {
     // Standardize the structure of the block, and identify the
@@ -344,22 +379,10 @@ pub async fn handle_new_block(
     // - Contracts deployment orchestration during the first blocks (max: 25 / block)
     // - PoX stacking order orchestration: enable PoX with some "stack-stx" transactions
     // defined in the devnet file config.
-    if let Ok(mut init_status_writer) = init_status.inner().write() {
+    if let Ok(init_status_writer) = init_status.inner().read() {
         if init_status_writer.contracts_left_to_deploy.len() > 0 {
-            if let Ok(config_reader) = config.inner().lock() {
-                if let Some(count) = publish_initial_contracts(
-                    &config_reader.devnet_config,
-                    &config_reader.accounts,
-                    &mut init_status_writer,
-                    config_reader.deployment_fee_rate,
-                ) {
-                    if let Ok(tx) = devnet_events_tx.lock() {
-                        let _ = tx.send(DevnetEvent::success(format!(
-                            "Will publish {} contracts",
-                            count
-                        )));
-                    }
-                }
+            if let Ok(background_job_tx) = background_job_tx_mutex.lock() {
+                let _ = background_job_tx.send(EventsObserverCommand::PublishInitialContracts);
             }
         }
     }
@@ -368,30 +391,10 @@ pub async fn handle_new_block(
     // cycle starts.
     let pox_cycle_length: u32 =
         pox_info.prepare_phase_block_length + pox_info.reward_phase_block_length;
-    let should_update_pox_info = block.metadata.pox_cycle_position == (pox_cycle_length - 3);
     let should_submit_pox_orders = block.metadata.pox_cycle_position == (pox_cycle_length - 2);
     if should_submit_pox_orders {
-        if let Ok(config_reader) = config.inner().lock() {
-            let bitcoin_block_height = block.metadata.bitcoin_anchor_block_identifier.index;
-            if let Some(count) = publish_stacking_orders(
-                &config_reader.devnet_config,
-                &config_reader.accounts,
-                &pox_info,
-                bitcoin_block_height as u32,
-                config_reader.deployment_fee_rate,
-            ) {
-                if let Ok(tx) = devnet_events_tx.lock() {
-                    let _ = tx.send(DevnetEvent::success(format!(
-                        "Will broadcast {} stacking orders",
-                        count
-                    )));
-                }
-            }
-        }
-    }
-    if should_update_pox_info {        
-        if let Ok(mut indexer) = indexer_rw_lock.inner().write() {
-            indexer.update_pox_info().await;
+        if let Ok(background_job_tx) = background_job_tx_mutex.lock() {
+            let _ = background_job_tx.send(EventsObserverCommand::PublishPoxStackingOrders(block.metadata.bitcoin_anchor_block_identifier.clone()));
         }
     }
 
@@ -480,11 +483,20 @@ pub fn handle_drop_mempool_tx() -> Json<JsonValue> {
     }))
 }
 
+#[get("/ping", format = "application/json")]
+pub fn handle_ping() -> Json<JsonValue> {
+    Json(json!({
+        "status": 200,
+        "result": "Ok",
+    }))
+}
+
+
 pub fn publish_initial_contracts(
     devnet_config: &DevnetConfig,
     accounts: &Vec<Account>,
-    init_status: &mut DevnetInitializationStatus,
     deployment_fee_rate: u64,
+    init_status: &mut DevnetInitializationStatus,
 ) -> Option<usize> {
     let contracts_left = init_status.contracts_left_to_deploy.len();
     if contracts_left == 0 {
@@ -507,8 +519,6 @@ pub fn publish_initial_contracts(
         contracts_to_deploy.push(contract);
     }
 
-    let moved_node_url = node_url.clone();
-
     let mut deployers_lookup = BTreeMap::new();
     for account in accounts.iter() {
         if account.name == "deployer" {
@@ -521,15 +531,13 @@ pub fn publish_initial_contracts(
     let contract_to_deploy_len = contracts_to_deploy.len();
     init_status.deployer_nonce += contract_to_deploy_len as u64;
 
-    // Move the transactions submission to another thread, the clock on that thread is ticking,
-    // and blocking our stacks-node
     std::thread::spawn(move || {
         for contract in contracts_to_deploy.into_iter() {
             match publish_contract(
                 &contract,
                 &deployers_lookup,
                 &mut deployers_nonces,
-                &moved_node_url,
+                &node_url,
                 deployment_fee_rate,
                 &Network::Devnet,
             ) {
@@ -550,19 +558,25 @@ pub fn publish_initial_contracts(
     Some(contract_to_deploy_len)
 }
 
-pub fn publish_stacking_orders(
+pub async fn publish_stacking_orders(
     devnet_config: &DevnetConfig,
     accounts: &Vec<Account>,
-    pox_info: &PoxInfo,
-    bitcoin_block_height: u32,
     fee_rate: u64,
+    bitcoin_block_height: u32,
 ) -> Option<usize> {
     if devnet_config.pox_stacking_orders.len() == 0 {
         return None;
     }
 
-    let node_url = format!("http://localhost:{}", devnet_config.stacks_node_rpc_port);
+    let stacks_node_rpc_url = format!("http://localhost:{}", devnet_config.stacks_node_rpc_port);
+
     let mut transactions = 0;
+    let pox_info: PoxInfo = reqwest::get(format!("{}/v2/pox", stacks_node_rpc_url))
+        .await
+        .expect("Unable to retrieve pox info")
+        .json()
+        .await
+        .expect("Unable to parse contract");
 
     for pox_stacking_order in devnet_config.pox_stacking_orders.iter() {
         if pox_stacking_order.start_at_cycle == (pox_info.reward_cycle_id + 1) {
@@ -579,8 +593,8 @@ pub fn publish_stacking_orders(
 
             transactions += 1;
 
-            let stacks_rpc = StacksRpc::new(&node_url);
             let default_fee = fee_rate * 10;
+            let stacks_rpc = StacksRpc::new(&stacks_node_rpc_url);
             let nonce = stacks_rpc
                 .get_nonce(&account.address)
                 .expect("Unable to retrieve nonce");
