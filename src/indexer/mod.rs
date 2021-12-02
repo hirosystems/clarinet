@@ -1,6 +1,6 @@
 pub mod chains;
 
-use crate::types::{BitcoinBlockData, BlockIdentifier, StacksBlockData};
+use crate::types::{BitcoinBlockData, BlockIdentifier, StacksBlockData, StacksBlockMetadata};
 use crate::utils::stacks::{PoxInfo, StacksRpc};
 use rocket::serde::json::Value as JsonValue;
 use std::collections::{HashMap, VecDeque};
@@ -61,7 +61,7 @@ pub struct IndexerConfig {
 
 pub struct Indexer {
     config: IndexerConfig,
-    stacks_last_7_blocks: VecDeque<BlockIdentifier>,
+    stacks_last_7_blocks: VecDeque<(BlockIdentifier, StacksBlockMetadata)>,
     bitcoin_last_7_blocks: VecDeque<BlockIdentifier>,
     pub stacks_context: StacksChainContext,
 }
@@ -108,10 +108,10 @@ impl Indexer {
             marshalled_block,
             &mut self.stacks_context,
         );
-        if let Some(tip) = self.stacks_last_7_blocks.back() {
+        if let Some((tip, _)) = self.stacks_last_7_blocks.back() {
             if block.block_identifier.index == tip.index + 1 {
                 self.stacks_last_7_blocks
-                    .push_back(block.block_identifier.clone());
+                    .push_back((block.block_identifier.clone(), block.metadata.clone()));
                 if self.stacks_last_7_blocks.len() > 7 {
                     self.stacks_last_7_blocks.pop_front();
                 }
@@ -124,20 +124,21 @@ impl Indexer {
             }
         } else {
             self.stacks_last_7_blocks
-                .push_front(block.block_identifier.clone());
+                .push_front((block.block_identifier.clone(), block.metadata.clone()));
         }
         StacksChainEvent::ChainUpdatedWithBlock(block)
     }
 
-    pub fn get_updated_pox_info(&mut self, block: &StacksBlockData) -> PoxInfo {
-        let pox_cycle_len = self.stacks_context.pox_info.prepare_phase_block_length
-            + self.stacks_context.pox_info.reward_phase_block_length;
-        if block.metadata.pox_cycle_position == pox_cycle_len - 2 {
-            let stacks_rpc = StacksRpc::new(&self.config.stacks_node_rpc_url);
-            if let Ok(pox_info) = stacks_rpc.get_pox_info() {
-                self.stacks_context.pox_info = pox_info;
-            }
-        }
+    pub fn get_pox_info(&mut self) -> PoxInfo {
         self.stacks_context.pox_info.clone()
+    }
+
+    pub async fn update_pox_info(&mut self) {
+        let res: Result<PoxInfo, _> = reqwest::get(format!("{}/v2/pox", self.config.stacks_node_rpc_url)).await
+            .expect("Unable to retrieve pox info")
+            .json().await;
+        if let Ok(ref pox_info) = res {
+            self.stacks_context.pox_info = pox_info.clone();
+        }
     }
 }

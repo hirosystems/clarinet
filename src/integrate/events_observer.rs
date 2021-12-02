@@ -224,7 +224,7 @@ pub async fn start_events_observer(
 
 #[post("/new_burn_block", format = "json", data = "<marshalled_block>")]
 pub fn handle_new_burn_block(
-    indexer: &State<Arc<RwLock<Indexer>>>,
+    indexer_rw_lock: &State<Arc<RwLock<Indexer>>>,
     devnet_events_tx: &State<Arc<Mutex<Sender<DevnetEvent>>>>,
     marshalled_block: Json<JsonValue>,
 ) -> Json<JsonValue> {
@@ -233,7 +233,7 @@ pub fn handle_new_burn_block(
     // Standardize the structure of the block, and identify the
     // kind of update that this new block would imply, taking
     // into account the last 7 blocks.
-    let chain_update = match indexer.inner().write() {
+    let chain_update = match indexer_rw_lock.inner().write() {
         Ok(mut indexer) => indexer.handle_bitcoin_block(marshalled_block.into_inner()),
         _ => {
             return Json(json!({
@@ -283,32 +283,21 @@ pub fn handle_new_burn_block(
 }
 
 #[post("/new_block", format = "application/json", data = "<marshalled_block>")]
-pub fn handle_new_block(
+pub async fn handle_new_block(
     config: &State<Arc<Mutex<EventObserverConfig>>>,
     init_status: &State<Arc<RwLock<DevnetInitializationStatus>>>,
-    indexer: &State<Arc<RwLock<Indexer>>>,
+    indexer_rw_lock: &State<Arc<RwLock<Indexer>>>,
     devnet_events_tx: &State<Arc<Mutex<Sender<DevnetEvent>>>>,
     marshalled_block: Json<JsonValue>,
 ) -> Json<JsonValue> {
     // Standardize the structure of the block, and identify the
     // kind of update that this new block would imply, taking
     // into account the last 7 blocks.
-    let (pox_info, block) = match indexer.inner().write() {
+    let (pox_info, chain_event) = match indexer_rw_lock.inner().write() {
         Ok(mut indexer) => {
+            let pox_info = indexer.get_pox_info();
             let chain_event = indexer.handle_stacks_block(marshalled_block.into_inner());
-            // Contextual: Devnet is an environment under control,
-            // with 1 miner. As such we will ignore Reorgs handling.
-            match chain_event {
-                StacksChainEvent::ChainUpdatedWithBlock(block) => {
-                    (indexer.get_updated_pox_info(&block), block)
-                }
-                _ => {
-                    return Json(json!({
-                        "status": 200,
-                        "result": "Ok",
-                    }))
-                }
-            }
+            (pox_info, chain_event)
         }
         _ => {
             return Json(json!({
@@ -318,10 +307,20 @@ pub fn handle_new_block(
         }
     };
 
-    let config = config.inner();
+    // Contextual: Devnet is an environment under control,
+    // with 1 miner. As such we will ignore Reorgs handling.
+    let block = match chain_event {
+        StacksChainEvent::ChainUpdatedWithBlock(block) => block,
+        _ => {
+            return Json(json!({
+                "status": 200,
+                "result": "Ok",
+            }))
+        }
+    };
 
-    // Perform a partial update the UI.
-    // We will keep the block around for now.
+    // Partially update the UI. With current approach a full update 
+    // would requires either cloning the block, or passing ownership.
     let devnet_events_tx = devnet_events_tx.inner();
     if let Ok(tx) = devnet_events_tx.lock() {
         let _ = tx.send(DevnetEvent::ServiceStatus(ServiceStatusData {
@@ -347,7 +346,7 @@ pub fn handle_new_block(
     // defined in the devnet file config.
     if let Ok(mut init_status_writer) = init_status.inner().write() {
         if init_status_writer.contracts_left_to_deploy.len() > 0 {
-            if let Ok(config_reader) = config.lock() {
+            if let Ok(config_reader) = config.inner().lock() {
                 if let Some(count) = publish_initial_contracts(
                     &config_reader.devnet_config,
                     &config_reader.accounts,
@@ -369,8 +368,10 @@ pub fn handle_new_block(
     // cycle starts.
     let pox_cycle_length: u32 =
         pox_info.prepare_phase_block_length + pox_info.reward_phase_block_length;
-    if block.metadata.pox_cycle_position == (pox_cycle_length - 2) {
-        if let Ok(config_reader) = config.lock() {
+    let should_update_pox_info = block.metadata.pox_cycle_position == (pox_cycle_length - 3);
+    let should_submit_pox_orders = block.metadata.pox_cycle_position == (pox_cycle_length - 2);
+    if should_submit_pox_orders {
+        if let Ok(config_reader) = config.inner().lock() {
             let bitcoin_block_height = block.metadata.bitcoin_anchor_block_identifier.index;
             if let Some(count) = publish_stacking_orders(
                 &config_reader.devnet_config,
@@ -386,6 +387,11 @@ pub fn handle_new_block(
                     )));
                 }
             }
+        }
+    }
+    if should_update_pox_info {        
+        if let Ok(mut indexer) = indexer_rw_lock.inner().write() {
+            indexer.update_pox_info().await;
         }
     }
 
