@@ -569,7 +569,7 @@ pub async fn publish_stacking_orders(
     }
 
     let stacks_node_rpc_url = format!("http://localhost:{}", devnet_config.stacks_node_rpc_port);
-
+    
     let mut transactions = 0;
     let pox_info: PoxInfo = reqwest::get(format!("{}/v2/pox", stacks_node_rpc_url))
         .await
@@ -584,7 +584,7 @@ pub async fn publish_stacking_orders(
             let mut accounts_iter = accounts.iter();
             while let Some(e) = accounts_iter.next() {
                 if e.name == pox_stacking_order.wallet {
-                    account = Some(e);
+                    account = Some(e.clone());
                     break;
                 }
             }
@@ -595,50 +595,54 @@ pub async fn publish_stacking_orders(
 
             transactions += 1;
 
-            let default_fee = fee_rate * 10;
-            let stacks_rpc = StacksRpc::new(&stacks_node_rpc_url);
-            let nonce = stacks_rpc
-                .get_nonce(&account.address)
-                .expect("Unable to retrieve nonce");
-
             let stx_amount = pox_info.next_cycle.min_threshold_ustx * pox_stacking_order.slots;
-            let (_, _, account_secret_key) =
-                types::compute_addresses(&account.mnemonic, &account.derivation, false);
             let addr_bytes = pox_stacking_order
                 .btc_address
                 .from_base58()
                 .expect("Unable to get bytes from btc address");
+            let duration = pox_stacking_order.duration.into();
+            let node_url = stacks_node_rpc_url.clone();
+            let pox_contract_id = pox_info.contract_id.clone();
 
-            let addr_bytes = Hash160::from_bytes(&addr_bytes[1..21]).unwrap();
-            let addr_version = AddressHashMode::SerializeP2PKH;
-            let stack_stx_tx = transactions::build_contrat_call_transaction(
-                pox_info.contract_id.clone(),
-                "stack-stx".into(),
-                vec![
-                    ClarityValue::UInt(stx_amount.into()),
-                    ClarityValue::Tuple(
-                        TupleData::from_data(vec![
-                            (
-                                ClarityName::try_from("version".to_owned()).unwrap(),
-                                ClarityValue::buff_from_byte(addr_version as u8),
-                            ),
-                            (
-                                ClarityName::try_from("hashbytes".to_owned()).unwrap(),
-                                ClarityValue::Sequence(SequenceData::Buffer(BuffData {
-                                    data: addr_bytes.as_bytes().to_vec(),
-                                })),
-                            ),
-                        ])
-                        .unwrap(),
-                    ),
-                    ClarityValue::UInt((bitcoin_block_height - 1).into()),
-                    ClarityValue::UInt(pox_stacking_order.duration.into()),
-                ],
-                nonce,
-                default_fee,
-                &hex_bytes(&account_secret_key).unwrap(),
-            );
             std::thread::spawn(move || {
+                let default_fee = fee_rate * 10;
+                let stacks_rpc = StacksRpc::new(&node_url);
+                let nonce = stacks_rpc
+                    .get_nonce(&account.address)
+                    .expect("Unable to retrieve nonce");
+
+                let (_, _, account_secret_key) =
+                    types::compute_addresses(&account.mnemonic, &account.derivation, false);
+
+                let addr_bytes = Hash160::from_bytes(&addr_bytes[1..21]).unwrap();
+                let addr_version = AddressHashMode::SerializeP2PKH;
+                let stack_stx_tx = transactions::build_contrat_call_transaction(
+                    pox_contract_id,
+                    "stack-stx".into(),
+                    vec![
+                        ClarityValue::UInt(stx_amount.into()),
+                        ClarityValue::Tuple(
+                            TupleData::from_data(vec![
+                                (
+                                    ClarityName::try_from("version".to_owned()).unwrap(),
+                                    ClarityValue::buff_from_byte(addr_version as u8),
+                                ),
+                                (
+                                    ClarityName::try_from("hashbytes".to_owned()).unwrap(),
+                                    ClarityValue::Sequence(SequenceData::Buffer(BuffData {
+                                        data: addr_bytes.as_bytes().to_vec(),
+                                    })),
+                                ),
+                            ])
+                            .unwrap(),
+                        ),
+                        ClarityValue::UInt((bitcoin_block_height - 1).into()),
+                        ClarityValue::UInt(duration),
+                    ],
+                    nonce,
+                    default_fee,
+                    &hex_bytes(&account_secret_key).unwrap(),
+                );
                 let _ = stacks_rpc
                     .post_transaction(stack_stx_tx)
                     .expect("Unable to broadcast transaction");
