@@ -1,4 +1,5 @@
-use crate::integrate::{BlockData, LogLevel, Status};
+use crate::integrate::{LogLevel, Status};
+use crate::types::StacksBlockData;
 
 use super::App;
 use tui::{
@@ -186,7 +187,7 @@ where
     draw_transactions(f, app, block_details_components[1], &selected_block);
 }
 
-fn draw_block_details<B>(f: &mut Frame<B>, _app: &mut App, area: Rect, block: &BlockData)
+fn draw_block_details<B>(f: &mut Frame<B>, _app: &mut App, area: Rect, block: &StacksBlockData)
 where
     B: Backend,
 {
@@ -224,7 +225,7 @@ where
         .block(Block::default().borders(Borders::NONE));
     f.render_widget(paragraph, labels[1]);
 
-    let value = format!("{}", block.block_height);
+    let value = format!("{}", block.block_identifier.index);
     let paragraph = Paragraph::new(value)
         .style(Style::default().fg(Color::White))
         .block(Block::default().borders(Borders::NONE));
@@ -236,7 +237,7 @@ where
         .block(Block::default().borders(Borders::NONE));
     f.render_widget(paragraph, labels[3]);
 
-    let value = format!("{}", block.block_hash);
+    let value = format!("{}", block.block_identifier.hash);
     let paragraph = Paragraph::new(value)
         .style(Style::default().fg(Color::White))
         .block(Block::default().borders(Borders::NONE));
@@ -248,7 +249,7 @@ where
         .block(Block::default().borders(Borders::NONE));
     f.render_widget(paragraph, labels[5]);
 
-    let value = format!("{}", block.bitcoin_block_height);
+    let value = format!("{}", block.metadata.bitcoin_anchor_block_identifier.index);
     let paragraph = Paragraph::new(value)
         .style(Style::default().fg(Color::White))
         .block(Block::default().borders(Borders::NONE));
@@ -260,7 +261,7 @@ where
         .block(Block::default().borders(Borders::NONE));
     f.render_widget(paragraph, labels[7]);
 
-    let value = format!("{}", block.bitcoin_block_hash);
+    let value = format!("{}", block.metadata.bitcoin_anchor_block_identifier.hash);
     let paragraph = Paragraph::new(value)
         .style(Style::default().fg(Color::White))
         .block(Block::default().borders(Borders::NONE));
@@ -272,7 +273,7 @@ where
         .block(Block::default().borders(Borders::NONE));
     f.render_widget(paragraph, labels[9]);
 
-    let value = format!("{}", block.pox_cycle_id);
+    let value = format!("{}", block.metadata.pox_cycle_index);
     let paragraph = Paragraph::new(value)
         .style(Style::default().fg(Color::White))
         .block(Block::default().borders(Borders::NONE));
@@ -282,7 +283,7 @@ where
     // TODO(ludo): Mining informations (miner, VRF)
 }
 
-fn draw_transactions<B>(f: &mut Frame<B>, _app: &mut App, area: Rect, block: &BlockData)
+fn draw_transactions<B>(f: &mut Frame<B>, _app: &mut App, area: Rect, block: &StacksBlockData)
 where
     B: Backend,
 {
@@ -292,16 +293,16 @@ where
         .map(|t| {
             let tx_info = Spans::from(vec![
                 Span::styled(
-                    match t.success {
+                    match t.metadata.success {
                         true => "🟩",
                         false => "🟥",
                     },
                     Style::default(),
                 ),
                 Span::raw(" "),
-                Span::styled(t.description.clone(), Style::default()),
+                Span::styled(t.metadata.description.clone(), Style::default()),
                 Span::raw(" "),
-                Span::styled(t.result.clone(), Style::default()),
+                Span::styled(t.metadata.result.clone(), Style::default()),
             ]);
             ListItem::new(vec![
                 tx_info,

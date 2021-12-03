@@ -10,13 +10,13 @@ use std::{collections::BTreeMap, fs::File};
 use tiny_hderive::bip32::ExtendedPrivKey;
 use toml::value::Value;
 
-const DEFAULT_DERIVATION_PATH: &str = "m/44'/5757'/0'/0/0";
-const DEFAULT_BITCOIN_NODE_IMAGE: &str = "quay.io/hirosystems/bitcoind:devnet";
-const DEFAULT_STACKS_NODE_IMAGE: &str = "quay.io/hirosystems/stacks-node:devnet";
-const DEFAULT_BITCOIN_EXPLORER_IMAGE: &str = "quay.io/hirosystems/bitcoin-explorer:devnet";
-const DEFAULT_STACKS_API_IMAGE: &str = "blockstack/stacks-blockchain-api:latest";
-const DEFAULT_STACKS_EXPLORER_IMAGE: &str = "blockstack/explorer:1.13.0";
-const DEFAULT_POSTGRES_IMAGE: &str = "postgres:alpine";
+pub const DEFAULT_DERIVATION_PATH: &str = "m/44'/5757'/0'/0/0";
+pub const DEFAULT_BITCOIN_NODE_IMAGE: &str = "quay.io/hirosystems/bitcoind:devnet";
+pub const DEFAULT_STACKS_NODE_IMAGE: &str = "quay.io/hirosystems/stacks-node:devnet";
+pub const DEFAULT_BITCOIN_EXPLORER_IMAGE: &str = "quay.io/hirosystems/bitcoin-explorer:devnet";
+pub const DEFAULT_STACKS_API_IMAGE: &str = "blockstack/stacks-blockchain-api:latest";
+pub const DEFAULT_STACKS_EXPLORER_IMAGE: &str = "blockstack/explorer:1.16.1";
+pub const DEFAULT_POSTGRES_IMAGE: &str = "postgres:alpine";
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct ChainConfigFile {
@@ -34,38 +34,38 @@ pub struct NetworkConfigFile {
 
 #[derive(Serialize, Deserialize, Debug, Default)]
 pub struct DevnetConfigFile {
-    orchestrator_port: Option<u16>,
-    bitcoin_node_p2p_port: Option<u16>,
-    bitcoin_node_rpc_port: Option<u16>,
-    stacks_node_p2p_port: Option<u16>,
-    stacks_node_rpc_port: Option<u16>,
-    stacks_node_events_observers: Option<Vec<String>>,
-    stacks_api_port: Option<u16>,
-    stacks_api_events_port: Option<u16>,
-    bitcoin_explorer_port: Option<u16>,
-    stacks_explorer_port: Option<u16>,
-    bitcoin_controller_port: Option<u16>,
-    bitcoin_node_username: Option<String>,
-    bitcoin_node_password: Option<String>,
-    miner_mnemonic: Option<String>,
-    miner_derivation_path: Option<String>,
-    bitcoin_controller_block_time: Option<u32>,
-    working_dir: Option<String>,
-    postgres_port: Option<u16>,
-    postgres_username: Option<String>,
-    postgres_password: Option<String>,
-    postgres_database: Option<String>,
-    pox_stacking_orders: Option<Vec<PoxStackingOrder>>,
-    execute_script: Option<Vec<ExecuteScript>>,
-    bitcoin_node_image_url: Option<String>,
-    bitcoin_explorer_image_url: Option<String>,
-    stacks_node_image_url: Option<String>,
-    stacks_api_image_url: Option<String>,
-    stacks_explorer_image_url: Option<String>,
-    postgres_image_url: Option<String>,
-    disable_bitcoin_explorer: Option<bool>,
-    disable_stacks_explorer: Option<bool>,
-    disable_stacks_api: Option<bool>,
+    pub orchestrator_port: Option<u16>,
+    pub bitcoin_node_p2p_port: Option<u16>,
+    pub bitcoin_node_rpc_port: Option<u16>,
+    pub stacks_node_p2p_port: Option<u16>,
+    pub stacks_node_rpc_port: Option<u16>,
+    pub stacks_node_events_observers: Option<Vec<String>>,
+    pub stacks_api_port: Option<u16>,
+    pub stacks_api_events_port: Option<u16>,
+    pub bitcoin_explorer_port: Option<u16>,
+    pub stacks_explorer_port: Option<u16>,
+    pub bitcoin_controller_port: Option<u16>,
+    pub bitcoin_node_username: Option<String>,
+    pub bitcoin_node_password: Option<String>,
+    pub miner_mnemonic: Option<String>,
+    pub miner_derivation_path: Option<String>,
+    pub bitcoin_controller_block_time: Option<u32>,
+    pub working_dir: Option<String>,
+    pub postgres_port: Option<u16>,
+    pub postgres_username: Option<String>,
+    pub postgres_password: Option<String>,
+    pub postgres_database: Option<String>,
+    pub pox_stacking_orders: Option<Vec<PoxStackingOrder>>,
+    pub execute_script: Option<Vec<ExecuteScript>>,
+    pub bitcoin_node_image_url: Option<String>,
+    pub bitcoin_explorer_image_url: Option<String>,
+    pub stacks_node_image_url: Option<String>,
+    pub stacks_api_image_url: Option<String>,
+    pub stacks_explorer_image_url: Option<String>,
+    pub postgres_image_url: Option<String>,
+    pub disable_bitcoin_explorer: Option<bool>,
+    pub disable_stacks_explorer: Option<bool>,
+    pub disable_stacks_api: Option<bool>,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -173,26 +173,27 @@ impl ChainConfig {
                 panic!(error)
             }
         };
-        let mut config_file_reader = BufReader::new(path);
-        let mut config_file_buffer = vec![];
-        config_file_reader
-            .read_to_end(&mut config_file_buffer)
+        let mut chain_config_file_reader = BufReader::new(path);
+        let mut chain_config_file_buffer = vec![];
+        chain_config_file_reader
+            .read_to_end(&mut chain_config_file_buffer)
             .unwrap();
-        let mut config_file: ChainConfigFile = toml::from_slice(&config_file_buffer[..]).unwrap();
-        ChainConfig::from_config_file(&mut config_file)
+        let mut chain_config_file: ChainConfigFile =
+            toml::from_slice(&chain_config_file_buffer[..]).unwrap();
+        ChainConfig::from_chain_config_file(&mut chain_config_file)
     }
 
-    pub fn from_config_file(config_file: &mut ChainConfigFile) -> ChainConfig {
+    pub fn from_chain_config_file(chain_config_file: &mut ChainConfigFile) -> ChainConfig {
         let network = NetworkConfig {
-            name: config_file.network.name.clone(),
-            node_rpc_address: config_file.network.node_rpc_address.clone(),
-            deployment_fee_rate: config_file.network.deployment_fee_rate.unwrap_or(1),
+            name: chain_config_file.network.name.clone(),
+            node_rpc_address: chain_config_file.network.node_rpc_address.clone(),
+            deployment_fee_rate: chain_config_file.network.deployment_fee_rate.unwrap_or(10),
         };
 
         let mut accounts = BTreeMap::new();
         let is_mainnet = network.name == "mainnet".to_string();
 
-        match &config_file.accounts {
+        match &chain_config_file.accounts {
             Some(Value::Table(entries)) => {
                 for (account_name, account_settings) in entries.iter() {
                     match account_settings {
@@ -248,8 +249,8 @@ impl ChainConfig {
             _ => {}
         };
 
-        let devnet = if config_file.network.name == "devnet" {
-            let mut devnet_config = match config_file.devnet.take() {
+        let devnet = if chain_config_file.network.name == "devnet" {
+            let mut devnet_config = match chain_config_file.devnet.take() {
                 Some(conf) => conf,
                 _ => DevnetConfigFile::default(),
             };

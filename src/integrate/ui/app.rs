@@ -1,5 +1,6 @@
 use super::util::{StatefulList, TabsState};
-use crate::integrate::{BlockData, LogData, MempoolAdmissionData, ServiceStatusData, Transaction};
+use crate::integrate::{LogData, MempoolAdmissionData, ServiceStatusData};
+use crate::types::{StacksBlockData, StacksTransactionData};
 use tui::style::{Color, Style};
 use tui::text::{Span, Spans};
 
@@ -7,9 +8,9 @@ pub struct App<'a> {
     pub title: &'a str,
     pub devnet_path: &'a str,
     pub should_quit: bool,
-    pub blocks: Vec<BlockData>,
+    pub blocks: Vec<StacksBlockData>,
     pub tabs: TabsState<'a>,
-    pub transactions: StatefulList<Transaction>,
+    pub transactions: StatefulList<StacksTransactionData>,
     pub mempool: StatefulList<MempoolAdmissionData>,
     pub logs: StatefulList<LogData>,
     pub services: StatefulList<ServiceStatusData>,
@@ -91,24 +92,26 @@ impl<'a> App<'a> {
         self.mempool.items.push(tx);
     }
 
-    pub fn display_block(&mut self, block: BlockData) {
-        let cycle_len: u64 = block.pox_cycle_length.into();
-        let abs_pos = block.bitcoin_block_height - block.first_burnchain_block_height;
-        let (start, end) = if abs_pos % cycle_len == (cycle_len - 1) {
-            ("", "<")
-        } else if abs_pos % cycle_len == 0 {
-            (">", "")
-        } else {
-            ("", "")
-        };
+    pub fn display_block(&mut self, block: StacksBlockData) {
+        let (start, end) =
+            if block.metadata.pox_cycle_position == (block.metadata.pox_cycle_length - 1) {
+                ("", "<")
+            } else if block.metadata.pox_cycle_position == 0 {
+                (">", "")
+            } else {
+                ("", "")
+            };
         let has_tx = if block.transactions.len() <= 1 {
             ""
         } else {
             "␂"
         };
         self.tabs.titles.push_front(Spans::from(Span::styled(
-            format!("{}[{}{}]{}", end, block.block_height, has_tx, start),
-            if block.pox_cycle_id % 2 == 1 {
+            format!(
+                "{}[{}{}]{}",
+                end, block.block_identifier.index, has_tx, start
+            ),
+            if block.metadata.pox_cycle_index % 2 == 1 {
                 Style::default().fg(Color::Yellow)
             } else {
                 Style::default().fg(Color::LightYellow)

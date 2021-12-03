@@ -55,7 +55,7 @@ jobs:
         run: cargo install cargo-audit
 
       - name: Run audit
-        run: cargo audit --ignore RUSTSEC-2021-0076 --ignore RUSTSEC-2021-0079 --ignore RUSTSEC-2021-0078 --ignore RUSTSEC-2021-0093 --ignore RUSTSEC-2020-0159 --ignore RUSTSEC-2021-0119 --ignore RUSTSEC-2020-0071
+        run: cargo audit --ignore RUSTSEC-2021-0076 --ignore RUSTSEC-2021-0079 --ignore RUSTSEC-2021-0078 --ignore RUSTSEC-2021-0093 --ignore RUSTSEC-2020-0159 --ignore RUSTSEC-2021-0119 --ignore RUSTSEC-2020-0071 --ignore RUSTSEC-2021-0124
 
       - name: Run rustfmt
         run: cargo fmt --all -- --check
@@ -131,41 +131,48 @@ jobs:
       matrix:
         include:
           - os: ubuntu-latest
-            platform: linux-x64
+            platform: linux
             target: x86_64-unknown-linux-gnu
             linker_package:
             cc: ""
+            architecture: x64
           # To be uncommented later when adding new distros
           # - os: ubuntu-latest
-          #   platform: linux-arm64
+          #   platform: linux
           #   target: aarch64-unknown-linux-gnu
           #   linker_package: gcc-aarch64-linux-gnu
           #   cc: aarch64-linux-gnu-gcc
+          #   architecture: arm64
           # - os: ubuntu-latest
-          #   platform: linux-armv7
+          #   platform: linux
           #   target: armv7-unknown-linux-gnueabihf
           #   linker_package: gcc-arm-linux-gnueabihf
           #   cc: arm-linux-gnueabihf-gcc
+          #   architecture: armv7l
           # - os: ubuntu-latest
-          #   platform: linux-musl-x64
+          #   platform: linux
           #   target: x86_64-unknown-linux-musl
           #   linker_package:
           #   cc: musl-gcc
+          #   architecture: x64
           - os: windows-latest
-            platform: windows-x64
+            platform: windows
             target: x86_64-pc-windows-msvc
             linker_package:
             cc: ""
+            architecture: x64
           - os: macos-latest
-            platform: macos-x64
+            platform: darwin
             target: x86_64-apple-darwin
             linker_package:
             cc: ""
+            architecture: x64
           # - os: macos-latest
-          #   platform: macos-aarch64-m1
+          #   platform: darwin
           #   target: aarch64-apple-darwin
           #   linker_package:
           #   cc: ""
+          #   architecture: arm64
 
     steps:
       - name: Configure git to use LF (Windows)
@@ -187,6 +194,14 @@ jobs:
           profile: minimal
           override: true
 
+      - name: Install and cache Node
+        uses: actions/setup-node@v2
+        with:
+          node-version: '14'
+          architecture: ${{ matrix.architecture }}
+          cache: npm
+          cache-dependency-path: node-bindings/package-lock.json
+
       - name: Install wix (Windows)
         if: matrix.os == 'windows-latest'
         run: cargo install cargo-wix
@@ -206,11 +221,11 @@ jobs:
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
 
       # To be uncommented later when adding new distros
-      # - name: Install ${{ matrix.platform }} linker
-      #   if: matrix.platform == 'linux-arm64' || matrix.platform == 'linux-armv7' || matrix.platform == 'linux-musl-x64'
+      # - name: Install ${{ matrix.platform }}-${{ matrix.architecture }} linker
+      #   if: ${{ matrix.platform }}-${{ matrix.architecture }} == 'linux-arm64' || ${{ matrix.platform }}-${{ matrix.architecture }} == 'linux-armv7' || ${{ matrix.platform }}-${{ matrix.architecture }} == 'linux-musl-x64'
       #   run: sudo apt-get update && sudo apt-get install -y ${{ matrix.linker_package }}
 
-      - name: Build
+      - name: Build - Cargo
         run: cargo build --release --locked --target ${{ matrix.target }}
         # To be uncommented later when adding new distros
         # env:
@@ -221,6 +236,12 @@ jobs:
         #   CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER: ${{ matrix.cc }}
         #   CARGO_TARGET_ARMV7_UNKNOWN_LINUX_GNUEABIHF_LINKER: ${{ matrix.cc }}
         #   CARGO_TARGET_X86_64_UNKNOWN_LINUX_MUSL_LINKER: ${{ matrix.cc }}
+
+      - name: Build - Node
+        working-directory: node-bindings
+        run: |
+          npm install --ignore-scripts
+          npm run build-${{ matrix.platform }}-${{ matrix.architecture }}
 
       - name: Code sign bin (Windows)
         if: matrix.os == 'windows-latest'
@@ -267,31 +288,46 @@ jobs:
             "${msi_path}"
 
       # Don't compress for Windows because winget can't yet unzip files
-      - name: Compress artifact (Not Windows)
+      - name: Compress cargo artifact (Not Windows)
         if: matrix.os != 'windows-latest'
-        run: zip --junk-paths clarinet-${{ matrix.platform }} ./target/${{ matrix.target }}/release/clarinet
+        run: tar -C target/${{ matrix.target }}/release -zcvf clarinet-${{ matrix.platform }}-${{ matrix.architecture }}.tar.gz clarinet
 
-      - name: Rename artifact (Windows)
+      - name: Rename cargo artifact (Windows)
         if: matrix.os == 'windows-latest'
-        run: mv target/wix/*.msi clarinet-${{ matrix.platform }}.msi
+        shell: bash
+        run: mv target/wix/*.msi clarinet-${{ matrix.platform }}-${{ matrix.architecture }}.msi
+
+      - name: Compress node artifact
+        shell: bash
+        run: tar -C node-bindings -zcvf clarinet-js-${{ matrix.platform }}-${{ matrix.architecture }}.tar.gz native/index.node
 
       # Separate uploads to prevent paths from being preserved
-      - name: Upload artifact (Not Windows)
+      - name: Upload cargo artifacts (Not Windows)
         if: matrix.os != 'windows-latest'
         uses: actions/upload-artifact@v2
         with:
-          name: clarinet-${{ matrix.platform }}
-          path: clarinet-${{ matrix.platform }}.zip
+          name: clarinet-${{ matrix.platform }}-${{ matrix.architecture }}
+          path: clarinet-${{ matrix.platform }}-${{ matrix.architecture }}.tar.gz
 
-      - name: Upload artifact (Windows)
+      - name: Upload cargo artifact (Windows)
         if: matrix.os == 'windows-latest'
         uses: actions/upload-artifact@v2
         with:
-          name: clarinet-${{ matrix.platform }}
-          path: clarinet-${{ matrix.platform }}.msi
+          name: clarinet-${{ matrix.platform }}-${{ matrix.architecture }}
+          path: clarinet-${{ matrix.platform }}-${{ matrix.architecture }}.msi
 
-      - name: Unit Tests
+      - name: Upload node artifact
+        uses: actions/upload-artifact@v2
+        with:
+          name: clarinet-js-${{ matrix.platform }}-${{ matrix.architecture }}
+          path: clarinet-js-${{ matrix.platform }}-${{ matrix.architecture }}.tar.gz
+
+      - name: Unit Tests - Cargo
         run: cargo test --release --locked --target ${{ matrix.target }}
+
+      # - name: Unit Tests - Node
+      #   working-directory: node-bindings
+      #   run: npm run spec
 
       - name: Functional Tests (Not Windows)
         if: matrix.os != 'windows-latest'
@@ -312,7 +348,7 @@ jobs:
         if: startsWith(github.ref, 'refs/tags/v') && matrix.os != 'windows-latest'
         with:
           repo_token: ${{ secrets.GITHUB_TOKEN }}
-          file: clarinet-${{ matrix.platform }}.zip
+          file: clarinet-${{ matrix.platform }}-${{ matrix.architecture }}.zip
           tag: ${{ github.ref }}
 
       - name: Upload Artifacts to GH release (Windows)
@@ -320,7 +356,7 @@ jobs:
         if: startsWith(github.ref, 'refs/tags/v') && matrix.os == 'windows-latest'
         with:
           repo_token: ${{ secrets.GITHUB_TOKEN }}
-          file: clarinet-${{ matrix.platform }}.msi
+          file: clarinet-${{ matrix.platform }}-${{ matrix.architecture }}.msi
           tag: ${{ github.ref }}
 
       # Cleans the `./target` dir after the build such that only dependencies are cached on CI

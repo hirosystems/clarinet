@@ -311,11 +311,11 @@ export namespace types {
     return `${val}`;
   }
 
-  export function int(val: number) {
+  export function int(val: number|bigint) {
     return `${val}`;
   }
 
-  export function uint(val: number) {
+  export function uint(val: number|bigint) {
     return `u${val}`;
   }
 
@@ -360,8 +360,8 @@ declare global {
     expectSome(): String;
     expectNone(): void;
     expectBool(value: boolean): boolean;
-    expectUint(value: number): number;
-    expectInt(value: number): number;
+    expectUint(value: number|bigint): bigint;
+    expectInt(value: number|bigint): bigint;
     expectBuff(value: ArrayBuffer): ArrayBuffer;
     expectAscii(value: String): String;
     expectUtf8(value: String): String;
@@ -372,23 +372,23 @@ declare global {
 
   interface Array<T> {
     expectSTXTransferEvent(
-      amount: Number,
+      amount: Number|bigint,
       sender: String,
       recipient: String,
     ): Object;
     expectFungibleTokenTransferEvent(
-      amount: Number,
+      amount: Number|bigint,
       sender: String,
       recipient: String,
       assetId: String,
     ): Object;
     expectFungibleTokenMintEvent(
-      amount: Number,
+      amount: Number|bigint,
       recipient: String,
       assetId: String,
     ): Object;
     expectFungibleTokenBurnEvent(
-      amount: Number,
+      amount: Number|bigint,
       sender: String,
       assetId: String,
     ): Object;
@@ -396,10 +396,25 @@ declare global {
       contract_identifier: string, 
       value: string
     ): Object;
-    // Absence of test vectors at the moment - token field could present some challenges.
-    // expectNonFungibleTokenTransferEvent(token: String, sender: String, recipient: String, assetId: String): Object;
-    // expectNonFungibleTokenMintEvent(token: String, recipient: String, assetId: String): Object;
-    // expectNonFungibleTokenBurnEvent(token: String, sender: String, assetId: String): Object;
+    expectNonFungibleTokenTransferEvent(
+      tokenId: String, 
+      sender: String, 
+      recipient: String, 
+      assetAddress: String,
+      assetId: String
+    ): Object;
+    expectNonFungibleTokenMintEvent(
+      tokenId: String, 
+      recipient: String, 
+      assetAddress: String,
+      assetId: String
+    ): Object;
+    expectNonFungibleTokenBurnEvent(
+      tokenId: String, 
+      sender: String, 
+      assetAddress: String,
+      assetId: String
+    ): Object;
     // expectEvent(sel: (e: Object) => Object): Object;
   }
 }
@@ -462,22 +477,22 @@ String.prototype.expectBool = function (value: boolean) {
   return value;
 };
 
-String.prototype.expectUint = function (value: number) {
+String.prototype.expectUint = function (value: number|bigint):bigint {
   try {
     consume(this, `u${value}`, false);
   } catch (error) {
     throw error;
   }
-  return value;
+  return BigInt(value);
 };
 
-String.prototype.expectInt = function (value: number) {
+String.prototype.expectInt = function (value: number|bigint):bigint {
   try {
     consume(this, `${value}`, false);
   } catch (error) {
     throw error;
   }
-  return value;
+  return BigInt(value);
 };
 
 String.prototype.expectBuff = function (value: ArrayBuffer) {
@@ -599,7 +614,7 @@ String.prototype.expectTuple = function () {
 };
 
 Array.prototype.expectSTXTransferEvent = function (
-  amount: Number,
+  amount: Number|bigint,
   sender: String,
   recipient: String,
 ) {
@@ -616,7 +631,7 @@ Array.prototype.expectSTXTransferEvent = function (
       continue;
     }
   }
-  throw new Error(`Unable to retrieve expected NonFungibleTokenTransferEvent`);
+  throw new Error(`Unable to retrieve expected STXTransferEvent`);
 };
 
 Array.prototype.expectFungibleTokenTransferEvent = function (
@@ -651,7 +666,7 @@ Array.prototype.expectFungibleTokenTransferEvent = function (
 };
 
 Array.prototype.expectFungibleTokenMintEvent = function (
-  amount: Number,
+  amount: Number|bigint,
   recipient: String,
   assetId: String,
 ) {
@@ -674,7 +689,7 @@ Array.prototype.expectFungibleTokenMintEvent = function (
 };
 
 Array.prototype.expectFungibleTokenBurnEvent = function (
-  amount: Number,
+  amount: Number|bigint,
   sender: String,
   assetId: String,
 ) {
@@ -737,64 +752,91 @@ Array.prototype.expectPrintEvent = function (
 //     }
 //     throw new Error(`Unable to retrieve expected PrintEvent`);
 // }
+Array.prototype.expectNonFungibleTokenTransferEvent = function(
+  tokenId: String, 
+  sender: String, 
+  recipient: String, 
+  assetAddress: String, 
+  assetId: String
+  ) {
+  for (let event of this) {
+    try {
+      let e: any = {};
+      if(event.nft_transfer_event.value === tokenId) {
+        e["tokenId"] = event.nft_transfer_event.value;
+      } else {
+        continue;
+      }
+      e["sender"] = event.nft_transfer_event.sender.expectPrincipal(sender);
+      e["recipient"] = event.nft_transfer_event.recipient.expectPrincipal(recipient);
+      if (event.nft_transfer_event.asset_identifier === `${assetAddress}::${assetId}`) {
+        e["assetId"] = event.nft_transfer_event.asset_identifier;
+      } else {
+        continue;
+      }
+      return e;
+    } catch (error) {
+      continue;
+    }
+  }
+  throw new Error(`Unable to retrieve expected NonFungibleTokenTransferEvent`);
+}
 
-// Array.prototype.expectNonFungibleTokenTransferEvent = function(token: String, sender: String, recipient: String, assetId: String) {
-//     for (let event of this) {
-//         try {
-//             let e: any = {};
-//             e["token"] = event.nft_transfer_event.amount.expectInt(token);
-//             e["sender"] = event.nft_transfer_event.sender.expectPrincipal(sender);
-//             e["recipient"] = event.nft_transfer_event.recipient.expectPrincipal(recipient);
-//             if (event.nft_transfer_event.asset_identifier.endsWith(assetId)) {
-//                 e["assetId"] = event.nft_transfer_event.asset_identifier;
-//             } else {
-//                 continue;
-//             }
-//             return e;
-//         } catch (error) {
-//             continue;
-//         }
-//     }
-//     throw new Error(`Unable to retrieve expected NonFungibleTokenTransferEvent`);
-// }
+Array.prototype.expectNonFungibleTokenMintEvent = function(
+  tokenId: String, 
+  recipient: String, 
+  assetAddress: String,
+  assetId: String
+  ) {
+  for (let event of this) {
+    try {
+      let e: any = {};
+      if(event.nft_mint_event.value === tokenId) {
+        e["tokenId"] = event.nft_mint_event.value;
+      } else {
+        continue;
+      }
+      e["recipient"] = event.nft_mint_event.recipient.expectPrincipal(recipient);
+      if (event.nft_mint_event.asset_identifier === `${assetAddress}::${assetId}`) {
+        e["assetId"] = event.nft_mint_event.asset_identifier;
+      } else {
+        continue;
+      }
+      return e;
+    } catch (error) {
+      continue;
+    }
+  }
+  throw new Error(`Unable to retrieve expected NonFungibleTokenMintEvent`);
+}
 
-// Array.prototype.expectNonFungibleTokenMintEvent = function(token: String, recipient: String, assetId: String) {
-//     for (let event of this) {
-//         try {
-//             let e: any = {};
-//             e["token"] = event.nft_mint_event.amount.expectInt(token);
-//             e["recipient"] = event.nft_mint_event.recipient.expectPrincipal(recipient);
-//             if (event.nft_mint_event.asset_identifier.endsWith(assetId)) {
-//                 e["assetId"] = event.nft_mint_event.asset_identifier;
-//             } else {
-//                 continue;
-//             }
-//             return e;
-//         } catch (error) {
-//             continue;
-//         }
-//     }
-//     throw new Error(`Unable to retrieve expected NonFungibleTokenTransferEvent`);
-// }
-
-// Array.prototype.expectNonFungibleTokenBurnEvent = function(token: String, sender: String, assetId: String) {
-//     for (let event of this) {
-//         try {
-//             let e: any = {};
-//             e["token"] = event.nft_burn_event.amount.expectInt(token);
-//             e["sender"] = event.nft_burn_event.sender.expectPrincipal(sender);
-//             if (event.nft_burn_event.asset_identifier.endsWith(assetId)) {
-//                 e["assetId"] = event.nft_burn_event.asset_identifier;
-//             } else {
-//                 continue;
-//             }
-//             return e;
-//         } catch (error) {
-//             continue;
-//         }
-//     }
-//     throw new Error(`Unable to retrieve expected NonFungibleTokenTransferEvent`);
-// }
+Array.prototype.expectNonFungibleTokenBurnEvent = function(
+  tokenId: String, 
+  sender: String, 
+  assetAddress: String,
+  assetId: String
+  ) {
+  for (let event of this) {
+    try {
+      let e: any = {};
+      if(event.nft_burn_event.value === tokenId) {
+        e["tokenId"] = event.nft_burn_event.value;
+      } else {
+        continue;
+      }
+      e["sender"] = event.nft_burn_event.sender.expectPrincipal(sender);
+      if (event.nft_burn_event.asset_identifier === `${assetAddress}::${assetId}`) {
+        e["assetId"] = event.nft_burn_event.asset_identifier;
+      } else {
+        continue;
+      }
+      return e;
+    } catch (error) {
+      continue;
+    }
+  }
+  throw new Error(`Unable to retrieve expected NonFungibleTokenBurnEvent`);
+}
 
 const noColor = globalThis.Deno?.noColor ?? true;
 

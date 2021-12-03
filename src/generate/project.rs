@@ -25,6 +25,8 @@ impl GetChangesForNewProject {
         self.create_environment_testnet_toml();
         self.create_environment_devnet_toml();
         self.create_vscode_directory();
+        self.create_vscode_settings_json();
+        self.create_vscode_tasks_json();
         self.create_gitignore();
         self.changes.clone()
     }
@@ -75,6 +77,9 @@ impl GetChangesForNewProject {
     fn create_vscode_directory(&mut self) {
         self.changes
             .push(self.get_changes_for_new_root_dir(format!(".vscode")));
+    }
+
+    fn create_vscode_settings_json(&mut self) {
         let content = format!(
             r#"
 {{
@@ -83,6 +88,47 @@ impl GetChangesForNewProject {
 "#
         );
         let name = format!("settings.json");
+        let path = format!(
+            "{}/{}/.vscode/{}",
+            self.project_path, self.project_name, name
+        );
+        let change = FileCreation {
+            comment: format!(
+                "{} {}/.vscode/{}",
+                green!("Created file"),
+                self.project_name,
+                name
+            ),
+            name,
+            content,
+            path,
+        };
+        self.changes.push(Changes::AddFile(change));
+    }
+
+    fn create_vscode_tasks_json(&mut self) {
+        let content = format!(
+            r#"
+{{
+    "version": "2.0.0",
+    "tasks": [
+        {{
+            "label": "check contracts",
+            "group": "test",
+            "type": "shell",
+            "command": "clarinet check"
+        }},
+        {{
+            "label": "test contracts",
+            "group": "test",
+            "type": "shell",
+            "command": "clarinet test"
+        }}
+    ]
+}}
+"#
+        );
+        let name = format!("tasks.json");
         let path = format!(
             "{}/{}/.vscode/{}",
             self.project_path, self.project_name, name
@@ -148,7 +194,7 @@ name = "{}"
             r#"[network]
 name = "testnet"
 node_rpc_address = "https://stacks-node-api.testnet.stacks.co"
-deployment_fee_rate = 1
+deployment_fee_rate = 10
 
 [accounts.deployer]
 mnemonic = "<YOUR PRIVATE TESTNET MNEMONIC HERE>"
@@ -178,7 +224,7 @@ mnemonic = "<YOUR PRIVATE TESTNET MNEMONIC HERE>"
             r#"[network]
 name = "mainnet"
 node_rpc_address = "https://stacks-node-api.mainnet.stacks.co"
-deployment_fee_rate = 1
+deployment_fee_rate = 10
 
 [accounts.deployer]
 mnemonic = "<YOUR PRIVATE MAINNET MNEMONIC HERE>"
@@ -207,6 +253,7 @@ mnemonic = "<YOUR PRIVATE MAINNET MNEMONIC HERE>"
         let content = format!(
             r#"[network]
 name = "devnet"
+deployment_fee_rate = 10
 
 [accounts.deployer]
 mnemonic = "twice kind fence tip hidden tilt action fragile skin nothing glory cousin green tomorrow spring wrist shed math olympic multiply hip blue scout claw"

@@ -17,6 +17,7 @@ mod macros;
 
 mod frontend;
 mod generate;
+mod indexer;
 mod integrate;
 mod poke;
 mod publish;

@@ -33,7 +33,7 @@ jobs:
           brew bump-formula-pr \
             --no-browse \
             --no-audit \
-            --url https://github.com/${{ github.repository }}/archive/${TAG}.tar.gz \
+            --tag "${TAG}"
             ${{ github.event.repository.name }}
 
   winget:
@@ -56,7 +56,7 @@ jobs:
   
           # Update manifest and submit PR
           ./wingetcreate.exe update `
-            --url https://github.com/${{ github.repository }}/releases/download/${env:TAG}/clarinet-windows-x64.msi `
+            --urls https://github.com/${{ github.repository }}/releases/download/${env:TAG}/clarinet-windows-x64.msi `
             --version ${VERSION} `
             --token ${{ secrets.GH_TOKEN }} `
             --submit `

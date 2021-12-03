@@ -1,5 +1,5 @@
 use crate::publish::Network;
-use crate::types::{ChainConfig, MainConfig};
+use crate::types::{ChainConfig, ProjectManifest};
 use clarity_repl::{repl, Terminal};
 use std::fs;
 use std::path::PathBuf;
@@ -7,7 +7,7 @@ use std::path::PathBuf;
 pub fn load_session(
     manifest_path: PathBuf,
     start_repl: bool,
-    env: Network,
+    env: &Network,
 ) -> Result<(repl::Session, ChainConfig), String> {
     let mut settings = repl::SessionSettings::default();
 
@@ -24,7 +24,7 @@ pub fn load_session(
         Network::Mainnet => "Mainnet.toml",
     });
 
-    let mut project_config = MainConfig::from_path(&manifest_path);
+    let mut project_config = ProjectManifest::from_path(&manifest_path);
     let chain_config = ChainConfig::from_path(&chain_config_path);
 
     let mut deployer_address = None;
