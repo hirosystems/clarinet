@@ -9,3 +9,5 @@ package-lock.json
 target
 index.node
 npm-debug.log*
+node-bindings/dist
+node-bindings/build
