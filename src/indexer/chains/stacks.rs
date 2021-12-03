@@ -81,7 +81,7 @@ pub struct STXMintEventData {
 #[derive(Debug, Clone, PartialEq, Deserialize)]
 pub struct STXLockEventData {
     pub locked_amount: String,
-    pub unlock_height: u64,
+    pub unlock_height: String,
     pub locked_address: String,
 }
 
