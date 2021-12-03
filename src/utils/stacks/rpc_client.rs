@@ -50,7 +50,7 @@ struct Balance {
 
 impl StacksRpc {
     pub fn new(url: &str) -> Self {
-        Self { 
+        Self {
             url: url.into(),
             client: Client::builder().build().unwrap(),
         }
@@ -62,7 +62,8 @@ impl StacksRpc {
     ) -> Result<PostTransactionResult, RpcError> {
         let tx = transaction.serialize_to_vec();
         let path = format!("{}/v2/transactions", self.url);
-        let res = self.client
+        let res = self
+            .client
             .post(&path)
             .header("Content-Type", "application/octet-stream")
             .body(tx)
@@ -82,7 +83,9 @@ impl StacksRpc {
     pub fn get_nonce(&self, address: &str) -> Result<u64, RpcError> {
         let request_url = format!("{}/v2/accounts/{addr}", self.url, addr = address,);
 
-        let res: Balance = self.client.get(&request_url)
+        let res: Balance = self
+            .client
+            .get(&request_url)
             .send()
             .expect("Unable to retrieve account")
             .json()
@@ -94,7 +97,9 @@ impl StacksRpc {
     pub fn get_pox_info(&self) -> Result<PoxInfo, RpcError> {
         let request_url = format!("{}/v2/pox", self.url);
 
-        let res: PoxInfo = self.client.get(&request_url)
+        let res: PoxInfo = self
+            .client
+            .get(&request_url)
             .send()
             .expect("Unable to retrieve account")
             .json()
@@ -119,7 +124,8 @@ impl StacksRpc {
             .iter()
             .map(|a| bytes_to_hex(&a.serialize_to_vec()))
             .collect::<Vec<_>>();
-        let res = self.client
+        let res = self
+            .client
             .post(&path)
             .json(&json!({
                 "sender": sender,

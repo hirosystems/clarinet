@@ -5,7 +5,7 @@ mod ui;
 #[allow(dead_code)]
 mod util;
 
-use super::{DevnetEvent, events_observer::EventsObserverCommand};
+use super::{events_observer::EventsObserverCommand, DevnetEvent};
 use app::App;
 use crossterm::{
     event::{self, Event, KeyCode, KeyModifiers},

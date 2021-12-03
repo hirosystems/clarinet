@@ -81,7 +81,12 @@ pub async fn do_run_devnet(
     let (events_observer_commands_tx, events_observer_commands_rx) = channel();
     let moved_events_observer_commands_tx = events_observer_commands_tx.clone();
     let events_observer_handle = std::thread::spawn(move || {
-        let future = start_events_observer(config, events_observer_tx, events_observer_commands_rx, moved_events_observer_commands_tx);
+        let future = start_events_observer(
+            config,
+            events_observer_tx,
+            events_observer_commands_rx,
+            moved_events_observer_commands_tx,
+        );
         let rt = utils::create_basic_runtime();
         let _ = rt.block_on(future);
     });

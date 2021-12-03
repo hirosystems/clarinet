@@ -3,9 +3,9 @@ use crate::indexer::{chains, BitcoinChainEvent, Indexer, IndexerConfig, StacksCh
 use crate::integrate::{MempoolAdmissionData, ServiceStatusData, Status};
 use crate::poke::load_session;
 use crate::publish::{publish_contract, Network};
-use crate::types::{self, DevnetConfig, BlockIdentifier};
+use crate::types::{self, BlockIdentifier, DevnetConfig};
 use crate::utils;
-use crate::utils::stacks::{transactions, StacksRpc, PoxInfo};
+use crate::utils::stacks::{transactions, PoxInfo, StacksRpc};
 use base58::FromBase58;
 use clarity_repl::clarity::representations::ClarityName;
 use clarity_repl::clarity::types::{BuffData, SequenceData, TupleData, Value as ClarityValue};
@@ -225,12 +225,15 @@ pub async fn start_events_observer(
                     init_status.deployer_nonce = 0;
                 }
             }
-            Ok(EventsObserverCommand::UpdatePoxInfo) => {
-
-            }
+            Ok(EventsObserverCommand::UpdatePoxInfo) => {}
             Ok(EventsObserverCommand::PublishInitialContracts) => {
                 if let Ok(mut init_status_writer) = init_status_rw_lock.write() {
-                    let res = publish_initial_contracts(&config.devnet_config, &config.accounts, config.deployment_fee_rate, &mut init_status_writer);
+                    let res = publish_initial_contracts(
+                        &config.devnet_config,
+                        &config.accounts,
+                        config.deployment_fee_rate,
+                        &mut init_status_writer,
+                    );
                     if let Some(tx_count) = res {
                         let _ = devnet_event_tx.send(DevnetEvent::success(format!(
                             "Will publish {} contracts",
@@ -241,7 +244,13 @@ pub async fn start_events_observer(
             }
             Ok(EventsObserverCommand::PublishPoxStackingOrders(block_identifier)) => {
                 let bitcoin_block_height = block_identifier.index;
-                let res = publish_stacking_orders(&config.devnet_config, &config.accounts, config.deployment_fee_rate, bitcoin_block_height as u32).await;
+                let res = publish_stacking_orders(
+                    &config.devnet_config,
+                    &config.accounts,
+                    config.deployment_fee_rate,
+                    bitcoin_block_height as u32,
+                )
+                .await;
                 if let Some(tx_count) = res {
                     let _ = devnet_event_tx.send(DevnetEvent::success(format!(
                         "Will broadcast {} stacking orders",
@@ -354,7 +363,7 @@ pub fn handle_new_block(
         }
     };
 
-    // Partially update the UI. With current approach a full update 
+    // Partially update the UI. With current approach a full update
     // would requires either cloning the block, or passing ownership.
     let devnet_events_tx = devnet_events_tx.inner();
     if let Ok(tx) = devnet_events_tx.lock() {
@@ -394,7 +403,9 @@ pub fn handle_new_block(
     let should_submit_pox_orders = block.metadata.pox_cycle_position == (pox_cycle_length - 2);
     if should_submit_pox_orders {
         if let Ok(background_job_tx) = background_job_tx_mutex.lock() {
-            let _ = background_job_tx.send(EventsObserverCommand::PublishPoxStackingOrders(block.metadata.bitcoin_anchor_block_identifier.clone()));
+            let _ = background_job_tx.send(EventsObserverCommand::PublishPoxStackingOrders(
+                block.metadata.bitcoin_anchor_block_identifier.clone(),
+            ));
         }
     }
 
@@ -491,7 +502,6 @@ pub fn handle_ping() -> Json<JsonValue> {
     }))
 }
 
-
 pub fn publish_initial_contracts(
     devnet_config: &DevnetConfig,
     accounts: &Vec<Account>,
@@ -569,7 +579,7 @@ pub async fn publish_stacking_orders(
     }
 
     let stacks_node_rpc_url = format!("http://localhost:{}", devnet_config.stacks_node_rpc_port);
-    
+
     let mut transactions = 0;
     let pox_info: PoxInfo = reqwest::get(format!("{}/v2/pox", stacks_node_rpc_url))
         .await
