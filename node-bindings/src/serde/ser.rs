@@ -61,7 +61,7 @@ pub struct TupleVariantSerializer<'a, 'j, C: 'a>
 where
     C: Context<'j>,
 {
-    outter_object: Handle<'j, JsObject>,
+    outer_object: Handle<'j, JsObject>,
     inner: ArraySerializer<'a, 'j, C>,
 }
 
@@ -404,10 +404,10 @@ where
 {
     fn new(cx: &'a mut C, key: &'static str) -> LibResult<Self> {
         let inner_array = JsArray::new(cx, 0);
-        let outter_object = JsObject::new(cx);
-        outter_object.set(cx, key, inner_array)?;
+        let outer_object = JsObject::new(cx);
+        outer_object.set(cx, key, inner_array)?;
         Ok(TupleVariantSerializer {
-            outter_object,
+            outer_object,
             inner: ArraySerializer {
                 cx,
                 array: inner_array,
@@ -435,7 +435,7 @@ where
 
     #[inline]
     fn end(self) -> Result<Self::Ok, Self::Error> {
-        Ok(self.outter_object.upcast())
+        Ok(self.outer_object.upcast())
     }
 }
 
@@ -535,10 +535,10 @@ where
 {
     fn new(cx: &'a mut C, key: &'static str) -> LibResult<Self> {
         let inner_object = JsObject::new(cx);
-        let outter_object = JsObject::new(cx);
-        outter_object.set(cx, key, inner_object)?;
+        let outer_object = JsObject::new(cx);
+        outer_object.set(cx, key, inner_object)?;
         Ok(StructVariantSerializer {
-            outer_object: outter_object,
+            outer_object: outer_object,
             inner: StructSerializer {
                 cx,
                 object: inner_object,

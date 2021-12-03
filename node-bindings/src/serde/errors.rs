@@ -63,7 +63,7 @@ error_chain! {
             description("JS exception")
             display("JS exception")
         }
-        // failed to convert something to f64
+        /// failed to convert something to f64
         CastError {
             description("CastError")
             display("CastError")
