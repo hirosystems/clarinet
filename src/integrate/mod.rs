@@ -1,30 +1,35 @@
-mod events_observer;
+pub mod events_observer;
 mod orchestrator;
 mod ui;
 
-use std::sync::mpsc::{channel, Sender};
+use std::sync::mpsc::{self, channel, Sender};
 
 use chrono::prelude::*;
 use tracing::{self, debug, error, info, warn};
 use tracing_appender;
 
+use crate::types::{BitcoinBlockData, StacksBlockData};
 use crate::utils;
-use events_observer::start_events_observer;
+use events_observer::{start_events_observer, EventsObserverCommand};
 pub use orchestrator::DevnetOrchestrator;
 
 use self::events_observer::EventObserverConfig;
 
-pub enum NodeObserverEvent {}
-
 pub fn run_devnet(
     devnet: DevnetOrchestrator,
-    event_tx: Option<Sender<NodeObserverEvent>>,
+    log_tx: Option<Sender<LogData>>,
     display_dashboard: bool,
-) {
-    match block_on(do_run_devnet(devnet, event_tx, display_dashboard)) {
+) -> Result<
+    (
+        Option<mpsc::Receiver<DevnetEvent>>,
+        Option<mpsc::Sender<bool>>,
+    ),
+    String,
+> {
+    match block_on(do_run_devnet(devnet, log_tx, display_dashboard)) {
         Err(_e) => std::process::exit(1),
-        _ => {}
-    };
+        Ok(res) => Ok(res),
+    }
 }
 
 pub fn block_on<F, R>(future: F) -> R
@@ -37,17 +42,23 @@ where
 
 pub async fn do_run_devnet(
     mut devnet: DevnetOrchestrator,
-    event_tx: Option<Sender<NodeObserverEvent>>,
+    log_tx: Option<Sender<LogData>>,
     display_dashboard: bool,
-) -> Result<bool, String> {
+) -> Result<
+    (
+        Option<mpsc::Receiver<DevnetEvent>>,
+        Option<mpsc::Sender<bool>>,
+    ),
+    String,
+> {
     let (devnet_events_tx, devnet_events_rx) = channel();
     let (termination_success_tx, orchestrator_terminated_rx) = channel();
 
     devnet.termination_success_tx = Some(termination_success_tx);
 
-    let (devnet_config, accounts) = match devnet.network_config {
+    let devnet_config = match devnet.network_config {
         Some(ref network_config) => match &network_config.devnet {
-            Some(devnet_config) => Ok((devnet_config.clone(), network_config.accounts.clone())),
+            Some(devnet_config) => Ok(devnet_config.clone()),
             _ => Err("Unable to retrieve config"),
         },
         _ => Err("Unable to retrieve config"),
@@ -64,12 +75,18 @@ pub async fn do_run_devnet(
     // The event observer should be able to send some events to the UI thread,
     // and should be able to be terminated
     let devnet_path = devnet_config.working_dir.clone();
-    let config = EventObserverConfig::new(devnet_config, devnet.manifest_path.clone(), accounts);
+    let config = EventObserverConfig::new(devnet_config, devnet.manifest_path.clone());
     let contracts_to_deploy_len = config.contracts_to_deploy.len();
     let events_observer_tx = devnet_events_tx.clone();
-    let (events_observer_terminator_tx, terminator_rx) = channel();
+    let (events_observer_commands_tx, events_observer_commands_rx) = channel();
+    let moved_events_observer_commands_tx = events_observer_commands_tx.clone();
     let events_observer_handle = std::thread::spawn(move || {
-        let future = start_events_observer(config, events_observer_tx, terminator_rx, event_tx);
+        let future = start_events_observer(
+            config,
+            events_observer_tx,
+            events_observer_commands_rx,
+            moved_events_observer_commands_tx,
+        );
         let rt = utils::create_basic_runtime();
         let _ = rt.block_on(future);
     });
@@ -95,52 +112,64 @@ pub async fn do_run_devnet(
         let _ = ui::start_ui(
             devnet_events_tx,
             devnet_events_rx,
-            events_observer_terminator_tx,
+            events_observer_commands_tx,
             orchestrator_terminator_tx,
             orchestrator_terminated_rx,
             &devnet_path,
         );
     } else {
-        println!("Starting Devnet...");
-
+        let moved_orchestrator_terminator_tx = orchestrator_terminator_tx.clone();
+        let moved_events_observer_commands_tx = events_observer_commands_tx.clone();
         ctrlc::set_handler(move || {
-            events_observer_terminator_tx
-                .send(true)
+            moved_events_observer_commands_tx
+                .send(EventsObserverCommand::Terminate(true))
                 .expect("Unable to terminate devnet");
-            orchestrator_terminator_tx
+            moved_orchestrator_terminator_tx
                 .send(true)
                 .expect("Unable to terminate devnet");
         })
         .expect("Error setting Ctrl-C handler");
 
-        loop {
-            match devnet_events_rx.recv() {
-                Ok(DevnetEvent::Log(ref log)) => {
-                    println!("{}", log.message);
-                    match log.level {
-                        LogLevel::Debug => debug!("{}", log.message),
-                        LogLevel::Info | LogLevel::Success => info!("{}", log.message),
-                        LogLevel::Warning => warn!("{}", log.message),
-                        LogLevel::Error => error!("{}", log.message),
+        if log_tx.is_none() {
+            println!("Starting Devnet...");
+
+            loop {
+                match devnet_events_rx.recv() {
+                    Ok(DevnetEvent::Log(log)) => {
+                        if let Some(ref log_tx) = log_tx {
+                            let _ = log_tx.send(log.clone());
+                        } else {
+                            println!("{}", log.message);
+                            match log.level {
+                                LogLevel::Debug => debug!("{}", log.message),
+                                LogLevel::Info | LogLevel::Success => info!("{}", log.message),
+                                LogLevel::Warning => warn!("{}", log.message),
+                                LogLevel::Error => error!("{}", log.message),
+                            }
+                        }
                     }
+                    _ => {}
                 }
-                _ => {}
             }
+        } else {
+            return Ok((Some(devnet_events_rx), Some(orchestrator_terminator_tx)));
         }
     }
 
     events_observer_handle.join().unwrap();
     orchestrator_handle.join().unwrap();
 
-    Ok(true)
+    Ok((None, None))
 }
 
+#[derive(Debug)]
 pub enum DevnetEvent {
     Log(LogData),
     KeyEvent(crossterm::event::KeyEvent),
     Tick,
     ServiceStatus(ServiceStatusData),
-    Block(BlockData),
+    StacksBlock(StacksBlockData),
+    BitcoinBlock(BitcoinBlockData),
     MempoolAdmission(MempoolAdmissionData),
     // Restart,
     // Terminate,
@@ -190,6 +219,7 @@ impl DevnetEvent {
     }
 }
 
+#[derive(Clone, Debug)]
 pub enum LogLevel {
     Error,
     Warning,
@@ -198,6 +228,7 @@ pub enum LogLevel {
     Debug,
 }
 
+#[derive(Clone, Debug)]
 pub struct LogData {
     pub occurred_at: String,
     pub message: String,
@@ -215,12 +246,14 @@ impl LogData {
     }
 }
 
+#[derive(Clone, Debug)]
 pub enum Status {
     Red,
     Yellow,
     Green,
 }
 
+#[derive(Clone, Debug)]
 pub struct ServiceStatusData {
     pub order: usize,
     pub status: Status,
@@ -228,32 +261,12 @@ pub struct ServiceStatusData {
     pub comment: String,
 }
 
-#[derive(Clone)]
-pub struct Transaction {
-    pub txid: String,
-    pub success: bool,
-    pub result: String,
-    pub events: Vec<String>,
-    pub description: String,
-}
-
-#[derive(Clone)]
-pub struct BlockData {
-    pub block_height: u64,
-    pub block_hash: String,
-    pub bitcoin_block_height: u64,
-    pub bitcoin_block_hash: String,
-    pub first_burnchain_block_height: u64,
-    pub pox_cycle_length: u32,
-    pub pox_cycle_id: u32,
-    pub transactions: Vec<Transaction>,
-}
-
 // pub struct MicroblockData {
 //     pub seq: u32,
 //     pub transactions: Vec<Transaction>
 // }
 
+#[derive(Clone, Debug)]
 pub struct MempoolAdmissionData {
     pub tx: String,
 }

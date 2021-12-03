@@ -5,7 +5,7 @@ mod ui;
 #[allow(dead_code)]
 mod util;
 
-use super::DevnetEvent;
+use super::{events_observer::EventsObserverCommand, DevnetEvent};
 use app::App;
 use crossterm::{
     event::{self, Event, KeyCode, KeyModifiers},
@@ -24,7 +24,7 @@ use tui::{backend::CrosstermBackend, Terminal};
 pub fn start_ui(
     devnet_events_tx: Sender<DevnetEvent>,
     devnet_events_rx: Receiver<DevnetEvent>,
-    events_observer_terminator_tx: Sender<bool>,
+    events_observer_commands_tx: Sender<EventsObserverCommand>,
     orchestrator_terminator_tx: Sender<bool>,
     orchestrator_terminated_rx: Receiver<bool>,
     devnet_path: &str,
@@ -73,7 +73,7 @@ pub fn start_ui(
                     app.display_log(DevnetEvent::log_warning("Ctrl+C received, initiating termination sequence.".into()));
                     let _ = trigger_reset(
                         true,
-                        &events_observer_terminator_tx,
+                        &events_observer_commands_tx,
                         &orchestrator_terminator_tx);
 
                     let _ = terminate(
@@ -87,7 +87,7 @@ pub fn start_ui(
                     app.display_log(DevnetEvent::log_warning("Reset Devnet...".into()));
                     let _ = trigger_reset(
                         false,
-                        &events_observer_terminator_tx,
+                        &events_observer_commands_tx,
                         &orchestrator_terminator_tx);
                 },
                 (_, KeyCode::Left) => app.on_left(),
@@ -105,15 +105,15 @@ pub fn start_ui(
             DevnetEvent::ServiceStatus(status) => {
                 app.display_service_status_update(status);
             }
-            DevnetEvent::Block(block) => {
+            DevnetEvent::StacksBlock(block) => {
                 app.display_block(block);
             }
             DevnetEvent::MempoolAdmission(tx) => {
                 app.update_mempool(tx);
             }
-            // DevnetEvent::Microblock(microblock) => {
+            DevnetEvent::BitcoinBlock(_block) => {
 
-            // }
+            }
             // DevnetEvent::Terminate => {
 
             // },
@@ -131,11 +131,11 @@ pub fn start_ui(
 
 fn trigger_reset(
     terminate: bool,
-    events_observer_terminator_tx: &Sender<bool>,
+    events_observer_commands_tx: &Sender<EventsObserverCommand>,
     orchestrator_terminator_tx: &Sender<bool>,
 ) -> Result<(), Box<dyn Error>> {
-    events_observer_terminator_tx
-        .send(terminate)
+    events_observer_commands_tx
+        .send(EventsObserverCommand::Terminate(true))
         .expect("Unable to terminate devnet");
     orchestrator_terminator_tx
         .send(terminate)

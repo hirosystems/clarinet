@@ -1,6 +1,7 @@
 use clarity_repl::clarity::codec::{StacksMessageCodec, StacksTransaction};
 use clarity_repl::clarity::types::Value;
 use clarity_repl::clarity::util::hash::{bytes_to_hex, hex_bytes};
+use reqwest::blocking::Client;
 use std::io::Cursor;
 
 #[derive(Debug)]
@@ -10,6 +11,7 @@ pub enum RpcError {
 
 pub struct StacksRpc {
     pub url: String,
+    pub client: Client,
 }
 
 pub struct PostTransactionResult {
@@ -18,6 +20,24 @@ pub struct PostTransactionResult {
 
 pub struct CallReadOnlyFnResult {
     pub result: Value,
+}
+
+#[derive(Deserialize, Debug, Clone, Default)]
+pub struct PoxInfo {
+    pub contract_id: String,
+    pub pox_activation_threshold_ustx: u64,
+    pub first_burnchain_block_height: u64,
+    pub prepare_phase_block_length: u32,
+    pub reward_phase_block_length: u32,
+    pub reward_slots: u32,
+    pub reward_cycle_id: u32,
+    pub total_liquid_supply_ustx: u64,
+    pub next_cycle: PoxCycle,
+}
+
+#[derive(Deserialize, Debug, Clone, Default)]
+pub struct PoxCycle {
+    pub min_threshold_ustx: u64,
 }
 
 #[derive(Deserialize, Debug)]
@@ -29,8 +49,11 @@ struct Balance {
 }
 
 impl StacksRpc {
-    pub fn new(url: String) -> Self {
-        Self { url }
+    pub fn new(url: &str) -> Self {
+        Self {
+            url: url.into(),
+            client: Client::builder().build().unwrap(),
+        }
     }
 
     pub fn post_transaction(
@@ -38,9 +61,9 @@ impl StacksRpc {
         transaction: StacksTransaction,
     ) -> Result<PostTransactionResult, RpcError> {
         let tx = transaction.serialize_to_vec();
-        let client = reqwest::blocking::Client::new();
         let path = format!("{}/v2/transactions", self.url);
-        let res = client
+        let res = self
+            .client
             .post(&path)
             .header("Content-Type", "application/octet-stream")
             .body(tx)
@@ -57,10 +80,13 @@ impl StacksRpc {
         Ok(res)
     }
 
-    pub fn get_nonce(&self, address: String) -> Result<u64, RpcError> {
+    pub fn get_nonce(&self, address: &str) -> Result<u64, RpcError> {
         let request_url = format!("{}/v2/accounts/{addr}", self.url, addr = address,);
 
-        let res: Balance = reqwest::blocking::get(&request_url)
+        let res: Balance = self
+            .client
+            .get(&request_url)
+            .send()
             .expect("Unable to retrieve account")
             .json()
             .expect("Unable to parse contract");
@@ -68,15 +94,27 @@ impl StacksRpc {
         Ok(nonce)
     }
 
+    pub fn get_pox_info(&self) -> Result<PoxInfo, RpcError> {
+        let request_url = format!("{}/v2/pox", self.url);
+
+        let res: PoxInfo = self
+            .client
+            .get(&request_url)
+            .send()
+            .expect("Unable to retrieve account")
+            .json()
+            .expect("Unable to parse contract");
+        Ok(res)
+    }
+
     pub fn call_read_only_fn(
         &self,
-        contract_addr: String,
-        contract_name: String,
-        method: String,
+        contract_addr: &str,
+        contract_name: &str,
+        method: &str,
         args: Vec<Value>,
-        sender: String,
+        sender: &str,
     ) -> Result<Value, RpcError> {
-        let client = reqwest::blocking::Client::new();
         let path = format!(
             "{}/v2/contracts/call-read/{}/{}/{}",
             self.url, contract_addr, contract_name, method
@@ -86,7 +124,8 @@ impl StacksRpc {
             .iter()
             .map(|a| bytes_to_hex(&a.serialize_to_vec()))
             .collect::<Vec<_>>();
-        let res = client
+        let res = self
+            .client
             .post(&path)
             .json(&json!({
                 "sender": sender,
@@ -106,11 +145,14 @@ impl StacksRpc {
             result: String,
         }
 
-        let mut response: ReadOnlyCallResult = res.json().unwrap();
+        let response: ReadOnlyCallResult = res.json().unwrap();
         if response.okay {
             // Removing the 0x prefix
-            let clar_val = response.result.split_off(2);
-            let bytes = hex_bytes(&clar_val).unwrap();
+            let raw_value = match response.result.strip_prefix("0x") {
+                Some(raw_value) => raw_value,
+                _ => panic!(),
+            };
+            let bytes = hex_bytes(&raw_value).unwrap();
             let mut cursor = Cursor::new(&bytes);
             let value = Value::consensus_deserialize(&mut cursor).unwrap();
             Ok(value)

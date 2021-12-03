@@ -4,4 +4,10 @@
 clarinet.code-workspace
 history.txt
 node_modules
+**/node_modules
 package-lock.json
+target
+index.node
+npm-debug.log*
+node-bindings/dist
+node-bindings/build

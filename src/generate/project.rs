@@ -194,7 +194,7 @@ name = "{}"
             r#"[network]
 name = "testnet"
 node_rpc_address = "https://stacks-node-api.testnet.stacks.co"
-deployment_fee_rate = 1
+deployment_fee_rate = 10
 
 [accounts.deployer]
 mnemonic = "<YOUR PRIVATE TESTNET MNEMONIC HERE>"
@@ -224,7 +224,7 @@ mnemonic = "<YOUR PRIVATE TESTNET MNEMONIC HERE>"
             r#"[network]
 name = "mainnet"
 node_rpc_address = "https://stacks-node-api.mainnet.stacks.co"
-deployment_fee_rate = 1
+deployment_fee_rate = 10
 
 [accounts.deployer]
 mnemonic = "<YOUR PRIVATE MAINNET MNEMONIC HERE>"
@@ -253,6 +253,7 @@ mnemonic = "<YOUR PRIVATE MAINNET MNEMONIC HERE>"
         let content = format!(
             r#"[network]
 name = "devnet"
+deployment_fee_rate = 10
 
 [accounts.deployer]
 mnemonic = "twice kind fence tip hidden tilt action fragile skin nothing glory cousin green tomorrow spring wrist shed math olympic multiply hip blue scout claw"

@@ -1,5 +1,6 @@
 use crate::poke::load_session;
 use crate::utils::mnemonic;
+use crate::utils::stacks::StacksRpc;
 use clarity_repl::clarity::codec::transaction::{
     StacksTransaction, StacksTransactionSigner, TransactionAnchorMode, TransactionAuth,
     TransactionPayload, TransactionPostConditionMode, TransactionPublicKeyEncoding,
@@ -44,8 +45,9 @@ pub fn publish_contract(
     contract: &InitialContract,
     deployers_lookup: &BTreeMap<String, Account>,
     deployers_nonces: &mut BTreeMap<String, u64>,
-    node: &str,
+    node_url: &str,
     deployment_fee_rate: u64,
+    network: &Network,
 ) -> Result<(String, u64), String> {
     let contract_name = contract.name.clone().unwrap();
 
@@ -74,20 +76,14 @@ pub fn publish_contract(
     let anchor_mode = TransactionAnchorMode::Any;
     let tx_fee = deployment_fee_rate * contract.code.len() as u64;
 
+    let stacks_rpc = StacksRpc::new(&node_url);
+
     let nonce = match deployers_nonces.get(&deployer.name) {
         Some(nonce) => *nonce,
         None => {
-            let request_url = format!(
-                "{host}/v2/accounts/{addr}",
-                host = node,
-                addr = deployer.address,
-            );
-
-            let response: Balance = reqwest::blocking::get(&request_url)
-                .expect("Unable to retrieve account")
-                .json()
-                .expect("Unable to parse contract");
-            let nonce = response.nonce;
+            let nonce = stacks_rpc
+                .get_nonce(&deployer.address)
+                .expect("Unable to retrieve account");
             deployers_nonces.insert(deployer.name.clone(), nonce);
             nonce
         }
@@ -112,8 +108,14 @@ pub fn publish_contract(
 
     let auth = TransactionAuth::Standard(spending_condition);
     let unsigned_tx = StacksTransaction {
-        version: TransactionVersion::Testnet,
-        chain_id: 0x80000000, // MAINNET=0x00000001 TODO(ludo): mainnet handling
+        version: match network {
+            Network::Mainnet => TransactionVersion::Mainnet,
+            _ => TransactionVersion::Testnet,
+        },
+        chain_id: match network {
+            Network::Mainnet => 0x00000001,
+            _ => 0x80000000,
+        },
         auth: auth,
         anchor_mode: anchor_mode,
         post_condition_mode: TransactionPostConditionMode::Deny,
@@ -130,20 +132,10 @@ pub fn publish_contract(
     tx_signer.sign_origin(&wrapped_secret_key).unwrap();
     let signed_tx = tx_signer.get_tx().unwrap();
 
-    let tx_bytes = signed_tx.serialize_to_vec();
-    let client = reqwest::blocking::Client::new();
-    let path = format!("{}/v2/transactions", node);
-    let res = client
-        .post(&path)
-        .header("Content-Type", "application/octet-stream")
-        .body(tx_bytes)
-        .send()
-        .unwrap();
-
-    if !res.status().is_success() {
-        return Err(format!("{}", res.text().unwrap()));
-    }
-    let txid: String = res.json().unwrap();
+    let txid = match stacks_rpc.post_transaction(signed_tx) {
+        Ok(res) => res.txid,
+        Err(e) => return Err(format!("{:?}", e)),
+    };
     deployers_nonces.insert(deployer.name.clone(), nonce + 1);
     Ok((txid, nonce))
 }
@@ -153,7 +145,7 @@ pub fn publish_all_contracts(
     network: Network,
 ) -> Result<Vec<String>, Vec<String>> {
     let start_repl = false;
-    let (session, chain) = match load_session(manifest_path, start_repl, network) {
+    let (session, chain) = match load_session(manifest_path, start_repl, &network) {
         Ok((session, chain)) => (session, chain),
         Err(e) => return Err(vec![e]),
     };
@@ -174,6 +166,7 @@ pub fn publish_all_contracts(
             &mut deployers_nonces,
             &settings.node,
             chain.network.deployment_fee_rate,
+            &network,
         ) {
             Ok((txid, nonce)) => {
                 results.push(format!(
