@@ -615,7 +615,7 @@ pub async fn publish_stacking_orders(
             let pox_contract_id = pox_info.contract_id.clone();
 
             std::thread::spawn(move || {
-                let default_fee = fee_rate * 10;
+                let default_fee = fee_rate * 1000;
                 let stacks_rpc = StacksRpc::new(&node_url);
                 let nonce = stacks_rpc
                     .get_nonce(&account.address)
