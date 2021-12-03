@@ -1,14 +1,7 @@
 import { StacksDevnetOrchestrator } from "./index";
 
-// const devnet = new StacksDevnet({
-//     config: {
-//         manifestPath: "/Users/ludovic/Coding/clarinet/clarinet-cli/examples/counter/Clarinet.toml",
-//     },
-//     logger: (msg) => console.log(msg)
-// });
-
 const devnet = new StacksDevnetOrchestrator({
-    path: "/Users/ludovic/Coding/clarinet/clarinet-cli/examples/counter/Clarinet.toml",
+    path: "../examples/counter/Clarinet.toml",
     logs: true,
     accounts: [
         {

@@ -90,8 +90,6 @@ impl StacksDevnet {
                         DevnetCommand::Start(_) => break,
                     }
                 }
-            } else {
-                // todo(ludo): Graceful termination.
             }
         });
 
