@@ -1,3 +1,10 @@
+## [0.19.1](https://github.com/hirosystems/clarinet/compare/v0.19.0...v0.19.1) (2021-12-06)
+
+
+### Bug Fixes
+
+* update package name ([6477408](https://github.com/hirosystems/clarinet/commit/647740816577ba7faa978281ac83fc3485e929fa))
+
 # [0.19.0](https://github.com/hirosystems/clarinet/compare/v0.18.3...v0.19.0) (2021-12-06)
 
 
