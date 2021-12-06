@@ -349,7 +349,7 @@ jobs:
         if: startsWith(github.ref, 'refs/tags/v') && matrix.os != 'windows-latest'
         with:
           repo_token: ${{ secrets.GITHUB_TOKEN }}
-          file: clarinet-${{ matrix.platform }}-${{ matrix.architecture }}.zip
+          file: clarinet-${{ matrix.platform }}-${{ matrix.architecture }}.tar.gz
           tag: ${{ github.ref }}
 
       - name: Upload Artifacts to GH release (Windows)
