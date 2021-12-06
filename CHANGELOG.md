@@ -1,3 +1,47 @@
+# [0.19.0](https://github.com/hirosystems/clarinet/compare/v0.18.3...v0.19.0) (2021-12-06)
+
+
+### Bug Fixes
+
+* add 128bit numbers support ([a87a99c](https://github.com/hirosystems/clarinet/commit/a87a99c99e8377d7cef0eeb331dd537702dae588))
+* address feedbacks ([4a74c51](https://github.com/hirosystems/clarinet/commit/4a74c51f592ac68fd6948d7818fa5ff18f9eb7d2))
+* better event management ([bd1e9c3](https://github.com/hirosystems/clarinet/commit/bd1e9c30e87b78af99178f4144a9ae47032d7f9f))
+* build ([b8d1ac7](https://github.com/hirosystems/clarinet/commit/b8d1ac727dd6ce4d84032044ca3c6372cfe33774))
+* deployment fee rate can be too low ([1fa7564](https://github.com/hirosystems/clarinet/commit/1fa756426f12689aace74b46a23e6bbaec10597d))
+* deployment_fee_rate not being used ([940f17d](https://github.com/hirosystems/clarinet/commit/940f17dbb4e33fe315bf9e799503d61974d3a236))
+* dropped request ([c777d91](https://github.com/hirosystems/clarinet/commit/c777d9122a5e0323e26be4c0c609fa391a1be5e3))
+* error message ([bb1c5c7](https://github.com/hirosystems/clarinet/commit/bb1c5c7de89622fc04fff85172780d676501cfa7))
+* fee too low (stacking orders) ([90d46b7](https://github.com/hirosystems/clarinet/commit/90d46b759dd17f22da7c12a3cae954523b7c62a7))
+* ignore RUSTSEC-2021-0124 ([b4b570a](https://github.com/hirosystems/clarinet/commit/b4b570a20a7115a8b8ae3b5fe0616777beca2d3d))
+* incorrect error message ([ac48d31](https://github.com/hirosystems/clarinet/commit/ac48d318a84bd0515640ec09fab22f8dd50cee3d))
+* infinite iter ([1ab975a](https://github.com/hirosystems/clarinet/commit/1ab975aeee561baa6813f06db24f0025d532a3eb))
+* nested runtimes / switch to futures ([26d60b7](https://github.com/hirosystems/clarinet/commit/26d60b7d9a04b6c5fcd7971fe0f64feaf7ea3d9f))
+* package name ([e8dc71b](https://github.com/hirosystems/clarinet/commit/e8dc71bcb374f02c3c553d3d850ba7b2b68f0ab3))
+* return type ([52a37bf](https://github.com/hirosystems/clarinet/commit/52a37bfc2cb23942c96b8696253180de96d81ecd))
+* StacksRpc internal improvements ([2bf6c52](https://github.com/hirosystems/clarinet/commit/2bf6c52d44ccf2d4f68bee407fba61074286fa50))
+* STXLockEventData unlock_height type ([927acfe](https://github.com/hirosystems/clarinet/commit/927acfe9ed4069725bc1b8313e968883bb6b8b62))
+* testnet / mainnet deployment ([b49056b](https://github.com/hirosystems/clarinet/commit/b49056ba4db966c86086f05bf25ec03f4a02e423))
+* tsconfig adjustments ([4f5320e](https://github.com/hirosystems/clarinet/commit/4f5320e23030099add3ee12eabbb92c58975d82f))
+* typos ([669d94b](https://github.com/hirosystems/clarinet/commit/669d94b2c183f1ae641d77a61ff4125eda5c4a66))
+* update lib name ([9041ff8](https://github.com/hirosystems/clarinet/commit/9041ff829f8edff19a50e8c7aa3e8bf017b70c07))
+* update node bindings ([cf29e00](https://github.com/hirosystems/clarinet/commit/cf29e00a757a35b603d06b8140b343d3ba843f72))
+* update types/node + package.json ([7fdb417](https://github.com/hirosystems/clarinet/commit/7fdb417fbe39c1e0d5d7f7124ceba03c9ecb8250))
+* warnings, remove rustdoc ([c81d7a7](https://github.com/hirosystems/clarinet/commit/c81d7a7f0b887b9cb23642ec3232fd11a638d563))
+
+
+### Features
+
+* add expectFungibleTokenBurnEvent ([0a77641](https://github.com/hirosystems/clarinet/commit/0a77641d685d53eeda2db0e0c79e37415409a3a4))
+* add expectNonFungibleTokenBurnEvent ([b33be1b](https://github.com/hirosystems/clarinet/commit/b33be1ba31d57f0845ef2e2c5439b40988dc0bf4))
+* add expectNonFungibleTokenMintEvent ([1bcf5b1](https://github.com/hirosystems/clarinet/commit/1bcf5b1aa2eb7a574c68229c89c9cc5a38ad722b))
+* add stacks / bitcoin specific metadata for blocks / transactions ([59d66ee](https://github.com/hirosystems/clarinet/commit/59d66eec7fdbc63f29bdf041caaedff28b22969e))
+* closing the loop ([e80a6dc](https://github.com/hirosystems/clarinet/commit/e80a6dc434042307375639d9b831b06b79c0f3c8))
+* expose get_stacks_node_url for stacks.js ([f1f8bed](https://github.com/hirosystems/clarinet/commit/f1f8bed146add3c0ecbfdaf0ab4db3b3b5b4c21a))
+* improve api ([2f72f6d](https://github.com/hirosystems/clarinet/commit/2f72f6dc70142670a2ac0acbf11394d01f34518b))
+* introduce new schemas for block / transaction handling ([01501d9](https://github.com/hirosystems/clarinet/commit/01501d97d4da55b64f090365353b3d4e8f2a73d6))
+* migrate to typescript ([dd55845](https://github.com/hirosystems/clarinet/commit/dd55845ab554958a0e7b73fc447efdbb473a1c49))
+* polish stacks operations schemas ([cb939f4](https://github.com/hirosystems/clarinet/commit/cb939f4b550514dbae5a27aafd5c254063c1dcd0))
+
 # [0.18.0](https://github.com/hirosystems/clarinet/compare/v0.17.0...v0.18.0) (2021-10-18)
 
 
