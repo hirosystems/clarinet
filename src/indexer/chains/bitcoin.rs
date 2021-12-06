@@ -19,7 +19,7 @@ pub fn standardize_bitcoin_block(
     indexer_config: &IndexerConfig,
     marshalled_block: JsonValue,
 ) -> BitcoinBlockData {
-    let mut transactions = vec![];
+    let transactions = vec![];
 
     let auth = Auth::UserPass(
         indexer_config.bitcoin_node_rpc_username.clone(),
@@ -38,7 +38,7 @@ pub fn standardize_bitcoin_block(
     };
     let block = rpc.get_block(&block_hash).unwrap();
 
-    for txdata in block.txdata.iter() {
+    for _txdata in block.txdata.iter() {
         // TODO: retrieve stacks transactions
         // let _ = tx.send(DevnetEvent::debug(format!(
         //     "Tx.out: {:?}", txdata.output
@@ -56,6 +56,6 @@ pub fn standardize_bitcoin_block(
         },
         timestamp: block.header.time,
         metadata: BitcoinBlockMetadata {},
-        transactions: transactions,
+        transactions,
     }
 }
