@@ -249,7 +249,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
-      - name: "Execute unit test"
+      - name: "Execute unit tests"
         uses: docker://hirosystems/clarinet:latest
         with: 
           args: test --coverage --manifest-path=./Clarinet.toml
