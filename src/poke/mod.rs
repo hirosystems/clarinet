@@ -102,6 +102,10 @@ pub fn load_session(
     settings.initial_deployer = initial_deployer;
     settings.costs_version = project_config.project.costs_version;
 
+    if let Some(analysis_passes) = project_config.project.analysis {
+        settings.analysis = analysis_passes;
+    }
+
     let session = if start_repl {
         let mut terminal = Terminal::new(settings.clone());
         terminal.start();
