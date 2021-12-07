@@ -1,0 +1,8 @@
+[project]
+name = "checker"
+requirements = []
+analysis = ["check-checker"]
+costs_version = 1
+[contracts.checker]
+path = "contracts/checker.clar"
+depends_on = []
