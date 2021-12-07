@@ -64,7 +64,7 @@ sudo apt install build-essential pkg-config libssl-dev
 You can build Clarinet from source using Cargo with the following commands:
 
 ```bash
-git clone git@github.com:hirosystems/clarinet.git --recursive
+git clone https://github.com/hirosystems/clarinet.git --recursive
 cd clarinet
 cargo install --path . --locked
 ```
@@ -234,6 +234,34 @@ evaluation on a blockchain. Use the following command:
 ```bash
 $ clarinet deploy --testnet
 ```
+
+### Use Clarinet in your CI workflow as a GitHub Action
+
+Clarinet can be used in GitHub Actions as a step of your CI workflows. 
+You can set-up a simple workflow by adding the following steps in a file `.github/workflows/github-actions-clarinet.yml`:
+
+```yaml
+name: CI
+on: [push]
+jobs:
+  tests:
+    name: "Test contracts with Clarinet"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - name: "Execute unit test"
+        uses: docker://hirosystems/clarinet:latest
+        with: 
+          args: test --coverage --manifest-path=./Clarinet.toml
+      - name: "Export code coverage"
+        uses: codecov/codecov-action@v1
+        with:
+          files: ./coverage.lcov
+          verbose: true
+```
+
+Or add the steps above in your existing workflows.
+The generated code coverage output can then be used as is with GitHub Apps like https://codecov.io.
 
 ### Extensions
 
