@@ -7,6 +7,7 @@ on:
     paths-ignore:
       - "**/CHANGELOG.md"
       - "**/package.json"
+      - "**/package-lock.json"
       - "**/Cargo.toml"
       - "**/Cargo.lock"
     branches:
@@ -299,7 +300,7 @@ jobs:
 
       - name: Compress node artifact
         shell: bash
-        run: tar -C node-bindings -zcvf clarinet-js-${{ matrix.platform }}-${{ matrix.architecture }}.tar.gz native/index.node
+        run: tar -C node-bindings -zcvf stacks-devnet-js-${{ matrix.platform }}-${{ matrix.architecture }}.tar.gz native/index.node
 
       # Separate uploads to prevent paths from being preserved
       - name: Upload cargo artifacts (Not Windows)
@@ -319,8 +320,8 @@ jobs:
       - name: Upload node artifact
         uses: actions/upload-artifact@v2
         with:
-          name: clarinet-js-${{ matrix.platform }}-${{ matrix.architecture }}
-          path: clarinet-js-${{ matrix.platform }}-${{ matrix.architecture }}.tar.gz
+          name: stacks-devnet-js-${{ matrix.platform }}-${{ matrix.architecture }}
+          path: stacks-devnet-js-${{ matrix.platform }}-${{ matrix.architecture }}.tar.gz
 
       - name: Unit Tests - Cargo
         run: cargo test --release --locked --target ${{ matrix.target }}
@@ -348,7 +349,7 @@ jobs:
         if: startsWith(github.ref, 'refs/tags/v') && matrix.os != 'windows-latest'
         with:
           repo_token: ${{ secrets.GITHUB_TOKEN }}
-          file: clarinet-${{ matrix.platform }}-${{ matrix.architecture }}.zip
+          file: clarinet-${{ matrix.platform }}-${{ matrix.architecture }}.tar.gz
           tag: ${{ github.ref }}
 
       - name: Upload Artifacts to GH release (Windows)
@@ -441,6 +442,7 @@ jobs:
         uses: cycjimmy/semantic-release-action@v2
         env:
           GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
+          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
           SEMANTIC_RELEASE_PACKAGE: ${{ github.event.repository.name }}
         with:
           extra_plugins: |

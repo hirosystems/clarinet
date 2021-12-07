@@ -1,3 +1,5 @@
+#![allow(unused_imports)]
+
 extern crate serde;
 
 #[macro_use]

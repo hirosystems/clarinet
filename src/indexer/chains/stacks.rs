@@ -33,6 +33,7 @@ pub struct NewBlock {
     // burn_amount: u32,
 }
 
+#[allow(dead_code)]
 #[derive(Deserialize)]
 pub struct NewMicroBlock {
     transactions: Vec<NewTransaction>,

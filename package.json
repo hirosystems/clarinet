@@ -1,5 +1,5 @@
 {
-    "name": "@hiro/clarinet",
+    "name": "@hirosystems/clarinet",
     "description": "Clarinet is a Clarity runtime packaged as a command line tool, designed to facilitate smart contract understanding, development, testing and deployment.",
     "commitlint": {
         "extends": [
@@ -27,7 +27,15 @@
             [
                 "@semantic-release/exec",
                 {
-                    "prepareCmd": "sed -i -e '1h;2,$H;$!d;g' -e 's@name = \"clarinet-js\"\\nversion = \"[^\"]*\"@name = \"clarinet-js\"\\nversion = \"${nextRelease.version}\"@g' node-bindings/Cargo.toml node-bindings/Cargo.lock"
+                    "execCwd": "node-bindings",
+                    "prepareCmd": "sed -i -e '1h;2,$H;$!d;g' -e 's@name = \"stacks-devnet-js\"\\nversion = \"[^\"]*\"@name = \"stacks-devnet-js\"\\nversion = \"${nextRelease.version}\"@g' Cargo.toml Cargo.lock"
+                }
+            ],
+            [
+                "@semantic-release/exec",
+                {
+                    "execCwd": "node-bindings",
+                    "prepareCmd": "npm install --ignore-scripts"
                 }
             ],
             [

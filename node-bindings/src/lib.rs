@@ -1,3 +1,4 @@
+#[allow(unused_imports)]
 #[macro_use]
 extern crate error_chain;
 
@@ -521,7 +522,7 @@ impl StacksDevnet {
 
         let block = match devnet.stacks_block_rx.recv() {
             Ok(obj) => obj,
-            Err(err) => panic!(),
+            Err(err) => panic!("{:?}", err),
         };
 
         let js_block = serde::to_value(&mut cx, &block).expect("Unable to serialize block");
@@ -536,7 +537,7 @@ impl StacksDevnet {
 
         let block = match devnet.bitcoin_block_rx.recv() {
             Ok(obj) => obj,
-            Err(err) => panic!(),
+            Err(err) => panic!("{:?}", err),
         };
 
         let js_block = serde::to_value(&mut cx, &block).expect("Unable to serialize block");
