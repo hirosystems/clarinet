@@ -344,7 +344,7 @@ jobs:
             ./target/${{ matrix.target }}/release/clarinet test --manifest-path ${testdir}/Clarinet.toml
           }
 
-      - name: Upload Artifacts to GH release (Not Windows)
+      - name: Upload Cargo Artifact to GH release (Not Windows)
         uses: svenstaro/upload-release-action@v2
         if: startsWith(github.ref, 'refs/tags/v') && matrix.os != 'windows-latest'
         with:
@@ -352,12 +352,20 @@ jobs:
           file: clarinet-${{ matrix.platform }}-${{ matrix.architecture }}.tar.gz
           tag: ${{ github.ref }}
 
-      - name: Upload Artifacts to GH release (Windows)
+      - name: Upload Cargo Artifact to GH release (Windows)
         uses: svenstaro/upload-release-action@v2
         if: startsWith(github.ref, 'refs/tags/v') && matrix.os == 'windows-latest'
         with:
           repo_token: ${{ secrets.GITHUB_TOKEN }}
           file: clarinet-${{ matrix.platform }}-${{ matrix.architecture }}.msi
+          tag: ${{ github.ref }}
+
+      - name: Upload Node Artifact to GH release
+        uses: svenstaro/upload-release-action@v2
+        if: startsWith(github.ref, 'refs/tags/v')
+        with:
+          repo_token: ${{ secrets.GITHUB_TOKEN }}
+          file: stacks-devnet-js-${{ matrix.platform }}-${{ matrix.architecture }}.tar.gz
           tag: ${{ github.ref }}
 
       # Cleans the `./target` dir after the build such that only dependencies are cached on CI
