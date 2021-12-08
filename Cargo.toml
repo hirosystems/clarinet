@@ -28,19 +28,16 @@ deno = { path = "./vendor/deno/cli", optional = true }
 # clarity_repl = { package = "clarity-repl", path = "../../clarity-repl", features = ["cli"] }
 clarity_repl = { package = "clarity-repl", version = "=0.16.0" }
 bip39 = { version = "1.0.1", default-features = false }
-aes = "0.6.0"
+aes = "0.7.5"
 base64 = "0.13.0"
-block-modes = "0.7.0"
-bs58 = "0.4.0"
+block-modes = "0.8.1"
 rand = "0.8.3"
 ring = "0.16.20"
-ripemd160 = "0.9.1"
-libsecp256k1 = "0.5.0"
-sha2 = "0.9.3"
+libsecp256k1 = "0.7.0"
+sha2 = "0.10.0"
 uuid = { version = "0.8.2", features = ["v4"] }
-hmac = "0.10.1"
-pbkdf2 = { version = "0.7.3", features=["parallel"], default-features = false }
-hex = "0.4.3"
+hmac = "0.12.0"
+pbkdf2 = { version = "0.10.0", features=["parallel"], default-features = false }
 futures = "0.3.12"
 tokio = { version = "=1.8.1", features = ["full"] }
 lazy_static = "1.4.0"
@@ -60,18 +57,19 @@ reqwest = { version = "0.11", features = ["blocking", "json", "rustls"] }
 swc_common = { version = "0.10.20", features = ["sourcemap"], optional = true }
 bollard = "0.11.0"
 rocket = { version = "=0.5.0-rc.1", features = ["json"] }
-crossterm = "0.20.0"
+crossterm = "0.22.1"
 chrono = "0.4.19"
-base58 = "0.1.0"
+base58 = "0.2.0"
 tracing = "0.1"
-tracing-subscriber = "0.2"
-tracing-appender = "0.1"
+tracing-subscriber = "0.3.3"
+tracing-appender = "0.2.0"
 ctrlc = "3.1.9"
-strum = { version = "0.22", features = ["derive"] }
+strum = { version = "0.23.0", features = ["derive"] }
 bitcoincore-rpc = "0.14.0"
+segment = "0.1.2"
 
 [dependencies.tui]
-version = "0.15.0"
+version = "0.16.0"
 default-features = false
 features = ["crossterm"]
 
