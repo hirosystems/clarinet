@@ -76,7 +76,7 @@ struct GenerateProject {
     /// Project's name
     pub name: String,
     /// Enable developer usage telemetry
-    #[clap(long = "telemetry")]
+    #[clap(long = "disable-telemetry")]
     pub disable_telemetry: Option<bool>,
 }
 
@@ -232,7 +232,7 @@ pub fn main() {
 
             let telemetry_enabled = if cfg!(feature = "telemetry") {
                 if let Some(disable_telemetry) = project_opts.disable_telemetry {
-                    disable_telemetry
+                    !disable_telemetry
                 } else {
                     println!("{}", yellow!("Send usage data to Hiro."));
                     println!("{}", yellow!("Help Hiro improve its products and services by automatically sending diagnostics and usage data [Y/n]:"));
