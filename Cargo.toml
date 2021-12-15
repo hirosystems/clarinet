@@ -66,7 +66,8 @@ tracing-appender = "0.2.0"
 ctrlc = "3.1.9"
 strum = { version = "0.23.0", features = ["derive"] }
 bitcoincore-rpc = "0.14.0"
-segment = "0.1.2"
+segment = { version = "0.1.2", optional = true }
+mac_address = { version = "1.1.2", optional = true }
 
 [dependencies.tui]
 version = "0.16.0"
@@ -95,6 +96,7 @@ path = "src/bin.rs"
 [features]
 default = ["cli"]
 cli = ["swc_common", "deno", "deno_runtime", "deno_core", "clap"]
+telemetry = ["segment", "mac_address"]
 
 [workspace]
 members = [

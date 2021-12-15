@@ -1,6 +1,7 @@
 use crate::poke::load_session;
 use crate::utils::mnemonic;
 use crate::utils::stacks::StacksRpc;
+use crate::types::ProjectManifest;
 use clarity_repl::clarity::codec::transaction::{
     StacksTransaction, StacksTransactionSigner, TransactionAnchorMode, TransactionAuth,
     TransactionPayload, TransactionPostConditionMode, TransactionPublicKeyEncoding,
@@ -35,6 +36,7 @@ struct Balance {
 }
 
 #[allow(dead_code)]
+#[derive(Debug)]
 pub enum Network {
     Devnet,
     Testnet,
@@ -142,11 +144,11 @@ pub fn publish_contract(
 
 pub fn publish_all_contracts(
     manifest_path: PathBuf,
-    network: Network,
-) -> Result<Vec<String>, Vec<String>> {
+    network: &Network,
+) -> Result<(Vec<String>, ProjectManifest), Vec<String>> {
     let start_repl = false;
-    let (session, chain) = match load_session(manifest_path, start_repl, &network) {
-        Ok((session, chain)) => (session, chain),
+    let (session, chain, manifest) = match load_session(manifest_path, start_repl, &network) {
+        Ok((session, chain, manifest)) => (session, chain, manifest),
         Err(e) => return Err(vec![e]),
     };
     let mut results = vec![];
@@ -184,5 +186,5 @@ pub fn publish_all_contracts(
     }
     // If devnet, we should be pulling all the links.
 
-    Ok(results)
+    Ok((results, manifest))
 }

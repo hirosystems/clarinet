@@ -8,7 +8,7 @@ pub fn load_session(
     manifest_path: PathBuf,
     start_repl: bool,
     env: &Network,
-) -> Result<(repl::Session, ChainConfig), String> {
+) -> Result<(repl::Session, ChainConfig, ProjectManifest), String> {
     let mut settings = repl::SessionSettings::default();
 
     let mut project_path = manifest_path.clone();
@@ -117,5 +117,5 @@ pub fn load_session(
         };
         session
     };
-    Ok((session, chain_config))
+    Ok((session, chain_config, project_config))
 }

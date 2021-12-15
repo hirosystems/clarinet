@@ -22,4 +22,6 @@ COPY --from=build /out/ /bin/
 
 WORKDIR /workspace
 
+ENV CLARINET_MODE_CI=1
+
 ENTRYPOINT ["clarinet"]

@@ -22,7 +22,7 @@ pub fn run_scripts(
     allow_disk_write: bool,
     manifest_path: PathBuf,
     session: Option<Session>,
-) {
+) -> Result<u32, (String, u32)> {
     match block_on(deno::do_run_scripts(
         files,
         include_coverage,
@@ -33,9 +33,9 @@ pub fn run_scripts(
         manifest_path,
         session,
     )) {
-        Err(e) => std::process::exit(1),
-        _ => {}
-    };
+        Err(e) => Err((format!("{:?}", e), 0)),
+        Ok(res) => Ok(res)
+    }
 }
 
 pub fn block_on<F, R>(future: F) -> R
