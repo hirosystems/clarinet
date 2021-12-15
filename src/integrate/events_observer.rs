@@ -111,7 +111,6 @@ impl EventObserverConfig {
 
 pub enum EventsObserverCommand {
     Terminate(bool), // Restart
-    UpdatePoxInfo,
     PublishInitialContracts,
     PublishPoxStackingOrders(BlockIdentifier),
 }
@@ -174,6 +173,7 @@ pub async fn start_events_observer(
             .mount(
                 "/",
                 routes![
+                    handle_ping,
                     handle_new_burn_block,
                     handle_new_block,
                     handle_new_microblocks,
@@ -225,7 +225,6 @@ pub async fn start_events_observer(
                     init_status.deployer_nonce = 0;
                 }
             }
-            Ok(EventsObserverCommand::UpdatePoxInfo) => {}
             Ok(EventsObserverCommand::PublishInitialContracts) => {
                 if let Ok(mut init_status_writer) = init_status_rw_lock.write() {
                     let res = publish_initial_contracts(

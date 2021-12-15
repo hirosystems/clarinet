@@ -117,6 +117,7 @@ async fn send_event(event: DeveloperUsageEvent) {
                 "team_id": digest.team_id,
                 "clarinet_version": clarinet_version,
                 "ci_mode": ci_mode,
+                "command": command,
             }),
         ),
     };
@@ -124,7 +125,7 @@ async fn send_event(event: DeveloperUsageEvent) {
     let user_id = match get_mac_address() {
         Ok(Some(ma)) => Hash160::from_data(&ma.bytes()),
         Ok(None) => Hash160::from_data(&[0]),
-        Err(e) => return,
+        Err(_e) => return,
     };
 
     let client = HttpClient::default();

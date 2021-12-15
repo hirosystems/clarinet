@@ -232,7 +232,7 @@ pub fn main() {
 
             let telemetry_enabled = if cfg!(feature = "telemetry") {
                 if let Some(disable_telemetry) = project_opts.disable_telemetry {
-                    false
+                    disable_telemetry
                 } else {
                     println!("{}", yellow!("Send usage data to Hiro."));
                     println!("{}", yellow!("Help Hiro improve its products and services by automatically sending diagnostics and usage data [Y/n]:"));
@@ -445,13 +445,13 @@ pub fn main() {
             let start_repl = false;
             let res = load_session(manifest_path.clone(), start_repl, &Network::Devnet);
             let session = match res {
-                Ok((session, _, manifest)) => session,
+                Ok((session, _, _)) => session,
                 Err(e) => {
                     println!("{}", e);
                     return;
                 }
             };
-            run_scripts(
+            let _ = run_scripts(
                 vec![cmd.script],
                 false,
                 false,
