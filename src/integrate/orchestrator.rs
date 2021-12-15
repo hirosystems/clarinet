@@ -198,6 +198,17 @@ impl DevnetOrchestrator {
         }
     }
 
+    #[allow(dead_code)]
+    pub fn get_stacks_node_url(&self) -> String {
+        match self.network_config {
+            Some(ref config) => match config.devnet {
+                Some(ref devnet) => format!("http://0.0.0.0:{}", devnet.stacks_node_rpc_port),
+                _ => unreachable!(),
+            },
+            _ => unreachable!(),
+        }
+    }
+
     pub async fn start(
         &mut self,
         event_tx: Sender<DevnetEvent>,
