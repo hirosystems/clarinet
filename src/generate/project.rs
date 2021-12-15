@@ -180,8 +180,7 @@ telemetry = {}
 # path = "contracts/counter.clar"
 # depends_on = []
 "#,
-            self.project_name,
-            self.telemetry_enabled
+            self.project_name, self.telemetry_enabled
         );
         let name = format!("Clarinet.toml");
         let path = format!("{}/{}/{}", self.project_path, self.project_name, name);

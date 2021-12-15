@@ -34,7 +34,7 @@ pub fn run_scripts(
         session,
     )) {
         Err(e) => Err((format!("{:?}", e), 0)),
-        Ok(res) => Ok(res)
+        Ok(res) => Ok(res),
     }
 }
 

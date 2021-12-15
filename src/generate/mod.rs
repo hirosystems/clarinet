@@ -10,7 +10,11 @@ use notebook::GetChangesForNewNotebook;
 use project::GetChangesForNewProject;
 use std::{collections::HashMap, path::PathBuf};
 
-pub fn get_changes_for_new_project(project_path: String, project_name: String, telemetry_enabled: bool) -> Vec<Changes> {
+pub fn get_changes_for_new_project(
+    project_path: String,
+    project_name: String,
+    telemetry_enabled: bool,
+) -> Vec<Changes> {
     let mut command = GetChangesForNewProject::new(project_path, project_name, telemetry_enabled);
     command.run()
 }

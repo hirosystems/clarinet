@@ -6,7 +6,7 @@ pub fn get_bip39_seed_from_mnemonic(mnemonic: &str, password: &str) -> Result<Ve
     const PBKDF2_BYTES: usize = 64;
     let salt = format!("mnemonic{}", password);
     let mut seed = vec![0u8; PBKDF2_BYTES];
-    
+
     pbkdf2::<Hmac<sha2::Sha512>>(
         mnemonic.as_bytes(),
         salt.as_bytes(),

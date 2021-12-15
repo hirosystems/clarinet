@@ -137,9 +137,12 @@ impl ProjectManifest {
         let project = ProjectConfig {
             name: project_manifest_file.project.name.clone(),
             requirements: None,
-            description: project_manifest_file.project.description.unwrap_or("".into()),
+            description: project_manifest_file
+                .project
+                .description
+                .unwrap_or("".into()),
             authors: project_manifest_file.project.authors.unwrap_or(vec![]),
-            telemetry: project_manifest_file.project.telemetry.unwrap_or(false),  
+            telemetry: project_manifest_file.project.telemetry.unwrap_or(false),
             costs_version: project_manifest_file.project.costs_version.unwrap_or(2),
         };
 

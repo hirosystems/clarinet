@@ -1,6 +1,9 @@
-use segment::{HttpClient, Client, message::{Track, User, Message}};
-use mac_address::get_mac_address;
 use clarity_repl::clarity::util::hash::{bytes_to_hex, Hash160};
+use mac_address::get_mac_address;
+use segment::{
+    message::{Message, Track, User},
+    Client, HttpClient,
+};
 
 use crate::publish::Network;
 
@@ -11,7 +14,7 @@ pub enum DeveloperUsageEvent {
     TestSuiteExecuted(DeveloperUsageDigest, bool, u32),
     DevnetExecuted(DeveloperUsageDigest),
     ContractPublished(DeveloperUsageDigest, Network),
-    UnknownCommand(DeveloperUsageDigest, String)
+    UnknownCommand(DeveloperUsageDigest, String),
 }
 
 pub struct DeveloperUsageDigest {
@@ -20,7 +23,6 @@ pub struct DeveloperUsageDigest {
 }
 
 impl DeveloperUsageDigest {
-
     pub fn new(project_id: &str, team_id: &Vec<String>) -> Self {
         let hashed_project_id = Hash160::from_data(project_id.as_bytes());
         let hashed_team_id = Hash160::from_data(team_id.join(",").as_bytes());
@@ -30,7 +32,6 @@ impl DeveloperUsageDigest {
         }
     }
 }
-
 
 pub fn telemetry_report_event(event: DeveloperUsageEvent) {
     let rt = tokio::runtime::Builder::new_current_thread()
@@ -46,69 +47,99 @@ pub fn telemetry_report_event(event: DeveloperUsageEvent) {
 async fn send_event(event: DeveloperUsageEvent) {
     let segment_api_key = "<REPLACE_SEGMENT_API_KEY>";
 
-    let clarinet_version = option_env!("CARGO_PKG_VERSION").expect("Unable to detect version").to_string();
+    let clarinet_version = option_env!("CARGO_PKG_VERSION")
+        .expect("Unable to detect version")
+        .to_string();
     let ci_mode = option_env!("CLARINET_MODE_CI").unwrap_or("0").to_string();
 
     let (event_name, properties) = match event {
-        DeveloperUsageEvent::NewProject(digest) => ("NewProject", json!({
-            "project_id": digest.project_id,
-            "team_id": digest.team_id,
-            "clarinet_version": clarinet_version,
-            "ci_mode": ci_mode,
-        })),
-        DeveloperUsageEvent::TestSuiteExecuted(digest, success, count) => ("TestSuiteExecuted", json!({
-            "project_id": digest.project_id,
-            "team_id": digest.team_id,
-            "clarinet_version": clarinet_version,
-            "ci_mode": ci_mode,
-            "success": success,
-            "count": count,
-        })),
-        DeveloperUsageEvent::DevnetExecuted(digest) => ("DevnetExecuted", json!({
-            "project_id": digest.project_id,
-            "team_id": digest.team_id,
-            "clarinet_version": clarinet_version,
-            "ci_mode": ci_mode,
-        })),
-        DeveloperUsageEvent::ContractPublished(digest, network) => ("ContractPublished", json!({
-            "project_id": digest.project_id,
-            "team_id": digest.team_id,
-            "clarinet_version": clarinet_version,
-            "ci_mode": ci_mode,
-            "network": format!("{:?}", network),
-        })),
-        DeveloperUsageEvent::CheckExecuted(digest) => ("CheckExecuted", json!({
-            "project_id": digest.project_id,
-            "team_id": digest.team_id,
-            "clarinet_version": clarinet_version,
-            "ci_mode": ci_mode,
-        })),
-        DeveloperUsageEvent::PokeExecuted(digest) => ("PokeExecuted", json!({
-            "project_id": digest.project_id,
-            "team_id": digest.team_id,
-            "clarinet_version": clarinet_version,
-            "ci_mode": ci_mode,
-        })),
-        DeveloperUsageEvent::UnknownCommand(digest, command) => ("UnknownCommand", json!({
-            "project_id": digest.project_id,
-            "team_id": digest.team_id,
-            "clarinet_version": clarinet_version,
-            "ci_mode": ci_mode,
-        })),
+        DeveloperUsageEvent::NewProject(digest) => (
+            "NewProject",
+            json!({
+                "project_id": digest.project_id,
+                "team_id": digest.team_id,
+                "clarinet_version": clarinet_version,
+                "ci_mode": ci_mode,
+            }),
+        ),
+        DeveloperUsageEvent::TestSuiteExecuted(digest, success, count) => (
+            "TestSuiteExecuted",
+            json!({
+                "project_id": digest.project_id,
+                "team_id": digest.team_id,
+                "clarinet_version": clarinet_version,
+                "ci_mode": ci_mode,
+                "success": success,
+                "count": count,
+            }),
+        ),
+        DeveloperUsageEvent::DevnetExecuted(digest) => (
+            "DevnetExecuted",
+            json!({
+                "project_id": digest.project_id,
+                "team_id": digest.team_id,
+                "clarinet_version": clarinet_version,
+                "ci_mode": ci_mode,
+            }),
+        ),
+        DeveloperUsageEvent::ContractPublished(digest, network) => (
+            "ContractPublished",
+            json!({
+                "project_id": digest.project_id,
+                "team_id": digest.team_id,
+                "clarinet_version": clarinet_version,
+                "ci_mode": ci_mode,
+                "network": format!("{:?}", network),
+            }),
+        ),
+        DeveloperUsageEvent::CheckExecuted(digest) => (
+            "CheckExecuted",
+            json!({
+                "project_id": digest.project_id,
+                "team_id": digest.team_id,
+                "clarinet_version": clarinet_version,
+                "ci_mode": ci_mode,
+            }),
+        ),
+        DeveloperUsageEvent::PokeExecuted(digest) => (
+            "PokeExecuted",
+            json!({
+                "project_id": digest.project_id,
+                "team_id": digest.team_id,
+                "clarinet_version": clarinet_version,
+                "ci_mode": ci_mode,
+            }),
+        ),
+        DeveloperUsageEvent::UnknownCommand(digest, command) => (
+            "UnknownCommand",
+            json!({
+                "project_id": digest.project_id,
+                "team_id": digest.team_id,
+                "clarinet_version": clarinet_version,
+                "ci_mode": ci_mode,
+            }),
+        ),
     };
 
     let user_id = match get_mac_address() {
         Ok(Some(ma)) => Hash160::from_data(&ma.bytes()),
         Ok(None) => Hash160::from_data(&[0]),
-        Err(e) => return
+        Err(e) => return,
     };
 
     let client = HttpClient::default();
 
-    let _ = client.send(segment_api_key.to_string(), Message::from(Track {
-        user: User::UserId { user_id: format!("0x{}", bytes_to_hex(&user_id.to_bytes().to_vec())) },
-        event: event_name.into(),
-        properties: properties,
-        ..Default::default()
-    })).await;
+    let _ = client
+        .send(
+            segment_api_key.to_string(),
+            Message::from(Track {
+                user: User::UserId {
+                    user_id: format!("0x{}", bytes_to_hex(&user_id.to_bytes().to_vec())),
+                },
+                event: event_name.into(),
+                properties: properties,
+                ..Default::default()
+            }),
+        )
+        .await;
 }

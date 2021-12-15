@@ -1,7 +1,7 @@
 use crate::poke::load_session;
+use crate::types::ProjectManifest;
 use crate::utils::mnemonic;
 use crate::utils::stacks::StacksRpc;
-use crate::types::ProjectManifest;
 use clarity_repl::clarity::codec::transaction::{
     StacksTransaction, StacksTransactionSigner, TransactionAnchorMode, TransactionAuth,
     TransactionPayload, TransactionPostConditionMode, TransactionPublicKeyEncoding,
