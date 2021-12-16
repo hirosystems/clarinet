@@ -119,8 +119,8 @@ pub fn load_session(
             }
             Ok((message, _)) => match message.is_empty() {
                 true => None,
-                false => Some(message)
-            }
+                false => Some(message),
+            },
         };
         (session, output)
     };

@@ -346,7 +346,7 @@ pub fn main() {
                         println!("{}", message);
                     }
                     session
-                },
+                }
                 Err(e) => {
                     println!("{}", e);
                     return;
@@ -376,7 +376,7 @@ pub fn main() {
                         println!("{}", message);
                     }
                     session
-                },
+                }
                 Err(e) => {
                     println!("{}", e);
                     return;
