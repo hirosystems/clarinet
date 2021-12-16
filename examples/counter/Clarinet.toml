@@ -1,5 +1,6 @@
 [project]
 name = "counter"
+analysis = ["all"]
 
 [contracts.counter]
 path = "contracts/counter.clar"
