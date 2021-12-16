@@ -156,8 +156,7 @@ mod sessions {
             settings.costs_version = project_config.project.costs_version;
             settings.include_boot_contracts = vec![
                 "pox".to_string(),
-                "costs-v1".to_string(),
-                "costs-v2".to_string(),
+                format!("costs-v{}", project_config.project.costs_version),
                 "bns".to_string(),
             ];
             let mut session = Session::new(settings.clone());
