@@ -1213,7 +1213,11 @@ fn mine_block(state: &mut OpState, args: Value, _: ()) -> Result<String, AnyErro
                         continue;
                     }
                 };
-                receipts.push((execution.result, execution.events));
+                let result = match execution.result {
+                    Some(output) => format!("{}", output),
+                    _ => unreachable!("Value empty")
+                };
+                receipts.push((result, execution.events));
             } else {
                 session.set_tx_sender(tx.sender.clone());
                 if let Some(ref args) = tx.deploy_contract {
@@ -1225,7 +1229,11 @@ fn mine_block(state: &mut OpState, args: Value, _: ()) -> Result<String, AnyErro
                             Some(name.into()),
                         )
                         .unwrap(); // todo(ludo)
-                    receipts.push((execution.result, execution.events));
+                    let result = match execution.result {
+                        Some(output) => format!("{}", output),
+                        _ => unreachable!("Value empty")
+                    };
+                    receipts.push((result, execution.events));
                 } else if let Some(ref args) = tx.transfer_stx {
                     let snippet = format!(
                         "(stx-transfer? u{} tx-sender '{})",
@@ -1234,7 +1242,11 @@ fn mine_block(state: &mut OpState, args: Value, _: ()) -> Result<String, AnyErro
                     let execution = session
                         .interpret(snippet, None, true, Some(name.into()))
                         .unwrap(); // todo(ludo)
-                    receipts.push((execution.result, execution.events));
+                    let result = match execution.result {
+                        Some(output) => format!("{}", output),
+                        _ => unreachable!("Value empty")
+                    };
+                    receipts.push((result, execution.events));
                 }
                 session.set_tx_sender(initial_tx_sender.clone());
             }
@@ -1302,8 +1314,11 @@ fn call_read_only_fn(state: &mut OpState, args: Value, _: ()) -> Result<String, 
                 "readonly-calls".into(),
             )
             .unwrap(); // todo(ludo)
-
-        Ok((execution.result, execution.events))
+        let result = match execution.result {
+            Some(output) => format!("{}", output),
+            _ => unreachable!("Value empty")
+        };
+        Ok((result, execution.events))
     })?;
     Ok(json!({
       "session_id": args.session_id,
