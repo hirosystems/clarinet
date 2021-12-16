@@ -10,7 +10,8 @@
         (ok new-val)))
 
 (define-public (decrement (step uint))
-    (let ((new-val (- step (var-get counter)))) 
+    (let ((new-val (- step (var-get counter))))
+        ;; #[allow(unchecked_data)]
         (var-set counter new-val)
         (print { object: "counter", action: "decremented", value: new-val })
         (ok new-val)))
