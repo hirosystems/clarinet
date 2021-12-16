@@ -634,7 +634,7 @@ dependencies = [
 
 [[package]]
 name = "clarinet"
-version = "0.19.1"
+version = "0.20.0"
 dependencies = [
  "aes",
  "ansi_term 0.12.1",
@@ -694,9 +694,9 @@ dependencies = [
 
 [[package]]
 name = "clarity-repl"
-version = "0.16.0"
+version = "0.17.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "cab9a91d7ef8169adf9cf5dfd0e58907453d67e3180bb2a481864b8fc2cb63fa"
+checksum = "a96af7d108e64c2842d4786184973c1e768e38930f8f18c6f8840378dbc1e575"
 dependencies = [
  "ansi_term 0.12.1",
  "atty",
@@ -2481,9 +2481,9 @@ dependencies = [
 
 [[package]]
 name = "libc"
-version = "0.2.109"
+version = "0.2.112"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f98a04dce437184842841303488f70d0188c5f51437d2a834dc097eafa909a01"
+checksum = "1b03d17f364a3a042d5e5d46b053bbbf82c92c9430c592dd4c064dc6ee997125"
 
 [[package]]
 name = "libloading"
@@ -4365,7 +4365,7 @@ dependencies = [
 
 [[package]]
 name = "stacks-devnet-js"
-version = "0.19.1"
+version = "0.20.0"
 dependencies = [
  "clarinet",
  "error-chain",
