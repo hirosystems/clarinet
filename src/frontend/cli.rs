@@ -243,7 +243,6 @@ pub fn main() {
             } else {
                 false
             };
-            println!("{}", telemetry_enabled);
             let project_id = project_opts.name.clone();
             let changes =
                 generate::get_changes_for_new_project(current_path, project_id, telemetry_enabled);
