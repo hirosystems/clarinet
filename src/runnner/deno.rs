@@ -1215,7 +1215,7 @@ fn mine_block(state: &mut OpState, args: Value, _: ()) -> Result<String, AnyErro
                 };
                 let result = match execution.result {
                     Some(output) => format!("{}", output),
-                    _ => unreachable!("Value empty")
+                    _ => unreachable!("Value empty"),
                 };
                 receipts.push((result, execution.events));
             } else {
@@ -1231,7 +1231,7 @@ fn mine_block(state: &mut OpState, args: Value, _: ()) -> Result<String, AnyErro
                         .unwrap(); // todo(ludo)
                     let result = match execution.result {
                         Some(output) => format!("{}", output),
-                        _ => unreachable!("Value empty")
+                        _ => unreachable!("Value empty"),
                     };
                     receipts.push((result, execution.events));
                 } else if let Some(ref args) = tx.transfer_stx {
@@ -1244,7 +1244,7 @@ fn mine_block(state: &mut OpState, args: Value, _: ()) -> Result<String, AnyErro
                         .unwrap(); // todo(ludo)
                     let result = match execution.result {
                         Some(output) => format!("{}", output),
-                        _ => unreachable!("Value empty")
+                        _ => unreachable!("Value empty"),
                     };
                     receipts.push((result, execution.events));
                 }
@@ -1316,7 +1316,7 @@ fn call_read_only_fn(state: &mut OpState, args: Value, _: ()) -> Result<String, 
             .unwrap(); // todo(ludo)
         let result = match execution.result {
             Some(output) => format!("{}", output),
-            _ => unreachable!("Value empty")
+            _ => unreachable!("Value empty"),
         };
         Ok((result, execution.events))
     })?;
