@@ -16,6 +16,7 @@ extern crate lazy_static;
 
 pub extern crate bip39;
 
+#[macro_use]
 pub mod macros;
 
 pub mod indexer;

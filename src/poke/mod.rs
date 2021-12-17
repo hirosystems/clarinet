@@ -8,7 +8,7 @@ pub fn load_session(
     manifest_path: PathBuf,
     start_repl: bool,
     env: &Network,
-) -> Result<(repl::Session, ChainConfig), String> {
+) -> Result<(repl::Session, ChainConfig, Option<String>), String> {
     let mut settings = repl::SessionSettings::default();
 
     let mut project_path = manifest_path.clone();
@@ -102,20 +102,27 @@ pub fn load_session(
     settings.initial_deployer = initial_deployer;
     settings.costs_version = project_config.project.costs_version;
 
-    let session = if start_repl {
+    if let Some(analysis_passes) = project_config.project.analysis {
+        settings.analysis = analysis_passes;
+    }
+
+    let (session, output) = if start_repl {
         let mut terminal = Terminal::new(settings.clone());
         terminal.start();
-        terminal.session.clone()
+        (terminal.session.clone(), None)
     } else {
         let mut session = repl::Session::new(settings.clone());
-        match session.start() {
+        let output = match session.start() {
             Err(message) => {
                 println!("{}", message);
                 std::process::exit(1);
             }
-            _ => {}
+            Ok((message, _)) => match message.is_empty() {
+                true => None,
+                false => Some(message),
+            },
         };
-        session
+        (session, output)
     };
-    Ok((session, chain_config))
+    Ok((session, chain_config, output))
 }
