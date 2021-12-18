@@ -26,7 +26,7 @@ deno_core = { path = "./vendor/deno/core", optional = true }
 deno_runtime = { path = "./vendor/deno/runtime", optional = true }
 deno = { path = "./vendor/deno/cli", optional = true }
 # clarity_repl = { package = "clarity-repl", path = "../../clarity-repl", features = ["cli"] }
-clarity_repl = { package = "clarity-repl", version = "=0.16.0" }
+clarity_repl = { package = "clarity-repl", version = "=0.18.0" }
 bip39 = { version = "1.0.1", default-features = false }
 aes = "0.6.0"
 base64 = "0.13.0"
@@ -69,6 +69,7 @@ tracing-appender = "0.1"
 ctrlc = "3.1.9"
 strum = { version = "0.22", features = ["derive"] }
 bitcoincore-rpc = "0.14.0"
+tower-lsp = "0.14.0"
 
 [dependencies.tui]
 version = "0.15.0"

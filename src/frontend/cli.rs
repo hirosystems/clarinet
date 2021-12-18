@@ -12,6 +12,7 @@ use crate::integrate::{self, DevnetOrchestrator};
 use crate::poke::load_session;
 use crate::publish::{publish_all_contracts, Network};
 use crate::runnner::run_scripts;
+use crate::lsp::run_lsp;
 use crate::types::{ProjectManifest, ProjectManifestFile, RequirementConfig};
 use clarity_repl::repl;
 
@@ -53,6 +54,9 @@ enum Command {
     /// Work on contracts integration
     #[clap(name = "integrate")]
     Integrate(Integrate),
+    /// Start a LSP session
+    #[clap(name = "lsp")]
+    LSP,    
 }
 
 #[derive(Clap, PartialEq, Clone, Debug)]
@@ -404,6 +408,9 @@ pub fn main() {
             if hints_enabled {
                 display_deploy_hint();
             }
+        }
+        Command::LSP => {
+            run_lsp()
         }
     };
 }

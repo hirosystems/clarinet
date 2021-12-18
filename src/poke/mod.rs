@@ -4,11 +4,11 @@ use clarity_repl::{repl, Terminal};
 use std::fs;
 use std::path::PathBuf;
 
-pub fn load_session(
+
+pub fn load_session_settings(
     manifest_path: PathBuf,
-    start_repl: bool,
     env: &Network,
-) -> Result<(repl::Session, ChainConfig), String> {
+) -> Result<(repl::SessionSettings, ChainConfig), String> {
     let mut settings = repl::SessionSettings::default();
 
     let mut project_path = manifest_path.clone();
@@ -101,6 +101,18 @@ pub fn load_session(
     ];
     settings.initial_deployer = initial_deployer;
     settings.costs_version = project_config.project.costs_version;
+
+    Ok((settings, chain_config))
+}
+
+
+pub fn load_session(
+    manifest_path: PathBuf,
+    start_repl: bool,
+    env: &Network,
+) -> Result<(repl::Session, ChainConfig), String> {
+
+    let (settings, chain_config) = load_session_settings(manifest_path, env)?;
 
     let session = if start_repl {
         let mut terminal = Terminal::new(settings.clone());
