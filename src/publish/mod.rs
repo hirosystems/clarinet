@@ -145,10 +145,22 @@ pub fn publish_all_contracts(
     network: Network,
 ) -> Result<Vec<String>, Vec<String>> {
     let start_repl = false;
-    let (session, chain) = match load_session(manifest_path, start_repl, &network) {
-        Ok((session, chain)) => (session, chain),
+    let (session, chain, output) = match load_session(manifest_path, start_repl, &network) {
+        Ok((session, chain, output)) => (session, chain, output),
         Err(e) => return Err(vec![e]),
     };
+
+    if let Some(message) = output {
+        println!("{}", message);
+        println!("{}", yellow!("Would you like to continue [Y/n]:"));
+        let mut buffer = String::new();
+        std::io::stdin().read_line(&mut buffer).unwrap();
+        if buffer == "n\n" {
+            println!("{}", red!("Contracts deployment aborted"));
+            std::process::exit(1);
+        }
+    }
+
     let mut results = vec![];
     let mut deployers_nonces = BTreeMap::new();
     let mut deployers_lookup = BTreeMap::new();

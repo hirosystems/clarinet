@@ -325,7 +325,10 @@ pub fn main() {
                 Err(e) => {
                     println!("{}", e);
                 }
-                Ok((session, _)) => {
+                Ok((session, _, output)) => {
+                    if let Some(message) = output {
+                        println!("{}", message);
+                    }
                     println!(
                         "{} Syntax of {} contract(s) successfully checked",
                         green!("✔"),
@@ -342,7 +345,12 @@ pub fn main() {
             let start_repl = false;
             let res = load_session(manifest_path.clone(), start_repl, &Network::Devnet);
             let session = match res {
-                Ok((session, _)) => session,
+                Ok((session, _, output)) => {
+                    if let Some(message) = output {
+                        println!("{}", message);
+                    }
+                    session
+                }
                 Err(e) => {
                     println!("{}", e);
                     return;
@@ -367,7 +375,12 @@ pub fn main() {
             let start_repl = false;
             let res = load_session(manifest_path.clone(), start_repl, &Network::Devnet);
             let session = match res {
-                Ok((session, _)) => session,
+                Ok((session, _, output)) => {
+                    if let Some(message) = output {
+                        println!("{}", message);
+                    }
+                    session
+                }
                 Err(e) => {
                     println!("{}", e);
                     return;
