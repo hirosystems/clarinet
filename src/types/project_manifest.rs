@@ -16,6 +16,7 @@ pub struct ProjectManifestFile {
 pub struct ProjectConfigFile {
     name: String,
     requirements: Option<Value>,
+    analysis: Option<Vec<String>>,
     costs_version: Option<u32>,
 }
 
@@ -30,6 +31,7 @@ pub struct ProjectManifest {
 pub struct ProjectConfig {
     pub name: String,
     pub requirements: Option<Vec<RequirementConfig>>,
+    pub analysis: Option<Vec<String>>,
     pub costs_version: u32,
 }
 
@@ -132,6 +134,7 @@ impl ProjectManifest {
             name: project_manifest_file.project.name.clone(),
             requirements: None,
             costs_version: project_manifest_file.project.costs_version.unwrap_or(2),
+            analysis: project_manifest_file.project.analysis,
         };
 
         let mut config = ProjectManifest {

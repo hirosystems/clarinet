@@ -1,3 +1,10 @@
+# [0.20.0](https://github.com/hirosystems/clarinet/compare/v0.19.1...v0.20.0) (2021-12-09)
+
+
+### Features
+
+* document CI how-to ([a4079d9](https://github.com/hirosystems/clarinet/commit/a4079d96dd762ae85804bd1d8b116eac75447dac))
+
 ## [0.19.1](https://github.com/hirosystems/clarinet/compare/v0.19.0...v0.19.1) (2021-12-06)
 
 
