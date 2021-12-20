@@ -7,7 +7,7 @@ use tower_lsp::{LspService, Server};
 
 pub fn run_lsp() {
     match block_on(do_run_lsp()) {
-        Err(e) => std::process::exit(1),
+        Err(_e) => std::process::exit(1),
         _ => {}
     };
 }

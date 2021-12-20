@@ -4,7 +4,6 @@ use clarity_repl::{repl, Terminal};
 use std::fs;
 use std::path::PathBuf;
 
-
 pub fn load_session_settings(
     manifest_path: PathBuf,
     env: &Network,
@@ -109,13 +108,11 @@ pub fn load_session_settings(
     Ok((settings, chain_config))
 }
 
-
 pub fn load_session(
     manifest_path: PathBuf,
     start_repl: bool,
     env: &Network,
 ) -> Result<(repl::Session, ChainConfig, Option<String>), String> {
-
     let (settings, chain_config) = load_session_settings(manifest_path, env)?;
 
     let (session, output) = if start_repl {

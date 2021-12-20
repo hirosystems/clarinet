@@ -84,7 +84,7 @@ pub fn build_intellisense(analysis: &ContractAnalysis) -> CompletionMaps {
             analysis.contract_identifier.name.to_string(),
             name.to_string()
         );
-        let insert = format!("{} {}", name, build_intellisense_args(signature).join(" "));
+        let _insert = format!("{} {}", name, build_intellisense_args(signature).join(" "));
         let insert_text = format!(
             "contract-call? .{} {} {}",
             analysis.contract_identifier.name.to_string(),

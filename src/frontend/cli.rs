@@ -9,10 +9,10 @@ use crate::generate::{
     changes::{Changes, TOMLEdition},
 };
 use crate::integrate::{self, DevnetOrchestrator};
+use crate::lsp::run_lsp;
 use crate::poke::load_session;
 use crate::publish::{publish_all_contracts, Network};
 use crate::runnner::run_scripts;
-use crate::lsp::run_lsp;
 use crate::types::{ProjectManifest, ProjectManifestFile, RequirementConfig};
 use clarity_repl::repl;
 
@@ -56,7 +56,7 @@ enum Command {
     Integrate(Integrate),
     /// Start a LSP session
     #[clap(name = "lsp")]
-    LSP,    
+    LSP,
 }
 
 #[derive(Clap, PartialEq, Clone, Debug)]
@@ -422,9 +422,7 @@ pub fn main() {
                 display_deploy_hint();
             }
         }
-        Command::LSP => {
-            run_lsp()
-        }
+        Command::LSP => run_lsp(),
     };
 }
 
