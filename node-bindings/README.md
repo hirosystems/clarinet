@@ -68,7 +68,7 @@ test('Block height changes when blocks are mined', async () => {
 
 ### Screencasts
 
-A serie of short tutorials is available as a playlist of screencasts on Youtube, covering the following subjects:
+A series of short tutorials is available as a playlist of screencasts on Youtube, covering the following subjects:
 
 - [Introduction to smart contract integration with Clarinet](https://youtu.be/pucJ_tOC3pk)
 - [Setup a React project interacting with Clarinet](https://youtu.be/b7iipqzTUH8)

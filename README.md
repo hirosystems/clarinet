@@ -12,7 +12,7 @@ the Stacks blockchain. Smart contracts allow developers to encode essential busi
 
 ### Screencasts
 
-A serie of short tutorials is available as a playlist of screencasts on Youtube, covering the following subjects:
+A series of short tutorials is available as a playlist of screencasts on Youtube, covering the following subjects:
 
 - [What is Clarinet?](https://youtu.be/a451iFQfZOE)
 - [Create a new project](https://youtu.be/BPB_gM960BA)
