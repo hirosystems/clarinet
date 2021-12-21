@@ -294,7 +294,7 @@ export interface ClarinetManifest {
    */
   accounts?: Account[];
   /**
-   * Blockchains that utilize a username model (where the address is not a derivative of a cryptographic public key) should specify the public key(s) owned by the address in metadata.
+   * Devnet config values that will be overriding any values present in the Devnet.toml file.
    * @type {DevnetConfig}
    * @memberof ClarinetManifest
    */
