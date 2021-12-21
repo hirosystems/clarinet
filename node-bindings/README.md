@@ -6,10 +6,10 @@ It is implemented as a dynamic library that can be loaded by Node, and will let 
 ### Installation
 
 ```bash
-// Yarn
+# Yarn
 yarn add dev @hirosystems/stacks-devnet-js
 
-// NPM
+# NPM
 npm install --save-dev @hirosystems/stacks-devnet-js
 ```
 
@@ -65,3 +65,11 @@ test('Block height changes when blocks are mined', async () => {
     console.log(`Next Block: ${JSON.stringify(block)}`);
 })
 ```
+
+### Screencasts
+
+A serie of short tutorials is available as a playlist of screencasts on Youtube, covering the following subjects:
+
+- [Introduction to smart contract integration with Clarinet](https://youtu.be/pucJ_tOC3pk)
+- [Setup a React project interacting with Clarinet](https://youtu.be/b7iipqzTUH8)
+- [Setup an intgration test environment with stacks-devnet-js](https://youtu.be/BqeL17m1dZk)
