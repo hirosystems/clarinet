@@ -19,6 +19,7 @@ pub struct ProjectConfigFile {
     description: Option<String>,
     telemetry: Option<bool>,
     requirements: Option<Value>,
+    analysis: Option<Vec<String>>,
     costs_version: Option<u32>,
 }
 
@@ -36,6 +37,7 @@ pub struct ProjectConfig {
     pub description: String,
     pub telemetry: bool,
     pub requirements: Option<Vec<RequirementConfig>>,
+    pub analysis: Option<Vec<String>>,
     pub costs_version: u32,
 }
 
@@ -144,6 +146,7 @@ impl ProjectManifest {
             authors: project_manifest_file.project.authors.unwrap_or(vec![]),
             telemetry: project_manifest_file.project.telemetry.unwrap_or(false),
             costs_version: project_manifest_file.project.costs_version.unwrap_or(2),
+            analysis: project_manifest_file.project.analysis,
         };
 
         let mut config = ProjectManifest {

@@ -202,7 +202,7 @@ struct Check {
 pub fn main() {
     let opts: Opts = match Opts::try_parse() {
         Ok(opts) => opts,
-        Err(e) => {
+        Err(_e) => {
             let manifest_path = get_manifest_path_or_exit(None);
             let manifest = ProjectManifest::from_path(&manifest_path);
             red!("Command unknown.");
@@ -248,9 +248,17 @@ pub fn main() {
                 false
             };
             if telemetry_enabled {
-                println!("{}", yellow!("Telemetry enabled. Thanks for helping to improve clarinet!"));   
+                println!(
+                    "{}",
+                    yellow!("Telemetry enabled. Thanks for helping to improve clarinet!")
+                );
             } else {
-                println!("{}", yellow!("Telemetry disabled. Clarinet will not collect any data on this project."));
+                println!(
+                    "{}",
+                    yellow!(
+                        "Telemetry disabled. Clarinet will not collect any data on this project."
+                    )
+                );
             }
             let project_id = project_opts.name.clone();
             let changes =
@@ -360,7 +368,7 @@ pub fn main() {
         Command::Poke(cmd) | Command::Console(cmd) => {
             let manifest_path = get_manifest_path_or_exit(cmd.manifest_path);
             let start_repl = true;
-            let (_, _, project_manifest) =
+            let (_, _, project_manifest, _) =
                 load_session(manifest_path, start_repl, &Network::Devnet)
                     .expect("Unable to start REPL");
             if hints_enabled {
@@ -384,7 +392,10 @@ pub fn main() {
                     println!("{}", e);
                     return;
                 }
-                Ok((session, _, manifest)) => {
+                Ok((session, _, manifest, output)) => {
+                    if let Some(message) = output {
+                        println!("{}", message);
+                    }
                     println!(
                         "{} Syntax of {} contract(s) successfully checked",
                         green!("✔"),
@@ -411,13 +422,18 @@ pub fn main() {
             let start_repl = false;
             let res = load_session(manifest_path.clone(), start_repl, &Network::Devnet);
             let (session, project_manifest) = match res {
-                Ok((session, _, manifest)) => (session, manifest),
+                Ok((session, _, manifest, output)) => {
+                    if let Some(message) = output {
+                        println!("{}", message);
+                    }
+                    (session, manifest)
+                }
                 Err(e) => {
                     println!("{}", e);
                     return;
                 }
             };
-            let (success, count) = match run_scripts(
+            let (success, _count) = match run_scripts(
                 cmd.files,
                 cmd.coverage,
                 cmd.costs_report,
@@ -453,7 +469,12 @@ pub fn main() {
             let start_repl = false;
             let res = load_session(manifest_path.clone(), start_repl, &Network::Devnet);
             let session = match res {
-                Ok((session, _, _)) => session,
+                Ok((session, _, _, output)) => {
+                    if let Some(message) = output {
+                        println!("{}", message);
+                    }
+                    session
+                }
                 Err(e) => {
                     println!("{}", e);
                     return;

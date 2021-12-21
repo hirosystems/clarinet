@@ -694,9 +694,9 @@ dependencies = [
 
 [[package]]
 name = "clarity-repl"
-version = "0.17.0"
+version = "0.18.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a96af7d108e64c2842d4786184973c1e768e38930f8f18c6f8840378dbc1e575"
+checksum = "c1483f3421cc90e13ec2b2b8148a7760d99a5d0e0a795dcb206c5bfed6cc1e53"
 dependencies = [
  "ansi_term 0.12.1",
  "atty",
@@ -709,7 +709,7 @@ dependencies = [
  "regex",
  "reqwest",
  "ripemd160",
- "rustyline 7.1.0",
+ "rustyline 9.1.1",
  "serde",
  "serde_derive",
  "serde_json",
@@ -1745,6 +1745,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "fd-lock"
+version = "3.0.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a16910e685088843d53132b04e0f10a571fdb193224fc589685b3ba1ce4cb03d"
+dependencies = [
+ "cfg-if 1.0.0",
+ "libc",
+ "windows-sys",
+]
+
+[[package]]
 name = "figment"
 version = "0.10.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1829,16 +1840,6 @@ dependencies = [
  "proc-macro2 1.0.29",
  "swc_macros_common",
  "syn 1.0.74",
-]
-
-[[package]]
-name = "fs2"
-version = "0.4.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9564fc758e15025b46aa6643b1b77d047d1a56a1aea6e01002ac0c7026876213"
-dependencies = [
- "libc",
- "winapi 0.3.9",
 ]
 
 [[package]]
@@ -2831,18 +2832,6 @@ dependencies = [
 
 [[package]]
 name = "nix"
-version = "0.19.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b2ccba0cfe4fdf15982d1674c69b1fd80bad427d293849982668dfe454bd61f2"
-dependencies = [
- "bitflags",
- "cc",
- "cfg-if 1.0.0",
- "libc",
-]
-
-[[package]]
-name = "nix"
 version = "0.20.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "fa9b4819da1bc61c0ea48b63b7bc8604064dd43013e7cc325df098d49cd7c18a"
@@ -2858,6 +2847,19 @@ name = "nix"
 version = "0.22.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "cf1e25ee6b412c2a1e3fcb6a4499a5c1bfe7f43e014bdce9a6b6666e5aa2d187"
+dependencies = [
+ "bitflags",
+ "cc",
+ "cfg-if 1.0.0",
+ "libc",
+ "memoffset",
+]
+
+[[package]]
+name = "nix"
+version = "0.23.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9f866317acbd3a240710c63f065ffb1e4fd466259045ccb504130b7f668f35c6"
 dependencies = [
  "bitflags",
  "cc",
@@ -3881,19 +3883,21 @@ dependencies = [
 
 [[package]]
 name = "rustyline"
-version = "7.1.0"
+version = "8.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8227301bfc717136f0ecbd3d064ba8199e44497a0bdd46bb01ede4387cfd2cec"
+checksum = "fbd4eaf7a7738f76c98e4f0395253ae853be3eb018f7b0bb57fe1b6c17e31874"
 dependencies = [
  "bitflags",
  "cfg-if 1.0.0",
- "dirs-next",
- "fs2",
+ "clipboard-win",
+ "fd-lock 2.0.0",
  "libc",
  "log",
  "memchr",
- "nix 0.19.1",
+ "nix 0.20.0",
+ "radix_trie",
  "scopeguard",
+ "smallvec",
  "unicode-segmentation",
  "unicode-width",
  "utf8parse",
@@ -3902,18 +3906,19 @@ dependencies = [
 
 [[package]]
 name = "rustyline"
-version = "8.2.0"
+version = "9.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "fbd4eaf7a7738f76c98e4f0395253ae853be3eb018f7b0bb57fe1b6c17e31874"
+checksum = "6c38cfbd0a4d7df7aab7cf53732d5d43449d0300358fd15cd4e8c8468a956aca"
 dependencies = [
  "bitflags",
  "cfg-if 1.0.0",
  "clipboard-win",
- "fd-lock",
+ "dirs-next",
+ "fd-lock 3.0.2",
  "libc",
  "log",
  "memchr",
- "nix 0.20.0",
+ "nix 0.23.1",
  "radix_trie",
  "scopeguard",
  "smallvec",
@@ -5194,9 +5199,9 @@ checksum = "cda74da7e1a664f795bb1f8a87ec406fb89a02522cf6e50620d016add6dbbf5c"
 
 [[package]]
 name = "tokio"
-version = "1.8.1"
+version = "1.14.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "98c8b05dc14c75ea83d63dd391100353789f5f24b8b3866542a5e85c8be8e985"
+checksum = "70e992e41e0d2fb9f755b37446f20900f64446ef54874f40a60c78f021ac6144"
 dependencies = [
  "autocfg",
  "bytes",
@@ -5214,9 +5219,9 @@ dependencies = [
 
 [[package]]
 name = "tokio-macros"
-version = "1.3.0"
+version = "1.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "54473be61f4ebe4efd09cec9bd5d16fa51d70ea0192213d754d2d500457db110"
+checksum = "c9efc1aba077437943f7515666aa2b882dfabfbfdf89c819ea75a8d6e9eaba5e"
 dependencies = [
  "proc-macro2 1.0.29",
  "quote 1.0.9",
@@ -5880,6 +5885,49 @@ name = "winapi-x86_64-pc-windows-gnu"
 version = "0.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "712e227841d057c1ee1cd2fb22fa7e5a5461ae8e48fa2ca79ec42cfc1931183f"
+
+[[package]]
+name = "windows-sys"
+version = "0.28.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "82ca39602d5cbfa692c4b67e3bcbb2751477355141c1ed434c94da4186836ff6"
+dependencies = [
+ "windows_aarch64_msvc",
+ "windows_i686_gnu",
+ "windows_i686_msvc",
+ "windows_x86_64_gnu",
+ "windows_x86_64_msvc",
+]
+
+[[package]]
+name = "windows_aarch64_msvc"
+version = "0.28.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "52695a41e536859d5308cc613b4a022261a274390b25bd29dfff4bf08505f3c2"
+
+[[package]]
+name = "windows_i686_gnu"
+version = "0.28.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f54725ac23affef038fecb177de6c9bf065787c2f432f79e3c373da92f3e1d8a"
+
+[[package]]
+name = "windows_i686_msvc"
+version = "0.28.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "51d5158a43cc43623c0729d1ad6647e62fa384a3d135fd15108d37c683461f64"
+
+[[package]]
+name = "windows_x86_64_gnu"
+version = "0.28.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "bc31f409f565611535130cfe7ee8e6655d3fa99c1c61013981e491921b5ce954"
+
+[[package]]
+name = "windows_x86_64_msvc"
+version = "0.28.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3f2b8c7cbd3bfdddd9ab98769f9746a7fad1bca236554cd032b78d768bc0e89f"
 
 [[package]]
 name = "winreg"
