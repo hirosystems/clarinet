@@ -235,7 +235,11 @@ pub fn main() {
                     !disable_telemetry
                 } else {
                     println!("{}", yellow!("Send usage data to Hiro."));
-                    println!("{}", yellow!("Help Hiro improve its products and services by automatically sending diagnostics and usage data [Y/n]:"));
+                    println!("{}", yellow!("Help Hiro improve its products and services by automatically sending diagnostics and usage data."));
+                    println!("{}", yellow!("Only high level usage information, and no information identifying you or your project are collected."));
+                    // todo(ludo): once we have a privacy policy available, add a link
+                    // println!("{}", yellow!("Visit http://hiro.so/clarinet-privacy for details."));
+                    println!("{}", yellow!("Enable [Y/n]?"));
                     let mut buffer = String::new();
                     std::io::stdin().read_line(&mut buffer).unwrap();
                     buffer != "n\n"
@@ -243,6 +247,11 @@ pub fn main() {
             } else {
                 false
             };
+            if telemetry_enabled {
+                println!("{}", yellow!("Telemetry enabled. Thanks for helping to improve clarinet!"));   
+            } else {
+                println!("{}", yellow!("Telemetry disabled. Clarinet will not collect any data on this project."));
+            }
             let project_id = project_opts.name.clone();
             let changes =
                 generate::get_changes_for_new_project(current_path, project_id, telemetry_enabled);
