@@ -5,8 +5,8 @@ development, testing and deployment. Clarinet consists of a Clarity REPL and a t
 together allow you to rapidly develop and test a Clarity smart contract, with the need to deploy the contract to a local
 devnet or testnet.
 
-Clarity is a **decidable** smart contract language that optimizes for predictability and security, designed by
-Blockstack. Smart contracts allow developers to encode essential business logic on a blockchain.
+Clarity is a **decidable** smart contract language that optimizes for predictability and security, designed for
+the Stacks blockchain. Smart contracts allow developers to encode essential business logic on a blockchain.
 
 ![screenshot](docs/images/demo.gif)
 
