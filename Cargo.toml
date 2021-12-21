@@ -94,7 +94,7 @@ name = "clarinet"
 path = "src/bin.rs"
 
 [features]
-default = ["cli"]
+default = ["cli", "telemetry"]
 cli = ["swc_common", "deno", "deno_runtime", "deno_core", "clap"]
 telemetry = ["segment", "mac_address"]
 

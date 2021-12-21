@@ -210,7 +210,7 @@ pub fn main() {
                 #[cfg(feature = "telemetry")]
                 telemetry_report_event(DeveloperUsageEvent::UnknownCommand(
                     DeveloperUsageDigest::new(&manifest.project.name, &manifest.project.authors),
-                    format!("{}", e),
+                    format!("{}", _e),
                 ));
             }
             process::exit(1);
@@ -457,7 +457,7 @@ pub fn main() {
                         &project_manifest.project.authors,
                     ),
                     success,
-                    count,
+                    _count,
                 ));
             }
             if !success {
