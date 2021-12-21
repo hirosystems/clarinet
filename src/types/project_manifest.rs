@@ -133,8 +133,8 @@ impl ProjectManifest {
         let project = ProjectConfig {
             name: project_manifest_file.project.name.clone(),
             requirements: None,
-            analysis: project_manifest_file.project.analysis,
             costs_version: project_manifest_file.project.costs_version.unwrap_or(2),
+            analysis: project_manifest_file.project.analysis,
         };
 
         let mut config = ProjectManifest {
