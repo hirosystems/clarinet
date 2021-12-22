@@ -45,7 +45,7 @@ pub fn telemetry_report_event(event: DeveloperUsageEvent) {
 }
 
 async fn send_event(event: DeveloperUsageEvent) {
-    let segment_api_key = "<REPLACE_SEGMENT_API_KEY>";
+    let segment_api_key = "Q3xpmFRvy0psXnwBEXErtMBIeabOVjbC";
 
     let clarinet_version = option_env!("CARGO_PKG_VERSION")
         .expect("Unable to detect version")
