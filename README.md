@@ -5,10 +5,25 @@ development, testing and deployment. Clarinet consists of a Clarity REPL and a t
 together allow you to rapidly develop and test a Clarity smart contract, with the need to deploy the contract to a local
 devnet or testnet.
 
-Clarity is a **decidable** smart contract language that optimizes for predictability and security, designed by
-Blockstack. Smart contracts allow developers to encode essential business logic on a blockchain.
+Clarity is a **decidable** smart contract language that optimizes for predictability and security, designed for
+the Stacks blockchain. Smart contracts allow developers to encode essential business logic on a blockchain.
 
 ![screenshot](docs/images/demo.gif)
+
+### Screencasts
+
+A series of short tutorials is available as a playlist of screencasts on Youtube, covering the following subjects:
+
+- [What is Clarinet?](https://youtu.be/a451iFQfZOE)
+- [Create a new project](https://youtu.be/BPB_gM960BA)
+- [Add a public function in a Clarity contract](https://youtu.be/fjQLmpMSws8)
+- [Invoking a function from the console](https://youtu.be/MGljkGjsSco)
+- [Write unit tests using Typescript](https://youtu.be/YxWk804IdXU)
+- [A simple CI with Clarinet and Github](https://youtu.be/5w-QTGq8W5I)
+- [Execute tests and check code covereage](https://youtu.be/jZ_XUqfbCqg)
+- [Introduction to smart contract integration with Clarinet](https://youtu.be/pucJ_tOC3pk)
+- [Setup a React project interacting with Clarinet](https://youtu.be/b7iipqzTUH8)
+- [Setup an intgration test environment with stacks-devnet-js](https://youtu.be/BqeL17m1dZk)
 
 ## Installation
 
