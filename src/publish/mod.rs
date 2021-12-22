@@ -1,4 +1,5 @@
 use crate::poke::load_session;
+use crate::types::ProjectManifest;
 use crate::utils::mnemonic;
 use crate::utils::stacks::StacksRpc;
 use clarity_repl::clarity::codec::transaction::{
@@ -35,6 +36,7 @@ struct Balance {
 }
 
 #[allow(dead_code)]
+#[derive(Debug)]
 pub enum Network {
     Devnet,
     Testnet,
@@ -142,13 +144,26 @@ pub fn publish_contract(
 
 pub fn publish_all_contracts(
     manifest_path: PathBuf,
-    network: Network,
-) -> Result<Vec<String>, Vec<String>> {
+    network: &Network,
+) -> Result<(Vec<String>, ProjectManifest), Vec<String>> {
     let start_repl = false;
-    let (session, chain) = match load_session(manifest_path, start_repl, &network) {
-        Ok((session, chain)) => (session, chain),
+    let (session, chain, manifest, output) = match load_session(manifest_path, start_repl, &network)
+    {
+        Ok((session, chain, manifest, output)) => (session, chain, manifest, output),
         Err(e) => return Err(vec![e]),
     };
+
+    if let Some(message) = output {
+        println!("{}", message);
+        println!("{}", yellow!("Would you like to continue [Y/n]:"));
+        let mut buffer = String::new();
+        std::io::stdin().read_line(&mut buffer).unwrap();
+        if buffer == "n\n" {
+            println!("{}", red!("Contracts deployment aborted"));
+            std::process::exit(1);
+        }
+    }
+
     let mut results = vec![];
     let mut deployers_nonces = BTreeMap::new();
     let mut deployers_lookup = BTreeMap::new();
@@ -184,5 +199,5 @@ pub fn publish_all_contracts(
     }
     // If devnet, we should be pulling all the links.
 
-    Ok(results)
+    Ok((results, manifest))
 }

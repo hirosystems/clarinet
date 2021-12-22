@@ -25,6 +25,7 @@ pub struct DevnetOrchestrator {
     pub manifest_path: PathBuf,
     pub network_config: Option<ChainConfig>,
     pub termination_success_tx: Option<Sender<bool>>,
+    pub manifest: ProjectManifest,
     stacks_blockchain_container_id: Option<String>,
     stacks_blockchain_api_container_id: Option<String>,
     stacks_explorer_container_id: Option<String>,
@@ -49,8 +50,8 @@ impl DevnetOrchestrator {
         network_config_path.push("Devnet.toml");
 
         let mut network_config = ChainConfig::from_path(&network_config_path);
-        let project_config = ProjectManifest::from_path(&manifest_path);
-        let name = project_config.project.name.clone();
+        let manifest = ProjectManifest::from_path(&manifest_path);
+        let name = manifest.project.name.clone();
         let network_name = format!("{}.devnet", name);
 
         match (&mut network_config.devnet, devnet_override) {
@@ -190,12 +191,14 @@ impl DevnetOrchestrator {
             name,
             network_name,
             manifest_path,
+            manifest,
             network_config: Some(network_config),
             docker_client: Some(docker_client),
             ..Default::default()
         }
     }
 
+    #[allow(dead_code)]
     pub fn get_stacks_node_url(&self) -> String {
         match self.network_config {
             Some(ref config) => match config.devnet {

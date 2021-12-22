@@ -19,6 +19,7 @@ mod frontend;
 mod generate;
 mod indexer;
 mod integrate;
+mod lsp;
 mod poke;
 mod publish;
 mod runnner;

@@ -156,8 +156,7 @@ mod sessions {
             settings.costs_version = project_config.project.costs_version;
             settings.include_boot_contracts = vec![
                 "pox".to_string(),
-                "costs-v1".to_string(),
-                "costs-v2".to_string(),
+                format!("costs-v{}", project_config.project.costs_version),
                 "bns".to_string(),
             ];
             let mut session = Session::new(settings.clone());
@@ -205,7 +204,7 @@ pub async fn do_run_scripts(
     allow_disk_write: bool,
     manifest_path: PathBuf,
     session: Option<Session>,
-) -> Result<bool, AnyError> {
+) -> Result<u32, AnyError> {
     let mut flags = Flags::default();
     flags.unstable = true;
     flags.reload = true;
@@ -458,7 +457,9 @@ pub async fn do_run_scripts(
         display_costs_report()
     }
 
-    Ok(true)
+    let total = sessions::SESSIONS.lock().unwrap().len();
+
+    Ok(total as u32)
 }
 
 #[derive(Clone)]
@@ -1213,7 +1214,11 @@ fn mine_block(state: &mut OpState, args: Value, _: ()) -> Result<String, AnyErro
                         continue;
                     }
                 };
-                receipts.push((execution.result, execution.events));
+                let result = match execution.result {
+                    Some(output) => format!("{}", output),
+                    _ => unreachable!("Value empty"),
+                };
+                receipts.push((result, execution.events));
             } else {
                 session.set_tx_sender(tx.sender.clone());
                 if let Some(ref args) = tx.deploy_contract {
@@ -1225,7 +1230,11 @@ fn mine_block(state: &mut OpState, args: Value, _: ()) -> Result<String, AnyErro
                             Some(name.into()),
                         )
                         .unwrap(); // todo(ludo)
-                    receipts.push((execution.result, execution.events));
+                    let result = match execution.result {
+                        Some(output) => format!("{}", output),
+                        _ => unreachable!("Value empty"),
+                    };
+                    receipts.push((result, execution.events));
                 } else if let Some(ref args) = tx.transfer_stx {
                     let snippet = format!(
                         "(stx-transfer? u{} tx-sender '{})",
@@ -1234,7 +1243,11 @@ fn mine_block(state: &mut OpState, args: Value, _: ()) -> Result<String, AnyErro
                     let execution = session
                         .interpret(snippet, None, true, Some(name.into()))
                         .unwrap(); // todo(ludo)
-                    receipts.push((execution.result, execution.events));
+                    let result = match execution.result {
+                        Some(output) => format!("{}", output),
+                        _ => unreachable!("Value empty"),
+                    };
+                    receipts.push((result, execution.events));
                 }
                 session.set_tx_sender(initial_tx_sender.clone());
             }
@@ -1302,8 +1315,11 @@ fn call_read_only_fn(state: &mut OpState, args: Value, _: ()) -> Result<String, 
                 "readonly-calls".into(),
             )
             .unwrap(); // todo(ludo)
-
-        Ok((execution.result, execution.events))
+        let result = match execution.result {
+            Some(output) => format!("{}", output),
+            _ => unreachable!("Value empty"),
+        };
+        Ok((result, execution.events))
     })?;
     Ok(json!({
       "session_id": args.session_id,

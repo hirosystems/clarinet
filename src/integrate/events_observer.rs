@@ -70,7 +70,7 @@ impl EventObserverConfig {
     pub fn new(devnet_config: DevnetConfig, manifest_path: PathBuf) -> Self {
         info!("Checking contracts...");
         let (session, config) = match load_session(manifest_path.clone(), false, &Network::Devnet) {
-            Ok((session, config)) => (session, config),
+            Ok((session, config, _, _)) => (session, config),
             Err(e) => {
                 println!("{}", e);
                 std::process::exit(1);
@@ -111,7 +111,6 @@ impl EventObserverConfig {
 
 pub enum EventsObserverCommand {
     Terminate(bool), // Restart
-    UpdatePoxInfo,
     PublishInitialContracts,
     PublishPoxStackingOrders(BlockIdentifier),
 }
@@ -174,6 +173,7 @@ pub async fn start_events_observer(
             .mount(
                 "/",
                 routes![
+                    handle_ping,
                     handle_new_burn_block,
                     handle_new_block,
                     handle_new_microblocks,
@@ -202,7 +202,7 @@ pub async fn start_events_observer(
                     .expect("Unable to terminate event observer");
 
                 let session = match load_session(manifest_path.clone(), false, &Network::Devnet) {
-                    Ok((session, _)) => session,
+                    Ok((session, _, _, _)) => session,
                     Err(e) => {
                         devnet_event_tx
                             .send(DevnetEvent::error(format!("Contracts invalid: {}", e)))
@@ -225,7 +225,6 @@ pub async fn start_events_observer(
                     init_status.deployer_nonce = 0;
                 }
             }
-            Ok(EventsObserverCommand::UpdatePoxInfo) => {}
             Ok(EventsObserverCommand::PublishInitialContracts) => {
                 if let Ok(mut init_status_writer) = init_status_rw_lock.write() {
                     let res = publish_initial_contracts(
