@@ -9,6 +9,7 @@ use crate::generate::{
     changes::{Changes, TOMLEdition},
 };
 use crate::integrate::{self, DevnetOrchestrator};
+use crate::lsp::run_lsp;
 use crate::poke::load_session;
 use crate::publish::{publish_all_contracts, Network};
 use crate::runnner::run_scripts;
@@ -53,6 +54,9 @@ enum Command {
     /// Work on contracts integration
     #[clap(name = "integrate")]
     Integrate(Integrate),
+    /// Start a LSP session
+    #[clap(name = "lsp")]
+    LSP,
 }
 
 #[derive(Clap, PartialEq, Clone, Debug)]
@@ -418,6 +422,7 @@ pub fn main() {
                 display_deploy_hint();
             }
         }
+        Command::LSP => run_lsp(),
     };
 }
 
