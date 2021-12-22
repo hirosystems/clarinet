@@ -207,16 +207,25 @@ pub fn main() {
     let opts: Opts = match Opts::try_parse() {
         Ok(opts) => opts,
         Err(_e) => {
-            let manifest_path = get_manifest_path_or_exit(None);
-            let manifest = ProjectManifest::from_path(&manifest_path);
-            red!("Command unknown.");
-            if manifest.project.telemetry {
-                #[cfg(feature = "telemetry")]
-                telemetry_report_event(DeveloperUsageEvent::UnknownCommand(
-                    DeveloperUsageDigest::new(&manifest.project.name, &manifest.project.authors),
-                    format!("{}", _e),
-                ));
+            if _e.kind == clap::ErrorKind::UnknownArgument {
+                match get_manifest_path(None) {
+                    Some(manifest_path) => {
+                        let manifest = ProjectManifest::from_path(&manifest_path);
+                        if manifest.project.telemetry {
+                            #[cfg(feature = "telemetry")]
+                            telemetry_report_event(DeveloperUsageEvent::UnknownCommand(
+                                DeveloperUsageDigest::new(
+                                    &manifest.project.name,
+                                    &manifest.project.authors,
+                                ),
+                                format!("{}", _e),
+                            ));
+                        }
+                    }
+                    None => {}
+                };
             }
+            println!("{}", _e);
             process::exit(1);
         }
     };
@@ -549,29 +558,37 @@ pub fn main() {
     };
 }
 
-fn get_manifest_path_or_exit(path: Option<String>) -> PathBuf {
-    println!("");
+fn get_manifest_path(path: Option<String>) -> Option<PathBuf> {
     if let Some(path) = path {
         let manifest_path = PathBuf::from(path);
         if !manifest_path.exists() {
-            println!("Could not find Clarinet.toml");
-            process::exit(1);
+            return None;
         }
-        manifest_path
+        Some(manifest_path)
     } else {
         let mut current_dir = env::current_dir().unwrap();
         loop {
             current_dir.push("Clarinet.toml");
 
             if current_dir.exists() {
-                break current_dir;
+                return Some(current_dir);
             }
             current_dir.pop();
 
             if !current_dir.pop() {
-                println!("Could not find Clarinet.toml");
-                process::exit(1);
+                return None;
             }
+        }
+    }
+}
+
+fn get_manifest_path_or_exit(path: Option<String>) -> PathBuf {
+    println!("");
+    match get_manifest_path(path) {
+        Some(manifest_path) => manifest_path,
+        None => {
+            println!("Could not find Clarinet.toml");
+            process::exit(1);
         }
     }
 }
