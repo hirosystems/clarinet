@@ -227,7 +227,7 @@ jobs:
       #   run: sudo apt-get update && sudo apt-get install -y ${{ matrix.linker_package }}
 
       - name: Build - Cargo
-        run: cargo build --release --locked --target ${{ matrix.target }}
+        run: cargo build --release --features=telemetry --locked --target ${{ matrix.target }}
         # To be uncommented later when adding new distros
         # env:
         #   CC: ${{ matrix.cc }}

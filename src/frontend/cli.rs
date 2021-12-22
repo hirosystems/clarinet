@@ -19,6 +19,9 @@ use clarity_repl::repl;
 use clap::Clap;
 use toml;
 
+#[cfg(feature = "telemetry")]
+use super::telemetry::{telemetry_report_event, DeveloperUsageDigest, DeveloperUsageEvent};
+
 #[derive(Clap, PartialEq, Clone, Debug)]
 #[clap(version = option_env!("CARGO_PKG_VERSION").expect("Unable to detect version"))]
 struct Opts {
@@ -76,6 +79,9 @@ enum Contract {
 struct GenerateProject {
     /// Project's name
     pub name: String,
+    /// Enable developer usage telemetry
+    #[clap(long = "disable-telemetry")]
+    pub disable_telemetry: Option<bool>,
 }
 
 #[derive(Clap, PartialEq, Clone, Debug)]
@@ -198,7 +204,22 @@ struct Check {
 }
 
 pub fn main() {
-    let opts: Opts = Opts::parse();
+    let opts: Opts = match Opts::try_parse() {
+        Ok(opts) => opts,
+        Err(_e) => {
+            let manifest_path = get_manifest_path_or_exit(None);
+            let manifest = ProjectManifest::from_path(&manifest_path);
+            red!("Command unknown.");
+            if manifest.project.telemetry {
+                #[cfg(feature = "telemetry")]
+                telemetry_report_event(DeveloperUsageEvent::UnknownCommand(
+                    DeveloperUsageDigest::new(&manifest.project.name, &manifest.project.authors),
+                    format!("{}", _e),
+                ));
+            }
+            process::exit(1);
+        }
+    };
 
     let hints_enabled = if env::var("CLARINET_DISABLE_HINTS") == Ok("1".into()) {
         false
@@ -213,10 +234,49 @@ pub fn main() {
                 current_dir.to_str().unwrap().to_owned()
             };
 
-            let changes = generate::get_changes_for_new_project(current_path, project_opts.name);
+            let telemetry_enabled = if cfg!(feature = "telemetry") {
+                if let Some(disable_telemetry) = project_opts.disable_telemetry {
+                    !disable_telemetry
+                } else {
+                    println!("{}", yellow!("Send usage data to Hiro."));
+                    println!("{}", yellow!("Help Hiro improve its products and services by automatically sending diagnostics and usage data."));
+                    println!("{}", yellow!("Only high level usage information, and no information identifying you or your project are collected."));
+                    // todo(ludo): once we have a privacy policy available, add a link
+                    // println!("{}", yellow!("Visit http://hiro.so/clarinet-privacy for details."));
+                    println!("{}", yellow!("Enable [Y/n]?"));
+                    let mut buffer = String::new();
+                    std::io::stdin().read_line(&mut buffer).unwrap();
+                    buffer != "n\n"
+                }
+            } else {
+                false
+            };
+            if telemetry_enabled {
+                println!(
+                    "{}",
+                    yellow!("Telemetry enabled. Thanks for helping to improve clarinet!")
+                );
+            } else {
+                println!(
+                    "{}",
+                    yellow!(
+                        "Telemetry disabled. Clarinet will not collect any data on this project."
+                    )
+                );
+            }
+            let project_id = project_opts.name.clone();
+            let changes =
+                generate::get_changes_for_new_project(current_path, project_id, telemetry_enabled);
             execute_changes(changes);
             if hints_enabled {
                 display_post_check_hint();
+            }
+            if telemetry_enabled {
+                #[cfg(feature = "telemetry")]
+                telemetry_report_event(DeveloperUsageEvent::NewProject(DeveloperUsageDigest::new(
+                    &project_opts.name,
+                    &vec![],
+                )));
             }
         }
         Command::Contract(subcommand) => match subcommand {
@@ -312,20 +372,31 @@ pub fn main() {
         Command::Poke(cmd) | Command::Console(cmd) => {
             let manifest_path = get_manifest_path_or_exit(cmd.manifest_path);
             let start_repl = true;
-            load_session(manifest_path, start_repl, &Network::Devnet)
-                .expect("Unable to start REPL");
+            let (_, _, project_manifest, _) =
+                load_session(manifest_path, start_repl, &Network::Devnet)
+                    .expect("Unable to start REPL");
             if hints_enabled {
                 display_post_poke_hint();
+            }
+            if project_manifest.project.telemetry {
+                #[cfg(feature = "telemetry")]
+                telemetry_report_event(DeveloperUsageEvent::PokeExecuted(
+                    DeveloperUsageDigest::new(
+                        &project_manifest.project.name,
+                        &project_manifest.project.authors,
+                    ),
+                ));
             }
         }
         Command::Check(cmd) => {
             let manifest_path = get_manifest_path_or_exit(cmd.manifest_path);
             let start_repl = false;
-            match load_session(manifest_path, start_repl, &Network::Devnet) {
+            let project_manifest = match load_session(manifest_path, start_repl, &Network::Devnet) {
                 Err(e) => {
                     println!("{}", e);
+                    return;
                 }
-                Ok((session, _, output)) => {
+                Ok((session, _, manifest, output)) => {
                     if let Some(message) = output {
                         println!("{}", message);
                     }
@@ -334,29 +405,39 @@ pub fn main() {
                         green!("✔"),
                         session.settings.initial_contracts.len()
                     );
+                    manifest
                 }
-            }
+            };
             if hints_enabled {
                 display_post_check_hint();
+            }
+            if project_manifest.project.telemetry {
+                #[cfg(feature = "telemetry")]
+                telemetry_report_event(DeveloperUsageEvent::CheckExecuted(
+                    DeveloperUsageDigest::new(
+                        &project_manifest.project.name,
+                        &project_manifest.project.authors,
+                    ),
+                ));
             }
         }
         Command::Test(cmd) => {
             let manifest_path = get_manifest_path_or_exit(cmd.manifest_path);
             let start_repl = false;
             let res = load_session(manifest_path.clone(), start_repl, &Network::Devnet);
-            let session = match res {
-                Ok((session, _, output)) => {
+            let (session, project_manifest) = match res {
+                Ok((session, _, manifest, output)) => {
                     if let Some(message) = output {
                         println!("{}", message);
                     }
-                    session
+                    (session, manifest)
                 }
                 Err(e) => {
                     println!("{}", e);
                     return;
                 }
             };
-            run_scripts(
+            let (success, _count) = match run_scripts(
                 cmd.files,
                 cmd.coverage,
                 cmd.costs_report,
@@ -365,9 +446,26 @@ pub fn main() {
                 false,
                 manifest_path,
                 Some(session),
-            );
+            ) {
+                Ok(count) => (true, count),
+                Err((_, count)) => (false, count),
+            };
             if hints_enabled {
                 display_tests_pro_tips_hint();
+            }
+            if project_manifest.project.telemetry {
+                #[cfg(feature = "telemetry")]
+                telemetry_report_event(DeveloperUsageEvent::TestSuiteExecuted(
+                    DeveloperUsageDigest::new(
+                        &project_manifest.project.name,
+                        &project_manifest.project.authors,
+                    ),
+                    success,
+                    _count,
+                ));
+            }
+            if !success {
+                process::exit(1)
             }
         }
         Command::Run(cmd) => {
@@ -375,7 +473,7 @@ pub fn main() {
             let start_repl = false;
             let res = load_session(manifest_path.clone(), start_repl, &Network::Devnet);
             let session = match res {
-                Ok((session, _, output)) => {
+                Ok((session, _, _, output)) => {
                     if let Some(message) = output {
                         println!("{}", message);
                     }
@@ -386,7 +484,7 @@ pub fn main() {
                     return;
                 }
             };
-            run_scripts(
+            let _ = run_scripts(
                 vec![cmd.script],
                 false,
                 false,
@@ -409,14 +507,39 @@ pub fn main() {
             } else {
                 panic!("Target deployment must be specified with --devnet, --testnet or --mainnet")
             };
-            match publish_all_contracts(manifest_path, network) {
-                Ok(results) => println!("{}", results.join("\n")),
-                Err(results) => println!("{}", results.join("\n")),
+            let project_manifest = match publish_all_contracts(manifest_path, &network) {
+                Ok((results, project_manifest)) => {
+                    println!("{}", results.join("\n"));
+                    project_manifest
+                }
+                Err(results) => {
+                    println!("{}", results.join("\n"));
+                    return;
+                }
             };
+            if project_manifest.project.telemetry {
+                #[cfg(feature = "telemetry")]
+                telemetry_report_event(DeveloperUsageEvent::ContractPublished(
+                    DeveloperUsageDigest::new(
+                        &project_manifest.project.name,
+                        &project_manifest.project.authors,
+                    ),
+                    network,
+                ));
+            }
         }
         Command::Integrate(cmd) => {
             let manifest_path = get_manifest_path_or_exit(cmd.manifest_path);
             let devnet = DevnetOrchestrator::new(manifest_path, None);
+            if devnet.manifest.project.telemetry {
+                #[cfg(feature = "telemetry")]
+                telemetry_report_event(DeveloperUsageEvent::DevnetExecuted(
+                    DeveloperUsageDigest::new(
+                        &devnet.manifest.project.name,
+                        &devnet.manifest.project.authors,
+                    ),
+                ));
+            }
             let _ = integrate::run_devnet(devnet, None, !cmd.no_dashboard);
             if hints_enabled {
                 display_deploy_hint();

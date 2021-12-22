@@ -81,7 +81,7 @@ impl ClarityLanguageBackend {
                 // Read these 2 files and build a SessionSetting
                 match load_session_settings(clarinet_toml_path, &Network::Devnet) {
                     Err(message) => return Err((message, logs)),
-                    Ok((settings, _)) => settings,
+                    Ok((settings, _, _)) => settings,
                 }
             }
             Ok(None) => SessionSettings::default(),

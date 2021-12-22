@@ -4,14 +4,16 @@ pub struct GetChangesForNewProject {
     project_path: String,
     project_name: String,
     changes: Vec<Changes>,
+    telemetry_enabled: bool,
 }
 
 impl GetChangesForNewProject {
-    pub fn new(project_path: String, project_name: String) -> Self {
+    pub fn new(project_path: String, project_name: String, telemetry_enabled: bool) -> Self {
         Self {
             project_path,
             project_name,
             changes: vec![],
+            telemetry_enabled,
         }
     }
 
@@ -171,12 +173,14 @@ history.txt
             r#"
 [project]
 name = "{}"
+authors = []
+telemetry = {}
 
 # [contracts.counter]
 # path = "contracts/counter.clar"
 # depends_on = []
 "#,
-            self.project_name
+            self.project_name, self.telemetry_enabled
         );
         let name = format!("Clarinet.toml");
         let path = format!("{}/{}/{}", self.project_path, self.project_name, name);

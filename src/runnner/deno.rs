@@ -204,7 +204,7 @@ pub async fn do_run_scripts(
     allow_disk_write: bool,
     manifest_path: PathBuf,
     session: Option<Session>,
-) -> Result<bool, AnyError> {
+) -> Result<u32, AnyError> {
     let mut flags = Flags::default();
     flags.unstable = true;
     flags.reload = true;
@@ -457,7 +457,9 @@ pub async fn do_run_scripts(
         display_costs_report()
     }
 
-    Ok(true)
+    let total = sessions::SESSIONS.lock().unwrap().len();
+
+    Ok(total as u32)
 }
 
 #[derive(Clone)]
