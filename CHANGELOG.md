@@ -1,3 +1,28 @@
+# [0.21.0](https://github.com/hirosystems/clarinet/compare/v0.20.0...v0.21.0) (2021-12-22)
+
+
+### Bug Fixes
+
+* build error ([6399169](https://github.com/hirosystems/clarinet/commit/63991693e3f9ce33c7ee010a5419190d0ed2c7cf))
+* caveman debug vestige ([a89c631](https://github.com/hirosystems/clarinet/commit/a89c631e3cd283094bd81d51c41379acb9bf28e3))
+* clarity integration ([259fb4a](https://github.com/hirosystems/clarinet/commit/259fb4a0669d0c0e58b4192c1a21e187cff8572a))
+* comments and doc ([ea269ae](https://github.com/hirosystems/clarinet/commit/ea269aefc980b6aea663ff1115cec4321c13179c))
+* disable_telemetry flag ([8dcb0ec](https://github.com/hirosystems/clarinet/commit/8dcb0ec805a66570d8e10d1bb1e05e36e7cae43b))
+* doc copy pasta ([8927144](https://github.com/hirosystems/clarinet/commit/8927144e7240049beadbfbc19c2671ba299d523f))
+* enable telemetry in Dockerfile ([8b43980](https://github.com/hirosystems/clarinet/commit/8b43980a18ac9d996449b7873384236ae3be5c40))
+* iterate on integration ([3a65165](https://github.com/hirosystems/clarinet/commit/3a651655b2aa1a39aafac6a38a83a082a612b48c))
+* make tower-lsp optional ([1f83b21](https://github.com/hirosystems/clarinet/commit/1f83b2146205ed3ad8479c865ef8c2e0deb523bf))
+* remove reference to Blockstack ([350be75](https://github.com/hirosystems/clarinet/commit/350be75a8368bf27dea36fa14275e24d5f3feca4))
+* stacks-devnet-js build ([fe74897](https://github.com/hirosystems/clarinet/commit/fe74897b03b2b5a464e8f6a874f0a2f3a6311373))
+
+
+### Features
+
+* add `analysis` field into project config ([ce61daf](https://github.com/hirosystems/clarinet/commit/ce61dafb92048e8268cc0082250d838b9289163f))
+* add key ([0631e72](https://github.com/hirosystems/clarinet/commit/0631e720d4e4260c94a725b4f78fbb0dad5cf242))
+* implement telemetry as a gated feature ([8b04f8b](https://github.com/hirosystems/clarinet/commit/8b04f8ba5f1cb0017f28ab2f050cf68f2af8369b))
+* implement telemetry helpers ([b1cbcc6](https://github.com/hirosystems/clarinet/commit/b1cbcc6d264f5dc7f49fef983ef167b330028e06))
+
 # [0.20.0](https://github.com/hirosystems/clarinet/compare/v0.19.1...v0.20.0) (2021-12-09)
 
 
