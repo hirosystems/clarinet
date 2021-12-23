@@ -25,6 +25,7 @@ mod publish;
 mod runnner;
 mod types;
 mod utils;
+mod clarion;
 
 use frontend::cli;
 
