@@ -1,3 +1,10 @@
+## [0.21.1](https://github.com/hirosystems/clarinet/compare/v0.21.0...v0.21.1) (2021-12-23)
+
+
+### Bug Fixes
+
+* show errors when parsing opts ([2dad960](https://github.com/hirosystems/clarinet/commit/2dad96064c95b763a1df13b2ea56421acc527a27)), closes [#188](https://github.com/hirosystems/clarinet/issues/188)
+
 # [0.21.0](https://github.com/hirosystems/clarinet/compare/v0.20.0...v0.21.0) (2021-12-22)
 
 
