@@ -1,18 +1,18 @@
 mod hypervisor;
 mod services;
 
-pub use hypervisor::{ClarionHypervisor, ClarionHypervisorCommand};
 use crate::utils;
-use std::sync::mpsc::{channel, Sender, Receiver};
+pub use hypervisor::{ClarionHypervisor, ClarionHypervisorCommand};
+use std::sync::mpsc::{channel, Receiver, Sender};
 
 pub fn run_clarion_hypervisor(
     hypervisor_cmd_tx: Sender<ClarionHypervisorCommand>,
     hypervisor_cmd_rx: Receiver<ClarionHypervisorCommand>,
-) -> Result<
-    (),
-    String,
-> {
-    match block_on(do_run_clarion_hypervisor(hypervisor_cmd_tx, hypervisor_cmd_rx)) {
+) -> Result<(), String> {
+    match block_on(do_run_clarion_hypervisor(
+        hypervisor_cmd_tx,
+        hypervisor_cmd_rx,
+    )) {
         Err(_e) => std::process::exit(1),
         Ok(res) => Ok(res),
     }
@@ -29,16 +29,11 @@ where
 pub async fn do_run_clarion_hypervisor(
     hypervisor_cmd_tx: Sender<ClarionHypervisorCommand>,
     hypervisor_cmd_rx: Receiver<ClarionHypervisorCommand>,
-) -> Result<
-    (
-    ),
-    String,
-> {
+) -> Result<(), String> {
     let mut hypervisor = ClarionHypervisor::new(hypervisor_cmd_tx, hypervisor_cmd_rx);
     hypervisor.run();
     Ok(())
 }
-
 
 trait Datastore {}
 // InMemory Datastore

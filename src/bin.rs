@@ -15,6 +15,7 @@ extern crate serde_json;
 #[macro_use]
 mod macros;
 
+mod clarion;
 mod frontend;
 mod generate;
 mod indexer;
@@ -25,7 +26,6 @@ mod publish;
 mod runnner;
 mod types;
 mod utils;
-mod clarion;
 
 use frontend::cli;
 
