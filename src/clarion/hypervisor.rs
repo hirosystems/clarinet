@@ -1,13 +1,14 @@
 use crate::indexer::{BitcoinChainEvent, StacksChainEvent};
-use crate::types::AccountIdentifier;
+use crate::types::{AccountIdentifier, StacksTransactionReceipt};
 use clarity_repl::clarity::types::{QualifiedContractIdentifier, StandardPrincipalData};
-use std::collections::{BTreeMap, HashMap, HashSet};
+use std::collections::{BTreeMap, HashMap, HashSet, VecDeque};
 use std::convert::TryInto;
 use std::sync::mpsc::{channel, Receiver, Sender};
 
+#[derive(PartialEq, Eq, Hash, Clone, Debug)]
 pub struct TriggerId {
-    pid: u64,
-    lambda_id: u64,
+    pub pid: ClarionPid,
+    pub lambda_id: u64,
 }
 
 #[derive(Clone, Debug)]
@@ -44,6 +45,12 @@ pub struct ClarionInstanceController {
     tx: Sender<ClarionInstanceCommand>,
 }
 
+impl ClarionInstanceController {
+    pub fn trigger_lambda(&self, lambda_id: u64) {
+        println!("Triggering lambda {}", lambda_id);
+    }
+}
+
 pub struct ClarionInstance {
     pub pid: ClarionPid,
     project_id: u64,
@@ -70,11 +77,17 @@ impl ClarionInstance {
             tx,
         }
     }
+
+    pub fn execute_lambda(&self, lambda_id: u64) {
+        println!("Executing lambda {}", lambda_id);
+    }
 }
 
 #[derive(Clone, Debug)]
 pub enum ClarionHypervisorCommand {
-    RegisterInstance(ClarionManifest),
+    RegisterClarionInstance(ClarionManifest),
+    ProcessStacksChainEvent(StacksChainEvent),
+    ProcessBitcoinChainEvent(BitcoinChainEvent),
     Exit,
 }
 
@@ -85,21 +98,45 @@ pub struct ClarionHypervisor {
     instances_pool: HashMap<ClarionPid, ClarionInstance>,
     clarion_controllers: HashMap<ClarionPid, ClarionInstanceController>,
     bitcoin_predicates: HashMap<BitcoinPredicate, Vec<TriggerId>>,
-    stacks_predicates: HashMap<StacksPredicate, Vec<TriggerId>>,
+    stacks_predicates: StacksChainPredicates,
     rx: Receiver<ClarionHypervisorCommand>,
     tx: Sender<ClarionHypervisorCommand>,
+    trigger_history: VecDeque<(String, HashSet<TriggerId>)>,
+}
+
+pub struct StacksChainPredicates {
+    pub watching_contract_id_activity: HashMap<String, HashSet<TriggerId>>,
+    pub watching_contract_data_mutation_activity: HashMap<String, HashSet<TriggerId>>,
+    pub watching_principal_activity: HashMap<String, HashSet<TriggerId>>,
+    pub watching_ft_move_activity: HashMap<String, HashSet<TriggerId>>,
+    pub watching_nft_activity: HashMap<String, HashSet<TriggerId>>,
+    pub watching_any_block_activity: HashSet<TriggerId>,
+}
+
+impl StacksChainPredicates {
+    pub fn new() -> Self {
+        Self {
+            watching_contract_id_activity: HashMap::new(),
+            watching_contract_data_mutation_activity: HashMap::new(),
+            watching_principal_activity: HashMap::new(),
+            watching_ft_move_activity: HashMap::new(),
+            watching_nft_activity: HashMap::new(),
+            watching_any_block_activity: HashSet::new(),
+        }
+    }
 }
 
 impl ClarionHypervisor {
     pub fn new(
         tx: Sender<ClarionHypervisorCommand>,
         rx: Receiver<ClarionHypervisorCommand>,
-    ) -> ClarionHypervisor {
-        ClarionHypervisor {
+    ) -> Self {
+        Self {
             instances_pool: HashMap::new(),
             clarion_controllers: HashMap::new(),
             bitcoin_predicates: HashMap::new(),
-            stacks_predicates: HashMap::new(),
+            stacks_predicates: StacksChainPredicates::new(),
+            trigger_history: VecDeque::new(),
             tx,
             rx,
         }
@@ -109,17 +146,15 @@ impl ClarionHypervisor {
         let mut last_pid = 1;
         loop {
             match self.rx.recv() {
-                Ok(ClarionHypervisorCommand::RegisterInstance(manifest)) => {
-                    println!("Registering new instance {:?}", manifest);
-                    let pid = ClarionPid(last_pid);
-                    let instance = ClarionInstance::new(manifest, pid.clone());
-                    let controller = ClarionInstanceController {
-                        pid: pid.clone(),
-                        tx: instance.tx.clone(),
-                    };
-                    self.clarion_controllers.insert(pid.clone(), controller);
-                    self.instances_pool.insert(pid, instance);
+                Ok(ClarionHypervisorCommand::RegisterClarionInstance(manifest)) => {
+                    self.register_clarion_instance(manifest, ClarionPid(last_pid));
                     last_pid += 1;
+                }
+                Ok(ClarionHypervisorCommand::ProcessStacksChainEvent(event)) => {
+                    self.handle_stacks_chain_event(event);
+                }
+                Ok(ClarionHypervisorCommand::ProcessBitcoinChainEvent(event)) => {
+                    self.handle_bitcoin_chain_event(event);
                 }
                 Ok(ClarionHypervisorCommand::Exit) => {
                     println!("Exiting...");
@@ -132,9 +167,73 @@ impl ClarionHypervisor {
         }
     }
 
-    pub fn handle_stacks_chain_event(&self, chain_event: BitcoinChainEvent) {}
+    pub fn register_clarion_instance(&mut self, manifest: ClarionManifest, pid: ClarionPid) {
+        let instance = ClarionInstance::new(manifest, pid.clone());
+        let controller = ClarionInstanceController {
+            pid: pid.clone(),
+            tx: instance.tx.clone(),
+        };
+        self.clarion_controllers.insert(pid.clone(), controller);
+        self.instances_pool.insert(pid, instance);
+    }
 
-    pub fn handle_bitcoin_chain_event(&self, chain_event: StacksChainEvent) {}
+    pub fn handle_stacks_chain_event(&mut self, chain_event: StacksChainEvent) {
+        match chain_event {
+            StacksChainEvent::ChainUpdatedWithBlock(new_block) => {
+                let mut instances_to_trigger: HashSet<&TriggerId> = HashSet::new();
+
+                // Start by adding the predicates looking for any new block
+                instances_to_trigger.extend(&self.stacks_predicates.watching_any_block_activity);
+
+                for tx in new_block.transactions.iter() {
+                    let contract_id_based_predicates = self
+                        .evaluate_predicates_watching_contract_mutations_activity(
+                            &tx.metadata.receipt,
+                        );
+                    instances_to_trigger.extend(&contract_id_based_predicates);
+                }
+
+                for trigger in instances_to_trigger {
+                    if let Some(controller) = self.clarion_controllers.get(&trigger.pid) {
+                        controller.trigger_lambda(trigger.lambda_id);
+                    }
+                }
+                // todo: keep track of trigger_history.
+            }
+            StacksChainEvent::ChainUpdatedWithReorg(old_segment, new_segment) => {
+                // TODO(lgalabru): handle
+                // todo: keep track of trigger_history.
+            }
+        }
+    }
+
+    pub fn handle_bitcoin_chain_event(&mut self, chain_event: BitcoinChainEvent) {
+        match chain_event {
+            BitcoinChainEvent::ChainUpdatedWithBlock(new_block) => {}
+            BitcoinChainEvent::ChainUpdatedWithReorg(old_segment, new_segment) => {
+                // TODO(lgalabru): handle
+            }
+        }
+    }
+
+    fn evaluate_predicates_watching_contract_mutations_activity(
+        &self,
+        transaction_receipt: &StacksTransactionReceipt,
+    ) -> HashSet<&TriggerId> {
+        let mut activated_triggers = HashSet::new();
+
+        for contract_id in transaction_receipt.contracts_execution_radius.iter() {
+            if let Some(triggers) = self
+                .stacks_predicates
+                .watching_contract_id_activity
+                .get(contract_id)
+            {
+                activated_triggers.extend(triggers);
+            }
+        }
+
+        activated_triggers
+    }
 }
 
 #[derive(Clone, Debug)]
@@ -161,20 +260,20 @@ pub enum Platform {
     ApiGenerator,
 }
 
-#[derive(Clone, Debug)]
+#[derive(PartialEq, Eq, Hash, Clone, Debug)]
 pub enum Predicate {
     BitcoinPredicate,
     StacksPredicate,
 }
 
-#[derive(Clone, Debug)]
+#[derive(PartialEq, Eq, Hash, Clone, Debug)]
 pub enum BitcoinPredicate {
     AnyBlock,
     AnyOperation(AccountIdentifier),
     AnyStacksOperation(CrossStacksChainOperation, AccountIdentifier),
 }
 
-#[derive(Clone, Debug)]
+#[derive(PartialEq, Eq, Hash, Clone, Debug)]
 pub enum CrossStacksChainOperation {
     Any,
     MineBlock,
@@ -182,11 +281,20 @@ pub enum CrossStacksChainOperation {
     StacksSTX,
 }
 
-#[derive(Clone, Debug)]
+#[derive(PartialEq, Eq, Hash, Clone, Debug)]
 pub enum StacksPredicate {
-    AnyBlock,
+    BitcoinPredicate,
+    StacksContractPredicate,
+}
+
+#[derive(PartialEq, Eq, Hash, Clone, Debug)]
+pub enum StacksContractBasedPredicate {
     AnyCallToContract(QualifiedContractIdentifier),
     AnyResultFromContractCall(QualifiedContractIdentifier, String),
+}
+
+#[derive(PartialEq, Eq, Hash, Clone, Debug)]
+pub enum StacksOperationPredicate {
     AnyOperation(AccountIdentifier),
 }
 
@@ -224,7 +332,9 @@ fn instantiate_and_terminate_hypervisor() {
     });
 
     hypervisor_cmd_tx
-        .send(ClarionHypervisorCommand::RegisterInstance(clarion_manifest))
+        .send(ClarionHypervisorCommand::RegisterClarionInstance(
+            clarion_manifest,
+        ))
         .unwrap();
 
     hypervisor_cmd_tx

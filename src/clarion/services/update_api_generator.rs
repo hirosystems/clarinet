@@ -9,6 +9,6 @@ pub fn stacks_chain_event_handler(
 ) {
     match chain_event {
         StacksChainEvent::ChainUpdatedWithBlock(block) => {}
-        StacksChainEvent::ChainUpdatedWithReorg(blocks) => {}
+        StacksChainEvent::ChainUpdatedWithReorg(old_segment, new_segment) => {}
     }
 }

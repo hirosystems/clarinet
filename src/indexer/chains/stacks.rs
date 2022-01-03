@@ -1,9 +1,11 @@
 use crate::indexer::AssetClassCache;
 use crate::indexer::{IndexerConfig, StacksChainContext};
+use crate::types::events::*;
 use crate::types::{
     AccountIdentifier, Amount, BlockIdentifier, Currency, CurrencyMetadata, CurrencyStandard,
     Operation, OperationIdentifier, OperationStatusKind, OperationType, StacksBlockData,
-    StacksBlockMetadata, StacksTransactionData, StacksTransactionMetadata, TransactionIdentifier,
+    StacksBlockMetadata, StacksTransactionData, StacksTransactionMetadata,
+    StacksTransactionReceipt, TransactionIdentifier,
 };
 use crate::utils::stacks::StacksRpc;
 use clarity_repl::clarity::codec::transaction::TransactionPayload;
@@ -64,85 +66,10 @@ pub struct NewEvent {
     pub ft_transfer_event: Option<JsonValue>,
     pub ft_mint_event: Option<JsonValue>,
     pub ft_burn_event: Option<JsonValue>,
-}
-
-#[derive(Debug, Clone, PartialEq, Deserialize)]
-pub struct STXTransferEventData {
-    pub sender: String,
-    pub recipient: String,
-    pub amount: String,
-}
-
-#[derive(Debug, Clone, PartialEq, Deserialize)]
-pub struct STXMintEventData {
-    pub recipient: String,
-    pub amount: String,
-}
-
-#[derive(Debug, Clone, PartialEq, Deserialize)]
-pub struct STXLockEventData {
-    pub locked_amount: String,
-    pub unlock_height: String,
-    pub locked_address: String,
-}
-
-#[derive(Debug, Clone, PartialEq, Deserialize)]
-pub struct STXBurnEventData {
-    pub sender: String,
-    pub amount: String,
-}
-
-#[derive(Debug, Clone, PartialEq, Deserialize)]
-pub struct NFTTransferEventData {
-    #[serde(rename = "asset_identifier")]
-    pub asset_class_identifier: String,
-    #[serde(rename = "value")]
-    pub asset_identifier: String,
-    pub sender: String,
-    pub recipient: String,
-}
-
-#[derive(Debug, Clone, PartialEq, Deserialize)]
-pub struct NFTMintEventData {
-    #[serde(rename = "asset_identifier")]
-    pub asset_class_identifier: String,
-    #[serde(rename = "value")]
-    pub asset_identifier: String,
-    pub recipient: String,
-}
-
-#[derive(Debug, Clone, PartialEq, Deserialize)]
-pub struct NFTBurnEventData {
-    #[serde(rename = "asset_identifier")]
-    pub asset_class_identifier: String,
-    #[serde(rename = "value")]
-    pub asset_identifier: String,
-    pub sender: String,
-}
-
-#[derive(Debug, Clone, PartialEq, Deserialize)]
-pub struct FTTransferEventData {
-    #[serde(rename = "asset_identifier")]
-    pub asset_class_identifier: String,
-    pub sender: String,
-    pub recipient: String,
-    pub amount: String,
-}
-
-#[derive(Debug, Clone, PartialEq, Deserialize)]
-pub struct FTMintEventData {
-    #[serde(rename = "asset_identifier")]
-    pub asset_class_identifier: String,
-    pub recipient: String,
-    pub amount: String,
-}
-
-#[derive(Debug, Clone, PartialEq, Deserialize)]
-pub struct FTBurnEventData {
-    #[serde(rename = "asset_identifier")]
-    pub asset_class_identifier: String,
-    pub sender: String,
-    pub amount: String,
+    pub data_var_set_event: Option<JsonValue>,
+    pub data_map_insert_event: Option<JsonValue>,
+    pub data_map_update_event: Option<JsonValue>,
+    pub data_map_delete_event: Option<JsonValue>,
 }
 
 pub fn get_stacks_currency() -> Currency {
@@ -191,7 +118,7 @@ pub fn standardize_stacks_block(
                 metadata: StacksTransactionMetadata {
                     success: t.status == "success",
                     result: get_value_description(&t.raw_result),
-                    events: vec![],
+                    receipt: StacksTransactionReceipt::new(),
                     description,
                 },
             }
@@ -702,6 +629,18 @@ pub fn get_standardized_stacks_operations(
                     metadata: None,
                 });
                 operation_id += 1;
+            } else if let Some(ref event_data) = event.data_var_set_event {
+                let data: DataVarSetEventData = serde_json::from_value(event_data.clone())
+                    .expect("Unable to decode event_data");
+            } else if let Some(ref event_data) = event.data_map_insert_event {
+                let data: DataMapInsertEventData = serde_json::from_value(event_data.clone())
+                    .expect("Unable to decode event_data");
+            } else if let Some(ref event_data) = event.data_map_update_event {
+                let data: DataMapUpdateEventData = serde_json::from_value(event_data.clone())
+                    .expect("Unable to decode event_data");
+            } else if let Some(ref event_data) = event.data_map_delete_event {
+                let data: DataMapDeleteEventData = serde_json::from_value(event_data.clone())
+                    .expect("Unable to decode event_data");
             }
         } else {
             i += 1;

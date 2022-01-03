@@ -1,5 +1,6 @@
 mod chain_config;
 mod data;
+pub mod events;
 mod project_manifest;
 
 pub use chain_config::{
@@ -15,5 +16,5 @@ pub use data::{
     BitcoinTransactionMetadata, BlockIdentifier, Currency, CurrencyMetadata, CurrencyStandard,
     Operation, OperationIdentifier, OperationMetadata, OperationStatusKind, OperationType,
     StacksBlockData, StacksBlockMetadata, StacksTransactionData, StacksTransactionMetadata,
-    TransactionIdentifier,
+    StacksTransactionReceipt, TransactionIdentifier,
 };

@@ -6,15 +6,17 @@ use rocket::serde::json::Value as JsonValue;
 use std::collections::{HashMap, VecDeque};
 
 #[allow(dead_code)]
+#[derive(Clone, Debug)]
 pub enum BitcoinChainEvent {
     ChainUpdatedWithBlock(BitcoinBlockData),
-    ChainUpdatedWithReorg(Vec<BitcoinBlockData>),
+    ChainUpdatedWithReorg(Vec<BitcoinBlockData>, Vec<BitcoinBlockData>),
 }
 
 #[allow(dead_code)]
+#[derive(Clone, Debug)]
 pub enum StacksChainEvent {
     ChainUpdatedWithBlock(StacksBlockData),
-    ChainUpdatedWithReorg(Vec<StacksBlockData>),
+    ChainUpdatedWithReorg(Vec<BitcoinBlockData>, Vec<BitcoinBlockData>),
 }
 
 #[derive(Deserialize, Debug, Clone, Default)]

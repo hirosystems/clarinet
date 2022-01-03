@@ -1,4 +1,6 @@
+use super::events::StacksTransactionEvent;
 use serde::{self, Deserialize, Serialize};
+use std::collections::HashSet;
 
 /// BlockIdentifier uniquely identifies a block in a particular network.
 #[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
@@ -77,8 +79,26 @@ pub struct StacksTransactionData {
 pub struct StacksTransactionMetadata {
     pub success: bool,
     pub result: String,
-    pub events: Vec<String>,
+    pub receipt: StacksTransactionReceipt,
     pub description: String,
+}
+
+/// Extra event data for Transaction
+#[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
+pub struct StacksTransactionReceipt {
+    pub contracts_execution_radius: HashSet<String>,
+    pub assets_mutation_radius: HashSet<String>,
+    pub events: Vec<StacksTransactionEvent>,
+}
+
+impl StacksTransactionReceipt {
+    pub fn new() -> StacksTransactionReceipt {
+        StacksTransactionReceipt {
+            contracts_execution_radius: HashSet::new(),
+            assets_mutation_radius: HashSet::new(),
+            events: vec![],
+        }
+    }
 }
 
 /// Transactions contain an array of Operations that are attributable to the
@@ -110,8 +130,6 @@ pub struct TransactionIdentifier {
 )]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub enum OperationType {
-    DeployContract,
-    FunctionCall,
     Credit,
     Debit,
     Lock,
@@ -223,7 +241,7 @@ pub enum OperationStatusKind {
 /// The account_identifier uniquely identifies an account within a network. All
 /// fields in the account_identifier are utilized to determine this uniqueness
 /// (including the metadata field, if populated).
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Hash)]
 pub struct AccountIdentifier {
     /// The address may be a cryptographic public key (or some encoding of it)
     /// or a provided username.
@@ -243,7 +261,7 @@ pub struct AccountIdentifier {
 /// An account may have state specific to a contract address (ERC-20 token)
 /// and/or a stake (delegated balance). The sub_account_identifier should
 /// specify which state (if applicable) an account instantiation refers to.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Hash)]
 pub struct SubAccountIdentifier {
     /// The SubAccount address may be a cryptographic value or some other
     /// identifier (ex: bonded) that uniquely specifies a SubAccount.
@@ -258,7 +276,7 @@ pub struct SubAccountIdentifier {
      * pub metadata: Option<serde_json::Value>, */
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Hash)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub enum SubAccount {
     LiquidBalanceForStorage,
