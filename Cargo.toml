@@ -70,6 +70,12 @@ ctrlc = "3.1.9"
 strum = { version = "0.22", features = ["derive"] }
 bitcoincore-rpc = "0.14.0"
 tower-lsp = { version = "0.14.0", optional = true }
+# Clarion dependencies
+kompact = "0.11.0"
+slog = "2"
+slog-async = "2"
+slog-term = "2"
+opentelemetry = "0.16.0"
 
 [dependencies.tui]
 version = "0.15.0"

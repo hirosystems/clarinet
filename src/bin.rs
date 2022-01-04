@@ -13,6 +13,9 @@ extern crate rocket;
 extern crate serde_json;
 
 #[macro_use]
+extern crate slog;
+
+#[macro_use]
 mod macros;
 
 mod clarion;
