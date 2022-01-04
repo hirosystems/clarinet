@@ -335,13 +335,14 @@ impl ClarityLanguageBackend {
             let mut erroring_files = vec![];
             for (url, diagnostic) in diagnostics.into_iter() {
                 if !diagnostic.is_empty() {
-                    erroring_files.push(url.to_file_path()
-                        .unwrap()
-                        .file_name()
-                        .unwrap()
-                        .to_str()
-                        .unwrap()
-                        .to_string()
+                    erroring_files.push(
+                        url.to_file_path()
+                            .unwrap()
+                            .file_name()
+                            .unwrap()
+                            .to_str()
+                            .unwrap()
+                            .to_string(),
                     );
                 }
                 self.client.publish_diagnostics(url, diagnostic, None).await;
