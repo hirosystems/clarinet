@@ -16,17 +16,17 @@ use crate::runnner::run_scripts;
 use crate::types::{ProjectManifest, ProjectManifestFile, RequirementConfig};
 use clarity_repl::repl;
 
-use clap::Clap;
+use clap::Parser;
 use toml;
 
-#[derive(Clap, PartialEq, Clone, Debug)]
+#[derive(Parser, PartialEq, Clone, Debug)]
 #[clap(version = option_env!("CARGO_PKG_VERSION").expect("Unable to detect version"))]
 struct Opts {
     #[clap(subcommand)]
     command: Command,
 }
 
-#[derive(Clap, PartialEq, Clone, Debug)]
+#[derive(Parser, PartialEq, Clone, Debug)]
 enum Command {
     /// Create and scaffold a new project
     #[clap(name = "new")]
@@ -59,7 +59,7 @@ enum Command {
     LSP,
 }
 
-#[derive(Clap, PartialEq, Clone, Debug)]
+#[derive(Parser, PartialEq, Clone, Debug)]
 enum Contract {
     /// New contract subcommand
     #[clap(name = "new")]
@@ -72,13 +72,13 @@ enum Contract {
     ForkContract(ForkContract),
 }
 
-#[derive(Clap, PartialEq, Clone, Debug)]
+#[derive(Parser, PartialEq, Clone, Debug)]
 struct GenerateProject {
     /// Project's name
     pub name: String,
 }
 
-#[derive(Clap, PartialEq, Clone, Debug)]
+#[derive(Parser, PartialEq, Clone, Debug)]
 struct NewContract {
     /// Contract's name
     pub name: String,
@@ -87,7 +87,7 @@ struct NewContract {
     pub manifest_path: Option<String>,
 }
 
-#[derive(Clap, PartialEq, Clone, Debug)]
+#[derive(Parser, PartialEq, Clone, Debug)]
 struct LinkContract {
     /// Contract id
     pub contract_id: String,
@@ -96,7 +96,7 @@ struct LinkContract {
     pub manifest_path: Option<String>,
 }
 
-#[derive(Clap, PartialEq, Clone, Debug)]
+#[derive(Parser, PartialEq, Clone, Debug)]
 struct ForkContract {
     /// Contract id
     pub contract_id: String,
@@ -108,14 +108,14 @@ struct ForkContract {
     // pub recursive: bool,
 }
 
-#[derive(Clap, PartialEq, Clone, Debug)]
+#[derive(Parser, PartialEq, Clone, Debug)]
 struct Poke {
     /// Path to Clarinet.toml
     #[clap(long = "manifest-path")]
     pub manifest_path: Option<String>,
 }
 
-#[derive(Clap, PartialEq, Clone, Debug)]
+#[derive(Parser, PartialEq, Clone, Debug)]
 struct Integrate {
     /// Path to Clarinet.toml
     #[clap(long = "manifest-path")]
@@ -125,7 +125,7 @@ struct Integrate {
     pub no_dashboard: bool,
 }
 
-#[derive(Clap, PartialEq, Clone, Debug)]
+#[derive(Parser, PartialEq, Clone, Debug)]
 struct Test {
     /// Generate coverage
     #[clap(long = "coverage")]
@@ -143,7 +143,7 @@ struct Test {
     pub files: Vec<String>,
 }
 
-#[derive(Clap, PartialEq, Clone, Debug)]
+#[derive(Parser, PartialEq, Clone, Debug)]
 struct Run {
     /// Script to run
     pub script: String,
@@ -162,7 +162,7 @@ struct Run {
     pub allow_disk_read: bool,
 }
 
-#[derive(Clap, PartialEq, Clone, Debug)]
+#[derive(Parser, PartialEq, Clone, Debug)]
 struct Publish {
     /// Deploy contracts on devnet, using settings/Devnet.toml
     #[clap(
@@ -190,7 +190,7 @@ struct Publish {
     pub manifest_path: Option<String>,
 }
 
-#[derive(Clap, PartialEq, Clone, Debug)]
+#[derive(Parser, PartialEq, Clone, Debug)]
 struct Check {
     /// Path to Clarinet.toml
     #[clap(long = "manifest-path")]
@@ -198,7 +198,7 @@ struct Check {
 }
 
 pub fn main() {
-    let opts: Opts = Opts::parse();
+    let args: Opts = Opts::parse();
 
     let hints_enabled = if env::var("CLARINET_DISABLE_HINTS") == Ok("1".into()) {
         false
@@ -206,7 +206,7 @@ pub fn main() {
         true
     };
 
-    match opts.command {
+    match args.command {
         Command::New(project_opts) => {
             let current_path = {
                 let current_dir = env::current_dir().expect("Unable to read current directory");
