@@ -332,19 +332,21 @@ impl ClarityLanguageBackend {
                 self.client.publish_diagnostics(url, vec![], None).await;
             }
 
-            if !diagnostics.is_empty() {
-                let erroring_files = diagnostics
-                    .iter()
-                    .map(|(url, _)| {
-                        url.to_file_path()
-                            .unwrap()
-                            .file_name()
-                            .unwrap()
-                            .to_str()
-                            .unwrap()
-                            .to_string()
-                    })
-                    .collect::<Vec<_>>();
+            let mut erroring_files = vec![];
+            for (url, diagnostic) in diagnostics.into_iter() {
+                if !diagnostic.is_empty() {
+                    erroring_files.push(url.to_file_path()
+                        .unwrap()
+                        .file_name()
+                        .unwrap()
+                        .to_str()
+                        .unwrap()
+                        .to_string()
+                    );
+                }
+                self.client.publish_diagnostics(url, diagnostic, None).await;
+            }
+            if !erroring_files.is_empty() {
                 self.client
                     .show_message(
                         MessageType::Error,
@@ -354,9 +356,6 @@ impl ClarityLanguageBackend {
                         ),
                     )
                     .await;
-            }
-            for (url, diagnostic) in diagnostics.into_iter() {
-                self.client.publish_diagnostics(url, diagnostic, None).await;
             }
         }
     }
