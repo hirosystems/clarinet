@@ -77,7 +77,11 @@ impl ProjectManifest {
             match toml::from_slice(&project_manifest_file_buffer[..]) {
                 Ok(s) => s,
                 Err(_e) => {
-                    println!("{}\n{:?}", red!("Error: there is an issue with the Clarinet.toml file"), _e);
+                    println!(
+                        "{}\n{:?}",
+                        red!("Error: there is an issue with the Clarinet.toml file"),
+                        _e
+                    );
                     std::process::exit(1);
                 }
             };
