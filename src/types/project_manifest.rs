@@ -72,8 +72,20 @@ impl ProjectManifest {
         project_manifest_file_reader
             .read_to_end(&mut project_manifest_file_buffer)
             .unwrap();
+
         let project_manifest_file: ProjectManifestFile =
-            toml::from_slice(&project_manifest_file_buffer[..]).unwrap();
+            match toml::from_slice(&project_manifest_file_buffer[..]) {
+                Ok(s) => s,
+                Err(_e) => {
+                    println!(
+                        "{}\n{:?}",
+                        red!("Error: there is an issue with the Clarinet.toml file"),
+                        _e
+                    );
+                    std::process::exit(1);
+                }
+            };
+
         ProjectManifest::from_project_manifest_file(project_manifest_file)
     }
 
