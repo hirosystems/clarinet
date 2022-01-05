@@ -3,13 +3,13 @@ on:
   pull_request:
   push:
     tags:
-      - "v*"
+      - 'v*'
     paths-ignore:
-      - "**/CHANGELOG.md"
-      - "**/package.json"
-      - "**/package-lock.json"
-      - "**/Cargo.toml"
-      - "**/Cargo.lock"
+      - '**/CHANGELOG.md'
+      - '**/package.json'
+      - '**/package-lock.json'
+      - '**/Cargo.toml'
+      - '**/Cargo.lock'
     branches:
       - main
       - develop
