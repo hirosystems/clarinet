@@ -1,3 +1,15 @@
+# [0.22.0](https://github.com/hirosystems/clarinet/compare/v0.21.2...v0.22.0) (2022-01-05)
+
+
+### Bug Fixes
+
+* lsp adjustment ([67233f2](https://github.com/hirosystems/clarinet/commit/67233f29fb01a4f3faa192d1a0d62866471605b1))
+
+
+### Features
+
+* fail gracefully on Clarinet.toml errors ([3023320](https://github.com/hirosystems/clarinet/commit/3023320cfe919f925fbb0710d42811d12100e430))
+
 ## [0.21.2](https://github.com/hirosystems/clarinet/compare/v0.21.1...v0.21.2) (2021-12-23)
 
 
