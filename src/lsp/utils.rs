@@ -18,7 +18,7 @@ pub fn convert_clarity_diagnotic_to_lsp_diagnostic(diagnostic: ClarityDiagnostic
         _ => Range {
             start: Position {
                 line: diagnostic.spans[0].start_line - 1,
-                character: diagnostic.spans[0].start_column,
+                character: diagnostic.spans[0].start_column - 1,
             },
             end: Position {
                 line: diagnostic.spans[0].end_line - 1,
