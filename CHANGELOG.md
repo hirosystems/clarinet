@@ -1,3 +1,16 @@
+# [0.23.0](https://github.com/hirosystems/clarinet/compare/v0.22.0...v0.23.0) (2022-01-07)
+
+
+### Bug Fixes
+
+* display warnings and notes ([e0c4e1c](https://github.com/hirosystems/clarinet/commit/e0c4e1c0a1bd41a1814225a2565607523cfb25be))
+* off by one spans ([c724911](https://github.com/hirosystems/clarinet/commit/c724911e1f252c123d382947576014fa648638ee))
+
+
+### Features
+
+* display warning as warning in popups ([0ec64cf](https://github.com/hirosystems/clarinet/commit/0ec64cf4ea53ac169c7f798edca69be24d0c97f9))
+
 # [0.22.0](https://github.com/hirosystems/clarinet/compare/v0.21.2...v0.22.0) (2022-01-05)
 
 
