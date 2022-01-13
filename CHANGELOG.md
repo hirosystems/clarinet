@@ -1,3 +1,10 @@
+## [0.23.1](https://github.com/hirosystems/clarinet/compare/v0.23.0...v0.23.1) (2022-01-13)
+
+
+### Bug Fixes
+
+* issue with chunked information in Mempool section ([1dd1e22](https://github.com/hirosystems/clarinet/commit/1dd1e22e1f14f6d23a8cdfe364bebb88489b25cb))
+
 # [0.23.0](https://github.com/hirosystems/clarinet/compare/v0.22.0...v0.23.0) (2022-01-07)
 
 
