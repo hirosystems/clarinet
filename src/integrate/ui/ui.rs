@@ -81,21 +81,11 @@ where
         let cells = vec![Cell::from(item.tx.clone())];
         Row::new(cells).height(1).bottom_margin(0)
     });
-    let block = Block::default()
-        .borders(Borders::ALL)
-        .title("Mempool")
-        .style(Style::default().fg(Color::White));
-    f.render_widget(block, area);
 
     let t = Table::new(rows)
         .block(Block::default().borders(Borders::ALL).title("Mempool"))
         .style(Style::default().fg(Color::White))
-        .widths(&[
-            // Constraint::Length(8),
-            Constraint::Min(1),
-        ]);
-    let mut inner_area = area.clone();
-    inner_area.height -= 1;
+        .widths(&[Constraint::Percentage(100)]);
 
     f.render_widget(t, area);
 }
