@@ -8,7 +8,7 @@ use chrono::prelude::*;
 use tracing::{self, debug, error, info, warn};
 use tracing_appender;
 
-use crate::types::{BitcoinBlockData, StacksBlockData};
+use crate::types::{BitcoinBlockData, StacksBlockData, BitcoinChainEvent, StacksChainEvent};
 use crate::utils;
 use events_observer::{start_events_observer, EventsObserverCommand};
 pub use orchestrator::DevnetOrchestrator;
@@ -168,8 +168,8 @@ pub enum DevnetEvent {
     KeyEvent(crossterm::event::KeyEvent),
     Tick,
     ServiceStatus(ServiceStatusData),
-    StacksBlock(StacksBlockData),
-    BitcoinBlock(BitcoinBlockData),
+    StacksChainEvent(StacksChainEvent),
+    BitcoinChainEvent(BitcoinChainEvent),
     MempoolAdmission(MempoolAdmissionData),
     // Restart,
     // Terminate,

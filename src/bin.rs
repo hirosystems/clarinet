@@ -18,7 +18,6 @@ extern crate slog;
 #[macro_use]
 mod macros;
 
-mod clarion;
 mod frontend;
 mod generate;
 mod indexer;

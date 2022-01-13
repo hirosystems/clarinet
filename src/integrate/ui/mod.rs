@@ -19,6 +19,7 @@ use std::{
     thread,
     time::{Duration, Instant},
 };
+use crate::types::StacksChainEvent;
 use tui::{backend::CrosstermBackend, Terminal};
 
 pub fn start_ui(
@@ -105,14 +106,17 @@ pub fn start_ui(
             DevnetEvent::ServiceStatus(status) => {
                 app.display_service_status_update(status);
             }
-            DevnetEvent::StacksBlock(block) => {
-                app.display_block(block);
+            DevnetEvent::StacksChainEvent(chain_event) => {
+                if let StacksChainEvent::ChainUpdatedWithBlock(block) = chain_event {
+                    app.display_block(block);
+                } else {
+                    // todo(lgalabru)
+                }
+            }
+            DevnetEvent::BitcoinChainEvent(_chain_event) => {
             }
             DevnetEvent::MempoolAdmission(tx) => {
                 app.update_mempool(tx);
-            }
-            DevnetEvent::BitcoinBlock(_block) => {
-
             }
             // DevnetEvent::Terminate => {
 

@@ -74,29 +74,60 @@ pub struct StacksTransactionData {
     pub metadata: StacksTransactionMetadata,
 }
 
+#[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
+pub enum StacksTransactionKind {
+    ContractCall,
+    ContractDeployment(StacksContractDeploymentData),
+    NativeTokenTransfer,
+    Coinbase,
+    Other,
+}
+
+#[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
+pub struct StacksContractDeploymentData {
+    pub contract_identifier: String,
+    pub code: String,
+}
+
 /// Extra data for Transaction
 #[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
 pub struct StacksTransactionMetadata {
     pub success: bool,
+    pub raw_tx: String,
     pub result: String,
+    pub sender: String,
+    pub fee: u64,
+    pub kind: StacksTransactionKind,
+    pub execution_cost: Option<StacksTransactionExecutionCost>,
     pub receipt: StacksTransactionReceipt,
     pub description: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub sponsor: Option<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
+pub struct StacksTransactionExecutionCost {
+    pub write_length: u64,
+    pub write_count: u64,
+    pub read_length: u64,
+    pub read_count: u64,
+    pub runtime: u64,
 }
 
 /// Extra event data for Transaction
 #[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
 pub struct StacksTransactionReceipt {
-    pub contracts_execution_radius: HashSet<String>,
-    pub assets_mutation_radius: HashSet<String>,
+    pub mutated_contracts_radius: HashSet<String>,
+    pub mutated_assets_radius: HashSet<String>,
     pub events: Vec<StacksTransactionEvent>,
 }
 
 impl StacksTransactionReceipt {
-    pub fn new() -> StacksTransactionReceipt {
+    pub fn new(mutated_contracts_radius: HashSet<String>, mutated_assets_radius: HashSet<String>, events: Vec<StacksTransactionEvent>) -> StacksTransactionReceipt {
         StacksTransactionReceipt {
-            contracts_execution_radius: HashSet::new(),
-            assets_mutation_radius: HashSet::new(),
-            events: vec![],
+            mutated_contracts_radius,
+            mutated_assets_radius,
+            events,
         }
     }
 }

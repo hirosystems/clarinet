@@ -98,15 +98,15 @@ impl StacksDevnet {
             if let Ok(ref devnet_rx) = meta_rx.recv() {
                 while let Ok(ref event) = devnet_rx.recv() {
                     match event {
-                        DevnetEvent::BitcoinBlock(block) => {
+                        DevnetEvent::BitcoinChainEvent(BitcoinChainEvent::ChainUpdatedWithBlock(block)) => {
                             bitcoin_block_tx
                                 .send(block.clone())
                                 .expect("Unable to transmit bitcoin block");
                         }
-                        DevnetEvent::StacksBlock(block) => {
+                        DevnetEvent::StacksChainEvent(StacksChainEvent::ChainUpdatedWithBlock(block)) => {
                             stacks_block_tx
                                 .send(block.clone())
-                                .expect("Unable to transmit stacks block");
+                                .expect("Unable to transmit bitcoin block");
                         }
                         DevnetEvent::Log(log) => {
                             if logs_enabled {

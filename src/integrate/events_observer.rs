@@ -1,5 +1,6 @@
 use super::DevnetEvent;
-use crate::indexer::{chains, BitcoinChainEvent, Indexer, IndexerConfig, StacksChainEvent};
+use crate::indexer::{chains, Indexer, IndexerConfig};
+use crate::types::{BitcoinChainEvent, StacksChainEvent};
 use crate::integrate::{MempoolAdmissionData, ServiceStatusData, Status};
 use crate::poke::load_session;
 use crate::publish::{publish_contract, Network};
@@ -289,33 +290,43 @@ pub fn handle_new_burn_block(
 
     // Contextual shortcut: Devnet is an environment under control,
     // with 1 miner. As such we will ignore Reorgs handling.
-    let block = match chain_update {
-        BitcoinChainEvent::ChainUpdatedWithBlock(block) => block,
-        _ => {
-            return Json(json!({
-                "status": 200,
-                "result": "Ok",
-            }))
+    let (log, status) = match &chain_update {
+        BitcoinChainEvent::ChainUpdatedWithBlock(block) => {
+            let log = format!(
+                "Bitcoin block #{} received",
+                block.block_identifier.index
+            );
+            let status = format!(
+                "mining blocks (chaintip = #{})",
+                block.block_identifier.index
+            );
+            (log, status)
+        }
+        BitcoinChainEvent::ChainUpdatedWithReorg(old_blocks, new_blocks) => {
+            let tip = new_blocks.last().unwrap();
+            let log = format!(
+                "Bitcoin reorg received (new height: {})",
+                tip.block_identifier.index
+            );
+            let status = format!(
+                "mining blocks (chaintip = #{})",
+                tip.block_identifier.index
+            );
+            (log, status)
         }
     };
 
     match devnet_events_tx.lock() {
         Ok(tx) => {
-            let _ = tx.send(DevnetEvent::debug(format!(
-                "Bitcoin block #{} received",
-                block.block_identifier.index
-            )));
+            let _ = tx.send(DevnetEvent::debug(log));
 
             let _ = tx.send(DevnetEvent::ServiceStatus(ServiceStatusData {
                 order: 0,
                 status: Status::Green,
                 name: "bitcoin-node".into(),
-                comment: format!(
-                    "mining blocks (chaintip = #{})",
-                    block.block_identifier.index
-                ),
+                comment: status,
             }));
-            let _ = tx.send(DevnetEvent::BitcoinBlock(block));
+            let _ = tx.send(DevnetEvent::BitcoinChainEvent(chain_update));
         }
         _ => {}
     };
@@ -353,13 +364,11 @@ pub fn handle_new_block(
 
     // Contextual: Devnet is an environment under control,
     // with 1 miner. As such we will ignore Reorgs handling.
-    let block = match chain_event {
-        StacksChainEvent::ChainUpdatedWithBlock(block) => block,
-        _ => {
-            return Json(json!({
-                "status": 200,
-                "result": "Ok",
-            }))
+    let block = match &chain_event {
+        StacksChainEvent::ChainUpdatedWithBlock(block) => block.clone(),
+        StacksChainEvent::ChainUpdatedWithReorg(old_blocks, new_blocks) => {
+            let tip = new_blocks.last().unwrap().clone();
+            tip
         }
     };
 
@@ -410,7 +419,7 @@ pub fn handle_new_block(
     }
 
     if let Ok(tx) = devnet_events_tx.lock() {
-        let _ = tx.send(DevnetEvent::StacksBlock(block));
+        let _ = tx.send(DevnetEvent::StacksChainEvent(chain_event));
     }
 
     Json(json!({
@@ -471,7 +480,10 @@ pub fn handle_new_mempool_tx(
 ) -> Json<JsonValue> {
     let decoded_transactions = raw_txs
         .iter()
-        .map(|t| chains::stacks::get_tx_description(t))
+        .map(|t| {
+            let (txid, ..) = chains::stacks::get_tx_description(t).expect("unable to parse transaction");
+            txid
+        })
         .collect::<Vec<String>>();
 
     if let Ok(tx_sender) = devnet_events_tx.lock() {

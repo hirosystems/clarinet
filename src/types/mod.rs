@@ -16,5 +16,19 @@ pub use data::{
     BitcoinTransactionMetadata, BlockIdentifier, Currency, CurrencyMetadata, CurrencyStandard,
     Operation, OperationIdentifier, OperationMetadata, OperationStatusKind, OperationType,
     StacksBlockData, StacksBlockMetadata, StacksTransactionData, StacksTransactionMetadata,
-    StacksTransactionReceipt, TransactionIdentifier,
+    StacksTransactionReceipt, TransactionIdentifier, StacksTransactionExecutionCost, StacksTransactionKind, StacksContractDeploymentData
 };
+
+#[allow(dead_code)]
+#[derive(Clone, Debug)]
+pub enum BitcoinChainEvent {
+    ChainUpdatedWithBlock(BitcoinBlockData),
+    ChainUpdatedWithReorg(Vec<BitcoinBlockData>, Vec<BitcoinBlockData>),
+}
+
+#[allow(dead_code)]
+#[derive(Clone, Debug)]
+pub enum StacksChainEvent {
+    ChainUpdatedWithBlock(StacksBlockData),
+    ChainUpdatedWithReorg(Vec<StacksBlockData>, Vec<StacksBlockData>),
+}
