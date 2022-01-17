@@ -785,7 +785,7 @@ fn display_deploy_hint() {
     );
     println!(
         "{}",
-        yellow!("Find more information on the DevNet here: https://docs.hiro.so/smart-contracts/devnet")
+        yellow!("Find more information on the DevNet here: https://docs.hiro.so/smart-contracts/devnet/")
     );
     display_hint_footer();
 }
