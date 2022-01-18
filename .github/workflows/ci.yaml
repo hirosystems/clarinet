@@ -245,7 +245,7 @@ jobs:
           npm run build-${{ matrix.platform }}-${{ matrix.architecture }}
 
       - name: Code sign bin (Windows)
-        if: matrix.os == 'windows-latest'
+        if: startsWith(github.ref, 'refs/tags/v') && matrix.os == 'windows-latest'
         run: |
           $certificate_file_name = "${env:TEMP}\certificate.pfx"
 
@@ -269,7 +269,7 @@ jobs:
         run: cargo wix -v --no-build --nocapture -p clarinet
 
       - name: Code sign installer (Windows)
-        if: matrix.os == 'windows-latest'
+        if: startsWith(github.ref, 'refs/tags/v') && matrix.os == 'windows-latest'
         run: |
           $certificate_file_name = "${env:TEMP}\certificate.pfx"
 
