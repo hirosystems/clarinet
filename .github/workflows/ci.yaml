@@ -266,7 +266,7 @@ jobs:
 
       - name: Build Installer (Windows)
         if: matrix.os == 'windows-latest'
-        run: cargo wix -v --no-build --nocapture
+        run: cargo wix -v --no-build --nocapture -p clarinet
 
       - name: Code sign installer (Windows)
         if: matrix.os == 'windows-latest'
