@@ -1,3 +1,18 @@
+# [0.24.0](https://github.com/hirosystems/clarinet/compare/v0.23.1...v0.24.0) (2022-01-19)
+
+
+### Bug Fixes
+
+* fixed broken links ([b0f073a](https://github.com/hirosystems/clarinet/commit/b0f073ac634f480c86b0b788c51057605b202c64))
+* generate proper strings from contract results ([6b189c6](https://github.com/hirosystems/clarinet/commit/6b189c61b36f1f1ca755b86225916373565411bb)), closes [#213](https://github.com/hirosystems/clarinet/issues/213)
+* only code-sign on release ([e10f3d1](https://github.com/hirosystems/clarinet/commit/e10f3d12eeae10e0fe809df4b2bdfbe97d33a26a))
+* resolve bug with windows build in CI ([16ccd00](https://github.com/hirosystems/clarinet/commit/16ccd00110c6abde8f4e27b74ddd93f935028e36))
+
+
+### Features
+
+* added ignore and only options to clarinet test ([a57cc23](https://github.com/hirosystems/clarinet/commit/a57cc2373cfe25604290c59143469df649337657))
+
 ## [0.23.1](https://github.com/hirosystems/clarinet/compare/v0.23.0...v0.23.1) (2022-01-13)
 
 
