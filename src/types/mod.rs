@@ -20,14 +20,14 @@ pub use data::{
 };
 
 #[allow(dead_code)]
-#[derive(Clone, Debug)]
+#[derive(Debug, Clone, PartialEq, Serialize)]
 pub enum BitcoinChainEvent {
     ChainUpdatedWithBlock(BitcoinBlockData),
     ChainUpdatedWithReorg(Vec<BitcoinBlockData>, Vec<BitcoinBlockData>),
 }
 
 #[allow(dead_code)]
-#[derive(Clone, Debug)]
+#[derive(Debug, Clone, PartialEq, Serialize)]
 pub enum StacksChainEvent {
     ChainUpdatedWithBlock(StacksBlockData),
     ChainUpdatedWithReorg(Vec<StacksBlockData>, Vec<StacksBlockData>),

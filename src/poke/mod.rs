@@ -55,7 +55,8 @@ pub fn load_session_settings(
         settings.initial_accounts.push(account);
     }
 
-    for (name, config) in project_config.ordered_contracts().iter() {
+    for name in project_config.ordered_contracts().iter() {
+        let config = project_config.contracts.get(name).unwrap();
         let mut contract_path = project_path.clone();
         contract_path.push(&config.path);
 

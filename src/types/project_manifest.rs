@@ -5,6 +5,7 @@ use std::iter::FromIterator;
 use std::path::PathBuf;
 use std::process;
 use toml::value::Value;
+use crate::utils;
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct ProjectManifestFile {
@@ -71,60 +72,13 @@ impl ProjectManifest {
         ProjectManifest::from_project_manifest_file(project_manifest_file)
     }
 
-    pub fn ordered_contracts(&self) -> Vec<(String, ContractConfig)> {
-        let mut dst = vec![];
-        let mut lookup = BTreeMap::new();
-        let mut reverse_lookup = BTreeMap::new();
+    pub fn ordered_contracts(&self) -> Vec<String> {
 
-        let mut index: usize = 0;
-        let contracts = self.contracts.clone();
-
-        if contracts.is_empty() {
-            return vec![];
+        let mut contracts = BTreeMap::new();
+        for (contract_name, config) in self.contracts.iter() {
+            contracts.insert(contract_name.clone(), config.depends_on.clone());
         }
-
-        for (contract, _) in contracts.iter() {
-            lookup.insert(contract, index);
-            reverse_lookup.insert(index, contract.clone());
-            index += 1;
-        }
-
-        let mut graph = Graph::new();
-        for (contract, contract_config) in contracts.iter() {
-            let contract_id = lookup.get(contract).unwrap();
-            graph.add_node(*contract_id);
-            for deps in contract_config.depends_on.iter() {
-                let dep_id = lookup.get(deps).unwrap();
-                graph.add_directed_edge(*contract_id, *dep_id);
-            }
-        }
-
-        let mut walker = GraphWalker::new();
-        let sorted_indexes = walker.get_sorted_dependencies(&graph);
-
-        let cyclic_deps = walker.get_cycling_dependencies(&graph, &sorted_indexes);
-        if let Some(deps) = cyclic_deps {
-            let mut contracts = vec![];
-            for index in deps.iter() {
-                let contract = {
-                    let entry = reverse_lookup.get(index).unwrap();
-                    entry.clone()
-                };
-                contracts.push(contract);
-            }
-            println!("Error: cycling dependencies: {}", contracts.join(", "));
-            process::exit(0);
-        }
-
-        for index in sorted_indexes.iter() {
-            let contract = {
-                let entry = reverse_lookup.get(index).unwrap();
-                entry.clone()
-            };
-            let config = contracts.get(&contract).unwrap();
-            dst.push((contract, config.clone()))
-        }
-        dst
+        utils::order_contracts(&contracts)
     }
 
     pub fn from_project_manifest_file(
@@ -192,109 +146,5 @@ impl ProjectManifest {
         config.contracts = config_contracts;
         config.project.requirements = Some(config_requirements);
         config
-    }
-}
-
-struct Graph {
-    pub adjacency_list: Vec<Vec<usize>>,
-}
-
-impl Graph {
-    fn new() -> Self {
-        Self {
-            adjacency_list: Vec::new(),
-        }
-    }
-
-    fn add_node(&mut self, _expr_index: usize) {
-        self.adjacency_list.push(vec![]);
-    }
-
-    fn add_directed_edge(&mut self, src_expr_index: usize, dst_expr_index: usize) {
-        let list = self.adjacency_list.get_mut(src_expr_index).unwrap();
-        list.push(dst_expr_index);
-    }
-
-    fn get_node_descendants(&self, expr_index: usize) -> Vec<usize> {
-        self.adjacency_list[expr_index].clone()
-    }
-
-    fn has_node_descendants(&self, expr_index: usize) -> bool {
-        self.adjacency_list[expr_index].len() > 0
-    }
-
-    fn nodes_count(&self) -> usize {
-        self.adjacency_list.len()
-    }
-}
-
-struct GraphWalker {
-    seen: HashSet<usize>,
-}
-
-impl GraphWalker {
-    fn new() -> Self {
-        Self {
-            seen: HashSet::new(),
-        }
-    }
-
-    /// Depth-first search producing a post-order sort
-    fn get_sorted_dependencies(&mut self, graph: &Graph) -> Vec<usize> {
-        let mut sorted_indexes = Vec::<usize>::new();
-        for expr_index in 0..graph.nodes_count() {
-            self.sort_dependencies_recursion(expr_index, graph, &mut sorted_indexes);
-        }
-
-        sorted_indexes
-    }
-
-    fn sort_dependencies_recursion(
-        &mut self,
-        tle_index: usize,
-        graph: &Graph,
-        branch: &mut Vec<usize>,
-    ) {
-        if self.seen.contains(&tle_index) {
-            return;
-        }
-
-        self.seen.insert(tle_index);
-        if let Some(list) = graph.adjacency_list.get(tle_index) {
-            for neighbor in list.iter() {
-                self.sort_dependencies_recursion(neighbor.clone(), graph, branch);
-            }
-        }
-        branch.push(tle_index);
-    }
-
-    fn get_cycling_dependencies(
-        &mut self,
-        graph: &Graph,
-        sorted_indexes: &Vec<usize>,
-    ) -> Option<Vec<usize>> {
-        let mut tainted: HashSet<usize> = HashSet::new();
-
-        for node in sorted_indexes.iter() {
-            let mut tainted_descendants_count = 0;
-            let descendants = graph.get_node_descendants(*node);
-            for descendant in descendants.iter() {
-                if !graph.has_node_descendants(*descendant) || tainted.contains(descendant) {
-                    tainted.insert(*descendant);
-                    tainted_descendants_count += 1;
-                }
-            }
-            if tainted_descendants_count == descendants.len() {
-                tainted.insert(*node);
-            }
-        }
-
-        if tainted.len() == sorted_indexes.len() {
-            return None;
-        }
-
-        let nodes = HashSet::from_iter(sorted_indexes.iter().cloned());
-        let deps = nodes.difference(&tainted).map(|i| *i).collect();
-        Some(deps)
     }
 }
