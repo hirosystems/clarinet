@@ -186,6 +186,8 @@ type PreSetupFunction = () => Array<Tx>;
 
 interface UnitTestOptions {
   name: string;
+  only?: true;
+  ignore? :true;
   preSetup?: PreSetupFunction;
   fn: TestFunction;
 }
@@ -214,6 +216,8 @@ export class Clarinet {
   static test(options: UnitTestOptions) {
     Deno.test({
       name: options.name,
+      only: options.only,
+      ignore: options.ignore,
       async fn() {
         (Deno as any).core.ops();
 
