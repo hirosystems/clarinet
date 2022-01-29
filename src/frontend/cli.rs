@@ -416,9 +416,11 @@ pub fn main() {
                 }
             };
             let contract_id = QualifiedContractIdentifier::transient();
-            let (ast, mut diagnostics, mut success) = session
-                .interpreter
-                .build_ast(contract_id.clone(), code.clone());
+            let (ast, mut diagnostics, mut success) = session.interpreter.build_ast(
+                contract_id.clone(),
+                code.clone(),
+                settings.parser_version,
+            );
             let (annotations, mut annotation_diagnostics) =
                 session.interpreter.collect_annotations(&ast, &code);
             diagnostics.append(&mut annotation_diagnostics);
