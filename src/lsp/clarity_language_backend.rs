@@ -109,9 +109,11 @@ impl ClarityLanguageBackend {
 
             // Extract the AST, and try to move to the next contract if we throw an error:
             // we're trying to get as many errors as possible
-            let (mut ast, mut diagnostics, _) = incremental_session
-                .interpreter
-                .build_ast(contract_id.clone(), code.clone());
+            let (mut ast, mut diagnostics, _) = incremental_session.interpreter.build_ast(
+                contract_id.clone(),
+                code.clone(),
+                settings.parser_version,
+            );
 
             // Run the analysis, and try to move to the next contract if we throw an error:
             // we're trying to get as many errors as possible
@@ -208,9 +210,10 @@ impl ClarityLanguageBackend {
 
         // Extract the AST, and try to move to the next contract if we throw an error:
         // we're trying to get as many errors as possible
-        let (mut ast, mut diagnostics, _) = incremental_session
-            .interpreter
-            .build_ast(contract_id.clone(), code.clone());
+        let (mut ast, mut diagnostics, _) =
+            incremental_session
+                .interpreter
+                .build_ast(contract_id.clone(), code.clone(), 2);
 
         // Run the analysis, and try to move to the next contract if we throw an error:
         // we're trying to get as many errors as possible
