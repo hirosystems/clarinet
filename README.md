@@ -84,6 +84,18 @@ cd clarinet
 cargo install --path . --locked
 ```
 
+By default, you will be in our development branch, `develop`, with code that has not been released yet. If you plan to submit any changes to the code, then this is the right branch for you. If you just want the latest stable version, switch to the main branch:
+
+```bash
+git checkout main
+```
+
+If you have previously checked out the source, ensure you have the latest code (including submodules) before building using:
+```
+git pull
+git submodule update --recursive
+```
+
 ## Getting started with Clarinet
 
 The following sections describe how to create a new project in Clarinet and populate it with smart contracts. Clarinet
