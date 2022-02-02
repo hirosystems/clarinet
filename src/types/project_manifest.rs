@@ -1,3 +1,4 @@
+use clarity_repl::analysis::{AnalysisSettings, AnalysisSettingsFile};
 use std::collections::{BTreeMap, HashSet};
 use std::fs::File;
 use std::io::{BufReader, Read};
@@ -20,8 +21,9 @@ pub struct ProjectConfigFile {
     telemetry: Option<bool>,
     requirements: Option<Value>,
     analysis: Option<Vec<String>>,
+    analysis_settings: Option<AnalysisSettingsFile>,
     costs_version: Option<u32>,
-    parser_version: Option<u32>
+    parser_version: Option<u32>,
 }
 
 #[derive(Serialize, Deserialize, Debug, Default)]
@@ -39,8 +41,9 @@ pub struct ProjectConfig {
     pub telemetry: bool,
     pub requirements: Option<Vec<RequirementConfig>>,
     pub analysis: Option<Vec<String>>,
+    pub analysis_settings: AnalysisSettings,
     pub costs_version: u32,
-    pub parser_version: u32
+    pub parser_version: u32,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Default)]
@@ -160,8 +163,15 @@ impl ProjectManifest {
             authors: project_manifest_file.project.authors.unwrap_or(vec![]),
             telemetry: project_manifest_file.project.telemetry.unwrap_or(false),
             costs_version: project_manifest_file.project.costs_version.unwrap_or(2),
-            analysis: project_manifest_file.project.analysis,
             parser_version: project_manifest_file.project.parser_version.unwrap_or(2),
+            analysis: project_manifest_file.project.analysis,
+            analysis_settings: if let Some(analysis_settings) =
+                project_manifest_file.project.analysis_settings
+            {
+                AnalysisSettings::from(analysis_settings)
+            } else {
+                AnalysisSettings::default()
+            },
         };
 
         let mut config = ProjectManifest {
