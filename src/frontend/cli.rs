@@ -433,6 +433,7 @@ pub fn main() {
                 &mut analysis_db,
                 &settings.analysis,
                 &annotations,
+                settings.analysis_settings,
             ) {
                 Ok(diagnostics) => diagnostics,
                 Err(diagnostics) => {
