@@ -16,7 +16,7 @@ An introductory video tutorial series, from Hiro Engineer [Ludo Galabru](https:/
 
 
 Check out the playlist on [Hiro's Youtube](https://www.youtube.com/c/HiroSystems):
-[<img src="clarinet101.png">](https://youtube.com/playlist?list=PL5Ujm489LoJaAz9kUJm8lYUWdGJ2AnQTb)
+[<img src="docs/images/clarinet101.png">](https://youtube.com/playlist?list=PL5Ujm489LoJaAz9kUJm8lYUWdGJ2AnQTb)
 
 ## Installation
 
