@@ -172,9 +172,20 @@ pub fn publish_all_contracts(
         if account.name == "deployer" {
             deployers_lookup.insert("*".into(), account.clone());
         }
+        deployers_lookup.insert(account.address.clone(), account.clone());
     }
 
     for contract in settings.initial_contracts.iter() {
+        if let Some(account) = deployers_lookup.get(&contract.deployer.clone().unwrap()) {
+            deployers_lookup.insert(contract.name.clone().unwrap(), account.clone());
+        } else {
+            results.push(format!(
+                "Error: unknown deployer {:?} for {:?}",
+                contract.deployer, contract.name,
+            ));
+            break;
+        }
+
         match publish_contract(
             contract,
             &deployers_lookup,

@@ -190,6 +190,7 @@ callee_filter = false
 # [contracts.counter]
 # path = "contracts/counter.clar"
 # depends_on = []
+# deployer = "deployer"
 "#,
             self.project_name, self.telemetry_enabled
         );
