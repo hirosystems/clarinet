@@ -177,6 +177,11 @@ export class Chain {
   }
 }
 
+type BeforeHookFunction = (
+  chain: Chain,
+  accounts: Map<string, Account>,
+) => void | Promise<void>;
+
 type TestFunction = (
   chain: Chain,
   accounts: Map<string, Account>,
@@ -188,7 +193,7 @@ interface UnitTestOptions {
   name: string;
   only?: true;
   ignore? :true;
-  preSetup?: PreSetupFunction;
+  beforeContractsDeployment?: BeforeHookFunction;
   fn: TestFunction;
 }
 
@@ -221,19 +226,31 @@ export class Clarinet {
       async fn() {
         (Deno as any).core.ops();
 
-        var transactions: Array<Tx> = [];
-        if (options.preSetup) {
-          transactions = options.preSetup()!;
-        }
-        let result = JSON.parse((Deno as any).core.opSync("setup_chain", {
+        let includesPreDeploymentSteps = options.beforeContractsDeployment !== undefined;
+
+        let result = JSON.parse((Deno as any).core.opSync("start_setup_chain", {
           name: options.name,
-          transactions: transactions,
+          includesPreDeploymentSteps: includesPreDeploymentSteps,
         }));
+
+        if (options.beforeContractsDeployment !== undefined) {
+          let chain = new Chain(result["session_id"]);
+          let accounts: Map<string, Account> = new Map();
+          for (let account of result["accounts"]) {
+            accounts.set(account.name, account);
+          }        
+          await options.beforeContractsDeployment(chain, accounts);
+
+          result = JSON.parse((Deno as any).core.opSync("complete_setup_chain", {
+            sessionId: chain.sessionId,
+          }));
+        }
+
         let chain = new Chain(result["session_id"]);
         let accounts: Map<string, Account> = new Map();
         for (let account of result["accounts"]) {
           accounts.set(account.name, account);
-        }
+        }        
         let contracts: Map<string, any> = new Map();
         for (let contract of result["contracts"]) {
           contracts.set(contract.contract_id, contract);

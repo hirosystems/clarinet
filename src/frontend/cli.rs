@@ -344,12 +344,16 @@ pub fn main() {
                     .max_blocking_threads(32)
                     .build()
                     .unwrap();
+
                 let mut retrieved = BTreeSet::new();
-                let res = rt.block_on(session.resolve_link(&repl::settings::InitialLink {
-                    contract_id: fork_contract.contract_id.clone(),
-                    stacks_node_addr: None,
-                    cache: None,
-                }, &mut retrieved));
+                let res = rt.block_on(session.resolve_link(
+                    &repl::settings::InitialLink {
+                        contract_id: fork_contract.contract_id.clone(),
+                        stacks_node_addr: None,
+                        cache: None,
+                    },
+                    &mut retrieved,
+                ));
                 let contracts = res.unwrap();
                 let mut changes = vec![];
                 for (contract_id, code, deps) in contracts.into_iter() {

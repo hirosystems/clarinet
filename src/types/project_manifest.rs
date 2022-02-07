@@ -1,11 +1,12 @@
+use crate::utils;
 use std::collections::{BTreeMap, HashSet};
+use std::env::var;
 use std::fs::File;
 use std::io::{BufReader, Read};
 use std::iter::FromIterator;
 use std::path::PathBuf;
 use std::process;
 use toml::value::Value;
-use crate::utils;
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct ProjectManifestFile {
@@ -22,7 +23,8 @@ pub struct ProjectConfigFile {
     requirements: Option<Value>,
     analysis: Option<Vec<String>>,
     costs_version: Option<u32>,
-    parser_version: Option<u32>
+    parser_version: Option<u32>,
+    cache_dir: Option<String>,
 }
 
 #[derive(Serialize, Deserialize, Debug, Default)]
@@ -41,7 +43,8 @@ pub struct ProjectConfig {
     pub requirements: Option<Vec<RequirementConfig>>,
     pub analysis: Option<Vec<String>>,
     pub costs_version: u32,
-    pub parser_version: u32
+    pub parser_version: u32,
+    pub cache_dir: String,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Default)]
@@ -93,7 +96,6 @@ impl ProjectManifest {
     }
 
     pub fn ordered_contracts(&self) -> Vec<String> {
-
         let mut contracts = BTreeMap::new();
         for (contract_name, config) in self.contracts.iter() {
             contracts.insert(contract_name.clone(), config.depends_on.clone());
@@ -104,8 +106,12 @@ impl ProjectManifest {
     pub fn from_project_manifest_file(
         project_manifest_file: ProjectManifestFile,
     ) -> ProjectManifest {
+        let project_name = project_manifest_file.project.name;
+        let default_cache_path =
+            format!("{}/.clarinet/{}/cache", var("HOME").unwrap(), project_name);
+
         let project = ProjectConfig {
-            name: project_manifest_file.project.name.clone(),
+            name: project_name.clone(),
             requirements: None,
             description: project_manifest_file
                 .project
@@ -116,6 +122,10 @@ impl ProjectManifest {
             costs_version: project_manifest_file.project.costs_version.unwrap_or(2),
             analysis: project_manifest_file.project.analysis,
             parser_version: project_manifest_file.project.parser_version.unwrap_or(2),
+            cache_dir: project_manifest_file
+                .project
+                .cache_dir
+                .unwrap_or(default_cache_path),
         };
 
         let mut config = ProjectManifest {

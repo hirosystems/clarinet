@@ -50,6 +50,8 @@ use swc_common::comments::CommentKind;
 
 mod sessions {
     use super::TransactionArgs;
+    use crate::poke::load_session_settings;
+    use crate::publish::Network;
     use crate::types::{ChainConfig, ProjectManifest};
     use clarity_repl::clarity::analysis::ContractAnalysis;
     use clarity_repl::repl::settings::Account;
@@ -75,6 +77,68 @@ mod sessions {
     pub fn handle_setup_chain(
         manifest_path: &PathBuf,
         name: String,
+        includes_pre_deployment_steps: bool,
+    ) -> Result<(u32, Vec<Account>, Vec<(ContractAnalysis, String, String)>), AnyError> {
+        let mut sessions = SESSIONS.lock().unwrap();
+        let session_id = sessions.len() as u32;
+        let session_templated = {
+            let res = SESSION_TEMPLATE.lock().unwrap();
+            !res.is_empty()
+        };
+        let can_use_cache = !includes_pre_deployment_steps && session_templated;
+        let should_update_cache = !includes_pre_deployment_steps;
+
+        let (mut session, contracts) = if !can_use_cache {
+            let (mut session_settings, _, _) =
+                load_session_settings(&manifest_path, &Network::Devnet)
+                    .expect("Unable to load manifest");
+            session_settings.lazy_initial_contracts_interpretation = includes_pre_deployment_steps;
+            let mut session = Session::new(session_settings.clone());
+            let (_, contracts) = match session.start() {
+                Ok(res) => res,
+                Err(e) => {
+                    std::process::exit(1);
+                }
+            };
+            if should_update_cache {
+                SESSION_TEMPLATE.lock().unwrap().push(session.clone());
+            }
+            (session, contracts)
+        } else {
+            let session = SESSION_TEMPLATE.lock().unwrap().last().unwrap().clone();
+            let contracts = session.initial_contracts_analysis.clone();
+            (session, contracts)
+        };
+
+        if !includes_pre_deployment_steps {
+            session.advance_chain_tip(1);
+        }
+
+        let accounts = session.settings.initial_accounts.clone();
+        sessions.insert(session_id, (name, session));
+        Ok((session_id, accounts, contracts))
+    }
+
+    pub fn complete_setup_chain(
+        session_id: u32,
+    ) -> Result<(u32, Vec<Account>, Vec<(ContractAnalysis, String, String)>), AnyError> {
+        let mut sessions = SESSIONS.lock().unwrap();
+        match sessions.get_mut(&session_id) {
+            Some((_, session)) => {
+                let (_, contracts) = session
+                    .interpret_initial_contracts()
+                    .expect("Unable to load contracts");
+                session.advance_chain_tip(1);
+                let accounts = session.settings.initial_accounts.clone();
+                Ok((session_id, accounts, contracts))
+            }
+            _ => unreachable!(),
+        }
+    }
+
+    pub fn handle_setup_chain_legacy(
+        manifest_path: &PathBuf,
+        name: String,
         transactions: Vec<TransactionArgs>,
     ) -> Result<(u32, Vec<Account>, Vec<(ContractAnalysis, String, String)>), AnyError> {
         let mut sessions = SESSIONS.lock().unwrap();
@@ -83,9 +147,10 @@ mod sessions {
             let res = SESSION_TEMPLATE.lock().unwrap();
             !res.is_empty()
         };
-        let use_cache = transactions.is_empty() && session_templated;
+        let can_use_cache = transactions.is_empty() && session_templated;
+        let should_update_cache = transactions.is_empty();
 
-        let (mut session, contracts) = if !use_cache {
+        let (mut session, contracts) = if !can_use_cache {
             let mut settings = repl::SessionSettings::default();
             let mut project_path = manifest_path.clone();
             project_path.pop();
@@ -170,7 +235,9 @@ mod sessions {
                     std::process::exit(1);
                 }
             };
-            SESSION_TEMPLATE.lock().unwrap().push(session.clone());
+            if should_update_cache {
+                SESSION_TEMPLATE.lock().unwrap().push(session.clone());
+            }
             (session, contracts)
         } else {
             let session = SESSION_TEMPLATE.lock().unwrap().last().unwrap().clone();
@@ -1043,7 +1110,12 @@ pub async fn run_script(
 
     {
         let js_runtime = &mut worker.js_runtime;
-        js_runtime.register_op("setup_chain", deno_core::op_sync(setup_chain));
+        js_runtime.register_op("setup_chain", deno_core::op_sync(setup_chain_legacy));
+        js_runtime.register_op("start_setup_chain", deno_core::op_sync(start_chain_setup));
+        js_runtime.register_op(
+            "complete_setup_chain",
+            deno_core::op_sync(complete_chain_setup),
+        );
         js_runtime.register_op("mine_block", deno_core::op_sync(mine_block));
         js_runtime.register_op("mine_empty_blocks", deno_core::op_sync(mine_empty_blocks));
         js_runtime.register_op("call_read_only_fn", deno_core::op_sync(call_read_only_fn));
@@ -1120,17 +1192,86 @@ pub async fn run_script(
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
-struct SetupChainArgs {
+struct SetupChainArgsLegacy {
     name: String,
     transactions: Vec<TransactionArgs>,
 }
 
-fn setup_chain(state: &mut OpState, args: Value, _: ()) -> Result<String, AnyError> {
+// We need to keep this flow untouched, to maintain backward compatibility with test suites
+// relying on this previous flow (v0.24.0).
+// See `start_chain_setup` for the new flow.
+fn setup_chain_legacy(state: &mut OpState, args: Value, _: ()) -> Result<String, AnyError> {
+    let manifest_path = state.borrow::<PathBuf>();
+    println!("{:?}", manifest_path);
+    let args: SetupChainArgsLegacy =
+        serde_json::from_value(args).expect("Invalid request from JavaScript for \"op_load\".");
+    let (session_id, accounts, contracts) =
+        sessions::handle_setup_chain_legacy(manifest_path, args.name, args.transactions)?;
+    let serialized_contracts = contracts.iter().map(|(a, s, _)| json!({
+      "contract_id": a.contract_identifier.to_string(),
+      "contract_interface": a.contract_interface.clone(),
+      "dependencies": a.dependencies.clone().into_iter().map(|c| c.to_string()).collect::<Vec<String>>(),
+      "source": s
+    })).collect::<Vec<_>>();
+
+    let allow_wallets = state.borrow::<bool>();
+    let accounts = if *allow_wallets { accounts } else { vec![] };
+
+    Ok(json!({
+        "session_id": session_id,
+        "accounts": accounts,
+        "contracts": serialized_contracts,
+    })
+    .to_string())
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct SetupChainArgs {
+    name: String,
+    includes_pre_deployment_steps: bool,
+}
+
+// In this new flow, we want to improve the chain customizability.
+// Instead of having an optional `preSetup` function, admitting a vector of transactions, a new
+// function that will be providing a handle to the chain with the genesis accounts seeded.
+fn start_chain_setup(state: &mut OpState, args: Value, _: ()) -> Result<String, AnyError> {
     let manifest_path = state.borrow::<PathBuf>();
     let args: SetupChainArgs =
         serde_json::from_value(args).expect("Invalid request from JavaScript for \"op_load\".");
     let (session_id, accounts, contracts) =
-        sessions::handle_setup_chain(manifest_path, args.name, args.transactions)?;
+        sessions::handle_setup_chain(manifest_path, args.name, args.includes_pre_deployment_steps)?;
+    let serialized_contracts = contracts.iter().map(|(a, s, _)| json!({
+      "contract_id": a.contract_identifier.to_string(),
+      "contract_interface": a.contract_interface.clone(),
+      "dependencies": a.dependencies.clone().into_iter().map(|c| c.to_string()).collect::<Vec<String>>(),
+      "source": s
+    })).collect::<Vec<_>>();
+
+    let allow_wallets = state.borrow::<bool>();
+    let accounts = if *allow_wallets { accounts } else { vec![] };
+
+    Ok(json!({
+        "session_id": session_id,
+        "accounts": accounts,
+        "contracts": serialized_contracts,
+    })
+    .to_string())
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct CompleteSetupChainArgs {
+    session_id: u32,
+}
+
+// In this new flow, we want to improve the chain customizability.
+// Instead of having an optional `preSetup` function, admitting a vector of transactions, a new
+// function that will be providing a handle to the chain with the genesis accounts seeded.
+fn complete_chain_setup(state: &mut OpState, args: Value, _: ()) -> Result<String, AnyError> {
+    let args: CompleteSetupChainArgs =
+        serde_json::from_value(args).expect("Invalid request from JavaScript for \"op_load\".");
+    let (session_id, accounts, contracts) = sessions::complete_setup_chain(args.session_id)?;
     let serialized_contracts = contracts.iter().map(|(a, s, _)| json!({
       "contract_id": a.contract_identifier.to_string(),
       "contract_interface": a.contract_interface.clone(),

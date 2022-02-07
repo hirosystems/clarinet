@@ -53,3 +53,30 @@ Clarinet.test({
         "ST1HTBVD3JG9C05J7HBJTHGR0GGW7KXW28M5JS8QE.plaid-token".expectPrincipal('ST1HTBVD3JG9C05J7HBJTHGR0GGW7KXW28M5JS8QE.plaid-token');
     },
 });
+
+Clarinet.test({
+    name: "Test with pre-setup",
+    beforeContractsDeployment: async (chain: Chain, accounts: Map<string, Account>) => {
+        chain.mineEmptyBlock(100);
+    },
+    async fn(chain: Chain, accounts: Map<string, Account>, contracts: Map<string, Contract>) {
+        let wallet_1 = accounts.get("wallet_1")!;
+        let wallet_2 = accounts.get("wallet_2")!;
+
+        let block = chain.mineBlock([
+            Tx.contractCall("counter", "increment", [types.uint(1)], wallet_1.address),
+            Tx.contractCall("counter", "increment", [types.uint(4)], wallet_1.address),
+            Tx.contractCall("counter", "increment", [types.uint(10)], wallet_1.address)
+        ]);
+        assertEquals(block.height, 102);
+        block.receipts[0].result
+            .expectOk()
+            .expectUint(2);
+        block.receipts[1].result
+            .expectOk()
+            .expectUint(6);
+        block.receipts[2].result
+            .expectOk()
+            .expectUint(16);
+    },
+});
