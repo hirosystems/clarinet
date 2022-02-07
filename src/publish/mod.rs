@@ -157,10 +157,13 @@ pub fn publish_all_contracts(
 ) -> Result<(Vec<String>, ProjectManifest), Vec<String>> {
     let (settings, chain, project_manifest) = if analysis_enabled {
         let start_repl = false;
-        let (session, chain, project_manifest, output) = match load_session(manifest_path, start_repl, &network) {
-            Ok((session, chain, project_manifest, output)) => (session, chain, project_manifest, output),
-            Err(e) => return Err(vec![e]),
-        };
+        let (session, chain, project_manifest, output) =
+            match load_session(manifest_path, start_repl, &network) {
+                Ok((session, chain, project_manifest, output)) => {
+                    (session, chain, project_manifest, output)
+                }
+                Err(e) => return Err(vec![e]),
+            };
 
         if let Some(message) = output {
             println!("{}", message);
@@ -174,10 +177,11 @@ pub fn publish_all_contracts(
         }
         (session.settings, chain, project_manifest)
     } else {
-        let (settings, chain, project_manifest) = match load_session_settings(manifest_path, &network) {
-            Ok((session, chain, project_manifest)) => (session, chain, project_manifest),
-            Err(e) => return Err(vec![e]),
-        };
+        let (settings, chain, project_manifest) =
+            match load_session_settings(manifest_path, &network) {
+                Ok((session, chain, project_manifest)) => (session, chain, project_manifest),
+                Err(e) => return Err(vec![e]),
+            };
         (settings, chain, project_manifest)
     };
 
