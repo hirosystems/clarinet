@@ -123,16 +123,4 @@ impl Indexer {
     pub fn get_pox_info(&mut self) -> PoxInfo {
         self.stacks_context.pox_info.clone()
     }
-
-    pub async fn update_pox_info(&mut self) {
-        let res: Result<PoxInfo, _> =
-            reqwest::get(format!("{}/v2/pox", self.config.stacks_node_rpc_url))
-                .await
-                .expect("Unable to retrieve pox info")
-                .json()
-                .await;
-        if let Ok(ref pox_info) = res {
-            self.stacks_context.pox_info = pox_info.clone();
-        }
-    }
 }

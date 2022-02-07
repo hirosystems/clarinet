@@ -10,20 +10,13 @@ the Stacks blockchain. Smart contracts allow developers to encode essential busi
 
 ![screenshot](docs/images/demo.gif)
 
-### Screencasts
+### Clarinet 101
 
-A series of short tutorials is available as a playlist of screencasts on Youtube, covering the following subjects:
+An introductory video tutorial series, from Hiro Engineer [Ludo Galabru](https://twitter.com/ludovic?lang=en), that guides developers through some of the fundamentals of of Clarinet, and how it can help develop, test, and deploy Clarity smart contracts. 
 
-- [What is Clarinet?](https://youtu.be/a451iFQfZOE)
-- [Create a new project](https://youtu.be/BPB_gM960BA)
-- [Add a public function in a Clarity contract](https://youtu.be/fjQLmpMSws8)
-- [Invoking a function from the console](https://youtu.be/MGljkGjsSco)
-- [Write unit tests using Typescript](https://youtu.be/YxWk804IdXU)
-- [A simple CI with Clarinet and Github](https://youtu.be/5w-QTGq8W5I)
-- [Execute tests and check code covereage](https://youtu.be/jZ_XUqfbCqg)
-- [Introduction to smart contract integration with Clarinet](https://youtu.be/pucJ_tOC3pk)
-- [Setup a React project interacting with Clarinet](https://youtu.be/b7iipqzTUH8)
-- [Setup an intgration test environment with stacks-devnet-js](https://youtu.be/BqeL17m1dZk)
+
+Check out the playlist on [Hiro's Youtube](https://www.youtube.com/c/HiroSystems):
+[<img src="docs/images/clarinet101.png">](https://youtube.com/playlist?list=PL5Ujm489LoJaAz9kUJm8lYUWdGJ2AnQTb)
 
 ## Installation
 
@@ -82,6 +75,18 @@ You can build Clarinet from source using Cargo with the following commands:
 git clone https://github.com/hirosystems/clarinet.git --recursive
 cd clarinet
 cargo install --path . --locked
+```
+
+By default, you will be in our development branch, `develop`, with code that has not been released yet. If you plan to submit any changes to the code, then this is the right branch for you. If you just want the latest stable version, switch to the main branch:
+
+```bash
+git checkout main
+```
+
+If you have previously checked out the source, ensure you have the latest code (including submodules) before building using:
+```
+git pull
+git submodule update --recursive
 ```
 
 ## Getting started with Clarinet

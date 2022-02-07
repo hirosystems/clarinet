@@ -1,4 +1,5 @@
 use crate::poke::{load_session, load_session_settings};
+use crate::types::ProjectManifest;
 use crate::utils::mnemonic;
 use crate::utils::stacks::StacksRpc;
 use clarity_repl::clarity::codec::transaction::{
@@ -39,6 +40,7 @@ struct Balance {
 }
 
 #[allow(dead_code)]
+#[derive(Debug)]
 pub enum Network {
     Devnet,
     Testnet,
@@ -152,11 +154,11 @@ pub fn publish_all_contracts(
     network: Network,
     analysis_enabled: bool,
     delay_between_checks: u32,
-) -> Result<Vec<String>, Vec<String>> {
-    let (settings, chain) = if analysis_enabled {
+) -> Result<(Vec<String>, ProjectManifest), Vec<String>> {
+    let (settings, chain, project_manifest) = if analysis_enabled {
         let start_repl = false;
-        let (session, chain, output) = match load_session(manifest_path, start_repl, &network) {
-            Ok((session, chain, output)) => (session, chain, output),
+        let (session, chain, project_manifest, output) = match load_session(manifest_path, start_repl, &network) {
+            Ok((session, chain, project_manifest, output)) => (session, chain, project_manifest, output),
             Err(e) => return Err(vec![e]),
         };
 
@@ -170,13 +172,13 @@ pub fn publish_all_contracts(
                 std::process::exit(1);
             }
         }
-        (session.settings, chain)
+        (session.settings, chain, project_manifest)
     } else {
-        let (settings, chain) = match load_session_settings(manifest_path, &network) {
-            Ok((session, chain, _)) => (session, chain),
+        let (settings, chain, project_manifest) = match load_session_settings(manifest_path, &network) {
+            Ok((session, chain, project_manifest)) => (session, chain, project_manifest),
             Err(e) => return Err(vec![e]),
         };
-        (settings, chain)
+        (settings, chain, project_manifest)
     };
 
     let mut results = vec![];
@@ -234,5 +236,5 @@ pub fn publish_all_contracts(
 
     // If devnet, we should be pulling all the links.
 
-    Ok(results)
+    Ok((results, project_manifest))
 }

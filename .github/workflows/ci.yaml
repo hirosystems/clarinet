@@ -3,13 +3,13 @@ on:
   pull_request:
   push:
     tags:
-      - "v*"
+      - 'v*'
     paths-ignore:
-      - "**/CHANGELOG.md"
-      - "**/package.json"
-      - "**/package-lock.json"
-      - "**/Cargo.toml"
-      - "**/Cargo.lock"
+      - '**/CHANGELOG.md'
+      - '**/package.json'
+      - '**/package-lock.json'
+      - '**/Cargo.toml'
+      - '**/Cargo.lock'
     branches:
       - main
       - develop
@@ -56,7 +56,7 @@ jobs:
         run: cargo install cargo-audit
 
       - name: Run audit
-        run: cargo audit --ignore RUSTSEC-2021-0076 --ignore RUSTSEC-2021-0079 --ignore RUSTSEC-2021-0078 --ignore RUSTSEC-2021-0093 --ignore RUSTSEC-2020-0159 --ignore RUSTSEC-2021-0119 --ignore RUSTSEC-2020-0071
+        run: cargo audit --ignore RUSTSEC-2021-0076 --ignore RUSTSEC-2021-0079 --ignore RUSTSEC-2021-0078 --ignore RUSTSEC-2021-0093 --ignore RUSTSEC-2020-0159 --ignore RUSTSEC-2021-0119 --ignore RUSTSEC-2020-0071 --ignore RUSTSEC-2022-0006
 
       - name: Run rustfmt
         run: cargo fmt --all -- --check
@@ -227,7 +227,7 @@ jobs:
       #   run: sudo apt-get update && sudo apt-get install -y ${{ matrix.linker_package }}
 
       - name: Build - Cargo
-        run: cargo build --release --locked --target ${{ matrix.target }}
+        run: cargo build --release --features=telemetry --locked --target ${{ matrix.target }}
         # To be uncommented later when adding new distros
         # env:
         #   CC: ${{ matrix.cc }}
@@ -245,7 +245,7 @@ jobs:
           npm run build-${{ matrix.platform }}-${{ matrix.architecture }}
 
       - name: Code sign bin (Windows)
-        if: matrix.os == 'windows-latest'
+        if: startsWith(github.ref, 'refs/tags/v') && matrix.os == 'windows-latest'
         run: |
           $certificate_file_name = "${env:TEMP}\certificate.pfx"
 
@@ -266,10 +266,10 @@ jobs:
 
       - name: Build Installer (Windows)
         if: matrix.os == 'windows-latest'
-        run: cargo wix -v --no-build --nocapture
+        run: cargo wix -v --no-build --nocapture -p clarinet
 
       - name: Code sign installer (Windows)
-        if: matrix.os == 'windows-latest'
+        if: startsWith(github.ref, 'refs/tags/v') && matrix.os == 'windows-latest'
         run: |
           $certificate_file_name = "${env:TEMP}\certificate.pfx"
 

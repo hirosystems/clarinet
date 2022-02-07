@@ -1,5 +1,5 @@
 use clarity_repl::clarity::analysis::ContractAnalysis;
-use clarity_repl::clarity::diagnostic::Diagnostic as ClarityDiagnostic;
+use clarity_repl::clarity::diagnostic::{Diagnostic as ClarityDiagnostic, Level as ClarityLevel};
 use clarity_repl::clarity::docs::{
     make_api_reference, make_define_reference, make_keyword_reference,
 };
@@ -18,7 +18,7 @@ pub fn convert_clarity_diagnotic_to_lsp_diagnostic(diagnostic: ClarityDiagnostic
         _ => Range {
             start: Position {
                 line: diagnostic.spans[0].start_line - 1,
-                character: diagnostic.spans[0].start_column,
+                character: diagnostic.spans[0].start_column - 1,
             },
             end: Position {
                 line: diagnostic.spans[0].end_line - 1,
@@ -29,7 +29,11 @@ pub fn convert_clarity_diagnotic_to_lsp_diagnostic(diagnostic: ClarityDiagnostic
     // TODO(lgalabru): add hint for contracts not found errors
     LspDiagnostic {
         range,
-        severity: Some(DiagnosticSeverity::Error),
+        severity: match diagnostic.level {
+            ClarityLevel::Error => Some(DiagnosticSeverity::Error),
+            ClarityLevel::Warning => Some(DiagnosticSeverity::Warning),
+            ClarityLevel::Note => Some(DiagnosticSeverity::Information),
+        },
         code: None,
         code_description: None,
         source: Some("clarity".to_string()),

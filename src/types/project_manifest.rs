@@ -16,27 +16,33 @@ pub struct ProjectManifestFile {
 #[derive(Serialize, Deserialize, Debug)]
 pub struct ProjectConfigFile {
     name: String,
+    authors: Option<Vec<String>>,
+    description: Option<String>,
+    telemetry: Option<bool>,
     requirements: Option<Value>,
     analysis: Option<Vec<String>>,
     costs_version: Option<u32>,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Default)]
 pub struct ProjectManifest {
     pub project: ProjectConfig,
     #[serde(serialize_with = "toml::ser::tables_last")]
     pub contracts: BTreeMap<String, ContractConfig>,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Default)]
 pub struct ProjectConfig {
     pub name: String,
+    pub authors: Vec<String>,
+    pub description: String,
+    pub telemetry: bool,
     pub requirements: Option<Vec<RequirementConfig>>,
     pub analysis: Option<Vec<String>>,
     pub costs_version: u32,
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Default)]
 pub struct RequirementConfig {
     pub contract_id: String,
 }
@@ -67,8 +73,20 @@ impl ProjectManifest {
         project_manifest_file_reader
             .read_to_end(&mut project_manifest_file_buffer)
             .unwrap();
+
         let project_manifest_file: ProjectManifestFile =
-            toml::from_slice(&project_manifest_file_buffer[..]).unwrap();
+            match toml::from_slice(&project_manifest_file_buffer[..]) {
+                Ok(s) => s,
+                Err(_e) => {
+                    println!(
+                        "{}\n{:?}",
+                        red!("Error: there is an issue with the Clarinet.toml file"),
+                        _e
+                    );
+                    std::process::exit(1);
+                }
+            };
+
         ProjectManifest::from_project_manifest_file(project_manifest_file)
     }
 
@@ -87,6 +105,12 @@ impl ProjectManifest {
         let project = ProjectConfig {
             name: project_manifest_file.project.name.clone(),
             requirements: None,
+            description: project_manifest_file
+                .project
+                .description
+                .unwrap_or("".into()),
+            authors: project_manifest_file.project.authors.unwrap_or(vec![]),
+            telemetry: project_manifest_file.project.telemetry.unwrap_or(false),
             costs_version: project_manifest_file.project.costs_version.unwrap_or(2),
             analysis: project_manifest_file.project.analysis,
         };

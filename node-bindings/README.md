@@ -13,7 +13,7 @@ yarn add dev @hirosystems/stacks-devnet-js
 npm install --save-dev @hirosystems/stacks-devnet-js
 ```
 
-If any error occurs during the installation of this package, feel free to open an issue on this repository. 
+If any error occurs during the installation of this package, feel free to open an issue on this repository.
 
 
 ### Usage
@@ -57,7 +57,7 @@ test('Block height changes when blocks are mined', async () => {
 
     // Broadcast transaction to our Devnet stacks node
     await broadcastTransaction(transaction, network);
-    
+
     // Wait for the next block
     block = orchestrator.waitForStacksBlock();
 
@@ -72,4 +72,4 @@ A series of short tutorials is available as a playlist of screencasts on Youtube
 
 - [Introduction to smart contract integration with Clarinet](https://youtu.be/pucJ_tOC3pk)
 - [Setup a React project interacting with Clarinet](https://youtu.be/b7iipqzTUH8)
-- [Setup an intgration test environment with stacks-devnet-js](https://youtu.be/BqeL17m1dZk)
+- [Setup an integration test environment with stacks-devnet-js](https://youtu.be/BqeL17m1dZk)

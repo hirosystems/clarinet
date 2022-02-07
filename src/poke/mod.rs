@@ -113,8 +113,8 @@ pub fn load_session(
     manifest_path: &PathBuf,
     start_repl: bool,
     env: &Network,
-) -> Result<(repl::Session, ChainConfig, Option<String>), String> {
-    let (settings, chain_config, _) = load_session_settings(manifest_path, env)?;
+) -> Result<(repl::Session, ChainConfig, ProjectManifest, Option<String>), String> {
+    let (settings, chain_config, project_config) = load_session_settings(manifest_path, env)?;
 
     let (session, output) = if start_repl {
         let mut terminal = Terminal::new(settings.clone());
@@ -134,5 +134,5 @@ pub fn load_session(
         };
         (session, output)
     };
-    Ok((session, chain_config, output))
+    Ok((session, chain_config, project_config, output))
 }
