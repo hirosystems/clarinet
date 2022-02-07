@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{BTreeSet, HashMap};
 use std::fs::{self, File};
 use std::io::{prelude::*, BufReader, Read};
 use std::path::PathBuf;
@@ -312,7 +312,7 @@ pub fn main() {
         Command::Poke(cmd) | Command::Console(cmd) => {
             let manifest_path = get_manifest_path_or_exit(cmd.manifest_path);
             let start_repl = true;
-            load_session(manifest_path, start_repl, &Network::Devnet)
+            load_session(&manifest_path, start_repl, &Network::Devnet)
                 .expect("Unable to start REPL");
             if hints_enabled {
                 display_post_poke_hint();
@@ -321,7 +321,7 @@ pub fn main() {
         Command::Check(cmd) => {
             let manifest_path = get_manifest_path_or_exit(cmd.manifest_path);
             let start_repl = false;
-            match load_session(manifest_path, start_repl, &Network::Devnet) {
+            match load_session(&manifest_path, start_repl, &Network::Devnet) {
                 Err(e) => {
                     println!("{}", e);
                 }
@@ -343,7 +343,7 @@ pub fn main() {
         Command::Test(cmd) => {
             let manifest_path = get_manifest_path_or_exit(cmd.manifest_path);
             let start_repl = false;
-            let res = load_session(manifest_path.clone(), start_repl, &Network::Devnet);
+            let res = load_session(&manifest_path, start_repl, &Network::Devnet);
             let session = match res {
                 Ok((session, _, output)) => {
                     if let Some(message) = output {
@@ -373,7 +373,7 @@ pub fn main() {
         Command::Run(cmd) => {
             let manifest_path = get_manifest_path_or_exit(cmd.manifest_path);
             let start_repl = false;
-            let res = load_session(manifest_path.clone(), start_repl, &Network::Devnet);
+            let res = load_session(&manifest_path, start_repl, &Network::Devnet);
             let session = match res {
                 Ok((session, _, output)) => {
                     if let Some(message) = output {
@@ -409,7 +409,7 @@ pub fn main() {
             } else {
                 panic!("Target deployment must be specified with --devnet, --testnet or --mainnet")
             };
-            match publish_all_contracts(manifest_path, network) {
+            match publish_all_contracts(&manifest_path, network, true, 30) {
                 Ok(results) => println!("{}", results.join("\n")),
                 Err(results) => println!("{}", results.join("\n")),
             };

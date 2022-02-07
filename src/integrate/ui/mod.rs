@@ -6,6 +6,7 @@ mod ui;
 mod util;
 
 use super::{events_observer::EventsObserverCommand, DevnetEvent};
+use crate::types::StacksChainEvent;
 use app::App;
 use crossterm::{
     event::{self, Event, KeyCode, KeyModifiers},
@@ -19,7 +20,6 @@ use std::{
     thread,
     time::{Duration, Instant},
 };
-use crate::types::StacksChainEvent;
 use tui::{backend::CrosstermBackend, Terminal};
 
 pub fn start_ui(
@@ -117,6 +117,12 @@ pub fn start_ui(
             }
             DevnetEvent::MempoolAdmission(tx) => {
                 app.update_mempool(tx);
+            }
+            DevnetEvent::ProtocolDeployingProgress(data) => {
+                // Display something
+            }
+            DevnetEvent::ProtocolDeployed => {
+                app.display_log(DevnetEvent::log_success("Protocol successfully deployed".into()));
             }
             // DevnetEvent::Terminate => {
 

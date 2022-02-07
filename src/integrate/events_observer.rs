@@ -1,10 +1,11 @@
 use super::DevnetEvent;
 use crate::indexer::{chains, Indexer, IndexerConfig};
-use crate::types::{BitcoinChainEvent, StacksChainEvent};
 use crate::integrate::{MempoolAdmissionData, ServiceStatusData, Status};
+use crate::integrate::{ProtocolDeployedData, ProtocolDeployingData};
 use crate::poke::load_session;
-use crate::publish::{publish_contract, Network};
+use crate::publish::{publish_all_contracts, Network};
 use crate::types::{self, BlockIdentifier, DevnetConfig};
+use crate::types::{BitcoinChainEvent, StacksChainEvent};
 use crate::utils;
 use crate::utils::stacks::{transactions, PoxInfo, StacksRpc};
 use base58::FromBase58;
@@ -70,7 +71,7 @@ struct ContractReadonlyCall {
 impl EventObserverConfig {
     pub fn new(devnet_config: DevnetConfig, manifest_path: PathBuf) -> Self {
         info!("Checking contracts...");
-        let (session, config) = match load_session(manifest_path.clone(), false, &Network::Devnet) {
+        let (session, config) = match load_session(&manifest_path, false, &Network::Devnet) {
             Ok((session, config, _)) => (session, config),
             Err(e) => {
                 println!("{}", e);
@@ -188,6 +189,7 @@ pub async fn start_events_observer(
     });
 
     // This loop is used for handling background jobs, emitted by HTTP calls.
+    let mut contracts_deployed = false;
     loop {
         match events_observer_commands_rx.recv() {
             Ok(EventsObserverCommand::Terminate(true)) => {
@@ -202,7 +204,7 @@ pub async fn start_events_observer(
                     .send(DevnetEvent::info("Reloading contracts".into()))
                     .expect("Unable to terminate event observer");
 
-                let session = match load_session(manifest_path.clone(), false, &Network::Devnet) {
+                let session = match load_session(&manifest_path, false, &Network::Devnet) {
                     Ok((session, _, _)) => session,
                     Err(e) => {
                         devnet_event_tx
@@ -221,6 +223,8 @@ pub async fn start_events_observer(
                     )))
                     .expect("Unable to terminate event observer");
 
+                contracts_deployed = false;
+
                 if let Ok(mut init_status) = init_status_rw_lock.write() {
                     init_status.contracts_left_to_deploy = contracts_to_deploy;
                     init_status.deployer_nonce = 0;
@@ -228,19 +232,9 @@ pub async fn start_events_observer(
             }
             Ok(EventsObserverCommand::UpdatePoxInfo) => {}
             Ok(EventsObserverCommand::PublishInitialContracts) => {
-                if let Ok(mut init_status_writer) = init_status_rw_lock.write() {
-                    let res = publish_initial_contracts(
-                        &config.devnet_config,
-                        &config.accounts,
-                        config.deployment_fee_rate,
-                        &mut init_status_writer,
-                    );
-                    if let Some(tx_count) = res {
-                        let _ = devnet_event_tx.send(DevnetEvent::success(format!(
-                            "Will publish {} contracts",
-                            tx_count
-                        )));
-                    }
+                if !contracts_deployed {
+                    contracts_deployed = true;
+                    publish_initial_contracts(&config.manifest_path, &devnet_event_tx);
                 }
             }
             Ok(EventsObserverCommand::PublishPoxStackingOrders(block_identifier)) => {
@@ -292,10 +286,7 @@ pub fn handle_new_burn_block(
     // with 1 miner. As such we will ignore Reorgs handling.
     let (log, status) = match &chain_update {
         BitcoinChainEvent::ChainUpdatedWithBlock(block) => {
-            let log = format!(
-                "Bitcoin block #{} received",
-                block.block_identifier.index
-            );
+            let log = format!("Bitcoin block #{} received", block.block_identifier.index);
             let status = format!(
                 "mining blocks (chaintip = #{})",
                 block.block_identifier.index
@@ -308,10 +299,7 @@ pub fn handle_new_burn_block(
                 "Bitcoin reorg received (new height: {})",
                 tip.block_identifier.index
             );
-            let status = format!(
-                "mining blocks (chaintip = #{})",
-                tip.block_identifier.index
-            );
+            let status = format!("mining blocks (chaintip = #{})", tip.block_identifier.index);
             (log, status)
         }
     };
@@ -481,7 +469,8 @@ pub fn handle_new_mempool_tx(
     let decoded_transactions = raw_txs
         .iter()
         .map(|t| {
-            let (txid, ..) = chains::stacks::get_tx_description(t).expect("unable to parse transaction");
+            let (txid, ..) =
+                chains::stacks::get_tx_description(t).expect("unable to parse transaction");
             txid
         })
         .collect::<Vec<String>>();
@@ -514,70 +503,13 @@ pub fn handle_ping() -> Json<JsonValue> {
     }))
 }
 
-pub fn publish_initial_contracts(
-    devnet_config: &DevnetConfig,
-    accounts: &Vec<Account>,
-    deployment_fee_rate: u64,
-    init_status: &mut DevnetInitializationStatus,
-) -> Option<usize> {
-    let contracts_left = init_status.contracts_left_to_deploy.len();
-    if contracts_left == 0 {
-        return None;
-    }
-
-    let node_url = format!("http://localhost:{}", devnet_config.stacks_node_rpc_port);
-    let tx_chaining_limit = 25;
-    let blocks_required = 1 + (contracts_left / tx_chaining_limit);
-    let contracts_to_deploy_in_blocks = if blocks_required == 1 {
-        contracts_left
-    } else {
-        contracts_left / blocks_required
-    };
-
-    let mut contracts_to_deploy = vec![];
-
-    for _ in 0..contracts_to_deploy_in_blocks {
-        let contract = init_status.contracts_left_to_deploy.pop_front().unwrap();
-        contracts_to_deploy.push(contract);
-    }
-
-    let mut deployers_lookup = BTreeMap::new();
-    for account in accounts.iter() {
-        if account.name == "deployer" {
-            deployers_lookup.insert("*".into(), account.clone());
-        }
-    }
-
-    let mut deployers_nonces = BTreeMap::new();
-    deployers_nonces.insert("deployer".to_string(), init_status.deployer_nonce);
-    let contract_to_deploy_len = contracts_to_deploy.len();
-    init_status.deployer_nonce += contract_to_deploy_len as u64;
-
+pub fn publish_initial_contracts(manifest_path: &PathBuf, devnet_event_tx: &Sender<DevnetEvent>) {
+    let moved_manifest_path = manifest_path.clone();
+    let moved_devnet_event_tx = devnet_event_tx.clone();
     std::thread::spawn(move || {
-        for contract in contracts_to_deploy.into_iter() {
-            match publish_contract(
-                &contract,
-                &deployers_lookup,
-                &mut deployers_nonces,
-                &node_url,
-                deployment_fee_rate,
-                &Network::Devnet,
-            ) {
-                Ok((_txid, _nonce)) => {
-                    // let _ = tx_clone.send(DevnetEvent::success(format!(
-                    //     "Contract {} broadcasted in mempool (txid: {}, nonce: {})",
-                    //     contract.name.unwrap(), txid, nonce
-                    // )));
-                }
-                Err(_err) => {
-                    // let _ = tx_clone.send(DevnetEvent::error(err.to_string()));
-                    break;
-                }
-            }
-        }
+        let _ = publish_all_contracts(&moved_manifest_path, Network::Devnet, false, 10);
+        let _ = moved_devnet_event_tx.send(DevnetEvent::ProtocolDeployed);
     });
-
-    Some(contract_to_deploy_len)
 }
 
 pub async fn publish_stacking_orders(

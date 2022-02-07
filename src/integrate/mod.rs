@@ -8,7 +8,7 @@ use chrono::prelude::*;
 use tracing::{self, debug, error, info, warn};
 use tracing_appender;
 
-use crate::types::{BitcoinBlockData, StacksBlockData, BitcoinChainEvent, StacksChainEvent};
+use crate::types::{BitcoinBlockData, BitcoinChainEvent, StacksBlockData, StacksChainEvent};
 use crate::utils;
 use events_observer::{start_events_observer, EventsObserverCommand};
 pub use orchestrator::DevnetOrchestrator;
@@ -168,6 +168,8 @@ pub enum DevnetEvent {
     KeyEvent(crossterm::event::KeyEvent),
     Tick,
     ServiceStatus(ServiceStatusData),
+    ProtocolDeployingProgress(ProtocolDeployingData),
+    ProtocolDeployed,
     StacksChainEvent(StacksChainEvent),
     BitcoinChainEvent(BitcoinChainEvent),
     MempoolAdmission(MempoolAdmissionData),
@@ -259,6 +261,16 @@ pub struct ServiceStatusData {
     pub status: Status,
     pub name: String,
     pub comment: String,
+}
+
+#[derive(Clone, Debug)]
+pub struct ProtocolDeployingData {
+    pub new_contracts_deployed: Vec<String>,
+}
+
+#[derive(Clone, Debug)]
+pub struct ProtocolDeployedData {
+    pub contracts_deployed: Vec<String>,
 }
 
 // pub struct MicroblockData {

@@ -5,9 +5,9 @@ use std::fs;
 use std::path::PathBuf;
 
 pub fn load_session_settings(
-    manifest_path: PathBuf,
+    manifest_path: &PathBuf,
     env: &Network,
-) -> Result<(repl::SessionSettings, ChainConfig), String> {
+) -> Result<(repl::SessionSettings, ChainConfig, ProjectManifest), String> {
     let mut settings = repl::SessionSettings::default();
 
     let mut project_path = manifest_path.clone();
@@ -102,19 +102,19 @@ pub fn load_session_settings(
     settings.initial_deployer = initial_deployer;
     settings.costs_version = project_config.project.costs_version;
 
-    if let Some(analysis_passes) = project_config.project.analysis {
-        settings.analysis = analysis_passes;
+    if let Some(ref analysis_passes) = project_config.project.analysis {
+        settings.analysis = analysis_passes.clone();
     }
 
-    Ok((settings, chain_config))
+    Ok((settings, chain_config, project_config))
 }
 
 pub fn load_session(
-    manifest_path: PathBuf,
+    manifest_path: &PathBuf,
     start_repl: bool,
     env: &Network,
 ) -> Result<(repl::Session, ChainConfig, Option<String>), String> {
-    let (settings, chain_config) = load_session_settings(manifest_path, env)?;
+    let (settings, chain_config, _) = load_session_settings(manifest_path, env)?;
 
     let (session, output) = if start_repl {
         let mut terminal = Terminal::new(settings.clone());
