@@ -1,9 +1,9 @@
 pub mod mnemonic;
 pub mod stacks;
 
-use std::process;
-use std::collections::{HashSet, BTreeMap};
+use std::collections::{BTreeMap, HashSet};
 use std::iter::FromIterator;
+use std::process;
 use tokio;
 
 pub fn create_basic_runtime() -> tokio::runtime::Runtime {
@@ -16,7 +16,6 @@ pub fn create_basic_runtime() -> tokio::runtime::Runtime {
 }
 
 pub fn order_contracts(src: &BTreeMap<String, Vec<String>>) -> Vec<String> {
-
     if src.is_empty() {
         return vec![];
     }

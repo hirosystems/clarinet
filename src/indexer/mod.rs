@@ -1,6 +1,9 @@
 pub mod chains;
 
-use crate::types::{BitcoinBlockData, BlockIdentifier, StacksBlockData, StacksBlockMetadata, StacksChainEvent, BitcoinChainEvent};
+use crate::types::{
+    BitcoinBlockData, BitcoinChainEvent, BlockIdentifier, StacksBlockData, StacksBlockMetadata,
+    StacksChainEvent,
+};
 use crate::utils::stacks::PoxInfo;
 use rocket::serde::json::Value as JsonValue;
 use std::collections::{HashMap, VecDeque};

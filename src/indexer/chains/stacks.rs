@@ -4,11 +4,12 @@ use crate::types::events::*;
 use crate::types::{
     AccountIdentifier, Amount, BlockIdentifier, Currency, CurrencyMetadata, CurrencyStandard,
     Operation, OperationIdentifier, OperationStatusKind, OperationType, StacksBlockData,
-    StacksBlockMetadata, StacksTransactionData, StacksTransactionMetadata,
-    StacksTransactionReceipt, TransactionIdentifier, StacksTransactionExecutionCost, StacksTransactionKind, StacksContractDeploymentData
+    StacksBlockMetadata, StacksContractDeploymentData, StacksTransactionData,
+    StacksTransactionExecutionCost, StacksTransactionKind, StacksTransactionMetadata,
+    StacksTransactionReceipt, TransactionIdentifier,
 };
 use crate::utils::stacks::StacksRpc;
-use clarity_repl::clarity::codec::transaction::{TransactionPayload, TransactionAuth};
+use clarity_repl::clarity::codec::transaction::{TransactionAuth, TransactionPayload};
 use clarity_repl::clarity::codec::{StacksMessageCodec, StacksTransaction};
 use clarity_repl::clarity::types::Value as ClarityValue;
 use clarity_repl::clarity::util::hash::hex_bytes;
@@ -110,7 +111,8 @@ pub fn standardize_stacks_block(
         .transactions
         .iter()
         .map(|t| {
-            let (description, tx, tx_type, fee, sender, sponsor) = get_tx_description(&t.raw_tx).expect("unable to parse transaction");
+            let (description, tx, tx_type, fee, sender, sponsor) =
+                get_tx_description(&t.raw_tx).expect("unable to parse transaction");
             let (operations, receipt) = get_standardized_stacks_operations(
                 &t.txid,
                 &tx,
@@ -182,7 +184,19 @@ pub fn get_value_description(raw_value: &str) -> String {
     value
 }
 
-pub fn get_tx_description(raw_tx: &str) -> Result<(String, StacksTransaction, StacksTransactionKind, u64, String, Option<String>), ()> {
+pub fn get_tx_description(
+    raw_tx: &str,
+) -> Result<
+    (
+        String,
+        StacksTransaction,
+        StacksTransactionKind,
+        u64,
+        String,
+        Option<String>,
+    ),
+    (),
+> {
     let raw_tx = match raw_tx.strip_prefix("0x") {
         Some(raw_tx) => raw_tx,
         _ => return Err(()),
@@ -193,33 +207,44 @@ pub fn get_tx_description(raw_tx: &str) -> Result<(String, StacksTransaction, St
     };
     let tx = match StacksTransaction::consensus_deserialize(&mut Cursor::new(&tx_bytes)) {
         Ok(bytes) => bytes,
-        Err(e) => {
-            return Err(())
-        }
+        Err(e) => return Err(()),
     };
 
     let (fee, sender, sponsor) = match tx.auth {
-        TransactionAuth::Standard(ref conditions) => {
-            (conditions.tx_fee(), 
-            if tx.is_mainnet() { conditions.address_mainnet().to_string() } else { conditions.address_testnet().to_string() }, 
-            None)
-        }
-        TransactionAuth::Sponsored(ref sender_conditions, ref sponsor_conditions) => {
-            (sponsor_conditions.tx_fee(), 
-            if tx.is_mainnet() { sender_conditions.address_mainnet().to_string() } else { sender_conditions.address_testnet().to_string() }, 
-            Some(if tx.is_mainnet() { sponsor_conditions.address_mainnet().to_string() } else { sponsor_conditions.address_testnet().to_string() }))
-        }
+        TransactionAuth::Standard(ref conditions) => (
+            conditions.tx_fee(),
+            if tx.is_mainnet() {
+                conditions.address_mainnet().to_string()
+            } else {
+                conditions.address_testnet().to_string()
+            },
+            None,
+        ),
+        TransactionAuth::Sponsored(ref sender_conditions, ref sponsor_conditions) => (
+            sponsor_conditions.tx_fee(),
+            if tx.is_mainnet() {
+                sender_conditions.address_mainnet().to_string()
+            } else {
+                sender_conditions.address_testnet().to_string()
+            },
+            Some(if tx.is_mainnet() {
+                sponsor_conditions.address_mainnet().to_string()
+            } else {
+                sponsor_conditions.address_testnet().to_string()
+            }),
+        ),
     };
 
     let (description, tx_type) = match tx.payload {
-        TransactionPayload::TokenTransfer(ref addr, ref amount, ref _memo) => {
-            (format!(
+        TransactionPayload::TokenTransfer(ref addr, ref amount, ref _memo) => (
+            format!(
                 "transfered: {} µSTX from {} to {}",
                 amount,
                 tx.origin_address(),
                 addr
-            ), StacksTransactionKind::NativeTokenTransfer)
-        }
+            ),
+            StacksTransactionKind::NativeTokenTransfer,
+        ),
         TransactionPayload::ContractCall(ref contract_call) => {
             let formatted_args = contract_call
                 .function_args
@@ -227,13 +252,16 @@ pub fn get_tx_description(raw_tx: &str) -> Result<(String, StacksTransaction, St
                 .map(|v| format!("{}", v))
                 .collect::<Vec<String>>()
                 .join(", ");
-            (format!(
-                "invoked: {}.{}::{}({})",
-                contract_call.address,
-                contract_call.contract_name,
-                contract_call.function_name,
-                formatted_args
-            ), StacksTransactionKind::ContractCall)
+            (
+                format!(
+                    "invoked: {}.{}::{}({})",
+                    contract_call.address,
+                    contract_call.contract_name,
+                    contract_call.function_name,
+                    formatted_args
+                ),
+                StacksTransactionKind::ContractCall,
+            )
         }
         TransactionPayload::SmartContract(ref smart_contract) => {
             let contract_identifier = format!("{}.{}", tx.origin_address(), smart_contract.name);
@@ -241,14 +269,13 @@ pub fn get_tx_description(raw_tx: &str) -> Result<(String, StacksTransaction, St
                 contract_identifier: contract_identifier.clone(),
                 code: smart_contract.code_body.to_string(),
             };
-            (format!("deployed: {}", contract_identifier), StacksTransactionKind::ContractDeployment(data))
+            (
+                format!("deployed: {}", contract_identifier),
+                StacksTransactionKind::ContractDeployment(data),
+            )
         }
-        TransactionPayload::Coinbase(_) => {
-            (format!("coinbase"), StacksTransactionKind::Coinbase)
-        }
-        _ => {
-            (format!("other"), StacksTransactionKind::Other)
-        }
+        TransactionPayload::Coinbase(_) => (format!("coinbase"), StacksTransactionKind::Coinbase),
+        _ => (format!("other"), StacksTransactionKind::Other),
     };
     Ok((description, tx, tx_type, fee, sender, sponsor))
 }
@@ -338,7 +365,7 @@ pub fn get_standardized_stacks_operations(
     events: &mut Vec<NewEvent>,
     asset_class_cache: &mut HashMap<String, AssetClassCache>,
     node_url: &str,
-) -> (Vec<Operation>, StacksTransactionReceipt){
+) -> (Vec<Operation>, StacksTransactionReceipt) {
     let mut mutated_contracts_radius = HashSet::new();
     let mut mutated_assets_radius = HashSet::new();
     let mut marshalled_events = Vec::new();
@@ -474,7 +501,8 @@ pub fn get_standardized_stacks_operations(
                 let data: NFTMintEventData = serde_json::from_value(event_data.clone())
                     .expect("Unable to decode event_data");
                 marshalled_events.push(StacksTransactionEvent::NFTMintEvent(data.clone()));
-                let (asset_class_identifier, contract_identifier) = get_mutated_ids(&data.asset_class_identifier);
+                let (asset_class_identifier, contract_identifier) =
+                    get_mutated_ids(&data.asset_class_identifier);
                 mutated_assets_radius.insert(asset_class_identifier);
                 mutated_contracts_radius.insert(contract_identifier);
 
@@ -503,7 +531,8 @@ pub fn get_standardized_stacks_operations(
                 let data: NFTBurnEventData = serde_json::from_value(event_data.clone())
                     .expect("Unable to decode event_data");
                 marshalled_events.push(StacksTransactionEvent::NFTBurnEvent(data.clone()));
-                let (asset_class_identifier, contract_identifier) = get_mutated_ids(&data.asset_class_identifier);
+                let (asset_class_identifier, contract_identifier) =
+                    get_mutated_ids(&data.asset_class_identifier);
                 mutated_assets_radius.insert(asset_class_identifier);
                 mutated_contracts_radius.insert(contract_identifier);
 
@@ -532,7 +561,8 @@ pub fn get_standardized_stacks_operations(
                 let data: NFTTransferEventData = serde_json::from_value(event_data.clone())
                     .expect("Unable to decode event_data");
                 marshalled_events.push(StacksTransactionEvent::NFTTransferEvent(data.clone()));
-                let (asset_class_identifier, contract_identifier) = get_mutated_ids(&data.asset_class_identifier);
+                let (asset_class_identifier, contract_identifier) =
+                    get_mutated_ids(&data.asset_class_identifier);
                 mutated_assets_radius.insert(asset_class_identifier);
                 mutated_contracts_radius.insert(contract_identifier);
 
@@ -586,7 +616,8 @@ pub fn get_standardized_stacks_operations(
                 let data: FTMintEventData = serde_json::from_value(event_data.clone())
                     .expect("Unable to decode event_data");
                 marshalled_events.push(StacksTransactionEvent::FTMintEvent(data.clone()));
-                let (asset_class_identifier, contract_identifier) = get_mutated_ids(&data.asset_class_identifier);
+                let (asset_class_identifier, contract_identifier) =
+                    get_mutated_ids(&data.asset_class_identifier);
                 mutated_assets_radius.insert(asset_class_identifier);
                 mutated_contracts_radius.insert(contract_identifier);
 
@@ -618,7 +649,8 @@ pub fn get_standardized_stacks_operations(
                 let data: FTBurnEventData = serde_json::from_value(event_data.clone())
                     .expect("Unable to decode event_data");
                 marshalled_events.push(StacksTransactionEvent::FTBurnEvent(data.clone()));
-                let (asset_class_identifier, contract_identifier) = get_mutated_ids(&data.asset_class_identifier);
+                let (asset_class_identifier, contract_identifier) =
+                    get_mutated_ids(&data.asset_class_identifier);
                 mutated_assets_radius.insert(asset_class_identifier);
                 mutated_contracts_radius.insert(contract_identifier);
 
@@ -650,7 +682,8 @@ pub fn get_standardized_stacks_operations(
                 let data: FTTransferEventData = serde_json::from_value(event_data.clone())
                     .expect("Unable to decode event_data");
                 marshalled_events.push(StacksTransactionEvent::FTTransferEvent(data.clone()));
-                let (asset_class_identifier, contract_identifier) = get_mutated_ids(&data.asset_class_identifier);
+                let (asset_class_identifier, contract_identifier) =
+                    get_mutated_ids(&data.asset_class_identifier);
                 mutated_assets_radius.insert(asset_class_identifier);
                 mutated_contracts_radius.insert(contract_identifier);
 
@@ -727,13 +760,17 @@ pub fn get_standardized_stacks_operations(
                 let data: SmartContractEventData = serde_json::from_value(event_data.clone())
                     .expect("Unable to decode event_data");
                 marshalled_events.push(StacksTransactionEvent::SmartContractEvent(data.clone()));
-                mutated_contracts_radius.insert(data.contract_identifier.clone());  
+                mutated_contracts_radius.insert(data.contract_identifier.clone());
             }
         } else {
             i += 1;
         }
     }
-    let receipt = StacksTransactionReceipt::new(mutated_contracts_radius, mutated_assets_radius, marshalled_events);
+    let receipt = StacksTransactionReceipt::new(
+        mutated_contracts_radius,
+        mutated_assets_radius,
+        marshalled_events,
+    );
     (operations, receipt)
 }
 

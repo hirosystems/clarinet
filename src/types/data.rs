@@ -123,7 +123,11 @@ pub struct StacksTransactionReceipt {
 }
 
 impl StacksTransactionReceipt {
-    pub fn new(mutated_contracts_radius: HashSet<String>, mutated_assets_radius: HashSet<String>, events: Vec<StacksTransactionEvent>) -> StacksTransactionReceipt {
+    pub fn new(
+        mutated_contracts_radius: HashSet<String>,
+        mutated_assets_radius: HashSet<String>,
+        events: Vec<StacksTransactionEvent>,
+    ) -> StacksTransactionReceipt {
         StacksTransactionReceipt {
             mutated_contracts_radius,
             mutated_assets_radius,

@@ -712,3 +712,97 @@ export enum CoinAction {
   created = "coin_created",
   spent = "coin_spent",
 }
+
+/**
+ * Contract interfaces are ABI returned by the stacks node
+ * @export
+ * @interface StacksContractInterface
+ */
+export interface StacksContractInterface {
+  /**
+   * List of defined methods
+   * @type {Array<object>}
+   * @memberof ContractInterfaceResponse
+   */
+  functions: Array<object>;
+  /**
+   * List of defined variables
+   * @type {Array<object>}
+   * @memberof ContractInterfaceResponse
+   */
+  variables: Array<DataVarField>;
+  /**
+   * List of defined data-maps
+   * @type {Array<object>}
+   * @memberof ContractInterfaceResponse
+   */
+  maps: Array<DataMapField>;
+  /**
+   * List of fungible tokens in the contract
+   * @type {Array<DataFtField>}
+   * @memberof ContractInterfaceResponse
+   */
+  fungible_tokens: Array<DataFtField>;
+  /**
+   * List of non-fungible tokens in the contract
+   * @type {Array<DataNftField>}
+   * @memberof ContractInterfaceResponse
+   */
+  non_fungible_tokens: Array<DataNftField>;
+}
+
+/**
+ * DataVarField describes clarity data-var metadata.
+ * @export
+ * @interface DataVarField
+ */
+ export interface DataVarField {
+  /**
+   * Name of var
+   * @type {string}
+   * @memberof DataVarField
+   */
+  name: string;
+}
+
+/**
+ * DataMapField describes clarity data-map metadata.
+ * @export
+ * @interface DataMapField
+ */
+ export interface DataMapField {
+  /**
+   * Name of map
+   * @type {string}
+   * @memberof DataMapField
+   */
+  name: string;
+}
+
+/**
+ * DataMapField describes clarity fungible token metadata.
+ * @export
+ * @interface DataFtField
+ */
+ export interface DataFtField {
+  /**
+   * Name of fungible token
+   * @type {string}
+   * @memberof DataFtField
+   */
+  name: string;
+}
+
+/**
+ * DataMapField describes clarity non fungible token metadata.
+ * @export
+ * @interface DataNftField
+ */
+ export interface DataNftField {
+  /**
+   * Name of non fungible token
+   * @type {string}
+   * @memberof DataNftField
+   */
+  name: string;
+}
