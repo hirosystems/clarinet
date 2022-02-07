@@ -151,7 +151,7 @@ pub fn publish_contract(
 
 pub fn publish_all_contracts(
     manifest_path: &PathBuf,
-    network: Network,
+    network: &Network,
     analysis_enabled: bool,
     delay_between_checks: u32,
 ) -> Result<(Vec<String>, ProjectManifest), Vec<String>> {

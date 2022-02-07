@@ -22,6 +22,7 @@ pub struct ProjectConfigFile {
     requirements: Option<Value>,
     analysis: Option<Vec<String>>,
     costs_version: Option<u32>,
+    parser_version: Option<u32>
 }
 
 #[derive(Serialize, Deserialize, Debug, Default)]
@@ -40,6 +41,7 @@ pub struct ProjectConfig {
     pub requirements: Option<Vec<RequirementConfig>>,
     pub analysis: Option<Vec<String>>,
     pub costs_version: u32,
+    pub parser_version: u32
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Default)]
@@ -113,6 +115,7 @@ impl ProjectManifest {
             telemetry: project_manifest_file.project.telemetry.unwrap_or(false),
             costs_version: project_manifest_file.project.costs_version.unwrap_or(2),
             analysis: project_manifest_file.project.analysis,
+            parser_version: project_manifest_file.project.parser_version.unwrap_or(2),
         };
 
         let mut config = ProjectManifest {

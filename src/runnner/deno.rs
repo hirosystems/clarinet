@@ -1258,16 +1258,18 @@ fn mine_block(state: &mut OpState, args: Value, _: ()) -> Result<String, AnyErro
                     name.into(),
                 ) {
                     Ok(res) => res,
-                    Err(diags) => {
-                        // todo(ludo): if CLARINET_BACKTRACE=1
-                        // Retrieve the AST (penultimate entry), and the expression id (last entry)
-                        println!(
-                            "Runtime error: {}::{}({}) -> {:?}",
-                            args.contract,
-                            args.method,
-                            args.args.join(", "),
-                            diags
-                        );
+                    Err(diagnostics) => {
+                        if diagnostics.len() > 0 {
+                            // todo(ludo): if CLARINET_BACKTRACE=1
+                            // Retrieve the AST (penultimate entry), and the expression id (last entry)
+                            println!(
+                                "Runtime error: {}::{}({}) -> {}",
+                                args.contract,
+                                args.method,
+                                args.args.join(", "),
+                                diagnostics.last().unwrap().message
+                            );
+                        }
                         continue;
                     }
                 };

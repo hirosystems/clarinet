@@ -106,6 +106,8 @@ pub fn load_session_settings(
         settings.analysis = analysis_passes.clone();
     }
 
+    settings.parser_version = project_config.project.parser_version;
+
     Ok((settings, chain_config, project_config))
 }
 

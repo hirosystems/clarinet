@@ -7,7 +7,7 @@ use tower_lsp::lsp_types::*;
 use tower_lsp::{async_trait, Client, LanguageServer};
 
 use clarity_repl::clarity::types::QualifiedContractIdentifier;
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 use std::fs;
 use std::path::PathBuf;
 use std::str::FromStr;
@@ -109,47 +109,31 @@ impl ClarityLanguageBackend {
 
             // Extract the AST, and try to move to the next contract if we throw an error:
             // we're trying to get as many errors as possible
-            let mut ast = match incremental_session
-                .interpreter
-                .build_ast(contract_id.clone(), code.clone())
-            {
-                Ok(ast) => ast,
-                Err((_, Some(diagnostic), _)) => {
-                    collected_diagnostics.insert(
-                        contract_url.clone(),
-                        vec![utils::convert_clarity_diagnotic_to_lsp_diagnostic(
-                            diagnostic,
-                        )],
-                    );
-                    continue;
-                }
-                Err((_, _, Some(error))) => {
-                    logs.push(format!("Unable to get ast: {:?}", error).into());
-                    continue;
-                }
-                _ => {
-                    logs.push("Unable to get ast".into());
-                    continue;
-                }
-            };
+            let (mut ast, mut diagnostics, _) = incremental_session.interpreter.build_ast(
+                contract_id.clone(),
+                code.clone(),
+                settings.parser_version,
+            );
 
             // Run the analysis, and try to move to the next contract if we throw an error:
             // we're trying to get as many errors as possible
             let (annotations, mut annotation_diagnostics) = incremental_session
                 .interpreter
                 .collect_annotations(&ast, &code);
-            let (analysis, mut diagnostics) = match incremental_session.interpreter.run_analysis(
-                contract_id.clone(),
-                &mut ast,
-                &annotations,
-            ) {
+            diagnostics.append(&mut annotation_diagnostics);
+            let (analysis, mut analysis_diagnostics) = match incremental_session
+                .interpreter
+                .run_analysis(contract_id.clone(), &mut ast, &annotations)
+            {
                 Ok(analysis) => analysis,
                 Err((_, Some(diagnostic), _)) => {
+                    diagnostics.push(diagnostic);
                     collected_diagnostics.insert(
                         contract_url.clone(),
-                        vec![utils::convert_clarity_diagnotic_to_lsp_diagnostic(
-                            diagnostic,
-                        )],
+                        diagnostics
+                            .into_iter()
+                            .map(|d| utils::convert_clarity_diagnotic_to_lsp_diagnostic(d))
+                            .collect::<Vec<Diagnostic>>(),
                     );
                     continue;
                 }
@@ -162,7 +146,7 @@ impl ClarityLanguageBackend {
                     continue;
                 }
             };
-            diagnostics.append(&mut annotation_diagnostics);
+            diagnostics.append(&mut analysis_diagnostics);
             collected_diagnostics.insert(
                 contract_url.clone(),
                 diagnostics
@@ -226,43 +210,30 @@ impl ClarityLanguageBackend {
 
         // Extract the AST, and try to move to the next contract if we throw an error:
         // we're trying to get as many errors as possible
-        let mut ast = match incremental_session
-            .interpreter
-            .build_ast(contract_id.clone(), code.clone())
-        {
-            Ok(ast) => ast,
-            Err((_, Some(diagnostic), _)) => {
-                collected_diagnostics.insert(
-                    contract_url.clone(),
-                    vec![utils::convert_clarity_diagnotic_to_lsp_diagnostic(
-                        diagnostic,
-                    )],
-                );
-                return Ok((collected_diagnostics, logs));
-            }
-            _ => {
-                logs.push("Unable to get ast".into());
-                return Ok((collected_diagnostics, logs));
-            }
-        };
+        let (mut ast, mut diagnostics, _) =
+            incremental_session
+                .interpreter
+                .build_ast(contract_id.clone(), code.clone(), 2);
 
         // Run the analysis, and try to move to the next contract if we throw an error:
         // we're trying to get as many errors as possible
         let (annotations, mut annotation_diagnostics) = incremental_session
             .interpreter
             .collect_annotations(&ast, &code);
-        let (analysis, mut diagnostics) = match incremental_session.interpreter.run_analysis(
-            contract_id.clone(),
-            &mut ast,
-            &annotations,
-        ) {
+        diagnostics.append(&mut annotation_diagnostics);
+        let (analysis, mut analysis_diagnostics) = match incremental_session
+            .interpreter
+            .run_analysis(contract_id.clone(), &mut ast, &annotations)
+        {
             Ok(analysis) => analysis,
             Err((_, Some(diagnostic), _)) => {
+                diagnostics.push(diagnostic);
                 collected_diagnostics.insert(
                     contract_url.clone(),
-                    vec![utils::convert_clarity_diagnotic_to_lsp_diagnostic(
-                        diagnostic,
-                    )],
+                    diagnostics
+                        .into_iter()
+                        .map(|d| utils::convert_clarity_diagnotic_to_lsp_diagnostic(d))
+                        .collect::<Vec<Diagnostic>>(),
                 );
                 return Ok((collected_diagnostics, logs));
             }
@@ -271,7 +242,7 @@ impl ClarityLanguageBackend {
                 return Ok((collected_diagnostics, logs));
             }
         };
-        diagnostics.append(&mut annotation_diagnostics);
+        diagnostics.append(&mut analysis_diagnostics);
         collected_diagnostics.insert(
             contract_url.clone(),
             diagnostics
@@ -340,62 +311,31 @@ impl ClarityLanguageBackend {
                 self.client.publish_diagnostics(url, vec![], None).await;
             }
 
-            let mut erroring_files = HashSet::new();
-            let mut warning_files = HashSet::new();
-            for (url, diagnostic) in diagnostics.into_iter() {
-                for d in diagnostic.iter() {
-                    if let Some(level) = d.severity {
-                        if level == DiagnosticSeverity::Warning {
-                            warning_files.insert(
-                                url.to_file_path()
-                                    .unwrap()
-                                    .file_name()
-                                    .unwrap()
-                                    .to_str()
-                                    .unwrap()
-                                    .to_string(),
-                            );
-                        } else if level == DiagnosticSeverity::Error {
-                            erroring_files.insert(
-                                url.to_file_path()
-                                    .unwrap()
-                                    .file_name()
-                                    .unwrap()
-                                    .to_str()
-                                    .unwrap()
-                                    .to_string(),
-                            );
-                        }
-                    }
-                }
-                self.client.publish_diagnostics(url, diagnostic, None).await;
+            if !diagnostics.is_empty() {
+                let erroring_files = diagnostics
+                    .iter()
+                    .map(|(url, _)| {
+                        url.to_file_path()
+                            .unwrap()
+                            .file_name()
+                            .unwrap()
+                            .to_str()
+                            .unwrap()
+                            .to_string()
+                    })
+                    .collect::<Vec<_>>();
+                self.client
+                    .show_message(
+                        MessageType::Error,
+                        format!(
+                            "Errors detected in following contracts: {}",
+                            erroring_files.join(", ")
+                        ),
+                    )
+                    .await;
             }
-            let res = match (erroring_files.len(), warning_files.len()) {
-                (0, 0) => None,
-                (0, warnings) if warnings > 0 => Some((
-                    MessageType::Warning,
-                    format!(
-                        "Warning detected in following contracts: {}",
-                        warning_files.into_iter().collect::<Vec<_>>().join(", ")
-                    ),
-                )),
-                (errors, 0) if errors > 0 => Some((
-                    MessageType::Error,
-                    format!(
-                        "Errors detected in following contracts: {}",
-                        erroring_files.into_iter().collect::<Vec<_>>().join(", ")
-                    ),
-                )),
-                (_errors, _warnings) => Some((
-                    MessageType::Error,
-                    format!(
-                        "Errors and warnings detected in following contracts: {}",
-                        erroring_files.into_iter().collect::<Vec<_>>().join(", ")
-                    ),
-                )),
-            };
-            if let Some((level, message)) = res {
-                self.client.show_message(level, message).await;
+            for (url, diagnostic) in diagnostics.into_iter() {
+                self.client.publish_diagnostics(url, diagnostic, None).await;
             }
         }
     }
