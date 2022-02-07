@@ -48,6 +48,12 @@ struct Balance {
     nonce_proof: String,
 }
 
+#[derive(Deserialize, Debug)]
+pub struct Contract {
+    source: String,
+    publish_height: u64,
+}
+
 impl StacksRpc {
     pub fn new(url: &str) -> Self {
         Self {
@@ -105,6 +111,27 @@ impl StacksRpc {
             .json()
             .expect("Unable to parse contract");
         Ok(res)
+    }
+
+    pub fn get_contract_source(
+        &self,
+        principal: &str,
+        contract_name: &str,
+    ) -> Result<Contract, RpcError> {
+        let request_url = format!(
+            "{}/v2/contracts/source/{}/{}",
+            self.url, principal, contract_name
+        );
+
+        let res = self.client.get(&request_url).send();
+
+        match res {
+            Ok(response) => match response.json() {
+                Ok(value) => Ok(value),
+                _ => Err(RpcError::Generic),
+            },
+            _ => Err(RpcError::Generic),
+        }
     }
 
     pub fn call_read_only_fn(
