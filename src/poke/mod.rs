@@ -89,7 +89,7 @@ pub fn load_session_settings(
         settings.initial_links.push(repl::settings::InitialLink {
             contract_id: link_config.contract_id.clone(),
             stacks_node_addr: None,
-            cache: None,
+            cache: Some(project_config.project.cache_dir.clone()),
         });
     }
 
@@ -101,6 +101,7 @@ pub fn load_session_settings(
     ];
     settings.initial_deployer = initial_deployer;
     settings.costs_version = project_config.project.costs_version;
+    settings.disk_cache_enabled = true;
 
     if let Some(ref analysis_passes) = project_config.project.analysis {
         settings.analysis = analysis_passes.clone();
