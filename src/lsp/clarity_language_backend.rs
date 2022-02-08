@@ -1,5 +1,6 @@
 use clarity_repl::clarity::analysis::ContractAnalysis;
 use clarity_repl::repl::{Session, SessionSettings};
+use clarity_repl::analysis;
 
 use serde_json::Value;
 use tower_lsp::jsonrpc::Result;
@@ -112,7 +113,7 @@ impl ClarityLanguageBackend {
             let (mut ast, mut diagnostics, _) = incremental_session.interpreter.build_ast(
                 contract_id.clone(),
                 code.clone(),
-                settings.parser_version,
+                settings.repl_settings.parser_version,
             );
 
             // Run the analysis, and try to move to the next contract if we throw an error:
@@ -126,7 +127,6 @@ impl ClarityLanguageBackend {
                     contract_id.clone(),
                     &mut ast,
                     &annotations,
-                    settings.analysis_settings,
                 ) {
                     Ok(analysis) => analysis,
                     Err((_, Some(diagnostic), _)) => {
@@ -194,7 +194,7 @@ impl ClarityLanguageBackend {
     ) -> std::result::Result<(HashMap<Url, Vec<Diagnostic>>, Logs), (String, Logs)> {
         let mut logs = vec![];
         let mut settings = SessionSettings::default();
-        settings.analysis = vec!["all".into()];
+        settings.repl_settings.analysis.enable_all_passes();
 
         let mut incremental_session = Session::new(settings.clone());
         let mut collected_diagnostics = HashMap::new();
@@ -229,7 +229,6 @@ impl ClarityLanguageBackend {
                 contract_id.clone(),
                 &mut ast,
                 &annotations,
-                settings.analysis_settings,
             ) {
                 Ok(analysis) => analysis,
                 Err((_, Some(diagnostic), _)) => {

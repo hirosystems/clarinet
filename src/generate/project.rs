@@ -175,7 +175,8 @@ history.txt
 name = "{}"
 authors = []
 telemetry = {}
-analysis = ["check_checker"]
+[project.repl.analysis]
+passes = ["check_checker"]
 
 # [contracts.counter]
 # path = "contracts/counter.clar"

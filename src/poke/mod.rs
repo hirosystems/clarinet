@@ -99,13 +99,7 @@ pub fn load_session_settings(
         "bns".to_string(),
     ];
     settings.initial_deployer = initial_deployer;
-    settings.costs_version = project_config.project.costs_version;
-    settings.parser_version = project_config.project.parser_version;
-
-    if let Some(ref analysis_passes) = project_config.project.analysis {
-        settings.analysis = analysis_passes.clone();
-    }
-    settings.analysis_settings = project_config.project.analysis_settings;
+    settings.repl_settings = project_config.project.repl_settings.clone();
 
     Ok((settings, chain_config, project_config))
 }

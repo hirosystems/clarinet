@@ -405,7 +405,7 @@ pub fn main() {
         Command::Check(cmd) if cmd.file.is_some() => {
             let file = cmd.file.unwrap();
             let mut settings = repl::SessionSettings::default();
-            settings.analysis = vec!["all".into()];
+            settings.repl_settings.analysis.enable_all_passes();
 
             let mut session = repl::Session::new(settings.clone());
             let code = match fs::read_to_string(&file) {
@@ -419,7 +419,7 @@ pub fn main() {
             let (ast, mut diagnostics, mut success) = session.interpreter.build_ast(
                 contract_id.clone(),
                 code.clone(),
-                settings.parser_version,
+                settings.repl_settings.parser_version,
             );
             let (annotations, mut annotation_diagnostics) =
                 session.interpreter.collect_annotations(&ast, &code);
@@ -431,9 +431,8 @@ pub fn main() {
             let mut analysis_diagnostics = match analysis::run_analysis(
                 &mut contract_analysis,
                 &mut analysis_db,
-                &settings.analysis,
                 &annotations,
-                settings.analysis_settings,
+                &settings.repl_settings.analysis,
             ) {
                 Ok(diagnostics) => diagnostics,
                 Err(diagnostics) => {
