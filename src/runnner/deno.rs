@@ -156,10 +156,10 @@ mod sessions {
                     });
             }
             settings.initial_deployer = initial_deployer;
-            settings.costs_version = project_config.project.costs_version;
+            settings.repl_settings = project_config.project.repl_settings;
             settings.include_boot_contracts = vec![
                 "pox".to_string(),
-                format!("costs-v{}", project_config.project.costs_version),
+                format!("costs-v{}", settings.repl_settings.costs_version),
                 "bns".to_string(),
             ];
             let mut session = Session::new(settings.clone());

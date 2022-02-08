@@ -1,4 +1,4 @@
-use clarity_repl::analysis::{AnalysisSettings, AnalysisSettingsFile};
+use clarity_repl::repl;
 use std::collections::{BTreeMap, HashSet};
 use std::fs::File;
 use std::io::{BufReader, Read};
@@ -20,10 +20,12 @@ pub struct ProjectConfigFile {
     description: Option<String>,
     telemetry: Option<bool>,
     requirements: Option<Value>,
-    analysis: Option<Vec<String>>,
-    analysis_settings: Option<AnalysisSettingsFile>,
+    repl: Option<repl::SettingsFile>,
+
+    // The fields below have been moved into repl above, but are kept here for
+    // backwards compatibility.
+    analysis: Option<Vec<clarity_repl::analysis::Pass>>,
     costs_version: Option<u32>,
-    parser_version: Option<u32>,
 }
 
 #[derive(Serialize, Deserialize, Debug, Default)]
@@ -40,10 +42,7 @@ pub struct ProjectConfig {
     pub description: String,
     pub telemetry: bool,
     pub requirements: Option<Vec<RequirementConfig>>,
-    pub analysis: Option<Vec<String>>,
-    pub analysis_settings: AnalysisSettings,
-    pub costs_version: u32,
-    pub parser_version: u32,
+    pub repl_settings: repl::Settings,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Default)]
@@ -153,7 +152,7 @@ impl ProjectManifest {
     pub fn from_project_manifest_file(
         project_manifest_file: ProjectManifestFile,
     ) -> ProjectManifest {
-        let project = ProjectConfig {
+        let mut project = ProjectConfig {
             name: project_manifest_file.project.name.clone(),
             requirements: None,
             description: project_manifest_file
@@ -162,17 +161,28 @@ impl ProjectManifest {
                 .unwrap_or("".into()),
             authors: project_manifest_file.project.authors.unwrap_or(vec![]),
             telemetry: project_manifest_file.project.telemetry.unwrap_or(false),
-            costs_version: project_manifest_file.project.costs_version.unwrap_or(2),
-            parser_version: project_manifest_file.project.parser_version.unwrap_or(2),
-            analysis: project_manifest_file.project.analysis,
-            analysis_settings: if let Some(analysis_settings) =
-                project_manifest_file.project.analysis_settings
-            {
-                AnalysisSettings::from(analysis_settings)
+            repl_settings: if let Some(repl_settings) = project_manifest_file.project.repl {
+                repl::Settings::from(repl_settings)
             } else {
-                AnalysisSettings::default()
+                repl::Settings::default()
             },
         };
+
+        // Check for deprecated settings
+        if let Some(passes) = project_manifest_file.project.analysis {
+            println!(
+                "{}: use of 'project.analysis' in Clarinet.toml is deprecated; use project.repl.analysis.passes",
+                yellow!("warning")
+            );
+            project.repl_settings.analysis.set_passes(passes);
+        }
+        if let Some(costs_version) = project_manifest_file.project.costs_version {
+            println!(
+                "{}: use of 'project.costs_version' in Clarinet.toml is deprecated; use project.repl.costs_version",
+                yellow!("warning")
+            );
+            project.repl_settings.costs_version = costs_version;
+        }
 
         let mut config = ProjectManifest {
             project,
