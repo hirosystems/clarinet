@@ -1,6 +1,6 @@
+use clarity_repl::analysis;
 use clarity_repl::clarity::analysis::ContractAnalysis;
 use clarity_repl::repl::{Session, SessionSettings};
-use clarity_repl::analysis;
 
 use serde_json::Value;
 use tower_lsp::jsonrpc::Result;
@@ -122,33 +122,31 @@ impl ClarityLanguageBackend {
                 .interpreter
                 .collect_annotations(&ast, &code);
             diagnostics.append(&mut annotation_diagnostics);
-            let (analysis, mut analysis_diagnostics) =
-                match incremental_session.interpreter.run_analysis(
-                    contract_id.clone(),
-                    &mut ast,
-                    &annotations,
-                ) {
-                    Ok(analysis) => analysis,
-                    Err((_, Some(diagnostic), _)) => {
-                        diagnostics.push(diagnostic);
-                        collected_diagnostics.insert(
-                            contract_url.clone(),
-                            diagnostics
-                                .into_iter()
-                                .map(|d| utils::convert_clarity_diagnotic_to_lsp_diagnostic(d))
-                                .collect::<Vec<Diagnostic>>(),
-                        );
-                        continue;
-                    }
-                    Err((_, _, Some(error))) => {
-                        logs.push(format!("Unable to get analysis: {:?}", error).into());
-                        continue;
-                    }
-                    _ => {
-                        logs.push("Unable to get diagnostics".into());
-                        continue;
-                    }
-                };
+            let (analysis, mut analysis_diagnostics) = match incremental_session
+                .interpreter
+                .run_analysis(contract_id.clone(), &mut ast, &annotations)
+            {
+                Ok(analysis) => analysis,
+                Err((_, Some(diagnostic), _)) => {
+                    diagnostics.push(diagnostic);
+                    collected_diagnostics.insert(
+                        contract_url.clone(),
+                        diagnostics
+                            .into_iter()
+                            .map(|d| utils::convert_clarity_diagnotic_to_lsp_diagnostic(d))
+                            .collect::<Vec<Diagnostic>>(),
+                    );
+                    continue;
+                }
+                Err((_, _, Some(error))) => {
+                    logs.push(format!("Unable to get analysis: {:?}", error).into());
+                    continue;
+                }
+                _ => {
+                    logs.push("Unable to get diagnostics".into());
+                    continue;
+                }
+            };
             diagnostics.append(&mut analysis_diagnostics);
             collected_diagnostics.insert(
                 contract_url.clone(),
@@ -224,29 +222,27 @@ impl ClarityLanguageBackend {
             .interpreter
             .collect_annotations(&ast, &code);
         diagnostics.append(&mut annotation_diagnostics);
-        let (analysis, mut analysis_diagnostics) =
-            match incremental_session.interpreter.run_analysis(
-                contract_id.clone(),
-                &mut ast,
-                &annotations,
-            ) {
-                Ok(analysis) => analysis,
-                Err((_, Some(diagnostic), _)) => {
-                    diagnostics.push(diagnostic);
-                    collected_diagnostics.insert(
-                        contract_url.clone(),
-                        diagnostics
-                            .into_iter()
-                            .map(|d| utils::convert_clarity_diagnotic_to_lsp_diagnostic(d))
-                            .collect::<Vec<Diagnostic>>(),
-                    );
-                    return Ok((collected_diagnostics, logs));
-                }
-                _ => {
-                    logs.push("Unable to get diagnostic".into());
-                    return Ok((collected_diagnostics, logs));
-                }
-            };
+        let (analysis, mut analysis_diagnostics) = match incremental_session
+            .interpreter
+            .run_analysis(contract_id.clone(), &mut ast, &annotations)
+        {
+            Ok(analysis) => analysis,
+            Err((_, Some(diagnostic), _)) => {
+                diagnostics.push(diagnostic);
+                collected_diagnostics.insert(
+                    contract_url.clone(),
+                    diagnostics
+                        .into_iter()
+                        .map(|d| utils::convert_clarity_diagnotic_to_lsp_diagnostic(d))
+                        .collect::<Vec<Diagnostic>>(),
+                );
+                return Ok((collected_diagnostics, logs));
+            }
+            _ => {
+                logs.push("Unable to get diagnostic".into());
+                return Ok((collected_diagnostics, logs));
+            }
+        };
         diagnostics.append(&mut analysis_diagnostics);
         collected_diagnostics.insert(
             contract_url.clone(),
