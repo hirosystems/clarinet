@@ -141,11 +141,11 @@ impl ClarityLanguageBackend {
                         continue;
                     }
                     Err((_, _, Some(error))) => {
-                        logs.push(format!("Unable to get anaylis: {:?}", error).into());
+                        logs.push(format!("Unable to get analysis: {:?}", error).into());
                         continue;
                     }
                     _ => {
-                        logs.push("Unable to get diagnostic".into());
+                        logs.push("Unable to get diagnostics".into());
                         continue;
                     }
                 };
