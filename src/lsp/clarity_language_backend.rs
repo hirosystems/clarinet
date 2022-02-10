@@ -1,4 +1,3 @@
-use clarity_repl::analysis;
 use clarity_repl::clarity::analysis::ContractAnalysis;
 use clarity_repl::repl::{Session, SessionSettings};
 
