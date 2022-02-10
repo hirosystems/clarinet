@@ -715,7 +715,8 @@ fn execute_changes(changes: Vec<Changes>) {
     }
 
     if let Some(config) = shared_config {
-        let toml = toml::to_string(&config).unwrap();
+        let toml_value = toml::Value::try_from(&config).unwrap();
+        let toml = format!("{}", toml_value);
         let mut file = File::create(path).unwrap();
         file.write_all(&toml.as_bytes()).unwrap();
         file.sync_all().unwrap();
