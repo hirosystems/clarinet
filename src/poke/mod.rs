@@ -99,7 +99,7 @@ pub fn load_session_settings(
         "bns".to_string(),
     ];
     settings.initial_deployer = initial_deployer;
-    settings.repl_settings = project_config.project.repl_settings.clone();
+    settings.repl_settings = project_config.repl_settings.clone();
 
     Ok((settings, chain_config, project_config))
 }

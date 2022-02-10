@@ -11,6 +11,7 @@ use toml::value::Value;
 pub struct ProjectManifestFile {
     project: ProjectConfigFile,
     contracts: Option<Value>,
+    repl: Option<repl::SettingsFile>,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -20,7 +21,6 @@ pub struct ProjectConfigFile {
     description: Option<String>,
     telemetry: Option<bool>,
     requirements: Option<Value>,
-    repl: Option<repl::SettingsFile>,
 
     // The fields below have been moved into repl above, but are kept here for
     // backwards compatibility.
@@ -33,6 +33,7 @@ pub struct ProjectManifest {
     pub project: ProjectConfig,
     #[serde(serialize_with = "toml::ser::tables_last")]
     pub contracts: BTreeMap<String, ContractConfig>,
+    pub repl_settings: repl::Settings,
 }
 
 #[derive(Serialize, Deserialize, Debug, Default)]
@@ -42,7 +43,6 @@ pub struct ProjectConfig {
     pub description: String,
     pub telemetry: bool,
     pub requirements: Option<Vec<RequirementConfig>>,
-    pub repl_settings: repl::Settings,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Default)]
@@ -152,7 +152,7 @@ impl ProjectManifest {
     pub fn from_project_manifest_file(
         project_manifest_file: ProjectManifestFile,
     ) -> ProjectManifest {
-        let mut project = ProjectConfig {
+        let project = ProjectConfig {
             name: project_manifest_file.project.name.clone(),
             requirements: None,
             description: project_manifest_file
@@ -161,32 +161,34 @@ impl ProjectManifest {
                 .unwrap_or("".into()),
             authors: project_manifest_file.project.authors.unwrap_or(vec![]),
             telemetry: project_manifest_file.project.telemetry.unwrap_or(false),
-            repl_settings: if let Some(repl_settings) = project_manifest_file.project.repl {
-                repl::Settings::from(repl_settings)
-            } else {
-                repl::Settings::default()
-            },
+        };
+
+        let mut repl_settings = if let Some(repl_settings) = project_manifest_file.repl {
+            repl::Settings::from(repl_settings)
+        } else {
+            repl::Settings::default()
         };
 
         // Check for deprecated settings
         if let Some(passes) = project_manifest_file.project.analysis {
             println!(
-                "{}: use of 'project.analysis' in Clarinet.toml is deprecated; use project.repl.analysis.passes",
+                "{}: use of 'project.analysis' in Clarinet.toml is deprecated; use repl.analysis.passes",
                 yellow!("warning")
             );
-            project.repl_settings.analysis.set_passes(passes);
+            repl_settings.analysis.set_passes(passes);
         }
         if let Some(costs_version) = project_manifest_file.project.costs_version {
             println!(
-                "{}: use of 'project.costs_version' in Clarinet.toml is deprecated; use project.repl.costs_version",
+                "{}: use of 'project.costs_version' in Clarinet.toml is deprecated; use repl.costs_version",
                 yellow!("warning")
             );
-            project.repl_settings.costs_version = costs_version;
+            repl_settings.costs_version = costs_version;
         }
 
         let mut config = ProjectManifest {
             project,
             contracts: BTreeMap::new(),
+            repl_settings,
         };
         let mut config_contracts = BTreeMap::new();
         let mut config_requirements: Vec<RequirementConfig> = Vec::new();
