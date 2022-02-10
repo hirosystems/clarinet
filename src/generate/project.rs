@@ -175,7 +175,17 @@ history.txt
 name = "{}"
 authors = []
 telemetry = {}
-analysis = ["check_checker"]
+[repl.analysis]
+passes = ["check_checker"]
+[repl.analysis.check_checker]
+# If true, inputs are trusted after tx_sender has been checked.
+trusted_sender = false
+# If true, inputs are trusted after contract-caller has been checked.
+trusted_caller = false
+# If true, untrusted data may be passed into a private function without a
+# warning, if it gets checked inside. This check will also propagate up to the
+# caller.
+callee_filter = false
 
 # [contracts.counter]
 # path = "contracts/counter.clar"

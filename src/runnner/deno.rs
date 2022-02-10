@@ -156,10 +156,10 @@ mod sessions {
                     });
             }
             settings.initial_deployer = initial_deployer;
-            settings.costs_version = project_config.project.costs_version;
+            settings.repl_settings = project_config.repl_settings;
             settings.include_boot_contracts = vec![
                 "pox".to_string(),
-                format!("costs-v{}", project_config.project.costs_version),
+                format!("costs-v{}", settings.repl_settings.costs_version),
                 "bns".to_string(),
             ];
             let mut session = Session::new(settings.clone());
@@ -1257,16 +1257,16 @@ fn mine_block(state: &mut OpState, args: Value, _: ()) -> Result<String, AnyErro
                     name.into(),
                 ) {
                     Ok(res) => res,
-                    Err((_, _, err)) => {
-                        if let Some(e) = err {
+                    Err(diagnostics) => {
+                        if diagnostics.len() > 0 {
                             // todo(ludo): if CLARINET_BACKTRACE=1
                             // Retrieve the AST (penultimate entry), and the expression id (last entry)
                             println!(
-                                "Runtime error: {}::{}({}) -> {:?}",
+                                "Runtime error: {}::{}({}) -> {}",
                                 args.contract,
                                 args.method,
                                 args.args.join(", "),
-                                e
+                                diagnostics.last().unwrap().message
                             );
                         }
                         continue;

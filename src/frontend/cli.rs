@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{BTreeSet, HashMap};
 use std::fs::{self, File};
 use std::io::{prelude::*, BufReader, Read};
 use std::path::PathBuf;
@@ -14,7 +14,10 @@ use crate::poke::load_session;
 use crate::publish::{publish_all_contracts, Network};
 use crate::runnner::run_scripts;
 use crate::types::{ProjectManifest, ProjectManifestFile, RequirementConfig};
-use clarity_repl::repl;
+use clarity_repl::clarity::analysis::{AnalysisDatabase, ContractAnalysis};
+use clarity_repl::clarity::costs::LimitedCostTracker;
+use clarity_repl::clarity::types::QualifiedContractIdentifier;
+use clarity_repl::{analysis, repl};
 
 use clap::Clap;
 use toml;
@@ -201,6 +204,8 @@ struct Check {
     /// Path to Clarinet.toml
     #[clap(long = "manifest-path")]
     pub manifest_path: Option<String>,
+    /// If specified, check this file
+    pub file: Option<String>,
 }
 
 pub fn main() {
@@ -334,18 +339,15 @@ pub fn main() {
                 let settings = repl::SessionSettings::default();
                 let mut session = repl::Session::new(settings);
 
-                let rt = tokio::runtime::Builder::new_current_thread()
-                    .enable_io()
-                    .enable_time()
-                    .max_blocking_threads(32)
-                    .build()
-                    .unwrap();
-
-                let res = rt.block_on(session.resolve_link(&repl::settings::InitialLink {
-                    contract_id: fork_contract.contract_id.clone(),
-                    stacks_node_addr: None,
-                    cache: None,
-                }));
+                let mut resolved = BTreeSet::new();
+                let res = session.resolve_link(
+                    &repl::settings::InitialLink {
+                        contract_id: fork_contract.contract_id.clone(),
+                        stacks_node_addr: None,
+                        cache: None,
+                    },
+                    &mut resolved,
+                );
                 let contracts = res.unwrap();
                 let mut changes = vec![];
                 for (contract_id, code, deps) in contracts.into_iter() {
@@ -395,6 +397,61 @@ pub fn main() {
                         &project_manifest.project.authors,
                     ),
                 ));
+            }
+        }
+        Command::Check(cmd) if cmd.file.is_some() => {
+            let file = cmd.file.unwrap();
+            let mut settings = repl::SessionSettings::default();
+            settings.repl_settings.analysis.enable_all_passes();
+
+            let mut session = repl::Session::new(settings.clone());
+            let code = match fs::read_to_string(&file) {
+                Ok(code) => code,
+                _ => {
+                    println!("{}: unable to read file: '{}'", red!("error"), file);
+                    std::process::exit(1);
+                }
+            };
+            let contract_id = QualifiedContractIdentifier::transient();
+            let (ast, mut diagnostics, mut success) = session.interpreter.build_ast(
+                contract_id.clone(),
+                code.clone(),
+                settings.repl_settings.parser_version,
+            );
+            let (annotations, mut annotation_diagnostics) =
+                session.interpreter.collect_annotations(&ast, &code);
+            diagnostics.append(&mut annotation_diagnostics);
+
+            let mut contract_analysis =
+                ContractAnalysis::new(contract_id, ast.expressions, LimitedCostTracker::new_free());
+            let mut analysis_db = AnalysisDatabase::new(&mut session.interpreter.datastore);
+            let mut analysis_diagnostics = match analysis::run_analysis(
+                &mut contract_analysis,
+                &mut analysis_db,
+                &annotations,
+                &settings.repl_settings.analysis,
+            ) {
+                Ok(diagnostics) => diagnostics,
+                Err(diagnostics) => {
+                    success = false;
+                    diagnostics
+                }
+            };
+            diagnostics.append(&mut analysis_diagnostics);
+
+            let lines = code.lines();
+            let formatted_lines: Vec<String> = lines.map(|l| l.to_string()).collect();
+            for d in diagnostics {
+                for line in d.output(&file, &formatted_lines) {
+                    println!("{}", line);
+                }
+            }
+
+            if success {
+                println!("{} Syntax of contract successfully checked", green!("✔"),);
+                return;
+            } else {
+                std::process::exit(1);
             }
         }
         Command::Check(cmd) => {
