@@ -168,12 +168,12 @@ jobs:
             linker_package:
             cc: ""
             architecture: x64
-          # - os: macos-latest
-          #   platform: darwin
-          #   target: aarch64-apple-darwin
-          #   linker_package:
-          #   cc: ""
-          #   architecture: arm64
+          - os: macos-latest
+            platform: darwin
+            target: aarch64-apple-darwin
+            linker_package:
+            cc: ""
+            architecture: arm64
 
     steps:
       - name: Configure git to use LF (Windows)
@@ -199,7 +199,9 @@ jobs:
         uses: actions/setup-node@v2
         with:
           node-version: '14'
-          architecture: ${{ matrix.architecture }}
+          # Host nodejs arch does not matter in our usecase for compiling cross-platform npm packages,
+          # if enabled, this will fail after installing an arm64 nodejs runtime for an x86_64 arch macos system
+          # architecture: ${{ matrix.architecture }}
           cache: npm
           cache-dependency-path: node-bindings/package-lock.json
 
@@ -225,6 +227,13 @@ jobs:
       # - name: Install ${{ matrix.platform }}-${{ matrix.architecture }} linker
       #   if: ${{ matrix.platform }}-${{ matrix.architecture }} == 'linux-arm64' || ${{ matrix.platform }}-${{ matrix.architecture }} == 'linux-armv7' || ${{ matrix.platform }}-${{ matrix.architecture }} == 'linux-musl-x64'
       #   run: sudo apt-get update && sudo apt-get install -y ${{ matrix.linker_package }}
+
+      # Set environment variables required from cross compiling from macos-x86_64 to macos-arm64
+      - name: Configure macos-arm64 cross compile config
+        if: matrix.target == 'aarch64-apple-darwin'
+        run: |
+          echo "SDKROOT=$(xcrun -sdk macosx --show-sdk-path)" >> $GITHUB_ENV
+          echo "MACOSX_DEPLOYMENT_TARGET=$(xcrun -sdk macosx --show-sdk-platform-version)" >> $GITHUB_ENV
 
       - name: Build - Cargo
         run: cargo build --release --features=telemetry --locked --target ${{ matrix.target }}
@@ -324,6 +333,8 @@ jobs:
           path: stacks-devnet-js-${{ matrix.platform }}-${{ matrix.architecture }}.tar.gz
 
       - name: Unit Tests - Cargo
+        # can't easily run mac-arm64 tests in GH without native runners for that arch
+        if: matrix.target != 'aarch64-apple-darwin'
         run: cargo test --release --locked --target ${{ matrix.target }}
 
       # - name: Unit Tests - Node
@@ -331,7 +342,8 @@ jobs:
       #   run: npm run spec
 
       - name: Functional Tests (Not Windows)
-        if: matrix.os != 'windows-latest'
+        # can't easily run mac-arm64 tests in GH without native runners for that arch
+        if: matrix.os != 'windows-latest' && matrix.target != 'aarch64-apple-darwin' 
         run: |
           for testdir in $(ls examples); do
             ./target/${{ matrix.target }}/release/clarinet test --manifest-path examples/${testdir}/Clarinet.toml
