@@ -134,45 +134,24 @@ jobs:
           - os: ubuntu-latest
             platform: linux
             target: x86_64-unknown-linux-gnu
-            linker_package:
-            cc: ""
             architecture: x64
-          # To be uncommented later when adding new distros
-          # - os: ubuntu-latest
-          #   platform: linux
-          #   target: aarch64-unknown-linux-gnu
-          #   linker_package: gcc-aarch64-linux-gnu
-          #   cc: aarch64-linux-gnu-gcc
-          #   architecture: arm64
-          # - os: ubuntu-latest
-          #   platform: linux
-          #   target: armv7-unknown-linux-gnueabihf
-          #   linker_package: gcc-arm-linux-gnueabihf
-          #   cc: arm-linux-gnueabihf-gcc
-          #   architecture: armv7l
-          # - os: ubuntu-latest
-          #   platform: linux
-          #   target: x86_64-unknown-linux-musl
-          #   linker_package:
-          #   cc: musl-gcc
-          #   architecture: x64
+            libc: glibc
+          - os: ubuntu-latest
+            platform: linux
+            target: x86_64-unknown-linux-musl
+            architecture: x64
+            libc: musl
           - os: windows-latest
             platform: windows
             target: x86_64-pc-windows-msvc
-            linker_package:
-            cc: ""
             architecture: x64
           - os: macos-latest
             platform: darwin
             target: x86_64-apple-darwin
-            linker_package:
-            cc: ""
             architecture: x64
           - os: macos-latest
             platform: darwin
             target: aarch64-apple-darwin
-            linker_package:
-            cc: ""
             architecture: arm64
 
     steps:
@@ -196,6 +175,7 @@ jobs:
           override: true
 
       - name: Install and cache Node
+        if: matrix.target != 'x86_64-unknown-linux-musl'
         uses: actions/setup-node@v2
         with:
           node-version: '14'
@@ -223,11 +203,6 @@ jobs:
             target/${{ matrix.target }}/release/
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
 
-      # To be uncommented later when adding new distros
-      # - name: Install ${{ matrix.platform }}-${{ matrix.architecture }} linker
-      #   if: ${{ matrix.platform }}-${{ matrix.architecture }} == 'linux-arm64' || ${{ matrix.platform }}-${{ matrix.architecture }} == 'linux-armv7' || ${{ matrix.platform }}-${{ matrix.architecture }} == 'linux-musl-x64'
-      #   run: sudo apt-get update && sudo apt-get install -y ${{ matrix.linker_package }}
-
       # Set environment variables required from cross compiling from macos-x86_64 to macos-arm64
       - name: Configure macos-arm64 cross compile config
         if: matrix.target == 'aarch64-apple-darwin'
@@ -235,7 +210,22 @@ jobs:
           echo "SDKROOT=$(xcrun -sdk macosx --show-sdk-path)" >> $GITHUB_ENV
           echo "MACOSX_DEPLOYMENT_TARGET=$(xcrun -sdk macosx --show-sdk-platform-version)" >> $GITHUB_ENV
 
+      - name: Configure artifact names (libc)
+        if: ${{ matrix.libc }}
+        shell: bash
+        run: |
+          echo "SHORT_TARGET_NAME=${{ matrix.platform }}-${{ matrix.architecture }}-${{ matrix.libc }}" >> $GITHUB_ENV
+          echo "PRE_GYP_TARGET_NAME=${{ matrix.platform }}-${{ matrix.architecture }}-${{ matrix.libc }}" >> $GITHUB_ENV
+
+      - name: Configure artifact names (not libc)
+        if: ${{ ! matrix.libc }}
+        shell: bash
+        run: |
+          echo "SHORT_TARGET_NAME=${{ matrix.platform }}-${{ matrix.architecture }}" >> $GITHUB_ENV
+          echo "PRE_GYP_TARGET_NAME=${{ matrix.platform }}-${{ matrix.architecture }}-unknown" >> $GITHUB_ENV
+
       - name: Build - Cargo
+        if: matrix.target != 'x86_64-unknown-linux-musl'
         run: cargo build --release --features=telemetry --locked --target ${{ matrix.target }}
         # To be uncommented later when adding new distros
         # env:
@@ -248,10 +238,24 @@ jobs:
         #   CARGO_TARGET_X86_64_UNKNOWN_LINUX_MUSL_LINKER: ${{ matrix.cc }}
 
       - name: Build - Node
+        if: matrix.target != 'x86_64-unknown-linux-musl'
         working-directory: node-bindings
         run: |
           npm install --ignore-scripts
-          npm run build-${{ matrix.platform }}-${{ matrix.architecture }}
+          npm run build-${{ env.SHORT_TARGET_NAME }}
+
+      - name: Build - Node (linux-musl)
+        if: matrix.target == 'x86_64-unknown-linux-musl'
+        uses: docker://rust:alpine3.15
+        env:
+          RUSTFLAGS: -C target-feature=-crt-static
+        with:
+          entrypoint: /bin/sh
+          args: -c "
+            cd node-bindings &&
+            apk add alpine-sdk nodejs npm git &&
+            npm install --ignore-scripts &&
+            npm run build-${{ env.SHORT_TARGET_NAME }}"
 
       - name: Code sign bin (Windows)
         if: startsWith(github.ref, 'refs/tags/v') && matrix.os == 'windows-latest'
@@ -299,42 +303,42 @@ jobs:
 
       # Don't compress for Windows because winget can't yet unzip files
       - name: Compress cargo artifact (Not Windows)
-        if: matrix.os != 'windows-latest'
-        run: tar -C target/${{ matrix.target }}/release -zcvf clarinet-${{ matrix.platform }}-${{ matrix.architecture }}.tar.gz clarinet
+        if: matrix.os != 'windows-latest' && matrix.target != 'x86_64-unknown-linux-musl'
+        run: tar -C target/${{ matrix.target }}/release -zcvf clarinet-${{ env.SHORT_TARGET_NAME }}.tar.gz clarinet
 
       - name: Rename cargo artifact (Windows)
         if: matrix.os == 'windows-latest'
         shell: bash
-        run: mv target/wix/*.msi clarinet-${{ matrix.platform }}-${{ matrix.architecture }}.msi
+        run: mv target/wix/*.msi clarinet-${{ env.SHORT_TARGET_NAME }}.msi
 
       - name: Compress node artifact
         shell: bash
-        run: tar -C node-bindings -zcvf stacks-devnet-js-${{ matrix.platform }}-${{ matrix.architecture }}.tar.gz native/index.node
+        run: tar -C node-bindings -zcvf stacks-devnet-js-${{ env.PRE_GYP_TARGET_NAME }}.tar.gz native/index.node
 
       # Separate uploads to prevent paths from being preserved
       - name: Upload cargo artifacts (Not Windows)
-        if: matrix.os != 'windows-latest'
+        if: matrix.os != 'windows-latest' && matrix.target != 'x86_64-unknown-linux-musl'
         uses: actions/upload-artifact@v2
         with:
-          name: clarinet-${{ matrix.platform }}-${{ matrix.architecture }}
-          path: clarinet-${{ matrix.platform }}-${{ matrix.architecture }}.tar.gz
+          name: clarinet-${{ env.SHORT_TARGET_NAME }}
+          path: clarinet-${{ env.SHORT_TARGET_NAME }}.tar.gz
 
       - name: Upload cargo artifact (Windows)
         if: matrix.os == 'windows-latest'
         uses: actions/upload-artifact@v2
         with:
-          name: clarinet-${{ matrix.platform }}-${{ matrix.architecture }}
-          path: clarinet-${{ matrix.platform }}-${{ matrix.architecture }}.msi
+          name: clarinet-${{ env.SHORT_TARGET_NAME }}
+          path: clarinet-${{ env.SHORT_TARGET_NAME }}.msi
 
       - name: Upload node artifact
         uses: actions/upload-artifact@v2
         with:
-          name: stacks-devnet-js-${{ matrix.platform }}-${{ matrix.architecture }}
-          path: stacks-devnet-js-${{ matrix.platform }}-${{ matrix.architecture }}.tar.gz
+          name: stacks-devnet-js-${{ env.PRE_GYP_TARGET_NAME }}
+          path: stacks-devnet-js-${{ env.PRE_GYP_TARGET_NAME }}.tar.gz
 
       - name: Unit Tests - Cargo
         # can't easily run mac-arm64 tests in GH without native runners for that arch
-        if: matrix.target != 'aarch64-apple-darwin'
+        if: matrix.target != 'aarch64-apple-darwin' && matrix.target != 'x86_64-unknown-linux-musl'
         run: cargo test --release --locked --target ${{ matrix.target }}
 
       # - name: Unit Tests - Node
@@ -343,7 +347,7 @@ jobs:
 
       - name: Functional Tests (Not Windows)
         # can't easily run mac-arm64 tests in GH without native runners for that arch
-        if: matrix.os != 'windows-latest' && matrix.target != 'aarch64-apple-darwin' 
+        if: matrix.os != 'windows-latest' && matrix.target != 'aarch64-apple-darwin' && matrix.target != 'x86_64-unknown-linux-musl'
         run: |
           for testdir in $(ls examples); do
             ./target/${{ matrix.target }}/release/clarinet test --manifest-path examples/${testdir}/Clarinet.toml
@@ -358,10 +362,10 @@ jobs:
 
       - name: Upload Cargo Artifact to GH release (Not Windows)
         uses: svenstaro/upload-release-action@v2
-        if: startsWith(github.ref, 'refs/tags/v') && matrix.os != 'windows-latest'
+        if: startsWith(github.ref, 'refs/tags/v') && matrix.os != 'windows-latest' && matrix.target != 'x86_64-unknown-linux-musl'
         with:
           repo_token: ${{ secrets.GITHUB_TOKEN }}
-          file: clarinet-${{ matrix.platform }}-${{ matrix.architecture }}.tar.gz
+          file: clarinet-${{ env.SHORT_TARGET_NAME }}.tar.gz
           tag: ${{ github.ref }}
 
       - name: Upload Cargo Artifact to GH release (Windows)
@@ -369,7 +373,7 @@ jobs:
         if: startsWith(github.ref, 'refs/tags/v') && matrix.os == 'windows-latest'
         with:
           repo_token: ${{ secrets.GITHUB_TOKEN }}
-          file: clarinet-${{ matrix.platform }}-${{ matrix.architecture }}.msi
+          file: clarinet-${{ env.SHORT_TARGET_NAME }}.msi
           tag: ${{ github.ref }}
 
       - name: Upload Node Artifact to GH release
@@ -377,7 +381,7 @@ jobs:
         if: startsWith(github.ref, 'refs/tags/v')
         with:
           repo_token: ${{ secrets.GITHUB_TOKEN }}
-          file: stacks-devnet-js-${{ matrix.platform }}-${{ matrix.architecture }}.tar.gz
+          file: stacks-devnet-js-${{ env.PRE_GYP_TARGET_NAME }}.tar.gz
           tag: ${{ github.ref }}
 
       # Cleans the `./target` dir after the build such that only dependencies are cached on CI
