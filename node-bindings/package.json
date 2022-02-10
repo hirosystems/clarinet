@@ -13,7 +13,8 @@
     "build": "tsc --build && cargo-cp-artifact -nc native/index.node -- cargo build --message-format=json-render-diagnostics",
     "build-debug": "npm run build --",
     "build-release": "npm run build -- --release",
-    "build-linux-x64": "npm run build-release -- --target x86_64-unknown-linux-gnu",
+    "build-linux-x64-glibc": "npm run build-release -- --target x86_64-unknown-linux-gnu",
+    "build-linux-x64-musl": "npm run build-release -- --target x86_64-unknown-linux-musl",
     "build-windows-x64": "npm run build-release -- --target x86_64-pc-windows-msvc",
     "build-darwin-x64": "npm run build-release -- --target x86_64-apple-darwin",
     "build-darwin-arm64": "npm run build-release -- --target aarch64-apple-darwin",
@@ -39,7 +40,7 @@
     "module_name": "index",
     "host": "https://github.com/hirosystems/clarinet/releases/download/",
     "remote_path": "v{version}",
-    "package_name": "stacks-devnet-js-{platform}-{arch}.tar.gz",
+    "package_name": "stacks-devnet-js-{platform}-{arch}-{libc}.tar.gz",
     "module_path": "./native",
     "pkg_path": "."
   }
