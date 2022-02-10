@@ -16,6 +16,7 @@
     "build-linux-x64": "npm run build-release -- --target x86_64-unknown-linux-gnu",
     "build-windows-x64": "npm run build-release -- --target x86_64-pc-windows-msvc",
     "build-darwin-x64": "npm run build-release -- --target x86_64-apple-darwin",
+    "build-darwin-arm64": "npm run build-release -- --target aarch64-apple-darwin",
     "install": "node-pre-gyp install --fallback-to-build=false || npm run build-release",
     "lint": "eslint .",
     "package": "node-pre-gyp package",
