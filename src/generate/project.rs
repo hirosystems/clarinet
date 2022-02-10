@@ -175,9 +175,9 @@ history.txt
 name = "{}"
 authors = []
 telemetry = {}
-[project.repl.analysis]
+[repl.analysis]
 passes = ["check_checker"]
-[project.repl.analysis.check_checker]
+[repl.analysis.check_checker]
 # If true, inputs are trusted after tx_sender has been checked.
 trusted_sender = false
 # If true, inputs are trusted after contract-caller has been checked.

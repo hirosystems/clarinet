@@ -156,7 +156,7 @@ mod sessions {
                     });
             }
             settings.initial_deployer = initial_deployer;
-            settings.repl_settings = project_config.project.repl_settings;
+            settings.repl_settings = project_config.repl_settings;
             settings.include_boot_contracts = vec![
                 "pox".to_string(),
                 format!("costs-v{}", settings.repl_settings.costs_version),
