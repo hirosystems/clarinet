@@ -27,7 +27,8 @@ deno_core = { path = "./vendor/deno/core", optional = true }
 deno_runtime = { path = "./vendor/deno/runtime", optional = true }
 deno = { path = "./vendor/deno/cli", optional = true }
 # clarity_repl = { package = "clarity-repl", path = "../../clarity-repl", features = ["cli"] }
-clarity_repl = { package = "clarity-repl", version = "=0.22.1" }
+# clarity_repl = { package = "clarity-repl", version = "=0.22.0" }
+clarity-repl = { git = "https://github.com/hirosystems/clarity-repl", branch = "develop" }
 bip39 = { version = "1.0.1", default-features = false }
 aes = "0.7.5"
 base64 = "0.13.0"
@@ -54,7 +55,7 @@ pin-project = "1.0.5"
 indexmap = { version = "1.6.1", features = ["serde"] }
 shell-escape = "0.1.5"
 tiny-hderive = "0.3.0"
-reqwest = { version = "0.11", features = ["blocking", "json", "rustls"] }
+reqwest = { version = "0.11", default-features = false, features = ["blocking", "json", "rustls-tls"] }
 swc_common = { version = "0.10.20", features = ["sourcemap"], optional = true }
 bollard = "0.11.0"
 rocket = { version = "=0.5.0-rc.1", features = ["json"] }
