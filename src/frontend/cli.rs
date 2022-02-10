@@ -1,4 +1,4 @@
-use std::collections::{HashMap, BTreeSet};
+use std::collections::{BTreeSet, HashMap};
 use std::fs::{self, File};
 use std::io::{prelude::*, BufReader, Read};
 use std::path::PathBuf;
@@ -340,11 +340,14 @@ pub fn main() {
                 let mut session = repl::Session::new(settings);
 
                 let mut resolved = BTreeSet::new();
-                let res = session.resolve_link(&repl::settings::InitialLink {
-                    contract_id: fork_contract.contract_id.clone(),
-                    stacks_node_addr: None,
-                    cache: None,
-                }, &mut resolved);
+                let res = session.resolve_link(
+                    &repl::settings::InitialLink {
+                        contract_id: fork_contract.contract_id.clone(),
+                        stacks_node_addr: None,
+                        cache: None,
+                    },
+                    &mut resolved,
+                );
                 let contracts = res.unwrap();
                 let mut changes = vec![];
                 for (contract_id, code, deps) in contracts.into_iter() {
