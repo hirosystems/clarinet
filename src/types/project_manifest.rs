@@ -33,6 +33,7 @@ pub struct ProjectManifest {
     pub project: ProjectConfig,
     #[serde(serialize_with = "toml::ser::tables_last")]
     pub contracts: BTreeMap<String, ContractConfig>,
+    #[serde(rename = "repl")]
     pub repl_settings: repl::Settings,
 }
 
