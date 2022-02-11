@@ -814,6 +814,7 @@ fn display_tests_pro_tips_hint() {
     );
 
     println!("{}", yellow!("Find more information on testing with Clarinet here: https://docs.hiro.so/smart-contracts/clarinet#testing-with-clarinet"));
+    println!("{}", yellow!("And learn more about local integration testing here: https://docs.hiro.so/smart-contracts/devnet"));
     display_hint_footer();
 }
 
