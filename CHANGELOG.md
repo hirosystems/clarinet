@@ -1,3 +1,10 @@
+## [0.25.1](https://github.com/hirosystems/clarinet/compare/v0.25.0...v0.25.1) (2022-02-11)
+
+
+### Bug Fixes
+
+* crash on `clarinet new contract` ([d236370](https://github.com/hirosystems/clarinet/commit/d2363700b0a7594ea54802496dd4244343a7e238)), closes [#246](https://github.com/hirosystems/clarinet/issues/246)
+
 # [0.25.0](https://github.com/hirosystems/clarinet/compare/v0.24.0...v0.25.0) (2022-02-10)
 
 
