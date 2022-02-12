@@ -1,3 +1,15 @@
+# [0.26.0](https://github.com/hirosystems/clarinet/compare/v0.25.1...v0.26.0) (2022-02-12)
+
+
+### Bug Fixes
+
+* fix serialization of REPL settings ([5fc9d08](https://github.com/hirosystems/clarinet/commit/5fc9d080cdb499d61d69498050773b7cbaba72fe))
+
+
+### Features
+
+* macos-arm64 / Apple Silicon / M1 builds ([da5f1bc](https://github.com/hirosystems/clarinet/commit/da5f1bc43a977156656d3036861c2ff4978d53bf))
+
 ## [0.25.1](https://github.com/hirosystems/clarinet/compare/v0.25.0...v0.25.1) (2022-02-11)
 
 
