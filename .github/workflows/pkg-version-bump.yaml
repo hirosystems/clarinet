@@ -30,6 +30,7 @@ jobs:
           git config --global user.name "${GIT_USER_NAME}"
           git config --global user.email "${GIT_USER_EMAIL}"
 
+          brew update
           brew bump-formula-pr \
             --no-browse \
             --no-audit \
