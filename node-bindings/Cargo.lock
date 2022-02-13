@@ -449,7 +449,7 @@ dependencies = [
 
 [[package]]
 name = "stacks-devnet-js"
-version = "0.26.0"
+version = "0.26.1"
 dependencies = [
  "clarinet",
  "neon",

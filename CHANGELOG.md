@@ -1,3 +1,10 @@
+## [0.26.1](https://github.com/hirosystems/clarinet/compare/v0.26.0...v0.26.1) (2022-02-13)
+
+
+### Bug Fixes
+
+* update to clarity-repl 0.22.1 ([644c082](https://github.com/hirosystems/clarinet/commit/644c082da056511ebe3c5d0d9e2eb10411b78c4b))
+
 # [0.26.0](https://github.com/hirosystems/clarinet/compare/v0.25.1...v0.26.0) (2022-02-12)
 
 
