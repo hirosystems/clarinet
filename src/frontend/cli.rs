@@ -37,43 +37,41 @@ enum Command {
     /// Create and scaffold a new project
     #[clap(name = "new")]
     New(GenerateProject),
-    /// Contract subcommand
+    /// Subcommands for working with contracts
     #[clap(subcommand, name = "contract")]
     Contract(Contract),
-    /// Load contracts in a REPL for interactions
-    #[clap(name = "poke")]
-    Poke(Poke),
-    #[clap(name = "console")]
-    Console(Poke),
+    /// Load contracts in a REPL for an interactive session
+    #[clap(name = "console", aliases = &["poke"])]
+    Console(Console),
     /// Execute test suite
     #[clap(name = "test")]
     Test(Test),
-    /// Check contracts syntax
+    /// Check syntax of your contracts
     #[clap(name = "check")]
     Check(Check),
     /// Publish contracts on chain
     #[clap(name = "publish")]
     Publish(Publish),
-    /// Execute Clarinet Extension
+    /// Execute Clarinet extension
     #[clap(name = "run")]
     Run(Run),
-    /// Work on contracts integration
+    /// Start devnet environment for integration testing
     #[clap(name = "integrate")]
     Integrate(Integrate),
-    /// Start a LSP session
+    /// Start an LSP server (for integration with editors)
     #[clap(name = "lsp")]
     LSP,
 }
 
 #[derive(Clap, PartialEq, Clone, Debug)]
 enum Contract {
-    /// New contract subcommand
+    /// Generate files and settings for a new contract
     #[clap(name = "new")]
     NewContract(NewContract),
-    /// Import contract subcommand
+    /// Add third-party requirements to this project
     #[clap(name = "requirement")]
-    LinkContract(LinkContract),
-    /// Fork contract subcommand
+    Requirement(Requirement),
+    /// Replicate a third-party contract into this project
     #[clap(name = "fork")]
     ForkContract(ForkContract),
 }
@@ -82,9 +80,9 @@ enum Contract {
 struct GenerateProject {
     /// Project's name
     pub name: String,
-    /// Enable developer usage telemetry
-    #[clap(long = "disable-telemetry")]
-    pub disable_telemetry: Option<bool>,
+    /// Do not provide developer usage telemetry for this project
+    #[clap(long = "disable-telemetry", takes_value = false)]
+    pub disable_telemetry: bool,
 }
 
 #[derive(Clap, PartialEq, Clone, Debug)]
@@ -97,8 +95,8 @@ struct NewContract {
 }
 
 #[derive(Clap, PartialEq, Clone, Debug)]
-struct LinkContract {
-    /// Contract id
+struct Requirement {
+    /// Contract id (ex. " SP2PABAF9FTAJYNFZH93XENAJ8FVY99RRM50D2JG9.nft-trait")
     pub contract_id: String,
     /// Path to Clarinet.toml
     #[clap(long = "manifest-path")]
@@ -107,7 +105,7 @@ struct LinkContract {
 
 #[derive(Clap, PartialEq, Clone, Debug)]
 struct ForkContract {
-    /// Contract id
+    /// Contract id (ex. " SP2PABAF9FTAJYNFZH93XENAJ8FVY99RRM50D2JG9.nft-trait")
     pub contract_id: String,
     /// Path to Clarinet.toml
     #[clap(long = "manifest-path")]
@@ -118,7 +116,7 @@ struct ForkContract {
 }
 
 #[derive(Clap, PartialEq, Clone, Debug)]
-struct Poke {
+struct Console {
     /// Path to Clarinet.toml
     #[clap(long = "manifest-path")]
     pub manifest_path: Option<String>,
@@ -136,7 +134,7 @@ struct Integrate {
 
 #[derive(Clap, PartialEq, Clone, Debug)]
 struct Test {
-    /// Generate coverage
+    /// Generate coverage file (coverage.lcov)
     #[clap(long = "coverage")]
     pub coverage: bool,
     /// Generate costs report
@@ -145,10 +143,10 @@ struct Test {
     /// Path to Clarinet.toml
     #[clap(long = "manifest-path")]
     pub manifest_path: Option<String>,
-    /// Relaunch tests on updates
+    /// Relaunch tests upon updates to contracts
     #[clap(long = "watch")]
     pub watch: bool,
-    /// Files to includes
+    /// Test files to be included (defaults to all tests found under tests/)
     pub files: Vec<String>,
 }
 
@@ -249,8 +247,8 @@ pub fn main() {
             };
 
             let telemetry_enabled = if cfg!(feature = "telemetry") {
-                if let Some(disable_telemetry) = project_opts.disable_telemetry {
-                    !disable_telemetry
+                if project_opts.disable_telemetry {
+                    false
                 } else {
                     println!("{}", yellow!("Send usage data to Hiro."));
                     println!("{}", yellow!("Help Hiro improve its products and services by automatically sending diagnostics and usage data."));
@@ -309,7 +307,7 @@ pub fn main() {
                     display_post_check_hint();
                 }
             }
-            Contract::LinkContract(required_contract) => {
+            Contract::Requirement(required_contract) => {
                 let manifest_path = get_manifest_path_or_exit(required_contract.manifest_path);
 
                 let change = TOMLEdition {
@@ -380,14 +378,14 @@ pub fn main() {
                 }
             }
         },
-        Command::Poke(cmd) | Command::Console(cmd) => {
+        Command::Console(cmd) => {
             let manifest_path = get_manifest_path_or_exit(cmd.manifest_path);
             let start_repl = true;
             let (_, _, project_manifest, _) =
                 load_session(manifest_path, start_repl, &Network::Devnet)
                     .expect("Unable to start REPL");
             if hints_enabled {
-                display_post_poke_hint();
+                display_post_console_hint();
             }
             if project_manifest.project.telemetry {
                 #[cfg(feature = "telemetry")]
@@ -756,7 +754,7 @@ fn display_post_check_hint() {
     display_hint_footer();
 }
 
-fn display_post_poke_hint() {
+fn display_post_console_hint() {
     println!("");
     display_hint_header();
     println!(
