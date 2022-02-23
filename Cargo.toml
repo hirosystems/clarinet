@@ -17,7 +17,8 @@ winapi = "0.3.9"
 winres = "0.1.11"
 
 [dependencies]
-clap = { version = "=3.0.0-beta.4", optional = true }
+clap = { version = "3.0.14", features = ["derive"], optional = true }
+clap_generate = { version = "3.0.3", optional = true }
 toml = { version = "0.5.6", features = ["preserve_order"] }
 serde = "1"
 serde_json = "1"
@@ -96,7 +97,7 @@ path = "src/bin.rs"
 
 [features]
 default = ["cli", "telemetry"]
-cli = ["swc_common", "deno", "deno_runtime", "deno_core", "clap", "tower-lsp"]
+cli = ["swc_common", "deno", "deno_runtime", "deno_core", "clap", "clap_generate", "tower-lsp"]
 telemetry = ["segment", "mac_address"]
 
 [workspace]

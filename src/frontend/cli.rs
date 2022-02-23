@@ -19,64 +19,69 @@ use clarity_repl::clarity::costs::LimitedCostTracker;
 use clarity_repl::clarity::types::QualifiedContractIdentifier;
 use clarity_repl::{analysis, repl};
 
-use clap::Clap;
+use clap::{IntoApp, Parser, Subcommand};
+use clap_generate::{Generator, Shell};
 use toml;
 
 #[cfg(feature = "telemetry")]
 use super::telemetry::{telemetry_report_event, DeveloperUsageDigest, DeveloperUsageEvent};
 
-#[derive(Clap, PartialEq, Clone, Debug)]
-#[clap(version = option_env!("CARGO_PKG_VERSION").expect("Unable to detect version"))]
+#[derive(Parser, PartialEq, Clone, Debug)]
+#[clap(version = option_env!("CARGO_PKG_VERSION").expect("Unable to detect version"), bin_name = "clarinet")]
 struct Opts {
     #[clap(subcommand)]
     command: Command,
 }
 
-#[derive(Clap, PartialEq, Clone, Debug)]
+#[derive(Subcommand, PartialEq, Clone, Debug)]
 enum Command {
     /// Create and scaffold a new project
-    #[clap(name = "new")]
+    #[clap(name = "new", bin_name = "new")]
     New(GenerateProject),
     /// Subcommands for working with contracts
     #[clap(subcommand, name = "contract")]
     Contract(Contract),
     /// Load contracts in a REPL for an interactive session
-    #[clap(name = "console", aliases = &["poke"])]
+    #[clap(name = "console", aliases = &["poke"], bin_name = "console")]
     Console(Console),
     /// Execute test suite
-    #[clap(name = "test")]
+    #[clap(name = "test", bin_name = "test")]
     Test(Test),
     /// Check syntax of your contracts
-    #[clap(name = "check")]
+    #[clap(name = "check", bin_name = "check")]
     Check(Check),
     /// Publish contracts on chain
-    #[clap(name = "publish")]
+    #[clap(name = "publish", bin_name = "publish")]
     Publish(Publish),
     /// Execute Clarinet extension
-    #[clap(name = "run")]
+    #[clap(name = "run", bin_name = "run")]
     Run(Run),
     /// Start devnet environment for integration testing
-    #[clap(name = "integrate")]
+    #[clap(name = "integrate", bin_name = "integrate")]
     Integrate(Integrate),
     /// Start an LSP server (for integration with editors)
-    #[clap(name = "lsp")]
+    #[clap(name = "lsp", bin_name = "lsp")]
     LSP,
+    /// Generate shell completions scripts
+    #[clap(name = "completions", bin_name = "completions")]
+    Completions(Completions),
 }
 
-#[derive(Clap, PartialEq, Clone, Debug)]
+#[derive(Subcommand, PartialEq, Clone, Debug)]
+#[clap(bin_name = "contract")]
 enum Contract {
     /// Generate files and settings for a new contract
-    #[clap(name = "new")]
+    #[clap(name = "new", bin_name = "new")]
     NewContract(NewContract),
     /// Add third-party requirements to this project
-    #[clap(name = "requirement")]
+    #[clap(name = "requirement", bin_name = "requirement")]
     Requirement(Requirement),
     /// Replicate a third-party contract into this project
-    #[clap(name = "fork")]
+    #[clap(name = "fork", bin_name = "fork")]
     ForkContract(ForkContract),
 }
 
-#[derive(Clap, PartialEq, Clone, Debug)]
+#[derive(Parser, PartialEq, Clone, Debug)]
 struct GenerateProject {
     /// Project's name
     pub name: String,
@@ -85,7 +90,7 @@ struct GenerateProject {
     pub disable_telemetry: bool,
 }
 
-#[derive(Clap, PartialEq, Clone, Debug)]
+#[derive(Parser, PartialEq, Clone, Debug)]
 struct NewContract {
     /// Contract's name
     pub name: String,
@@ -94,7 +99,7 @@ struct NewContract {
     pub manifest_path: Option<String>,
 }
 
-#[derive(Clap, PartialEq, Clone, Debug)]
+#[derive(Parser, PartialEq, Clone, Debug)]
 struct Requirement {
     /// Contract id (ex. " SP2PABAF9FTAJYNFZH93XENAJ8FVY99RRM50D2JG9.nft-trait")
     pub contract_id: String,
@@ -103,7 +108,7 @@ struct Requirement {
     pub manifest_path: Option<String>,
 }
 
-#[derive(Clap, PartialEq, Clone, Debug)]
+#[derive(Parser, PartialEq, Clone, Debug)]
 struct ForkContract {
     /// Contract id (ex. " SP2PABAF9FTAJYNFZH93XENAJ8FVY99RRM50D2JG9.nft-trait")
     pub contract_id: String,
@@ -115,14 +120,14 @@ struct ForkContract {
     // pub recursive: bool,
 }
 
-#[derive(Clap, PartialEq, Clone, Debug)]
+#[derive(Parser, PartialEq, Clone, Debug)]
 struct Console {
     /// Path to Clarinet.toml
     #[clap(long = "manifest-path")]
     pub manifest_path: Option<String>,
 }
 
-#[derive(Clap, PartialEq, Clone, Debug)]
+#[derive(Parser, PartialEq, Clone, Debug)]
 struct Integrate {
     /// Path to Clarinet.toml
     #[clap(long = "manifest-path")]
@@ -132,7 +137,7 @@ struct Integrate {
     pub no_dashboard: bool,
 }
 
-#[derive(Clap, PartialEq, Clone, Debug)]
+#[derive(Parser, PartialEq, Clone, Debug)]
 struct Test {
     /// Generate coverage file (coverage.lcov)
     #[clap(long = "coverage")]
@@ -150,7 +155,7 @@ struct Test {
     pub files: Vec<String>,
 }
 
-#[derive(Clap, PartialEq, Clone, Debug)]
+#[derive(Parser, PartialEq, Clone, Debug)]
 struct Run {
     /// Script to run
     pub script: String,
@@ -169,7 +174,7 @@ struct Run {
     pub allow_disk_read: bool,
 }
 
-#[derive(Clap, PartialEq, Clone, Debug)]
+#[derive(Parser, PartialEq, Clone, Debug)]
 struct Publish {
     /// Deploy contracts on devnet, using settings/Devnet.toml
     #[clap(
@@ -197,13 +202,20 @@ struct Publish {
     pub manifest_path: Option<String>,
 }
 
-#[derive(Clap, PartialEq, Clone, Debug)]
+#[derive(Parser, PartialEq, Clone, Debug)]
 struct Check {
     /// Path to Clarinet.toml
     #[clap(long = "manifest-path")]
     pub manifest_path: Option<String>,
     /// If specified, check this file
     pub file: Option<String>,
+}
+
+#[derive(Parser, PartialEq, Clone, Debug)]
+struct Completions {
+    /// Specify which shell to generation completions script for
+    #[clap(arg_enum, ignore_case = true)]
+    pub shell: Shell,
 }
 
 pub fn main() {
@@ -610,6 +622,20 @@ pub fn main() {
             }
         }
         Command::LSP => run_lsp(),
+        Command::Completions(cmd) => {
+            let mut app = Opts::command();
+            let file_name = cmd.shell.file_name("clarinet");
+            let mut file = match File::create(file_name.clone()) {
+                Ok(file) => file,
+                Err(e) => {
+                    println!("error creating {}: {}", file_name, e);
+                    return;
+                }
+            };
+            cmd.shell.generate(&mut app, &mut file);
+            println!("generated: {}", file_name.clone());
+            println!("Check your shell's documentation for details about using this file to enable completions for clarinet");
+        }
     };
 }
 
