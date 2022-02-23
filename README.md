@@ -94,6 +94,16 @@ git submodule update --recursive
 The following sections describe how to create a new project in Clarinet and populate it with smart contracts. Clarinet
 also provides tools for interacting with your contracts in a REPL, and performing automated testing of contracts.
 
+### Setup shell completions
+
+Clarinet has many different commands built in, so it will be useful to enable tab-completion in your shell. You can use `clarinet` to generate the shell completion scripts for many common shells using the command:
+
+```sh
+clarinet completions (bash|elvish|fish|powershell|zsh)
+```
+
+After generating the file, please refer to the documentation for your shell to determine where this file should be moved and what other steps may be necessary to enable tab-completion for `clarinet`.
+
 ### Create a new project
 
 Once installed, you can use clarinet to create a new project:
