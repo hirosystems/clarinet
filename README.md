@@ -12,14 +12,12 @@ the Stacks blockchain. Smart contracts allow developers to encode essential busi
 
 ### Clarinet 101
 
-An introductory video tutorial series, from Hiro Engineer [Ludo Galabru](https://twitter.com/ludovic?lang=en), that guides developers through some of the fundamentals of of Clarinet, and how it can help develop, test, and deploy Clarity smart contracts. 
-
+An introductory video tutorial series, from Hiro Engineer [Ludo Galabru](https://twitter.com/ludovic?lang=en), that guides developers through some of the fundamentals of of Clarinet, and how it can help develop, test, and deploy Clarity smart contracts.
 
 Check out the playlist on [Hiro's Youtube](https://www.youtube.com/c/HiroSystems):
 [<img src="docs/images/clarinet101.png">](https://youtube.com/playlist?list=PL5Ujm489LoJaAz9kUJm8lYUWdGJ2AnQTb)
 
 ## Installation
-
 
 ### Install on macOS (Homebrew)
 
@@ -84,6 +82,7 @@ git checkout main
 ```
 
 If you have previously checked out the source, ensure you have the latest code (including submodules) before building using:
+
 ```
 git pull
 git submodule update --recursive
@@ -198,6 +197,7 @@ $ clarinet test
 #### Measure and increase cost coverage
 
 To help developers maximizing their test coverage, Clarinet can produce a `lcov` report, using the following option:
+
 ```bash
 $ clarinet test --coverage
 ```
@@ -212,7 +212,6 @@ $ open index.html
 
 ![lcov](docs/images/lcov.png)
 
-
 ### Cost optimizations
 
 Clarinet can also be use for optimizing costs. When executing a test suite, Clarinet will keep track of all the costs being computed when executing the `contract-call`, and display the most expensive ones in a table:
@@ -224,7 +223,6 @@ $ clarinet test --cost
 The `--cost` option can be used in conjunction with `--watch` and filters to maximize productivity, as illustrated here:
 
 ![costs](docs/images/costs.gif)
-
 
 ### Load contracts in a console
 
@@ -255,7 +253,6 @@ $ clarinet integrate
 
 Make sure that you have a working installation of Docker running locally.
 
-
 ### Deploy contracts to Testnet
 
 You can use Clarinet to deploy your contracts to the public Testnet environment for testing and
@@ -267,7 +264,7 @@ $ clarinet deploy --testnet
 
 ### Use Clarinet in your CI workflow as a GitHub Action
 
-Clarinet can be used in GitHub Actions as a step of your CI workflows. 
+Clarinet can be used in GitHub Actions as a step of your CI workflows.
 You can set-up a simple workflow by adding the following steps in a file `.github/workflows/github-actions-clarinet.yml`:
 
 ```yaml
@@ -281,7 +278,7 @@ jobs:
       - uses: actions/checkout@v2
       - name: "Execute unit tests"
         uses: docker://hirosystems/clarinet:latest
-        with: 
+        with:
           args: test --coverage --manifest-path=./Clarinet.toml
       - name: "Export code coverage"
         uses: codecov/codecov-action@v1
@@ -297,11 +294,10 @@ The generated code coverage output can then be used as is with GitHub Apps like 
 
 Clarinet can easily be extended by community members: open source contributions to clarinet are welcome, but developers can also write their own clarinet extensions if they want to integrate clarity contracts with their own tooling and workflow.
 
-
-| Name                          | wallet access | disk write | disk read | Deployment | Description |
-| --- | --- | --- | --- | --- | --- |
-| stacksjs-helper-generator | no | yes | no | https://deno.land/x/clarinet@v0.16.0/ext/stacksjs-helper-generator.ts | Facilitates contract integration by generating some typescript constants that can be used with stacks.js. Never hard code a stacks address again! | 
-|                               |                       |                    |                   | |
+| Name                      | wallet access | disk write | disk read | Deployment                                                            | Description                                                                                                                                       |
+| ------------------------- | ------------- | ---------- | --------- | --------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
+| stacksjs-helper-generator | no            | yes        | no        | https://deno.land/x/clarinet@v0.16.0/ext/stacksjs-helper-generator.ts | Facilitates contract integration by generating some typescript constants that can be used with stacks.js. Never hard code a stacks address again! |
+|                           |               |            |           |                                                                       |
 
 #### How to use extensions
 
@@ -312,7 +308,7 @@ $ clarinet run --allow-write https://deno.land/x/clarinet@v0.15.4/ext/stacksjs-h
 ```
 
 An extension can be deployed as a standalone plugin on Deno, or can also just be a local file if it includes sensitive / private setup informations.
-As illustrated in the example above, permissions (wallet / disk read / disk write) are declared using command flags. If at runtime, the clarinet extension is trying to write to disk, read disk, or access wallets without permission, the script will end up failing. 
+As illustrated in the example above, permissions (wallet / disk read / disk write) are declared using command flags. If at runtime, the clarinet extension is trying to write to disk, read disk, or access wallets without permission, the script will end up failing.
 
 ## Contributing
 
