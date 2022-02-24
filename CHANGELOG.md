@@ -1,3 +1,13 @@
+# [0.27.0](https://github.com/hirosystems/clarinet/compare/v0.26.1...v0.27.0) (2022-02-24)
+
+
+### Features
+
+* add shell completions files ([e6b1f25](https://github.com/hirosystems/clarinet/commit/e6b1f25683cb2c0e8f031e08fa0843fb0e5af690))
+* add subcommand to generate shell completions ([a493b67](https://github.com/hirosystems/clarinet/commit/a493b6792515a6163a401f4c4a25802d98b76882)), closes [#146](https://github.com/hirosystems/clarinet/issues/146)
+* clean up commands and improve help docs ([8f18182](https://github.com/hirosystems/clarinet/commit/8f18182ce659b9dd8969af0ac28c9a0a3b4c9278)), closes [#118](https://github.com/hirosystems/clarinet/issues/118)
+* stacks-devnet-js support for linux-musl (non-glibc, e.g. alpine) ([6e322f1](https://github.com/hirosystems/clarinet/commit/6e322f1b668b9fcbc547e1053cf8d10807828c60))
+
 ## [0.26.1](https://github.com/hirosystems/clarinet/compare/v0.26.0...v0.26.1) (2022-02-13)
 
 
