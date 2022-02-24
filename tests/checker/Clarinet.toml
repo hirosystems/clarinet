@@ -1,8 +1,0 @@
-[project]
-name = "checker"
-requirements = []
-analysis = ["check_checker"]
-costs_version = 1
-[contracts.checker]
-path = "contracts/checker.clar"
-depends_on = []
