@@ -107,8 +107,8 @@ pub fn start_ui(
                 app.display_service_status_update(status);
             }
             DevnetEvent::StacksChainEvent(chain_event) => {
-                if let StacksChainEvent::ChainUpdatedWithBlock(block) = chain_event {
-                    app.display_block(block);
+                if let StacksChainEvent::ChainUpdatedWithBlock(update) = chain_event {
+                    app.display_block(update.new_block);
                 } else {
                     // todo(lgalabru)
                 }

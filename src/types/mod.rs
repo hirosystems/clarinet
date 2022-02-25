@@ -17,7 +17,7 @@ pub use data::{
     Operation, OperationIdentifier, OperationMetadata, OperationStatusKind, OperationType,
     StacksBlockData, StacksBlockMetadata, StacksContractDeploymentData, StacksTransactionData,
     StacksTransactionExecutionCost, StacksTransactionKind, StacksTransactionMetadata,
-    StacksTransactionReceipt, TransactionIdentifier,
+    StacksTransactionReceipt, TransactionIdentifier, StacksMicroblocksTrail, StacksMicroblockData,
 };
 
 #[allow(dead_code)]
@@ -30,6 +30,35 @@ pub enum BitcoinChainEvent {
 #[allow(dead_code)]
 #[derive(Debug, Clone, PartialEq, Serialize)]
 pub enum StacksChainEvent {
-    ChainUpdatedWithBlock(StacksBlockData),
-    ChainUpdatedWithReorg(Vec<StacksBlockData>, Vec<StacksBlockData>),
+    ChainUpdatedWithBlock(ChainUpdatedWithBlockData),
+    ChainUpdatedWithReorg(ChainUpdatedWithReorgData),
+    ChainUpdatedWithMicroblock(ChainUpdatedWithMicroblockData),
+    ChainUpdatedWithMicroblockReorg(ChainUpdatedWithMicroblockReorgData),
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize)]
+pub struct ChainUpdatedWithBlockData {
+    pub new_block: StacksBlockData,
+    pub anchored_trail: Option<StacksMicroblocksTrail>,
+    pub confirmed_block: (StacksBlockData, Option<StacksMicroblocksTrail>),
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize)]
+pub struct ChainUpdatedWithReorgData {
+    pub old_blocks: Vec<(Option<StacksMicroblocksTrail>, StacksBlockData)>,
+    pub new_blocks: Vec<(Option<StacksMicroblocksTrail>, StacksBlockData)>,
+    pub confirmed_block: (StacksBlockData, Option<StacksMicroblocksTrail>),
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize)]
+pub struct ChainUpdatedWithMicroblockData {
+    pub anchored_block: StacksBlockData,
+    pub current_trail: StacksMicroblocksTrail,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize)]
+pub struct ChainUpdatedWithMicroblockReorgData {
+    pub new_block: StacksBlockData,
+    pub new_anchored_trail: Option<StacksMicroblocksTrail>,
+    pub old_trail: Option<StacksMicroblocksTrail>,
 }

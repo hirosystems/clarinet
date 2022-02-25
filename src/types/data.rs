@@ -28,6 +28,24 @@ pub struct StacksBlockData {
     pub metadata: StacksBlockMetadata,
 }
 
+/// StacksMicroblockData contain an array of Transactions that occurred at a particular
+/// BlockIdentifier. A hard requirement for blocks returned by Rosetta
+/// implementations is that they MUST be _inalterable_: once a client has
+/// requested and received a block identified by a specific BlockIndentifier,
+/// all future calls for that same BlockIdentifier must return the same block
+/// contents.
+#[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
+pub struct StacksMicroblockData {
+    pub block_identifier: BlockIdentifier,
+    pub parent_block_identifier: BlockIdentifier,
+    pub transactions: Vec<StacksTransactionData>,
+}
+
+#[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
+pub struct StacksMicroblocksTrail {
+    pub microblocks: Vec<StacksMicroblockData>,
+}
+
 #[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
 pub struct StacksBlockMetadata {
     pub bitcoin_anchor_block_identifier: BlockIdentifier,

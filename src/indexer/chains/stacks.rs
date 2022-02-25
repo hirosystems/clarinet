@@ -6,7 +6,7 @@ use crate::types::{
     Operation, OperationIdentifier, OperationStatusKind, OperationType, StacksBlockData,
     StacksBlockMetadata, StacksContractDeploymentData, StacksTransactionData,
     StacksTransactionExecutionCost, StacksTransactionKind, StacksTransactionMetadata,
-    StacksTransactionReceipt, TransactionIdentifier,
+    StacksTransactionReceipt, TransactionIdentifier, StacksMicroblockData
 };
 use crate::utils::stacks::StacksRpc;
 use clarity_repl::clarity::codec::transaction::{TransactionAuth, TransactionPayload};
@@ -38,8 +38,9 @@ pub struct NewBlock {
 
 #[allow(dead_code)]
 #[derive(Deserialize)]
-pub struct NewMicroBlock {
+pub struct NewMicroblock {
     transactions: Vec<NewTransaction>,
+    events: Vec<NewEvent>,
 }
 
 #[derive(Deserialize)]
@@ -148,7 +149,7 @@ pub fn standardize_stacks_block(
         },
         parent_block_identifier: BlockIdentifier {
             hash: block.parent_index_block_hash.clone(),
-            index: block.block_height,
+            index: block.block_height - 1,
         },
         timestamp: 0,
         metadata: StacksBlockMetadata {
@@ -160,6 +161,60 @@ pub fn standardize_stacks_block(
             pox_cycle_position: (current_len % pox_cycle_length) as u32,
             pox_cycle_length: pox_cycle_length.try_into().unwrap(),
         },
+        transactions,
+    }
+}
+
+pub fn standardize_stacks_microblock(
+    indexer_config: &IndexerConfig,
+    marshalled_microblock: JsonValue,
+    anchored_block_identifier: &BlockIdentifier,
+    ctx: &mut StacksChainContext,
+) -> StacksMicroblockData {
+    let mut microblock: NewMicroblock = serde_json::from_value(marshalled_microblock).unwrap();
+
+    let mut events = vec![];
+    events.append(&mut microblock.events);
+    let transactions = microblock
+        .transactions
+        .iter()
+        .map(|t| {
+            let (description, tx, tx_type, fee, sender, sponsor) =
+                get_tx_description(&t.raw_tx).expect("unable to parse transaction");
+            let (operations, receipt) = get_standardized_stacks_operations(
+                &t.txid,
+                &tx,
+                &mut events,
+                &mut ctx.asset_class_map,
+                &indexer_config.stacks_node_rpc_url,
+            );
+            StacksTransactionData {
+                transaction_identifier: TransactionIdentifier {
+                    hash: t.txid.clone(),
+                },
+                operations,
+                metadata: StacksTransactionMetadata {
+                    success: t.status == "success",
+                    result: get_value_description(&t.raw_result),
+                    raw_tx: t.raw_tx.clone(),
+                    sender,
+                    fee,
+                    sponsor,
+                    kind: tx_type,
+                    execution_cost: t.execution_cost.clone(),
+                    receipt,
+                    description,
+                },
+            }
+        })
+        .collect();
+
+    StacksMicroblockData {
+        block_identifier: BlockIdentifier {
+            hash: "".into(),
+            index: 0,
+        },
+        parent_block_identifier: anchored_block_identifier.clone(),
         transactions,
     }
 }

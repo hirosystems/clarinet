@@ -2,7 +2,7 @@ pub mod chains;
 
 use crate::types::{
     BitcoinBlockData, BitcoinChainEvent, BlockIdentifier, StacksBlockData, StacksBlockMetadata,
-    StacksChainEvent,
+    StacksChainEvent, StacksMicroblocksTrail, ChainUpdatedWithBlockData, ChainUpdatedWithMicroblockData
 };
 use crate::utils::stacks::PoxInfo;
 use rocket::serde::json::Value as JsonValue;
@@ -52,7 +52,8 @@ pub struct IndexerConfig {
 
 pub struct Indexer {
     config: IndexerConfig,
-    stacks_last_7_blocks: VecDeque<(BlockIdentifier, StacksBlockMetadata)>,
+    current_microblock_trail: StacksMicroblocksTrail,
+    stacks_last_7_blocks: VecDeque<(BlockIdentifier, StacksBlockData)>,
     bitcoin_last_7_blocks: VecDeque<BlockIdentifier>,
     pub stacks_context: StacksChainContext,
 }
@@ -61,12 +62,16 @@ impl Indexer {
     pub fn new(config: IndexerConfig) -> Indexer {
         let stacks_last_7_blocks = VecDeque::new();
         let bitcoin_last_7_blocks = VecDeque::new();
+        let current_microblock_trail = StacksMicroblocksTrail {
+            microblocks: vec![]
+        };
         let stacks_context = StacksChainContext::new();
         Indexer {
             config,
             stacks_last_7_blocks,
             bitcoin_last_7_blocks,
             stacks_context,
+            current_microblock_trail,
         }
     }
 
@@ -99,13 +104,15 @@ impl Indexer {
             marshalled_block,
             &mut self.stacks_context,
         );
+        let mut anchored_trail = None;
         if let Some((tip, _)) = self.stacks_last_7_blocks.back() {
             if block.block_identifier.index == tip.index + 1 {
                 self.stacks_last_7_blocks
-                    .push_back((block.block_identifier.clone(), block.metadata.clone()));
-                if self.stacks_last_7_blocks.len() > 7 {
-                    self.stacks_last_7_blocks.pop_front();
-                }
+                    .push_back((block.block_identifier.clone(), block.clone()));
+                anchored_trail = Some(self.current_microblock_trail.clone());
+                self.current_microblock_trail = StacksMicroblocksTrail {
+                    microblocks: vec![],
+                };
             } else if block.block_identifier.index > tip.index + 1 {
                 // TODO: we received a block and we don't have the parent
             } else if block.block_identifier.index == tip.index {
@@ -115,9 +122,42 @@ impl Indexer {
             }
         } else {
             self.stacks_last_7_blocks
-                .push_front((block.block_identifier.clone(), block.metadata.clone()));
+                .push_front((block.block_identifier.clone(), block.clone()));
+            self.current_microblock_trail = StacksMicroblocksTrail {
+                microblocks: vec![],
+            };
         }
-        StacksChainEvent::ChainUpdatedWithBlock(block)
+        let (_, confirmed_block) = self.stacks_last_7_blocks.front().unwrap().clone();
+        if self.stacks_last_7_blocks.len() > 7 {
+            self.stacks_last_7_blocks.pop_front();
+        }
+
+        let update = ChainUpdatedWithBlockData {
+            new_block: block,
+            anchored_trail,
+            confirmed_block: (confirmed_block, None),
+        };
+        StacksChainEvent::ChainUpdatedWithBlock(update)
+    }
+
+    pub fn handle_stacks_microblock(&mut self, marshalled_microblock: JsonValue) -> StacksChainEvent {
+        let (_, anchored_block) = self.stacks_last_7_blocks.back().unwrap();
+
+        let microblock = chains::standardize_stacks_microblock(
+            &self.config,
+            marshalled_microblock,
+            &anchored_block.block_identifier,
+            &mut self.stacks_context,
+        );
+        self.current_microblock_trail.microblocks.push(microblock);
+        let (_, anchored_block) = self.stacks_last_7_blocks.back().unwrap();
+
+        let update = ChainUpdatedWithMicroblockData {
+            anchored_block: anchored_block.clone(),
+            current_trail: self.current_microblock_trail.clone(),
+        };
+
+        StacksChainEvent::ChainUpdatedWithMicroblock(update)
     }
 
     pub fn get_pox_info(&mut self) -> PoxInfo {

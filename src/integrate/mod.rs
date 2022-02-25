@@ -8,7 +8,7 @@ use chrono::prelude::*;
 use tracing::{self, debug, error, info, warn};
 use tracing_appender;
 
-use crate::types::{BitcoinBlockData, BitcoinChainEvent, StacksBlockData, StacksChainEvent};
+use crate::types::{BitcoinChainEvent, StacksChainEvent};
 use crate::utils;
 use events_observer::{start_events_observer, EventsObserverCommand};
 pub use orchestrator::DevnetOrchestrator;

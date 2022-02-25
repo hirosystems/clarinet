@@ -34,11 +34,6 @@ use tracing::info;
 use crate::runnner::deno;
 
 #[derive(Deserialize)]
-pub struct NewMicroBlock {
-    transactions: Vec<NewTransaction>,
-}
-
-#[derive(Deserialize)]
 pub struct NewTransaction {
     pub txid: String,
     pub status: String,
@@ -73,7 +68,7 @@ impl EventObserverConfig {
         info!("Checking contracts...");
         let (session, config) = match load_session(&manifest_path, false, &Network::Devnet) {
             Ok((session, config, _, _)) => (session, config),
-            Err(e) => {
+            Err((_, e)) => {
                 println!("{}", e);
                 std::process::exit(1);
             }
@@ -206,7 +201,7 @@ pub async fn start_events_observer(
 
                 let session = match load_session(&manifest_path, false, &Network::Devnet) {
                     Ok((session, _, _, _)) => session,
-                    Err(e) => {
+                    Err((_, e)) => {
                         devnet_event_tx
                             .send(DevnetEvent::error(format!("Contracts invalid: {}", e)))
                             .expect("Unable to terminate event observer");
@@ -351,11 +346,16 @@ pub fn handle_new_block(
 
     // Contextual: Devnet is an environment under control,
     // with 1 miner. As such we will ignore Reorgs handling.
-    let block = match &chain_event {
+    let update = match &chain_event {
         StacksChainEvent::ChainUpdatedWithBlock(block) => block.clone(),
-        StacksChainEvent::ChainUpdatedWithReorg(old_blocks, new_blocks) => {
-            let tip = new_blocks.last().unwrap().clone();
-            tip
+        StacksChainEvent::ChainUpdatedWithMicroblock(_) => {
+            unreachable!() // todo(ludo): good enough for now
+        }
+        StacksChainEvent::ChainUpdatedWithMicroblockReorg(_) => {
+            unreachable!() // todo(ludo): good enough for now
+        }
+        StacksChainEvent::ChainUpdatedWithReorg(_) => {
+            unreachable!() // todo(ludo): good enough for now
         }
     };
 
@@ -369,14 +369,14 @@ pub fn handle_new_block(
             name: "stacks-node".into(),
             comment: format!(
                 "mining blocks (chaintip = #{})",
-                block.block_identifier.index
+                update.new_block.block_identifier.index
             ),
         }));
         let _ = tx.send(DevnetEvent::info(format!(
             "Block #{} anchored in Bitcoin block #{} includes {} transactions",
-            block.block_identifier.index,
-            block.metadata.bitcoin_anchor_block_identifier.index,
-            block.transactions.len(),
+            update.new_block.block_identifier.index,
+            update.new_block.metadata.bitcoin_anchor_block_identifier.index,
+            update.new_block.transactions.len(),
         )));
     }
 
@@ -396,11 +396,11 @@ pub fn handle_new_block(
     // cycle starts.
     let pox_cycle_length: u32 =
         pox_info.prepare_phase_block_length + pox_info.reward_phase_block_length;
-    let should_submit_pox_orders = block.metadata.pox_cycle_position == (pox_cycle_length - 2);
+    let should_submit_pox_orders = update.new_block.metadata.pox_cycle_position == (pox_cycle_length - 2);
     if should_submit_pox_orders {
         if let Ok(background_job_tx) = background_job_tx_mutex.lock() {
             let _ = background_job_tx.send(EventsObserverCommand::PublishPoxStackingOrders(
-                block.metadata.bitcoin_anchor_block_identifier.clone(),
+                update.new_block.metadata.bitcoin_anchor_block_identifier.clone(),
             ));
         }
     }
@@ -418,41 +418,42 @@ pub fn handle_new_block(
 #[post(
     "/new_microblocks",
     format = "application/json",
-    data = "<new_microblock>"
+    data = "<marshalled_microblock>"
 )]
 pub fn handle_new_microblocks(
     _config: &State<Arc<Mutex<EventObserverConfig>>>,
-    _indexer: &State<Arc<RwLock<Indexer>>>,
+    indexer_rw_lock: &State<Arc<RwLock<Indexer>>>,
     devnet_events_tx: &State<Arc<Mutex<Sender<DevnetEvent>>>>,
-    new_microblock: Json<NewMicroBlock>,
+    marshalled_microblock: Json<JsonValue>,
 ) -> Json<JsonValue> {
     let devnet_events_tx = devnet_events_tx.inner();
 
-    if let Ok(tx) = devnet_events_tx.lock() {
-        let _ = tx.send(DevnetEvent::info(format!(
-            "Microblock received including {} transactions",
-            new_microblock.transactions.len(),
-        )));
-    }
+    // Standardize the structure of the microblock, and identify the
+    // kind of update that this new microblock would imply
+    let chain_event = match indexer_rw_lock.inner().write() {
+        Ok(mut indexer) => {
+            let chain_event = indexer.handle_stacks_microblock(marshalled_microblock.into_inner());
+            chain_event
+        }
+        _ => {
+            return Json(json!({
+                "status": 200,
+                "result": "Ok",
+            }))
+        }
+    };
 
-    // let transactions = new_block
-    //     .transactions
-    //     .iter()
-    //     .map(|t| {
-    //         let description = get_tx_description(&t.raw_tx);
-    //         StacksTransactionData {
-    //             transaction_identifier: TransactionIdentifier {
-    //                 hash: t.txid.clone(),
-    //             },
-    //             metadata: {
-    //                 success: t.status == "success",
-    //                 result: get_value_description(&t.raw_result),
-    //                 events: vec![],
-    //                 description,
-    //             }
-    //         }
-    //     })
-    //     .collect();
+    if let Ok(tx) = devnet_events_tx.lock() {
+        if let StacksChainEvent::ChainUpdatedWithMicroblock(ref update) = chain_event {
+            if let Some(microblock) = update.current_trail.microblocks.last() {
+                let _ = tx.send(DevnetEvent::info(format!(
+                    "Microblock received including {} transactions",
+                    microblock.transactions.len(),
+                )));
+            }
+        }
+        let _ = tx.send(DevnetEvent::StacksChainEvent(chain_event));
+    }
 
     Json(json!({
         "status": 200,
