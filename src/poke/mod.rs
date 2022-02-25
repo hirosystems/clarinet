@@ -112,8 +112,10 @@ pub fn load_session(
     manifest_path: &PathBuf,
     start_repl: bool,
     env: &Network,
-) -> Result<(repl::Session, ChainConfig, ProjectManifest, Option<String>), (ProjectManifest, String)> {
-    let (settings, chain_config, project_config) = load_session_settings(manifest_path, env).expect("Unable to load manifest");
+) -> Result<(repl::Session, ChainConfig, ProjectManifest, Option<String>), (ProjectManifest, String)>
+{
+    let (settings, chain_config, project_config) =
+        load_session_settings(manifest_path, env).expect("Unable to load manifest");
 
     let (session, output) = if start_repl {
         let mut terminal = Terminal::new(settings.clone());

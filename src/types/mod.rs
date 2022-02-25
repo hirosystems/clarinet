@@ -15,9 +15,10 @@ pub use data::{
     AccountIdentifier, Amount, BitcoinBlockData, BitcoinBlockMetadata, BitcoinTransactionData,
     BitcoinTransactionMetadata, BlockIdentifier, Currency, CurrencyMetadata, CurrencyStandard,
     Operation, OperationIdentifier, OperationMetadata, OperationStatusKind, OperationType,
-    StacksBlockData, StacksBlockMetadata, StacksContractDeploymentData, StacksTransactionData,
-    StacksTransactionExecutionCost, StacksTransactionKind, StacksTransactionMetadata,
-    StacksTransactionReceipt, TransactionIdentifier, StacksMicroblocksTrail, StacksMicroblockData,
+    StacksBlockData, StacksBlockMetadata, StacksContractDeploymentData, StacksMicroblockData,
+    StacksMicroblocksTrail, StacksTransactionData, StacksTransactionExecutionCost,
+    StacksTransactionKind, StacksTransactionMetadata, StacksTransactionReceipt,
+    TransactionIdentifier,
 };
 
 #[allow(dead_code)]

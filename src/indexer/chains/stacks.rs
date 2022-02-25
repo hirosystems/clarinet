@@ -4,9 +4,9 @@ use crate::types::events::*;
 use crate::types::{
     AccountIdentifier, Amount, BlockIdentifier, Currency, CurrencyMetadata, CurrencyStandard,
     Operation, OperationIdentifier, OperationStatusKind, OperationType, StacksBlockData,
-    StacksBlockMetadata, StacksContractDeploymentData, StacksTransactionData,
+    StacksBlockMetadata, StacksContractDeploymentData, StacksMicroblockData, StacksTransactionData,
     StacksTransactionExecutionCost, StacksTransactionKind, StacksTransactionMetadata,
-    StacksTransactionReceipt, TransactionIdentifier, StacksMicroblockData
+    StacksTransactionReceipt, TransactionIdentifier,
 };
 use crate::utils::stacks::StacksRpc;
 use clarity_repl::clarity::codec::transaction::{TransactionAuth, TransactionPayload};

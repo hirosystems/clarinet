@@ -375,7 +375,11 @@ pub fn handle_new_block(
         let _ = tx.send(DevnetEvent::info(format!(
             "Block #{} anchored in Bitcoin block #{} includes {} transactions",
             update.new_block.block_identifier.index,
-            update.new_block.metadata.bitcoin_anchor_block_identifier.index,
+            update
+                .new_block
+                .metadata
+                .bitcoin_anchor_block_identifier
+                .index,
             update.new_block.transactions.len(),
         )));
     }
@@ -396,11 +400,16 @@ pub fn handle_new_block(
     // cycle starts.
     let pox_cycle_length: u32 =
         pox_info.prepare_phase_block_length + pox_info.reward_phase_block_length;
-    let should_submit_pox_orders = update.new_block.metadata.pox_cycle_position == (pox_cycle_length - 2);
+    let should_submit_pox_orders =
+        update.new_block.metadata.pox_cycle_position == (pox_cycle_length - 2);
     if should_submit_pox_orders {
         if let Ok(background_job_tx) = background_job_tx_mutex.lock() {
             let _ = background_job_tx.send(EventsObserverCommand::PublishPoxStackingOrders(
-                update.new_block.metadata.bitcoin_anchor_block_identifier.clone(),
+                update
+                    .new_block
+                    .metadata
+                    .bitcoin_anchor_block_identifier
+                    .clone(),
             ));
         }
     }

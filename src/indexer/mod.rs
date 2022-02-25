@@ -1,8 +1,9 @@
 pub mod chains;
 
 use crate::types::{
-    BitcoinBlockData, BitcoinChainEvent, BlockIdentifier, StacksBlockData, StacksBlockMetadata,
-    StacksChainEvent, StacksMicroblocksTrail, ChainUpdatedWithBlockData, ChainUpdatedWithMicroblockData
+    BitcoinBlockData, BitcoinChainEvent, BlockIdentifier, ChainUpdatedWithBlockData,
+    ChainUpdatedWithMicroblockData, StacksBlockData, StacksBlockMetadata, StacksChainEvent,
+    StacksMicroblocksTrail,
 };
 use crate::utils::stacks::PoxInfo;
 use rocket::serde::json::Value as JsonValue;
@@ -63,7 +64,7 @@ impl Indexer {
         let stacks_last_7_blocks = VecDeque::new();
         let bitcoin_last_7_blocks = VecDeque::new();
         let current_microblock_trail = StacksMicroblocksTrail {
-            microblocks: vec![]
+            microblocks: vec![],
         };
         let stacks_context = StacksChainContext::new();
         Indexer {
@@ -140,7 +141,10 @@ impl Indexer {
         StacksChainEvent::ChainUpdatedWithBlock(update)
     }
 
-    pub fn handle_stacks_microblock(&mut self, marshalled_microblock: JsonValue) -> StacksChainEvent {
+    pub fn handle_stacks_microblock(
+        &mut self,
+        marshalled_microblock: JsonValue,
+    ) -> StacksChainEvent {
         let (_, anchored_block) = self.stacks_last_7_blocks.back().unwrap();
 
         let microblock = chains::standardize_stacks_microblock(
