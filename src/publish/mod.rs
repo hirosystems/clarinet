@@ -162,7 +162,7 @@ pub fn publish_all_contracts(
                 Ok((session, chain, project_manifest, output)) => {
                     (session, chain, project_manifest, output)
                 }
-                Err(e) => return Err(vec![e]),
+                Err((_, e)) => return Err(vec![e]),
             };
 
         if let Some(message) = output {

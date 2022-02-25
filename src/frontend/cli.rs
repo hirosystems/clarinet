@@ -469,7 +469,7 @@ pub fn main() {
             let start_repl = false;
             let project_manifest = match load_session(&manifest_path, start_repl, &Network::Devnet)
             {
-                Err(e) => {
+                Err((_, e)) => {
                     println!("{}", e);
                     return;
                 }
@@ -507,11 +507,11 @@ pub fn main() {
                     if let Some(message) = output {
                         println!("{}", message);
                     }
-                    (session, manifest)
+                    (Some(session), manifest)
                 }
-                Err(e) => {
+                Err((manifest, e)) => {
                     println!("{}", e);
-                    return;
+                    (None, manifest)
                 }
             };
             let (success, _count) = match run_scripts(
@@ -522,7 +522,7 @@ pub fn main() {
                 true,
                 false,
                 manifest_path,
-                Some(session),
+                session,
             ) {
                 Ok(count) => (true, count),
                 Err((_, count)) => (false, count),
@@ -556,7 +556,7 @@ pub fn main() {
                     }
                     session
                 }
-                Err(e) => {
+                Err((_, e)) => {
                     println!("{}", e);
                     return;
                 }

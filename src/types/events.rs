@@ -87,7 +87,6 @@ pub struct FTBurnEventData {
 pub struct DataVarSetEventData {
     pub contract_identifier: String,
     pub var: String,
-    pub new_value: String,
     #[serde(rename = "raw_new_value")]
     pub hex_new_value: String,
 }
@@ -96,8 +95,6 @@ pub struct DataVarSetEventData {
 pub struct DataMapInsertEventData {
     pub contract_identifier: String,
     pub map: String,
-    pub inserted_key: String,
-    pub inserted_value: String,
     #[serde(rename = "raw_inserted_key")]
     pub hex_inserted_key: String,
     #[serde(rename = "raw_inserted_value")]
@@ -108,8 +105,6 @@ pub struct DataMapInsertEventData {
 pub struct DataMapUpdateEventData {
     pub contract_identifier: String,
     pub map: String,
-    pub key: String,
-    pub new_value: String,
     #[serde(rename = "raw_key")]
     pub hex_key: String,
     #[serde(rename = "raw_new_value")]
@@ -120,7 +115,6 @@ pub struct DataMapUpdateEventData {
 pub struct DataMapDeleteEventData {
     pub contract_identifier: String,
     pub map: String,
-    pub deleted_key: String,
     #[serde(rename = "raw_new_value")]
     pub hex_deleted_key: String,
 }
@@ -129,7 +123,6 @@ pub struct DataMapDeleteEventData {
 pub struct SmartContractEventData {
     pub contract_identifier: String,
     pub topic: String,
-    pub value: String,
     #[serde(rename = "raw_value")]
     pub hex_value: String,
 }
