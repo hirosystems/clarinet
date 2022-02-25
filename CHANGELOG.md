@@ -1,3 +1,58 @@
+# [0.27.0](https://github.com/hirosystems/clarinet/compare/v0.26.1...v0.27.0) (2022-02-24)
+
+
+### Features
+
+* add shell completions files ([e6b1f25](https://github.com/hirosystems/clarinet/commit/e6b1f25683cb2c0e8f031e08fa0843fb0e5af690))
+* add subcommand to generate shell completions ([a493b67](https://github.com/hirosystems/clarinet/commit/a493b6792515a6163a401f4c4a25802d98b76882)), closes [#146](https://github.com/hirosystems/clarinet/issues/146)
+* clean up commands and improve help docs ([8f18182](https://github.com/hirosystems/clarinet/commit/8f18182ce659b9dd8969af0ac28c9a0a3b4c9278)), closes [#118](https://github.com/hirosystems/clarinet/issues/118)
+* stacks-devnet-js support for linux-musl (non-glibc, e.g. alpine) ([6e322f1](https://github.com/hirosystems/clarinet/commit/6e322f1b668b9fcbc547e1053cf8d10807828c60))
+
+## [0.26.1](https://github.com/hirosystems/clarinet/compare/v0.26.0...v0.26.1) (2022-02-13)
+
+
+### Bug Fixes
+
+* update to clarity-repl 0.22.1 ([644c082](https://github.com/hirosystems/clarinet/commit/644c082da056511ebe3c5d0d9e2eb10411b78c4b))
+
+# [0.26.0](https://github.com/hirosystems/clarinet/compare/v0.25.1...v0.26.0) (2022-02-12)
+
+
+### Bug Fixes
+
+* fix serialization of REPL settings ([5fc9d08](https://github.com/hirosystems/clarinet/commit/5fc9d080cdb499d61d69498050773b7cbaba72fe))
+
+
+### Features
+
+* macos-arm64 / Apple Silicon / M1 builds ([da5f1bc](https://github.com/hirosystems/clarinet/commit/da5f1bc43a977156656d3036861c2ff4978d53bf))
+
+## [0.25.1](https://github.com/hirosystems/clarinet/compare/v0.25.0...v0.25.1) (2022-02-11)
+
+
+### Bug Fixes
+
+* crash on `clarinet new contract` ([d236370](https://github.com/hirosystems/clarinet/commit/d2363700b0a7594ea54802496dd4244343a7e238)), closes [#246](https://github.com/hirosystems/clarinet/issues/246)
+
+# [0.25.0](https://github.com/hirosystems/clarinet/compare/v0.24.0...v0.25.0) (2022-02-10)
+
+
+### Bug Fixes
+
+* clarity-repl resolve_link adjustment ([f1e8b47](https://github.com/hirosystems/clarinet/commit/f1e8b47814173acb6cd39ed5bf98a987ff8c97cf))
+* link title typo ([20b5982](https://github.com/hirosystems/clarinet/commit/20b5982be084b0934a86938e7a67115c94c43168))
+
+
+### Features
+
+* add analysis settings support ([c7984e3](https://github.com/hirosystems/clarinet/commit/c7984e3036641ac95c65b6ae56f5b954641e282c)), closes [hirosystems/clarity-repl#62](https://github.com/hirosystems/clarity-repl/issues/62)
+* add check-checker options to Clarinet.toml ([2f8ad7f](https://github.com/hirosystems/clarinet/commit/2f8ad7fdd962e8f94eb6871074edef86416993a2))
+* add option to check single file ([64b0e2f](https://github.com/hirosystems/clarinet/commit/64b0e2fbe3f68c5c5dc412f30bbaba17a8f1c54a))
+* add option to select parser version ([470734c](https://github.com/hirosystems/clarinet/commit/470734c634ab4f3dada4797af92a6b7c32155afd))
+* consolidate repl settings in config file ([cfe7af3](https://github.com/hirosystems/clarinet/commit/cfe7af3a781ccc93896f0da4f3f5593924618205))
+* update to clarity-repl 0.22.0 ([e2d996a](https://github.com/hirosystems/clarinet/commit/e2d996a9a1f6a211c5d867168b09de78349949a7))
+* update to work with new parser ([ce8267a](https://github.com/hirosystems/clarinet/commit/ce8267ac94502a43f0bb3e2a2fe27b23c37ac97a))
+
 # [0.24.0](https://github.com/hirosystems/clarinet/compare/v0.23.1...v0.24.0) (2022-01-19)
 
 

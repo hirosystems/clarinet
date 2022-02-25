@@ -19,61 +19,65 @@ use clarity_repl::clarity::costs::LimitedCostTracker;
 use clarity_repl::clarity::types::QualifiedContractIdentifier;
 use clarity_repl::{analysis, repl};
 
-use clap::Parser;
+use clap::{IntoApp, Parser, Subcommand};
+use clap_generate::{Generator, Shell};
 use toml;
 
 #[cfg(feature = "telemetry")]
 use super::telemetry::{telemetry_report_event, DeveloperUsageDigest, DeveloperUsageEvent};
+
 #[derive(Parser, PartialEq, Clone, Debug)]
-#[clap(version = option_env!("CARGO_PKG_VERSION").expect("Unable to detect version"))]
+#[clap(version = option_env!("CARGO_PKG_VERSION").expect("Unable to detect version"), bin_name = "clarinet")]
 struct Opts {
     #[clap(subcommand)]
     command: Command,
 }
 
-#[derive(Parser, PartialEq, Clone, Debug)]
+#[derive(Subcommand, PartialEq, Clone, Debug)]
 enum Command {
     /// Create and scaffold a new project
-    #[clap(name = "new")]
+    #[clap(name = "new", bin_name = "new")]
     New(GenerateProject),
-    /// Contract subcommand
+    /// Subcommands for working with contracts
     #[clap(subcommand, name = "contract")]
     Contract(Contract),
-    /// Load contracts in a REPL for interactions
-    #[clap(name = "poke")]
-    Poke(Poke),
-    #[clap(name = "console")]
-    Console(Poke),
+    /// Load contracts in a REPL for an interactive session
+    #[clap(name = "console", aliases = &["poke"], bin_name = "console")]
+    Console(Console),
     /// Execute test suite
-    #[clap(name = "test")]
+    #[clap(name = "test", bin_name = "test")]
     Test(Test),
-    /// Check contracts syntax
-    #[clap(name = "check")]
+    /// Check syntax of your contracts
+    #[clap(name = "check", bin_name = "check")]
     Check(Check),
     /// Publish contracts on chain
-    #[clap(name = "publish")]
+    #[clap(name = "publish", bin_name = "publish")]
     Publish(Publish),
-    /// Execute Clarinet Extension
-    #[clap(name = "run")]
+    /// Execute Clarinet extension
+    #[clap(name = "run", bin_name = "run")]
     Run(Run),
-    /// Work on contracts integration
-    #[clap(name = "integrate")]
+    /// Start devnet environment for integration testing
+    #[clap(name = "integrate", bin_name = "integrate")]
     Integrate(Integrate),
-    /// Start a LSP session
-    #[clap(name = "lsp")]
+    /// Start an LSP server (for integration with editors)
+    #[clap(name = "lsp", bin_name = "lsp")]
     LSP,
+    /// Generate shell completions scripts
+    #[clap(name = "completions", bin_name = "completions")]
+    Completions(Completions),
 }
 
-#[derive(Parser, PartialEq, Clone, Debug)]
+#[derive(Subcommand, PartialEq, Clone, Debug)]
+#[clap(bin_name = "contract")]
 enum Contract {
-    /// New contract subcommand
-    #[clap(name = "new")]
+    /// Generate files and settings for a new contract
+    #[clap(name = "new", bin_name = "new")]
     NewContract(NewContract),
-    /// Import contract subcommand
-    #[clap(name = "requirement")]
-    LinkContract(LinkContract),
-    /// Fork contract subcommand
-    #[clap(name = "fork")]
+    /// Add third-party requirements to this project
+    #[clap(name = "requirement", bin_name = "requirement")]
+    Requirement(Requirement),
+    /// Replicate a third-party contract into this project
+    #[clap(name = "fork", bin_name = "fork")]
     ForkContract(ForkContract),
 }
 
@@ -81,9 +85,9 @@ enum Contract {
 struct GenerateProject {
     /// Project's name
     pub name: String,
-    /// Enable developer usage telemetry
-    #[clap(long = "disable-telemetry")]
-    pub disable_telemetry: Option<bool>,
+    /// Do not provide developer usage telemetry for this project
+    #[clap(long = "disable-telemetry", takes_value = false)]
+    pub disable_telemetry: bool,
 }
 
 #[derive(Parser, PartialEq, Clone, Debug)]
@@ -96,8 +100,8 @@ struct NewContract {
 }
 
 #[derive(Parser, PartialEq, Clone, Debug)]
-struct LinkContract {
-    /// Contract id
+struct Requirement {
+    /// Contract id (ex. " SP2PABAF9FTAJYNFZH93XENAJ8FVY99RRM50D2JG9.nft-trait")
     pub contract_id: String,
     /// Path to Clarinet.toml
     #[clap(long = "manifest-path")]
@@ -106,7 +110,7 @@ struct LinkContract {
 
 #[derive(Parser, PartialEq, Clone, Debug)]
 struct ForkContract {
-    /// Contract id
+    /// Contract id (ex. " SP2PABAF9FTAJYNFZH93XENAJ8FVY99RRM50D2JG9.nft-trait")
     pub contract_id: String,
     /// Path to Clarinet.toml
     #[clap(long = "manifest-path")]
@@ -117,7 +121,7 @@ struct ForkContract {
 }
 
 #[derive(Parser, PartialEq, Clone, Debug)]
-struct Poke {
+struct Console {
     /// Path to Clarinet.toml
     #[clap(long = "manifest-path")]
     pub manifest_path: Option<String>,
@@ -135,7 +139,7 @@ struct Integrate {
 
 #[derive(Parser, PartialEq, Clone, Debug)]
 struct Test {
-    /// Generate coverage
+    /// Generate coverage file (coverage.lcov)
     #[clap(long = "coverage")]
     pub coverage: bool,
     /// Generate costs report
@@ -144,10 +148,10 @@ struct Test {
     /// Path to Clarinet.toml
     #[clap(long = "manifest-path")]
     pub manifest_path: Option<String>,
-    /// Relaunch tests on updates
+    /// Relaunch tests upon updates to contracts
     #[clap(long = "watch")]
     pub watch: bool,
-    /// Files to includes
+    /// Test files to be included (defaults to all tests found under tests/)
     pub files: Vec<String>,
 }
 
@@ -207,6 +211,13 @@ struct Check {
     pub file: Option<String>,
 }
 
+#[derive(Parser, PartialEq, Clone, Debug)]
+struct Completions {
+    /// Specify which shell to generation completions script for
+    #[clap(arg_enum, ignore_case = true)]
+    pub shell: Shell,
+}
+
 pub fn main() {
     let opts: Opts = match Opts::try_parse() {
         Ok(opts) => opts,
@@ -248,8 +259,8 @@ pub fn main() {
             };
 
             let telemetry_enabled = if cfg!(feature = "telemetry") {
-                if let Some(disable_telemetry) = project_opts.disable_telemetry {
-                    !disable_telemetry
+                if project_opts.disable_telemetry {
+                    false
                 } else {
                     println!("{}", yellow!("Send usage data to Hiro."));
                     println!("{}", yellow!("Help Hiro improve its products and services by automatically sending diagnostics and usage data."));
@@ -308,7 +319,7 @@ pub fn main() {
                     display_post_check_hint();
                 }
             }
-            Contract::LinkContract(required_contract) => {
+            Contract::Requirement(required_contract) => {
                 let manifest_path = get_manifest_path_or_exit(required_contract.manifest_path);
 
                 let change = TOMLEdition {
@@ -338,22 +349,15 @@ pub fn main() {
                 let settings = repl::SessionSettings::default();
                 let mut session = repl::Session::new(settings);
 
-                let rt = tokio::runtime::Builder::new_current_thread()
-                    .enable_io()
-                    .enable_time()
-                    .max_blocking_threads(32)
-                    .build()
-                    .unwrap();
-
-                let mut retrieved = BTreeSet::new();
-                let res = rt.block_on(session.resolve_link(
+                let mut resolved = BTreeSet::new();
+                let res = session.resolve_link(
                     &repl::settings::InitialLink {
                         contract_id: fork_contract.contract_id.clone(),
                         stacks_node_addr: None,
                         cache: None,
                     },
-                    &mut retrieved,
-                ));
+                    &mut resolved,
+                );
                 let contracts = res.unwrap();
                 let mut changes = vec![];
                 for (contract_id, code, deps) in contracts.into_iter() {
@@ -386,14 +390,14 @@ pub fn main() {
                 }
             }
         },
-        Command::Poke(cmd) | Command::Console(cmd) => {
+        Command::Console(cmd) => {
             let manifest_path = get_manifest_path_or_exit(cmd.manifest_path);
             let start_repl = true;
             let (_, _, project_manifest, _) =
                 load_session(&manifest_path, start_repl, &Network::Devnet)
                     .expect("Unable to start REPL");
             if hints_enabled {
-                display_post_poke_hint();
+                display_post_console_hint();
             }
             if project_manifest.project.telemetry {
                 #[cfg(feature = "telemetry")]
@@ -408,7 +412,7 @@ pub fn main() {
         Command::Check(cmd) if cmd.file.is_some() => {
             let file = cmd.file.unwrap();
             let mut settings = repl::SessionSettings::default();
-            settings.analysis = vec!["all".into()];
+            settings.repl_settings.analysis.enable_all_passes();
 
             let mut session = repl::Session::new(settings.clone());
             let code = match fs::read_to_string(&file) {
@@ -422,7 +426,7 @@ pub fn main() {
             let (ast, mut diagnostics, mut success) = session.interpreter.build_ast(
                 contract_id.clone(),
                 code.clone(),
-                settings.parser_version,
+                settings.repl_settings.parser_version,
             );
             let (annotations, mut annotation_diagnostics) =
                 session.interpreter.collect_annotations(&ast, &code);
@@ -434,8 +438,8 @@ pub fn main() {
             let mut analysis_diagnostics = match analysis::run_analysis(
                 &mut contract_analysis,
                 &mut analysis_db,
-                &settings.analysis,
                 &annotations,
+                &settings.repl_settings.analysis,
             ) {
                 Ok(diagnostics) => diagnostics,
                 Err(diagnostics) => {
@@ -619,6 +623,20 @@ pub fn main() {
             }
         }
         Command::LSP => run_lsp(),
+        Command::Completions(cmd) => {
+            let mut app = Opts::command();
+            let file_name = cmd.shell.file_name("clarinet");
+            let mut file = match File::create(file_name.clone()) {
+                Ok(file) => file,
+                Err(e) => {
+                    println!("error creating {}: {}", file_name, e);
+                    return;
+                }
+            };
+            cmd.shell.generate(&mut app, &mut file);
+            println!("generated: {}", file_name.clone());
+            println!("Check your shell's documentation for details about using this file to enable completions for clarinet");
+        }
     };
 }
 
@@ -722,7 +740,8 @@ fn execute_changes(changes: Vec<Changes>) {
     }
 
     if let Some(config) = shared_config {
-        let toml = toml::to_string(&config).unwrap();
+        let toml_value = toml::Value::try_from(&config).unwrap();
+        let toml = format!("{}", toml_value);
         let mut file = File::create(path).unwrap();
         file.write_all(&toml.as_bytes()).unwrap();
         file.sync_all().unwrap();
@@ -762,7 +781,7 @@ fn display_post_check_hint() {
     display_hint_footer();
 }
 
-fn display_post_poke_hint() {
+fn display_post_console_hint() {
     println!("");
     display_hint_header();
     println!(
@@ -820,6 +839,7 @@ fn display_tests_pro_tips_hint() {
     );
 
     println!("{}", yellow!("Find more information on testing with Clarinet here: https://docs.hiro.so/smart-contracts/clarinet#testing-with-clarinet"));
+    println!("{}", yellow!("And learn more about local integration testing here: https://docs.hiro.so/smart-contracts/devnet"));
     display_hint_footer();
 }
 

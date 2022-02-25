@@ -68,7 +68,7 @@ impl EventObserverConfig {
         info!("Checking contracts...");
         let (session, config) = match load_session(&manifest_path, false, &Network::Devnet) {
             Ok((session, config, _, _)) => (session, config),
-            Err((_, e)) => {
+            Err(e) => {
                 println!("{}", e);
                 std::process::exit(1);
             }
@@ -201,7 +201,7 @@ pub async fn start_events_observer(
 
                 let session = match load_session(&manifest_path, false, &Network::Devnet) {
                     Ok((session, _, _, _)) => session,
-                    Err((_, e)) => {
+                    Err(e) => {
                         devnet_event_tx
                             .send(DevnetEvent::error(format!("Contracts invalid: {}", e)))
                             .expect("Unable to terminate event observer");

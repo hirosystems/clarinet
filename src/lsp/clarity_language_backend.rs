@@ -112,7 +112,7 @@ impl ClarityLanguageBackend {
             let (mut ast, mut diagnostics, _) = incremental_session.interpreter.build_ast(
                 contract_id.clone(),
                 code.clone(),
-                settings.parser_version,
+                settings.repl_settings.parser_version,
             );
 
             // Run the analysis, and try to move to the next contract if we throw an error:
@@ -138,11 +138,11 @@ impl ClarityLanguageBackend {
                     continue;
                 }
                 Err((_, _, Some(error))) => {
-                    logs.push(format!("Unable to get anaylis: {:?}", error).into());
+                    logs.push(format!("Unable to get analysis: {:?}", error).into());
                     continue;
                 }
                 _ => {
-                    logs.push("Unable to get diagnostic".into());
+                    logs.push("Unable to get diagnostics".into());
                     continue;
                 }
             };
@@ -191,7 +191,7 @@ impl ClarityLanguageBackend {
     ) -> std::result::Result<(HashMap<Url, Vec<Diagnostic>>, Logs), (String, Logs)> {
         let mut logs = vec![];
         let mut settings = SessionSettings::default();
-        settings.analysis = vec!["all".into()];
+        settings.repl_settings.analysis.enable_all_passes();
 
         let mut incremental_session = Session::new(settings.clone());
         let mut collected_diagnostics = HashMap::new();
