@@ -26,7 +26,7 @@ pub fn load_session_settings(
     let mut project_config = ProjectManifest::from_path(&manifest_path);
     let chain_config = ChainConfig::from_path(&chain_config_path);
 
-    let mut deployer_address = None;
+    let mut initial_deployer_address = None;
     let mut initial_deployer = None;
 
     settings.node = chain_config
@@ -50,7 +50,7 @@ pub fn load_session_settings(
         };
         if name == "deployer" {
             initial_deployer = Some(account.clone());
-            deployer_address = Some(account.address.clone());
+            initial_deployer_address = Some(account.address.clone());
         }
         settings.initial_accounts.push(account);
     }
@@ -66,6 +66,20 @@ pub fn load_session_settings(
                     "Error: unable to read {:?}: {}",
                     contract_path, err
                 ))
+            }
+        };
+
+        let deployer_address = match config.deployer.as_str() {
+            "" => initial_deployer_address.clone(),
+            _ => {
+                if let Some(account) = &chain_config.accounts.get(config.deployer.as_str()) {
+                    Some(account.address.clone())
+                } else {
+                    return Err(format!(
+                        "Error: unknown deployer {} for {}",
+                        config.deployer, name
+                    ));
+                }
             }
         };
 

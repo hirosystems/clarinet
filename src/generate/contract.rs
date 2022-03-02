@@ -122,6 +122,7 @@ Clarinet.test({{
         let contract_config = ContractConfig {
             depends_on: deps,
             path: format!("contracts/{}", contract_file_name),
+            deployer: "deployer".to_string(),
         };
         let mut contracts_to_add = HashMap::new();
         contracts_to_add.insert(self.contract_name.clone(), contract_config);

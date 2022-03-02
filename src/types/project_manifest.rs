@@ -55,6 +55,7 @@ pub struct RequirementConfig {
 pub struct ContractConfig {
     pub path: String,
     pub depends_on: Vec<String>,
+    pub deployer: String,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -228,9 +229,17 @@ impl ProjectManifest {
                                     .collect::<Vec<String>>(),
                                 _ => continue,
                             };
+                            let deployer = match contract_settings.get("deployer") {
+                                Some(Value::String(deployer)) => deployer,
+                                _ => "deployer",
+                            };
                             config_contracts.insert(
                                 contract_name.to_string(),
-                                ContractConfig { path, depends_on },
+                                ContractConfig {
+                                    path,
+                                    depends_on,
+                                    deployer: deployer.to_string(),
+                                },
                             );
                         }
                         _ => {}

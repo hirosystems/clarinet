@@ -97,7 +97,7 @@ mod sessions {
             let project_config = ProjectManifest::from_path(manifest_path);
             let chain_config = ChainConfig::from_path(&chain_config_path);
 
-            let mut deployer_address = None;
+            let mut initial_deployer_address = None;
             let mut initial_deployer = None;
 
             for (name, account) in chain_config.accounts.iter() {
@@ -110,7 +110,7 @@ mod sessions {
                 };
                 if name == "deployer" {
                     initial_deployer = Some(account.clone());
-                    deployer_address = Some(account.address.clone());
+                    initial_deployer_address = Some(account.address.clone());
                 }
                 settings.initial_accounts.push(account);
             }
@@ -145,6 +145,19 @@ mod sessions {
                 contract_path.push(&config.path);
 
                 let code = fs::read_to_string(&contract_path).unwrap();
+
+                let deployer_address = match config.deployer.as_str() {
+                    "" => initial_deployer_address.clone(),
+                    _ => {
+                        if let Some(account) = &chain_config.accounts.get(config.deployer.as_str())
+                        {
+                            Some(account.address.clone())
+                        } else {
+                            println!("Error: unknown deployer {} for {:?}", config.deployer, name);
+                            panic!()
+                        }
+                    }
+                };
 
                 settings
                     .initial_contracts
