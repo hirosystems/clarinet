@@ -349,6 +349,10 @@ Within these tests, developers can simulate mining a block containing transactio
 
 See the [billboard example](examples/billboard/tests/billboard_test.ts) for sample unit tests.
 
+_Note: If you see an error in VS Code on the imports in the generated test file(s), that says, "An import path cannot end with a '.ts' extension" (example below), installing the [Deno extension](https://marketplace.visualstudio.com/items?itemName=denoland.vscode-deno) will resolve this error._
+
+![VS Code deno error](docs/images/deno-error.png)
+
 #### Measure and increase code coverage
 
 To help developers maximizing their test coverage, Clarinet can produce a `lcov` report, using the following option:
