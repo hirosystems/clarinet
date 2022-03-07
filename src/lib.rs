@@ -14,6 +14,9 @@ extern crate serde_json;
 #[macro_use]
 extern crate lazy_static;
 
+#[macro_use]
+extern crate anyhow;
+
 pub extern crate bip39;
 
 pub extern crate clarity_repl;

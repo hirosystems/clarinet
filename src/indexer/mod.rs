@@ -26,9 +26,9 @@ impl PoxInfo {
             contract_id: "ST000000000000000000002AMW42H.pox".into(),
             pox_activation_threshold_ustx: 0,
             first_burnchain_block_height: 100,
-            prepare_phase_block_length: 1,
-            reward_phase_block_length: 4,
-            reward_slots: 8,
+            prepare_phase_block_length: 3,
+            reward_phase_block_length: 15,
+            reward_slots: 30,
             total_liquid_supply_ustx: 1000000000000000,
             ..Default::default()
         }

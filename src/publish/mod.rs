@@ -47,14 +47,13 @@ pub enum Network {
     Mainnet,
 }
 
-pub fn publish_contract(
+pub fn endode_contract(
     contract: &InitialContract,
-    deployers_lookup: &BTreeMap<String, Account>,
-    deployers_nonces: &mut BTreeMap<String, u64>,
-    node_url: &str,
+    account: &Account,
+    nonce: u64,
     deployment_fee_rate: u64,
     network: &Network,
-) -> Result<(String, u64, String, String), String> {
+) -> Result<(StacksTransaction, StacksAddress), String> {
     let contract_name = contract.name.clone().unwrap();
 
     let payload = TransactionSmartContract {
@@ -62,16 +61,11 @@ pub fn publish_contract(
         code_body: StacksString::from_string(&contract.code).unwrap(),
     };
 
-    let deployer = match deployers_lookup.get(&contract_name) {
-        Some(deployer) => deployer,
-        None => deployers_lookup.get("*").unwrap(),
-    };
-
-    let bip39_seed = match mnemonic::get_bip39_seed_from_mnemonic(&deployer.mnemonic, "") {
+    let bip39_seed = match mnemonic::get_bip39_seed_from_mnemonic(&account.mnemonic, "") {
         Ok(bip39_seed) => bip39_seed,
         Err(_) => panic!(),
     };
-    let ext = ExtendedPrivKey::derive(&bip39_seed[..], deployer.derivation.as_str()).unwrap();
+    let ext = ExtendedPrivKey::derive(&bip39_seed[..], account.derivation.as_str()).unwrap();
     let secret_key = SecretKey::parse_slice(&ext.secret()).unwrap();
     let public_key = PublicKey::from_secret_key(&secret_key);
 
@@ -79,21 +73,8 @@ pub fn publish_contract(
         Secp256k1PublicKey::from_slice(&public_key.serialize_compressed()).unwrap();
     let wrapped_secret_key = Secp256k1PrivateKey::from_slice(&ext.secret()).unwrap();
 
-    let anchor_mode = TransactionAnchorMode::Any;
+    let anchor_mode = TransactionAnchorMode::OnChainOnly;
     let tx_fee = deployment_fee_rate * contract.code.len() as u64;
-
-    let stacks_rpc = StacksRpc::new(&node_url);
-
-    let nonce = match deployers_nonces.get(&deployer.name) {
-        Some(nonce) => *nonce,
-        None => {
-            let nonce = stacks_rpc
-                .get_nonce(&deployer.address)
-                .expect("Unable to retrieve account");
-            deployers_nonces.insert(deployer.name.clone(), nonce);
-            nonce
-        }
-    };
 
     let signer_addr = StacksAddress::from_public_keys(
         match network {
@@ -127,7 +108,7 @@ pub fn publish_contract(
         },
         auth: auth,
         anchor_mode: anchor_mode,
-        post_condition_mode: TransactionPostConditionMode::Deny,
+        post_condition_mode: TransactionPostConditionMode::Allow,
         post_conditions: vec![],
         payload: TransactionPayload::SmartContract(payload),
     };
@@ -141,6 +122,39 @@ pub fn publish_contract(
     tx_signer.sign_origin(&wrapped_secret_key).unwrap();
     let signed_tx = tx_signer.get_tx().unwrap();
 
+    Ok((signed_tx, signer_addr))
+}
+
+pub fn publish_contract(
+    contract: &InitialContract,
+    deployers_lookup: &BTreeMap<String, Account>,
+    deployers_nonces: &mut BTreeMap<String, u64>,
+    node_url: &str,
+    deployment_fee_rate: u64,
+    network: &Network,
+) -> Result<(String, u64, String, String), String> {
+    let contract_name = contract.name.clone().unwrap();
+
+    let stacks_rpc = StacksRpc::new(&node_url);
+
+    let deployer = match deployers_lookup.get(&contract_name) {
+        Some(deployer) => deployer,
+        None => deployers_lookup.get("*").unwrap(),
+    };
+
+    let nonce = match deployers_nonces.get(&deployer.name) {
+        Some(nonce) => *nonce,
+        None => {
+            let nonce = stacks_rpc
+                .get_nonce(&deployer.address)
+                .expect("Unable to retrieve account");
+            deployers_nonces.insert(deployer.name.clone(), nonce);
+            nonce
+        }
+    };
+
+    let (signed_tx, signer_addr) =
+        endode_contract(contract, deployer, nonce, deployment_fee_rate, network)?;
     let txid = match stacks_rpc.post_transaction(signed_tx) {
         Ok(res) => res.txid,
         Err(e) => return Err(format!("{:?}", e)),
@@ -224,17 +238,34 @@ pub fn publish_all_contracts(
             }
         }
 
-        while contracts_being_deployed.len() > 0 {
-            let contracts = contracts_being_deployed.clone();
-            for (principal, contract_name) in contracts.into_iter() {
+        let contracts = contracts_being_deployed.clone();
+        let mut current_block_height = match stacks_rpc.get_info() {
+            Ok(info) => info.burn_block_height,
+            _ => 0,
+        };
+        loop {
+            std::thread::sleep(std::time::Duration::from_secs(delay_between_checks.into()));
+            let new_block_height = match stacks_rpc.get_info() {
+                Ok(info) => info.burn_block_height,
+                _ => 0,
+            };
+
+            if new_block_height <= current_block_height {
+                continue;
+            }
+
+            for (principal, contract_name) in contracts.iter() {
                 let res = stacks_rpc.get_contract_source(&principal, &contract_name);
-                if let Ok(contract) = res {
-                    contracts_being_deployed.remove(&(principal, contract_name));
+                if let Ok(_contract) = res {
+                    contracts_being_deployed.remove(&(principal.into(), contract_name.into()));
                 }
             }
 
-            // Todo: use delay_between_checks instead
-            std::thread::sleep(std::time::Duration::from_secs(5));
+            if contracts_being_deployed.is_empty() {
+                break;
+            } else {
+                current_block_height = new_block_height;
+            }
         }
     }
 

@@ -5,7 +5,7 @@ mod ui;
 #[allow(dead_code)]
 mod util;
 
-use super::{events_observer::EventsObserverCommand, DevnetEvent};
+use super::{chains_coordinator::StacksEventsObserverCommand, DevnetEvent};
 use crate::types::StacksChainEvent;
 use app::App;
 use crossterm::{
@@ -25,7 +25,7 @@ use tui::{backend::CrosstermBackend, Terminal};
 pub fn start_ui(
     devnet_events_tx: Sender<DevnetEvent>,
     devnet_events_rx: Receiver<DevnetEvent>,
-    events_observer_commands_tx: Sender<EventsObserverCommand>,
+    chains_coordinator_commands_tx: Sender<StacksEventsObserverCommand>,
     orchestrator_terminator_tx: Sender<bool>,
     orchestrator_terminated_rx: Receiver<bool>,
     devnet_path: &str,
@@ -74,7 +74,7 @@ pub fn start_ui(
                     app.display_log(DevnetEvent::log_warning("Ctrl+C received, initiating termination sequence.".into()));
                     let _ = trigger_reset(
                         true,
-                        &events_observer_commands_tx,
+                        & chains_coordinator_commands_tx,
                         &orchestrator_terminator_tx);
 
                     let _ = terminate(
@@ -88,7 +88,7 @@ pub fn start_ui(
                     app.display_log(DevnetEvent::log_warning("Reset Devnet...".into()));
                     let _ = trigger_reset(
                         false,
-                        &events_observer_commands_tx,
+                        & chains_coordinator_commands_tx,
                         &orchestrator_terminator_tx);
                 },
                 (_, KeyCode::Left) => app.on_left(),
@@ -122,6 +122,7 @@ pub fn start_ui(
                 // Display something
             }
             DevnetEvent::ProtocolDeployed => {
+                let _ = chains_coordinator_commands_tx.send(StacksEventsObserverCommand::ProtocolDeployed);
                 app.display_log(DevnetEvent::log_success("Protocol successfully deployed".into()));
             }
             // DevnetEvent::Terminate => {
@@ -141,11 +142,11 @@ pub fn start_ui(
 
 fn trigger_reset(
     terminate: bool,
-    events_observer_commands_tx: &Sender<EventsObserverCommand>,
+    chains_coordinator_commands_tx: &Sender<StacksEventsObserverCommand>,
     orchestrator_terminator_tx: &Sender<bool>,
 ) -> Result<(), Box<dyn Error>> {
-    events_observer_commands_tx
-        .send(EventsObserverCommand::Terminate(true))
+    chains_coordinator_commands_tx
+        .send(StacksEventsObserverCommand::Terminate(true))
         .expect("Unable to terminate devnet");
     orchestrator_terminator_tx
         .send(terminate)

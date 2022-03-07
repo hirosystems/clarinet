@@ -50,6 +50,7 @@ pub struct DevnetConfigFile {
     pub miner_mnemonic: Option<String>,
     pub miner_derivation_path: Option<String>,
     pub bitcoin_controller_block_time: Option<u32>,
+    pub bitcoin_controller_automining_disabled: Option<bool>,
     pub working_dir: Option<String>,
     pub postgres_port: Option<u16>,
     pub postgres_username: Option<String>,
@@ -122,6 +123,7 @@ pub struct DevnetConfig {
     pub bitcoin_explorer_port: u16,
     pub bitcoin_controller_port: u16,
     pub bitcoin_controller_block_time: u32,
+    pub bitcoin_controller_automining_disabled: bool,
     pub miner_stx_address: String,
     pub miner_secret_key_hex: String,
     pub miner_btc_address: String,
@@ -170,7 +172,7 @@ impl ChainConfig {
             Ok(path) => path,
             Err(_) => {
                 let error = format!("Unable to open file {:?}", path.to_str());
-                panic!(error)
+                panic!("{}", error)
             }
         };
         let mut chain_config_file_reader = BufReader::new(path);
@@ -284,6 +286,9 @@ impl ChainConfig {
                 bitcoin_controller_block_time: devnet_config
                     .bitcoin_controller_block_time
                     .unwrap_or(30_000),
+                bitcoin_controller_automining_disabled: devnet_config
+                    .bitcoin_controller_automining_disabled
+                    .unwrap_or(false),
                 stacks_node_p2p_port: devnet_config.stacks_node_p2p_port.unwrap_or(20444),
                 stacks_node_rpc_port: devnet_config.stacks_node_rpc_port.unwrap_or(20443),
                 stacks_node_events_observers: devnet_config

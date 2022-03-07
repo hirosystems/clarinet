@@ -23,6 +23,22 @@ pub struct CallReadOnlyFnResult {
 }
 
 #[derive(Deserialize, Debug, Clone, Default)]
+pub struct NodeInfo {
+    pub peer_version: u64,
+    pub pox_consensus: String,
+    pub burn_block_height: u64,
+    pub stable_pox_consensus: String,
+    pub stable_burn_block_height: u64,
+    pub server_version: String,
+    pub network_id: u32,
+    pub parent_network_id: u32,
+    pub stacks_tip_height: u64,
+    pub stacks_tip: String,
+    pub stacks_tip_consensus_hash: String,
+    pub genesis_chainstate_hash: String,
+}
+
+#[derive(Deserialize, Debug, Clone, Default)]
 pub struct PoxInfo {
     pub contract_id: String,
     pub pox_activation_threshold_ustx: u64,
@@ -104,6 +120,19 @@ impl StacksRpc {
         let request_url = format!("{}/v2/pox", self.url);
 
         let res: PoxInfo = self
+            .client
+            .get(&request_url)
+            .send()
+            .expect("Unable to retrieve account")
+            .json()
+            .expect("Unable to parse contract");
+        Ok(res)
+    }
+
+    pub fn get_info(&self) -> Result<NodeInfo, RpcError> {
+        let request_url = format!("{}/v2/info", self.url);
+
+        let res: NodeInfo = self
             .client
             .get(&request_url)
             .send()

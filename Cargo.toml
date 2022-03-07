@@ -67,9 +67,12 @@ tracing-appender = "0.2.0"
 ctrlc = "3.1.9"
 strum = { version = "0.23.0", features = ["derive"] }
 bitcoincore-rpc = "0.14.0"
+bitcoincore-rpc-json = "0.14.0"
 segment = { version = "0.1.2", optional = true }
 mac_address = { version = "1.1.2", optional = true }
 tower-lsp = { version = "0.14.0", optional = true }
+anyhow = "1.0"
+hex = "0.4.3"
 
 [dependencies.tui]
 version = "0.16.0"

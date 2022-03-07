@@ -428,13 +428,13 @@ impl StacksDevnet {
             .downcast::<JsArray, _>(&mut cx)
         {
             let raw_events_observers = res.to_vec(&mut cx)?;
-            let mut events_observers = vec![];
+            let mut chains_coordinators = vec![];
 
             for raw_events_observer in raw_events_observers.iter() {
                 let observer_url = raw_events_observer
                     .downcast_or_throw::<JsString, _>(&mut cx)?
                     .value(&mut cx);
-                events_observers.push(observer_url);
+                chains_coordinators.push(observer_url);
             }
             overrides.stacks_node_events_observers = Some(events_observers);
         }

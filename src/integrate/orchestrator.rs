@@ -183,6 +183,10 @@ impl DevnetOrchestrator {
                 if let Some(val) = devnet_override.disable_stacks_api {
                     devnet_config.disable_stacks_api = val;
                 }
+
+                if let Some(val) = devnet_override.bitcoin_controller_automining_disabled {
+                    devnet_config.bitcoin_controller_automining_disabled = val;
+                }
             }
             _ => {}
         };
@@ -338,7 +342,9 @@ impl DevnetOrchestrator {
             comment: "booting".into(),
         }));
         match self.boot_bitcoin_node_container().await {
-            Ok(_) => {}
+            Ok(_) => {
+                self.initialize_bitcoin_node(&event_tx);
+            }
             Err(message) => {
                 println!("{}", message);
                 self.kill(true).await;
@@ -586,7 +592,6 @@ rpcuser={}
 rpcpassword={}
 txindex=1
 listen=1
-reindex=0
 discover=0
 dns=0
 dnsseed=0
@@ -687,10 +692,16 @@ ignore_txs = false
             format!("{}/tcp", devnet_config.bitcoin_node_p2p_port),
             HashMap::new(),
         );
+        exposed_ports.insert(format!("{}/tcp", "28332"), HashMap::new());
 
         let mut labels = HashMap::new();
         labels.insert("project".to_string(), self.network_name.to_string());
         labels.insert("reset".to_string(), "true".to_string());
+
+        let mut env = vec![];
+        if devnet_config.bitcoin_controller_automining_disabled {
+            env.push("STACKS_BITCOIN_AUTOMINING_DISABLED=1".to_string());
+        }
 
         let config = Config {
             labels: Some(labels),
@@ -699,6 +710,7 @@ ignore_txs = false
             tty: None,
             exposed_ports: Some(exposed_ports),
             entrypoint: Some(vec![]),
+            env: Some(env),
             host_config: Some(HostConfig {
                 port_bindings: Some(port_bindings),
                 binds: Some(vec![
@@ -870,16 +882,24 @@ p2p_bind = "0.0.0.0:{}"
 miner = true
 seed = "{}"
 local_peer_seed = "{}"
-wait_time_for_microblocks = 1000
+wait_time_for_microblocks = 5000
+pox_sync_sample_secs = 10
+microblock_frequency = 15000
 
 [burnchain]
 chain = "bitcoin"
 mode = "krypton"
+poll_time_secs = 1
 peer_host = "{}"
 username = "{}"
 password = "{}"
 rpc_port = {}
 peer_port = {}
+
+[miner]
+first_attempt_time_ms = 10000
+subsequent_attempt_time_ms = 10000
+# microblock_attempt_time_ms = 15000
 
 # Add orchestrator (docker-host) as an event observer
 [[events_observer]]
@@ -891,7 +911,7 @@ events_keys = ["*"]
             devnet_config.stacks_node_p2p_port,
             devnet_config.miner_secret_key_hex,
             devnet_config.miner_secret_key_hex,
-            format!("bitcoin-node.{}", self.network_name),
+            format!("host.docker.internal"),
             devnet_config.bitcoin_node_username,
             devnet_config.bitcoin_node_password,
             devnet_config.bitcoin_controller_port,
@@ -926,7 +946,7 @@ amount = {}
             ));
         }
 
-        for events_observer in devnet_config.stacks_node_events_observers.iter() {
+        for chains_coordinator in devnet_config.stacks_node_events_observers.iter() {
             stacks_conf.push_str(&format!(
                 r#"
 [[events_observer]]
@@ -934,7 +954,7 @@ endpoint = "{}"
 retry_count = 255
 events_keys = ["*"]
 "#,
-                events_observer,
+                chains_coordinator,
             ));
         }
 
@@ -978,6 +998,7 @@ events_keys = ["*"]
             ]),
             env: Some(vec![
                 "STACKS_LOG_PP=1".to_string(),
+                // "STACKS_LOG_DEBUG=1".to_string(),
                 "BLOCKSTACK_USE_TEST_GENESIS_CHAINSTATE=1".to_string(),
             ]),
             host_config: Some(HostConfig {
@@ -1488,6 +1509,11 @@ events_keys = ["*"]
                     "BTCEXP_BITCOIND_PASS={}",
                     devnet_config.bitcoin_node_password
                 ),
+                format!(
+                    "BTCEXP_BASIC_AUTH_PASSWORD={}",
+                    devnet_config.bitcoin_node_password
+                ),
+                format!("BTCEXP_RPC_ALLOWALL=true",),
             ]),
             host_config: Some(HostConfig {
                 port_bindings: Some(port_bindings),
@@ -1824,6 +1850,51 @@ events_keys = ["*"]
         let _ = docker
             .prune_networks(Some(PruneNetworksOptions { filters }))
             .await;
+    }
+
+    pub fn initialize_bitcoin_node(&self, devnet_event_tx: &Sender<DevnetEvent>) {
+        use bitcoincore_rpc::bitcoin::Address;
+        use bitcoincore_rpc::{Auth, Client, RpcApi};
+        use std::str::FromStr;
+
+        let devnet_config = match &self.network_config {
+            Some(ref network_config) => match network_config.devnet {
+                Some(ref devnet_config) => devnet_config,
+                _ => return,
+            },
+            _ => return,
+        };
+
+        const FAUCET_SECRET_KEY: &str = "cTYqAVPS7uJTAcxyzkXWjmRGoCjkPcb38wZVRjyXov1RiRDWPQj3";
+        const FAUCET_ADDRESS: &str = "n3k15aVS4rEWhVYn4YfAFjD8Em5mmsducg";
+
+        let rpc = Client::new(
+            &format!("http://0.0.0.0:{}", devnet_config.bitcoin_node_rpc_port),
+            Auth::UserPass(
+                devnet_config.bitcoin_node_username.to_string(),
+                devnet_config.bitcoin_node_password.to_string(),
+            ),
+        )
+        .unwrap();
+
+        let _ = devnet_event_tx.send(DevnetEvent::info(format!("Configuring Bitcoin",)));
+
+        loop {
+            match rpc.get_network_info() {
+                Ok(_r) => break,
+                Err(_e) => {}
+            }
+            std::thread::sleep(std::time::Duration::from_secs(1));
+            let _ = devnet_event_tx.send(DevnetEvent::info(format!("Waiting for bitcoind",)));
+        }
+
+        let miner_address = Address::from_str(&devnet_config.miner_btc_address).unwrap();
+
+        rpc.generate_to_address(3, &miner_address);
+        rpc.generate_to_address(97, &Address::from_str(&FAUCET_ADDRESS).unwrap());
+        rpc.generate_to_address(1, &miner_address);
+        rpc.create_wallet("", None, None, None, None);
+        rpc.import_address(&miner_address, None, None);
     }
 }
 

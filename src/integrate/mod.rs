@@ -1,4 +1,4 @@
-pub mod events_observer;
+pub mod chains_coordinator;
 mod orchestrator;
 mod ui;
 
@@ -10,10 +10,16 @@ use tracing_appender;
 
 use crate::types::{BitcoinChainEvent, StacksChainEvent};
 use crate::utils;
-use events_observer::{start_events_observer, EventsObserverCommand};
+use chains_coordinator::{start_chains_coordinator, StacksEventsObserverCommand};
 pub use orchestrator::DevnetOrchestrator;
 
-use self::events_observer::EventObserverConfig;
+// Warmup:
+// 3 possible levels:
+// - level 1: mine blocks 101-109 (first blocks + key registration) - (invalidated when miner key is modified)
+// - level 2: mine blocks 110 (genesis) - (invalidated when Devnet.accounts keys are modified)
+// - level 3: mine blocks 111-XXX (contract deployments) - (invalidated when contracts are modified)
+
+use self::chains_coordinator::StacksEventObserverConfig;
 
 pub fn run_devnet(
     devnet: DevnetOrchestrator,
@@ -75,21 +81,37 @@ pub async fn do_run_devnet(
     // The event observer should be able to send some events to the UI thread,
     // and should be able to be terminated
     let devnet_path = devnet_config.working_dir.clone();
-    let config = EventObserverConfig::new(devnet_config, devnet.manifest_path.clone());
+    let config =
+        StacksEventObserverConfig::new(devnet_config.clone(), devnet.manifest_path.clone());
     let contracts_to_deploy_len = config.contracts_to_deploy.len();
-    let events_observer_tx = devnet_events_tx.clone();
-    let (events_observer_commands_tx, events_observer_commands_rx) = channel();
-    let moved_events_observer_commands_tx = events_observer_commands_tx.clone();
-    let events_observer_handle = std::thread::spawn(move || {
-        let future = start_events_observer(
+    let chains_coordinator_tx = devnet_events_tx.clone();
+    let (chains_coordinator_commands_tx, chains_coordinator_commands_rx) = channel();
+    let moved_events_observer_commands_tx = chains_coordinator_commands_tx.clone();
+    let chains_coordinator_handle = std::thread::spawn(move || {
+        let future = start_chains_coordinator(
             config,
-            events_observer_tx,
-            events_observer_commands_rx,
+            chains_coordinator_tx,
+            chains_coordinator_commands_rx,
             moved_events_observer_commands_tx,
         );
         let rt = utils::create_basic_runtime();
         let _ = rt.block_on(future);
     });
+
+    // let (bitcoin_events_observer_commands_tx, bitcoin_events_observer_commands_rx) = channel();
+    // let moved_devnet_events_tx = devnet_events_tx.clone();
+    // let config = BitcoinEventObserverConfig::new(devnet_config, devnet.manifest_path.clone());
+
+    // let bitcoin_events_observer_handle = std::thread::spawn(move || {
+    //     let future = start_bitcoin_events_observer(
+    //         config,
+    //         moved_devnet_events_tx,
+    //         bitcoin_events_observer_commands_rx,
+    //         bitcoin_events_observer_commands_tx,
+    //     );
+    //     let rt = utils::create_basic_runtime();
+    //     let _ = rt.block_on(future);
+    // });
 
     // Let's start the orchestration
 
@@ -112,17 +134,17 @@ pub async fn do_run_devnet(
         let _ = ui::start_ui(
             devnet_events_tx,
             devnet_events_rx,
-            events_observer_commands_tx,
+            chains_coordinator_commands_tx,
             orchestrator_terminator_tx,
             orchestrator_terminated_rx,
             &devnet_path,
         );
     } else {
         let moved_orchestrator_terminator_tx = orchestrator_terminator_tx.clone();
-        let moved_events_observer_commands_tx = events_observer_commands_tx.clone();
+        let moved_events_observer_commands_tx = chains_coordinator_commands_tx.clone();
         ctrlc::set_handler(move || {
             moved_events_observer_commands_tx
-                .send(EventsObserverCommand::Terminate(true))
+                .send(StacksEventsObserverCommand::Terminate(true))
                 .expect("Unable to terminate devnet");
             moved_orchestrator_terminator_tx
                 .send(true)
@@ -148,6 +170,10 @@ pub async fn do_run_devnet(
                             }
                         }
                     }
+                    Ok(DevnetEvent::ProtocolDeployed) => {
+                        let _ = chains_coordinator_commands_tx
+                            .send(StacksEventsObserverCommand::ProtocolDeployed);
+                    }
                     _ => {}
                 }
             }
@@ -156,7 +182,7 @@ pub async fn do_run_devnet(
         }
     }
 
-    events_observer_handle.join().unwrap();
+    chains_coordinator_handle.join().unwrap();
     orchestrator_handle.join().unwrap();
 
     Ok((None, None))
