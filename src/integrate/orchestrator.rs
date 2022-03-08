@@ -908,6 +908,7 @@ subsequent_attempt_time_ms = 10000
 [[events_observer]]
 endpoint = "host.docker.internal:{}"
 retry_count = 255
+include_data_events = true
 events_keys = ["*"]
 "#,
             devnet_config.stacks_node_rpc_port,
@@ -929,6 +930,7 @@ events_keys = ["*"]
 [[events_observer]]
 endpoint = "{}"
 retry_count = 255
+include_data_events = false
 events_keys = ["*"]
 "#,
                 format!(

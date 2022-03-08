@@ -92,21 +92,6 @@ pub async fn do_run_devnet(
         let _ = rt.block_on(future);
     });
 
-    // let (bitcoin_events_observer_commands_tx, bitcoin_events_observer_commands_rx) = channel();
-    // let moved_devnet_events_tx = devnet_events_tx.clone();
-    // let config = BitcoinEventObserverConfig::new(devnet_config, devnet.manifest_path.clone());
-
-    // let bitcoin_events_observer_handle = std::thread::spawn(move || {
-    //     let future = start_bitcoin_events_observer(
-    //         config,
-    //         moved_devnet_events_tx,
-    //         bitcoin_events_observer_commands_rx,
-    //         bitcoin_events_observer_commands_tx,
-    //     );
-    //     let rt = utils::create_basic_runtime();
-    //     let _ = rt.block_on(future);
-    // });
-
     // Let's start the orchestration
 
     // The devnet orchestrator should be able to send some events to the UI thread,

@@ -109,8 +109,9 @@ impl ProjectManifest {
         project_manifest_file: ProjectManifestFile,
     ) -> ProjectManifest {
         let project_name = project_manifest_file.project.name;
-        let default_cache_path =
-            format!("{}/.clarinet/{}/cache", var("HOME").unwrap(), project_name);
+        let mut default_cache_path = dirs::home_dir().expect("Unable to retrieve home directory");
+        default_cache_path.push(".clarinet");
+        default_cache_path.push("cache");
 
         let project = ProjectConfig {
             name: project_name.clone(),
