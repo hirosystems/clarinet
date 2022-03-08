@@ -261,7 +261,7 @@ pub async fn start_chains_coordinator(
                     std::thread::sleep(std::time::Duration::from_secs(1));
                     let rpc = Client::new(
                         &format!(
-                            "http://0.0.0.0:{}",
+                            "http://localhost:{}",
                             config.devnet_config.bitcoin_node_rpc_port
                         ),
                         Auth::UserPass(
@@ -588,7 +588,7 @@ pub async fn handle_bitcoin_rpc_call(
             let client = Client::new();
             client
                 .post(format!(
-                    "http://0.0.0.0:{}/",
+                    "http://localhost:{}/",
                     config.devnet_config.bitcoin_node_rpc_port
                 ))
                 .header("Content-Type", "application/json")
