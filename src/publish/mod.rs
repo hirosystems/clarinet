@@ -323,7 +323,7 @@ pub fn publish_all_contracts(
 
     deploying_thread_handle.join();
 
-    // todo: if devnet, we should be pulling all the links.
+    // TODO(lgalabru): if devnet, we should be pulling all the links.
 
     Ok((results, project_manifest))
 }

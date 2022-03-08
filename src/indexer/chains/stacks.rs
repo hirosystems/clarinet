@@ -342,33 +342,33 @@ pub fn get_standardized_fungible_currency_from_asset_class_id(
 ) -> Currency {
     match asset_class_cache.get(asset_class_id) {
         None => {
-            let comps = asset_class_id.split("::").collect::<Vec<&str>>();
-            let principal = comps[0].split(".").collect::<Vec<&str>>();
-            let contract_address = principal[0];
-            let contract_name = principal[1];
+            // TODO(lgalabru): re-approach this, with an adequate runtime strategy.
+            // let comps = asset_class_id.split("::").collect::<Vec<&str>>();
+            // let principal = comps[0].split(".").collect::<Vec<&str>>();
+            // let contract_address = principal[0];
+            // let contract_name = principal[1];
+            // let stacks_rpc = StacksRpc::new(&node_url);
+            // let value = stacks_rpc
+            //     .call_read_only_fn(
+            //         &contract_address,
+            //         &contract_name,
+            //         "get-symbol",
+            //         vec![],
+            //         contract_address,
+            //     )
+            //     .expect("Unable to retrieve symbol");
+            let symbol = "TOKEN".into(); //value.expect_result_ok().expect_ascii();
 
-            let stacks_rpc = StacksRpc::new(&node_url);
-            let value = stacks_rpc
-                .call_read_only_fn(
-                    &contract_address,
-                    &contract_name,
-                    "get-symbol",
-                    vec![],
-                    contract_address,
-                )
-                .expect("Unable to retrieve symbol");
-            let symbol = value.expect_result_ok().expect_ascii();
-
-            let value = stacks_rpc
-                .call_read_only_fn(
-                    &contract_address,
-                    &contract_name,
-                    "get-decimals",
-                    vec![],
-                    &contract_address,
-                )
-                .expect("Unable to retrieve decimals");
-            let decimals = value.expect_result_ok().expect_u128() as u8;
+            // let value = stacks_rpc
+            //     .call_read_only_fn(
+            //         &contract_address,
+            //         &contract_name,
+            //         "get-decimals",
+            //         vec![],
+            //         &contract_address,
+            //     )
+            //     .expect("Unable to retrieve decimals");
+            let decimals = 6; // value.expect_result_ok().expect_u128() as u8;
 
             let entry = AssetClassCache { symbol, decimals };
 

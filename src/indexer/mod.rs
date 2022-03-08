@@ -86,11 +86,11 @@ impl Indexer {
                     self.bitcoin_last_7_blocks.pop_front();
                 }
             } else if block.block_identifier.index > tip.index + 1 {
-                // TODO: we received a block and we don't have the parent
+                // TODO(lgalabru): we received a block and we don't have the parent
             } else if block.block_identifier.index == tip.index {
-                // TODO: 1 block reorg
+                // TODO(lgalabru): 1 block reorg
             } else {
-                // TODO: deeper reorg
+                // TODO(lgalabru): deeper reorg
             }
         } else {
             self.bitcoin_last_7_blocks
@@ -115,11 +115,11 @@ impl Indexer {
                     microblocks: vec![],
                 };
             } else if block.block_identifier.index > tip.index + 1 {
-                // TODO: we received a block and we don't have the parent
+                // TODO(lgalabru): we received a block and we don't have the parent
             } else if block.block_identifier.index == tip.index {
-                // TODO: 1 block reorg
+                // TODO(lgalabru): 1 block reorg
             } else {
-                // TODO: deeper reorg
+                // TODO(lgalabru): deeper reorg
             }
         } else {
             self.stacks_last_7_blocks

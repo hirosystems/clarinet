@@ -222,7 +222,7 @@ impl ChainConfig {
                                     let entropy = &[
                                         0x33, 0xE4, 0x6B, 0xB1, 0x3A, 0x74, 0x6E, 0xA4, 0x1C, 0xDD,
                                         0xE4, 0x5C, 0x90, 0x84, 0x6A, 0x79,
-                                    ]; // todo(ludo): rand
+                                    ]; // TODO(lgalabru): rand
                                     Mnemonic::from_entropy(entropy).unwrap().to_string()
                                 }
                             };
@@ -230,7 +230,7 @@ impl ChainConfig {
                             let derivation = match account_settings.get("derivation") {
                                 Some(Value::String(derivation)) => derivation.to_string(),
                                 _ => DEFAULT_DERIVATION_PATH.to_string(),
-                            }; // todo(ludo): use derivation path
+                            }; // TODO(lgalabru): use derivation path
 
                             let (address, _, _) =
                                 compute_addresses(&mnemonic, &derivation, is_mainnet);

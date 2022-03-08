@@ -193,7 +193,7 @@ mod sessions {
                         });
                 }
                 // if let Some(ref contract_call) tx.contract_call {
-                // TODO: initial_tx_sender
+                // TODO(lgalabru): initial_tx_sender
                 //   let code = format!("(contract-call? '{}.{} {} {})", initial_tx_sender, contract_call.contract, contract_call.method, contract_call.args.join(" "));
                 //   settings
                 //     .initial_contracts
@@ -1401,7 +1401,7 @@ fn mine_block(state: &mut OpState, args: Value, _: ()) -> Result<String, AnyErro
                     Ok(res) => res,
                     Err(diagnostics) => {
                         if diagnostics.len() > 0 {
-                            // todo(ludo): if CLARINET_BACKTRACE=1
+                            // TODO(lgalabru): if CLARINET_BACKTRACE=1
                             // Retrieve the AST (penultimate entry), and the expression id (last entry)
                             println!(
                                 "Runtime error: {}::{}({}) -> {}",
@@ -1429,7 +1429,7 @@ fn mine_block(state: &mut OpState, args: Value, _: ()) -> Result<String, AnyErro
                             true,
                             Some(name.into()),
                         )
-                        .unwrap(); // todo(ludo)
+                        .unwrap(); // TODO(lgalabru)
                     let result = match execution.result {
                         Some(output) => format!("{}", output),
                         _ => unreachable!("Value empty"),
@@ -1442,7 +1442,7 @@ fn mine_block(state: &mut OpState, args: Value, _: ()) -> Result<String, AnyErro
                     );
                     let execution = session
                         .interpret(snippet, None, true, Some(name.into()))
-                        .unwrap(); // todo(ludo)
+                        .unwrap(); // TODO(lgalabru)
                     let result = match execution.result {
                         Some(output) => format!("{}", output),
                         _ => unreachable!("Value empty"),
@@ -1514,7 +1514,7 @@ fn call_read_only_fn(state: &mut OpState, args: Value, _: ()) -> Result<String, 
                 &args.sender,
                 "readonly-calls".into(),
             )
-            .unwrap(); // todo(ludo)
+            .unwrap(); // TODO(lgalabru)
         let result = match execution.result {
             Some(output) => format!("{}", output),
             _ => unreachable!("Value empty"),

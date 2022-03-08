@@ -193,7 +193,7 @@ pub struct OperationMetadata {
     /// Has to be specified for ADD_KEY, REMOVE_KEY, and STAKE operations
     #[serde(skip_serializing_if = "Option::is_none")]
     pub public_key: Option<PublicKey>,
-    // todo(ludo): ???
+    // TODO(lgalabru): ???
     //#[serde(skip_serializing_if = "Option::is_none")]
     // pub access_key: Option<TODO>,
     /// Has to be specified for DEPLOY_CONTRACT operation

@@ -531,7 +531,7 @@ impl LanguageServer for ClarityLanguageBackend {
     // }
 
     // fn hover(&self, _: TextDocumentPositionParams) -> Self::HoverFuture {
-    //     // todo(ludo): to implement
+    //     // TODO(lgalabru): to implement
     //     let result = Hover {
     //         contents: HoverContents::Scalar(MarkedString::String("".to_string())),
     //         range: None,

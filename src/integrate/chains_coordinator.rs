@@ -409,13 +409,13 @@ pub fn handle_new_block(
     let update = match &chain_event {
         StacksChainEvent::ChainUpdatedWithBlock(block) => block.clone(),
         StacksChainEvent::ChainUpdatedWithMicroblock(_) => {
-            unreachable!() // todo(ludo): good enough for now
+            unreachable!() // TODO(lgalabru): good enough for now
         }
         StacksChainEvent::ChainUpdatedWithMicroblockReorg(_) => {
-            unreachable!() // todo(ludo): good enough for now
+            unreachable!() // TODO(lgalabru): good enough for now
         }
         StacksChainEvent::ChainUpdatedWithReorg(_) => {
-            unreachable!() // todo(ludo): good enough for now
+            unreachable!() // TODO(lgalabru): good enough for now
         }
     };
 

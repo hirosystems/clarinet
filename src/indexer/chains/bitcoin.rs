@@ -39,7 +39,7 @@ pub fn standardize_bitcoin_block(
     let block = rpc.get_block(&block_hash).unwrap();
 
     for _txdata in block.txdata.iter() {
-        // TODO: retrieve stacks transactions
+        // TODO(lgalabru): retrieve stacks transactions
         // let _ = tx.send(DevnetEvent::debug(format!(
         //     "Tx.out: {:?}", txdata.output
         // )));

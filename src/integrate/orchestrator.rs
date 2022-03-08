@@ -1666,7 +1666,7 @@ events_keys = ["*"]
             _ => return Err("Unable to get Docker client".into()),
         };
 
-        // todo(ludo): should we spawn
+        // TODO(lgalabru): should we spawn
         // docker run -d -p 5000:5000 --name registry registry:2.7
         // ?
 
