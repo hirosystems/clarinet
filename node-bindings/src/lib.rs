@@ -7,8 +7,9 @@ mod serde;
 use clarinet_lib::bip39::{Language, Mnemonic};
 use clarinet_lib::integrate::{self, DevnetEvent, DevnetOrchestrator};
 use clarinet_lib::types::{
-    compute_addresses, AccountConfig, BitcoinBlockData, DevnetConfigFile, PoxStackingOrder,
-    StacksBlockData, DEFAULT_DERIVATION_PATH,
+    compute_addresses, AccountConfig, BitcoinBlockData, BitcoinChainEvent,
+    ChainUpdatedWithBlockData, DevnetConfigFile, PoxStackingOrder, StacksChainEvent,
+    DEFAULT_DERIVATION_PATH,
 };
 use core::panic;
 use neon::prelude::*;
@@ -23,7 +24,7 @@ type DevnetCallback = Box<dyn FnOnce(&Channel) + Send>;
 struct StacksDevnet {
     tx: mpsc::Sender<DevnetCommand>,
     bitcoin_block_rx: mpsc::Receiver<BitcoinBlockData>,
-    stacks_block_rx: mpsc::Receiver<StacksBlockData>,
+    stacks_block_rx: mpsc::Receiver<ChainUpdatedWithBlockData>,
     node_url: String,
 }
 
@@ -525,7 +526,7 @@ impl StacksDevnet {
             .downcast_or_throw::<JsBox<StacksDevnet>, _>(&mut cx)?;
 
         let block = match devnet.stacks_block_rx.recv() {
-            Ok(obj) => obj,
+            Ok(obj) => obj.new_block,
             Err(err) => panic!("{:?}", err),
         };
 
