@@ -703,6 +703,15 @@ ignore_txs = false
             env.push("STACKS_BITCOIN_AUTOMINING_DISABLED=1".to_string());
         }
 
+        let mut binds = vec![format!("{}/conf:/etc/bitcoin", devnet_config.working_dir)];
+
+        if devnet_config.bind_containers_volumes {
+            binds.push(format!(
+                "{}/data/{}/bitcoin:/root/.bitcoin",
+                devnet_config.working_dir, boot_index
+            ));
+        }
+
         let config = Config {
             labels: Some(labels),
             image: Some(devnet_config.bitcoin_node_image_url.clone()),
@@ -713,13 +722,7 @@ ignore_txs = false
             env: Some(env),
             host_config: Some(HostConfig {
                 port_bindings: Some(port_bindings),
-                binds: Some(vec![
-                    format!("{}/conf:/etc/bitcoin", devnet_config.working_dir),
-                    format!(
-                        "{}/data/{}/bitcoin:/root/.bitcoin",
-                        devnet_config.working_dir, boot_index
-                    ),
-                ]),
+                binds: Some(binds),
                 extra_hosts: Some(vec!["host.docker.internal:host-gateway".into()]),
                 ..Default::default()
             }),
@@ -985,6 +988,18 @@ events_keys = ["*"]
         labels.insert("project".to_string(), self.network_name.to_string());
         labels.insert("reset".to_string(), "true".to_string());
 
+        let mut binds = vec![format!(
+            "{}/conf:/src/stacks-node/",
+            devnet_config.working_dir
+        )];
+
+        if devnet_config.bind_containers_volumes {
+            binds.push(format!(
+                "{}/data/{}/stacks:/devnet/",
+                devnet_config.working_dir, boot_index
+            ))
+        }
+
         let config = Config {
             labels: Some(labels),
             image: Some(devnet_config.stacks_node_image_url.clone()),
@@ -1003,14 +1018,7 @@ events_keys = ["*"]
             ]),
             host_config: Some(HostConfig {
                 port_bindings: Some(port_bindings),
-
-                binds: Some(vec![
-                    format!("{}/conf:/src/stacks-node/", devnet_config.working_dir),
-                    format!(
-                        "{}/data/{}/stacks:/devnet/",
-                        devnet_config.working_dir, boot_index
-                    ),
-                ]),
+                binds: Some(binds),
                 extra_hosts: Some(vec!["host.docker.internal:host-gateway".into()]),
                 ..Default::default()
             }),

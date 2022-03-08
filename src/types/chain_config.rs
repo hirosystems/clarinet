@@ -67,6 +67,7 @@ pub struct DevnetConfigFile {
     pub disable_bitcoin_explorer: Option<bool>,
     pub disable_stacks_explorer: Option<bool>,
     pub disable_stacks_api: Option<bool>,
+    pub bind_containers_volumes: Option<bool>,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -145,6 +146,7 @@ pub struct DevnetConfig {
     pub disable_bitcoin_explorer: bool,
     pub disable_stacks_explorer: bool,
     pub disable_stacks_api: bool,
+    pub bind_containers_volumes: bool,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -350,6 +352,7 @@ impl ChainConfig {
                 disable_bitcoin_explorer: devnet_config.disable_bitcoin_explorer.unwrap_or(false),
                 disable_stacks_api: devnet_config.disable_stacks_api.unwrap_or(false),
                 disable_stacks_explorer: devnet_config.disable_stacks_explorer.unwrap_or(false),
+                bind_containers_volumes: devnet_config.bind_containers_volumes.unwrap_or(false),
             };
             if !config.disable_stacks_api && config.disable_stacks_api {
                 config.disable_stacks_api = false;
