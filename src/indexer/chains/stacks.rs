@@ -8,7 +8,6 @@ use crate::types::{
     StacksTransactionExecutionCost, StacksTransactionKind, StacksTransactionMetadata,
     StacksTransactionReceipt, TransactionIdentifier,
 };
-use crate::utils::stacks::StacksRpc;
 use clarity_repl::clarity::codec::transaction::{TransactionAuth, TransactionPayload};
 use clarity_repl::clarity::codec::{StacksMessageCodec, StacksTransaction};
 use clarity_repl::clarity::types::Value as ClarityValue;
@@ -262,7 +261,7 @@ pub fn get_tx_description(
     };
     let tx = match StacksTransaction::consensus_deserialize(&mut Cursor::new(&tx_bytes)) {
         Ok(bytes) => bytes,
-        Err(e) => return Err(()),
+        Err(_e) => return Err(()),
     };
 
     let (fee, sender, sponsor) = match tx.auth {
@@ -338,7 +337,7 @@ pub fn get_tx_description(
 pub fn get_standardized_fungible_currency_from_asset_class_id(
     asset_class_id: &str,
     asset_class_cache: &mut HashMap<String, AssetClassCache>,
-    node_url: &str,
+    _node_url: &str,
 ) -> Currency {
     match asset_class_cache.get(asset_class_id) {
         None => {
@@ -416,7 +415,7 @@ pub fn get_standardized_non_fungible_currency_from_asset_class_id(
 
 pub fn get_standardized_stacks_operations(
     txid: &str,
-    transaction: &StacksTransaction,
+    _transaction: &StacksTransaction,
     events: &mut Vec<NewEvent>,
     asset_class_cache: &mut HashMap<String, AssetClassCache>,
     node_url: &str,

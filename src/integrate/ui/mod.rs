@@ -118,7 +118,7 @@ pub fn start_ui(
             DevnetEvent::MempoolAdmission(tx) => {
                 app.update_mempool(tx);
             }
-            DevnetEvent::ProtocolDeployingProgress(data) => {
+            DevnetEvent::ProtocolDeployingProgress(_) => {
                 // Display something
             }
             DevnetEvent::ProtocolDeployed => {

@@ -1,12 +1,10 @@
 use crate::utils;
 use clarity_repl::repl;
-use std::collections::{BTreeMap, HashSet};
+use std::collections::BTreeMap;
 use std::env::var;
 use std::fs::File;
 use std::io::{BufReader, Read};
-use std::iter::FromIterator;
 use std::path::PathBuf;
-use std::process;
 use toml::value::Value;
 
 #[derive(Serialize, Deserialize, Debug)]

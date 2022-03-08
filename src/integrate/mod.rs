@@ -188,6 +188,7 @@ pub async fn do_run_devnet(
     Ok((None, None))
 }
 
+#[allow(dead_code)]
 #[derive(Debug)]
 pub enum DevnetEvent {
     Log(LogData),

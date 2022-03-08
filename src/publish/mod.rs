@@ -1,3 +1,4 @@
+use crate::integrate::DevnetEvent;
 use crate::poke::{load_session, load_session_settings};
 use crate::types::ProjectManifest;
 use crate::utils::mnemonic;
@@ -26,10 +27,10 @@ use clarity_repl::clarity::{
 };
 use clarity_repl::repl::settings::{Account, InitialContract};
 use libsecp256k1::{PublicKey, SecretKey};
-use std::collections::HashSet;
-use std::collections::{BTreeMap, VecDeque};
+use std::collections::BTreeMap;
 use std::path::PathBuf;
 use std::sync::mpsc::channel;
+use std::sync::mpsc::Sender;
 use tiny_hderive::bip32::ExtendedPrivKey;
 
 #[derive(Deserialize, Debug)]
@@ -126,6 +127,7 @@ pub fn endode_contract(
     Ok((signed_tx, signer_addr))
 }
 
+#[allow(dead_code)]
 pub fn publish_contract(
     contract: &InitialContract,
     deployers_lookup: &BTreeMap<String, Account>,
@@ -169,6 +171,7 @@ pub fn publish_all_contracts(
     network: &Network,
     analysis_enabled: bool,
     delay_between_checks: u32,
+    devnet_event_tx: Option<&Sender<DevnetEvent>>,
 ) -> Result<(Vec<String>, ProjectManifest), Vec<String>> {
     let (settings, chain, project_manifest) = if analysis_enabled {
         let start_repl = false;
@@ -330,6 +333,10 @@ pub fn publish_all_contracts(
     deploying_thread_handle.join();
 
     // TODO(lgalabru): if devnet, we should be pulling all the links.
+
+    if let Some(devnet_event_tx) = devnet_event_tx {
+        let _ = devnet_event_tx.send(DevnetEvent::ProtocolDeployed);
+    }
 
     Ok((results, project_manifest))
 }

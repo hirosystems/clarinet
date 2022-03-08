@@ -174,6 +174,8 @@ impl GraphWalker {
     }
 }
 
+// TODO(lgalabru): use this helper to name thread, instead of raw std::thread::spawn
+#[allow(dead_code)]
 pub fn spawn<F>(name: &'static str, f: F) -> std::thread::JoinHandle<()>
 where
     F: 'static + Send + FnOnce() -> Result<()>,

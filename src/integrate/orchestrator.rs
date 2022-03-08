@@ -1861,7 +1861,7 @@ events_keys = ["*"]
     }
 
     pub fn initialize_bitcoin_node(&self, devnet_event_tx: &Sender<DevnetEvent>) {
-        use bitcoincore_rpc::bitcoin::Address;
+        use bitcoincore_rpc::bitcoin::{Address, PrivateKey};
         use bitcoincore_rpc::{Auth, Client, RpcApi};
         use std::str::FromStr;
 
@@ -1898,11 +1898,16 @@ events_keys = ["*"]
 
         let miner_address = Address::from_str(&devnet_config.miner_btc_address).unwrap();
 
-        rpc.generate_to_address(3, &miner_address);
-        rpc.generate_to_address(97, &Address::from_str(&FAUCET_ADDRESS).unwrap());
-        rpc.generate_to_address(1, &miner_address);
-        rpc.create_wallet("", None, None, None, None);
-        rpc.import_address(&miner_address, None, None);
+        let _ = rpc.generate_to_address(3, &miner_address);
+        let _ = rpc.generate_to_address(97, &Address::from_str(&FAUCET_ADDRESS).unwrap());
+        let _ = rpc.generate_to_address(1, &miner_address);
+        let _ = rpc.create_wallet("", None, None, None, None);
+        let _ = rpc.import_address(&miner_address, None, None);
+        let _ = rpc.import_private_key(
+            &PrivateKey::from_str(&FAUCET_SECRET_KEY).unwrap(),
+            None,
+            None,
+        );
     }
 }
 

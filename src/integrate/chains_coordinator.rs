@@ -1,7 +1,6 @@
 use super::DevnetEvent;
 use crate::indexer::{chains, Indexer, IndexerConfig};
 use crate::integrate::{MempoolAdmissionData, ServiceStatusData, Status};
-use crate::integrate::{ProtocolDeployedData, ProtocolDeployingData};
 use crate::poke::load_session;
 use crate::publish::{publish_all_contracts, Network};
 use crate::types::{self, BlockIdentifier, DevnetConfig};
@@ -19,7 +18,7 @@ use rocket::config::{Config, LogLevel};
 use rocket::serde::json::{json, Json, Value as JsonValue};
 use rocket::serde::Deserialize;
 use rocket::State;
-use std::collections::{BTreeMap, VecDeque};
+use std::collections::VecDeque;
 use std::convert::TryFrom;
 use std::error::Error;
 use std::iter::FromIterator;
@@ -304,8 +303,6 @@ pub async fn start_chains_coordinator(
 pub fn handle_new_burn_block(
     indexer_rw_lock: &State<Arc<RwLock<Indexer>>>,
     devnet_events_tx: &State<Arc<Mutex<Sender<DevnetEvent>>>>,
-    init_status: &State<Arc<RwLock<DevnetInitializationStatus>>>,
-    background_job_tx_mutex: &State<Arc<Mutex<Sender<StacksEventsObserverCommand>>>>,
     marshalled_block: Json<JsonValue>,
 ) -> Json<JsonValue> {
     let devnet_events_tx = devnet_events_tx.inner();
@@ -334,7 +331,7 @@ pub fn handle_new_burn_block(
             );
             (log, status)
         }
-        BitcoinChainEvent::ChainUpdatedWithReorg(old_blocks, new_blocks) => {
+        BitcoinChainEvent::ChainUpdatedWithReorg(_old_blocks, new_blocks) => {
             let tip = new_blocks.last().unwrap();
             let log = format!(
                 "Bitcoin reorg received (new height: {})",
@@ -563,7 +560,7 @@ pub fn handle_ping() -> Json<JsonValue> {
 #[post("/", format = "application/json", data = "<bitcoin_rpc_call>")]
 pub async fn handle_bitcoin_rpc_call(
     config: &State<Arc<Mutex<StacksEventObserverConfig>>>,
-    devnet_events_tx: &State<Arc<Mutex<Sender<DevnetEvent>>>>,
+    _devnet_events_tx: &State<Arc<Mutex<Sender<DevnetEvent>>>>,
     background_job_tx_mutex: &State<Arc<Mutex<Sender<StacksEventsObserverCommand>>>>,
     bitcoin_rpc_call: Json<BitcoinRPCRequest>,
 ) -> Json<JsonValue> {
@@ -616,8 +613,13 @@ pub fn publish_initial_contracts(manifest_path: &PathBuf, devnet_event_tx: &Send
     let moved_manifest_path = manifest_path.clone();
     let moved_devnet_event_tx = devnet_event_tx.clone();
     std::thread::spawn(move || {
-        let _ = publish_all_contracts(&moved_manifest_path, &Network::Devnet, false, 1);
-        let _ = moved_devnet_event_tx.send(DevnetEvent::ProtocolDeployed);
+        let _ = publish_all_contracts(
+            &moved_manifest_path,
+            &Network::Devnet,
+            false,
+            1,
+            Some(&moved_devnet_event_tx),
+        );
     });
 }
 
