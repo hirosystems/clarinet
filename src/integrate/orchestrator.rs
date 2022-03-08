@@ -1809,7 +1809,7 @@ events_keys = ["*"]
         const FAUCET_ADDRESS: &str = "n3k15aVS4rEWhVYn4YfAFjD8Em5mmsducg";
 
         let rpc = Client::new(
-            &format!("http://0.0.0.0:{}", devnet_config.bitcoin_node_rpc_port),
+            &format!("http://localhost:{}", devnet_config.bitcoin_node_rpc_port),
             Auth::UserPass(
                 devnet_config.bitcoin_node_username.to_string(),
                 devnet_config.bitcoin_node_password.to_string(),
