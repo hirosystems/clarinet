@@ -205,21 +205,22 @@ pub fn publish_all_contracts(
     let node_url = settings.node.clone();
 
     let deploying_thread_handle = std::thread::spawn(move || {
-        
         let mut total_contracts_deployed = 0;
         let stacks_rpc = StacksRpc::new(&node_url);
 
         while contracts_to_deploy != total_contracts_deployed {
-            
             let mut current_block_height = 0;
-            let mut contracts_batch: Vec<(StacksTransaction, StacksAddress, String)> = rx.recv().unwrap();
+            let mut contracts_batch: Vec<(StacksTransaction, StacksAddress, String)> =
+                rx.recv().unwrap();
             let mut batch_deployed = false;
             let mut contracts_being_deployed: BTreeMap<(String, String), bool> = BTreeMap::new();
             loop {
                 let new_block_height = match stacks_rpc.get_info() {
                     Ok(info) => info.burn_block_height,
                     _ => {
-                        std::thread::sleep(std::time::Duration::from_secs(delay_between_checks.into()));
+                        std::thread::sleep(std::time::Duration::from_secs(
+                            delay_between_checks.into(),
+                        ));
                         continue;
                     }
                 };
@@ -236,9 +237,10 @@ pub fn publish_all_contracts(
                     for (tx, deployer, contract_name) in contracts_batch.drain(..) {
                         let txid = match stacks_rpc.post_transaction(tx) {
                             Ok(res) => {
-                                contracts_being_deployed.insert((deployer.to_string(), contract_name), true);
+                                contracts_being_deployed
+                                    .insert((deployer.to_string(), contract_name), true);
                                 res.txid
-                            },
+                            }
                             Err(e) => return Err(format!("{:?}", e)),
                         };
                     }
@@ -287,18 +289,16 @@ pub fn publish_all_contracts(
     let stacks_rpc = StacksRpc::new(&node_url);
 
     for batch in settings.initial_contracts.chunks(25) {
-
         let mut encoded_contracts = vec![];
 
         for contract in batch.iter() {
-
             let contract_name = contract.name.clone().unwrap();
-        
+
             let deployer = match deployers_lookup.get(&contract_name) {
                 Some(deployer) => deployer,
                 None => deployers_lookup.get("*").unwrap(),
             };
-        
+
             let nonce = match deployers_nonces.get(&deployer.name) {
                 Some(nonce) => *nonce,
                 None => {
@@ -309,10 +309,16 @@ pub fn publish_all_contracts(
                     nonce
                 }
             };
-        
-            let (signed_tx, signer_addr) =
-                endode_contract(contract, deployer, nonce, chain.network.deployment_fee_rate, network).expect("Unable to encode contract");
-    
+
+            let (signed_tx, signer_addr) = endode_contract(
+                contract,
+                deployer,
+                nonce,
+                chain.network.deployment_fee_rate,
+                network,
+            )
+            .expect("Unable to encode contract");
+
             encoded_contracts.push((signed_tx, signer_addr, contract_name));
 
             deployers_nonces.insert(deployer.name.clone(), nonce + 1);
