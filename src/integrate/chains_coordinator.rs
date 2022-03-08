@@ -117,7 +117,7 @@ impl StacksEventObserverConfig {
     }
 }
 
-pub enum StacksEventsObserverCommand {
+pub enum ChainsCoordinatorCommand {
     Terminate(bool), // Restart
     PublishInitialContracts,
     BitcoinOpSent,
@@ -128,8 +128,8 @@ pub enum StacksEventsObserverCommand {
 pub async fn start_chains_coordinator(
     config: StacksEventObserverConfig,
     devnet_event_tx: Sender<DevnetEvent>,
-    chains_coordinator_commands_rx: Receiver<StacksEventsObserverCommand>,
-    chains_coordinator_commands_tx: Sender<StacksEventsObserverCommand>,
+    chains_coordinator_commands_rx: Receiver<ChainsCoordinatorCommand>,
+    chains_coordinator_commands_tx: Sender<ChainsCoordinatorCommand>,
 ) -> Result<(), Box<dyn Error>> {
     let _ = config.execute_scripts().await;
 
@@ -202,13 +202,13 @@ pub async fn start_chains_coordinator(
 
     loop {
         match chains_coordinator_commands_rx.recv() {
-            Ok(StacksEventsObserverCommand::Terminate(true)) => {
+            Ok(ChainsCoordinatorCommand::Terminate(true)) => {
                 devnet_event_tx
                     .send(DevnetEvent::info("Terminating event observer".into()))
                     .expect("Unable to terminate event observer");
                 break;
             }
-            Ok(StacksEventsObserverCommand::Terminate(false)) => {
+            Ok(ChainsCoordinatorCommand::Terminate(false)) => {
                 // Restart
                 devnet_event_tx
                     .send(DevnetEvent::info("Reloading contracts".into()))
@@ -239,7 +239,7 @@ pub async fn start_chains_coordinator(
                     init_status.should_deploy_protocol = true;
                 }
             }
-            Ok(StacksEventsObserverCommand::PublishInitialContracts) => {
+            Ok(ChainsCoordinatorCommand::PublishInitialContracts) => {
                 if should_deploy_protocol {
                     should_deploy_protocol = false;
                     if let Ok(mut init_status) = init_status_rw_lock.write() {
@@ -248,11 +248,11 @@ pub async fn start_chains_coordinator(
                     publish_initial_contracts(&config.manifest_path, &devnet_event_tx);
                 }
             }
-            Ok(StacksEventsObserverCommand::ProtocolDeployed) => {
+            Ok(ChainsCoordinatorCommand::ProtocolDeployed) => {
                 should_deploy_protocol = false;
                 protocol_deployed = true;
             }
-            Ok(StacksEventsObserverCommand::BitcoinOpSent) => {
+            Ok(ChainsCoordinatorCommand::BitcoinOpSent) => {
                 if !protocol_deployed {
                     use bitcoincore_rpc::bitcoin::Address;
                     use bitcoincore_rpc::{Auth, Client, RpcApi};
@@ -275,7 +275,7 @@ pub async fn start_chains_coordinator(
                     let _ = rpc.generate_to_address(1, &miner_address);
                 }
             }
-            Ok(StacksEventsObserverCommand::PublishPoxStackingOrders(block_identifier)) => {
+            Ok(ChainsCoordinatorCommand::PublishPoxStackingOrders(block_identifier)) => {
                 let bitcoin_block_height = block_identifier.index;
                 let res = publish_stacking_orders(
                     &config.devnet_config,
@@ -368,7 +368,7 @@ pub fn handle_new_block(
     indexer_rw_lock: &State<Arc<RwLock<Indexer>>>,
     devnet_events_tx: &State<Arc<Mutex<Sender<DevnetEvent>>>>,
     init_status: &State<Arc<RwLock<DevnetInitializationStatus>>>,
-    background_job_tx_mutex: &State<Arc<Mutex<Sender<StacksEventsObserverCommand>>>>,
+    background_job_tx_mutex: &State<Arc<Mutex<Sender<ChainsCoordinatorCommand>>>>,
     marshalled_block: Json<JsonValue>,
 ) -> Json<JsonValue> {
     // A few things need to be done:
@@ -379,7 +379,7 @@ pub fn handle_new_block(
         if init_status_writer.should_deploy_protocol {
             if let Ok(background_job_tx) = background_job_tx_mutex.lock() {
                 let _ =
-                    background_job_tx.send(StacksEventsObserverCommand::PublishInitialContracts);
+                    background_job_tx.send(ChainsCoordinatorCommand::PublishInitialContracts);
             }
         }
     }
@@ -406,13 +406,13 @@ pub fn handle_new_block(
     let update = match &chain_event {
         StacksChainEvent::ChainUpdatedWithBlock(block) => block.clone(),
         StacksChainEvent::ChainUpdatedWithMicroblock(_) => {
-            unreachable!() // TODO(lgalabru): good enough for now
+            unreachable!() // TODO(lgalabru): good enough for now - code path unreachable in the context of Devnet 
         }
         StacksChainEvent::ChainUpdatedWithMicroblockReorg(_) => {
-            unreachable!() // TODO(lgalabru): good enough for now
+            unreachable!() // TODO(lgalabru): good enough for now - code path unreachable in the context of Devnet
         }
         StacksChainEvent::ChainUpdatedWithReorg(_) => {
-            unreachable!() // TODO(lgalabru): good enough for now
+            unreachable!() // TODO(lgalabru): good enough for now - code path unreachable in the context of Devnet
         }
     };
 
@@ -449,7 +449,7 @@ pub fn handle_new_block(
         update.new_block.metadata.pox_cycle_position == (pox_cycle_length - 2);
     if should_submit_pox_orders {
         if let Ok(background_job_tx) = background_job_tx_mutex.lock() {
-            let _ = background_job_tx.send(StacksEventsObserverCommand::PublishPoxStackingOrders(
+            let _ = background_job_tx.send(ChainsCoordinatorCommand::PublishPoxStackingOrders(
                 update
                     .new_block
                     .metadata
@@ -561,7 +561,7 @@ pub fn handle_ping() -> Json<JsonValue> {
 pub async fn handle_bitcoin_rpc_call(
     config: &State<Arc<Mutex<StacksEventObserverConfig>>>,
     _devnet_events_tx: &State<Arc<Mutex<Sender<DevnetEvent>>>>,
-    background_job_tx_mutex: &State<Arc<Mutex<Sender<StacksEventsObserverCommand>>>>,
+    background_job_tx_mutex: &State<Arc<Mutex<Sender<ChainsCoordinatorCommand>>>>,
     bitcoin_rpc_call: Json<BitcoinRPCRequest>,
 ) -> Json<JsonValue> {
     use base64::encode;
@@ -600,7 +600,7 @@ pub async fn handle_bitcoin_rpc_call(
 
     if method == "sendrawtransaction" {
         if let Ok(background_job_tx) = background_job_tx_mutex.lock() {
-            let _ = background_job_tx.send(StacksEventsObserverCommand::BitcoinOpSent);
+            let _ = background_job_tx.send(ChainsCoordinatorCommand::BitcoinOpSent);
         }
     }
 

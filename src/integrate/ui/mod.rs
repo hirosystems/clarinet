@@ -5,7 +5,7 @@ mod ui;
 #[allow(dead_code)]
 mod util;
 
-use super::{chains_coordinator::StacksEventsObserverCommand, DevnetEvent};
+use super::{chains_coordinator::ChainsCoordinatorCommand, DevnetEvent};
 use crate::types::StacksChainEvent;
 use app::App;
 use crossterm::{
@@ -25,7 +25,7 @@ use tui::{backend::CrosstermBackend, Terminal};
 pub fn start_ui(
     devnet_events_tx: Sender<DevnetEvent>,
     devnet_events_rx: Receiver<DevnetEvent>,
-    chains_coordinator_commands_tx: Sender<StacksEventsObserverCommand>,
+    chains_coordinator_commands_tx: Sender<ChainsCoordinatorCommand>,
     orchestrator_terminator_tx: Sender<bool>,
     orchestrator_terminated_rx: Receiver<bool>,
     devnet_path: &str,
@@ -122,7 +122,7 @@ pub fn start_ui(
                 // Display something
             }
             DevnetEvent::ProtocolDeployed => {
-                let _ = chains_coordinator_commands_tx.send(StacksEventsObserverCommand::ProtocolDeployed);
+                let _ = chains_coordinator_commands_tx.send(ChainsCoordinatorCommand::ProtocolDeployed);
                 app.display_log(DevnetEvent::log_success("Protocol successfully deployed".into()));
             }
             // DevnetEvent::Terminate => {
@@ -142,11 +142,11 @@ pub fn start_ui(
 
 fn trigger_reset(
     terminate: bool,
-    chains_coordinator_commands_tx: &Sender<StacksEventsObserverCommand>,
+    chains_coordinator_commands_tx: &Sender<ChainsCoordinatorCommand>,
     orchestrator_terminator_tx: &Sender<bool>,
 ) -> Result<(), Box<dyn Error>> {
     chains_coordinator_commands_tx
-        .send(StacksEventsObserverCommand::Terminate(true))
+        .send(ChainsCoordinatorCommand::Terminate(true))
         .expect("Unable to terminate devnet");
     orchestrator_terminator_tx
         .send(terminate)

@@ -26,8 +26,8 @@ impl PoxInfo {
             pox_activation_threshold_ustx: 0,
             first_burnchain_block_height: 100,
             prepare_phase_block_length: 3,
-            reward_phase_block_length: 15,
-            reward_slots: 30,
+            reward_phase_block_length: 12,
+            reward_slots: 24,
             total_liquid_supply_ustx: 1000000000000000,
             ..Default::default()
         }

@@ -10,14 +10,8 @@ use tracing_appender;
 
 use crate::types::{BitcoinChainEvent, StacksChainEvent};
 use crate::utils;
-use chains_coordinator::{start_chains_coordinator, StacksEventsObserverCommand};
+use chains_coordinator::{start_chains_coordinator, ChainsCoordinatorCommand};
 pub use orchestrator::DevnetOrchestrator;
-
-// Warmup:
-// 3 possible levels:
-// - level 1: mine blocks 101-109 (first blocks + key registration) - (invalidated when miner key is modified)
-// - level 2: mine blocks 110 (genesis) - (invalidated when Devnet.accounts keys are modified)
-// - level 3: mine blocks 111-XXX (contract deployments) - (invalidated when contracts are modified)
 
 use self::chains_coordinator::StacksEventObserverConfig;
 
@@ -144,7 +138,7 @@ pub async fn do_run_devnet(
         let moved_events_observer_commands_tx = chains_coordinator_commands_tx.clone();
         ctrlc::set_handler(move || {
             moved_events_observer_commands_tx
-                .send(StacksEventsObserverCommand::Terminate(true))
+                .send(ChainsCoordinatorCommand::Terminate(true))
                 .expect("Unable to terminate devnet");
             moved_orchestrator_terminator_tx
                 .send(true)
@@ -172,7 +166,7 @@ pub async fn do_run_devnet(
                     }
                     Ok(DevnetEvent::ProtocolDeployed) => {
                         let _ = chains_coordinator_commands_tx
-                            .send(StacksEventsObserverCommand::ProtocolDeployed);
+                            .send(ChainsCoordinatorCommand::ProtocolDeployed);
                     }
                     _ => {}
                 }
