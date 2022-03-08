@@ -570,12 +570,12 @@ pub async fn handle_bitcoin_rpc_call(
     use base64::encode;
     use reqwest::Client;
 
-    if let Ok(tx_sender) = devnet_events_tx.lock() {
-        let _ = tx_sender.send(DevnetEvent::info(format!(
-            "Forwarding request {:?}",
-            bitcoin_rpc_call.method
-        )));
-    }
+    // if let Ok(tx_sender) = devnet_events_tx.lock() {
+    //     let _ = tx_sender.send(DevnetEvent::debug(format!(
+    //         "Forwarding request {:?}",
+    //         bitcoin_rpc_call.method
+    //     )));
+    // }
 
     let bitcoin_rpc_call = bitcoin_rpc_call.into_inner().clone();
     let method = bitcoin_rpc_call.method.clone();
@@ -616,7 +616,7 @@ pub fn publish_initial_contracts(manifest_path: &PathBuf, devnet_event_tx: &Send
     let moved_manifest_path = manifest_path.clone();
     let moved_devnet_event_tx = devnet_event_tx.clone();
     std::thread::spawn(move || {
-        let _ = publish_all_contracts(&moved_manifest_path, &Network::Devnet, false, 2);
+        let _ = publish_all_contracts(&moved_manifest_path, &Network::Devnet, false, 1);
         let _ = moved_devnet_event_tx.send(DevnetEvent::ProtocolDeployed);
     });
 }

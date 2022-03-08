@@ -29,6 +29,7 @@ use libsecp256k1::{PublicKey, SecretKey};
 use std::collections::HashSet;
 use std::collections::{BTreeMap, VecDeque};
 use std::path::PathBuf;
+use std::sync::mpsc::channel;
 use tiny_hderive::bip32::ExtendedPrivKey;
 
 #[derive(Deserialize, Debug)]
@@ -40,7 +41,7 @@ struct Balance {
 }
 
 #[allow(dead_code)]
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub enum Network {
     Devnet,
     Testnet,
@@ -199,13 +200,86 @@ pub fn publish_all_contracts(
         (settings, chain, project_manifest)
     };
 
+    let (tx, rx) = channel();
+    let contracts_to_deploy = settings.initial_contracts.len();
+    let node_url = settings.node.clone();
+
+    let deploying_thread_handle = std::thread::spawn(move || {
+        
+        let mut total_contracts_deployed = 0;
+        let stacks_rpc = StacksRpc::new(&node_url);
+
+        while contracts_to_deploy != total_contracts_deployed {
+            
+            let mut current_block_height = 0;
+            let mut contracts_batch: Vec<(StacksTransaction, StacksAddress, String)> = rx.recv().unwrap();
+            let mut batch_deployed = false;
+            let mut contracts_being_deployed: BTreeMap<(String, String), bool> = BTreeMap::new();
+            loop {
+                let new_block_height = match stacks_rpc.get_info() {
+                    Ok(info) => info.burn_block_height,
+                    _ => {
+                        std::thread::sleep(std::time::Duration::from_secs(delay_between_checks.into()));
+                        continue;
+                    }
+                };
+
+                if new_block_height <= current_block_height {
+                    std::thread::sleep(std::time::Duration::from_secs(delay_between_checks.into()));
+                    continue;
+                }
+
+                current_block_height = new_block_height;
+
+                if !batch_deployed {
+                    batch_deployed = true;
+                    for (tx, deployer, contract_name) in contracts_batch.drain(..) {
+                        let txid = match stacks_rpc.post_transaction(tx) {
+                            Ok(res) => {
+                                contracts_being_deployed.insert((deployer.to_string(), contract_name), true);
+                                res.txid
+                            },
+                            Err(e) => return Err(format!("{:?}", e)),
+                        };
+                    }
+                    std::thread::sleep(std::time::Duration::from_secs(delay_between_checks.into()));
+                    continue;
+                }
+
+                let mut keep_looping = false;
+
+                for ((deployer, contract_name), value) in contracts_being_deployed.iter_mut() {
+                    if *value {
+                        let res = stacks_rpc.get_contract_source(&deployer, &contract_name);
+                        if let Ok(_contract) = res {
+                            *value = false;
+                            total_contracts_deployed += 1;
+                        } else {
+                            keep_looping = true;
+                            break;
+                        }
+                    }
+                }
+
+                if !keep_looping {
+                    break;
+                }
+            }
+        }
+        Ok(())
+    });
+
     let mut results = vec![];
     let mut deployers_nonces = BTreeMap::new();
-    let mut deployers_lookup = BTreeMap::new();
+    let mut deployers_lookup: BTreeMap<String, Account> = BTreeMap::new();
 
     for account in settings.initial_accounts.iter() {
         if account.name == "deployer" {
             deployers_lookup.insert("*".into(), account.clone());
+        }
+        // Let's avoid fetching nonces in the case of Devnet.
+        if network == &Network::Devnet {
+            deployers_nonces.insert(account.name.clone(), 0);
         }
     }
 
@@ -213,63 +287,43 @@ pub fn publish_all_contracts(
     let stacks_rpc = StacksRpc::new(&node_url);
 
     for batch in settings.initial_contracts.chunks(25) {
-        let mut contracts_being_deployed = HashSet::new();
+
+        let mut encoded_contracts = vec![];
+
         for contract in batch.iter() {
-            match publish_contract(
-                contract,
-                &deployers_lookup,
-                &mut deployers_nonces,
-                &node_url,
-                chain.network.deployment_fee_rate,
-                &network,
-            ) {
-                Ok((txid, nonce, deployer_address, contract_name)) => {
-                    results.push(format!(
-                        "Contract {} broadcasted in mempool (txid: {}, nonce: {})",
-                        contract.name.as_ref().unwrap(),
-                        txid,
-                        nonce
-                    ));
-                    contracts_being_deployed.insert((deployer_address, contract_name));
-                }
-                Err(err) => {
-                    panic!("Unable to publish contract: {}", err);
-                }
-            }
-        }
 
-        let contracts = contracts_being_deployed.clone();
-        let mut current_block_height = match stacks_rpc.get_info() {
-            Ok(info) => info.burn_block_height,
-            _ => 0,
-        };
-        loop {
-            std::thread::sleep(std::time::Duration::from_secs(delay_between_checks.into()));
-            let new_block_height = match stacks_rpc.get_info() {
-                Ok(info) => info.burn_block_height,
-                _ => 0,
+            let contract_name = contract.name.clone().unwrap();
+        
+            let deployer = match deployers_lookup.get(&contract_name) {
+                Some(deployer) => deployer,
+                None => deployers_lookup.get("*").unwrap(),
             };
-
-            if new_block_height <= current_block_height {
-                continue;
-            }
-
-            for (principal, contract_name) in contracts.iter() {
-                let res = stacks_rpc.get_contract_source(&principal, &contract_name);
-                if let Ok(_contract) = res {
-                    contracts_being_deployed.remove(&(principal.into(), contract_name.into()));
+        
+            let nonce = match deployers_nonces.get(&deployer.name) {
+                Some(nonce) => *nonce,
+                None => {
+                    let nonce = stacks_rpc
+                        .get_nonce(&deployer.address)
+                        .expect("Unable to retrieve account");
+                    deployers_nonces.insert(deployer.name.clone(), nonce);
+                    nonce
                 }
-            }
+            };
+        
+            let (signed_tx, signer_addr) =
+                endode_contract(contract, deployer, nonce, chain.network.deployment_fee_rate, network).expect("Unable to encode contract");
+    
+            encoded_contracts.push((signed_tx, signer_addr, contract_name));
 
-            if contracts_being_deployed.is_empty() {
-                break;
-            } else {
-                current_block_height = new_block_height;
-            }
+            deployers_nonces.insert(deployer.name.clone(), nonce + 1);
         }
+
+        let _ = tx.send(encoded_contracts);
     }
 
-    // If devnet, we should be pulling all the links.
+    deploying_thread_handle.join();
+
+    // todo: if devnet, we should be pulling all the links.
 
     Ok((results, project_manifest))
 }
