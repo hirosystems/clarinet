@@ -163,6 +163,7 @@ impl ClarityLanguageBackend {
                 code.clone(),
                 analysis.clone(),
                 false,
+                false,
                 None,
             );
 
