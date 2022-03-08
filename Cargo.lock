@@ -732,9 +732,9 @@ dependencies = [
 
 [[package]]
 name = "clarity-repl"
-version = "0.23.0"
+version = "0.23.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "60401e39af201cd76a53a8c0caf7dd8496e7d4336e903cc17b856d942d707dbc"
+checksum = "17dec84dea06c53245c92786f4ed2edb2e335ae29a427a1388d60027f698b0fc"
 dependencies = [
  "ansi_term",
  "atty",
