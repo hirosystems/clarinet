@@ -125,7 +125,7 @@ impl ProjectManifest {
             cache_dir: project_manifest_file
                 .project
                 .cache_dir
-                .unwrap_or(default_cache_path),
+                .unwrap_or(default_cache_path.to_str().unwrap().to_string()),
         };
 
         let mut repl_settings = if let Some(repl_settings) = project_manifest_file.repl {
