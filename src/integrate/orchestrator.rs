@@ -96,10 +96,6 @@ impl DevnetOrchestrator {
                     devnet_config.stacks_explorer_port = val;
                 }
 
-                if let Some(val) = devnet_override.bitcoin_controller_port {
-                    devnet_config.bitcoin_controller_port = val;
-                }
-
                 if let Some(ref val) = devnet_override.bitcoin_node_username {
                     devnet_config.bitcoin_node_username = val.clone();
                 }
@@ -561,13 +557,6 @@ impl DevnetOrchestrator {
 
         let mut port_bindings = HashMap::new();
         port_bindings.insert(
-            format!("{}/tcp", devnet_config.bitcoin_controller_port),
-            Some(vec![PortBinding {
-                host_ip: Some(String::from("0.0.0.0")),
-                host_port: Some(format!("{}/tcp", devnet_config.bitcoin_controller_port)),
-            }]),
-        );
-        port_bindings.insert(
             format!("{}/tcp", devnet_config.bitcoin_node_p2p_port),
             Some(vec![PortBinding {
                 host_ip: Some(String::from("0.0.0.0")),
@@ -625,65 +614,7 @@ rpcport={}
         bitcoind_data_path.push("bitcoin");
         fs::create_dir(bitcoind_data_path).expect("Unable to create working dir");
 
-        let bitcoin_controller_conf = format!(
-            r#"
-[network]
-rpc_bind = "0.0.0.0:{}"
-block_time = {}
-miner_address = "{}"
-bitcoind_rpc_host = "0.0.0.0:{}"
-bitcoind_rpc_user = "{}"
-bitcoind_rpc_pass = "{}"
-whitelisted_rpc_calls = [
-    "listunspent",
-    "listwallets",
-    "createwallet",
-    "importaddress",
-    "sendrawtransaction",
-    "getrawtransaction",
-    "scantxoutset",
-    "getrawmempool",
-    "getblockhash",
-]
-# Expedite the key registration / genesis block
-[[blocks]]
-count = 1
-block_time = 30000
-ignore_txs = false
-
-# Expedite the key registration / genesis block
-[[blocks]]
-count = 2
-block_time = 20000
-ignore_txs = false
-
-# Give more time to the first blocks
-[[blocks]]
-count = {}
-block_time = 50000
-ignore_txs = false
-"#,
-            devnet_config.bitcoin_controller_port,
-            devnet_config.bitcoin_controller_block_time,
-            devnet_config.miner_btc_address,
-            devnet_config.bitcoin_node_rpc_port,
-            devnet_config.bitcoin_node_username,
-            devnet_config.bitcoin_node_password,
-            1 + contracts_to_deploy_len / 25
-        );
-        let mut bitcoin_controller_conf_path = PathBuf::from(&devnet_config.working_dir);
-        bitcoin_controller_conf_path.push("conf/puppet-chain.toml");
-
-        let mut file = File::create(bitcoin_controller_conf_path)
-            .expect("Unable to create bitcoin_controller.toml");
-        file.write_all(bitcoin_controller_conf.as_bytes())
-            .expect("Unable to create bitcoin_controller.toml");
-
         let mut exposed_ports = HashMap::new();
-        exposed_ports.insert(
-            format!("{}/tcp", devnet_config.bitcoin_controller_port),
-            HashMap::new(),
-        );
         exposed_ports.insert(
             format!("{}/tcp", devnet_config.bitcoin_node_rpc_port),
             HashMap::new(),
@@ -692,7 +623,6 @@ ignore_txs = false
             format!("{}/tcp", devnet_config.bitcoin_node_p2p_port),
             HashMap::new(),
         );
-        exposed_ports.insert(format!("{}/tcp", "28332"), HashMap::new());
 
         let mut labels = HashMap::new();
         labels.insert("project".to_string(), self.network_name.to_string());
@@ -918,7 +848,7 @@ events_keys = ["*"]
             format!("host.docker.internal"),
             devnet_config.bitcoin_node_username,
             devnet_config.bitcoin_node_password,
-            devnet_config.bitcoin_controller_port,
+            devnet_config.orchestrator_port,
             devnet_config.bitcoin_node_p2p_port,
             devnet_config.orchestrator_port,
         );

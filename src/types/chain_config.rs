@@ -15,7 +15,7 @@ pub const DEFAULT_BITCOIN_NODE_IMAGE: &str = "quay.io/hirosystems/bitcoind:devne
 pub const DEFAULT_STACKS_NODE_IMAGE: &str = "quay.io/hirosystems/stacks-node:devnet-v2";
 pub const DEFAULT_BITCOIN_EXPLORER_IMAGE: &str = "quay.io/hirosystems/bitcoin-explorer:devnet";
 pub const DEFAULT_STACKS_API_IMAGE: &str = "blockstack/stacks-blockchain-api:latest";
-pub const DEFAULT_STACKS_EXPLORER_IMAGE: &str = "blockstack/explorer:1.16.1";
+pub const DEFAULT_STACKS_EXPLORER_IMAGE: &str = "blockstack/explorer:latest";
 pub const DEFAULT_POSTGRES_IMAGE: &str = "postgres:alpine";
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -44,7 +44,6 @@ pub struct DevnetConfigFile {
     pub stacks_api_events_port: Option<u16>,
     pub bitcoin_explorer_port: Option<u16>,
     pub stacks_explorer_port: Option<u16>,
-    pub bitcoin_controller_port: Option<u16>,
     pub bitcoin_node_username: Option<String>,
     pub bitcoin_node_password: Option<String>,
     pub miner_mnemonic: Option<String>,
@@ -122,7 +121,6 @@ pub struct DevnetConfig {
     pub stacks_api_events_port: u16,
     pub stacks_explorer_port: u16,
     pub bitcoin_explorer_port: u16,
-    pub bitcoin_controller_port: u16,
     pub bitcoin_controller_block_time: u32,
     pub bitcoin_controller_automining_disabled: bool,
     pub miner_stx_address: String,
@@ -284,7 +282,6 @@ impl ChainConfig {
                     .bitcoin_node_password
                     .take()
                     .unwrap_or("devnet".to_string()),
-                bitcoin_controller_port: devnet_config.bitcoin_controller_port.unwrap_or(18442),
                 bitcoin_controller_block_time: devnet_config
                     .bitcoin_controller_block_time
                     .unwrap_or(30_000),
