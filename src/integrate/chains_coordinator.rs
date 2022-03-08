@@ -378,8 +378,7 @@ pub fn handle_new_block(
     if let Ok(init_status_writer) = init_status.inner().read() {
         if init_status_writer.should_deploy_protocol {
             if let Ok(background_job_tx) = background_job_tx_mutex.lock() {
-                let _ =
-                    background_job_tx.send(ChainsCoordinatorCommand::PublishInitialContracts);
+                let _ = background_job_tx.send(ChainsCoordinatorCommand::PublishInitialContracts);
             }
         }
     }
@@ -406,7 +405,7 @@ pub fn handle_new_block(
     let update = match &chain_event {
         StacksChainEvent::ChainUpdatedWithBlock(block) => block.clone(),
         StacksChainEvent::ChainUpdatedWithMicroblock(_) => {
-            unreachable!() // TODO(lgalabru): good enough for now - code path unreachable in the context of Devnet 
+            unreachable!() // TODO(lgalabru): good enough for now - code path unreachable in the context of Devnet
         }
         StacksChainEvent::ChainUpdatedWithMicroblockReorg(_) => {
             unreachable!() // TODO(lgalabru): good enough for now - code path unreachable in the context of Devnet

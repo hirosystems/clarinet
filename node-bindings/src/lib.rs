@@ -434,7 +434,7 @@ impl StacksDevnet {
                 let observer_url = raw_events_observer
                     .downcast_or_throw::<JsString, _>(&mut cx)?
                     .value(&mut cx);
-                    events_observers.push(observer_url);
+                events_observers.push(observer_url);
             }
             overrides.stacks_node_events_observers = Some(events_observers);
         }
