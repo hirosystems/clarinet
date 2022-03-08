@@ -254,7 +254,13 @@ pub fn main() {
     match opts.command {
         Command::New(project_opts) => {
             let current_path = {
-                let current_dir = env::current_dir().expect("Unable to read current directory");
+                let current_dir = match env::current_dir() {
+                    Ok(dir) => dir,
+                    Err(e) => {
+                        println!("{}: Unable to get current directory: {}", red!("error"), e);
+                        std::process::exit(1);
+                    }
+                };
                 current_dir.to_str().unwrap().to_owned()
             };
 
@@ -291,7 +297,9 @@ pub fn main() {
             let project_id = project_opts.name.clone();
             let changes =
                 generate::get_changes_for_new_project(current_path, project_id, telemetry_enabled);
-            execute_changes(changes);
+            if !execute_changes(changes) {
+                std::process::exit(1);
+            }
             if hints_enabled {
                 display_post_check_hint();
             }
@@ -314,7 +322,9 @@ pub fn main() {
                     true,
                     vec![],
                 );
-                execute_changes(changes);
+                if !execute_changes(changes) {
+                    std::process::exit(1);
+                }
                 if hints_enabled {
                     display_post_check_hint();
                 }
@@ -333,7 +343,9 @@ pub fn main() {
                         contract_id: required_contract.contract_id.clone(),
                     }],
                 };
-                execute_changes(vec![Changes::EditTOML(change)]);
+                if !execute_changes(vec![Changes::EditTOML(change)]) {
+                    std::process::exit(1);
+                }
                 if hints_enabled {
                     display_post_check_hint();
                 }
@@ -384,7 +396,9 @@ pub fn main() {
                         }
                     }
                 }
-                execute_changes(changes);
+                if !execute_changes(changes) {
+                    std::process::exit(1);
+                }
                 if hints_enabled {
                     display_post_check_hint();
                 }
@@ -394,8 +408,13 @@ pub fn main() {
             let manifest_path = get_manifest_path_or_exit(cmd.manifest_path);
             let start_repl = true;
             let (_, _, project_manifest, _) =
-                load_session(&manifest_path, start_repl, &Network::Devnet)
-                    .expect("Unable to start REPL");
+                match load_session(manifest_path, start_repl, &Network::Devnet) {
+                    Ok(res) => res,
+                    Err(e) => {
+                        println!("{}: Unable to start REPL: {}", red!("error"), e);
+                        std::process::exit(1);
+                    }
+                };
             if hints_enabled {
                 display_post_console_hint();
             }
@@ -629,12 +648,17 @@ pub fn main() {
             let mut file = match File::create(file_name.clone()) {
                 Ok(file) => file,
                 Err(e) => {
-                    println!("error creating {}: {}", file_name, e);
-                    return;
+                    println!(
+                        "{}: Unable to create file {}: {}",
+                        red!("error"),
+                        file_name,
+                        e
+                    );
+                    std::process::exit(1);
                 }
             };
             cmd.shell.generate(&mut app, &mut file);
-            println!("generated: {}", file_name.clone());
+            println!("{} {}", green!("Created file"), file_name.clone());
             println!("Check your shell's documentation for details about using this file to enable completions for clarinet");
         }
     };
@@ -675,7 +699,7 @@ fn get_manifest_path_or_exit(path: Option<String>) -> PathBuf {
     }
 }
 
-fn execute_changes(changes: Vec<Changes>) {
+fn execute_changes(changes: Vec<Changes>) -> bool {
     let mut shared_config = None;
     let mut path = PathBuf::new();
 
@@ -685,35 +709,92 @@ fn execute_changes(changes: Vec<Changes>) {
                 if let Ok(entry) = fs::metadata(&options.path) {
                     if entry.is_file() {
                         println!(
-                            "{}, file already exists at path {}",
-                            red!("Skip creating file"),
+                            "{}: file already exists at path {}",
+                            yellow!("warning"),
                             options.path
                         );
                         continue;
                     }
                 }
+                let mut file = match File::create(options.path.clone()) {
+                    Ok(file) => file,
+                    Err(e) => {
+                        println!(
+                            "{}: Unable to create file {}: {}",
+                            red!("error"),
+                            options.path,
+                            e
+                        );
+                        return false;
+                    }
+                };
+                match file.write_all(options.content.as_bytes()) {
+                    Ok(_) => (),
+                    Err(e) => {
+                        println!(
+                            "{}: Unable to write file {}: {}",
+                            red!("error"),
+                            options.path,
+                            e
+                        );
+                        return false;
+                    }
+                };
                 println!("{}", options.comment);
-                let mut file = File::create(options.path.clone()).expect("Unable to create file");
-                file.write_all(options.content.as_bytes())
-                    .expect("Unable to write file");
             }
             Changes::AddDirectory(options) => {
+                match fs::create_dir_all(options.path.clone()) {
+                    Ok(_) => (),
+                    Err(e) => {
+                        println!(
+                            "{}: Unable to create directory {}: {}",
+                            red!("error"),
+                            options.path,
+                            e
+                        );
+                        return false;
+                    }
+                };
                 println!("{}", options.comment);
-                fs::create_dir_all(options.path.clone()).expect("Unable to create directory");
             }
             Changes::EditTOML(ref mut options) => {
                 let mut config = match shared_config.take() {
                     Some(config) => config,
                     None => {
                         path = options.manifest_path.clone();
-                        let file = File::open(path.clone()).unwrap();
+                        let file = match File::open(path.clone()) {
+                            Ok(file) => file,
+                            Err(e) => {
+                                println!(
+                                    "{}: Unable to open file {}: {}",
+                                    red!("error"),
+                                    path.to_string_lossy(),
+                                    e
+                                );
+                                return false;
+                            }
+                        };
                         let mut project_manifest_file_reader = BufReader::new(file);
                         let mut project_manifest_file = vec![];
-                        project_manifest_file_reader
-                            .read_to_end(&mut project_manifest_file)
-                            .unwrap();
+                        match project_manifest_file_reader.read_to_end(&mut project_manifest_file) {
+                            Ok(_) => (),
+                            Err(e) => {
+                                println!("{}: Unable to read manifest file: {}", red!("error"), e);
+                                return false;
+                            }
+                        };
                         let project_manifest_file: ProjectManifestFile =
-                            toml::from_slice(&project_manifest_file[..]).unwrap();
+                            match toml::from_slice(&project_manifest_file[..]) {
+                                Ok(manifest) => manifest,
+                                Err(e) => {
+                                    println!(
+                                        "{}: Failed to process manifest file: {}",
+                                        red!("error"),
+                                        e
+                                    );
+                                    return false;
+                                }
+                            };
                         ProjectManifest::from_project_manifest_file(project_manifest_file)
                     }
                 };
@@ -740,12 +821,43 @@ fn execute_changes(changes: Vec<Changes>) {
     }
 
     if let Some(config) = shared_config {
-        let toml_value = toml::Value::try_from(&config).unwrap();
+        let toml_value = match toml::Value::try_from(&config) {
+            Ok(value) => value,
+            Err(e) => {
+                println!("{}: Failed to encode config file: {}", red!("error"), e);
+                return false;
+            }
+        };
         let toml = format!("{}", toml_value);
-        let mut file = File::create(path).unwrap();
-        file.write_all(&toml.as_bytes()).unwrap();
-        file.sync_all().unwrap();
+        let mut file = match File::create(path.clone()) {
+            Ok(file) => file,
+            Err(e) => {
+                println!(
+                    "{}: Unable to create manifest file {}: {}",
+                    red!("error"),
+                    path.to_string_lossy(),
+                    e
+                );
+                return false;
+            }
+        };
+        match file.write_all(&toml.as_bytes()) {
+            Ok(_) => (),
+            Err(e) => {
+                println!("{}: Unable to write to manifest file: {}", red!("error"), e);
+                return false;
+            }
+        };
+        match file.sync_all() {
+            Ok(_) => (),
+            Err(e) => {
+                println!("{}: sync_all: {}", red!("error"), e);
+                return false;
+            }
+        };
     }
+
+    true
 }
 
 fn display_separator() {

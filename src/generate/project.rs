@@ -36,7 +36,7 @@ impl GetChangesForNewProject {
     fn create_root_directory(&mut self) {
         let dir = format!("{}/{}", self.project_path, self.project_name);
         let change = DirectoryCreation {
-            comment: format!("{} {}", green!("Creating directory"), self.project_name),
+            comment: format!("{} {}", green!("Created directory"), self.project_name),
             name: self.project_name.clone(),
             path: dir,
         };
@@ -417,7 +417,12 @@ btc_address = "mvZtbibDAAA3WLpY7zXXFqRa3T4XSknBX7"
     fn get_changes_for_new_root_dir(&self, name: String) -> Changes {
         let dir = format!("{}/{}", self.project_name, name);
         let change = DirectoryCreation {
-            comment: format!("{} {}/{}", green!("Created file"), self.project_name, name),
+            comment: format!(
+                "{} {}/{}",
+                green!("Created directory"),
+                self.project_name,
+                name
+            ),
             name,
             path: dir,
         };
