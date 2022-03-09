@@ -202,7 +202,7 @@ impl DevnetOrchestrator {
     pub fn get_stacks_node_url(&self) -> String {
         match self.network_config {
             Some(ref config) => match config.devnet {
-                Some(ref devnet) => format!("http://0.0.0.0:{}", devnet.stacks_node_rpc_port),
+                Some(ref devnet) => format!("http:/localhost:{}", devnet.stacks_node_rpc_port),
                 _ => unreachable!(),
             },
             _ => unreachable!(),

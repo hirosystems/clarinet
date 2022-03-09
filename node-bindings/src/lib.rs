@@ -274,13 +274,6 @@ impl StacksDevnet {
         }
 
         if let Ok(res) = devnet_settings
-            .get(&mut cx, "bitcoin_controller_port")?
-            .downcast::<JsNumber, _>(&mut cx)
-        {
-            overrides.bitcoin_controller_port = Some(res.value(&mut cx) as u16);
-        }
-
-        if let Ok(res) = devnet_settings
             .get(&mut cx, "bitcoin_node_username")?
             .downcast::<JsString, _>(&mut cx)
         {
@@ -390,6 +383,22 @@ impl StacksDevnet {
             .downcast::<JsString, _>(&mut cx)
         {
             overrides.postgres_image_url = Some(res.value(&mut cx));
+        }
+
+        if let Ok(res) = devnet_settings
+            .get(&mut cx, "bitcoin_controller_automining_disabled")?
+            .downcast::<JsBoolean, _>(&mut cx)
+        {
+            overrides.bitcoin_controller_automining_disabled = Some(res.value(&mut cx));
+        }
+
+        if let Ok(res) = devnet_settings
+            .get(&mut cx, "bind_containers_volumes")?
+            .downcast::<JsBoolean, _>(&mut cx)
+        {
+            overrides.bind_containers_volumes = Some(res.value(&mut cx));
+        } else {
+            overrides.bind_containers_volumes = Some(false);
         }
 
         // Disable scripts
