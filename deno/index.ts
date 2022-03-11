@@ -349,8 +349,7 @@ export namespace types {
   }
 
   export function buff(val: ArrayBuffer | string) {
-
-    const buff =  typeof val == "string" ? new TextEncoder().encode(val) : new Uint8Array(val);
+    const buff = typeof val == "string" ? new TextEncoder().encode(val) : new Uint8Array(val);
 
     const hexOctets = new Array(buff.length);
 
