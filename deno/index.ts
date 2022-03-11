@@ -156,7 +156,7 @@ export class Chain {
       method: method,
       args: args,
       sender: sender,
-    }));  
+    }));
     let readOnlyFn: ReadOnlyFn = {
       session_id: result.session_id,
       result: result.result,
@@ -332,8 +332,7 @@ export namespace types {
   }
 
   export function buff(val: ArrayBuffer | string) {
-    
-    const buff =  typeof val == "string" ? new TextEncoder().encode(val) : new Uint8Array(val);
+    const buff = typeof val == "string" ? new TextEncoder().encode(val) : new Uint8Array(val);
 
     const hexOctets = new Array(buff.length);
 
@@ -352,78 +351,78 @@ export namespace types {
     return `'${val}`;
   }
 
-  export function tuple(val: Object) {
+  export function tuple(val: object) {
     return `{ ${serializeTuple(val)} }`;
   }
 }
 
 declare global {
   interface String {
-    expectOk(): String;
-    expectErr(): String;
-    expectSome(): String;
+    expectOk(): string;
+    expectErr(): string;
+    expectSome(): string;
     expectNone(): void;
     expectBool(value: boolean): boolean;
     expectUint(value: number|bigint): bigint;
     expectInt(value: number|bigint): bigint;
     expectBuff(value: ArrayBuffer): ArrayBuffer;
-    expectAscii(value: String): String;
-    expectUtf8(value: String): String;
-    expectPrincipal(value: String): String;
-    expectList(): Array<String>;
+    expectAscii(value: string): string;
+    expectUtf8(value: string): string;
+    expectPrincipal(value: string): string;
+    expectList(): Array<string>;
     expectTuple(): Object;
   }
 
   interface Array<T> {
     expectSTXTransferEvent(
-      amount: Number|bigint,
-      sender: String,
-      recipient: String,
-    ): Object;
+      amount: number|bigint,
+      sender: string,
+      recipient: string,
+    ): object;
     expectFungibleTokenTransferEvent(
-      amount: Number|bigint,
-      sender: String,
-      recipient: String,
-      assetId: String,
-    ): Object;
+      amount: number|bigint,
+      sender: string,
+      recipient: string,
+      assetId: string,
+    ): object;
     expectFungibleTokenMintEvent(
-      amount: Number|bigint,
-      recipient: String,
-      assetId: String,
-    ): Object;
+      amount: number|bigint,
+      recipient: string,
+      assetId: string,
+    ): object;
     expectFungibleTokenBurnEvent(
-      amount: Number|bigint,
-      sender: String,
-      assetId: String,
-    ): Object;
+      amount: number|bigint,
+      sender: string,
+      assetId: string,
+    ): object;
     expectPrintEvent(
-      contract_identifier: string, 
+      contract_identifier: string,
       value: string
-    ): Object;
+    ): object;
     expectNonFungibleTokenTransferEvent(
-      tokenId: String, 
-      sender: String, 
-      recipient: String, 
-      assetAddress: String,
-      assetId: String
-    ): Object;
+      tokenId: string,
+      sender: string,
+      recipient: string,
+      assetAddress: string,
+      assetId: string
+    ): object;
     expectNonFungibleTokenMintEvent(
-      tokenId: String, 
-      recipient: String, 
-      assetAddress: String,
-      assetId: String
-    ): Object;
+      tokenId: string,
+      recipient: string,
+      assetAddress: string,
+      assetId: string
+    ): object;
     expectNonFungibleTokenBurnEvent(
-      tokenId: String, 
-      sender: String, 
-      assetAddress: String,
-      assetId: String
-    ): Object;
+      tokenId: string,
+      sender: string,
+      assetAddress: string,
+      assetId: string
+    ): object;
     // expectEvent(sel: (e: Object) => Object): Object;
   }
 }
 
-function consume(src: String, expectation: String, wrapped: boolean) {
+function consume(src: String, expectation: string, wrapped: boolean) {
   let dst = (" " + src).slice(1);
   let size = expectation.length;
   if (!wrapped && src !== expectation) {
@@ -618,9 +617,9 @@ String.prototype.expectTuple = function () {
 };
 
 Array.prototype.expectSTXTransferEvent = function (
-  amount: Number|bigint,
-  sender: String,
-  recipient: String,
+  amount: number|bigint,
+  sender: string,
+  recipient: string,
 ) {
   for (let event of this) {
     try {
@@ -639,10 +638,10 @@ Array.prototype.expectSTXTransferEvent = function (
 };
 
 Array.prototype.expectFungibleTokenTransferEvent = function (
-  amount: Number,
-  sender: String,
-  recipient: String,
-  assetId: String,
+  amount: number,
+  sender: string,
+  recipient: string,
+  assetId: string,
 ) {
   for (let event of this) {
     try {
@@ -670,9 +669,9 @@ Array.prototype.expectFungibleTokenTransferEvent = function (
 };
 
 Array.prototype.expectFungibleTokenMintEvent = function (
-  amount: Number|bigint,
-  recipient: String,
-  assetId: String,
+  amount: number|bigint,
+  recipient: string,
+  assetId: string,
 ) {
   for (let event of this) {
     try {
@@ -693,9 +692,9 @@ Array.prototype.expectFungibleTokenMintEvent = function (
 };
 
 Array.prototype.expectFungibleTokenBurnEvent = function (
-  amount: Number|bigint,
-  sender: String,
-  assetId: String,
+  amount: number|bigint,
+  sender: string,
+  assetId: string,
 ) {
   for (let event of this) {
     try {
@@ -757,11 +756,11 @@ Array.prototype.expectPrintEvent = function (
 //     throw new Error(`Unable to retrieve expected PrintEvent`);
 // }
 Array.prototype.expectNonFungibleTokenTransferEvent = function(
-  tokenId: String, 
-  sender: String, 
-  recipient: String, 
-  assetAddress: String, 
-  assetId: String
+  tokenId: string,
+  sender: string,
+  recipient: string,
+  assetAddress: string,
+  assetId: string
   ) {
   for (let event of this) {
     try {
@@ -787,10 +786,10 @@ Array.prototype.expectNonFungibleTokenTransferEvent = function(
 }
 
 Array.prototype.expectNonFungibleTokenMintEvent = function(
-  tokenId: String, 
-  recipient: String, 
-  assetAddress: String,
-  assetId: String
+  tokenId: string,
+  recipient: string,
+  assetAddress: string,
+  assetId: string
   ) {
   for (let event of this) {
     try {
@@ -815,10 +814,10 @@ Array.prototype.expectNonFungibleTokenMintEvent = function(
 }
 
 Array.prototype.expectNonFungibleTokenBurnEvent = function(
-  tokenId: String, 
-  sender: String, 
-  assetAddress: String,
-  assetId: String
+  tokenId: string,
+  sender: string,
+  assetAddress: string,
+  assetId: string
   ) {
   for (let event of this) {
     try {
