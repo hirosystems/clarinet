@@ -88,9 +88,9 @@ pub fn get_stacks_currency() -> Currency {
 }
 
 #[derive(Deserialize, Debug)]
-struct ContractReadonlyCall {
-    okay: bool,
-    result: String,
+pub struct ContractReadonlyCall {
+    pub okay: bool,
+    pub result: String,
 }
 
 pub fn standardize_stacks_block(

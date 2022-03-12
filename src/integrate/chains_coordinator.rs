@@ -2,9 +2,9 @@ use super::DevnetEvent;
 use crate::indexer::{chains, Indexer, IndexerConfig};
 use crate::integrate::{MempoolAdmissionData, ServiceStatusData, Status};
 use crate::poke::load_session;
-use crate::publish::{publish_all_contracts, Network};
+use crate::publish::publish_all_contracts;
 use crate::types::{self, BlockIdentifier, DevnetConfig};
-use crate::types::{BitcoinChainEvent, StacksChainEvent};
+use crate::types::{BitcoinChainEvent, Network, StacksChainEvent};
 use crate::utils;
 use crate::utils::stacks::{transactions, PoxInfo, StacksRpc};
 use base58::FromBase58;
@@ -56,9 +56,9 @@ pub struct DevnetInitializationStatus {
 }
 
 #[derive(Deserialize, Debug)]
-struct ContractReadonlyCall {
-    okay: bool,
-    result: String,
+pub struct ContractReadonlyCall {
+    pub okay: bool,
+    pub result: String,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -122,6 +122,7 @@ pub enum ChainsCoordinatorCommand {
     PublishInitialContracts,
     BitcoinOpSent,
     ProtocolDeployed,
+    StartMining,
     PublishPoxStackingOrders(BlockIdentifier),
 }
 
@@ -251,6 +252,10 @@ pub async fn start_chains_coordinator(
             Ok(ChainsCoordinatorCommand::ProtocolDeployed) => {
                 should_deploy_protocol = false;
                 protocol_deployed = true;
+                if !config.devnet_config.bitcoin_controller_automining_disabled {
+                    let _ =
+                        chains_coordinator_commands_tx.send(ChainsCoordinatorCommand::StartMining);
+                }
             }
             Ok(ChainsCoordinatorCommand::BitcoinOpSent) => {
                 if !protocol_deployed {
@@ -274,6 +279,29 @@ pub async fn start_chains_coordinator(
                         Address::from_str(&config.devnet_config.miner_btc_address).unwrap();
                     let _ = rpc.generate_to_address(1, &miner_address);
                 }
+            }
+            Ok(ChainsCoordinatorCommand::StartMining) => {
+                use bitcoincore_rpc::bitcoin::Address;
+                use bitcoincore_rpc::{Auth, Client, RpcApi};
+                use std::str::FromStr;
+
+                let devnet_config = config.devnet_config.clone();
+                std::thread::spawn(move || loop {
+                    std::thread::sleep(std::time::Duration::from_millis(
+                        devnet_config.bitcoin_controller_block_time.into(),
+                    ));
+                    let rpc = Client::new(
+                        &format!("http://localhost:{}", devnet_config.bitcoin_node_rpc_port),
+                        Auth::UserPass(
+                            devnet_config.bitcoin_node_username.to_string(),
+                            devnet_config.bitcoin_node_password.to_string(),
+                        ),
+                    )
+                    .unwrap();
+                    let miner_address =
+                        Address::from_str(&devnet_config.miner_btc_address).unwrap();
+                    let _ = rpc.generate_to_address(1, &miner_address);
+                });
             }
             Ok(ChainsCoordinatorCommand::PublishPoxStackingOrders(block_identifier)) => {
                 let bitcoin_block_height = block_identifier.index;

@@ -63,3 +63,11 @@ pub struct ChainUpdatedWithMicroblockReorgData {
     pub new_anchored_trail: Option<StacksMicroblocksTrail>,
     pub old_trail: Option<StacksMicroblocksTrail>,
 }
+
+#[allow(dead_code)]
+#[derive(Debug, PartialEq, Eq)]
+pub enum Network {
+    Devnet,
+    Testnet,
+    Mainnet,
+}

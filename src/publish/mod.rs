@@ -1,6 +1,7 @@
+mod ui;
 use crate::integrate::DevnetEvent;
 use crate::poke::{load_session, load_session_settings};
-use crate::types::ProjectManifest;
+use crate::types::{Network, ProjectManifest};
 use crate::utils::mnemonic;
 use crate::utils::stacks::StacksRpc;
 use clarity_repl::clarity::codec::transaction::{
@@ -34,19 +35,32 @@ use std::sync::mpsc::Sender;
 use tiny_hderive::bip32::ExtendedPrivKey;
 
 #[derive(Deserialize, Debug)]
-struct Balance {
-    balance: String,
-    nonce: u64,
-    balance_proof: String,
-    nonce_proof: String,
+pub struct Balance {
+    pub balance: String,
+    pub nonce: u64,
+    pub balance_proof: String,
+    pub nonce_proof: String,
 }
 
-#[allow(dead_code)]
-#[derive(Debug, PartialEq)]
-pub enum Network {
-    Devnet,
-    Testnet,
-    Mainnet,
+pub enum PublishUpdate {
+    ContractUpdate(ContractUpdate),
+    Completed,
+}
+
+#[derive(Clone, Debug)]
+pub struct ContractUpdate {
+    pub contract_id: String,
+    pub status: ContractStatus,
+    pub comment: Option<String>,
+}
+
+#[derive(Clone, Debug)]
+pub enum ContractStatus {
+    Queued,
+    Encoded,
+    Broadcasted,
+    Published,
+    Error,
 }
 
 pub fn endode_contract(
@@ -204,9 +218,12 @@ pub fn publish_all_contracts(
     };
 
     let (tx, rx) = channel();
+    let (per_contract_event_tx, per_contract_event_rx) = channel();
+
     let contracts_to_deploy = settings.initial_contracts.len();
     let node_url = settings.node.clone();
 
+    let per_contract_event_tx_moved = per_contract_event_tx.clone();
     let deploying_thread_handle = std::thread::spawn(move || {
         let mut total_contracts_deployed = 0;
         let stacks_rpc = StacksRpc::new(&node_url);
@@ -238,13 +255,32 @@ pub fn publish_all_contracts(
                 if !batch_deployed {
                     batch_deployed = true;
                     for (tx, deployer, contract_name) in contracts_batch.drain(..) {
-                        let txid = match stacks_rpc.post_transaction(tx) {
+                        let _ = match stacks_rpc.post_transaction(tx) {
                             Ok(res) => {
+                                let _ = per_contract_event_tx_moved.send(
+                                    PublishUpdate::ContractUpdate(ContractUpdate {
+                                        contract_id: format!("{}.{}", deployer, contract_name),
+                                        status: ContractStatus::Broadcasted,
+                                        comment: Some(format!(
+                                            "Contract broadcasted: {}",
+                                            res.txid.clone()
+                                        )),
+                                    }),
+                                );
                                 contracts_being_deployed
                                     .insert((deployer.to_string(), contract_name), true);
                                 res.txid
                             }
-                            Err(e) => return Err(format!("{:?}", e)),
+                            Err(e) => {
+                                let _ = per_contract_event_tx_moved.send(
+                                    PublishUpdate::ContractUpdate(ContractUpdate {
+                                        contract_id: format!("{}.{}", deployer, contract_name),
+                                        status: ContractStatus::Error,
+                                        comment: Some(format!("Broadcast error: {:?}", e)),
+                                    }),
+                                );
+                                std::process::exit(1);
+                            }
                         };
                     }
                     std::thread::sleep(std::time::Duration::from_secs(delay_between_checks.into()));
@@ -259,6 +295,13 @@ pub fn publish_all_contracts(
                         if let Ok(_contract) = res {
                             *value = false;
                             total_contracts_deployed += 1;
+                            let _ = per_contract_event_tx_moved.send(
+                                PublishUpdate::ContractUpdate(ContractUpdate {
+                                    contract_id: format!("{}.{}", deployer, contract_name),
+                                    status: ContractStatus::Published,
+                                    comment: None,
+                                }),
+                            );
                         } else {
                             keep_looping = true;
                             break;
@@ -271,19 +314,20 @@ pub fn publish_all_contracts(
                 }
             }
         }
-        Ok(())
+        let _ = per_contract_event_tx_moved.send(PublishUpdate::Completed);
     });
 
-    let mut results = vec![];
+    let results = vec![];
     let mut deployers_nonces = BTreeMap::new();
     let mut deployers_lookup: BTreeMap<String, Account> = BTreeMap::new();
 
     for account in settings.initial_accounts.iter() {
+        deployers_lookup.insert(account.name.to_string(), account.clone());
         if account.name == "deployer" {
             deployers_lookup.insert("*".into(), account.clone());
         }
-        // Let's avoid fetching nonces in the case of Devnet.
-        if network == &Network::Devnet {
+        // Let's avoid fetching nonces in the case of initial Devnet setup.
+        if devnet_event_tx.is_some() {
             deployers_nonces.insert(account.name.clone(), 0);
         }
     }
@@ -322,20 +366,52 @@ pub fn publish_all_contracts(
             )
             .expect("Unable to encode contract");
 
-            encoded_contracts.push((signed_tx, signer_addr, contract_name));
+            let _ = per_contract_event_tx.send(PublishUpdate::ContractUpdate(ContractUpdate {
+                contract_id: format!("{}.{}", deployer.address, contract_name),
+                status: ContractStatus::Encoded,
+                comment: Some(format!("Contract encoded and queued")),
+            }));
 
+            encoded_contracts.push((signed_tx, signer_addr, contract_name));
             deployers_nonces.insert(deployer.name.clone(), nonce + 1);
         }
 
         let _ = tx.send(encoded_contracts);
     }
 
-    deploying_thread_handle.join();
+    if devnet_event_tx.is_none() {
+        let mut contracts = Vec::new();
+        for contract in settings.initial_contracts.iter() {
+            let deployer = {
+                let deployer = contract.deployer.clone().unwrap_or("deployer".to_string());
+                match deployers_lookup.get(&deployer) {
+                    Some(deployer) => deployer,
+                    None => deployers_lookup.get("*").unwrap(),
+                }
+            };
+            contracts.push((deployer.address.to_string(), contract.name.clone().unwrap()));
+        }
+
+        ctrlc::set_handler(move || {
+            let _ = per_contract_event_tx.send(PublishUpdate::Completed);
+        })
+        .expect("Error setting Ctrl-C handler");
+
+        let _ = ui::start_ui(&node_url, per_contract_event_rx, contracts);
+    } else {
+        let _ = deploying_thread_handle.join();
+    }
 
     // TODO(lgalabru): if devnet, we should be pulling all the links.
 
     if let Some(devnet_event_tx) = devnet_event_tx {
         let _ = devnet_event_tx.send(DevnetEvent::ProtocolDeployed);
+    } else {
+        println!(
+            "{} Contracts successfully deployed on {:?}",
+            green!("✔"),
+            network
+        );
     }
 
     Ok((results, project_manifest))

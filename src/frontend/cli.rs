@@ -11,9 +11,9 @@ use crate::generate::{
 use crate::integrate::{self, DevnetOrchestrator};
 use crate::lsp::run_lsp;
 use crate::poke::load_session;
-use crate::publish::{publish_all_contracts, Network};
+use crate::publish::publish_all_contracts;
 use crate::runnner::run_scripts;
-use crate::types::{ProjectManifest, ProjectManifestFile, RequirementConfig};
+use crate::types::{Network, ProjectManifest, ProjectManifestFile, RequirementConfig};
 use clarity_repl::clarity::analysis::{AnalysisDatabase, ContractAnalysis};
 use clarity_repl::clarity::costs::LimitedCostTracker;
 use clarity_repl::clarity::types::QualifiedContractIdentifier;

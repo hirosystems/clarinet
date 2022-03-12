@@ -5,7 +5,7 @@ use segment::{
     Client, HttpClient,
 };
 
-use crate::publish::Network;
+use crate::types::Network;
 
 pub enum DeveloperUsageEvent {
     NewProject(DeveloperUsageDigest),

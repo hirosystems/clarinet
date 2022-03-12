@@ -1,3 +1,4 @@
+use super::Network;
 use crate::utils::mnemonic;
 use bip39::{Language, Mnemonic};
 use clarity_repl::clarity::util::hash::bytes_to_hex;
@@ -167,7 +168,7 @@ pub struct AccountConfig {
 
 impl ChainConfig {
     #[allow(non_fmt_panics)]
-    pub fn from_path(path: &PathBuf) -> ChainConfig {
+    pub fn from_path(path: &PathBuf, network: &Network) -> ChainConfig {
         let path = match File::open(path) {
             Ok(path) => path,
             Err(_) => {
@@ -182,10 +183,13 @@ impl ChainConfig {
             .unwrap();
         let mut chain_config_file: ChainConfigFile =
             toml::from_slice(&chain_config_file_buffer[..]).unwrap();
-        ChainConfig::from_chain_config_file(&mut chain_config_file)
+        ChainConfig::from_chain_config_file(&mut chain_config_file, network)
     }
 
-    pub fn from_chain_config_file(chain_config_file: &mut ChainConfigFile) -> ChainConfig {
+    pub fn from_chain_config_file(
+        chain_config_file: &mut ChainConfigFile,
+        env: &Network,
+    ) -> ChainConfig {
         let network = NetworkConfig {
             name: chain_config_file.network.name.clone(),
             node_rpc_address: chain_config_file.network.node_rpc_address.clone(),
@@ -205,10 +209,7 @@ impl ChainConfig {
                                 _ => 0,
                             };
 
-                            let is_mainnet = match account_settings.get("is_mainnet") {
-                                Some(Value::Boolean(is_mainnet)) => *is_mainnet,
-                                _ => false,
-                            };
+                            let is_mainnet = env == &Network::Mainnet;
 
                             let mnemonic = match account_settings.get("mnemonic") {
                                 Some(Value::String(words)) => {

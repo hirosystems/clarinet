@@ -15,7 +15,7 @@ use std::sync::RwLock;
 
 use super::utils;
 use crate::poke::load_session_settings;
-use crate::publish::Network;
+use crate::types::Network;
 
 #[allow(dead_code)]
 #[derive(Debug)]
@@ -40,9 +40,9 @@ pub struct CompletionMaps {
 
 #[derive(Debug)]
 pub struct ContractState {
-    analysis: ContractAnalysis,
+    pub session: Session,
+    pub analysis: ContractAnalysis,
     intellisense: CompletionMaps,
-    session: Session,
     // TODO(lgalabru)
     // hash: Vec<u8>,
     // symbols: HashMap<String, Symbol>,

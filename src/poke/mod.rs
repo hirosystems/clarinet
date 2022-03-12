@@ -1,5 +1,4 @@
-use crate::publish::Network;
-use crate::types::{ChainConfig, ProjectManifest};
+use crate::types::{ChainConfig, Network, ProjectManifest};
 use clarity_repl::{repl, Terminal};
 use std::fs;
 use std::path::PathBuf;
@@ -24,7 +23,7 @@ pub fn load_session_settings(
     });
 
     let mut project_config = ProjectManifest::from_path(&manifest_path);
-    let chain_config = ChainConfig::from_path(&chain_config_path);
+    let chain_config = ChainConfig::from_path(&chain_config_path, env);
 
     let mut deployer_address = None;
     let mut initial_deployer = None;

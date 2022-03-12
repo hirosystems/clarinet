@@ -51,8 +51,7 @@ use swc_common::comments::CommentKind;
 mod sessions {
     use super::TransactionArgs;
     use crate::poke::load_session_settings;
-    use crate::publish::Network;
-    use crate::types::{ChainConfig, ProjectManifest};
+    use crate::types::{ChainConfig, Network, ProjectManifest};
     use clarity_repl::clarity::analysis::ContractAnalysis;
     use clarity_repl::repl::settings::Account;
     use clarity_repl::repl::{self, Session};
@@ -160,7 +159,7 @@ mod sessions {
             chain_config_path.push("Devnet.toml");
 
             let project_config = ProjectManifest::from_path(manifest_path);
-            let chain_config = ChainConfig::from_path(&chain_config_path);
+            let chain_config = ChainConfig::from_path(&chain_config_path, &Network::Devnet);
 
             let mut deployer_address = None;
             let mut initial_deployer = None;

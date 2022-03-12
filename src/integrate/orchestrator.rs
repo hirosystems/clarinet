@@ -1,6 +1,6 @@
 use super::DevnetEvent;
 use crate::integrate::{ServiceStatusData, Status};
-use crate::types::{ChainConfig, DevnetConfigFile, ProjectManifest};
+use crate::types::{ChainConfig, DevnetConfigFile, Network, ProjectManifest};
 use bollard::container::{
     Config, CreateContainerOptions, KillContainerOptions, ListContainersOptions,
     PruneContainersOptions, WaitContainerOptions,
@@ -20,7 +20,7 @@ use tracing::info;
 
 #[derive(Default, Debug)]
 pub struct DevnetOrchestrator {
-    name: String,
+    pub name: String,
     network_name: String,
     pub manifest_path: PathBuf,
     pub network_config: Option<ChainConfig>,
@@ -49,7 +49,7 @@ impl DevnetOrchestrator {
         network_config_path.push("settings");
         network_config_path.push("Devnet.toml");
 
-        let mut network_config = ChainConfig::from_path(&network_config_path);
+        let mut network_config = ChainConfig::from_path(&network_config_path, &Network::Devnet);
         let manifest = ProjectManifest::from_path(&manifest_path);
         let name = manifest.project.name.clone();
         let network_name = format!("{}.devnet", name);
@@ -209,12 +209,7 @@ impl DevnetOrchestrator {
         }
     }
 
-    pub async fn start(
-        &mut self,
-        event_tx: Sender<DevnetEvent>,
-        terminator_rx: Receiver<bool>,
-        contracts_to_deploy_len: usize,
-    ) {
+    pub async fn start(&mut self, event_tx: Sender<DevnetEvent>, terminator_rx: Receiver<bool>) {
         let (docker, devnet_config) = match (&self.docker_client, &self.network_config) {
             (Some(ref docker), Some(ref network_config)) => match network_config.devnet {
                 Some(ref devnet_config) => (docker, devnet_config),
@@ -320,10 +315,7 @@ impl DevnetOrchestrator {
             name: "bitcoin-node".into(),
             comment: "preparing container".into(),
         }));
-        match self
-            .prepare_bitcoin_node_container(contracts_to_deploy_len)
-            .await
-        {
+        match self.prepare_bitcoin_node_container().await {
             Ok(_) => {}
             Err(message) => {
                 println!("{}", message);
@@ -529,7 +521,7 @@ impl DevnetOrchestrator {
 
                     let _ = event_tx.send(DevnetEvent::debug("Restarting containers...".into()));
                     let (bitcoin_node_c_id, stacks_node_c_id) = self
-                        .start_containers(boot_index, contracts_to_deploy_len)
+                        .start_containers(boot_index)
                         .await
                         .expect("Unable to reboot");
                     self.bitcoin_blockchain_container_id = Some(bitcoin_node_c_id);
@@ -542,11 +534,7 @@ impl DevnetOrchestrator {
         }
     }
 
-    pub fn prepare_bitcoin_node_config(
-        &self,
-        boot_index: u32,
-        contracts_to_deploy_len: usize,
-    ) -> Result<Config<String>, String> {
+    pub fn prepare_bitcoin_node_config(&self, boot_index: u32) -> Result<Config<String>, String> {
         let devnet_config = match &self.network_config {
             Some(ref network_config) => match network_config.devnet {
                 Some(ref devnet_config) => devnet_config,
@@ -662,10 +650,7 @@ rpcport={}
         Ok(config)
     }
 
-    pub async fn prepare_bitcoin_node_container(
-        &mut self,
-        contracts_to_deploy_len: usize,
-    ) -> Result<(), String> {
+    pub async fn prepare_bitcoin_node_container(&mut self) -> Result<(), String> {
         let (docker, devnet_config) = match (&self.docker_client, &self.network_config) {
             (Some(ref docker), Some(ref network_config)) => match network_config.devnet {
                 Some(ref devnet_config) => (docker, devnet_config),
@@ -687,7 +672,7 @@ rpcport={}
             .await
             .map_err(|_| "Unable to create image".to_string())?;
 
-        let config = self.prepare_bitcoin_node_config(1, contracts_to_deploy_len)?;
+        let config = self.prepare_bitcoin_node_config(1)?;
         let options = CreateContainerOptions {
             name: format!("bitcoin-node.{}", self.network_name),
         };
@@ -1576,11 +1561,7 @@ events_keys = ["*"]
         Ok(())
     }
 
-    pub async fn start_containers(
-        &self,
-        boot_index: u32,
-        contracts_to_deploy_len: usize,
-    ) -> Result<(String, String), String> {
+    pub async fn start_containers(&self, boot_index: u32) -> Result<(String, String), String> {
         let containers_ids = match (
             &self.stacks_blockchain_api_container_id,
             &self.stacks_explorer_container_id,
@@ -1615,8 +1596,7 @@ events_keys = ["*"]
             .prune_containers(Some(PruneContainersOptions { filters }))
             .await;
 
-        let bitcoin_node_config =
-            self.prepare_bitcoin_node_config(boot_index, contracts_to_deploy_len)?;
+        let bitcoin_node_config = self.prepare_bitcoin_node_config(boot_index)?;
         let options = CreateContainerOptions {
             name: format!("bitcoin-node.{}", self.network_name),
         };

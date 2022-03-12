@@ -1,7 +1,6 @@
 use crate::utils;
 use clarity_repl::repl;
 use std::collections::BTreeMap;
-use std::env::var;
 use std::fs::File;
 use std::io::{BufReader, Read};
 use std::path::PathBuf;

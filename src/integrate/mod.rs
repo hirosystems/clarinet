@@ -77,7 +77,6 @@ pub async fn do_run_devnet(
     let devnet_path = devnet_config.working_dir.clone();
     let config =
         StacksEventObserverConfig::new(devnet_config.clone(), devnet.manifest_path.clone());
-    let contracts_to_deploy_len = config.contracts_to_deploy.len();
     let chains_coordinator_tx = devnet_events_tx.clone();
     let (chains_coordinator_commands_tx, chains_coordinator_commands_rx) = channel();
     let moved_events_observer_commands_tx = chains_coordinator_commands_tx.clone();
@@ -99,11 +98,7 @@ pub async fn do_run_devnet(
     let orchestrator_event_tx = devnet_events_tx.clone();
     let (orchestrator_terminator_tx, terminator_rx) = channel();
     let orchestrator_handle = std::thread::spawn(move || {
-        let future = devnet.start(
-            orchestrator_event_tx,
-            terminator_rx,
-            contracts_to_deploy_len,
-        );
+        let future = devnet.start(orchestrator_event_tx, terminator_rx);
         let rt = utils::create_basic_runtime();
         rt.block_on(future);
     });
