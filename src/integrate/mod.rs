@@ -23,6 +23,7 @@ pub fn run_devnet(
     (
         Option<mpsc::Receiver<DevnetEvent>>,
         Option<mpsc::Sender<bool>>,
+        Option<mpsc::Sender<ChainsCoordinatorCommand>>,
     ),
     String,
 > {
@@ -48,6 +49,7 @@ pub async fn do_run_devnet(
     (
         Option<mpsc::Receiver<DevnetEvent>>,
         Option<mpsc::Sender<bool>>,
+        Option<mpsc::Sender<ChainsCoordinatorCommand>>,
     ),
     String,
 > {
@@ -105,10 +107,11 @@ pub async fn do_run_devnet(
 
     if display_dashboard {
         info!("Starting Devnet...");
+        let moved_chains_coordinator_commands_tx = chains_coordinator_commands_tx.clone();
         let _ = ui::start_ui(
             devnet_events_tx,
             devnet_events_rx,
-            chains_coordinator_commands_tx,
+            moved_chains_coordinator_commands_tx,
             orchestrator_terminator_tx,
             orchestrator_terminated_rx,
             &devnet_path,
@@ -152,14 +155,18 @@ pub async fn do_run_devnet(
                 }
             }
         } else {
-            return Ok((Some(devnet_events_rx), Some(orchestrator_terminator_tx)));
+            return Ok((
+                Some(devnet_events_rx),
+                Some(orchestrator_terminator_tx),
+                Some(chains_coordinator_commands_tx),
+            ));
         }
     }
 
     chains_coordinator_handle.join().unwrap();
     orchestrator_handle.join().unwrap();
 
-    Ok((None, None))
+    Ok((None, None, Some(chains_coordinator_commands_tx)))
 }
 
 #[allow(dead_code)]

@@ -18,6 +18,7 @@ use rocket::config::{Config, LogLevel};
 use rocket::serde::json::{json, Json, Value as JsonValue};
 use rocket::serde::Deserialize;
 use rocket::State;
+use std::cmp;
 use std::collections::VecDeque;
 use std::convert::TryFrom;
 use std::error::Error;
@@ -25,6 +26,7 @@ use std::iter::FromIterator;
 use std::net::{IpAddr, Ipv4Addr};
 use std::path::PathBuf;
 use std::str;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc::{Receiver, Sender};
 use std::sync::{Arc, Mutex, RwLock};
 use tracing::info;
@@ -122,7 +124,9 @@ pub enum ChainsCoordinatorCommand {
     PublishInitialContracts,
     BitcoinOpSent,
     ProtocolDeployed,
-    StartMining,
+    StartAutoMining,
+    StopAutoMining,
+    MineBlock,
     PublishPoxStackingOrders(BlockIdentifier),
 }
 
@@ -200,6 +204,7 @@ pub async fn start_chains_coordinator(
     // This loop is used for handling background jobs, emitted by HTTP calls.
     let mut should_deploy_protocol = true;
     let mut protocol_deployed = false;
+    let stop_miner = Arc::new(AtomicBool::new(false));
 
     loop {
         match chains_coordinator_commands_rx.recv() {
@@ -253,55 +258,50 @@ pub async fn start_chains_coordinator(
                 should_deploy_protocol = false;
                 protocol_deployed = true;
                 if !config.devnet_config.bitcoin_controller_automining_disabled {
-                    let _ =
-                        chains_coordinator_commands_tx.send(ChainsCoordinatorCommand::StartMining);
+                    let _ = chains_coordinator_commands_tx
+                        .send(ChainsCoordinatorCommand::StartAutoMining);
                 }
             }
             Ok(ChainsCoordinatorCommand::BitcoinOpSent) => {
                 if !protocol_deployed {
-                    use bitcoincore_rpc::bitcoin::Address;
-                    use bitcoincore_rpc::{Auth, Client, RpcApi};
-                    use std::str::FromStr;
-
                     std::thread::sleep(std::time::Duration::from_secs(1));
-                    let rpc = Client::new(
-                        &format!(
-                            "http://localhost:{}",
-                            config.devnet_config.bitcoin_node_rpc_port
-                        ),
-                        Auth::UserPass(
-                            config.devnet_config.bitcoin_node_username.to_string(),
-                            config.devnet_config.bitcoin_node_password.to_string(),
-                        ),
-                    )
-                    .unwrap();
-                    let miner_address =
-                        Address::from_str(&config.devnet_config.miner_btc_address).unwrap();
-                    let _ = rpc.generate_to_address(1, &miner_address);
+                    mine_bitcoin_block(
+                        config.devnet_config.bitcoin_node_rpc_port,
+                        &config.devnet_config.bitcoin_node_username,
+                        &config.devnet_config.bitcoin_node_password,
+                        &config.devnet_config.miner_btc_address,
+                    );
                 }
             }
-            Ok(ChainsCoordinatorCommand::StartMining) => {
-                use bitcoincore_rpc::bitcoin::Address;
-                use bitcoincore_rpc::{Auth, Client, RpcApi};
-                use std::str::FromStr;
-
+            Ok(ChainsCoordinatorCommand::StartAutoMining) => {
+                stop_miner.store(false, Ordering::SeqCst);
+                let stop_miner_reader = stop_miner.clone();
                 let devnet_config = config.devnet_config.clone();
                 std::thread::spawn(move || loop {
                     std::thread::sleep(std::time::Duration::from_millis(
                         devnet_config.bitcoin_controller_block_time.into(),
                     ));
-                    let rpc = Client::new(
-                        &format!("http://localhost:{}", devnet_config.bitcoin_node_rpc_port),
-                        Auth::UserPass(
-                            devnet_config.bitcoin_node_username.to_string(),
-                            devnet_config.bitcoin_node_password.to_string(),
-                        ),
-                    )
-                    .unwrap();
-                    let miner_address =
-                        Address::from_str(&devnet_config.miner_btc_address).unwrap();
-                    let _ = rpc.generate_to_address(1, &miner_address);
+                    mine_bitcoin_block(
+                        devnet_config.bitcoin_node_rpc_port,
+                        &devnet_config.bitcoin_node_username,
+                        &devnet_config.bitcoin_node_password,
+                        &devnet_config.miner_btc_address,
+                    );
+                    if stop_miner_reader.load(Ordering::SeqCst) {
+                        break;
+                    }
                 });
+            }
+            Ok(ChainsCoordinatorCommand::StopAutoMining) => {
+                stop_miner.store(true, Ordering::SeqCst);
+            }
+            Ok(ChainsCoordinatorCommand::MineBlock) => {
+                mine_bitcoin_block(
+                    config.devnet_config.bitcoin_node_rpc_port,
+                    config.devnet_config.bitcoin_node_username.as_str(),
+                    &config.devnet_config.bitcoin_node_password.as_str(),
+                    &config.devnet_config.miner_btc_address.as_str(),
+                );
             }
             Ok(ChainsCoordinatorCommand::PublishPoxStackingOrders(block_identifier)) => {
                 let bitcoin_block_height = block_identifier.index;
@@ -746,4 +746,26 @@ pub async fn publish_stacking_orders(
     } else {
         None
     }
+}
+
+pub fn mine_bitcoin_block(
+    bitcoin_node_rpc_port: u16,
+    bitcoin_node_username: &str,
+    bitcoin_node_password: &str,
+    miner_btc_address: &str,
+) {
+    use bitcoincore_rpc::bitcoin::Address;
+    use bitcoincore_rpc::{Auth, Client, RpcApi};
+    use std::str::FromStr;
+
+    let rpc = Client::new(
+        &format!("http://localhost:{}", bitcoin_node_rpc_port),
+        Auth::UserPass(
+            bitcoin_node_username.to_string(),
+            bitcoin_node_password.to_string(),
+        ),
+    )
+    .unwrap();
+    let miner_address = Address::from_str(miner_btc_address).unwrap();
+    let _ = rpc.generate_to_address(1, &miner_address);
 }
