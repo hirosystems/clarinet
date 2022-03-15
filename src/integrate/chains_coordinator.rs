@@ -119,6 +119,7 @@ impl StacksEventObserverConfig {
     }
 }
 
+#[derive(Debug)]
 pub enum ChainsCoordinatorCommand {
     Terminate(bool), // Restart
     PublishInitialContracts,

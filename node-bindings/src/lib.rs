@@ -111,7 +111,7 @@ impl StacksDevnet {
                         )) => {
                             stacks_block_tx
                                 .send(block.clone())
-                                .expect("Unable to transmit bitcoin block");
+                                .expect("Unable to transmit stacks block");
                         }
                         DevnetEvent::Log(log) => {
                             if logs_enabled {

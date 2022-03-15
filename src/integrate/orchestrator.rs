@@ -1738,7 +1738,7 @@ events_keys = ["*"]
             println!("Pruning network and containers...");
             self.prune().await;
             if let Some(ref tx) = self.termination_success_tx {
-                tx.send(true).expect("Unable to confirm termination");
+                let _ = tx.send(true);
             }
 
             println!(
