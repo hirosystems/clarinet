@@ -258,7 +258,6 @@ pub async fn start_chains_coordinator(
             Ok(ChainsCoordinatorCommand::BitcoinOpSent) => {
                 if !protocol_deployed {
                     std::thread::sleep(std::time::Duration::from_secs(1));
-                    println!("?? BitcoinOpSent");
                     mine_bitcoin_block(
                         config.devnet_config.bitcoin_node_rpc_port,
                         &config.devnet_config.bitcoin_node_username,
@@ -757,7 +756,6 @@ pub fn mine_bitcoin_block(
     use bitcoincore_rpc::bitcoin::Address;
     use bitcoincore_rpc::{Auth, Client, RpcApi};
     use std::str::FromStr;
-    println!("?? Mining block");
     let rpc = Client::new(
         &format!("http://localhost:{}", bitcoin_node_rpc_port),
         Auth::UserPass(
