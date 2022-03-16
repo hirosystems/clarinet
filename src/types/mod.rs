@@ -80,6 +80,7 @@ pub enum ChainsCoordinatorCommand {
     ProtocolDeployed,
     StartAutoMining,
     StopAutoMining,
-    MineBlock,
+    MineBitcoinBlock,
+    InvalidateBitcoinChainTip,
     PublishPoxStackingOrders(BlockIdentifier),
 }

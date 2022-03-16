@@ -289,12 +289,19 @@ pub async fn start_chains_coordinator(
             Ok(ChainsCoordinatorCommand::StopAutoMining) => {
                 stop_miner.store(true, Ordering::SeqCst);
             }
-            Ok(ChainsCoordinatorCommand::MineBlock) => {
+            Ok(ChainsCoordinatorCommand::MineBitcoinBlock) => {
                 mine_bitcoin_block(
                     config.devnet_config.bitcoin_node_rpc_port,
                     config.devnet_config.bitcoin_node_username.as_str(),
                     &config.devnet_config.bitcoin_node_password.as_str(),
                     &config.devnet_config.miner_btc_address.as_str(),
+                );
+            }
+            Ok(ChainsCoordinatorCommand::InvalidateBitcoinChainTip) => {
+                invalidate_bitcoin_chain_tip(
+                    config.devnet_config.bitcoin_node_rpc_port,
+                    config.devnet_config.bitcoin_node_username.as_str(),
+                    &config.devnet_config.bitcoin_node_password.as_str(),
                 );
             }
             Ok(ChainsCoordinatorCommand::PublishPoxStackingOrders(block_identifier)) => {
@@ -745,6 +752,29 @@ pub async fn publish_stacking_orders(
     } else {
         None
     }
+}
+
+pub fn invalidate_bitcoin_chain_tip(
+    bitcoin_node_rpc_port: u16,
+    bitcoin_node_username: &str,
+    bitcoin_node_password: &str,
+) {
+    use bitcoincore_rpc::bitcoin::Address;
+    use bitcoincore_rpc::{Auth, Client, RpcApi};
+    use std::str::FromStr;
+    let rpc = Client::new(
+        &format!("http://localhost:{}", bitcoin_node_rpc_port),
+        Auth::UserPass(
+            bitcoin_node_username.to_string(),
+            bitcoin_node_password.to_string(),
+        ),
+    )
+    .unwrap();
+
+    let chain_tip = rpc.get_best_block_hash().expect("Unable to get chain tip");
+    let _ = rpc
+        .invalidate_block(&chain_tip)
+        .expect("Unable to invalidate chain tip");
 }
 
 pub fn mine_bitcoin_block(
