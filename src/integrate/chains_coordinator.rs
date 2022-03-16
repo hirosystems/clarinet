@@ -4,7 +4,7 @@ use crate::integrate::{MempoolAdmissionData, ServiceStatusData, Status};
 use crate::poke::load_session;
 use crate::publish::publish_all_contracts;
 use crate::types::{self, BlockIdentifier, DevnetConfig};
-use crate::types::{BitcoinChainEvent, Network, StacksChainEvent};
+use crate::types::{BitcoinChainEvent, ChainsCoordinatorCommand, Network, StacksChainEvent};
 use crate::utils;
 use crate::utils::stacks::{transactions, PoxInfo, StacksRpc};
 use base58::FromBase58;
@@ -117,18 +117,6 @@ impl StacksEventObserverConfig {
             }
         }
     }
-}
-
-#[derive(Debug)]
-pub enum ChainsCoordinatorCommand {
-    Terminate(bool), // Restart
-    PublishInitialContracts,
-    BitcoinOpSent,
-    ProtocolDeployed,
-    StartAutoMining,
-    StopAutoMining,
-    MineBlock,
-    PublishPoxStackingOrders(BlockIdentifier),
 }
 
 pub async fn start_chains_coordinator(
@@ -252,7 +240,11 @@ pub async fn start_chains_coordinator(
                     if let Ok(mut init_status) = init_status_rw_lock.write() {
                         init_status.should_deploy_protocol = false;
                     }
-                    publish_initial_contracts(&config.manifest_path, &devnet_event_tx);
+                    publish_initial_contracts(
+                        &config.manifest_path,
+                        &devnet_event_tx,
+                        chains_coordinator_commands_tx.clone(),
+                    );
                 }
             }
             Ok(ChainsCoordinatorCommand::ProtocolDeployed) => {
@@ -266,6 +258,7 @@ pub async fn start_chains_coordinator(
             Ok(ChainsCoordinatorCommand::BitcoinOpSent) => {
                 if !protocol_deployed {
                     std::thread::sleep(std::time::Duration::from_secs(1));
+                    println!("?? BitcoinOpSent");
                     mine_bitcoin_block(
                         config.devnet_config.bitcoin_node_rpc_port,
                         &config.devnet_config.bitcoin_node_username,
@@ -275,6 +268,7 @@ pub async fn start_chains_coordinator(
                 }
             }
             Ok(ChainsCoordinatorCommand::StartAutoMining) => {
+                println!("Automining started??");
                 stop_miner.store(false, Ordering::SeqCst);
                 let stop_miner_reader = stop_miner.clone();
                 let devnet_config = config.devnet_config.clone();
@@ -637,7 +631,11 @@ pub async fn handle_bitcoin_rpc_call(
     Json(res.json().await.unwrap())
 }
 
-pub fn publish_initial_contracts(manifest_path: &PathBuf, devnet_event_tx: &Sender<DevnetEvent>) {
+pub fn publish_initial_contracts(
+    manifest_path: &PathBuf,
+    devnet_event_tx: &Sender<DevnetEvent>,
+    chains_coordinator_commands_tx: Sender<ChainsCoordinatorCommand>,
+) {
     let moved_manifest_path = manifest_path.clone();
     let moved_devnet_event_tx = devnet_event_tx.clone();
     std::thread::spawn(move || {
@@ -647,6 +645,7 @@ pub fn publish_initial_contracts(manifest_path: &PathBuf, devnet_event_tx: &Send
             false,
             1,
             Some(&moved_devnet_event_tx),
+            Some(chains_coordinator_commands_tx),
         );
     });
 }
@@ -758,7 +757,7 @@ pub fn mine_bitcoin_block(
     use bitcoincore_rpc::bitcoin::Address;
     use bitcoincore_rpc::{Auth, Client, RpcApi};
     use std::str::FromStr;
-
+    println!("?? Mining block");
     let rpc = Client::new(
         &format!("http://localhost:{}", bitcoin_node_rpc_port),
         Auth::UserPass(

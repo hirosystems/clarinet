@@ -64,7 +64,7 @@ impl StacksDevnet {
                 // Start devnet
                 let (devnet_events_rx, terminator_tx) =
                     match integrate::run_devnet(devnet, Some(log_tx), false) {
-                        Ok((Some(devnet_events_rx), Some(terminator_tx))) => {
+                        Ok((Some(devnet_events_rx), Some(terminator_tx), _)) => {
                             (devnet_events_rx, terminator_tx)
                         }
                         _ => std::process::exit(1),

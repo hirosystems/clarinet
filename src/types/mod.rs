@@ -71,3 +71,15 @@ pub enum Network {
     Testnet,
     Mainnet,
 }
+
+#[derive(Debug)]
+pub enum ChainsCoordinatorCommand {
+    Terminate(bool), // Restart
+    PublishInitialContracts,
+    BitcoinOpSent,
+    ProtocolDeployed,
+    StartAutoMining,
+    StopAutoMining,
+    MineBlock,
+    PublishPoxStackingOrders(BlockIdentifier),
+}

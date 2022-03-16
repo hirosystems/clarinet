@@ -311,135 +311,135 @@ pub fn main() {
                 )));
             }
         }
-        Command::Contracts(subcommand) => {
-            match subcommand {
-                Contracts::NewContract(new_contract) => {
-                    let manifest_path = get_manifest_path_or_exit(new_contract.manifest_path);
+        Command::Contracts(subcommand) => match subcommand {
+            Contracts::NewContract(new_contract) => {
+                let manifest_path = get_manifest_path_or_exit(new_contract.manifest_path);
 
-                    let changes = generate::get_changes_for_new_contract(
-                        manifest_path,
-                        new_contract.name,
-                        None,
-                        true,
-                        vec![],
-                    );
-                    if !execute_changes(changes) {
-                        std::process::exit(1);
-                    }
-                    if hints_enabled {
-                        display_post_check_hint();
-                    }
+                let changes = generate::get_changes_for_new_contract(
+                    manifest_path,
+                    new_contract.name,
+                    None,
+                    true,
+                    vec![],
+                );
+                if !execute_changes(changes) {
+                    std::process::exit(1);
                 }
-                Contracts::Requirement(required_contract) => {
-                    let manifest_path = get_manifest_path_or_exit(required_contract.manifest_path);
-
-                    let change = TOMLEdition {
-                        comment: format!(
-                            "Adding {} as a requirement to Clarinet.toml",
-                            required_contract.contract_id
-                        ),
-                        manifest_path,
-                        contracts_to_add: HashMap::new(),
-                        requirements_to_add: vec![RequirementConfig {
-                            contract_id: required_contract.contract_id.clone(),
-                        }],
-                    };
-                    if !execute_changes(vec![Changes::EditTOML(change)]) {
-                        std::process::exit(1);
-                    }
-                    if hints_enabled {
-                        display_post_check_hint();
-                    }
-                }
-                Contracts::ForkContract(fork_contract) => {
-                    let manifest_path = get_manifest_path_or_exit(fork_contract.manifest_path);
-
-                    println!(
-                        "Resolving {} and its dependencies...",
-                        fork_contract.contract_id
-                    );
-
-                    let settings = repl::SessionSettings::default();
-                    let mut session = repl::Session::new(settings);
-
-                    let mut resolved = BTreeSet::new();
-                    let res = session.resolve_link(
-                        &repl::settings::InitialLink {
-                            contract_id: fork_contract.contract_id.clone(),
-                            stacks_node_addr: None,
-                            cache: None,
-                        },
-                        &mut resolved,
-                    );
-                    let contracts = res.unwrap();
-                    let mut changes = vec![];
-                    for (contract_id, code, deps) in contracts.into_iter() {
-                        let components: Vec<&str> = contract_id.split('.').collect();
-                        let contract_name = components.last().unwrap();
-
-                        if &contract_id == &fork_contract.contract_id {
-                            let mut change_set = generate::get_changes_for_new_contract(
-                                manifest_path.clone(),
-                                contract_name.to_string(),
-                                Some(code),
-                                false,
-                                vec![],
-                            );
-                            changes.append(&mut change_set);
-
-                            for dep in deps.iter() {
-                                let mut change_set = generate::get_changes_for_new_link(
-                                    manifest_path.clone(),
-                                    dep.clone(),
-                                    None,
-                                );
-                                changes.append(&mut change_set);
-                            }
-                        }
-                    }
-                    if !execute_changes(changes) {
-                        std::process::exit(1);
-                    }
-                    if hints_enabled {
-                        display_post_check_hint();
-                    }
-                }
-                Contracts::Publish(deploy) => {
-                    let manifest_path = get_manifest_path_or_exit(deploy.manifest_path);
-
-                    let network = if deploy.devnet == true {
-                        Network::Devnet
-                    } else if deploy.testnet == true {
-                        Network::Testnet
-                    } else if deploy.mainnet == true {
-                        Network::Mainnet
-                    } else {
-                        panic!("Target deployment must be specified with --devnet, --testnet or --mainnet")
-                    };
-                    let project_manifest =
-                        match publish_all_contracts(&manifest_path, &network, true, 30, None) {
-                            Ok((results, project_manifest)) => {
-                                println!("{}", results.join("\n"));
-                                project_manifest
-                            }
-                            Err(results) => {
-                                println!("{}", results.join("\n"));
-                                return;
-                            }
-                        };
-                    if project_manifest.project.telemetry {
-                        #[cfg(feature = "telemetry")]
-                        telemetry_report_event(DeveloperUsageEvent::ContractPublished(
-                            DeveloperUsageDigest::new(
-                                &project_manifest.project.name,
-                                &project_manifest.project.authors,
-                            ),
-                            network,
-                        ));
-                    }
+                if hints_enabled {
+                    display_post_check_hint();
                 }
             }
-        }
+            Contracts::Requirement(required_contract) => {
+                let manifest_path = get_manifest_path_or_exit(required_contract.manifest_path);
+
+                let change = TOMLEdition {
+                    comment: format!(
+                        "Adding {} as a requirement to Clarinet.toml",
+                        required_contract.contract_id
+                    ),
+                    manifest_path,
+                    contracts_to_add: HashMap::new(),
+                    requirements_to_add: vec![RequirementConfig {
+                        contract_id: required_contract.contract_id.clone(),
+                    }],
+                };
+                if !execute_changes(vec![Changes::EditTOML(change)]) {
+                    std::process::exit(1);
+                }
+                if hints_enabled {
+                    display_post_check_hint();
+                }
+            }
+            Contracts::ForkContract(fork_contract) => {
+                let manifest_path = get_manifest_path_or_exit(fork_contract.manifest_path);
+
+                println!(
+                    "Resolving {} and its dependencies...",
+                    fork_contract.contract_id
+                );
+
+                let settings = repl::SessionSettings::default();
+                let mut session = repl::Session::new(settings);
+
+                let mut resolved = BTreeSet::new();
+                let res = session.resolve_link(
+                    &repl::settings::InitialLink {
+                        contract_id: fork_contract.contract_id.clone(),
+                        stacks_node_addr: None,
+                        cache: None,
+                    },
+                    &mut resolved,
+                );
+                let contracts = res.unwrap();
+                let mut changes = vec![];
+                for (contract_id, code, deps) in contracts.into_iter() {
+                    let components: Vec<&str> = contract_id.split('.').collect();
+                    let contract_name = components.last().unwrap();
+
+                    if &contract_id == &fork_contract.contract_id {
+                        let mut change_set = generate::get_changes_for_new_contract(
+                            manifest_path.clone(),
+                            contract_name.to_string(),
+                            Some(code),
+                            false,
+                            vec![],
+                        );
+                        changes.append(&mut change_set);
+
+                        for dep in deps.iter() {
+                            let mut change_set = generate::get_changes_for_new_link(
+                                manifest_path.clone(),
+                                dep.clone(),
+                                None,
+                            );
+                            changes.append(&mut change_set);
+                        }
+                    }
+                }
+                if !execute_changes(changes) {
+                    std::process::exit(1);
+                }
+                if hints_enabled {
+                    display_post_check_hint();
+                }
+            }
+            Contracts::Publish(deploy) => {
+                let manifest_path = get_manifest_path_or_exit(deploy.manifest_path);
+
+                let network = if deploy.devnet == true {
+                    Network::Devnet
+                } else if deploy.testnet == true {
+                    Network::Testnet
+                } else if deploy.mainnet == true {
+                    Network::Mainnet
+                } else {
+                    panic!(
+                        "Target deployment must be specified with --devnet, --testnet or --mainnet"
+                    )
+                };
+                let project_manifest =
+                    match publish_all_contracts(&manifest_path, &network, true, 30, None, None) {
+                        Ok((results, project_manifest)) => {
+                            println!("{}", results.join("\n"));
+                            project_manifest
+                        }
+                        Err(results) => {
+                            println!("{}", results.join("\n"));
+                            return;
+                        }
+                    };
+                if project_manifest.project.telemetry {
+                    #[cfg(feature = "telemetry")]
+                    telemetry_report_event(DeveloperUsageEvent::ContractPublished(
+                        DeveloperUsageDigest::new(
+                            &project_manifest.project.name,
+                            &project_manifest.project.authors,
+                        ),
+                        network,
+                    ));
+                }
+            }
+        },
         Command::Console(cmd) => {
             let manifest_path = get_manifest_path_or_exit(cmd.manifest_path);
             let start_repl = true;

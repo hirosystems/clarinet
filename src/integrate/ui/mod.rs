@@ -5,8 +5,8 @@ mod ui;
 #[allow(dead_code)]
 mod util;
 
-use super::{chains_coordinator::ChainsCoordinatorCommand, DevnetEvent};
-use crate::types::StacksChainEvent;
+use super::DevnetEvent;
+use crate::types::{ChainsCoordinatorCommand, StacksChainEvent};
 use app::App;
 use crossterm::{
     event::{self, Event, KeyCode, KeyModifiers},

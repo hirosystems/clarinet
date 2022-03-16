@@ -1,7 +1,7 @@
 mod ui;
 use crate::integrate::DevnetEvent;
 use crate::poke::{load_session, load_session_settings};
-use crate::types::{Network, ProjectManifest};
+use crate::types::{ChainsCoordinatorCommand, Network, ProjectManifest};
 use crate::utils::mnemonic;
 use crate::utils::stacks::StacksRpc;
 use clarity_repl::clarity::codec::transaction::{
@@ -186,6 +186,7 @@ pub fn publish_all_contracts(
     analysis_enabled: bool,
     delay_between_checks: u32,
     devnet_event_tx: Option<&Sender<DevnetEvent>>,
+    chains_coordinator_commands_tx: Option<Sender<ChainsCoordinatorCommand>>,
 ) -> Result<(Vec<String>, ProjectManifest), Vec<String>> {
     let (settings, chain, project_manifest) = if analysis_enabled {
         let start_repl = false;
@@ -403,6 +404,10 @@ pub fn publish_all_contracts(
     }
 
     // TODO(lgalabru): if devnet, we should be pulling all the links.
+
+    if let Some(chains_coordinator_commands_tx) = chains_coordinator_commands_tx {
+        let _ = chains_coordinator_commands_tx.send(ChainsCoordinatorCommand::ProtocolDeployed);
+    }
 
     if let Some(devnet_event_tx) = devnet_event_tx {
         let _ = devnet_event_tx.send(DevnetEvent::ProtocolDeployed);
