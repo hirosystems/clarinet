@@ -126,7 +126,7 @@ export interface StacksTransactionMetadata {
   description: string;
   /**
    *
-   * @type {string}
+   * @type {boolean}
    * @memberof StacksTransactionMetadata
    */
   raw_tx: boolean;
