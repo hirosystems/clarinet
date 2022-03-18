@@ -261,7 +261,7 @@ pub fn get_tx_description(
     };
     let tx = match StacksTransaction::consensus_deserialize(&mut Cursor::new(&tx_bytes)) {
         Ok(bytes) => bytes,
-        Err(_e) => return Err(()),
+        _ => return Err(()),
     };
 
     let (fee, sender, sponsor) = match tx.auth {
