@@ -443,12 +443,12 @@ pub fn main() {
         Command::Console(cmd) => {
             let manifest_path = get_manifest_path_or_exit(cmd.manifest_path);
             let start_repl = true;
-            let project_manifest = match load_session(&manifest_path, start_repl, &Network::Devnet)
+            let (session, project_manifest) = match load_session(&manifest_path, start_repl, &Network::Devnet)
             {
-                Ok((_, _, res, _)) => res,
+                Ok((session, _, project_manifest, _)) => (Some(session), project_manifest),
                 Err((project_manifest, e)) => {
                     println!("{}: Unable to start REPL: {}", red!("error"), e);
-                    project_manifest
+                    (None, project_manifest)
                 }
             };
             if hints_enabled {
@@ -462,6 +462,25 @@ pub fn main() {
                         &project_manifest.project.authors,
                     ),
                 ));
+
+                #[cfg(feature = "telemetry")]
+                if let Some(session) = session {
+                    let mut debug_count = 0;
+                    for command in session.executed {
+                        if command.starts_with("::debug") {
+                            debug_count += 1;
+                        }
+                    }
+                    if debug_count > 0 {
+                        telemetry_report_event(DeveloperUsageEvent::DebugStarted(
+                            DeveloperUsageDigest::new(
+                                &project_manifest.project.name,
+                                &project_manifest.project.authors,
+                            ),
+                            debug_count,
+                        ));
+                    }
+                }
             }
         }
         Command::Check(cmd) if cmd.file.is_some() => {
