@@ -14,6 +14,7 @@ pub enum DeveloperUsageEvent {
     TestSuiteExecuted(DeveloperUsageDigest, bool, u32),
     DevnetExecuted(DeveloperUsageDigest),
     ContractPublished(DeveloperUsageDigest, Network),
+    DebugStarted(DeveloperUsageDigest, u32),
     UnknownCommand(DeveloperUsageDigest, String),
 }
 
@@ -108,6 +109,16 @@ async fn send_event(event: DeveloperUsageEvent) {
                 "team_id": digest.team_id,
                 "clarinet_version": clarinet_version,
                 "ci_mode": ci_mode,
+            }),
+        ),
+        DeveloperUsageEvent::DebugStarted(digest, num_sessions) => (
+            "DebugStarted",
+            json!({
+                "project_id": digest.project_id,
+                "team_id": digest.team_id,
+                "clarinet_version": clarinet_version,
+                "ci_mode": ci_mode,
+                "sessions": num_sessions,
             }),
         ),
         DeveloperUsageEvent::UnknownCommand(digest, command) => (
