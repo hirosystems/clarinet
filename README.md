@@ -471,6 +471,44 @@ $ clarinet run --allow-write https://deno.land/x/clarinet@v0.15.4/ext/stacksjs-h
 An extension can be deployed as a standalone plugin on Deno, or can also just be a local file if it includes sensitive / private setup informations.
 As illustrated in the example above, permissions (wallet / disk read / disk write) are declared using command flags. If at runtime, the clarinet extension is trying to write to disk, read disk, or access wallets without permission, the script will end up failing.
 
+### Debug your contracts
+
+Inside of the console (`clarinet console`), there is a debugger for stepping through your contracts, including support for:
+
+- Breakpoints
+  - **Source**: Break at a specific line (and optional column) of a contract (`break` or `b` command)
+    ```
+    b SP466FNC0P7JWTNM2R9T199QRZN1MYEDTAR0KP27.miamicoin-token:28:4
+    ```
+  - **Function**: Break at a specific function (`break` or `b` command)
+    ```
+    b .crashpunks-v2.transfer
+    ```
+  - **Data**: Break on read/write to a variable or map (`watch` or `w` to break on write, `rwatch` or `rw` to break on read, and `awatch` or `aw` to break on read or write)
+    ```
+    w contracts/SP2KAF9RF86PVX3NEE27DFV1CQX0T4WGR41X3S45C.bitcoin-whales.payout
+    ```
+- Step execution
+  - **Step-in**: Step into the sub-expressions (`step` or `s` command)
+  - **Step-out**: Complete execution of the current expression and return the result back to the parent (`finish` or `f` command)
+  - **Step-over**: Continue to completion of the current expression, stepping over sub-expressions (`next` or `n` command)
+  - **Continue**: Continue execution until hitting a breakpoint or completing execution (`continue` or `c` command)
+- Evaluate and print the result of any expression (`print` or `p` command)
+
+To initiate a debug sessionm, first enter the REPL console using:
+
+```
+clarinet console
+```
+
+Then at the REPL prompt, debug any expression:
+
+```
+::debug (contract-call? .foo hello .bar))
+```
+
+At the debug prompt, use any of the commands described above, or use `help` to get the full help documentation.
+
 ## Contributing
 
 We welcome contributions to Clarinet! The following sections provide information on how to contribute.
