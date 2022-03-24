@@ -41,7 +41,9 @@ To install Clarinet from pre-built binaries, download the latest release from th
 Unzip the binary, then copy it to a location that is already in your path, such as `/usr/local/bin`.
 
 ```sh
-unzip clarinet-linux-x64.zip -d .
+# note: you can change the v0.27.0 with version that are available in the releases page.
+wget -nv https://github.com/hirosystems/clarinet/releases/download/v0.27.0/clarinet-linux-x64-glibc.tar.gz -O clarinet-linux-x64.tar.gz
+tar -xf clarinet-linux-x64.tar.gz
 chmod +x ./clarinet
 mv ./clarinet /usr/local/bin
 ```
