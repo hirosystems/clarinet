@@ -170,23 +170,40 @@ export interface StacksTransactionMetadata {
 
 export interface StacksTransactionReceipt {
   /**
-    *
-    * @type {string[]}
-    * @memberof StacksTransactionReceipt
-    */
-   mutated_contracts_radius: string[];
+   *
+   * @type {string[]}
+   * @memberof StacksTransactionReceipt
+   */
+  mutated_contracts_radius: string[];
   /**
-    *
-    * @type {string[]}
-    * @memberof StacksTransactionReceipt
-    */
-   mutated_assets_radius: string[];
+   *
+   * @type {string[]}
+   * @memberof StacksTransactionReceipt
+   */
+  mutated_assets_radius: string[];
   /**
-    *
-    * @type {Array<StacksTransactionEvent>}
-    * @memberof StacksTransactionReceipt
-    */
-   events: {[key: string]: StacksSTXTransferEventData|StacksSTXMintEventData|StacksSTXLockEventData|StacksSTXBurnEventData|StacksNFTTransferEventData|StacksNFTMintEventData|StacksNFTBurnEventData|StacksFTTransferEventData|StacksFTMintEventData|StacksFTBurnEventData|StacksDataVarSetEventData|StacksDataMapInsertEventData|StacksDataMapUpdateEventData|StacksDataMapDeleteEventData|StacksSmartContractEventData };
+   *
+   * @type {{[key: string]: StacksSTXTransferEventData|StacksSTXMintEventData|StacksSTXLockEventData|StacksSTXBurnEventData|StacksNFTTransferEventData|StacksNFTMintEventData|StacksNFTBurnEventData|StacksFTTransferEventData|StacksFTMintEventData|StacksFTBurnEventData|StacksDataVarSetEventData|StacksDataMapInsertEventData|StacksDataMapUpdateEventData|StacksDataMapDeleteEventData|StacksSmartContractEventData }}
+   * @memberof StacksTransactionReceipt
+   */
+  events: {
+    [key: string]:
+      | StacksSTXTransferEventData
+      | StacksSTXMintEventData
+      | StacksSTXLockEventData
+      | StacksSTXBurnEventData
+      | StacksNFTTransferEventData
+      | StacksNFTMintEventData
+      | StacksNFTBurnEventData
+      | StacksFTTransferEventData
+      | StacksFTMintEventData
+      | StacksFTBurnEventData
+      | StacksDataVarSetEventData
+      | StacksDataMapInsertEventData
+      | StacksDataMapUpdateEventData
+      | StacksDataMapDeleteEventData
+      | StacksSmartContractEventData;
+  };
 }
 
 export interface StacksContractDeploymentData {
@@ -204,9 +221,7 @@ export interface StacksContractDeploymentData {
   code: string[];
 }
 
-export interface StacksTransactionEvent {
-
-}
+export interface StacksTransactionEvent {}
 
 export interface StacksTransactionExecutionCost {
   /**
@@ -334,7 +349,7 @@ export interface StacksDataVarSetEventData {
 }
 
 export interface StacksDataMapInsertEventData {
-  contract_identifier: String,
+  contract_identifier: String;
   map: string;
   inserted_key: string;
   inserted_value: string;
@@ -727,7 +742,7 @@ export interface StacksContractInterface {
   functions: Array<object>;
   /**
    * List of defined variables
-   * @type {Array<object>}
+   * @type {Array<DataVarField>}
    * @memberof ContractInterfaceResponse
    */
   variables: Array<DataVarField>;
@@ -756,7 +771,7 @@ export interface StacksContractInterface {
  * @export
  * @interface DataVarField
  */
- export interface DataVarField {
+export interface DataVarField {
   /**
    * Name of var
    * @type {string}
@@ -770,7 +785,7 @@ export interface StacksContractInterface {
  * @export
  * @interface DataMapField
  */
- export interface DataMapField {
+export interface DataMapField {
   /**
    * Name of map
    * @type {string}
@@ -784,7 +799,7 @@ export interface StacksContractInterface {
  * @export
  * @interface DataFtField
  */
- export interface DataFtField {
+export interface DataFtField {
   /**
    * Name of fungible token
    * @type {string}
@@ -798,7 +813,7 @@ export interface StacksContractInterface {
  * @export
  * @interface DataNftField
  */
- export interface DataNftField {
+export interface DataNftField {
   /**
    * Name of non fungible token
    * @type {string}

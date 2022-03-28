@@ -102,8 +102,6 @@ pub fn load_session_settings(
     settings.repl_settings = project_config.repl_settings.clone();
     settings.disk_cache_enabled = true;
 
-    settings.repl_settings.parser_version = settings.repl_settings.parser_version;
-
     Ok((settings, chain_config, project_config))
 }
 
