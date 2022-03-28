@@ -238,7 +238,7 @@ export class Clarinet {
           let accounts: Map<string, Account> = new Map();
           for (let account of result["accounts"]) {
             accounts.set(account.name, account);
-          }        
+          }
           await options.beforeContractsDeployment(chain, accounts);
 
           result = JSON.parse((Deno as any).core.opSync("complete_setup_chain", {
@@ -250,7 +250,7 @@ export class Clarinet {
         let accounts: Map<string, Account> = new Map();
         for (let account of result["accounts"]) {
           accounts.set(account.name, account);
-        }        
+        }
         let contracts: Map<string, any> = new Map();
         for (let contract of result["contracts"]) {
           contracts.set(contract.contract_id, contract);
