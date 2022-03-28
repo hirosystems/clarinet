@@ -110,7 +110,7 @@ pub fn start_ui(
                 if let StacksChainEvent::ChainUpdatedWithBlock(update) = chain_event {
                     app.display_block(update.new_block);
                 } else {
-                    // todo(lgalabru)
+                    // TODO(lgalabru)
                 }
             }
             DevnetEvent::BitcoinChainEvent(_chain_event) => {
