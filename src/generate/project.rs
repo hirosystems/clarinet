@@ -341,8 +341,8 @@ balance = 100_000_000_000_000
 # btc_address: mjSrB3wS4xab3kYqFktwBzfTdPg367ZJ2d
 
 [devnet]
-disable_stacks_explorer = true
-disable_stacks_api = true
+disable_stacks_explorer = false
+disable_stacks_api = false
 # disable_bitcoin_explorer = true
 # working_dir = "tmp/devnet"
 # stacks_node_events_observers = ["host.docker.internal:8002"]
