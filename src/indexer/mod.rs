@@ -25,9 +25,9 @@ impl PoxInfo {
             contract_id: "ST000000000000000000002AMW42H.pox".into(),
             pox_activation_threshold_ustx: 0,
             first_burnchain_block_height: 100,
-            prepare_phase_block_length: 2,
-            reward_phase_block_length: 8,
-            reward_slots: 16,
+            prepare_phase_block_length: 5,
+            reward_phase_block_length: 10,
+            reward_slots: 20,
             total_liquid_supply_ustx: 1000000000000000,
             ..Default::default()
         }
@@ -153,7 +153,6 @@ impl Indexer {
             &mut self.stacks_context,
         );
         self.current_microblock_trail.microblocks.push(microblock);
-        let (_, anchored_block) = self.stacks_last_7_blocks.back().unwrap();
 
         let update = ChainUpdatedWithMicroblockData {
             anchored_block: anchored_block.clone(),

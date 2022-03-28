@@ -28,8 +28,6 @@ pub struct STXBurnEventData {
 pub struct NFTTransferEventData {
     #[serde(rename = "asset_identifier")]
     pub asset_class_identifier: String,
-    #[serde(rename = "value")]
-    pub asset_identifier: String,
     #[serde(rename = "raw_value")]
     pub hex_asset_identifier: String,
     pub sender: String,
@@ -40,8 +38,6 @@ pub struct NFTTransferEventData {
 pub struct NFTMintEventData {
     #[serde(rename = "asset_identifier")]
     pub asset_class_identifier: String,
-    #[serde(rename = "value")]
-    pub asset_identifier: String,
     #[serde(rename = "raw_value")]
     pub hex_asset_identifier: String,
     pub recipient: String,
@@ -51,8 +47,6 @@ pub struct NFTMintEventData {
 pub struct NFTBurnEventData {
     #[serde(rename = "asset_identifier")]
     pub asset_class_identifier: String,
-    #[serde(rename = "value")]
-    pub asset_identifier: String,
     #[serde(rename = "raw_value")]
     pub hex_asset_identifier: String,
     pub sender: String,
@@ -115,7 +109,7 @@ pub struct DataMapUpdateEventData {
 pub struct DataMapDeleteEventData {
     pub contract_identifier: String,
     pub map: String,
-    #[serde(rename = "raw_new_value")]
+    #[serde(rename = "raw_deleted_key")]
     pub hex_deleted_key: String,
 }
 

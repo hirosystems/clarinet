@@ -28,7 +28,7 @@ use clarity_repl::clarity::{
 };
 use clarity_repl::repl::settings::{Account, InitialContract};
 use libsecp256k1::{PublicKey, SecretKey};
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashMap};
 use std::path::PathBuf;
 use std::sync::mpsc::channel;
 use std::sync::mpsc::Sender;
@@ -144,8 +144,8 @@ pub fn endode_contract(
 #[allow(dead_code)]
 pub fn publish_contract(
     contract: &InitialContract,
-    deployers_lookup: &BTreeMap<String, Account>,
-    deployers_nonces: &mut BTreeMap<String, u64>,
+    deployers_lookup: &HashMap<String, Account>,
+    deployers_nonces: &mut HashMap<String, u64>,
     node_url: &str,
     deployment_fee_rate: u64,
     network: &Network,
@@ -180,6 +180,8 @@ pub fn publish_contract(
     Ok((txid, nonce, signer_addr.to_string(), contract_name))
 }
 
+/// publish_all_contracts publish all the contracts referenced by the manifest passed.
+/// this method is being used by developers
 pub fn publish_all_contracts(
     manifest_path: &PathBuf,
     network: &Network,
@@ -319,8 +321,8 @@ pub fn publish_all_contracts(
     });
 
     let results = vec![];
-    let mut deployers_nonces = BTreeMap::new();
-    let mut deployers_lookup: BTreeMap<String, Account> = BTreeMap::new();
+    let mut deployers_nonces = HashMap::new();
+    let mut deployers_lookup: HashMap<String, Account> = HashMap::new();
 
     for account in settings.initial_accounts.iter() {
         deployers_lookup.insert(account.name.to_string(), account.clone());

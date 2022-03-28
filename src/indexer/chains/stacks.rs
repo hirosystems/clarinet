@@ -242,12 +242,12 @@ pub fn get_tx_description(
     raw_tx: &str,
 ) -> Result<
     (
-        String,
-        StacksTransaction,
-        StacksTransactionKind,
-        u64,
-        String,
-        Option<String>,
+        String,            // Human readable transaction's description (contract-call, publish, ...)
+        StacksTransaction, //
+        StacksTransactionKind, //
+        u64,               // Transaction fee
+        String,            // Sender's address
+        Option<String>,    // Sponsor's address (optional)
     ),
     (),
 > {
@@ -562,7 +562,7 @@ pub fn get_standardized_stacks_operations(
 
                 let currency = get_standardized_non_fungible_currency_from_asset_class_id(
                     &data.asset_class_identifier,
-                    &data.asset_identifier,
+                    &data.hex_asset_identifier,
                     asset_class_cache,
                 );
                 operations.push(Operation {
@@ -592,7 +592,7 @@ pub fn get_standardized_stacks_operations(
 
                 let currency = get_standardized_non_fungible_currency_from_asset_class_id(
                     &data.asset_class_identifier,
-                    &data.asset_identifier,
+                    &data.hex_asset_identifier,
                     asset_class_cache,
                 );
                 operations.push(Operation {
@@ -622,7 +622,7 @@ pub fn get_standardized_stacks_operations(
 
                 let currency = get_standardized_non_fungible_currency_from_asset_class_id(
                     &data.asset_class_identifier,
-                    &data.asset_identifier,
+                    &data.hex_asset_identifier,
                     asset_class_cache,
                 );
                 operations.push(Operation {

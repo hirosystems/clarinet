@@ -1,7 +1,6 @@
 pub mod mnemonic;
 pub mod stacks;
 
-use anyhow::Result;
 use std::collections::{BTreeMap, HashSet};
 use std::iter::FromIterator;
 use std::process;
@@ -172,20 +171,4 @@ impl GraphWalker {
         let deps = nodes.difference(&tainted).map(|i| *i).collect();
         Some(deps)
     }
-}
-
-// TODO(lgalabru): use this helper to name thread, instead of raw std::thread::spawn
-#[allow(dead_code)]
-pub fn spawn<F>(name: &'static str, f: F) -> std::thread::JoinHandle<()>
-where
-    F: 'static + Send + FnOnce() -> Result<()>,
-{
-    std::thread::Builder::new()
-        .name(name.to_owned())
-        .spawn(move || {
-            if let Err(e) = f() {
-                e.chain().skip(1).for_each(|e| println!("because: {}", e));
-            }
-        })
-        .expect("failed to spawn a thread")
 }

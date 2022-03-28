@@ -71,7 +71,6 @@ bitcoincore-rpc-json = "0.14.0"
 segment = { version = "0.1.2", optional = true }
 mac_address = { version = "1.1.2", optional = true }
 tower-lsp = { version = "0.14.0", optional = true }
-anyhow = "1.0"
 hex = "0.4.3"
 dirs = "4.0.0"
 

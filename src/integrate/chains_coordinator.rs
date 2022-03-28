@@ -267,7 +267,6 @@ pub async fn start_chains_coordinator(
                 }
             }
             Ok(ChainsCoordinatorCommand::StartAutoMining) => {
-                println!("Automining started??");
                 stop_miner.store(false, Ordering::SeqCst);
                 let stop_miner_reader = stop_miner.clone();
                 let devnet_config = config.devnet_config.clone();
@@ -594,13 +593,6 @@ pub async fn handle_bitcoin_rpc_call(
 ) -> Json<JsonValue> {
     use base64::encode;
     use reqwest::Client;
-
-    // if let Ok(tx_sender) = devnet_events_tx.lock() {
-    //     let _ = tx_sender.send(DevnetEvent::debug(format!(
-    //         "Forwarding request {:?}",
-    //         bitcoin_rpc_call.method
-    //     )));
-    // }
 
     let bitcoin_rpc_call = bitcoin_rpc_call.into_inner().clone();
     let method = bitcoin_rpc_call.method.clone();
