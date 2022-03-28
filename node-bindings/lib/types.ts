@@ -198,7 +198,7 @@ export interface StacksContractDeploymentData {
   contract_identifier: string;
   /**
    *
-   * @type {string}
+   * @type {string[]}
    * @memberof StacksContractDeploymentData
    */
   code: string[];
