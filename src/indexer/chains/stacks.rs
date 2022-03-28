@@ -111,11 +111,10 @@ pub fn standardize_stacks_block(
         .transactions
         .iter()
         .map(|t| {
-            let (description, tx, tx_type, fee, sender, sponsor) =
+            let (description, tx_type, fee, sender, sponsor) =
                 get_tx_description(&t.raw_tx).expect("unable to parse transaction");
             let (operations, receipt) = get_standardized_stacks_operations(
                 &t.txid,
-                &tx,
                 &mut events,
                 &mut ctx.asset_class_map,
                 &indexer_config.stacks_node_rpc_url,
@@ -178,11 +177,10 @@ pub fn standardize_stacks_microblock(
         .transactions
         .iter()
         .map(|t| {
-            let (description, tx, tx_type, fee, sender, sponsor) =
+            let (description, tx_type, fee, sender, sponsor) =
                 get_tx_description(&t.raw_tx).expect("unable to parse transaction");
             let (operations, receipt) = get_standardized_stacks_operations(
                 &t.txid,
-                &tx,
                 &mut events,
                 &mut ctx.asset_class_map,
                 &indexer_config.stacks_node_rpc_url,
@@ -242,12 +240,11 @@ pub fn get_tx_description(
     raw_tx: &str,
 ) -> Result<
     (
-        String,            // Human readable transaction's description (contract-call, publish, ...)
-        StacksTransaction, //
+        String, // Human readable transaction's description (contract-call, publish, ...)
         StacksTransactionKind, //
-        u64,               // Transaction fee
-        String,            // Sender's address
-        Option<String>,    // Sponsor's address (optional)
+        u64,    // Transaction fee
+        String, // Sender's address
+        Option<String>, // Sponsor's address (optional)
     ),
     (),
 > {
@@ -331,7 +328,7 @@ pub fn get_tx_description(
         TransactionPayload::Coinbase(_) => (format!("coinbase"), StacksTransactionKind::Coinbase),
         _ => (format!("other"), StacksTransactionKind::Other),
     };
-    Ok((description, tx, tx_type, fee, sender, sponsor))
+    Ok((description, tx_type, fee, sender, sponsor))
 }
 
 pub fn get_standardized_fungible_currency_from_asset_class_id(
@@ -415,7 +412,6 @@ pub fn get_standardized_non_fungible_currency_from_asset_class_id(
 
 pub fn get_standardized_stacks_operations(
     txid: &str,
-    _transaction: &StacksTransaction,
     events: &mut Vec<NewEvent>,
     asset_class_cache: &mut HashMap<String, AssetClassCache>,
     node_url: &str,

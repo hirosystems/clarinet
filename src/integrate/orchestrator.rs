@@ -808,7 +808,7 @@ microblock_frequency = 15000
 chain = "bitcoin"
 mode = "krypton"
 poll_time_secs = 1
-peer_host = "{}"
+peer_host = "host.docker.internal"
 username = "{}"
 password = "{}"
 rpc_port = {}
@@ -830,7 +830,6 @@ events_keys = ["*"]
             devnet_config.stacks_node_p2p_port,
             devnet_config.miner_secret_key_hex,
             devnet_config.miner_secret_key_hex,
-            format!("host.docker.internal"),
             devnet_config.bitcoin_node_username,
             devnet_config.bitcoin_node_password,
             devnet_config.orchestrator_port,

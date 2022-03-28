@@ -3,7 +3,7 @@ use crate::indexer::{chains, Indexer, IndexerConfig};
 use crate::integrate::{MempoolAdmissionData, ServiceStatusData, Status};
 use crate::poke::load_session;
 use crate::publish::publish_all_contracts;
-use crate::types::{self, BlockIdentifier, DevnetConfig};
+use crate::types::{self, DevnetConfig};
 use crate::types::{BitcoinChainEvent, ChainsCoordinatorCommand, Network, StacksChainEvent};
 use crate::utils;
 use crate::utils::stacks::{transactions, PoxInfo, StacksRpc};
@@ -18,7 +18,6 @@ use rocket::config::{Config, LogLevel};
 use rocket::serde::json::{json, Json, Value as JsonValue};
 use rocket::serde::Deserialize;
 use rocket::State;
-use std::cmp;
 use std::collections::VecDeque;
 use std::convert::TryFrom;
 use std::error::Error;
@@ -751,9 +750,8 @@ pub fn invalidate_bitcoin_chain_tip(
     bitcoin_node_username: &str,
     bitcoin_node_password: &str,
 ) {
-    use bitcoincore_rpc::bitcoin::Address;
     use bitcoincore_rpc::{Auth, Client, RpcApi};
-    use std::str::FromStr;
+
     let rpc = Client::new(
         &format!("http://localhost:{}", bitcoin_node_rpc_port),
         Auth::UserPass(

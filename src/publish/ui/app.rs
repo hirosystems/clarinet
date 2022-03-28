@@ -36,15 +36,14 @@ impl<'a> App<'a> {
     pub fn reset(&mut self) {}
 
     pub fn display_contract_status_update(&mut self, update: ContractUpdate) {
-        let mut index = 0;
-        for (i, contract) in self.contracts.items.iter().enumerate() {
-            if contract.contract_id == update.contract_id {
-                index = i;
-                break;
-            }
+        let index_found = self
+            .contracts
+            .items
+            .iter()
+            .position(|contract| contract.contract_id == update.contract_id);
+        if let Some(index) = index_found {
+            self.contracts.items.remove(index);
+            self.contracts.items.insert(index, update);
         }
-
-        self.contracts.items.remove(index);
-        self.contracts.items.insert(index, update)
     }
 }
