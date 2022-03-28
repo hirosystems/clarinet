@@ -733,7 +733,7 @@ export interface StacksContractInterface {
   variables: Array<DataVarField>;
   /**
    * List of defined data-maps
-   * @type {Array<object>}
+   * @type {Array<DataMapField>}
    * @memberof ContractInterfaceResponse
    */
   maps: Array<DataMapField>;
