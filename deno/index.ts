@@ -388,7 +388,7 @@ declare global {
     expectUtf8(value: String): String;
     expectPrincipal(value: String): String;
     expectList(): Array<String>;
-    expectTuple(): Object;
+    expectTuple(): Record<string, string>;
   }
 
   interface Array<T> {
@@ -619,7 +619,7 @@ String.prototype.expectTuple = function () {
     elements.push(remainder);
   }
 
-  let tuple: { [key: string]: String } = {};
+  let tuple: Record<string, string> = {};
   for (let element of elements) {
     for (var i = 0; i < element.length; i++) {
       if (element.charAt(i) === ":") {
