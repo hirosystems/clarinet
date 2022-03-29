@@ -93,7 +93,7 @@ jobs:
 
       - name: Install dependencies
         if: steps.cache-cargo.outputs.cache-hit != 'true'
-        run: cargo install grcov
+        run: cargo install grcov --version 0.8.6
 
       - name: Unit Tests
         env:
