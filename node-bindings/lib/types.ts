@@ -124,6 +124,254 @@ export interface StacksTransactionMetadata {
    * @memberof StacksTransactionMetadata
    */
   description: string;
+  /**
+   *
+   * @type {boolean}
+   * @memberof StacksTransactionMetadata
+   */
+  raw_tx: boolean;
+  /**
+   *
+   * @type {string}
+   * @memberof StacksTransactionMetadata
+   */
+  sender: string;
+  /**
+   *
+   * @type {string}
+   * @memberof StacksTransactionMetadata
+   */
+  sponsor?: string;
+  /**
+   *
+   * @type {number}
+   * @memberof StacksTransactionMetadata
+   */
+  fee: number;
+  /**
+   *
+   * @type {StacksTransactionKind}
+   * @memberof StacksTransactionMetadata
+   */
+  kind: StacksTransactionKind;
+  /**
+   *
+   * @type {StacksTransactionReceipt}
+   * @memberof StacksTransactionMetadata
+   */
+  receipt: StacksTransactionReceipt;
+  /**
+   *
+   * @type {StacksTransactionExecutionCost}
+   * @memberof StacksTransactionMetadata
+   */
+  execution_cost?: StacksTransactionExecutionCost;
+}
+
+export interface StacksTransactionReceipt {
+  /**
+   *
+   * @type {string[]}
+   * @memberof StacksTransactionReceipt
+   */
+  mutated_contracts_radius: string[];
+  /**
+   *
+   * @type {string[]}
+   * @memberof StacksTransactionReceipt
+   */
+  mutated_assets_radius: string[];
+  /**
+   *
+   * @type {{[key: string]: StacksSTXTransferEventData|StacksSTXMintEventData|StacksSTXLockEventData|StacksSTXBurnEventData|StacksNFTTransferEventData|StacksNFTMintEventData|StacksNFTBurnEventData|StacksFTTransferEventData|StacksFTMintEventData|StacksFTBurnEventData|StacksDataVarSetEventData|StacksDataMapInsertEventData|StacksDataMapUpdateEventData|StacksDataMapDeleteEventData|StacksSmartContractEventData }}
+   * @memberof StacksTransactionReceipt
+   */
+  events: {
+    [key: string]:
+      | StacksSTXTransferEventData
+      | StacksSTXMintEventData
+      | StacksSTXLockEventData
+      | StacksSTXBurnEventData
+      | StacksNFTTransferEventData
+      | StacksNFTMintEventData
+      | StacksNFTBurnEventData
+      | StacksFTTransferEventData
+      | StacksFTMintEventData
+      | StacksFTBurnEventData
+      | StacksDataVarSetEventData
+      | StacksDataMapInsertEventData
+      | StacksDataMapUpdateEventData
+      | StacksDataMapDeleteEventData
+      | StacksSmartContractEventData;
+  };
+}
+
+export interface StacksContractDeploymentData {
+  /**
+   *
+   * @type {string}
+   * @memberof StacksContractDeploymentData
+   */
+  contract_identifier: string;
+  /**
+   *
+   * @type {string[]}
+   * @memberof StacksContractDeploymentData
+   */
+  code: string[];
+}
+
+export interface StacksTransactionEvent {}
+
+export interface StacksTransactionExecutionCost {
+  /**
+   *
+   * @type {number}
+   * @memberof StacksTransactionExecutionCost
+   */
+  write_length: number;
+  /**
+   *
+   * @type {number}
+   * @memberof StacksTransactionExecutionCost
+   */
+  write_count: number;
+  /**
+   *
+   * @type {number}
+   * @memberof StacksTransactionExecutionCost
+   */
+  read_length: number;
+  /**
+   *
+   * @type {number}
+   * @memberof StacksTransactionExecutionCost
+   */
+  read_count: number;
+  /**
+   *
+   * @type {number}
+   * @memberof StacksTransactionExecutionCost
+   */
+  runtime: number;
+}
+
+export enum StacksTransactionKind {
+  ContractCall = "ContractCall",
+  ContractDeployment = "ContractDeployment",
+  NativeTokenTransfer = "NativeTokenTransfer",
+  Coinbase = "Coinbase",
+  Other = "Other",
+}
+
+export enum StacksTransactionEventType {
+  StacksSTXTransferEvent = "StacksSTXTransferEvent",
+  StacksSTXMintEvent = "StacksSTXMintEvent",
+  StacksSTXLockEvent = "StacksSTXLockEvent",
+  StacksSTXBurnEvent = "StacksSTXBurnEvent",
+  StacksNFTTransferEvent = "StacksNFTTransferEvent",
+  StacksNFTMintEvent = "StacksNFTMintEvent",
+  StacksNFTBurnEvent = "StacksNFTBurnEvent",
+  StacksFTTransferEvent = "StacksFTTransferEvent",
+  StacksFTMintEvent = "StacksFTMintEvent",
+  StacksFTBurnEvent = "StacksFTBurnEvent",
+  StacksDataVarSetEvent = "StacksDataVarSetEvent",
+  StacksDataMapInsertEvent = "StacksDataMapInsertEvent",
+  StacksDataMapUpdateEvent = "StacksDataMapUpdateEvent",
+  StacksDataMapDeleteEvent = "StacksDataMapDeleteEvent",
+  StacksSmartContractEvent = "StacksSmartContractEvent",
+}
+
+export interface StacksSTXTransferEventData {
+  sender: string;
+  recipient: string;
+  amount: string;
+}
+
+export interface StacksSTXMintEventData {
+  recipient: string;
+  amount: string;
+}
+
+export interface StacksSTXLockEventData {
+  locked_amount: string;
+  unlock_height: string;
+  locked_address: string;
+}
+
+export interface StacksSTXBurnEventData {
+  sender: string;
+  amount: string;
+}
+
+export interface StacksNFTTransferEventData {
+  asset_class_identifier: string;
+  asset_identifier: string;
+  sender: string;
+  recipient: string;
+}
+
+export interface StacksNFTMintEventData {
+  asset_class_identifier: string;
+  asset_identifier: string;
+  recipient: string;
+}
+
+export interface StacksNFTBurnEventData {
+  asset_class_identifier: string;
+  asset_identifier: string;
+  sender: string;
+}
+
+export interface StacksFTTransferEventData {
+  asset_class_identifier: string;
+  sender: string;
+  recipient: string;
+  amount: string;
+}
+
+export interface StacksFTMintEventData {
+  asset_class_identifier: string;
+  recipient: string;
+  amount: string;
+}
+
+export interface StacksFTBurnEventData {
+  asset_class_identifier: string;
+  sender: string;
+  amount: string;
+}
+
+export interface StacksDataVarSetEventData {
+  contract_identifier: string;
+  var: string;
+  new_value: string;
+}
+
+export interface StacksDataMapInsertEventData {
+  contract_identifier: String;
+  map: string;
+  inserted_key: string;
+  inserted_value: string;
+}
+
+export interface StacksDataMapUpdateEventData {
+  contract_identifier: string;
+  map: string;
+  key: string;
+  new_value: string;
+}
+
+export interface StacksDataMapDeleteEventData {
+  contract_identifier: string;
+  map: string;
+  deleted_key: string;
+}
+
+export interface StacksSmartContractEventData {
+  contract_identifier: string;
+  topic: string;
+  value: string;
 }
 
 /**
@@ -478,4 +726,98 @@ export interface CoinChange {
 export enum CoinAction {
   created = "coin_created",
   spent = "coin_spent",
+}
+
+/**
+ * Contract interfaces are ABI returned by the stacks node
+ * @export
+ * @interface StacksContractInterface
+ */
+export interface StacksContractInterface {
+  /**
+   * List of defined methods
+   * @type {Array<object>}
+   * @memberof ContractInterfaceResponse
+   */
+  functions: Array<object>;
+  /**
+   * List of defined variables
+   * @type {Array<DataVarField>}
+   * @memberof ContractInterfaceResponse
+   */
+  variables: Array<DataVarField>;
+  /**
+   * List of defined data-maps
+   * @type {Array<DataMapField>}
+   * @memberof ContractInterfaceResponse
+   */
+  maps: Array<DataMapField>;
+  /**
+   * List of fungible tokens in the contract
+   * @type {Array<DataFtField>}
+   * @memberof ContractInterfaceResponse
+   */
+  fungible_tokens: Array<DataFtField>;
+  /**
+   * List of non-fungible tokens in the contract
+   * @type {Array<DataNftField>}
+   * @memberof ContractInterfaceResponse
+   */
+  non_fungible_tokens: Array<DataNftField>;
+}
+
+/**
+ * DataVarField describes clarity data-var metadata.
+ * @export
+ * @interface DataVarField
+ */
+export interface DataVarField {
+  /**
+   * Name of var
+   * @type {string}
+   * @memberof DataVarField
+   */
+  name: string;
+}
+
+/**
+ * DataMapField describes clarity data-map metadata.
+ * @export
+ * @interface DataMapField
+ */
+export interface DataMapField {
+  /**
+   * Name of map
+   * @type {string}
+   * @memberof DataMapField
+   */
+  name: string;
+}
+
+/**
+ * DataMapField describes clarity fungible token metadata.
+ * @export
+ * @interface DataFtField
+ */
+export interface DataFtField {
+  /**
+   * Name of fungible token
+   * @type {string}
+   * @memberof DataFtField
+   */
+  name: string;
+}
+
+/**
+ * DataMapField describes clarity non fungible token metadata.
+ * @export
+ * @interface DataNftField
+ */
+export interface DataNftField {
+  /**
+   * Name of non fungible token
+   * @type {string}
+   * @memberof DataNftField
+   */
+  name: string;
 }

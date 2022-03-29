@@ -1,4 +1,6 @@
+use super::events::StacksTransactionEvent;
 use serde::{self, Deserialize, Serialize};
+use std::collections::HashSet;
 
 /// BlockIdentifier uniquely identifies a block in a particular network.
 #[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
@@ -24,6 +26,24 @@ pub struct StacksBlockData {
     pub timestamp: i64,
     pub transactions: Vec<StacksTransactionData>,
     pub metadata: StacksBlockMetadata,
+}
+
+/// StacksMicroblockData contain an array of Transactions that occurred at a particular
+/// BlockIdentifier. A hard requirement for blocks returned by Rosetta
+/// implementations is that they MUST be _inalterable_: once a client has
+/// requested and received a block identified by a specific BlockIndentifier,
+/// all future calls for that same BlockIdentifier must return the same block
+/// contents.
+#[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
+pub struct StacksMicroblockData {
+    pub block_identifier: BlockIdentifier,
+    pub parent_block_identifier: BlockIdentifier,
+    pub transactions: Vec<StacksTransactionData>,
+}
+
+#[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
+pub struct StacksMicroblocksTrail {
+    pub microblocks: Vec<StacksMicroblockData>,
 }
 
 #[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
@@ -72,13 +92,66 @@ pub struct StacksTransactionData {
     pub metadata: StacksTransactionMetadata,
 }
 
+#[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
+pub enum StacksTransactionKind {
+    ContractCall,
+    ContractDeployment(StacksContractDeploymentData),
+    NativeTokenTransfer,
+    Coinbase,
+    Other,
+}
+
+#[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
+pub struct StacksContractDeploymentData {
+    pub contract_identifier: String,
+    pub code: String,
+}
+
 /// Extra data for Transaction
 #[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
 pub struct StacksTransactionMetadata {
     pub success: bool,
+    pub raw_tx: String,
     pub result: String,
-    pub events: Vec<String>,
+    pub sender: String,
+    pub fee: u64,
+    pub kind: StacksTransactionKind,
+    pub execution_cost: Option<StacksTransactionExecutionCost>,
+    pub receipt: StacksTransactionReceipt,
     pub description: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub sponsor: Option<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
+pub struct StacksTransactionExecutionCost {
+    pub write_length: u64,
+    pub write_count: u64,
+    pub read_length: u64,
+    pub read_count: u64,
+    pub runtime: u64,
+}
+
+/// Extra event data for Transaction
+#[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
+pub struct StacksTransactionReceipt {
+    pub mutated_contracts_radius: HashSet<String>,
+    pub mutated_assets_radius: HashSet<String>,
+    pub events: Vec<StacksTransactionEvent>,
+}
+
+impl StacksTransactionReceipt {
+    pub fn new(
+        mutated_contracts_radius: HashSet<String>,
+        mutated_assets_radius: HashSet<String>,
+        events: Vec<StacksTransactionEvent>,
+    ) -> StacksTransactionReceipt {
+        StacksTransactionReceipt {
+            mutated_contracts_radius,
+            mutated_assets_radius,
+            events,
+        }
+    }
 }
 
 /// Transactions contain an array of Operations that are attributable to the
@@ -98,7 +171,7 @@ pub struct BitcoinTransactionMetadata {}
 
 /// The transaction_identifier uniquely identifies a transaction in a particular
 /// network and block or in the mempool.
-#[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
 pub struct TransactionIdentifier {
     /// Any transactions that are attributable only to a block (ex: a block
     /// event) should use the hash of the block as the identifier.
@@ -110,8 +183,6 @@ pub struct TransactionIdentifier {
 )]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub enum OperationType {
-    DeployContract,
-    FunctionCall,
     Credit,
     Debit,
     Lock,
@@ -122,7 +193,7 @@ pub struct OperationMetadata {
     /// Has to be specified for ADD_KEY, REMOVE_KEY, and STAKE operations
     #[serde(skip_serializing_if = "Option::is_none")]
     pub public_key: Option<PublicKey>,
-    // todo(ludo): ???
+    // TODO(lgalabru): ???
     //#[serde(skip_serializing_if = "Option::is_none")]
     // pub access_key: Option<TODO>,
     /// Has to be specified for DEPLOY_CONTRACT operation
@@ -223,7 +294,7 @@ pub enum OperationStatusKind {
 /// The account_identifier uniquely identifies an account within a network. All
 /// fields in the account_identifier are utilized to determine this uniqueness
 /// (including the metadata field, if populated).
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Hash)]
 pub struct AccountIdentifier {
     /// The address may be a cryptographic public key (or some encoding of it)
     /// or a provided username.
@@ -243,7 +314,7 @@ pub struct AccountIdentifier {
 /// An account may have state specific to a contract address (ERC-20 token)
 /// and/or a stake (delegated balance). The sub_account_identifier should
 /// specify which state (if applicable) an account instantiation refers to.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Hash)]
 pub struct SubAccountIdentifier {
     /// The SubAccount address may be a cryptographic value or some other
     /// identifier (ex: bonded) that uniquely specifies a SubAccount.
@@ -258,7 +329,7 @@ pub struct SubAccountIdentifier {
      * pub metadata: Option<serde_json::Value>, */
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Hash)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub enum SubAccount {
     LiquidBalanceForStorage,
