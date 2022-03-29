@@ -1,3 +1,4 @@
+use super::Network;
 use crate::utils::mnemonic;
 use bip39::{Language, Mnemonic};
 use clarity_repl::clarity::util::hash::bytes_to_hex;
@@ -11,11 +12,11 @@ use tiny_hderive::bip32::ExtendedPrivKey;
 use toml::value::Value;
 
 pub const DEFAULT_DERIVATION_PATH: &str = "m/44'/5757'/0'/0/0";
-pub const DEFAULT_BITCOIN_NODE_IMAGE: &str = "quay.io/hirosystems/bitcoind:devnet";
-pub const DEFAULT_STACKS_NODE_IMAGE: &str = "quay.io/hirosystems/stacks-node:devnet";
+pub const DEFAULT_BITCOIN_NODE_IMAGE: &str = "quay.io/hirosystems/bitcoind:devnet-v2";
+pub const DEFAULT_STACKS_NODE_IMAGE: &str = "quay.io/hirosystems/stacks-node:devnet-v2";
 pub const DEFAULT_BITCOIN_EXPLORER_IMAGE: &str = "quay.io/hirosystems/bitcoin-explorer:devnet";
 pub const DEFAULT_STACKS_API_IMAGE: &str = "blockstack/stacks-blockchain-api:latest";
-pub const DEFAULT_STACKS_EXPLORER_IMAGE: &str = "blockstack/explorer:1.16.1";
+pub const DEFAULT_STACKS_EXPLORER_IMAGE: &str = "blockstack/explorer:latest";
 pub const DEFAULT_POSTGRES_IMAGE: &str = "postgres:alpine";
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -44,12 +45,12 @@ pub struct DevnetConfigFile {
     pub stacks_api_events_port: Option<u16>,
     pub bitcoin_explorer_port: Option<u16>,
     pub stacks_explorer_port: Option<u16>,
-    pub bitcoin_controller_port: Option<u16>,
     pub bitcoin_node_username: Option<String>,
     pub bitcoin_node_password: Option<String>,
     pub miner_mnemonic: Option<String>,
     pub miner_derivation_path: Option<String>,
     pub bitcoin_controller_block_time: Option<u32>,
+    pub bitcoin_controller_automining_disabled: Option<bool>,
     pub working_dir: Option<String>,
     pub postgres_port: Option<u16>,
     pub postgres_username: Option<String>,
@@ -66,6 +67,7 @@ pub struct DevnetConfigFile {
     pub disable_bitcoin_explorer: Option<bool>,
     pub disable_stacks_explorer: Option<bool>,
     pub disable_stacks_api: Option<bool>,
+    pub bind_containers_volumes: Option<bool>,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -120,8 +122,8 @@ pub struct DevnetConfig {
     pub stacks_api_events_port: u16,
     pub stacks_explorer_port: u16,
     pub bitcoin_explorer_port: u16,
-    pub bitcoin_controller_port: u16,
     pub bitcoin_controller_block_time: u32,
+    pub bitcoin_controller_automining_disabled: bool,
     pub miner_stx_address: String,
     pub miner_secret_key_hex: String,
     pub miner_btc_address: String,
@@ -143,6 +145,7 @@ pub struct DevnetConfig {
     pub disable_bitcoin_explorer: bool,
     pub disable_stacks_explorer: bool,
     pub disable_stacks_api: bool,
+    pub bind_containers_volumes: bool,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -165,12 +168,12 @@ pub struct AccountConfig {
 
 impl ChainConfig {
     #[allow(non_fmt_panics)]
-    pub fn from_path(path: &PathBuf) -> ChainConfig {
+    pub fn from_path(path: &PathBuf, network: &Network) -> ChainConfig {
         let path = match File::open(path) {
             Ok(path) => path,
             Err(_) => {
                 let error = format!("Unable to open file {:?}", path.to_str());
-                panic!(error)
+                panic!("{}", error)
             }
         };
         let mut chain_config_file_reader = BufReader::new(path);
@@ -180,10 +183,13 @@ impl ChainConfig {
             .unwrap();
         let mut chain_config_file: ChainConfigFile =
             toml::from_slice(&chain_config_file_buffer[..]).unwrap();
-        ChainConfig::from_chain_config_file(&mut chain_config_file)
+        ChainConfig::from_chain_config_file(&mut chain_config_file, network)
     }
 
-    pub fn from_chain_config_file(chain_config_file: &mut ChainConfigFile) -> ChainConfig {
+    pub fn from_chain_config_file(
+        chain_config_file: &mut ChainConfigFile,
+        env: &Network,
+    ) -> ChainConfig {
         let network = NetworkConfig {
             name: chain_config_file.network.name.clone(),
             node_rpc_address: chain_config_file.network.node_rpc_address.clone(),
@@ -203,10 +209,7 @@ impl ChainConfig {
                                 _ => 0,
                             };
 
-                            let is_mainnet = match account_settings.get("is_mainnet") {
-                                Some(Value::Boolean(is_mainnet)) => *is_mainnet,
-                                _ => false,
-                            };
+                            let is_mainnet = env == &Network::Mainnet;
 
                             let mnemonic = match account_settings.get("mnemonic") {
                                 Some(Value::String(words)) => {
@@ -218,7 +221,7 @@ impl ChainConfig {
                                     let entropy = &[
                                         0x33, 0xE4, 0x6B, 0xB1, 0x3A, 0x74, 0x6E, 0xA4, 0x1C, 0xDD,
                                         0xE4, 0x5C, 0x90, 0x84, 0x6A, 0x79,
-                                    ]; // todo(ludo): rand
+                                    ]; // TODO(lgalabru): rand
                                     Mnemonic::from_entropy(entropy).unwrap().to_string()
                                 }
                             };
@@ -226,7 +229,7 @@ impl ChainConfig {
                             let derivation = match account_settings.get("derivation") {
                                 Some(Value::String(derivation)) => derivation.to_string(),
                                 _ => DEFAULT_DERIVATION_PATH.to_string(),
-                            }; // todo(ludo): use derivation path
+                            }; // TODO(lgalabru): use derivation path
 
                             let (address, _, _) =
                                 compute_addresses(&mnemonic, &derivation, is_mainnet);
@@ -280,10 +283,12 @@ impl ChainConfig {
                     .bitcoin_node_password
                     .take()
                     .unwrap_or("devnet".to_string()),
-                bitcoin_controller_port: devnet_config.bitcoin_controller_port.unwrap_or(18442),
                 bitcoin_controller_block_time: devnet_config
                     .bitcoin_controller_block_time
                     .unwrap_or(30_000),
+                bitcoin_controller_automining_disabled: devnet_config
+                    .bitcoin_controller_automining_disabled
+                    .unwrap_or(false),
                 stacks_node_p2p_port: devnet_config.stacks_node_p2p_port.unwrap_or(20444),
                 stacks_node_rpc_port: devnet_config.stacks_node_rpc_port.unwrap_or(20443),
                 stacks_node_events_observers: devnet_config
@@ -345,6 +350,7 @@ impl ChainConfig {
                 disable_bitcoin_explorer: devnet_config.disable_bitcoin_explorer.unwrap_or(false),
                 disable_stacks_api: devnet_config.disable_stacks_api.unwrap_or(false),
                 disable_stacks_explorer: devnet_config.disable_stacks_explorer.unwrap_or(false),
+                bind_containers_volumes: devnet_config.bind_containers_volumes.unwrap_or(false),
             };
             if !config.disable_stacks_api && config.disable_stacks_api {
                 config.disable_stacks_api = false;

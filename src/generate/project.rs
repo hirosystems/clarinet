@@ -341,9 +341,9 @@ balance = 100_000_000_000_000
 # btc_address: mjSrB3wS4xab3kYqFktwBzfTdPg367ZJ2d
 
 [devnet]
-disable_bitcoin_explorer = true
-# disable_stacks_explorer = true
-# disable_stacks_api = true
+disable_stacks_explorer = false
+disable_stacks_api = false
+# disable_bitcoin_explorer = true
 # working_dir = "tmp/devnet"
 # stacks_node_events_observers = ["host.docker.internal:8002"]
 # miner_mnemonic = "twice kind fence tip hidden tilt action fragile skin nothing glory cousin green tomorrow spring wrist shed math olympic multiply hip blue scout claw"
@@ -353,7 +353,6 @@ disable_bitcoin_explorer = true
 # bitcoin_node_rpc_port = 18443
 # bitcoin_node_username = "devnet"
 # bitcoin_node_password = "devnet"
-# bitcoin_controller_port = 18442
 # bitcoin_controller_block_time = 30_000
 # stacks_node_rpc_port = 20443
 # stacks_node_p2p_port = 20444
@@ -365,8 +364,8 @@ disable_bitcoin_explorer = true
 # postgres_username = "postgres"
 # postgres_password = "postgres"
 # postgres_database = "postgres"
-# bitcoin_node_image_url = "quay.io/hirosystems/bitcoind:devnet"
-# stacks_node_image_url = "localhost:5000/stacks-node:devnet"
+# bitcoin_node_image_url = "quay.io/hirosystems/bitcoind:devnet-v2"
+# stacks_node_image_url = "localhost:5000/stacks-node:devnet-v2"
 # stacks_api_image_url = "blockstack/stacks-blockchain-api:latest"
 # stacks_explorer_image_url = "blockstack/explorer:latest"
 # bitcoin_explorer_image_url = "quay.io/hirosystems/bitcoin-explorer:devnet"

@@ -56,7 +56,7 @@ jobs:
         run: cargo install cargo-audit
 
       - name: Run audit
-        run: cargo audit --ignore RUSTSEC-2021-0076 --ignore RUSTSEC-2021-0079 --ignore RUSTSEC-2021-0078 --ignore RUSTSEC-2021-0093 --ignore RUSTSEC-2020-0159 --ignore RUSTSEC-2021-0119 --ignore RUSTSEC-2020-0071 --ignore RUSTSEC-2022-0006
+        run: cargo audit --ignore RUSTSEC-2021-0076 --ignore RUSTSEC-2021-0079 --ignore RUSTSEC-2021-0078 --ignore RUSTSEC-2021-0093 --ignore RUSTSEC-2020-0159 --ignore RUSTSEC-2021-0119 --ignore RUSTSEC-2020-0071 --ignore RUSTSEC-2022-0006 --ignore RUSTSEC-2022-0013
 
       - name: Run rustfmt
         run: cargo fmt --all -- --check
@@ -74,9 +74,9 @@ jobs:
       - name: Install Rust toolchain
         uses: actions-rs/toolchain@v1
         with:
-          toolchain: nightly-2021-08-05
+          toolchain: stable
+          target: ${{ matrix.target }}
           profile: minimal
-          components: llvm-tools-preview
           override: true
 
       - name: Cache cargo
@@ -93,11 +93,11 @@ jobs:
 
       - name: Install dependencies
         if: steps.cache-cargo.outputs.cache-hit != 'true'
-        run: cargo install grcov
+        run: RUSTC_BOOTSTRAP=1 cargo install grcov
 
       - name: Unit Tests
         env:
-          RUSTFLAGS: "-Zinstrument-coverage"
+          RUSTFLAGS: "-Cinstrument-coverage"
           LLVM_PROFILE_FILE: "clarinet-%p-%m.profraw"
         run: cargo build --locked && cargo test
 
@@ -172,6 +172,7 @@ jobs:
           toolchain: stable
           target: ${{ matrix.target }}
           profile: minimal
+          components: llvm-tools-preview
           override: true
 
       - name: Install and cache Node

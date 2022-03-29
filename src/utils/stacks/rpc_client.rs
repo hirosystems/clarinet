@@ -23,6 +23,22 @@ pub struct CallReadOnlyFnResult {
 }
 
 #[derive(Deserialize, Debug, Clone, Default)]
+pub struct NodeInfo {
+    pub peer_version: u64,
+    pub pox_consensus: String,
+    pub burn_block_height: u64,
+    pub stable_pox_consensus: String,
+    pub stable_burn_block_height: u64,
+    pub server_version: String,
+    pub network_id: u32,
+    pub parent_network_id: u32,
+    pub stacks_tip_height: u64,
+    pub stacks_tip: String,
+    pub stacks_tip_consensus_hash: String,
+    pub genesis_chainstate_hash: String,
+}
+
+#[derive(Deserialize, Debug, Clone, Default)]
 pub struct PoxInfo {
     pub contract_id: String,
     pub pox_activation_threshold_ustx: u64,
@@ -46,6 +62,12 @@ struct Balance {
     nonce: u64,
     balance_proof: String,
     nonce_proof: String,
+}
+
+#[derive(Deserialize, Debug)]
+pub struct Contract {
+    source: String,
+    publish_height: u64,
 }
 
 impl StacksRpc {
@@ -105,6 +127,40 @@ impl StacksRpc {
             .json()
             .expect("Unable to parse contract");
         Ok(res)
+    }
+
+    pub fn get_info(&self) -> Result<NodeInfo, RpcError> {
+        let request_url = format!("{}/v2/info", self.url);
+
+        let res: NodeInfo = self
+            .client
+            .get(&request_url)
+            .send()
+            .expect("Unable to retrieve account")
+            .json()
+            .expect("Unable to parse contract");
+        Ok(res)
+    }
+
+    pub fn get_contract_source(
+        &self,
+        principal: &str,
+        contract_name: &str,
+    ) -> Result<Contract, RpcError> {
+        let request_url = format!(
+            "{}/v2/contracts/source/{}/{}",
+            self.url, principal, contract_name
+        );
+
+        let res = self.client.get(&request_url).send();
+
+        match res {
+            Ok(response) => match response.json() {
+                Ok(value) => Ok(value),
+                _ => Err(RpcError::Generic),
+            },
+            _ => Err(RpcError::Generic),
+        }
     }
 
     pub fn call_read_only_fn(
