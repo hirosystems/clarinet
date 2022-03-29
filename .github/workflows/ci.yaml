@@ -74,9 +74,9 @@ jobs:
       - name: Install Rust toolchain
         uses: actions-rs/toolchain@v1
         with:
-          toolchain: nightly-2022-02-22
+          toolchain: stable
+          target: ${{ matrix.target }}
           profile: minimal
-          components: llvm-tools-preview
           override: true
 
       - name: Cache cargo
@@ -93,11 +93,11 @@ jobs:
 
       - name: Install dependencies
         if: steps.cache-cargo.outputs.cache-hit != 'true'
-        run: cargo install grcov --version 0.8.6
+        run: RUSTC_BOOTSTRAP=1 cargo install grcov
 
       - name: Unit Tests
         env:
-          RUSTFLAGS: "-Zinstrument-coverage"
+          RUSTFLAGS: "-Cinstrument-coverage"
           LLVM_PROFILE_FILE: "clarinet-%p-%m.profraw"
         run: cargo build --locked && cargo test
 
@@ -172,6 +172,7 @@ jobs:
           toolchain: stable
           target: ${{ matrix.target }}
           profile: minimal
+          components: llvm-tools-preview
           override: true
 
       - name: Install and cache Node
