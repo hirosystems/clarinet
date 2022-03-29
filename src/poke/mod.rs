@@ -1,11 +1,10 @@
-use crate::publish::Network;
-use crate::types::{ChainConfig, ProjectManifest};
+use crate::types::{ChainConfig, Network, ProjectManifest};
 use clarity_repl::{repl, Terminal};
 use std::fs;
 use std::path::PathBuf;
 
 pub fn load_session_settings(
-    manifest_path: PathBuf,
+    manifest_path: &PathBuf,
     env: &Network,
 ) -> Result<(repl::SessionSettings, ChainConfig, ProjectManifest), String> {
     let mut settings = repl::SessionSettings::default();
@@ -24,7 +23,7 @@ pub fn load_session_settings(
     });
 
     let mut project_config = ProjectManifest::from_path(&manifest_path);
-    let chain_config = ChainConfig::from_path(&chain_config_path);
+    let chain_config = ChainConfig::from_path(&chain_config_path, env);
 
     let mut deployer_address = None;
     let mut initial_deployer = None;
@@ -55,7 +54,8 @@ pub fn load_session_settings(
         settings.initial_accounts.push(account);
     }
 
-    for (name, config) in project_config.ordered_contracts().iter() {
+    for name in project_config.ordered_contracts().iter() {
+        let config = project_config.contracts.get(name).unwrap();
         let mut contract_path = project_path.clone();
         contract_path.push(&config.path);
 
@@ -88,7 +88,7 @@ pub fn load_session_settings(
         settings.initial_links.push(repl::settings::InitialLink {
             contract_id: link_config.contract_id.clone(),
             stacks_node_addr: None,
-            cache: None,
+            cache: Some(project_config.project.cache_dir.clone()),
         });
     }
 
@@ -100,16 +100,19 @@ pub fn load_session_settings(
     ];
     settings.initial_deployer = initial_deployer;
     settings.repl_settings = project_config.repl_settings.clone();
+    settings.disk_cache_enabled = true;
 
     Ok((settings, chain_config, project_config))
 }
 
 pub fn load_session(
-    manifest_path: PathBuf,
+    manifest_path: &PathBuf,
     start_repl: bool,
     env: &Network,
-) -> Result<(repl::Session, ChainConfig, ProjectManifest, Option<String>), String> {
-    let (settings, chain_config, project_config) = load_session_settings(manifest_path, env)?;
+) -> Result<(repl::Session, ChainConfig, ProjectManifest, Option<String>), (ProjectManifest, String)>
+{
+    let (settings, chain_config, project_config) =
+        load_session_settings(manifest_path, env).expect("Unable to load manifest");
 
     let (session, output) = if start_repl {
         let mut terminal = Terminal::new(settings.clone());
@@ -119,8 +122,7 @@ pub fn load_session(
         let mut session = repl::Session::new(settings.clone());
         let output = match session.start() {
             Err(message) => {
-                println!("{}", message);
-                std::process::exit(1);
+                return Err((project_config, message));
             }
             Ok((message, _)) => match message.is_empty() {
                 true => None,
