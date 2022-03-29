@@ -7,7 +7,7 @@ use tower_lsp::lsp_types::*;
 use tower_lsp::{async_trait, Client, LanguageServer};
 
 use clarity_repl::clarity::types::QualifiedContractIdentifier;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::fs;
 use std::path::PathBuf;
 use std::str::FromStr;
@@ -40,9 +40,9 @@ pub struct CompletionMaps {
 
 #[derive(Debug)]
 pub struct ContractState {
-    pub session: Session,
-    pub analysis: ContractAnalysis,
+    analysis: ContractAnalysis,
     intellisense: CompletionMaps,
+    session: Session,
     // TODO(lgalabru)
     // hash: Vec<u8>,
     // symbols: HashMap<String, Symbol>,
@@ -311,31 +311,62 @@ impl ClarityLanguageBackend {
                 self.client.publish_diagnostics(url, vec![], None).await;
             }
 
-            if !diagnostics.is_empty() {
-                let erroring_files = diagnostics
-                    .iter()
-                    .map(|(url, _)| {
-                        url.to_file_path()
-                            .unwrap()
-                            .file_name()
-                            .unwrap()
-                            .to_str()
-                            .unwrap()
-                            .to_string()
-                    })
-                    .collect::<Vec<_>>();
-                self.client
-                    .show_message(
-                        MessageType::Error,
-                        format!(
-                            "Errors detected in following contracts: {}",
-                            erroring_files.join(", ")
-                        ),
-                    )
-                    .await;
-            }
+            let mut erroring_files = HashSet::new();
+            let mut warning_files = HashSet::new();
             for (url, diagnostic) in diagnostics.into_iter() {
+                for d in diagnostic.iter() {
+                    if let Some(level) = d.severity {
+                        if level == DiagnosticSeverity::Warning {
+                            warning_files.insert(
+                                url.to_file_path()
+                                    .unwrap()
+                                    .file_name()
+                                    .unwrap()
+                                    .to_str()
+                                    .unwrap()
+                                    .to_string(),
+                            );
+                        } else if level == DiagnosticSeverity::Error {
+                            erroring_files.insert(
+                                url.to_file_path()
+                                    .unwrap()
+                                    .file_name()
+                                    .unwrap()
+                                    .to_str()
+                                    .unwrap()
+                                    .to_string(),
+                            );
+                        }
+                    }
+                }
                 self.client.publish_diagnostics(url, diagnostic, None).await;
+            }
+            let res = match (erroring_files.len(), warning_files.len()) {
+                (0, 0) => None,
+                (0, warnings) if warnings > 0 => Some((
+                    MessageType::Warning,
+                    format!(
+                        "Warning detected in following contracts: {}",
+                        warning_files.into_iter().collect::<Vec<_>>().join(", ")
+                    ),
+                )),
+                (errors, 0) if errors > 0 => Some((
+                    MessageType::Error,
+                    format!(
+                        "Errors detected in following contracts: {}",
+                        erroring_files.into_iter().collect::<Vec<_>>().join(", ")
+                    ),
+                )),
+                (_errors, _warnings) => Some((
+                    MessageType::Error,
+                    format!(
+                        "Errors and warnings detected in following contracts: {}",
+                        erroring_files.into_iter().collect::<Vec<_>>().join(", ")
+                    ),
+                )),
+            };
+            if let Some((level, message)) = res {
+                self.client.show_message(level, message).await;
             }
         }
     }
@@ -531,7 +562,7 @@ impl LanguageServer for ClarityLanguageBackend {
     // }
 
     // fn hover(&self, _: TextDocumentPositionParams) -> Self::HoverFuture {
-    //     // TODO(lgalabru): to implement
+    //     // todo(ludo): to implement
     //     let result = Hover {
     //         contents: HoverContents::Scalar(MarkedString::String("".to_string())),
     //         range: None,
