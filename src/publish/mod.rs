@@ -226,10 +226,10 @@ pub fn publish_all_contracts(
     let contracts_to_deploy = settings.initial_contracts.len();
     let node_url = settings.node.clone();
 
-    // Approach's description: after getting all the contracts indexed by the manifest, we build a 
-    // a sorted set that we will be splitting in batches of 25 contracts, which is the number of 
+    // Approach's description: after getting all the contracts indexed by the manifest, we build a
+    // a sorted set that we will be splitting in batches of 25 contracts, which is the number of
     // transactions that you can have for one user at a givent time in a mempool.
-    // We then keep fetching the stacks-node every `delay_between_checks` seconds and wait for 
+    // We then keep fetching the stacks-node every `delay_between_checks` seconds and wait for
     // all the contracts to be published, and then move on to the next batch.
     // We're using a channel here because this routine can be used in 2 different contexts:
     // - clarinet contracts publish: display a UI that let developers tracking the progress

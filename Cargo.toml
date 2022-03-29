@@ -38,7 +38,7 @@ libsecp256k1 = "0.7.0"
 sha2 = "0.10.0"
 uuid = { version = "0.8.2", features = ["v4"] }
 hmac = "0.12.0"
-pbkdf2 = { version = "0.10.0", features=["parallel"], default-features = false }
+pbkdf2 = { version = "0.11.0", features=["simple"], default-features = false }
 futures = "0.3.12"
 tokio = { version = "=1.15.0", features = ["full"] }
 lazy_static = "1.4.0"
