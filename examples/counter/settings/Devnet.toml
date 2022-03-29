@@ -71,14 +71,13 @@ balance = 100_000_000_000_000
 # stx_address: STNHKEPYEPJ8ET55ZZ0M5A34J0R3N5FM2CMMMAZ6
 # btc_address: mjSrB3wS4xab3kYqFktwBzfTdPg367ZJ2d
 
-# [devnet]
+[devnet]
 # pox_stacking_orders = []
 # orchestrator_port = 20445
 # bitcoin_node_p2p_port = 18444
 # bitcoin_node_rpc_port = 18443
 # bitcoin_node_username = "devnet"
 # bitcoin_node_password = "devnet"
-# bitcoin_controller_port = 18442
 # bitcoin_controller_block_time = 30_000
 # stacks_node_rpc_port = 20443
 # stacks_node_p2p_port = 20444
@@ -100,9 +99,10 @@ balance = 100_000_000_000_000
 # stacks_explorer_image_url = "blockstack/explorer:latest"
 # bitcoin_explorer_image_url = "quay.io/hirosystems/bitcoin-explorer:devnet"
 # postgres_image_url = "postgres:alpine"
-# disable_bitcoin_explorer: false
-# disable_stacks_explorer: false
-# disable_stacks_api: false
+# bitcoin_controller_automining_disabled = true
+# disable_bitcoin_explorer = false
+# disable_stacks_explorer = true
+# disable_stacks_api = true
 
 [[devnet.pox_stacking_orders]]
 start_at_cycle = 3

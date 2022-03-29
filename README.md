@@ -136,7 +136,7 @@ phrases and initial balances. Initial balances are in microSTX.
 Clarinet can handle adding a new contract and its configuration to your project with the following command:
 
 ```bash
-$ clarinet contract new bbtc
+$ clarinet contracts new bbtc
 ```
 
 Clarinet will add 2 files to your project, the contract file in the `contracts` directory, and the contract test file

@@ -1,6 +1,6 @@
 use super::DevnetEvent;
 use crate::integrate::{ServiceStatusData, Status};
-use crate::types::{ChainConfig, DevnetConfigFile, ProjectManifest};
+use crate::types::{ChainConfig, DevnetConfigFile, Network, ProjectManifest};
 use bollard::container::{
     Config, CreateContainerOptions, KillContainerOptions, ListContainersOptions,
     PruneContainersOptions, WaitContainerOptions,
@@ -20,7 +20,7 @@ use tracing::info;
 
 #[derive(Default, Debug)]
 pub struct DevnetOrchestrator {
-    name: String,
+    pub name: String,
     network_name: String,
     pub manifest_path: PathBuf,
     pub network_config: Option<ChainConfig>,
@@ -49,7 +49,7 @@ impl DevnetOrchestrator {
         network_config_path.push("settings");
         network_config_path.push("Devnet.toml");
 
-        let mut network_config = ChainConfig::from_path(&network_config_path);
+        let mut network_config = ChainConfig::from_path(&network_config_path, &Network::Devnet);
         let manifest = ProjectManifest::from_path(&manifest_path);
         let name = manifest.project.name.clone();
         let network_name = format!("{}.devnet", name);
@@ -94,10 +94,6 @@ impl DevnetOrchestrator {
 
                 if let Some(val) = devnet_override.stacks_explorer_port {
                     devnet_config.stacks_explorer_port = val;
-                }
-
-                if let Some(val) = devnet_override.bitcoin_controller_port {
-                    devnet_config.bitcoin_controller_port = val;
                 }
 
                 if let Some(ref val) = devnet_override.bitcoin_node_username {
@@ -183,6 +179,10 @@ impl DevnetOrchestrator {
                 if let Some(val) = devnet_override.disable_stacks_api {
                     devnet_config.disable_stacks_api = val;
                 }
+
+                if let Some(val) = devnet_override.bitcoin_controller_automining_disabled {
+                    devnet_config.bitcoin_controller_automining_disabled = val;
+                }
             }
             _ => {}
         };
@@ -202,19 +202,14 @@ impl DevnetOrchestrator {
     pub fn get_stacks_node_url(&self) -> String {
         match self.network_config {
             Some(ref config) => match config.devnet {
-                Some(ref devnet) => format!("http://0.0.0.0:{}", devnet.stacks_node_rpc_port),
+                Some(ref devnet) => format!("http://localhost:{}", devnet.stacks_node_rpc_port),
                 _ => unreachable!(),
             },
             _ => unreachable!(),
         }
     }
 
-    pub async fn start(
-        &mut self,
-        event_tx: Sender<DevnetEvent>,
-        terminator_rx: Receiver<bool>,
-        contracts_to_deploy_len: usize,
-    ) {
+    pub async fn start(&mut self, event_tx: Sender<DevnetEvent>, terminator_rx: Receiver<bool>) {
         let (docker, devnet_config) = match (&self.docker_client, &self.network_config) {
             (Some(ref docker), Some(ref network_config)) => match network_config.devnet {
                 Some(ref devnet_config) => (docker, devnet_config),
@@ -320,10 +315,7 @@ impl DevnetOrchestrator {
             name: "bitcoin-node".into(),
             comment: "preparing container".into(),
         }));
-        match self
-            .prepare_bitcoin_node_container(contracts_to_deploy_len)
-            .await
-        {
+        match self.prepare_bitcoin_node_container().await {
             Ok(_) => {}
             Err(message) => {
                 println!("{}", message);
@@ -338,7 +330,9 @@ impl DevnetOrchestrator {
             comment: "booting".into(),
         }));
         match self.boot_bitcoin_node_container().await {
-            Ok(_) => {}
+            Ok(_) => {
+                self.initialize_bitcoin_node(&event_tx);
+            }
             Err(message) => {
                 println!("{}", message);
                 self.kill(true).await;
@@ -527,7 +521,7 @@ impl DevnetOrchestrator {
 
                     let _ = event_tx.send(DevnetEvent::debug("Restarting containers...".into()));
                     let (bitcoin_node_c_id, stacks_node_c_id) = self
-                        .start_containers(boot_index, contracts_to_deploy_len)
+                        .start_containers(boot_index)
                         .await
                         .expect("Unable to reboot");
                     self.bitcoin_blockchain_container_id = Some(bitcoin_node_c_id);
@@ -540,11 +534,7 @@ impl DevnetOrchestrator {
         }
     }
 
-    pub fn prepare_bitcoin_node_config(
-        &self,
-        boot_index: u32,
-        contracts_to_deploy_len: usize,
-    ) -> Result<Config<String>, String> {
+    pub fn prepare_bitcoin_node_config(&self, boot_index: u32) -> Result<Config<String>, String> {
         let devnet_config = match &self.network_config {
             Some(ref network_config) => match network_config.devnet {
                 Some(ref devnet_config) => devnet_config,
@@ -554,13 +544,6 @@ impl DevnetOrchestrator {
         };
 
         let mut port_bindings = HashMap::new();
-        port_bindings.insert(
-            format!("{}/tcp", devnet_config.bitcoin_controller_port),
-            Some(vec![PortBinding {
-                host_ip: Some(String::from("0.0.0.0")),
-                host_port: Some(format!("{}/tcp", devnet_config.bitcoin_controller_port)),
-            }]),
-        );
         port_bindings.insert(
             format!("{}/tcp", devnet_config.bitcoin_node_p2p_port),
             Some(vec![PortBinding {
@@ -586,7 +569,6 @@ rpcuser={}
 rpcpassword={}
 txindex=1
 listen=1
-reindex=0
 discover=0
 dns=0
 dnsseed=0
@@ -620,65 +602,7 @@ rpcport={}
         bitcoind_data_path.push("bitcoin");
         fs::create_dir(bitcoind_data_path).expect("Unable to create working dir");
 
-        let bitcoin_controller_conf = format!(
-            r#"
-[network]
-rpc_bind = "0.0.0.0:{}"
-block_time = {}
-miner_address = "{}"
-bitcoind_rpc_host = "0.0.0.0:{}"
-bitcoind_rpc_user = "{}"
-bitcoind_rpc_pass = "{}"
-whitelisted_rpc_calls = [
-    "listunspent",
-    "listwallets",
-    "createwallet",
-    "importaddress",
-    "sendrawtransaction",
-    "getrawtransaction",
-    "scantxoutset",
-    "getrawmempool",
-    "getblockhash",
-]
-# Expedite the key registration / genesis block
-[[blocks]]
-count = 1
-block_time = 30000
-ignore_txs = false
-
-# Expedite the key registration / genesis block
-[[blocks]]
-count = 2
-block_time = 20000
-ignore_txs = false
-
-# Give more time to the first blocks
-[[blocks]]
-count = {}
-block_time = 50000
-ignore_txs = false
-"#,
-            devnet_config.bitcoin_controller_port,
-            devnet_config.bitcoin_controller_block_time,
-            devnet_config.miner_btc_address,
-            devnet_config.bitcoin_node_rpc_port,
-            devnet_config.bitcoin_node_username,
-            devnet_config.bitcoin_node_password,
-            1 + contracts_to_deploy_len / 25
-        );
-        let mut bitcoin_controller_conf_path = PathBuf::from(&devnet_config.working_dir);
-        bitcoin_controller_conf_path.push("conf/puppet-chain.toml");
-
-        let mut file = File::create(bitcoin_controller_conf_path)
-            .expect("Unable to create bitcoin_controller.toml");
-        file.write_all(bitcoin_controller_conf.as_bytes())
-            .expect("Unable to create bitcoin_controller.toml");
-
         let mut exposed_ports = HashMap::new();
-        exposed_ports.insert(
-            format!("{}/tcp", devnet_config.bitcoin_controller_port),
-            HashMap::new(),
-        );
         exposed_ports.insert(
             format!("{}/tcp", devnet_config.bitcoin_node_rpc_port),
             HashMap::new(),
@@ -692,6 +616,20 @@ ignore_txs = false
         labels.insert("project".to_string(), self.network_name.to_string());
         labels.insert("reset".to_string(), "true".to_string());
 
+        let mut env = vec![];
+        if devnet_config.bitcoin_controller_automining_disabled {
+            env.push("STACKS_BITCOIN_AUTOMINING_DISABLED=1".to_string());
+        }
+
+        let mut binds = vec![format!("{}/conf:/etc/bitcoin", devnet_config.working_dir)];
+
+        if devnet_config.bind_containers_volumes {
+            binds.push(format!(
+                "{}/data/{}/bitcoin:/root/.bitcoin",
+                devnet_config.working_dir, boot_index
+            ));
+        }
+
         let config = Config {
             labels: Some(labels),
             image: Some(devnet_config.bitcoin_node_image_url.clone()),
@@ -699,15 +637,10 @@ ignore_txs = false
             tty: None,
             exposed_ports: Some(exposed_ports),
             entrypoint: Some(vec![]),
+            env: Some(env),
             host_config: Some(HostConfig {
                 port_bindings: Some(port_bindings),
-                binds: Some(vec![
-                    format!("{}/conf:/etc/bitcoin", devnet_config.working_dir),
-                    format!(
-                        "{}/data/{}/bitcoin:/root/.bitcoin",
-                        devnet_config.working_dir, boot_index
-                    ),
-                ]),
+                binds: Some(binds),
                 extra_hosts: Some(vec!["host.docker.internal:host-gateway".into()]),
                 ..Default::default()
             }),
@@ -717,10 +650,7 @@ ignore_txs = false
         Ok(config)
     }
 
-    pub async fn prepare_bitcoin_node_container(
-        &mut self,
-        contracts_to_deploy_len: usize,
-    ) -> Result<(), String> {
+    pub async fn prepare_bitcoin_node_container(&mut self) -> Result<(), String> {
         let (docker, devnet_config) = match (&self.docker_client, &self.network_config) {
             (Some(ref docker), Some(ref network_config)) => match network_config.devnet {
                 Some(ref devnet_config) => (docker, devnet_config),
@@ -742,7 +672,7 @@ ignore_txs = false
             .await
             .map_err(|_| "Unable to create image".to_string())?;
 
-        let config = self.prepare_bitcoin_node_config(1, contracts_to_deploy_len)?;
+        let config = self.prepare_bitcoin_node_config(1)?;
         let options = CreateContainerOptions {
             name: format!("bitcoin-node.{}", self.network_name),
         };
@@ -870,31 +800,39 @@ p2p_bind = "0.0.0.0:{}"
 miner = true
 seed = "{}"
 local_peer_seed = "{}"
-wait_time_for_microblocks = 1000
+wait_time_for_microblocks = 5000
+pox_sync_sample_secs = 10
+microblock_frequency = 15000
 
 [burnchain]
 chain = "bitcoin"
 mode = "krypton"
-peer_host = "{}"
+poll_time_secs = 1
+peer_host = "host.docker.internal"
 username = "{}"
 password = "{}"
 rpc_port = {}
 peer_port = {}
 
+[miner]
+first_attempt_time_ms = 10000
+subsequent_attempt_time_ms = 10000
+# microblock_attempt_time_ms = 15000
+
 # Add orchestrator (docker-host) as an event observer
 [[events_observer]]
 endpoint = "host.docker.internal:{}"
 retry_count = 255
+include_data_events = true
 events_keys = ["*"]
 "#,
             devnet_config.stacks_node_rpc_port,
             devnet_config.stacks_node_p2p_port,
             devnet_config.miner_secret_key_hex,
             devnet_config.miner_secret_key_hex,
-            format!("bitcoin-node.{}", self.network_name),
             devnet_config.bitcoin_node_username,
             devnet_config.bitcoin_node_password,
-            devnet_config.bitcoin_controller_port,
+            devnet_config.orchestrator_port,
             devnet_config.bitcoin_node_p2p_port,
             devnet_config.orchestrator_port,
         );
@@ -906,6 +844,7 @@ events_keys = ["*"]
 [[events_observer]]
 endpoint = "{}"
 retry_count = 255
+include_data_events = false
 events_keys = ["*"]
 "#,
                 format!(
@@ -926,7 +865,7 @@ amount = {}
             ));
         }
 
-        for events_observer in devnet_config.stacks_node_events_observers.iter() {
+        for chains_coordinator in devnet_config.stacks_node_events_observers.iter() {
             stacks_conf.push_str(&format!(
                 r#"
 [[events_observer]]
@@ -934,7 +873,7 @@ endpoint = "{}"
 retry_count = 255
 events_keys = ["*"]
 "#,
-                events_observer,
+                chains_coordinator,
             ));
         }
 
@@ -965,6 +904,18 @@ events_keys = ["*"]
         labels.insert("project".to_string(), self.network_name.to_string());
         labels.insert("reset".to_string(), "true".to_string());
 
+        let mut binds = vec![format!(
+            "{}/conf:/src/stacks-node/",
+            devnet_config.working_dir
+        )];
+
+        if devnet_config.bind_containers_volumes {
+            binds.push(format!(
+                "{}/data/{}/stacks:/devnet/",
+                devnet_config.working_dir, boot_index
+            ))
+        }
+
         let config = Config {
             labels: Some(labels),
             image: Some(devnet_config.stacks_node_image_url.clone()),
@@ -978,18 +929,12 @@ events_keys = ["*"]
             ]),
             env: Some(vec![
                 "STACKS_LOG_PP=1".to_string(),
+                // "STACKS_LOG_DEBUG=1".to_string(),
                 "BLOCKSTACK_USE_TEST_GENESIS_CHAINSTATE=1".to_string(),
             ]),
             host_config: Some(HostConfig {
                 port_bindings: Some(port_bindings),
-
-                binds: Some(vec![
-                    format!("{}/conf:/src/stacks-node/", devnet_config.working_dir),
-                    format!(
-                        "{}/data/{}/stacks:/devnet/",
-                        devnet_config.working_dir, boot_index
-                    ),
-                ]),
+                binds: Some(binds),
                 extra_hosts: Some(vec!["host.docker.internal:host-gateway".into()]),
                 ..Default::default()
             }),
@@ -1488,6 +1433,11 @@ events_keys = ["*"]
                     "BTCEXP_BITCOIND_PASS={}",
                     devnet_config.bitcoin_node_password
                 ),
+                format!(
+                    "BTCEXP_BASIC_AUTH_PASSWORD={}",
+                    devnet_config.bitcoin_node_password
+                ),
+                format!("BTCEXP_RPC_ALLOWALL=true",),
             ]),
             host_config: Some(HostConfig {
                 port_bindings: Some(port_bindings),
@@ -1610,11 +1560,7 @@ events_keys = ["*"]
         Ok(())
     }
 
-    pub async fn start_containers(
-        &self,
-        boot_index: u32,
-        contracts_to_deploy_len: usize,
-    ) -> Result<(String, String), String> {
+    pub async fn start_containers(&self, boot_index: u32) -> Result<(String, String), String> {
         let containers_ids = match (
             &self.stacks_blockchain_api_container_id,
             &self.stacks_explorer_container_id,
@@ -1632,7 +1578,7 @@ events_keys = ["*"]
             _ => return Err("Unable to get Docker client".into()),
         };
 
-        // todo(ludo): should we spawn
+        // TODO(lgalabru): should we spawn
         // docker run -d -p 5000:5000 --name registry registry:2.7
         // ?
 
@@ -1649,8 +1595,7 @@ events_keys = ["*"]
             .prune_containers(Some(PruneContainersOptions { filters }))
             .await;
 
-        let bitcoin_node_config =
-            self.prepare_bitcoin_node_config(boot_index, contracts_to_deploy_len)?;
+        let bitcoin_node_config = self.prepare_bitcoin_node_config(boot_index)?;
         let options = CreateContainerOptions {
             name: format!("bitcoin-node.{}", self.network_name),
         };
@@ -1792,7 +1737,7 @@ events_keys = ["*"]
             println!("Pruning network and containers...");
             self.prune().await;
             if let Some(ref tx) = self.termination_success_tx {
-                tx.send(true).expect("Unable to confirm termination");
+                let _ = tx.send(true);
             }
 
             println!(
@@ -1824,6 +1769,56 @@ events_keys = ["*"]
         let _ = docker
             .prune_networks(Some(PruneNetworksOptions { filters }))
             .await;
+    }
+
+    pub fn initialize_bitcoin_node(&self, devnet_event_tx: &Sender<DevnetEvent>) {
+        use bitcoincore_rpc::bitcoin::{Address, PrivateKey};
+        use bitcoincore_rpc::{Auth, Client, RpcApi};
+        use std::str::FromStr;
+
+        let devnet_config = match &self.network_config {
+            Some(ref network_config) => match network_config.devnet {
+                Some(ref devnet_config) => devnet_config,
+                _ => return,
+            },
+            _ => return,
+        };
+
+        const FAUCET_SECRET_KEY: &str = "cTYqAVPS7uJTAcxyzkXWjmRGoCjkPcb38wZVRjyXov1RiRDWPQj3";
+        const FAUCET_ADDRESS: &str = "n3k15aVS4rEWhVYn4YfAFjD8Em5mmsducg";
+
+        let rpc = Client::new(
+            &format!("http://localhost:{}", devnet_config.bitcoin_node_rpc_port),
+            Auth::UserPass(
+                devnet_config.bitcoin_node_username.to_string(),
+                devnet_config.bitcoin_node_password.to_string(),
+            ),
+        )
+        .unwrap();
+
+        let _ = devnet_event_tx.send(DevnetEvent::info(format!("Configuring Bitcoin",)));
+
+        loop {
+            match rpc.get_network_info() {
+                Ok(_r) => break,
+                Err(_e) => {}
+            }
+            std::thread::sleep(std::time::Duration::from_secs(1));
+            let _ = devnet_event_tx.send(DevnetEvent::info(format!("Waiting for bitcoind",)));
+        }
+
+        let miner_address = Address::from_str(&devnet_config.miner_btc_address).unwrap();
+
+        let _ = rpc.generate_to_address(3, &miner_address);
+        let _ = rpc.generate_to_address(97, &Address::from_str(&FAUCET_ADDRESS).unwrap());
+        let _ = rpc.generate_to_address(1, &miner_address);
+        let _ = rpc.create_wallet("", None, None, None, None);
+        let _ = rpc.import_address(&miner_address, None, None);
+        let _ = rpc.import_private_key(
+            &PrivateKey::from_str(&FAUCET_SECRET_KEY).unwrap(),
+            None,
+            None,
+        );
     }
 }
 
