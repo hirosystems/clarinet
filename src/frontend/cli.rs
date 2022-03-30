@@ -443,14 +443,14 @@ pub fn main() {
         Command::Console(cmd) => {
             let manifest_path = get_manifest_path_or_exit(cmd.manifest_path);
             let start_repl = true;
-            let (session, project_manifest) = match load_session(&manifest_path, start_repl, &Network::Devnet)
-            {
-                Ok((session, _, project_manifest, _)) => (Some(session), project_manifest),
-                Err((project_manifest, e)) => {
-                    println!("{}: Unable to start REPL: {}", red!("error"), e);
-                    (None, project_manifest)
-                }
-            };
+            let (session, project_manifest) =
+                match load_session(&manifest_path, start_repl, &Network::Devnet) {
+                    Ok((session, _, project_manifest, _)) => (Some(session), project_manifest),
+                    Err((project_manifest, e)) => {
+                        println!("{}: Unable to start REPL: {}", red!("error"), e);
+                        (None, project_manifest)
+                    }
+                };
             if hints_enabled {
                 display_post_console_hint();
             }
