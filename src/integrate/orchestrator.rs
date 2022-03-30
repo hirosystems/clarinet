@@ -386,7 +386,7 @@ impl DevnetOrchestrator {
                 order: 2,
                 status: Status::Green,
                 name: "stacks-api".into(),
-                comment: format!("http://localhost:{}", stacks_api_port),
+                comment: format!("http://localhost:{}/doc", stacks_api_port),
             }));
             match self.boot_stacks_api_container().await {
                 Ok(_) => {}
@@ -1086,6 +1086,7 @@ events_keys = ["*"]
                 format!("PG_DATABASE={}", devnet_config.postgres_database),
                 format!("STACKS_CHAIN_ID=2147483648"),
                 format!("V2_POX_MIN_AMOUNT_USTX=90000000260"),
+                "NODE_ENV=development".to_string(),
             ]),
             host_config: Some(HostConfig {
                 port_bindings: Some(port_bindings),
@@ -1296,21 +1297,19 @@ events_keys = ["*"]
             exposed_ports: Some(exposed_ports),
             env: Some(vec![
                 format!(
-                    "NEXT_PUBLIC_MAINNET_API_SERVER=http://stacks-api.{}:{}",
-                    self.network_name, devnet_config.stacks_api_port
+                    "NEXT_PUBLIC_REGTEST_API_SERVER=http://localhost:{}",
+                    devnet_config.stacks_api_port
                 ),
                 format!(
-                    "NEXT_PUBLIC_TESTNET_API_SERVER=http://stacks-api.{}:{}",
-                    self.network_name, devnet_config.stacks_api_port
+                    "NEXT_PUBLIC_TESTNET_API_SERVER=http://localhost:{}",
+                    devnet_config.stacks_api_port
                 ),
                 format!(
-                    "MOCKNET_API_SERVER=http://stacks-api.{}:{}",
-                    self.network_name, devnet_config.stacks_api_port
+                    "NEXT_PUBLIC_MAINNET_API_SERVER=http://localhost:{}",
+                    devnet_config.stacks_api_port
                 ),
-                format!(
-                    "TESTNET_API_SERVER=http://stacks-api.{}:{}",
-                    self.network_name, devnet_config.stacks_api_port
-                ),
+                format!("NEXT_PUBLIC_DEFAULT_POLLING_INTERVAL={}", 5000),
+                "NODE_ENV=development".to_string(),
             ]),
             host_config: Some(HostConfig {
                 port_bindings: Some(port_bindings),
