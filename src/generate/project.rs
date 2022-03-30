@@ -86,6 +86,7 @@ impl GetChangesForNewProject {
             r#"
 {{
     "deno.enable": true,
+    "files.eol": "\n"
 }}
 "#
         );
