@@ -141,11 +141,17 @@ export interface DevnetConfig {
    */
   stacks_explorer_port?: number;
   /**
-   * The port that should be used by the bitcoin controller/puppeteer port
+   * Bind bitcoind and stacks-node data volumes (false by default)
    * @type {number}
    * @memberof DevnetConfig
    */
-  bitcoin_controller_port?: number;
+  bind_containers_volumes?: boolean;
+  /**
+   * Disable Bitcoin automining
+   * @type {number}
+   * @memberof DevnetConfig
+   */
+  bitcoin_controller_automining_disabled?: boolean;
   /**
    * The username to use for authenticating bitcoind RPC calls
    * @type {number}

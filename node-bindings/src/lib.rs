@@ -7,8 +7,9 @@ mod serde;
 use clarinet_lib::bip39::{Language, Mnemonic};
 use clarinet_lib::integrate::{self, DevnetEvent, DevnetOrchestrator};
 use clarinet_lib::types::{
-    compute_addresses, AccountConfig, BitcoinBlockData, DevnetConfigFile, PoxStackingOrder,
-    StacksBlockData, DEFAULT_DERIVATION_PATH,
+    compute_addresses, AccountConfig, BitcoinBlockData, BitcoinChainEvent,
+    ChainUpdatedWithBlockData, DevnetConfigFile, PoxStackingOrder, StacksChainEvent,
+    DEFAULT_DERIVATION_PATH,
 };
 use core::panic;
 use neon::prelude::*;
@@ -23,7 +24,7 @@ type DevnetCallback = Box<dyn FnOnce(&Channel) + Send>;
 struct StacksDevnet {
     tx: mpsc::Sender<DevnetCommand>,
     bitcoin_block_rx: mpsc::Receiver<BitcoinBlockData>,
-    stacks_block_rx: mpsc::Receiver<StacksBlockData>,
+    stacks_block_rx: mpsc::Receiver<ChainUpdatedWithBlockData>,
     node_url: String,
 }
 
@@ -63,7 +64,7 @@ impl StacksDevnet {
                 // Start devnet
                 let (devnet_events_rx, terminator_tx) =
                     match integrate::run_devnet(devnet, Some(log_tx), false) {
-                        Ok((Some(devnet_events_rx), Some(terminator_tx))) => {
+                        Ok((Some(devnet_events_rx), Some(terminator_tx), _)) => {
                             (devnet_events_rx, terminator_tx)
                         }
                         _ => std::process::exit(1),
@@ -98,12 +99,16 @@ impl StacksDevnet {
             if let Ok(ref devnet_rx) = meta_rx.recv() {
                 while let Ok(ref event) = devnet_rx.recv() {
                     match event {
-                        DevnetEvent::BitcoinBlock(block) => {
+                        DevnetEvent::BitcoinChainEvent(
+                            BitcoinChainEvent::ChainUpdatedWithBlock(block),
+                        ) => {
                             bitcoin_block_tx
                                 .send(block.clone())
                                 .expect("Unable to transmit bitcoin block");
                         }
-                        DevnetEvent::StacksBlock(block) => {
+                        DevnetEvent::StacksChainEvent(StacksChainEvent::ChainUpdatedWithBlock(
+                            block,
+                        )) => {
                             stacks_block_tx
                                 .send(block.clone())
                                 .expect("Unable to transmit stacks block");
@@ -269,13 +274,6 @@ impl StacksDevnet {
         }
 
         if let Ok(res) = devnet_settings
-            .get(&mut cx, "bitcoin_controller_port")?
-            .downcast::<JsNumber, _>(&mut cx)
-        {
-            overrides.bitcoin_controller_port = Some(res.value(&mut cx) as u16);
-        }
-
-        if let Ok(res) = devnet_settings
             .get(&mut cx, "bitcoin_node_username")?
             .downcast::<JsString, _>(&mut cx)
         {
@@ -385,6 +383,22 @@ impl StacksDevnet {
             .downcast::<JsString, _>(&mut cx)
         {
             overrides.postgres_image_url = Some(res.value(&mut cx));
+        }
+
+        if let Ok(res) = devnet_settings
+            .get(&mut cx, "bitcoin_controller_automining_disabled")?
+            .downcast::<JsBoolean, _>(&mut cx)
+        {
+            overrides.bitcoin_controller_automining_disabled = Some(res.value(&mut cx));
+        }
+
+        if let Ok(res) = devnet_settings
+            .get(&mut cx, "bind_containers_volumes")?
+            .downcast::<JsBoolean, _>(&mut cx)
+        {
+            overrides.bind_containers_volumes = Some(res.value(&mut cx));
+        } else {
+            overrides.bind_containers_volumes = Some(false);
         }
 
         // Disable scripts
@@ -521,7 +535,7 @@ impl StacksDevnet {
             .downcast_or_throw::<JsBox<StacksDevnet>, _>(&mut cx)?;
 
         let block = match devnet.stacks_block_rx.recv() {
-            Ok(obj) => obj,
+            Ok(obj) => obj.new_block,
             Err(err) => panic!("{:?}", err),
         };
 

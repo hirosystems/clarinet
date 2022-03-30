@@ -11,9 +11,9 @@ use crate::generate::{
 use crate::integrate::{self, DevnetOrchestrator};
 use crate::lsp::run_lsp;
 use crate::poke::load_session;
-use crate::publish::{publish_all_contracts, Network};
+use crate::publish::publish_all_contracts;
 use crate::runnner::run_scripts;
-use crate::types::{ProjectManifest, ProjectManifestFile, RequirementConfig};
+use crate::types::{Network, ProjectManifest, ProjectManifestFile, RequirementConfig};
 use clarity_repl::clarity::analysis::{AnalysisDatabase, ContractAnalysis};
 use clarity_repl::clarity::costs::LimitedCostTracker;
 use clarity_repl::clarity::types::QualifiedContractIdentifier;
@@ -39,8 +39,8 @@ enum Command {
     #[clap(name = "new", bin_name = "new")]
     New(GenerateProject),
     /// Subcommands for working with contracts
-    #[clap(subcommand, name = "contract")]
-    Contract(Contract),
+    #[clap(subcommand, name = "contracts")]
+    Contracts(Contracts),
     /// Load contracts in a REPL for an interactive session
     #[clap(name = "console", aliases = &["poke"], bin_name = "console")]
     Console(Console),
@@ -50,9 +50,6 @@ enum Command {
     /// Check syntax of your contracts
     #[clap(name = "check", bin_name = "check")]
     Check(Check),
-    /// Publish contracts on chain
-    #[clap(name = "publish", bin_name = "publish")]
-    Publish(Publish),
     /// Execute Clarinet extension
     #[clap(name = "run", bin_name = "run")]
     Run(Run),
@@ -68,8 +65,8 @@ enum Command {
 }
 
 #[derive(Subcommand, PartialEq, Clone, Debug)]
-#[clap(bin_name = "contract")]
-enum Contract {
+#[clap(bin_name = "contract", aliases = &["contract"])]
+enum Contracts {
     /// Generate files and settings for a new contract
     #[clap(name = "new", bin_name = "new")]
     NewContract(NewContract),
@@ -79,6 +76,9 @@ enum Contract {
     /// Replicate a third-party contract into this project
     #[clap(name = "fork", bin_name = "fork")]
     ForkContract(ForkContract),
+    /// Publish contracts on chain
+    #[clap(name = "publish", bin_name = "publish")]
+    Publish(Publish),
 }
 
 #[derive(Parser, PartialEq, Clone, Debug)]
@@ -118,6 +118,34 @@ struct ForkContract {
     // /// Fork contract and all its dependencies
     // #[clap(short = 'r')]
     // pub recursive: bool,
+}
+
+#[derive(Parser, PartialEq, Clone, Debug)]
+struct Publish {
+    /// Deploy contracts on devnet, using settings/Devnet.toml
+    #[clap(
+        long = "devnet",
+        conflicts_with = "testnet",
+        conflicts_with = "mainnet"
+    )]
+    pub devnet: bool,
+    /// Deploy contracts on testnet, using settings/Testnet.toml
+    #[clap(
+        long = "testnet",
+        conflicts_with = "devnet",
+        conflicts_with = "mainnet"
+    )]
+    pub testnet: bool,
+    /// Deploy contracts on mainnet, using settings/Mainnet.toml
+    #[clap(
+        long = "mainnet",
+        conflicts_with = "testnet",
+        conflicts_with = "devnet"
+    )]
+    pub mainnet: bool,
+    /// Path to Clarinet.toml
+    #[clap(long = "manifest-path")]
+    pub manifest_path: Option<String>,
 }
 
 #[derive(Parser, PartialEq, Clone, Debug)]
@@ -175,34 +203,6 @@ struct Run {
 }
 
 #[derive(Parser, PartialEq, Clone, Debug)]
-struct Publish {
-    /// Deploy contracts on devnet, using settings/Devnet.toml
-    #[clap(
-        long = "devnet",
-        conflicts_with = "testnet",
-        conflicts_with = "mainnet"
-    )]
-    pub devnet: bool,
-    /// Deploy contracts on testnet, using settings/Testnet.toml
-    #[clap(
-        long = "testnet",
-        conflicts_with = "devnet",
-        conflicts_with = "mainnet"
-    )]
-    pub testnet: bool,
-    /// Deploy contracts on mainnet, using settings/Mainnet.toml
-    #[clap(
-        long = "mainnet",
-        conflicts_with = "testnet",
-        conflicts_with = "devnet"
-    )]
-    pub mainnet: bool,
-    /// Path to Clarinet.toml
-    #[clap(long = "manifest-path")]
-    pub manifest_path: Option<String>,
-}
-
-#[derive(Parser, PartialEq, Clone, Debug)]
 struct Check {
     /// Path to Clarinet.toml
     #[clap(long = "manifest-path")]
@@ -221,8 +221,8 @@ struct Completions {
 pub fn main() {
     let opts: Opts = match Opts::try_parse() {
         Ok(opts) => opts,
-        Err(_e) => {
-            if _e.kind == clap::ErrorKind::UnknownArgument {
+        Err(e) => {
+            if e.kind() == clap::ErrorKind::UnknownArgument {
                 match get_manifest_path(None) {
                     Some(manifest_path) => {
                         let manifest = ProjectManifest::from_path(&manifest_path);
@@ -233,14 +233,14 @@ pub fn main() {
                                     &manifest.project.name,
                                     &manifest.project.authors,
                                 ),
-                                format!("{}", _e),
+                                format!("{}", e),
                             ));
                         }
                     }
                     None => {}
                 };
             }
-            println!("{}", _e);
+            println!("{}", e);
             process::exit(1);
         }
     };
@@ -271,7 +271,7 @@ pub fn main() {
                     println!("{}", yellow!("Send usage data to Hiro."));
                     println!("{}", yellow!("Help Hiro improve its products and services by automatically sending diagnostics and usage data."));
                     println!("{}", yellow!("Only high level usage information, and no information identifying you or your project are collected."));
-                    // todo(ludo): once we have a privacy policy available, add a link
+                    // TODO(lgalabru): once we have a privacy policy available, add a link
                     // println!("{}", yellow!("Visit http://hiro.so/clarinet-privacy for details."));
                     println!("{}", yellow!("Enable [Y/n]?"));
                     let mut buffer = String::new();
@@ -311,8 +311,8 @@ pub fn main() {
                 )));
             }
         }
-        Command::Contract(subcommand) => match subcommand {
-            Contract::NewContract(new_contract) => {
+        Command::Contracts(subcommand) => match subcommand {
+            Contracts::NewContract(new_contract) => {
                 let manifest_path = get_manifest_path_or_exit(new_contract.manifest_path);
 
                 let changes = generate::get_changes_for_new_contract(
@@ -329,7 +329,7 @@ pub fn main() {
                     display_post_check_hint();
                 }
             }
-            Contract::Requirement(required_contract) => {
+            Contracts::Requirement(required_contract) => {
                 let manifest_path = get_manifest_path_or_exit(required_contract.manifest_path);
 
                 let change = TOMLEdition {
@@ -350,7 +350,7 @@ pub fn main() {
                     display_post_check_hint();
                 }
             }
-            Contract::ForkContract(fork_contract) => {
+            Contracts::ForkContract(fork_contract) => {
                 let manifest_path = get_manifest_path_or_exit(fork_contract.manifest_path);
 
                 println!(
@@ -403,18 +403,54 @@ pub fn main() {
                     display_post_check_hint();
                 }
             }
+            Contracts::Publish(deploy) => {
+                let manifest_path = get_manifest_path_or_exit(deploy.manifest_path);
+
+                let network = if deploy.devnet == true {
+                    Network::Devnet
+                } else if deploy.testnet == true {
+                    Network::Testnet
+                } else if deploy.mainnet == true {
+                    Network::Mainnet
+                } else {
+                    panic!(
+                        "Target deployment must be specified with --devnet, --testnet or --mainnet"
+                    )
+                };
+                let project_manifest =
+                    match publish_all_contracts(&manifest_path, &network, true, 30, None, None) {
+                        Ok((results, project_manifest)) => {
+                            println!("{}", results.join("\n"));
+                            project_manifest
+                        }
+                        Err(results) => {
+                            println!("{}", results.join("\n"));
+                            return;
+                        }
+                    };
+                if project_manifest.project.telemetry {
+                    #[cfg(feature = "telemetry")]
+                    telemetry_report_event(DeveloperUsageEvent::ContractPublished(
+                        DeveloperUsageDigest::new(
+                            &project_manifest.project.name,
+                            &project_manifest.project.authors,
+                        ),
+                        network,
+                    ));
+                }
+            }
         },
         Command::Console(cmd) => {
             let manifest_path = get_manifest_path_or_exit(cmd.manifest_path);
             let start_repl = true;
-            let (_, _, project_manifest, _) =
-                match load_session(manifest_path, start_repl, &Network::Devnet) {
-                    Ok(res) => res,
-                    Err(e) => {
-                        println!("{}: Unable to start REPL: {}", red!("error"), e);
-                        std::process::exit(1);
-                    }
-                };
+            let project_manifest = match load_session(&manifest_path, start_repl, &Network::Devnet)
+            {
+                Ok((_, _, res, _)) => res,
+                Err((project_manifest, e)) => {
+                    println!("{}: Unable to start REPL: {}", red!("error"), e);
+                    project_manifest
+                }
+            };
             if hints_enabled {
                 display_post_console_hint();
             }
@@ -486,8 +522,9 @@ pub fn main() {
         Command::Check(cmd) => {
             let manifest_path = get_manifest_path_or_exit(cmd.manifest_path);
             let start_repl = false;
-            let project_manifest = match load_session(manifest_path, start_repl, &Network::Devnet) {
-                Err(e) => {
+            let project_manifest = match load_session(&manifest_path, start_repl, &Network::Devnet)
+            {
+                Err((_, e)) => {
                     println!("{}", e);
                     return;
                 }
@@ -519,17 +556,17 @@ pub fn main() {
         Command::Test(cmd) => {
             let manifest_path = get_manifest_path_or_exit(cmd.manifest_path);
             let start_repl = false;
-            let res = load_session(manifest_path.clone(), start_repl, &Network::Devnet);
+            let res = load_session(&manifest_path, start_repl, &Network::Devnet);
             let (session, project_manifest) = match res {
                 Ok((session, _, manifest, output)) => {
                     if let Some(message) = output {
                         println!("{}", message);
                     }
-                    (session, manifest)
+                    (Some(session), manifest)
                 }
-                Err(e) => {
+                Err((manifest, e)) => {
                     println!("{}", e);
-                    return;
+                    (None, manifest)
                 }
             };
             let (success, _count) = match run_scripts(
@@ -540,7 +577,7 @@ pub fn main() {
                 true,
                 false,
                 manifest_path,
-                Some(session),
+                session,
             ) {
                 Ok(count) => (true, count),
                 Err((_, count)) => (false, count),
@@ -566,7 +603,7 @@ pub fn main() {
         Command::Run(cmd) => {
             let manifest_path = get_manifest_path_or_exit(cmd.manifest_path);
             let start_repl = false;
-            let res = load_session(manifest_path.clone(), start_repl, &Network::Devnet);
+            let res = load_session(&manifest_path, start_repl, &Network::Devnet);
             let session = match res {
                 Ok((session, _, _, output)) => {
                     if let Some(message) = output {
@@ -574,7 +611,7 @@ pub fn main() {
                     }
                     session
                 }
-                Err(e) => {
+                Err((_, e)) => {
                     println!("{}", e);
                     return;
                 }
@@ -589,39 +626,6 @@ pub fn main() {
                 manifest_path,
                 Some(session),
             );
-        }
-        Command::Publish(deploy) => {
-            let manifest_path = get_manifest_path_or_exit(deploy.manifest_path);
-
-            let network = if deploy.devnet == true {
-                Network::Devnet
-            } else if deploy.testnet == true {
-                Network::Testnet
-            } else if deploy.mainnet == true {
-                Network::Mainnet
-            } else {
-                panic!("Target deployment must be specified with --devnet, --testnet or --mainnet")
-            };
-            let project_manifest = match publish_all_contracts(manifest_path, &network) {
-                Ok((results, project_manifest)) => {
-                    println!("{}", results.join("\n"));
-                    project_manifest
-                }
-                Err(results) => {
-                    println!("{}", results.join("\n"));
-                    return;
-                }
-            };
-            if project_manifest.project.telemetry {
-                #[cfg(feature = "telemetry")]
-                telemetry_report_event(DeveloperUsageEvent::ContractPublished(
-                    DeveloperUsageDigest::new(
-                        &project_manifest.project.name,
-                        &project_manifest.project.authors,
-                    ),
-                    network,
-                ));
-            }
         }
         Command::Integrate(cmd) => {
             let manifest_path = get_manifest_path_or_exit(cmd.manifest_path);
