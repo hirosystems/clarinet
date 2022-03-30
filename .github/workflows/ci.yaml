@@ -97,7 +97,7 @@ jobs:
       - name: Install Rust toolchain nightly
         uses: actions-rs/toolchain@v1
         with:
-          toolchain: nightly-2022-03-28
+          toolchain: nightly-2022-01-01
           profile: minimal
           components: llvm-tools-preview
           override: true
