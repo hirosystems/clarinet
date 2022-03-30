@@ -547,10 +547,7 @@ pub fn main() {
                     println!("{}", e);
                     return;
                 }
-                Ok((session, _, manifest, output)) => {
-                    if let Some(message) = output {
-                        println!("{}", message);
-                    }
+                Ok((session, _, manifest, _)) => {
                     println!(
                         "{} Syntax of {} contract(s) successfully checked",
                         green!("✔"),
@@ -577,12 +574,7 @@ pub fn main() {
             let start_repl = false;
             let res = load_session(&manifest_path, start_repl, &Network::Devnet);
             let (session, project_manifest) = match res {
-                Ok((session, _, manifest, output)) => {
-                    if let Some(message) = output {
-                        println!("{}", message);
-                    }
-                    (Some(session), manifest)
-                }
+                Ok((session, _, manifest, _)) => (Some(session), manifest),
                 Err((manifest, e)) => {
                     println!("{}", e);
                     (None, manifest)
