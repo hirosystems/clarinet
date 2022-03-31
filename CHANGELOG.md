@@ -1,3 +1,25 @@
+# [0.28.0](https://github.com/hirosystems/clarinet/compare/v0.27.0...v0.28.0) (2022-03-31)
+
+
+### Bug Fixes
+
+* address https://github.com/hirosystems/clarinet/issues/279 ([69253d3](https://github.com/hirosystems/clarinet/commit/69253d3f8f974e4841b30b25233e63971d38434b))
+* adjust some env variables ([6bd3436](https://github.com/hirosystems/clarinet/commit/6bd3436665ad7034e6dac2f707c0ed946b49aacb))
+* attempt to repair Test workflow ([cf1d598](https://github.com/hirosystems/clarinet/commit/cf1d5988db214fbba6a943248066e4f59337b4d9))
+* handle errors during file creation properly ([88b14b2](https://github.com/hirosystems/clarinet/commit/88b14b28b24877f5de9b61ad6b6290acb7b0beca)), closes [#229](https://github.com/hirosystems/clarinet/issues/229)
+* try another nightly ([5694857](https://github.com/hirosystems/clarinet/commit/56948574d5d07f1dcdbe25c603a96991866867f8))
+* upgrade @mapbox/node-pre-gyp from 1.0.6 to 1.0.8 ([0eff1a7](https://github.com/hirosystems/clarinet/commit/0eff1a75eb920e462b48d0a595806f73a61a9d56))
+* upgrade typescript from 4.5.2 to 4.5.5 ([0129097](https://github.com/hirosystems/clarinet/commit/0129097cb2dfc1b3447edca02885f5f453b78075))
+
+
+### Features
+
+* **debugger:** add telemetry for debugger ([4438e23](https://github.com/hirosystems/clarinet/commit/4438e23430f3beee04ef0629c144b428adc55cf6))
+* **deugger:** add debugger info to README ([3026df7](https://github.com/hirosystems/clarinet/commit/3026df7beee680bd2a4e12cb8a82a89123275e2d))
+* improve clarinet integrate, clarinet contracts publish and testing harness reliability ([#240](https://github.com/hirosystems/clarinet/issues/240)) ([b9b6f74](https://github.com/hirosystems/clarinet/commit/b9b6f74a3c36b99bf816067785ca291062f8de20)), closes [#1](https://github.com/hirosystems/clarinet/issues/1) [#231](https://github.com/hirosystems/clarinet/issues/231)
+* update interfaces for debugger in REPL ([38a89b5](https://github.com/hirosystems/clarinet/commit/38a89b5c6dd148488e61c9c7c7b63f90d2a0154b))
+* use lib v0.28.0 ([354fecf](https://github.com/hirosystems/clarinet/commit/354fecf1dbc9fbc4ef47996b7710a631667596a6))
+
 # [0.27.0](https://github.com/hirosystems/clarinet/compare/v0.26.1...v0.27.0) (2022-02-24)
 
 
