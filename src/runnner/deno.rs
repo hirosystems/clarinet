@@ -613,8 +613,6 @@ impl FunctionCosts {
 fn display_costs_report() {
     let mut consolidated: BTreeMap<String, BTreeMap<String, Vec<CostsReport>>> = BTreeMap::new();
     let sessions = sessions::SESSIONS.lock().unwrap();
-    let mut mins: BTreeMap<(&String, &String), (f32, CostsReport, Bottleneck)> = BTreeMap::new();
-    let mut maxs: BTreeMap<(&String, &String), (f32, CostsReport, Bottleneck)> = BTreeMap::new();
 
     let mut contracts_costs: BTreeMap<&String, BTreeMap<&String, Vec<FunctionCosts>>> =
         BTreeMap::new();
@@ -642,84 +640,17 @@ fn display_costs_report() {
                 }
             };
 
-            // Look for the bounding factor
-            let ratios = vec![
-                (
-                    report.cost_result.total.runtime,
-                    report.cost_result.limit.runtime,
-                ),
-                (
-                    report.cost_result.total.read_count,
-                    report.cost_result.limit.read_count,
-                ),
-                (
-                    report.cost_result.total.read_length,
-                    report.cost_result.limit.read_length,
-                ),
-                (
-                    report.cost_result.total.write_count,
-                    report.cost_result.limit.write_count,
-                ),
-                (
-                    report.cost_result.total.write_length,
-                    report.cost_result.limit.write_length,
-                ),
-            ];
-            let (bottleneck, mut max) = ratios.iter().enumerate().fold(
-                (Bottleneck::Unknown, 0 as f32),
-                |(bottleneck, max), (index, (cost, limit))| {
-                    let ratio = (*cost as f32) / (*limit as f32);
-                    if ratio > max {
-                        (
-                            match index {
-                                0 => Bottleneck::Runtime(*cost, *limit),
-                                1 => Bottleneck::ReadCount(*cost, *limit),
-                                2 => Bottleneck::ReadLength(*cost, *limit),
-                                3 => Bottleneck::WriteCount(*cost, *limit),
-                                4 => Bottleneck::WriteLength(*cost, *limit),
-                                _ => Bottleneck::Unknown,
-                            },
-                            ratio,
-                        )
-                    } else {
-                        (bottleneck, max)
-                    }
-                },
-            );
-
-            let key = (&report.contract_id, &report.method);
-
             let contract_costs = contracts_costs
                 .entry(&report.contract_id)
                 .or_insert(BTreeMap::new());
             let function_costs = contract_costs.entry(&report.method).or_insert(Vec::new());
 
             function_costs.push(FunctionCosts::from_cost_report(report.cost_result.clone()));
-
-            mins.entry(key)
-                .and_modify(|(cur_min, min_report, cur_bottleneck)| {
-                    if &mut max < cur_min {
-                        *cur_min = max;
-                        *min_report = report.clone();
-                        *cur_bottleneck = bottleneck.clone();
-                    }
-                })
-                .or_insert((max, report.clone(), bottleneck.clone()));
-
-            maxs.entry(key)
-                .and_modify(|(cur_max, max_report, cur_bottleneck)| {
-                    if &mut max > cur_max {
-                        *cur_max = max;
-                        *max_report = report.clone();
-                        *cur_bottleneck = bottleneck.clone();
-                    }
-                })
-                .or_insert((max, report.clone(), bottleneck.clone()));
         }
     }
 
     println!("\nContract calls cost synthesis");
-    let mut table = Table::new();
+    let table = Table::new();
     let headers = vec![
         "".to_string(),
         "# Calls".to_string(),
@@ -734,68 +665,16 @@ fn display_costs_report() {
     for header in headers.iter() {
         headers_cells.push(Cell::new(&header).with_style(Attr::Bold));
     }
-    table.add_row(Row::new(headers_cells.clone()));
-
-    for (contract_id, methods) in consolidated.iter() {
-        for (method, reports) in methods.iter() {
-            let (min, min_report, min_bottleneck) = mins.get(&(contract_id, method)).unwrap();
-            let (max, max_report, max_bottleneck) = mins.get(&(contract_id, method)).unwrap();
-
-            // Not displaying the min row for now - probably not so interesting atm.
-            // if min != max {
-            //     table.add_row(Row::new(formatted_cost_cells(
-            //         "Min",
-            //         &min_report,
-            //         &min_bottleneck,
-            //     )));
-            // }
-
-            let contract_name = contract_id.split(".").last().unwrap();
-            table.add_row(Row::new(formatted_cost_cells(
-                &format!("{}::{}", contract_name, method),
-                &max_report,
-                &max_bottleneck,
-            )));
-        }
-    }
-
-    if let Some((_, (_, report, _))) = maxs.iter().next() {
-        let limit = &report.cost_result.limit;
-        table.add_row(Row::new(vec![Cell::new_align(
-            &format!(""),
-            format::Alignment::LEFT,
-        )
-        .with_hspan(7)]));
-
-        table.add_row(Row::new(vec![
-            Cell::new("Mainnet Block Limits (Stacks 2.0)"),
-            Cell::new_align("/", format::Alignment::RIGHT),
-            Cell::new_align(
-                &format!("{}", &limit.runtime.to_string()),
-                format::Alignment::RIGHT,
-            ),
-            Cell::new_align(&limit.read_count.to_string(), format::Alignment::RIGHT),
-            Cell::new_align(&format!("{}", limit.read_length), format::Alignment::RIGHT),
-            Cell::new_align(&limit.write_count.to_string(), format::Alignment::RIGHT),
-            Cell::new_align(&format!("{}", limit.write_length), format::Alignment::RIGHT),
-            Cell::new_align("/", format::Alignment::RIGHT),
-        ]));
-    }
-
-    table.printstd();
-    println!("");
 
     for (contract_name, contract_stats) in contracts_costs.iter_mut() {
         let mut table = Table::new();
         table.set_format(*format::consts::FORMAT_BOX_CHARS);
 
-        table.add_row(Row::new(vec![Cell::new(&format!(
-            "\n✨  {}\n ",
-            contract_name
-        ))
-        .with_style(Attr::Bold)
-        .with_style(Attr::ForegroundColor(color::YELLOW))
-        .with_hspan(8)]));
+        let formatted_contract_name = &format!("\n✨  {}\n ", contract_name);
+        table.add_row(Row::new(vec![Cell::new(formatted_contract_name)
+            .with_style(Attr::Bold)
+            .with_style(Attr::ForegroundColor(color::YELLOW))
+            .with_hspan(8)]));
 
         table.add_row(Row::new(headers_cells.clone()));
 
@@ -953,127 +832,6 @@ fn execution_costs_summary(min: &ExecutionCost, max: &ExecutionCost, avg: &Execu
     ]));
 
     table
-}
-
-fn formatted_cost_cells(title: &str, report: &CostsReport, bottleneck: &Bottleneck) -> Vec<Cell> {
-    let mut runtime_style = Attr::ForegroundColor(color::BRIGHT_BLACK);
-    let mut read_count_style = Attr::ForegroundColor(color::BRIGHT_BLACK);
-    let mut read_len_style = Attr::ForegroundColor(color::BRIGHT_BLACK);
-    let mut write_count_style = Attr::ForegroundColor(color::BRIGHT_BLACK);
-    let mut write_len_style = Attr::ForegroundColor(color::BRIGHT_BLACK);
-
-    let tx_per_block = match bottleneck {
-        Bottleneck::Runtime(cost, limit) => {
-            runtime_style = Attr::ForegroundColor(color::BRIGHT_WHITE);
-            limit / cost
-        }
-        Bottleneck::ReadCount(cost, limit) => {
-            read_count_style = Attr::ForegroundColor(color::BRIGHT_WHITE);
-            limit / cost
-        }
-        Bottleneck::ReadLength(cost, limit) => {
-            read_len_style = Attr::ForegroundColor(color::BRIGHT_WHITE);
-            limit / cost
-        }
-        Bottleneck::WriteCount(cost, limit) => {
-            write_count_style = Attr::ForegroundColor(color::BRIGHT_WHITE);
-            limit / cost
-        }
-        Bottleneck::WriteLength(cost, limit) => {
-            write_len_style = Attr::ForegroundColor(color::BRIGHT_WHITE);
-            limit / cost
-        }
-        _ => 0,
-    };
-
-    let block_style = if tx_per_block < 100 {
-        Attr::ForegroundColor(color::RED)
-    } else if tx_per_block < 500 {
-        Attr::ForegroundColor(color::YELLOW)
-    } else {
-        Attr::ForegroundColor(color::GREEN)
-    };
-
-    let ratios = vec![
-        (
-            report.cost_result.total.runtime,
-            report.cost_result.limit.runtime,
-        ),
-        (
-            report.cost_result.total.read_count,
-            report.cost_result.limit.read_count,
-        ),
-        (
-            report.cost_result.total.read_length,
-            report.cost_result.limit.read_length,
-        ),
-        (
-            report.cost_result.total.write_count,
-            report.cost_result.limit.write_count,
-        ),
-        (
-            report.cost_result.total.write_length,
-            report.cost_result.limit.write_length,
-        ),
-    ];
-
-    let annotations = ratios
-        .iter()
-        .map(|(value, limit)| {
-            if *value == 0 {
-                "".to_string()
-            } else {
-                format!(" ({:.2}%)", 100.0 * *value as f32 / *limit as f32)
-            }
-        })
-        .collect::<Vec<String>>();
-
-    vec![
-        Cell::new(title),
-        Cell::new_align(&format!("{}", 0), format::Alignment::RIGHT),
-        Cell::new_align(
-            &format!(
-                "{}{}",
-                report.cost_result.total.runtime.to_string(),
-                annotations[0]
-            ),
-            format::Alignment::RIGHT,
-        )
-        .with_style(runtime_style),
-        Cell::new_align(
-            &format!(
-                "{}{}",
-                report.cost_result.total.read_count.to_string(),
-                annotations[1]
-            ),
-            format::Alignment::RIGHT,
-        )
-        .with_style(read_count_style),
-        Cell::new_align(
-            &format!("{}{}", report.cost_result.total.read_length, annotations[2]),
-            format::Alignment::RIGHT,
-        )
-        .with_style(read_len_style),
-        Cell::new_align(
-            &format!(
-                "{}{}",
-                report.cost_result.total.write_count.to_string(),
-                annotations[3]
-            ),
-            format::Alignment::RIGHT,
-        )
-        .with_style(write_count_style),
-        Cell::new_align(
-            &format!(
-                "{}{}",
-                report.cost_result.total.write_length, annotations[4]
-            ),
-            format::Alignment::RIGHT,
-        )
-        .with_style(write_len_style),
-        Cell::new_align(&format!("{}", tx_per_block), format::Alignment::RIGHT)
-            .with_style(block_style),
-    ]
 }
 
 pub fn is_supported_ext(path: &Path) -> bool {
