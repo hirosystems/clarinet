@@ -1,9 +1,10 @@
 use clarity_repl::clarity::coverage::CoverageReporter;
 use clarity_repl::clarity::types;
 use clarity_repl::clarity::util::hash;
+use clarity_repl::prettytable::format::{FormatBuilder, LinePosition, LineSeparator};
 use clarity_repl::prettytable::{color, format, Attr, Cell, Row, Table};
 use clarity_repl::repl::session::CostsReport;
-use clarity_repl::repl::Session;
+use clarity_repl::repl::{CostSynthesis, Session};
 use deno::ast;
 use deno::colors;
 use deno::create_main_worker;
@@ -547,12 +548,66 @@ struct FunctionStats {
     pub write_length: Vec<(u64, u64)>,
 }
 
+#[derive(Debug)]
+struct CallStats {
+    pub runtime: u64,
+    pub runtime_limit: u64,
+    pub read_count: u64,
+    pub read_count_limit: u64,
+    pub read_length: u64,
+    pub read_length_limit: u64,
+    pub write_count: u64,
+    pub write_count_limit: u64,
+    pub write_length: u64,
+    pub write_length_limit: u64,
+    pub tx_per_block: u64,
+}
+
+fn safe_div(limit: u64, total: u64) -> u64 {
+    limit.checked_div(total).unwrap_or_else(|| limit)
+}
+
+impl CallStats {
+    #[must_use]
+    fn from_cost_report(costs: CostSynthesis) -> Self {
+        let limit = costs.limit;
+        let total = costs.total;
+
+        let mut tx_per_block_limits = vec![
+            safe_div(limit.runtime, total.runtime),
+            safe_div(limit.read_count, total.read_count),
+            safe_div(limit.read_length, total.read_length),
+            safe_div(limit.write_count, total.write_count),
+            safe_div(limit.write_length, total.write_length),
+        ];
+
+        tx_per_block_limits.sort_by(|a, b| a.cmp(&b));
+        let tx_per_block = tx_per_block_limits.first().unwrap();
+
+        Self {
+            runtime: total.runtime,
+            runtime_limit: limit.runtime,
+            read_count: total.read_count,
+            read_count_limit: limit.read_count,
+            read_length: total.read_length,
+            read_length_limit: limit.read_length,
+            write_count: total.write_count,
+            write_count_limit: limit.write_count,
+            write_length: total.write_length,
+            write_length_limit: limit.write_length,
+            tx_per_block: *tx_per_block,
+        }
+    }
+}
+
 fn display_costs_report() {
     let mut consolidated: BTreeMap<String, BTreeMap<String, Vec<CostsReport>>> = BTreeMap::new();
     let sessions = sessions::SESSIONS.lock().unwrap();
     let mut mins: BTreeMap<(&String, &String), (f32, CostsReport, Bottleneck)> = BTreeMap::new();
     let mut maxs: BTreeMap<(&String, &String), (f32, CostsReport, Bottleneck)> = BTreeMap::new();
     let mut stats: BTreeMap<(&String, &String), FunctionStats> = BTreeMap::new();
+
+    let mut contracts_stats: BTreeMap<&String, BTreeMap<&String, Vec<CallStats>>> = BTreeMap::new();
 
     for (session_id, (name, session)) in sessions.iter() {
         for report in session.costs_reports.iter() {
@@ -623,6 +678,13 @@ fn display_costs_report() {
             );
 
             let key = (&report.contract_id, &report.method);
+
+            let contract_stats = contracts_stats
+                .entry(&report.contract_id)
+                .or_insert(BTreeMap::new());
+            let call_stats = contract_stats.entry(&report.method).or_insert(Vec::new());
+
+            call_stats.push(CallStats::from_cost_report(report.cost_result.clone()));
 
             let st = stats.entry(key).or_insert(FunctionStats::default());
 
@@ -791,6 +853,130 @@ fn display_costs_report() {
     }
 
     table.printstd();
+
+    for (contract_name, contract_stats) in contracts_stats.iter_mut() {
+        let mut table = Table::new();
+        table.set_format(*format::consts::FORMAT_BOX_CHARS);
+
+        table.add_row(Row::new(vec![Cell::new(&format!("\n✨  {}\n ", contract_name))
+            .with_style(Attr::Bold)
+            .with_style(Attr::ForegroundColor(color::YELLOW))
+            .with_hspan(8)]));
+
+        table.add_row(Row::new(headers_cells.clone()));
+
+        for (method, method_stats) in contract_stats.iter_mut() {
+            method_stats.sort_by(|a, b| a.tx_per_block.cmp(&b.tx_per_block));
+
+            let min: &CallStats = method_stats.last().unwrap();
+            let max: &CallStats = method_stats.first().unwrap();
+
+            table.add_row(Row::new(vec![
+                Cell::new_align(&format!("{}", method), format::Alignment::LEFT)
+                    .with_style(Attr::Bold)
+                    .with_style(Attr::ForegroundColor(color::GREEN)),
+                Cell::new_align(&format!("{}", method_stats.len()), format::Alignment::RIGHT),
+                mini_table(
+                    min.runtime,
+                    min.runtime_limit,
+                    max.runtime,
+                    max.runtime_limit,
+                    method_stats.iter().fold(0, |acc, x| acc + x.runtime)
+                        / method_stats.len() as u64,
+                    max.runtime_limit,
+                ),
+                mini_table(
+                    min.read_count,
+                    min.read_count_limit,
+                    max.read_count,
+                    max.read_count_limit,
+                    method_stats.iter().fold(0, |acc, x| acc + x.read_count)
+                        / method_stats.len() as u64,
+                    max.read_count_limit,
+                ),
+                mini_table(
+                    min.read_length,
+                    min.read_length_limit,
+                    max.read_length,
+                    max.read_length_limit,
+                    method_stats.iter().fold(0, |acc, x| acc + x.read_length)
+                        / method_stats.len() as u64,
+                    max.read_length_limit,
+                ),
+                mini_table(
+                    min.write_count,
+                    min.write_count_limit,
+                    max.write_count,
+                    max.write_count_limit,
+                    method_stats.iter().fold(0, |acc, x| acc + x.write_count)
+                        / method_stats.len() as u64,
+                    max.write_count_limit,
+                ),
+                mini_table(
+                    min.write_length,
+                    min.write_length_limit,
+                    max.write_length,
+                    max.write_length_limit,
+                    method_stats.iter().fold(0, |acc, x| acc + x.write_length)
+                        / method_stats.len() as u64,
+                    max.write_length_limit,
+                ),
+                Cell::new_align(
+                    &format!(
+                        "{}\n{}\n{}",
+                        min.tx_per_block,
+                        max.tx_per_block,
+                        method_stats.iter().fold(0, |acc, x| acc + x.tx_per_block)
+                            / method_stats.len() as u64,
+                    ),
+                    format::Alignment::RIGHT,
+                ),
+            ]));
+        }
+        table.printstd();
+        println!("");
+    }
+}
+
+fn mini_table(
+    min: u64,
+    min_limit: u64,
+    max: u64,
+    max_limit: u64,
+    avg: u64,
+    avg_limit: u64,
+) -> Cell {
+    let mut table = Table::new();
+    table.set_format(*format::consts::FORMAT_CLEAN);
+
+    table.add_row(Row::new(vec![
+        Cell::new_align("min:", format::Alignment::LEFT),
+        Cell::new_align(&format!("{}", min,), format::Alignment::RIGHT),
+        Cell::new_align(
+            &format!("({:.3}%)", (min as f64 / min_limit as f64 * 100.0)),
+            format::Alignment::RIGHT,
+        ),
+    ]));
+
+    table.add_row(Row::new(vec![
+        Cell::new_align("max:", format::Alignment::LEFT),
+        Cell::new_align(&format!("{}", max,), format::Alignment::RIGHT),
+        Cell::new_align(
+            &format!("({:.3}%)", (max as f64 / max_limit as f64 * 100.0)),
+            format::Alignment::RIGHT,
+        ),
+    ]));
+
+    table.add_row(Row::new(vec![
+        Cell::new_align("avg:", format::Alignment::LEFT),
+        Cell::new_align(&format!("{}", avg,), format::Alignment::RIGHT),
+        Cell::new_align(
+            &format!("({:.3}%)", (avg as f64 / avg_limit as f64 * 100.0)),
+            format::Alignment::RIGHT,
+        ),
+    ]));
+
+    Cell::new_align(&table.to_string(), format::Alignment::RIGHT)
 }
 
 struct AggStats {
@@ -841,24 +1027,6 @@ fn process_stats(stats: &mut Vec<(u64, u64)>) -> Table {
     ]));
 
     table
-
-    // AggStats {
-    //     min: format!(
-    //         "{} ({:.3}%) [min]",
-    //         min,
-    //         (min as f64 / min_limit as f64 * 100.0)
-    //     ),
-    //     max: format!(
-    //         "{} ({:.3}%) [max]",
-    //         max,
-    //         (max as f64 / max_limit as f64 * 100.0)
-    //     ),
-    //     avg: format!(
-    //         "{} ({:.3}%) [avg]",
-    //         avg,
-    //         (avg as f64 / max_limit as f64 * 100.0)
-    //     ),
-    // }
 }
 
 fn formatted_cost_cells(title: &str, report: &CostsReport, bottleneck: &Bottleneck) -> Vec<Cell> {
