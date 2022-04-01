@@ -1,7 +1,6 @@
 use clarity_repl::clarity::coverage::CoverageReporter;
 use clarity_repl::clarity::types;
 use clarity_repl::clarity::util::hash;
-use clarity_repl::prettytable::format::{FormatBuilder, LinePosition, LineSeparator};
 use clarity_repl::prettytable::{color, format, Attr, Cell, Row, Table};
 use clarity_repl::repl::session::CostsReport;
 use clarity_repl::repl::{CostSynthesis, Session};
