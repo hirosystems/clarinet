@@ -542,11 +542,21 @@ enum Bottleneck {
     WriteLength(u64, u64),
 }
 
+#[derive(Debug, Default)]
+struct FunctionStats {
+    pub runtime: Vec<(u64, u64)>,
+    pub read_count: Vec<(u64, u64)>,
+    pub read_length: Vec<(u64, u64)>,
+    pub write_count: Vec<(u64, u64)>,
+    pub write_length: Vec<(u64, u64)>,
+}
+
 fn display_costs_report() {
     let mut consolidated: BTreeMap<String, BTreeMap<String, Vec<CostsReport>>> = BTreeMap::new();
     let sessions = sessions::SESSIONS.lock().unwrap();
     let mut mins: BTreeMap<(&String, &String), (f32, CostsReport, Bottleneck)> = BTreeMap::new();
     let mut maxs: BTreeMap<(&String, &String), (f32, CostsReport, Bottleneck)> = BTreeMap::new();
+    let mut stats: BTreeMap<(&String, &String), FunctionStats> = BTreeMap::new();
 
     for (session_id, (name, session)) in sessions.iter() {
         for report in session.costs_reports.iter() {
@@ -618,6 +628,33 @@ fn display_costs_report() {
 
             let key = (&report.contract_id, &report.method);
 
+            let st = stats.entry(key).or_insert(FunctionStats::default());
+
+            st.runtime.push((
+                report.cost_result.total.runtime,
+                report.cost_result.limit.runtime,
+            ));
+
+            st.read_count.push((
+                report.cost_result.total.read_count,
+                report.cost_result.limit.read_count,
+            ));
+
+            st.read_length.push((
+                report.cost_result.total.read_length,
+                report.cost_result.limit.read_length,
+            ));
+
+            st.write_count.push((
+                report.cost_result.total.write_count,
+                report.cost_result.limit.write_count,
+            ));
+
+            st.write_length.push((
+                report.cost_result.total.write_length,
+                report.cost_result.limit.write_length,
+            ));
+
             mins.entry(key)
                 .and_modify(|(cur_min, min_report, cur_bottleneck)| {
                     if &mut max < cur_min {
@@ -627,6 +664,7 @@ fn display_costs_report() {
                     }
                 })
                 .or_insert((max, report.clone(), bottleneck.clone()));
+
             maxs.entry(key)
                 .and_modify(|(cur_max, max_report, cur_bottleneck)| {
                     if &mut max > cur_max {
@@ -643,6 +681,7 @@ fn display_costs_report() {
     let mut table = Table::new();
     let headers = vec![
         "".to_string(),
+        "# Calls".to_string(),
         "Runtime (units)".to_string(),
         "Read Count".to_string(),
         "Read Length (bytes)".to_string(),
@@ -689,6 +728,7 @@ fn display_costs_report() {
 
         table.add_row(Row::new(vec![
             Cell::new("Mainnet Block Limits (Stacks 2.0)"),
+            Cell::new_align("/", format::Alignment::RIGHT),
             Cell::new_align(
                 &format!("{}", &limit.runtime.to_string()),
                 format::Alignment::RIGHT,
@@ -703,6 +743,126 @@ fn display_costs_report() {
 
     table.printstd();
     println!("");
+
+    let mut table = Table::new();
+    table.set_format(*format::consts::FORMAT_BOX_CHARS);
+
+    let headers = vec![
+        "".to_string(),
+        "# Calls".to_string(),
+        "Runtime (units)".to_string(),
+        "Read Count".to_string(),
+        "Read Length (bytes)".to_string(),
+        "Write Count".to_string(),
+        "Write Length (bytes)".to_string(),
+        "Tx per Block".to_string(),
+    ];
+    let mut headers_cells = vec![];
+    for header in headers.iter() {
+        headers_cells.push(Cell::new(&header).with_style(Attr::Bold));
+    }
+
+    table.add_row(Row::new(headers_cells.clone()));
+
+    for (key, val) in stats.iter() {
+        let (contract_id, method) = *key;
+
+        let contract_name = contract_id.split(".").last().unwrap();
+
+        let runtime = process_stats(&mut val.runtime.clone());
+        let read_count = process_stats(&mut val.read_count.clone());
+        let read_length = process_stats(&mut val.read_length.clone());
+        let write_count = process_stats(&mut val.write_count.clone());
+        let write_length = process_stats(&mut val.write_length.clone());
+
+        table.add_row(Row::new(vec![
+            Cell::new_align(
+                &format!("\n{}::{}", contract_name, method),
+                format::Alignment::LEFT,
+            )
+            .with_style(Attr::Bold)
+            .with_style(Attr::ForegroundColor(color::GREEN)),
+            Cell::new_align(
+                &format!("\n{}", val.read_count.len()),
+                format::Alignment::CENTER,
+            ),
+            Cell::new_align(&runtime.to_string(), format::Alignment::RIGHT),
+            Cell::new_align(&read_count.to_string(), format::Alignment::RIGHT),
+            Cell::new_align(&read_length.to_string(), format::Alignment::RIGHT),
+            Cell::new_align(&write_count.to_string(), format::Alignment::RIGHT),
+            Cell::new_align(&write_length.to_string(), format::Alignment::RIGHT),
+        ]));
+    }
+
+    table.printstd();
+}
+
+struct AggStats {
+    pub min: String,
+    pub max: String,
+    pub avg: String,
+}
+
+fn process_stats(stats: &mut Vec<(u64, u64)>) -> Table {
+    stats.sort_by(|a, b| a.0.cmp(&b.0));
+
+    let min: u64 = stats.first().unwrap().0;
+    let min_limit: u64 = stats.first().unwrap().1;
+
+    let max: u64 = stats.last().unwrap().0;
+    let max_limit: u64 = stats.last().unwrap().1;
+
+    let avg = stats.iter().fold(0, |acc, x| acc + x.0) / stats.len() as u64;
+
+    let mut table = Table::new();
+    table.set_format(*format::consts::FORMAT_CLEAN);
+
+    table.add_row(Row::new(vec![
+        Cell::new_align("min:", format::Alignment::LEFT),
+        Cell::new_align(&format!("{}", min,), format::Alignment::RIGHT),
+        Cell::new_align(
+            &format!("({:.3}%)", (min as f64 / min_limit as f64 * 100.0)),
+            format::Alignment::RIGHT,
+        ),
+    ]));
+
+    table.add_row(Row::new(vec![
+        Cell::new_align("max:", format::Alignment::LEFT),
+        Cell::new_align(&format!("{}", max), format::Alignment::RIGHT),
+        Cell::new_align(
+            &format!("({:.3}%)", (max as f64 / max_limit as f64 * 100.0)),
+            format::Alignment::RIGHT,
+        ),
+    ]));
+
+    table.add_row(Row::new(vec![
+        Cell::new_align("avg:", format::Alignment::LEFT),
+        Cell::new_align(&format!("{}", avg), format::Alignment::RIGHT),
+        Cell::new_align(
+            &format!("({:.3}%)", (avg as f64 / max_limit as f64 * 100.0)),
+            format::Alignment::RIGHT,
+        ),
+    ]));
+
+    table
+
+    // AggStats {
+    //     min: format!(
+    //         "{} ({:.3}%) [min]",
+    //         min,
+    //         (min as f64 / min_limit as f64 * 100.0)
+    //     ),
+    //     max: format!(
+    //         "{} ({:.3}%) [max]",
+    //         max,
+    //         (max as f64 / max_limit as f64 * 100.0)
+    //     ),
+    //     avg: format!(
+    //         "{} ({:.3}%) [avg]",
+    //         avg,
+    //         (avg as f64 / max_limit as f64 * 100.0)
+    //     ),
+    // }
 }
 
 fn formatted_cost_cells(title: &str, report: &CostsReport, bottleneck: &Bottleneck) -> Vec<Cell> {
@@ -780,6 +940,7 @@ fn formatted_cost_cells(title: &str, report: &CostsReport, bottleneck: &Bottlene
 
     vec![
         Cell::new(title),
+        Cell::new_align(&format!("{}", 0), format::Alignment::RIGHT),
         Cell::new_align(
             &format!(
                 "{}{}",
