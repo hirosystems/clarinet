@@ -1,3 +1,10 @@
+## [0.28.1](https://github.com/hirosystems/clarinet/compare/v0.28.0...v0.28.1) (2022-04-06)
+
+
+### Bug Fixes
+
+* add `principal` type for completions ([1aa8fb7](https://github.com/hirosystems/clarinet/commit/1aa8fb74d099e06d4a14626588d6daafbf720652)), closes [#303](https://github.com/hirosystems/clarinet/issues/303)
+
 # [0.28.0](https://github.com/hirosystems/clarinet/compare/v0.27.0...v0.28.0) (2022-03-31)
 
 
