@@ -252,7 +252,7 @@ impl ChainConfig {
             _ => {}
         };
 
-        let devnet = if chain_config_file.network.name == "devnet" {
+        let devnet = if chain_config_file.network.name.to_lowercase() == "devnet" {
             let mut devnet_config = match chain_config_file.devnet.take() {
                 Some(conf) => conf,
                 _ => DevnetConfigFile::default(),

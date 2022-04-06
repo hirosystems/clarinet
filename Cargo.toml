@@ -40,7 +40,7 @@ uuid = { version = "0.8.2", features = ["v4"] }
 hmac = "0.12.0"
 pbkdf2 = { version = "0.11.0", features=["simple"], default-features = false }
 futures = "0.3.12"
-tokio = { version = "=1.15.0", features = ["full"] }
+tokio = { version = "=1.17.0", features = ["full"] }
 lazy_static = "1.4.0"
 atty = "0.2.14"
 termcolor = "1.1.2"

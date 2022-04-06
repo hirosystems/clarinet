@@ -9,6 +9,7 @@ use bollard::image::CreateImageOptions;
 use bollard::models::{HostConfig, PortBinding};
 use bollard::network::{ConnectNetworkOptions, CreateNetworkOptions, PruneNetworksOptions};
 use bollard::Docker;
+use bollard::errors::Error as DockerError;
 use crossterm::terminal::disable_raw_mode;
 use futures::stream::TryStreamExt;
 use std::collections::HashMap;
@@ -26,6 +27,7 @@ pub struct DevnetOrchestrator {
     pub network_config: Option<ChainConfig>,
     pub termination_success_tx: Option<Sender<bool>>,
     pub manifest: ProjectManifest,
+    pub can_exit: bool,
     stacks_blockchain_container_id: Option<String>,
     stacks_blockchain_api_container_id: Option<String>,
     stacks_explorer_container_id: Option<String>,
@@ -194,6 +196,7 @@ impl DevnetOrchestrator {
             manifest,
             network_config: Some(network_config),
             docker_client: Some(docker_client),
+            can_exit: true,
             ..Default::default()
         }
     }
@@ -318,9 +321,9 @@ impl DevnetOrchestrator {
         match self.prepare_bitcoin_node_container().await {
             Ok(_) => {}
             Err(message) => {
-                println!("{}", message);
-                self.kill(true).await;
-                return process_exit();
+                self.kill().await;
+                event_tx.send(DevnetEvent::FatalError(message));
+                return;
             }
         };
         let _ = event_tx.send(DevnetEvent::ServiceStatus(ServiceStatusData {
@@ -334,9 +337,9 @@ impl DevnetOrchestrator {
                 self.initialize_bitcoin_node(&event_tx);
             }
             Err(message) => {
-                println!("{}", message);
-                self.kill(true).await;
-                return process_exit();
+                event_tx.send(DevnetEvent::FatalError(message));
+                self.kill().await;
+                return;
             }
         };
 
@@ -353,17 +356,17 @@ impl DevnetOrchestrator {
             match self.prepare_postgres_container().await {
                 Ok(_) => {}
                 Err(message) => {
-                    println!("{}", message);
-                    self.kill(true).await;
-                    return process_exit();
-                }
+                    event_tx.send(DevnetEvent::FatalError(message));
+                    self.kill().await;
+                    return;
+                    }
             };
             match self.boot_postgres_container().await {
                 Ok(_) => {}
                 Err(message) => {
-                    println!("{}", message);
-                    self.kill(true).await;
-                    return process_exit();
+                    event_tx.send(DevnetEvent::FatalError(message));
+                    self.kill().await;
+                    return;    
                 }
             };
             let _ = event_tx.send(DevnetEvent::ServiceStatus(ServiceStatusData {
@@ -377,9 +380,9 @@ impl DevnetOrchestrator {
             match self.prepare_stacks_api_container().await {
                 Ok(_) => {}
                 Err(message) => {
-                    println!("{}", message);
-                    self.kill(true).await;
-                    return process_exit();
+                    event_tx.send(DevnetEvent::FatalError(message));
+                    self.kill().await;
+                    return;
                 }
             };
             let _ = event_tx.send(DevnetEvent::ServiceStatus(ServiceStatusData {
@@ -391,9 +394,9 @@ impl DevnetOrchestrator {
             match self.boot_stacks_api_container().await {
                 Ok(_) => {}
                 Err(message) => {
-                    println!("{}", message);
-                    self.kill(true).await;
-                    return process_exit();
+                    event_tx.send(DevnetEvent::FatalError(message));
+                    self.kill().await;
+                    return;
                 }
             };
         }
@@ -409,9 +412,9 @@ impl DevnetOrchestrator {
         match self.prepare_stacks_node_container().await {
             Ok(_) => {}
             Err(message) => {
-                println!("{}", message);
-                self.kill(true).await;
-                return process_exit();
+                event_tx.send(DevnetEvent::FatalError(message));
+                self.kill().await;
+                return;
             }
         };
         let _ = event_tx.send(DevnetEvent::ServiceStatus(ServiceStatusData {
@@ -423,9 +426,9 @@ impl DevnetOrchestrator {
         match self.boot_stacks_node_container().await {
             Ok(_) => {}
             Err(message) => {
-                println!("{}", message);
-                self.kill(true).await;
-                return process_exit();
+                event_tx.send(DevnetEvent::FatalError(message));
+                self.kill().await;
+                return;
             }
         };
 
@@ -440,18 +443,18 @@ impl DevnetOrchestrator {
             match self.prepare_stacks_explorer_container().await {
                 Ok(_) => {}
                 Err(message) => {
-                    println!("{}", message);
-                    self.kill(true).await;
-                    return process_exit();
-                }
+                    event_tx.send(DevnetEvent::FatalError(message));
+                    self.kill().await;
+                    return;
+                    }
             };
             let _ = event_tx.send(DevnetEvent::info(format!("Starting stacks-explorer")));
             match self.boot_stacks_explorer_container().await {
                 Ok(_) => {}
                 Err(message) => {
-                    println!("{}", message);
-                    self.kill(true).await;
-                    return process_exit();
+                    event_tx.send(DevnetEvent::FatalError(message));
+                    self.kill().await;
+                    return;
                 }
             };
             let _ = event_tx.send(DevnetEvent::ServiceStatus(ServiceStatusData {
@@ -473,18 +476,18 @@ impl DevnetOrchestrator {
             match self.prepare_bitcoin_explorer_container().await {
                 Ok(_) => {}
                 Err(message) => {
-                    println!("{}", message);
-                    self.kill(true).await;
-                    return process_exit();
+                    event_tx.send(DevnetEvent::FatalError(message));
+                    self.kill().await;
+                    return;
                 }
             };
             let _ = event_tx.send(DevnetEvent::info(format!("Starting bitcoin-explorer")));
             match self.boot_bitcoin_explorer_container().await {
                 Ok(_) => {}
                 Err(message) => {
-                    println!("{}", message);
-                    self.kill(true).await;
-                    return process_exit();
+                    event_tx.send(DevnetEvent::FatalError(message));
+                    self.kill().await;
+                    return;
                 }
             };
             let _ = event_tx.send(DevnetEvent::ServiceStatus(ServiceStatusData {
@@ -499,7 +502,7 @@ impl DevnetOrchestrator {
             boot_index += 1;
             match terminator_rx.recv() {
                 Ok(true) => {
-                    self.kill(true).await;
+                    self.kill().await;
                     break;
                 }
                 Ok(false) => {
@@ -600,7 +603,7 @@ rpcport={}
         bitcoind_data_path.push(format!("{}", boot_index));
         let _ = fs::create_dir(bitcoind_data_path.clone());
         bitcoind_data_path.push("bitcoin");
-        fs::create_dir(bitcoind_data_path).expect("Unable to create working dir");
+        let _ = fs::create_dir(bitcoind_data_path);
 
         let mut exposed_ports = HashMap::new();
         exposed_ports.insert(
@@ -670,7 +673,7 @@ rpcport={}
             )
             .try_collect::<Vec<_>>()
             .await
-            .map_err(|_| "Unable to create image".to_string())?;
+            .map_err(|e| formatted_docker_error("Unable to create bitcoind image", e))?;
 
         let config = self.prepare_bitcoin_node_config(1)?;
         let options = CreateContainerOptions {
@@ -680,7 +683,7 @@ rpcport={}
         let container = docker
             .create_container::<String, String>(Some(options), config)
             .await
-            .map_err(|e| format!("Unable to create container: {}", e))?
+            .map_err(|e| formatted_docker_error("Unable to create bitcoind container", e))?
             .id;
         info!("Created container bitcoin-node: {}", container);
         self.bitcoin_blockchain_container_id = Some(container);
@@ -745,7 +748,7 @@ rpcport={}
         docker
             .start_container::<String>(&container, None)
             .await
-            .map_err(|_| "Unable to start container".to_string())?;
+            .map_err(|e| formatted_docker_error("Unable to start bitcoind container", e))?;
 
         let res = docker
             .connect_network(
@@ -888,7 +891,7 @@ events_keys = ["*"]
         stacks_node_data_path.push(format!("{}", boot_index));
         let _ = fs::create_dir(stacks_node_data_path.clone());
         stacks_node_data_path.push("stacks");
-        fs::create_dir(stacks_node_data_path).expect("Unable to create working dir");
+        let _ = fs::create_dir(stacks_node_data_path);
 
         let mut exposed_ports = HashMap::new();
         exposed_ports.insert(
@@ -998,7 +1001,7 @@ events_keys = ["*"]
         docker
             .start_container::<String>(&container, None)
             .await
-            .map_err(|_| "Unable to start container".to_string())?;
+            .map_err(|e| formatted_docker_error("Unable to start stacks-node container", e))?;
 
         let res = docker
             .connect_network(
@@ -1126,7 +1129,7 @@ events_keys = ["*"]
         docker
             .start_container::<String>(&container, None)
             .await
-            .map_err(|_| "Unable to start container".to_string())?;
+            .map_err(|e| formatted_docker_error("Unable to start stacks-api container", e))?;
 
         let res = docker
             .connect_network(
@@ -1231,7 +1234,7 @@ events_keys = ["*"]
         docker
             .start_container::<String>(&container, None)
             .await
-            .map_err(|_| "Unable to start container".to_string())?;
+            .map_err(|e| formatted_docker_error("Unable to start postgres container", e))?;
 
         let res = docker
             .connect_network(
@@ -1658,7 +1661,7 @@ events_keys = ["*"]
         Ok((bitcoin_node_c_id, stacks_node_c_id))
     }
 
-    pub async fn kill(&self, terminate: bool) {
+    pub async fn kill(&self) {
         let (docker, devnet_config) = match (&self.docker_client, &self.network_config) {
             (Some(ref docker), Some(ref network_config)) => match network_config.devnet {
                 Some(ref devnet_config) => (docker, devnet_config),
@@ -1673,30 +1676,24 @@ events_keys = ["*"]
             let _ = docker
                 .kill_container(bitcoin_explorer_container_id, options.clone())
                 .await;
-            if terminate {
-                println!("Terminating bitcoin-explorer...");
-                let _ = docker.remove_container(bitcoin_explorer_container_id, None);
-            }
+            println!("Terminating bitcoin-explorer...");
+            let _ = docker.remove_container(bitcoin_explorer_container_id, None);
         }
 
         if let Some(ref stacks_explorer_container_id) = self.stacks_explorer_container_id {
             let _ = docker
                 .kill_container(stacks_explorer_container_id, options.clone())
                 .await;
-            if terminate {
-                println!("Terminating stacks-explorer...");
-                let _ = docker.remove_container(stacks_explorer_container_id, None);
-            }
+            println!("Terminating stacks-explorer...");
+            let _ = docker.remove_container(stacks_explorer_container_id, None);
         }
 
         if let Some(ref bitcoin_blockchain_container_id) = self.bitcoin_blockchain_container_id {
             let _ = docker
                 .kill_container(bitcoin_blockchain_container_id, options.clone())
                 .await;
-            if terminate {
-                println!("Terminating bitcoin-node...");
-                let _ = docker.remove_container(bitcoin_blockchain_container_id, None);
-            }
+            println!("Terminating bitcoin-node...");
+            let _ = docker.remove_container(bitcoin_blockchain_container_id, None);
         }
 
         if let Some(ref stacks_blockchain_api_container_id) =
@@ -1705,45 +1702,39 @@ events_keys = ["*"]
             let _ = docker
                 .kill_container(stacks_blockchain_api_container_id, options.clone())
                 .await;
-            if terminate {
-                println!("Terminating stacks-api...");
-                let _ = docker.remove_container(stacks_blockchain_api_container_id, None);
-            }
+            println!("Terminating stacks-api...");
+            let _ = docker.remove_container(stacks_blockchain_api_container_id, None);
         }
 
         if let Some(ref postgres_container_id) = self.postgres_container_id {
             let _ = docker
                 .kill_container(postgres_container_id, options.clone())
                 .await;
-            if terminate {
-                println!("Terminating postgres...");
-                let _ = docker.remove_container(postgres_container_id, None);
-            }
+            println!("Terminating postgres...");
+            let _ = docker.remove_container(postgres_container_id, None);
         }
 
         if let Some(ref stacks_blockchain_container_id) = self.stacks_blockchain_container_id {
             let _ = docker
                 .kill_container(stacks_blockchain_container_id, options)
                 .await;
-            if terminate {
-                println!("Terminating stacks-node...");
-                let _ = docker.remove_container(stacks_blockchain_container_id, None);
-            }
+            println!("Terminating stacks-node...");
+            let _ = docker.remove_container(stacks_blockchain_container_id, None);
         }
 
-        if terminate {
-            // Prune network
-            println!("Pruning network and containers...");
-            self.prune().await;
-            if let Some(ref tx) = self.termination_success_tx {
-                let _ = tx.send(true);
-            }
+        // Prune network
+        println!("Pruning network and containers...");
+        self.prune().await;
+        if let Some(ref tx) = self.termination_success_tx {
+            let _ = tx.send(true);
+        }
 
-            println!(
-                "Artifacts (logs, conf, chainstates) available here: {}",
-                devnet_config.working_dir
-            );
-            println!("✌️");
+        println!(
+            "Artifacts (logs, conf, chainstates) available here: {}",
+            devnet_config.working_dir
+        );
+        println!("✌️");
+        if self.can_exit {
             std::process::exit(0);
         }
     }
@@ -1819,6 +1810,16 @@ events_keys = ["*"]
             None,
         );
     }
+}
+
+fn formatted_docker_error(message: &str, error: DockerError) -> String {
+    let error = match &error {
+        DockerError::DockerResponseServerError { status_code: _c, message: m } => {
+            m.to_string()
+        }
+        _ => format!("{:?}", error)
+    };
+    format!("{}: {}", message, error)
 }
 
 fn process_exit() {

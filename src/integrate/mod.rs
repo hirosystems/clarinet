@@ -28,7 +28,10 @@ pub fn run_devnet(
     String,
 > {
     match block_on(do_run_devnet(devnet, log_tx, display_dashboard)) {
-        Err(_e) => std::process::exit(1),
+        Err(e) => {
+            println!("{}", e);
+            Err(e)
+        },
         Ok(res) => Ok(res),
     }
 }
@@ -61,9 +64,9 @@ pub async fn do_run_devnet(
     let devnet_config = match devnet.network_config {
         Some(ref network_config) => match &network_config.devnet {
             Some(devnet_config) => Ok(devnet_config.clone()),
-            _ => Err("Unable to retrieve config"),
+            _ => Err("Unable to retrieve config 1"),
         },
-        _ => Err("Unable to retrieve config"),
+        _ => Err("Unable to retrieve config 2"),
     }?;
 
     let file_appender = tracing_appender::rolling::never(&devnet_config.working_dir, "devnet.log");
@@ -82,12 +85,15 @@ pub async fn do_run_devnet(
     let chains_coordinator_tx = devnet_events_tx.clone();
     let (chains_coordinator_commands_tx, chains_coordinator_commands_rx) = channel();
     let moved_events_observer_commands_tx = chains_coordinator_commands_tx.clone();
+    let (orchestrator_terminator_tx, terminator_rx) = channel();
+    let moved_orchestrator_terminator_tx = orchestrator_terminator_tx.clone();
     let chains_coordinator_handle = std::thread::spawn(move || {
         let future = start_chains_coordinator(
             config,
             chains_coordinator_tx,
             chains_coordinator_commands_rx,
             moved_events_observer_commands_tx,
+            moved_orchestrator_terminator_tx,
         );
         let rt = utils::create_basic_runtime();
         let _ = rt.block_on(future);
@@ -98,7 +104,6 @@ pub async fn do_run_devnet(
     // The devnet orchestrator should be able to send some events to the UI thread,
     // and should be able to be restarted/terminated
     let orchestrator_event_tx = devnet_events_tx.clone();
-    let (orchestrator_terminator_tx, terminator_rx) = channel();
     let orchestrator_handle = std::thread::spawn(move || {
         let future = devnet.start(orchestrator_event_tx, terminator_rx);
         let rt = utils::create_basic_runtime();
@@ -112,19 +117,14 @@ pub async fn do_run_devnet(
             devnet_events_tx,
             devnet_events_rx,
             moved_chains_coordinator_commands_tx,
-            orchestrator_terminator_tx,
             orchestrator_terminated_rx,
             &devnet_path,
         );
     } else {
-        let moved_orchestrator_terminator_tx = orchestrator_terminator_tx.clone();
         let moved_events_observer_commands_tx = chains_coordinator_commands_tx.clone();
         ctrlc::set_handler(move || {
             moved_events_observer_commands_tx
                 .send(ChainsCoordinatorCommand::Terminate(true))
-                .expect("Unable to terminate devnet");
-            moved_orchestrator_terminator_tx
-                .send(true)
                 .expect("Unable to terminate devnet");
         })
         .expect("Error setting Ctrl-C handler");
@@ -181,6 +181,7 @@ pub enum DevnetEvent {
     StacksChainEvent(StacksChainEvent),
     BitcoinChainEvent(BitcoinChainEvent),
     MempoolAdmission(MempoolAdmissionData),
+    FatalError(String),
     // Restart,
     // Terminate,
     // Microblock(MicroblockData),

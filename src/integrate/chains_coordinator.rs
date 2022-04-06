@@ -135,6 +135,7 @@ pub async fn start_chains_coordinator(
     devnet_event_tx: Sender<DevnetEvent>,
     chains_coordinator_commands_rx: Receiver<ChainsCoordinatorCommand>,
     chains_coordinator_commands_tx: Sender<ChainsCoordinatorCommand>,
+    chains_coordinator_terminator_tx: Sender<bool>,
 ) -> Result<(), Box<dyn Error>> {
     let _ = config.execute_scripts().await;
 
@@ -212,6 +213,8 @@ pub async fn start_chains_coordinator(
                 devnet_event_tx
                     .send(DevnetEvent::info("Terminating event observer".into()))
                     .expect("Unable to terminate event observer");
+                let _ = chains_coordinator_terminator_tx
+                    .send(true);
                 break;
             }
             Ok(ChainsCoordinatorCommand::Terminate(false)) => {
