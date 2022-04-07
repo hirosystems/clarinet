@@ -10,7 +10,11 @@ keywords = ["blockstack", "blockchain", "clarity", "smart-contract", "repl"]
 exclude = ["examples/**"]
 homepage = "https://github.com/hirosystems/clarinet"
 repository = "https://github.com/hirosystems/clarinet"
-categories = ["command-line-utilities", "development-tools", "development-tools::build-utils"]
+categories = [
+    "command-line-utilities",
+    "development-tools",
+    "development-tools::build-utils",
+]
 
 [target.'cfg(windows)'.build-dependencies]
 winapi = "0.3.9"
@@ -20,7 +24,7 @@ winres = "0.1.11"
 clap = { version = "3.1.6", features = ["derive"], optional = true }
 clap_generate = { version = "3.0.3", optional = true }
 toml = { version = "0.5.6", features = ["preserve_order"] }
-serde = "1"
+serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 serde_derive = "1"
 deno_core = { path = "./vendor/deno/core", optional = true }
@@ -38,7 +42,7 @@ libsecp256k1 = "0.7.0"
 sha2 = "0.10.0"
 uuid = { version = "0.8.2", features = ["v4"] }
 hmac = "0.12.0"
-pbkdf2 = { version = "0.11.0", features=["simple"], default-features = false }
+pbkdf2 = { version = "0.11.0", features = ["simple"], default-features = false }
 futures = "0.3.12"
 tokio = { version = "=1.15.0", features = ["full"] }
 lazy_static = "1.4.0"
@@ -54,7 +58,11 @@ pin-project = "1.0.5"
 indexmap = { version = "1.6.1", features = ["serde"] }
 shell-escape = "0.1.5"
 tiny-hderive = "0.3.0"
-reqwest = { version = "0.11", default-features = false, features = ["blocking", "json", "rustls-tls"] }
+reqwest = { version = "0.11", default-features = false, features = [
+    "blocking",
+    "json",
+    "rustls-tls",
+] }
 swc_common = { version = "0.10.20", features = ["sourcemap"], optional = true }
 bollard = "0.11.0"
 rocket = { version = "=0.5.0-rc.1", features = ["json"] }
@@ -73,6 +81,11 @@ mac_address = { version = "1.1.2", optional = true }
 tower-lsp = { version = "0.14.0", optional = true }
 hex = "0.4.3"
 dirs = "4.0.0"
+tokio-util = { version = "0.7.1", features = ["codec"] }
+httparse = "1.6.0"
+bytes = "1.1.0"
+log = "0.4.16"
+memchr = "2.4.1"
 
 [dependencies.tui]
 version = "0.16.0"
@@ -81,7 +94,16 @@ features = ["crossterm"]
 
 [target.'cfg(windows)'.dependencies]
 fwdansi = "1.1.0"
-winapi = { version = "0.3.9", features = ["knownfolders", "mswsock", "objbase", "shlobj", "tlhelp32", "winbase", "winerror", "winsock2"] }
+winapi = { version = "0.3.9", features = [
+    "knownfolders",
+    "mswsock",
+    "objbase",
+    "shlobj",
+    "tlhelp32",
+    "winbase",
+    "winerror",
+    "winsock2",
+] }
 
 [package.metadata.winres]
 OriginalFilename = "clarinet.exe"
@@ -100,7 +122,15 @@ path = "src/bin.rs"
 
 [features]
 default = ["cli", "telemetry"]
-cli = ["swc_common", "deno", "deno_runtime", "deno_core", "clap", "clap_generate", "tower-lsp"]
+cli = [
+    "swc_common",
+    "deno",
+    "deno_runtime",
+    "deno_core",
+    "clap",
+    "clap_generate",
+    "tower-lsp",
+]
 telemetry = ["segment", "mac_address"]
 
 [workspace]
@@ -110,5 +140,5 @@ members = [
     "vendor/deno/runtime/",
     "vendor/deno/core/",
     "xtask/",
-    "node-bindings"
+    "node-bindings",
 ]

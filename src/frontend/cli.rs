@@ -4,6 +4,7 @@ use std::io::{prelude::*, BufReader, Read};
 use std::path::PathBuf;
 use std::{env, process};
 
+use crate::dap::run_dap;
 use crate::generate::{
     self,
     changes::{Changes, TOMLEdition},
@@ -59,6 +60,9 @@ enum Command {
     /// Start an LSP server (for integration with editors)
     #[clap(name = "lsp", bin_name = "lsp")]
     LSP,
+    /// Start a DAP server (for debugging from IDE)
+    #[clap(name = "dap", bin_name = "dap")]
+    DAP,
     /// Generate shell completions scripts
     #[clap(name = "completions", bin_name = "completions")]
     Completions(Completions),
@@ -664,6 +668,7 @@ pub fn main() {
             }
         }
         Command::LSP => run_lsp(),
+        Command::DAP => run_dap(),
         Command::Completions(cmd) => {
             let mut app = Opts::command();
             let file_name = cmd.shell.file_name("clarinet");
