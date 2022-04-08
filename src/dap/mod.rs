@@ -1,18 +1,21 @@
+use self::codec::{DebugAdapterCodec, ParseError};
+use crate::poke::load_session;
+use crate::types::Network;
+use clarity_repl::repl::Session;
+use dap_types::events::*;
+use dap_types::requests::*;
+use dap_types::responses::*;
+use dap_types::types::*;
+use dap_types::*;
 use futures::{SinkExt, StreamExt};
-use std::fmt::Debug;
 use std::fs::File;
 use std::io::prelude::*;
+use std::path::PathBuf;
 use tokio;
 use tokio::io::{Stdin, Stdout};
-use tokio_util::codec::{Encoder, FramedRead, FramedWrite, LinesCodec};
-
-use crate::dap::types::*;
-
-use self::codec::{DebugAdapterCodec, ParseError};
-use self::types::{Event, ProtocolMessage, RequestCommand, Response};
+use tokio_util::codec::{FramedRead, FramedWrite};
 
 mod codec;
-mod types;
 
 pub fn run_dap() {
     match block_on(do_run_dap()) {
@@ -77,7 +80,7 @@ impl DapSession {
                     println!("got message: {:?}", msg);
                     writeln!(self.log_file, "message: {:?}", msg);
 
-                    use crate::dap::types::MessageKind::*;
+                    use dap_types::MessageKind::*;
                     match msg.message {
                         Request(command) => self.handle_request(msg.seq, command).await,
                         Response(response) => self.handle_response(msg.seq, response).await,
@@ -116,7 +119,7 @@ impl DapSession {
     }
 
     pub async fn handle_request(&mut self, seq: i64, command: RequestCommand) {
-        use crate::dap::types::RequestCommand::*;
+        use dap_types::requests::RequestCommand::*;
         match command {
             Initialize(arguments) => {
                 let capabilities = Capabilities {
@@ -179,6 +182,7 @@ impl DapSession {
                     body: None,
                 }).await;
             }
+            _ => (),
         }
     }
 
