@@ -86,6 +86,7 @@ httparse = "1.6.0"
 bytes = "1.1.0"
 log = "0.4.16"
 memchr = "2.4.1"
+dap_types = { package = "dap-types", path = "../dap-types" }
 
 [dependencies.tui]
 version = "0.16.0"
