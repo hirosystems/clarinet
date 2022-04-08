@@ -420,7 +420,7 @@ You can use Clarinet to deploy your contracts to the public Testnet environment 
 evaluation on a blockchain. Use the following command:
 
 ```bash
-$ clarinet deploy --testnet
+$ clarinet contract publish --testnet
 ```
 
 ### Use Clarinet in your CI workflow as a GitHub Action
