@@ -276,7 +276,7 @@ pub fn main() {
                     println!("{}", yellow!("Enable [Y/n]?"));
                     let mut buffer = String::new();
                     std::io::stdin().read_line(&mut buffer).unwrap();
-                    buffer != "n\n"
+                    !buffer.starts_with("n")
                 }
             } else {
                 false
