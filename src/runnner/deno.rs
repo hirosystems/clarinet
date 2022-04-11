@@ -222,11 +222,7 @@ mod sessions {
             }
             settings.initial_deployer = initial_deployer;
             settings.repl_settings = project_config.repl_settings;
-            settings.include_boot_contracts = vec![
-                "pox".to_string(),
-                format!("costs-v{}", settings.repl_settings.costs_version),
-                "bns".to_string(),
-            ];
+            settings.include_boot_contracts = project_config.project.boot_contracts;
             let mut session = Session::new(settings.clone());
             let (_, contracts) = match session.start() {
                 Ok(res) => res,
