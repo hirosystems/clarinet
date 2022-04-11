@@ -20,6 +20,7 @@ pub struct ProjectConfigFile {
     description: Option<String>,
     telemetry: Option<bool>,
     requirements: Option<Value>,
+    boot_contracts: Option<Vec<String>>,
 
     // The fields below have been moved into repl above, but are kept here for
     // backwards compatibility.
@@ -46,6 +47,7 @@ pub struct ProjectConfig {
     pub telemetry: bool,
     pub requirements: Option<Vec<RequirementConfig>>,
     pub cache_dir: String,
+    pub boot_contracts: Vec<String>,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Default)]
@@ -107,26 +109,6 @@ impl ProjectManifest {
     pub fn from_project_manifest_file(
         project_manifest_file: ProjectManifestFile,
     ) -> ProjectManifest {
-        let project_name = project_manifest_file.project.name;
-        let mut default_cache_path = dirs::home_dir().expect("Unable to retrieve home directory");
-        default_cache_path.push(".clarinet");
-        default_cache_path.push("cache");
-
-        let project = ProjectConfig {
-            name: project_name.clone(),
-            requirements: None,
-            description: project_manifest_file
-                .project
-                .description
-                .unwrap_or("".into()),
-            authors: project_manifest_file.project.authors.unwrap_or(vec![]),
-            telemetry: project_manifest_file.project.telemetry.unwrap_or(false),
-            cache_dir: project_manifest_file
-                .project
-                .cache_dir
-                .unwrap_or(default_cache_path.to_str().unwrap().to_string()),
-        };
-
         let mut repl_settings = if let Some(repl_settings) = project_manifest_file.repl {
             repl::Settings::from(repl_settings)
         } else {
@@ -148,6 +130,31 @@ impl ProjectManifest {
             );
             repl_settings.costs_version = costs_version;
         }
+
+        let project_name = project_manifest_file.project.name;
+        let mut default_cache_path = dirs::home_dir().expect("Unable to retrieve home directory");
+        default_cache_path.push(".clarinet");
+        default_cache_path.push("cache");
+
+        let project = ProjectConfig {
+            name: project_name.clone(),
+            requirements: None,
+            description: project_manifest_file
+                .project
+                .description
+                .unwrap_or("".into()),
+            authors: project_manifest_file.project.authors.unwrap_or(vec![]),
+            telemetry: project_manifest_file.project.telemetry.unwrap_or(false),
+            cache_dir: project_manifest_file
+                .project
+                .cache_dir
+                .unwrap_or(default_cache_path.to_str().unwrap().to_string()),
+            boot_contracts: project_manifest_file.project.boot_contracts.unwrap_or(vec![
+                "pox".to_string(),
+                format!("costs-v{}", repl_settings.costs_version),
+                "bns".to_string(),
+            ]),
+        };
 
         let mut config = ProjectManifest {
             project,
