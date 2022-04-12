@@ -24,7 +24,8 @@ pub mod macros;
 pub mod indexer;
 pub mod integrate;
 pub mod poke;
-pub mod publish;
+mod deployment;
+mod hook;
 #[cfg(feature = "cli")]
 pub mod runnner;
 pub mod types;

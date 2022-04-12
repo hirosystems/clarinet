@@ -65,9 +65,17 @@ pub struct ChainUpdatedWithMicroblockReorgData {
 }
 
 #[allow(dead_code)]
-#[derive(Debug, PartialEq, Eq)]
-pub enum Network {
+#[derive(Debug, PartialEq, Eq, Clone)]
+pub enum StacksNetwork {
     Devnet,
+    Testnet,
+    Mainnet,
+}
+
+#[allow(dead_code)]
+#[derive(Debug, PartialEq, Eq, Clone)]
+pub enum BitcoinNetwork {
+    Regtest,
     Testnet,
     Mainnet,
 }
@@ -84,4 +92,6 @@ pub enum ChainsCoordinatorCommand {
     MineBitcoinBlock,
     InvalidateBitcoinChainTip,
     PublishPoxStackingOrders(BlockIdentifier),
+    EvaluateBitcoinHooks(BitcoinChainEvent),
+    EvaluateStacksHooks(StacksChainEvent),
 }

@@ -1,7 +1,10 @@
 mod ui;
+mod types;
+
+use self::types::{DeploymentPlan};
 use crate::integrate::DevnetEvent;
 use crate::poke::{load_session, load_session_settings};
-use crate::types::{ChainsCoordinatorCommand, Network, ProjectManifest};
+use crate::types::{ChainsCoordinatorCommand, StacksNetwork, ProjectManifest};
 use crate::utils::mnemonic;
 use crate::utils::stacks::StacksRpc;
 use clarity_repl::clarity::codec::transaction::{
@@ -33,6 +36,7 @@ use std::path::PathBuf;
 use std::sync::mpsc::channel;
 use std::sync::mpsc::Sender;
 use tiny_hderive::bip32::ExtendedPrivKey;
+use serde_yaml;
 
 #[derive(Deserialize, Debug)]
 pub struct Balance {
@@ -63,12 +67,33 @@ pub enum ContractStatus {
     Error,
 }
 
+pub fn build_plan(manifest_path: &PathBuf, network: &StacksNetwork) -> DeploymentPlan {
+
+    // Load manifest
+
+    // Load global network state, if any
+
+    // Load contracts
+    // -> Compare hash, any update?
+
+    // Load hooks
+    // -> Compare hash, any update?
+
+    // If transactions are present between outdated contracts, raise a warning
+    // 
+
+    DeploymentPlan {
+        network: network.clone(),
+        actions: vec![],
+    }
+}
+
 pub fn endode_contract(
     contract: &InitialContract,
     account: &Account,
     nonce: u64,
     deployment_fee_rate: u64,
-    network: &Network,
+    network: &StacksNetwork,
 ) -> Result<(StacksTransaction, StacksAddress), String> {
     let contract_name = contract.name.clone().unwrap();
 
@@ -94,7 +119,7 @@ pub fn endode_contract(
 
     let signer_addr = StacksAddress::from_public_keys(
         match network {
-            Network::Mainnet => C32_ADDRESS_VERSION_MAINNET_SINGLESIG,
+            StacksNetwork::Mainnet => C32_ADDRESS_VERSION_MAINNET_SINGLESIG,
             _ => C32_ADDRESS_VERSION_TESTNET_SINGLESIG,
         },
         &AddressHashMode::SerializeP2PKH,
@@ -115,11 +140,11 @@ pub fn endode_contract(
     let auth = TransactionAuth::Standard(spending_condition);
     let unsigned_tx = StacksTransaction {
         version: match network {
-            Network::Mainnet => TransactionVersion::Mainnet,
+            StacksNetwork::Mainnet => TransactionVersion::Mainnet,
             _ => TransactionVersion::Testnet,
         },
         chain_id: match network {
-            Network::Mainnet => 0x00000001,
+            StacksNetwork::Mainnet => 0x00000001,
             _ => 0x80000000,
         },
         auth: auth,
@@ -148,7 +173,7 @@ pub fn publish_contract(
     deployers_nonces: &mut HashMap<String, u64>,
     node_url: &str,
     deployment_fee_rate: u64,
-    network: &Network,
+    network: &StacksNetwork,
 ) -> Result<(String, u64, String, String), String> {
     let contract_name = contract.name.clone().unwrap();
 
@@ -184,7 +209,7 @@ pub fn publish_contract(
 /// this method is being used by developers
 pub fn publish_all_contracts(
     manifest_path: &PathBuf,
-    network: &Network,
+    network: &StacksNetwork,
     analysis_enabled: bool,
     delay_between_checks: u32,
     devnet_event_tx: Option<&Sender<DevnetEvent>>,

@@ -1,6 +1,6 @@
 use super::DevnetEvent;
 use crate::integrate::{ServiceStatusData, Status};
-use crate::types::{ChainConfig, DevnetConfigFile, Network, ProjectManifest};
+use crate::types::{ChainConfig, DevnetConfigFile, StacksNetwork, ProjectManifest};
 use bollard::container::{
     Config, CreateContainerOptions, KillContainerOptions, ListContainersOptions,
     PruneContainersOptions, WaitContainerOptions,
@@ -49,7 +49,7 @@ impl DevnetOrchestrator {
         network_config_path.push("settings");
         network_config_path.push("Devnet.toml");
 
-        let mut network_config = ChainConfig::from_path(&network_config_path, &Network::Devnet);
+        let mut network_config = ChainConfig::from_path(&network_config_path, &StacksNetwork::Devnet);
         let manifest = ProjectManifest::from_path(&manifest_path);
         let name = manifest.project.name.clone();
         let network_name = format!("{}.devnet", name);

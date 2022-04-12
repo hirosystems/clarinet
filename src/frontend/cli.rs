@@ -10,10 +10,11 @@ use crate::generate::{
 };
 use crate::integrate::{self, DevnetOrchestrator};
 use crate::lsp::run_lsp;
+use crate::hook::check_hooks;
 use crate::poke::load_session;
-use crate::publish::publish_all_contracts;
+use crate::deployment::publish_all_contracts;
 use crate::runnner::run_scripts;
-use crate::types::{Network, ProjectManifest, ProjectManifestFile, RequirementConfig};
+use crate::types::{StacksNetwork, ProjectManifest, ProjectManifestFile, RequirementConfig};
 use clarity_repl::clarity::analysis::{AnalysisDatabase, ContractAnalysis};
 use clarity_repl::clarity::costs::LimitedCostTracker;
 use clarity_repl::clarity::types::QualifiedContractIdentifier;
@@ -41,6 +42,9 @@ enum Command {
     /// Subcommands for working with contracts
     #[clap(subcommand, name = "contracts")]
     Contracts(Contracts),
+    /// Subcommands for working with hooks
+    #[clap(subcommand, name = "hooks")]
+    Hooks(Hooks),
     /// Load contracts in a REPL for an interactive session
     #[clap(name = "console", aliases = &["poke"], bin_name = "console")]
     Console(Console),
@@ -79,6 +83,20 @@ enum Contracts {
     /// Publish contracts on chain
     #[clap(name = "publish", bin_name = "publish")]
     Publish(Publish),
+}
+
+#[derive(Subcommand, PartialEq, Clone, Debug)]
+#[clap(bin_name = "hook", aliases = &["hooks"])]
+enum Hooks {
+    /// Generate files and settings for a new hook
+    #[clap(name = "new", bin_name = "new")]
+    NewHook(NewHook),
+    /// Check hooks format
+    #[clap(name = "check", bin_name = "check")]
+    CheckHooks(CheckHooks),
+    /// Publish contracts on chain
+    #[clap(name = "deploy", bin_name = "deploy")]
+    DeployHooks(DeployHooks),
 }
 
 #[derive(Parser, PartialEq, Clone, Debug)]
@@ -143,6 +161,29 @@ struct Publish {
         conflicts_with = "devnet"
     )]
     pub mainnet: bool,
+    /// Path to Clarinet.toml
+    #[clap(long = "manifest-path")]
+    pub manifest_path: Option<String>,
+}
+
+#[derive(Parser, PartialEq, Clone, Debug)]
+struct NewHook {
+    /// Hook's name
+    pub name: String,
+    /// Path to Clarinet.toml
+    #[clap(long = "manifest-path")]
+    pub manifest_path: Option<String>,
+}
+
+#[derive(Parser, PartialEq, Clone, Debug)]
+struct CheckHooks {
+    /// Path to Clarinet.toml
+    #[clap(long = "manifest-path")]
+    pub manifest_path: Option<String>,
+}
+
+#[derive(Parser, PartialEq, Clone, Debug)]
+struct DeployHooks {
     /// Path to Clarinet.toml
     #[clap(long = "manifest-path")]
     pub manifest_path: Option<String>,
@@ -311,6 +352,35 @@ pub fn main() {
                 )));
             }
         }
+        Command::Hooks(subcommand) => match subcommand {
+            Hooks::NewHook(cmd) => {
+                let manifest_path = get_manifest_path_or_exit(cmd.manifest_path);
+
+                // let changes = generate::get_changes_for_new_contract(
+                //     manifest_path,
+                //     new_contract.name,
+                //     None,
+                //     true,
+                //     vec![],
+                // );
+                // if !execute_changes(changes) {
+                //     std::process::exit(1);
+                // }
+                // if hints_enabled {
+                //     display_post_check_hint();
+                // }
+            }
+            Hooks::CheckHooks(cmd) => {
+                let manifest_path = get_manifest_path_or_exit(cmd.manifest_path);
+                // Ensure that all the hooks can correctly be deserialized.
+                println!("Checking hooks");
+                check_hooks(&manifest_path);
+            }
+            Hooks::DeployHooks(cmd) => {
+                let manifest_path = get_manifest_path_or_exit(cmd.manifest_path);
+                // Deploy hooks
+            }
+        },
         Command::Contracts(subcommand) => match subcommand {
             Contracts::NewContract(new_contract) => {
                 let manifest_path = get_manifest_path_or_exit(new_contract.manifest_path);
@@ -407,11 +477,11 @@ pub fn main() {
                 let manifest_path = get_manifest_path_or_exit(deploy.manifest_path);
 
                 let network = if deploy.devnet == true {
-                    Network::Devnet
+                    StacksNetwork::Devnet
                 } else if deploy.testnet == true {
-                    Network::Testnet
+                    StacksNetwork::Testnet
                 } else if deploy.mainnet == true {
-                    Network::Mainnet
+                    StacksNetwork::Mainnet
                 } else {
                     panic!(
                         "Target deployment must be specified with --devnet, --testnet or --mainnet"
@@ -444,7 +514,7 @@ pub fn main() {
             let manifest_path = get_manifest_path_or_exit(cmd.manifest_path);
             let start_repl = true;
             let (session, project_manifest) =
-                match load_session(&manifest_path, start_repl, &Network::Devnet) {
+                match load_session(&manifest_path, start_repl, &StacksNetwork::Devnet) {
                     Ok((session, _, project_manifest, _)) => (Some(session), project_manifest),
                     Err((project_manifest, e)) => {
                         println!("{}: Unable to start REPL: {}", red!("error"), e);
@@ -541,7 +611,7 @@ pub fn main() {
         Command::Check(cmd) => {
             let manifest_path = get_manifest_path_or_exit(cmd.manifest_path);
             let start_repl = false;
-            let project_manifest = match load_session(&manifest_path, start_repl, &Network::Devnet)
+            let project_manifest = match load_session(&manifest_path, start_repl, &StacksNetwork::Devnet)
             {
                 Err((_, e)) => {
                     println!("{}", e);
@@ -575,7 +645,7 @@ pub fn main() {
         Command::Test(cmd) => {
             let manifest_path = get_manifest_path_or_exit(cmd.manifest_path);
             let start_repl = false;
-            let res = load_session(&manifest_path, start_repl, &Network::Devnet);
+            let res = load_session(&manifest_path, start_repl, &StacksNetwork::Devnet);
             let (session, project_manifest) = match res {
                 Ok((session, _, manifest, output)) => {
                     if let Some(message) = output {
@@ -622,7 +692,7 @@ pub fn main() {
         Command::Run(cmd) => {
             let manifest_path = get_manifest_path_or_exit(cmd.manifest_path);
             let start_repl = false;
-            let res = load_session(&manifest_path, start_repl, &Network::Devnet);
+            let res = load_session(&manifest_path, start_repl, &StacksNetwork::Devnet);
             let session = match res {
                 Ok((session, _, _, output)) => {
                     if let Some(message) = output {

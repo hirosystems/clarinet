@@ -15,7 +15,7 @@ use std::sync::RwLock;
 
 use super::utils;
 use crate::poke::load_session_settings;
-use crate::types::Network;
+use crate::types::StacksNetwork;
 
 #[allow(dead_code)]
 #[derive(Debug)]
@@ -79,7 +79,7 @@ impl ClarityLanguageBackend {
             Err(message) => return Err((message, logs)),
             Ok(Some(clarinet_toml_path)) => {
                 // Read these 2 files and build a SessionSetting
-                match load_session_settings(&clarinet_toml_path, &Network::Devnet) {
+                match load_session_settings(&clarinet_toml_path, &StacksNetwork::Devnet) {
                     Err(message) => return Err((message, logs)),
                     Ok((settings, _, _)) => settings,
                 }

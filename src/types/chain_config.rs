@@ -1,4 +1,4 @@
-use super::Network;
+use super::StacksNetwork;
 use crate::utils::mnemonic;
 use bip39::{Language, Mnemonic};
 use clarity_repl::clarity::util::hash::bytes_to_hex;
@@ -168,7 +168,7 @@ pub struct AccountConfig {
 
 impl ChainConfig {
     #[allow(non_fmt_panics)]
-    pub fn from_path(path: &PathBuf, network: &Network) -> ChainConfig {
+    pub fn from_path(path: &PathBuf, network: &StacksNetwork) -> ChainConfig {
         let path = match File::open(path) {
             Ok(path) => path,
             Err(_) => {
@@ -188,7 +188,7 @@ impl ChainConfig {
 
     pub fn from_chain_config_file(
         chain_config_file: &mut ChainConfigFile,
-        env: &Network,
+        env: &StacksNetwork,
     ) -> ChainConfig {
         let network = NetworkConfig {
             name: chain_config_file.network.name.clone(),
@@ -209,7 +209,7 @@ impl ChainConfig {
                                 _ => 0,
                             };
 
-                            let is_mainnet = env == &Network::Mainnet;
+                            let is_mainnet = env == &StacksNetwork::Mainnet;
 
                             let mnemonic = match account_settings.get("mnemonic") {
                                 Some(Value::String(words)) => {

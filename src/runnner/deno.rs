@@ -51,7 +51,7 @@ use swc_common::comments::CommentKind;
 mod sessions {
     use super::TransactionArgs;
     use crate::poke::load_session_settings;
-    use crate::types::{ChainConfig, Network, ProjectManifest};
+    use crate::types::{ChainConfig, StacksNetwork, ProjectManifest};
     use clarity_repl::clarity::analysis::ContractAnalysis;
     use clarity_repl::repl::settings::Account;
     use clarity_repl::repl::{self, Session};
@@ -89,7 +89,7 @@ mod sessions {
 
         let (mut session, contracts) = if !can_use_cache {
             let (mut session_settings, _, _) =
-                load_session_settings(&manifest_path, &Network::Devnet)
+                load_session_settings(&manifest_path, &StacksNetwork::Devnet)
                     .expect("Unable to load manifest");
             session_settings.lazy_initial_contracts_interpretation = includes_pre_deployment_steps;
             let mut session = Session::new(session_settings.clone());
@@ -159,7 +159,7 @@ mod sessions {
             chain_config_path.push("Devnet.toml");
 
             let project_config = ProjectManifest::from_path(manifest_path);
-            let chain_config = ChainConfig::from_path(&chain_config_path, &Network::Devnet);
+            let chain_config = ChainConfig::from_path(&chain_config_path, &StacksNetwork::Devnet);
 
             let mut deployer_address = None;
             let mut initial_deployer = None;

@@ -1,11 +1,11 @@
-use crate::types::{ChainConfig, Network, ProjectManifest};
+use crate::types::{ChainConfig, StacksNetwork, ProjectManifest};
 use clarity_repl::{repl, Terminal};
 use std::fs;
 use std::path::PathBuf;
 
 pub fn load_session_settings(
     manifest_path: &PathBuf,
-    env: &Network,
+    env: &StacksNetwork,
 ) -> Result<(repl::SessionSettings, ChainConfig, ProjectManifest), String> {
     let mut settings = repl::SessionSettings::default();
 
@@ -17,9 +17,9 @@ pub fn load_session_settings(
     chain_config_path.push("settings");
 
     chain_config_path.push(match env {
-        Network::Devnet => "Devnet.toml",
-        Network::Testnet => "Testnet.toml",
-        Network::Mainnet => "Mainnet.toml",
+        StacksNetwork::Devnet => "Devnet.toml",
+        StacksNetwork::Testnet => "Testnet.toml",
+        StacksNetwork::Mainnet => "Mainnet.toml",
     });
 
     let mut project_config = ProjectManifest::from_path(&manifest_path);
@@ -34,9 +34,9 @@ pub fn load_session_settings(
         .clone()
         .take()
         .unwrap_or(match env {
-            Network::Devnet => "http://127.0.0.1:20443".into(),
-            Network::Testnet => "https://stacks-node-api.testnet.stacks.co".into(),
-            Network::Mainnet => "https://stacks-node-api.mainnet.stacks.co".into(),
+            StacksNetwork::Devnet => "http://127.0.0.1:20443".into(),
+            StacksNetwork::Testnet => "https://stacks-node-api.testnet.stacks.co".into(),
+            StacksNetwork::Mainnet => "https://stacks-node-api.mainnet.stacks.co".into(),
         });
 
     for (name, account) in chain_config.accounts.iter() {
@@ -108,7 +108,7 @@ pub fn load_session_settings(
 pub fn load_session(
     manifest_path: &PathBuf,
     start_repl: bool,
-    env: &Network,
+    env: &StacksNetwork,
 ) -> Result<(repl::Session, ChainConfig, ProjectManifest, Option<String>), (ProjectManifest, String)>
 {
     let (settings, chain_config, project_config) =

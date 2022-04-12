@@ -1,4 +1,4 @@
-use crate::publish::{ContractStatus, ContractUpdate};
+use crate::deployment::{ContractStatus, ContractUpdate};
 use tui::widgets::ListState;
 
 pub struct StatefulList<T> {

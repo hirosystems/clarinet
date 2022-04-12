@@ -5,7 +5,7 @@ use segment::{
     Client, HttpClient,
 };
 
-use crate::types::Network;
+use crate::types::StacksNetwork;
 
 pub enum DeveloperUsageEvent {
     NewProject(DeveloperUsageDigest),
@@ -13,7 +13,7 @@ pub enum DeveloperUsageEvent {
     CheckExecuted(DeveloperUsageDigest),
     TestSuiteExecuted(DeveloperUsageDigest, bool, u32),
     DevnetExecuted(DeveloperUsageDigest),
-    ContractPublished(DeveloperUsageDigest, Network),
+    ContractPublished(DeveloperUsageDigest, StacksNetwork),
     DebugStarted(DeveloperUsageDigest, u32),
     UnknownCommand(DeveloperUsageDigest, String),
 }
