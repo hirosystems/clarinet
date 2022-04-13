@@ -52,9 +52,10 @@ async fn do_run_dap() -> Result<(), String> {
 
 struct DapSession {
     log_file: File,
-    response_seq: i64,
+    send_seq: i64,
     reader: FramedRead<Stdin, DebugAdapterCodec<ProtocolMessage>>,
     writer: FramedWrite<Stdout, DebugAdapterCodec<ProtocolMessage>>,
+    session: Option<Session>,
 }
 
 impl DapSession {
@@ -64,9 +65,10 @@ impl DapSession {
     ) -> Self {
         Self {
             log_file: File::create("/Users/brice/work/debugger-demo/dap.txt").unwrap(),
-            response_seq: 0,
+            send_seq: 0,
             reader,
             writer,
+            session: None,
         }
     }
 
@@ -100,11 +102,11 @@ impl DapSession {
 
     async fn send_response(&mut self, response: Response) {
         let response_json = serde_json::to_string(&response).unwrap();
-        writeln!(self.log_file, "response: {}", response_json);
-        println!("response: {}", response_json);
+        writeln!(self.log_file, "::::response: {}", response_json);
+        println!("::::response: {}", response_json);
 
         let message = ProtocolMessage {
-            seq: self.response_seq,
+            seq: self.send_seq,
             message: MessageKind::Response(response),
         };
 
@@ -115,75 +117,55 @@ impl DapSession {
             }
         };
 
-        self.response_seq += 1;
+        self.send_seq += 1;
+    }
+
+    async fn send_event(&mut self, body: EventBody) {
+        let event_json = serde_json::to_string(&body).unwrap();
+        writeln!(self.log_file, "::::event: {}", event_json);
+        println!("::::event: {}", event_json);
+
+        let message = ProtocolMessage {
+            seq: self.send_seq,
+            message: MessageKind::Event(Event { body: Some(body) }),
+        };
+
+        match self.writer.send(message).await {
+            Ok(_) => (),
+            Err(e) => {
+                writeln!(self.log_file, "ERROR: sending response: {}", e);
+            }
+        };
+
+        self.send_seq += 1;
     }
 
     pub async fn handle_request(&mut self, seq: i64, command: RequestCommand) {
         use dap_types::requests::RequestCommand::*;
-        match command {
-            Initialize(arguments) => {
-                let capabilities = Capabilities {
-                    supports_function_breakpoints: Some(true),
-                    supports_step_in_targets_request: Some(true),
-                    support_terminate_debuggee: Some(true),
-                    supports_loaded_sources_request: Some(true),
-                    supports_data_breakpoints: Some(true),
-                    supports_breakpoint_locations_request: Some(true),
-                    supports_configuration_done_request: None,
-                    supports_conditional_breakpoints: None,
-                    supports_hit_conditional_breakpoints: None,
-                    supports_evaluate_for_hovers: None,
-                    exception_breakpoint_filters: None,
-                    supports_step_back: None,
-                    supports_set_variable: None,
-                    supports_restart_frame: None,
-                    supports_goto_targets_request: None,
-                    supports_completions_request: None,
-                    completion_trigger_characters: None,
-                    supports_modules_request: None,
-                    additional_module_columns: None,
-                    supported_checksum_algorithms: None,
-                    supports_restart_request: None,
-                    supports_exception_options: None,
-                    supports_value_formatting_options: None,
-                    supports_exception_info_request: None,
-                    support_suspend_debuggee: None,
-                    supports_delayed_stack_trace_loading: None,
-                    supports_log_points: None,
-                    supports_terminate_threads_request: None,
-                    supports_set_expression: None,
-                    supports_terminate_request: None,
-                    supports_read_memory_request: None,
-                    supports_write_memory_request: None,
-                    supports_disassemble_request: None,
-                    supports_cancel_request: None,
-                    supports_clipboard_context: None,
-                    supports_stepping_granularity: None,
-                    supports_instruction_breakpoints: None,
-                    supports_exception_filter_options: None,
-                    supports_single_thread_execution_requests: None,
-                };
-                let response = Response {
-                    request_seq: seq,
-                    success: true,
-                    message: None,
-                    body: Some(ResponseBody::Initialize(InitializeResponse {
-                        capabilities,
-                    })),
-                };
+        let result = match command {
+            Initialize(arguments) => self.initialize(arguments),
+            Launch(arguments) => self.launch(arguments).await,
+            // SetBreakpoints(arguments) => self.setBreakpoints(arguments),
+            _ => Err("unsupported request".to_string()),
+        };
 
-                self.send_response(response).await;
+        let response = match result {
+            Ok(body) => Response {
+                request_seq: seq,
+                success: true,
+                message: None,
+                body,
             },
-            Launch(_arguments) => {
-                self.send_response(Response {
-                    request_seq: seq,
-                    success: true,
-                    message: None,
-                    body: None,
-                }).await;
-            }
-            _ => (),
-        }
+            Err(err_msg) => Response {
+                request_seq: seq,
+                success: false,
+                message: Some(err_msg),
+                body: None,
+            },
+        };
+
+        println!("SENDING RESPONSE");
+        self.send_response(response).await;
     }
 
     pub async fn handle_event(&mut self, seq: i64, event: Event) {
@@ -205,4 +187,100 @@ impl DapSession {
         };
         self.send_response(response).await;
     }
+
+    // Request handlers
+
+    fn initialize(
+        &mut self,
+        arguments: InitializeRequestArguments,
+    ) -> Result<Option<ResponseBody>, String> {
+        println!("INITIALIZE");
+        let capabilities = Capabilities {
+            supports_function_breakpoints: Some(true),
+            supports_step_in_targets_request: Some(true),
+            support_terminate_debuggee: Some(true),
+            supports_loaded_sources_request: Some(true),
+            supports_data_breakpoints: Some(true),
+            supports_breakpoint_locations_request: Some(true),
+            supports_configuration_done_request: None,
+            supports_conditional_breakpoints: None,
+            supports_hit_conditional_breakpoints: None,
+            supports_evaluate_for_hovers: None,
+            exception_breakpoint_filters: None,
+            supports_step_back: None,
+            supports_set_variable: None,
+            supports_restart_frame: None,
+            supports_goto_targets_request: None,
+            supports_completions_request: None,
+            completion_trigger_characters: None,
+            supports_modules_request: None,
+            additional_module_columns: None,
+            supported_checksum_algorithms: None,
+            supports_restart_request: None,
+            supports_exception_options: None,
+            supports_value_formatting_options: None,
+            supports_exception_info_request: None,
+            support_suspend_debuggee: None,
+            supports_delayed_stack_trace_loading: None,
+            supports_log_points: None,
+            supports_terminate_threads_request: None,
+            supports_set_expression: None,
+            supports_terminate_request: None,
+            supports_read_memory_request: None,
+            supports_write_memory_request: None,
+            supports_disassemble_request: None,
+            supports_cancel_request: None,
+            supports_clipboard_context: None,
+            supports_stepping_granularity: None,
+            supports_instruction_breakpoints: None,
+            supports_exception_filter_options: None,
+            supports_single_thread_execution_requests: None,
+        };
+        Ok(Some(ResponseBody::Initialize(InitializeResponse {
+            capabilities,
+        })))
+    }
+
+    async fn launch(
+        &mut self,
+        arguments: LaunchRequestArguments,
+    ) -> Result<Option<ResponseBody>, String> {
+        println!("LAUNCH");
+        // Verify that the manifest and expression were specified
+        let manifest = match arguments.manifest {
+            Some(manifest) => manifest,
+            None => return Err("manifest must be specified".to_string()),
+        };
+        let expression = match arguments.expression {
+            Some(expression) => expression,
+            None => return Err("expression to debug must be specified".to_string()),
+        };
+
+        // Initiate the session
+        let manifest_path = PathBuf::from(manifest);
+        let session = match load_session(&manifest_path, false, &Network::Devnet) {
+            Ok((session, _, _, _)) => session,
+            Err((_, e)) => return Err(e),
+        };
+        self.session = Some(session);
+
+        // Begin execution of the expression in debug mode
+        // if self
+        //     .session
+        //     .as_mut()
+        //     .unwrap()
+        //     .interpret(expression, None, false, true, None)
+        //     .is_err()
+        // {
+        //     return Err("unable to start session".to_string());
+        // }
+
+        self.send_event(EventBody::Initialized).await;
+
+        Ok(Some(ResponseBody::Launch))
+    }
+
+    // fn setBreakpoints(arguments: SetBreakpointsArguments) -> Result<Option<ResponseBody>, String> {
+    //     println!("SET BREAKPOINTS");
+    // }
 }
