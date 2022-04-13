@@ -160,7 +160,7 @@ impl<T: DeserializeOwned> Decoder for DebugAdapterCodec<T> {
                     .append(true)
                     .open("/Users/brice/work/debugger-demo/debugger.txt")
                     .unwrap();
-                writeln!(file, "recvd: {}", message);
+                writeln!(file, "---> {}", message);
                 trace!("<- {}", message);
                 match serde_json::from_str(message) {
                     Ok(parsed) => Ok(Some(parsed)),
