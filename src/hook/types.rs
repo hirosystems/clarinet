@@ -145,18 +145,18 @@ pub struct HttpHook {
 
 #[derive(Clone, Debug)]
 pub enum BitcoinHookPredicate {
-    TxIn(BitcoinTxInBasedPredicate),
-    TxOut(BitcoinTxOutBasedPredicate),
+    TxIn(BitcoinPredicate),
+    TxOut(BitcoinPredicate),
 }
 
 impl BitcoinHookPredicate {
 
     pub fn from_specifications(specs: &HookPredicateFile) -> Result<BitcoinHookPredicate, String> {
         if let Some(ref specs) = specs.tx_in {
-            let predicate = BitcoinTxInBasedPredicate::from_specifications(specs)?;
+            let predicate = BitcoinPredicate::from_specifications(specs)?;
             return Ok(BitcoinHookPredicate::TxIn(predicate))
         } else if let Some(ref specs) = specs.tx_out {
-            let predicate = BitcoinTxOutBasedPredicate::from_specifications(specs)?;
+            let predicate = BitcoinPredicate::from_specifications(specs)?;
             return Ok(BitcoinHookPredicate::TxOut(predicate))
         }
         return Err(format!("trigger not specified (contract-call, event)"))
@@ -164,59 +164,94 @@ impl BitcoinHookPredicate {
 }
 
 #[derive(Clone, Debug)]
+pub enum BitcoinPredicate {
+    Hex(MatchingRule),
+    P2PKH(MatchingRule),
+    P2SH(MatchingRule),
+    P2WPKH(MatchingRule),
+    P2WSH(MatchingRule),
+}
+
+impl BitcoinPredicate {
+    pub fn from_specifications(specs: &BTreeMap<String, BTreeMap<String, String>>) -> Result<BitcoinPredicate, String> {
+        if let Some(rule) = specs.get("hex") {
+            let rule = MatchingRule::from_specifications(rule)?;
+            return Ok(BitcoinPredicate::Hex(rule))
+        };
+
+        if let Some(rule) = specs.get("p2pkh") {
+            let rule = MatchingRule::from_specifications(rule)?;
+            return Ok(BitcoinPredicate::P2PKH(rule))
+        };
+
+        if let Some(rule) = specs.get("p2sh") {
+            let rule = MatchingRule::from_specifications(rule)?;
+            return Ok(BitcoinPredicate::P2SH(rule))
+        };
+
+        if let Some(rule) = specs.get("p2wpkh") {
+            let rule = MatchingRule::from_specifications(rule)?;
+            return Ok(BitcoinPredicate::P2WPKH(rule))
+        };
+
+        if let Some(rule) = specs.get("p2wsh") {
+            let rule = MatchingRule::from_specifications(rule)?;
+            return Ok(BitcoinPredicate::P2WSH(rule))
+        };
+
+        return Err(format!("predicate rule not specified (hex, p2pkh, p2sh, p2wpkh, p2wsh)"));
+    }    
+}
+
+#[derive(Clone, Debug)]
+pub enum MatchingRule {
+    Equals(String),
+    StartsWith(String),
+    EndsWith(String),
+}
+
+impl MatchingRule {
+    pub fn from_specifications(specs: &BTreeMap<String, String>) -> Result<MatchingRule, String> {
+        if let Some(rule) = specs.get("starts-with") {
+            return Ok(MatchingRule::StartsWith(rule.to_string()))
+        };
+
+        if let Some(rule) = specs.get("ends-with") {
+            return Ok(MatchingRule::EndsWith(rule.to_string()))
+        };
+
+        if let Some(rule) = specs.get("equals") {
+            return Ok(MatchingRule::Equals(rule.to_string()))
+        };
+
+        return Err(format!("predicate rule not specified (starts-with, ends-with, equals)"));
+    }    
+}
+
+#[derive(Clone, Debug)]
 pub struct BitcoinTxInBasedPredicate {
-    pub starts_with: String,
-    pub ends_with: String,
-    pub exact_match: String,
+    pub rule: BitcoinPredicate,
 }
 
 impl BitcoinTxInBasedPredicate {
-    pub fn from_specifications(specs: &BTreeMap<String, String>) -> Result<BitcoinTxInBasedPredicate, String> {
-        let starts_with = match specs.get("starts-with") {
-            Some(rule) => Ok(rule.to_string()),
-            None => Err(format!("contract missing for predicate.contract-call"))
-        }?;
-        let ends_with = match specs.get("ends-with") {
-            Some(rule) => Ok(rule.to_string()),
-            None => Err(format!("contract missing for predicate.contract-call"))
-        }?;
-        let exact_match = match specs.get("exact-match") {
-            Some(rule) => Ok(rule.to_string()),
-            None => Err(format!("contract missing for predicate.contract-call"))
-        }?;
+    pub fn from_specifications(specs: &BTreeMap<String, BTreeMap<String, String>>) -> Result<BitcoinTxInBasedPredicate, String> {
+        let rule = BitcoinPredicate::from_specifications(specs)?;
         Ok(BitcoinTxInBasedPredicate {
-            starts_with,
-            ends_with,
-            exact_match,
+            rule
         })
     }    
 }
 
 #[derive(Clone, Debug)]
 pub struct BitcoinTxOutBasedPredicate {
-    pub starts_with: String,
-    pub ends_with: String,
-    pub exact_match: String,
+    pub rule: BitcoinPredicate,
 }
 
 impl BitcoinTxOutBasedPredicate {
-    pub fn from_specifications(specs: &BTreeMap<String, String>) -> Result<BitcoinTxOutBasedPredicate, String> {
-        let starts_with = match specs.get("starts-with") {
-            Some(rule) => Ok(rule.to_string()),
-            None => Err(format!("contract missing for predicate.contract-call"))
-        }?;
-        let ends_with = match specs.get("ends-with") {
-            Some(rule) => Ok(rule.to_string()),
-            None => Err(format!("contract missing for predicate.contract-call"))
-        }?;
-        let exact_match = match specs.get("exact-match") {
-            Some(rule) => Ok(rule.to_string()),
-            None => Err(format!("contract missing for predicate.contract-call"))
-        }?;
+    pub fn from_specifications(specs: &BTreeMap<String, BTreeMap<String, String>>) -> Result<BitcoinTxOutBasedPredicate, String> {
+        let rule = BitcoinPredicate::from_specifications(specs)?;
         Ok(BitcoinTxOutBasedPredicate {
-            starts_with,
-            ends_with,
-            exact_match,
+            rule
         })
     }
 }
@@ -274,7 +309,7 @@ pub struct StacksContractCallBasedPredicate {
 
 impl StacksContractCallBasedPredicate {
     pub fn from_specifications(specs: &BTreeMap<String, String>) -> Result<StacksContractCallBasedPredicate, String> {
-        let contract = match specs.get("contract") {
+        let contract = match specs.get("contract-id") {
             Some(contract) => Ok(contract.to_string()),
             None => Err(format!("contract missing for predicate.contract-call"))
         }?;
@@ -294,8 +329,25 @@ pub struct StacksEventBasedPredicate {
 }
 
 impl StacksEventBasedPredicate {
-    pub fn from_specifications(specs: &BTreeMap<String, String>) -> Result<StacksEventBasedPredicate, String> {
-        return Err(format!("trigger not specified (contract-call, event)"))
+    pub fn from_specifications(specs: &BTreeMap<String, BTreeMap<String, String>>) -> Result<StacksEventBasedPredicate, String> {
+        let print_event = match specs.get("print-event") {
+            Some(rule) => Some(rule),
+            None => None
+        };
+        let nft_rule = match specs.get("nft-event") {
+            Some(rule) => Some(rule),
+            None => None
+        };
+        let ft_rule = match specs.get("ft-event") {
+            Some(rule) => Some(rule),
+            None => None
+        };
+        let stx_rule = match specs.get("stx-event") {
+            Some(rule) => Some(rule),
+            None => None
+        };
+        Ok(StacksEventBasedPredicate {
+        })
     }    
 }
 
@@ -329,13 +381,13 @@ pub struct HookSpecificationFile {
 
 #[derive(Debug, PartialEq, Serialize, Deserialize)]
 pub struct HookPredicateFile {
-    event: Option<BTreeMap<String, String>>,
+    event: Option<BTreeMap<String, BTreeMap<String, String>>>,
     #[serde(rename = "contract-call")]
     contract_call: Option<BTreeMap<String, String>>,
     #[serde(rename = "tx-in")]
-    tx_in: Option<BTreeMap<String, String>>,
+    tx_in: Option<BTreeMap<String, BTreeMap<String, String>>>,
     #[serde(rename = "tx-out")]
-    tx_out: Option<BTreeMap<String, String>>,
+    tx_out: Option<BTreeMap<String, BTreeMap<String, String>>>,
 }
 
 #[derive(Debug, PartialEq, Serialize, Deserialize)]

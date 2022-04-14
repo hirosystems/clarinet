@@ -9,18 +9,20 @@ use crate::types::{self, DevnetConfig};
 use crate::types::{BitcoinChainEvent, ChainsCoordinatorCommand, StacksNetwork, StacksChainEvent};
 use crate::utils;
 use crate::utils::stacks::{transactions, PoxInfo, StacksRpc};
+use crate::hook::{evaluate_bitcoin_hooks_on_chain_event, handle_bitcoin_hook_action, evaluate_stacks_hooks_on_chain_event, handle_stacks_hook_action};
 use base58::FromBase58;
+use bitcoincore_rpc::bitcoin::{Txid, BlockHash};
 use clarity_repl::clarity::representations::ClarityName;
 use clarity_repl::clarity::types::{BuffData, SequenceData, TupleData, Value as ClarityValue};
 use clarity_repl::clarity::util::address::AddressHashMode;
-use clarity_repl::clarity::util::hash::{hex_bytes, Hash160};
+use clarity_repl::clarity::util::hash::{hex_bytes, bytes_to_hex, Hash160};
 use clarity_repl::repl::settings::{Account, InitialContract};
 use clarity_repl::repl::Session;
 use rocket::config::{Config, LogLevel};
 use rocket::serde::json::{json, Json, Value as JsonValue};
 use rocket::serde::Deserialize;
 use rocket::State;
-use std::collections::VecDeque;
+use std::collections::{VecDeque, HashMap};
 use std::convert::TryFrom;
 use std::error::Error;
 use std::iter::FromIterator;
@@ -31,6 +33,8 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc::{Receiver, Sender};
 use std::sync::{Arc, Mutex, RwLock};
 use tracing::info;
+use bitcoincore_rpc::{Auth, Client, RpcApi};
+use std::str::FromStr;
 
 #[cfg(feature = "cli")]
 use crate::runnner::deno;
@@ -334,10 +338,36 @@ pub async fn start_chains_coordinator(
                 }
             }
             Ok(ChainsCoordinatorCommand::EvaluateBitcoinHooks(chain_event)) => {
+                let hooks_to_trigger = evaluate_bitcoin_hooks_on_chain_event(&chain_event, &config.hooks.bitcoin_hooks);
+                let mut proofs = HashMap::new();
+                for (_, transaction, block_identifier) in hooks_to_trigger.iter() {
+                    if !proofs.contains_key(&transaction.transaction_identifier.hash) {
 
+                        let rpc = Client::new(
+                            &format!("http://localhost:{}", config.devnet_config.bitcoin_node_rpc_port),
+                            Auth::UserPass(
+                                config.devnet_config.bitcoin_node_username.to_string(),
+                                config.devnet_config.bitcoin_node_password.to_string(),
+                            ),
+                        )
+                        .unwrap();
+                        let txid = Txid::from_str(&transaction.transaction_identifier.hash).expect("Unable to retrieve txid");
+                        let block_hash = BlockHash::from_str(&block_identifier.hash).expect("Unable to retrieve txid");
+                        let res = rpc.get_tx_out_proof(&vec![txid], Some(&block_hash));
+                        if let Ok(proof) = res {
+                            proofs.insert(transaction.transaction_identifier.hash.clone(), bytes_to_hex(&proof));
+                        }
+                    }
+                }
+                for (hook, transaction, block_identifier) in hooks_to_trigger.into_iter() {
+                    handle_bitcoin_hook_action(hook, transaction, block_identifier, proofs.get(&transaction.transaction_identifier.hash)).await;
+                }
             }
             Ok(ChainsCoordinatorCommand::EvaluateStacksHooks(chain_event)) => {
-
+                let hooks_to_trigger = evaluate_stacks_hooks_on_chain_event(&chain_event, &config.hooks.stacks_hooks);
+                for (hook, transaction, block_identifier) in hooks_to_trigger.into_iter() {
+                    handle_stacks_hook_action(hook, transaction).await;
+                }
             }
             Err(_) => {
                 break;
@@ -511,7 +541,6 @@ pub fn handle_new_stacks_block(
         }
         let _ = background_job_tx.send(ChainsCoordinatorCommand::EvaluateStacksHooks(chain_event.clone()));
     }
-
 
     if let Ok(tx) = devnet_events_tx.lock() {
         let _ = tx.send(DevnetEvent::StacksChainEvent(chain_event));
@@ -778,7 +807,6 @@ pub fn invalidate_bitcoin_chain_tip(
     bitcoin_node_username: &str,
     bitcoin_node_password: &str,
 ) {
-    use bitcoincore_rpc::{Auth, Client, RpcApi};
 
     let rpc = Client::new(
         &format!("http://localhost:{}", bitcoin_node_rpc_port),
@@ -802,7 +830,6 @@ pub fn mine_bitcoin_block(
     miner_btc_address: &str,
 ) {
     use bitcoincore_rpc::bitcoin::Address;
-    use bitcoincore_rpc::{Auth, Client, RpcApi};
     use std::str::FromStr;
     let rpc = Client::new(
         &format!("http://localhost:{}", bitcoin_node_rpc_port),

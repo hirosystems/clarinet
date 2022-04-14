@@ -1,4 +1,5 @@
 use super::events::StacksTransactionEvent;
+use bitcoincore_rpc::bitcoin::{TxIn, TxOut};
 use serde::{self, Deserialize, Serialize};
 use std::collections::HashSet;
 
@@ -167,7 +168,10 @@ pub struct BitcoinTransactionData {
 
 /// Extra data for Transaction
 #[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
-pub struct BitcoinTransactionMetadata {}
+pub struct BitcoinTransactionMetadata {
+    pub inputs: Vec<TxIn>,
+    pub outputs: Vec<TxOut>,
+}
 
 /// The transaction_identifier uniquely identifies a transaction in a particular
 /// network and block or in the mempool.
