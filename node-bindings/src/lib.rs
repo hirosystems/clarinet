@@ -432,6 +432,15 @@ impl StacksDevnet {
             overrides.disable_stacks_api = Some(true);
         }
 
+        if let Ok(res) = devnet_settings
+            .get(&mut cx, "disable_electrum")?
+            .downcast::<JsBoolean, _>(&mut cx)
+        {
+            overrides.disable_electrum = Some(res.value(&mut cx));
+        } else {
+            overrides.disable_electrum = Some(true);
+        }
+
         // Retrieve stacks_node_events_observers
         if let Ok(res) = devnet_settings
             .get(&mut cx, "stacks_node_events_observers")?

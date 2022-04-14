@@ -18,6 +18,8 @@ pub const DEFAULT_BITCOIN_EXPLORER_IMAGE: &str = "quay.io/hirosystems/bitcoin-ex
 pub const DEFAULT_STACKS_API_IMAGE: &str = "blockstack/stacks-blockchain-api:latest";
 pub const DEFAULT_STACKS_EXPLORER_IMAGE: &str = "blockstack/explorer:latest";
 pub const DEFAULT_POSTGRES_IMAGE: &str = "postgres:alpine";
+pub const DEFAULT_ELECTRUM_IMAGE: &str = "ludovic/electrs:devnet";
+// pub const DEFAULT_ELECTRUM_IMAGE: &str = "quay.io/hirosystems/electrs:devnet";
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct ChainConfigFile {
@@ -45,6 +47,7 @@ pub struct DevnetConfigFile {
     pub stacks_api_events_port: Option<u16>,
     pub bitcoin_explorer_port: Option<u16>,
     pub stacks_explorer_port: Option<u16>,
+    pub electrum_port: Option<u16>,
     pub bitcoin_node_username: Option<String>,
     pub bitcoin_node_password: Option<String>,
     pub miner_mnemonic: Option<String>,
@@ -61,12 +64,14 @@ pub struct DevnetConfigFile {
     pub bitcoin_node_image_url: Option<String>,
     pub bitcoin_explorer_image_url: Option<String>,
     pub stacks_node_image_url: Option<String>,
+    pub electrum_image_url: Option<String>,
     pub stacks_api_image_url: Option<String>,
     pub stacks_explorer_image_url: Option<String>,
     pub postgres_image_url: Option<String>,
     pub disable_bitcoin_explorer: Option<bool>,
     pub disable_stacks_explorer: Option<bool>,
     pub disable_stacks_api: Option<bool>,
+    pub disable_electrum: Option<bool>,
     pub bind_containers_volumes: Option<bool>,
 }
 
@@ -122,6 +127,7 @@ pub struct DevnetConfig {
     pub stacks_api_events_port: u16,
     pub stacks_explorer_port: u16,
     pub bitcoin_explorer_port: u16,
+    pub electrum_port: u16,
     pub bitcoin_controller_block_time: u32,
     pub bitcoin_controller_automining_disabled: bool,
     pub miner_stx_address: String,
@@ -142,9 +148,11 @@ pub struct DevnetConfig {
     pub stacks_explorer_image_url: String,
     pub postgres_image_url: String,
     pub bitcoin_explorer_image_url: String,
+    pub electrum_image_url: String,
     pub disable_bitcoin_explorer: bool,
     pub disable_stacks_explorer: bool,
     pub disable_stacks_api: bool,
+    pub disable_electrum: bool,
     pub bind_containers_volumes: bool,
 }
 
@@ -299,6 +307,7 @@ impl ChainConfig {
                 stacks_api_events_port: devnet_config.stacks_api_events_port.unwrap_or(3700),
                 stacks_explorer_port: devnet_config.stacks_explorer_port.unwrap_or(8000),
                 bitcoin_explorer_port: devnet_config.bitcoin_explorer_port.unwrap_or(8001),
+                electrum_port: devnet_config.electrum_port.unwrap_or(50001),
                 miner_btc_address,
                 miner_stx_address,
                 miner_mnemonic,
@@ -346,9 +355,14 @@ impl ChainConfig {
                     .bitcoin_explorer_image_url
                     .take()
                     .unwrap_or(DEFAULT_BITCOIN_EXPLORER_IMAGE.to_string()),
+                electrum_image_url: devnet_config
+                    .electrum_image_url
+                    .take()
+                    .unwrap_or(DEFAULT_ELECTRUM_IMAGE.to_string()),
                 pox_stacking_orders: devnet_config.pox_stacking_orders.take().unwrap_or(vec![]),
                 disable_bitcoin_explorer: devnet_config.disable_bitcoin_explorer.unwrap_or(false),
                 disable_stacks_api: devnet_config.disable_stacks_api.unwrap_or(false),
+                disable_electrum: devnet_config.disable_electrum.unwrap_or(true),
                 disable_stacks_explorer: devnet_config.disable_stacks_explorer.unwrap_or(false),
                 bind_containers_volumes: devnet_config.bind_containers_volumes.unwrap_or(false),
             };

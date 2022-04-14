@@ -34,6 +34,7 @@ pub struct DevnetOrchestrator {
     bitcoin_blockchain_container_id: Option<String>,
     bitcoin_explorer_container_id: Option<String>,
     postgres_container_id: Option<String>,
+    electrum_container_id: Option<String>,
     docker_client: Option<Docker>,
 }
 
@@ -182,6 +183,10 @@ impl DevnetOrchestrator {
                     devnet_config.disable_stacks_api = val;
                 }
 
+                if let Some(val) = devnet_override.disable_electrum {
+                    devnet_config.disable_electrum = val;
+                }
+
                 if let Some(val) = devnet_override.bitcoin_controller_automining_disabled {
                     devnet_config.bitcoin_controller_automining_disabled = val;
                 }
@@ -237,6 +242,7 @@ impl DevnetOrchestrator {
         let disable_stacks_api = devnet_config.disable_stacks_api;
         let disable_stacks_explorer = devnet_config.disable_stacks_explorer;
         let disable_bitcoin_explorer = devnet_config.disable_bitcoin_explorer;
+        let disable_electrum = devnet_config.disable_electrum;
 
         let _ = fs::create_dir(format!("{}", devnet_config.working_dir));
         let _ = fs::create_dir(format!("{}/conf", devnet_config.working_dir));
@@ -244,6 +250,7 @@ impl DevnetOrchestrator {
 
         let bitcoin_explorer_port = devnet_config.bitcoin_explorer_port;
         let stacks_explorer_port = devnet_config.stacks_explorer_port;
+        let electrum_port = devnet_config.electrum_port;
         let stacks_api_port = devnet_config.stacks_api_port;
 
         let _ = event_tx.send(DevnetEvent::ServiceStatus(ServiceStatusData {
@@ -287,6 +294,17 @@ impl DevnetOrchestrator {
             status: Status::Red,
             name: "bitcoin-explorer".into(),
             comment: if disable_bitcoin_explorer {
+                "disabled".into()
+            } else {
+                "initializing".into()
+            },
+        }));
+
+        let _ = event_tx.send(DevnetEvent::ServiceStatus(ServiceStatusData {
+            order: 5,
+            status: Status::Red,
+            name: "electrum".into(),
+            comment: if disable_electrum {
                 "disabled".into()
             } else {
                 "initializing".into()
@@ -495,6 +513,39 @@ impl DevnetOrchestrator {
                 status: Status::Green,
                 name: "bitcoin-explorer".into(),
                 comment: format!("http://localhost:{}", bitcoin_explorer_port),
+            }));
+        }
+
+        // Start electrum-node
+        if !disable_electrum {
+            let _ = event_tx.send(DevnetEvent::ServiceStatus(ServiceStatusData {
+                order: 5,
+                status: Status::Yellow,
+                name: "electrum".into(),
+                comment: "preparing container".into(),
+            }));
+            match self.prepare_electrum_container().await {
+                Ok(_) => {}
+                Err(message) => {
+                    event_tx.send(DevnetEvent::FatalError(message));
+                    self.kill().await;
+                    return;
+                    }
+            };
+            let _ = event_tx.send(DevnetEvent::info(format!("Starting electrum")));
+            match self.boot_electrum_container().await {
+                Ok(_) => {}
+                Err(message) => {
+                    event_tx.send(DevnetEvent::FatalError(message));
+                    self.kill().await;
+                    return;
+                }
+            };
+            let _ = event_tx.send(DevnetEvent::ServiceStatus(ServiceStatusData {
+                order: 5,
+                status: Status::Green,
+                name: "electrum".into(),
+                comment: format!("http://localhost:{}", electrum_port),
             }));
         }
 
@@ -1500,6 +1551,174 @@ events_keys = ["*"]
         Ok(())
     }
 
+    pub async fn prepare_electrum_container(&mut self) -> Result<(), String> {
+        let (docker, devnet_config) = match (&self.docker_client, &self.network_config) {
+            (Some(ref docker), Some(ref network_config)) => match network_config.devnet {
+                Some(ref devnet_config) => (docker, devnet_config),
+                _ => return Err("Unable to get devnet configuration".into()),
+            },
+            _ => return Err("Unable to get Docker client".into()),
+        };
+
+        let _info = docker
+            .create_image(
+                Some(CreateImageOptions {
+                    from_image: devnet_config.electrum_image_url.clone(),
+                    ..Default::default()
+                }),
+                None,
+                None,
+            )
+            .try_collect::<Vec<_>>()
+            .await
+            .map_err(|e| format!("Unable to create image: {}", e))?;
+
+        let config = self.prepare_electrum_config(1)?;
+
+        let options = CreateContainerOptions {
+            name: format!("electrum.{}", self.network_name),
+        };
+
+        let container = docker
+            .create_container::<String, String>(Some(options), config)
+            .await
+            .map_err(|e| format!("Unable to create container: {}", e))?
+            .id;
+
+        info!("Created container electrum: {}", container);
+        self.electrum_container_id = Some(container.clone());
+
+        Ok(())
+    }
+
+    pub fn prepare_electrum_config(&self, boot_index: u32) -> Result<Config<String>, String> {
+        let (network_config, devnet_config) = match &self.network_config {
+            Some(ref network_config) => match network_config.devnet {
+                Some(ref devnet_config) => (network_config, devnet_config),
+                _ => return Err("Unable to get devnet configuration".into()),
+            },
+            _ => return Err("Unable to get Docker client".into()),
+        };
+
+        let mut port_bindings = HashMap::new();
+        port_bindings.insert(
+            format!("{}/tcp", devnet_config.electrum_port),
+            Some(vec![PortBinding {
+                host_ip: Some(String::from("0.0.0.0")),
+                host_port: Some(format!("{}/tcp", devnet_config.electrum_port)),
+            }]),
+        );
+
+        let mut electrum_conf = format!(
+            r#"
+daemon_rpc_addr = "host.docker.internal:{}"
+daemon_p2p_addr = "host.docker.internal:{}"
+auth = "{}:{}"
+network = "regtest"
+db_dir = "/devnet/"
+electrum_rpc_addr = "0.0.0.0:{}"
+log_filters = "INFO"
+"#,
+            devnet_config.bitcoin_node_rpc_port,
+            devnet_config.bitcoin_node_p2p_port,
+            devnet_config.bitcoin_node_username,
+            devnet_config.bitcoin_node_password,
+            devnet_config.electrum_port,
+        );
+
+        let mut electrun_conf_path = PathBuf::from(&devnet_config.working_dir);
+        electrun_conf_path.push("conf/Electrum.toml");
+        let mut file = File::create(electrun_conf_path).expect("Unable to create Electrum.toml");
+        file.write_all(electrum_conf.as_bytes())
+            .expect("Unable to write Electrum.toml");
+
+        let mut electrum_data_path = PathBuf::from(&devnet_config.working_dir);
+        electrum_data_path.push("data");
+        electrum_data_path.push(format!("{}", boot_index));
+        let _ = fs::create_dir(electrum_data_path.clone());
+        electrum_data_path.push("electrum");
+        let _ = fs::create_dir(electrum_data_path);
+
+        let mut exposed_ports = HashMap::new();
+        exposed_ports.insert(
+            format!("{}/tcp", devnet_config.electrum_port),
+            HashMap::new(),
+        );
+
+        let mut labels = HashMap::new();
+        labels.insert("project".to_string(), self.network_name.to_string());
+        labels.insert("reset".to_string(), "true".to_string());
+
+        let mut binds = vec![format!(
+            "{}/conf:/src/electrum/",
+            devnet_config.working_dir
+        )];
+
+        if devnet_config.bind_containers_volumes {
+            binds.push(format!(
+                "{}/data/{}/electrum:/devnet/",
+                devnet_config.working_dir, boot_index
+            ))
+        }
+
+        let config = Config {
+            labels: Some(labels),
+            image: Some(devnet_config.electrum_image_url.clone()),
+            domainname: Some(self.network_name.to_string()),
+            tty: None,
+            exposed_ports: Some(exposed_ports),
+            entrypoint: Some(vec![
+                "electrs".into(),
+                "--conf=/src/electrum/Electrum.toml".into(),
+            ]),
+            env: None,
+            host_config: Some(HostConfig {
+                port_bindings: Some(port_bindings),
+                binds: Some(binds),
+                extra_hosts: Some(vec!["host.docker.internal:host-gateway".into()]),
+                ..Default::default()
+            }),
+            ..Default::default()
+        };
+
+        Ok(config)
+    }
+
+    pub async fn boot_electrum_container(&self) -> Result<(), String> {
+        let container = match &self.electrum_container_id {
+            Some(container) => container.clone(),
+            _ => return Err(format!("Unable to boot container")),
+        };
+
+        let docker = match &self.docker_client {
+            Some(ref docker) => docker,
+            _ => return Err("Unable to get Docker client".into()),
+        };
+
+        docker
+            .start_container::<String>(&container, None)
+            .await
+            .map_err(|e| format!("Unable to create container: {}", e))?;
+
+        let res = docker
+            .connect_network(
+                &self.network_name,
+                ConnectNetworkOptions {
+                    container,
+                    ..Default::default()
+                },
+            )
+            .await;
+
+        if let Err(e) = res {
+            let err = format!("Error connecting container: {}", e);
+            println!("{}", err);
+            return Err(err);
+        }
+
+        Ok(())
+    }
+
     pub async fn stop_containers(&self) -> Result<(), String> {
         let containers_ids = match (
             &self.stacks_blockchain_container_id,
@@ -1716,10 +1935,18 @@ events_keys = ["*"]
 
         if let Some(ref stacks_blockchain_container_id) = self.stacks_blockchain_container_id {
             let _ = docker
-                .kill_container(stacks_blockchain_container_id, options)
+                .kill_container(stacks_blockchain_container_id, options.clone())
                 .await;
             println!("Terminating stacks-node...");
             let _ = docker.remove_container(stacks_blockchain_container_id, None);
+        }
+
+        if let Some(ref electrum_container_id) = self.electrum_container_id {
+            let _ = docker
+                .kill_container(electrum_container_id, options)
+                .await;
+            println!("Terminating stacks-node...");
+            let _ = docker.remove_container(electrum_container_id, None);
         }
 
         // Prune network
@@ -1786,7 +2013,7 @@ events_keys = ["*"]
         )
         .unwrap();
 
-        let _ = devnet_event_tx.send(DevnetEvent::info(format!("Configuring Bitcoin",)));
+        let _ = devnet_event_tx.send(DevnetEvent::info(format!("Configuring bitcoind",)));
 
         loop {
             match rpc.get_network_info() {
