@@ -209,6 +209,9 @@ impl BitcoinHookSpecification {
             types::BitcoinHookPredicate::TxIn(BitcoinPredicate::P2WSH(MatchingRule::EndsWith(address))) => {
                 false
             }
+            types::BitcoinHookPredicate::TxIn(BitcoinPredicate::Script(template)) => {
+                false
+            }
             types::BitcoinHookPredicate::TxOut(BitcoinPredicate::Hex(MatchingRule::Equals(address))) => {
                 false
             }
@@ -266,6 +269,13 @@ impl BitcoinHookSpecification {
                 false
             }
             types::BitcoinHookPredicate::TxOut(BitcoinPredicate::P2WSH(MatchingRule::EndsWith(address))) => {
+                false
+            }
+            types::BitcoinHookPredicate::TxOut(BitcoinPredicate::Script(template)) => {
+
+                // let mut hex = vec![];
+
+
                 false
             }
         }       
