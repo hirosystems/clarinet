@@ -161,7 +161,7 @@ mod sessions {
             let project_config = ProjectManifest::from_path(manifest_path);
             let chain_config = ChainConfig::from_path(&chain_config_path, &Network::Devnet);
 
-            let mut deployer_address = None;
+            let mut default_deployer_address = None;
             let mut initial_deployer = None;
 
             for (name, account) in chain_config.accounts.iter() {
@@ -174,7 +174,7 @@ mod sessions {
                 };
                 if name == "deployer" {
                     initial_deployer = Some(account.clone());
-                    deployer_address = Some(account.address.clone());
+                    default_deployer_address = Some(account.address.clone());
                 }
                 settings.initial_accounts.push(account);
             }
@@ -211,13 +211,18 @@ mod sessions {
 
                 let code = fs::read_to_string(&contract_path).unwrap();
 
+                let deployer_address = match &config.deployer {
+                    Some(deployer_address) => Some(deployer_address.to_string()),
+                    None => default_deployer_address.clone(),
+                };
+
                 settings
                     .initial_contracts
                     .push(repl::settings::InitialContract {
                         code: code,
                         path: contract_path.to_str().unwrap().into(),
                         name: Some(name.clone()),
-                        deployer: deployer_address.clone(),
+                        deployer: deployer_address,
                     });
             }
             settings.initial_deployer = initial_deployer;
