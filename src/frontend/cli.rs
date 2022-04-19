@@ -668,7 +668,13 @@ pub fn main() {
             }
         }
         Command::LSP => run_lsp(),
-        Command::DAP => run_dap(),
+        Command::DAP => match run_dap() {
+            Ok(_) => (),
+            Err(e) => {
+                println!("{}: {}", red!("error"), e);
+                process::exit(1);
+            }
+        },
         Command::Completions(cmd) => {
             let mut app = Opts::command();
             let file_name = cmd.shell.file_name("clarinet");
