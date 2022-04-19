@@ -679,14 +679,12 @@ dependencies = [
  "bitcoincore-rpc-json",
  "block-modes",
  "bollard",
- "bytes",
  "chrono",
  "clap 3.1.6",
  "clap_generate",
  "clarity-repl",
  "crossterm 0.22.1",
  "ctrlc",
- "dap-types",
  "deno",
  "deno_core",
  "deno_runtime",
@@ -696,14 +694,11 @@ dependencies = [
  "fwdansi",
  "hex",
  "hmac 0.12.1",
- "httparse",
  "indexmap",
  "lazy_static",
  "libc",
  "libsecp256k1 0.7.0",
- "log",
  "mac_address",
- "memchr",
  "pbkdf2",
  "percent-encoding",
  "pin-project",
@@ -724,7 +719,6 @@ dependencies = [
  "text-size",
  "tiny-hderive",
  "tokio",
- "tokio-util 0.7.1",
  "toml",
  "tower-lsp",
  "tracing",
@@ -739,15 +733,19 @@ dependencies = [
 [[package]]
 name = "clarity-repl"
 version = "0.26.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d2fe12cd50f77ccfbbbfccef7a295f93f1ba8aa8d83a18ca325d9b638eea281c"
 dependencies = [
  "ansi_term",
  "atty",
+ "bytes",
+ "dap-types",
+ "futures",
  "getrandom 0.2.6",
+ "httparse",
  "integer-sqrt",
  "lazy_static",
  "libsecp256k1 0.5.0",
+ "log",
+ "memchr",
  "pico-args 0.4.2",
  "prettytable-rs",
  "rand 0.7.3",
@@ -764,6 +762,7 @@ dependencies = [
  "sha2 0.9.9",
  "sha3",
  "tokio",
+ "tokio-util 0.7.1",
 ]
 
 [[package]]

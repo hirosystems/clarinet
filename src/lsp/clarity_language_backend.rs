@@ -196,7 +196,7 @@ impl ClarityLanguageBackend {
                 contract.code.clone(),
                 analysis.clone(),
                 false,
-                false,
+                None,
                 None,
             );
 
