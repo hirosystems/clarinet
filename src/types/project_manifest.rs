@@ -1,4 +1,3 @@
-use crate::utils;
 use clarity_repl::repl;
 use std::collections::BTreeMap;
 use std::fs::File;
@@ -96,14 +95,6 @@ impl ProjectManifest {
             };
 
         ProjectManifest::from_project_manifest_file(project_manifest_file)
-    }
-
-    pub fn ordered_contracts(&self) -> Vec<String> {
-        let mut contracts = BTreeMap::new();
-        for (contract_name, config) in self.contracts.iter() {
-            contracts.insert(contract_name.clone(), config.depends_on.clone());
-        }
-        utils::order_contracts(&contracts)
     }
 
     pub fn from_project_manifest_file(
