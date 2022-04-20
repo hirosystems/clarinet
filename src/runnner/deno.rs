@@ -1197,7 +1197,6 @@ struct SetupChainArgsLegacy {
 // See `start_chain_setup` for the new flow.
 fn setup_chain_legacy(state: &mut OpState, args: Value, _: ()) -> Result<String, AnyError> {
     let manifest_path = state.borrow::<PathBuf>();
-    println!("{:?}", manifest_path);
     let args: SetupChainArgsLegacy =
         serde_json::from_value(args).expect("Invalid request from JavaScript for \"op_load\".");
     let (session_id, accounts, contracts) =
