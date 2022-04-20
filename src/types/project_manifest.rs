@@ -117,17 +117,9 @@ impl ProjectManifest {
 
         // Check for deprecated settings
         if let Some(passes) = project_manifest_file.project.analysis {
-            println!(
-                "{}: use of 'project.analysis' in Clarinet.toml is deprecated; use repl.analysis.passes",
-                yellow!("warning")
-            );
             repl_settings.analysis.set_passes(passes);
         }
         if let Some(costs_version) = project_manifest_file.project.costs_version {
-            println!(
-                "{}: use of 'project.costs_version' in Clarinet.toml is deprecated; use repl.costs_version",
-                yellow!("warning")
-            );
             repl_settings.costs_version = costs_version;
         }
 
