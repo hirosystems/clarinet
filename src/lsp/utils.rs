@@ -304,6 +304,7 @@ pub fn build_default_native_keywords_list() -> Vec<CompletionItem> {
         "string-utf8",
         "option",
         "response",
+        "principal",
     ]
     .iter()
     .map(|var| CompletionItem {

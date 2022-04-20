@@ -667,7 +667,7 @@ dependencies = [
 
 [[package]]
 name = "clarinet"
-version = "0.28.0"
+version = "0.28.1"
 dependencies = [
  "aes",
  "ansi_term",
@@ -732,9 +732,9 @@ dependencies = [
 
 [[package]]
 name = "clarity-repl"
-version = "0.24.0"
+version = "0.25.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6e97de8d2cc64aadf90026e89d7587dc228363baa7bc016b71fb92550c7e01be"
+checksum = "d8e968e679c550a008fb910e695f76f5577c9a6644028e9cdf17dc923ae6b8f0"
 dependencies = [
  "ansi_term",
  "atty",
@@ -4429,7 +4429,7 @@ dependencies = [
 
 [[package]]
 name = "stacks-devnet-js"
-version = "0.28.0"
+version = "0.28.1"
 dependencies = [
  "clarinet",
  "error-chain",
