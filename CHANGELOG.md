@@ -1,3 +1,19 @@
+# [0.29.0](https://github.com/hirosystems/clarinet/compare/v0.28.1...v0.29.0) (2022-04-21)
+
+
+### Bug Fixes
+
+* add new costs synthesis table ([d8f5f29](https://github.com/hirosystems/clarinet/commit/d8f5f2939521d56f71db06a0b4ab4ef718b16fcf))
+* Fix issue with telemetry prompt on windows ([0af8fe9](https://github.com/hirosystems/clarinet/commit/0af8fe997dbb61fe335fe4bb607d6f0147639a66)), closes [#317](https://github.com/hirosystems/clarinet/issues/317)
+* remove caveman dbg statement ([bd830f9](https://github.com/hirosystems/clarinet/commit/bd830f959897d755fe94fb1c94997b942154b91e))
+* remove warnings about manifest file ([49edfd4](https://github.com/hirosystems/clarinet/commit/49edfd41136b2389054c47c37808663cbc8faa6d))
+
+
+### Features
+
+* add boot_contracts config ([c1cab93](https://github.com/hirosystems/clarinet/commit/c1cab93ccffa03366d25956634311a9b886a1957))
+* add tx_per_block and improve formatting ([1fc6d4f](https://github.com/hirosystems/clarinet/commit/1fc6d4f56e311edfebc8378b684cedc5155e91a0))
+
 ## [0.28.1](https://github.com/hirosystems/clarinet/compare/v0.28.0...v0.28.1) (2022-04-06)
 
 
