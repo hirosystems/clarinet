@@ -1,3 +1,4 @@
+use clarity_repl::analysis::ast_dependency_detector::ASTDependencyDetector;
 use clarity_repl::clarity::analysis::ContractAnalysis;
 use clarity_repl::repl::{Session, SessionSettings};
 
@@ -7,7 +8,7 @@ use tower_lsp::lsp_types::*;
 use tower_lsp::{async_trait, Client, LanguageServer};
 
 use clarity_repl::clarity::types::QualifiedContractIdentifier;
-use std::collections::{HashMap, HashSet};
+use std::collections::{BTreeMap, HashMap, HashSet};
 use std::fs;
 use std::path::PathBuf;
 use std::str::FromStr;
@@ -90,8 +91,11 @@ impl ClarityLanguageBackend {
         // Build a blank Session: we will be evaluating the contracts one by one
         let mut incremental_session = Session::new(settings.clone());
         let mut collected_diagnostics = HashMap::new();
+        let mut initial_contracts_map = HashMap::new();
+        let mut contract_asts = HashMap::new();
         let mainnet = false;
 
+        // Parse all contracts first and collect the ASTs
         for (i, contract) in settings.initial_contracts.iter().enumerate() {
             let contract_path =
                 PathBuf::from_str(&contract.path).expect("Expect url to be well formatted");
@@ -104,23 +108,52 @@ impl ClarityLanguageBackend {
 
             logs.push(format!("Analysis #{}: {}", i, contract_id.to_string()));
 
-            // Before doing anything, keep a clone of the session before inserting anything in the datastore.
-            let session = incremental_session.clone();
-
             // Extract the AST, and try to move to the next contract if we throw an error:
             // we're trying to get as many errors as possible
-            let (mut ast, mut diagnostics, _) = incremental_session.interpreter.build_ast(
+            let (ast, diagnostics, _) = incremental_session.interpreter.build_ast(
                 contract_id.clone(),
                 code.clone(),
                 settings.repl_settings.parser_version,
             );
 
+            contract_asts.insert(contract_id.clone(), ast);
+            initial_contracts_map.insert(contract_id, contract);
+            collected_diagnostics.insert(
+                contract_url.clone(),
+                diagnostics
+                    .into_iter()
+                    .map(|d| utils::convert_clarity_diagnotic_to_lsp_diagnostic(d))
+                    .collect::<_>(),
+            );
+        }
+
+        let dependencies =
+            ASTDependencyDetector::detect_dependencies(&contract_asts, &BTreeMap::new());
+        let ordered_contracts = match ASTDependencyDetector::order_contracts(&dependencies) {
+            Ok(ordered_contracts) => ordered_contracts,
+            Err(e) => {
+                logs.push(format!("{}", e));
+                dependencies.keys().collect()
+            }
+        };
+
+        // Analyze and interpret the contract ASTs in order
+        for contract_id in ordered_contracts {
+            let contract = initial_contracts_map[contract_id];
+            let mut ast = contract_asts.remove(contract_id).unwrap();
+            let contract_path =
+                PathBuf::from_str(&contract.path).expect("Expect url to be well formatted");
+            let contract_url =
+                Url::from_file_path(contract_path).expect("Expect url to be well formatted");
+
+            // Before doing anything, keep a clone of the session before inserting anything in the datastore.
+            let session = incremental_session.clone();
+
             // Run the analysis, and try to move to the next contract if we throw an error:
             // we're trying to get as many errors as possible
-            let (annotations, mut annotation_diagnostics) = incremental_session
+            let (annotations, mut diagnostics) = incremental_session
                 .interpreter
-                .collect_annotations(&ast, &code);
-            diagnostics.append(&mut annotation_diagnostics);
+                .collect_annotations(&ast, &contract.code);
             let (analysis, mut analysis_diagnostics) = match incremental_session
                 .interpreter
                 .run_analysis(contract_id.clone(), &mut ast, &annotations)
@@ -160,7 +193,7 @@ impl ClarityLanguageBackend {
             let _ = incremental_session.interpreter.execute(
                 contract_id.clone(),
                 &mut ast,
-                code.clone(),
+                contract.code.clone(),
                 analysis.clone(),
                 false,
                 false,
@@ -183,6 +216,7 @@ impl ClarityLanguageBackend {
                 logs.push(format!("Unable to acquire write lock"));
             }
         }
+
         return Ok((collected_diagnostics, logs));
     }
 
