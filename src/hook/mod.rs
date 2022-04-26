@@ -78,7 +78,6 @@ fn get_hooks_files(manifest_path: &PathBuf) -> Result<Vec<(PathBuf, String)>, St
     Ok(hook_paths)
 }
 
-
 pub fn evaluate_stacks_hooks_on_chain_event<'a>(chain_event: &'a StacksChainEvent, active_hooks: &'a Vec<StacksHookSpecification>) -> Vec<(&'a StacksHookSpecification, &'a StacksTransactionData, &'a BlockIdentifier)> {
     let mut enabled = vec![];
     match chain_event {
@@ -128,9 +127,14 @@ pub async fn handle_bitcoin_hook_action<'a>(hook: &'a BitcoinHookSpecification, 
             let host = format!("{}", http.url);
             let method = Method::from_bytes(http.method.as_bytes()).unwrap();
             let payload = json!({
-                "transaction": tx,
-                "proof": proof,
-                "block_identifier": block_identifier,
+                "apply": vec![
+                    json!({
+                        "transaction": tx,
+                        "proof": proof,
+                        "block_identifier": block_identifier,
+                        "confirmations": 1,
+                    })
+                ]
             });
             let body = serde_json::to_vec(&payload).unwrap();
             let res = client

@@ -1,0 +1,23 @@
+---
+name: "On Counter Increment"
+version: 1
+chain: stacks
+network: devnet
+predicate:
+  event: 
+    print-event:
+      contract-id: counter
+      include: vault
+    nft-event:
+      asset-id: Lorem ipsum
+      actions: mint, transfer, burn
+    ft-event:
+      asset-id: Lorem ipsum
+      actions: mint, transfer, burn
+    stx-event:
+      asset-id: Lorem ipsum
+      actions: mint, transfer, burn
+action:
+  http-hook: 
+    url: http://localhost:9000/chain-events/
+    method: POST

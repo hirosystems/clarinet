@@ -1,5 +1,5 @@
 mod clarity_language_backend;
-mod utils;
+pub mod utils;
 
 use clarity_language_backend::ClarityLanguageBackend;
 use tokio;

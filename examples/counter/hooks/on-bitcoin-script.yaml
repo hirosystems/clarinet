@@ -1,0 +1,27 @@
+---
+name: "On Bitcoin script"
+version: 1
+chain: bitcoin
+network: regtest
+predicate:
+  tx-out: 
+    script: 
+      template: '
+  OP_PUSHBYTES_4 {swapper-id:4}
+  OP_DROP
+  OP_IF
+    OP_SHA256 OP_PUSHBYTES_32 {hash:32}
+    OP_EQUALVERIFY
+    OP_PUSHBYTES_33 {supplier-public-key:33}
+  OP_ELSE
+    OP_PUSHBYTES_2 f401
+    OP_CSV
+    OP_DROP
+    OP_PUSHBYTES_33 {swapper-public-key:33}
+  OP_ENDIF
+  OP_CHECKSIG'
+action:
+  http-hook: 
+    url: http://localhost:9000/chain-events/
+    method: POST
+ 

@@ -1,0 +1,13 @@
+---
+name: "On Counter Increment"
+version: 1
+chain: stacks
+network: devnet
+predicate:
+  contract-call:
+    contract-id: counter
+    method: counter
+action:
+  http-hook: 
+    url: http://localhost:9000/chain-events/
+    method: POST

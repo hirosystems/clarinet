@@ -1,0 +1,15 @@
+---
+name: "On P2PKH Payment"
+version: 1
+chain: bitcoin
+network: regtest
+predicate:
+  confirmations: 1
+  tx-out: 
+    p2pkh:
+      equals: muYdXKmX9bByAueDe6KFfHd5Ff1gdN9ErG
+action:
+  http-hook: 
+    url: http://localhost:9000/chain-events/
+    method: POST
+ 

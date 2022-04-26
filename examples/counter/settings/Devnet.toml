@@ -72,6 +72,10 @@ balance = 100_000_000_000_000
 # btc_address: mjSrB3wS4xab3kYqFktwBzfTdPg367ZJ2d
 
 [devnet]
+disable_bitcoin_explorer = false
+disable_stacks_explorer = false
+disable_stacks_api = false
+disable_electrum = true
 # pox_stacking_orders = []
 # orchestrator_port = 20445
 # bitcoin_node_p2p_port = 18444

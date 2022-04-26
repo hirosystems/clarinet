@@ -1,0 +1,13 @@
+---
+name: "On Counter Increment"
+version: 1
+chain: bitcoin
+network: regtest
+predicate:
+  tx-in: 
+    hex:
+      starts-with: X1
+action:
+  http-hook: 
+    url: http://localhost:9000/chain-events/
+    method: POST
