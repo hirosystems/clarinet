@@ -5,7 +5,7 @@ use std::path::PathBuf;
 
 pub fn run_dap() -> Result<(), String> {
     let mut dap = DAPDebugger::new();
-    match block_on(dap.init()) {
+    match dap.init() {
         Ok((manifest, expression)) => {
             let manifest_path = PathBuf::from(manifest);
             let mut session = match load_session(&manifest_path, false, &Network::Devnet) {
@@ -41,12 +41,4 @@ pub fn run_dap() -> Result<(), String> {
         }
         Err(e) => Err(format!("dap_init: {}", e)),
     }
-}
-
-pub fn block_on<F, R>(future: F) -> R
-where
-    F: std::future::Future<Output = R>,
-{
-    let rt = crate::utils::create_basic_runtime();
-    rt.block_on(future)
 }
