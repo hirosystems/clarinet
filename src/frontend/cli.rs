@@ -4,7 +4,6 @@ use std::io::{prelude::*, BufReader, Read};
 use std::path::PathBuf;
 use std::{env, process};
 
-use crate::dap::run_dap;
 use crate::generate::{
     self,
     changes::{Changes, TOMLEdition},
@@ -668,7 +667,7 @@ pub fn main() {
             }
         }
         Command::LSP => run_lsp(),
-        Command::DAP => match run_dap() {
+        Command::DAP => match super::dap::run_dap() {
             Ok(_) => (),
             Err(e) => {
                 println!("{}: {}", red!("error"), e);
