@@ -197,7 +197,6 @@ impl ClarityLanguageBackend {
                 analysis.clone(),
                 false,
                 None,
-                None,
             );
 
             // We have a legit contract, let's extract some Intellisense data that will be served for
