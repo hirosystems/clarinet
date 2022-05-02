@@ -737,7 +737,7 @@ dependencies = [
  "ansi_term",
  "atty",
  "bytes",
- "dap-types",
+ "debug_types",
  "futures",
  "getrandom 0.2.6",
  "httparse",

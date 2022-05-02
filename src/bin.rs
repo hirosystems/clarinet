@@ -20,7 +20,6 @@ mod generate;
 mod indexer;
 mod integrate;
 mod lsp;
-mod dap;
 mod poke;
 mod publish;
 mod runnner;
