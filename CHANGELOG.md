@@ -1,3 +1,10 @@
+## [0.29.1](https://github.com/hirosystems/clarinet/compare/v0.29.0...v0.29.1) (2022-05-03)
+
+
+### Bug Fixes
+
+* fixed problem with contract ordering in lsp ([12bccc5](https://github.com/hirosystems/clarinet/commit/12bccc5db45a230f7faa91a4ab784a4161c3a135))
+
 # [0.29.0](https://github.com/hirosystems/clarinet/compare/v0.28.1...v0.29.0) (2022-04-21)
 
 
