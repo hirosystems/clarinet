@@ -21,7 +21,6 @@ pub extern crate clarity_repl;
 #[macro_use]
 pub mod macros;
 
-pub mod indexer;
 pub mod integrate;
 pub mod poke;
 mod deployment;

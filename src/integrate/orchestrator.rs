@@ -340,7 +340,7 @@ impl DevnetOrchestrator {
             Ok(_) => {}
             Err(message) => {
                 self.kill().await;
-                event_tx.send(DevnetEvent::FatalError(message));
+                let _ = event_tx.send(DevnetEvent::FatalError(message));
                 return;
             }
         };
@@ -355,7 +355,7 @@ impl DevnetOrchestrator {
                 self.initialize_bitcoin_node(&event_tx);
             }
             Err(message) => {
-                event_tx.send(DevnetEvent::FatalError(message));
+                let _ = event_tx.send(DevnetEvent::FatalError(message));
                 self.kill().await;
                 return;
             }
@@ -374,7 +374,7 @@ impl DevnetOrchestrator {
             match self.prepare_postgres_container().await {
                 Ok(_) => {}
                 Err(message) => {
-                    event_tx.send(DevnetEvent::FatalError(message));
+                    let _ = event_tx.send(DevnetEvent::FatalError(message));
                     self.kill().await;
                     return;
                     }
@@ -382,7 +382,7 @@ impl DevnetOrchestrator {
             match self.boot_postgres_container().await {
                 Ok(_) => {}
                 Err(message) => {
-                    event_tx.send(DevnetEvent::FatalError(message));
+                    let _ = event_tx.send(DevnetEvent::FatalError(message));
                     self.kill().await;
                     return;    
                 }
@@ -398,7 +398,7 @@ impl DevnetOrchestrator {
             match self.prepare_stacks_api_container().await {
                 Ok(_) => {}
                 Err(message) => {
-                    event_tx.send(DevnetEvent::FatalError(message));
+                    let _ = event_tx.send(DevnetEvent::FatalError(message));
                     self.kill().await;
                     return;
                 }
@@ -412,7 +412,7 @@ impl DevnetOrchestrator {
             match self.boot_stacks_api_container().await {
                 Ok(_) => {}
                 Err(message) => {
-                    event_tx.send(DevnetEvent::FatalError(message));
+                    let _ = event_tx.send(DevnetEvent::FatalError(message));
                     self.kill().await;
                     return;
                 }
@@ -430,7 +430,7 @@ impl DevnetOrchestrator {
         match self.prepare_stacks_node_container().await {
             Ok(_) => {}
             Err(message) => {
-                event_tx.send(DevnetEvent::FatalError(message));
+                let _ = event_tx.send(DevnetEvent::FatalError(message));
                 self.kill().await;
                 return;
             }
@@ -444,7 +444,7 @@ impl DevnetOrchestrator {
         match self.boot_stacks_node_container().await {
             Ok(_) => {}
             Err(message) => {
-                event_tx.send(DevnetEvent::FatalError(message));
+                let _ = event_tx.send(DevnetEvent::FatalError(message));
                 self.kill().await;
                 return;
             }
@@ -461,7 +461,7 @@ impl DevnetOrchestrator {
             match self.prepare_stacks_explorer_container().await {
                 Ok(_) => {}
                 Err(message) => {
-                    event_tx.send(DevnetEvent::FatalError(message));
+                    let _ = event_tx.send(DevnetEvent::FatalError(message));
                     self.kill().await;
                     return;
                     }
@@ -470,7 +470,7 @@ impl DevnetOrchestrator {
             match self.boot_stacks_explorer_container().await {
                 Ok(_) => {}
                 Err(message) => {
-                    event_tx.send(DevnetEvent::FatalError(message));
+                    let _ = event_tx.send(DevnetEvent::FatalError(message));
                     self.kill().await;
                     return;
                 }
@@ -494,7 +494,7 @@ impl DevnetOrchestrator {
             match self.prepare_bitcoin_explorer_container().await {
                 Ok(_) => {}
                 Err(message) => {
-                    event_tx.send(DevnetEvent::FatalError(message));
+                    let _ = event_tx.send(DevnetEvent::FatalError(message));
                     self.kill().await;
                     return;
                 }
@@ -503,7 +503,7 @@ impl DevnetOrchestrator {
             match self.boot_bitcoin_explorer_container().await {
                 Ok(_) => {}
                 Err(message) => {
-                    event_tx.send(DevnetEvent::FatalError(message));
+                    let _ = event_tx.send(DevnetEvent::FatalError(message));
                     self.kill().await;
                     return;
                 }
@@ -527,7 +527,7 @@ impl DevnetOrchestrator {
             match self.prepare_electrum_container().await {
                 Ok(_) => {}
                 Err(message) => {
-                    event_tx.send(DevnetEvent::FatalError(message));
+                    let _ = event_tx.send(DevnetEvent::FatalError(message));
                     self.kill().await;
                     return;
                     }
@@ -536,7 +536,7 @@ impl DevnetOrchestrator {
             match self.boot_electrum_container().await {
                 Ok(_) => {}
                 Err(message) => {
-                    event_tx.send(DevnetEvent::FatalError(message));
+                    let _ = event_tx.send(DevnetEvent::FatalError(message));
                     self.kill().await;
                     return;
                 }

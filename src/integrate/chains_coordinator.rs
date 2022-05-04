@@ -1,6 +1,5 @@
 use super::DevnetEvent;
 use crate::hook::load_hooks;
-use crate::indexer::{chains, Indexer, IndexerConfig};
 use crate::integrate::{MempoolAdmissionData, ServiceStatusData, Status};
 use crate::poke::load_session;
 use crate::deployment::publish_all_contracts;
