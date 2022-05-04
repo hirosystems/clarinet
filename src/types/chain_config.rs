@@ -38,6 +38,7 @@ pub struct NetworkConfigFile {
 #[derive(Serialize, Deserialize, Debug, Default)]
 pub struct DevnetConfigFile {
     pub orchestrator_port: Option<u16>,
+    pub orchestrator_control_port: Option<u16>,
     pub bitcoin_node_p2p_port: Option<u16>,
     pub bitcoin_node_rpc_port: Option<u16>,
     pub stacks_node_p2p_port: Option<u16>,
@@ -115,7 +116,8 @@ pub struct NetworkConfig {
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct DevnetConfig {
-    pub orchestrator_port: u16,
+    pub orchestrator_ingestion_port: u16,
+    pub orchestrator_control_port: u16,
     pub bitcoin_node_p2p_port: u16,
     pub bitcoin_node_rpc_port: u16,
     pub bitcoin_node_username: String,
@@ -280,7 +282,8 @@ impl ChainConfig {
                 compute_addresses(&miner_mnemonic, &miner_derivation_path, is_mainnet);
 
             let mut config = DevnetConfig {
-                orchestrator_port: devnet_config.orchestrator_port.unwrap_or(20445),
+                orchestrator_ingestion_port: devnet_config.orchestrator_port.unwrap_or(20445),
+                orchestrator_control_port: devnet_config.orchestrator_control_port.unwrap_or(20446),
                 bitcoin_node_p2p_port: devnet_config.bitcoin_node_p2p_port.unwrap_or(18444),
                 bitcoin_node_rpc_port: devnet_config.bitcoin_node_rpc_port.unwrap_or(18443),
                 bitcoin_node_username: devnet_config

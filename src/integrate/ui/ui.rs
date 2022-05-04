@@ -1,5 +1,5 @@
 use crate::integrate::{LogLevel, Status};
-use crate::types::StacksBlockData;
+use orchestra_types::StacksBlockData;
 
 use super::App;
 use tui::{

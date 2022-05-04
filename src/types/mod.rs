@@ -80,6 +80,13 @@ pub enum BitcoinNetwork {
     Mainnet,
 }
 
+#[derive(Debug)]
+pub enum DeploymentEvent {
+    ContractCallBroadcasted,
+    ContractPublishBroadcasted,
+    ProtocolDeployed,
+}
+
 #[allow(dead_code)]
 #[derive(Debug)]
 pub enum ChainsCoordinatorCommand {

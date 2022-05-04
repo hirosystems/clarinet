@@ -60,7 +60,7 @@ impl DevnetOrchestrator {
         match (&mut network_config.devnet, devnet_override) {
             (Some(ref mut devnet_config), Some(ref devnet_override)) => {
                 if let Some(val) = devnet_override.orchestrator_port {
-                    devnet_config.orchestrator_port = val;
+                    devnet_config.orchestrator_ingestion_port = val;
                 }
 
                 if let Some(val) = devnet_override.bitcoin_node_p2p_port {
@@ -886,9 +886,9 @@ events_keys = ["*"]
             devnet_config.miner_secret_key_hex,
             devnet_config.bitcoin_node_username,
             devnet_config.bitcoin_node_password,
-            devnet_config.orchestrator_port,
+            devnet_config.orchestrator_ingestion_port,
             devnet_config.bitcoin_node_p2p_port,
-            devnet_config.orchestrator_port,
+            devnet_config.orchestrator_ingestion_port,
         );
 
         if !devnet_config.disable_stacks_api {

@@ -8,12 +8,14 @@ use chrono::prelude::*;
 use tracing::{self, debug, error, info, warn};
 use tracing_appender;
 
-use crate::types::{BitcoinChainEvent, ChainsCoordinatorCommand, StacksChainEvent};
+use orchestra_types::{BitcoinChainEvent, StacksChainEvent};
+use crate::types::{ChainsCoordinatorCommand};
+
 use crate::utils;
 use chains_coordinator::start_chains_coordinator;
 pub use orchestrator::DevnetOrchestrator;
 
-use self::chains_coordinator::StacksEventObserverConfig;
+use self::chains_coordinator::DevnetEventObserverConfig;
 
 pub fn run_devnet(
     devnet: DevnetOrchestrator,
@@ -81,7 +83,7 @@ pub async fn do_run_devnet(
     // and should be able to be terminated
     let devnet_path = devnet_config.working_dir.clone();
     let config =
-        StacksEventObserverConfig::new(devnet_config.clone(), devnet.manifest_path.clone());
+        DevnetEventObserverConfig::new(devnet_config.clone(), devnet.manifest_path.clone());
     let chains_coordinator_tx = devnet_events_tx.clone();
     let (chains_coordinator_commands_tx, chains_coordinator_commands_rx) = channel();
     let moved_events_observer_commands_tx = chains_coordinator_commands_tx.clone();
@@ -146,10 +148,6 @@ pub async fn do_run_devnet(
                                 LogLevel::Error => error!("{}", log.message),
                             }
                         }
-                    }
-                    Ok(DevnetEvent::ProtocolDeployed) => {
-                        let _ = chains_coordinator_commands_tx
-                            .send(ChainsCoordinatorCommand::ProtocolDeployed);
                     }
                     _ => {}
                 }

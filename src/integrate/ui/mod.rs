@@ -6,7 +6,8 @@ mod ui;
 mod util;
 
 use super::DevnetEvent;
-use crate::types::{ChainsCoordinatorCommand, StacksChainEvent};
+use crate::types::ChainsCoordinatorCommand;
+use orchestra_types::StacksChainEvent;
 use app::App;
 use crossterm::{
     event::{self, Event, KeyCode, KeyModifiers},
@@ -126,7 +127,6 @@ pub fn start_ui(
                 break;
             },
             DevnetEvent::ProtocolDeployed => {
-                let _ = chains_coordinator_commands_tx.send(ChainsCoordinatorCommand::ProtocolDeployed);
                 app.display_log(DevnetEvent::log_success("Protocol successfully deployed".into()));
             }
             // DevnetEvent::Terminate => {
