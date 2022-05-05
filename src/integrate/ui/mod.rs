@@ -73,22 +73,12 @@ pub fn start_ui(
                 (KeyModifiers::CONTROL, KeyCode::Char('c')) => {
                     app.display_log(DevnetEvent::log_warning("Ctrl+C received, initiating termination sequence.".into()));
                     let _ = trigger_reset(
-                        true,
                         & chains_coordinator_commands_tx);
-
                     let _ = terminate(
                         &mut terminal,
                         orchestrator_terminated_rx);
                     break;
                 }
-                (_, KeyCode::Char('0')) => {
-                    // Reset Testnet`
-                    app.reset();
-                    app.display_log(DevnetEvent::log_warning("Reset Devnet...".into()));
-                    let _ = trigger_reset(
-                        false,
-                        & chains_coordinator_commands_tx);
-                },
                 (_, KeyCode::Left) => app.on_left(),
                 (_, KeyCode::Up) => app.on_up(),
                 (_, KeyCode::Right) => app.on_right(),
@@ -145,11 +135,10 @@ pub fn start_ui(
 }
 
 fn trigger_reset(
-    terminate: bool,
     chains_coordinator_commands_tx: &Sender<ChainsCoordinatorCommand>,
 ) -> Result<(), Box<dyn Error>> {
     chains_coordinator_commands_tx
-        .send(ChainsCoordinatorCommand::Terminate(true))
+        .send(ChainsCoordinatorCommand::Terminate)
         .expect("Unable to terminate devnet");
     Ok(())
 }

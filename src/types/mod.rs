@@ -90,15 +90,5 @@ pub enum DeploymentEvent {
 #[allow(dead_code)]
 #[derive(Debug)]
 pub enum ChainsCoordinatorCommand {
-    Terminate(bool), // Restart
-    PublishInitialContracts,
-    BitcoinOpSent,
-    ProtocolDeployed,
-    StartAutoMining,
-    StopAutoMining,
-    MineBitcoinBlock,
-    InvalidateBitcoinChainTip,
-    PublishPoxStackingOrders(BlockIdentifier),
-    EvaluateBitcoinHooks(BitcoinChainEvent),
-    EvaluateStacksHooks(StacksChainEvent),
+    Terminate,
 }

@@ -144,7 +144,6 @@ pub async fn start_chains_coordinator(
     config: DevnetEventObserverConfig,
     devnet_event_tx: Sender<DevnetEvent>,
     chains_coordinator_commands_rx: Receiver<ChainsCoordinatorCommand>,
-    chains_coordinator_commands_tx: Sender<ChainsCoordinatorCommand>,
     chains_coordinator_terminator_tx: Sender<bool>,
 ) -> Result<(), Box<dyn Error>> {
     let _ = config.execute_scripts().await;
@@ -156,7 +155,7 @@ pub async fn start_chains_coordinator(
     let observer_event_tx_moved = observer_event_tx.clone();
     let _ = std::thread::spawn(move || {
         let future = start_event_observer(event_observer_config, observer_command_tx, observer_command_rx, Some(observer_event_tx_moved));
-        utils::nestable_block_on(future);
+        let _ = utils::nestable_block_on(future);
     });
 
     // Spawn bitcoin miner controller
@@ -171,6 +170,11 @@ pub async fn start_chains_coordinator(
     let mut should_deploy_protocol = true;
     let protocol_deployed = Arc::new(AtomicBool::new(false));
     loop {
+        // Did we receive a termination notice?
+        if let Ok(ChainsCoordinatorCommand::Terminate) = chains_coordinator_commands_rx.try_recv() {
+            let _ = chains_coordinator_terminator_tx.send(true);
+            break;
+        }
         let command = match observer_event_rx.recv() {
             Ok(cmd) => cmd,
             Err(e) => {
@@ -261,22 +265,6 @@ pub async fn start_chains_coordinator(
                 
                 }
 
-                let pox_info = PoxInfo::default();
-
-                // Standardize the structure of the block, and identify the
-                // kind of update that this new block would imply, taking
-                // into account the last 7 blocks.
-                // let (pox_info, chain_event) = match indexer_rw_lock.inner().write() {
-                //     Ok(mut indexer) => {
-                //         let pox_info = indexer.get_pox_info();
-                //         let chain_event = indexer.handle_stacks_block(marshalled_block.into_inner());
-                //         (pox_info, chain_event)
-                //     }
-                //     _ => continue;
-                // };
-                // Contextual: Devnet is an environment under control,
-                // with 1 miner. As such we will ignore Reorgs handling.
-
                 let update = match &chain_event {
                     StacksChainEvent::ChainUpdatedWithBlock(block) => block.clone(),
                     StacksChainEvent::ChainUpdatedWithMicroblock(_) => {
@@ -312,10 +300,8 @@ pub async fn start_chains_coordinator(
                     update.new_block.transactions.len(),
                 )));
 
-                let pox_cycle_length: u32 =
-                    pox_info.prepare_phase_block_length + pox_info.reward_phase_block_length;
                 let should_submit_pox_orders =
-                    update.new_block.metadata.pox_cycle_position == (pox_cycle_length - 2);
+                    update.new_block.metadata.pox_cycle_position == (update.new_block.metadata.pox_cycle_length - 2);
                 if should_submit_pox_orders {
 
                     let bitcoin_block_height = update.new_block.block_identifier.index;
@@ -350,6 +336,7 @@ pub async fn start_chains_coordinator(
             }
         }
     }
+    Ok(())
 }
          
 // #[post("/new_mempool_tx", format = "application/json", data = "<raw_txs>")]

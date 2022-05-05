@@ -86,7 +86,6 @@ pub async fn do_run_devnet(
         DevnetEventObserverConfig::new(devnet_config.clone(), devnet.manifest_path.clone());
     let chains_coordinator_tx = devnet_events_tx.clone();
     let (chains_coordinator_commands_tx, chains_coordinator_commands_rx) = channel();
-    let moved_events_observer_commands_tx = chains_coordinator_commands_tx.clone();
     let (orchestrator_terminator_tx, terminator_rx) = channel();
     let moved_orchestrator_terminator_tx = orchestrator_terminator_tx.clone();
     let chains_coordinator_handle = std::thread::spawn(move || {
@@ -94,7 +93,6 @@ pub async fn do_run_devnet(
             config,
             chains_coordinator_tx,
             chains_coordinator_commands_rx,
-            moved_events_observer_commands_tx,
             moved_orchestrator_terminator_tx,
         );
         let rt = utils::create_basic_runtime();
@@ -126,7 +124,7 @@ pub async fn do_run_devnet(
         let moved_events_observer_commands_tx = chains_coordinator_commands_tx.clone();
         ctrlc::set_handler(move || {
             moved_events_observer_commands_tx
-                .send(ChainsCoordinatorCommand::Terminate(true))
+                .send(ChainsCoordinatorCommand::Terminate)
                 .expect("Unable to terminate devnet");
         })
         .expect("Error setting Ctrl-C handler");
