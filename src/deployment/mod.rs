@@ -6,7 +6,7 @@ use crate::integrate::DevnetEvent;
 use crate::poke::{load_session, load_session_settings};
 use crate::types::{StacksNetwork, ProjectManifest, DeploymentEvent};
 use crate::utils::mnemonic;
-use crate::utils::stacks::StacksRpc;
+use stacks_rpc_client::StacksRpc;
 use clarity_repl::clarity::codec::transaction::{
     StacksTransaction, StacksTransactionSigner, TransactionAnchorMode, TransactionAuth,
     TransactionPayload, TransactionPostConditionMode, TransactionPublicKeyEncoding,

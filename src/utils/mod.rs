@@ -1,5 +1,4 @@
 pub mod mnemonic;
-pub mod stacks;
 
 use std::collections::{BTreeMap, HashSet};
 use std::iter::FromIterator;

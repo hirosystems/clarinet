@@ -7,7 +7,7 @@ use crate::types::{self, DevnetConfig, DeploymentEvent};
 use crate::types::{StacksNetwork};
 use crate::types::ChainsCoordinatorCommand;
 use crate::utils;
-use crate::utils::stacks::{transactions, PoxInfo, StacksRpc};
+use stacks_rpc_client::{transactions, PoxInfo, StacksRpc};
 use orchestra_event_observer::observer::{EventObserverConfig, ObserverEvent, start_event_observer};
 use orchestra_types::{BitcoinChainEvent, StacksChainEvent};
 use base58::FromBase58;

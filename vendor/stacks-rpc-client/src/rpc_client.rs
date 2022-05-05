@@ -51,6 +51,21 @@ pub struct PoxInfo {
     pub next_cycle: PoxCycle,
 }
 
+impl PoxInfo {
+    pub fn default() -> PoxInfo {
+        PoxInfo {
+            contract_id: "ST000000000000000000002AMW42H.pox".into(),
+            pox_activation_threshold_ustx: 0,
+            first_burnchain_block_height: 100,
+            prepare_phase_block_length: 5,
+            reward_phase_block_length: 10,
+            reward_slots: 20,
+            total_liquid_supply_ustx: 1000000000000000,
+            ..Default::default()
+        }
+    }
+}
+
 #[derive(Deserialize, Debug, Clone, Default)]
 pub struct PoxCycle {
     pub min_threshold_ustx: u64,
