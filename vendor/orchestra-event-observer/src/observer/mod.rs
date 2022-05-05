@@ -1,28 +1,31 @@
+use crate::hooks::types::{HookFormation, HookSpecification};
+use crate::hooks::{
+    evaluate_bitcoin_hooks_on_chain_event, evaluate_stacks_hooks_on_chain_event,
+    handle_bitcoin_hook_action, handle_stacks_hook_action,
+};
 use crate::indexer::{chains, Indexer, IndexerConfig};
 use crate::utils;
-use orchestra_types::{BitcoinChainEvent, StacksNetwork, StacksChainEvent};
-use crate::hooks::types::{HookFormation, HookSpecification};
-use crate::hooks::{evaluate_stacks_hooks_on_chain_event, evaluate_bitcoin_hooks_on_chain_event, handle_stacks_hook_action, handle_bitcoin_hook_action};
-use stacks_rpc_client::{PoxInfo, StacksRpc};
+use bitcoincore_rpc::bitcoin::{BlockHash, Txid};
+use bitcoincore_rpc::{Auth, Client, RpcApi};
+use clarity_repl::clarity::util::hash::bytes_to_hex;
+use orchestra_types::{BitcoinChainEvent, StacksChainEvent, StacksNetwork};
+use reqwest::Client as HttpClient;
 use rocket::config::{Config, LogLevel};
 use rocket::serde::json::{json, Json, Value as JsonValue};
 use rocket::serde::Deserialize;
 use rocket::State;
-use std::collections::{VecDeque, HashMap};
+use stacks_rpc_client::{PoxInfo, StacksRpc};
+use std::collections::{HashMap, VecDeque};
 use std::convert::TryFrom;
 use std::error::Error;
 use std::iter::FromIterator;
 use std::net::{IpAddr, Ipv4Addr};
 use std::path::PathBuf;
 use std::str;
+use std::str::FromStr;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc::{Receiver, Sender};
 use std::sync::{Arc, Mutex, RwLock};
-use reqwest::Client as HttpClient;
-use std::str::FromStr;
-use bitcoincore_rpc::bitcoin::{Txid, BlockHash};
-use bitcoincore_rpc::{Auth, Client, RpcApi};
-use clarity_repl::clarity::util::hash::bytes_to_hex;
 
 pub const DEFAULT_INGESTION_PORT: u16 = 20445;
 pub const DEFAULT_CONTROL_PORT: u16 = 20446;
@@ -48,14 +51,15 @@ pub enum EventHandler {
 }
 
 impl EventHandler {
-
     async fn propagate_stacks_event(&self, stacks_event: &StacksChainEvent) {
         match self {
             EventHandler::WebHook(host) => {
                 let path = "chain-events/stacks";
                 let url = format!("{}/{}", host, path);
                 let body = rocket::serde::json::serde_json::to_vec(&stacks_event).unwrap();
-                let http_client = HttpClient::builder().build().expect("Unable to build http client");
+                let http_client = HttpClient::builder()
+                    .build()
+                    .expect("Unable to build http client");
                 let _ = http_client
                     .post(url)
                     .header("Content-Type", "application/json")
@@ -63,9 +67,7 @@ impl EventHandler {
                     .send()
                     .await;
             }
-            EventHandler::GrpcStream(stream) => {
-                
-            }
+            EventHandler::GrpcStream(stream) => {}
         }
     }
 
@@ -75,7 +77,9 @@ impl EventHandler {
                 let path = "chain-events/bitcoin";
                 let url = format!("{}/{}", host, path);
                 let body = rocket::serde::json::serde_json::to_vec(&bitcoin_event).unwrap();
-                let http_client = HttpClient::builder().build().expect("Unable to build http client");
+                let http_client = HttpClient::builder()
+                    .build()
+                    .expect("Unable to build http client");
                 let res = http_client
                     .post(url)
                     .header("Content-Type", "application/json")
@@ -83,15 +87,11 @@ impl EventHandler {
                     .send()
                     .await;
             }
-            EventHandler::GrpcStream(stream) => {
-
-            }
+            EventHandler::GrpcStream(stream) => {}
         }
     }
 
-    async fn notify_bitcoin_transaction_proxied(&self) {
-
-    }
+    async fn notify_bitcoin_transaction_proxied(&self) {}
 }
 
 #[derive(Clone, Debug)]
@@ -138,7 +138,7 @@ pub enum ObserverEvent {
     BitcoinChainEvent(BitcoinChainEvent),
     StacksChainEvent(StacksChainEvent),
     NotifyBitcoinTransactionProxied,
-    Terminate
+    Terminate,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -160,17 +160,14 @@ pub async fn start_event_observer(
     observer_commands_rx: Receiver<ObserverCommand>,
     observer_events_tx: Option<Sender<ObserverEvent>>,
 ) -> Result<(), Box<dyn Error>> {
-
     let indexer = Indexer::new(IndexerConfig {
         stacks_node_rpc_url: format!(
             "{}:{}",
-            config.stacks_node_rpc_host,
-            config.stacks_node_rpc_port
+            config.stacks_node_rpc_host, config.stacks_node_rpc_port
         ),
         bitcoin_node_rpc_url: format!(
             "{}:{}",
-            config.bitcoin_node_rpc_host,
-            config.bitcoin_node_rpc_port
+            config.bitcoin_node_rpc_host, config.bitcoin_node_rpc_port
         ),
         bitcoin_node_rpc_username: config.bitcoin_node_username.clone(),
         bitcoin_node_rpc_password: config.bitcoin_node_password.clone(),
@@ -209,10 +206,7 @@ pub async fn start_event_observer(
             .manage(indexer_rw_lock)
             .manage(config_mutex)
             .manage(background_job_tx_mutex)
-            .mount(
-                "/",
-                routes,
-            )
+            .mount("/", routes)
             .launch();
 
         utils::nestable_block_on(future);
@@ -228,26 +222,18 @@ pub async fn start_event_observer(
         ..Config::default()
     };
 
-    let routes = routes![
-        handle_ping,
-        handle_create_hook,
-        handle_delete_hook,
-    ];
+    let routes = routes![handle_ping, handle_create_hook, handle_delete_hook,];
 
     let background_job_tx_mutex = Arc::new(Mutex::new(observer_commands_tx.clone()));
 
     let _ = std::thread::spawn(move || {
-
         let future = rocket::custom(control_config)
             .manage(background_job_tx_mutex)
-            .mount(
-                "/",
-                routes,
-            )
+            .mount("/", routes)
             .launch();
 
-            utils::nestable_block_on(future);
-        });
+        utils::nestable_block_on(future);
+    });
 
     // This loop is used for handling background jobs, emitted by HTTP calls.
     let stop_miner = Arc::new(AtomicBool::new(false));
@@ -255,8 +241,12 @@ pub async fn start_event_observer(
     let mut hook_formation = HookFormation::new();
 
     if let Some(ref mut initial_hook_formation) = config.initial_hook_formation {
-        hook_formation.stacks_hooks.append(&mut initial_hook_formation.stacks_hooks);
-        hook_formation.bitcoin_hooks.append(&mut initial_hook_formation.bitcoin_hooks); 
+        hook_formation
+            .stacks_hooks
+            .append(&mut initial_hook_formation.stacks_hooks);
+        hook_formation
+            .bitcoin_hooks
+            .append(&mut initial_hook_formation.bitcoin_hooks);
     }
 
     loop {
@@ -283,11 +273,13 @@ pub async fn start_event_observer(
                 }
                 // process hooks
                 if config.hooks_enabled {
-                    let hooks_to_trigger = evaluate_bitcoin_hooks_on_chain_event(&chain_event, &hook_formation.bitcoin_hooks);
+                    let hooks_to_trigger = evaluate_bitcoin_hooks_on_chain_event(
+                        &chain_event,
+                        &hook_formation.bitcoin_hooks,
+                    );
                     let mut proofs = HashMap::new();
                     for (_, transaction, block_identifier) in hooks_to_trigger.iter() {
                         if !proofs.contains_key(&transaction.transaction_identifier.hash) {
-
                             let rpc = Client::new(
                                 &format!("http://localhost:{}", config.bitcoin_node_rpc_port),
                                 Auth::UserPass(
@@ -296,16 +288,27 @@ pub async fn start_event_observer(
                                 ),
                             )
                             .unwrap();
-                            let txid = Txid::from_str(&transaction.transaction_identifier.hash).expect("Unable to retrieve txid");
-                            let block_hash = BlockHash::from_str(&block_identifier.hash).expect("Unable to retrieve txid");
+                            let txid = Txid::from_str(&transaction.transaction_identifier.hash)
+                                .expect("Unable to retrieve txid");
+                            let block_hash = BlockHash::from_str(&block_identifier.hash)
+                                .expect("Unable to retrieve txid");
                             let res = rpc.get_tx_out_proof(&vec![txid], Some(&block_hash));
                             if let Ok(proof) = res {
-                                proofs.insert(transaction.transaction_identifier.hash.clone(), bytes_to_hex(&proof));
+                                proofs.insert(
+                                    transaction.transaction_identifier.hash.clone(),
+                                    bytes_to_hex(&proof),
+                                );
                             }
                         }
                     }
                     for (hook, transaction, block_identifier) in hooks_to_trigger.into_iter() {
-                        handle_bitcoin_hook_action(hook, transaction, block_identifier, proofs.get(&transaction.transaction_identifier.hash)).await;
+                        handle_bitcoin_hook_action(
+                            hook,
+                            transaction,
+                            block_identifier,
+                            proofs.get(&transaction.transaction_identifier.hash),
+                        )
+                        .await;
                     }
                 }
 
@@ -319,10 +322,13 @@ pub async fn start_event_observer(
                 }
                 if config.hooks_enabled {
                     // process hooks
-                    let hooks_to_trigger = evaluate_stacks_hooks_on_chain_event(&chain_event, &hook_formation.stacks_hooks);
+                    let hooks_to_trigger = evaluate_stacks_hooks_on_chain_event(
+                        &chain_event,
+                        &hook_formation.stacks_hooks,
+                    );
                     for (hook, transaction, block_identifier) in hooks_to_trigger.into_iter() {
                         handle_stacks_hook_action(hook, transaction).await;
-                    }    
+                    }
                 }
                 if let Some(ref tx) = observer_events_tx {
                     let _ = tx.send(ObserverEvent::StacksChainEvent(chain_event));
@@ -339,16 +345,12 @@ pub async fn start_event_observer(
             ObserverCommand::SubscribeStreamer(stream) => {
                 event_handlers.push(EventHandler::GrpcStream(stream));
             }
-            ObserverCommand::UnsubscribeStreamer(stream) => {
-            }
-            ObserverCommand::RegisterHook(hook) => {
-                match hook {
-                    HookSpecification::Stacks(hook) => hook_formation.stacks_hooks.push(hook),
-                    HookSpecification::Bitcoin(hook) => hook_formation.bitcoin_hooks.push(hook),
-                }
-            }
-            ObserverCommand::DeregisterHook(hook_id) => {
-            }
+            ObserverCommand::UnsubscribeStreamer(stream) => {}
+            ObserverCommand::RegisterHook(hook) => match hook {
+                HookSpecification::Stacks(hook) => hook_formation.stacks_hooks.push(hook),
+                HookSpecification::Bitcoin(hook) => hook_formation.bitcoin_hooks.push(hook),
+            },
+            ObserverCommand::DeregisterHook(hook_id) => {}
         }
     }
     Ok(())
@@ -368,7 +370,6 @@ pub fn handle_new_bitcoin_block(
     marshalled_block: Json<JsonValue>,
     background_job_tx: &State<Arc<Mutex<Sender<ObserverCommand>>>>,
 ) -> Json<JsonValue> {
-
     // Standardize the structure of the block, and identify the
     // kind of update that this new block would imply, taking
     // into account the last 7 blocks.
@@ -443,7 +444,6 @@ pub fn handle_new_microblocks(
     marshalled_microblock: Json<JsonValue>,
     background_job_tx: &State<Arc<Mutex<Sender<ObserverCommand>>>>,
 ) -> Json<JsonValue> {
-
     // Standardize the structure of the microblock, and identify the
     // kind of update that this new microblock would imply
     let chain_event = match indexer_rw_lock.inner().write() {
@@ -524,15 +524,13 @@ pub async fn handle_bitcoin_rpc_call(
         Ok(config) => {
             let token = encode(format!(
                 "{}:{}",
-                config.bitcoin_node_username,
-                config.bitcoin_node_password
+                config.bitcoin_node_username, config.bitcoin_node_password
             ));
             let client = Client::new();
             client
                 .post(format!(
                     "{}:{}/",
-                    config.bitcoin_node_rpc_host,
-                    config.bitcoin_node_rpc_port
+                    config.bitcoin_node_rpc_host, config.bitcoin_node_rpc_port
                 ))
                 .header("Content-Type", "application/json")
                 .header("Authorization", format!("Basic {}", token))
@@ -560,7 +558,6 @@ pub fn handle_create_hook(
     hook: Json<HookSpecification>,
     background_job_tx: &State<Arc<Mutex<Sender<ObserverCommand>>>>,
 ) -> Json<JsonValue> {
-
     let hook = hook.into_inner();
 
     let background_job_tx = background_job_tx.inner();
@@ -582,7 +579,6 @@ pub fn handle_delete_hook(
     hook_id: Json<JsonValue>,
     background_job_tx: &State<Arc<Mutex<Sender<ObserverCommand>>>>,
 ) -> Json<JsonValue> {
-
     let background_job_tx = background_job_tx.inner();
     match background_job_tx.lock() {
         Ok(tx) => {

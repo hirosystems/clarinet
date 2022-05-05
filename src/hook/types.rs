@@ -1,11 +1,11 @@
-use serde::{Serialize, Deserialize};
-use std::path::PathBuf;
-use std::collections::BTreeMap;
-use std::fs::File;
-use std::io::{BufReader, Read};
 use clarity_repl::clarity::util::hash::hex_bytes;
 use orchestra_event_observer::hooks::types::*;
 use orchestra_types::{BitcoinNetwork, StacksNetwork};
+use serde::{Deserialize, Serialize};
+use std::collections::BTreeMap;
+use std::fs::File;
+use std::io::{BufReader, Read};
+use std::path::PathBuf;
 
 #[derive(Debug, PartialEq, Serialize, Deserialize)]
 pub struct HookSpecificationFile {
@@ -40,7 +40,6 @@ pub struct HookActionFile {
 }
 
 impl HookSpecificationFile {
-
     pub fn parse(path: &PathBuf) -> Result<HookSpecification, String> {
         let file = HookSpecificationFile::new(path)?;
         file.to_specification()
@@ -59,12 +58,11 @@ impl HookSpecificationFile {
             .read_to_end(&mut hook_spec_file_buffer)
             .unwrap();
 
-        let specification: HookSpecificationFile = match serde_yaml::from_slice(&hook_spec_file_buffer[..]) {
-            Ok(res) => res,
-            Err(msg) => {
-                return Err(format!("unable to read file {}", msg))
-            }
-        };
+        let specification: HookSpecificationFile =
+            match serde_yaml::from_slice(&hook_spec_file_buffer[..]) {
+                Ok(res) => res,
+                Err(msg) => return Err(format!("unable to read file {}", msg)),
+            };
 
         Ok(specification)
     }
@@ -77,7 +75,10 @@ impl HookSpecificationFile {
             let res = self.to_bitcoin_specification()?;
             HookSpecification::Bitcoin(res)
         } else {
-            return Err(format!("chain '{}' not supported (stacks, bitcoin)", self.chain))
+            return Err(format!(
+                "chain '{}' not supported (stacks, bitcoin)",
+                self.chain
+            ));
         };
         Ok(res)
     }
@@ -91,7 +92,8 @@ impl HookSpecificationFile {
             BitcoinNetwork::Mainnet
         } else {
             return Err(format!(
-                "network '{}' not supported (devnet, testnet or mainnet)", self.network
+                "network '{}' not supported (devnet, testnet or mainnet)",
+                self.network
             ));
         };
 
@@ -104,7 +106,7 @@ impl HookSpecificationFile {
             version: self.version.unwrap_or(1),
             predicate: self.predicate.to_bitcoin_predicate()?,
             action: self.action.to_specifications()?,
-        })        
+        })
     }
 
     pub fn to_stacks_specification(&self) -> Result<StacksHookSpecification, String> {
@@ -116,7 +118,8 @@ impl HookSpecificationFile {
             StacksNetwork::Mainnet
         } else {
             return Err(format!(
-                "network '{}' not supported (devnet, testnet or mainnet)", self.network
+                "network '{}' not supported (devnet, testnet or mainnet)",
+                self.network
             ));
         };
 
@@ -129,7 +132,7 @@ impl HookSpecificationFile {
             version: self.version.unwrap_or(1),
             predicate: self.predicate.to_stacks_predicate()?,
             action: self.action.to_specifications()?,
-        })      
+        })
     }
 }
 
@@ -138,16 +141,13 @@ impl HookActionFile {
         if let Some(ref specs) = self.http_hook {
             let url = match specs.get("url") {
                 Some(url) => Ok(url.to_string()),
-                None => Err(format!("url missing for http-hook"))
+                None => Err(format!("url missing for http-hook")),
             }?;
             let method = match specs.get("method") {
                 Some(method) => Ok(method.to_string()),
-                None => Err(format!("method missing for http-hook"))
+                None => Err(format!("method missing for http-hook")),
             }?;
-            Ok(HookAction::HttpHook(HttpHook {
-                url,
-                method
-            }))
+            Ok(HookAction::HttpHook(HttpHook { url, method }))
         } else {
             Err(format!("action not supported (http-hook)"))
         }
@@ -155,115 +155,126 @@ impl HookActionFile {
 }
 
 impl HookPredicateFile {
-
     pub fn to_bitcoin_predicate(&self) -> Result<BitcoinHookPredicate, String> {
         if let Some(ref specs) = self.tx_in {
             let predicate = self.extract_bitcoin_predicate(specs)?;
-            return Ok(BitcoinHookPredicate::TxIn(predicate))
+            return Ok(BitcoinHookPredicate::TxIn(predicate));
         } else if let Some(ref specs) = self.tx_out {
             let predicate = self.extract_bitcoin_predicate(specs)?;
-            return Ok(BitcoinHookPredicate::TxOut(predicate))
+            return Ok(BitcoinHookPredicate::TxOut(predicate));
         }
-        return Err(format!("trigger not specified (contract-call, event)"))
+        return Err(format!("trigger not specified (contract-call, event)"));
     }
 
-    pub fn extract_bitcoin_predicate(&self, specs: &BTreeMap<String, BTreeMap<String, String>>) -> Result<BitcoinPredicate, String> {
+    pub fn extract_bitcoin_predicate(
+        &self,
+        specs: &BTreeMap<String, BTreeMap<String, String>>,
+    ) -> Result<BitcoinPredicate, String> {
         if let Some(rule) = specs.get("hex") {
             let rule = self.extract_matching_rule(rule)?;
-            return Ok(BitcoinPredicate::Hex(rule))
+            return Ok(BitcoinPredicate::Hex(rule));
         };
 
         if let Some(rule) = specs.get("p2pkh") {
             let rule = self.extract_matching_rule(rule)?;
-            return Ok(BitcoinPredicate::P2PKH(rule))
+            return Ok(BitcoinPredicate::P2PKH(rule));
         };
 
         if let Some(rule) = specs.get("p2sh") {
             let rule = self.extract_matching_rule(rule)?;
-            return Ok(BitcoinPredicate::P2SH(rule))
+            return Ok(BitcoinPredicate::P2SH(rule));
         };
 
         if let Some(rule) = specs.get("p2wpkh") {
             let rule = self.extract_matching_rule(rule)?;
-            return Ok(BitcoinPredicate::P2WPKH(rule))
+            return Ok(BitcoinPredicate::P2WPKH(rule));
         };
 
         if let Some(rule) = specs.get("p2wsh") {
             let rule = self.extract_matching_rule(rule)?;
-            return Ok(BitcoinPredicate::P2WSH(rule))
+            return Ok(BitcoinPredicate::P2WSH(rule));
         };
 
         if let Some(rule) = specs.get("script") {
             if let Some(raw) = rule.get("template") {
                 let script = ScriptTemplate::parse(raw)?;
-                return Ok(BitcoinPredicate::Script(script))
+                return Ok(BitcoinPredicate::Script(script));
             }
             return Err(format!("predicate rule not specified (template)"));
         };
 
-        return Err(format!("predicate rule not specified (hex, p2pkh, p2sh, p2wpkh, p2wsh, script)"));
+        return Err(format!(
+            "predicate rule not specified (hex, p2pkh, p2sh, p2wpkh, p2wsh, script)"
+        ));
     }
 
-    pub fn extract_matching_rule(&self, specs: &BTreeMap<String, String>) -> Result<MatchingRule, String> {
+    pub fn extract_matching_rule(
+        &self,
+        specs: &BTreeMap<String, String>,
+    ) -> Result<MatchingRule, String> {
         if let Some(rule) = specs.get("starts-with") {
-            return Ok(MatchingRule::StartsWith(rule.to_string()))
+            return Ok(MatchingRule::StartsWith(rule.to_string()));
         };
 
         if let Some(rule) = specs.get("ends-with") {
-            return Ok(MatchingRule::EndsWith(rule.to_string()))
+            return Ok(MatchingRule::EndsWith(rule.to_string()));
         };
 
         if let Some(rule) = specs.get("equals") {
-            return Ok(MatchingRule::Equals(rule.to_string()))
+            return Ok(MatchingRule::Equals(rule.to_string()));
         };
 
-        return Err(format!("predicate rule not specified (starts-with, ends-with, equals)"));
-    }    
+        return Err(format!(
+            "predicate rule not specified (starts-with, ends-with, equals)"
+        ));
+    }
 
     pub fn to_stacks_predicate(&self) -> Result<StacksHookPredicate, String> {
         if let Some(ref specs) = self.contract_call {
             let predicate = self.extract_contract_call_predicate(specs)?;
-            return Ok(StacksHookPredicate::ContractCall(predicate))
+            return Ok(StacksHookPredicate::ContractCall(predicate));
         } else if let Some(ref specs) = self.event {
             let predicate = self.extract_event_predicate(specs)?;
-            return Ok(StacksHookPredicate::Event(predicate))
+            return Ok(StacksHookPredicate::Event(predicate));
         }
-        return Err(format!("trigger not specified (contract-call, event)"))
+        return Err(format!("trigger not specified (contract-call, event)"));
     }
 
-    pub fn extract_contract_call_predicate(&self, specs: &BTreeMap<String, String>) -> Result<StacksContractCallBasedPredicate, String> {
+    pub fn extract_contract_call_predicate(
+        &self,
+        specs: &BTreeMap<String, String>,
+    ) -> Result<StacksContractCallBasedPredicate, String> {
         let contract = match specs.get("contract-id") {
             Some(contract) => Ok(contract.to_string()),
-            None => Err(format!("contract missing for predicate.contract-call"))
+            None => Err(format!("contract missing for predicate.contract-call")),
         }?;
         let method = match specs.get("method") {
             Some(method) => Ok(method.to_string()),
-            None => Err(format!("method missing for predicate.contract-call"))
+            None => Err(format!("method missing for predicate.contract-call")),
         }?;
-        Ok(StacksContractCallBasedPredicate {
-            contract,
-            method,
-        })
-    }  
-    
-    pub fn extract_event_predicate(&self, specs: &BTreeMap<String, BTreeMap<String, String>>) -> Result<StacksEventBasedPredicate, String> {
+        Ok(StacksContractCallBasedPredicate { contract, method })
+    }
+
+    pub fn extract_event_predicate(
+        &self,
+        specs: &BTreeMap<String, BTreeMap<String, String>>,
+    ) -> Result<StacksEventBasedPredicate, String> {
         let print_event = match specs.get("print-event") {
             Some(rule) => Some(rule),
-            None => None
+            None => None,
         };
         let nft_rule = match specs.get("nft-event") {
             Some(rule) => Some(rule),
-            None => None
+            None => None,
         };
         let ft_rule = match specs.get("ft-event") {
             Some(rule) => Some(rule),
-            None => None
+            None => None,
         };
         let stx_rule = match specs.get("stx-event") {
             Some(rule) => Some(rule),
-            None => None
+            None => None,
         };
-        Ok(StacksEventBasedPredicate {
-        })
+        Ok(StacksEventBasedPredicate {})
     }
 }

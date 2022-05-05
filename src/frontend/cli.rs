@@ -4,17 +4,17 @@ use std::io::{prelude::*, BufReader, Read};
 use std::path::PathBuf;
 use std::{env, process};
 
+use crate::deployment::publish_all_contracts;
 use crate::generate::{
     self,
     changes::{Changes, TOMLEdition},
 };
+use crate::hook::check_hooks;
 use crate::integrate::{self, DevnetOrchestrator};
 use crate::lsp::run_lsp;
-use crate::hook::check_hooks;
 use crate::poke::load_session;
-use crate::deployment::publish_all_contracts;
 use crate::runnner::run_scripts;
-use crate::types::{StacksNetwork, ProjectManifest, ProjectManifestFile, RequirementConfig};
+use crate::types::{ProjectManifest, ProjectManifestFile, RequirementConfig, StacksNetwork};
 use clarity_repl::clarity::analysis::{AnalysisDatabase, ContractAnalysis};
 use clarity_repl::clarity::costs::LimitedCostTracker;
 use clarity_repl::clarity::types::QualifiedContractIdentifier;
@@ -611,24 +611,24 @@ pub fn main() {
         Command::Check(cmd) => {
             let manifest_path = get_manifest_path_or_exit(cmd.manifest_path);
             let start_repl = false;
-            let project_manifest = match load_session(&manifest_path, start_repl, &StacksNetwork::Devnet)
-            {
-                Err((_, e)) => {
-                    println!("{}", e);
-                    return;
-                }
-                Ok((session, _, manifest, output)) => {
-                    if let Some(message) = output {
-                        println!("{}", message);
+            let project_manifest =
+                match load_session(&manifest_path, start_repl, &StacksNetwork::Devnet) {
+                    Err((_, e)) => {
+                        println!("{}", e);
+                        return;
                     }
-                    println!(
-                        "{} Syntax of {} contract(s) successfully checked",
-                        green!("✔"),
-                        session.settings.initial_contracts.len()
-                    );
-                    manifest
-                }
-            };
+                    Ok((session, _, manifest, output)) => {
+                        if let Some(message) = output {
+                            println!("{}", message);
+                        }
+                        println!(
+                            "{} Syntax of {} contract(s) successfully checked",
+                            green!("✔"),
+                            session.settings.initial_contracts.len()
+                        );
+                        manifest
+                    }
+                };
             if hints_enabled {
                 display_post_check_hint();
             }

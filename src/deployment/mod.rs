@@ -1,12 +1,11 @@
-mod ui;
 mod types;
+mod ui;
 
-use self::types::{DeploymentPlan};
+use self::types::DeploymentPlan;
 use crate::integrate::DevnetEvent;
 use crate::poke::{load_session, load_session_settings};
-use crate::types::{StacksNetwork, ProjectManifest, DeploymentEvent};
+use crate::types::{DeploymentEvent, ProjectManifest, StacksNetwork};
 use crate::utils::mnemonic;
-use stacks_rpc_client::StacksRpc;
 use clarity_repl::clarity::codec::transaction::{
     StacksTransaction, StacksTransactionSigner, TransactionAnchorMode, TransactionAuth,
     TransactionPayload, TransactionPostConditionMode, TransactionPublicKeyEncoding,
@@ -31,12 +30,13 @@ use clarity_repl::clarity::{
 };
 use clarity_repl::repl::settings::{Account, InitialContract};
 use libsecp256k1::{PublicKey, SecretKey};
+use serde_yaml;
+use stacks_rpc_client::StacksRpc;
 use std::collections::{BTreeMap, HashMap};
 use std::path::PathBuf;
 use std::sync::mpsc::channel;
 use std::sync::mpsc::Sender;
 use tiny_hderive::bip32::ExtendedPrivKey;
-use serde_yaml;
 
 #[derive(Deserialize, Debug)]
 pub struct Balance {
@@ -68,7 +68,6 @@ pub enum ContractStatus {
 }
 
 pub fn build_plan(manifest_path: &PathBuf, network: &StacksNetwork) -> DeploymentPlan {
-
     // Load manifest
 
     // Load global network state, if any
@@ -80,7 +79,7 @@ pub fn build_plan(manifest_path: &PathBuf, network: &StacksNetwork) -> Deploymen
     // -> Compare hash, any update?
 
     // If transactions are present between outdated contracts, raise a warning
-    // 
+    //
 
     DeploymentPlan {
         network: network.clone(),

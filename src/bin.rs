@@ -12,13 +12,13 @@ extern crate serde_json;
 #[macro_use]
 mod macros;
 
+mod deployment;
 mod frontend;
 mod generate;
+mod hook;
 mod integrate;
 mod lsp;
 mod poke;
-mod deployment;
-mod hook;
 mod runnner;
 mod types;
 mod utils;

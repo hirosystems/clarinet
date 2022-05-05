@@ -51,7 +51,7 @@ use swc_common::comments::CommentKind;
 mod sessions {
     use super::TransactionArgs;
     use crate::poke::load_session_settings;
-    use crate::types::{ChainConfig, StacksNetwork, ProjectManifest};
+    use crate::types::{ChainConfig, ProjectManifest, StacksNetwork};
     use clarity_repl::clarity::analysis::ContractAnalysis;
     use clarity_repl::repl::settings::Account;
     use clarity_repl::repl::{self, Session};

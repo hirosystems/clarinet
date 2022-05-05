@@ -1,10 +1,10 @@
 use crate::indexer::AssetClassCache;
 use crate::indexer::{IndexerConfig, StacksChainContext};
-use orchestra_types::*;
 use clarity_repl::clarity::codec::transaction::{TransactionAuth, TransactionPayload};
 use clarity_repl::clarity::codec::{StacksMessageCodec, StacksTransaction};
 use clarity_repl::clarity::types::Value as ClarityValue;
 use clarity_repl::clarity::util::hash::hex_bytes;
+use orchestra_types::*;
 use rocket::serde::json::Value as JsonValue;
 use rocket::serde::Deserialize;
 use std::collections::{HashMap, HashSet};

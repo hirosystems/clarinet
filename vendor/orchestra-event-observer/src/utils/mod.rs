@@ -1,5 +1,5 @@
-use tokio;
 use std::future::Future;
+use tokio;
 
 pub fn create_basic_runtime() -> tokio::runtime::Runtime {
     tokio::runtime::Builder::new_current_thread()

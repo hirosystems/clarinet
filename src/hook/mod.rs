@@ -1,22 +1,30 @@
 use std::str::FromStr;
-use std::{path::PathBuf, fs::DirEntry};
+use std::{fs::DirEntry, path::PathBuf};
 
 pub mod types;
 use crate::hook::types::HookSpecificationFile;
-use orchestra_event_observer::hooks::types::{HookAction, BitcoinPredicate, MatchingRule, HookSpecification, StacksHookSpecification, BitcoinHookSpecification, HookFormation};
-use crate::types::{StacksTransactionData, BitcoinTransactionData, StacksNetwork, BitcoinChainEvent, StacksChainEvent, BlockIdentifier};
-use bitcoincore_rpc::bitcoin::blockdata::script::{Builder as BitcoinScriptBuilder};
-use bitcoincore_rpc::bitcoin::blockdata::opcodes;
-use bitcoincore_rpc::bitcoin::{TxIn, Script, PubkeyHash, Address, PublicKey};
-use clarity_repl::clarity::util::hash::Hash160;
-use reqwest::{Client};
-use reqwest::Method;
+use crate::types::{
+    BitcoinChainEvent, BitcoinTransactionData, BlockIdentifier, StacksChainEvent, StacksNetwork,
+    StacksTransactionData,
+};
 use base58::FromBase58;
-use std::fs;
+use bitcoincore_rpc::bitcoin::blockdata::opcodes;
+use bitcoincore_rpc::bitcoin::blockdata::script::Builder as BitcoinScriptBuilder;
+use bitcoincore_rpc::bitcoin::{Address, PubkeyHash, PublicKey, Script, TxIn};
 use clarity_repl::clarity::util::hash::bytes_to_hex;
+use clarity_repl::clarity::util::hash::Hash160;
+use orchestra_event_observer::hooks::types::{
+    BitcoinHookSpecification, BitcoinPredicate, HookAction, HookFormation, HookSpecification,
+    MatchingRule, StacksHookSpecification,
+};
+use reqwest::Client;
+use reqwest::Method;
+use std::fs;
 
-
-pub fn load_hooks(manifest_path: &PathBuf, network: &StacksNetwork) -> Result<HookFormation, String> {
+pub fn load_hooks(
+    manifest_path: &PathBuf,
+    network: &StacksNetwork,
+) -> Result<HookFormation, String> {
     let hook_files = get_hooks_files(manifest_path)?;
     let mut stacks_hooks = vec![];
     let mut bitcoin_hooks = vec![];
@@ -26,9 +34,7 @@ pub fn load_hooks(manifest_path: &PathBuf, network: &StacksNetwork) -> Result<Ho
                 HookSpecification::Bitcoin(hook) => bitcoin_hooks.push(hook),
                 HookSpecification::Stacks(hook) => stacks_hooks.push(hook),
             },
-            Err(msg) => {
-                return Err(format!("{} syntax incorrect: {}", relative_path, msg))
-            }
+            Err(msg) => return Err(format!("{} syntax incorrect: {}", relative_path, msg)),
         };
     }
     Ok(HookFormation {
@@ -44,10 +50,10 @@ pub fn check_hooks(manifest_path: &PathBuf) -> Result<(), String> {
             Ok(hook) => hook,
             Err(msg) => {
                 println!("{} {} syntax incorrect\n{}", red!("x"), relative_path, msg);
-                continue;        
+                continue;
             }
         };
-        println!("{} {} succesfully checked", green!("✔"), relative_path);    
+        println!("{} {} succesfully checked", green!("✔"), relative_path);
     }
     Ok(())
 }
@@ -59,12 +65,13 @@ fn get_hooks_files(manifest_path: &PathBuf) -> Result<Vec<(PathBuf, String)>, St
     hooks_home.push("hooks");
     let paths = match fs::read_dir(&hooks_home) {
         Ok(paths) => paths,
-        Err(_) => return Ok(vec![])
+        Err(_) => return Ok(vec![]),
     };
     let mut hook_paths = vec![];
     for path in paths {
         let file = path.unwrap().path();
-        let is_extension_valid = file.extension()
+        let is_extension_valid = file
+            .extension()
             .and_then(|ext| ext.to_str())
             .and_then(|ext| Some(ext == "yml" || ext == "yaml"));
 

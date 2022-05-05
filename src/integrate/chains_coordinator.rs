@@ -1,23 +1,26 @@
 use super::DevnetEvent;
+use crate::deployment::publish_all_contracts;
 use crate::hook::load_hooks;
 use crate::integrate::{MempoolAdmissionData, ServiceStatusData, Status};
 use crate::poke::load_session;
-use crate::deployment::publish_all_contracts;
-use crate::types::{self, DevnetConfig, DeploymentEvent};
-use crate::types::{StacksNetwork};
 use crate::types::ChainsCoordinatorCommand;
+use crate::types::StacksNetwork;
+use crate::types::{self, DeploymentEvent, DevnetConfig};
 use crate::utils;
-use stacks_rpc_client::{transactions, PoxInfo, StacksRpc};
-use orchestra_event_observer::observer::{EventObserverConfig, ObserverEvent, start_event_observer};
-use orchestra_types::{BitcoinChainEvent, StacksChainEvent};
 use base58::FromBase58;
+use bitcoincore_rpc::{Auth, Client, RpcApi};
 use clarity_repl::clarity::representations::ClarityName;
 use clarity_repl::clarity::types::{BuffData, SequenceData, TupleData, Value as ClarityValue};
 use clarity_repl::clarity::util::address::AddressHashMode;
 use clarity_repl::clarity::util::hash::{hex_bytes, Hash160};
 use clarity_repl::repl::settings::{Account, InitialContract};
 use clarity_repl::repl::Session;
-use std::collections::{VecDeque, HashMap};
+use orchestra_event_observer::observer::{
+    start_event_observer, EventObserverConfig, ObserverEvent,
+};
+use orchestra_types::{BitcoinChainEvent, StacksChainEvent};
+use stacks_rpc_client::{transactions, PoxInfo, StacksRpc};
+use std::collections::{HashMap, VecDeque};
 use std::convert::TryFrom;
 use std::error::Error;
 use std::iter::FromIterator;
@@ -25,11 +28,10 @@ use std::net::{IpAddr, Ipv4Addr};
 use std::path::PathBuf;
 use std::str;
 use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::mpsc::channel;
 use std::sync::mpsc::{Receiver, Sender};
 use std::sync::{Arc, Mutex, RwLock};
 use tracing::info;
-use bitcoincore_rpc::{Auth, Client, RpcApi};
-use std::sync::mpsc::channel;
 
 #[cfg(feature = "cli")]
 use crate::runnner::deno;
@@ -154,7 +156,12 @@ pub async fn start_chains_coordinator(
     let event_observer_config = config.event_observer_config.clone();
     let observer_event_tx_moved = observer_event_tx.clone();
     let _ = std::thread::spawn(move || {
-        let future = start_event_observer(event_observer_config, observer_command_tx, observer_command_rx, Some(observer_event_tx_moved));
+        let future = start_event_observer(
+            event_observer_config,
+            observer_command_tx,
+            observer_command_rx,
+            Some(observer_event_tx_moved),
+        );
         let _ = utils::nestable_block_on(future);
     });
 
@@ -166,7 +173,7 @@ pub async fn start_chains_coordinator(
     });
 
     // Loop over events being received from Bitcoin and Stacks,
-    // and orchestrate the 2 chains + protocol. 
+    // and orchestrate the 2 chains + protocol.
     let mut should_deploy_protocol = true;
     let protocol_deployed = Arc::new(AtomicBool::new(false));
     loop {
@@ -188,23 +195,24 @@ pub async fn start_chains_coordinator(
                     .send(DevnetEvent::error(msg))
                     .expect("Unable to terminate event observer");
                 // Terminate
-            },
+            }
             ObserverEvent::Error(msg) => {
                 devnet_event_tx
                     .send(DevnetEvent::error(msg))
                     .expect("Unable to terminate event observer");
-            },
+            }
             ObserverEvent::Info(msg) => {
                 devnet_event_tx
                     .send(DevnetEvent::info(msg))
                     .expect("Unable to terminate event observer");
-            },
+            }
             ObserverEvent::BitcoinChainEvent(chain_update) => {
                 // Contextual shortcut: Devnet is an environment under control,
                 // with 1 miner. As such we will ignore Reorgs handling.
                 let (log, status) = match &chain_update {
                     BitcoinChainEvent::ChainUpdatedWithBlock(block) => {
-                        let log = format!("Bitcoin block #{} received", block.block_identifier.index);
+                        let log =
+                            format!("Bitcoin block #{} received", block.block_identifier.index);
                         let status = format!(
                             "mining blocks (chaintip = #{})",
                             block.block_identifier.index
@@ -217,7 +225,8 @@ pub async fn start_chains_coordinator(
                             "Bitcoin reorg received (new height: {})",
                             tip.block_identifier.index
                         );
-                        let status = format!("mining blocks (chaintip = #{})", tip.block_identifier.index);
+                        let status =
+                            format!("mining blocks (chaintip = #{})", tip.block_identifier.index);
                         (log, status)
                     }
                 };
@@ -235,7 +244,8 @@ pub async fn start_chains_coordinator(
             ObserverEvent::StacksChainEvent(chain_event) => {
                 if should_deploy_protocol {
                     should_deploy_protocol = false;
-                    let automining_disabled = config.devnet_config.bitcoin_controller_automining_disabled;
+                    let automining_disabled =
+                        config.devnet_config.bitcoin_controller_automining_disabled;
                     let mining_command_tx_moved = mining_command_tx.clone();
                     let devnet_event_tx_moved = devnet_event_tx.clone();
                     let protocol_deployed_moved = protocol_deployed.clone();
@@ -248,7 +258,7 @@ pub async fn start_chains_coordinator(
                             &devnet_event_tx_moved,
                             deployment_progress_tx,
                         );
-    
+
                         loop {
                             match deployment_progress_rx.recv() {
                                 Ok(DeploymentEvent::ProtocolDeployed) => {
@@ -258,11 +268,10 @@ pub async fn start_chains_coordinator(
                                             .send(BitcoinMiningCommand::Start);
                                     }
                                 }
-                                _ => continue
+                                _ => continue,
                             }
                         }
                     });
-                
                 }
 
                 let update = match &chain_event {
@@ -300,10 +309,9 @@ pub async fn start_chains_coordinator(
                     update.new_block.transactions.len(),
                 )));
 
-                let should_submit_pox_orders =
-                    update.new_block.metadata.pox_cycle_position == (update.new_block.metadata.pox_cycle_length - 2);
+                let should_submit_pox_orders = update.new_block.metadata.pox_cycle_position
+                    == (update.new_block.metadata.pox_cycle_length - 2);
                 if should_submit_pox_orders {
-
                     let bitcoin_block_height = update.new_block.block_identifier.index;
                     let res = publish_stacking_orders(
                         &config.devnet_config,
@@ -330,15 +338,13 @@ pub async fn start_chains_coordinator(
                         &config.devnet_config.miner_btc_address.as_str(),
                     );
                 }
-            },
-            ObserverEvent::Terminate => {
-
             }
+            ObserverEvent::Terminate => {}
         }
     }
     Ok(())
 }
-         
+
 // #[post("/new_mempool_tx", format = "application/json", data = "<raw_txs>")]
 // pub fn handle_new_mempool_tx(
 //     devnet_events_tx: &State<Arc<Mutex<Sender<DevnetEvent>>>>,
@@ -487,7 +493,6 @@ pub fn invalidate_bitcoin_chain_tip(
     bitcoin_node_username: &str,
     bitcoin_node_password: &str,
 ) {
-
     let rpc = Client::new(
         &format!("http://localhost:{}", bitcoin_node_rpc_port),
         Auth::UserPass(
@@ -523,7 +528,10 @@ pub fn mine_bitcoin_block(
     let _ = rpc.generate_to_address(1, &miner_address);
 }
 
-pub fn handle_bitcoin_mining(mining_command_rx: Receiver<BitcoinMiningCommand>, devnet_config: &DevnetConfig) {
+pub fn handle_bitcoin_mining(
+    mining_command_rx: Receiver<BitcoinMiningCommand>,
+    devnet_config: &DevnetConfig,
+) {
     let stop_miner = Arc::new(AtomicBool::new(false));
     loop {
         let command = match mining_command_rx.recv() {

@@ -1,9 +1,9 @@
 use crate::indexer::IndexerConfig;
-use orchestra_types::{BitcoinBlockData, BitcoinBlockMetadata, BlockIdentifier};
 use bitcoincore_rpc::bitcoin::hashes::Hash;
 use bitcoincore_rpc::bitcoin::BlockHash;
 use bitcoincore_rpc::{Auth, Client, RpcApi};
 use clarity_repl::clarity::util::hash::hex_bytes;
+use orchestra_types::{BitcoinBlockData, BitcoinBlockMetadata, BlockIdentifier};
 use rocket::serde::json::Value as JsonValue;
 
 #[allow(dead_code)]
@@ -55,8 +55,7 @@ pub fn standardize_bitcoin_block(
             index: block_height - 1,
         },
         timestamp: block.header.time,
-        metadata: BitcoinBlockMetadata {
-        },
+        metadata: BitcoinBlockMetadata {},
         transactions,
     }
 }

@@ -11,20 +11,20 @@ extern crate serde_json;
 #[macro_use]
 extern crate rocket;
 
-mod observer;
-mod indexer;
-mod utils;
 mod hooks;
+mod indexer;
+mod observer;
+mod utils;
 
-use std::sync::mpsc::{channel, Receiver, Sender};
+use crate::hooks::types::HookFormation;
+use clap::Parser;
+use ctrlc;
+use observer::{EventHandler, EventObserverConfig, ObserverCommand};
 use std::fs::File;
 use std::io::{BufReader, Read};
 use std::path::PathBuf;
+use std::sync::mpsc::{channel, Receiver, Sender};
 use toml::value::Value;
-use observer::{EventObserverConfig, EventHandler, ObserverCommand};
-use clap::Parser;
-use ctrlc;
-use crate::hooks::types::HookFormation;
 
 /// Simple program to greet a person
 #[derive(Parser, Debug)]
@@ -42,9 +42,13 @@ async fn main() {
     let config = EventObserverConfig::from_path(&config_path);
     let (command_tx, command_rx) = channel();
     let tx_terminator = command_tx.clone();
-        
-    ctrlc::set_handler(move || tx_terminator.send(ObserverCommand::Terminate).expect("Could not send signal on channel."))
-        .expect("Error setting Ctrl-C handler");
+
+    ctrlc::set_handler(move || {
+        tx_terminator
+            .send(ObserverCommand::Terminate)
+            .expect("Could not send signal on channel.")
+    })
+    .expect("Error setting Ctrl-C handler");
 
     let config = EventObserverConfig {
         normalization_enabled: true,
@@ -93,31 +97,26 @@ impl EventObserverConfig {
         };
         let mut file_reader = BufReader::new(path);
         let mut file_buffer = vec![];
-        file_reader
-            .read_to_end(&mut file_buffer)
-            .unwrap();
+        file_reader.read_to_end(&mut file_buffer).unwrap();
 
-        let file: EventObserverConfigFile =
-            match toml::from_slice(&file_buffer[..]) {
-                Ok(s) => s,
-                Err(e) => {
-                    println!(
-                        "Unable to read config {}", e
-                    );
-                    std::process::exit(1);
-                }
-            };
+        let file: EventObserverConfigFile = match toml::from_slice(&file_buffer[..]) {
+            Ok(s) => s,
+            Err(e) => {
+                println!("Unable to read config {}", e);
+                std::process::exit(1);
+            }
+        };
 
-            EventObserverConfig::from_config_file(file)
+        EventObserverConfig::from_config_file(file)
     }
 
-    pub fn from_config_file(
-        mut config_file: EventObserverConfigFile,
-    ) -> EventObserverConfig {
-
+    pub fn from_config_file(mut config_file: EventObserverConfigFile) -> EventObserverConfig {
         let event_handlers = match config_file.webhooks.take() {
-            Some(webhooks) => webhooks.into_iter().map(|h| EventHandler::WebHook(h)).collect::<Vec<_>>(),
-            None => vec![]
+            Some(webhooks) => webhooks
+                .into_iter()
+                .map(|h| EventHandler::WebHook(h))
+                .collect::<Vec<_>>(),
+            None => vec![],
         };
         let config = EventObserverConfig {
             normalization_enabled: config_file.normalization_enabled.unwrap_or(true),
@@ -126,8 +125,12 @@ impl EventObserverConfig {
             initial_hook_formation: Some(HookFormation::new()),
             bitcoin_rpc_proxy_enabled: config_file.bitcoin_rpc_proxy_enabled.unwrap_or(false),
             event_handlers: event_handlers,
-            ingestion_port: config_file.ingestion_port.unwrap_or(observer::DEFAULT_INGESTION_PORT),
-            control_port: config_file.control_port.unwrap_or(observer::DEFAULT_CONTROL_PORT),
+            ingestion_port: config_file
+                .ingestion_port
+                .unwrap_or(observer::DEFAULT_INGESTION_PORT),
+            control_port: config_file
+                .control_port
+                .unwrap_or(observer::DEFAULT_CONTROL_PORT),
             bitcoin_node_username: config_file.bitcoin_node_username.clone(),
             bitcoin_node_password: config_file.bitcoin_node_password.clone(),
             bitcoin_node_rpc_host: config_file.bitcoin_node_rpc_host.clone(),

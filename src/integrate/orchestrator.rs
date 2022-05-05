@@ -1,15 +1,15 @@
 use super::DevnetEvent;
 use crate::integrate::{ServiceStatusData, Status};
-use crate::types::{ChainConfig, DevnetConfigFile, StacksNetwork, ProjectManifest};
+use crate::types::{ChainConfig, DevnetConfigFile, ProjectManifest, StacksNetwork};
 use bollard::container::{
     Config, CreateContainerOptions, KillContainerOptions, ListContainersOptions,
     PruneContainersOptions, WaitContainerOptions,
 };
+use bollard::errors::Error as DockerError;
 use bollard::image::CreateImageOptions;
 use bollard::models::{HostConfig, PortBinding};
 use bollard::network::{ConnectNetworkOptions, CreateNetworkOptions, PruneNetworksOptions};
 use bollard::Docker;
-use bollard::errors::Error as DockerError;
 use crossterm::terminal::disable_raw_mode;
 use futures::stream::TryStreamExt;
 use std::collections::HashMap;
@@ -52,7 +52,8 @@ impl DevnetOrchestrator {
         network_config_path.push("settings");
         network_config_path.push("Devnet.toml");
 
-        let mut network_config = ChainConfig::from_path(&network_config_path, &StacksNetwork::Devnet);
+        let mut network_config =
+            ChainConfig::from_path(&network_config_path, &StacksNetwork::Devnet);
         let manifest = ProjectManifest::from_path(&manifest_path);
         let name = manifest.project.name.clone();
         let network_name = format!("{}.devnet", name);
@@ -377,14 +378,14 @@ impl DevnetOrchestrator {
                     let _ = event_tx.send(DevnetEvent::FatalError(message));
                     self.kill().await;
                     return;
-                    }
+                }
             };
             match self.boot_postgres_container().await {
                 Ok(_) => {}
                 Err(message) => {
                     let _ = event_tx.send(DevnetEvent::FatalError(message));
                     self.kill().await;
-                    return;    
+                    return;
                 }
             };
             let _ = event_tx.send(DevnetEvent::ServiceStatus(ServiceStatusData {
@@ -464,7 +465,7 @@ impl DevnetOrchestrator {
                     let _ = event_tx.send(DevnetEvent::FatalError(message));
                     self.kill().await;
                     return;
-                    }
+                }
             };
             let _ = event_tx.send(DevnetEvent::info(format!("Starting stacks-explorer")));
             match self.boot_stacks_explorer_container().await {
@@ -530,7 +531,7 @@ impl DevnetOrchestrator {
                     let _ = event_tx.send(DevnetEvent::FatalError(message));
                     self.kill().await;
                     return;
-                    }
+                }
             };
             let _ = event_tx.send(DevnetEvent::info(format!("Starting electrum")));
             match self.boot_electrum_container().await {
@@ -1649,10 +1650,7 @@ log_filters = "INFO"
         labels.insert("project".to_string(), self.network_name.to_string());
         labels.insert("reset".to_string(), "true".to_string());
 
-        let mut binds = vec![format!(
-            "{}/conf:/src/electrum/",
-            devnet_config.working_dir
-        )];
+        let mut binds = vec![format!("{}/conf:/src/electrum/", devnet_config.working_dir)];
 
         if devnet_config.bind_containers_volumes {
             binds.push(format!(
@@ -1942,9 +1940,7 @@ log_filters = "INFO"
         }
 
         if let Some(ref electrum_container_id) = self.electrum_container_id {
-            let _ = docker
-                .kill_container(electrum_container_id, options)
-                .await;
+            let _ = docker.kill_container(electrum_container_id, options).await;
             println!("Terminating stacks-node...");
             let _ = docker.remove_container(electrum_container_id, None);
         }
@@ -2041,10 +2037,11 @@ log_filters = "INFO"
 
 fn formatted_docker_error(message: &str, error: DockerError) -> String {
     let error = match &error {
-        DockerError::DockerResponseServerError { status_code: _c, message: m } => {
-            m.to_string()
-        }
-        _ => format!("{:?}", error)
+        DockerError::DockerResponseServerError {
+            status_code: _c,
+            message: m,
+        } => m.to_string(),
+        _ => format!("{:?}", error),
     };
     format!("{}: {}", message, error)
 }

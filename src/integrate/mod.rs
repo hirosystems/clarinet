@@ -8,8 +8,8 @@ use chrono::prelude::*;
 use tracing::{self, debug, error, info, warn};
 use tracing_appender;
 
+use crate::types::ChainsCoordinatorCommand;
 use orchestra_types::{BitcoinChainEvent, StacksChainEvent};
-use crate::types::{ChainsCoordinatorCommand};
 
 use crate::utils;
 use chains_coordinator::start_chains_coordinator;
@@ -33,7 +33,7 @@ pub fn run_devnet(
         Err(e) => {
             println!("{}", e);
             Err(e)
-        },
+        }
         Ok(res) => Ok(res),
     }
 }

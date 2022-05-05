@@ -1,9 +1,9 @@
-use serde::{Serialize, Deserialize};
-use std::path::PathBuf;
+use clarity_repl::clarity::util::hash::hex_bytes;
+use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 use std::fs::File;
 use std::io::{BufReader, Read};
-use clarity_repl::clarity::util::hash::hex_bytes;
+use std::path::PathBuf;
 
 use orchestra_types::{BitcoinNetwork, StacksNetwork};
 
@@ -31,12 +31,8 @@ pub enum HookSpecification {
 impl HookSpecification {
     pub fn name(&self) -> &str {
         match &self {
-            Self::Bitcoin(data) => {
-                &data.name
-            },
-            Self::Stacks(data) => {
-                &data.name
-            }
+            Self::Bitcoin(data) => &data.name,
+            Self::Stacks(data) => &data.name,
         }
     }
 }
@@ -55,7 +51,7 @@ pub struct BitcoinHookSpecification {
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub enum HookAction {
-    HttpHook(HttpHook)
+    HttpHook(HttpHook),
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -83,9 +79,11 @@ pub enum ScriptInstruction {
 }
 
 impl ScriptTemplate {
-
     pub fn parse(template: &str) -> Result<ScriptTemplate, String> {
-        let raw_instructions = template.split_ascii_whitespace().map(|c| c.to_string()).collect::<Vec<_>>();
+        let raw_instructions = template
+            .split_ascii_whitespace()
+            .map(|c| c.to_string())
+            .collect::<Vec<_>>();
         let mut instructions = vec![];
         for raw_instruction in raw_instructions.into_iter() {
             if raw_instruction.starts_with("{") {
@@ -97,19 +95,17 @@ impl ScriptTemplate {
                 let size = match size.parse::<u8>() {
                     Ok(res) => res,
                     Err(_) => return Err(format!("malformated placeholder {}: should be {{placeholder-name:number-of-bytes}} (ex: {{id:4}}", raw_instruction))
-                };                
+                };
                 instructions.push(ScriptInstruction::Placeholder(name.to_string(), size));
             } else if let Some(opcode) = opcode_to_hex(&raw_instruction) {
                 instructions.push(ScriptInstruction::Opcode(opcode));
             } else if let Ok(bytes) = hex_bytes(&raw_instruction) {
                 instructions.push(ScriptInstruction::RawBytes(bytes));
             } else {
-                return Err(format!("unable to handle instruction {}", raw_instruction))
+                return Err(format!("unable to handle instruction {}", raw_instruction));
             }
         }
-        Ok(ScriptTemplate {
-            instructions
-        })
+        Ok(ScriptTemplate { instructions })
     }
 }
 
@@ -120,7 +116,7 @@ pub enum BitcoinPredicate {
     P2SH(MatchingRule),
     P2WPKH(MatchingRule),
     P2WSH(MatchingRule),
-    Script(ScriptTemplate)
+    Script(ScriptTemplate),
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -140,7 +136,6 @@ pub struct BitcoinTxOutBasedPredicate {
     pub rule: BitcoinPredicate,
 }
 
-
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct StacksHookSpecification {
     pub id: u32,
@@ -152,7 +147,6 @@ pub struct StacksHookSpecification {
     pub predicate: StacksHookPredicate,
     pub action: HookAction,
 }
-
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub enum StacksHookPredicate {
@@ -167,8 +161,7 @@ pub struct StacksContractCallBasedPredicate {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct StacksEventBasedPredicate {
-}
+pub struct StacksEventBasedPredicate {}
 
 pub fn opcode_to_hex(asm: &str) -> Option<u8> {
     match asm {
@@ -690,4 +683,4 @@ pub fn opcode_to_hex(asm: &str) -> Option<u8> {
         "OP_RETURN_255" => Some(0xff),
         _ => None,
     }
-} 
+}

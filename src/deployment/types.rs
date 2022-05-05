@@ -10,16 +10,12 @@ pub struct ContractPublishAction {
 
 pub struct ContractCallAction {
     name: String,
-    sender: String
+    sender: String,
 }
 
-pub struct StacksHookUpdateAction {
+pub struct StacksHookUpdateAction {}
 
-}
-
-pub struct BitcoinHookUpdateAction {
-
-}
+pub struct BitcoinHookUpdateAction {}
 
 pub enum DeploymentAction {
     ContractPublish(ContractPublishAction),
@@ -33,15 +29,11 @@ pub struct DeploymentPlan {
     pub actions: Vec<DeploymentAction>,
 }
 
-pub struct DeploymentPlanFile {
-
-}
+pub struct DeploymentPlanFile {}
 
 pub struct DeploymentState {
     pub network: StacksNetwork,
     pub actions: Vec<DeploymentAction>,
 }
 
-pub struct DeploymentStateFile {
-
-}
+pub struct DeploymentStateFile {}

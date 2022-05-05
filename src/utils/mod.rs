@@ -1,9 +1,9 @@
 pub mod mnemonic;
 
 use std::collections::{BTreeMap, HashSet};
+use std::future::Future;
 use std::iter::FromIterator;
 use std::process;
-use std::future::Future;
 use tokio;
 
 pub fn create_basic_runtime() -> tokio::runtime::Runtime {

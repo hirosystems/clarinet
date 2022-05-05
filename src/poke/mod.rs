@@ -1,4 +1,4 @@
-use crate::types::{ChainConfig, StacksNetwork, ProjectManifest};
+use crate::types::{ChainConfig, ProjectManifest, StacksNetwork};
 use clarity_repl::{repl, Terminal};
 use std::fs;
 use std::path::PathBuf;

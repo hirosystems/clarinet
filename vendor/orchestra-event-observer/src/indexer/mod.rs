@@ -4,8 +4,8 @@ use orchestra_types::{
     BitcoinChainEvent, BlockIdentifier, ChainUpdatedWithBlockData, ChainUpdatedWithMicroblockData,
     StacksBlockData, StacksChainEvent, StacksMicroblocksTrail,
 };
-use stacks_rpc_client::PoxInfo;
 use rocket::serde::json::Value as JsonValue;
+use stacks_rpc_client::PoxInfo;
 use std::collections::{HashMap, VecDeque};
 
 #[derive(Deserialize, Debug, Clone, Default)]
