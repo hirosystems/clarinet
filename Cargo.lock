@@ -706,7 +706,6 @@ dependencies = [
  "regex",
  "reqwest",
  "ring",
- "rocket",
  "segment",
  "serde",
  "serde_derive",

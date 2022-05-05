@@ -66,9 +66,9 @@ pub async fn do_run_devnet(
     let devnet_config = match devnet.network_config {
         Some(ref network_config) => match &network_config.devnet {
             Some(devnet_config) => Ok(devnet_config.clone()),
-            _ => Err("Unable to retrieve config 1"),
+            _ => Err("Unable to retrieve config"),
         },
-        _ => Err("Unable to retrieve config 2"),
+        _ => Err("Unable to retrieve config"),
     }?;
 
     let file_appender = tracing_appender::rolling::never(&devnet_config.working_dir, "devnet.log");

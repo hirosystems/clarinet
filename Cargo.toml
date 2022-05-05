@@ -57,7 +57,6 @@ tiny-hderive = "0.3.0"
 reqwest = { version = "0.11", default-features = false, features = ["blocking", "json", "rustls-tls"] }
 swc_common = { version = "0.10.20", features = ["sourcemap"], optional = true }
 bollard = "0.11.0"
-rocket = { version = "=0.5.0-rc.1", features = ["json"] }
 crossterm = "0.22.1"
 chrono = "0.4.19"
 base58 = "0.2.0"
