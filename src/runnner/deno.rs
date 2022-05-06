@@ -1,8 +1,10 @@
-use clarity_repl::clarity::coverage::CoverageReporter;
-use clarity_repl::clarity::types;
+use clarity_repl::clarity::coverage::{CoverageReporter, TestCoverageReport};
+use clarity_repl::clarity::types::{self, QualifiedContractIdentifier};
 use clarity_repl::clarity::util::hash;
 use clarity_repl::prettytable::{color, format, Attr, Cell, Row, Table};
+use clarity_repl::repl::ast::ContractAST;
 use clarity_repl::repl::session::CostsReport;
+use clarity_repl::repl::settings::InitialContract;
 use clarity_repl::repl::{CostSynthesis, Session};
 use deno::ast;
 use deno::colors;
@@ -48,8 +50,14 @@ use std::sync::Arc;
 use std::sync::Mutex;
 use swc_common::comments::CommentKind;
 
+pub struct SessionArtifact {
+    pub contracts: Vec<InitialContract>,
+    pub asts: BTreeMap<QualifiedContractIdentifier, ContractAST>,
+    pub coverage_reports: Vec<TestCoverageReport>,
+}
+
 mod sessions {
-    use super::TransactionArgs;
+    use super::{SessionArtifact, TransactionArgs};
     use crate::poke::load_session_settings;
     use crate::types::{ChainConfig, Network, ProjectManifest};
     use clarity_repl::clarity::analysis::ContractAnalysis;
@@ -65,11 +73,14 @@ mod sessions {
     lazy_static! {
         pub static ref SESSIONS: Mutex<HashMap<u32, (String, Session)>> =
             Mutex::new(HashMap::new());
+        pub static ref SESSION_ARTIFACTS: Mutex<HashMap<u32, SessionArtifact>> =
+            Mutex::new(HashMap::new());
         pub static ref SESSION_TEMPLATE: Mutex<Vec<Session>> = Mutex::new(vec![]);
     }
 
     pub fn reset() {
         SESSION_TEMPLATE.lock().unwrap().clear();
+        SESSION_ARTIFACTS.lock().unwrap().clear();
         SESSIONS.lock().unwrap().clear();
     }
 
@@ -78,8 +89,13 @@ mod sessions {
         name: String,
         includes_pre_deployment_steps: bool,
     ) -> Result<(u32, Vec<Account>, Vec<(ContractAnalysis, String, String)>), AnyError> {
-        let mut sessions = SESSIONS.lock().unwrap();
-        let session_id = sessions.len() as u32;
+        let session_id =
+            { SESSIONS.lock().unwrap().len() + SESSION_ARTIFACTS.lock().unwrap().len() } as u32;
+
+        if session_id > 0 {
+            clean_session(session_id - 1);
+        }
+
         let session_templated = {
             let res = SESSION_TEMPLATE.lock().unwrap();
             !res.is_empty()
@@ -114,6 +130,7 @@ mod sessions {
         }
 
         let accounts = session.settings.initial_accounts.clone();
+        let mut sessions = SESSIONS.lock().unwrap();
         sessions.insert(session_id, (name, session));
         Ok((session_id, accounts, contracts))
     }
@@ -135,13 +152,47 @@ mod sessions {
         }
     }
 
+    pub fn clean_session(session_id: u32) -> Result<(), AnyError> {
+        let mut sessions = SESSIONS.lock().unwrap();
+        match sessions.remove(&session_id) {
+            Some((_, mut session)) => {
+                let mut contracts = vec![];
+                contracts.append(&mut session.settings.initial_contracts);
+                use std::collections::BTreeMap;
+
+                let mut asts = BTreeMap::new();
+                asts.append(&mut session.asts);
+
+                let mut coverage_reports = vec![];
+                coverage_reports.append(&mut session.coverage_reports);
+
+                let mut artifacts = SESSION_ARTIFACTS.lock().unwrap();
+                artifacts.insert(
+                    session_id,
+                    SessionArtifact {
+                        contracts,
+                        asts,
+                        coverage_reports,
+                    },
+                );
+                Ok(())
+            }
+            None => Ok(()),
+        }
+    }
+
     pub fn handle_setup_chain_legacy(
         manifest_path: &PathBuf,
         name: String,
         transactions: Vec<TransactionArgs>,
     ) -> Result<(u32, Vec<Account>, Vec<(ContractAnalysis, String, String)>), AnyError> {
-        let mut sessions = SESSIONS.lock().unwrap();
-        let session_id = sessions.len() as u32;
+        let session_id =
+            { SESSIONS.lock().unwrap().len() + SESSION_ARTIFACTS.lock().unwrap().len() } as u32;
+
+        if session_id > 0 {
+            clean_session(session_id - 1);
+        }
+
         let session_templated = {
             let res = SESSION_TEMPLATE.lock().unwrap();
             !res.is_empty()
@@ -241,6 +292,7 @@ mod sessions {
 
         session.advance_chain_tip(1);
         let accounts = session.settings.initial_accounts.clone();
+        let mut sessions = SESSIONS.lock().unwrap();
         sessions.insert(session_id, (name, session));
         Ok((session_id, accounts, contracts))
     }
@@ -293,7 +345,7 @@ pub async fn do_run_scripts(
 
     let allow_none = true;
     let no_run = false;
-    let concurrent_jobs = 2;
+    let concurrent_jobs = 1;
     let quiet = false;
     let filter: Option<String> = None;
     let fail_fast = true;
@@ -513,6 +565,18 @@ pub async fn do_run_scripts(
             }
             coverage_reporter.add_reports(&session.coverage_reports);
             coverage_reporter.add_asts(&session.asts);
+        }
+        let session_artifacts = sessions::SESSION_ARTIFACTS.lock().unwrap();
+        for (session_id, artifact) in session_artifacts.iter() {
+            for contract in artifact.contracts.iter() {
+                if let Some(ref name) = contract.name {
+                    if contract.path != "" {
+                        coverage_reporter.register_contract(name.clone(), contract.path.clone());
+                    }
+                }
+            }
+            coverage_reporter.add_reports(&artifact.coverage_reports);
+            coverage_reporter.add_asts(&artifact.asts);
         }
 
         coverage_reporter.write_lcov_file("coverage.lcov");
@@ -981,13 +1045,19 @@ pub async fn run_scripts(
 
     let (sender, receiver) = channel::<TestEvent>();
 
+    if let Some(template) = session {
+        sessions::SESSION_TEMPLATE
+            .lock()
+            .unwrap()
+            .push(template.clone());
+    }
+
     let join_handles = test_modules.iter().map(move |main_module| {
         let program_state = program_state.clone();
         let main_module = main_module.clone();
         let test_module = test_module.clone();
         let permissions = permissions.clone();
         let sender = sender.clone();
-        let session = session.clone();
 
         let manifest = manifest_path.clone();
         tokio::task::spawn_blocking(move || {
@@ -1000,7 +1070,6 @@ pub async fn run_scripts(
                     sender,
                     manifest,
                     allow_wallets,
-                    session,
                 );
 
                 tokio_util::run_basic(future)
@@ -1103,16 +1172,8 @@ pub async fn run_script(
     channel: Sender<TestEvent>,
     manifest_path: PathBuf,
     allow_wallets: bool,
-    session: Option<Session>,
 ) -> Result<(), AnyError> {
     let mut worker = create_main_worker(&program_state, main_module.clone(), permissions, true);
-
-    if let Some(template) = session {
-        sessions::SESSION_TEMPLATE
-            .lock()
-            .unwrap()
-            .push(template.clone());
-    }
 
     {
         let js_runtime = &mut worker.js_runtime;
@@ -1138,19 +1199,6 @@ pub async fn run_script(
             .put::<Sender<TestEvent>>(channel.clone());
     }
 
-    let mut maybe_coverage_collector = if let Some(ref coverage_dir) = program_state.coverage_dir {
-        let session = worker.create_inspector_session().await;
-        let coverage_dir = PathBuf::from(coverage_dir);
-        let mut coverage_collector = CoverageCollector::new(coverage_dir, session);
-        worker
-            .with_event_loop(coverage_collector.start_collecting().boxed_local())
-            .await?;
-
-        Some(coverage_collector)
-    } else {
-        None
-    };
-
     let execute_result = worker.execute_module(&main_module).await;
     if let Err(e) = execute_result {
         println!("{}", e);
@@ -1169,28 +1217,10 @@ pub async fn run_script(
         return Err(e);
     }
 
-    let execute_result = worker
-        .run_event_loop(maybe_coverage_collector.is_none())
-        .await;
-    if let Err(e) = execute_result {
-        println!("{}", e);
-        return Err(e);
-    }
-
     let execute_result = worker.execute("window.dispatchEvent(new Event('unload'))");
     if let Err(e) = execute_result {
         println!("{}", e);
         return Err(e);
-    }
-
-    if let Some(coverage_collector) = maybe_coverage_collector.as_mut() {
-        let execute_result = worker
-            .with_event_loop(coverage_collector.stop_collecting().boxed_local())
-            .await;
-        if let Err(e) = execute_result {
-            println!("{}", e);
-            return Err(e);
-        }
     }
 
     Ok(())
