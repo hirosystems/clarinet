@@ -180,6 +180,9 @@ struct CheckHooks {
     /// Path to Clarinet.toml
     #[clap(long = "manifest-path")]
     pub manifest_path: Option<String>,
+    /// Path to Clarinet.toml
+    #[clap(long = "output-json")]
+    pub output_json: bool,    
 }
 
 #[derive(Parser, PartialEq, Clone, Debug)]
@@ -374,7 +377,7 @@ pub fn main() {
                 let manifest_path = get_manifest_path_or_exit(cmd.manifest_path);
                 // Ensure that all the hooks can correctly be deserialized.
                 println!("Checking hooks");
-                check_hooks(&manifest_path);
+                let _ = check_hooks(&manifest_path, cmd.output_json);
             }
             Hooks::DeployHooks(cmd) => {
                 let manifest_path = get_manifest_path_or_exit(cmd.manifest_path);

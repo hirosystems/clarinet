@@ -23,6 +23,7 @@ impl HookFormation {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
 pub enum HookSpecification {
     Bitcoin(BitcoinHookSpecification),
     Stacks(StacksHookSpecification),
@@ -50,6 +51,7 @@ pub struct BitcoinHookSpecification {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
 pub enum HookAction {
     HttpHook(HttpHook),
 }
@@ -61,6 +63,7 @@ pub struct HttpHook {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
 pub enum BitcoinHookPredicate {
     TxIn(BitcoinPredicate),
     TxOut(BitcoinPredicate),
@@ -72,6 +75,7 @@ pub struct ScriptTemplate {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
 pub enum ScriptInstruction {
     Opcode(u8),
     RawBytes(Vec<u8>),
@@ -110,16 +114,18 @@ impl ScriptTemplate {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
 pub enum BitcoinPredicate {
     Hex(MatchingRule),
-    P2PKH(MatchingRule),
-    P2SH(MatchingRule),
-    P2WPKH(MatchingRule),
-    P2WSH(MatchingRule),
+    P2pkh(MatchingRule),
+    P2sh(MatchingRule),
+    P2wpkh(MatchingRule),
+    P2wsh(MatchingRule),
     Script(ScriptTemplate),
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
 pub enum MatchingRule {
     Equals(String),
     StartsWith(String),
@@ -149,6 +155,7 @@ pub struct StacksHookSpecification {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
 pub enum StacksHookPredicate {
     ContractCall(StacksContractCallBasedPredicate),
     Event(StacksEventBasedPredicate),

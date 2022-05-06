@@ -1,9 +1,9 @@
 use crate::indexer::IndexerConfig;
+use orchestra_types::{BitcoinBlockData, BitcoinBlockMetadata, BlockIdentifier, TransactionIdentifier, BitcoinTransactionData, BitcoinTransactionMetadata};
 use bitcoincore_rpc::bitcoin::hashes::Hash;
 use bitcoincore_rpc::bitcoin::BlockHash;
 use bitcoincore_rpc::{Auth, Client, RpcApi};
 use clarity_repl::clarity::util::hash::hex_bytes;
-use orchestra_types::{BitcoinBlockData, BitcoinBlockMetadata, BlockIdentifier};
 use rocket::serde::json::Value as JsonValue;
 
 #[allow(dead_code)]
@@ -19,7 +19,7 @@ pub fn standardize_bitcoin_block(
     indexer_config: &IndexerConfig,
     marshalled_block: JsonValue,
 ) -> BitcoinBlockData {
-    let transactions = vec![];
+    let mut transactions = vec![];
 
     let auth = Auth::UserPass(
         indexer_config.bitcoin_node_rpc_username.clone(),
@@ -38,11 +38,18 @@ pub fn standardize_bitcoin_block(
     };
     let block = rpc.get_block(&block_hash).unwrap();
 
-    for _txdata in block.txdata.iter() {
-        // TODO(lgalabru): retrieve stacks transactions
-        // let _ = tx.send(DevnetEvent::debug(format!(
-        //     "Tx.out: {:?}", txdata.output
-        // )));
+    for mut tx in block.txdata.into_iter() {
+        let tx = BitcoinTransactionData {
+            transaction_identifier: TransactionIdentifier {
+                hash: tx.txid().to_string()
+            },
+            operations: vec![],
+            metadata: BitcoinTransactionMetadata {
+                inputs: tx.input.drain(..).collect::<Vec<_>>(),
+                outputs: tx.output.drain(..).collect::<Vec<_>>(),
+            },
+        };
+        transactions.push(tx);
     }
 
     BitcoinBlockData {

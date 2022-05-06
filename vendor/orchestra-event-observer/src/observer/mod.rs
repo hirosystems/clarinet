@@ -138,6 +138,9 @@ pub enum ObserverEvent {
     BitcoinChainEvent(BitcoinChainEvent),
     StacksChainEvent(StacksChainEvent),
     NotifyBitcoinTransactionProxied,
+    HookRegistered(HookSpecification),
+    HookUnregistered(HookSpecification),
+    HooksTriggered(usize),
     Terminate,
 }
 
@@ -209,7 +212,7 @@ pub async fn start_event_observer(
             .mount("/", routes)
             .launch();
 
-        utils::nestable_block_on(future);
+        let _ = utils::nestable_block_on(future);
     });
 
     let control_config = Config {
@@ -232,11 +235,10 @@ pub async fn start_event_observer(
             .mount("/", routes)
             .launch();
 
-        utils::nestable_block_on(future);
+        let _ = utils::nestable_block_on(future);
     });
 
     // This loop is used for handling background jobs, emitted by HTTP calls.
-    let stop_miner = Arc::new(AtomicBool::new(false));
     let mut event_handlers = config.event_handlers.clone();
     let mut hook_formation = HookFormation::new();
 
@@ -281,7 +283,7 @@ pub async fn start_event_observer(
                     for (_, transaction, block_identifier) in hooks_to_trigger.iter() {
                         if !proofs.contains_key(&transaction.transaction_identifier.hash) {
                             let rpc = Client::new(
-                                &format!("http://localhost:{}", config.bitcoin_node_rpc_port),
+                                &format!("{}:{}", config.bitcoin_node_rpc_host, config.bitcoin_node_rpc_port),
                                 Auth::UserPass(
                                     config.bitcoin_node_username.to_string(),
                                     config.bitcoin_node_password.to_string(),
@@ -326,6 +328,11 @@ pub async fn start_event_observer(
                         &chain_event,
                         &hook_formation.stacks_hooks,
                     );
+                    if hooks_to_trigger.len() > 0 {
+                        if let Some(ref tx) = observer_events_tx {
+                            let _ = tx.send(ObserverEvent::HooksTriggered(hooks_to_trigger.len())); 
+                        }
+                    }
                     for (hook, transaction, block_identifier) in hooks_to_trigger.into_iter() {
                         handle_stacks_hook_action(hook, transaction).await;
                     }
@@ -346,9 +353,14 @@ pub async fn start_event_observer(
                 event_handlers.push(EventHandler::GrpcStream(stream));
             }
             ObserverCommand::UnsubscribeStreamer(stream) => {}
-            ObserverCommand::RegisterHook(hook) => match hook {
-                HookSpecification::Stacks(hook) => hook_formation.stacks_hooks.push(hook),
-                HookSpecification::Bitcoin(hook) => hook_formation.bitcoin_hooks.push(hook),
+            ObserverCommand::RegisterHook(hook) => {
+                match hook {
+                    HookSpecification::Stacks(ref hook) => hook_formation.stacks_hooks.push(hook.clone()),
+                    HookSpecification::Bitcoin(ref hook) => hook_formation.bitcoin_hooks.push(hook.clone()),
+                };
+                if let Some(ref tx) = observer_events_tx {
+                    let _ = tx.send(ObserverEvent::HookRegistered(hook));
+                }
             },
             ObserverCommand::DeregisterHook(hook_id) => {}
         }

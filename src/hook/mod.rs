@@ -43,7 +43,7 @@ pub fn load_hooks(
     })
 }
 
-pub fn check_hooks(manifest_path: &PathBuf) -> Result<(), String> {
+pub fn check_hooks(manifest_path: &PathBuf, output_json: bool) -> Result<(), String> {
     let hook_files = get_hooks_files(manifest_path)?;
     for (path, relative_path) in hook_files.into_iter() {
         let _hook = match HookSpecificationFile::parse(&path) {
@@ -54,6 +54,10 @@ pub fn check_hooks(manifest_path: &PathBuf) -> Result<(), String> {
             }
         };
         println!("{} {} succesfully checked", green!("✔"), relative_path);
+        if output_json {
+            let body = serde_json::to_string_pretty(&_hook).unwrap();
+            println!("{}", body);    
+        }
     }
     Ok(())
 }

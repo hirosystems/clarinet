@@ -177,22 +177,22 @@ impl HookPredicateFile {
 
         if let Some(rule) = specs.get("p2pkh") {
             let rule = self.extract_matching_rule(rule)?;
-            return Ok(BitcoinPredicate::P2PKH(rule));
+            return Ok(BitcoinPredicate::P2pkh(rule));
         };
 
         if let Some(rule) = specs.get("p2sh") {
             let rule = self.extract_matching_rule(rule)?;
-            return Ok(BitcoinPredicate::P2SH(rule));
+            return Ok(BitcoinPredicate::P2sh(rule));
         };
 
         if let Some(rule) = specs.get("p2wpkh") {
             let rule = self.extract_matching_rule(rule)?;
-            return Ok(BitcoinPredicate::P2WPKH(rule));
+            return Ok(BitcoinPredicate::P2wpkh(rule));
         };
 
         if let Some(rule) = specs.get("p2wsh") {
             let rule = self.extract_matching_rule(rule)?;
-            return Ok(BitcoinPredicate::P2WSH(rule));
+            return Ok(BitcoinPredicate::P2wsh(rule));
         };
 
         if let Some(rule) = specs.get("script") {

@@ -15,6 +15,7 @@ use clarity_repl::clarity::util::address::AddressHashMode;
 use clarity_repl::clarity::util::hash::{hex_bytes, Hash160};
 use clarity_repl::repl::settings::{Account, InitialContract};
 use clarity_repl::repl::Session;
+use orchestra_event_observer::hooks::types::HookFormation;
 use orchestra_event_observer::observer::{
     start_event_observer, EventObserverConfig, ObserverEvent,
 };
@@ -85,7 +86,7 @@ impl DevnetEventObserverConfig {
         };
         info!("Checking hooks...");
         let hooks = match load_hooks(&manifest_path, &StacksNetwork::Devnet) {
-            Ok(hooks) => hooks,
+            Ok(hooks) => HookFormation::new(), // hooks,
             Err(e) => {
                 println!("{}", e);
                 std::process::exit(1);
@@ -149,6 +150,13 @@ pub async fn start_chains_coordinator(
     chains_coordinator_terminator_tx: Sender<bool>,
 ) -> Result<(), Box<dyn Error>> {
     let _ = config.execute_scripts().await;
+
+
+    if let Some(ref hooks) = config.event_observer_config.initial_hook_formation {
+        devnet_event_tx
+            .send(DevnetEvent::info(format!("{} hooks registered", hooks.bitcoin_hooks.len() + hooks.stacks_hooks.len())))
+            .expect("Unable to terminate event observer");
+    }
 
     // Spawn event observer
     let (observer_command_tx, observer_command_rx) = channel();
@@ -287,6 +295,8 @@ pub async fn start_chains_coordinator(
                     }
                 };
 
+                let _ = devnet_event_tx.send(DevnetEvent::StacksChainEvent(chain_event));
+
                 // Partially update the UI. With current approach a full update
                 // would requires either cloning the block, or passing ownership.
                 let _ = devnet_event_tx.send(DevnetEvent::ServiceStatus(ServiceStatusData {
@@ -339,6 +349,19 @@ pub async fn start_chains_coordinator(
                     );
                 }
             }
+            ObserverEvent::HookRegistered(hook) => {
+                let _ = devnet_event_tx.send(DevnetEvent::info(format!(
+                    "New hook \"{}\" registered", hook.name()
+                )));
+            }
+            ObserverEvent::HookUnregistered(hook) => {
+            }
+            ObserverEvent::HooksTriggered(count) => {
+                let _ = devnet_event_tx.send(DevnetEvent::info(format!(
+                    "{} hooks triggered", count
+                )));
+            }
+
             ObserverEvent::Terminate => {}
         }
     }
