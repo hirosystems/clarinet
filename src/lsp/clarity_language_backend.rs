@@ -128,7 +128,15 @@ impl ClarityLanguageBackend {
         }
 
         let dependencies =
-            ASTDependencyDetector::detect_dependencies(&contract_asts, &BTreeMap::new());
+            match ASTDependencyDetector::detect_dependencies(&contract_asts, &BTreeMap::new()) {
+                Ok(dependencies) => dependencies,
+                Err((dependencies, unresolved)) => {
+                    for contract_id in unresolved {
+                        logs.push(format!("unresolved dependency: {}", contract_id));
+                    }
+                    dependencies
+                }
+            };
         let ordered_contracts = match ASTDependencyDetector::order_contracts(&dependencies) {
             Ok(ordered_contracts) => ordered_contracts,
             Err(e) => {
