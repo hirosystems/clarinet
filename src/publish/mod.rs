@@ -4,6 +4,7 @@ use crate::poke::{load_session, load_session_settings};
 use crate::types::{ChainsCoordinatorCommand, Network, ProjectManifest};
 use crate::utils::mnemonic;
 use crate::utils::stacks::StacksRpc;
+use clarity_repl::analysis::ast_dependency_detector::ASTDependencyDetector;
 use clarity_repl::clarity::codec::transaction::{
     StacksTransaction, StacksTransactionSigner, TransactionAnchorMode, TransactionAuth,
     TransactionPayload, TransactionPostConditionMode, TransactionPublicKeyEncoding,
@@ -185,21 +186,21 @@ pub fn publish_contract(
 pub fn publish_all_contracts(
     manifest_path: &PathBuf,
     network: &Network,
-    analysis_enabled: bool,
+    prompt_enabled: bool,
     delay_between_checks: u32,
     devnet_event_tx: Option<&Sender<DevnetEvent>>,
     chains_coordinator_commands_tx: Option<Sender<ChainsCoordinatorCommand>>,
 ) -> Result<(Vec<String>, ProjectManifest), Vec<String>> {
-    let (settings, chain, project_manifest) = if analysis_enabled {
-        let start_repl = false;
-        let (session, chain, project_manifest, output) =
-            match load_session(manifest_path, start_repl, &network) {
-                Ok((session, chain, project_manifest, output)) => {
-                    (session, chain, project_manifest, output)
-                }
-                Err((_, e)) => return Err(vec![e]),
-            };
+    let start_repl = false;
+    let (session, chain, project_manifest, output) =
+        match load_session(manifest_path, start_repl, &network) {
+            Ok((session, chain, project_manifest, output)) => {
+                (session, chain, project_manifest, output)
+            }
+            Err((_, e)) => return Err(vec![e]),
+        };
 
+    if prompt_enabled {
         if let Some(message) = output {
             println!("{}", message);
             println!("{}", yellow!("Would you like to continue [Y/n]:"));
@@ -210,21 +211,39 @@ pub fn publish_all_contracts(
                 std::process::exit(1);
             }
         }
-        (session.settings, chain, project_manifest)
-    } else {
-        let (settings, chain, project_manifest) =
-            match load_session_settings(manifest_path, &network) {
-                Ok((session, chain, project_manifest)) => (session, chain, project_manifest),
-                Err(e) => return Err(vec![e]),
-            };
-        (settings, chain, project_manifest)
-    };
+    }
 
     let (tx, rx) = channel();
     let (per_contract_event_tx, per_contract_event_rx) = channel();
 
-    let contracts_to_deploy = settings.initial_contracts.len();
-    let node_url = settings.node.clone();
+    let mut contract_asts = HashMap::new();
+    let mut contracts = HashMap::new();
+    for initial_contract in session.settings.initial_contracts.iter() {
+        let contract_id = initial_contract.get_contract_identifier(false).unwrap();
+        contracts.insert(contract_id.clone(), initial_contract);
+        let (ast, _, _) =
+            session
+                .interpreter
+                .build_ast(contract_id.clone(), initial_contract.code.clone(), 2);
+        contract_asts.insert(contract_id.clone(), ast);
+    }
+
+    let result = ASTDependencyDetector::detect_dependencies(&contract_asts, &BTreeMap::new());
+    let dependencies = match result {
+        Ok(deps) => deps,
+        Err(_) => {
+            println!("Deployments in presence of requirements is not supported yet.");
+            std::process::exit(1);
+        }
+    };
+
+    let ordered_contracts_ids = match ASTDependencyDetector::order_contracts(&dependencies) {
+        Ok(ordered_contracts) => ordered_contracts,
+        Err(e) => return Err(vec![format!("unable order contracts {}", e)]),
+    };
+
+    let contracts_to_deploy = ordered_contracts_ids.len();
+    let node_url = session.settings.node.clone();
 
     // Approach's description: after getting all the contracts indexed by the manifest, we build a
     // a sorted set that we will be splitting in batches of 25 contracts, which is the number of
@@ -333,7 +352,7 @@ pub fn publish_all_contracts(
     let mut deployers_nonces = HashMap::new();
     let mut deployers_lookup: HashMap<String, Account> = HashMap::new();
 
-    for account in settings.initial_accounts.iter() {
+    for account in session.settings.initial_accounts.iter() {
         deployers_lookup.insert(account.name.to_string(), account.clone());
         if account.name == "deployer" {
             deployers_lookup.insert("*".into(), account.clone());
@@ -344,13 +363,14 @@ pub fn publish_all_contracts(
         }
     }
 
-    let node_url = settings.node.clone();
+    let node_url = session.settings.node.clone();
     let stacks_rpc = StacksRpc::new(&node_url);
 
-    for batch in settings.initial_contracts.chunks(25) {
+    for batch in ordered_contracts_ids.chunks(25) {
         let mut encoded_contracts = vec![];
 
-        for contract in batch.iter() {
+        for contract_id in batch.iter() {
+            let contract = contracts.get(contract_id).unwrap();
             let contract_name = contract.name.clone().unwrap();
 
             let deployer = match deployers_lookup.get(&contract_name) {
@@ -392,8 +412,9 @@ pub fn publish_all_contracts(
     }
 
     if devnet_event_tx.is_none() {
-        let mut contracts = Vec::new();
-        for contract in settings.initial_contracts.iter() {
+        let mut ordered_contracts = Vec::new();
+        for contract_id in ordered_contracts_ids.iter() {
+            let contract = contracts.get(contract_id).unwrap();
             let deployer = {
                 let deployer = contract.deployer.clone().unwrap_or("deployer".to_string());
                 match deployers_lookup.get(&deployer) {
@@ -401,7 +422,7 @@ pub fn publish_all_contracts(
                     None => deployers_lookup.get("*").unwrap(),
                 }
             };
-            contracts.push((deployer.address.to_string(), contract.name.clone().unwrap()));
+            ordered_contracts.push((deployer.address.to_string(), contract.name.clone().unwrap()));
         }
 
         ctrlc::set_handler(move || {
@@ -409,7 +430,7 @@ pub fn publish_all_contracts(
         })
         .expect("Error setting Ctrl-C handler");
 
-        let _ = ui::start_ui(&node_url, per_contract_event_rx, contracts);
+        let _ = ui::start_ui(&node_url, per_contract_event_rx, ordered_contracts);
     } else {
         let _ = deploying_thread_handle.join();
     }
