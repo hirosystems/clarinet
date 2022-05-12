@@ -4566,7 +4566,7 @@ dependencies = [
 name = "stacks-rpc-client"
 version = "0.1.0"
 dependencies = [
- "clarity-repl 0.26.0",
+ "clarity-repl 0.26.0 (git+https://github.com/hirosystems/clarity-repl?branch=feat/tweaks)",
  "reqwest",
  "serde",
  "serde_derive",

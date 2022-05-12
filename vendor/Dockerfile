@@ -2,7 +2,7 @@ FROM rust:stretch as build
 
 WORKDIR /src
 
-RUN apt update && apt install -y ca-certificates pkg-config libssl-dev
+RUN apt update && apt install -y ca-certificates pkg-config libssl-dev protobuf-compiler
 
 RUN rustup update 1.59.0 && rustup default 1.59.0
 
@@ -15,6 +15,10 @@ COPY ./stacks-rpc-client /src/stacks-rpc-client
 WORKDIR /src/orchestra-event-observer
 
 RUN mkdir /out
+
+ENV PROTOC=/usr/bin/protoc
+
+ENV PROTOC_INCLUDE=/usr/include
 
 RUN cargo build --release
 
