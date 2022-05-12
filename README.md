@@ -475,7 +475,7 @@ As illustrated in the example above, permissions (wallet / disk read / disk writ
 
 #### VS Code Debugger
 
-Clarinet supports the [Debug Adapter Protocol](https://microsoft.github.io/debug-adapter-protocol/) (DAP) which enables debugging your smart contracts inside of VS Code.
+Clarinet supports the [Debug Adapter Protocol](https://microsoft.github.io/debug-adapter-protocol/) (DAP) which enables debugging your smart contracts inside of VS Code, or any code editor supporting the DAP protocol.
 
 To setup a debug session, you'll first need to create a launch.json file to tell VS Code what you want to debug. The easiest way to do this is to let Code generate the template for you by opening the "Run and Debug" view and clicking "create a launch.json file".
 
