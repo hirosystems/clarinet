@@ -59,6 +59,9 @@ enum Command {
     /// Start an LSP server (for integration with editors)
     #[clap(name = "lsp", bin_name = "lsp")]
     LSP,
+    /// Start a DAP server (for debugging from IDE)
+    #[clap(name = "dap", bin_name = "dap")]
+    DAP,
     /// Generate shell completions scripts
     #[clap(name = "completions", bin_name = "completions")]
     Completions(Completions),
@@ -664,6 +667,13 @@ pub fn main() {
             }
         }
         Command::LSP => run_lsp(),
+        Command::DAP => match super::dap::run_dap() {
+            Ok(_) => (),
+            Err(e) => {
+                println!("{}: {}", red!("error"), e);
+                process::exit(1);
+            }
+        },
         Command::Completions(cmd) => {
             let mut app = Opts::command();
             let file_name = cmd.shell.file_name("clarinet");
