@@ -6,11 +6,17 @@ RUN apt update && apt install -y ca-certificates pkg-config libssl-dev
 
 RUN rustup update 1.59.0 && rustup default 1.59.0
 
-COPY . .
+COPY ./orchestra-types /src/orchestra-types
+
+COPY ./orchestra-event-observer /src/orchestra-event-observer
+
+COPY ./stacks-rpc-client /src/stacks-rpc-client
+
+WORKDIR /src/orchestra-event-observer
 
 RUN mkdir /out
 
-RUN cargo build --release --locked
+RUN cargo build --release
 
 RUN cp target/release/orchestra-event-observer /out
 
