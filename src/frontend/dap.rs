@@ -32,12 +32,12 @@ pub fn run_dap() -> Result<(), String> {
 
             for contract in &session.settings.initial_contracts {
                 dap.path_to_contract_id.insert(
-                    contract.path.clone(),
+                    PathBuf::from(&contract.path),
                     contract.get_contract_identifier(false).unwrap(),
                 );
                 dap.contract_id_to_path.insert(
                     contract.get_contract_identifier(false).unwrap(),
-                    contract.path.clone(),
+                    PathBuf::from(&contract.path),
                 );
             }
 
