@@ -21,7 +21,7 @@ pub extern crate clarity_repl;
 #[macro_use]
 pub mod macros;
 
-mod deployment;
+pub mod deployment;
 pub mod indexer;
 pub mod integrate;
 #[cfg(feature = "cli")]

@@ -5,11 +5,12 @@ extern crate error_chain;
 mod serde;
 
 use clarinet_lib::bip39::{Language, Mnemonic};
+use clarinet_lib::deployment;
 use clarinet_lib::integrate::{self, DevnetEvent, DevnetOrchestrator};
 use clarinet_lib::types::{
     compute_addresses, AccountConfig, BitcoinBlockData, BitcoinChainEvent,
-    ChainUpdatedWithBlockData, DevnetConfigFile, PoxStackingOrder, StacksChainEvent,
-    DEFAULT_DERIVATION_PATH,
+    ChainUpdatedWithBlockData, DevnetConfigFile, PoxStackingOrder, ProjectManifest,
+    StacksChainEvent, DEFAULT_DERIVATION_PATH,
 };
 use core::panic;
 use neon::prelude::*;
@@ -55,7 +56,11 @@ impl StacksDevnet {
         let channel = cx.channel();
 
         let manifest_path = get_manifest_path_or_exit(Some(manifest_path.into()));
-        let devnet = DevnetOrchestrator::new(manifest_path, Some(devnet_overrides));
+        let manifest =
+            ProjectManifest::from_path(&manifest_path).expect("Syntax error in Clarinet.toml.");
+        let (deployment, _) = deployment::read_or_default_to_generated_deployment(&manifest, &None)
+            .expect("Unable to generate deployment");
+        let devnet = DevnetOrchestrator::new(manifest, Some(devnet_overrides));
 
         let node_url = devnet.get_stacks_node_url();
 
@@ -63,7 +68,7 @@ impl StacksDevnet {
             if let Ok(DevnetCommand::Start(callback)) = rx.recv() {
                 // Start devnet
                 let (devnet_events_rx, terminator_tx) =
-                    match integrate::run_devnet(devnet, Some(log_tx), false) {
+                    match integrate::run_devnet(devnet, deployment, Some(log_tx), false) {
                         Ok((Some(devnet_events_rx), Some(terminator_tx), _)) => {
                             (devnet_events_rx, terminator_tx)
                         }
@@ -158,6 +163,11 @@ impl StacksDevnet {
 
         for account in accounts.iter() {
             let account_settings = account.downcast_or_throw::<JsObject, _>(&mut cx)?;
+            let label = account_settings
+                .get(&mut cx, "label")?
+                .downcast_or_throw::<JsString, _>(&mut cx)?
+                .value(&mut cx);
+
             let id = account_settings
                 .get(&mut cx, "id")?
                 .downcast_or_throw::<JsString, _>(&mut cx)?
@@ -199,6 +209,7 @@ impl StacksDevnet {
             let (address, _, _) = compute_addresses(&mnemonic, &derivation, is_mainnet);
 
             let account = AccountConfig {
+                label,
                 mnemonic,
                 address,
                 derivation,
@@ -591,7 +602,6 @@ fn main(mut cx: ModuleContext) -> NeonResult<()> {
 }
 
 fn get_manifest_path_or_exit(path: Option<String>) -> PathBuf {
-    println!("");
     if let Some(path) = path {
         let manifest_path = PathBuf::from(path);
         if !manifest_path.exists() {

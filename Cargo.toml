@@ -31,7 +31,7 @@ deno_core = { path = "./vendor/deno/core", optional = true }
 deno_runtime = { path = "./vendor/deno/runtime", optional = true }
 deno = { path = "./vendor/deno/cli", optional = true }
 # clarity_repl = { package = "clarity-repl", path = "../../clarity-repl", features = ["cli"] }
-clarity_repl = { package = "clarity-repl", version = "=0.27.0" }
+clarity_repl = { package = "clarity-repl", version = "=0.28.0" }
 bip39 = { version = "1.0.1", default-features = false }
 aes = "0.7.5"
 base64 = "0.13.0"
