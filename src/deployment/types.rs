@@ -54,7 +54,7 @@ pub struct ContractCallSpecificationFile {
 
 #[derive(Debug, PartialEq, Serialize, Deserialize)]
 pub struct ContractPublishSpecificationFile {
-    pub contract: String,
+    pub contract_name: String,
     #[serde(rename = "expected-sender")]
     pub expected_sender: String,
     pub path: String,
@@ -72,7 +72,7 @@ pub struct EmulatedContractCallSpecificationFile {
 
 #[derive(Debug, PartialEq, Serialize, Deserialize)]
 pub struct EmulatedContractPublishSpecificationFile {
-    pub contract: String,
+    pub contract_name: String,
     #[serde(rename = "emulated-sender")]
     pub emulated_sender: String,
     pub path: String,
@@ -152,7 +152,7 @@ impl ContractCallSpecification {
 
 #[derive(Debug, PartialEq, Serialize, Deserialize, Clone)]
 pub struct ContractPublishSpecification {
-    pub contract: ContractName,
+    pub contract_name: ContractName,
     pub expected_sender: StandardPrincipalData,
     pub relative_path: String,
     pub source: String,
@@ -164,12 +164,12 @@ impl ContractPublishSpecification {
         specs: &ContractPublishSpecificationFile,
         base_path: &PathBuf,
     ) -> Result<ContractPublishSpecification, String> {
-        let contract = match ContractName::try_from(specs.contract.to_string()) {
+        let contract_name = match ContractName::try_from(specs.contract_name.to_string()) {
             Ok(res) => res,
             Err(_) => {
                 return Err(format!(
                     "unable to use {} as a valid contract name",
-                    specs.contract
+                    specs.contract_name
                 ))
             }
         };
@@ -204,7 +204,7 @@ impl ContractPublishSpecification {
         };
 
         Ok(ContractPublishSpecification {
-            contract,
+            contract_name,
             expected_sender,
             source,
             relative_path: specs.path.clone(),
@@ -267,7 +267,7 @@ impl EmulatedContractCallSpecification {
 
 #[derive(Debug, PartialEq, Serialize, Deserialize, Clone)]
 pub struct EmulatedContractPublishSpecification {
-    pub contract: ContractName,
+    pub contract_name: ContractName,
     pub emulated_sender: StandardPrincipalData,
     pub source: String,
     pub relative_path: String,
@@ -278,12 +278,12 @@ impl EmulatedContractPublishSpecification {
         specs: &EmulatedContractPublishSpecificationFile,
         base_path: &PathBuf,
     ) -> Result<EmulatedContractPublishSpecification, String> {
-        let contract = match ContractName::try_from(specs.contract.to_string()) {
+        let contract_name = match ContractName::try_from(specs.contract_name.to_string()) {
             Ok(res) => res,
             Err(_) => {
                 return Err(format!(
                     "unable to use {} as a valid contract name",
-                    specs.contract
+                    specs.contract_name
                 ))
             }
         };
@@ -318,7 +318,7 @@ impl EmulatedContractPublishSpecification {
         };
 
         Ok(EmulatedContractPublishSpecification {
-            contract,
+            contract_name,
             emulated_sender,
             source,
             relative_path: specs.path.clone(),
@@ -435,7 +435,7 @@ impl DeploymentSpecification {
                                 }
                                 TransactionSpecificationFile::EmulatedContractPublish(spec) => {
                                     let spec = EmulatedContractPublishSpecification::from_specifications(spec, base_path)?;
-                                    let contract_id = QualifiedContractIdentifier::new(spec.emulated_sender.clone(), spec.contract.clone());
+                                    let contract_id = QualifiedContractIdentifier::new(spec.emulated_sender.clone(), spec.contract_name.clone());
                                     contracts.insert(contract_id, (spec.source.clone(), spec.relative_path.clone()));
                                     TransactionSpecification::EmulatedContractPublish(spec)
                                 }
@@ -469,7 +469,7 @@ impl DeploymentSpecification {
                                 }
                                 TransactionSpecificationFile::ContractPublish(spec) => {
                                     let spec = ContractPublishSpecification::from_specifications(spec, base_path)?;
-                                    let contract_id = QualifiedContractIdentifier::new(spec.expected_sender.clone(), spec.contract.clone());
+                                    let contract_id = QualifiedContractIdentifier::new(spec.expected_sender.clone(), spec.contract_name.clone());
                                     contracts.insert(contract_id, (spec.source.clone(), spec.relative_path.clone()));
                                     TransactionSpecification::ContractPublish(spec)
                                 }
@@ -669,7 +669,7 @@ impl TransactionPlanSpecification {
                     TransactionSpecification::ContractPublish(tx) => {
                         TransactionSpecificationFile::ContractPublish(
                             ContractPublishSpecificationFile {
-                                contract: tx.contract.to_string(),
+                                contract_name: tx.contract_name.to_string(),
                                 expected_sender: tx.expected_sender.to_address(),
                                 path: tx.relative_path.clone(),
                                 cost: tx.cost,
@@ -689,7 +689,7 @@ impl TransactionPlanSpecification {
                     TransactionSpecification::EmulatedContractPublish(tx) => {
                         TransactionSpecificationFile::EmulatedContractPublish(
                             EmulatedContractPublishSpecificationFile {
-                                contract: tx.contract.to_string(),
+                                contract_name: tx.contract_name.to_string(),
                                 emulated_sender: tx.emulated_sender.to_address(),
                                 path: tx.relative_path.clone(),
                             },

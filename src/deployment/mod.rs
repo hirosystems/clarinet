@@ -215,19 +215,19 @@ pub fn update_session_with_contracts_executions(
 
                     let contract_id = QualifiedContractIdentifier::new(
                         tx.emulated_sender.clone(),
-                        tx.contract.clone(),
+                        tx.contract_name.clone(),
                     );
                     let result = match contracts_asts.as_ref().and_then(|m| m.get(&contract_id)) {
                         Some(contract_ast) => session.interpreter.run_ast(
                             contract_ast.clone(),
-                            tx.contract.to_string(),
+                            tx.source.to_string(),
                             contract_id.clone(),
                             false,
                             None,
                         ),
                         None => session.interpret(
                             tx.source.clone(),
-                            Some(tx.contract.to_string()),
+                            Some(tx.contract_name.to_string()),
                             None,
                             false,
                             None,
@@ -275,7 +275,7 @@ pub fn update_session_with_contracts_analyses(
 
                     let contract_id = QualifiedContractIdentifier::new(
                         tx.emulated_sender.clone(),
-                        tx.contract.clone(),
+                        tx.contract_name.clone(),
                     );
 
                     if let Some(ast) = contracts_asts.get(&contract_id) {
@@ -460,7 +460,7 @@ pub fn apply_on_chain_deployment(
                     let account = accounts_lookup.get(&issuer_address).unwrap();
 
                     let stacks_transaction = match encode_contract_publish(
-                        &tx.contract,
+                        &tx.contract_name,
                         &tx.source,
                         *account,
                         nonce,
@@ -477,14 +477,14 @@ pub fn apply_on_chain_deployment(
                     accounts_cached_nonces.insert(issuer_address.clone(), nonce + 1);
                     batch.push((
                         tx.expected_sender.clone(),
-                        tx.contract.clone(),
+                        tx.contract_name.clone(),
                         stacks_transaction,
                         TransactionStatus::Encoded,
                     ));
 
                     let _ =
                         deployment_event_tx.send(DeploymentEvent::ContractUpdate(ContractUpdate {
-                            contract_id: format!("{}.{}", issuer_address, tx.contract),
+                            contract_id: format!("{}.{}", issuer_address, tx.contract_name),
                             status: ContractStatus::Queued,
                             comment: None,
                         }));
@@ -811,7 +811,7 @@ pub fn generate_default_deployment(
 
                     // Build the struct representing the requirement in the deployment
                     let data = EmulatedContractPublishSpecification {
-                        contract: contract_id.name.clone(),
+                        contract_name: contract_id.name.clone(),
                         emulated_sender: contract_id.issuer.clone(),
                         source: source.clone(),
                         relative_path: path,
@@ -891,7 +891,7 @@ pub fn generate_default_deployment(
     let mut contracts = HashMap::new();
 
     for (name, config) in manifest.contracts.iter() {
-        let contract = match ContractName::try_from(name.to_string()) {
+        let contract_name = match ContractName::try_from(name.to_string()) {
             Ok(res) => res,
             Err(_) => return Err(format!("unable to use {} as a valid contract name", name)),
         };
@@ -936,7 +936,7 @@ pub fn generate_default_deployment(
         };
 
         let contract = EmulatedContractPublishSpecification {
-            contract,
+            contract_name,
             emulated_sender,
             source,
             relative_path: config.path.clone(),
@@ -944,7 +944,7 @@ pub fn generate_default_deployment(
 
         let contract_id = QualifiedContractIdentifier::new(
             contract.emulated_sender.clone(),
-            contract.contract.clone(),
+            contract.contract_name.clone(),
         );
 
         contracts.insert(contract_id, contract);
@@ -1000,12 +1000,12 @@ pub fn generate_default_deployment(
             TransactionSpecification::EmulatedContractPublish(data)
         } else {
             TransactionSpecification::ContractPublish(ContractPublishSpecification {
-                contract: data.contract.clone(),
+                contract_name: data.contract_name.clone(),
                 expected_sender: data.emulated_sender.clone(),
                 relative_path: data.relative_path.clone(),
                 source: data.source.clone(),
                 cost: deployment_fee_rate
-                    .saturating_mul(data.contract.as_bytes().len().try_into().unwrap()),
+                    .saturating_mul(data.source.as_bytes().len().try_into().unwrap()),
             })
         };
 
