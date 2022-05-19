@@ -551,7 +551,7 @@ pub fn main() {
                 let manifest_path_moved = manifest_path.clone();
                 std::thread::spawn(move || {
                     let manifest_path = manifest_path_moved;
-                    apply_on_chain_deployment(&manifest_path, deployment, event_tx, command_rx);
+                    apply_on_chain_deployment(&manifest_path, deployment, event_tx, command_rx, true);
                 });
 
                 let _ = command_tx.send(DeploymentCommand::Start);

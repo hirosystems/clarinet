@@ -411,6 +411,7 @@ pub fn apply_on_chain_deployment(
     deployment: DeploymentSpecification,
     deployment_event_tx: Sender<DeploymentEvent>,
     deployment_command_rx: Receiver<DeploymentCommand>,
+    fetch_initial_nonces: bool,
 ) {
     let chain_config = ChainConfig::from_manifest_path(&manifest_path, &deployment.network);
     let delay_between_checks: u64 = 10;
@@ -425,10 +426,12 @@ pub fn apply_on_chain_deployment(
     let mut accounts_cached_nonces: BTreeMap<String, u64> = BTreeMap::new();
     let mut accounts_lookup: BTreeMap<String, &AccountConfig> = BTreeMap::new();
 
-    if network == StacksNetwork::Devnet {
-        for (_, account) in chain_config.accounts.iter() {
-            accounts_cached_nonces.insert(account.address.clone(), 0);
-        }
+    if !fetch_initial_nonces {
+        if network == StacksNetwork::Devnet {
+            for (_, account) in chain_config.accounts.iter() {
+                accounts_cached_nonces.insert(account.address.clone(), 0);
+            }
+        }    
     }
 
     for (_, account) in chain_config.accounts.iter() {

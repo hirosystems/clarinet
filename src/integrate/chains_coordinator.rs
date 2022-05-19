@@ -591,7 +591,7 @@ pub fn publish_initial_contracts(
     let (command_tx, command_rx) = channel();
 
     std::thread::spawn(move || {
-        apply_on_chain_deployment(&manifest_path, deployment, event_tx, command_rx);
+        apply_on_chain_deployment(&manifest_path, deployment, event_tx, command_rx, false);
     });
 
     std::thread::spawn(move || {
