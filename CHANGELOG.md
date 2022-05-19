@@ -1,3 +1,27 @@
+# [0.30.0](https://github.com/hirosystems/clarinet/compare/v0.29.1...v0.30.0) (2022-05-13)
+
+
+### Bug Fixes
+
+* unordered contracts ([4cc54c7](https://github.com/hirosystems/clarinet/commit/4cc54c772299d4d034a87f13b5c20997b59359a4))
+
+
+### Features
+
+* add telemetry for DAP debugger ([b1511e6](https://github.com/hirosystems/clarinet/commit/b1511e6427abffa14b4dda22b222aa856e575a32))
+* **dap:** implement DAP debugger ([6bcec16](https://github.com/hirosystems/clarinet/commit/6bcec165e6029be4074d1350f783a2a6bf7fb852))
+* **dap:** WIP implementation of DAP interface ([2600cb1](https://github.com/hirosystems/clarinet/commit/2600cb1c2bf54164af6181312e51cf9288600828))
+* initial setup for DAP debugger ([cf352d2](https://github.com/hirosystems/clarinet/commit/cf352d2a0a1c88ba615afb946ba2862ba19a2100))
+* support new interface to dependency checker ([223a158](https://github.com/hirosystems/clarinet/commit/223a158885d21f473e305358483d0fc1c05ddd16))
+* update to use repl with DAP support ([f937bb2](https://github.com/hirosystems/clarinet/commit/f937bb2b52560c55d4df74113d0a4e83cfd69d62))
+
+## [0.29.1](https://github.com/hirosystems/clarinet/compare/v0.29.0...v0.29.1) (2022-05-03)
+
+
+### Bug Fixes
+
+* fixed problem with contract ordering in lsp ([12bccc5](https://github.com/hirosystems/clarinet/commit/12bccc5db45a230f7faa91a4ab784a4161c3a135))
+
 # [0.29.0](https://github.com/hirosystems/clarinet/compare/v0.28.1...v0.29.0) (2022-04-21)
 
 
