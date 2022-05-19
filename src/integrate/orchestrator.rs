@@ -1,6 +1,6 @@
 use super::DevnetEvent;
 use crate::integrate::{ServiceStatusData, Status};
-use crate::types::{ChainConfig, DevnetConfigFile, Network, ProjectManifest};
+use crate::types::{ChainConfig, DevnetConfigFile, ProjectManifest, StacksNetwork};
 use bollard::container::{
     Config, CreateContainerOptions, KillContainerOptions, ListContainersOptions,
     PruneContainersOptions, WaitContainerOptions,
@@ -49,7 +49,8 @@ impl DevnetOrchestrator {
         network_config_path.push("settings");
         network_config_path.push("Devnet.toml");
 
-        let mut network_config = ChainConfig::from_path(&network_config_path, &Network::Devnet);
+        let mut network_config =
+            ChainConfig::from_path(&network_config_path, &StacksNetwork::Devnet);
         let manifest = ProjectManifest::from_path(&manifest_path);
         let name = manifest.project.name.clone();
         let network_name = format!("{}.devnet", name);
@@ -308,7 +309,7 @@ impl DevnetOrchestrator {
             .expect("Unable to create network");
 
         // Start bitcoind
-        let _ = event_tx.send(DevnetEvent::info(format!("Starting bitcoind")));
+        let _ = event_tx.send(DevnetEvent::info(format!("Starting bitcoin-node")));
         let _ = event_tx.send(DevnetEvent::ServiceStatus(ServiceStatusData {
             order: 0,
             status: Status::Yellow,
@@ -1795,7 +1796,7 @@ events_keys = ["*"]
         )
         .unwrap();
 
-        let _ = devnet_event_tx.send(DevnetEvent::info(format!("Configuring Bitcoin",)));
+        let _ = devnet_event_tx.send(DevnetEvent::info(format!("Configuring bitcoin-node",)));
 
         loop {
             match rpc.get_network_info() {
@@ -1803,7 +1804,7 @@ events_keys = ["*"]
                 Err(_e) => {}
             }
             std::thread::sleep(std::time::Duration::from_secs(1));
-            let _ = devnet_event_tx.send(DevnetEvent::info(format!("Waiting for bitcoind",)));
+            let _ = devnet_event_tx.send(DevnetEvent::info(format!("Waiting for bitcoin-node",)));
         }
 
         let miner_address = Address::from_str(&devnet_config.miner_btc_address).unwrap();
