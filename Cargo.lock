@@ -699,6 +699,7 @@ dependencies = [
  "libc",
  "libsecp256k1 0.7.0",
  "mac_address",
+ "num_cpus",
  "pbkdf2",
  "percent-encoding",
  "pin-project",

@@ -71,7 +71,7 @@ pub async fn do_run_scripts(
     }
     let program_state = ProgramState::build(flags.clone()).await?;
     let permissions = Permissions::from_options(&flags.clone().into());
-    let mut project_path = manifest.get_project_root_dir();
+    let project_path = manifest.get_project_root_dir();
     let cwd = Path::new(&project_path);
     let mut include = if include.is_empty() {
         vec!["tests".into()]
@@ -81,7 +81,7 @@ pub async fn do_run_scripts(
 
     let allow_none = true;
     let no_run = false;
-    let concurrent_jobs = 2;
+    let concurrent_jobs = num_cpus::get();
     let quiet = false;
     let filter: Option<String> = None;
     let fail_fast = true;
