@@ -5,7 +5,7 @@ use segment::{
     Client, HttpClient,
 };
 
-use crate::types::Network;
+use crate::types::StacksNetwork;
 
 pub enum DeveloperUsageEvent {
     NewProject(DeveloperUsageDigest),
@@ -13,8 +13,9 @@ pub enum DeveloperUsageEvent {
     CheckExecuted(DeveloperUsageDigest),
     TestSuiteExecuted(DeveloperUsageDigest, bool, u32),
     DevnetExecuted(DeveloperUsageDigest),
-    ContractPublished(DeveloperUsageDigest, Network),
+    ContractPublished(DeveloperUsageDigest, StacksNetwork),
     DebugStarted(DeveloperUsageDigest, u32),
+    DAPDebugStarted(DeveloperUsageDigest),
     UnknownCommand(DeveloperUsageDigest, String),
 }
 
@@ -119,6 +120,15 @@ async fn send_event(event: DeveloperUsageEvent) {
                 "clarinet_version": clarinet_version,
                 "ci_mode": ci_mode,
                 "sessions": num_sessions,
+            }),
+        ),
+        DeveloperUsageEvent::DAPDebugStarted(digest) => (
+            "DAPDebugStarted",
+            json!({
+                "project_id": digest.project_id,
+                "team_id": digest.team_id,
+                "clarinet_version": clarinet_version,
+                "ci_mode": ci_mode,
             }),
         ),
         DeveloperUsageEvent::UnknownCommand(digest, command) => (
