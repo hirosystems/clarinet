@@ -752,11 +752,18 @@ pub fn generate_default_deployment(
     let mut requirements_asts = BTreeMap::new();
     let mut requirements_deps = HashMap::new();
 
-    let mut settings = SessionSettings::default();
     let parser_version = manifest.repl_settings.parser_version;
+
+    let mut settings = SessionSettings::default();
+    settings.include_boot_contracts = manifest.project.boot_contracts.clone();
     settings.repl_settings = manifest.repl_settings.clone();
+
     let session = Session::new(settings.clone());
     let mut boot_contracts_asts = session.get_boot_contracts_asts();
+    let boot_contracts_ids = boot_contracts_asts
+        .iter()
+        .map(|(k, v)| k.clone())
+        .collect::<Vec<QualifiedContractIdentifier>>();
     requirements_asts.append(&mut boot_contracts_asts);
 
     // Only handle requirements in test environments
@@ -974,6 +981,10 @@ pub fn generate_default_deployment(
             return Err(format!("unable to detect dependencies"));
         }
     };
+
+    for contract_id in boot_contracts_ids.into_iter() {
+        dependencies.insert(contract_id.clone(), DependencySet::new());
+    }
 
     dependencies.extend(requirements_deps);
 
