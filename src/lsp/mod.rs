@@ -4,6 +4,7 @@ use crate::deployment::{
     generate_default_deployment, initiate_session_from_deployment,
     update_session_with_contracts_analyses,
 };
+use crate::types::ProjectManifest;
 use clarity_language_backend::ClarityLanguageBackend;
 use clarity_repl::analysis::ast_dependency_detector::DependencySet;
 use clarity_repl::clarity::analysis::ContractAnalysis;
@@ -532,9 +533,11 @@ pub fn build_state(
     // expect contracts to be created, edited, removed.
     // A on-disk deployment could quickly lead to an outdated
     // view of the repo.
-    let (deployment, mut artifacts) = generate_default_deployment(&manifest_path, &None)?;
+    let manifest = ProjectManifest::from_path(manifest_path)?;
 
-    let mut session = initiate_session_from_deployment(&manifest_path);
+    let (deployment, mut artifacts) = generate_default_deployment(&manifest, &None)?;
+
+    let mut session = initiate_session_from_deployment(&manifest);
     let results =
         update_session_with_contracts_analyses(&mut session, &deployment, &artifacts.asts);
     for (contract_id, result) in results.into_iter() {

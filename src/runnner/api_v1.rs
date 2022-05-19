@@ -2,6 +2,7 @@ use super::utils;
 use super::DeploymentCache;
 use crate::deployment::types::DeploymentSpecification;
 use crate::deployment::update_session_with_contracts_executions;
+use crate::types::ProjectManifest;
 use clarity_repl::clarity::analysis::contract_interface_builder::{
     build_contract_interface, ContractInterface,
 };
@@ -34,7 +35,6 @@ pub async fn run_bridge(
     test_module: ModuleSpecifier,
     permissions: Permissions,
     channel: Sender<TestEvent>,
-    manifest_path: PathBuf,
     allow_wallets: bool,
     mut cache: Option<DeploymentCache>,
 ) -> Result<Vec<SessionArtifacts>, AnyError> {
@@ -78,7 +78,6 @@ pub async fn run_bridge(
             deployments.insert(None, cache);
         }
 
-        js_runtime.op_state().borrow_mut().put(manifest_path);
         js_runtime.op_state().borrow_mut().put(allow_wallets);
         js_runtime.op_state().borrow_mut().put(deployments);
         js_runtime.op_state().borrow_mut().put(sessions);

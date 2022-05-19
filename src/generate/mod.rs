@@ -20,13 +20,13 @@ pub fn get_changes_for_new_project(
 }
 
 pub fn get_changes_for_new_contract(
-    manifest_path: PathBuf,
+    manifest_path: &PathBuf,
     contract_name: String,
     source: Option<String>,
     include_test: bool,
     deps: Vec<String>,
 ) -> Vec<Changes> {
-    let mut command = GetChangesForNewContract::new(manifest_path, contract_name, source);
+    let mut command = GetChangesForNewContract::new(manifest_path.clone(), contract_name, source);
     command.run(include_test, deps)
 }
 

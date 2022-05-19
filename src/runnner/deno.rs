@@ -48,6 +48,7 @@ use std::sync::Mutex;
 use swc_common::comments::CommentKind;
 
 use crate::deployment::types::DeploymentSpecification;
+use crate::types::ProjectManifest;
 
 pub async fn do_run_scripts(
     include: Vec<String>,
@@ -56,23 +57,21 @@ pub async fn do_run_scripts(
     watch: bool,
     allow_wallets: bool,
     allow_disk_write: bool,
-    manifest_path: PathBuf,
+    manifest: &ProjectManifest,
     cache: DeploymentCache,
 ) -> Result<u32, AnyError> {
     let mut flags = Flags::default();
     flags.unstable = true;
     flags.reload = true;
     if allow_disk_write {
-        let mut write_path = manifest_path.clone();
-        write_path.pop();
+        let mut write_path = manifest.get_project_root_dir();
         write_path.push("artifacts");
         let _ = std::fs::create_dir_all(&write_path);
         flags.allow_write = Some(vec![write_path])
     }
     let program_state = ProgramState::build(flags.clone()).await?;
     let permissions = Permissions::from_options(&flags.clone().into());
-    let mut project_path = manifest_path.clone();
-    project_path.pop();
+    let mut project_path = manifest.get_project_root_dir();
     let cwd = Path::new(&project_path);
     let mut include = if include.is_empty() {
         vec!["tests".into()]
@@ -242,7 +241,6 @@ pub async fn do_run_scripts(
                     true,
                     filter.clone(),
                     concurrent_jobs,
-                    manifest_path.clone(),
                     allow_wallets,
                     None,
                 )
@@ -282,7 +280,6 @@ pub async fn do_run_scripts(
             allow_none,
             filter,
             concurrent_jobs,
-            manifest_path,
             allow_wallets,
             Some(cache.clone()),
         )
@@ -340,7 +337,6 @@ pub async fn run_scripts(
     allow_none: bool,
     filter: Option<String>,
     concurrent_jobs: usize,
-    manifest_path: PathBuf,
     allow_wallets: bool,
     cache: Option<DeploymentCache>,
 ) -> Result<(bool, Vec<SessionArtifacts>), AnyError> {
@@ -476,7 +472,6 @@ pub async fn run_scripts(
         let sender = sender.clone();
         let cache = cache.clone();
 
-        let manifest = manifest_path.clone();
         tokio::task::spawn_blocking(move || {
             let join_handle = std::thread::spawn(move || {
                 let future = api_v1::run_bridge(
@@ -485,7 +480,6 @@ pub async fn run_scripts(
                     test_module,
                     permissions,
                     sender,
-                    manifest,
                     allow_wallets,
                     cache,
                 );

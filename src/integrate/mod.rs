@@ -80,11 +80,8 @@ pub async fn do_run_devnet(
     // The event observer should be able to send some events to the UI thread,
     // and should be able to be terminated
     let devnet_path = devnet_config.working_dir.clone();
-    let config = StacksEventObserverConfig::new(
-        devnet_config.clone(),
-        devnet.manifest_path.clone(),
-        deployment,
-    );
+    let config =
+        StacksEventObserverConfig::new(devnet_config.clone(), devnet.manifest.clone(), deployment);
     let chains_coordinator_tx = devnet_events_tx.clone();
     let (chains_coordinator_commands_tx, chains_coordinator_commands_rx) = channel();
     let moved_events_observer_commands_tx = chains_coordinator_commands_tx.clone();

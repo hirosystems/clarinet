@@ -155,26 +155,25 @@ pub fn encode_contract_publish(
 }
 
 pub fn setup_session_with_deployment(
-    manifest_path: &PathBuf,
+    manifest: &ProjectManifest,
     deployment: &DeploymentSpecification,
     contracts_asts: Option<HashMap<QualifiedContractIdentifier, ContractAST>>,
 ) -> (
     Session,
     BTreeMap<QualifiedContractIdentifier, Result<ExecutionResult, Vec<Diagnostic>>>,
 ) {
-    let mut session = initiate_session_from_deployment(&manifest_path);
+    let mut session = initiate_session_from_deployment(&manifest);
     update_session_with_genesis_accounts(&mut session, deployment);
     let results =
         update_session_with_contracts_executions(&mut session, deployment, contracts_asts);
     (session, results)
 }
 
-pub fn initiate_session_from_deployment(manifest_path: &PathBuf) -> Session {
-    let mut manifest = ProjectManifest::from_path(manifest_path);
+pub fn initiate_session_from_deployment(manifest: &ProjectManifest) -> Session {
     let mut settings = SessionSettings::default();
     settings
         .include_boot_contracts
-        .append(&mut manifest.project.boot_contracts);
+        .append(&mut manifest.project.boot_contracts.clone());
     settings.repl_settings = manifest.repl_settings.clone();
     settings.disk_cache_enabled = true;
     let session = Session::new(settings);
@@ -319,11 +318,10 @@ pub fn update_session_with_contracts_analyses(
 }
 
 pub fn get_absolute_deployment_path(
-    manifest_path: &PathBuf,
+    manifest: &ProjectManifest,
     relative_deployment_path: &str,
 ) -> PathBuf {
-    let mut base_path = manifest_path.clone();
-    base_path.pop();
+    let mut base_path = manifest.get_project_root_dir();
     let path = match PathBuf::from_str(relative_deployment_path) {
         Ok(path) => path,
         Err(_e) => {
@@ -335,11 +333,10 @@ pub fn get_absolute_deployment_path(
 }
 
 pub fn get_default_deployment_path(
-    manifest_path: &PathBuf,
+    manifest: &ProjectManifest,
     network: &Option<StacksNetwork>,
 ) -> PathBuf {
-    let mut deployment_path = manifest_path.clone();
-    deployment_path.pop();
+    let mut deployment_path = manifest.get_project_root_dir();
     deployment_path.push("deployments");
     let file_path = match network {
         None => "default.test-plan.yaml",
@@ -352,7 +349,7 @@ pub fn get_default_deployment_path(
 }
 
 pub fn read_or_default_to_generated_deployment(
-    manifest_path: &PathBuf,
+    manifest: &ProjectManifest,
     network: &Option<StacksNetwork>,
 ) -> Result<
     (
@@ -361,14 +358,14 @@ pub fn read_or_default_to_generated_deployment(
     ),
     String,
 > {
-    let default_deployment_file_path = get_default_deployment_path(manifest_path, network);
+    let default_deployment_file_path = get_default_deployment_path(&manifest, network);
     let (deployment, artifacts) = if default_deployment_file_path.exists() {
         (
-            load_deployment(manifest_path, &default_deployment_file_path)?,
+            load_deployment(manifest, &default_deployment_file_path)?,
             None,
         )
     } else {
-        let (deployment, artifacts) = generate_default_deployment(manifest_path, network)?;
+        let (deployment, artifacts) = generate_default_deployment(manifest, network)?;
         (deployment, Some(artifacts))
     };
     Ok((deployment, artifacts))
@@ -407,13 +404,13 @@ pub enum TransactionStatus {
 }
 
 pub fn apply_on_chain_deployment(
-    manifest_path: &PathBuf,
+    manifest: &ProjectManifest,
     deployment: DeploymentSpecification,
     deployment_event_tx: Sender<DeploymentEvent>,
     deployment_command_rx: Receiver<DeploymentCommand>,
     fetch_initial_nonces: bool,
 ) {
-    let chain_config = ChainConfig::from_manifest_path(&manifest_path, &deployment.network);
+    let chain_config = ChainConfig::from_manifest_path(&manifest.path, &deployment.network);
     let delay_between_checks: u64 = 10;
     // Load deployers, deployment_fee_rate
     // Check fee, balances and deployers
@@ -431,7 +428,7 @@ pub fn apply_on_chain_deployment(
             for (_, account) in chain_config.accounts.iter() {
                 accounts_cached_nonces.insert(account.address.clone(), 0);
             }
-        }    
+        }
     }
 
     for (_, account) in chain_config.accounts.iter() {
@@ -584,10 +581,9 @@ pub fn apply_on_chain_deployment(
     let _ = deployment_event_tx.send(DeploymentEvent::ProtocolDeployed);
 }
 
-pub fn check_deployments(manifest_path: &PathBuf) -> Result<(), String> {
-    let mut base_path = manifest_path.clone();
-    base_path.pop();
-    let files = get_deployments_files(manifest_path)?;
+pub fn check_deployments(manifest: &ProjectManifest) -> Result<(), String> {
+    let mut base_path = manifest.get_project_root_dir();
+    let files = get_deployments_files(manifest)?;
     for (path, relative_path) in files.into_iter() {
         let _spec = match DeploymentSpecification::from_config_file(&path, &base_path) {
             Ok(spec) => spec,
@@ -602,22 +598,21 @@ pub fn check_deployments(manifest_path: &PathBuf) -> Result<(), String> {
 }
 
 pub fn load_deployment_if_exists(
-    manifest_path: &PathBuf,
+    manifest: &ProjectManifest,
     network: &Option<StacksNetwork>,
 ) -> Option<Result<DeploymentSpecification, String>> {
-    let default_deployment_path = get_default_deployment_path(manifest_path, network);
+    let default_deployment_path = get_default_deployment_path(manifest, network);
     if !default_deployment_path.exists() {
         return None;
     }
-    Some(load_deployment(manifest_path, &default_deployment_path))
+    Some(load_deployment(manifest, &default_deployment_path))
 }
 
 pub fn load_deployment(
-    manifest_path: &PathBuf,
+    manifest: &ProjectManifest,
     deployment_plan_path: &PathBuf,
 ) -> Result<DeploymentSpecification, String> {
-    let mut base_path = manifest_path.clone();
-    base_path.pop();
+    let base_path = manifest.get_project_root_dir();
     let spec = match DeploymentSpecification::from_config_file(&deployment_plan_path, &base_path) {
         Ok(spec) => spec,
         Err(msg) => {
@@ -632,16 +627,15 @@ pub fn load_deployment(
     Ok(spec)
 }
 
-fn get_deployments_files(manifest_path: &PathBuf) -> Result<Vec<(PathBuf, String)>, String> {
-    let mut hooks_home = manifest_path.clone();
-    hooks_home.pop();
-    let suffix_len = hooks_home.to_str().unwrap().len() + 1;
-    hooks_home.push("deployments");
-    let paths = match fs::read_dir(&hooks_home) {
+fn get_deployments_files(manifest: &ProjectManifest) -> Result<Vec<(PathBuf, String)>, String> {
+    let mut project_dir = manifest.get_project_root_dir();
+    let suffix_len = project_dir.to_str().unwrap().len() + 1;
+    project_dir.push("deployments");
+    let paths = match fs::read_dir(&project_dir) {
         Ok(paths) => paths,
         Err(_) => return Ok(vec![]),
     };
-    let mut hook_paths = vec![];
+    let mut plans_paths = vec![];
     for path in paths {
         let file = path.unwrap().path();
         let is_extension_valid = file
@@ -652,11 +646,11 @@ fn get_deployments_files(manifest_path: &PathBuf) -> Result<Vec<(PathBuf, String
         if let Some(true) = is_extension_valid {
             let relative_path = file.clone();
             let (_, relative_path) = relative_path.to_str().unwrap().split_at(suffix_len);
-            hook_paths.push((file, relative_path.to_string()));
+            plans_paths.push((file, relative_path.to_string()));
         }
     }
 
-    Ok(hook_paths)
+    Ok(plans_paths)
 }
 
 pub fn write_deployment(
@@ -714,11 +708,10 @@ pub fn write_deployment(
 }
 
 pub fn generate_default_deployment(
-    manifest_path: &PathBuf,
+    manifest: &ProjectManifest,
     network: &Option<StacksNetwork>,
 ) -> Result<(DeploymentSpecification, DeploymentGenerationArtifacts), String> {
-    let mut project_config = ProjectManifest::from_path(&manifest_path);
-    let chain_config = ChainConfig::from_manifest_path(&manifest_path, &network);
+    let chain_config = ChainConfig::from_manifest_path(&manifest.path, &network);
 
     let node = match network {
         None => None,
@@ -760,27 +753,25 @@ pub fn generate_default_deployment(
     let mut requirements_deps = HashMap::new();
 
     let mut settings = SessionSettings::default();
-    let parser_version = project_config.repl_settings.parser_version;
-    settings.repl_settings = project_config.repl_settings.clone();
+    let parser_version = manifest.repl_settings.parser_version;
+    settings.repl_settings = manifest.repl_settings.clone();
     let session = Session::new(settings.clone());
     let mut boot_contracts_asts = session.get_boot_contracts_asts();
     requirements_asts.append(&mut boot_contracts_asts);
 
     // Only handle requirements in test environments
-    if project_config.project.requirements.is_some() {
-        let default_cache_path = match PathBuf::from_str(&project_config.project.cache_dir) {
+    if let Some(ref requirements) = manifest.project.requirements {
+        let default_cache_path = match PathBuf::from_str(&manifest.project.cache_dir) {
             Ok(path) => path,
             Err(_) => return Err("unable to get default cache path".to_string()),
         };
         let mut contracts = HashMap::new();
 
-        let requirements = project_config.project.requirements.take().unwrap();
-
         // Load all the requirements
         // Some requirements are explicitly listed, some are discovered as we compute the ASTs.
         let mut queue = VecDeque::new();
 
-        for requirement in requirements.into_iter() {
+        for requirement in requirements.iter() {
             let contract_id = match QualifiedContractIdentifier::parse(&requirement.contract_id) {
                 Ok(contract_id) => contract_id,
                 Err(_e) => {
@@ -810,10 +801,8 @@ pub fn generate_default_deployment(
                         Some(default_cache_path.clone()),
                     )?;
 
-                    let path = if project_config.project.cache_dir_relative {
-                        let mut manifest_dir = manifest_path.clone();
-                        manifest_dir.pop();
-                        let manifest_dir = format!("{}", manifest_dir.display());
+                    let path = if manifest.project.cache_dir_relative {
+                        let manifest_dir = format!("{}", manifest.get_project_root_dir().display());
                         let absolute_path = format!("{}", path.display());
                         absolute_path[(manifest_dir.len() + 1)..].to_string()
                     } else {
@@ -901,7 +890,7 @@ pub fn generate_default_deployment(
 
     let mut contracts = HashMap::new();
 
-    for (name, config) in project_config.contracts.iter() {
+    for (name, config) in manifest.contracts.iter() {
         let contract = match ContractName::try_from(name.to_string()) {
             Ok(res) => res,
             Err(_) => return Err(format!("unable to use {} as a valid contract name", name)),
@@ -934,8 +923,7 @@ pub fn generate_default_deployment(
             }
         };
 
-        let mut path = manifest_path.clone();
-        path.pop();
+        let mut path = manifest.get_project_root_dir();
         path.push(&config.path);
         let source = match std::fs::read_to_string(&path) {
             Ok(code) => code,
@@ -1066,7 +1054,7 @@ pub fn generate_default_deployment(
         genesis: if network.is_none() {
             Some(GenesisSpecification {
                 wallets,
-                contracts: project_config.project.boot_contracts.clone(),
+                contracts: manifest.project.boot_contracts.clone(),
             })
         } else {
             None

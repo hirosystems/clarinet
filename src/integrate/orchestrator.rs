@@ -22,10 +22,9 @@ use tracing::info;
 pub struct DevnetOrchestrator {
     pub name: String,
     network_name: String,
-    pub manifest_path: PathBuf,
+    pub manifest: ProjectManifest,
     pub network_config: Option<ChainConfig>,
     pub termination_success_tx: Option<Sender<bool>>,
-    pub manifest: ProjectManifest,
     stacks_blockchain_container_id: Option<String>,
     stacks_blockchain_api_container_id: Option<String>,
     stacks_explorer_container_id: Option<String>,
@@ -37,21 +36,19 @@ pub struct DevnetOrchestrator {
 
 impl DevnetOrchestrator {
     pub fn new(
-        manifest_path: PathBuf,
+        manifest: ProjectManifest,
         devnet_override: Option<DevnetConfigFile>,
     ) -> DevnetOrchestrator {
         let docker_client = Docker::connect_with_socket_defaults().unwrap();
 
-        let mut project_path = manifest_path.clone();
-        project_path.pop();
-
+        let mut project_path = manifest.get_project_root_dir();
         let mut network_config_path = project_path.clone();
         network_config_path.push("settings");
         network_config_path.push("Devnet.toml");
 
         let mut network_config =
             ChainConfig::from_path(&network_config_path, &StacksNetwork::Devnet);
-        let manifest = ProjectManifest::from_path(&manifest_path);
+
         let name = manifest.project.name.clone();
         let network_name = format!("{}.devnet", name);
 
@@ -191,7 +188,6 @@ impl DevnetOrchestrator {
         DevnetOrchestrator {
             name,
             network_name,
-            manifest_path,
             manifest,
             network_config: Some(network_config),
             docker_client: Some(docker_client),

@@ -332,22 +332,17 @@ pub fn main() {
         Ok(opts) => opts,
         Err(e) => {
             if e.kind() == clap::ErrorKind::UnknownArgument {
-                match get_manifest_path(None) {
-                    Some(manifest_path) => {
-                        let manifest = ProjectManifest::from_path(&manifest_path);
-                        if manifest.project.telemetry {
-                            #[cfg(feature = "telemetry")]
-                            telemetry_report_event(DeveloperUsageEvent::UnknownCommand(
-                                DeveloperUsageDigest::new(
-                                    &manifest.project.name,
-                                    &manifest.project.authors,
-                                ),
-                                format!("{}", e),
-                            ));
-                        }
-                    }
-                    None => {}
-                };
+                let manifest = load_manifest_or_exit(None);
+                if manifest.project.telemetry {
+                    #[cfg(feature = "telemetry")]
+                    telemetry_report_event(DeveloperUsageEvent::UnknownCommand(
+                        DeveloperUsageDigest::new(
+                            &manifest.project.name,
+                            &manifest.project.authors,
+                        ),
+                        format!("{}", e),
+                    ));
+                }
             }
             println!("{}", e);
             process::exit(1);
@@ -422,17 +417,17 @@ pub fn main() {
         }
         Command::Deployments(subcommand) => match subcommand {
             Deployments::CheckDeployments(cmd) => {
-                let manifest_path = get_manifest_path_or_exit(cmd.manifest_path);
+                let manifest = load_manifest_or_exit(cmd.manifest_path);
                 // Ensure that all the deployments can correctly be deserialized.
                 println!("Checking deployments");
-                let res = check_deployments(&manifest_path);
+                let res = check_deployments(&manifest);
                 if let Err(message) = res {
                     println!("{}", message);
                     process::exit(1);
                 }
             }
             Deployments::GenerateDeployment(cmd) => {
-                let manifest_path = get_manifest_path_or_exit(cmd.manifest_path);
+                let manifest = load_manifest_or_exit(cmd.manifest_path);
 
                 let network = if cmd.devnet == true {
                     Some(StacksNetwork::Devnet)
@@ -444,8 +439,8 @@ pub fn main() {
                     None
                 };
 
-                let default_deployment_path = get_default_deployment_path(&manifest_path, &network);
-                let (deployment, _) = match generate_default_deployment(&manifest_path, &network) {
+                let default_deployment_path = get_default_deployment_path(&manifest, &network);
+                let (deployment, _) = match generate_default_deployment(&manifest, &network) {
                     Ok(deployment) => deployment,
                     Err(message) => {
                         println!("{}", red!(message));
@@ -463,7 +458,7 @@ pub fn main() {
                 println!("{} {}", green!("Generated file"), relative_path.display());
             }
             Deployments::ApplyDeployment(cmd) => {
-                let manifest_path = get_manifest_path_or_exit(cmd.manifest_path);
+                let manifest = load_manifest_or_exit(cmd.manifest_path);
 
                 let network = if cmd.devnet == true {
                     Some(StacksNetwork::Devnet)
@@ -480,7 +475,7 @@ pub fn main() {
                         Err(format!("{}: a flag `--devnet`, `--testnet`, `--mainnet` or `--deployment-plan-path=path/to/yaml` should be provided.", yellow!("Command usage")))
                     }
                     (Some(network), None) => {
-                        let res = load_deployment_if_exists(&manifest_path, &Some(network.clone()));
+                        let res = load_deployment_if_exists(&manifest, &Some(network.clone()));
                         match res {
                             Some(Ok(deployment)) => {
                                 println!(
@@ -492,8 +487,8 @@ pub fn main() {
                             }
                             Some(Err(e)) => Err(e),
                             None => {
-                                let default_deployment_path = get_default_deployment_path(&manifest_path, &Some(network.clone()));
-                                let (deployment, _) = match generate_default_deployment(&manifest_path, &Some(network.clone())) {
+                                let default_deployment_path = get_default_deployment_path(&manifest, &Some(network.clone()));
+                                let (deployment, _) = match generate_default_deployment(&manifest, &Some(network.clone())) {
                                     Ok(deployment) => deployment,
                                     Err(message) => {
                                         println!("{}", red!(message));
@@ -513,8 +508,8 @@ pub fn main() {
                         }
                     }
                     (None, Some(deployment_plan_path)) => {
-                        let deployment_path = get_absolute_deployment_path(&manifest_path, &deployment_plan_path);
-                        load_deployment(&manifest_path, &deployment_path)
+                        let deployment_path = get_absolute_deployment_path(&manifest, &deployment_plan_path);
+                        load_deployment(&manifest, &deployment_path)
                     }
                     (_, _) => unreachable!()
                 };
@@ -548,10 +543,10 @@ pub fn main() {
 
                 let (command_tx, command_rx) = std::sync::mpsc::channel();
                 let (event_tx, event_rx) = std::sync::mpsc::channel();
-                let manifest_path_moved = manifest_path.clone();
+                let manifest_moved = manifest.clone();
                 std::thread::spawn(move || {
-                    let manifest_path = manifest_path_moved;
-                    apply_on_chain_deployment(&manifest_path, deployment, event_tx, command_rx, true);
+                    let manifest = manifest_moved;
+                    apply_on_chain_deployment(&manifest, deployment, event_tx, command_rx, true);
                 });
 
                 let _ = command_tx.send(DeploymentCommand::Start);
@@ -601,12 +596,12 @@ pub fn main() {
             }
         },
         Command::Contracts(subcommand) => match subcommand {
-            Contracts::NewContract(new_contract) => {
-                let manifest_path = get_manifest_path_or_exit(new_contract.manifest_path);
+            Contracts::NewContract(cmd) => {
+                let manifest = load_manifest_or_exit(cmd.manifest_path);
 
                 let changes = generate::get_changes_for_new_contract(
-                    manifest_path,
-                    new_contract.name,
+                    &manifest.path,
+                    cmd.name,
                     None,
                     true,
                     vec![],
@@ -618,18 +613,18 @@ pub fn main() {
                     display_post_check_hint();
                 }
             }
-            Contracts::Requirement(required_contract) => {
-                let manifest_path = get_manifest_path_or_exit(required_contract.manifest_path);
+            Contracts::Requirement(cmd) => {
+                let manifest = load_manifest_or_exit(cmd.manifest_path);
 
                 let change = TOMLEdition {
                     comment: format!(
                         "Adding {} as a requirement to Clarinet.toml",
-                        required_contract.contract_id
+                        cmd.contract_id
                     ),
-                    manifest_path,
+                    manifest_path: manifest.path.clone(),
                     contracts_to_add: HashMap::new(),
                     requirements_to_add: vec![RequirementConfig {
-                        contract_id: required_contract.contract_id.clone(),
+                        contract_id: cmd.contract_id.clone(),
                     }],
                 };
                 if !execute_changes(vec![Changes::EditTOML(change)]) {
@@ -639,21 +634,22 @@ pub fn main() {
                     display_post_check_hint();
                 }
             }
-            Contracts::ForkContract(fork_contract) => {
-                let _manifest_path = get_manifest_path_or_exit(fork_contract.manifest_path);
+            Contracts::ForkContract(cmd) => {
+                let _manifest = load_manifest_or_exit(cmd.manifest_path);
                 // TODO(lgalabru)
                 // Download contract
                 // Buld AST
                 // Get dependencies
                 // Add dependencies as requirements
+                // Update Clarinet.toml
             }
         },
         Command::Console(cmd) => {
-            let manifest_path = get_manifest_path_or_exit(cmd.manifest_path);
+            let manifest = load_manifest_or_exit(cmd.manifest_path);
 
             let (res, _, artifacts) = match cmd.deployment_plan_path {
                 None => {
-                    let res = load_deployment_if_exists(&manifest_path, &None);
+                    let res = load_deployment_if_exists(&manifest, &None);
                     match res {
                         Some(Ok(deployment)) => {
                             println!(
@@ -670,15 +666,15 @@ pub fn main() {
                             );
                             std::process::exit(1);
                         }
-                        None => match generate_default_deployment(&manifest_path, &None) {
+                        None => match generate_default_deployment(&manifest, &None) {
                             Ok((deployment, artifacts)) => (Ok(deployment), None, Some(artifacts)),
                             Err(e) => (Err(e), None, None),
                         },
                     }
                 }
                 Some(path) => {
-                    let deployment_path = get_absolute_deployment_path(&manifest_path, &path);
-                    let deployment = load_deployment(&manifest_path, &deployment_path);
+                    let deployment_path = get_absolute_deployment_path(&manifest, &path);
+                    let deployment = load_deployment(&manifest, &deployment_path);
                     (
                         deployment,
                         Some(format!("{}", deployment_path.display())),
@@ -697,19 +693,15 @@ pub fn main() {
 
             let contracts_asts = artifacts.and_then(|a| Some(a.asts));
             let (session, _) =
-                setup_session_with_deployment(&manifest_path, &deployment, contracts_asts);
+                setup_session_with_deployment(&manifest, &deployment, contracts_asts);
             let mut terminal = Terminal::load(session);
             terminal.start();
 
             // Report telemetry
-            let project_manifest = ProjectManifest::from_path(&manifest_path);
-            if project_manifest.project.telemetry {
+            if manifest.project.telemetry {
                 #[cfg(feature = "telemetry")]
                 telemetry_report_event(DeveloperUsageEvent::PokeExecuted(
-                    DeveloperUsageDigest::new(
-                        &project_manifest.project.name,
-                        &project_manifest.project.authors,
-                    ),
+                    DeveloperUsageDigest::new(&manifest.project.name, &manifest.project.authors),
                 ));
 
                 #[cfg(feature = "telemetry")]
@@ -722,8 +714,8 @@ pub fn main() {
                 if debug_count > 0 {
                     telemetry_report_event(DeveloperUsageEvent::DebugStarted(
                         DeveloperUsageDigest::new(
-                            &project_manifest.project.name,
-                            &project_manifest.project.authors,
+                            &manifest.project.name,
+                            &manifest.project.authors,
                         ),
                         debug_count,
                     ));
@@ -787,11 +779,11 @@ pub fn main() {
             }
         }
         Command::Check(cmd) => {
-            let manifest_path = get_manifest_path_or_exit(cmd.manifest_path);
+            let manifest = load_manifest_or_exit(cmd.manifest_path);
 
             let (res, _, artifacts) = match cmd.deployment_plan_path {
                 None => {
-                    let res = load_deployment_if_exists(&manifest_path, &None);
+                    let res = load_deployment_if_exists(&manifest, &None);
                     match res {
                         Some(Ok(deployment)) => {
                             println!(
@@ -808,15 +800,15 @@ pub fn main() {
                             );
                             std::process::exit(1);
                         }
-                        None => match generate_default_deployment(&manifest_path, &None) {
+                        None => match generate_default_deployment(&manifest, &None) {
                             Ok((deployment, artifacts)) => (Ok(deployment), None, Some(artifacts)),
                             Err(e) => (Err(e), None, None),
                         },
                     }
                 }
                 Some(path) => {
-                    let deployment_path = get_absolute_deployment_path(&manifest_path, &path);
-                    let deployment = load_deployment(&manifest_path, &deployment_path);
+                    let deployment_path = get_absolute_deployment_path(&manifest, &path);
+                    let deployment = load_deployment(&manifest, &deployment_path);
                     (
                         deployment,
                         Some(format!("{}", deployment_path.display())),
@@ -835,7 +827,7 @@ pub fn main() {
 
             let contracts_asts = artifacts.and_then(|a| Some(a.asts));
             let (_, results) =
-                setup_session_with_deployment(&manifest_path, &deployment, contracts_asts);
+                setup_session_with_deployment(&manifest, &deployment, contracts_asts);
             let mut success = 0;
             let mut warnings = 0;
             let mut errors = 0;
@@ -978,22 +970,19 @@ pub fn main() {
             if hints_enabled {
                 display_post_check_hint();
             }
-            // if project_manifest.project.telemetry {
-            //     #[cfg(feature = "telemetry")]
-            //     telemetry_report_event(DeveloperUsageEvent::CheckExecuted(
-            //         DeveloperUsageDigest::new(
-            //             &project_manifest.project.name,
-            //             &project_manifest.project.authors,
-            //         ),
-            //     ));
-            // }
+            if manifest.project.telemetry {
+                #[cfg(feature = "telemetry")]
+                telemetry_report_event(DeveloperUsageEvent::CheckExecuted(
+                    DeveloperUsageDigest::new(&manifest.project.name, &manifest.project.authors),
+                ));
+            }
         }
         Command::Test(cmd) => {
-            let manifest_path = get_manifest_path_or_exit(cmd.manifest_path);
+            let manifest = load_manifest_or_exit(cmd.manifest_path);
 
             let (res, deployment_path, artifacts) = match cmd.deployment_plan_path {
                 None => {
-                    let res = load_deployment_if_exists(&manifest_path, &None);
+                    let res = load_deployment_if_exists(&manifest, &None);
                     match res {
                         Some(Ok(deployment)) => {
                             println!(
@@ -1010,15 +999,15 @@ pub fn main() {
                             );
                             std::process::exit(1);
                         }
-                        None => match generate_default_deployment(&manifest_path, &None) {
+                        None => match generate_default_deployment(&manifest, &None) {
                             Ok((deployment, artifacts)) => (Ok(deployment), None, Some(artifacts)),
                             Err(e) => (Err(e), None, None),
                         },
                     }
                 }
                 Some(path) => {
-                    let deployment_path = get_absolute_deployment_path(&manifest_path, &path);
-                    let deployment = load_deployment(&manifest_path, &deployment_path);
+                    let deployment_path = get_absolute_deployment_path(&manifest, &path);
+                    let deployment = load_deployment(&manifest, &deployment_path);
                     (
                         deployment,
                         Some(format!("{}", deployment_path.display())),
@@ -1037,7 +1026,7 @@ pub fn main() {
 
             let contracts_asts = artifacts.and_then(|a| Some(a.asts));
             let cache =
-                DeploymentCache::new(&manifest_path, deployment, &deployment_path, contracts_asts);
+                DeploymentCache::new(&manifest, deployment, &deployment_path, contracts_asts);
 
             let (success, _count) = match run_scripts(
                 cmd.files,
@@ -1046,7 +1035,7 @@ pub fn main() {
                 cmd.watch,
                 true,
                 false,
-                manifest_path,
+                &manifest,
                 cache,
             ) {
                 Ok(count) => (true, count),
@@ -1055,27 +1044,24 @@ pub fn main() {
             if hints_enabled {
                 display_tests_pro_tips_hint();
             }
-            // if project_manifest.project.telemetry {
-            //     #[cfg(feature = "telemetry")]
-            //     telemetry_report_event(DeveloperUsageEvent::TestSuiteExecuted(
-            //         DeveloperUsageDigest::new(
-            //             &project_manifest.project.name,
-            //             &project_manifest.project.authors,
-            //         ),
-            //         success,
-            //         _count,
-            //     ));
-            // }
+            if manifest.project.telemetry {
+                #[cfg(feature = "telemetry")]
+                telemetry_report_event(DeveloperUsageEvent::TestSuiteExecuted(
+                    DeveloperUsageDigest::new(&manifest.project.name, &manifest.project.authors),
+                    success,
+                    _count,
+                ));
+            }
             if !success {
                 process::exit(1)
             }
         }
         Command::Run(cmd) => {
-            let manifest_path = get_manifest_path_or_exit(cmd.manifest_path);
+            let manifest = load_manifest_or_exit(cmd.manifest_path);
 
             let (res, deployment_path, artifacts) = match cmd.deployment_plan_path {
                 None => {
-                    let res = load_deployment_if_exists(&manifest_path, &None);
+                    let res = load_deployment_if_exists(&manifest, &None);
                     match res {
                         Some(Ok(deployment)) => {
                             println!(
@@ -1092,15 +1078,15 @@ pub fn main() {
                             );
                             std::process::exit(1);
                         }
-                        None => match generate_default_deployment(&manifest_path, &None) {
+                        None => match generate_default_deployment(&manifest, &None) {
                             Ok((deployment, artifacts)) => (Ok(deployment), None, Some(artifacts)),
                             Err(e) => (Err(e), None, None),
                         },
                     }
                 }
                 Some(path) => {
-                    let deployment_path = get_absolute_deployment_path(&manifest_path, &path);
-                    let deployment = load_deployment(&manifest_path, &deployment_path);
+                    let deployment_path = get_absolute_deployment_path(&manifest, &path);
+                    let deployment = load_deployment(&manifest, &deployment_path);
                     (
                         deployment,
                         Some(format!("{}", deployment_path.display())),
@@ -1119,7 +1105,7 @@ pub fn main() {
 
             let contracts_asts = artifacts.and_then(|a| Some(a.asts));
             let cache =
-                DeploymentCache::new(&manifest_path, deployment, &deployment_path, contracts_asts);
+                DeploymentCache::new(&manifest, deployment, &deployment_path, contracts_asts);
 
             let _ = run_scripts(
                 vec![cmd.script],
@@ -1128,17 +1114,16 @@ pub fn main() {
                 false,
                 cmd.allow_wallets,
                 cmd.allow_disk_write,
-                manifest_path,
+                &manifest,
                 cache,
             );
         }
         Command::Integrate(cmd) => {
-            let manifest_path = get_manifest_path_or_exit(cmd.manifest_path);
+            let manifest = load_manifest_or_exit(cmd.manifest_path);
             println!("Loading deployment plan");
             let result = match cmd.deployment_plan_path {
                 None => {
-                    let res =
-                        load_deployment_if_exists(&manifest_path, &Some(StacksNetwork::Devnet));
+                    let res = load_deployment_if_exists(&manifest, &Some(StacksNetwork::Devnet));
                     match res {
                         Some(Ok(deployment)) => {
                             println!(
@@ -1152,11 +1137,11 @@ pub fn main() {
                         Some(Err(e)) => Err(e),
                         None => {
                             let default_deployment_path = get_default_deployment_path(
-                                &manifest_path,
+                                &manifest,
                                 &Some(StacksNetwork::Devnet),
                             );
                             let (deployment, _) = match generate_default_deployment(
-                                &manifest_path,
+                                &manifest,
                                 &Some(StacksNetwork::Devnet),
                             ) {
                                 Ok(deployment) => deployment,
@@ -1183,8 +1168,8 @@ pub fn main() {
                 }
                 Some(deployment_plan_path) => {
                     let deployment_path =
-                        get_absolute_deployment_path(&manifest_path, &deployment_plan_path);
-                    load_deployment(&manifest_path, &deployment_path)
+                        get_absolute_deployment_path(&manifest, &deployment_plan_path);
+                    load_deployment(&manifest, &deployment_path)
                 }
             };
 
@@ -1196,7 +1181,7 @@ pub fn main() {
                 }
             };
 
-            let devnet = DevnetOrchestrator::new(manifest_path, None);
+            let devnet = DevnetOrchestrator::new(manifest, None);
             if devnet.manifest.project.telemetry {
                 #[cfg(feature = "telemetry")]
                 telemetry_report_event(DeveloperUsageEvent::DevnetExecuted(
@@ -1273,6 +1258,22 @@ fn get_manifest_path_or_exit(path: Option<String>) -> PathBuf {
             process::exit(1);
         }
     }
+}
+
+fn load_manifest_or_exit(path: Option<String>) -> ProjectManifest {
+    let manifest_path = get_manifest_path_or_exit(path);
+    let manifest = match ProjectManifest::from_path(&manifest_path) {
+        Ok(manifest) => manifest,
+        Err(message) => {
+            println!(
+                "{}: Syntax errors in Clarinet.toml\n{}",
+                red!("error"),
+                message,
+            );
+            process::exit(1);
+        }
+    };
+    manifest
 }
 
 fn execute_changes(changes: Vec<Changes>) -> bool {
@@ -1372,6 +1373,7 @@ fn execute_changes(changes: Vec<Changes>) -> bool {
                                 }
                             };
                         ProjectManifest::from_project_manifest_file(project_manifest_file, &path)
+                            .unwrap()
                     }
                 };
 

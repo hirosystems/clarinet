@@ -6,7 +6,7 @@ use crate::deployment::{
 };
 use crate::indexer::{chains, Indexer, IndexerConfig};
 use crate::integrate::{MempoolAdmissionData, ServiceStatusData, Status};
-use crate::types::{self, AccountConfig, ChainConfig, DevnetConfig};
+use crate::types::{self, AccountConfig, ChainConfig, DevnetConfig, ProjectManifest};
 use crate::types::{BitcoinChainEvent, ChainsCoordinatorCommand, StacksChainEvent, StacksNetwork};
 use crate::utils;
 use crate::utils::stacks::{transactions, PoxInfo, StacksRpc};
@@ -46,7 +46,7 @@ pub struct StacksEventObserverConfig {
     pub devnet_config: DevnetConfig,
     pub accounts: Vec<AccountConfig>,
     pub deployment: DeploymentSpecification,
-    pub manifest_path: PathBuf,
+    pub manifest: ProjectManifest,
     pub deployment_fee_rate: u64,
 }
 
@@ -77,18 +77,18 @@ pub struct BitcoinRPCRequest {
 impl StacksEventObserverConfig {
     pub fn new(
         devnet_config: DevnetConfig,
-        manifest_path: PathBuf,
+        manifest: ProjectManifest,
         deployment: DeploymentSpecification,
     ) -> Self {
         info!("Checking contracts...");
         let network = Some(StacksNetwork::Devnet);
 
-        let chain_config = ChainConfig::from_manifest_path(&manifest_path, &network);
+        let chain_config = ChainConfig::from_manifest_path(&manifest.path, &network);
 
         StacksEventObserverConfig {
             devnet_config,
             accounts: chain_config.accounts.into_values().collect::<Vec<_>>(),
-            manifest_path,
+            manifest,
             deployment,
             deployment_fee_rate: chain_config.network.deployment_fee_rate,
         }
@@ -187,7 +187,7 @@ pub async fn start_chains_coordinator(
                         init_status.should_deploy_protocol = false;
                     }
                     publish_initial_contracts(
-                        &config.manifest_path,
+                        config.manifest.clone(),
                         &config.deployment,
                         &devnet_event_tx,
                         chains_coordinator_commands_tx.clone(),
@@ -578,12 +578,12 @@ pub async fn handle_bitcoin_rpc_call(
 }
 
 pub fn publish_initial_contracts(
-    manifest_path: &PathBuf,
+    manifest: ProjectManifest,
     deployment: &DeploymentSpecification,
     devnet_event_tx: &Sender<DevnetEvent>,
     chains_coordinator_commands_tx: Sender<ChainsCoordinatorCommand>,
 ) {
-    let manifest_path = manifest_path.clone();
+    let manifest = manifest.clone();
     let devnet_event_tx = devnet_event_tx.clone();
     let deployment = deployment.clone();
 
@@ -591,7 +591,7 @@ pub fn publish_initial_contracts(
     let (command_tx, command_rx) = channel();
 
     std::thread::spawn(move || {
-        apply_on_chain_deployment(&manifest_path, deployment, event_tx, command_rx, false);
+        apply_on_chain_deployment(&manifest, deployment, event_tx, command_rx, false);
     });
 
     std::thread::spawn(move || {

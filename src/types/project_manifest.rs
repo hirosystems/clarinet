@@ -30,16 +30,18 @@ pub struct ProjectConfigFile {
     cache_dir: Option<String>,
 }
 
-#[derive(Serialize, Deserialize, Debug, Default)]
+#[derive(Serialize, Deserialize, Debug, Default, Clone)]
 pub struct ProjectManifest {
     pub project: ProjectConfig,
     #[serde(serialize_with = "toml::ser::tables_last")]
     pub contracts: BTreeMap<String, ContractConfig>,
     #[serde(rename = "repl")]
     pub repl_settings: repl::Settings,
+    #[serde(skip_serializing, skip_deserializing)]
+    pub path: PathBuf,
 }
 
-#[derive(Serialize, Deserialize, Debug, Default)]
+#[derive(Serialize, Deserialize, Debug, Default, Clone)]
 pub struct ProjectConfig {
     pub name: String,
     pub authors: Vec<String>,
@@ -71,7 +73,7 @@ pub struct NotebookConfig {
 }
 
 impl ProjectManifest {
-    pub fn from_path(path: &PathBuf) -> ProjectManifest {
+    pub fn from_path(path: &PathBuf) -> Result<ProjectManifest, String> {
         let file = match File::open(path) {
             Ok(path) => path,
             Err(_e) => {
@@ -104,7 +106,7 @@ impl ProjectManifest {
     pub fn from_project_manifest_file(
         project_manifest_file: ProjectManifestFile,
         manifest_path: &PathBuf,
-    ) -> ProjectManifest {
+    ) -> Result<ProjectManifest, String> {
         let mut repl_settings = if let Some(repl_settings) = project_manifest_file.repl {
             repl::Settings::from(repl_settings)
         } else {
@@ -172,6 +174,7 @@ impl ProjectManifest {
             project,
             contracts: BTreeMap::new(),
             repl_settings,
+            path: manifest_path.clone(),
         };
         let mut config_contracts = BTreeMap::new();
         let mut config_requirements: Vec<RequirementConfig> = Vec::new();
@@ -231,6 +234,12 @@ impl ProjectManifest {
         };
         config.contracts = config_contracts;
         config.project.requirements = Some(config_requirements);
-        config
+        Ok(config)
+    }
+
+    pub fn get_project_root_dir(&self) -> PathBuf {
+        let mut dir = self.path.clone();
+        dir.pop();
+        dir
     }
 }

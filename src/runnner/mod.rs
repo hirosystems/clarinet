@@ -13,6 +13,7 @@ use crate::deployment::{
     update_session_with_contracts_executions, update_session_with_genesis_accounts,
     write_deployment,
 };
+use crate::types::ProjectManifest;
 use clarity_repl::clarity::analysis::contract_interface_builder::{
     build_contract_interface, ContractInterface,
 };
@@ -41,12 +42,12 @@ pub struct DeploymentCache {
 
 impl DeploymentCache {
     pub fn new(
-        manifest_path: &PathBuf,
+        manifest: &ProjectManifest,
         deployment: DeploymentSpecification,
         deployment_path: &Option<String>,
         mut contracts_asts: Option<HashMap<QualifiedContractIdentifier, ContractAST>>,
     ) -> DeploymentCache {
-        let mut session_accounts_only = initiate_session_from_deployment(&manifest_path);
+        let mut session_accounts_only = initiate_session_from_deployment(&manifest);
         update_session_with_genesis_accounts(&mut session_accounts_only, &deployment);
         let mut session = session_accounts_only.clone();
 
@@ -108,7 +109,7 @@ pub fn run_scripts(
     watch: bool,
     allow_wallets: bool,
     allow_disk_write: bool,
-    manifest_path: PathBuf,
+    manifest: &ProjectManifest,
     cache: DeploymentCache,
 ) -> Result<u32, (String, u32)> {
     match block_on(deno::do_run_scripts(
@@ -118,7 +119,7 @@ pub fn run_scripts(
         watch,
         allow_wallets,
         allow_disk_write,
-        manifest_path,
+        manifest,
         cache,
     )) {
         Err(e) => Err((format!("{:?}", e), 0)),
