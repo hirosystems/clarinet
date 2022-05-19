@@ -153,8 +153,8 @@ impl GetChangesForNewProject {
     fn create_gitignore(&mut self) {
         let content = format!(
             r#"
-settings/Mainnet.toml
-settings/Testnet.toml
+**/settings/Mainnet.toml
+**/settings/Testnet.toml
 history.txt
 "#,
         );
