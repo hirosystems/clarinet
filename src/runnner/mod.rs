@@ -9,7 +9,7 @@
 use crate::deployment::{
     apply_on_chain_deployment, check_deployments, display_deployment, generate_default_deployment,
     get_absolute_deployment_path, get_default_deployment_path, initiate_session_from_deployment,
-    load_deployment, read_or_default_to_generated_deployment, setup_session_with_deployment,
+    load_deployment, read_deployment_or_generate_default, setup_session_with_deployment,
     update_session_with_contracts_executions, update_session_with_genesis_accounts,
     write_deployment,
 };

@@ -345,7 +345,7 @@ pub fn get_default_deployment_path(manifest: &ProjectManifest, network: &StacksN
     deployment_path
 }
 
-pub fn read_or_default_to_generated_deployment(
+pub fn read_deployment_or_generate_default(
     manifest: &ProjectManifest,
     network: &StacksNetwork,
 ) -> Result<
