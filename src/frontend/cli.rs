@@ -520,7 +520,7 @@ pub fn main() {
                 );
                 let mut buffer = String::new();
                 std::io::stdin().read_line(&mut buffer).unwrap();
-                if !buffer.starts_with("Y") {
+                if !buffer.starts_with("Y") || !buffer.starts_with("") {
                     println!("Deployment aborted");
                     std::process::exit(1);
                 }
@@ -665,7 +665,7 @@ pub fn main() {
             let deployment = match res {
                 Ok(deployment) => deployment,
                 Err(e) => {
-                    println!("error: {}", e);
+                    println!("{}: {}", red!("error"), e);
                     process::exit(1);
                 }
             };
@@ -802,7 +802,7 @@ pub fn main() {
             let deployment = match res {
                 Ok(deployment) => deployment,
                 Err(e) => {
-                    println!("error: {}", e);
+                    println!("{}: {}", red!("error"), e);
                     process::exit(1);
                 }
             };
@@ -1007,7 +1007,7 @@ pub fn main() {
             let deployment = match res {
                 Ok(deployment) => deployment,
                 Err(e) => {
-                    println!("error: {}", e);
+                    println!("{}: {}", red!("error"), e);
                     process::exit(1);
                 }
             };
@@ -1090,7 +1090,7 @@ pub fn main() {
             let deployment = match res {
                 Ok(deployment) => deployment,
                 Err(e) => {
-                    println!("error: {}", e);
+                    println!("{}: {}", red!("error"), e);
                     process::exit(1);
                 }
             };
