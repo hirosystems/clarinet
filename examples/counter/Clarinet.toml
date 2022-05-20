@@ -6,6 +6,8 @@ telemetry = false
 cache_dir = "./.requirements"
 boot_contracts = ["pox", "costs-v2", "bns"]
 
+# The counter project is being used by the CI, and having to rely on network
+# leads to flaky tests.
 [[project.requirements]]
 contract_id = "SP2PABAF9FTAJYNFZH93XENAJ8FVY99RRM50D2JG9.nft-trait"
 

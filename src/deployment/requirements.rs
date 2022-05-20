@@ -58,7 +58,7 @@ pub fn retrieve_contract(
 #[derive(Deserialize, Debug, Default, Clone)]
 struct Contract {
     source: String,
-    _publish_height: u32,
+    publish_height: u32,
 }
 
 async fn fetch_contract(request_url: String) -> Result<Contract, String> {
@@ -66,8 +66,10 @@ async fn fetch_contract(request_url: String) -> Result<Contract, String> {
         .await
         .map_err(|_| format!("Unable to retrieve contract {}", request_url))?;
 
-    response
+    let contract = response
         .json()
         .await
-        .map_err(|_| format!("Unable to parse contract {}", request_url))?
+        .map_err(|_| format!("Unable to parse contract {}", request_url))?;
+
+    Ok(contract)
 }
