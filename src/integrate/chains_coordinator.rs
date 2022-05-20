@@ -1,7 +1,7 @@
 use super::DevnetEvent;
 use crate::deployment::types::DeploymentSpecification;
 use crate::deployment::{
-    apply_on_chain_deployment, read_or_default_to_generated_deployment,
+    apply_on_chain_deployment, read_deployment_or_generate_default,
     setup_session_with_deployment, DeploymentCommand, DeploymentEvent,
 };
 use crate::indexer::{chains, Indexer, IndexerConfig};
@@ -112,6 +112,11 @@ pub async fn start_chains_coordinator(
         bitcoin_node_rpc_password: config.devnet_config.bitcoin_node_password.clone(),
     });
 
+    let (deployment_events_tx, deployment_events_rx) = channel();
+    let (deployment_commands_tx, deployments_command_rx) = channel();
+
+    prepare_protocol_deployment(&config.manifest, &config.deployment, deployment_events_tx, deployments_command_rx);
+
     let init_status = DevnetInitializationStatus {
         should_deploy_protocol: true,
     };
@@ -165,7 +170,7 @@ pub async fn start_chains_coordinator(
     let mut should_deploy_protocol = true;
     let mut protocol_deployed = false;
     let stop_miner = Arc::new(AtomicBool::new(false));
-
+    let mut deployment_events_rx = Some(deployment_events_rx);
     loop {
         match chains_coordinator_commands_rx.recv() {
             Ok(ChainsCoordinatorCommand::Terminate(true)) => {
@@ -184,12 +189,14 @@ pub async fn start_chains_coordinator(
                     if let Ok(mut init_status) = init_status_rw_lock.write() {
                         init_status.should_deploy_protocol = false;
                     }
-                    publish_initial_contracts(
-                        config.manifest.clone(),
-                        &config.deployment,
-                        &devnet_event_tx,
-                        chains_coordinator_commands_tx.clone(),
-                    );
+                    if let Some(deployment_events_rx) = deployment_events_rx.take() {
+                        perform_protocol_deployment(
+                            deployment_events_rx,
+                            &deployment_commands_tx,
+                            &devnet_event_tx,
+                            &chains_coordinator_commands_tx,
+                        )    
+                    }
                 }
             }
             Ok(ChainsCoordinatorCommand::ProtocolDeployed) => {
@@ -575,27 +582,34 @@ pub async fn handle_bitcoin_rpc_call(
     Json(res.json().await.unwrap())
 }
 
-pub fn publish_initial_contracts(
-    manifest: ProjectManifest,
+pub fn prepare_protocol_deployment(
+    manifest: &ProjectManifest,
     deployment: &DeploymentSpecification,
-    devnet_event_tx: &Sender<DevnetEvent>,
-    chains_coordinator_commands_tx: Sender<ChainsCoordinatorCommand>,
+    deployment_event_tx: Sender<DeploymentEvent>,
+    deployment_command_rx: Receiver<DeploymentCommand>,
 ) {
     let manifest = manifest.clone();
-    let devnet_event_tx = devnet_event_tx.clone();
     let deployment = deployment.clone();
 
-    let (event_tx, event_rx) = channel();
-    let (command_tx, command_rx) = channel();
-
     std::thread::spawn(move || {
-        apply_on_chain_deployment(&manifest, deployment, event_tx, command_rx, false);
+        apply_on_chain_deployment(&manifest, deployment, deployment_event_tx, deployment_command_rx, false);
     });
+}
+
+pub fn perform_protocol_deployment(
+    deployment_events_rx: Receiver<DeploymentEvent>,
+    deployment_commands_tx: &Sender<DeploymentCommand>,
+    devnet_event_tx: &Sender<DevnetEvent>,
+    chains_coordinator_commands_tx: &Sender<ChainsCoordinatorCommand>,
+) {
+    let devnet_event_tx = devnet_event_tx.clone();
+    let chains_coordinator_commands_tx = chains_coordinator_commands_tx.clone();
+
+    let _ = deployment_commands_tx.send(DeploymentCommand::Start);
 
     std::thread::spawn(move || {
-        let _ = command_tx.send(DeploymentCommand::Start);
         loop {
-            let event = match event_rx.recv() {
+            let event = match deployment_events_rx.recv() {
                 Ok(event) => event,
                 Err(e) => break,
             };
@@ -615,6 +629,7 @@ pub fn publish_initial_contracts(
         }
     });
 }
+
 
 pub async fn publish_stacking_orders(
     devnet_config: &DevnetConfig,
