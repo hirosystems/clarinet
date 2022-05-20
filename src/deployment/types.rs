@@ -14,38 +14,37 @@ use std::fs;
 
 use crate::types::StacksNetwork;
 
-#[derive(Debug, PartialEq, Clone, Serialize, Deserialize)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct TransactionPlanSpecification {
     pub batches: Vec<TransactionsBatchSpecification>,
 }
 
 #[derive(Debug, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
 pub struct TransactionPlanSpecificationFile {
     pub batches: Vec<TransactionsBatchSpecificationFile>,
 }
 
 #[derive(Debug, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
 pub struct TransactionsBatchSpecificationFile {
     pub id: usize,
     pub transactions: Vec<TransactionSpecificationFile>,
 }
 
 #[derive(Debug, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
 pub enum TransactionSpecificationFile {
-    #[serde(rename = "contract-call")]
     ContractCall(ContractCallSpecificationFile),
-    #[serde(rename = "contract-publish")]
     ContractPublish(ContractPublishSpecificationFile),
-    #[serde(rename = "emulated-contract-call")]
     EmulatedContractCall(EmulatedContractCallSpecificationFile),
-    #[serde(rename = "emulated-contract-publish")]
     EmulatedContractPublish(EmulatedContractPublishSpecificationFile),
 }
 
 #[derive(Debug, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
 pub struct ContractCallSpecificationFile {
     pub contract_id: String,
-    #[serde(rename = "expected-sender")]
     pub expected_sender: String,
     pub method: String,
     pub parameters: Vec<String>,
@@ -53,53 +52,46 @@ pub struct ContractCallSpecificationFile {
 }
 
 #[derive(Debug, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
 pub struct ContractPublishSpecificationFile {
-    #[serde(rename = "contract-name")]
     pub contract_name: String,
-    #[serde(rename = "expected-sender")]
     pub expected_sender: String,
     pub path: String,
     pub cost: u64,
 }
 
 #[derive(Debug, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
 pub struct EmulatedContractCallSpecificationFile {
-    #[serde(rename = "contract-id")]
     pub contract_id: String,
-    #[serde(rename = "emulated-sender")]
     pub emulated_sender: String,
     pub method: String,
     pub parameters: Vec<String>,
 }
 
 #[derive(Debug, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
 pub struct EmulatedContractPublishSpecificationFile {
-    #[serde(rename = "contract-name")]
     pub contract_name: String,
-    #[serde(rename = "emulated-sender")]
     pub emulated_sender: String,
     pub path: String,
 }
 
-#[derive(Debug, PartialEq, Clone, Serialize, Deserialize)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct TransactionsBatchSpecification {
     pub id: usize,
     pub transactions: Vec<TransactionSpecification>,
 }
 
-#[derive(Debug, PartialEq, Serialize, Deserialize, Clone)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum TransactionSpecification {
-    #[serde(rename = "contract-call")]
     ContractCall(ContractCallSpecification),
-    #[serde(rename = "contract-publish")]
     ContractPublish(ContractPublishSpecification),
-    #[serde(rename = "emulated-contract-call")]
     EmulatedContractCall(EmulatedContractCallSpecification),
-    #[serde(rename = "emulated-contract-publish")]
     EmulatedContractPublish(EmulatedContractPublishSpecification),
 }
 
-#[derive(Debug, PartialEq, Serialize, Deserialize, Clone)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct ContractCallSpecification {
     pub contract_id: QualifiedContractIdentifier,
     pub expected_sender: StandardPrincipalData,
@@ -351,18 +343,15 @@ impl std::fmt::Display for DeploymentSynthesis {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone)]
 pub struct DeploymentSpecification {
     pub id: u32,
     pub name: String,
     pub network: StacksNetwork,
-    #[serde(skip_serializing_if = "Option::is_none")]
     pub node: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
     pub genesis: Option<GenesisSpecification>,
     pub plan: TransactionPlanSpecification,
     // Keep a cache of contract's (source, relative_path)
-    #[serde(skip_serializing, skip_deserializing)]
     pub contracts: BTreeMap<QualifiedContractIdentifier, (String, String)>,
 }
 
@@ -542,29 +531,35 @@ impl DeploymentSpecification {
 }
 
 #[derive(Debug, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+
 pub struct DeploymentSpecificationFile {
     pub id: Option<u32>,
     pub name: String,
     pub network: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub node: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub genesis: Option<GenesisSpecificationFile>,
     pub plan: Option<TransactionPlanSpecificationFile>,
 }
 
 #[derive(Debug, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
 pub struct GenesisSpecificationFile {
     pub wallets: Vec<WalletSpecificationFile>,
     pub contracts: Vec<String>,
 }
 
 #[derive(Debug, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
 pub struct WalletSpecificationFile {
     pub name: String,
     pub address: String,
     pub balance: String,
 }
 
-#[derive(Debug, PartialEq, Clone, Serialize, Deserialize)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct GenesisSpecification {
     pub wallets: Vec<WalletSpecification>,
     pub contracts: Vec<String>,
@@ -602,7 +597,7 @@ impl GenesisSpecification {
     }
 }
 
-#[derive(Debug, PartialEq, Clone, Serialize, Deserialize)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct WalletSpecification {
     pub name: String,
     pub address: StandardPrincipalData,
