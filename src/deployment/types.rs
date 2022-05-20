@@ -296,7 +296,7 @@ impl EmulatedContractPublishSpecification {
             Ok(res) => res,
             Err(_) => {
                 return Err(format!(
-                    "unable to turn emulated_sender {} as a valid Stacks address",
+                    "unable to parse emulated sender '{}' as a valid Stacks address",
                     specs.emulated_sender
                 ))
             }
