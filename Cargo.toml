@@ -83,6 +83,7 @@ hex = "0.4.3"
 dirs = "4.0.0"
 serde_yaml = "0.8.23"
 num_cpus = "1.13.1"
+mio = "=0.8.2"
 
 [dependencies.tui]
 version = "0.16.0"
@@ -100,6 +101,10 @@ winapi = { version = "0.3.9", features = [
     "winbase",
     "winerror",
     "winsock2",
+    "std",
+    "handleapi",
+    "ws2ipdef",
+    "ws2tcpip"
 ] }
 
 [package.metadata.winres]
