@@ -797,7 +797,7 @@ pub fn generate_default_deployment(
                 continue;
             }
 
-            // Did we already got the source in a prior cycle?
+            // Did we already get the source in a prior cycle?
             let ast = match requirements_asts.remove(&contract_id) {
                 Some(ast) => ast,
                 None => {
