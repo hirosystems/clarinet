@@ -860,7 +860,7 @@ pub fn generate_default_deployment(
                 }
                 Err((inferable_dependencies, non_inferable_dependencies)) => {
                     // In the case of unknown dependencies, we were unable to construct an exhaustive list of dependencies.
-                    // As such, we will enqueue re-enqueue the present (front) and push all the unknown contract_ids in front of it,
+                    // As such, we will re-enqueue the present (front) and push all the unknown contract_ids in front of it,
                     // and we will keep the source in memory to avoid useless disk access.
                     for (_, dependencies) in inferable_dependencies.iter() {
                         for dependency in dependencies.iter() {
