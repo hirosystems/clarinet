@@ -45,8 +45,8 @@ pub fn run_dap() -> Result<(), String> {
                 false,
                 None,
             ) {
-                Ok(result) => Ok(()),
-                Err(diagnostics) => Err("unable to interpret expression".to_string()),
+                Ok(_result) => Ok(()),
+                Err(_diagnostics) => Err("unable to interpret expression".to_string()),
             }
         }
         Err(e) => Err(format!("dap_init: {}", e)),

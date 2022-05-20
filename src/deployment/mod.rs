@@ -46,7 +46,7 @@ use clarity_repl::repl::SessionSettings;
 use clarity_repl::repl::{ExecutionResult, Session};
 use libsecp256k1::{PublicKey, SecretKey};
 use serde_yaml;
-use std::collections::{BTreeMap, HashMap, HashSet, VecDeque};
+use std::collections::{BTreeMap, HashMap, VecDeque};
 use std::fs::{self, File};
 use std::io::Write;
 use std::path::PathBuf;
@@ -68,6 +68,7 @@ pub struct DeploymentGenerationArtifacts {
     pub diags: HashMap<QualifiedContractIdentifier, Vec<Diagnostic>>,
 }
 
+#[allow(dead_code)]
 pub fn encode_contract_call(
     _contract_name: &ContractName,
     _source: &str,
@@ -75,7 +76,7 @@ pub fn encode_contract_call(
     _deployment_fee_rate: u64,
     _network: &StacksNetwork,
 ) -> Result<(StacksTransaction, StacksAddress), String> {
-    Err(format!("unimplemented"))
+    Err(format!("encode_contract_call operations unimplemented"))
 }
 
 pub fn encode_contract_publish(
@@ -323,7 +324,7 @@ pub fn get_absolute_deployment_path(
     manifest: &ProjectManifest,
     relative_deployment_path: &str,
 ) -> PathBuf {
-    let mut base_path = manifest.get_project_root_dir();
+    let base_path = manifest.get_project_root_dir();
     let path = match PathBuf::from_str(relative_deployment_path) {
         Ok(path) => path,
         Err(_e) => {
@@ -481,7 +482,7 @@ pub fn apply_on_chain_deployment(
                     let _ =
                         deployment_event_tx.send(DeploymentEvent::ContractUpdate(ContractUpdate {
                             contract_id: format!("{}.{}", issuer_address, tx.contract_name),
-                            status: ContractStatus::Queued,
+                            status: ContractStatus::Encoded,
                             comment: None,
                         }));
                 }
@@ -522,7 +523,17 @@ pub fn apply_on_chain_deployment(
                         (sender, contract_name, TransactionStatus::Broadcasted),
                     );
                 }
-                Err(_e) => return,
+                Err(e) => {
+                    let message = format!("{:?}", e);
+                    let _ =
+                        deployment_event_tx.send(DeploymentEvent::ContractUpdate(ContractUpdate {
+                            contract_id: format!("{}.{}", sender.to_address(), contract_name),
+                            status: ContractStatus::Error,
+                            comment: Some(message.clone()),
+                        }));
+                    let _ = deployment_event_tx.send(DeploymentEvent::Interrupted(message));
+                    return;
+                }
             };
         }
 
@@ -578,7 +589,7 @@ pub fn apply_on_chain_deployment(
 }
 
 pub fn check_deployments(manifest: &ProjectManifest) -> Result<(), String> {
-    let mut base_path = manifest.get_project_root_dir();
+    let base_path = manifest.get_project_root_dir();
     let files = get_deployments_files(manifest)?;
     for (path, relative_path) in files.into_iter() {
         let _spec = match DeploymentSpecification::from_config_file(&path, &base_path) {
@@ -764,7 +775,7 @@ pub fn generate_default_deployment(
     let mut boot_contracts_asts = session.get_boot_contracts_asts();
     let boot_contracts_ids = boot_contracts_asts
         .iter()
-        .map(|(k, v)| k.clone())
+        .map(|(k, _)| k.clone())
         .collect::<Vec<QualifiedContractIdentifier>>();
     requirements_asts.append(&mut boot_contracts_asts);
 

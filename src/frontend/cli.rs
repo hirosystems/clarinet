@@ -1,8 +1,8 @@
 use crate::deployment::{
     self, apply_on_chain_deployment, check_deployments, generate_default_deployment,
     get_absolute_deployment_path, get_default_deployment_path, load_deployment,
-    load_deployment_if_exists, read_deployment_or_generate_default, setup_session_with_deployment,
-    write_deployment, DeploymentCommand, DeploymentEvent,
+    load_deployment_if_exists, setup_session_with_deployment, write_deployment, DeploymentCommand,
+    DeploymentEvent,
 };
 use crate::generate::{
     self,
@@ -528,6 +528,18 @@ pub fn main() {
                 let (command_tx, command_rx) = std::sync::mpsc::channel();
                 let (event_tx, event_rx) = std::sync::mpsc::channel();
                 let manifest_moved = manifest.clone();
+
+                if manifest.project.telemetry {
+                    #[cfg(feature = "telemetry")]
+                    telemetry_report_event(DeveloperUsageEvent::ProtocolPublished(
+                        DeveloperUsageDigest::new(
+                            &manifest.project.name,
+                            &manifest.project.authors,
+                        ),
+                        deployment.network.clone(),
+                    ));
+                }
+
                 std::thread::spawn(move || {
                     let manifest = manifest_moved;
                     apply_on_chain_deployment(&manifest, deployment, event_tx, command_rx, true);
@@ -539,7 +551,7 @@ pub fn main() {
                     loop {
                         let cmd = match event_rx.recv() {
                             Ok(cmd) => cmd,
-                            Err(e) => break,
+                            Err(_e) => break,
                         };
                         match cmd {
                             DeploymentEvent::Interrupted(message) => {
@@ -583,13 +595,8 @@ pub fn main() {
             Contracts::NewContract(cmd) => {
                 let manifest = load_manifest_or_exit(cmd.manifest_path);
 
-                let changes = generate::get_changes_for_new_contract(
-                    &manifest.path,
-                    cmd.name,
-                    None,
-                    true,
-                    vec![],
-                );
+                let changes =
+                    generate::get_changes_for_new_contract(&manifest.path, cmd.name, None, true);
                 if !execute_changes(changes) {
                     std::process::exit(1);
                 }
@@ -675,6 +682,10 @@ pub fn main() {
                 setup_session_with_deployment(&manifest, &deployment, contracts_asts);
             let mut terminal = Terminal::load(session);
             terminal.start();
+
+            if hints_enabled {
+                display_post_console_hint();
+            }
 
             // Report telemetry
             if manifest.project.telemetry {

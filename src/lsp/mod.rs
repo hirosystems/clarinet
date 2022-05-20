@@ -87,8 +87,8 @@ pub struct ContractState {
 impl ContractState {
     pub fn new(
         contract_id: QualifiedContractIdentifier,
-        ast: ContractAST,
-        deps: DependencySet,
+        _ast: ContractAST,
+        _deps: DependencySet,
         mut diags: Vec<ClarityDiagnostic>,
         analysis: Option<ContractAnalysis>,
         path: PathBuf,
@@ -145,7 +145,7 @@ impl EditorState {
     }
 
     pub fn index_protocol(&mut self, manifest_path: PathBuf, protocol: ProtocolState) {
-        for (contract_uri, protocol_state) in protocol.contracts.iter() {
+        for (contract_uri, _) in protocol.contracts.iter() {
             self.contracts_lookup
                 .insert(contract_uri.clone(), manifest_path.clone());
         }
@@ -194,7 +194,6 @@ impl EditorState {
         let mut contracts = vec![];
         let mut erroring_files = HashSet::new();
         let mut warning_files = HashSet::new();
-        let mut tldr = None;
 
         for (_, protocol_state) in self.protocols.iter() {
             for (contract_url, state) in protocol_state.contracts.iter() {
@@ -228,7 +227,7 @@ impl EditorState {
             }
         }
 
-        tldr = match (erroring_files.len(), warning_files.len()) {
+        let tldr = match (erroring_files.len(), warning_files.len()) {
             (0, 0) => None,
             (0, warnings) if warnings > 0 => Some((
                 MessageType::Warning,
@@ -354,7 +353,6 @@ impl Response {
 }
 
 fn start_server(command_rx: Receiver<LspRequest>) {
-    let mut manifest_checksum = String::new();
     let mut editor_state = EditorState::new();
 
     loop {
@@ -499,11 +497,10 @@ fn start_server(command_rx: Receiver<LspRequest>) {
                     };
                 // TODO(lgalabru): introduce partial analysis
                 // https://github.com/hirosystems/clarity-lsp/issues/98
-
-                // We will rebuild the entire state, without to try any optimizations for now
+                // We will rebuild the entire state, without trying any optimizations for now
                 let mut protocol_state = ProtocolState::new();
                 match build_state(&manifest_path, &mut protocol_state) {
-                    Ok(contracts_updates) => {
+                    Ok(_contracts_updates) => {
                         editor_state.index_protocol(manifest_path, protocol_state);
                         let (aggregated_diagnostics, notification) =
                             editor_state.get_aggregated_diagnostics();
@@ -599,7 +596,7 @@ fn test_opening_counter_contract_should_return_fresh_analysis() {
 
     // the counter project should emit 2 warnings and 2 notes coming from counter.clar
     assert_eq!(response.aggregated_diagnostics.len(), 1);
-    let (url, diags) = &response.aggregated_diagnostics[0];
+    let (_url, diags) = &response.aggregated_diagnostics[0];
     assert_eq!(diags.len(), 4);
 
     // re-opening this contract should not trigger a full analysis
@@ -631,7 +628,7 @@ fn test_opening_counter_manifest_should_return_fresh_analysis() {
 
     // the counter project should emit 2 warnings and 2 notes coming from counter.clar
     assert_eq!(response.aggregated_diagnostics.len(), 1);
-    let (url, diags) = &response.aggregated_diagnostics[0];
+    let (_url, diags) = &response.aggregated_diagnostics[0];
     assert_eq!(diags.len(), 4);
 
     // re-opening this manifest should not trigger a full analysis
@@ -663,6 +660,6 @@ fn test_opening_simple_nft_manifest_should_return_fresh_analysis() {
 
     // the counter project should emit 2 warnings and 2 notes coming from counter.clar
     assert_eq!(response.aggregated_diagnostics.len(), 2);
-    let (url, diags) = &response.aggregated_diagnostics[0];
+    let (_url, diags) = &response.aggregated_diagnostics[0];
     assert_eq!(diags.len(), 8);
 }

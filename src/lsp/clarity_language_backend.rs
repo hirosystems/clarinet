@@ -9,8 +9,6 @@ use tower_lsp::jsonrpc::Result;
 use tower_lsp::lsp_types::*;
 use tower_lsp::{async_trait, Client, LanguageServer};
 
-type Logs = Vec<String>;
-
 // The LSP is being initialized when clarity files are being detected in the project.
 // We want the LSP to be notified when 2 kind of edits happened:
 // - .clar file opened:
@@ -99,7 +97,7 @@ impl LanguageServer for ClarityLanguageBackend {
     }
 
     async fn did_open(&self, params: DidOpenTextDocumentParams) {
-        let response_rx = if let Some(contract_path) =
+        let response_rx = if let Some(_contract_path) =
             utils::get_contract_file(&params.text_document.uri)
         {
             let (response_tx, response_rx) = channel();
@@ -147,7 +145,7 @@ impl LanguageServer for ClarityLanguageBackend {
     }
 
     async fn did_save(&self, params: DidSaveTextDocumentParams) {
-        let response_rx = if let Some(contract_path) =
+        let response_rx = if let Some(_contract_path) =
             utils::get_contract_file(&params.text_document.uri)
         {
             let (response_tx, response_rx) = channel();

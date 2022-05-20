@@ -189,6 +189,7 @@ pub enum DevnetEvent {
     // Microblock(MicroblockData),
 }
 
+#[allow(dead_code)]
 impl DevnetEvent {
     pub fn error(message: String) -> DevnetEvent {
         DevnetEvent::Log(Self::log_error(message))

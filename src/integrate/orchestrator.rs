@@ -41,7 +41,7 @@ impl DevnetOrchestrator {
     ) -> DevnetOrchestrator {
         let docker_client = Docker::connect_with_socket_defaults().unwrap();
 
-        let mut project_path = manifest.get_project_root_dir();
+        let project_path = manifest.get_project_root_dir();
         let mut network_config_path = project_path.clone();
         network_config_path.push("settings");
         network_config_path.push("Devnet.toml");

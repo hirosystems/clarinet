@@ -19,12 +19,12 @@ impl GetChangesForNewContract {
         }
     }
 
-    pub fn run(&mut self, include_test: bool, deps: Vec<String>) -> Vec<Changes> {
+    pub fn run(&mut self, include_test: bool) -> Vec<Changes> {
         self.create_template_contract();
         if include_test {
             self.create_template_test();
         }
-        self.index_contract_in_clarinet_toml(deps);
+        self.index_contract_in_clarinet_toml();
         self.changes.clone()
     }
 
@@ -115,7 +115,7 @@ Clarinet.test({{
         self.changes.push(Changes::AddFile(change));
     }
 
-    fn index_contract_in_clarinet_toml(&mut self, deps: Vec<String>) {
+    fn index_contract_in_clarinet_toml(&mut self) {
         let contract_file_name = format!("{}.clar", self.contract_name);
         let manifest_path = self.manifest_path.clone();
 

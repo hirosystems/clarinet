@@ -9,8 +9,8 @@ use crossterm::{
     execute,
     terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
 };
+use std::io::stdout;
 use std::sync::mpsc::Receiver;
-use std::{error::Error, io::stdout};
 use tui::{backend::CrosstermBackend, Terminal};
 
 pub fn start_ui(

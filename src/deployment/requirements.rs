@@ -54,10 +54,11 @@ pub fn retrieve_contract(
     Ok((code, file_path))
 }
 
+#[allow(dead_code)]
 #[derive(Deserialize, Debug, Default, Clone)]
 struct Contract {
     source: String,
-    publish_height: u32,
+    _publish_height: u32,
 }
 
 async fn fetch_contract(request_url: String) -> Result<Contract, String> {

@@ -1,9 +1,6 @@
 use super::DevnetEvent;
 use crate::deployment::types::DeploymentSpecification;
-use crate::deployment::{
-    apply_on_chain_deployment, read_deployment_or_generate_default, setup_session_with_deployment,
-    DeploymentCommand, DeploymentEvent,
-};
+use crate::deployment::{apply_on_chain_deployment, DeploymentCommand, DeploymentEvent};
 use crate::indexer::{chains, Indexer, IndexerConfig};
 use crate::integrate::{MempoolAdmissionData, ServiceStatusData, Status};
 use crate::types::{self, AccountConfig, ChainConfig, DevnetConfig, ProjectManifest};
@@ -15,18 +12,17 @@ use clarity_repl::clarity::representations::ClarityName;
 use clarity_repl::clarity::types::{BuffData, SequenceData, TupleData, Value as ClarityValue};
 use clarity_repl::clarity::util::address::AddressHashMode;
 use clarity_repl::clarity::util::hash::{hex_bytes, Hash160};
-use clarity_repl::repl::settings::InitialContract;
-use clarity_repl::repl::Session;
+
 use rocket::config::{Config, LogLevel};
 use rocket::serde::json::{json, Json, Value as JsonValue};
 use rocket::serde::Deserialize;
 use rocket::State;
-use std::collections::VecDeque;
+
 use std::convert::TryFrom;
 use std::error::Error;
-use std::iter::FromIterator;
+
 use std::net::{IpAddr, Ipv4Addr};
-use std::path::PathBuf;
+
 use std::str;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc::{channel, Receiver, Sender};
@@ -289,7 +285,6 @@ pub fn handle_new_bitcoin_block(
     indexer_rw_lock: &State<Arc<RwLock<Indexer>>>,
     devnet_events_tx: &State<Arc<Mutex<Sender<DevnetEvent>>>>,
     marshalled_block: Json<JsonValue>,
-    background_job_tx_mutex: &State<Arc<Mutex<Sender<ChainsCoordinatorCommand>>>>,
 ) -> Json<JsonValue> {
     let devnet_events_tx = devnet_events_tx.inner();
 
@@ -622,7 +617,7 @@ pub fn perform_protocol_deployment(
         loop {
             let event = match deployment_events_rx.recv() {
                 Ok(event) => event,
-                Err(e) => break,
+                Err(_e) => break,
             };
             match event {
                 DeploymentEvent::ContractUpdate(_) => {}
