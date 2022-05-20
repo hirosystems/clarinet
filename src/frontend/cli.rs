@@ -1,8 +1,8 @@
 use crate::deployment::{
     self, apply_on_chain_deployment, check_deployments, generate_default_deployment,
     get_absolute_deployment_path, get_default_deployment_path, load_deployment,
-    load_deployment_if_exists, read_deployment_or_generate_default,
-    setup_session_with_deployment, write_deployment, DeploymentCommand, DeploymentEvent,
+    load_deployment_if_exists, read_deployment_or_generate_default, setup_session_with_deployment,
+    write_deployment, DeploymentCommand, DeploymentEvent,
 };
 use crate::generate::{
     self,

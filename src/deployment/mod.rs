@@ -667,7 +667,13 @@ pub fn write_deployment(
         let mut base_dir = target_path.clone();
         base_dir.pop();
         if !base_dir.exists() {
-            let _ = std::fs::create_dir(base_dir);
+            if let Err(e) = std::fs::create_dir(&base_dir) {
+                return Err(format!(
+                    "unable to create directory {}: {:?}",
+                    base_dir.display(),
+                    e
+                ));
+            }
         }
     }
 
@@ -760,7 +766,7 @@ pub fn generate_default_deployment(
         .collect::<Vec<QualifiedContractIdentifier>>();
     requirements_asts.append(&mut boot_contracts_asts);
 
-    // Build the ASTs / DependencySet for requirements - step required for Tests/Devnet/Testnet/Mainnet
+    // Build the ASTs / DependencySet for requirements - step required for Simnet/Devnet/Testnet/Mainnet
     if let Some(ref requirements) = manifest.project.requirements {
         let default_cache_path = match PathBuf::from_str(&manifest.project.cache_dir) {
             Ok(path) => path,
@@ -985,7 +991,7 @@ pub fn generate_default_deployment(
     let ordered_contracts_ids = match ASTDependencyDetector::order_contracts(&dependencies) {
         Ok(ordered_contracts_ids) => ordered_contracts_ids
             .into_iter()
-            .map(|c| c.clone())
+            .map(|c| c)
             .collect::<Vec<_>>(),
         Err(e) => return Err(format!("unable to order contracts {}", e)),
     };
@@ -1017,10 +1023,10 @@ pub fn generate_default_deployment(
         transactions.push(tx);
     }
 
-    let _tx_chain_limit = 25;
+    let tx_chain_limit = 25;
 
     let mut batches = vec![];
-    for (id, transactions) in transactions.chunks(25).enumerate() {
+    for (id, transactions) in transactions.chunks(tx_chain_limit).enumerate() {
         batches.push(TransactionsBatchSpecification {
             id: id,
             transactions: transactions.to_vec(),
@@ -1028,22 +1034,24 @@ pub fn generate_default_deployment(
     }
 
     let mut wallets = vec![];
-    for (name, account) in chain_config.accounts.into_iter() {
-        let address = match PrincipalData::parse_standard_principal(&account.address) {
-            Ok(res) => res,
-            Err(_) => {
-                return Err(format!(
-                    "unable to parse wallet {} in a valid Stacks address",
-                    account.address
-                ))
-            }
-        };
+    if let StacksNetwork::Simnet = network {
+        for (name, account) in chain_config.accounts.into_iter() {
+            let address = match PrincipalData::parse_standard_principal(&account.address) {
+                Ok(res) => res,
+                Err(_) => {
+                    return Err(format!(
+                        "unable to parse wallet {} in a valid Stacks address",
+                        account.address
+                    ))
+                }
+            };
 
-        wallets.push(WalletSpecification {
-            name,
-            address,
-            balance: account.balance.into(),
-        });
+            wallets.push(WalletSpecification {
+                name,
+                address,
+                balance: account.balance.into(),
+            });
+        }
     }
 
     let name = match network {

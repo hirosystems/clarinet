@@ -1,8 +1,8 @@
 use super::DevnetEvent;
 use crate::deployment::types::DeploymentSpecification;
 use crate::deployment::{
-    apply_on_chain_deployment, read_deployment_or_generate_default,
-    setup_session_with_deployment, DeploymentCommand, DeploymentEvent,
+    apply_on_chain_deployment, read_deployment_or_generate_default, setup_session_with_deployment,
+    DeploymentCommand, DeploymentEvent,
 };
 use crate::indexer::{chains, Indexer, IndexerConfig};
 use crate::integrate::{MempoolAdmissionData, ServiceStatusData, Status};
@@ -115,7 +115,12 @@ pub async fn start_chains_coordinator(
     let (deployment_events_tx, deployment_events_rx) = channel();
     let (deployment_commands_tx, deployments_command_rx) = channel();
 
-    prepare_protocol_deployment(&config.manifest, &config.deployment, deployment_events_tx, deployments_command_rx);
+    prepare_protocol_deployment(
+        &config.manifest,
+        &config.deployment,
+        deployment_events_tx,
+        deployments_command_rx,
+    );
 
     let init_status = DevnetInitializationStatus {
         should_deploy_protocol: true,
@@ -195,7 +200,7 @@ pub async fn start_chains_coordinator(
                             &deployment_commands_tx,
                             &devnet_event_tx,
                             &chains_coordinator_commands_tx,
-                        )    
+                        )
                     }
                 }
             }
@@ -592,7 +597,13 @@ pub fn prepare_protocol_deployment(
     let deployment = deployment.clone();
 
     std::thread::spawn(move || {
-        apply_on_chain_deployment(&manifest, deployment, deployment_event_tx, deployment_command_rx, false);
+        apply_on_chain_deployment(
+            &manifest,
+            deployment,
+            deployment_event_tx,
+            deployment_command_rx,
+            false,
+        );
     });
 }
 
@@ -629,7 +640,6 @@ pub fn perform_protocol_deployment(
         }
     });
 }
-
 
 pub async fn publish_stacking_orders(
     devnet_config: &DevnetConfig,

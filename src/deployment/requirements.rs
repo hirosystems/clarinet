@@ -36,7 +36,7 @@ pub fn retrieve_contract(
     );
 
     let rt = tokio::runtime::Runtime::new().unwrap();
-    let response = rt.block_on(async { fetch_contract(request_url).await });
+    let response = rt.block_on(async { fetch_contract(request_url).await })?;
     let code = response.source.to_string();
 
     if use_cache {
@@ -60,12 +60,13 @@ struct Contract {
     publish_height: u32,
 }
 
-async fn fetch_contract(request_url: String) -> Contract {
-    let response: Contract = reqwest::get(&request_url)
+async fn fetch_contract(request_url: String) -> Result<Contract, String> {
+    let response = reqwest::get(&request_url)
         .await
-        .expect("Unable to retrieve contract")
+        .map_err(|_| format!("Unable to retrieve contract {}", request_url))?;
+
+    response
         .json()
         .await
-        .expect("Unable to parse contract");
-    return response;
+        .map_err(|_| format!("Unable to parse contract {}", request_url))?
 }
