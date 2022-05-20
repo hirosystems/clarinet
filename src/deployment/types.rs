@@ -285,7 +285,7 @@ impl EmulatedContractPublishSpecification {
             Ok(res) => res,
             Err(_) => {
                 return Err(format!(
-                    "unable to use {} as a valid contract name",
+                    "unable to parse '{}' as a valid contract name",
                     specs.contract_name
                 ))
             }
