@@ -116,7 +116,7 @@ impl ContractCallSpecification {
             Ok(res) => res,
             Err(_) => {
                 return Err(format!(
-                    "unable to parse {} as a valid contract_id",
+                    "unable to parse '{}' as a valid contract identifier",
                     specs.contract_id
                 ))
             }
