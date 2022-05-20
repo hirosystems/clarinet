@@ -190,7 +190,7 @@ impl ContractPublishSpecification {
 
         let path = match PathBuf::try_from(&specs.path) {
             Ok(res) => res,
-            Err(_) => return Err(format!("unable to turn {} into a valid path", specs.path)),
+            Err(_) => return Err(format!("unable to parse '{}' as a valid path", specs.path)),
         };
 
         let mut contract_path = base_path.clone();
