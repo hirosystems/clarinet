@@ -62,7 +62,6 @@ pub struct RequirementConfig {
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct ContractConfig {
     pub path: String,
-    pub depends_on: Vec<String>,
     pub deployer: Option<String>,
 }
 
@@ -77,8 +76,7 @@ impl ProjectManifest {
         let file = match File::open(path) {
             Ok(path) => path,
             Err(_e) => {
-                println!("Error: unable to locate Clarinet.toml in current directory");
-                std::process::exit(1);
+                return Err("unable to locate Clarinet.toml in current directory".to_string());
             }
         };
         let mut project_manifest_file_reader = BufReader::new(file);
@@ -91,12 +89,7 @@ impl ProjectManifest {
             match toml::from_slice(&project_manifest_file_buffer[..]) {
                 Ok(s) => s,
                 Err(e) => {
-                    println!(
-                        "{}: Clarinet.toml file malformatted.\n{:?}",
-                        red!("error"),
-                        e
-                    );
-                    std::process::exit(1);
+                    return Err(format!("Clarinet.toml file malformatted {:?}", e));
                 }
             };
 
@@ -127,11 +120,7 @@ impl ProjectManifest {
                 let path = match PathBuf::from_str(path) {
                     Ok(path) => path,
                     Err(_e) => {
-                        println!(
-                            "{}: Clarinet.toml file malformatted, the entry cache_dir is not a valid path",
-                            red!("error")
-                        );
-                        std::process::exit(1);
+                        return Err("setting cache_dir is not a valid path".to_string());
                     }
                 };
                 if path.is_relative() {
@@ -206,13 +195,10 @@ impl ProjectManifest {
                                 Some(Value::String(path)) => path.to_string(),
                                 _ => continue,
                             };
-                            let depends_on = match contract_settings.get("depends_on") {
-                                Some(Value::Array(depends_on)) => depends_on
-                                    .iter()
-                                    .map(|v| v.as_str().unwrap().to_string())
-                                    .collect::<Vec<String>>(),
-                                _ => continue,
-                            };
+                            if contract_settings.get("depends_on").is_some() {
+                                // We could print a deprecation notice here if that code path
+                                // was not used by the LSP.
+                            }
                             let deployer = match contract_settings.get("deployer") {
                                 Some(Value::String(path)) => Some(path.to_string()),
                                 _ => None,
@@ -221,7 +207,6 @@ impl ProjectManifest {
                                 contract_name.to_string(),
                                 ContractConfig {
                                     path,
-                                    depends_on,
                                     deployer,
                                 },
                             );

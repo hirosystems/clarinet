@@ -176,21 +176,22 @@ history.txt
 name = "{}"
 authors = []
 telemetry = {}
-[repl.analysis]
-passes = ["check_checker"]
-[repl.analysis.check_checker]
-# If true, inputs are trusted after tx_sender has been checked.
-trusted_sender = false
-# If true, inputs are trusted after contract-caller has been checked.
-trusted_caller = false
-# If true, untrusted data may be passed into a private function without a
-# warning, if it gets checked inside. This check will also propagate up to the
-# caller.
-callee_filter = false
+cache_dir = "./.requirements"
 
 # [contracts.counter]
 # path = "contracts/counter.clar"
-# depends_on = []
+
+[repl.analysis]
+passes = ["check_checker"]
+check_checker = {{ trusted_sender = false, trusted_caller = false, callee_filter = false }}
+
+# Check-checker settings:
+# trusted_sender: if true, inputs are trusted after tx_sender has been checked.
+# trusted_caller: if true, inputs are trusted after contract-caller has been checked.
+# callee_filter: if true, untrusted data may be passed into a private function without a
+# warning, if it gets checked inside. This check will also propagate up to the
+# caller.
+# More informations: https://www.hiro.so/blog/new-safety-checks-in-clarinet
 "#,
             self.project_name, self.telemetry_enabled
         );

@@ -120,7 +120,6 @@ Clarinet.test({{
         let manifest_path = self.manifest_path.clone();
 
         let contract_config = ContractConfig {
-            depends_on: deps,
             path: format!("contracts/{}", contract_file_name),
             deployer: None,
         };
