@@ -264,9 +264,11 @@ pub fn update_session_with_contracts_analyses(
     for batch in deployment.plan.batches.iter() {
         for transaction in batch.transactions.iter() {
             match transaction {
-                TransactionSpecification::EmulatedContractCall(_)
-                | TransactionSpecification::ContractCall(_)
-                | TransactionSpecification::ContractPublish(_) => {}
+                TransactionSpecification::ContractCall(_)
+                | TransactionSpecification::ContractPublish(_) => unreachable!(),
+                TransactionSpecification::EmulatedContractCall(_) => {
+                    /* Do nothing, as a emulated-contract-call would not impact subsequent emulated-contract-publish */
+                }
                 TransactionSpecification::EmulatedContractPublish(tx) => {
                     let mut diagnostics = vec![];
 
@@ -878,7 +880,7 @@ pub fn generate_default_deployment(
         }
 
         // Avoid listing requirements as deployment transactions to the deployment specification on Devnet / Testnet / Mainnet
-        if let StacksNetwork::Simnet = network {
+        if network.is_simnet() {
             let ordered_contracts_ids =
                 match ASTDependencyDetector::order_contracts(&requirements_deps) {
                     Ok(ordered_contracts) => ordered_contracts,
@@ -896,7 +898,7 @@ pub fn generate_default_deployment(
     }
 
     let mut contracts = HashMap::new();
-
+    let mut contracts_sources = HashMap::new();
     for (name, config) in manifest.contracts.iter() {
         let contract_name = match ContractName::try_from(name.to_string()) {
             Ok(res) => res,
@@ -920,7 +922,7 @@ pub fn generate_default_deployment(
             None => default_deployer,
         };
 
-        let emulated_sender = match PrincipalData::parse_standard_principal(&deployer.address) {
+        let sender = match PrincipalData::parse_standard_principal(&deployer.address) {
             Ok(res) => res,
             Err(_) => {
                 return Err(format!(
@@ -942,19 +944,31 @@ pub fn generate_default_deployment(
             }
         };
 
-        let contract = EmulatedContractPublishSpecification {
-            contract_name,
-            emulated_sender,
-            source,
-            relative_path: config.path.clone(),
+        let contract_id = QualifiedContractIdentifier::new(sender.clone(), contract_name.clone());
+
+        contracts_sources.insert(contract_id.clone(), source.clone());
+
+        let contract_spec = if network.is_simnet() {
+            TransactionSpecification::EmulatedContractPublish(
+                EmulatedContractPublishSpecification {
+                    contract_name,
+                    emulated_sender: sender,
+                    source,
+                    relative_path: config.path.clone(),
+                },
+            )
+        } else {
+            TransactionSpecification::ContractPublish(ContractPublishSpecification {
+                contract_name,
+                expected_sender: sender,
+                relative_path: config.path.clone(),
+                cost: deployment_fee_rate
+                    .saturating_mul(source.as_bytes().len().try_into().unwrap()),
+                source,
+            })
         };
 
-        let contract_id = QualifiedContractIdentifier::new(
-            contract.emulated_sender.clone(),
-            contract.contract_name.clone(),
-        );
-
-        contracts.insert(contract_id, contract);
+        contracts.insert(contract_id, contract_spec);
     }
 
     let session = Session::new(settings);
@@ -962,14 +976,13 @@ pub fn generate_default_deployment(
     let mut contract_asts = HashMap::new();
     let mut contract_diags = HashMap::new();
 
-    for (contract_id, contract) in contracts.iter() {
-        let (ast, diags, _) = session.interpreter.build_ast(
-            contract_id.clone(),
-            contract.source.clone(),
-            parser_version,
-        );
+    for (contract_id, source) in contracts_sources.into_iter() {
+        let (ast, diags, _) =
+            session
+                .interpreter
+                .build_ast(contract_id.clone(), source, parser_version);
         contract_asts.insert(contract_id.clone(), ast);
-        contract_diags.insert(contract_id.clone(), diags);
+        contract_diags.insert(contract_id, diags);
     }
 
     let dependencies =
@@ -1000,26 +1013,25 @@ pub fn generate_default_deployment(
         if requirements_asts.contains_key(&contract_id) {
             continue;
         }
-        let data = contracts
+        let tx = contracts
             .remove(&contract_id)
             .expect("unable to retrieve contract");
-        contracts_map.insert(
-            contract_id.clone(),
-            (data.source.clone(), data.relative_path.clone()),
-        );
-        let tx = if let StacksNetwork::Simnet = network {
-            TransactionSpecification::EmulatedContractPublish(data)
-        } else {
-            TransactionSpecification::ContractPublish(ContractPublishSpecification {
-                contract_name: data.contract_name.clone(),
-                expected_sender: data.emulated_sender.clone(),
-                relative_path: data.relative_path.clone(),
-                source: data.source.clone(),
-                cost: deployment_fee_rate
-                    .saturating_mul(data.source.as_bytes().len().try_into().unwrap()),
-            })
-        };
 
+        match tx {
+            TransactionSpecification::EmulatedContractPublish(ref data) => {
+                contracts_map.insert(
+                    contract_id.clone(),
+                    (data.source.clone(), data.relative_path.clone()),
+                );
+            }
+            TransactionSpecification::ContractPublish(ref data) => {
+                contracts_map.insert(
+                    contract_id.clone(),
+                    (data.source.clone(), data.relative_path.clone()),
+                );
+            }
+            _ => unreachable!(),
+        }
         transactions.push(tx);
     }
 
@@ -1034,7 +1046,7 @@ pub fn generate_default_deployment(
     }
 
     let mut wallets = vec![];
-    if let StacksNetwork::Simnet = network {
+    if network.is_simnet() {
         for (name, account) in chain_config.accounts.into_iter() {
             let address = match PrincipalData::parse_standard_principal(&account.address) {
                 Ok(res) => res,
@@ -1064,7 +1076,7 @@ pub fn generate_default_deployment(
         name,
         node,
         network: network.clone(),
-        genesis: if let StacksNetwork::Simnet = network {
+        genesis: if network.is_simnet() {
             Some(GenesisSpecification {
                 wallets,
                 contracts: manifest.project.boot_contracts.clone(),

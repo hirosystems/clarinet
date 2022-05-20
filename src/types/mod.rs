@@ -73,6 +73,15 @@ pub enum StacksNetwork {
     Mainnet,
 }
 
+impl StacksNetwork {
+    pub fn is_simnet(&self) -> bool {
+        match self {
+            StacksNetwork::Simnet => true,
+            _ => false,
+        }
+    }
+}
+
 #[allow(dead_code)]
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub enum BitcoinNetwork {
