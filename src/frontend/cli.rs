@@ -95,9 +95,6 @@ enum Contracts {
     /// Add third-party requirements to this project
     #[clap(name = "requirement", bin_name = "requirement")]
     Requirement(Requirement),
-    /// Replicate a third-party contract into this project
-    #[clap(name = "fork", bin_name = "fork")]
-    ForkContract(ForkContract),
 }
 
 #[derive(Subcommand, PartialEq, Clone, Debug)]
@@ -139,18 +136,6 @@ struct Requirement {
     /// Path to Clarinet.toml
     #[clap(long = "manifest-path", short = 'm')]
     pub manifest_path: Option<String>,
-}
-
-#[derive(Parser, PartialEq, Clone, Debug)]
-struct ForkContract {
-    /// Contract id (ex. " SP2PABAF9FTAJYNFZH93XENAJ8FVY99RRM50D2JG9.nft-trait")
-    pub contract_id: String,
-    /// Path to Clarinet.toml
-    #[clap(long = "manifest-path", short = 'm')]
-    pub manifest_path: Option<String>,
-    // /// Fork contract and all its dependencies
-    // #[clap(short = 'r')]
-    // pub recursive: bool,
 }
 
 #[derive(Parser, PartialEq, Clone, Debug)]
@@ -634,15 +619,6 @@ pub fn main() {
                     display_post_check_hint();
                 }
             }
-            Contracts::ForkContract(cmd) => {
-                let _manifest = load_manifest_or_exit(cmd.manifest_path);
-                // TODO(lgalabru)
-                // Download contract
-                // Buld AST
-                // Get dependencies
-                // Add dependencies as requirements
-                // Update Clarinet.toml
-            }
         },
         Command::Console(cmd) => {
             let manifest = load_manifest_or_exit(cmd.manifest_path);
@@ -723,7 +699,6 @@ pub fn main() {
             }
         }
         Command::Check(cmd) if cmd.file.is_some() => {
-            // TODO(lgalabru): check
             let file = cmd.file.unwrap();
             let mut settings = repl::SessionSettings::default();
             settings.repl_settings.analysis.enable_all_passes();

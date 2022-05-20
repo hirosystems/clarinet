@@ -498,6 +498,7 @@ fn start_server(command_rx: Receiver<LspRequest>) {
                         },
                     };
                 // TODO(lgalabru): introduce partial analysis
+                // https://github.com/hirosystems/clarity-lsp/issues/98
 
                 // We will rebuild the entire state, without to try any optimizations for now
                 let mut protocol_state = ProtocolState::new();
