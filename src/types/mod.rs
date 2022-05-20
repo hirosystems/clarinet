@@ -67,6 +67,7 @@ pub struct ChainUpdatedWithMicroblockReorgData {
 #[allow(dead_code)]
 #[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize)]
 pub enum StacksNetwork {
+    Simnet,
     Devnet,
     Testnet,
     Mainnet,

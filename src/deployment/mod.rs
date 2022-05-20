@@ -332,17 +332,14 @@ pub fn get_absolute_deployment_path(
     base_path.join(path)
 }
 
-pub fn get_default_deployment_path(
-    manifest: &ProjectManifest,
-    network: &Option<StacksNetwork>,
-) -> PathBuf {
+pub fn get_default_deployment_path(manifest: &ProjectManifest, network: &StacksNetwork) -> PathBuf {
     let mut deployment_path = manifest.get_project_root_dir();
     deployment_path.push("deployments");
     let file_path = match network {
-        None => "default.test-plan.yaml",
-        Some(StacksNetwork::Devnet) => "default.devnet-plan.yaml",
-        Some(StacksNetwork::Testnet) => "default.testnet-plan.yaml",
-        Some(StacksNetwork::Mainnet) => "default.mainnet-plan.yaml",
+        StacksNetwork::Simnet => "default.simnet-plan.yaml",
+        StacksNetwork::Devnet => "default.devnet-plan.yaml",
+        StacksNetwork::Testnet => "default.testnet-plan.yaml",
+        StacksNetwork::Mainnet => "default.mainnet-plan.yaml",
     };
     deployment_path.push(file_path);
     deployment_path
@@ -350,7 +347,7 @@ pub fn get_default_deployment_path(
 
 pub fn read_or_default_to_generated_deployment(
     manifest: &ProjectManifest,
-    network: &Option<StacksNetwork>,
+    network: &StacksNetwork,
 ) -> Result<
     (
         DeploymentSpecification,
@@ -416,10 +413,7 @@ pub fn apply_on_chain_deployment(
     // Check fee, balances and deployers
 
     let mut batches = VecDeque::new();
-    let network = deployment
-        .network
-        .clone()
-        .expect("unable to retrieve network");
+    let network = deployment.network.clone();
     let mut accounts_cached_nonces: BTreeMap<String, u64> = BTreeMap::new();
     let mut accounts_lookup: BTreeMap<String, &AccountConfig> = BTreeMap::new();
 
@@ -599,7 +593,7 @@ pub fn check_deployments(manifest: &ProjectManifest) -> Result<(), String> {
 
 pub fn load_deployment_if_exists(
     manifest: &ProjectManifest,
-    network: &Option<StacksNetwork>,
+    network: &StacksNetwork,
 ) -> Option<Result<DeploymentSpecification, String>> {
     let default_deployment_path = get_default_deployment_path(manifest, network);
     if !default_deployment_path.exists() {
@@ -709,25 +703,25 @@ pub fn write_deployment(
 
 pub fn generate_default_deployment(
     manifest: &ProjectManifest,
-    network: &Option<StacksNetwork>,
+    network: &StacksNetwork,
 ) -> Result<(DeploymentSpecification, DeploymentGenerationArtifacts), String> {
     let chain_config = ChainConfig::from_manifest_path(&manifest.path, &network);
 
     let node = match network {
-        None => None,
-        Some(StacksNetwork::Devnet) => Some(
+        StacksNetwork::Simnet => None,
+        StacksNetwork::Devnet => Some(
             chain_config
                 .network
                 .node_rpc_address
                 .unwrap_or("http://localhost:20443".to_string()),
         ),
-        Some(StacksNetwork::Testnet) => Some(
+        StacksNetwork::Testnet => Some(
             chain_config
                 .network
                 .node_rpc_address
                 .unwrap_or("http://stacks-node-api.testnet.stacks.co".to_string()),
         ),
-        Some(StacksNetwork::Mainnet) => Some(
+        StacksNetwork::Mainnet => Some(
             chain_config
                 .network
                 .node_rpc_address
@@ -766,7 +760,7 @@ pub fn generate_default_deployment(
         .collect::<Vec<QualifiedContractIdentifier>>();
     requirements_asts.append(&mut boot_contracts_asts);
 
-    // Only handle requirements in test environments
+    // Build the ASTs / DependencySet for requirements - step required for Tests/Devnet/Testnet/Mainnet
     if let Some(ref requirements) = manifest.project.requirements {
         let default_cache_path = match PathBuf::from_str(&manifest.project.cache_dir) {
             Ok(path) => path,
@@ -878,7 +872,7 @@ pub fn generate_default_deployment(
         }
 
         // Avoid listing requirements as deployment transactions to the deployment specification on Devnet / Testnet / Mainnet
-        if network.is_none() {
+        if let StacksNetwork::Simnet = network {
             let ordered_contracts_ids =
                 match ASTDependencyDetector::order_contracts(&requirements_deps) {
                     Ok(ordered_contracts) => ordered_contracts,
@@ -1007,7 +1001,7 @@ pub fn generate_default_deployment(
             contract_id.clone(),
             (data.source.clone(), data.relative_path.clone()),
         );
-        let tx = if network.is_none() {
+        let tx = if let StacksNetwork::Simnet = network {
             TransactionSpecification::EmulatedContractPublish(data)
         } else {
             TransactionSpecification::ContractPublish(ContractPublishSpecification {
@@ -1053,8 +1047,8 @@ pub fn generate_default_deployment(
     }
 
     let name = match network {
-        None => format!("Test deployment, used as a default for `clarinet console`, `clarinet test` and `clarinet check`"),
-        Some(network) => format!("{:?} deployment", network)
+        StacksNetwork::Simnet => format!("Simulated deployment, used as a default for `clarinet console`, `clarinet test` and `clarinet check`"),
+        _ => format!("{:?} deployment", network)
     };
 
     let deployment = DeploymentSpecification {
@@ -1062,7 +1056,7 @@ pub fn generate_default_deployment(
         name,
         node,
         network: network.clone(),
-        genesis: if network.is_none() {
+        genesis: if let StacksNetwork::Simnet = network {
             Some(GenesisSpecification {
                 wallets,
                 contracts: manifest.project.boot_contracts.clone(),

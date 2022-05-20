@@ -81,9 +81,7 @@ impl StacksEventObserverConfig {
         deployment: DeploymentSpecification,
     ) -> Self {
         info!("Checking contracts...");
-        let network = Some(StacksNetwork::Devnet);
-
-        let chain_config = ChainConfig::from_manifest_path(&manifest.path, &network);
+        let chain_config = ChainConfig::from_manifest_path(&manifest.path, &StacksNetwork::Devnet);
 
         StacksEventObserverConfig {
             devnet_config,

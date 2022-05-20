@@ -10,7 +10,7 @@ use clarinet_lib::integrate::{self, DevnetEvent, DevnetOrchestrator};
 use clarinet_lib::types::{
     compute_addresses, AccountConfig, BitcoinBlockData, BitcoinChainEvent,
     ChainUpdatedWithBlockData, DevnetConfigFile, PoxStackingOrder, ProjectManifest,
-    StacksChainEvent, DEFAULT_DERIVATION_PATH,
+    StacksChainEvent, StacksNetwork, DEFAULT_DERIVATION_PATH,
 };
 use core::panic;
 use neon::prelude::*;
@@ -58,8 +58,9 @@ impl StacksDevnet {
         let manifest_path = get_manifest_path_or_exit(Some(manifest_path.into()));
         let manifest =
             ProjectManifest::from_path(&manifest_path).expect("Syntax error in Clarinet.toml.");
-        let (deployment, _) = deployment::read_or_default_to_generated_deployment(&manifest, &None)
-            .expect("Unable to generate deployment");
+        let (deployment, _) =
+            deployment::read_or_default_to_generated_deployment(&manifest, &StacksNetwork::Simnet)
+                .expect("Unable to generate deployment");
         let devnet = DevnetOrchestrator::new(manifest, Some(devnet_overrides));
 
         let node_url = devnet.get_stacks_node_url();

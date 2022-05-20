@@ -4,7 +4,7 @@ use crate::deployment::{
     generate_default_deployment, initiate_session_from_deployment,
     update_session_with_contracts_analyses,
 };
-use crate::types::ProjectManifest;
+use crate::types::{ProjectManifest, StacksNetwork};
 use clarity_language_backend::ClarityLanguageBackend;
 use clarity_repl::analysis::ast_dependency_detector::DependencySet;
 use clarity_repl::clarity::analysis::ContractAnalysis;
@@ -536,7 +536,8 @@ pub fn build_state(
     // view of the repo.
     let manifest = ProjectManifest::from_path(manifest_path)?;
 
-    let (deployment, mut artifacts) = generate_default_deployment(&manifest, &None)?;
+    let (deployment, mut artifacts) =
+        generate_default_deployment(&manifest, &StacksNetwork::Simnet)?;
 
     let mut session = initiate_session_from_deployment(&manifest);
     let results =

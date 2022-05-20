@@ -355,8 +355,7 @@ impl std::fmt::Display for DeploymentSynthesis {
 pub struct DeploymentSpecification {
     pub id: u32,
     pub name: String,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub network: Option<StacksNetwork>,
+    pub network: StacksNetwork,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub node: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -388,44 +387,33 @@ impl DeploymentSpecification {
                 Err(msg) => return Err(format!("unable to read file {}", msg)),
             };
 
-        let deployment_spec = if specification_file.network.to_lowercase() == "test" {
-            DeploymentSpecification::from_specifications(&specification_file, None, base_path)?
-        } else if specification_file.network.to_lowercase() == "devnet" {
-            DeploymentSpecification::from_specifications(
-                &specification_file,
-                Some(StacksNetwork::Devnet),
-                base_path,
-            )?
-        } else if specification_file.network.to_lowercase() == "testnet" {
-            DeploymentSpecification::from_specifications(
-                &specification_file,
-                Some(StacksNetwork::Testnet),
-                base_path,
-            )?
-        } else if specification_file.network.to_lowercase() == "mainnet" {
-            DeploymentSpecification::from_specifications(
-                &specification_file,
-                Some(StacksNetwork::Mainnet),
-                base_path,
-            )?
-        } else {
-            return Err(format!(
-                "network '{}' not supported (test, devnet, testnet, mainnet)",
-                specification_file.network
-            ));
+        let network = match specification_file.network.to_lowercase().as_str() {
+            "simnet" => StacksNetwork::Simnet,
+            "devnet" => StacksNetwork::Devnet,
+            "testnet" => StacksNetwork::Testnet,
+            "mainnet" => StacksNetwork::Mainnet,
+            _ => {
+                return Err(format!(
+                    "network '{}' not supported (simnet, devnet, testnet, mainnet)",
+                    specification_file.network
+                ));
+            }
         };
+
+        let deployment_spec =
+            DeploymentSpecification::from_specifications(&specification_file, &network, base_path)?;
 
         Ok(deployment_spec)
     }
 
     pub fn from_specifications(
         specs: &DeploymentSpecificationFile,
-        network: Option<StacksNetwork>,
+        network: &StacksNetwork,
         base_path: &PathBuf,
     ) -> Result<DeploymentSpecification, String> {
         let mut contracts = BTreeMap::new();
-        let (plan, genesis) = match &network {
-            None => {
+        let (plan, genesis) = match network {
+            StacksNetwork::Simnet => {
                 let mut batches = vec![];
                 let mut genesis = None;
                 if let Some(ref plan) = specs.plan {
@@ -460,7 +448,7 @@ impl DeploymentSpecification {
                 }
                 (TransactionPlanSpecification { batches }, genesis)
             }
-            Some(_network) => {
+            StacksNetwork::Devnet | StacksNetwork::Testnet | StacksNetwork::Mainnet => {
                 let mut batches = vec![];
                 if let Some(ref plan) = specs.plan {
                     for batch in plan.batches.iter() {
@@ -495,7 +483,7 @@ impl DeploymentSpecification {
             id: specs.id.unwrap_or(0),
             node: specs.node.clone(),
             name: specs.name.to_string(),
-            network,
+            network: network.clone(),
             genesis,
             plan,
             contracts,
@@ -507,10 +495,10 @@ impl DeploymentSpecification {
             id: Some(self.id),
             name: self.name.clone(),
             network: match self.network {
-                None => "test".to_string(),
-                Some(StacksNetwork::Devnet) => "devnet".to_string(),
-                Some(StacksNetwork::Testnet) => "testnet".to_string(),
-                Some(StacksNetwork::Mainnet) => "mainnet".to_string(),
+                StacksNetwork::Simnet => "simnet".to_string(),
+                StacksNetwork::Devnet => "devnet".to_string(),
+                StacksNetwork::Testnet => "testnet".to_string(),
+                StacksNetwork::Mainnet => "mainnet".to_string(),
             },
             node: self.node.clone(),
             genesis: match self.genesis {

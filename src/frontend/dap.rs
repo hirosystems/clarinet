@@ -1,5 +1,5 @@
 use crate::deployment::{generate_default_deployment, setup_session_with_deployment};
-use crate::types::ProjectManifest;
+use crate::types::{ProjectManifest, StacksNetwork};
 use clarity_repl::clarity::debug::dap::DAPDebugger;
 use std::path::PathBuf;
 use std::str::FromStr;
@@ -13,7 +13,8 @@ pub fn run_dap() -> Result<(), String> {
         Ok((manifest_path_str, expression)) => {
             let manifest_path = PathBuf::from(manifest_path_str);
             let project_manifest = ProjectManifest::from_path(&manifest_path)?;
-            let (deployment, _) = generate_default_deployment(&project_manifest, &None)?;
+            let (deployment, _) =
+                generate_default_deployment(&project_manifest, &StacksNetwork::Simnet)?;
             let (mut session, _) =
                 setup_session_with_deployment(&project_manifest, &deployment, None);
 

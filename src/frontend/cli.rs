@@ -18,11 +18,10 @@ use clarity_repl::clarity::costs::LimitedCostTracker;
 use clarity_repl::clarity::diagnostic::Level;
 use clarity_repl::clarity::types::QualifiedContractIdentifier;
 use clarity_repl::{analysis, repl, Terminal};
-use std::collections::{BTreeMap, HashMap};
+use std::collections::HashMap;
 use std::fs::{self, File};
 use std::io::{prelude::*, BufReader, Read};
 use std::path::PathBuf;
-use std::sync::mpsc::channel;
 use std::{env, process};
 
 use clap::{IntoApp, Parser, Subcommand};
@@ -415,13 +414,13 @@ pub fn main() {
                 let manifest = load_manifest_or_exit(cmd.manifest_path);
 
                 let network = if cmd.devnet == true {
-                    Some(StacksNetwork::Devnet)
+                    StacksNetwork::Devnet
                 } else if cmd.testnet == true {
-                    Some(StacksNetwork::Testnet)
+                    StacksNetwork::Testnet
                 } else if cmd.mainnet == true {
-                    Some(StacksNetwork::Mainnet)
+                    StacksNetwork::Mainnet
                 } else {
-                    None
+                    StacksNetwork::Simnet
                 };
 
                 let default_deployment_path = get_default_deployment_path(&manifest, &network);
@@ -460,7 +459,7 @@ pub fn main() {
                         Err(format!("{}: a flag `--devnet`, `--testnet`, `--mainnet` or `--deployment-plan-path=path/to/yaml` should be provided.", yellow!("Command usage")))
                     }
                     (Some(network), None) => {
-                        let res = load_deployment_if_exists(&manifest, &Some(network.clone()));
+                        let res = load_deployment_if_exists(&manifest, &network);
                         match res {
                             Some(Ok(deployment)) => {
                                 println!(
@@ -472,8 +471,8 @@ pub fn main() {
                             }
                             Some(Err(e)) => Err(e),
                             None => {
-                                let default_deployment_path = get_default_deployment_path(&manifest, &Some(network.clone()));
-                                let (deployment, _) = match generate_default_deployment(&manifest, &Some(network.clone())) {
+                                let default_deployment_path = get_default_deployment_path(&manifest, &network);
+                                let (deployment, _) = match generate_default_deployment(&manifest, &network) {
                                     Ok(deployment) => deployment,
                                     Err(message) => {
                                         println!("{}", red!(message));
@@ -625,27 +624,31 @@ pub fn main() {
 
             let (res, _, artifacts) = match cmd.deployment_plan_path {
                 None => {
-                    let res = load_deployment_if_exists(&manifest, &None);
+                    let res = load_deployment_if_exists(&manifest, &StacksNetwork::Simnet);
                     match res {
                         Some(Ok(deployment)) => {
                             println!(
-                                "{}: using deployments/default.test-plan.yaml",
+                                "{}: using deployments/default.simnet-plan.yaml",
                                 yellow!("note")
                             );
                             (Ok(deployment), None, None)
                         }
                         Some(Err(e)) => {
                             println!(
-                                "{}: loading deployments/default.test-plan.yaml failed with error: {}",
+                                "{}: loading deployments/default.simnet-plan.yaml failed with error: {}",
                                 red!("error"),
                                 e
                             );
                             std::process::exit(1);
                         }
-                        None => match generate_default_deployment(&manifest, &None) {
-                            Ok((deployment, artifacts)) => (Ok(deployment), None, Some(artifacts)),
-                            Err(e) => (Err(e), None, None),
-                        },
+                        None => {
+                            match generate_default_deployment(&manifest, &StacksNetwork::Simnet) {
+                                Ok((deployment, artifacts)) => {
+                                    (Ok(deployment), None, Some(artifacts))
+                                }
+                                Err(e) => (Err(e), None, None),
+                            }
+                        }
                     }
                 }
                 Some(path) => {
@@ -758,27 +761,31 @@ pub fn main() {
 
             let (res, _, artifacts) = match cmd.deployment_plan_path {
                 None => {
-                    let res = load_deployment_if_exists(&manifest, &None);
+                    let res = load_deployment_if_exists(&manifest, &StacksNetwork::Simnet);
                     match res {
                         Some(Ok(deployment)) => {
                             println!(
-                                "{}: using deployments/default.test-plan.yaml",
+                                "{}: using deployments/default.simnet-plan.yaml",
                                 yellow!("note")
                             );
                             (Ok(deployment), None, None)
                         }
                         Some(Err(e)) => {
                             println!(
-                                "{}: loading deployments/default.test-plan.yaml failed with error: {}",
+                                "{}: loading deployments/default.simnet-plan.yaml failed with error: {}",
                                 red!("error"),
                                 e
                             );
                             std::process::exit(1);
                         }
-                        None => match generate_default_deployment(&manifest, &None) {
-                            Ok((deployment, artifacts)) => (Ok(deployment), None, Some(artifacts)),
-                            Err(e) => (Err(e), None, None),
-                        },
+                        None => {
+                            match generate_default_deployment(&manifest, &StacksNetwork::Simnet) {
+                                Ok((deployment, artifacts)) => {
+                                    (Ok(deployment), None, Some(artifacts))
+                                }
+                                Err(e) => (Err(e), None, None),
+                            }
+                        }
                     }
                 }
                 Some(path) => {
@@ -959,27 +966,31 @@ pub fn main() {
 
             let (res, deployment_path, artifacts) = match cmd.deployment_plan_path {
                 None => {
-                    let res = load_deployment_if_exists(&manifest, &None);
+                    let res = load_deployment_if_exists(&manifest, &StacksNetwork::Simnet);
                     match res {
                         Some(Ok(deployment)) => {
                             println!(
-                                "{}: using deployments/default.test-plan.yaml",
+                                "{}: using deployments/default.simnet-plan.yaml",
                                 yellow!("note")
                             );
                             (Ok(deployment), None, None)
                         }
                         Some(Err(e)) => {
                             println!(
-                                "{}: loading deployments/default.test-plan.yaml failed with error: {}",
+                                "{}: loading deployments/default.simnet-plan.yaml failed with error: {}",
                                 red!("error"),
                                 e
                             );
                             std::process::exit(1);
                         }
-                        None => match generate_default_deployment(&manifest, &None) {
-                            Ok((deployment, artifacts)) => (Ok(deployment), None, Some(artifacts)),
-                            Err(e) => (Err(e), None, None),
-                        },
+                        None => {
+                            match generate_default_deployment(&manifest, &StacksNetwork::Simnet) {
+                                Ok((deployment, artifacts)) => {
+                                    (Ok(deployment), None, Some(artifacts))
+                                }
+                                Err(e) => (Err(e), None, None),
+                            }
+                        }
                     }
                 }
                 Some(path) => {
@@ -1038,27 +1049,31 @@ pub fn main() {
 
             let (res, deployment_path, artifacts) = match cmd.deployment_plan_path {
                 None => {
-                    let res = load_deployment_if_exists(&manifest, &None);
+                    let res = load_deployment_if_exists(&manifest, &StacksNetwork::Simnet);
                     match res {
                         Some(Ok(deployment)) => {
                             println!(
-                                "{}: using deployments/default.test-plan.yaml",
+                                "{}: using deployments/default.simnet-plan.yaml",
                                 yellow!("note")
                             );
                             (Ok(deployment), None, None)
                         }
                         Some(Err(e)) => {
                             println!(
-                                "{}: loading deployments/default.test-plan.yaml failed with error: {}",
+                                "{}: loading deployments/default.simnet-plan.yaml failed with error: {}",
                                 red!("error"),
                                 e
                             );
                             std::process::exit(1);
                         }
-                        None => match generate_default_deployment(&manifest, &None) {
-                            Ok((deployment, artifacts)) => (Ok(deployment), None, Some(artifacts)),
-                            Err(e) => (Err(e), None, None),
-                        },
+                        None => {
+                            match generate_default_deployment(&manifest, &StacksNetwork::Simnet) {
+                                Ok((deployment, artifacts)) => {
+                                    (Ok(deployment), None, Some(artifacts))
+                                }
+                                Err(e) => (Err(e), None, None),
+                            }
+                        }
                     }
                 }
                 Some(path) => {
@@ -1100,7 +1115,7 @@ pub fn main() {
             println!("Loading deployment plan");
             let result = match cmd.deployment_plan_path {
                 None => {
-                    let res = load_deployment_if_exists(&manifest, &Some(StacksNetwork::Devnet));
+                    let res = load_deployment_if_exists(&manifest, &StacksNetwork::Devnet);
                     match res {
                         Some(Ok(deployment)) => {
                             println!(
@@ -1113,13 +1128,11 @@ pub fn main() {
                         }
                         Some(Err(e)) => Err(e),
                         None => {
-                            let default_deployment_path = get_default_deployment_path(
-                                &manifest,
-                                &Some(StacksNetwork::Devnet),
-                            );
+                            let default_deployment_path =
+                                get_default_deployment_path(&manifest, &StacksNetwork::Devnet);
                             let (deployment, _) = match generate_default_deployment(
                                 &manifest,
-                                &Some(StacksNetwork::Devnet),
+                                &StacksNetwork::Devnet,
                             ) {
                                 Ok(deployment) => deployment,
                                 Err(message) => {
