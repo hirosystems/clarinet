@@ -617,7 +617,7 @@ impl WalletSpecification {
             Ok(res) => res,
             Err(_) => {
                 return Err(format!(
-                    "unable to turn {}'s principal as a valid Stacks address",
+                    "unable to parse {}'s principal as a valid Stacks address",
                     specs.name
                 ))
             }
