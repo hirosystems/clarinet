@@ -54,6 +54,7 @@ pub struct ContractCallSpecificationFile {
 
 #[derive(Debug, PartialEq, Serialize, Deserialize)]
 pub struct ContractPublishSpecificationFile {
+    #[serde(rename = "contract-name")]
     pub contract_name: String,
     #[serde(rename = "expected-sender")]
     pub expected_sender: String,
@@ -63,6 +64,7 @@ pub struct ContractPublishSpecificationFile {
 
 #[derive(Debug, PartialEq, Serialize, Deserialize)]
 pub struct EmulatedContractCallSpecificationFile {
+    #[serde(rename = "contract-id")]
     pub contract_id: String,
     #[serde(rename = "emulated-sender")]
     pub emulated_sender: String,
@@ -72,6 +74,7 @@ pub struct EmulatedContractCallSpecificationFile {
 
 #[derive(Debug, PartialEq, Serialize, Deserialize)]
 pub struct EmulatedContractPublishSpecificationFile {
+    #[serde(rename = "contract-name")]
     pub contract_name: String,
     #[serde(rename = "emulated-sender")]
     pub emulated_sender: String,

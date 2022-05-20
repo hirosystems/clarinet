@@ -205,10 +205,7 @@ impl ProjectManifest {
                             };
                             config_contracts.insert(
                                 contract_name.to_string(),
-                                ContractConfig {
-                                    path,
-                                    deployer,
-                                },
+                                ContractConfig { path, deployer },
                             );
                         }
                         _ => {}

@@ -948,7 +948,9 @@ pub fn main() {
                     }
                 }
             }
-            println!("{}\n", outputs.join("\n"));
+            if !outputs.is_empty() {
+                println!("{}\n", outputs.join("\n"));
+            }
             if warnings > 0 {
                 println!(
                     "{} {} detected",
