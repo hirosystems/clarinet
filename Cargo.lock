@@ -4539,6 +4539,7 @@ dependencies = [
  "error-chain",
  "neon",
  "num",
+ "orchestra-types",
  "serde",
 ]
 
