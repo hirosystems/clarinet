@@ -67,9 +67,19 @@ pub struct ChainUpdatedWithMicroblockReorgData {
 #[allow(dead_code)]
 #[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize)]
 pub enum StacksNetwork {
+    Simnet,
     Devnet,
     Testnet,
     Mainnet,
+}
+
+impl StacksNetwork {
+    pub fn is_simnet(&self) -> bool {
+        match self {
+            StacksNetwork::Simnet => true,
+            _ => false,
+        }
+    }
 }
 
 #[allow(dead_code)]
@@ -91,4 +101,5 @@ pub enum DeploymentEvent {
 #[derive(Debug)]
 pub enum ChainsCoordinatorCommand {
     Terminate,
+    ProtocolDeployed,
 }

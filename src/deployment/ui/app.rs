@@ -12,12 +12,12 @@ pub struct App<'a> {
 }
 
 impl<'a> App<'a> {
-    pub fn new(node_url: &'a str, contracts: Vec<(String, String)>) -> App<'a> {
-        let tracked_contracts = contracts
+    pub fn new(node_url: &'a str, contracts_ids: Vec<String>) -> App<'a> {
+        let tracked_contracts = contracts_ids
             .iter()
-            .map(|(deployer, name)| ContractUpdate {
+            .map(|contract_id| ContractUpdate {
                 status: ContractStatus::Queued,
-                contract_id: format!("{}.{}", deployer, name),
+                contract_id: format!("{}", contract_id),
                 comment: None,
             })
             .collect::<Vec<_>>();

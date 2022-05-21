@@ -138,7 +138,7 @@ phrases and initial balances. Initial balances are in microSTX.
 Clarinet can handle adding a new contract and its configuration to your project with the following command:
 
 ```bash
-$ clarinet contracts new bbtc
+$ clarinet contract new bbtc
 ```
 
 Clarinet will add 2 files to your project, the contract file in the `contracts` directory, and the contract test file
@@ -414,14 +414,45 @@ $ clarinet integrate
 
 Make sure that you have a working installation of Docker running locally.
 
-### Deploy contracts to Testnet
+### Interacting with contracts deployed on Mainnet
 
-You can use Clarinet to deploy your contracts to the public Testnet environment for testing and
-evaluation on a blockchain. Use the following command:
+Composition and interactions between protocols and contracts are one of the key innovations in blockchains. Clarinet was designed to handle this sort of interactions.
+
+Before refering to contracts deployed on Mainnet, they should be explicitily be listed as a `requirement` in the manifest `Clarinet.toml`:
+
+```toml
+[project]
+name = "my-project"
+requirements = [
+  "SP2KAF9RF86PVX3NEE27DFV1CQX0T4WGR41X3S45C.bitcoin-whales.payout"
+]
+
+```
+
+From there, clarinet will be able to reconciliate the `contract-call` present in your local contracts, download and cache a copy of the required contracts, and use them during the execution of your tests suites, and all the different features available in `clarinet`.
+
+When deploying your protocol to Devnet / Testnet, for the contracts involving requirements, the setting `remap_requirements` in your deployment plans must be set. 
+
+Before Devnet / Testnet deployments, your contracts will be automatically remapped on the fly to point to the duplicated requirements deployed by an account that you control.
+
+### Deploy contracts to Devnet / Testnet / Mainnet
+
+You can use Clarinet to publish your contracts to the public Testnet environment for testing and evaluation on a blockchain. 
+
+The first step is to generate a deployment plan, with the following command: 
 
 ```bash
-$ clarinet deploy --testnet
+$ clarinet deployment generate --mainnet
 ```
+
+After **cautiously** reviewing (and updating if needed) the generated plan, you can use the command:
+
+```bash
+$ clarinet deployment apply -p <path-to-plan.yaml>
+```
+
+which will handle the deployments of your contracts, according to the plan.
+
 
 ### Use Clarinet in your CI workflow as a GitHub Action
 
@@ -457,7 +488,7 @@ Clarinet can easily be extended by community members: open source contributions 
 
 | Name                      | wallet access | disk write | disk read | Deployment                                                            | Description                                                                                                                                       |
 | ------------------------- | ------------- | ---------- | --------- | --------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
-| stacksjs-helper-generator | no            | yes        | no        | https://deno.land/x/clarinet@v0.16.0/ext/stacksjs-helper-generator.ts | Facilitates contract integration by generating some typescript constants that can be used with stacks.js. Never hard code a stacks address again! |
+| stacksjs-helper-generator | no            | yes        | no        | https://deno.land/x/clarinet@v0.29.0/ext/stacksjs-helper-generator.ts | Facilitates contract integration by generating some typescript constants that can be used with stacks.js. Never hard code a stacks address again! |
 |                           |               |            |           |                                                                       |
 
 #### How to use extensions
@@ -465,7 +496,7 @@ Clarinet can easily be extended by community members: open source contributions 
 Extensions are ran with the following syntax:
 
 ```
-$ clarinet run --allow-write https://deno.land/x/clarinet@v0.15.4/ext/stacksjs-helper-generator.ts
+$ clarinet run --allow-write https://deno.land/x/clarinet@v0.29.0/ext/stacksjs-helper-generator.ts
 ```
 
 An extension can be deployed as a standalone plugin on Deno, or can also just be a local file if it includes sensitive / private setup informations.
@@ -473,7 +504,59 @@ As illustrated in the example above, permissions (wallet / disk read / disk writ
 
 ### Debug your contracts
 
-Inside of the console (`clarinet console`), there is a debugger for stepping through your contracts, including support for:
+#### VS Code Debugger
+
+Clarinet supports the [Debug Adapter Protocol](https://microsoft.github.io/debug-adapter-protocol/) (DAP) which enables debugging your smart contracts inside of VS Code, or any code editor supporting the DAP protocol.
+
+To setup a debug session, you'll first need to create a launch.json file to tell VS Code what you want to debug. The easiest way to do this is to let Code generate the template for you by opening the "Run and Debug" view and clicking "create a launch.json file".
+
+![Run and Debug View](docs/images/run-and-debug.png)
+
+This will create the file .vscode/launch.json with the default template:
+
+```json
+{
+  // Use IntelliSense to learn about possible attributes.
+  // Hover to view descriptions of existing attributes.
+  // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "type": "clarinet",
+      "request": "launch",
+      "name": "Call .foo.bar",
+      "manifest": "${workspaceFolder}/Clarinet.toml",
+      "expression": "(contract-call? .foo bar 42)"
+    }
+  ]
+}
+```
+
+Depending on your needs, you will want to set the `name` field to whatever makes sense for your project, then set the `expression` to the Clarity expression that you would like to debug. In the case of the default example shown in the template above, the debugger would start executing the `bar` function of the `foo` contract, passing the argument `42`. Once this file is configured, the debugger works as expected for any [VS Code debugging](https://code.visualstudio.com/docs/editor/debugging).
+
+Execution begins paused at the first expression. The debug toolbar includes buttons to continue, step over, step into, step out, restart, and stop, in that order.
+
+![debug toolbar](docs/images/debug-toolbar.png)
+
+Breakpoints can be set by clicking in the left gutter next to the code or using the right-click menu at a specific code location.
+
+![breakpoint](docs/images/breakpoint.png)
+
+Data watchpoints may also be set, by clicking the + in the Watch section of the Debug side bar and typing the contract variable to watch in the format `<principal>.<contract>.<name>` or using the shortcut for a local contract, `.<contract>.<name>`. When a watchpoint is set on a contract variable, execution will pause when its value will change.
+
+![watchpoint](docs/images/watchpoint.png)
+
+During execution, the values of the current contract's variables, the current function's arguments, and any local variables (i.e. from a `let` expression) are shown in the side bar. The current watchpoints are also shown with their current values. In both cases, the contents of a map are not shown, but can be queried in the Debug Console. The call stack is also updated to show the call stack of the current execution.
+
+![view of side bar, showing variables, watchpoints, and call stack](docs/images/sidebar.png)
+
+At any point during execution, an expression can be evaluated in the current context via the Debug Console. Just type any valid Clarity expression and hit enter to evaluate it. Upon completion, the events emitted and the return value are printed to the debug console.
+
+![debug console](docs/images/debug-console.png)
+
+#### Command Line Debugger
+
+Inside of the console (`clarinet console`), there is a debugger for stepping through your contracts on the command line, including support for:
 
 - Breakpoints
   - **Source**: Break at a specific line (and optional column) of a contract (`break` or `b` command)

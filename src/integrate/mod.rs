@@ -8,9 +8,9 @@ use chrono::prelude::*;
 use tracing::{self, debug, error, info, warn};
 use tracing_appender;
 
+use crate::deployment::types::DeploymentSpecification;
 use crate::types::ChainsCoordinatorCommand;
 use orchestra_types::{BitcoinChainEvent, StacksChainEvent};
-
 use crate::utils;
 use chains_coordinator::start_chains_coordinator;
 pub use orchestrator::DevnetOrchestrator;
@@ -19,6 +19,7 @@ use self::chains_coordinator::DevnetEventObserverConfig;
 
 pub fn run_devnet(
     devnet: DevnetOrchestrator,
+    deployment: DeploymentSpecification,
     log_tx: Option<Sender<LogData>>,
     display_dashboard: bool,
 ) -> Result<
@@ -29,11 +30,8 @@ pub fn run_devnet(
     ),
     String,
 > {
-    match block_on(do_run_devnet(devnet, log_tx, display_dashboard)) {
-        Err(e) => {
-            println!("{}", e);
-            Err(e)
-        }
+    match block_on(do_run_devnet(devnet, deployment, log_tx, display_dashboard)) {
+        Err(_e) => std::process::exit(1),
         Ok(res) => Ok(res),
     }
 }
@@ -48,6 +46,7 @@ where
 
 pub async fn do_run_devnet(
     mut devnet: DevnetOrchestrator,
+    deployment: DeploymentSpecification,
     log_tx: Option<Sender<LogData>>,
     display_dashboard: bool,
 ) -> Result<
@@ -83,16 +82,18 @@ pub async fn do_run_devnet(
     // and should be able to be terminated
     let devnet_path = devnet_config.working_dir.clone();
     let config =
-        DevnetEventObserverConfig::new(devnet_config.clone(), devnet.manifest_path.clone());
+        DevnetEventObserverConfig::new(devnet_config.clone(), devnet.manifest.clone(), deployment);
     let chains_coordinator_tx = devnet_events_tx.clone();
     let (chains_coordinator_commands_tx, chains_coordinator_commands_rx) = channel();
     let (orchestrator_terminator_tx, terminator_rx) = channel();
     let moved_orchestrator_terminator_tx = orchestrator_terminator_tx.clone();
+    let moved_chains_coordinator_commands_tx = chains_coordinator_commands_tx.clone();
     let chains_coordinator_handle = std::thread::spawn(move || {
         let future = start_chains_coordinator(
             config,
             chains_coordinator_tx,
             chains_coordinator_commands_rx,
+            moved_chains_coordinator_commands_tx,
             moved_orchestrator_terminator_tx,
         );
         let rt = utils::create_basic_runtime();
@@ -183,6 +184,7 @@ pub enum DevnetEvent {
     // Microblock(MicroblockData),
 }
 
+#[allow(dead_code)]
 impl DevnetEvent {
     pub fn error(message: String) -> DevnetEvent {
         DevnetEvent::Log(Self::log_error(message))

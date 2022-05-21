@@ -1,8 +1,7 @@
+use super::api_v1::SessionArtifacts;
+use super::{api_v1, costs, DeploymentCache};
 use clarity_repl::clarity::coverage::CoverageReporter;
 use clarity_repl::clarity::types;
-use clarity_repl::clarity::util::hash;
-use clarity_repl::prettytable::{color, format, Attr, Cell, Row, Table};
-use clarity_repl::repl::session::CostsReport;
 use clarity_repl::repl::Session;
 use deno::ast;
 use deno::colors;
@@ -34,8 +33,8 @@ use deno_runtime::permissions::Permissions;
 use regex::Regex;
 use serde::de::DeserializeOwned;
 use serde::Serialize;
-use std::collections::HashSet;
 use std::collections::{btree_map::Entry, BTreeMap};
+use std::collections::{HashMap, HashSet};
 use std::convert::TryFrom;
 use std::fmt::Write;
 use std::ops::Index;
@@ -48,222 +47,8 @@ use std::sync::Arc;
 use std::sync::Mutex;
 use swc_common::comments::CommentKind;
 
-mod sessions {
-    use super::TransactionArgs;
-    use crate::poke::load_session_settings;
-    use crate::types::{ChainConfig, ProjectManifest, StacksNetwork};
-    use clarity_repl::clarity::analysis::ContractAnalysis;
-    use clarity_repl::repl::settings::Account;
-    use clarity_repl::repl::{self, Session};
-    use deno_core::error::AnyError;
-    use std::collections::HashMap;
-    use std::env;
-    use std::fs;
-    use std::path::PathBuf;
-    use std::sync::Mutex;
-
-    lazy_static! {
-        pub static ref SESSIONS: Mutex<HashMap<u32, (String, Session)>> =
-            Mutex::new(HashMap::new());
-        pub static ref SESSION_TEMPLATE: Mutex<Vec<Session>> = Mutex::new(vec![]);
-    }
-
-    pub fn reset() {
-        SESSION_TEMPLATE.lock().unwrap().clear();
-        SESSIONS.lock().unwrap().clear();
-    }
-
-    pub fn handle_setup_chain(
-        manifest_path: &PathBuf,
-        name: String,
-        includes_pre_deployment_steps: bool,
-    ) -> Result<(u32, Vec<Account>, Vec<(ContractAnalysis, String, String)>), AnyError> {
-        let mut sessions = SESSIONS.lock().unwrap();
-        let session_id = sessions.len() as u32;
-        let session_templated = {
-            let res = SESSION_TEMPLATE.lock().unwrap();
-            !res.is_empty()
-        };
-        let can_use_cache = !includes_pre_deployment_steps && session_templated;
-        let should_update_cache = !includes_pre_deployment_steps;
-
-        let (mut session, contracts) = if !can_use_cache {
-            let (mut session_settings, _, _) =
-                load_session_settings(&manifest_path, &StacksNetwork::Devnet)
-                    .expect("Unable to load manifest");
-            session_settings.lazy_initial_contracts_interpretation = includes_pre_deployment_steps;
-            let mut session = Session::new(session_settings.clone());
-            let (_, contracts) = match session.start() {
-                Ok(res) => res,
-                Err(e) => {
-                    std::process::exit(1);
-                }
-            };
-            if should_update_cache {
-                SESSION_TEMPLATE.lock().unwrap().push(session.clone());
-            }
-            (session, contracts)
-        } else {
-            let session = SESSION_TEMPLATE.lock().unwrap().last().unwrap().clone();
-            let contracts = session.initial_contracts_analysis.clone();
-            (session, contracts)
-        };
-
-        if !includes_pre_deployment_steps {
-            session.advance_chain_tip(1);
-        }
-
-        let accounts = session.settings.initial_accounts.clone();
-        sessions.insert(session_id, (name, session));
-        Ok((session_id, accounts, contracts))
-    }
-
-    pub fn complete_setup_chain(
-        session_id: u32,
-    ) -> Result<(u32, Vec<Account>, Vec<(ContractAnalysis, String, String)>), AnyError> {
-        let mut sessions = SESSIONS.lock().unwrap();
-        match sessions.get_mut(&session_id) {
-            Some((_, session)) => {
-                let (_, contracts) = session
-                    .interpret_initial_contracts()
-                    .expect("Unable to load contracts");
-                session.advance_chain_tip(1);
-                let accounts = session.settings.initial_accounts.clone();
-                Ok((session_id, accounts, contracts))
-            }
-            _ => unreachable!(),
-        }
-    }
-
-    pub fn handle_setup_chain_legacy(
-        manifest_path: &PathBuf,
-        name: String,
-        transactions: Vec<TransactionArgs>,
-    ) -> Result<(u32, Vec<Account>, Vec<(ContractAnalysis, String, String)>), AnyError> {
-        let mut sessions = SESSIONS.lock().unwrap();
-        let session_id = sessions.len() as u32;
-        let session_templated = {
-            let res = SESSION_TEMPLATE.lock().unwrap();
-            !res.is_empty()
-        };
-        let can_use_cache = transactions.is_empty() && session_templated;
-        let should_update_cache = transactions.is_empty();
-
-        let (mut session, contracts) = if !can_use_cache {
-            let mut settings = repl::SessionSettings::default();
-            let mut project_path = manifest_path.clone();
-            project_path.pop();
-
-            let mut chain_config_path = project_path.clone();
-            chain_config_path.push("settings");
-            chain_config_path.push("Devnet.toml");
-
-            let project_config = ProjectManifest::from_path(manifest_path);
-            let chain_config = ChainConfig::from_path(&chain_config_path, &StacksNetwork::Devnet);
-
-            let mut deployer_address = None;
-            let mut initial_deployer = None;
-
-            for (name, account) in chain_config.accounts.iter() {
-                let account = repl::settings::Account {
-                    name: name.clone(),
-                    balance: account.balance,
-                    address: account.address.clone(),
-                    mnemonic: account.mnemonic.clone(),
-                    derivation: account.derivation.clone(),
-                };
-                if name == "deployer" {
-                    initial_deployer = Some(account.clone());
-                    deployer_address = Some(account.address.clone());
-                }
-                settings.initial_accounts.push(account);
-            }
-
-            for tx in transactions.iter() {
-                let deployer = Some(tx.sender.clone());
-                if let Some(ref deploy_contract) = tx.deploy_contract {
-                    settings
-                        .initial_contracts
-                        .push(repl::settings::InitialContract {
-                            code: deploy_contract.code.clone(),
-                            path: "".into(),
-                            name: Some(deploy_contract.name.clone()),
-                            deployer,
-                        });
-                }
-                // if let Some(ref contract_call) tx.contract_call {
-                // TODO(lgalabru): initial_tx_sender
-                //   let code = format!("(contract-call? '{}.{} {} {})", initial_tx_sender, contract_call.contract, contract_call.method, contract_call.args.join(" "));
-                //   settings
-                //     .initial_contracts
-                //     .push(repl::settings::InitialContract {
-                //         code: code,
-                //         name: Some(name.clone()),
-                //         deployer: tx.sender.clone(),
-                //     });
-                // }
-            }
-
-            for name in project_config.ordered_contracts().iter() {
-                let config = project_config.contracts.get(name).unwrap();
-                let mut contract_path = project_path.clone();
-                contract_path.push(&config.path);
-
-                let code = fs::read_to_string(&contract_path).unwrap();
-
-                settings
-                    .initial_contracts
-                    .push(repl::settings::InitialContract {
-                        code: code,
-                        path: contract_path.to_str().unwrap().into(),
-                        name: Some(name.clone()),
-                        deployer: deployer_address.clone(),
-                    });
-            }
-            settings.initial_deployer = initial_deployer;
-            settings.repl_settings = project_config.repl_settings;
-            settings.include_boot_contracts = vec![
-                "pox".to_string(),
-                format!("costs-v{}", settings.repl_settings.costs_version),
-                "bns".to_string(),
-            ];
-            let mut session = Session::new(settings.clone());
-            let (_, contracts) = match session.start() {
-                Ok(res) => res,
-                Err(e) => {
-                    std::process::exit(1);
-                }
-            };
-            if should_update_cache {
-                SESSION_TEMPLATE.lock().unwrap().push(session.clone());
-            }
-            (session, contracts)
-        } else {
-            let session = SESSION_TEMPLATE.lock().unwrap().last().unwrap().clone();
-            let contracts = session.initial_contracts_analysis.clone();
-            (session, contracts)
-        };
-
-        session.advance_chain_tip(1);
-        let accounts = session.settings.initial_accounts.clone();
-        sessions.insert(session_id, (name, session));
-        Ok((session_id, accounts, contracts))
-    }
-
-    pub fn perform_block<F, R>(session_id: u32, handler: F) -> Result<R, AnyError>
-    where
-        F: FnOnce(&str, &mut Session) -> Result<R, AnyError>,
-    {
-        let mut sessions = SESSIONS.lock().unwrap();
-        match sessions.get_mut(&session_id) {
-            None => {
-                println!("Error: unable to retrieve session");
-                panic!()
-            }
-            Some((name, ref mut session)) => handler(name.as_str(), session),
-        }
-    }
-}
+use crate::deployment::types::DeploymentSpecification;
+use crate::types::ProjectManifest;
 
 pub async fn do_run_scripts(
     include: Vec<String>,
@@ -272,23 +57,21 @@ pub async fn do_run_scripts(
     watch: bool,
     allow_wallets: bool,
     allow_disk_write: bool,
-    manifest_path: PathBuf,
-    session: Option<Session>,
+    manifest: &ProjectManifest,
+    cache: DeploymentCache,
 ) -> Result<u32, AnyError> {
     let mut flags = Flags::default();
     flags.unstable = true;
     flags.reload = true;
     if allow_disk_write {
-        let mut write_path = manifest_path.clone();
-        write_path.pop();
+        let mut write_path = manifest.get_project_root_dir();
         write_path.push("artifacts");
         let _ = std::fs::create_dir_all(&write_path);
         flags.allow_write = Some(vec![write_path])
     }
     let program_state = ProgramState::build(flags.clone()).await?;
     let permissions = Permissions::from_options(&flags.clone().into());
-    let mut project_path = manifest_path.clone();
-    project_path.pop();
+    let project_path = manifest.get_project_root_dir();
     let cwd = Path::new(&project_path);
     let mut include = if include.is_empty() {
         vec!["tests".into()]
@@ -298,7 +81,7 @@ pub async fn do_run_scripts(
 
     let allow_none = true;
     let no_run = false;
-    let concurrent_jobs = 2;
+    let concurrent_jobs = num_cpus::get();
     let quiet = false;
     let filter: Option<String> = None;
     let fail_fast = true;
@@ -446,7 +229,6 @@ pub async fn do_run_scripts(
                 // Clear the screen
                 print!("{esc}c", esc = 27 as char);
                 // Clear eventual previous sessions
-                sessions::reset();
                 run_scripts(
                     program_state.clone(),
                     permissions.clone(),
@@ -459,14 +241,18 @@ pub async fn do_run_scripts(
                     true,
                     filter.clone(),
                     concurrent_jobs,
-                    manifest_path.clone(),
                     allow_wallets,
                     None,
                 )
-                .map(|res| {
-                    if include_costs_report {
-                        display_costs_report()
-                    }
+                .map(|mut res| {
+                    match res.as_mut() {
+                        Ok((success, sessions_artifacts)) if *success => {
+                            if include_costs_report {
+                                costs::display_costs_report(sessions_artifacts)
+                            }
+                        }
+                        _ => {}
+                    };
                     res.map(|_| ())
                 })
             },
@@ -482,7 +268,7 @@ pub async fn do_run_scripts(
             tools::test_runner::is_supported,
         )?;
 
-        let failed = run_scripts(
+        let (success, sessions_artifacts) = run_scripts(
             program_state.clone(),
             permissions,
             lib,
@@ -494,335 +280,40 @@ pub async fn do_run_scripts(
             allow_none,
             filter,
             concurrent_jobs,
-            manifest_path,
             allow_wallets,
-            session,
+            Some(cache.clone()),
         )
         .await?;
 
-        if failed {
+        if !success {
             std::process::exit(1);
         }
-    }
 
-    if include_coverage {
-        let mut coverage_reporter = CoverageReporter::new();
-        let sessions = sessions::SESSIONS.lock().unwrap();
-        for (session_id, (name, session)) in sessions.iter() {
-            for contract in session.settings.initial_contracts.iter() {
-                if let Some(ref name) = contract.name {
-                    if contract.path != "" {
-                        coverage_reporter.register_contract(name.clone(), contract.path.clone());
-                    }
-                }
+        if include_coverage {
+            let mut coverage_reporter = CoverageReporter::new();
+            for (contract_id, analysis_artifacts) in cache.contracts_artifacts.iter() {
+                coverage_reporter
+                    .asts
+                    .insert(contract_id.clone(), analysis_artifacts.ast.clone());
             }
-            coverage_reporter.add_reports(&session.coverage_reports);
-            coverage_reporter.add_asts(&session.asts);
-        }
-
-        coverage_reporter.write_lcov_file("coverage.lcov");
-    }
-
-    if include_costs_report {
-        display_costs_report()
-    }
-
-    let total = sessions::SESSIONS.lock().unwrap().len();
-
-    Ok(total as u32)
-}
-
-#[derive(Clone)]
-enum Bottleneck {
-    Unknown,
-    Runtime(u64, u64),
-    ReadCount(u64, u64),
-    ReadLength(u64, u64),
-    WriteCount(u64, u64),
-    WriteLength(u64, u64),
-}
-
-fn display_costs_report() {
-    let mut consolidated: BTreeMap<String, BTreeMap<String, Vec<CostsReport>>> = BTreeMap::new();
-    let sessions = sessions::SESSIONS.lock().unwrap();
-    let mut mins: BTreeMap<(&String, &String), (f32, CostsReport, Bottleneck)> = BTreeMap::new();
-    let mut maxs: BTreeMap<(&String, &String), (f32, CostsReport, Bottleneck)> = BTreeMap::new();
-
-    for (session_id, (name, session)) in sessions.iter() {
-        for report in session.costs_reports.iter() {
-            let key = report.contract_id.to_string();
-            match consolidated.entry(key) {
-                Entry::Occupied(ref mut entry) => {
-                    match entry.get_mut().entry(report.method.to_string()) {
-                        Entry::Occupied(entry) => entry.into_mut().push(report.clone()),
-                        Entry::Vacant(entry) => {
-                            let mut reports = Vec::new();
-                            reports.push(report.clone());
-                            entry.insert(reports);
-                        }
-                    }
-                }
-                Entry::Vacant(entry) => {
-                    let mut reports = Vec::new();
-                    reports.push(report.clone());
-                    let mut methods = BTreeMap::new();
-                    methods.insert(report.method.to_string(), reports);
-                    entry.insert(methods);
-                }
-            };
-
-            // Look for the bounding factor
-            let ratios = vec![
-                (
-                    report.cost_result.total.runtime,
-                    report.cost_result.limit.runtime,
-                ),
-                (
-                    report.cost_result.total.read_count,
-                    report.cost_result.limit.read_count,
-                ),
-                (
-                    report.cost_result.total.read_length,
-                    report.cost_result.limit.read_length,
-                ),
-                (
-                    report.cost_result.total.write_count,
-                    report.cost_result.limit.write_count,
-                ),
-                (
-                    report.cost_result.total.write_length,
-                    report.cost_result.limit.write_length,
-                ),
-            ];
-            let (bottleneck, mut max) = ratios.iter().enumerate().fold(
-                (Bottleneck::Unknown, 0 as f32),
-                |(bottleneck, max), (index, (cost, limit))| {
-                    let ratio = (*cost as f32) / (*limit as f32);
-                    if ratio > max {
-                        (
-                            match index {
-                                0 => Bottleneck::Runtime(*cost, *limit),
-                                1 => Bottleneck::ReadCount(*cost, *limit),
-                                2 => Bottleneck::ReadLength(*cost, *limit),
-                                3 => Bottleneck::WriteCount(*cost, *limit),
-                                4 => Bottleneck::WriteLength(*cost, *limit),
-                                _ => Bottleneck::Unknown,
-                            },
-                            ratio,
-                        )
-                    } else {
-                        (bottleneck, max)
-                    }
-                },
-            );
-
-            let key = (&report.contract_id, &report.method);
-
-            mins.entry(key)
-                .and_modify(|(cur_min, min_report, cur_bottleneck)| {
-                    if &mut max < cur_min {
-                        *cur_min = max;
-                        *min_report = report.clone();
-                        *cur_bottleneck = bottleneck.clone();
-                    }
-                })
-                .or_insert((max, report.clone(), bottleneck.clone()));
-            maxs.entry(key)
-                .and_modify(|(cur_max, max_report, cur_bottleneck)| {
-                    if &mut max > cur_max {
-                        *cur_max = max;
-                        *max_report = report.clone();
-                        *cur_bottleneck = bottleneck.clone();
-                    }
-                })
-                .or_insert((max, report.clone(), bottleneck.clone()));
-        }
-    }
-
-    println!("\nContract calls cost synthesis");
-    let mut table = Table::new();
-    let headers = vec![
-        "".to_string(),
-        "Runtime (units)".to_string(),
-        "Read Count".to_string(),
-        "Read Length (bytes)".to_string(),
-        "Write Count".to_string(),
-        "Write Length (bytes)".to_string(),
-        "Tx per Block".to_string(),
-    ];
-    let mut headers_cells = vec![];
-    for header in headers.iter() {
-        headers_cells.push(Cell::new(&header));
-    }
-    table.add_row(Row::new(headers_cells.clone()));
-
-    for (contract_id, methods) in consolidated.iter() {
-        for (method, reports) in methods.iter() {
-            let (min, min_report, min_bottleneck) = mins.get(&(contract_id, method)).unwrap();
-            let (max, max_report, max_bottleneck) = mins.get(&(contract_id, method)).unwrap();
-
-            // Not displaying the min row for now - probably not so interesting atm.
-            // if min != max {
-            //     table.add_row(Row::new(formatted_cost_cells(
-            //         "Min",
-            //         &min_report,
-            //         &min_bottleneck,
-            //     )));
-            // }
-
-            let contract_name = contract_id.split(".").last().unwrap();
-            table.add_row(Row::new(formatted_cost_cells(
-                &format!("{}::{}", contract_name, method),
-                &max_report,
-                &max_bottleneck,
-            )));
-        }
-    }
-
-    if let Some((_, (_, report, _))) = maxs.iter().next() {
-        let limit = &report.cost_result.limit;
-        table.add_row(Row::new(vec![Cell::new_align(
-            &format!(""),
-            format::Alignment::LEFT,
-        )
-        .with_hspan(7)]));
-
-        table.add_row(Row::new(vec![
-            Cell::new("Mainnet Block Limits (Stacks 2.0)"),
-            Cell::new_align(
-                &format!("{}", &limit.runtime.to_string()),
-                format::Alignment::RIGHT,
-            ),
-            Cell::new_align(&limit.read_count.to_string(), format::Alignment::RIGHT),
-            Cell::new_align(&format!("{}", limit.read_length), format::Alignment::RIGHT),
-            Cell::new_align(&limit.write_count.to_string(), format::Alignment::RIGHT),
-            Cell::new_align(&format!("{}", limit.write_length), format::Alignment::RIGHT),
-            Cell::new_align("/", format::Alignment::RIGHT),
-        ]));
-    }
-
-    table.printstd();
-    println!("");
-}
-
-fn formatted_cost_cells(title: &str, report: &CostsReport, bottleneck: &Bottleneck) -> Vec<Cell> {
-    let mut runtime_style = Attr::ForegroundColor(color::BRIGHT_BLACK);
-    let mut read_count_style = Attr::ForegroundColor(color::BRIGHT_BLACK);
-    let mut read_len_style = Attr::ForegroundColor(color::BRIGHT_BLACK);
-    let mut write_count_style = Attr::ForegroundColor(color::BRIGHT_BLACK);
-    let mut write_len_style = Attr::ForegroundColor(color::BRIGHT_BLACK);
-
-    let tx_per_block = match bottleneck {
-        Bottleneck::Runtime(cost, limit) => {
-            runtime_style = Attr::ForegroundColor(color::BRIGHT_WHITE);
-            limit / cost
-        }
-        Bottleneck::ReadCount(cost, limit) => {
-            read_count_style = Attr::ForegroundColor(color::BRIGHT_WHITE);
-            limit / cost
-        }
-        Bottleneck::ReadLength(cost, limit) => {
-            read_len_style = Attr::ForegroundColor(color::BRIGHT_WHITE);
-            limit / cost
-        }
-        Bottleneck::WriteCount(cost, limit) => {
-            write_count_style = Attr::ForegroundColor(color::BRIGHT_WHITE);
-            limit / cost
-        }
-        Bottleneck::WriteLength(cost, limit) => {
-            write_len_style = Attr::ForegroundColor(color::BRIGHT_WHITE);
-            limit / cost
-        }
-        _ => 0,
-    };
-
-    let block_style = if tx_per_block < 100 {
-        Attr::ForegroundColor(color::RED)
-    } else if tx_per_block < 500 {
-        Attr::ForegroundColor(color::YELLOW)
-    } else {
-        Attr::ForegroundColor(color::GREEN)
-    };
-
-    let ratios = vec![
-        (
-            report.cost_result.total.runtime,
-            report.cost_result.limit.runtime,
-        ),
-        (
-            report.cost_result.total.read_count,
-            report.cost_result.limit.read_count,
-        ),
-        (
-            report.cost_result.total.read_length,
-            report.cost_result.limit.read_length,
-        ),
-        (
-            report.cost_result.total.write_count,
-            report.cost_result.limit.write_count,
-        ),
-        (
-            report.cost_result.total.write_length,
-            report.cost_result.limit.write_length,
-        ),
-    ];
-
-    let annotations = ratios
-        .iter()
-        .map(|(value, limit)| {
-            if *value == 0 {
-                "".to_string()
-            } else {
-                format!(" ({:.2}%)", 100.0 * *value as f32 / *limit as f32)
+            for (contract_id, (_, contract_path)) in cache.deployment.contracts.iter() {
+                coverage_reporter
+                    .contract_paths
+                    .insert(contract_id.name.to_string(), contract_path.clone());
             }
-        })
-        .collect::<Vec<String>>();
+            for mut artifact in sessions_artifacts.into_iter() {
+                coverage_reporter
+                    .reports
+                    .append(&mut artifact.coverage_reports);
+            }
+            coverage_reporter.write_lcov_file("coverage.lcov");
+        }
 
-    vec![
-        Cell::new(title),
-        Cell::new_align(
-            &format!(
-                "{}{}",
-                report.cost_result.total.runtime.to_string(),
-                annotations[0]
-            ),
-            format::Alignment::RIGHT,
-        )
-        .with_style(runtime_style),
-        Cell::new_align(
-            &format!(
-                "{}{}",
-                report.cost_result.total.read_count.to_string(),
-                annotations[1]
-            ),
-            format::Alignment::RIGHT,
-        )
-        .with_style(read_count_style),
-        Cell::new_align(
-            &format!("{}{}", report.cost_result.total.read_length, annotations[2]),
-            format::Alignment::RIGHT,
-        )
-        .with_style(read_len_style),
-        Cell::new_align(
-            &format!(
-                "{}{}",
-                report.cost_result.total.write_count.to_string(),
-                annotations[3]
-            ),
-            format::Alignment::RIGHT,
-        )
-        .with_style(write_count_style),
-        Cell::new_align(
-            &format!(
-                "{}{}",
-                report.cost_result.total.write_length, annotations[4]
-            ),
-            format::Alignment::RIGHT,
-        )
-        .with_style(write_len_style),
-        Cell::new_align(&format!("{}", tx_per_block), format::Alignment::RIGHT)
-            .with_style(block_style),
-    ]
+        if include_costs_report {
+            // costs::display_costs_report()
+        }
+    }
+    Ok(0 as u32)
 }
 
 pub fn is_supported_ext(path: &Path) -> bool {
@@ -846,10 +337,9 @@ pub async fn run_scripts(
     allow_none: bool,
     filter: Option<String>,
     concurrent_jobs: usize,
-    manifest_path: PathBuf,
     allow_wallets: bool,
-    session: Option<Session>,
-) -> Result<bool, AnyError> {
+    cache: Option<DeploymentCache>,
+) -> Result<(bool, Vec<SessionArtifacts>), AnyError> {
     if !doc_modules.is_empty() {
         let mut test_programs = Vec::new();
 
@@ -932,7 +422,7 @@ pub async fn run_scripts(
             std::process::exit(1);
         }
 
-        return Ok(false);
+        return Ok((false, vec![]));
     }
 
     let execution_result = program_state
@@ -950,7 +440,7 @@ pub async fn run_scripts(
     }
 
     if no_run {
-        return Ok(false);
+        return Ok((false, vec![]));
     }
 
     // Because scripts, and therefore worker.execute cannot detect unresolved promises at the moment
@@ -980,20 +470,18 @@ pub async fn run_scripts(
         let test_module = test_module.clone();
         let permissions = permissions.clone();
         let sender = sender.clone();
-        let session = session.clone();
+        let cache = cache.clone();
 
-        let manifest = manifest_path.clone();
         tokio::task::spawn_blocking(move || {
             let join_handle = std::thread::spawn(move || {
-                let future = run_script(
+                let future = api_v1::run_bridge(
                     program_state,
                     main_module,
                     test_module,
                     permissions,
                     sender,
-                    manifest,
                     allow_wallets,
-                    session,
+                    cache,
                 );
 
                 tokio_util::run_basic(future)
@@ -1005,7 +493,7 @@ pub async fn run_scripts(
 
     let join_futures = stream::iter(join_handles)
         .buffer_unordered(concurrent_jobs)
-        .collect::<Vec<Result<Result<(), AnyError>, tokio::task::JoinError>>>();
+        .collect::<Vec<Result<Result<Vec<SessionArtifacts>, AnyError>, tokio::task::JoinError>>>();
 
     let mut reporter = create_reporter(concurrent_jobs > 1);
     let handler = {
@@ -1072,571 +560,22 @@ pub async fn run_scripts(
         })
     };
 
-    let (result, join_results) = future::join(handler, join_futures).await;
+    let (result, mut join_results) = future::join(handler, join_futures).await;
 
-    let mut join_errors = join_results.into_iter().filter_map(|join_result| {
-        join_result
-            .ok()
-            .map(|handle_result| handle_result.err())
-            .flatten()
-    });
+    let mut reports = vec![];
+    let mut error = None;
+    for mut res in join_results.drain(..) {
+        if let Ok(Ok(artifacts)) = res.as_mut() {
+            reports.append(artifacts);
+        } else if let Ok(Err(e)) = res {
+            error = Some(e);
+            break;
+        }
+    }
 
-    if let Some(e) = join_errors.next() {
+    if let Some(e) = error {
         Err(e)
     } else {
-        Ok(result.unwrap_or(false))
-    }
-}
-
-pub async fn run_script(
-    program_state: Arc<ProgramState>,
-    main_module: ModuleSpecifier,
-    test_module: ModuleSpecifier,
-    permissions: Permissions,
-    channel: Sender<TestEvent>,
-    manifest_path: PathBuf,
-    allow_wallets: bool,
-    session: Option<Session>,
-) -> Result<(), AnyError> {
-    let mut worker = create_main_worker(&program_state, main_module.clone(), permissions, true);
-
-    if let Some(template) = session {
-        sessions::SESSION_TEMPLATE
-            .lock()
-            .unwrap()
-            .push(template.clone());
-    }
-
-    {
-        let js_runtime = &mut worker.js_runtime;
-        js_runtime.register_op("setup_chain", deno_core::op_sync(setup_chain_legacy));
-        js_runtime.register_op("start_setup_chain", deno_core::op_sync(start_chain_setup));
-        js_runtime.register_op(
-            "complete_setup_chain",
-            deno_core::op_sync(complete_chain_setup),
-        );
-        js_runtime.register_op("mine_block", deno_core::op_sync(mine_block));
-        js_runtime.register_op("mine_empty_blocks", deno_core::op_sync(mine_empty_blocks));
-        js_runtime.register_op("call_read_only_fn", deno_core::op_sync(call_read_only_fn));
-        js_runtime.register_op("get_assets_maps", deno_core::op_sync(get_assets_maps));
-        js_runtime.sync_ops_cache();
-
-        js_runtime.op_state().borrow_mut().put(manifest_path);
-
-        js_runtime.op_state().borrow_mut().put(allow_wallets);
-
-        js_runtime
-            .op_state()
-            .borrow_mut()
-            .put::<Sender<TestEvent>>(channel.clone());
-    }
-
-    let mut maybe_coverage_collector = if let Some(ref coverage_dir) = program_state.coverage_dir {
-        let session = worker.create_inspector_session().await;
-        let coverage_dir = PathBuf::from(coverage_dir);
-        let mut coverage_collector = CoverageCollector::new(coverage_dir, session);
-        worker
-            .with_event_loop(coverage_collector.start_collecting().boxed_local())
-            .await?;
-
-        Some(coverage_collector)
-    } else {
-        None
-    };
-
-    let execute_result = worker.execute_module(&main_module).await;
-    if let Err(e) = execute_result {
-        println!("{}", e);
-        return Err(e);
-    }
-
-    let execute_result = worker.execute("window.dispatchEvent(new Event('load'))");
-    if let Err(e) = execute_result {
-        println!("{}", e);
-        return Err(e);
-    }
-
-    let execute_result = worker.execute_module(&test_module).await;
-    if let Err(e) = execute_result {
-        println!("{}", e);
-        return Err(e);
-    }
-
-    let execute_result = worker
-        .run_event_loop(maybe_coverage_collector.is_none())
-        .await;
-    if let Err(e) = execute_result {
-        println!("{}", e);
-        return Err(e);
-    }
-
-    let execute_result = worker.execute("window.dispatchEvent(new Event('unload'))");
-    if let Err(e) = execute_result {
-        println!("{}", e);
-        return Err(e);
-    }
-
-    if let Some(coverage_collector) = maybe_coverage_collector.as_mut() {
-        let execute_result = worker
-            .with_event_loop(coverage_collector.stop_collecting().boxed_local())
-            .await;
-        if let Err(e) = execute_result {
-            println!("{}", e);
-            return Err(e);
-        }
-    }
-
-    Ok(())
-}
-
-#[derive(Debug, Deserialize)]
-#[serde(rename_all = "camelCase")]
-struct SetupChainArgsLegacy {
-    name: String,
-    transactions: Vec<TransactionArgs>,
-}
-
-// We need to keep this flow untouched, to maintain backward compatibility with test suites
-// relying on this previous flow (v0.24.0).
-// See `start_chain_setup` for the new flow.
-fn setup_chain_legacy(state: &mut OpState, args: Value, _: ()) -> Result<String, AnyError> {
-    let manifest_path = state.borrow::<PathBuf>();
-    let args: SetupChainArgsLegacy =
-        serde_json::from_value(args).expect("Invalid request from JavaScript for \"op_load\".");
-    let (session_id, accounts, contracts) =
-        sessions::handle_setup_chain_legacy(manifest_path, args.name, args.transactions)?;
-    let serialized_contracts = contracts.iter().map(|(a, s, _)| json!({
-      "contract_id": a.contract_identifier.to_string(),
-      "contract_interface": a.contract_interface.clone(),
-      "dependencies": a.dependencies.clone().into_iter().map(|c| c.to_string()).collect::<Vec<String>>(),
-      "source": s
-    })).collect::<Vec<_>>();
-
-    let allow_wallets = state.borrow::<bool>();
-    let accounts = if *allow_wallets { accounts } else { vec![] };
-
-    Ok(json!({
-        "session_id": session_id,
-        "accounts": accounts,
-        "contracts": serialized_contracts,
-    })
-    .to_string())
-}
-
-#[derive(Debug, Deserialize)]
-#[serde(rename_all = "camelCase")]
-struct SetupChainArgs {
-    name: String,
-    includes_pre_deployment_steps: bool,
-}
-
-// In this new flow, we want to improve the chain customizability.
-// Instead of having an optional `preSetup` function, admitting a vector of transactions, a new
-// function that will be providing a handle to the chain with the genesis accounts seeded.
-fn start_chain_setup(state: &mut OpState, args: Value, _: ()) -> Result<String, AnyError> {
-    let manifest_path = state.borrow::<PathBuf>();
-    let args: SetupChainArgs =
-        serde_json::from_value(args).expect("Invalid request from JavaScript for \"op_load\".");
-    let (session_id, accounts, contracts) =
-        sessions::handle_setup_chain(manifest_path, args.name, args.includes_pre_deployment_steps)?;
-    let serialized_contracts = contracts.iter().map(|(a, s, _)| json!({
-      "contract_id": a.contract_identifier.to_string(),
-      "contract_interface": a.contract_interface.clone(),
-      "dependencies": a.dependencies.clone().into_iter().map(|c| c.to_string()).collect::<Vec<String>>(),
-      "source": s
-    })).collect::<Vec<_>>();
-
-    let allow_wallets = state.borrow::<bool>();
-    let accounts = if *allow_wallets { accounts } else { vec![] };
-
-    Ok(json!({
-        "session_id": session_id,
-        "accounts": accounts,
-        "contracts": serialized_contracts,
-    })
-    .to_string())
-}
-
-#[derive(Debug, Deserialize)]
-#[serde(rename_all = "camelCase")]
-struct CompleteSetupChainArgs {
-    session_id: u32,
-}
-
-// In this new flow, we want to improve the chain customizability.
-// Instead of having an optional `preSetup` function, admitting a vector of transactions, a new
-// function that will be providing a handle to the chain with the genesis accounts seeded.
-fn complete_chain_setup(state: &mut OpState, args: Value, _: ()) -> Result<String, AnyError> {
-    let args: CompleteSetupChainArgs =
-        serde_json::from_value(args).expect("Invalid request from JavaScript for \"op_load\".");
-    let (session_id, accounts, contracts) = sessions::complete_setup_chain(args.session_id)?;
-    let serialized_contracts = contracts.iter().map(|(a, s, _)| json!({
-      "contract_id": a.contract_identifier.to_string(),
-      "contract_interface": a.contract_interface.clone(),
-      "dependencies": a.dependencies.clone().into_iter().map(|c| c.to_string()).collect::<Vec<String>>(),
-      "source": s
-    })).collect::<Vec<_>>();
-
-    let allow_wallets = state.borrow::<bool>();
-    let accounts = if *allow_wallets { accounts } else { vec![] };
-
-    Ok(json!({
-        "session_id": session_id,
-        "accounts": accounts,
-        "contracts": serialized_contracts,
-    })
-    .to_string())
-}
-
-#[derive(Debug, Deserialize)]
-#[serde(rename_all = "camelCase")]
-struct MineBlockArgs {
-    session_id: u32,
-    transactions: Vec<TransactionArgs>,
-}
-
-#[derive(Debug, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct TransactionArgs {
-    sender: String,
-    contract_call: Option<ContractCallArgs>,
-    deploy_contract: Option<DeployContractArgs>,
-    transfer_stx: Option<TransferSTXArgs>,
-}
-
-#[derive(Debug, Deserialize)]
-#[serde(rename_all = "camelCase")]
-struct ContractCallArgs {
-    contract: String,
-    method: String,
-    args: Vec<String>,
-}
-
-#[derive(Debug, Deserialize)]
-#[serde(rename_all = "camelCase")]
-struct DeployContractArgs {
-    name: String,
-    code: String,
-}
-
-#[derive(Debug, Deserialize)]
-#[serde(rename_all = "camelCase")]
-struct TransferSTXArgs {
-    amount: u64,
-    recipient: String,
-}
-
-fn value_to_string(value: &types::Value) -> String {
-    use clarity_repl::clarity::types::{CharType, SequenceData, Value};
-
-    match value {
-        Value::Tuple(tup_data) => {
-            let mut out = String::new();
-            write!(out, "{{");
-            for (i, (name, value)) in tup_data.data_map.iter().enumerate() {
-                write!(out, "{}: {}", &**name, value_to_string(value));
-                if i < tup_data.data_map.len() - 1 {
-                    write!(out, ", ");
-                }
-            }
-            write!(out, "}}");
-            out
-        }
-        Value::Optional(opt_data) => match opt_data.data {
-            Some(ref x) => format!("(some {})", value_to_string(&**x)),
-            None => "none".to_string(),
-        },
-        Value::Response(res_data) => match res_data.committed {
-            true => format!("(ok {})", value_to_string(&*res_data.data)),
-            false => format!("(err {})", value_to_string(&*res_data.data)),
-        },
-        Value::Sequence(SequenceData::String(CharType::ASCII(data))) => {
-            format!("\"{}\"", String::from_utf8(data.data.clone()).unwrap())
-        }
-        Value::Sequence(SequenceData::String(CharType::UTF8(data))) => {
-            let mut result = String::new();
-            for c in data.data.iter() {
-                if c.len() > 1 {
-                    // We escape extended charset
-                    result.push_str(&format!("\\u{{{}}}", hash::to_hex(&c[..])));
-                } else {
-                    result.push(c[0] as char)
-                }
-            }
-            format!("u\"{}\"", result)
-        }
-        Value::Sequence(SequenceData::List(list_data)) => {
-            let mut out = String::new();
-            write!(out, "[");
-            for (ix, v) in list_data.data.iter().enumerate() {
-                if ix > 0 {
-                    write!(out, ", ");
-                }
-                write!(out, "{}", value_to_string(v));
-            }
-            write!(out, "]");
-            out
-        }
-        _ => format!("{}", value),
-    }
-}
-
-fn mine_block(state: &mut OpState, args: Value, _: ()) -> Result<String, AnyError> {
-    let args: MineBlockArgs =
-        serde_json::from_value(args).expect("Invalid request from JavaScript.");
-    let (block_height, receipts) = sessions::perform_block(args.session_id, |name, session| {
-        let initial_tx_sender = session.get_tx_sender();
-        let mut receipts = vec![];
-        for tx in args.transactions.iter() {
-            if let Some(ref args) = tx.contract_call {
-                let execution = match session.invoke_contract_call(
-                    &args.contract,
-                    &args.method,
-                    &args.args,
-                    &tx.sender,
-                    name.into(),
-                ) {
-                    Ok(res) => res,
-                    Err(diagnostics) => {
-                        if diagnostics.len() > 0 {
-                            // TODO(lgalabru): if CLARINET_BACKTRACE=1
-                            // Retrieve the AST (penultimate entry), and the expression id (last entry)
-                            println!(
-                                "Runtime error: {}::{}({}) -> {}",
-                                args.contract,
-                                args.method,
-                                args.args.join(", "),
-                                diagnostics.last().unwrap().message
-                            );
-                        }
-                        continue;
-                    }
-                };
-                let result = match execution.result {
-                    Some(output) => value_to_string(&output),
-                    _ => unreachable!("Value empty"),
-                };
-                receipts.push((result, execution.events));
-            } else {
-                session.set_tx_sender(tx.sender.clone());
-                if let Some(ref args) = tx.deploy_contract {
-                    let execution = session
-                        .interpret(
-                            args.code.clone(),
-                            Some(args.name.clone()),
-                            true,
-                            false,
-                            Some(name.into()),
-                        )
-                        .unwrap(); // TODO(lgalabru)
-                    let result = match execution.result {
-                        Some(output) => format!("{}", output),
-                        _ => unreachable!("Value empty"),
-                    };
-                    receipts.push((result, execution.events));
-                } else if let Some(ref args) = tx.transfer_stx {
-                    let snippet = format!(
-                        "(stx-transfer? u{} tx-sender '{})",
-                        args.amount, args.recipient
-                    );
-                    let execution = session
-                        .interpret(snippet, None, true, false, Some(name.into()))
-                        .unwrap(); // TODO(lgalabru)
-                    let result = match execution.result {
-                        Some(output) => format!("{}", output),
-                        _ => unreachable!("Value empty"),
-                    };
-                    receipts.push((result, execution.events));
-                }
-                session.set_tx_sender(initial_tx_sender.clone());
-            }
-        }
-        let block_height = session.advance_chain_tip(1);
-        Ok((block_height, receipts))
-    })?;
-
-    let payload = json!({
-      "session_id": args.session_id,
-      "block_height": block_height,
-      "receipts":  receipts.iter().map(|r| {
-        json!({
-          "result": r.0,
-          "events": r.1,
-        })
-      }).collect::<Vec<_>>()
-    });
-
-    Ok(payload.to_string())
-}
-
-#[derive(Debug, Deserialize)]
-#[serde(rename_all = "camelCase")]
-struct MineEmptyBlocksArgs {
-    session_id: u32,
-    count: u32,
-}
-
-fn mine_empty_blocks(state: &mut OpState, args: Value, _: ()) -> Result<String, AnyError> {
-    let args: MineEmptyBlocksArgs =
-        serde_json::from_value(args).expect("Invalid request from JavaScript.");
-    let block_height = sessions::perform_block(args.session_id, |name, session| {
-        let block_height = session.advance_chain_tip(args.count);
-        Ok(block_height)
-    })?;
-
-    Ok(json!({
-      "session_id": args.session_id,
-      "block_height": block_height,
-    })
-    .to_string())
-}
-
-#[derive(Debug, Deserialize)]
-#[serde(rename_all = "camelCase")]
-struct CallReadOnlyFnArgs {
-    session_id: u32,
-    sender: String,
-    contract: String,
-    method: String,
-    args: Vec<String>,
-}
-
-fn call_read_only_fn(state: &mut OpState, args: Value, _: ()) -> Result<String, AnyError> {
-    let args: CallReadOnlyFnArgs =
-        serde_json::from_value(args).expect("Invalid request from JavaScript.");
-    let (result, events) = sessions::perform_block(args.session_id, |name, session| {
-        let execution = session
-            .invoke_contract_call(
-                &args.contract,
-                &args.method,
-                &args.args,
-                &args.sender,
-                "readonly-calls".into(),
-            )
-            .unwrap(); // TODO(lgalabru)
-        let result = match execution.result {
-            Some(output) => format!("{}", output),
-            _ => unreachable!("Value empty"),
-        };
-        Ok((result, execution.events))
-    })?;
-    Ok(json!({
-      "session_id": args.session_id,
-      "result": result,
-      "events": events,
-    })
-    .to_string())
-}
-
-#[derive(Debug, Deserialize)]
-#[serde(rename_all = "camelCase")]
-struct GetAssetsMapsArgs {
-    session_id: u32,
-}
-
-fn get_assets_maps(state: &mut OpState, args: Value, _: ()) -> Result<String, AnyError> {
-    let args: GetAssetsMapsArgs =
-        serde_json::from_value(args).expect("Invalid request from JavaScript.");
-    let assets_maps = sessions::perform_block(args.session_id, |name, session| {
-        let assets_maps = session.get_assets_maps();
-        let mut lev1 = BTreeMap::new();
-        for (key1, map1) in assets_maps.into_iter() {
-            let mut lev2 = BTreeMap::new();
-            for (key2, val2) in map1.into_iter() {
-                lev2.insert(
-                    key2,
-                    u64::try_from(val2)
-                        .expect("u128 unsupported at the moment, please open an issue."),
-                );
-            }
-            lev1.insert(key1, lev2);
-        }
-        Ok(lev1)
-    })?;
-    Ok(json!({
-      "session_id": args.session_id,
-      "assets": assets_maps,
-    })
-    .to_string())
-}
-
-#[cfg(test)]
-mod tests {
-    use clarity_repl::clarity::representations::ClarityName;
-    use clarity_repl::clarity::types::{
-        ListTypeData, OptionalData, ResponseData, SequenceData, SequencedValue, TupleData,
-    };
-
-    use super::*;
-
-    #[test]
-    fn test_value_to_string() {
-        let mut s = value_to_string(&types::Value::Int(42));
-        assert_eq!(s, "42");
-
-        s = value_to_string(&types::Value::UInt(12345678909876));
-        assert_eq!(s, "u12345678909876");
-
-        s = value_to_string(&types::Value::Bool(true));
-        assert_eq!(s, "true");
-
-        s = value_to_string(&types::Value::buff_from(vec![1, 2, 3]).unwrap());
-        assert_eq!(s, "0x010203");
-
-        s = value_to_string(&types::Value::buff_from(vec![1, 2, 3]).unwrap());
-        assert_eq!(s, "0x010203");
-
-        s = value_to_string(&types::Value::Tuple(
-            TupleData::from_data(vec![(
-                ClarityName::try_from("foo".to_string()).unwrap(),
-                types::Value::Bool(true),
-            )])
-            .unwrap(),
-        ));
-        assert_eq!(s, "{foo: true}");
-
-        s = value_to_string(&types::Value::Optional(OptionalData {
-            data: Some(Box::new(types::Value::UInt(42))),
-        }));
-        assert_eq!(s, "(some u42)");
-
-        s = value_to_string(&types::NONE);
-        assert_eq!(s, "none");
-
-        s = value_to_string(&types::Value::Response(ResponseData {
-            committed: true,
-            data: Box::new(types::Value::Int(-321)),
-        }));
-        assert_eq!(s, "(ok -321)");
-
-        s = value_to_string(&types::Value::Response(ResponseData {
-            committed: false,
-            data: Box::new(types::Value::Sequence(types::SequenceData::String(
-                types::CharType::ASCII(types::ASCIIData {
-                    data: "'foo'".as_bytes().to_vec(),
-                }),
-            ))),
-        }));
-        assert_eq!(s, "(err \"'foo'\")");
-
-        s = value_to_string(&types::Value::Sequence(types::SequenceData::String(
-            types::CharType::ASCII(types::ASCIIData {
-                data: "Hello, \"world\"\n".as_bytes().to_vec(),
-            }),
-        )));
-        assert_eq!(s, "\"Hello, \"world\"\n\"");
-
-        s = value_to_string(&types::UTF8Data::to_value(
-            &"Hello, 'world'\n".as_bytes().to_vec(),
-        ));
-        assert_eq!(s, "u\"Hello, 'world'\n\"");
-
-        s = value_to_string(&types::Value::Sequence(SequenceData::List(
-            types::ListData {
-                data: vec![types::Value::Int(-321)],
-                type_signature: ListTypeData::new_list(types::TypeSignature::IntType, 2).unwrap(),
-            },
-        )));
-        assert_eq!(s, "[-321]");
+        Ok((result.unwrap_or(false), reports))
     }
 }

@@ -169,6 +169,7 @@ pub struct PoxStackingOrder {
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct AccountConfig {
+    pub label: String,
     pub mnemonic: String,
     pub derivation: String,
     pub balance: u64,
@@ -177,6 +178,27 @@ pub struct AccountConfig {
 }
 
 impl ChainConfig {
+
+    #[allow(non_fmt_panics)]
+    pub fn from_manifest_path(manifest_path: &PathBuf, network: &StacksNetwork) -> ChainConfig {
+        let mut chain_config_path = manifest_path.clone();
+        chain_config_path.pop();
+        chain_config_path.push("settings");
+        chain_config_path.push(match network {
+            StacksNetwork::Simnet | StacksNetwork::Devnet => "Devnet.toml",
+            StacksNetwork::Testnet => "Testnet.toml",
+            StacksNetwork::Mainnet => "Mainnet.toml",
+        });
+        let chain_config = ChainConfig::from_path(
+            &chain_config_path,
+            match network {
+                StacksNetwork::Simnet => &StacksNetwork::Devnet, // TODO(lgalabru): handle backward compatibility
+                _ => network,
+            },
+        );
+        chain_config
+    }
+
     #[allow(non_fmt_panics)]
     pub fn from_path(path: &PathBuf, network: &StacksNetwork) -> ChainConfig {
         let path = match File::open(path) {
@@ -239,7 +261,7 @@ impl ChainConfig {
                             let derivation = match account_settings.get("derivation") {
                                 Some(Value::String(derivation)) => derivation.to_string(),
                                 _ => DEFAULT_DERIVATION_PATH.to_string(),
-                            }; // TODO(lgalabru): use derivation path
+                            };
 
                             let (address, _, _) =
                                 compute_addresses(&mnemonic, &derivation, is_mainnet);
@@ -247,6 +269,7 @@ impl ChainConfig {
                             accounts.insert(
                                 account_name.to_string(),
                                 AccountConfig {
+                                    label: account_name.to_string(),
                                     mnemonic: mnemonic.to_string(),
                                     derivation,
                                     balance,
