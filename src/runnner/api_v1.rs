@@ -315,8 +315,8 @@ pub fn terminate_session(state: &mut OpState, args: Value, _: ()) -> Result<(), 
         let sessions = state
             .try_borrow_mut::<HashMap<u32, (String, Session)>>()
             .expect("unable to retrieve sessions");
-        let (label, session) = sessions
-            .get_mut(&args.session_id)
+        let (label, mut session) = sessions
+            .remove(&args.session_id)
             .expect("unable to retrieve session");
 
         let mut coverage_reports = vec![];

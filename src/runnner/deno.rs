@@ -246,7 +246,7 @@ pub async fn do_run_scripts(
                 )
                 .map(|mut res| {
                     match res.as_mut() {
-                        Ok((success, sessions_artifacts)) if *success => {
+                        Ok((failed, sessions_artifacts)) if !*failed => {
                             if include_costs_report {
                                 costs::display_costs_report(sessions_artifacts)
                             }
@@ -268,7 +268,7 @@ pub async fn do_run_scripts(
             tools::test_runner::is_supported,
         )?;
 
-        let (success, sessions_artifacts) = run_scripts(
+        let (failed, sessions_artifacts) = run_scripts(
             program_state.clone(),
             permissions,
             lib,
@@ -285,7 +285,7 @@ pub async fn do_run_scripts(
         )
         .await?;
 
-        if !success {
+        if failed {
             std::process::exit(1);
         }
 
