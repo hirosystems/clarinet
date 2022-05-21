@@ -660,6 +660,7 @@ fn test_opening_simple_nft_manifest_should_return_fresh_analysis() {
 
     // the counter project should emit 2 warnings and 2 notes coming from counter.clar
     assert_eq!(response.aggregated_diagnostics.len(), 2);
-    let (_url, diags) = &response.aggregated_diagnostics[0];
-    assert_eq!(diags.len(), 8);
+    let (_, diags_0) = &response.aggregated_diagnostics[0];
+    let (_, diags_1) = &response.aggregated_diagnostics[1];
+    assert_eq!(diags_0.len().max(diags_1.len()), 8);
 }
