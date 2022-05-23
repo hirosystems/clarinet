@@ -17,7 +17,9 @@ pub const DEFAULT_STACKS_NODE_IMAGE: &str = "quay.io/hirosystems/stacks-node:dev
 pub const DEFAULT_BITCOIN_EXPLORER_IMAGE: &str = "quay.io/hirosystems/bitcoin-explorer:devnet";
 pub const DEFAULT_STACKS_API_IMAGE: &str = "blockstack/stacks-blockchain-api:latest";
 pub const DEFAULT_STACKS_EXPLORER_IMAGE: &str = "blockstack/explorer:latest";
+pub const DEFAULT_HYPERCHAINS_IMAGE: &str = "quay.io/hirosystems/stacks-hyperchains:devnet-v1";
 pub const DEFAULT_POSTGRES_IMAGE: &str = "postgres:alpine";
+pub const DEFAULT_HYPERCHAIN_CONTRACT_ID: &str = "STFTX3F4XCY7RS5VRHXP2SED0WC0YRKNWTNXD74P.hc-alpha";
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct ChainConfigFile {
@@ -68,6 +70,15 @@ pub struct DevnetConfigFile {
     pub disable_stacks_explorer: Option<bool>,
     pub disable_stacks_api: Option<bool>,
     pub bind_containers_volumes: Option<bool>,
+    pub enable_hyperchain_node: Option<bool>,
+    pub hyperchain_image_url: Option<String>,
+    pub hyperchain_leader_mnemonic: Option<String>,
+    pub hyperchain_leader_derivation_path: Option<String>,
+    pub hyperchain_node_p2p_port: Option<u16>,
+    pub hyperchain_node_rpc_port: Option<u16>,
+    pub hyperchain_events_ingestion_port: Option<u16>,
+    pub hyperchain_node_events_observers: Option<Vec<String>>,
+    pub hyperchain_contract_id: Option<String>,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -146,6 +157,18 @@ pub struct DevnetConfig {
     pub disable_stacks_explorer: bool,
     pub disable_stacks_api: bool,
     pub bind_containers_volumes: bool,
+    pub enable_hyperchain_node: bool,
+    pub hyperchain_image_url: String,
+    pub hyperchain_leader_stx_address: String,
+    pub hyperchain_leader_secret_key_hex: String,
+    pub hyperchain_leader_btc_address: String,
+    pub hyperchain_leader_mnemonic: String,
+    pub hyperchain_leader_derivation_path: String,
+    pub hyperchain_node_p2p_port: u16,
+    pub hyperchain_node_rpc_port: u16,
+    pub hyperchain_events_ingestion_port: u16,
+    pub hyperchain_node_events_observers: Vec<String>,
+    pub hyperchain_contract_id: String,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -218,7 +241,7 @@ impl ChainConfig {
         };
 
         let mut accounts = BTreeMap::new();
-        let is_mainnet = network.name == "mainnet".to_string();
+        let is_mainnet = env == &StacksNetwork::Mainnet;
 
         match &chain_config_file.accounts {
             Some(Value::Table(entries)) => {
@@ -229,8 +252,6 @@ impl ChainConfig {
                                 Some(Value::Integer(balance)) => *balance as u64,
                                 _ => 0,
                             };
-
-                            let is_mainnet = env == &StacksNetwork::Mainnet;
 
                             let mnemonic = match account_settings.get("mnemonic") {
                                 Some(Value::String(words)) => {
@@ -293,6 +314,67 @@ impl ChainConfig {
             let (miner_stx_address, miner_btc_address, miner_secret_key_hex) =
                 compute_addresses(&miner_mnemonic, &miner_derivation_path, is_mainnet);
 
+            // If unset, we'll reuse the miner's keypair for the hyperchain leader
+            let (
+                hyperchain_leader_stx_address,
+                hyperchain_leader_btc_address,
+                hyperchain_leader_secret_key_hex,
+                hyperchain_leader_derivation_path,
+                hyperchain_leader_mnemonic,
+            ) = if let Some(mnemonic) = devnet_config.hyperchain_leader_mnemonic.take() {
+                let derivation_path = devnet_config
+                    .hyperchain_leader_derivation_path
+                    .take()
+                    .unwrap_or(DEFAULT_DERIVATION_PATH.to_string());
+                let (stx_address, btc_address, secret_key_hex) =
+                    compute_addresses(&mnemonic, &derivation_path, is_mainnet);
+                (
+                    stx_address,
+                    btc_address,
+                    secret_key_hex,
+                    derivation_path,
+                    mnemonic,
+                )
+            } else {
+                (
+                    miner_stx_address.clone(),
+                    miner_btc_address.clone(),
+                    miner_secret_key_hex.clone(),
+                    miner_derivation_path.clone(),
+                    miner_mnemonic.clone(),
+                )
+            };
+
+            let enable_hyperchain_node = devnet_config.enable_hyperchain_node.unwrap_or(false);
+            let hyperchain_events_ingestion_port = devnet_config
+                .hyperchain_events_ingestion_port
+                .unwrap_or(30445);
+
+            let mut stacks_node_events_observers = devnet_config
+                .stacks_node_events_observers
+                .take()
+                .unwrap_or(vec![]);
+
+            if enable_hyperchain_node {
+                // add hyperchain node to stacks-node observers
+                let label = "hyperchain-leader";
+                stacks_node_events_observers.push(format!(
+                    "host.docker.internal:{}",
+                    hyperchain_events_ingestion_port
+                ));
+                accounts.insert(
+                    label.to_string(),
+                    AccountConfig {
+                        label: label.to_string(),
+                        mnemonic: hyperchain_leader_mnemonic.clone(),
+                        derivation: hyperchain_leader_derivation_path.clone(),
+                        balance: super::DEFAULT_DEVNET_BALANCE,
+                        address: hyperchain_leader_stx_address.clone(),
+                        is_mainnet,
+                    },
+                );
+            }
+
             let mut config = DevnetConfig {
                 orchestrator_port: devnet_config.orchestrator_port.unwrap_or(20445),
                 bitcoin_node_p2p_port: devnet_config.bitcoin_node_p2p_port.unwrap_or(18444),
@@ -313,10 +395,7 @@ impl ChainConfig {
                     .unwrap_or(false),
                 stacks_node_p2p_port: devnet_config.stacks_node_p2p_port.unwrap_or(20444),
                 stacks_node_rpc_port: devnet_config.stacks_node_rpc_port.unwrap_or(20443),
-                stacks_node_events_observers: devnet_config
-                    .stacks_node_events_observers
-                    .take()
-                    .unwrap_or(vec![]),
+                stacks_node_events_observers,
                 stacks_api_port: devnet_config.stacks_api_port.unwrap_or(3999),
                 stacks_api_events_port: devnet_config.stacks_api_events_port.unwrap_or(3700),
                 stacks_explorer_port: devnet_config.stacks_explorer_port.unwrap_or(8000),
@@ -373,6 +452,24 @@ impl ChainConfig {
                 disable_stacks_api: devnet_config.disable_stacks_api.unwrap_or(false),
                 disable_stacks_explorer: devnet_config.disable_stacks_explorer.unwrap_or(false),
                 bind_containers_volumes: devnet_config.bind_containers_volumes.unwrap_or(false),
+                enable_hyperchain_node,
+                hyperchain_image_url: devnet_config
+                    .hyperchain_image_url
+                    .take()
+                    .unwrap_or(DEFAULT_HYPERCHAINS_IMAGE.to_string()),
+                hyperchain_leader_btc_address,
+                hyperchain_leader_stx_address,
+                hyperchain_leader_mnemonic,
+                hyperchain_leader_secret_key_hex,
+                hyperchain_leader_derivation_path,
+                hyperchain_node_p2p_port: devnet_config.stacks_node_p2p_port.unwrap_or(30443),
+                hyperchain_node_rpc_port: devnet_config.stacks_node_rpc_port.unwrap_or(30444),
+                hyperchain_events_ingestion_port,
+                hyperchain_node_events_observers: devnet_config
+                    .hyperchain_node_events_observers
+                    .take()
+                    .unwrap_or(vec![]),
+                hyperchain_contract_id: devnet_config.hyperchain_contract_id.unwrap_or(DEFAULT_HYPERCHAIN_CONTRACT_ID.to_string()),
             };
             if !config.disable_stacks_api && config.disable_stacks_api {
                 config.disable_stacks_api = false;

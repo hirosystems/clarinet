@@ -103,3 +103,5 @@ pub enum ChainsCoordinatorCommand {
     InvalidateBitcoinChainTip,
     PublishPoxStackingOrders(BlockIdentifier),
 }
+
+pub const DEFAULT_DEVNET_BALANCE: u64 = 100_000_000_000_000;
