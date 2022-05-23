@@ -22,9 +22,14 @@ pub extern crate clarity_repl;
 pub mod macros;
 
 pub mod deployment;
+pub mod generate;
 pub mod indexer;
 pub mod integrate;
-#[cfg(feature = "cli")]
-pub mod runnner;
+pub mod lsp;
 pub mod types;
 pub mod utils;
+
+#[cfg(feature = "cli")]
+pub mod frontend;
+#[cfg(feature = "cli")]
+pub mod runnner;

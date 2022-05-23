@@ -33,11 +33,11 @@ mod utils;
 
 #[derive(Clone)]
 pub struct DeploymentCache {
-    session: Session,
-    session_accounts_only: Session,
-    deployment_path: Option<String>,
-    deployment: DeploymentSpecification,
-    contracts_artifacts: HashMap<QualifiedContractIdentifier, AnalysisArtifacts>,
+    pub session: Session,
+    pub session_accounts_only: Session,
+    pub deployment_path: Option<String>,
+    pub deployment: DeploymentSpecification,
+    pub contracts_artifacts: HashMap<QualifiedContractIdentifier, AnalysisArtifacts>,
 }
 
 impl DeploymentCache {
@@ -111,6 +111,7 @@ pub fn run_scripts(
     allow_disk_write: bool,
     manifest: &ProjectManifest,
     cache: DeploymentCache,
+    deployment_plan_path: Option<String>,
 ) -> Result<u32, (String, u32)> {
     match block_on(deno::do_run_scripts(
         files,
@@ -121,6 +122,7 @@ pub fn run_scripts(
         allow_disk_write,
         manifest,
         cache,
+        deployment_plan_path,
     )) {
         Err(e) => Err((format!("{:?}", e), 0)),
         Ok(res) => Ok(res),

@@ -1,5 +1,6 @@
 use super::api_v1::SessionArtifacts;
 use super::{api_v1, costs, DeploymentCache};
+use crate::frontend::cli;
 use clarity_repl::clarity::coverage::CoverageReporter;
 use clarity_repl::clarity::types;
 use clarity_repl::repl::Session;
@@ -59,6 +60,7 @@ pub async fn do_run_scripts(
     allow_disk_write: bool,
     manifest: &ProjectManifest,
     cache: DeploymentCache,
+    deployment_plan_path: Option<String>,
 ) -> Result<u32, AnyError> {
     let mut flags = Flags::default();
     flags.unstable = true;
@@ -229,6 +231,8 @@ pub async fn do_run_scripts(
                 // Clear the screen
                 print!("{esc}c", esc = 27 as char);
                 // Clear eventual previous sessions
+                let cache = cli::build_deployment_cache_or_exit(manifest, &deployment_plan_path);
+
                 run_scripts(
                     program_state.clone(),
                     permissions.clone(),
@@ -242,7 +246,7 @@ pub async fn do_run_scripts(
                     filter.clone(),
                     concurrent_jobs,
                     allow_wallets,
-                    None,
+                    Some(cache),
                 )
                 .map(|mut res| {
                     match res.as_mut() {
