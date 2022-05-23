@@ -31,6 +31,6 @@ pub mod utils;
 #[cfg(feature = "cli")]
 pub mod frontend;
 #[cfg(feature = "cli")]
-pub mod runnner;
-#[cfg(feature = "cli")]
 pub mod lsp;
+#[cfg(feature = "cli")]
+pub mod runnner;
