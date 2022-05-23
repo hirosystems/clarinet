@@ -305,16 +305,15 @@ pub async fn do_run_scripts(
                     .contract_paths
                     .insert(contract_id.name.to_string(), contract_path.clone());
             }
-            for mut artifact in sessions_artifacts.into_iter() {
-                coverage_reporter
-                    .reports
-                    .append(&mut artifact.coverage_reports);
+            for artifact in sessions_artifacts.iter() {
+                let mut coverage_reports = artifact.coverage_reports.clone();
+                coverage_reporter.reports.append(&mut coverage_reports);
             }
             coverage_reporter.write_lcov_file("coverage.lcov");
         }
 
         if include_costs_report {
-            // costs::display_costs_report()
+            costs::display_costs_report(&sessions_artifacts);
         }
     }
     Ok(0 as u32)
