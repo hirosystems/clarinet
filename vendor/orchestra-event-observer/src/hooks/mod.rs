@@ -81,7 +81,8 @@ pub async fn handle_bitcoin_hook_action<'a>(
                     "proof": proof,
                     "block_identifier": block_identifier,
                     "confirmations": 1,
-                })]
+                })],
+                "hook_id": hook.id,
             });
             let body = serde_json::to_vec(&payload).unwrap();
             let _ = client
