@@ -21,3 +21,4 @@ action:
   http-hook: 
     url: http://localhost:9000/chain-events/
     method: POST
+    authorization-header: "Bearer cn389ncoiwuencr"

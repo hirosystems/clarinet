@@ -11,3 +11,4 @@ bitcoin_node_rpc_host = "0.0.0.0"
 bitcoin_node_rpc_port = 18443
 stacks_node_rpc_host = "0.0.0.0"
 stacks_node_rpc_port = 20443
+operators = ["74738ff5-5367-5958-9aee-98fffdcd1876"]

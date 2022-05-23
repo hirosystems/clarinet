@@ -99,6 +99,7 @@ impl DevnetEventObserverConfig {
             bitcoin_node_rpc_port: devnet_config.bitcoin_node_rpc_port,
             stacks_node_rpc_host: "http://localhost".into(),
             stacks_node_rpc_port: devnet_config.stacks_node_rpc_port,
+            operators: HashMap::new(),
         };
 
         DevnetEventObserverConfig {

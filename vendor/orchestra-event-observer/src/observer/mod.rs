@@ -11,6 +11,9 @@ use clarity_repl::clarity::util::hash::bytes_to_hex;
 use orchestra_types::{BitcoinChainEvent, StacksChainEvent, StacksNetwork};
 use reqwest::Client as HttpClient;
 use rocket::config::{Config, LogLevel};
+use rocket::request::{self, Request, FromRequest, Outcome};
+use rocket::outcome::IntoOutcome;
+use rocket::http::Status;
 use rocket::serde::json::{json, Json, Value as JsonValue};
 use rocket::serde::Deserialize;
 use rocket::State;
@@ -110,6 +113,17 @@ pub struct EventObserverConfig {
     pub bitcoin_node_rpc_port: u16,
     pub stacks_node_rpc_host: String,
     pub stacks_node_rpc_port: u16,
+    pub operators: HashMap<Option<String>, HookFormation>,
+}
+
+impl EventObserverConfig {
+    pub fn is_authorization_required(&self) -> bool {
+        !self.operators.is_empty()
+    } 
+
+    pub fn is_authorized(&self, token: &str) -> bool {
+        self.operators.contains_key(&Some(token.to_string()))
+    } 
 }
 
 #[derive(Deserialize, Debug)]
@@ -124,8 +138,8 @@ pub enum ObserverCommand {
     PropagateStacksChainEvent(StacksChainEvent),
     SubscribeStreamer(u64),
     UnsubscribeStreamer(u64),
-    RegisterHook(HookSpecification),
-    DeregisterHook(u64),
+    RegisterHook(HookSpecification, ApiKey),
+    DeregisterHook(u64, ApiKey),
     NotifyBitcoinTransactionProxied,
     Terminate,
 }
@@ -176,7 +190,7 @@ pub async fn start_event_observer(
         bitcoin_node_rpc_password: config.bitcoin_node_password.clone(),
     });
 
-    let config_mutex = Arc::new(Mutex::new(config.clone()));
+    let managed_config = config.clone();
     let indexer_rw_lock = Arc::new(RwLock::new(indexer));
 
     let background_job_tx_mutex = Arc::new(Mutex::new(observer_commands_tx.clone()));
@@ -204,11 +218,13 @@ pub async fn start_event_observer(
         routes.append(&mut routes![handle_bitcoin_rpc_call]);
     }
 
+    let managed_config_ingestion = managed_config.clone();
+
     let _ = std::thread::spawn(move || {
         let future = rocket::custom(ingestion_config)
             .manage(indexer_rw_lock)
-            .manage(config_mutex)
             .manage(background_job_tx_mutex)
+            .manage(managed_config_ingestion)
             .mount("/", routes)
             .launch();
 
@@ -232,6 +248,7 @@ pub async fn start_event_observer(
     let _ = std::thread::spawn(move || {
         let future = rocket::custom(control_config)
             .manage(background_job_tx_mutex)
+            .manage(managed_config)
             .mount("/", routes)
             .launch();
 
@@ -240,15 +257,19 @@ pub async fn start_event_observer(
 
     // This loop is used for handling background jobs, emitted by HTTP calls.
     let mut event_handlers = config.event_handlers.clone();
-    let mut hook_formation = HookFormation::new();
 
-    if let Some(ref mut initial_hook_formation) = config.initial_hook_formation {
-        hook_formation
-            .stacks_hooks
-            .append(&mut initial_hook_formation.stacks_hooks);
-        hook_formation
-            .bitcoin_hooks
-            .append(&mut initial_hook_formation.bitcoin_hooks);
+    // If authorization not required, we create a default HookFormation
+    if !config.is_authorization_required() {
+        let mut hook_formation = HookFormation::new();
+        if let Some(ref mut initial_hook_formation) = config.initial_hook_formation {
+            hook_formation
+                .stacks_hooks
+                .append(&mut initial_hook_formation.stacks_hooks);
+            hook_formation
+                .bitcoin_hooks
+                .append(&mut initial_hook_formation.bitcoin_hooks);
+        }
+        config.operators.insert(None, hook_formation);
     }
 
     loop {
@@ -275,9 +296,11 @@ pub async fn start_event_observer(
                 }
                 // process hooks
                 if config.hooks_enabled {
+                    let bitcoin_hooks = config.operators.values().map(|v| &v.bitcoin_hooks).flatten().collect();
+
                     let hooks_to_trigger = evaluate_bitcoin_hooks_on_chain_event(
                         &chain_event,
-                        &hook_formation.bitcoin_hooks,
+                        bitcoin_hooks,
                     );
                     let mut proofs = HashMap::new();
                     for (_, transaction, block_identifier) in hooks_to_trigger.iter() {
@@ -323,10 +346,12 @@ pub async fn start_event_observer(
                     event_handler.propagate_stacks_event(&chain_event).await;
                 }
                 if config.hooks_enabled {
+                    let stacks_hooks = config.operators.values().map(|v| &v.stacks_hooks).flatten().collect();
+
                     // process hooks
                     let hooks_to_trigger = evaluate_stacks_hooks_on_chain_event(
                         &chain_event,
-                        &hook_formation.stacks_hooks,
+                        stacks_hooks,
                     );
                     if hooks_to_trigger.len() > 0 {
                         if let Some(ref tx) = observer_events_tx {
@@ -353,7 +378,8 @@ pub async fn start_event_observer(
                 event_handlers.push(EventHandler::GrpcStream(stream));
             }
             ObserverCommand::UnsubscribeStreamer(stream) => {}
-            ObserverCommand::RegisterHook(hook) => {
+            ObserverCommand::RegisterHook(hook, api_key) => {
+                let mut hook_formation = config.operators.get_mut(&api_key.0).expect("unable to retrieve hook formation");
                 match hook {
                     HookSpecification::Stacks(ref hook) => hook_formation.stacks_hooks.push(hook.clone()),
                     HookSpecification::Bitcoin(ref hook) => hook_formation.bitcoin_hooks.push(hook.clone()),
@@ -362,7 +388,9 @@ pub async fn start_event_observer(
                     let _ = tx.send(ObserverEvent::HookRegistered(hook));
                 }
             },
-            ObserverCommand::DeregisterHook(hook_id) => {}
+            ObserverCommand::DeregisterHook(hook_id, api_key) => {
+
+            }
         }
     }
     Ok(())
@@ -521,7 +549,7 @@ pub fn handle_drop_mempool_tx() -> Json<JsonValue> {
 
 #[post("/", format = "application/json", data = "<bitcoin_rpc_call>")]
 pub async fn handle_bitcoin_rpc_call(
-    config: &State<Arc<Mutex<EventObserverConfig>>>,
+    config: &State<EventObserverConfig>,
     bitcoin_rpc_call: Json<BitcoinRPCRequest>,
     background_job_tx: &State<Arc<Mutex<Sender<ObserverCommand>>>>,
 ) -> Json<JsonValue> {
@@ -532,23 +560,18 @@ pub async fn handle_bitcoin_rpc_call(
     let method = bitcoin_rpc_call.method.clone();
     let body = rocket::serde::json::serde_json::to_vec(&bitcoin_rpc_call).unwrap();
 
-    let builder = match config.inner().lock() {
-        Ok(config) => {
-            let token = encode(format!(
-                "{}:{}",
-                config.bitcoin_node_username, config.bitcoin_node_password
-            ));
-            let client = Client::new();
-            client
-                .post(format!(
-                    "{}:{}/",
-                    config.bitcoin_node_rpc_host, config.bitcoin_node_rpc_port
-                ))
-                .header("Content-Type", "application/json")
-                .header("Authorization", format!("Basic {}", token))
-        }
-        _ => unreachable!(),
-    };
+    let token = encode(format!(
+        "{}:{}",
+        config.bitcoin_node_username, config.bitcoin_node_password
+    ));
+    let client = Client::new();
+    let builder = client
+        .post(format!(
+            "{}:{}/",
+            config.bitcoin_node_rpc_host, config.bitcoin_node_rpc_port
+        ))
+        .header("Content-Type", "application/json")
+        .header("Authorization", format!("Basic {}", token));
 
     if method == "sendrawtransaction" {
         let background_job_tx = background_job_tx.inner();
@@ -569,13 +592,14 @@ pub async fn handle_bitcoin_rpc_call(
 pub fn handle_create_hook(
     hook: Json<HookSpecification>,
     background_job_tx: &State<Arc<Mutex<Sender<ObserverCommand>>>>,
+    api_key: ApiKey,
 ) -> Json<JsonValue> {
-    let hook = hook.into_inner();
 
+    let hook = hook.into_inner();
     let background_job_tx = background_job_tx.inner();
     match background_job_tx.lock() {
         Ok(tx) => {
-            let _ = tx.send(ObserverCommand::RegisterHook(hook));
+            let _ = tx.send(ObserverCommand::RegisterHook(hook, api_key));
         }
         _ => {}
     };
@@ -586,15 +610,16 @@ pub fn handle_create_hook(
     }))
 }
 
-#[delete("/v1/hooks", format = "application/json", data = "<hook_id>")]
+#[delete("/v1/hooks/<hook_id>", format = "application/json")]
 pub fn handle_delete_hook(
-    hook_id: Json<JsonValue>,
+    hook_id: u64,
     background_job_tx: &State<Arc<Mutex<Sender<ObserverCommand>>>>,
+    api_key: ApiKey,
 ) -> Json<JsonValue> {
     let background_job_tx = background_job_tx.inner();
     match background_job_tx.lock() {
         Ok(tx) => {
-            let _ = tx.send(ObserverCommand::DeregisterHook(1));
+            let _ = tx.send(ObserverCommand::DeregisterHook(hook_id, api_key));
         }
         _ => {}
     };
@@ -603,4 +628,40 @@ pub fn handle_delete_hook(
         "status": 200,
         "result": "Ok",
     }))
+}
+
+#[derive(Clone, Debug)]
+pub struct ApiKey(Option<String>);
+
+#[derive(Debug)]
+pub enum ApiKeyError {
+    Missing,
+    Invalid,
+    InternalError,
+}
+
+#[rocket::async_trait]
+impl<'r> FromRequest<'r> for ApiKey {
+    type Error = ApiKeyError;
+
+    async fn from_request(req: &'r Request<'_>) -> request::Outcome<Self, Self::Error> {
+        let res = req.rocket().state::<EventObserverConfig>();
+        if let Some(config) = res {
+            if !config.is_authorization_required() {
+                Outcome::Success(ApiKey(None))
+            } else {
+                let key = req.headers().get_one("x-api-key");
+                if let Some(key) = key {
+                    match config.is_authorized(key) {
+                        true => Outcome::Success(ApiKey(Some(key.to_string()))),
+                        false => Outcome::Failure((Status::BadRequest, ApiKeyError::Invalid)),
+                    }    
+                } else {
+                    Outcome::Failure((Status::BadRequest, ApiKeyError::Missing))
+                }
+            }
+        } else {
+            Outcome::Failure((Status::InternalServerError, ApiKeyError::InternalError))
+        }
+    }
 }

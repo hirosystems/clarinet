@@ -23,6 +23,7 @@ use observer::{EventHandler, EventObserverConfig, ObserverCommand};
 use std::fs::File;
 use std::io::{BufReader, Read};
 use std::path::PathBuf;
+use std::collections::HashMap;
 use std::sync::mpsc::{channel, Receiver, Sender};
 use toml::value::Value;
 
@@ -65,6 +66,7 @@ async fn main() {
         stacks_node_rpc_host: "0.0.0.0".into(),
         stacks_node_rpc_port: 20443,
         grpc_server_enabled: true,
+        operators: HashMap::new(),
     };
     observer::start_event_observer(config, command_tx, command_rx, None).await;
 }
@@ -84,6 +86,7 @@ pub struct EventObserverConfigFile {
     pub bitcoin_node_rpc_port: u16,
     pub stacks_node_rpc_host: String,
     pub stacks_node_rpc_port: u16,
+    pub operators: Option<Vec<String>>,
 }
 
 impl EventObserverConfig {
@@ -118,6 +121,13 @@ impl EventObserverConfig {
                 .collect::<Vec<_>>(),
             None => vec![],
         };
+        let mut operators = HashMap::new();
+        if let Some(ref operator_keys) = config_file.operators {
+            for operator_key in operator_keys.iter() {
+                operators.insert(operator_key.clone(), HookFormation::new());
+            }
+        }
+
         let config = EventObserverConfig {
             normalization_enabled: config_file.normalization_enabled.unwrap_or(true),
             grpc_server_enabled: config_file.grpc_server_enabled.unwrap_or(false),
@@ -137,6 +147,7 @@ impl EventObserverConfig {
             bitcoin_node_rpc_port: config_file.bitcoin_node_rpc_port.clone(),
             stacks_node_rpc_host: config_file.stacks_node_rpc_host.clone(),
             stacks_node_rpc_port: config_file.stacks_node_rpc_port.clone(),
+            operators,
         };
         config
     }

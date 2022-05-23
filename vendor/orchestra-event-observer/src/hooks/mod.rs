@@ -18,7 +18,7 @@ use std::str::FromStr;
 
 pub fn evaluate_stacks_hooks_on_chain_event<'a>(
     chain_event: &'a StacksChainEvent,
-    active_hooks: &'a Vec<StacksHookSpecification>,
+    active_hooks: Vec<&'a StacksHookSpecification>,
 ) -> Vec<(
     &'a StacksHookSpecification,
     &'a StacksTransactionData,
@@ -42,7 +42,7 @@ pub fn evaluate_stacks_hooks_on_chain_event<'a>(
 
 pub fn evaluate_bitcoin_hooks_on_chain_event<'a>(
     chain_event: &'a BitcoinChainEvent,
-    active_hooks: &'a Vec<BitcoinHookSpecification>,
+    active_hooks: Vec<&'a BitcoinHookSpecification>,
 ) -> Vec<(
     &'a BitcoinHookSpecification,
     &'a BitcoinTransactionData,
@@ -51,7 +51,7 @@ pub fn evaluate_bitcoin_hooks_on_chain_event<'a>(
     let mut enabled = vec![];
     match chain_event {
         BitcoinChainEvent::ChainUpdatedWithBlock(block) => {
-            for hook in active_hooks.iter() {
+            for hook in active_hooks.into_iter() {
                 for tx in block.transactions.iter() {
                     if hook.evaluate_predicate(&tx) {
                         enabled.push((hook, tx, &block.block_identifier));
@@ -87,6 +87,7 @@ pub async fn handle_bitcoin_hook_action<'a>(
             let _ = client
                 .request(method, &host)
                 .header("Content-Type", "application/json")
+                .header("Authorization", http.authorization_header.clone())
                 .body(body)
                 .send()
                 .await;

@@ -4,7 +4,7 @@ version: 1
 chain: bitcoin
 network: regtest
 predicate:
-  tx-out: 
+  tx-in: 
     script: 
       template: '
   OP_PUSHBYTES_4 {swapper-id:4}
@@ -24,4 +24,5 @@ action:
   http-hook: 
     url: http://localhost:9000/chain-events/
     method: POST
+    authorization-header: "Bearer cn389ncoiwuencr"
  

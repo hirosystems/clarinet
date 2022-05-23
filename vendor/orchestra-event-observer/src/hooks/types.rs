@@ -57,9 +57,11 @@ pub enum HookAction {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
 pub struct HttpHook {
     pub url: String,
     pub method: String,
+    pub authorization_header: String,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
