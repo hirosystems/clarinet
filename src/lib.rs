@@ -25,7 +25,6 @@ pub mod deployment;
 pub mod generate;
 pub mod indexer;
 pub mod integrate;
-pub mod lsp;
 pub mod types;
 pub mod utils;
 
@@ -33,3 +32,5 @@ pub mod utils;
 pub mod frontend;
 #[cfg(feature = "cli")]
 pub mod runnner;
+#[cfg(feature = "cli")]
+pub mod lsp;
