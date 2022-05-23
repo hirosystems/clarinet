@@ -20,6 +20,39 @@ impl HookFormation {
             bitcoin_hooks: vec![],
         }
     }
+
+    pub fn register_hook(&mut self, hook: HookSpecification) {
+        match hook {
+            HookSpecification::Stacks(hook) => self.stacks_hooks.push(hook),
+            HookSpecification::Bitcoin(hook) => self.bitcoin_hooks.push(hook),
+        };
+    }
+
+    pub fn deregister_stacks_hook(&mut self, hook_id: u32) -> Option<StacksHookSpecification> {
+        let mut i = 0;
+        while i < self.stacks_hooks.len() {
+            if self.stacks_hooks[i].id == hook_id {
+                let hook = self.stacks_hooks.remove(i);
+                return Some(hook);
+            } else {
+                i += 1;
+            }
+        }
+        None
+    }
+
+    pub fn deregister_bitcoin_hook(&mut self, hook_id: u32) -> Option<BitcoinHookSpecification> {
+        let mut i = 0;
+        while i < self.bitcoin_hooks.len() {
+            if self.bitcoin_hooks[i].id == hook_id {
+                let hook = self.bitcoin_hooks.remove(i);
+                return Some(hook);
+            } else {
+                i += 1;
+            }
+        }
+        None
+    }
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]

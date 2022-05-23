@@ -139,7 +139,8 @@ pub enum ObserverCommand {
     SubscribeStreamer(u64),
     UnsubscribeStreamer(u64),
     RegisterHook(HookSpecification, ApiKey),
-    DeregisterHook(u64, ApiKey),
+    DeregisterBitcoinHook(u32, ApiKey),
+    DeregisterStacksHook(u32, ApiKey),
     NotifyBitcoinTransactionProxied,
     Terminate,
 }
@@ -153,7 +154,7 @@ pub enum ObserverEvent {
     StacksChainEvent(StacksChainEvent),
     NotifyBitcoinTransactionProxied,
     HookRegistered(HookSpecification),
-    HookUnregistered(HookSpecification),
+    HookDeregistered(HookSpecification),
     HooksTriggered(usize),
     Terminate,
 }
@@ -241,7 +242,12 @@ pub async fn start_event_observer(
         ..Config::default()
     };
 
-    let routes = routes![handle_ping, handle_create_hook, handle_delete_hook,];
+    let routes = routes![
+        handle_ping,
+        handle_create_hook,
+        handle_delete_bitcoin_hook,
+        handle_delete_stacks_hook
+    ];
 
     let background_job_tx_mutex = Arc::new(Mutex::new(observer_commands_tx.clone()));
 
@@ -392,19 +398,35 @@ pub async fn start_event_observer(
                     .operators
                     .get_mut(&api_key.0)
                     .expect("unable to retrieve hook formation");
-                match hook {
-                    HookSpecification::Stacks(ref hook) => {
-                        hook_formation.stacks_hooks.push(hook.clone())
-                    }
-                    HookSpecification::Bitcoin(ref hook) => {
-                        hook_formation.bitcoin_hooks.push(hook.clone())
-                    }
-                };
+                hook_formation.register_hook(hook.clone());
                 if let Some(ref tx) = observer_events_tx {
                     let _ = tx.send(ObserverEvent::HookRegistered(hook));
                 }
             }
-            ObserverCommand::DeregisterHook(hook_id, api_key) => {}
+            ObserverCommand::DeregisterStacksHook(hook_id, api_key) => {
+                let mut hook_formation = config
+                    .operators
+                    .get_mut(&api_key.0)
+                    .expect("unable to retrieve hook formation");
+                let hook = hook_formation.deregister_stacks_hook(hook_id);
+                if let (Some(tx), Some(hook)) = (&observer_events_tx, hook) {
+                    let _ = tx.send(ObserverEvent::HookDeregistered(HookSpecification::Stacks(
+                        hook,
+                    )));
+                }
+            }
+            ObserverCommand::DeregisterBitcoinHook(hook_id, api_key) => {
+                let mut hook_formation = config
+                    .operators
+                    .get_mut(&api_key.0)
+                    .expect("unable to retrieve hook formation");
+                let hook = hook_formation.deregister_bitcoin_hook(hook_id);
+                if let (Some(tx), Some(hook)) = (&observer_events_tx, hook) {
+                    let _ = tx.send(ObserverEvent::HookDeregistered(HookSpecification::Bitcoin(
+                        hook,
+                    )));
+                }
+            }
         }
     }
     Ok(())
@@ -623,16 +645,36 @@ pub fn handle_create_hook(
     }))
 }
 
-#[delete("/v1/hooks/<hook_id>", format = "application/json")]
-pub fn handle_delete_hook(
-    hook_id: u64,
+#[delete("/v1/hooks/stacks/<hook_id>", format = "application/json")]
+pub fn handle_delete_stacks_hook(
+    hook_id: u32,
     background_job_tx: &State<Arc<Mutex<Sender<ObserverCommand>>>>,
     api_key: ApiKey,
 ) -> Json<JsonValue> {
     let background_job_tx = background_job_tx.inner();
     match background_job_tx.lock() {
         Ok(tx) => {
-            let _ = tx.send(ObserverCommand::DeregisterHook(hook_id, api_key));
+            let _ = tx.send(ObserverCommand::DeregisterStacksHook(hook_id, api_key));
+        }
+        _ => {}
+    };
+
+    Json(json!({
+        "status": 200,
+        "result": "Ok",
+    }))
+}
+
+#[delete("/v1/hooks/bitcoin/<hook_id>", format = "application/json")]
+pub fn handle_delete_bitcoin_hook(
+    hook_id: u32,
+    background_job_tx: &State<Arc<Mutex<Sender<ObserverCommand>>>>,
+    api_key: ApiKey,
+) -> Json<JsonValue> {
+    let background_job_tx = background_job_tx.inner();
+    match background_job_tx.lock() {
+        Ok(tx) => {
+            let _ = tx.send(ObserverCommand::DeregisterBitcoinHook(hook_id, api_key));
         }
         _ => {}
     };
