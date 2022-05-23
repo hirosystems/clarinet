@@ -56,7 +56,7 @@ pub fn check_hooks(manifest_path: &PathBuf, output_json: bool) -> Result<(), Str
         println!("{} {} succesfully checked", green!("✔"), relative_path);
         if output_json {
             let body = serde_json::to_string_pretty(&_hook).unwrap();
-            println!("{}", body);    
+            println!("{}", body);
         }
     }
     Ok(())

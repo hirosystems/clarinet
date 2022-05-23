@@ -217,7 +217,7 @@ struct CheckHooks {
     pub manifest_path: Option<String>,
     /// Path to Clarinet.toml
     #[clap(long = "output-json")]
-    pub output_json: bool,    
+    pub output_json: bool,
 }
 
 #[derive(Parser, PartialEq, Clone, Debug)]

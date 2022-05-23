@@ -178,7 +178,6 @@ pub struct AccountConfig {
 }
 
 impl ChainConfig {
-
     #[allow(non_fmt_panics)]
     pub fn from_manifest_path(manifest_path: &PathBuf, network: &StacksNetwork) -> ChainConfig {
         let mut chain_config_path = manifest_path.clone();

@@ -1,7 +1,7 @@
 use super::DevnetEvent;
-use crate::hook::load_hooks;
 use crate::deployment::types::DeploymentSpecification;
 use crate::deployment::{apply_on_chain_deployment, DeploymentCommand, DeploymentEvent};
+use crate::hook::load_hooks;
 use crate::integrate::{MempoolAdmissionData, ServiceStatusData, Status};
 use crate::types::{self, AccountConfig, ChainConfig, DevnetConfig, ProjectManifest};
 use crate::types::{ChainsCoordinatorCommand, StacksNetwork};
@@ -120,7 +120,6 @@ pub async fn start_chains_coordinator(
     chains_coordinator_commands_tx: Sender<ChainsCoordinatorCommand>,
     chains_coordinator_terminator_tx: Sender<bool>,
 ) -> Result<(), Box<dyn Error>> {
-
     let (deployment_events_tx, deployment_events_rx) = channel();
     let (deployment_commands_tx, deployments_command_rx) = channel();
 
@@ -137,7 +136,10 @@ pub async fn start_chains_coordinator(
 
     if let Some(ref hooks) = config.event_observer_config.initial_hook_formation {
         devnet_event_tx
-            .send(DevnetEvent::info(format!("{} hooks registered", hooks.bitcoin_hooks.len() + hooks.stacks_hooks.len())))
+            .send(DevnetEvent::info(format!(
+                "{} hooks registered",
+                hooks.bitcoin_hooks.len() + hooks.stacks_hooks.len()
+            )))
             .expect("Unable to terminate event observer");
     }
 
@@ -147,7 +149,6 @@ pub async fn start_chains_coordinator(
     let event_observer_config = config.event_observer_config.clone();
     let observer_event_tx_moved = observer_event_tx.clone();
     let _ = std::thread::spawn(move || {
-
         let future = start_event_observer(
             event_observer_config,
             observer_command_tx,
@@ -344,16 +345,14 @@ pub async fn start_chains_coordinator(
             }
             ObserverEvent::HookRegistered(hook) => {
                 let _ = devnet_event_tx.send(DevnetEvent::info(format!(
-                    "New hook \"{}\" registered", hook.name()
+                    "New hook \"{}\" registered",
+                    hook.name()
                 )));
             }
-            ObserverEvent::HookUnregistered(hook) => {
-
-            }
+            ObserverEvent::HookUnregistered(hook) => {}
             ObserverEvent::HooksTriggered(count) => {
-                let _ = devnet_event_tx.send(DevnetEvent::info(format!(
-                    "{} hooks triggered", count
-                )));
+                let _ =
+                    devnet_event_tx.send(DevnetEvent::info(format!("{} hooks triggered", count)));
             }
 
             ObserverEvent::Terminate => {}

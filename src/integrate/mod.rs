@@ -10,9 +10,9 @@ use tracing_appender;
 
 use crate::deployment::types::DeploymentSpecification;
 use crate::types::ChainsCoordinatorCommand;
-use orchestra_types::{BitcoinChainEvent, StacksChainEvent};
 use crate::utils;
 use chains_coordinator::start_chains_coordinator;
+use orchestra_types::{BitcoinChainEvent, StacksChainEvent};
 pub use orchestrator::DevnetOrchestrator;
 
 use self::chains_coordinator::DevnetEventObserverConfig;

@@ -11,9 +11,9 @@ use clarity_repl::clarity::util::hash::bytes_to_hex;
 use orchestra_types::{BitcoinChainEvent, StacksChainEvent, StacksNetwork};
 use reqwest::Client as HttpClient;
 use rocket::config::{Config, LogLevel};
-use rocket::request::{self, Request, FromRequest, Outcome};
-use rocket::outcome::IntoOutcome;
 use rocket::http::Status;
+use rocket::outcome::IntoOutcome;
+use rocket::request::{self, FromRequest, Outcome, Request};
 use rocket::serde::json::{json, Json, Value as JsonValue};
 use rocket::serde::Deserialize;
 use rocket::State;
@@ -119,11 +119,11 @@ pub struct EventObserverConfig {
 impl EventObserverConfig {
     pub fn is_authorization_required(&self) -> bool {
         !self.operators.is_empty()
-    } 
+    }
 
     pub fn is_authorized(&self, token: &str) -> bool {
         self.operators.contains_key(&Some(token.to_string()))
-    } 
+    }
 }
 
 #[derive(Deserialize, Debug)]
@@ -296,17 +296,23 @@ pub async fn start_event_observer(
                 }
                 // process hooks
                 if config.hooks_enabled {
-                    let bitcoin_hooks = config.operators.values().map(|v| &v.bitcoin_hooks).flatten().collect();
+                    let bitcoin_hooks = config
+                        .operators
+                        .values()
+                        .map(|v| &v.bitcoin_hooks)
+                        .flatten()
+                        .collect();
 
-                    let hooks_to_trigger = evaluate_bitcoin_hooks_on_chain_event(
-                        &chain_event,
-                        bitcoin_hooks,
-                    );
+                    let hooks_to_trigger =
+                        evaluate_bitcoin_hooks_on_chain_event(&chain_event, bitcoin_hooks);
                     let mut proofs = HashMap::new();
                     for (_, transaction, block_identifier) in hooks_to_trigger.iter() {
                         if !proofs.contains_key(&transaction.transaction_identifier.hash) {
                             let rpc = Client::new(
-                                &format!("{}:{}", config.bitcoin_node_rpc_host, config.bitcoin_node_rpc_port),
+                                &format!(
+                                    "{}:{}",
+                                    config.bitcoin_node_rpc_host, config.bitcoin_node_rpc_port
+                                ),
                                 Auth::UserPass(
                                     config.bitcoin_node_username.to_string(),
                                     config.bitcoin_node_password.to_string(),
@@ -346,16 +352,19 @@ pub async fn start_event_observer(
                     event_handler.propagate_stacks_event(&chain_event).await;
                 }
                 if config.hooks_enabled {
-                    let stacks_hooks = config.operators.values().map(|v| &v.stacks_hooks).flatten().collect();
+                    let stacks_hooks = config
+                        .operators
+                        .values()
+                        .map(|v| &v.stacks_hooks)
+                        .flatten()
+                        .collect();
 
                     // process hooks
-                    let hooks_to_trigger = evaluate_stacks_hooks_on_chain_event(
-                        &chain_event,
-                        stacks_hooks,
-                    );
+                    let hooks_to_trigger =
+                        evaluate_stacks_hooks_on_chain_event(&chain_event, stacks_hooks);
                     if hooks_to_trigger.len() > 0 {
                         if let Some(ref tx) = observer_events_tx {
-                            let _ = tx.send(ObserverEvent::HooksTriggered(hooks_to_trigger.len())); 
+                            let _ = tx.send(ObserverEvent::HooksTriggered(hooks_to_trigger.len()));
                         }
                     }
                     for (hook, transaction, block_identifier) in hooks_to_trigger.into_iter() {
@@ -379,18 +388,23 @@ pub async fn start_event_observer(
             }
             ObserverCommand::UnsubscribeStreamer(stream) => {}
             ObserverCommand::RegisterHook(hook, api_key) => {
-                let mut hook_formation = config.operators.get_mut(&api_key.0).expect("unable to retrieve hook formation");
+                let mut hook_formation = config
+                    .operators
+                    .get_mut(&api_key.0)
+                    .expect("unable to retrieve hook formation");
                 match hook {
-                    HookSpecification::Stacks(ref hook) => hook_formation.stacks_hooks.push(hook.clone()),
-                    HookSpecification::Bitcoin(ref hook) => hook_formation.bitcoin_hooks.push(hook.clone()),
+                    HookSpecification::Stacks(ref hook) => {
+                        hook_formation.stacks_hooks.push(hook.clone())
+                    }
+                    HookSpecification::Bitcoin(ref hook) => {
+                        hook_formation.bitcoin_hooks.push(hook.clone())
+                    }
                 };
                 if let Some(ref tx) = observer_events_tx {
                     let _ = tx.send(ObserverEvent::HookRegistered(hook));
                 }
-            },
-            ObserverCommand::DeregisterHook(hook_id, api_key) => {
-
             }
+            ObserverCommand::DeregisterHook(hook_id, api_key) => {}
         }
     }
     Ok(())
@@ -594,7 +608,6 @@ pub fn handle_create_hook(
     background_job_tx: &State<Arc<Mutex<Sender<ObserverCommand>>>>,
     api_key: ApiKey,
 ) -> Json<JsonValue> {
-
     let hook = hook.into_inner();
     let background_job_tx = background_job_tx.inner();
     match background_job_tx.lock() {
@@ -655,7 +668,7 @@ impl<'r> FromRequest<'r> for ApiKey {
                     match config.is_authorized(key) {
                         true => Outcome::Success(ApiKey(Some(key.to_string()))),
                         false => Outcome::Failure((Status::BadRequest, ApiKeyError::Invalid)),
-                    }    
+                    }
                 } else {
                     Outcome::Failure((Status::BadRequest, ApiKeyError::Missing))
                 }

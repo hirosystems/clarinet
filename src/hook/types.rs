@@ -152,7 +152,11 @@ impl HookActionFile {
                 None => Err(format!("method missing for http-hook")),
             }?;
 
-            Ok(HookAction::HttpHook(HttpHook { url, method, authorization_header }))
+            Ok(HookAction::HttpHook(HttpHook {
+                url,
+                method,
+                authorization_header,
+            }))
         } else {
             Err(format!("action not supported (http-hook)"))
         }

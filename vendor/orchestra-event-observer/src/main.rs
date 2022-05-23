@@ -20,10 +20,10 @@ use crate::hooks::types::HookFormation;
 use clap::Parser;
 use ctrlc;
 use observer::{EventHandler, EventObserverConfig, ObserverCommand};
+use std::collections::HashMap;
 use std::fs::File;
 use std::io::{BufReader, Read};
 use std::path::PathBuf;
-use std::collections::HashMap;
 use std::sync::mpsc::{channel, Receiver, Sender};
 use toml::value::Value;
 

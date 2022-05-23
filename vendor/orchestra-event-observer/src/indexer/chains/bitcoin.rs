@@ -1,9 +1,12 @@
 use crate::indexer::IndexerConfig;
-use orchestra_types::{BitcoinBlockData, BitcoinBlockMetadata, BlockIdentifier, TransactionIdentifier, BitcoinTransactionData, BitcoinTransactionMetadata};
 use bitcoincore_rpc::bitcoin::hashes::Hash;
 use bitcoincore_rpc::bitcoin::BlockHash;
 use bitcoincore_rpc::{Auth, Client, RpcApi};
 use clarity_repl::clarity::util::hash::hex_bytes;
+use orchestra_types::{
+    BitcoinBlockData, BitcoinBlockMetadata, BitcoinTransactionData, BitcoinTransactionMetadata,
+    BlockIdentifier, TransactionIdentifier,
+};
 use rocket::serde::json::Value as JsonValue;
 
 #[allow(dead_code)]
@@ -41,7 +44,7 @@ pub fn standardize_bitcoin_block(
     for mut tx in block.txdata.into_iter() {
         let tx = BitcoinTransactionData {
             transaction_identifier: TransactionIdentifier {
-                hash: tx.txid().to_string()
+                hash: tx.txid().to_string(),
             },
             operations: vec![],
             metadata: BitcoinTransactionMetadata {
