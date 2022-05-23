@@ -10,6 +10,7 @@ use crate::generate::{
 };
 use crate::integrate::{self, DevnetOrchestrator};
 use crate::lsp::run_lsp;
+use crate::poke::load_empty_session;
 use crate::poke::load_session;
 use crate::publish::publish_all_contracts;
 use crate::runnner::run_scripts;
@@ -444,16 +445,21 @@ pub fn main() {
             }
         },
         Command::Console(cmd) => {
-            let manifest_path = get_manifest_path_or_exit(cmd.manifest_path);
+            let manifest_path = get_manifest_path_or_warn(cmd.manifest_path);
             let start_repl = true;
-            let (session, project_manifest) =
-                match load_session(&manifest_path, start_repl, &Network::Devnet) {
-                    Ok((session, _, project_manifest, _)) => (Some(session), project_manifest),
-                    Err((project_manifest, e)) => {
-                        println!("{}: Unable to start REPL: {}", red!("error"), e);
-                        (None, project_manifest)
-                    }
-                };
+            let (session, project_manifest);
+            if manifest_path.is_some() {
+                (session, project_manifest) =
+                    match load_session(&manifest_path.unwrap(), start_repl, &Network::Devnet) {
+                        Ok((session, _, project_manifest, _)) => (Some(session), project_manifest),
+                        Err((project_manifest, e)) => {
+                            println!("{}: Unable to start REPL: {}", red!("error"), e);
+                            (None, project_manifest)
+                        }
+                    };
+            } else {
+                (session, project_manifest) = load_empty_session();
+            }
             if hints_enabled {
                 display_post_console_hint();
             }
@@ -727,6 +733,19 @@ fn get_manifest_path_or_exit(path: Option<String>) -> PathBuf {
         None => {
             println!("Could not find Clarinet.toml");
             process::exit(1);
+        }
+    }
+}
+
+fn get_manifest_path_or_warn(path: Option<String>) -> Option<PathBuf> {
+    println!("");
+    match get_manifest_path(path) {
+        Some(manifest_path) => Some(manifest_path),
+        None => {
+            println!(
+              "{}: no --manifest-path specified, so a plain REPL will be started with no contracts loaded.",
+              green!("note"));
+            None
         }
     }
 }

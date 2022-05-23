@@ -132,3 +132,13 @@ pub fn load_session(
     };
     Ok((session, chain_config, project_config, output))
 }
+
+pub fn load_empty_session() -> (Option<repl::Session>, ProjectManifest) {
+    let settings = repl::SessionSettings::default();
+    let manifest = ProjectManifest::default();
+
+    let mut terminal = Terminal::new(settings);
+    terminal.start();
+
+    (Some(terminal.session), manifest)
+}
