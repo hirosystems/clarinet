@@ -77,7 +77,7 @@ impl DevnetEventObserverConfig {
 
         info!("Checking hooks...");
         let hooks = match load_hooks(&manifest.path, &StacksNetwork::Devnet) {
-            Ok(hooks) => HookFormation::new(), // hooks,
+            Ok(hooks) => HookFormation::new(), // hooks, // TODO(lgalabru)
             Err(e) => {
                 println!("{}", e);
                 std::process::exit(1);
@@ -129,10 +129,6 @@ pub async fn start_chains_coordinator(
         deployment_events_tx,
         deployments_command_rx,
     );
-
-    let init_status = DevnetInitializationStatus {
-        should_deploy_protocol: true,
-    };
 
     if let Some(ref hooks) = config.event_observer_config.initial_hook_formation {
         devnet_event_tx
@@ -245,7 +241,6 @@ pub async fn start_chains_coordinator(
                     let automining_disabled =
                         config.devnet_config.bitcoin_controller_automining_disabled;
                     let mining_command_tx_moved = mining_command_tx.clone();
-                    let devnet_event_tx_moved = devnet_event_tx.clone();
                     let protocol_deployed_moved = protocol_deployed.clone();
 
                     if let Some(deployment_events_rx) = deployment_events_rx.take() {
@@ -257,7 +252,6 @@ pub async fn start_chains_coordinator(
                         )
                     }
 
-                    let manifest_path = config.manifest.clone();
                     std::thread::spawn(move || {
                         let (deployment_progress_tx, deployment_progress_rx) = channel();
 
@@ -349,12 +343,11 @@ pub async fn start_chains_coordinator(
                     hook.name()
                 )));
             }
-            ObserverEvent::HookUnregistered(hook) => {}
+            ObserverEvent::HookDeregistered(_hook) => {}
             ObserverEvent::HooksTriggered(count) => {
                 let _ =
                     devnet_event_tx.send(DevnetEvent::info(format!("{} hooks triggered", count)));
             }
-
             ObserverEvent::Terminate => {}
         }
     }
@@ -587,7 +580,7 @@ pub fn handle_bitcoin_mining(
     loop {
         let command = match mining_command_rx.recv() {
             Ok(cmd) => cmd,
-            Err(e) => {
+            Err(_e) => {
                 // cascade termination
                 continue;
             }

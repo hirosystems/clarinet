@@ -122,9 +122,9 @@ impl EventObserverConfig {
             None => vec![],
         };
         let mut operators = HashMap::new();
-        if let Some(ref operator_keys) = config_file.operators {
-            for operator_key in operator_keys.iter() {
-                operators.insert(operator_key.clone(), HookFormation::new());
+        if let Some(operator_keys) = config_file.operators.take() {
+            for operator_key in operator_keys.into_iter() {
+                operators.insert(Some(operator_key), HookFormation::new());
             }
         }
 
