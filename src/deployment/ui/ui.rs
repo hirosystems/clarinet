@@ -1,4 +1,4 @@
-use crate::publish::ContractStatus;
+use crate::deployment::ContractStatus;
 
 use super::App;
 use tui::{

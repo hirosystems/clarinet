@@ -65,9 +65,27 @@ pub struct ChainUpdatedWithMicroblockReorgData {
 }
 
 #[allow(dead_code)]
-#[derive(Debug, PartialEq, Eq)]
-pub enum Network {
+#[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize)]
+pub enum StacksNetwork {
+    Simnet,
     Devnet,
+    Testnet,
+    Mainnet,
+}
+
+impl StacksNetwork {
+    pub fn is_simnet(&self) -> bool {
+        match self {
+            StacksNetwork::Simnet => true,
+            _ => false,
+        }
+    }
+}
+
+#[allow(dead_code)]
+#[derive(Debug, PartialEq, Eq, Clone)]
+pub enum BitcoinNetwork {
+    Regtest,
     Testnet,
     Mainnet,
 }

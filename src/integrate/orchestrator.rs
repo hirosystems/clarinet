@@ -1,6 +1,6 @@
 use super::DevnetEvent;
 use crate::integrate::{ServiceStatusData, Status};
-use crate::types::{ChainConfig, DevnetConfigFile, Network, ProjectManifest};
+use crate::types::{ChainConfig, DevnetConfigFile, ProjectManifest, StacksNetwork};
 use bollard::container::{
     Config, CreateContainerOptions, KillContainerOptions, ListContainersOptions,
     PruneContainersOptions, WaitContainerOptions,
@@ -22,10 +22,9 @@ use tracing::info;
 pub struct DevnetOrchestrator {
     pub name: String,
     network_name: String,
-    pub manifest_path: PathBuf,
+    pub manifest: ProjectManifest,
     pub network_config: Option<ChainConfig>,
     pub termination_success_tx: Option<Sender<bool>>,
-    pub manifest: ProjectManifest,
     stacks_blockchain_container_id: Option<String>,
     stacks_blockchain_api_container_id: Option<String>,
     stacks_explorer_container_id: Option<String>,
@@ -37,20 +36,19 @@ pub struct DevnetOrchestrator {
 
 impl DevnetOrchestrator {
     pub fn new(
-        manifest_path: PathBuf,
+        manifest: ProjectManifest,
         devnet_override: Option<DevnetConfigFile>,
     ) -> DevnetOrchestrator {
         let docker_client = Docker::connect_with_socket_defaults().unwrap();
 
-        let mut project_path = manifest_path.clone();
-        project_path.pop();
-
+        let project_path = manifest.get_project_root_dir();
         let mut network_config_path = project_path.clone();
         network_config_path.push("settings");
         network_config_path.push("Devnet.toml");
 
-        let mut network_config = ChainConfig::from_path(&network_config_path, &Network::Devnet);
-        let manifest = ProjectManifest::from_path(&manifest_path);
+        let mut network_config =
+            ChainConfig::from_path(&network_config_path, &StacksNetwork::Devnet);
+
         let name = manifest.project.name.clone();
         let network_name = format!("{}.devnet", name);
 
@@ -190,7 +188,6 @@ impl DevnetOrchestrator {
         DevnetOrchestrator {
             name,
             network_name,
-            manifest_path,
             manifest,
             network_config: Some(network_config),
             docker_client: Some(docker_client),
@@ -308,7 +305,7 @@ impl DevnetOrchestrator {
             .expect("Unable to create network");
 
         // Start bitcoind
-        let _ = event_tx.send(DevnetEvent::info(format!("Starting bitcoind")));
+        let _ = event_tx.send(DevnetEvent::info(format!("Starting bitcoin-node")));
         let _ = event_tx.send(DevnetEvent::ServiceStatus(ServiceStatusData {
             order: 0,
             status: Status::Yellow,
@@ -1795,7 +1792,7 @@ events_keys = ["*"]
         )
         .unwrap();
 
-        let _ = devnet_event_tx.send(DevnetEvent::info(format!("Configuring Bitcoin",)));
+        let _ = devnet_event_tx.send(DevnetEvent::info(format!("Configuring bitcoin-node",)));
 
         loop {
             match rpc.get_network_info() {
@@ -1803,7 +1800,7 @@ events_keys = ["*"]
                 Err(_e) => {}
             }
             std::thread::sleep(std::time::Duration::from_secs(1));
-            let _ = devnet_event_tx.send(DevnetEvent::info(format!("Waiting for bitcoind",)));
+            let _ = devnet_event_tx.send(DevnetEvent::info(format!("Waiting for bitcoin-node",)));
         }
 
         let miner_address = Address::from_str(&devnet_config.miner_btc_address).unwrap();

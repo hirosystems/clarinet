@@ -1,7 +1,8 @@
-use crate::poke::load_session;
-use crate::types::Network;
+use crate::deployment::{generate_default_deployment, setup_session_with_deployment};
+use crate::types::{ProjectManifest, StacksNetwork};
 use clarity_repl::clarity::debug::dap::DAPDebugger;
 use std::path::PathBuf;
+use std::str::FromStr;
 
 #[cfg(feature = "telemetry")]
 use super::telemetry::{telemetry_report_event, DeveloperUsageDigest, DeveloperUsageEvent};
@@ -9,16 +10,13 @@ use super::telemetry::{telemetry_report_event, DeveloperUsageDigest, DeveloperUs
 pub fn run_dap() -> Result<(), String> {
     let mut dap = DAPDebugger::new();
     match dap.init() {
-        Ok((manifest, expression)) => {
-            let manifest_path = PathBuf::from(manifest);
-            let (mut session, project_manifest) =
-                match load_session(&manifest_path, false, &Network::Devnet) {
-                    Ok((session, _, project_manifest, _)) => (session, project_manifest),
-                    Err((_, e)) => {
-                        println!("{}: unable to load session: {}", red!("error"), e);
-                        std::process::exit(1);
-                    }
-                };
+        Ok((manifest_path_str, expression)) => {
+            let manifest_path = PathBuf::from(manifest_path_str);
+            let project_manifest = ProjectManifest::from_path(&manifest_path)?;
+            let (deployment, _) =
+                generate_default_deployment(&project_manifest, &StacksNetwork::Simnet)?;
+            let (mut session, _) =
+                setup_session_with_deployment(&project_manifest, &deployment, None);
 
             if project_manifest.project.telemetry {
                 #[cfg(feature = "telemetry")]
@@ -30,15 +28,13 @@ pub fn run_dap() -> Result<(), String> {
                 ));
             }
 
-            for contract in &session.settings.initial_contracts {
-                dap.path_to_contract_id.insert(
-                    contract.path.clone(),
-                    contract.get_contract_identifier(false).unwrap(),
-                );
-                dap.contract_id_to_path.insert(
-                    contract.get_contract_identifier(false).unwrap(),
-                    contract.path.clone(),
-                );
+            for (contract_id, (_, relative_path)) in deployment.contracts.iter() {
+                let mut absolute_path = project_manifest.get_project_root_dir();
+                absolute_path.extend(&PathBuf::from_str(relative_path).unwrap());
+                dap.path_to_contract_id
+                    .insert(absolute_path.clone(), contract_id.clone());
+                dap.contract_id_to_path
+                    .insert(contract_id.clone(), absolute_path);
             }
 
             // Begin execution of the expression in debug mode
@@ -49,8 +45,8 @@ pub fn run_dap() -> Result<(), String> {
                 false,
                 None,
             ) {
-                Ok(result) => Ok(()),
-                Err(diagnostics) => Err("unable to interpret expression".to_string()),
+                Ok(_result) => Ok(()),
+                Err(_diagnostics) => Err("unable to interpret expression".to_string()),
             }
         }
         Err(e) => Err(format!("dap_init: {}", e)),
