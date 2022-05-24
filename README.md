@@ -429,7 +429,7 @@ requirements = [
 
 ```
 
-From there, clarinet will be able to reconciliate the `contract-call` present in your local contracts, download and cache a copy of the required contracts, and use them during the execution of your tests suites, and all the different features available in `clarinet`.
+From there, clarinet will be able to reconciliate the `contract-call` present in your local contracts, download and cache a copy of the required contracts, and use them during the execution of your testsuites, and all the different features available in `clarinet`.
 
 When deploying your protocol to Devnet / Testnet, for the contracts involving requirements, the setting `remap_requirements` in your deployment plans must be set. 
 
