@@ -51,24 +51,7 @@ async fn main() {
     })
     .expect("Error setting Ctrl-C handler");
 
-    let config = EventObserverConfig {
-        normalization_enabled: true,
-        bitcoin_rpc_proxy_enabled: false,
-        initial_hook_formation: None,
-        hooks_enabled: true,
-        event_handlers: vec![EventHandler::WebHook("http://0.0.0.0:19999".into())],
-        control_port: 9998,
-        ingestion_port: 9999,
-        bitcoin_node_username: "devnet".into(),
-        bitcoin_node_password: "devnet".into(),
-        bitcoin_node_rpc_host: "0.0.0.0".into(),
-        bitcoin_node_rpc_port: 18443,
-        stacks_node_rpc_host: "0.0.0.0".into(),
-        stacks_node_rpc_port: 20443,
-        grpc_server_enabled: true,
-        operators: HashMap::new(),
-    };
-    observer::start_event_observer(config, command_tx, command_rx, None).await;
+    let _ = observer::start_event_observer(config, command_tx, command_rx, None).await;
 }
 
 #[derive(Serialize, Deserialize, Debug, Default)]
