@@ -418,7 +418,7 @@ Make sure that you have a working installation of Docker running locally.
 
 Composition and interactions between protocols and contracts are one of the key innovations in blockchains. Clarinet was designed to handle this sort of interactions.
 
-Before refering to contracts deployed on Mainnet, they should be explicitily be listed as a `requirement` in the manifest `Clarinet.toml`:
+Before referring to contracts deployed on Mainnet, they should be explicitily be listed as a `requirement` in the manifest `Clarinet.toml`:
 
 ```toml
 [project]
