@@ -528,7 +528,7 @@ pub fn main() {
                 );
                 let mut buffer = String::new();
                 std::io::stdin().read_line(&mut buffer).unwrap();
-                if !buffer.starts_with("Y") || !buffer.starts_with("y") || !buffer.starts_with("") {
+                if !buffer.starts_with("Y") && !buffer.starts_with("y") && !buffer.starts_with("\n") {
                     println!("Deployment aborted");
                     std::process::exit(1);
                 }
