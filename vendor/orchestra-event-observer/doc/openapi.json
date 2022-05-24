@@ -1,682 +1,692 @@
 {
-    "openapi": "3.0.0",
-    "info": {
-      "title": "orchestra-event-observer",
-      "version": "0.1.0"
-    },
-    "paths": {
-      "/v1/chainhooks": {
-        "post": {
-          "tags": [
-            "Chainhooks"
-          ],
-          "operationId": "handle_create_hook",
-          "requestBody": {
+  "openapi": "3.0.0",
+  "info": {
+    "title": "orchestra-event-observer",
+    "version": "0.33.0"
+  },
+  "paths": {
+    "/v1/chainhooks": {
+      "get": {
+        "tags": [
+          "Chainhooks"
+        ],
+        "operationId": "handle_get_hooks",
+        "responses": {
+          "200": {
+            "description": "",
             "content": {
               "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ChainhookSpecification"
-                }
+                "schema": {}
               }
-            },
-            "required": true
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Chainhooks"
+        ],
+        "operationId": "handle_create_hook",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ChainhookSpecification"
+              }
+            }
           },
-          "responses": {
-            "200": {
-              "description": "",
-              "content": {
-                "application/json": {
-                  "schema": {}
-                }
-              }
-            }
-          }
-        }
-      },
-      "/v1/chainhooks/bitcoin/{hook_uuid}": {
-        "delete": {
-          "tags": [
-            "Chainhooks"
-          ],
-          "operationId": "handle_delete_bitcoin_hook",
-          "parameters": [
-            {
-              "name": "hook_uuid",
-              "in": "path",
-              "required": true,
-              "schema": {
-                "type": "string"
-              }
-            }
-          ],
-          "responses": {
-            "200": {
-              "description": "",
-              "content": {
-                "application/json": {
-                  "schema": {}
-                }
-              }
-            }
-          }
-        }
-      },
-      "/v1/chainhooks/stacks/{hook_uuid}": {
-        "delete": {
-          "tags": [
-            "Chainhooks"
-          ],
-          "operationId": "handle_delete_stacks_hook",
-          "parameters": [
-            {
-              "name": "hook_uuid",
-              "in": "path",
-              "required": true,
-              "schema": {
-                "type": "string"
-              }
-            }
-          ],
-          "responses": {
-            "200": {
-              "description": "",
-              "content": {
-                "application/json": {
-                  "schema": {}
-                }
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {}
               }
             }
           }
         }
       }
     },
-    "components": {
-      "schemas": {
-        "ChainhookSpecification": {
-          "oneOf": [
-            {
-              "type": "object",
-              "required": [
-                "bitcoin"
-              ],
-              "properties": {
-                "bitcoin": {
-                  "$ref": "#/components/schemas/BitcoinChainhookSpecification"
-                }
-              },
-              "additionalProperties": false
-            },
-            {
-              "type": "object",
-              "required": [
-                "stacks"
-              ],
-              "properties": {
-                "stacks": {
-                  "$ref": "#/components/schemas/StacksChainhookSpecification"
-                }
-              },
-              "additionalProperties": false
-            }
-          ]
-        },
-        "BitcoinChainhookSpecification": {
-          "type": "object",
-          "required": [
-            "action",
-            "name",
-            "network",
-            "predicate",
-            "uuid",
-            "version"
-          ],
-          "properties": {
-            "uuid": {
-              "type": "string"
-            },
-            "name": {
-              "type": "string"
-            },
-            "network": {
-              "$ref": "#/components/schemas/BitcoinNetwork"
-            },
-            "version": {
-              "type": "integer",
-              "format": "uint32",
-              "minimum": 0.0
-            },
-            "start_block": {
-              "type": "integer",
-              "format": "uint64",
-              "minimum": 0.0,
-              "nullable": true
-            },
-            "end_block": {
-              "type": "integer",
-              "format": "uint64",
-              "minimum": 0.0,
-              "nullable": true
-            },
-            "predicate": {
-              "$ref": "#/components/schemas/BitcoinHookPredicate"
-            },
-            "action": {
-              "$ref": "#/components/schemas/HookAction"
-            }
-          }
-        },
-        "BitcoinNetwork": {
-          "type": "string",
-          "enum": [
-            "regtest",
-            "testnet",
-            "mainnet"
-          ]
-        },
-        "BitcoinHookPredicate": {
-          "type": "object",
-          "oneOf": [
-            {
-              "type": "object",
-              "required": [
-                "rule",
-                "type"
-              ],
-              "properties": {
-                "type": {
-                  "type": "string",
-                  "enum": [
-                    "hex"
-                  ]
-                },
-                "rule": {
-                  "$ref": "#/components/schemas/MatchingRule"
-                }
-              }
-            },
-            {
-              "type": "object",
-              "required": [
-                "rule",
-                "type"
-              ],
-              "properties": {
-                "type": {
-                  "type": "string",
-                  "enum": [
-                    "p2pkh"
-                  ]
-                },
-                "rule": {
-                  "$ref": "#/components/schemas/MatchingRule"
-                }
-              }
-            },
-            {
-              "type": "object",
-              "required": [
-                "rule",
-                "type"
-              ],
-              "properties": {
-                "type": {
-                  "type": "string",
-                  "enum": [
-                    "p2sh"
-                  ]
-                },
-                "rule": {
-                  "$ref": "#/components/schemas/MatchingRule"
-                }
-              }
-            },
-            {
-              "type": "object",
-              "required": [
-                "rule",
-                "type"
-              ],
-              "properties": {
-                "type": {
-                  "type": "string",
-                  "enum": [
-                    "p2wpkh"
-                  ]
-                },
-                "rule": {
-                  "$ref": "#/components/schemas/MatchingRule"
-                }
-              }
-            },
-            {
-              "type": "object",
-              "required": [
-                "rule",
-                "type"
-              ],
-              "properties": {
-                "type": {
-                  "type": "string",
-                  "enum": [
-                    "p2wsh"
-                  ]
-                },
-                "rule": {
-                  "$ref": "#/components/schemas/MatchingRule"
-                }
-              }
-            },
-            {
-              "type": "object",
-              "required": [
-                "rule",
-                "type"
-              ],
-              "properties": {
-                "type": {
-                  "type": "string",
-                  "enum": [
-                    "script"
-                  ]
-                },
-                "rule": {
-                  "$ref": "#/components/schemas/ScriptTemplate"
-                }
-              }
-            }
-          ],
-          "required": [
-            "scope"
-          ],
-          "properties": {
-            "scope": {
-              "$ref": "#/components/schemas/Scope"
-            }
-          }
-        },
-        "Scope": {
-          "type": "string",
-          "enum": [
-            "inputs",
-            "outputs"
-          ]
-        },
-        "MatchingRule": {
-          "oneOf": [
-            {
-              "type": "object",
-              "required": [
-                "equals"
-              ],
-              "properties": {
-                "equals": {
-                  "type": "string"
-                }
-              },
-              "additionalProperties": false
-            },
-            {
-              "type": "object",
-              "required": [
-                "starts_with"
-              ],
-              "properties": {
-                "starts_with": {
-                  "type": "string"
-                }
-              },
-              "additionalProperties": false
-            },
-            {
-              "type": "object",
-              "required": [
-                "ends_with"
-              ],
-              "properties": {
-                "ends_with": {
-                  "type": "string"
-                }
-              },
-              "additionalProperties": false
-            }
-          ]
-        },
-        "ScriptTemplate": {
-          "type": "object",
-          "required": [
-            "instructions"
-          ],
-          "properties": {
-            "instructions": {
-              "type": "array",
-              "items": {
-                "$ref": "#/components/schemas/ScriptInstruction"
-              }
-            }
-          }
-        },
-        "ScriptInstruction": {
-          "oneOf": [
-            {
-              "type": "object",
-              "required": [
-                "opcode"
-              ],
-              "properties": {
-                "opcode": {
-                  "type": "integer",
-                  "format": "uint8",
-                  "minimum": 0.0
-                }
-              },
-              "additionalProperties": false
-            },
-            {
-              "type": "object",
-              "required": [
-                "raw_bytes"
-              ],
-              "properties": {
-                "raw_bytes": {
-                  "type": "array",
-                  "items": {
-                    "type": "integer",
-                    "format": "uint8",
-                    "minimum": 0.0
-                  }
-                }
-              },
-              "additionalProperties": false
-            },
-            {
-              "type": "object",
-              "required": [
-                "placeholder"
-              ],
-              "properties": {
-                "placeholder": {
-                  "type": "array",
-                  "items": [
-                    {
-                      "type": "string"
-                    },
-                    {
-                      "type": "integer",
-                      "format": "uint8",
-                      "minimum": 0.0
-                    }
-                  ],
-                  "maxItems": 2,
-                  "minItems": 2
-                }
-              },
-              "additionalProperties": false
-            }
-          ]
-        },
-        "HookAction": {
-          "oneOf": [
-            {
-              "type": "object",
-              "required": [
-                "http"
-              ],
-              "properties": {
-                "http": {
-                  "$ref": "#/components/schemas/HttpHook"
-                }
-              },
-              "additionalProperties": false
-            }
-          ]
-        },
-        "HttpHook": {
-          "type": "object",
-          "required": [
-            "authorization_header",
-            "method",
-            "url"
-          ],
-          "properties": {
-            "url": {
-              "type": "string"
-            },
-            "method": {
-              "type": "string"
-            },
-            "authorization_header": {
+    "/v1/chainhooks/bitcoin/{hook_uuid}": {
+      "delete": {
+        "tags": [
+          "Chainhooks"
+        ],
+        "operationId": "handle_delete_bitcoin_hook",
+        "parameters": [
+          {
+            "name": "hook_uuid",
+            "in": "path",
+            "required": true,
+            "schema": {
               "type": "string"
             }
           }
-        },
-        "StacksChainhookSpecification": {
-          "type": "object",
-          "required": [
-            "action",
-            "name",
-            "network",
-            "predicate",
-            "uuid",
-            "version"
-          ],
-          "properties": {
-            "uuid": {
-              "type": "string"
-            },
-            "name": {
-              "type": "string"
-            },
-            "network": {
-              "$ref": "#/components/schemas/StacksNetwork"
-            },
-            "version": {
-              "type": "integer",
-              "format": "uint32",
-              "minimum": 0.0
-            },
-            "start_block": {
-              "type": "integer",
-              "format": "uint64",
-              "minimum": 0.0,
-              "nullable": true
-            },
-            "end_block": {
-              "type": "integer",
-              "format": "uint64",
-              "minimum": 0.0,
-              "nullable": true
-            },
-            "predicate": {
-              "$ref": "#/components/schemas/StacksHookPredicate"
-            },
-            "action": {
-              "$ref": "#/components/schemas/HookAction"
-            }
-          }
-        },
-        "StacksNetwork": {
-          "type": "string",
-          "enum": [
-            "simnet",
-            "devnet",
-            "testnet",
-            "mainnet"
-          ]
-        },
-        "StacksHookPredicate": {
-          "oneOf": [
-            {
-              "type": "object",
-              "required": [
-                "rule",
-                "type"
-              ],
-              "properties": {
-                "type": {
-                  "type": "string",
-                  "enum": [
-                    "contract_call"
-                  ]
-                },
-                "rule": {
-                  "$ref": "#/components/schemas/StacksContractCallBasedPredicate"
-                }
-              }
-            },
-            {
-              "type": "object",
-              "required": [
-                "rule",
-                "type"
-              ],
-              "properties": {
-                "type": {
-                  "type": "string",
-                  "enum": [
-                    "print_event"
-                  ]
-                },
-                "rule": {
-                  "$ref": "#/components/schemas/StacksPrintEventBasedPredicate"
-                }
-              }
-            },
-            {
-              "type": "object",
-              "required": [
-                "rule",
-                "type"
-              ],
-              "properties": {
-                "type": {
-                  "type": "string",
-                  "enum": [
-                    "ft_event"
-                  ]
-                },
-                "rule": {
-                  "$ref": "#/components/schemas/StacksFtEventBasedPredicate"
-                }
-              }
-            },
-            {
-              "type": "object",
-              "required": [
-                "rule",
-                "type"
-              ],
-              "properties": {
-                "type": {
-                  "type": "string",
-                  "enum": [
-                    "nft_event"
-                  ]
-                },
-                "rule": {
-                  "$ref": "#/components/schemas/StacksNftEventBasedPredicate"
-                }
-              }
-            },
-            {
-              "type": "object",
-              "required": [
-                "rule",
-                "type"
-              ],
-              "properties": {
-                "type": {
-                  "type": "string",
-                  "enum": [
-                    "stx_event"
-                  ]
-                },
-                "rule": {
-                  "$ref": "#/components/schemas/StacksStxEventBasedPredicate"
-                }
-              }
-            }
-          ]
-        },
-        "StacksContractCallBasedPredicate": {
-          "type": "object",
-          "required": [
-            "contract_identifier",
-            "method"
-          ],
-          "properties": {
-            "contract_identifier": {
-              "type": "string"
-            },
-            "method": {
-              "type": "string"
-            }
-          }
-        },
-        "StacksPrintEventBasedPredicate": {
-          "type": "object",
-          "required": [
-            "contains",
-            "contract_identifier"
-          ],
-          "properties": {
-            "contract_identifier": {
-              "type": "string"
-            },
-            "contains": {
-              "type": "string"
-            }
-          }
-        },
-        "StacksFtEventBasedPredicate": {
-          "type": "object",
-          "required": [
-            "actions",
-            "asset_identifier"
-          ],
-          "properties": {
-            "asset_identifier": {
-              "type": "string"
-            },
-            "actions": {
-              "type": "array",
-              "items": {
-                "type": "string"
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {}
               }
             }
           }
-        },
-        "StacksNftEventBasedPredicate": {
-          "type": "object",
-          "required": [
-            "actions",
-            "asset_identifier"
-          ],
-          "properties": {
-            "asset_identifier": {
+        }
+      }
+    },
+    "/v1/chainhooks/stacks/{hook_uuid}": {
+      "delete": {
+        "tags": [
+          "Chainhooks"
+        ],
+        "operationId": "handle_delete_stacks_hook",
+        "parameters": [
+          {
+            "name": "hook_uuid",
+            "in": "path",
+            "required": true,
+            "schema": {
               "type": "string"
-            },
-            "actions": {
-              "type": "array",
-              "items": {
-                "type": "string"
-              }
             }
           }
-        },
-        "StacksStxEventBasedPredicate": {
-          "type": "object",
-          "required": [
-            "actions"
-          ],
-          "properties": {
-            "actions": {
-              "type": "array",
-              "items": {
-                "type": "string"
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {}
               }
             }
           }
         }
       }
     }
+  },
+  "components": {
+    "schemas": {
+      "ChainhookSpecification": {
+        "oneOf": [
+          {
+            "type": "object",
+            "required": [
+              "bitcoin"
+            ],
+            "properties": {
+              "bitcoin": {
+                "$ref": "#/components/schemas/BitcoinChainhookSpecification"
+              }
+            },
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "required": [
+              "stacks"
+            ],
+            "properties": {
+              "stacks": {
+                "$ref": "#/components/schemas/StacksChainhookSpecification"
+              }
+            },
+            "additionalProperties": false
+          }
+        ]
+      },
+      "BitcoinChainhookSpecification": {
+        "type": "object",
+        "required": [
+          "action",
+          "name",
+          "network",
+          "predicate",
+          "uuid",
+          "version"
+        ],
+        "properties": {
+          "uuid": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "network": {
+            "$ref": "#/components/schemas/BitcoinNetwork"
+          },
+          "version": {
+            "type": "integer",
+            "format": "uint32",
+            "minimum": 0.0
+          },
+          "start_block": {
+            "type": "integer",
+            "format": "uint64",
+            "minimum": 0.0,
+            "nullable": true
+          },
+          "end_block": {
+            "type": "integer",
+            "format": "uint64",
+            "minimum": 0.0,
+            "nullable": true
+          },
+          "expire_after_occurrence": {
+            "type": "integer",
+            "format": "uint64",
+            "minimum": 0.0,
+            "nullable": true
+          },
+          "predicate": {
+            "$ref": "#/components/schemas/BitcoinHookPredicate"
+          },
+          "action": {
+            "$ref": "#/components/schemas/HookAction"
+          }
+        }
+      },
+      "BitcoinNetwork": {
+        "type": "string",
+        "enum": [
+          "regtest",
+          "testnet",
+          "mainnet"
+        ]
+      },
+      "BitcoinHookPredicate": {
+        "type": "object",
+        "oneOf": [
+          {
+            "type": "object",
+            "required": [
+              "rule",
+              "type"
+            ],
+            "properties": {
+              "type": {
+                "type": "string",
+                "enum": [
+                  "hex"
+                ]
+              },
+              "rule": {
+                "$ref": "#/components/schemas/MatchingRule"
+              }
+            }
+          },
+          {
+            "type": "object",
+            "required": [
+              "rule",
+              "type"
+            ],
+            "properties": {
+              "type": {
+                "type": "string",
+                "enum": [
+                  "p2pkh"
+                ]
+              },
+              "rule": {
+                "$ref": "#/components/schemas/MatchingRule"
+              }
+            }
+          },
+          {
+            "type": "object",
+            "required": [
+              "rule",
+              "type"
+            ],
+            "properties": {
+              "type": {
+                "type": "string",
+                "enum": [
+                  "p2sh"
+                ]
+              },
+              "rule": {
+                "$ref": "#/components/schemas/MatchingRule"
+              }
+            }
+          },
+          {
+            "type": "object",
+            "required": [
+              "rule",
+              "type"
+            ],
+            "properties": {
+              "type": {
+                "type": "string",
+                "enum": [
+                  "p2wpkh"
+                ]
+              },
+              "rule": {
+                "$ref": "#/components/schemas/MatchingRule"
+              }
+            }
+          },
+          {
+            "type": "object",
+            "required": [
+              "rule",
+              "type"
+            ],
+            "properties": {
+              "type": {
+                "type": "string",
+                "enum": [
+                  "p2wsh"
+                ]
+              },
+              "rule": {
+                "$ref": "#/components/schemas/MatchingRule"
+              }
+            }
+          },
+          {
+            "type": "object",
+            "required": [
+              "rule",
+              "type"
+            ],
+            "properties": {
+              "type": {
+                "type": "string",
+                "enum": [
+                  "script"
+                ]
+              },
+              "rule": {
+                "$ref": "#/components/schemas/ScriptTemplate"
+              }
+            }
+          }
+        ],
+        "required": [
+          "scope"
+        ],
+        "properties": {
+          "scope": {
+            "$ref": "#/components/schemas/Scope"
+          }
+        }
+      },
+      "Scope": {
+        "type": "string",
+        "enum": [
+          "inputs",
+          "outputs"
+        ]
+      },
+      "MatchingRule": {
+        "oneOf": [
+          {
+            "type": "object",
+            "required": [
+              "equals"
+            ],
+            "properties": {
+              "equals": {
+                "type": "string"
+              }
+            },
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "required": [
+              "starts_with"
+            ],
+            "properties": {
+              "starts_with": {
+                "type": "string"
+              }
+            },
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "required": [
+              "ends_with"
+            ],
+            "properties": {
+              "ends_with": {
+                "type": "string"
+              }
+            },
+            "additionalProperties": false
+          }
+        ]
+      },
+      "ScriptTemplate": {
+        "type": "object",
+        "required": [
+          "instructions"
+        ],
+        "properties": {
+          "instructions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ScriptInstruction"
+            }
+          }
+        }
+      },
+      "ScriptInstruction": {
+        "oneOf": [
+          {
+            "type": "object",
+            "required": [
+              "opcode"
+            ],
+            "properties": {
+              "opcode": {
+                "type": "integer",
+                "format": "uint8",
+                "minimum": 0.0
+              }
+            },
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "required": [
+              "raw_bytes"
+            ],
+            "properties": {
+              "raw_bytes": {
+                "type": "array",
+                "items": {
+                  "type": "integer",
+                  "format": "uint8",
+                  "minimum": 0.0
+                }
+              }
+            },
+            "additionalProperties": false
+          }
+        ]
+      },
+      "HookAction": {
+        "oneOf": [
+          {
+            "type": "string",
+            "enum": [
+              "noop"
+            ]
+          },
+          {
+            "type": "object",
+            "required": [
+              "http"
+            ],
+            "properties": {
+              "http": {
+                "$ref": "#/components/schemas/HttpHook"
+              }
+            },
+            "additionalProperties": false
+          }
+        ]
+      },
+      "HttpHook": {
+        "type": "object",
+        "required": [
+          "authorization_header",
+          "method",
+          "url"
+        ],
+        "properties": {
+          "url": {
+            "type": "string"
+          },
+          "method": {
+            "type": "string"
+          },
+          "authorization_header": {
+            "type": "string"
+          }
+        }
+      },
+      "StacksChainhookSpecification": {
+        "type": "object",
+        "required": [
+          "action",
+          "name",
+          "network",
+          "predicate",
+          "uuid",
+          "version"
+        ],
+        "properties": {
+          "uuid": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "network": {
+            "$ref": "#/components/schemas/StacksNetwork"
+          },
+          "version": {
+            "type": "integer",
+            "format": "uint32",
+            "minimum": 0.0
+          },
+          "start_block": {
+            "type": "integer",
+            "format": "uint64",
+            "minimum": 0.0,
+            "nullable": true
+          },
+          "end_block": {
+            "type": "integer",
+            "format": "uint64",
+            "minimum": 0.0,
+            "nullable": true
+          },
+          "expire_after_occurrence": {
+            "type": "integer",
+            "format": "uint64",
+            "minimum": 0.0,
+            "nullable": true
+          },
+          "predicate": {
+            "$ref": "#/components/schemas/StacksHookPredicate"
+          },
+          "action": {
+            "$ref": "#/components/schemas/HookAction"
+          }
+        }
+      },
+      "StacksNetwork": {
+        "type": "string",
+        "enum": [
+          "simnet",
+          "devnet",
+          "testnet",
+          "mainnet"
+        ]
+      },
+      "StacksHookPredicate": {
+        "oneOf": [
+          {
+            "type": "object",
+            "required": [
+              "rule",
+              "type"
+            ],
+            "properties": {
+              "type": {
+                "type": "string",
+                "enum": [
+                  "contract_call"
+                ]
+              },
+              "rule": {
+                "$ref": "#/components/schemas/StacksContractCallBasedPredicate"
+              }
+            }
+          },
+          {
+            "type": "object",
+            "required": [
+              "rule",
+              "type"
+            ],
+            "properties": {
+              "type": {
+                "type": "string",
+                "enum": [
+                  "print_event"
+                ]
+              },
+              "rule": {
+                "$ref": "#/components/schemas/StacksPrintEventBasedPredicate"
+              }
+            }
+          },
+          {
+            "type": "object",
+            "required": [
+              "rule",
+              "type"
+            ],
+            "properties": {
+              "type": {
+                "type": "string",
+                "enum": [
+                  "ft_event"
+                ]
+              },
+              "rule": {
+                "$ref": "#/components/schemas/StacksFtEventBasedPredicate"
+              }
+            }
+          },
+          {
+            "type": "object",
+            "required": [
+              "rule",
+              "type"
+            ],
+            "properties": {
+              "type": {
+                "type": "string",
+                "enum": [
+                  "nft_event"
+                ]
+              },
+              "rule": {
+                "$ref": "#/components/schemas/StacksNftEventBasedPredicate"
+              }
+            }
+          },
+          {
+            "type": "object",
+            "required": [
+              "rule",
+              "type"
+            ],
+            "properties": {
+              "type": {
+                "type": "string",
+                "enum": [
+                  "stx_event"
+                ]
+              },
+              "rule": {
+                "$ref": "#/components/schemas/StacksStxEventBasedPredicate"
+              }
+            }
+          }
+        ]
+      },
+      "StacksContractCallBasedPredicate": {
+        "type": "object",
+        "required": [
+          "contract_identifier",
+          "method"
+        ],
+        "properties": {
+          "contract_identifier": {
+            "type": "string"
+          },
+          "method": {
+            "type": "string"
+          }
+        }
+      },
+      "StacksPrintEventBasedPredicate": {
+        "type": "object",
+        "required": [
+          "contains",
+          "contract_identifier"
+        ],
+        "properties": {
+          "contract_identifier": {
+            "type": "string"
+          },
+          "contains": {
+            "type": "string"
+          }
+        }
+      },
+      "StacksFtEventBasedPredicate": {
+        "type": "object",
+        "required": [
+          "actions",
+          "asset_identifier"
+        ],
+        "properties": {
+          "asset_identifier": {
+            "type": "string"
+          },
+          "actions": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "StacksNftEventBasedPredicate": {
+        "type": "object",
+        "required": [
+          "actions",
+          "asset_identifier"
+        ],
+        "properties": {
+          "asset_identifier": {
+            "type": "string"
+          },
+          "actions": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "StacksStxEventBasedPredicate": {
+        "type": "object",
+        "required": [
+          "actions"
+        ],
+        "properties": {
+          "actions": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      }
+    }
   }
+}

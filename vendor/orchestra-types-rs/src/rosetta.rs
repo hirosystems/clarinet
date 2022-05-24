@@ -2,6 +2,7 @@ use super::bitcoin::{TxIn, TxOut};
 use crate::events::*;
 use std::cmp::Ordering;
 use std::collections::HashSet;
+use schemars::JsonSchema;
 use std::fmt::Display;
 use std::hash::{Hash, Hasher};
 
@@ -536,7 +537,7 @@ pub struct StacksChainUpdatedWithMicroblocksReorgData {
     pub microblocks_to_apply: Vec<StacksMicroblockData>,
 }
 
-#[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize)]
+#[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum StacksNetwork {
     Simnet,
@@ -585,7 +586,7 @@ impl StacksNetwork {
 }
 
 #[allow(dead_code)]
-#[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize)]
+#[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum BitcoinNetwork {
     Regtest,
