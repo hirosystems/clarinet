@@ -1,8 +1,8 @@
 use crate::deployment::{
     self, apply_on_chain_deployment, check_deployments, generate_default_deployment,
     get_absolute_deployment_path, get_default_deployment_path, load_deployment,
-    load_deployment_if_exists, setup_session_with_deployment, write_deployment, DeploymentCommand,
-    DeploymentEvent,
+    load_deployment_if_exists, setup_session_with_deployment, types::DeploymentSpecification,
+    write_deployment, DeploymentCommand, DeploymentEvent, DeploymentGenerationArtifacts,
 };
 use crate::generate::{
     self,
@@ -57,6 +57,9 @@ enum Command {
     /// Subcommands for working with contracts
     #[clap(subcommand, name = "contracts")]
     Contracts(Contracts),
+    /// Subcommands for working with requirements
+    #[clap(subcommand, name = "requirements")]
+    Requirements(Requirements),
     /// Subcommands for working with hooks
     #[clap(subcommand, name = "hooks")]
     Hooks(Hooks),
@@ -95,9 +98,14 @@ enum Contracts {
     /// Generate files and settings for a new contract
     #[clap(name = "new", bin_name = "new")]
     NewContract(NewContract),
+}
+
+#[derive(Subcommand, PartialEq, Clone, Debug)]
+#[clap(bin_name = "req", aliases = &["requirement"])]
+enum Requirements {
     /// Add third-party requirements to this project
-    #[clap(name = "requirement", bin_name = "requirement")]
-    Requirement(Requirement),
+    #[clap(name = "add", bin_name = "add")]
+    AddRequirement(AddRequirement),
 }
 
 #[derive(Subcommand, PartialEq, Clone, Debug)]
@@ -147,8 +155,8 @@ struct NewContract {
 }
 
 #[derive(Parser, PartialEq, Clone, Debug)]
-struct Requirement {
-    /// Contract id (ex. " SP2PABAF9FTAJYNFZH93XENAJ8FVY99RRM50D2JG9.nft-trait")
+struct AddRequirement {
+    /// Contract id (ex. "SP2PABAF9FTAJYNFZH93XENAJ8FVY99RRM50D2JG9.nft-trait")
     pub contract_id: String,
     /// Path to Clarinet.toml
     #[clap(long = "manifest-path", short = 'm')]
@@ -164,14 +172,14 @@ struct CheckDeployments {
 
 #[derive(Parser, PartialEq, Clone, Debug)]
 struct GenerateDeployment {
-    /// Generate a deployment file for a test environment (console, tests, etc.)
+    /// Generate a deployment file for simnet environments (console, tests)
     #[clap(
-        long = "test",
+        long = "simnet",
         conflicts_with = "devnet",
         conflicts_with = "testnet",
         conflicts_with = "mainnet"
     )]
-    pub test: bool,
+    pub simnet: bool,
     /// Generate a deployment file for devnet, using settings/Devnet.toml
     #[clap(
         long = "devnet",
@@ -564,7 +572,7 @@ pub fn main() {
                 );
                 let mut buffer = String::new();
                 std::io::stdin().read_line(&mut buffer).unwrap();
-                if !buffer.starts_with("Y") || !buffer.starts_with("") {
+                if !buffer.starts_with("Y") || !buffer.starts_with("y") || !buffer.starts_with("") {
                     println!("Deployment aborted");
                     std::process::exit(1);
                 }
@@ -677,7 +685,9 @@ pub fn main() {
                     display_post_check_hint();
                 }
             }
-            Contracts::Requirement(cmd) => {
+        },
+        Command::Requirements(subcommand) => match subcommand {
+            Requirements::AddRequirement(cmd) => {
                 let manifest = load_manifest_or_exit(cmd.manifest_path);
 
                 let change = TOMLEdition {
@@ -702,58 +712,9 @@ pub fn main() {
         Command::Console(cmd) => {
             let manifest = load_manifest_or_exit(cmd.manifest_path);
 
-            let (res, _, artifacts) = match cmd.deployment_plan_path {
-                None => {
-                    let res = load_deployment_if_exists(&manifest, &StacksNetwork::Simnet);
-                    match res {
-                        Some(Ok(deployment)) => {
-                            println!(
-                                "{}: using deployments/default.simnet-plan.yaml",
-                                yellow!("note")
-                            );
-                            (Ok(deployment), None, None)
-                        }
-                        Some(Err(e)) => {
-                            println!(
-                                "{}: loading deployments/default.simnet-plan.yaml failed with error: {}",
-                                red!("error"),
-                                e
-                            );
-                            std::process::exit(1);
-                        }
-                        None => {
-                            match generate_default_deployment(&manifest, &StacksNetwork::Simnet) {
-                                Ok((deployment, artifacts)) => {
-                                    (Ok(deployment), None, Some(artifacts))
-                                }
-                                Err(e) => (Err(e), None, None),
-                            }
-                        }
-                    }
-                }
-                Some(path) => {
-                    let deployment_path = get_absolute_deployment_path(&manifest, &path);
-                    let deployment = load_deployment(&manifest, &deployment_path);
-                    (
-                        deployment,
-                        Some(format!("{}", deployment_path.display())),
-                        None,
-                    )
-                }
-            };
+            let cache = build_deployment_cache_or_exit(&manifest, &cmd.deployment_plan_path);
 
-            let deployment = match res {
-                Ok(deployment) => deployment,
-                Err(e) => {
-                    println!("{}: {}", red!("error"), e);
-                    process::exit(1);
-                }
-            };
-
-            let contracts_asts = artifacts.and_then(|a| Some(a.asts));
-            let (session, _) =
-                setup_session_with_deployment(&manifest, &deployment, contracts_asts);
-            let mut terminal = Terminal::load(session);
+            let mut terminal = Terminal::load(cache.session);
             terminal.start();
 
             if hints_enabled {
@@ -843,57 +804,14 @@ pub fn main() {
         Command::Check(cmd) => {
             let manifest = load_manifest_or_exit(cmd.manifest_path);
 
-            let (res, _, artifacts) = match cmd.deployment_plan_path {
-                None => {
-                    let res = load_deployment_if_exists(&manifest, &StacksNetwork::Simnet);
-                    match res {
-                        Some(Ok(deployment)) => {
-                            println!(
-                                "{}: using deployments/default.simnet-plan.yaml",
-                                yellow!("note")
-                            );
-                            (Ok(deployment), None, None)
-                        }
-                        Some(Err(e)) => {
-                            println!(
-                                "{}: loading deployments/default.simnet-plan.yaml failed with error: {}",
-                                red!("error"),
-                                e
-                            );
-                            std::process::exit(1);
-                        }
-                        None => {
-                            match generate_default_deployment(&manifest, &StacksNetwork::Simnet) {
-                                Ok((deployment, artifacts)) => {
-                                    (Ok(deployment), None, Some(artifacts))
-                                }
-                                Err(e) => (Err(e), None, None),
-                            }
-                        }
-                    }
-                }
-                Some(path) => {
-                    let deployment_path = get_absolute_deployment_path(&manifest, &path);
-                    let deployment = load_deployment(&manifest, &deployment_path);
-                    (
-                        deployment,
-                        Some(format!("{}", deployment_path.display())),
-                        None,
-                    )
-                }
-            };
-
-            let deployment = match res {
-                Ok(deployment) => deployment,
-                Err(e) => {
-                    println!("{}: {}", red!("error"), e);
-                    process::exit(1);
-                }
-            };
+            let (deployment, _, artifacts) =
+                load_deployments_and_artifacts_or_exit(&manifest, &cmd.deployment_plan_path);
 
             let contracts_asts = artifacts.and_then(|a| Some(a.asts));
+
             let (_, results) =
                 setup_session_with_deployment(&manifest, &deployment, contracts_asts);
+
             let mut success = 0;
             let mut warnings = 0;
             let mut errors = 0;
@@ -1047,58 +965,8 @@ pub fn main() {
         }
         Command::Test(cmd) => {
             let manifest = load_manifest_or_exit(cmd.manifest_path);
-
-            let (res, deployment_path, artifacts) = match cmd.deployment_plan_path {
-                None => {
-                    let res = load_deployment_if_exists(&manifest, &StacksNetwork::Simnet);
-                    match res {
-                        Some(Ok(deployment)) => {
-                            println!(
-                                "{}: using deployments/default.simnet-plan.yaml",
-                                yellow!("note")
-                            );
-                            (Ok(deployment), None, None)
-                        }
-                        Some(Err(e)) => {
-                            println!(
-                                "{}: loading deployments/default.simnet-plan.yaml failed with error: {}",
-                                red!("error"),
-                                e
-                            );
-                            std::process::exit(1);
-                        }
-                        None => {
-                            match generate_default_deployment(&manifest, &StacksNetwork::Simnet) {
-                                Ok((deployment, artifacts)) => {
-                                    (Ok(deployment), None, Some(artifacts))
-                                }
-                                Err(e) => (Err(e), None, None),
-                            }
-                        }
-                    }
-                }
-                Some(path) => {
-                    let deployment_path = get_absolute_deployment_path(&manifest, &path);
-                    let deployment = load_deployment(&manifest, &deployment_path);
-                    (
-                        deployment,
-                        Some(format!("{}", deployment_path.display())),
-                        None,
-                    )
-                }
-            };
-
-            let deployment = match res {
-                Ok(deployment) => deployment,
-                Err(e) => {
-                    println!("{}: {}", red!("error"), e);
-                    process::exit(1);
-                }
-            };
-
-            let contracts_asts = artifacts.and_then(|a| Some(a.asts));
-            let cache =
-                DeploymentCache::new(&manifest, deployment, &deployment_path, contracts_asts);
+            let deployment_plan_path = cmd.deployment_plan_path.clone();
+            let cache = build_deployment_cache_or_exit(&manifest, &deployment_plan_path);
 
             let (success, _count) = match run_scripts(
                 cmd.files,
@@ -1109,6 +977,7 @@ pub fn main() {
                 false,
                 &manifest,
                 cache,
+                deployment_plan_path,
             ) {
                 Ok(count) => (true, count),
                 Err((_, count)) => (false, count),
@@ -1131,57 +1000,7 @@ pub fn main() {
         Command::Run(cmd) => {
             let manifest = load_manifest_or_exit(cmd.manifest_path);
 
-            let (res, deployment_path, artifacts) = match cmd.deployment_plan_path {
-                None => {
-                    let res = load_deployment_if_exists(&manifest, &StacksNetwork::Simnet);
-                    match res {
-                        Some(Ok(deployment)) => {
-                            println!(
-                                "{}: using deployments/default.simnet-plan.yaml",
-                                yellow!("note")
-                            );
-                            (Ok(deployment), None, None)
-                        }
-                        Some(Err(e)) => {
-                            println!(
-                                "{}: loading deployments/default.simnet-plan.yaml failed with error: {}",
-                                red!("error"),
-                                e
-                            );
-                            std::process::exit(1);
-                        }
-                        None => {
-                            match generate_default_deployment(&manifest, &StacksNetwork::Simnet) {
-                                Ok((deployment, artifacts)) => {
-                                    (Ok(deployment), None, Some(artifacts))
-                                }
-                                Err(e) => (Err(e), None, None),
-                            }
-                        }
-                    }
-                }
-                Some(path) => {
-                    let deployment_path = get_absolute_deployment_path(&manifest, &path);
-                    let deployment = load_deployment(&manifest, &deployment_path);
-                    (
-                        deployment,
-                        Some(format!("{}", deployment_path.display())),
-                        None,
-                    )
-                }
-            };
-
-            let deployment = match res {
-                Ok(deployment) => deployment,
-                Err(e) => {
-                    println!("{}: {}", red!("error"), e);
-                    process::exit(1);
-                }
-            };
-
-            let contracts_asts = artifacts.and_then(|a| Some(a.asts));
-            let cache =
-                DeploymentCache::new(&manifest, deployment, &deployment_path, contracts_asts);
+            let cache = build_deployment_cache_or_exit(&manifest, &cmd.deployment_plan_path);
 
             let _ = run_scripts(
                 vec![cmd.script],
@@ -1192,6 +1011,7 @@ pub fn main() {
                 cmd.allow_disk_write,
                 &manifest,
                 cache,
+                cmd.deployment_plan_path,
             );
         }
         Command::Integrate(cmd) => {
@@ -1348,6 +1168,75 @@ fn load_manifest_or_exit(path: Option<String>) -> ProjectManifest {
         }
     };
     manifest
+}
+
+fn load_deployments_and_artifacts_or_exit(
+    manifest: &ProjectManifest,
+    deployment_plan_path: &Option<String>,
+) -> (
+    DeploymentSpecification,
+    Option<String>,
+    Option<DeploymentGenerationArtifacts>,
+) {
+    let (res, deployment_path, artifacts) = match deployment_plan_path {
+        None => {
+            let res = load_deployment_if_exists(&manifest, &StacksNetwork::Simnet);
+            match res {
+                Some(Ok(deployment)) => {
+                    println!(
+                        "{}: using deployments/default.simnet-plan.yaml",
+                        yellow!("note")
+                    );
+                    (Ok(deployment), None, None)
+                }
+                Some(Err(e)) => {
+                    println!(
+                        "{}: loading deployments/default.simnet-plan.yaml failed with error: {}",
+                        red!("error"),
+                        e
+                    );
+                    std::process::exit(1);
+                }
+                None => match generate_default_deployment(&manifest, &StacksNetwork::Simnet) {
+                    Ok((deployment, artifacts)) => (Ok(deployment), None, Some(artifacts)),
+                    Err(e) => (Err(e), None, None),
+                },
+            }
+        }
+        Some(path) => {
+            let deployment_path = get_absolute_deployment_path(&manifest, &path);
+            let deployment = load_deployment(&manifest, &deployment_path);
+            (
+                deployment,
+                Some(format!("{}", deployment_path.display())),
+                None,
+            )
+        }
+    };
+
+    let deployment = match res {
+        Ok(deployment) => deployment,
+        Err(e) => {
+            println!("{}: {}", red!("error"), e);
+            process::exit(1);
+        }
+    };
+
+    (deployment, deployment_path, artifacts)
+}
+
+pub fn build_deployment_cache_or_exit(
+    manifest: &ProjectManifest,
+    deployment_plan_path: &Option<String>,
+) -> DeploymentCache {
+    let (deployment, deployment_path, artifacts) =
+        load_deployments_and_artifacts_or_exit(manifest, deployment_plan_path);
+
+    let contracts_asts = artifacts.and_then(|a| Some(a.asts));
+
+    let cache = DeploymentCache::new(&manifest, deployment, &deployment_path, contracts_asts);
+
+    cache
 }
 
 fn execute_changes(changes: Vec<Changes>) -> bool {

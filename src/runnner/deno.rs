@@ -1,5 +1,6 @@
 use super::api_v1::SessionArtifacts;
 use super::{api_v1, costs, DeploymentCache};
+use crate::frontend::cli;
 use clarity_repl::clarity::coverage::CoverageReporter;
 use clarity_repl::clarity::types;
 use clarity_repl::repl::Session;
@@ -59,6 +60,7 @@ pub async fn do_run_scripts(
     allow_disk_write: bool,
     manifest: &ProjectManifest,
     cache: DeploymentCache,
+    deployment_plan_path: Option<String>,
 ) -> Result<u32, AnyError> {
     let mut flags = Flags::default();
     flags.unstable = true;
@@ -229,6 +231,8 @@ pub async fn do_run_scripts(
                 // Clear the screen
                 print!("{esc}c", esc = 27 as char);
                 // Clear eventual previous sessions
+                let cache = cli::build_deployment_cache_or_exit(manifest, &deployment_plan_path);
+
                 run_scripts(
                     program_state.clone(),
                     permissions.clone(),
@@ -242,11 +246,11 @@ pub async fn do_run_scripts(
                     filter.clone(),
                     concurrent_jobs,
                     allow_wallets,
-                    None,
+                    Some(cache),
                 )
                 .map(|mut res| {
                     match res.as_mut() {
-                        Ok((success, sessions_artifacts)) if *success => {
+                        Ok((failed, sessions_artifacts)) if !*failed => {
                             if include_costs_report {
                                 costs::display_costs_report(sessions_artifacts)
                             }
@@ -268,7 +272,7 @@ pub async fn do_run_scripts(
             tools::test_runner::is_supported,
         )?;
 
-        let (success, sessions_artifacts) = run_scripts(
+        let (failed, sessions_artifacts) = run_scripts(
             program_state.clone(),
             permissions,
             lib,
@@ -285,7 +289,7 @@ pub async fn do_run_scripts(
         )
         .await?;
 
-        if !success {
+        if failed {
             std::process::exit(1);
         }
 
@@ -301,16 +305,15 @@ pub async fn do_run_scripts(
                     .contract_paths
                     .insert(contract_id.name.to_string(), contract_path.clone());
             }
-            for mut artifact in sessions_artifacts.into_iter() {
-                coverage_reporter
-                    .reports
-                    .append(&mut artifact.coverage_reports);
+            for artifact in sessions_artifacts.iter() {
+                let mut coverage_reports = artifact.coverage_reports.clone();
+                coverage_reporter.reports.append(&mut coverage_reports);
             }
             coverage_reporter.write_lcov_file("coverage.lcov");
         }
 
         if include_costs_report {
-            // costs::display_costs_report()
+            costs::display_costs_report(&sessions_artifacts);
         }
     }
     Ok(0 as u32)

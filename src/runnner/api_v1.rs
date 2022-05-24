@@ -8,6 +8,7 @@ use clarity_repl::clarity::analysis::contract_interface_builder::{
 };
 use clarity_repl::clarity::coverage::TestCoverageReport;
 use clarity_repl::clarity::types;
+use clarity_repl::repl::session::CostsReport;
 use clarity_repl::repl::Session;
 use deno::tools::test_runner::TestEvent;
 use deno::tsc::exec;
@@ -27,6 +28,7 @@ pub enum ClarinetTestEvent {
 
 pub struct SessionArtifacts {
     pub coverage_reports: Vec<TestCoverageReport>,
+    pub costs_reports: Vec<CostsReport>,
 }
 
 pub async fn run_bridge(
@@ -315,14 +317,20 @@ pub fn terminate_session(state: &mut OpState, args: Value, _: ()) -> Result<(), 
         let sessions = state
             .try_borrow_mut::<HashMap<u32, (String, Session)>>()
             .expect("unable to retrieve sessions");
-        let (label, session) = sessions
-            .get_mut(&args.session_id)
+        let (label, mut session) = sessions
+            .remove(&args.session_id)
             .expect("unable to retrieve session");
 
         let mut coverage_reports = vec![];
         coverage_reports.append(&mut session.coverage_reports);
 
-        SessionArtifacts { coverage_reports }
+        let mut costs_reports = vec![];
+        costs_reports.append(&mut session.costs_reports);
+
+        SessionArtifacts {
+            coverage_reports,
+            costs_reports,
+        }
     };
 
     let tx = state.borrow::<Sender<ClarinetTestEvent>>();
