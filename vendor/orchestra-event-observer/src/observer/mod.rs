@@ -213,6 +213,7 @@ pub async fn start_event_observer(
         handle_new_microblocks,
         handle_new_mempool_tx,
         handle_drop_mempool_tx,
+        handle_new_attachement,
     ];
 
     if config.bitcoin_rpc_proxy_enabled {
@@ -577,6 +578,14 @@ pub fn handle_new_mempool_tx(
 
 #[post("/drop_mempool_tx", format = "application/json")]
 pub fn handle_drop_mempool_tx() -> Json<JsonValue> {
+    Json(json!({
+        "status": 200,
+        "result": "Ok",
+    }))
+}
+
+#[post("/attachments/new", format = "application/json")]
+pub fn handle_new_attachement() -> Json<JsonValue> {
     Json(json!({
         "status": 200,
         "result": "Ok",
