@@ -11,3 +11,5 @@ index.node
 npm-debug.log*
 node-bindings/dist
 node-bindings/build
+**/settings/Mainnet.toml
+**/settings/Testnet.toml

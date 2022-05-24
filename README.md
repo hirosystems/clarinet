@@ -414,14 +414,52 @@ $ clarinet integrate
 
 Make sure that you have a working installation of Docker running locally.
 
-### Deploy contracts to Testnet
+### Interacting with contracts deployed on Mainnet
 
-You can use Clarinet to deploy your contracts to the public Testnet environment for testing and
-evaluation on a blockchain. Use the following command:
+Composition and interactions between protocols and contracts are one of the key innovations in blockchains. Clarinet was designed to handle this sort of interactions.
+
+Before referring to contracts deployed on Mainnet, they should be explicitily be listed as a `requirement` in the manifest `Clarinet.toml`, either manually:
+
+```toml
+[project]
+name = "my-project"
+requirements = [
+  "SP2KAF9RF86PVX3NEE27DFV1CQX0T4WGR41X3S45C.bitcoin-whales"
+]
+
+```
+
+or with the command:
+
 
 ```bash
-$ clarinet contract publish --testnet
+clarinet requirements add SP2KAF9RF86PVX3NEE27DFV1CQX0T4WGR41X3S45C.bitcoin-whales
 ```
+
+From there, clarinet will be able to resolve the `contract-call?` statements invoking requirements present in your local contracts, by downloading and caching a copy of these contracts and use them during the execution of your testsuites, and all the different features available in `clarinet`.
+
+When deploying your protocol to Devnet / Testnet, for the contracts involving requirements, the setting `remap_requirements` in your deployment plans must be set. 
+
+Before Devnet / Testnet deployments, your contracts will be automatically remapped on the fly to point to the duplicated requirements deployed by an account that you control.
+
+### Deploy contracts to Devnet / Testnet / Mainnet
+
+You can use Clarinet to publish your contracts to Devnet / Testnet / Mainnet environment for testing and evaluation on a blockchain. 
+
+The first step is to generate a deployment plan, with the following command: 
+
+```bash
+$ clarinet deployment generate --mainnet
+```
+
+After **cautiously** reviewing (and updating if needed) the generated plan, you can use the command:
+
+```bash
+$ clarinet deployment apply -p <path-to-plan.yaml>
+```
+
+which will handle the deployments of your contracts, according to the plan.
+
 
 ### Use Clarinet in your CI workflow as a GitHub Action
 

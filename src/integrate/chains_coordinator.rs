@@ -1,10 +1,10 @@
 use super::DevnetEvent;
+use crate::deployment::types::DeploymentSpecification;
+use crate::deployment::{apply_on_chain_deployment, DeploymentCommand, DeploymentEvent};
 use crate::indexer::{chains, Indexer, IndexerConfig};
 use crate::integrate::{MempoolAdmissionData, ServiceStatusData, Status};
-use crate::poke::load_session;
-use crate::publish::publish_all_contracts;
-use crate::types::{self, DevnetConfig};
-use crate::types::{BitcoinChainEvent, ChainsCoordinatorCommand, Network, StacksChainEvent};
+use crate::types::{self, AccountConfig, ChainConfig, DevnetConfig, ProjectManifest};
+use crate::types::{BitcoinChainEvent, ChainsCoordinatorCommand, StacksChainEvent, StacksNetwork};
 use crate::utils;
 use crate::utils::stacks::{transactions, PoxInfo, StacksRpc};
 use base58::FromBase58;
@@ -12,26 +12,22 @@ use clarity_repl::clarity::representations::ClarityName;
 use clarity_repl::clarity::types::{BuffData, SequenceData, TupleData, Value as ClarityValue};
 use clarity_repl::clarity::util::address::AddressHashMode;
 use clarity_repl::clarity::util::hash::{hex_bytes, Hash160};
-use clarity_repl::repl::settings::{Account, InitialContract};
-use clarity_repl::repl::Session;
+
 use rocket::config::{Config, LogLevel};
 use rocket::serde::json::{json, Json, Value as JsonValue};
 use rocket::serde::Deserialize;
 use rocket::State;
-use std::collections::VecDeque;
+
 use std::convert::TryFrom;
 use std::error::Error;
-use std::iter::FromIterator;
+
 use std::net::{IpAddr, Ipv4Addr};
-use std::path::PathBuf;
+
 use std::str;
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::mpsc::{Receiver, Sender};
+use std::sync::mpsc::{channel, Receiver, Sender};
 use std::sync::{Arc, Mutex, RwLock};
 use tracing::info;
-
-#[cfg(feature = "cli")]
-use crate::runnner::deno;
 
 #[derive(Deserialize)]
 pub struct NewTransaction {
@@ -44,10 +40,9 @@ pub struct NewTransaction {
 #[derive(Clone, Debug)]
 pub struct StacksEventObserverConfig {
     pub devnet_config: DevnetConfig,
-    pub accounts: Vec<Account>,
-    pub contracts_to_deploy: VecDeque<InitialContract>,
-    pub manifest_path: PathBuf,
-    pub session: Session,
+    pub accounts: Vec<AccountConfig>,
+    pub deployment: DeploymentSpecification,
+    pub manifest: ProjectManifest,
     pub deployment_fee_rate: u64,
 }
 
@@ -76,44 +71,20 @@ pub struct BitcoinRPCRequest {
 }
 
 impl StacksEventObserverConfig {
-    pub fn new(devnet_config: DevnetConfig, manifest_path: PathBuf) -> Self {
+    pub fn new(
+        devnet_config: DevnetConfig,
+        manifest: ProjectManifest,
+        deployment: DeploymentSpecification,
+    ) -> Self {
         info!("Checking contracts...");
-        let (session, config) = match load_session(&manifest_path, false, &Network::Devnet) {
-            Ok((session, config, _, _)) => (session, config),
-            Err((_, e)) => {
-                println!("{}", e);
-                std::process::exit(1);
-            }
-        };
+        let chain_config = ChainConfig::from_manifest_path(&manifest.path, &StacksNetwork::Devnet);
 
         StacksEventObserverConfig {
             devnet_config,
-            accounts: session.settings.initial_accounts.clone(),
-            manifest_path,
-            contracts_to_deploy: VecDeque::from_iter(
-                session.settings.initial_contracts.iter().map(|c| c.clone()),
-            ),
-            session,
-            deployment_fee_rate: config.network.deployment_fee_rate,
-        }
-    }
-
-    pub async fn execute_scripts(&self) {
-        if self.devnet_config.execute_script.len() > 0 {
-            for _cmd in self.devnet_config.execute_script.iter() {
-                #[cfg(feature = "cli")]
-                let _ = deno::do_run_scripts(
-                    vec![_cmd.script.clone()],
-                    false,
-                    false,
-                    false,
-                    _cmd.allow_wallets,
-                    _cmd.allow_write,
-                    self.manifest_path.clone(),
-                    Some(self.session.clone()),
-                )
-                .await;
-            }
+            accounts: chain_config.accounts.into_values().collect::<Vec<_>>(),
+            manifest,
+            deployment,
+            deployment_fee_rate: chain_config.network.deployment_fee_rate,
         }
     }
 }
@@ -124,8 +95,6 @@ pub async fn start_chains_coordinator(
     chains_coordinator_commands_rx: Receiver<ChainsCoordinatorCommand>,
     chains_coordinator_commands_tx: Sender<ChainsCoordinatorCommand>,
 ) -> Result<(), Box<dyn Error>> {
-    let _ = config.execute_scripts().await;
-
     let indexer = Indexer::new(IndexerConfig {
         stacks_node_rpc_url: format!(
             "http://localhost:{}",
@@ -139,12 +108,21 @@ pub async fn start_chains_coordinator(
         bitcoin_node_rpc_password: config.devnet_config.bitcoin_node_password.clone(),
     });
 
+    let (deployment_events_tx, deployment_events_rx) = channel();
+    let (deployment_commands_tx, deployments_command_rx) = channel();
+
+    prepare_protocol_deployment(
+        &config.manifest,
+        &config.deployment,
+        deployment_events_tx,
+        deployments_command_rx,
+    );
+
     let init_status = DevnetInitializationStatus {
         should_deploy_protocol: true,
     };
 
     let port = config.devnet_config.orchestrator_port;
-    let manifest_path = config.manifest_path.clone();
 
     let config_mutex = Arc::new(Mutex::new(config.clone()));
     let init_status_rw_lock = Arc::new(RwLock::new(init_status));
@@ -176,8 +154,8 @@ pub async fn start_chains_coordinator(
                 "/",
                 routes![
                     handle_ping,
-                    handle_new_burn_block,
-                    handle_new_block,
+                    handle_new_bitcoin_block,
+                    handle_new_stacks_block,
                     handle_new_microblocks,
                     handle_new_mempool_tx,
                     handle_drop_mempool_tx,
@@ -193,7 +171,7 @@ pub async fn start_chains_coordinator(
     let mut should_deploy_protocol = true;
     let mut protocol_deployed = false;
     let stop_miner = Arc::new(AtomicBool::new(false));
-
+    let mut deployment_events_rx = Some(deployment_events_rx);
     loop {
         match chains_coordinator_commands_rx.recv() {
             Ok(ChainsCoordinatorCommand::Terminate(true)) => {
@@ -203,35 +181,8 @@ pub async fn start_chains_coordinator(
                 break;
             }
             Ok(ChainsCoordinatorCommand::Terminate(false)) => {
-                // Restart
-                devnet_event_tx
-                    .send(DevnetEvent::info("Reloading contracts".into()))
-                    .expect("Unable to terminate event observer");
-
-                let session = match load_session(&manifest_path, false, &Network::Devnet) {
-                    Ok((session, _, _, _)) => session,
-                    Err((_, e)) => {
-                        devnet_event_tx
-                            .send(DevnetEvent::error(format!("Contracts invalid: {}", e)))
-                            .expect("Unable to terminate event observer");
-                        continue;
-                    }
-                };
-                let contracts_to_deploy = VecDeque::from_iter(
-                    session.settings.initial_contracts.iter().map(|c| c.clone()),
-                );
-                devnet_event_tx
-                    .send(DevnetEvent::success(format!(
-                        "{} contracts to deploy",
-                        contracts_to_deploy.len()
-                    )))
-                    .expect("Unable to terminate event observer");
-
-                should_deploy_protocol = true;
-                protocol_deployed = false;
-                if let Ok(mut init_status) = init_status_rw_lock.write() {
-                    init_status.should_deploy_protocol = true;
-                }
+                // Will be removed via https://github.com/hirosystems/clarinet/pull/340
+                unreachable!();
             }
             Ok(ChainsCoordinatorCommand::PublishInitialContracts) => {
                 if should_deploy_protocol {
@@ -239,11 +190,14 @@ pub async fn start_chains_coordinator(
                     if let Ok(mut init_status) = init_status_rw_lock.write() {
                         init_status.should_deploy_protocol = false;
                     }
-                    publish_initial_contracts(
-                        &config.manifest_path,
-                        &devnet_event_tx,
-                        chains_coordinator_commands_tx.clone(),
-                    );
+                    if let Some(deployment_events_rx) = deployment_events_rx.take() {
+                        perform_protocol_deployment(
+                            deployment_events_rx,
+                            &deployment_commands_tx,
+                            &devnet_event_tx,
+                            &chains_coordinator_commands_tx,
+                        )
+                    }
                 }
             }
             Ok(ChainsCoordinatorCommand::ProtocolDeployed) => {
@@ -327,7 +281,7 @@ pub async fn start_chains_coordinator(
 }
 
 #[post("/new_burn_block", format = "json", data = "<marshalled_block>")]
-pub fn handle_new_burn_block(
+pub fn handle_new_bitcoin_block(
     indexer_rw_lock: &State<Arc<RwLock<Indexer>>>,
     devnet_events_tx: &State<Arc<Mutex<Sender<DevnetEvent>>>>,
     marshalled_block: Json<JsonValue>,
@@ -391,7 +345,7 @@ pub fn handle_new_burn_block(
 }
 
 #[post("/new_block", format = "application/json", data = "<marshalled_block>")]
-pub fn handle_new_block(
+pub fn handle_new_stacks_block(
     indexer_rw_lock: &State<Arc<RwLock<Indexer>>>,
     devnet_events_tx: &State<Arc<Mutex<Sender<DevnetEvent>>>>,
     init_status: &State<Arc<RwLock<DevnetInitializationStatus>>>,
@@ -628,28 +582,63 @@ pub async fn handle_bitcoin_rpc_call(
     Json(res.json().await.unwrap())
 }
 
-pub fn publish_initial_contracts(
-    manifest_path: &PathBuf,
-    devnet_event_tx: &Sender<DevnetEvent>,
-    chains_coordinator_commands_tx: Sender<ChainsCoordinatorCommand>,
+pub fn prepare_protocol_deployment(
+    manifest: &ProjectManifest,
+    deployment: &DeploymentSpecification,
+    deployment_event_tx: Sender<DeploymentEvent>,
+    deployment_command_rx: Receiver<DeploymentCommand>,
 ) {
-    let moved_manifest_path = manifest_path.clone();
-    let moved_devnet_event_tx = devnet_event_tx.clone();
+    let manifest = manifest.clone();
+    let deployment = deployment.clone();
+
     std::thread::spawn(move || {
-        let _ = publish_all_contracts(
-            &moved_manifest_path,
-            &Network::Devnet,
+        apply_on_chain_deployment(
+            &manifest,
+            deployment,
+            deployment_event_tx,
+            deployment_command_rx,
             false,
-            1,
-            Some(&moved_devnet_event_tx),
-            Some(chains_coordinator_commands_tx),
         );
+    });
+}
+
+pub fn perform_protocol_deployment(
+    deployment_events_rx: Receiver<DeploymentEvent>,
+    deployment_commands_tx: &Sender<DeploymentCommand>,
+    devnet_event_tx: &Sender<DevnetEvent>,
+    chains_coordinator_commands_tx: &Sender<ChainsCoordinatorCommand>,
+) {
+    let devnet_event_tx = devnet_event_tx.clone();
+    let chains_coordinator_commands_tx = chains_coordinator_commands_tx.clone();
+
+    let _ = deployment_commands_tx.send(DeploymentCommand::Start);
+
+    std::thread::spawn(move || {
+        loop {
+            let event = match deployment_events_rx.recv() {
+                Ok(event) => event,
+                Err(_e) => break,
+            };
+            match event {
+                DeploymentEvent::ContractUpdate(_) => {}
+                DeploymentEvent::Interrupted(_) => {
+                    // Terminate
+                    break;
+                }
+                DeploymentEvent::ProtocolDeployed => {
+                    let _ = chains_coordinator_commands_tx
+                        .send(ChainsCoordinatorCommand::ProtocolDeployed);
+                    let _ = devnet_event_tx.send(DevnetEvent::ProtocolDeployed);
+                    break;
+                }
+            }
+        }
     });
 }
 
 pub async fn publish_stacking_orders(
     devnet_config: &DevnetConfig,
-    accounts: &Vec<Account>,
+    accounts: &Vec<AccountConfig>,
     fee_rate: u64,
     bitcoin_block_height: u32,
 ) -> Option<usize> {
@@ -672,7 +661,7 @@ pub async fn publish_stacking_orders(
             let mut account = None;
             let mut accounts_iter = accounts.iter();
             while let Some(e) = accounts_iter.next() {
-                if e.name == pox_stacking_order.wallet {
+                if e.label == pox_stacking_order.wallet {
                     account = Some(e.clone());
                     break;
                 }

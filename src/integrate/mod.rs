@@ -8,6 +8,7 @@ use chrono::prelude::*;
 use tracing::{self, debug, error, info, warn};
 use tracing_appender;
 
+use crate::deployment::types::DeploymentSpecification;
 use crate::types::{BitcoinChainEvent, ChainsCoordinatorCommand, StacksChainEvent};
 use crate::utils;
 use chains_coordinator::start_chains_coordinator;
@@ -17,6 +18,7 @@ use self::chains_coordinator::StacksEventObserverConfig;
 
 pub fn run_devnet(
     devnet: DevnetOrchestrator,
+    deployment: DeploymentSpecification,
     log_tx: Option<Sender<LogData>>,
     display_dashboard: bool,
 ) -> Result<
@@ -27,7 +29,7 @@ pub fn run_devnet(
     ),
     String,
 > {
-    match block_on(do_run_devnet(devnet, log_tx, display_dashboard)) {
+    match block_on(do_run_devnet(devnet, deployment, log_tx, display_dashboard)) {
         Err(_e) => std::process::exit(1),
         Ok(res) => Ok(res),
     }
@@ -43,6 +45,7 @@ where
 
 pub async fn do_run_devnet(
     mut devnet: DevnetOrchestrator,
+    deployment: DeploymentSpecification,
     log_tx: Option<Sender<LogData>>,
     display_dashboard: bool,
 ) -> Result<
@@ -78,7 +81,7 @@ pub async fn do_run_devnet(
     // and should be able to be terminated
     let devnet_path = devnet_config.working_dir.clone();
     let config =
-        StacksEventObserverConfig::new(devnet_config.clone(), devnet.manifest_path.clone());
+        StacksEventObserverConfig::new(devnet_config.clone(), devnet.manifest.clone(), deployment);
     let chains_coordinator_tx = devnet_events_tx.clone();
     let (chains_coordinator_commands_tx, chains_coordinator_commands_rx) = channel();
     let moved_events_observer_commands_tx = chains_coordinator_commands_tx.clone();
@@ -186,6 +189,7 @@ pub enum DevnetEvent {
     // Microblock(MicroblockData),
 }
 
+#[allow(dead_code)]
 impl DevnetEvent {
     pub fn error(message: String) -> DevnetEvent {
         DevnetEvent::Log(Self::log_error(message))
