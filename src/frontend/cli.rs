@@ -56,6 +56,9 @@ enum Command {
     /// Subcommands for working with contracts
     #[clap(subcommand, name = "contracts")]
     Contracts(Contracts),
+    /// Subcommands for working with requirements
+    #[clap(subcommand, name = "requirements")]
+    Requirements(Requirements),
     /// Subcommands for working with deployments
     #[clap(subcommand, name = "deployments")]
     Deployments(Deployments),
@@ -91,9 +94,14 @@ enum Contracts {
     /// Generate files and settings for a new contract
     #[clap(name = "new", bin_name = "new")]
     NewContract(NewContract),
+}
+
+#[derive(Subcommand, PartialEq, Clone, Debug)]
+#[clap(bin_name = "req", aliases = &["requirement"])]
+enum Requirements {
     /// Add third-party requirements to this project
-    #[clap(name = "requirement", bin_name = "requirement")]
-    Requirement(Requirement),
+    #[clap(name = "add", bin_name = "add")]
+    AddRequirement(AddRequirement),
 }
 
 #[derive(Subcommand, PartialEq, Clone, Debug)]
@@ -129,8 +137,8 @@ struct NewContract {
 }
 
 #[derive(Parser, PartialEq, Clone, Debug)]
-struct Requirement {
-    /// Contract id (ex. " SP2PABAF9FTAJYNFZH93XENAJ8FVY99RRM50D2JG9.nft-trait")
+struct AddRequirement {
+    /// Contract id (ex. "SP2PABAF9FTAJYNFZH93XENAJ8FVY99RRM50D2JG9.nft-trait")
     pub contract_id: String,
     /// Path to Clarinet.toml
     #[clap(long = "manifest-path", short = 'm')]
@@ -146,14 +154,14 @@ struct CheckDeployments {
 
 #[derive(Parser, PartialEq, Clone, Debug)]
 struct GenerateDeployment {
-    /// Generate a deployment file for a test environment (console, tests, etc.)
+    /// Generate a deployment file for simnet environments (console, tests)
     #[clap(
-        long = "test",
+        long = "simnet",
         conflicts_with = "devnet",
         conflicts_with = "testnet",
         conflicts_with = "mainnet"
     )]
-    pub test: bool,
+    pub simnet: bool,
     /// Generate a deployment file for devnet, using settings/Devnet.toml
     #[clap(
         long = "devnet",
@@ -520,7 +528,7 @@ pub fn main() {
                 );
                 let mut buffer = String::new();
                 std::io::stdin().read_line(&mut buffer).unwrap();
-                if !buffer.starts_with("Y") || !buffer.starts_with("") {
+                if !buffer.starts_with("Y") || !buffer.starts_with("y") || !buffer.starts_with("") {
                     println!("Deployment aborted");
                     std::process::exit(1);
                 }
@@ -604,7 +612,9 @@ pub fn main() {
                     display_post_check_hint();
                 }
             }
-            Contracts::Requirement(cmd) => {
+        },
+        Command::Requirements(subcommand) => match subcommand {
+            Requirements::AddRequirement(cmd) => {
                 let manifest = load_manifest_or_exit(cmd.manifest_path);
 
                 let change = TOMLEdition {

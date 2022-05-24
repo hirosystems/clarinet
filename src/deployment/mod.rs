@@ -209,7 +209,9 @@ pub fn update_session_with_contracts_executions(
         for transaction in batch.transactions.iter() {
             match transaction {
                 TransactionSpecification::ContractCall(_)
-                | TransactionSpecification::ContractPublish(_) => {}
+                | TransactionSpecification::ContractPublish(_) => {
+                    panic!("emulated-contract-call and contract-publish are the only operations admitted in simnet deployments")
+                }
                 TransactionSpecification::EmulatedContractPublish(tx) => {
                     let default_tx_sender = session.get_tx_sender();
                     session.set_tx_sender(tx.emulated_sender.to_string());
@@ -266,7 +268,9 @@ pub fn update_session_with_contracts_analyses(
         for transaction in batch.transactions.iter() {
             match transaction {
                 TransactionSpecification::ContractCall(_)
-                | TransactionSpecification::ContractPublish(_) => unreachable!(),
+                | TransactionSpecification::ContractPublish(_) => {
+                    panic!("emulated-contract-call and contract-publish are the only operations admitted in simnet deployments")
+                }
                 TransactionSpecification::EmulatedContractCall(_) => {
                     /* Do nothing, as a emulated-contract-call would not impact subsequent emulated-contract-publish */
                 }
@@ -1013,10 +1017,7 @@ pub fn generate_default_deployment(
     dependencies.extend(requirements_deps);
 
     let ordered_contracts_ids = match ASTDependencyDetector::order_contracts(&dependencies) {
-        Ok(ordered_contracts_ids) => ordered_contracts_ids
-            .into_iter()
-            .map(|c| c)
-            .collect::<Vec<_>>(),
+        Ok(ordered_contracts_ids) => ordered_contracts_ids,
         Err(e) => return Err(format!("unable to order contracts {}", e)),
     };
 
