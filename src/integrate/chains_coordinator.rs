@@ -418,7 +418,7 @@ pub fn perform_protocol_deployment(
                 Err(_e) => break,
             };
             match event {
-                DeploymentEvent::ContractUpdate(_) => {}
+                DeploymentEvent::TransactionUpdate(_) => {}
                 DeploymentEvent::Interrupted(_) => {
                     // Terminate
                     break;
@@ -520,7 +520,7 @@ pub async fn publish_stacking_orders(
                     &hex_bytes(&account_secret_key).unwrap(),
                 );
                 let _ = stacks_rpc
-                    .post_transaction(stack_stx_tx)
+                    .post_transaction(&stack_stx_tx)
                     .expect("Unable to broadcast transaction");
             });
         }

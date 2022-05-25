@@ -2,6 +2,8 @@ mod requirements;
 pub mod types;
 mod ui;
 
+use clarity_repl::clarity::types::StandardPrincipalData;
+use clarity_repl::clarity::{ClarityName, Value};
 pub use ui::start_ui;
 
 use self::types::{
@@ -18,8 +20,8 @@ use clarity_repl::clarity::analysis::ContractAnalysis;
 use clarity_repl::clarity::ast::ContractAST;
 use clarity_repl::clarity::codec::transaction::{
     StacksTransaction, StacksTransactionSigner, TransactionAnchorMode, TransactionAuth,
-    TransactionPayload, TransactionPostConditionMode, TransactionPublicKeyEncoding,
-    TransactionSmartContract, TransactionSpendingCondition,
+    TransactionContractCall, TransactionPayload, TransactionPostConditionMode,
+    TransactionPublicKeyEncoding, TransactionSmartContract, TransactionSpendingCondition,
 };
 use clarity_repl::clarity::codec::StacksMessageCodec;
 use clarity_repl::clarity::diagnostic::Diagnostic;
@@ -68,43 +70,21 @@ pub struct DeploymentGenerationArtifacts {
     pub diags: HashMap<QualifiedContractIdentifier, Vec<Diagnostic>>,
 }
 
-#[allow(dead_code)]
-pub fn encode_contract_call(
-    _contract_name: &ContractName,
-    _source: &str,
-    _nonce: u64,
-    _deployment_fee_rate: u64,
-    _network: &StacksNetwork,
-) -> Result<(StacksTransaction, StacksAddress), String> {
-    Err(format!("encode_contract_call operations unimplemented"))
-}
-
-pub fn encode_contract_publish(
-    contract_name: &ContractName,
-    source: &str,
-    account: &AccountConfig,
-    nonce: u64,
-    cost: u64,
-    network: &StacksNetwork,
-) -> Result<StacksTransaction, String> {
-    let payload = TransactionSmartContract {
-        name: contract_name.clone(),
-        code_body: StacksString::from_str(source).unwrap(),
-    };
-
+fn get_keypair(account: &AccountConfig) -> (ExtendedPrivKey, Secp256k1PrivateKey, PublicKey) {
     let bip39_seed = match mnemonic::get_bip39_seed_from_mnemonic(&account.mnemonic, "") {
         Ok(bip39_seed) => bip39_seed,
         Err(_) => panic!(),
     };
     let ext = ExtendedPrivKey::derive(&bip39_seed[..], account.derivation.as_str()).unwrap();
+    let wrapped_secret_key = Secp256k1PrivateKey::from_slice(&ext.secret()).unwrap();
     let secret_key = SecretKey::parse_slice(&ext.secret()).unwrap();
     let public_key = PublicKey::from_secret_key(&secret_key);
+    (ext, wrapped_secret_key, public_key)
+}
 
+fn get_stacks_address(public_key: &PublicKey, network: &StacksNetwork) -> StacksAddress {
     let wrapped_public_key =
         Secp256k1PublicKey::from_slice(&public_key.serialize_compressed()).unwrap();
-    let wrapped_secret_key = Secp256k1PrivateKey::from_slice(&ext.secret()).unwrap();
-
-    let anchor_mode = TransactionAnchorMode::OnChainOnly;
 
     let signer_addr = StacksAddress::from_public_keys(
         match network {
@@ -117,10 +97,25 @@ pub fn encode_contract_publish(
     )
     .unwrap();
 
+    signer_addr
+}
+
+fn sign_transaction_payload(
+    account: &AccountConfig,
+    payload: TransactionPayload,
+    nonce: u64,
+    tx_fee: u64,
+    network: &StacksNetwork,
+) -> Result<StacksTransaction, String> {
+    let (_, secret_key, public_key) = get_keypair(account);
+    let signer_addr = get_stacks_address(&public_key, network);
+
+    let anchor_mode = TransactionAnchorMode::OnChainOnly;
+
     let spending_condition = TransactionSpendingCondition::Singlesig(SinglesigSpendingCondition {
         signer: signer_addr.bytes.clone(),
         nonce: nonce,
-        tx_fee: cost,
+        tx_fee: tx_fee,
         hash_mode: SinglesigHashMode::P2PKH,
         key_encoding: TransactionPublicKeyEncoding::Compressed,
         signature: RecoverableSignature::empty(),
@@ -140,7 +135,7 @@ pub fn encode_contract_publish(
         anchor_mode: anchor_mode,
         post_condition_mode: TransactionPostConditionMode::Allow,
         post_conditions: vec![],
-        payload: TransactionPayload::SmartContract(payload),
+        payload: payload,
     };
 
     let mut unsigned_tx_bytes = vec![];
@@ -149,10 +144,58 @@ pub fn encode_contract_publish(
         .expect("FATAL: invalid transaction");
 
     let mut tx_signer = StacksTransactionSigner::new(&unsigned_tx);
-    tx_signer.sign_origin(&wrapped_secret_key).unwrap();
+    tx_signer.sign_origin(&secret_key).unwrap();
     let signed_tx = tx_signer.get_tx().unwrap();
-
     Ok(signed_tx)
+}
+
+#[allow(dead_code)]
+pub fn encode_contract_call(
+    contract_id: &QualifiedContractIdentifier,
+    function_name: ClarityName,
+    function_args: Vec<Value>,
+    account: &AccountConfig,
+    nonce: u64,
+    tx_fee: u64,
+    network: &StacksNetwork,
+) -> Result<StacksTransaction, String> {
+    let (_, _, public_key) = get_keypair(account);
+    let signer_addr = get_stacks_address(&public_key, network);
+
+    let payload = TransactionContractCall {
+        contract_name: contract_id.name.clone(),
+        address: signer_addr,
+        function_name: function_name.clone(),
+        function_args: function_args.clone(),
+    };
+    sign_transaction_payload(
+        account,
+        TransactionPayload::ContractCall(payload),
+        nonce,
+        tx_fee,
+        network,
+    )
+}
+
+pub fn encode_contract_publish(
+    contract_name: &ContractName,
+    source: &str,
+    account: &AccountConfig,
+    nonce: u64,
+    tx_fee: u64,
+    network: &StacksNetwork,
+) -> Result<StacksTransaction, String> {
+    let payload = TransactionSmartContract {
+        name: contract_name.clone(),
+        code_body: StacksString::from_str(source).unwrap(),
+    };
+    sign_transaction_payload(
+        account,
+        TransactionPayload::SmartContract(payload),
+        nonce,
+        tx_fee,
+        network,
+    )
 }
 
 pub fn setup_session_with_deployment(
@@ -375,24 +418,8 @@ pub fn read_deployment_or_generate_default(
     Ok((deployment, artifacts))
 }
 
-#[derive(Clone, Debug)]
-pub struct ContractUpdate {
-    pub contract_id: String,
-    pub status: ContractStatus,
-    pub comment: Option<String>,
-}
-
-#[derive(Clone, Debug)]
-pub enum ContractStatus {
-    Queued,
-    Encoded,
-    Broadcasted,
-    Published,
-    Error,
-}
-
 pub enum DeploymentEvent {
-    ContractUpdate(ContractUpdate),
+    TransactionUpdate(TransactionTracker),
     Interrupted(String),
     ProtocolDeployed,
 }
@@ -401,10 +428,58 @@ pub enum DeploymentCommand {
     Start,
 }
 
+#[derive(Clone, Debug)]
 pub enum TransactionStatus {
-    Encoded,
-    Broadcasted,
-    OnChain,
+    Queued,
+    Encoded(StacksTransaction, TransactionCheck),
+    Broadcasted(TransactionCheck),
+    Confirmed,
+    Error(String),
+}
+
+#[derive(Clone, Debug)]
+pub struct TransactionTracker {
+    pub index: usize,
+    pub name: String,
+    pub status: TransactionStatus,
+}
+
+#[derive(Clone, Debug)]
+pub enum TransactionCheck {
+    ContractCall(StandardPrincipalData, u64),
+    ContractPublish(StandardPrincipalData, ContractName),
+}
+
+pub fn get_initial_transactions_trackers(
+    deployment: &DeploymentSpecification,
+) -> Vec<TransactionTracker> {
+    let mut index = 0;
+    let mut trackers = vec![];
+    for batch_spec in deployment.plan.batches.iter() {
+        for transaction in batch_spec.transactions.iter() {
+            let tracker = match transaction {
+                TransactionSpecification::ContractCall(tx) => TransactionTracker {
+                    index,
+                    name: format!("Contract call {}::{}", tx.contract_id, tx.method),
+                    status: TransactionStatus::Queued,
+                },
+                TransactionSpecification::ContractPublish(tx) => TransactionTracker {
+                    index,
+                    name: format!(
+                        "Contract publish {}.{}",
+                        tx.expected_sender.to_address(),
+                        tx.contract_name
+                    ),
+                    status: TransactionStatus::Queued,
+                },
+                TransactionSpecification::EmulatedContractPublish(_)
+                | TransactionSpecification::EmulatedContractCall(_) => continue,
+            };
+            trackers.push(tracker);
+            index += 1;
+        }
+    }
+    trackers
 }
 
 pub fn apply_on_chain_deployment(
@@ -441,13 +516,63 @@ pub fn apply_on_chain_deployment(
 
     // Phase 1: we traverse the deployment plan and encode all the transactions,
     // keeping the order.
+    // Using a session to encode + coerce/check (todo) contract calls arguments.
+    let mut session = Session::new(SessionSettings::default());
+    let mut index = 0;
     for batch_spec in deployment.plan.batches.iter() {
         let mut batch = Vec::new();
         for transaction in batch_spec.transactions.iter() {
-            match transaction {
-                TransactionSpecification::ContractCall(_tx) => {
-                    // Retrieve nonce for issuer
-                    unimplemented!();
+            let tracker = match transaction {
+                TransactionSpecification::ContractCall(tx) => {
+                    let issuer_address = tx.expected_sender.to_address();
+                    let nonce = match accounts_cached_nonces.get(&issuer_address) {
+                        Some(cached_nonce) => cached_nonce.clone(),
+                        None => stacks_rpc
+                            .get_nonce(&issuer_address)
+                            .expect("Unable to retrieve account"),
+                    };
+                    let account = accounts_lookup.get(&issuer_address).unwrap();
+
+                    let function_args = tx
+                        .parameters
+                        .iter()
+                        .map(|value| {
+                            let execution = session
+                                .interpret(value.to_string(), None, None, false, None)
+                                .unwrap();
+                            execution.result.unwrap()
+                        })
+                        .collect::<Vec<_>>();
+
+                    let transaction = match encode_contract_call(
+                        &tx.contract_id,
+                        tx.method.clone(),
+                        function_args,
+                        *account,
+                        nonce,
+                        tx.cost,
+                        &network,
+                    ) {
+                        Ok(res) => res,
+                        Err(e) => {
+                            let _ = deployment_event_tx.send(DeploymentEvent::Interrupted(e));
+                            return;
+                        }
+                    };
+
+                    accounts_cached_nonces.insert(issuer_address.clone(), nonce + 1);
+                    let name = format!(
+                        "Call ({} {} {})",
+                        tx.contract_id.to_string(),
+                        tx.method,
+                        tx.parameters.join(" ")
+                    );
+                    let check = TransactionCheck::ContractCall(tx.expected_sender.clone(), nonce);
+                    TransactionTracker {
+                        index,
+                        name: name.clone(),
+                        status: TransactionStatus::Encoded(transaction, check),
+                    }
                 }
                 TransactionSpecification::ContractPublish(tx) => {
                     // Retrieve nonce for issuer
@@ -460,7 +585,7 @@ pub fn apply_on_chain_deployment(
                     };
                     let account = accounts_lookup.get(&issuer_address).unwrap();
 
-                    let stacks_transaction = match encode_contract_publish(
+                    let transaction = match encode_contract_publish(
                         &tx.contract_name,
                         &tx.source,
                         *account,
@@ -476,23 +601,28 @@ pub fn apply_on_chain_deployment(
                     };
 
                     accounts_cached_nonces.insert(issuer_address.clone(), nonce + 1);
-                    batch.push((
+                    let name = format!(
+                        "Publish {}.{})",
+                        tx.expected_sender.to_string(),
+                        tx.contract_name
+                    );
+                    let check = TransactionCheck::ContractPublish(
                         tx.expected_sender.clone(),
                         tx.contract_name.clone(),
-                        stacks_transaction,
-                        TransactionStatus::Encoded,
-                    ));
-
-                    let _ =
-                        deployment_event_tx.send(DeploymentEvent::ContractUpdate(ContractUpdate {
-                            contract_id: format!("{}.{}", issuer_address, tx.contract_name),
-                            status: ContractStatus::Encoded,
-                            comment: None,
-                        }));
+                    );
+                    TransactionTracker {
+                        index,
+                        name: name.clone(),
+                        status: TransactionStatus::Encoded(transaction, check),
+                    }
                 }
                 TransactionSpecification::EmulatedContractPublish(_)
-                | TransactionSpecification::EmulatedContractCall(_) => {}
-            }
+                | TransactionSpecification::EmulatedContractCall(_) => continue,
+            };
+
+            batch.push(tracker.clone());
+            let _ = deployment_event_tx.send(DeploymentEvent::TransactionUpdate(tracker));
+            index += 1;
         }
 
         batches.push_back(batch);
@@ -513,28 +643,25 @@ pub fn apply_on_chain_deployment(
     let mut current_block_height = 0;
     for batch in batches.into_iter() {
         let mut ongoing_batch = BTreeMap::new();
-        for (sender, contract_name, tx, _status) in batch.into_iter() {
-            let _ = match stacks_rpc.post_transaction(tx) {
+        for mut tracker in batch.into_iter() {
+            let (transaction, check) = match tracker.status {
+                TransactionStatus::Encoded(transaction, check) => (transaction, check),
+                _ => unreachable!(),
+            };
+            let _ = match stacks_rpc.post_transaction(&transaction) {
                 Ok(res) => {
-                    let _ =
-                        deployment_event_tx.send(DeploymentEvent::ContractUpdate(ContractUpdate {
-                            contract_id: format!("{}.{}", sender.to_address(), contract_name),
-                            status: ContractStatus::Broadcasted,
-                            comment: None,
-                        }));
-                    ongoing_batch.insert(
-                        res.txid,
-                        (sender, contract_name, TransactionStatus::Broadcasted),
-                    );
+                    tracker.status = TransactionStatus::Broadcasted(check);
+
+                    let _ = deployment_event_tx
+                        .send(DeploymentEvent::TransactionUpdate(tracker.clone()));
+                    ongoing_batch.insert(res.txid, tracker);
                 }
                 Err(e) => {
                     let message = format!("{:?}", e);
-                    let _ =
-                        deployment_event_tx.send(DeploymentEvent::ContractUpdate(ContractUpdate {
-                            contract_id: format!("{}.{}", sender.to_address(), contract_name),
-                            status: ContractStatus::Error,
-                            comment: Some(message.clone()),
-                        }));
+                    tracker.status = TransactionStatus::Error(message.clone());
+
+                    let _ = deployment_event_tx
+                        .send(DeploymentEvent::TransactionUpdate(tracker.clone()));
                     let _ = deployment_event_tx.send(DeploymentEvent::Interrupted(message));
                     return;
                 }
@@ -561,23 +688,38 @@ pub fn apply_on_chain_deployment(
 
             let mut keep_looping = false;
 
-            for (_txid, (deployer, contract_name, status)) in ongoing_batch.iter_mut() {
-                match *status {
-                    TransactionStatus::Broadcasted => {
+            for (_txid, tracker) in ongoing_batch.iter_mut() {
+                match &tracker.status {
+                    TransactionStatus::Broadcasted(TransactionCheck::ContractPublish(
+                        deployer,
+                        contract_name,
+                    )) => {
                         let deployer_address = deployer.to_address();
                         let res = stacks_rpc.get_contract_source(&deployer_address, &contract_name);
                         if let Ok(_contract) = res {
-                            *status = TransactionStatus::OnChain;
-                            let _ = deployment_event_tx.send(DeploymentEvent::ContractUpdate(
-                                ContractUpdate {
-                                    contract_id: format!("{}.{}", deployer_address, contract_name),
-                                    status: ContractStatus::Published,
-                                    comment: None,
-                                },
-                            ));
+                            tracker.status = TransactionStatus::Confirmed;
+                            let _ = deployment_event_tx
+                                .send(DeploymentEvent::TransactionUpdate(tracker.clone()));
                         } else {
                             keep_looping = true;
                             break;
+                        }
+                    }
+                    TransactionStatus::Broadcasted(TransactionCheck::ContractCall(
+                        tx_sender,
+                        expected_nonce,
+                    )) => {
+                        let tx_sender_address = tx_sender.to_address();
+                        let res = stacks_rpc.get_nonce(&tx_sender_address);
+                        if let Ok(current_nonce) = res {
+                            if current_nonce > *expected_nonce {
+                                tracker.status = TransactionStatus::Confirmed;
+                                let _ = deployment_event_tx
+                                    .send(DeploymentEvent::TransactionUpdate(tracker.clone()));
+                            } else {
+                                keep_looping = true;
+                                break;
+                            }
                         }
                     }
                     _ => {}

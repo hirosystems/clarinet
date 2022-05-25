@@ -1,8 +1,9 @@
 use crate::deployment::{
     self, apply_on_chain_deployment, check_deployments, generate_default_deployment,
-    get_absolute_deployment_path, get_default_deployment_path, load_deployment,
-    load_deployment_if_exists, setup_session_with_deployment, types::DeploymentSpecification,
-    write_deployment, DeploymentCommand, DeploymentEvent, DeploymentGenerationArtifacts,
+    get_absolute_deployment_path, get_default_deployment_path, get_initial_transactions_trackers,
+    load_deployment, load_deployment_if_exists, setup_session_with_deployment,
+    types::DeploymentSpecification, write_deployment, DeploymentCommand, DeploymentEvent,
+    DeploymentGenerationArtifacts,
 };
 use crate::generate::{
     self,
@@ -558,11 +559,6 @@ pub fn main() {
                     }
                 };
 
-                let contracts_ids = deployment
-                    .contracts
-                    .keys()
-                    .map(|contract_id| contract_id.to_string())
-                    .collect::<Vec<_>>();
                 let node_url = deployment.node.clone().unwrap();
 
                 println!(
@@ -592,6 +588,12 @@ pub fn main() {
                     ));
                 }
 
+                let transaction_trackers = if cmd.no_dashboard {
+                    vec![]
+                } else {
+                    get_initial_transactions_trackers(&deployment)
+                };
+
                 std::thread::spawn(move || {
                     let manifest = manifest_moved;
                     apply_on_chain_deployment(&manifest, deployment, event_tx, command_rx, true);
@@ -610,13 +612,8 @@ pub fn main() {
                                 println!("{} Error deploying contracts: {}", red!("x"), message);
                                 break;
                             }
-                            DeploymentEvent::ContractUpdate(update) => {
-                                println!(
-                                    "{} {:?} {}",
-                                    blue!("➡"),
-                                    update.status,
-                                    update.contract_id
-                                );
+                            DeploymentEvent::TransactionUpdate(update) => {
+                                println!("{} {:?} {}", blue!("➡"), update.status, update.name);
                             }
                             DeploymentEvent::ProtocolDeployed => {
                                 println!(
@@ -629,7 +626,7 @@ pub fn main() {
                         }
                     }
                 } else {
-                    let res = deployment::start_ui(&node_url, event_rx, contracts_ids);
+                    let res = deployment::start_ui(&node_url, event_rx, transaction_trackers);
                     match res {
                         Ok(()) => println!(
                             "{} Contracts successfully deployed on {:?}",
