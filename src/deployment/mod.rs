@@ -66,6 +66,7 @@ pub struct DeploymentGenerationArtifacts {
     pub asts: HashMap<QualifiedContractIdentifier, ContractAST>,
     pub deps: HashMap<QualifiedContractIdentifier, DependencySet>,
     pub diags: HashMap<QualifiedContractIdentifier, Vec<Diagnostic>>,
+    pub success: bool,
 }
 
 #[allow(dead_code)]
@@ -991,13 +992,16 @@ pub fn generate_default_deployment(
     let mut contract_asts = HashMap::new();
     let mut contract_diags = HashMap::new();
 
+    let mut asts_success = true;
+
     for (contract_id, source) in contracts_sources.into_iter() {
-        let (ast, diags, _) =
+        let (ast, diags, ast_success) =
             session
                 .interpreter
                 .build_ast(contract_id.clone(), source, parser_version);
         contract_asts.insert(contract_id.clone(), ast);
         contract_diags.insert(contract_id, diags);
+        asts_success = asts_success && ast_success;
     }
 
     let dependencies =
@@ -1104,6 +1108,7 @@ pub fn generate_default_deployment(
         asts: contract_asts,
         deps: dependencies,
         diags: contract_diags,
+        success: asts_success,
     };
 
     Ok((deployment, artifacts))
