@@ -599,6 +599,14 @@ Then at the REPL prompt, debug any expression:
 
 At the debug prompt, use any of the commands described above, or use `help` to get the full help documentation.
 
+#### Execution Trace
+
+When in the console (`clarinet console`), the `::trace <expr>` command allows developers to execute an expression and print a trace of the execution, which can be very helpful for identifying problems with the contract.
+
+This trace shows all function calls, both internal calls to private functions, and contract calls to other contracts. For each call, the parameters and return value are shown in the trace. Any events that are emitted are also shown in the trace.
+
+![execution trace](docs/images/trace.png)
+
 ## Contributing
 
 We welcome contributions to Clarinet! The following sections provide information on how to contribute.
