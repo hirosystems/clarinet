@@ -558,6 +558,7 @@ pub fn main() {
                         std::process::exit(1);
                     }
                 };
+                let network = deployment.network.clone();
 
                 let node_url = deployment.node.clone().unwrap();
 
@@ -585,7 +586,7 @@ pub fn main() {
                             &manifest.project.name,
                             &manifest.project.authors,
                         ),
-                        deployment.network.clone(),
+                        network.clone(),
                     ));
                 }
 
@@ -610,7 +611,11 @@ pub fn main() {
                         };
                         match cmd {
                             DeploymentEvent::Interrupted(message) => {
-                                println!("{} Error deploying contracts: {}", red!("x"), message);
+                                println!(
+                                    "{} Error publishing transactions: {}",
+                                    red!("x"),
+                                    message
+                                );
                                 break;
                             }
                             DeploymentEvent::TransactionUpdate(update) => {
@@ -618,9 +623,9 @@ pub fn main() {
                             }
                             DeploymentEvent::ProtocolDeployed => {
                                 println!(
-                                    "{} Contracts successfully deployed on {:?}",
+                                    "{} Transactions successfully confirmed on {:?}",
                                     green!("✔"),
-                                    network.unwrap()
+                                    network
                                 );
                                 break;
                             }
@@ -630,12 +635,12 @@ pub fn main() {
                     let res = deployment::start_ui(&node_url, event_rx, transaction_trackers);
                     match res {
                         Ok(()) => println!(
-                            "{} Contracts successfully deployed on {:?}",
+                            "{} Transactions successfully confirmed on {:?}",
                             green!("✔"),
-                            network.unwrap()
+                            network
                         ),
                         Err(message) => {
-                            println!("{} Error deploying contracts: {}", red!("x"), message)
+                            println!("{} Error publishing transactions: {}", red!("x"), message)
                         }
                     }
                 }
