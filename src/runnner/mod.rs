@@ -60,6 +60,7 @@ impl DeploymentCache {
             &mut session,
             &deployment,
             Some(contracts_asts),
+            true,
         );
 
         let mut contracts_artifacts = HashMap::new();

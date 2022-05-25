@@ -257,7 +257,7 @@ pub fn load_deployment(state: &mut OpState, args: Value, _: ()) -> Result<String
         .expect("unable to retrieve session");
 
     // Execute deployment on session
-    let results = update_session_with_contracts_executions(session, &deployment, None);
+    let results = update_session_with_contracts_executions(session, &deployment, None, true);
     let mut serialized_contracts = vec![];
     for (contract_id, result) in results.into_iter() {
         match result {

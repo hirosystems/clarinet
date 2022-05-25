@@ -166,7 +166,7 @@ pub fn setup_session_with_deployment(
     let mut session = initiate_session_from_deployment(&manifest);
     update_session_with_genesis_accounts(&mut session, deployment);
     let results =
-        update_session_with_contracts_executions(&mut session, deployment, contracts_asts);
+        update_session_with_contracts_executions(&mut session, deployment, contracts_asts, false);
     (session, results)
 }
 
@@ -203,6 +203,7 @@ pub fn update_session_with_contracts_executions(
     session: &mut Session,
     deployment: &DeploymentSpecification,
     contracts_asts: Option<HashMap<QualifiedContractIdentifier, ContractAST>>,
+    code_coverage_enabled: bool,
 ) -> BTreeMap<QualifiedContractIdentifier, Result<ExecutionResult, Vec<Diagnostic>>> {
     let mut results = BTreeMap::new();
     for batch in deployment.plan.batches.iter() {
@@ -233,7 +234,10 @@ pub fn update_session_with_contracts_executions(
                             Some(tx.contract_name.to_string()),
                             None,
                             false,
-                            None,
+                            match code_coverage_enabled {
+                                true => Some("__analysis__".to_string()),
+                                false => None,
+                            },
                         ),
                     };
                     results.insert(contract_id, result);
