@@ -1,3 +1,46 @@
+# [0.31.0](https://github.com/hirosystems/clarinet/compare/v0.30.0...v0.31.0) (2022-05-24)
+
+
+### Bug Fixes
+
+* address feedbacks ([c03549d](https://github.com/hirosystems/clarinet/commit/c03549d1fa3804faa9fbd19f01e0933d0051ae0f))
+* bug + associated name ambiguity ([4aaa881](https://github.com/hirosystems/clarinet/commit/4aaa881733af70a3c8856a36be9d504cd756dcba))
+* clarinet test --watch ([b985f32](https://github.com/hirosystems/clarinet/commit/b985f3255dddcc2714c605692655f499d0a5794e))
+* cost reports ([c26b063](https://github.com/hirosystems/clarinet/commit/c26b0635b30b0256a3cadeb73c647db61648b087))
+* deno interface import ([2978301](https://github.com/hirosystems/clarinet/commit/29783019328984f32377aaff4e07ee3f498da96d))
+* devnet deployments ([49e1701](https://github.com/hirosystems/clarinet/commit/49e1701e172f9bb916d073ddce236e18178781c0))
+* lsp integration tests, streamline deployment plan serde attributes ([8dff7e0](https://github.com/hirosystems/clarinet/commit/8dff7e0ad7b2e671b259db729cb8fe2bab855651))
+* node-binding build ([14a651d](https://github.com/hirosystems/clarinet/commit/14a651dd7c0eab677488c37f1d79261364bef3b1))
+* test relying on hashmap ([f84f67e](https://github.com/hirosystems/clarinet/commit/f84f67e7a03bb5ca076da66906c5252b8af8f7c8))
+* test return code ([50c39b8](https://github.com/hirosystems/clarinet/commit/50c39b87f74a3a66aa2fa78c98701a318fac9826))
+* tests ([c3fd59b](https://github.com/hirosystems/clarinet/commit/c3fd59b9db246b1acb6933f6c59becb6523d89ef))
+* unable to resolve dependencies in presence of boot contracts ([5df8330](https://github.com/hirosystems/clarinet/commit/5df8330a79fd390903dfedd6a49380885bfa0edc))
+* unordered contracts ([bf8f86f](https://github.com/hirosystems/clarinet/commit/bf8f86f2dee334e15890739dd4212a715869812b))
+* update doc ([5804c4b](https://github.com/hirosystems/clarinet/commit/5804c4bd3c7d7f34200cb0424ea5edbc16a58ca2))
+* using v0.100.0 instead of v1.0.0-beta1 ([1025e32](https://github.com/hirosystems/clarinet/commit/1025e3222150740e357c6f9e908c7bb9653056cf))
+* warnings ([cb97106](https://github.com/hirosystems/clarinet/commit/cb9710630cdd0689f11fcaf31e849f1a6bf12f88))
+* windows builds ([d020d57](https://github.com/hirosystems/clarinet/commit/d020d57e427c493ef01051acb188cfb8eec1b754))
+
+
+### Features
+
+* add telemetry for DAP debugger ([c7a29f5](https://github.com/hirosystems/clarinet/commit/c7a29f5dc3962f53ecf1ea9e459f86fbcab3a692))
+* cascade changes in clarinet integrate ([0fec1ed](https://github.com/hirosystems/clarinet/commit/0fec1ed7f836b75f4803bcb814482d218a8bf842))
+* cascade changes in clarinet test ([b719741](https://github.com/hirosystems/clarinet/commit/b71974156470e5028cc49749bec07c397f68e4ae))
+* cascade changes in cli interface ([4ca4024](https://github.com/hirosystems/clarinet/commit/4ca4024a183f1f92cb6313d16f1d787abdaa914a))
+* cascade changes in lsp ([56b0322](https://github.com/hirosystems/clarinet/commit/56b03225560481e8a98fb383ea78104ec088db18))
+* **dap:** implement DAP debugger ([60b7145](https://github.com/hirosystems/clarinet/commit/60b7145982294c87f45bce1732f30a755d88d9eb))
+* **dap:** WIP implementation of DAP interface ([270c5a7](https://github.com/hirosystems/clarinet/commit/270c5a7cf4632122c30ebe336f776f6379465e65))
+* enable multithreading ([67b7d1c](https://github.com/hirosystems/clarinet/commit/67b7d1cbcd75f99f75403354373c9e7e68e06c53))
+* improve protocol deployment timing on devnet ([b61b726](https://github.com/hirosystems/clarinet/commit/b61b7265013cf130412247a52c8fbf9a600f04f5))
+* initial setup for DAP debugger ([8ab5837](https://github.com/hirosystems/clarinet/commit/8ab58371412dc226c5e40c1e7dc2105f0dc58156))
+* introduce deployments ([fa83d83](https://github.com/hirosystems/clarinet/commit/fa83d839bb8f583f6ba170b6f115ded03f735243))
+* introduce notion of simnet ([c0085ac](https://github.com/hirosystems/clarinet/commit/c0085ac894093360d89e034d24f80ed969a0b122))
+* support new interface to dependency checker ([c3f8db4](https://github.com/hirosystems/clarinet/commit/c3f8db4432cb5a6a9e1c6d6ff816e98d892f1abc))
+* type updates ([10a5f16](https://github.com/hirosystems/clarinet/commit/10a5f16fd803494542c6ca4b2b84eb3a9cb4f8e7))
+* update deno layer ([98de4e8](https://github.com/hirosystems/clarinet/commit/98de4e81b22c56f45a800ed991cd68c43346fd7d))
+* update to use repl with DAP support ([472de80](https://github.com/hirosystems/clarinet/commit/472de80d5034cf5f5500652daa372fc22c14cfe3))
+
 # [0.30.0](https://github.com/hirosystems/clarinet/compare/v0.29.1...v0.30.0) (2022-05-13)
 
 
