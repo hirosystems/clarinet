@@ -15,7 +15,7 @@ use crate::runnner::DeploymentCache;
 use crate::types::{ProjectManifest, ProjectManifestFile, RequirementConfig, StacksNetwork};
 use clarity_repl::clarity::analysis::{AnalysisDatabase, ContractAnalysis};
 use clarity_repl::clarity::costs::LimitedCostTracker;
-use clarity_repl::clarity::diagnostic::Level;
+use clarity_repl::clarity::diagnostic::{Diagnostic, Level};
 use clarity_repl::clarity::types::QualifiedContractIdentifier;
 use clarity_repl::{analysis, repl, Terminal};
 use std::collections::HashMap;
@@ -731,153 +731,72 @@ pub fn main() {
         }
         Command::Check(cmd) => {
             let manifest = load_manifest_or_exit(cmd.manifest_path);
+            let (deployment, _, results) =
+                load_deployment_and_artifacts_or_exit(&manifest, &cmd.deployment_plan_path);
 
-            let (deployment, _, artifacts) =
-                load_deployments_and_artifacts_or_exit(&manifest, &cmd.deployment_plan_path);
+            let results = results.expect("Unable to retrieve artifacts");
 
-            let contracts_asts = artifacts.and_then(|a| Some(a.asts));
+            let parser_diags_digest = DiagnosticsDigest::new(&results.diags, &deployment);
+            if parser_diags_digest.has_feedbacks() {
+                println!("{}", parser_diags_digest.message);
+            }
 
-            let (_, results) =
-                setup_session_with_deployment(&manifest, &deployment, contracts_asts);
-
-            let mut success = 0;
-            let mut warnings = 0;
-            let mut errors = 0;
-            let mut contracts_checked = 0;
-            let mut outputs = vec![];
-            for (contract_id, result) in results.into_iter() {
-                contracts_checked += 1;
-                match result {
-                    Ok(result) => {
-                        if result.diagnostics.is_empty() {
-                            success += 1;
-                            continue;
+            let (exit_code, total_error, total_warning, contracts_checked) = if results.success {
+                let (_, results) =
+                    setup_session_with_deployment(&manifest, &deployment, Some(results.asts));
+                let mut contracts_diags = HashMap::new();
+                for (contract_id, res) in results.into_iter() {
+                    match res {
+                        Ok(execution_result) => {
+                            contracts_diags.insert(contract_id, execution_result.diagnostics);
                         }
-
-                        let (source, contract_path) = deployment
-                            .contracts
-                            .get(&contract_id)
-                            .expect("unable to retrieve contract");
-
-                        let lines = source.lines();
-                        let formatted_lines: Vec<String> = lines.map(|l| l.to_string()).collect();
-
-                        for diagnostic in result.diagnostics {
-                            match diagnostic.level {
-                                Level::Error => {
-                                    errors += 1;
-                                    outputs.push(format!(
-                                        "{}: {}",
-                                        red!("error"),
-                                        diagnostic.message
-                                    ));
-                                }
-                                Level::Warning => {
-                                    warnings += 1;
-                                    outputs.push(format!(
-                                        "{}: {}",
-                                        yellow!("warning"),
-                                        diagnostic.message
-                                    ));
-                                }
-                                Level::Note => {
-                                    outputs.push(format!(
-                                        "{}: {}",
-                                        green!("note:"),
-                                        diagnostic.message
-                                    ));
-                                    outputs.append(&mut diagnostic.output_code(&formatted_lines));
-                                    continue;
-                                }
-                            }
-                            if let Some(span) = diagnostic.spans.first() {
-                                outputs.push(format!(
-                                    "{} {}:{}:{}",
-                                    blue!("-->"),
-                                    contract_path,
-                                    span.start_line,
-                                    span.start_column
-                                ));
-                            }
-                            outputs.append(&mut diagnostic.output_code(&formatted_lines));
-
-                            if let Some(suggestion) = diagnostic.suggestion {
-                                outputs.push(format!("{}", suggestion));
-                            }
-                        }
-                    }
-                    Err(diagnostics) => {
-                        let (source, contract_path) = deployment
-                            .contracts
-                            .get(&contract_id)
-                            .expect("unable to retrieve contract");
-                        let lines = source.lines();
-                        let formatted_lines: Vec<String> = lines.map(|l| l.to_string()).collect();
-
-                        for diagnostic in diagnostics {
-                            match diagnostic.level {
-                                Level::Error => {
-                                    errors += 1;
-                                    outputs.push(format!(
-                                        "{}: {}",
-                                        red!("error"),
-                                        diagnostic.message
-                                    ));
-                                }
-                                Level::Warning => {
-                                    warnings += 1;
-                                    outputs.push(format!(
-                                        "{}: {}",
-                                        yellow!("warning"),
-                                        diagnostic.message
-                                    ));
-                                }
-                                Level::Note => {
-                                    outputs.push(format!(
-                                        "{}: {}",
-                                        green!("note:"),
-                                        diagnostic.message
-                                    ));
-                                    outputs.append(&mut diagnostic.output_code(&formatted_lines));
-                                    continue;
-                                }
-                            }
-                            if let Some(span) = diagnostic.spans.first() {
-                                outputs.push(format!(
-                                    "{} {}:{}:{}",
-                                    blue!("-->"),
-                                    contract_path,
-                                    span.start_line,
-                                    span.start_column
-                                ));
-                            }
-                            outputs.append(&mut diagnostic.output_code(&formatted_lines));
-
-                            if let Some(suggestion) = diagnostic.suggestion {
-                                outputs.push(format!("{}", suggestion));
-                            }
+                        Err(diags) => {
+                            contracts_diags.insert(contract_id, diags);
                         }
                     }
                 }
-            }
-            if !outputs.is_empty() {
-                println!("{}\n", outputs.join("\n"));
-            }
-            if warnings > 0 {
+                let analysis_diags_digest = DiagnosticsDigest::new(&contracts_diags, &deployment);
+                if analysis_diags_digest.has_feedbacks() {
+                    println!("{}", analysis_diags_digest.message);
+                }
+                let exit_code = if analysis_diags_digest.errors == 0 {
+                    0
+                } else {
+                    1
+                };
+                (
+                    exit_code,
+                    parser_diags_digest.errors + analysis_diags_digest.errors,
+                    parser_diags_digest.warnings + analysis_diags_digest.warnings,
+                    analysis_diags_digest.contracts_checked,
+                )
+            } else {
+                (
+                    1,
+                    parser_diags_digest.errors,
+                    parser_diags_digest.warnings,
+                    parser_diags_digest.contracts_checked,
+                )
+            };
+
+            if total_warning > 0 {
                 println!(
                     "{} {} detected",
                     yellow!("!"),
-                    pluralize!(warnings, "warning")
+                    pluralize!(total_warning, "warning")
                 );
             }
-            if errors > 0 {
-                println!("{} {} detected", red!("x"), pluralize!(errors, "error"));
+            if total_error > 0 {
+                println!(
+                    "{} {} detected",
+                    red!("x"),
+                    pluralize!(total_error, "error")
+                );
             } else {
                 println!(
-                    "{} {} checked, {} successfully validated",
+                    "{} {} checked",
                     green!("✔"),
                     pluralize!(contracts_checked, "contract"),
-                    success
                 );
             }
 
@@ -890,6 +809,7 @@ pub fn main() {
                     DeveloperUsageDigest::new(&manifest.project.name, &manifest.project.authors),
                 ));
             }
+            std::process::exit(exit_code);
         }
         Command::Test(cmd) => {
             let manifest = load_manifest_or_exit(cmd.manifest_path);
@@ -1098,7 +1018,7 @@ fn load_manifest_or_exit(path: Option<String>) -> ProjectManifest {
     manifest
 }
 
-fn load_deployments_and_artifacts_or_exit(
+fn load_deployment_and_artifacts_or_exit(
     manifest: &ProjectManifest,
     deployment_plan_path: &Option<String>,
 ) -> (
@@ -1158,7 +1078,7 @@ pub fn build_deployment_cache_or_exit(
     deployment_plan_path: &Option<String>,
 ) -> DeploymentCache {
     let (deployment, deployment_path, artifacts) =
-        load_deployments_and_artifacts_or_exit(manifest, deployment_plan_path);
+        load_deployment_and_artifacts_or_exit(manifest, deployment_plan_path);
 
     let contracts_asts = artifacts.and_then(|a| Some(a.asts));
 
@@ -1327,6 +1247,90 @@ fn execute_changes(changes: Vec<Changes>) -> bool {
     }
 
     true
+}
+
+struct DiagnosticsDigest {
+    message: String,
+    errors: usize,
+    warnings: usize,
+    contracts_checked: usize,
+    full_success: usize,
+    total: usize,
+}
+
+impl DiagnosticsDigest {
+    fn new(
+        contracts_diags: &HashMap<QualifiedContractIdentifier, Vec<Diagnostic>>,
+        deployment: &DeploymentSpecification,
+    ) -> DiagnosticsDigest {
+        let mut full_success = 0;
+        let mut warnings = 0;
+        let mut errors = 0;
+        let mut contracts_checked = 0;
+        let mut outputs = vec![];
+        let total = deployment.contracts.len();
+
+        for (contract_id, diags) in contracts_diags.into_iter() {
+            contracts_checked += 1;
+            if diags.is_empty() {
+                full_success += 1;
+                continue;
+            }
+
+            let (source, contract_path) = deployment
+                .contracts
+                .get(&contract_id)
+                .expect("unable to retrieve contract");
+
+            let lines = source.lines();
+            let formatted_lines: Vec<String> = lines.map(|l| l.to_string()).collect();
+
+            for diagnostic in diags {
+                match diagnostic.level {
+                    Level::Error => {
+                        errors += 1;
+                        outputs.push(format!("{}: {}", red!("error"), diagnostic.message));
+                    }
+                    Level::Warning => {
+                        warnings += 1;
+                        outputs.push(format!("{}: {}", yellow!("warning"), diagnostic.message));
+                    }
+                    Level::Note => {
+                        outputs.push(format!("{}: {}", green!("note:"), diagnostic.message));
+                        outputs.append(&mut diagnostic.output_code(&formatted_lines));
+                        continue;
+                    }
+                }
+                if let Some(span) = diagnostic.spans.first() {
+                    outputs.push(format!(
+                        "{} {}:{}:{}",
+                        blue!("-->"),
+                        contract_path,
+                        span.start_line,
+                        span.start_column
+                    ));
+                }
+                outputs.append(&mut diagnostic.output_code(&formatted_lines));
+
+                if let Some(ref suggestion) = diagnostic.suggestion {
+                    outputs.push(format!("{}", suggestion));
+                }
+            }
+        }
+
+        DiagnosticsDigest {
+            full_success,
+            errors,
+            warnings,
+            total,
+            contracts_checked,
+            message: outputs.join("\n").to_string(),
+        }
+    }
+
+    pub fn has_feedbacks(&self) -> bool {
+        self.errors > 0 || self.warnings > 0
+    }
 }
 
 fn display_separator() {
