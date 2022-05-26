@@ -13,10 +13,14 @@ pub fn run_dap() -> Result<(), String> {
         Ok((manifest_path_str, expression)) => {
             let manifest_path = PathBuf::from(manifest_path_str);
             let project_manifest = ProjectManifest::from_path(&manifest_path)?;
-            let (deployment, _) =
-                generate_default_deployment(&project_manifest, &StacksNetwork::Simnet)?;
-            let (mut session, _) =
-                setup_session_with_deployment(&project_manifest, &deployment, None);
+            let (deployment, artifacts) =
+                generate_default_deployment(&project_manifest, &StacksNetwork::Simnet, false)?;
+            let mut session = setup_session_with_deployment(
+                &project_manifest,
+                &deployment,
+                Some(&artifacts.asts),
+            )
+            .session;
 
             if project_manifest.project.telemetry {
                 #[cfg(feature = "telemetry")]
@@ -43,6 +47,7 @@ pub fn run_dap() -> Result<(), String> {
                 None,
                 Some(vec![Box::new(dap)]),
                 false,
+                None,
                 None,
             ) {
                 Ok(_result) => Ok(()),

@@ -649,9 +649,25 @@ pub fn main() {
         Command::Console(cmd) => {
             let manifest = load_manifest_or_exit(cmd.manifest_path);
 
-            let cache = build_deployment_cache_or_exit(&manifest, &cmd.deployment_plan_path);
+            let (deployment, _, artifacts) =
+                load_deployment_and_artifacts_or_exit(&manifest, &cmd.deployment_plan_path);
 
-            let mut terminal = Terminal::load(cache.session);
+            if !artifacts.success {
+                let diags_digest = DiagnosticsDigest::new(&artifacts.diags, &deployment);
+                if diags_digest.has_feedbacks() {
+                    println!("{}", diags_digest.message);
+                }
+                if diags_digest.errors > 0 {
+                    println!(
+                        "{} {} detected",
+                        red!("x"),
+                        pluralize!(diags_digest.errors, "error")
+                    );
+                }
+                std::process::exit(1);
+            }
+
+            let mut terminal = Terminal::load(artifacts.session);
             terminal.start();
 
             if hints_enabled {
@@ -743,71 +759,35 @@ pub fn main() {
             let (deployment, _, results) =
                 load_deployment_and_artifacts_or_exit(&manifest, &cmd.deployment_plan_path);
 
-            let results = results.expect("Unable to retrieve artifacts");
-
-            let parser_diags_digest = DiagnosticsDigest::new(&results.diags, &deployment);
-            if parser_diags_digest.has_feedbacks() {
-                println!("{}", parser_diags_digest.message);
+            let diags_digest = DiagnosticsDigest::new(&results.diags, &deployment);
+            if diags_digest.has_feedbacks() {
+                println!("{}", diags_digest.message);
             }
 
-            let (exit_code, total_error, total_warning, contracts_checked) = if results.success {
-                let (_, results) =
-                    setup_session_with_deployment(&manifest, &deployment, Some(results.asts));
-                let mut contracts_diags = HashMap::new();
-                for (contract_id, res) in results.into_iter() {
-                    match res {
-                        Ok(execution_result) => {
-                            contracts_diags.insert(contract_id, execution_result.diagnostics);
-                        }
-                        Err(diags) => {
-                            contracts_diags.insert(contract_id, diags);
-                        }
-                    }
-                }
-                let analysis_diags_digest = DiagnosticsDigest::new(&contracts_diags, &deployment);
-                if analysis_diags_digest.has_feedbacks() {
-                    println!("{}", analysis_diags_digest.message);
-                }
-                let exit_code = if analysis_diags_digest.errors == 0 {
-                    0
-                } else {
-                    1
-                };
-                (
-                    exit_code,
-                    parser_diags_digest.errors + analysis_diags_digest.errors,
-                    parser_diags_digest.warnings + analysis_diags_digest.warnings,
-                    analysis_diags_digest.contracts_checked,
-                )
-            } else {
-                (
-                    1,
-                    parser_diags_digest.errors,
-                    parser_diags_digest.warnings,
-                    parser_diags_digest.contracts_checked,
-                )
-            };
-
-            if total_warning > 0 {
+            if diags_digest.warnings > 0 {
                 println!(
                     "{} {} detected",
                     yellow!("!"),
-                    pluralize!(total_warning, "warning")
+                    pluralize!(diags_digest.warnings, "warning")
                 );
             }
-            if total_error > 0 {
+            if diags_digest.errors > 0 {
                 println!(
                     "{} {} detected",
                     red!("x"),
-                    pluralize!(total_error, "error")
+                    pluralize!(diags_digest.errors, "error")
                 );
             } else {
                 println!(
                     "{} {} checked",
                     green!("✔"),
-                    pluralize!(contracts_checked, "contract"),
+                    pluralize!(diags_digest.contracts_checked, "contract"),
                 );
             }
+            let exit_code = match results.success {
+                true => 0,
+                false => 1,
+            };
 
             if hints_enabled {
                 display_post_check_hint();
@@ -1034,9 +1014,9 @@ fn load_deployment_and_artifacts_or_exit(
 ) -> (
     DeploymentSpecification,
     Option<String>,
-    Option<DeploymentGenerationArtifacts>,
+    DeploymentGenerationArtifacts,
 ) {
-    let (res, deployment_path, artifacts) = match deployment_plan_path {
+    let result = match deployment_plan_path {
         None => {
             let res = load_deployment_if_exists(&manifest, &StacksNetwork::Simnet);
             match res {
@@ -1045,42 +1025,58 @@ fn load_deployment_and_artifacts_or_exit(
                         "{}: using deployments/default.simnet-plan.yaml",
                         yellow!("note")
                     );
-                    (Ok(deployment), None, None)
+                    let artifacts = setup_session_with_deployment(&manifest, &deployment, None);
+                    Ok((deployment, None, artifacts))
                 }
-                Some(Err(e)) => {
-                    println!(
-                        "{}: loading deployments/default.simnet-plan.yaml failed with error: {}",
-                        red!("error"),
-                        e
-                    );
-                    std::process::exit(1);
-                }
-                None => match generate_default_deployment(&manifest, &StacksNetwork::Simnet) {
-                    Ok((deployment, artifacts)) => (Ok(deployment), None, Some(artifacts)),
-                    Err(e) => (Err(e), None, None),
+                Some(Err(e)) => Err(format!(
+                    "loading deployments/default.simnet-plan.yaml failed with error: {}",
+                    e
+                )),
+                None => match generate_default_deployment(&manifest, &StacksNetwork::Simnet, false)
+                {
+                    Ok((deployment, ast_artifacts)) if ast_artifacts.success => {
+                        let mut artifacts = setup_session_with_deployment(
+                            &manifest,
+                            &deployment,
+                            Some(&ast_artifacts.asts),
+                        );
+                        for (contract_id, mut parser_diags) in ast_artifacts.diags.into_iter() {
+                            // Merge parser's diags with analysis' diags.
+                            if let Some(ref mut diags) = artifacts.diags.remove(&contract_id) {
+                                parser_diags.append(diags);
+                            }
+                            artifacts.diags.insert(contract_id, parser_diags);
+                        }
+                        Ok((deployment, None, artifacts))
+                    }
+                    Ok((deployment, ast_artifacts)) => Ok((deployment, None, ast_artifacts)),
+                    Err(e) => Err(e),
                 },
             }
         }
         Some(path) => {
             let deployment_path = get_absolute_deployment_path(&manifest, &path);
-            let deployment = load_deployment(&manifest, &deployment_path);
-            (
-                deployment,
-                Some(format!("{}", deployment_path.display())),
-                None,
-            )
+            match load_deployment(&manifest, &deployment_path) {
+                Ok(deployment) => {
+                    let artifacts = setup_session_with_deployment(&manifest, &deployment, None);
+                    Ok((
+                        deployment,
+                        Some(format!("{}", deployment_path.display())),
+                        artifacts,
+                    ))
+                }
+                Err(e) => Err(format!("loading {} failed with error: {}", path, e)),
+            }
         }
     };
 
-    let deployment = match res {
+    match result {
         Ok(deployment) => deployment,
         Err(e) => {
             println!("{}: {}", red!("error"), e);
             process::exit(1);
         }
-    };
-
-    (deployment, deployment_path, artifacts)
+    }
 }
 
 pub fn build_deployment_cache_or_exit(
@@ -1090,9 +1086,7 @@ pub fn build_deployment_cache_or_exit(
     let (deployment, deployment_path, artifacts) =
         load_deployment_and_artifacts_or_exit(manifest, deployment_plan_path);
 
-    let contracts_asts = artifacts.and_then(|a| Some(a.asts));
-
-    let cache = DeploymentCache::new(&manifest, deployment, &deployment_path, contracts_asts);
+    let cache = DeploymentCache::new(&manifest, deployment, &deployment_path, artifacts);
 
     cache
 }
@@ -1259,6 +1253,7 @@ fn execute_changes(changes: Vec<Changes>) -> bool {
     true
 }
 
+#[allow(dead_code)]
 struct DiagnosticsDigest {
     message: String,
     errors: usize,
