@@ -189,6 +189,14 @@ struct GenerateDeployment {
     /// Path to Clarinet.toml
     #[clap(long = "manifest-path", short = 'm')]
     pub manifest_path: Option<String>,
+    /// Generate a deployment file without trying to batch transactions (simnet only)
+    #[clap(
+        long = "no-batch",
+        conflicts_with = "devnet",
+        conflicts_with = "testnet",
+        conflicts_with = "mainnet"
+    )]
+    pub no_batch: bool,
 }
 
 #[derive(Parser, PartialEq, Clone, Debug)]
@@ -432,13 +440,14 @@ pub fn main() {
                 };
 
                 let default_deployment_path = get_default_deployment_path(&manifest, &network);
-                let (deployment, _) = match generate_default_deployment(&manifest, &network) {
-                    Ok(deployment) => deployment,
-                    Err(message) => {
-                        println!("{}", red!(message));
-                        std::process::exit(1);
-                    }
-                };
+                let (deployment, _) =
+                    match generate_default_deployment(&manifest, &network, cmd.no_batch) {
+                        Ok(deployment) => deployment,
+                        Err(message) => {
+                            println!("{}", red!(message));
+                            std::process::exit(1);
+                        }
+                    };
                 let res = write_deployment(&deployment, &default_deployment_path, true);
                 if let Err(message) = res {
                     println!("{}", message);
@@ -480,7 +489,7 @@ pub fn main() {
                             Some(Err(e)) => Err(e),
                             None => {
                                 let default_deployment_path = get_default_deployment_path(&manifest, &network);
-                                let (deployment, _) = match generate_default_deployment(&manifest, &network) {
+                                let (deployment, _) = match generate_default_deployment(&manifest, &network, false) {
                                     Ok(deployment) => deployment,
                                     Err(message) => {
                                         println!("{}", red!(message));
@@ -885,6 +894,7 @@ pub fn main() {
                             let (deployment, _) = match generate_default_deployment(
                                 &manifest,
                                 &StacksNetwork::Devnet,
+                                false,
                             ) {
                                 Ok(deployment) => deployment,
                                 Err(message) => {

@@ -374,7 +374,7 @@ pub fn read_deployment_or_generate_default(
             None,
         )
     } else {
-        let (deployment, artifacts) = generate_default_deployment(manifest, network)?;
+        let (deployment, artifacts) = generate_default_deployment(manifest, network, false)?;
         (deployment, Some(artifacts))
     };
     Ok((deployment, artifacts))
@@ -732,6 +732,7 @@ pub fn write_deployment(
 pub fn generate_default_deployment(
     manifest: &ProjectManifest,
     network: &StacksNetwork,
+    no_batch: bool,
 ) -> Result<(DeploymentSpecification, DeploymentGenerationArtifacts), String> {
     let chain_config = ChainConfig::from_manifest_path(&manifest.path, &network);
 
@@ -1055,7 +1056,10 @@ pub fn generate_default_deployment(
         transactions.push(tx);
     }
 
-    let tx_chain_limit = 25;
+    let tx_chain_limit = match no_batch {
+        true => 100_000,
+        false => 25,
+    };
 
     let mut batches = vec![];
     for (id, transactions) in transactions.chunks(tx_chain_limit).enumerate() {
