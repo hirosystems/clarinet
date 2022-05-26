@@ -56,10 +56,10 @@ enum Command {
     /// Subcommands for working with contracts
     #[clap(subcommand, name = "contracts")]
     Contracts(Contracts),
-    /// Subcommands for working with requirements
+    /// Interact with contracts deployed on Mainnet
     #[clap(subcommand, name = "requirements")]
     Requirements(Requirements),
-    /// Subcommands for working with deployments
+    /// Manage contracts deployments on Simnet/Devnet/Testnet/Mainnet
     #[clap(subcommand, name = "deployments")]
     Deployments(Deployments),
     /// Load contracts in a REPL for an interactive session
@@ -68,19 +68,19 @@ enum Command {
     /// Execute test suite
     #[clap(name = "test", bin_name = "test")]
     Test(Test),
-    /// Check syntax of your contracts
+    /// Check contracts syntax
     #[clap(name = "check", bin_name = "check")]
     Check(Check),
     /// Execute Clarinet extension
     #[clap(name = "run", bin_name = "run")]
     Run(Run),
-    /// Start devnet environment for integration testing
+    /// Start a local Devnet network for interacting with your contracts from your browser
     #[clap(name = "integrate", bin_name = "integrate")]
     Integrate(Integrate),
-    /// Start an LSP server (for integration with editors)
+    /// Get Clarity autocompletion and inline errors from your code editor (VSCode, vim, emacs, etc)
     #[clap(name = "lsp", bin_name = "lsp")]
     LSP,
-    /// Start a DAP server (for debugging from IDE)
+    /// Step by step debugging and breakpoints from your code editor (VSCode, vim, emacs, etc)
     #[clap(name = "dap", bin_name = "dap")]
     DAP,
     /// Generate shell completions scripts
@@ -99,7 +99,7 @@ enum Contracts {
 #[derive(Subcommand, PartialEq, Clone, Debug)]
 #[clap(bin_name = "req", aliases = &["requirement"])]
 enum Requirements {
-    /// Add third-party requirements to this project
+    /// Interact with contracts published on Mainnet
     #[clap(name = "add", bin_name = "add")]
     AddRequirement(AddRequirement),
 }
