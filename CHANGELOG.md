@@ -1,3 +1,15 @@
+## [0.31.1](https://github.com/hirosystems/clarinet/compare/v0.31.0...v0.31.1) (2022-05-27)
+
+
+### Bug Fixes
+
+* code coverage not including initial executions ([6089e86](https://github.com/hirosystems/clarinet/commit/6089e8604384d5e86bb48df47de0404cd2781cf0))
+* display errors from parsing ([517a3fa](https://github.com/hirosystems/clarinet/commit/517a3fa7cfcb5a0640c2a0f19cdb16741e8ef970))
+* explorer, noneCV ([3dd1142](https://github.com/hirosystems/clarinet/commit/3dd1142fb78433040f54dca6bd1c925e288b57f4))
+* usage of default deployment files ([c6b1f8c](https://github.com/hirosystems/clarinet/commit/c6b1f8c757e6654f5ee6e27e821b8df924237bd9))
+* use `clarinet@0.31.0` lib in generated tests ([74b1b99](https://github.com/hirosystems/clarinet/commit/74b1b99f8e121b067546645cc73b1104f2b5dc78)), closes [#381](https://github.com/hirosystems/clarinet/issues/381)
+* wrong network ([a631268](https://github.com/hirosystems/clarinet/commit/a63126818f00a051ab8f98a3ec7bf6a1ede334c2))
+
 # [0.31.0](https://github.com/hirosystems/clarinet/compare/v0.30.0...v0.31.0) (2022-05-24)
 
 
