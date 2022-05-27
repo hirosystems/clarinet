@@ -80,6 +80,20 @@ impl StacksNetwork {
             _ => false,
         }
     }
+
+    pub fn either_devnet_or_tesnet(&self) -> bool {
+        match self {
+            StacksNetwork::Simnet | StacksNetwork::Devnet => true,
+            _ => false,
+        }
+    }
+
+    pub fn is_mainnet(&self) -> bool {
+        match self {
+            StacksNetwork::Mainnet => true,
+            _ => false,
+        }
+    }
 }
 
 #[allow(dead_code)]

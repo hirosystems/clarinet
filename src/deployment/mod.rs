@@ -11,6 +11,7 @@ use self::types::{
     TransactionPlanSpecification, TransactionsBatchSpecification, WalletSpecification,
 };
 use crate::deployment::types::ContractPublishSpecification;
+use crate::deployment::types::RequirementPublishSpecification;
 use crate::deployment::types::TransactionSpecification;
 
 use crate::types::{AccountConfig, ChainConfig, ProjectManifest, StacksNetwork};
@@ -48,7 +49,7 @@ use clarity_repl::repl::SessionSettings;
 use clarity_repl::repl::{ExecutionResult, Session};
 use libsecp256k1::{PublicKey, SecretKey};
 use serde_yaml;
-use std::collections::{BTreeMap, HashMap, VecDeque};
+use std::collections::{BTreeMap, HashMap, HashSet, VecDeque};
 use std::fs::{self, File};
 use std::io::Write;
 use std::path::PathBuf;
@@ -279,12 +280,14 @@ pub fn update_session_with_contracts_executions(
     code_coverage_enabled: bool,
 ) -> BTreeMap<QualifiedContractIdentifier, Result<ExecutionResult, Vec<Diagnostic>>> {
     let mut results = BTreeMap::new();
+    // let mut remap_to_perform = vec![];
     for batch in deployment.plan.batches.iter() {
         for transaction in batch.transactions.iter() {
             match transaction {
-                TransactionSpecification::ContractCall(_)
+                TransactionSpecification::RequirementPublish(_)
+                | TransactionSpecification::ContractCall(_)
                 | TransactionSpecification::ContractPublish(_) => {
-                    panic!("emulated-contract-call and contract-publish are the only operations admitted in simnet deployments")
+                    panic!("requirement-publish, contract-call and contract-publish are the only operations admitted in simnet deployments")
                 }
                 TransactionSpecification::EmulatedContractPublish(tx) => {
                     let default_tx_sender = session.get_tx_sender();
@@ -337,7 +340,8 @@ pub fn update_session_with_contracts_analyses(
     for batch in deployment.plan.batches.iter() {
         for transaction in batch.transactions.iter() {
             match transaction {
-                TransactionSpecification::ContractCall(_)
+                TransactionSpecification::RequirementPublish(_)
+                | TransactionSpecification::ContractCall(_)
                 | TransactionSpecification::ContractPublish(_) => {
                     panic!("emulated-contract-call and contract-publish are the only operations admitted in simnet deployments")
                 }
@@ -499,6 +503,20 @@ pub fn get_initial_transactions_trackers(
                     ),
                     status: TransactionStatus::Queued,
                 },
+                TransactionSpecification::RequirementPublish(tx) => {
+                    if !deployment.network.either_devnet_or_tesnet() {
+                        panic!("Deployment specification malformed - requirements publish not supported on mainnet");
+                    }
+                    TransactionTracker {
+                        index,
+                        name: format!(
+                            "Contract publish {}.{}",
+                            tx.remap_sender.to_address(),
+                            tx.contract_id.name
+                        ),
+                        status: TransactionStatus::Queued,
+                    }
+                }
                 TransactionSpecification::EmulatedContractPublish(_)
                 | TransactionSpecification::EmulatedContractCall(_) => continue,
             };
@@ -546,6 +564,7 @@ pub fn apply_on_chain_deployment(
     // Using a session to encode + coerce/check (todo) contract calls arguments.
     let mut session = Session::new(SessionSettings::default());
     let mut index = 0;
+    let mut contracts_ids_to_remap: HashSet<(String, String)> = HashSet::new();
     for batch_spec in deployment.plan.batches.iter() {
         let mut batch = Vec::new();
         for transaction in batch_spec.transactions.iter() {
@@ -611,9 +630,82 @@ pub fn apply_on_chain_deployment(
                             .expect("Unable to retrieve account"),
                     };
                     let account = accounts_lookup.get(&issuer_address).unwrap();
+                    let source = if deployment.network.either_devnet_or_tesnet() {
+                        // Remapping - This is happening
+                        let mut source = tx.source.clone();
+                        for (old_contract_id, new_contract_id) in contracts_ids_to_remap.iter() {
+                            let mut matched_indices = source
+                                .match_indices(old_contract_id)
+                                .map(|(i, _)| i)
+                                .collect::<Vec<usize>>();
+                            matched_indices.reverse();
+                            for index in matched_indices {
+                                source.replace_range(
+                                    index..index + old_contract_id.len(),
+                                    new_contract_id,
+                                );
+                            }
+                        }
+                        source
+                    } else {
+                        tx.source.clone()
+                    };
 
                     let transaction = match encode_contract_publish(
                         &tx.contract_name,
+                        &source,
+                        *account,
+                        nonce,
+                        tx.cost,
+                        &network,
+                    ) {
+                        Ok(res) => res,
+                        Err(e) => {
+                            let _ = deployment_event_tx.send(DeploymentEvent::Interrupted(e));
+                            return;
+                        }
+                    };
+
+                    accounts_cached_nonces.insert(issuer_address.clone(), nonce + 1);
+                    let name = format!(
+                        "Publish {}.{}",
+                        tx.expected_sender.to_string(),
+                        tx.contract_name
+                    );
+                    let check = TransactionCheck::ContractPublish(
+                        tx.expected_sender.clone(),
+                        tx.contract_name.clone(),
+                    );
+                    TransactionTracker {
+                        index,
+                        name: name.clone(),
+                        status: TransactionStatus::Encoded(transaction, check),
+                    }
+                }
+                TransactionSpecification::RequirementPublish(tx) => {
+                    if deployment.network.is_mainnet() {
+                        panic!("Deployment specification malformed - requirements publish not supported on mainnet");
+                    }
+                    let old_contract_id = tx.contract_id.to_string();
+                    let new_contract_id = QualifiedContractIdentifier::new(
+                        tx.remap_sender.clone(),
+                        tx.contract_id.name.clone(),
+                    )
+                    .to_string();
+                    contracts_ids_to_remap.insert((old_contract_id, new_contract_id));
+
+                    // Retrieve nonce for issuer
+                    let issuer_address = tx.remap_sender.to_address();
+                    let nonce = match accounts_cached_nonces.get(&issuer_address) {
+                        Some(cached_nonce) => cached_nonce.clone(),
+                        None => stacks_rpc
+                            .get_nonce(&issuer_address)
+                            .expect("Unable to retrieve account"),
+                    };
+                    let account = accounts_lookup.get(&issuer_address).unwrap();
+
+                    let transaction = match encode_contract_publish(
+                        &tx.contract_id.name,
                         &tx.source,
                         *account,
                         nonce,
@@ -629,13 +721,13 @@ pub fn apply_on_chain_deployment(
 
                     accounts_cached_nonces.insert(issuer_address.clone(), nonce + 1);
                     let name = format!(
-                        "Publish {}.{})",
-                        tx.expected_sender.to_string(),
-                        tx.contract_name
+                        "Publish {}.{}",
+                        tx.remap_sender.to_string(),
+                        tx.contract_id.name
                     );
                     let check = TransactionCheck::ContractPublish(
-                        tx.expected_sender.clone(),
-                        tx.contract_name.clone(),
+                        tx.remap_sender.clone(),
+                        tx.contract_id.name.clone(),
                     );
                     TransactionTracker {
                         index,
@@ -933,6 +1025,16 @@ pub fn generate_default_deployment(
             ));
         }
     };
+    let default_deployer_address =
+        match PrincipalData::parse_standard_principal(&default_deployer.address) {
+            Ok(res) => res,
+            Err(_) => {
+                return Err(format!(
+                    "unable to turn address {} as a valid Stacks address",
+                    default_deployer.address
+                ))
+            }
+        };
 
     let mut transactions = vec![];
     let mut contracts_map = BTreeMap::new();
@@ -959,7 +1061,8 @@ pub fn generate_default_deployment(
             Ok(path) => path,
             Err(_) => return Err("unable to get default cache path".to_string()),
         };
-        let mut contracts = HashMap::new();
+        let mut emulated_contracts_publish = HashMap::new();
+        let mut requirements_publish = HashMap::new();
 
         // Load all the requirements
         // Some requirements are explicitly listed, some are discovered as we compute the ASTs.
@@ -1004,13 +1107,24 @@ pub fn generate_default_deployment(
                     };
 
                     // Build the struct representing the requirement in the deployment
-                    let data = EmulatedContractPublishSpecification {
-                        contract_name: contract_id.name.clone(),
-                        emulated_sender: contract_id.issuer.clone(),
-                        source: source.clone(),
-                        relative_path: path,
-                    };
-                    contracts.insert(contract_id.clone(), data);
+                    if network.is_simnet() {
+                        let data = EmulatedContractPublishSpecification {
+                            contract_name: contract_id.name.clone(),
+                            emulated_sender: contract_id.issuer.clone(),
+                            source: source.clone(),
+                            relative_path: path,
+                        };
+                        emulated_contracts_publish.insert(contract_id.clone(), data);
+                    } else if network.either_devnet_or_tesnet() {
+                        let data = RequirementPublishSpecification {
+                            contract_id: contract_id.clone(),
+                            remap_sender: default_deployer_address.clone(),
+                            source: source.clone(),
+                            relative_path: path,
+                            cost: deployment_fee_rate * source.len() as u64,
+                        };
+                        requirements_publish.insert(contract_id.clone(), data);
+                    }
 
                     // Compute the AST
                     let (ast, _, _) = session.interpreter.build_ast(
@@ -1065,19 +1179,29 @@ pub fn generate_default_deployment(
         }
 
         // Avoid listing requirements as deployment transactions to the deployment specification on Devnet / Testnet / Mainnet
-        if network.is_simnet() {
+        if !network.is_mainnet() {
             let ordered_contracts_ids =
                 match ASTDependencyDetector::order_contracts(&requirements_deps) {
                     Ok(ordered_contracts) => ordered_contracts,
-                    Err(e) => return Err(format!("unable to order contracts {}", e)),
+                    Err(e) => return Err(format!("unable to order requirements {}", e)),
                 };
 
-            for contract_id in ordered_contracts_ids.iter() {
-                let data = contracts
-                    .remove(contract_id)
-                    .expect("unable to retrieve contract");
-                let tx = TransactionSpecification::EmulatedContractPublish(data);
-                transactions.push(tx);
+            if network.is_simnet() {
+                for contract_id in ordered_contracts_ids.iter() {
+                    let data = emulated_contracts_publish
+                        .remove(contract_id)
+                        .expect("unable to retrieve contract");
+                    let tx = TransactionSpecification::EmulatedContractPublish(data);
+                    transactions.push(tx);
+                }
+            } else if network.either_devnet_or_tesnet() {
+                for contract_id in ordered_contracts_ids.iter() {
+                    let data = requirements_publish
+                        .remove(contract_id)
+                        .expect("unable to retrieve contract");
+                    let tx = TransactionSpecification::RequirementPublish(data);
+                    transactions.push(tx);
+                }
             }
         }
     }
