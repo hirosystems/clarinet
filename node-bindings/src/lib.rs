@@ -62,7 +62,7 @@ impl StacksDevnet {
         let manifest =
             ProjectManifest::from_path(&manifest_path).expect("Syntax error in Clarinet.toml.");
         let (deployment, _) =
-            deployment::read_deployment_or_generate_default(&manifest, &StacksNetwork::Simnet)
+            deployment::read_deployment_or_generate_default(&manifest, &StacksNetwork::Devnet)
                 .expect("Unable to generate deployment");
         let devnet = DevnetOrchestrator::new(manifest, Some(devnet_overrides));
 
