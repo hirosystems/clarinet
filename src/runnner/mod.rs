@@ -11,7 +11,7 @@ use crate::deployment::{
     get_absolute_deployment_path, get_default_deployment_path, initiate_session_from_deployment,
     load_deployment, read_deployment_or_generate_default, setup_session_with_deployment,
     update_session_with_contracts_executions, update_session_with_genesis_accounts,
-    write_deployment,
+    write_deployment, DeploymentGenerationArtifacts,
 };
 use crate::types::ProjectManifest;
 use clarity_repl::clarity::analysis::contract_interface_builder::{
@@ -45,21 +45,17 @@ impl DeploymentCache {
         manifest: &ProjectManifest,
         deployment: DeploymentSpecification,
         deployment_path: &Option<String>,
-        mut contracts_asts: Option<HashMap<QualifiedContractIdentifier, ContractAST>>,
+        artifacts: DeploymentGenerationArtifacts,
     ) -> DeploymentCache {
         let mut session_accounts_only = initiate_session_from_deployment(&manifest);
         update_session_with_genesis_accounts(&mut session_accounts_only, &deployment);
         let mut session = session_accounts_only.clone();
 
-        let contracts_asts = match contracts_asts.take() {
-            Some(asts) => asts,
-            None => HashMap::new(),
-        };
-
         let execution_results = update_session_with_contracts_executions(
             &mut session,
             &deployment,
-            Some(contracts_asts),
+            Some(&artifacts.asts),
+            true,
         );
 
         let mut contracts_artifacts = HashMap::new();

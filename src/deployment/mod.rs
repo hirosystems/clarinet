@@ -66,6 +66,9 @@ pub struct DeploymentGenerationArtifacts {
     pub asts: HashMap<QualifiedContractIdentifier, ContractAST>,
     pub deps: HashMap<QualifiedContractIdentifier, DependencySet>,
     pub diags: HashMap<QualifiedContractIdentifier, Vec<Diagnostic>>,
+    pub analysis: HashMap<QualifiedContractIdentifier, ContractAnalysis>,
+    pub session: Session,
+    pub success: bool,
 }
 
 #[allow(dead_code)]
@@ -158,16 +161,43 @@ pub fn encode_contract_publish(
 pub fn setup_session_with_deployment(
     manifest: &ProjectManifest,
     deployment: &DeploymentSpecification,
-    contracts_asts: Option<HashMap<QualifiedContractIdentifier, ContractAST>>,
-) -> (
-    Session,
-    BTreeMap<QualifiedContractIdentifier, Result<ExecutionResult, Vec<Diagnostic>>>,
-) {
+    contracts_asts: Option<&HashMap<QualifiedContractIdentifier, ContractAST>>,
+) -> DeploymentGenerationArtifacts {
     let mut session = initiate_session_from_deployment(&manifest);
     update_session_with_genesis_accounts(&mut session, deployment);
     let results =
-        update_session_with_contracts_executions(&mut session, deployment, contracts_asts);
-    (session, results)
+        update_session_with_contracts_executions(&mut session, deployment, contracts_asts, false);
+
+    let deps = HashMap::new();
+    let mut diags = HashMap::new();
+    let mut asts = HashMap::new();
+    let mut contracts_analysis = HashMap::new();
+    let mut success = true;
+    for (contract_id, res) in results.into_iter() {
+        match res {
+            Ok(execution_result) => {
+                diags.insert(contract_id.clone(), execution_result.diagnostics);
+                if let Some((_, _, _, ast, analysis)) = execution_result.contract {
+                    asts.insert(contract_id.clone(), ast);
+                    contracts_analysis.insert(contract_id, analysis);
+                }
+            }
+            Err(errors) => {
+                success = false;
+                diags.insert(contract_id.clone(), errors);
+            }
+        }
+    }
+
+    let artifacts = DeploymentGenerationArtifacts {
+        asts,
+        deps,
+        diags,
+        success,
+        session,
+        analysis: contracts_analysis,
+    };
+    artifacts
 }
 
 pub fn initiate_session_from_deployment(manifest: &ProjectManifest) -> Session {
@@ -202,7 +232,8 @@ pub fn update_session_with_genesis_accounts(
 pub fn update_session_with_contracts_executions(
     session: &mut Session,
     deployment: &DeploymentSpecification,
-    contracts_asts: Option<HashMap<QualifiedContractIdentifier, ContractAST>>,
+    contracts_asts: Option<&HashMap<QualifiedContractIdentifier, ContractAST>>,
+    code_coverage_enabled: bool,
 ) -> BTreeMap<QualifiedContractIdentifier, Result<ExecutionResult, Vec<Diagnostic>>> {
     let mut results = BTreeMap::new();
     for batch in deployment.plan.batches.iter() {
@@ -220,22 +251,18 @@ pub fn update_session_with_contracts_executions(
                         tx.emulated_sender.clone(),
                         tx.contract_name.clone(),
                     );
-                    let result = match contracts_asts.as_ref().and_then(|m| m.get(&contract_id)) {
-                        Some(contract_ast) => session.interpreter.run_ast(
-                            contract_ast.clone(),
-                            tx.source.to_string(),
-                            contract_id.clone(),
-                            false,
-                            None,
-                        ),
-                        None => session.interpret(
-                            tx.source.clone(),
-                            Some(tx.contract_name.to_string()),
-                            None,
-                            false,
-                            None,
-                        ),
-                    };
+                    let contract_ast = contracts_asts.as_ref().and_then(|m| m.get(&contract_id));
+                    let result = session.interpret(
+                        tx.source.clone(),
+                        Some(tx.contract_name.to_string()),
+                        None,
+                        false,
+                        match code_coverage_enabled {
+                            true => Some("__analysis__".to_string()),
+                            false => None,
+                        },
+                        contract_ast,
+                    );
                     results.insert(contract_id, result);
                     session.set_tx_sender(default_tx_sender);
                 }
@@ -369,7 +396,7 @@ pub fn read_deployment_or_generate_default(
             None,
         )
     } else {
-        let (deployment, artifacts) = generate_default_deployment(manifest, network)?;
+        let (deployment, artifacts) = generate_default_deployment(manifest, network, false)?;
         (deployment, Some(artifacts))
     };
     Ok((deployment, artifacts))
@@ -727,6 +754,7 @@ pub fn write_deployment(
 pub fn generate_default_deployment(
     manifest: &ProjectManifest,
     network: &StacksNetwork,
+    no_batch: bool,
 ) -> Result<(DeploymentSpecification, DeploymentGenerationArtifacts), String> {
     let chain_config = ChainConfig::from_manifest_path(&manifest.path, &network);
 
@@ -991,13 +1019,16 @@ pub fn generate_default_deployment(
     let mut contract_asts = HashMap::new();
     let mut contract_diags = HashMap::new();
 
+    let mut asts_success = true;
+
     for (contract_id, source) in contracts_sources.into_iter() {
-        let (ast, diags, _) =
+        let (ast, diags, ast_success) =
             session
                 .interpreter
                 .build_ast(contract_id.clone(), source, parser_version);
         contract_asts.insert(contract_id.clone(), ast);
         contract_diags.insert(contract_id, diags);
+        asts_success = asts_success && ast_success;
     }
 
     let dependencies =
@@ -1047,7 +1078,10 @@ pub fn generate_default_deployment(
         transactions.push(tx);
     }
 
-    let tx_chain_limit = 25;
+    let tx_chain_limit = match no_batch {
+        true => 100_000,
+        false => 25,
+    };
 
     let mut batches = vec![];
     for (id, transactions) in transactions.chunks(tx_chain_limit).enumerate() {
@@ -1104,6 +1138,9 @@ pub fn generate_default_deployment(
         asts: contract_asts,
         deps: dependencies,
         diags: contract_diags,
+        success: asts_success,
+        analysis: HashMap::new(),
+        session,
     };
 
     Ok((deployment, artifacts))

@@ -534,7 +534,7 @@ pub fn build_state(
     let manifest = ProjectManifest::from_path(manifest_path)?;
 
     let (deployment, mut artifacts) =
-        generate_default_deployment(&manifest, &StacksNetwork::Simnet)?;
+        generate_default_deployment(&manifest, &StacksNetwork::Simnet, false)?;
 
     let mut session = initiate_session_from_deployment(&manifest);
     let results =
