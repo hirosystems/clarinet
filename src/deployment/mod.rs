@@ -565,7 +565,7 @@ pub fn apply_on_chain_deployment(
                         .iter()
                         .map(|value| {
                             let execution = session
-                                .interpret(value.to_string(), None, None, false, None)
+                                .interpret(value.to_string(), None, None, false, None, None)
                                 .unwrap();
                             execution.result.unwrap()
                         })

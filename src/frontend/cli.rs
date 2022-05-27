@@ -184,7 +184,7 @@ struct GenerateDeployment {
     /// Generate a deployment file for devnet, using settings/Devnet.toml
     #[clap(
         long = "devnet",
-        conflicts_with = "test",
+        conflicts_with = "simnet",
         conflicts_with = "testnet",
         conflicts_with = "mainnet"
     )]
@@ -192,7 +192,7 @@ struct GenerateDeployment {
     /// Generate a deployment file for devnet, using settings/Testnet.toml
     #[clap(
         long = "testnet",
-        conflicts_with = "test",
+        conflicts_with = "simnet",
         conflicts_with = "devnet",
         conflicts_with = "mainnet"
     )]
@@ -200,7 +200,7 @@ struct GenerateDeployment {
     /// Generate a deployment file for devnet, using settings/Mainnet.toml
     #[clap(
         long = "mainnet",
-        conflicts_with = "test",
+        conflicts_with = "simnet",
         conflicts_with = "testnet",
         conflicts_with = "devnet"
     )]
