@@ -198,7 +198,7 @@ pub enum StacksHookPredicate {
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct StacksContractCallBasedPredicate {
-    pub contract: String,
+    pub contract_identifier: String,
     pub method: String,
 }
 

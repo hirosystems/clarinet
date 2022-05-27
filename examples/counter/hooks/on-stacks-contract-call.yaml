@@ -5,7 +5,7 @@ chain: stacks
 network: devnet
 predicate:
   contract-call:
-    contract-id: counter
+    contract-identifier: counter
     method: counter
 action:
   http-hook: 

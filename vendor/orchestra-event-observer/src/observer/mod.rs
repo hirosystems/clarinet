@@ -375,7 +375,7 @@ pub async fn start_event_observer(
                         }
                     }
                     for (hook, transaction, block_identifier) in hooks_to_trigger.into_iter() {
-                        handle_stacks_hook_action(hook, transaction).await;
+                        handle_stacks_hook_action(hook, transaction, block_identifier, None).await;
                     }
                 }
                 if let Some(ref tx) = observer_events_tx {

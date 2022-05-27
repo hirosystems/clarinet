@@ -253,15 +253,20 @@ impl HookPredicateFile {
         &self,
         specs: &BTreeMap<String, String>,
     ) -> Result<StacksContractCallBasedPredicate, String> {
-        let contract = match specs.get("contract-id") {
+        let contract_identifier = match specs.get("contract-identifier") {
             Some(contract) => Ok(contract.to_string()),
-            None => Err(format!("contract missing for predicate.contract-call")),
+            None => Err(format!(
+                "contract-identifier missing for predicate.contract-call"
+            )),
         }?;
         let method = match specs.get("method") {
             Some(method) => Ok(method.to_string()),
             None => Err(format!("method missing for predicate.contract-call")),
         }?;
-        Ok(StacksContractCallBasedPredicate { contract, method })
+        Ok(StacksContractCallBasedPredicate {
+            contract_identifier,
+            method,
+        })
     }
 
     pub fn extract_event_predicate(

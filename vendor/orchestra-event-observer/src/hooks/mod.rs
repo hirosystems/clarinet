@@ -2,7 +2,7 @@ pub mod types;
 
 use self::types::{
     BitcoinHookSpecification, BitcoinPredicate, BitcoinTxInBasedPredicate, HookAction,
-    HookFormation, HookSpecification, MatchingRule, StacksHookSpecification,
+    HookFormation, HookSpecification, MatchingRule, StacksHookPredicate, StacksHookSpecification,
 };
 use base58::FromBase58;
 use bitcoincore_rpc::bitcoin::blockdata::opcodes;
@@ -11,7 +11,7 @@ use bitcoincore_rpc::bitcoin::{Address, PubkeyHash, PublicKey, Script, TxIn};
 use clarity_repl::clarity::util::hash::Hash160;
 use orchestra_types::{
     BitcoinChainEvent, BitcoinTransactionData, BlockIdentifier, StacksChainEvent, StacksNetwork,
-    StacksTransactionData,
+    StacksTransactionData, StacksTransactionKind,
 };
 use reqwest::{Client, Method};
 use std::str::FromStr;
@@ -29,7 +29,26 @@ pub fn evaluate_stacks_hooks_on_chain_event<'a>(
         StacksChainEvent::ChainUpdatedWithBlock(update) => {
             for tx in update.new_block.transactions.iter() {
                 for hook in active_hooks.iter() {
-                    // enabled.push((hook, tx));
+                    if let StacksTransactionKind::ContractCall(actual_contract_call) =
+                        &tx.metadata.kind
+                    {
+                        match &hook.predicate {
+                            StacksHookPredicate::ContractCall(expected_contract_call) => {
+                                if actual_contract_call.contract_identifier
+                                    == expected_contract_call.contract_identifier
+                                    && actual_contract_call.method == expected_contract_call.method
+                                {
+                                    enabled.push((
+                                        hook.clone(),
+                                        tx,
+                                        &update.new_block.block_identifier,
+                                    ));
+                                    continue;
+                                }
+                            }
+                            StacksHookPredicate::Event(predicate) => unimplemented!(),
+                        }
+                    }
                 }
             }
         }
@@ -99,13 +118,24 @@ pub async fn handle_bitcoin_hook_action<'a>(
 pub async fn handle_stacks_hook_action<'a>(
     hook: &'a StacksHookSpecification,
     tx: &'a StacksTransactionData,
+    block_identifier: &'a BlockIdentifier,
+    proof: Option<&String>,
 ) {
     match &hook.action {
         HookAction::HttpHook(http) => {
             let client = Client::builder().build().unwrap();
             let host = format!("{}", http.url);
             let method = Method::from_bytes(http.method.as_bytes()).unwrap();
-            let body = serde_json::to_vec(&tx).unwrap();
+            let payload = json!({
+                "apply": vec![json!({
+                    "transaction": tx,
+                    "proof": proof,
+                    "block_identifier": block_identifier,
+                    "confirmations": 1,
+                })],
+                "hook_id": hook.id,
+            });
+            let body = serde_json::to_vec(&payload).unwrap();
             let _ = client
                 .request(method, &host)
                 .header("Content-Type", "application/json")

@@ -294,17 +294,23 @@ pub fn get_tx_description(
                 .function_args
                 .iter()
                 .map(|v| format!("{}", v))
-                .collect::<Vec<String>>()
-                .join(", ");
+                .collect::<Vec<String>>();
             (
                 format!(
                     "invoked: {}.{}::{}({})",
                     contract_call.address,
                     contract_call.contract_name,
                     contract_call.function_name,
-                    formatted_args
+                    formatted_args.join(", ")
                 ),
-                StacksTransactionKind::ContractCall,
+                StacksTransactionKind::ContractCall(StacksContractCallData {
+                    contract_identifier: format!(
+                        "{}.{}",
+                        contract_call.address, contract_call.contract_name
+                    ),
+                    method: contract_call.function_name.to_string(),
+                    args: formatted_args,
+                }),
             )
         }
         TransactionPayload::SmartContract(ref smart_contract) => {

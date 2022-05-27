@@ -94,11 +94,18 @@ pub struct StacksTransactionData {
 
 #[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
 pub enum StacksTransactionKind {
-    ContractCall,
+    ContractCall(StacksContractCallData),
     ContractDeployment(StacksContractDeploymentData),
     NativeTokenTransfer,
     Coinbase,
     Other,
+}
+
+#[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
+pub struct StacksContractCallData {
+    pub contract_identifier: String,
+    pub method: String,
+    pub args: Vec<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
@@ -137,6 +144,7 @@ pub struct StacksTransactionExecutionCost {
 pub struct StacksTransactionReceipt {
     pub mutated_contracts_radius: HashSet<String>,
     pub mutated_assets_radius: HashSet<String>,
+    pub contract_calls_stack: HashSet<String>,
     pub events: Vec<StacksTransactionEvent>,
 }
 
@@ -149,6 +157,7 @@ impl StacksTransactionReceipt {
         StacksTransactionReceipt {
             mutated_contracts_radius,
             mutated_assets_radius,
+            contract_calls_stack: HashSet::new(),
             events,
         }
     }
