@@ -535,7 +535,7 @@ impl DeploymentSpecification {
                                     TransactionSpecification::ContractPublish(spec)
                                 }
                                 _ => {
-                                    return Err(format!("{} only supports transactions of type 'contract-call' and 'contract-publish", specs.network.to_lowercase()))
+                                    return Err(format!("{} only supports transactions of type 'contract-call' and 'contract-publish'", specs.network.to_lowercase()))
                                 }
                             };
                             transactions.push(transaction);
