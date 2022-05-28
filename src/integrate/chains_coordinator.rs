@@ -1,7 +1,7 @@
 use super::DevnetEvent;
+use crate::chainhooks::load_chainhooks;
 use crate::deployment::types::DeploymentSpecification;
 use crate::deployment::{apply_on_chain_deployment, DeploymentCommand, DeploymentEvent};
-use crate::hook::load_hooks;
 use crate::integrate::{MempoolAdmissionData, ServiceStatusData, Status};
 use crate::types::{self, AccountConfig, ChainConfig, DevnetConfig, ProjectManifest};
 use crate::types::{ChainsCoordinatorCommand, StacksNetwork};
@@ -12,7 +12,7 @@ use clarity_repl::clarity::representations::ClarityName;
 use clarity_repl::clarity::types::{BuffData, SequenceData, TupleData, Value as ClarityValue};
 use clarity_repl::clarity::util::address::AddressHashMode;
 use clarity_repl::clarity::util::hash::{hex_bytes, Hash160};
-use orchestra_event_observer::hooks::types::HookFormation;
+use orchestra_event_observer::chainhooks::types::HookFormation;
 use orchestra_event_observer::observer::{
     start_event_observer, EventObserverConfig, ObserverEvent,
 };
@@ -76,7 +76,7 @@ impl DevnetEventObserverConfig {
         let chain_config = ChainConfig::from_manifest_path(&manifest.path, &StacksNetwork::Devnet);
 
         info!("Checking hooks...");
-        let hooks = match load_hooks(&manifest.path, &StacksNetwork::Devnet) {
+        let hooks = match load_chainhooks(&manifest.path, &StacksNetwork::Devnet) {
             Ok(hooks) => HookFormation::new(), // hooks, // TODO(lgalabru)
             Err(e) => {
                 println!("{}", e);
@@ -134,7 +134,7 @@ pub async fn start_chains_coordinator(
         devnet_event_tx
             .send(DevnetEvent::info(format!(
                 "{} hooks registered",
-                hooks.bitcoin_hooks.len() + hooks.stacks_hooks.len()
+                hooks.bitcoin_chainhooks.len() + hooks.stacks_chainhooks.len()
             )))
             .expect("Unable to terminate event observer");
     }

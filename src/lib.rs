@@ -18,9 +18,9 @@ pub extern crate clarity_repl;
 #[macro_use]
 pub mod macros;
 
+pub mod chainhooks;
 pub mod deployment;
 pub mod generate;
-pub mod hook;
 pub mod integrate;
 pub mod types;
 pub mod utils;

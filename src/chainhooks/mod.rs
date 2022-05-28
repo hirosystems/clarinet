@@ -2,7 +2,7 @@ use std::str::FromStr;
 use std::{fs::DirEntry, path::PathBuf};
 
 pub mod types;
-use crate::hook::types::HookSpecificationFile;
+use crate::chainhooks::types::ChainhookSpecificationFile;
 use crate::types::{
     BitcoinChainEvent, BitcoinTransactionData, BlockIdentifier, StacksChainEvent, StacksNetwork,
     StacksTransactionData,
@@ -13,40 +13,40 @@ use bitcoincore_rpc::bitcoin::blockdata::script::Builder as BitcoinScriptBuilder
 use bitcoincore_rpc::bitcoin::{Address, PubkeyHash, PublicKey, Script, TxIn};
 use clarity_repl::clarity::util::hash::bytes_to_hex;
 use clarity_repl::clarity::util::hash::Hash160;
-use orchestra_event_observer::hooks::types::{
-    BitcoinHookSpecification, BitcoinPredicate, HookAction, HookFormation, HookSpecification,
-    MatchingRule, StacksHookSpecification,
+use orchestra_event_observer::chainhooks::types::{
+    BitcoinChainhookSpecification, BitcoinPredicate, ChainhookSpecification, HookAction,
+    HookFormation, MatchingRule, StacksChainhookSpecification,
 };
 use reqwest::Client;
 use reqwest::Method;
 use std::fs;
 
-pub fn load_hooks(
+pub fn load_chainhooks(
     manifest_path: &PathBuf,
     network: &StacksNetwork,
 ) -> Result<HookFormation, String> {
-    let hook_files = get_hooks_files(manifest_path)?;
-    let mut stacks_hooks = vec![];
-    let mut bitcoin_hooks = vec![];
+    let hook_files = get_chainhooks_files(manifest_path)?;
+    let mut stacks_chainhooks = vec![];
+    let mut bitcoin_chainhooks = vec![];
     for (path, relative_path) in hook_files.into_iter() {
-        let hook = match HookSpecificationFile::parse(&path) {
+        let hook = match ChainhookSpecificationFile::parse(&path) {
             Ok(hook) => match hook {
-                HookSpecification::Bitcoin(hook) => bitcoin_hooks.push(hook),
-                HookSpecification::Stacks(hook) => stacks_hooks.push(hook),
+                ChainhookSpecification::Bitcoin(hook) => bitcoin_chainhooks.push(hook),
+                ChainhookSpecification::Stacks(hook) => stacks_chainhooks.push(hook),
             },
             Err(msg) => return Err(format!("{} syntax incorrect: {}", relative_path, msg)),
         };
     }
     Ok(HookFormation {
-        stacks_hooks,
-        bitcoin_hooks,
+        stacks_chainhooks,
+        bitcoin_chainhooks,
     })
 }
 
-pub fn check_hooks(manifest_path: &PathBuf, output_json: bool) -> Result<(), String> {
-    let hook_files = get_hooks_files(manifest_path)?;
+pub fn check_chainhooks(manifest_path: &PathBuf, output_json: bool) -> Result<(), String> {
+    let hook_files = get_chainhooks_files(manifest_path)?;
     for (path, relative_path) in hook_files.into_iter() {
-        let _hook = match HookSpecificationFile::parse(&path) {
+        let _hook = match ChainhookSpecificationFile::parse(&path) {
             Ok(hook) => hook,
             Err(msg) => {
                 println!("{} {} syntax incorrect\n{}", red!("x"), relative_path, msg);
@@ -62,7 +62,7 @@ pub fn check_hooks(manifest_path: &PathBuf, output_json: bool) -> Result<(), Str
     Ok(())
 }
 
-fn get_hooks_files(manifest_path: &PathBuf) -> Result<Vec<(PathBuf, String)>, String> {
+fn get_chainhooks_files(manifest_path: &PathBuf) -> Result<Vec<(PathBuf, String)>, String> {
     let mut hooks_home = manifest_path.clone();
     hooks_home.pop();
     let suffix_len = hooks_home.to_str().unwrap().len() + 1;

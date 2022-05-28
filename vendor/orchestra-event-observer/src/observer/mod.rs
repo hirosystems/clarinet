@@ -1,6 +1,6 @@
-use crate::hooks::types::{HookFormation, HookSpecification};
-use crate::hooks::{
-    evaluate_bitcoin_hooks_on_chain_event, evaluate_stacks_hooks_on_chain_event,
+use crate::chainhooks::types::{ChainhookSpecification, HookFormation};
+use crate::chainhooks::{
+    evaluate_bitcoin_chainhooks_on_chain_event, evaluate_stacks_chainhooks_on_chain_event,
     handle_bitcoin_hook_action, handle_stacks_hook_action,
 };
 use crate::indexer::{chains, Indexer, IndexerConfig};
@@ -138,7 +138,7 @@ pub enum ObserverCommand {
     PropagateStacksChainEvent(StacksChainEvent),
     SubscribeStreamer(u64),
     UnsubscribeStreamer(u64),
-    RegisterHook(HookSpecification, ApiKey),
+    RegisterHook(ChainhookSpecification, ApiKey),
     DeregisterBitcoinHook(u32, ApiKey),
     DeregisterStacksHook(u32, ApiKey),
     NotifyBitcoinTransactionProxied,
@@ -153,8 +153,8 @@ pub enum ObserverEvent {
     BitcoinChainEvent(BitcoinChainEvent),
     StacksChainEvent(StacksChainEvent),
     NotifyBitcoinTransactionProxied,
-    HookRegistered(HookSpecification),
-    HookDeregistered(HookSpecification),
+    HookRegistered(ChainhookSpecification),
+    HookDeregistered(ChainhookSpecification),
     HooksTriggered(usize),
     Terminate,
 }
@@ -270,11 +270,11 @@ pub async fn start_event_observer(
         let mut hook_formation = HookFormation::new();
         if let Some(ref mut initial_hook_formation) = config.initial_hook_formation {
             hook_formation
-                .stacks_hooks
-                .append(&mut initial_hook_formation.stacks_hooks);
+                .stacks_chainhooks
+                .append(&mut initial_hook_formation.stacks_chainhooks);
             hook_formation
-                .bitcoin_hooks
-                .append(&mut initial_hook_formation.bitcoin_hooks);
+                .bitcoin_chainhooks
+                .append(&mut initial_hook_formation.bitcoin_chainhooks);
         }
         config.operators.insert(None, hook_formation);
     }
@@ -303,15 +303,17 @@ pub async fn start_event_observer(
                 }
                 // process hooks
                 if config.hooks_enabled {
-                    let bitcoin_hooks = config
+                    let bitcoin_chainhooks = config
                         .operators
                         .values()
-                        .map(|v| &v.bitcoin_hooks)
+                        .map(|v| &v.bitcoin_chainhooks)
                         .flatten()
                         .collect();
 
-                    let hooks_to_trigger =
-                        evaluate_bitcoin_hooks_on_chain_event(&chain_event, bitcoin_hooks);
+                    let hooks_to_trigger = evaluate_bitcoin_chainhooks_on_chain_event(
+                        &chain_event,
+                        bitcoin_chainhooks,
+                    );
                     let mut proofs = HashMap::new();
                     for (_, transaction, block_identifier) in hooks_to_trigger.iter() {
                         if !proofs.contains_key(&transaction.transaction_identifier.hash) {
@@ -359,16 +361,16 @@ pub async fn start_event_observer(
                     event_handler.propagate_stacks_event(&chain_event).await;
                 }
                 if config.hooks_enabled {
-                    let stacks_hooks = config
+                    let stacks_chainhooks = config
                         .operators
                         .values()
-                        .map(|v| &v.stacks_hooks)
+                        .map(|v| &v.stacks_chainhooks)
                         .flatten()
                         .collect();
 
                     // process hooks
                     let hooks_to_trigger =
-                        evaluate_stacks_hooks_on_chain_event(&chain_event, stacks_hooks);
+                        evaluate_stacks_chainhooks_on_chain_event(&chain_event, stacks_chainhooks);
                     if hooks_to_trigger.len() > 0 {
                         if let Some(ref tx) = observer_events_tx {
                             let _ = tx.send(ObserverEvent::HooksTriggered(hooks_to_trigger.len()));
@@ -411,9 +413,9 @@ pub async fn start_event_observer(
                     .expect("unable to retrieve hook formation");
                 let hook = hook_formation.deregister_stacks_hook(hook_id);
                 if let (Some(tx), Some(hook)) = (&observer_events_tx, hook) {
-                    let _ = tx.send(ObserverEvent::HookDeregistered(HookSpecification::Stacks(
-                        hook,
-                    )));
+                    let _ = tx.send(ObserverEvent::HookDeregistered(
+                        ChainhookSpecification::Stacks(hook),
+                    ));
                 }
             }
             ObserverCommand::DeregisterBitcoinHook(hook_id, api_key) => {
@@ -423,9 +425,9 @@ pub async fn start_event_observer(
                     .expect("unable to retrieve hook formation");
                 let hook = hook_formation.deregister_bitcoin_hook(hook_id);
                 if let (Some(tx), Some(hook)) = (&observer_events_tx, hook) {
-                    let _ = tx.send(ObserverEvent::HookDeregistered(HookSpecification::Bitcoin(
-                        hook,
-                    )));
+                    let _ = tx.send(ObserverEvent::HookDeregistered(
+                        ChainhookSpecification::Bitcoin(hook),
+                    ));
                 }
             }
         }
@@ -635,7 +637,7 @@ pub async fn handle_bitcoin_rpc_call(
 
 #[post("/v1/hooks", format = "application/json", data = "<hook>")]
 pub fn handle_create_hook(
-    hook: Json<HookSpecification>,
+    hook: Json<ChainhookSpecification>,
     background_job_tx: &State<Arc<Mutex<Sender<ObserverCommand>>>>,
     api_key: ApiKey,
 ) -> Json<JsonValue> {

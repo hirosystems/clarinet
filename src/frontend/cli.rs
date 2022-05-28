@@ -1,3 +1,4 @@
+use crate::chainhooks::check_chainhooks;
 use crate::deployment::{
     self, apply_on_chain_deployment, check_deployments, generate_default_deployment,
     get_absolute_deployment_path, get_default_deployment_path, get_initial_transactions_trackers,
@@ -9,7 +10,6 @@ use crate::generate::{
     self,
     changes::{Changes, TOMLEdition},
 };
-use crate::hook::check_hooks;
 use crate::integrate::{self, DevnetOrchestrator};
 use crate::lsp::run_lsp;
 use crate::runnner::run_scripts;
@@ -61,9 +61,9 @@ enum Command {
     /// Interact with contracts deployed on Mainnet
     #[clap(subcommand, name = "requirements")]
     Requirements(Requirements),
-    /// Subcommands for working with hooks
-    #[clap(subcommand, name = "hooks")]
-    Hooks(Hooks),
+    /// Subcommands for working with chainhooks
+    #[clap(subcommand, name = "chainhooks")]
+    Chainhooks(Chainhooks),
     /// Manage contracts deployments on Simnet/Devnet/Testnet/Mainnet
     #[clap(subcommand, name = "deployments")]
     Deployments(Deployments),
@@ -124,17 +124,17 @@ enum Deployments {
 }
 
 #[derive(Subcommand, PartialEq, Clone, Debug)]
-#[clap(bin_name = "hook", aliases = &["hooks"])]
-enum Hooks {
+#[clap(bin_name = "chainhook", aliases = &["chainhooks"])]
+enum Chainhooks {
     /// Generate files and settings for a new hook
     #[clap(name = "new", bin_name = "new")]
-    NewHook(NewHook),
+    NewChainhook(NewChainhook),
     /// Check hooks format
     #[clap(name = "check", bin_name = "check")]
-    CheckHooks(CheckHooks),
+    CheckChainhooks(CheckChainhooks),
     /// Publish contracts on chain
     #[clap(name = "deploy", bin_name = "deploy")]
-    DeployHooks(DeployHooks),
+    DeployChainhook(DeployChainhook),
 }
 
 #[derive(Parser, PartialEq, Clone, Debug)]
@@ -219,7 +219,7 @@ struct GenerateDeployment {
 }
 
 #[derive(Parser, PartialEq, Clone, Debug)]
-struct NewHook {
+struct NewChainhook {
     /// Hook's name
     pub name: String,
     /// Path to Clarinet.toml
@@ -228,7 +228,7 @@ struct NewHook {
 }
 
 #[derive(Parser, PartialEq, Clone, Debug)]
-struct CheckHooks {
+struct CheckChainhooks {
     /// Path to Clarinet.toml
     #[clap(long = "manifest-path")]
     pub manifest_path: Option<String>,
@@ -238,7 +238,7 @@ struct CheckHooks {
 }
 
 #[derive(Parser, PartialEq, Clone, Debug)]
-struct DeployHooks {
+struct DeployChainhook {
     /// Path to Clarinet.toml
     #[clap(long = "manifest-path")]
     pub manifest_path: Option<String>,
@@ -655,8 +655,8 @@ pub fn main() {
                 }
             }
         },
-        Command::Hooks(subcommand) => match subcommand {
-            Hooks::NewHook(cmd) => {
+        Command::Chainhooks(subcommand) => match subcommand {
+            Chainhooks::NewChainhook(cmd) => {
                 let manifest_path = get_manifest_path_or_exit(cmd.manifest_path);
 
                 // let changes = generate::get_changes_for_new_contract(
@@ -673,13 +673,13 @@ pub fn main() {
                 //     display_post_check_hint();
                 // }
             }
-            Hooks::CheckHooks(cmd) => {
+            Chainhooks::CheckChainhooks(cmd) => {
                 let manifest_path = get_manifest_path_or_exit(cmd.manifest_path);
                 // Ensure that all the hooks can correctly be deserialized.
                 println!("Checking hooks");
-                let _ = check_hooks(&manifest_path, cmd.output_json);
+                let _ = check_chainhooks(&manifest_path, cmd.output_json);
             }
-            Hooks::DeployHooks(cmd) => {
+            Chainhooks::DeployChainhook(cmd) => {
                 let manifest_path = get_manifest_path_or_exit(cmd.manifest_path);
                 // Deploy hooks
             }

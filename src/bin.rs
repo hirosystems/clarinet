@@ -9,10 +9,10 @@ extern crate serde_json;
 #[macro_use]
 mod macros;
 
+mod chainhooks;
 mod deployment;
 mod frontend;
 mod generate;
-mod hook;
 mod integrate;
 mod lsp;
 mod runnner;

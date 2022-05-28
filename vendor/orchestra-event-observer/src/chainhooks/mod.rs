@@ -1,8 +1,9 @@
 pub mod types;
 
 use self::types::{
-    BitcoinHookSpecification, BitcoinPredicate, BitcoinTxInBasedPredicate, HookAction,
-    HookFormation, HookSpecification, MatchingRule, StacksHookPredicate, StacksHookSpecification,
+    BitcoinChainhookSpecification, BitcoinPredicate, BitcoinTxInBasedPredicate,
+    ChainhookSpecification, HookAction, HookFormation, MatchingRule, StacksChainhookSpecification,
+    StacksHookPredicate,
 };
 use base58::FromBase58;
 use bitcoincore_rpc::bitcoin::blockdata::opcodes;
@@ -16,11 +17,11 @@ use orchestra_types::{
 use reqwest::{Client, Method};
 use std::str::FromStr;
 
-pub fn evaluate_stacks_hooks_on_chain_event<'a>(
+pub fn evaluate_stacks_chainhooks_on_chain_event<'a>(
     chain_event: &'a StacksChainEvent,
-    active_hooks: Vec<&'a StacksHookSpecification>,
+    active_chainhooks: Vec<&'a StacksChainhookSpecification>,
 ) -> Vec<(
-    &'a StacksHookSpecification,
+    &'a StacksChainhookSpecification,
     &'a StacksTransactionData,
     &'a BlockIdentifier,
 )> {
@@ -28,7 +29,7 @@ pub fn evaluate_stacks_hooks_on_chain_event<'a>(
     match chain_event {
         StacksChainEvent::ChainUpdatedWithBlock(update) => {
             for tx in update.new_block.transactions.iter() {
-                for hook in active_hooks.iter() {
+                for hook in active_chainhooks.iter() {
                     if let StacksTransactionKind::ContractCall(actual_contract_call) =
                         &tx.metadata.kind
                     {
@@ -59,18 +60,18 @@ pub fn evaluate_stacks_hooks_on_chain_event<'a>(
     enabled
 }
 
-pub fn evaluate_bitcoin_hooks_on_chain_event<'a>(
+pub fn evaluate_bitcoin_chainhooks_on_chain_event<'a>(
     chain_event: &'a BitcoinChainEvent,
-    active_hooks: Vec<&'a BitcoinHookSpecification>,
+    active_chainhooks: Vec<&'a BitcoinChainhookSpecification>,
 ) -> Vec<(
-    &'a BitcoinHookSpecification,
+    &'a BitcoinChainhookSpecification,
     &'a BitcoinTransactionData,
     &'a BlockIdentifier,
 )> {
     let mut enabled = vec![];
     match chain_event {
         BitcoinChainEvent::ChainUpdatedWithBlock(block) => {
-            for hook in active_hooks.into_iter() {
+            for hook in active_chainhooks.into_iter() {
                 for tx in block.transactions.iter() {
                     if hook.evaluate_predicate(&tx) {
                         enabled.push((hook, tx, &block.block_identifier));
@@ -84,7 +85,7 @@ pub fn evaluate_bitcoin_hooks_on_chain_event<'a>(
 }
 
 pub async fn handle_bitcoin_hook_action<'a>(
-    hook: &'a BitcoinHookSpecification,
+    hook: &'a BitcoinChainhookSpecification,
     tx: &'a BitcoinTransactionData,
     block_identifier: &'a BlockIdentifier,
     proof: Option<&String>,
@@ -116,7 +117,7 @@ pub async fn handle_bitcoin_hook_action<'a>(
 }
 
 pub async fn handle_stacks_hook_action<'a>(
-    hook: &'a StacksHookSpecification,
+    hook: &'a StacksChainhookSpecification,
     tx: &'a StacksTransactionData,
     block_identifier: &'a BlockIdentifier,
     proof: Option<&String>,
@@ -146,7 +147,7 @@ pub async fn handle_stacks_hook_action<'a>(
     }
 }
 
-impl BitcoinHookSpecification {
+impl BitcoinChainhookSpecification {
     pub fn evaluate_predicate(&self, tx: &BitcoinTransactionData) -> bool {
         match &self.predicate {
             types::BitcoinHookPredicate::TxIn(BitcoinPredicate::Hex(MatchingRule::Equals(

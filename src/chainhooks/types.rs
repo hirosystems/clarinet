@@ -1,5 +1,5 @@
 use clarity_repl::clarity::util::hash::hex_bytes;
-use orchestra_event_observer::hooks::types::*;
+use orchestra_event_observer::chainhooks::types::*;
 use orchestra_types::{BitcoinNetwork, StacksNetwork};
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
@@ -8,7 +8,7 @@ use std::io::{BufReader, Read};
 use std::path::PathBuf;
 
 #[derive(Debug, PartialEq, Serialize, Deserialize)]
-pub struct HookSpecificationFile {
+pub struct ChainhookSpecificationFile {
     id: Option<u32>,
     name: String,
     network: String,
@@ -39,13 +39,13 @@ pub struct HookActionFile {
     http_hook: Option<BTreeMap<String, String>>,
 }
 
-impl HookSpecificationFile {
-    pub fn parse(path: &PathBuf) -> Result<HookSpecification, String> {
-        let file = HookSpecificationFile::new(path)?;
+impl ChainhookSpecificationFile {
+    pub fn parse(path: &PathBuf) -> Result<ChainhookSpecification, String> {
+        let file = ChainhookSpecificationFile::new(path)?;
         file.to_specification()
     }
 
-    pub fn new(path: &PathBuf) -> Result<HookSpecificationFile, String> {
+    pub fn new(path: &PathBuf) -> Result<ChainhookSpecificationFile, String> {
         let path = match File::open(path) {
             Ok(path) => path,
             Err(_e) => {
@@ -58,7 +58,7 @@ impl HookSpecificationFile {
             .read_to_end(&mut hook_spec_file_buffer)
             .unwrap();
 
-        let specification: HookSpecificationFile =
+        let specification: ChainhookSpecificationFile =
             match serde_yaml::from_slice(&hook_spec_file_buffer[..]) {
                 Ok(res) => res,
                 Err(msg) => return Err(format!("unable to read file {}", msg)),
@@ -67,13 +67,13 @@ impl HookSpecificationFile {
         Ok(specification)
     }
 
-    pub fn to_specification(&self) -> Result<HookSpecification, String> {
+    pub fn to_specification(&self) -> Result<ChainhookSpecification, String> {
         let res = if self.chain.to_lowercase() == "stacks" {
             let res = self.to_stacks_specification()?;
-            HookSpecification::Stacks(res)
+            ChainhookSpecification::Stacks(res)
         } else if self.chain.to_lowercase() == "bitcoin" {
             let res = self.to_bitcoin_specification()?;
-            HookSpecification::Bitcoin(res)
+            ChainhookSpecification::Bitcoin(res)
         } else {
             return Err(format!(
                 "chain '{}' not supported (stacks, bitcoin)",
@@ -83,7 +83,7 @@ impl HookSpecificationFile {
         Ok(res)
     }
 
-    pub fn to_bitcoin_specification(&self) -> Result<BitcoinHookSpecification, String> {
+    pub fn to_bitcoin_specification(&self) -> Result<BitcoinChainhookSpecification, String> {
         let network = if self.network.to_lowercase() == "regtest" {
             BitcoinNetwork::Regtest
         } else if self.network.to_lowercase() == "testnet" {
@@ -97,7 +97,7 @@ impl HookSpecificationFile {
             ));
         };
 
-        Ok(BitcoinHookSpecification {
+        Ok(BitcoinChainhookSpecification {
             id: self.id.unwrap_or(1),
             name: self.name.to_string(),
             network: network,
@@ -109,7 +109,7 @@ impl HookSpecificationFile {
         })
     }
 
-    pub fn to_stacks_specification(&self) -> Result<StacksHookSpecification, String> {
+    pub fn to_stacks_specification(&self) -> Result<StacksChainhookSpecification, String> {
         let network = if self.network.to_lowercase() == "devnet" {
             StacksNetwork::Devnet
         } else if self.network.to_lowercase() == "testnet" {
@@ -123,7 +123,7 @@ impl HookSpecificationFile {
             ));
         };
 
-        Ok(StacksHookSpecification {
+        Ok(StacksChainhookSpecification {
             id: self.id.unwrap_or(1),
             name: self.name.to_string(),
             network: network,

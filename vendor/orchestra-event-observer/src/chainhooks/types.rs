@@ -9,30 +9,30 @@ use orchestra_types::{BitcoinNetwork, StacksNetwork};
 
 #[derive(Clone, Debug)]
 pub struct HookFormation {
-    pub stacks_hooks: Vec<StacksHookSpecification>,
-    pub bitcoin_hooks: Vec<BitcoinHookSpecification>,
+    pub stacks_chainhooks: Vec<StacksChainhookSpecification>,
+    pub bitcoin_chainhooks: Vec<BitcoinChainhookSpecification>,
 }
 
 impl HookFormation {
     pub fn new() -> HookFormation {
         HookFormation {
-            stacks_hooks: vec![],
-            bitcoin_hooks: vec![],
+            stacks_chainhooks: vec![],
+            bitcoin_chainhooks: vec![],
         }
     }
 
-    pub fn register_hook(&mut self, hook: HookSpecification) {
+    pub fn register_hook(&mut self, hook: ChainhookSpecification) {
         match hook {
-            HookSpecification::Stacks(hook) => self.stacks_hooks.push(hook),
-            HookSpecification::Bitcoin(hook) => self.bitcoin_hooks.push(hook),
+            ChainhookSpecification::Stacks(hook) => self.stacks_chainhooks.push(hook),
+            ChainhookSpecification::Bitcoin(hook) => self.bitcoin_chainhooks.push(hook),
         };
     }
 
-    pub fn deregister_stacks_hook(&mut self, hook_id: u32) -> Option<StacksHookSpecification> {
+    pub fn deregister_stacks_hook(&mut self, hook_id: u32) -> Option<StacksChainhookSpecification> {
         let mut i = 0;
-        while i < self.stacks_hooks.len() {
-            if self.stacks_hooks[i].id == hook_id {
-                let hook = self.stacks_hooks.remove(i);
+        while i < self.stacks_chainhooks.len() {
+            if self.stacks_chainhooks[i].id == hook_id {
+                let hook = self.stacks_chainhooks.remove(i);
                 return Some(hook);
             } else {
                 i += 1;
@@ -41,11 +41,14 @@ impl HookFormation {
         None
     }
 
-    pub fn deregister_bitcoin_hook(&mut self, hook_id: u32) -> Option<BitcoinHookSpecification> {
+    pub fn deregister_bitcoin_hook(
+        &mut self,
+        hook_id: u32,
+    ) -> Option<BitcoinChainhookSpecification> {
         let mut i = 0;
-        while i < self.bitcoin_hooks.len() {
-            if self.bitcoin_hooks[i].id == hook_id {
-                let hook = self.bitcoin_hooks.remove(i);
+        while i < self.bitcoin_chainhooks.len() {
+            if self.bitcoin_chainhooks[i].id == hook_id {
+                let hook = self.bitcoin_chainhooks.remove(i);
                 return Some(hook);
             } else {
                 i += 1;
@@ -57,12 +60,12 @@ impl HookFormation {
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
-pub enum HookSpecification {
-    Bitcoin(BitcoinHookSpecification),
-    Stacks(StacksHookSpecification),
+pub enum ChainhookSpecification {
+    Bitcoin(BitcoinChainhookSpecification),
+    Stacks(StacksChainhookSpecification),
 }
 
-impl HookSpecification {
+impl ChainhookSpecification {
     pub fn name(&self) -> &str {
         match &self {
             Self::Bitcoin(data) => &data.name,
@@ -72,7 +75,7 @@ impl HookSpecification {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct BitcoinHookSpecification {
+pub struct BitcoinChainhookSpecification {
     pub id: u32,
     pub name: String,
     pub network: BitcoinNetwork,
@@ -178,7 +181,7 @@ pub struct BitcoinTxOutBasedPredicate {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct StacksHookSpecification {
+pub struct StacksChainhookSpecification {
     pub id: u32,
     pub name: String,
     pub network: StacksNetwork,

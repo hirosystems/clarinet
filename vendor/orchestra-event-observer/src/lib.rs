@@ -11,7 +11,7 @@ extern crate serde_json;
 #[macro_use]
 extern crate rocket;
 
-pub mod hooks;
+pub mod chainhooks;
 pub mod indexer;
 pub mod observer;
 pub mod utils;

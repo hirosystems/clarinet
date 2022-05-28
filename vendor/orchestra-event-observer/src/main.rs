@@ -11,12 +11,12 @@ extern crate serde_json;
 #[macro_use]
 extern crate rocket;
 
-mod hooks;
+mod chainhooks;
 mod indexer;
 mod observer;
 mod utils;
 
-use crate::hooks::types::HookFormation;
+use crate::chainhooks::types::HookFormation;
 use clap::Parser;
 use ctrlc;
 use observer::{EventHandler, EventObserverConfig, ObserverCommand};
