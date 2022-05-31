@@ -10,8 +10,8 @@ use crate::generate::{
 };
 use crate::integrate::{self, DevnetOrchestrator};
 use crate::lsp::run_lsp;
-use crate::runnner::run_scripts;
-use crate::runnner::DeploymentCache;
+use crate::runner::run_scripts;
+use crate::runner::DeploymentCache;
 use crate::types::{ProjectManifest, ProjectManifestFile, RequirementConfig, StacksNetwork};
 use clarity_repl::clarity::analysis::{AnalysisDatabase, ContractAnalysis};
 use clarity_repl::clarity::costs::LimitedCostTracker;
