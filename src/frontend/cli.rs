@@ -105,7 +105,7 @@ enum Requirements {
 }
 
 #[derive(Subcommand, PartialEq, Clone, Debug)]
-#[clap(bin_name = "deployment", aliases = &["deployments"])]
+#[clap(bin_name = "deployment", aliases = &["deployment"])]
 enum Deployments {
     /// Check deployments format
     #[clap(name = "check", bin_name = "check")]
