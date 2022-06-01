@@ -39,6 +39,7 @@ pub enum TransactionSpecificationFile {
     ContractPublish(ContractPublishSpecificationFile),
     EmulatedContractCall(EmulatedContractCallSpecificationFile),
     EmulatedContractPublish(EmulatedContractPublishSpecificationFile),
+    RequirementPublish(RequirementPublishSpecificationFile),
 }
 
 #[derive(Debug, PartialEq, Serialize, Deserialize)]
@@ -48,6 +49,15 @@ pub struct ContractCallSpecificationFile {
     pub expected_sender: String,
     pub method: String,
     pub parameters: Vec<String>,
+    pub cost: u64,
+}
+
+#[derive(Debug, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub struct RequirementPublishSpecificationFile {
+    pub contract_id: String,
+    pub remap_sender: String,
+    pub path: String,
     pub cost: u64,
 }
 
@@ -87,6 +97,7 @@ pub struct TransactionsBatchSpecification {
 pub enum TransactionSpecification {
     ContractCall(ContractCallSpecification),
     ContractPublish(ContractPublishSpecification),
+    RequirementPublish(RequirementPublishSpecification),
     EmulatedContractCall(EmulatedContractCallSpecification),
     EmulatedContractPublish(EmulatedContractPublishSpecification),
 }
@@ -201,6 +212,68 @@ impl ContractPublishSpecification {
         Ok(ContractPublishSpecification {
             contract_name,
             expected_sender,
+            source,
+            relative_path: specs.path.clone(),
+            cost: specs.cost,
+        })
+    }
+}
+
+#[derive(Debug, PartialEq, Serialize, Deserialize, Clone)]
+pub struct RequirementPublishSpecification {
+    pub contract_id: QualifiedContractIdentifier,
+    pub remap_sender: StandardPrincipalData,
+    pub relative_path: String,
+    pub source: String,
+    pub cost: u64,
+}
+
+impl RequirementPublishSpecification {
+    pub fn from_specifications(
+        specs: &RequirementPublishSpecificationFile,
+        base_path: &PathBuf,
+    ) -> Result<RequirementPublishSpecification, String> {
+        let contract_id = match QualifiedContractIdentifier::parse(&specs.contract_id) {
+            Ok(res) => res,
+            Err(_) => {
+                return Err(format!(
+                    "unable to parse '{}' as a valid contract identifier",
+                    specs.contract_id
+                ))
+            }
+        };
+
+        let remap_sender = match PrincipalData::parse_standard_principal(&specs.remap_sender) {
+            Ok(res) => res,
+            Err(_) => {
+                return Err(format!(
+                    "unable to parse remap sender '{}' as a valid Stacks address",
+                    specs.remap_sender
+                ))
+            }
+        };
+
+        let path = match PathBuf::try_from(&specs.path) {
+            Ok(res) => res,
+            Err(_) => return Err(format!("unable to parse '{}' as a valid path", specs.path)),
+        };
+
+        let mut contract_path = base_path.clone();
+        contract_path.push(path);
+
+        let source = match fs::read_to_string(&contract_path) {
+            Ok(code) => code,
+            Err(err) => {
+                return Err(format!(
+                    "unable to read contract at path {:?}: {}",
+                    contract_path, err
+                ))
+            }
+        };
+
+        Ok(RequirementPublishSpecification {
+            contract_id,
+            remap_sender,
             source,
             relative_path: specs.path.clone(),
             cost: specs.cost,
@@ -447,6 +520,14 @@ impl DeploymentSpecification {
                                 TransactionSpecificationFile::ContractCall(spec) => {
                                     TransactionSpecification::ContractCall(ContractCallSpecification::from_specifications(spec)?)
                                 }
+                                TransactionSpecificationFile::RequirementPublish(spec) => {
+                                    if network.is_mainnet() {
+                                        return Err(format!("{} only supports transactions of type 'contract-call' and 'contract-publish", specs.network.to_lowercase()))
+                                    }
+                                    let spec = RequirementPublishSpecification::from_specifications(spec, base_path)?;
+                                    // contracts.insert(contract_id, (spec.source.clone(), spec.relative_path.clone()));
+                                    TransactionSpecification::RequirementPublish(spec)
+                                }
                                 TransactionSpecificationFile::ContractPublish(spec) => {
                                     let spec = ContractPublishSpecification::from_specifications(spec, base_path)?;
                                     let contract_id = QualifiedContractIdentifier::new(spec.expected_sender.clone(), spec.contract_name.clone());
@@ -454,7 +535,7 @@ impl DeploymentSpecification {
                                     TransactionSpecification::ContractPublish(spec)
                                 }
                                 _ => {
-                                    return Err(format!("{} only supports transactions of type 'contract-call' and 'contract-publish", specs.network.to_lowercase()))
+                                    return Err(format!("{} only supports transactions of type 'contract-call' and 'contract-publish'", specs.network.to_lowercase()))
                                 }
                             };
                             transactions.push(transaction);
@@ -678,6 +759,16 @@ impl TransactionPlanSpecification {
                                 contract_name: tx.contract_name.to_string(),
                                 emulated_sender: tx.emulated_sender.to_address(),
                                 path: tx.relative_path.clone(),
+                            },
+                        )
+                    }
+                    TransactionSpecification::RequirementPublish(tx) => {
+                        TransactionSpecificationFile::RequirementPublish(
+                            RequirementPublishSpecificationFile {
+                                contract_id: tx.contract_id.to_string(),
+                                remap_sender: tx.remap_sender.to_address(),
+                                path: tx.relative_path.clone(),
+                                cost: tx.cost,
                             },
                         )
                     }
