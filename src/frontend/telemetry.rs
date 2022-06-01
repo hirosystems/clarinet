@@ -5,7 +5,7 @@ use segment::{
     Client, HttpClient,
 };
 
-use crate::types::StacksNetwork;
+use orchestra_types::StacksNetwork;
 
 pub enum DeveloperUsageEvent {
     NewProject(DeveloperUsageDigest),

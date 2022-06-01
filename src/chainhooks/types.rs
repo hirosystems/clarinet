@@ -1,6 +1,6 @@
 use clarity_repl::clarity::util::hash::hex_bytes;
 use orchestra_event_observer::chainhooks::types::*;
-use orchestra_types::{BitcoinNetwork, StacksNetwork};
+use orchestra_types::{BitcoinNetwork, Chain, StacksNetwork};
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 use std::fs::File;
@@ -11,38 +11,72 @@ use std::path::PathBuf;
 pub struct ChainhookSpecificationFile {
     id: Option<u32>,
     name: String,
-    network: String,
     version: Option<u32>,
-    #[serde(rename = "start-block")]
-    start_block: Option<u64>,
-    #[serde(rename = "end-block")]
-    end_block: Option<u64>,
     chain: String,
-    predicate: HookPredicateFile,
+    networks: BTreeMap<String, ChainhookNetworkSpecificationFile>,
+}
+
+#[derive(Debug, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub struct ChainhookNetworkSpecificationFile {
+    start_block: Option<u64>,
+    end_block: Option<u64>,
+    predicate: ChainhookPredicateFile,
     action: HookActionFile,
 }
 
 #[derive(Debug, PartialEq, Serialize, Deserialize)]
-pub struct HookPredicateFile {
-    event: Option<BTreeMap<String, BTreeMap<String, String>>>,
-    #[serde(rename = "contract-call")]
+#[serde(rename_all = "kebab-case")]
+pub struct ChainhookPredicateFile {
+    print_event: Option<PrintEventPredicateFile>,
+    ft_event: Option<FtEventPredicateFile>,
+    nft_event: Option<NftEventPredicateFile>,
+    stx_event: Option<StxEventPredicateFile>,
     contract_call: Option<BTreeMap<String, String>>,
-    #[serde(rename = "tx-in")]
     tx_in: Option<BTreeMap<String, BTreeMap<String, String>>>,
-    #[serde(rename = "tx-out")]
     tx_out: Option<BTreeMap<String, BTreeMap<String, String>>>,
 }
 
 #[derive(Debug, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub struct PrintEventPredicateFile {
+    contract_identifier: String,
+    contains: String,
+}
+
+#[derive(Debug, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub struct FtEventPredicateFile {
+    asset_identifier: String,
+    actions: Vec<String>,
+}
+
+#[derive(Debug, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub struct NftEventPredicateFile {
+    asset_identifier: String,
+    actions: Vec<String>,
+}
+
+#[derive(Debug, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub struct StxEventPredicateFile {
+    actions: Vec<String>,
+}
+
+#[derive(Debug, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
 pub struct HookActionFile {
-    #[serde(rename = "http-hook")]
     http_hook: Option<BTreeMap<String, String>>,
 }
 
 impl ChainhookSpecificationFile {
-    pub fn parse(path: &PathBuf) -> Result<ChainhookSpecification, String> {
+    pub fn parse(
+        path: &PathBuf,
+        networks: &(BitcoinNetwork, StacksNetwork),
+    ) -> Result<ChainhookSpecification, String> {
         let file = ChainhookSpecificationFile::new(path)?;
-        file.to_specification()
+        file.to_specification(networks)
     }
 
     pub fn new(path: &PathBuf) -> Result<ChainhookSpecificationFile, String> {
@@ -67,12 +101,15 @@ impl ChainhookSpecificationFile {
         Ok(specification)
     }
 
-    pub fn to_specification(&self) -> Result<ChainhookSpecification, String> {
+    pub fn to_specification(
+        &self,
+        networks: &(BitcoinNetwork, StacksNetwork),
+    ) -> Result<ChainhookSpecification, String> {
         let res = if self.chain.to_lowercase() == "stacks" {
-            let res = self.to_stacks_specification()?;
+            let res = self.to_stacks_specification(&networks.1)?;
             ChainhookSpecification::Stacks(res)
         } else if self.chain.to_lowercase() == "bitcoin" {
-            let res = self.to_bitcoin_specification()?;
+            let res = self.to_bitcoin_specification(&networks.0)?;
             ChainhookSpecification::Bitcoin(res)
         } else {
             return Err(format!(
@@ -83,55 +120,57 @@ impl ChainhookSpecificationFile {
         Ok(res)
     }
 
-    pub fn to_bitcoin_specification(&self) -> Result<BitcoinChainhookSpecification, String> {
-        let network = if self.network.to_lowercase() == "regtest" {
-            BitcoinNetwork::Regtest
-        } else if self.network.to_lowercase() == "testnet" {
-            BitcoinNetwork::Testnet
-        } else if self.network.to_lowercase() == "mainnet" {
-            BitcoinNetwork::Mainnet
-        } else {
-            return Err(format!(
-                "network '{}' not supported (devnet, testnet or mainnet)",
-                self.network
-            ));
+    pub fn to_bitcoin_specification(
+        &self,
+        network: &BitcoinNetwork,
+    ) -> Result<BitcoinChainhookSpecification, String> {
+        let network_ser = format!("{:?}", network).to_lowercase();
+        let network_spec = match self.networks.get(&network_ser) {
+            Some(entry) => entry,
+            None => {
+                return Err(format!(
+                    "network '{}' not found in chainhook specification file",
+                    network_ser
+                ))
+            }
         };
 
         Ok(BitcoinChainhookSpecification {
             id: self.id.unwrap_or(1),
-            name: self.name.to_string(),
-            network: network,
-            start_block: self.start_block,
-            end_block: self.end_block,
             version: self.version.unwrap_or(1),
-            predicate: self.predicate.to_bitcoin_predicate()?,
-            action: self.action.to_specifications()?,
+            name: self.name.to_string(),
+            network: network.clone(),
+            start_block: network_spec.start_block,
+            end_block: network_spec.end_block,
+            predicate: network_spec.predicate.to_bitcoin_predicate()?,
+            action: network_spec.action.to_specifications()?,
         })
     }
 
-    pub fn to_stacks_specification(&self) -> Result<StacksChainhookSpecification, String> {
-        let network = if self.network.to_lowercase() == "devnet" {
-            StacksNetwork::Devnet
-        } else if self.network.to_lowercase() == "testnet" {
-            StacksNetwork::Testnet
-        } else if self.network.to_lowercase() == "mainnet" {
-            StacksNetwork::Mainnet
-        } else {
-            return Err(format!(
-                "network '{}' not supported (devnet, testnet or mainnet)",
-                self.network
-            ));
+    pub fn to_stacks_specification(
+        &self,
+        network: &StacksNetwork,
+    ) -> Result<StacksChainhookSpecification, String> {
+        let network_ser = format!("{:?}", network).to_lowercase();
+        let network_spec = match self.networks.get(&network_ser) {
+            Some(entry) => entry,
+            None => {
+                return Err(format!(
+                    "network '{}' not found in chainhook specification file",
+                    network_ser
+                ))
+            }
         };
 
         Ok(StacksChainhookSpecification {
             id: self.id.unwrap_or(1),
-            name: self.name.to_string(),
-            network: network,
-            start_block: self.start_block,
-            end_block: self.end_block,
             version: self.version.unwrap_or(1),
-            predicate: self.predicate.to_stacks_predicate()?,
-            action: self.action.to_specifications()?,
+            name: self.name.to_string(),
+            network: network.clone(),
+            start_block: network_spec.start_block,
+            end_block: network_spec.end_block,
+            predicate: network_spec.predicate.to_stacks_predicate()?,
+            action: network_spec.action.to_specifications()?,
         })
     }
 }
@@ -163,7 +202,7 @@ impl HookActionFile {
     }
 }
 
-impl HookPredicateFile {
+impl ChainhookPredicateFile {
     pub fn to_bitcoin_predicate(&self) -> Result<BitcoinHookPredicate, String> {
         if let Some(ref specs) = self.tx_in {
             let predicate = self.extract_bitcoin_predicate(specs)?;
@@ -242,9 +281,18 @@ impl HookPredicateFile {
         if let Some(ref specs) = self.contract_call {
             let predicate = self.extract_contract_call_predicate(specs)?;
             return Ok(StacksHookPredicate::ContractCall(predicate));
-        } else if let Some(ref specs) = self.event {
-            let predicate = self.extract_event_predicate(specs)?;
-            return Ok(StacksHookPredicate::Event(predicate));
+        } else if let Some(ref specs) = self.print_event {
+            let predicate = self.extract_print_event_predicate(specs)?;
+            return Ok(StacksHookPredicate::PrintEvent(predicate));
+        } else if let Some(ref specs) = self.ft_event {
+            let predicate = self.extract_ft_event_predicate(specs)?;
+            return Ok(StacksHookPredicate::FtEvent(predicate));
+        } else if let Some(ref specs) = self.nft_event {
+            let predicate = self.extract_nft_event_predicate(specs)?;
+            return Ok(StacksHookPredicate::NftEvent(predicate));
+        } else if let Some(ref specs) = self.stx_event {
+            let predicate = self.extract_stx_event_predicate(specs)?;
+            return Ok(StacksHookPredicate::StxEvent(predicate));
         }
         return Err(format!("trigger not specified (contract-call, event)"));
     }
@@ -269,26 +317,42 @@ impl HookPredicateFile {
         })
     }
 
-    pub fn extract_event_predicate(
+    pub fn extract_print_event_predicate(
         &self,
-        specs: &BTreeMap<String, BTreeMap<String, String>>,
-    ) -> Result<StacksEventBasedPredicate, String> {
-        let print_event = match specs.get("print-event") {
-            Some(rule) => Some(rule),
-            None => None,
-        };
-        let nft_rule = match specs.get("nft-event") {
-            Some(rule) => Some(rule),
-            None => None,
-        };
-        let ft_rule = match specs.get("ft-event") {
-            Some(rule) => Some(rule),
-            None => None,
-        };
-        let stx_rule = match specs.get("stx-event") {
-            Some(rule) => Some(rule),
-            None => None,
-        };
-        Ok(StacksEventBasedPredicate {})
+        specs: &PrintEventPredicateFile,
+    ) -> Result<StacksPrintEventBasedPredicate, String> {
+        Ok(StacksPrintEventBasedPredicate {
+            contract_identifier: specs.contract_identifier.clone(),
+            contains: specs.contains.clone(),
+        })
+    }
+
+    pub fn extract_ft_event_predicate(
+        &self,
+        specs: &FtEventPredicateFile,
+    ) -> Result<StacksFtEventBasedPredicate, String> {
+        Ok(StacksFtEventBasedPredicate {
+            asset_identifier: specs.asset_identifier.clone(),
+            actions: specs.actions.clone(),
+        })
+    }
+
+    pub fn extract_nft_event_predicate(
+        &self,
+        specs: &NftEventPredicateFile,
+    ) -> Result<StacksNftEventBasedPredicate, String> {
+        Ok(StacksNftEventBasedPredicate {
+            asset_identifier: specs.asset_identifier.clone(),
+            actions: specs.actions.clone(),
+        })
+    }
+
+    pub fn extract_stx_event_predicate(
+        &self,
+        specs: &StxEventPredicateFile,
+    ) -> Result<StacksStxEventBasedPredicate, String> {
+        Ok(StacksStxEventBasedPredicate {
+            actions: specs.actions.clone(),
+        })
     }
 }

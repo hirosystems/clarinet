@@ -635,7 +635,7 @@ pub async fn handle_bitcoin_rpc_call(
     Json(res.json().await.unwrap())
 }
 
-#[post("/v1/hooks", format = "application/json", data = "<hook>")]
+#[post("/v1/chainhooks", format = "application/json", data = "<hook>")]
 pub fn handle_create_hook(
     hook: Json<ChainhookSpecification>,
     background_job_tx: &State<Arc<Mutex<Sender<ObserverCommand>>>>,
@@ -656,7 +656,7 @@ pub fn handle_create_hook(
     }))
 }
 
-#[delete("/v1/hooks/stacks/<hook_id>", format = "application/json")]
+#[delete("/v1/chainhooks/stacks/<hook_id>", format = "application/json")]
 pub fn handle_delete_stacks_hook(
     hook_id: u32,
     background_job_tx: &State<Arc<Mutex<Sender<ObserverCommand>>>>,
@@ -676,7 +676,7 @@ pub fn handle_delete_stacks_hook(
     }))
 }
 
-#[delete("/v1/hooks/bitcoin/<hook_id>", format = "application/json")]
+#[delete("/v1/chainhooks/bitcoin/<hook_id>", format = "application/json")]
 pub fn handle_delete_bitcoin_hook(
     hook_id: u32,
     background_job_tx: &State<Arc<Mutex<Sender<ObserverCommand>>>>,

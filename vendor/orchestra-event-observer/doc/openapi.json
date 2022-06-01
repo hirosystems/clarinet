@@ -5,10 +5,10 @@
     "version": "0.1.0"
   },
   "paths": {
-    "/v1/hooks": {
+    "/v1/chainhooks": {
       "post": {
         "tags": [
-          "Hooks"
+          "Chainhooks"
         ],
         "operationId": "handle_create_hook",
         "requestBody": {
@@ -33,10 +33,10 @@
         }
       }
     },
-    "/v1/hooks/bitcoin/{hook_id}": {
+    "/v1/chainhooks/bitcoin/{hook_id}": {
       "delete": {
         "tags": [
-          "Hooks"
+          "Chainhooks"
         ],
         "operationId": "handle_delete_bitcoin_hook",
         "parameters": [
@@ -63,10 +63,10 @@
         }
       }
     },
-    "/v1/hooks/stacks/{hook_id}": {
+    "/v1/chainhooks/stacks/{hook_id}": {
       "delete": {
         "tags": [
-          "Hooks"
+          "Chainhooks"
         ],
         "operationId": "handle_delete_stacks_hook",
         "parameters": [
@@ -517,11 +517,11 @@
       "StacksContractCallBasedPredicate": {
         "type": "object",
         "required": [
-          "contract",
+          "contract_identifier",
           "method"
         ],
         "properties": {
-          "contract": {
+          "contract_identifier": {
             "type": "string"
           },
           "method": {

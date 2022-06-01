@@ -12,7 +12,7 @@ use std::path::PathBuf;
 
 use std::fs;
 
-use crate::types::StacksNetwork;
+use orchestra_types::StacksNetwork;
 
 #[derive(Debug, PartialEq, Clone)]
 pub struct TransactionPlanSpecification {

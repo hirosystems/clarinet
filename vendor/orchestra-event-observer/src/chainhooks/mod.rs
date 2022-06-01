@@ -47,7 +47,10 @@ pub fn evaluate_stacks_chainhooks_on_chain_event<'a>(
                                     continue;
                                 }
                             }
-                            StacksHookPredicate::Event(predicate) => unimplemented!(),
+                            StacksHookPredicate::PrintEvent(event) => unimplemented!(),
+                            StacksHookPredicate::StxEvent(event) => unimplemented!(),
+                            StacksHookPredicate::NftEvent(event) => unimplemented!(),
+                            StacksHookPredicate::FtEvent(event) => unimplemented!(),
                         }
                     }
                 }

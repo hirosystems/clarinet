@@ -1,6 +1,6 @@
 use super::DevnetEvent;
 use crate::integrate::{ServiceStatusData, Status};
-use crate::types::{ChainConfig, DevnetConfigFile, ProjectManifest, StacksNetwork};
+use crate::types::{ChainConfig, DevnetConfigFile, ProjectManifest};
 use bollard::container::{
     Config, CreateContainerOptions, KillContainerOptions, ListContainersOptions,
     PruneContainersOptions, WaitContainerOptions,
@@ -12,6 +12,7 @@ use bollard::network::{ConnectNetworkOptions, CreateNetworkOptions, PruneNetwork
 use bollard::Docker;
 use crossterm::terminal::disable_raw_mode;
 use futures::stream::TryStreamExt;
+use orchestra_types::StacksNetwork;
 use std::collections::HashMap;
 use std::fs::{self, File};
 use std::io::Write;

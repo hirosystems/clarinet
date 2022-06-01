@@ -1,10 +1,10 @@
-use super::StacksNetwork;
 use crate::utils::mnemonic;
 use bip39::{Language, Mnemonic};
 use clarity_repl::clarity::util::hash::bytes_to_hex;
 use clarity_repl::clarity::util::secp256k1::Secp256k1PublicKey;
 use clarity_repl::clarity::util::StacksAddress;
 use libsecp256k1::{PublicKey, SecretKey};
+use orchestra_types::StacksNetwork;
 use std::io::{BufReader, Read};
 use std::path::PathBuf;
 use std::{collections::BTreeMap, fs::File};

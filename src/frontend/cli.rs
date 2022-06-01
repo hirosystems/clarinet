@@ -14,12 +14,14 @@ use crate::integrate::{self, DevnetOrchestrator};
 use crate::lsp::run_lsp;
 use crate::runnner::run_scripts;
 use crate::runnner::DeploymentCache;
-use crate::types::{ProjectManifest, ProjectManifestFile, RequirementConfig, StacksNetwork};
+use crate::types::{ProjectManifest, ProjectManifestFile, RequirementConfig};
 use clarity_repl::clarity::analysis::{AnalysisDatabase, ContractAnalysis};
 use clarity_repl::clarity::costs::LimitedCostTracker;
 use clarity_repl::clarity::diagnostic::{Diagnostic, Level};
 use clarity_repl::clarity::types::QualifiedContractIdentifier;
 use clarity_repl::{analysis, repl, Terminal};
+use orchestra_types::Chain;
+use orchestra_types::StacksNetwork;
 use std::collections::HashMap;
 use std::fs::{self, File};
 use std::io::{prelude::*, BufReader, Read};
@@ -124,7 +126,7 @@ enum Deployments {
 }
 
 #[derive(Subcommand, PartialEq, Clone, Debug)]
-#[clap(bin_name = "chainhook", aliases = &["chainhooks"])]
+#[clap(bin_name = "chainhook", aliases = &["chainhook"])]
 enum Chainhooks {
     /// Generate files and settings for a new hook
     #[clap(name = "new", bin_name = "new")]
@@ -225,6 +227,12 @@ struct NewChainhook {
     /// Path to Clarinet.toml
     #[clap(long = "manifest-path")]
     pub manifest_path: Option<String>,
+    /// Generate a Bitcoin chainhook
+    #[clap(long = "bitcoin", conflicts_with = "stacks")]
+    pub bitcoin: bool,
+    /// Generate a Stacks chainhook
+    #[clap(long = "stacks", conflicts_with = "bitcoin")]
+    pub stacks: bool,
 }
 
 #[derive(Parser, PartialEq, Clone, Debug)]
@@ -657,21 +665,27 @@ pub fn main() {
         },
         Command::Chainhooks(subcommand) => match subcommand {
             Chainhooks::NewChainhook(cmd) => {
-                let manifest_path = get_manifest_path_or_exit(cmd.manifest_path);
+                let manifest = load_manifest_or_exit(cmd.manifest_path);
 
-                // let changes = generate::get_changes_for_new_contract(
-                //     manifest_path,
-                //     new_contract.name,
-                //     None,
-                //     true,
-                //     vec![],
-                // );
-                // if !execute_changes(changes) {
-                //     std::process::exit(1);
-                // }
-                // if hints_enabled {
-                //     display_post_check_hint();
-                // }
+                let chain = match (cmd.bitcoin, cmd.stacks) {
+                    (true, false) => Chain::Bitcoin,
+                    (false, true) => Chain::Stacks,
+                    (_, _) => {
+                        println!(
+                            "{}: either --bitcoin or --stacks must be passed",
+                            red!("error")
+                        );
+                        process::exit(1);
+                    }
+                };
+
+                let changes = generate::get_changes_for_new_chainhook(&manifest, cmd.name, chain);
+                if !execute_changes(changes) {
+                    std::process::exit(1);
+                }
+                if hints_enabled {
+                    display_post_check_hint();
+                }
             }
             Chainhooks::CheckChainhooks(cmd) => {
                 let manifest_path = get_manifest_path_or_exit(cmd.manifest_path);

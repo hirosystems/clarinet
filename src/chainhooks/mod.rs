@@ -4,7 +4,7 @@ use std::{fs::DirEntry, path::PathBuf};
 pub mod types;
 use crate::chainhooks::types::ChainhookSpecificationFile;
 use crate::types::{
-    BitcoinChainEvent, BitcoinTransactionData, BlockIdentifier, StacksChainEvent, StacksNetwork,
+    BitcoinChainEvent, BitcoinTransactionData, BlockIdentifier, StacksChainEvent,
     StacksTransactionData,
 };
 use base58::FromBase58;
@@ -17,19 +17,20 @@ use orchestra_event_observer::chainhooks::types::{
     BitcoinChainhookSpecification, BitcoinPredicate, ChainhookSpecification, HookAction,
     HookFormation, MatchingRule, StacksChainhookSpecification,
 };
+use orchestra_types::{BitcoinNetwork, StacksNetwork};
 use reqwest::Client;
 use reqwest::Method;
 use std::fs;
 
 pub fn load_chainhooks(
     manifest_path: &PathBuf,
-    network: &StacksNetwork,
+    networks: &(BitcoinNetwork, StacksNetwork),
 ) -> Result<HookFormation, String> {
     let hook_files = get_chainhooks_files(manifest_path)?;
     let mut stacks_chainhooks = vec![];
     let mut bitcoin_chainhooks = vec![];
     for (path, relative_path) in hook_files.into_iter() {
-        let hook = match ChainhookSpecificationFile::parse(&path) {
+        let hook = match ChainhookSpecificationFile::parse(&path, networks) {
             Ok(hook) => match hook {
                 ChainhookSpecification::Bitcoin(hook) => bitcoin_chainhooks.push(hook),
                 ChainhookSpecification::Stacks(hook) => stacks_chainhooks.push(hook),
@@ -46,7 +47,10 @@ pub fn load_chainhooks(
 pub fn check_chainhooks(manifest_path: &PathBuf, output_json: bool) -> Result<(), String> {
     let hook_files = get_chainhooks_files(manifest_path)?;
     for (path, relative_path) in hook_files.into_iter() {
-        let _hook = match ChainhookSpecificationFile::parse(&path) {
+        let _hook = match ChainhookSpecificationFile::parse(
+            &path,
+            &(BitcoinNetwork::Regtest, StacksNetwork::Devnet),
+        ) {
             Ok(hook) => hook,
             Err(msg) => {
                 println!("{} {} syntax incorrect\n{}", red!("x"), relative_path, msg);
@@ -66,7 +70,7 @@ fn get_chainhooks_files(manifest_path: &PathBuf) -> Result<Vec<(PathBuf, String)
     let mut hooks_home = manifest_path.clone();
     hooks_home.pop();
     let suffix_len = hooks_home.to_str().unwrap().len() + 1;
-    hooks_home.push("hooks");
+    hooks_home.push("chainhooks");
     let paths = match fs::read_dir(&hooks_home) {
         Ok(paths) => paths,
         Err(_) => return Ok(vec![]),

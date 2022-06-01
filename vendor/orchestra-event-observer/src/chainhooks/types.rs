@@ -196,17 +196,45 @@ pub struct StacksChainhookSpecification {
 #[serde(rename_all = "snake_case")]
 pub enum StacksHookPredicate {
     ContractCall(StacksContractCallBasedPredicate),
-    Event(StacksEventBasedPredicate),
+    PrintEvent(StacksPrintEventBasedPredicate),
+    FtEvent(StacksFtEventBasedPredicate),
+    NftEvent(StacksNftEventBasedPredicate),
+    StxEvent(StacksStxEventBasedPredicate),
 }
 
+#[serde(rename_all = "snake_case")]
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct StacksContractCallBasedPredicate {
     pub contract_identifier: String,
     pub method: String,
 }
 
+#[serde(rename_all = "snake_case")]
 #[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct StacksEventBasedPredicate {}
+pub struct StacksPrintEventBasedPredicate {
+    pub contract_identifier: String,
+    pub contains: String,
+}
+
+#[serde(rename_all = "snake_case")]
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct StacksFtEventBasedPredicate {
+    pub asset_identifier: String,
+    pub actions: Vec<String>,
+}
+
+#[serde(rename_all = "snake_case")]
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct StacksNftEventBasedPredicate {
+    pub asset_identifier: String,
+    pub actions: Vec<String>,
+}
+
+#[serde(rename_all = "snake_case")]
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct StacksStxEventBasedPredicate {
+    pub actions: Vec<String>,
+}
 
 pub fn opcode_to_hex(asm: &str) -> Option<u8> {
     match asm {

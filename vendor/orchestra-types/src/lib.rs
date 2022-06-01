@@ -12,3 +12,8 @@ pub use rosetta::*;
 pub mod messages {
     include!(concat!(env!("OUT_DIR"), "/orchestra.messages.rs"));
 }
+
+pub enum Chain {
+    Bitcoin,
+    Stacks,
+}

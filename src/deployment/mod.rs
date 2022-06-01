@@ -13,7 +13,7 @@ use self::types::{
 use crate::deployment::types::ContractPublishSpecification;
 use crate::deployment::types::TransactionSpecification;
 
-use crate::types::{AccountConfig, ChainConfig, ProjectManifest, StacksNetwork};
+use crate::types::{AccountConfig, ChainConfig, ProjectManifest};
 use crate::utils::mnemonic;
 use clarity_repl::analysis::ast_dependency_detector::{ASTDependencyDetector, DependencySet};
 use clarity_repl::clarity::analysis::ContractAnalysis;
@@ -46,6 +46,7 @@ use clarity_repl::clarity::{
 use clarity_repl::repl::SessionSettings;
 use clarity_repl::repl::{ExecutionResult, Session};
 use libsecp256k1::{PublicKey, SecretKey};
+use orchestra_types::StacksNetwork;
 use serde_yaml;
 use stacks_rpc_client::StacksRpc;
 use std::collections::{BTreeMap, HashMap, VecDeque};

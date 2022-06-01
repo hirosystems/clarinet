@@ -3,8 +3,8 @@ use crate::chainhooks::load_chainhooks;
 use crate::deployment::types::DeploymentSpecification;
 use crate::deployment::{apply_on_chain_deployment, DeploymentCommand, DeploymentEvent};
 use crate::integrate::{MempoolAdmissionData, ServiceStatusData, Status};
+use crate::types::ChainsCoordinatorCommand;
 use crate::types::{self, AccountConfig, ChainConfig, DevnetConfig, ProjectManifest};
-use crate::types::{ChainsCoordinatorCommand, StacksNetwork};
 use crate::utils;
 use base58::FromBase58;
 use bitcoincore_rpc::{Auth, Client, RpcApi};
@@ -16,7 +16,7 @@ use orchestra_event_observer::chainhooks::types::HookFormation;
 use orchestra_event_observer::observer::{
     start_event_observer, EventObserverConfig, ObserverEvent,
 };
-use orchestra_types::{BitcoinChainEvent, StacksChainEvent};
+use orchestra_types::{BitcoinChainEvent, BitcoinNetwork, StacksChainEvent, StacksNetwork};
 use stacks_rpc_client::{transactions, PoxInfo, StacksRpc};
 use std::collections::{HashMap, VecDeque};
 use std::convert::TryFrom;
@@ -76,7 +76,10 @@ impl DevnetEventObserverConfig {
         let chain_config = ChainConfig::from_manifest_path(&manifest.path, &StacksNetwork::Devnet);
 
         info!("Checking hooks...");
-        let hooks = match load_chainhooks(&manifest.path, &StacksNetwork::Devnet) {
+        let hooks = match load_chainhooks(
+            &manifest.path,
+            &(BitcoinNetwork::Regtest, StacksNetwork::Devnet),
+        ) {
             Ok(hooks) => HookFormation::new(), // hooks, // TODO(lgalabru)
             Err(e) => {
                 println!("{}", e);
