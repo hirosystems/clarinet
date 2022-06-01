@@ -139,8 +139,8 @@ pub enum ObserverCommand {
     SubscribeStreamer(u64),
     UnsubscribeStreamer(u64),
     RegisterHook(ChainhookSpecification, ApiKey),
-    DeregisterBitcoinHook(u32, ApiKey),
-    DeregisterStacksHook(u32, ApiKey),
+    DeregisterBitcoinHook(String, ApiKey),
+    DeregisterStacksHook(String, ApiKey),
     NotifyBitcoinTransactionProxied,
     Terminate,
 }
@@ -406,24 +406,24 @@ pub async fn start_event_observer(
                     let _ = tx.send(ObserverEvent::HookRegistered(hook));
                 }
             }
-            ObserverCommand::DeregisterStacksHook(hook_id, api_key) => {
+            ObserverCommand::DeregisterStacksHook(hook_uuid, api_key) => {
                 let mut hook_formation = config
                     .operators
                     .get_mut(&api_key.0)
                     .expect("unable to retrieve hook formation");
-                let hook = hook_formation.deregister_stacks_hook(hook_id);
+                let hook = hook_formation.deregister_stacks_hook(hook_uuid);
                 if let (Some(tx), Some(hook)) = (&observer_events_tx, hook) {
                     let _ = tx.send(ObserverEvent::HookDeregistered(
                         ChainhookSpecification::Stacks(hook),
                     ));
                 }
             }
-            ObserverCommand::DeregisterBitcoinHook(hook_id, api_key) => {
+            ObserverCommand::DeregisterBitcoinHook(hook_uuid, api_key) => {
                 let mut hook_formation = config
                     .operators
                     .get_mut(&api_key.0)
                     .expect("unable to retrieve hook formation");
-                let hook = hook_formation.deregister_bitcoin_hook(hook_id);
+                let hook = hook_formation.deregister_bitcoin_hook(hook_uuid);
                 if let (Some(tx), Some(hook)) = (&observer_events_tx, hook) {
                     let _ = tx.send(ObserverEvent::HookDeregistered(
                         ChainhookSpecification::Bitcoin(hook),
@@ -656,16 +656,16 @@ pub fn handle_create_hook(
     }))
 }
 
-#[delete("/v1/chainhooks/stacks/<hook_id>", format = "application/json")]
+#[delete("/v1/chainhooks/stacks/<hook_uuid>", format = "application/json")]
 pub fn handle_delete_stacks_hook(
-    hook_id: u32,
+    hook_uuid: String,
     background_job_tx: &State<Arc<Mutex<Sender<ObserverCommand>>>>,
     api_key: ApiKey,
 ) -> Json<JsonValue> {
     let background_job_tx = background_job_tx.inner();
     match background_job_tx.lock() {
         Ok(tx) => {
-            let _ = tx.send(ObserverCommand::DeregisterStacksHook(hook_id, api_key));
+            let _ = tx.send(ObserverCommand::DeregisterStacksHook(hook_uuid, api_key));
         }
         _ => {}
     };
@@ -676,16 +676,16 @@ pub fn handle_delete_stacks_hook(
     }))
 }
 
-#[delete("/v1/chainhooks/bitcoin/<hook_id>", format = "application/json")]
+#[delete("/v1/chainhooks/bitcoin/<hook_uuid>", format = "application/json")]
 pub fn handle_delete_bitcoin_hook(
-    hook_id: u32,
+    hook_uuid: String,
     background_job_tx: &State<Arc<Mutex<Sender<ObserverCommand>>>>,
     api_key: ApiKey,
 ) -> Json<JsonValue> {
     let background_job_tx = background_job_tx.inner();
     match background_job_tx.lock() {
         Ok(tx) => {
-            let _ = tx.send(ObserverCommand::DeregisterBitcoinHook(hook_id, api_key));
+            let _ = tx.send(ObserverCommand::DeregisterBitcoinHook(hook_uuid, api_key));
         }
         _ => {}
     };

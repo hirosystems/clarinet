@@ -33,7 +33,7 @@
         }
       }
     },
-    "/v1/chainhooks/bitcoin/{hook_id}": {
+    "/v1/chainhooks/bitcoin/{hook_uuid}": {
       "delete": {
         "tags": [
           "Chainhooks"
@@ -41,7 +41,7 @@
         "operationId": "handle_delete_bitcoin_hook",
         "parameters": [
           {
-            "name": "hook_id",
+            "name": "hook_uuid",
             "in": "path",
             "required": true,
             "schema": {
@@ -63,7 +63,7 @@
         }
       }
     },
-    "/v1/chainhooks/stacks/{hook_id}": {
+    "/v1/chainhooks/stacks/{hook_uuid}": {
       "delete": {
         "tags": [
           "Chainhooks"
@@ -71,7 +71,7 @@
         "operationId": "handle_delete_stacks_hook",
         "parameters": [
           {
-            "name": "hook_id",
+            "name": "hook_uuid",
             "in": "path",
             "required": true,
             "schema": {

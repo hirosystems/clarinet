@@ -105,7 +105,7 @@ pub async fn handle_bitcoin_hook_action<'a>(
                     "block_identifier": block_identifier,
                     "confirmations": 1,
                 })],
-                "hook_id": hook.id,
+                "hook_uuid": hook.uuid,
             });
             let body = serde_json::to_vec(&payload).unwrap();
             let _ = client
@@ -137,7 +137,7 @@ pub async fn handle_stacks_hook_action<'a>(
                     "block_identifier": block_identifier,
                     "confirmations": 1,
                 })],
-                "hook_id": hook.id,
+                "hook_uuid": hook.uuid,
             });
             let body = serde_json::to_vec(&payload).unwrap();
             let _ = client

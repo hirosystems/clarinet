@@ -28,10 +28,13 @@ impl HookFormation {
         };
     }
 
-    pub fn deregister_stacks_hook(&mut self, hook_id: u32) -> Option<StacksChainhookSpecification> {
+    pub fn deregister_stacks_hook(
+        &mut self,
+        hook_uuid: String,
+    ) -> Option<StacksChainhookSpecification> {
         let mut i = 0;
         while i < self.stacks_chainhooks.len() {
-            if self.stacks_chainhooks[i].id == hook_id {
+            if self.stacks_chainhooks[i].uuid == hook_uuid {
                 let hook = self.stacks_chainhooks.remove(i);
                 return Some(hook);
             } else {
@@ -43,11 +46,11 @@ impl HookFormation {
 
     pub fn deregister_bitcoin_hook(
         &mut self,
-        hook_id: u32,
+        hook_uuid: String,
     ) -> Option<BitcoinChainhookSpecification> {
         let mut i = 0;
         while i < self.bitcoin_chainhooks.len() {
-            if self.bitcoin_chainhooks[i].id == hook_id {
+            if self.bitcoin_chainhooks[i].uuid == hook_uuid {
                 let hook = self.bitcoin_chainhooks.remove(i);
                 return Some(hook);
             } else {
@@ -76,7 +79,7 @@ impl ChainhookSpecification {
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct BitcoinChainhookSpecification {
-    pub id: u32,
+    pub uuid: String,
     pub name: String,
     pub network: BitcoinNetwork,
     pub version: u32,
@@ -182,7 +185,7 @@ pub struct BitcoinTxOutBasedPredicate {
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct StacksChainhookSpecification {
-    pub id: u32,
+    pub uuid: String,
     pub name: String,
     pub network: StacksNetwork,
     pub version: u32,
