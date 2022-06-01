@@ -94,7 +94,7 @@ pub async fn handle_bitcoin_hook_action<'a>(
     proof: Option<&String>,
 ) {
     match &hook.action {
-        HookAction::HttpHook(http) => {
+        HookAction::Http(http) => {
             let client = Client::builder().build().unwrap();
             let host = format!("{}", http.url);
             let method = Method::from_bytes(http.method.as_bytes()).unwrap();
@@ -126,7 +126,7 @@ pub async fn handle_stacks_hook_action<'a>(
     proof: Option<&String>,
 ) {
     match &hook.action {
-        HookAction::HttpHook(http) => {
+        HookAction::Http(http) => {
             let client = Client::builder().build().unwrap();
             let host = format!("{}", http.url);
             let method = Method::from_bytes(http.method.as_bytes()).unwrap();

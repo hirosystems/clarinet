@@ -30,7 +30,7 @@ pub fn load_chainhooks(
     let mut stacks_chainhooks = vec![];
     let mut bitcoin_chainhooks = vec![];
     for (path, relative_path) in hook_files.into_iter() {
-        let hook = match ChainhookSpecificationFile::parse(&path, networks) {
+        match ChainhookSpecificationFile::parse(&path, networks) {
             Ok(hook) => match hook {
                 ChainhookSpecification::Bitcoin(hook) => bitcoin_chainhooks.push(hook),
                 ChainhookSpecification::Stacks(hook) => stacks_chainhooks.push(hook),

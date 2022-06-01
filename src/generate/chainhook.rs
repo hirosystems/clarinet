@@ -47,14 +47,15 @@ version: 1
 chain: bitcoin
 networks:
     regtest:
+        oreo_url: http://0.0.0.0:20446/
         predicate:
             confirmations: 1                                    # 1 to 7. 1 = optimistic and better UX except when the chain is forking
             tx-out:                                             # support tx-in, tx-out.
                 p2pkh:                                          # support hex, p2pkh, p2sh, p2wpkh, p2wsh.
                     equals: muYdXKmX9bByAueDe6KFfHd5Ff1gdN9ErG  # support equals, starts-with, ends-with
         action:
-            http-hook: 
-                url: http://localhost:9000/chain-events/
+            http: 
+                url: http://0.0.0.0:9000/chain-events/
                 method: POST
                 authorization-header: "Bearer cn389ncoiwuencr"
 "#
@@ -81,6 +82,7 @@ version: 1
 chain: stacks
 networks:
     devnet:
+        oreo_url: http://0.0.0.0:20446/
         predicate:
             print-event:
                 contract-id: ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM.cbtc-token
@@ -99,8 +101,8 @@ networks:
             #     contract-identifier: ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM.cbtc-token
             #     method: mint
         action:
-            http-hook: 
-                url: http://localhost:9000/chain-events/
+            http: 
+                url: http://0.0.0.0:9000/chain-events/
                 method: POST
                 authorization-header: "Bearer cn389ncoiwuencr"
 "#

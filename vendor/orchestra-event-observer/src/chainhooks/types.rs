@@ -92,7 +92,7 @@ pub struct BitcoinChainhookSpecification {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum HookAction {
-    HttpHook(HttpHook),
+    Http(HttpHook),
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]

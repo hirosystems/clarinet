@@ -23,6 +23,7 @@ pub struct ChainhookNetworkSpecificationFile {
     end_block: Option<u64>,
     predicate: ChainhookPredicateFile,
     action: HookActionFile,
+    oreo_url: String,
 }
 
 #[derive(Debug, PartialEq, Serialize, Deserialize)]
@@ -67,7 +68,7 @@ pub struct StxEventPredicateFile {
 #[derive(Debug, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]
 pub struct HookActionFile {
-    http_hook: Option<BTreeMap<String, String>>,
+    http: Option<BTreeMap<String, String>>,
 }
 
 impl ChainhookSpecificationFile {
@@ -177,27 +178,27 @@ impl ChainhookSpecificationFile {
 
 impl HookActionFile {
     pub fn to_specifications(&self) -> Result<HookAction, String> {
-        if let Some(ref specs) = self.http_hook {
+        if let Some(ref specs) = self.http {
             let url = match specs.get("url") {
                 Some(url) => Ok(url.to_string()),
-                None => Err(format!("url missing for http-hook")),
+                None => Err(format!("url missing for http")),
             }?;
             let method = match specs.get("method") {
                 Some(method) => Ok(method.to_string()),
-                None => Err(format!("method missing for http-hook")),
+                None => Err(format!("method missing for http")),
             }?;
             let authorization_header = match specs.get("authorization-header") {
                 Some(authorization_header) => Ok(authorization_header.to_string()),
-                None => Err(format!("method missing for http-hook")),
+                None => Err(format!("method missing for http")),
             }?;
 
-            Ok(HookAction::HttpHook(HttpHook {
+            Ok(HookAction::Http(HttpHook {
                 url,
                 method,
                 authorization_header,
             }))
         } else {
-            Err(format!("action not supported (http-hook)"))
+            Err(format!("action not supported (http)"))
         }
     }
 }
