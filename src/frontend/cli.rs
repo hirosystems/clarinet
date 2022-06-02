@@ -647,27 +647,32 @@ pub fn main() {
             }
         },
         Command::Console(cmd) => {
-            let manifest = load_manifest_or_exit(cmd.manifest_path);
+            let manifest = load_manifest_or_warn(cmd.manifest_path);
 
-            let (deployment, _, artifacts) =
-                load_deployment_and_artifacts_or_exit(&manifest, &cmd.deployment_plan_path);
+            let mut terminal;
+            if manifest.path.as_os_str().is_empty() {
+                terminal = Terminal::new(repl::SessionSettings::default());
+            } else {
+                let (deployment, _, artifacts) =
+                    load_deployment_and_artifacts_or_exit(&manifest, &cmd.deployment_plan_path);
 
-            if !artifacts.success {
-                let diags_digest = DiagnosticsDigest::new(&artifacts.diags, &deployment);
-                if diags_digest.has_feedbacks() {
-                    println!("{}", diags_digest.message);
+                if !artifacts.success {
+                    let diags_digest = DiagnosticsDigest::new(&artifacts.diags, &deployment);
+                    if diags_digest.has_feedbacks() {
+                        println!("{}", diags_digest.message);
+                    }
+                    if diags_digest.errors > 0 {
+                        println!(
+                            "{} {} detected",
+                            red!("x"),
+                            pluralize!(diags_digest.errors, "error")
+                        );
+                    }
+                    std::process::exit(1);
                 }
-                if diags_digest.errors > 0 {
-                    println!(
-                        "{} {} detected",
-                        red!("x"),
-                        pluralize!(diags_digest.errors, "error")
-                    );
-                }
-                std::process::exit(1);
+
+                terminal = Terminal::load(artifacts.session);
             }
-
-            let mut terminal = Terminal::load(artifacts.session);
             terminal.start();
 
             if hints_enabled {
@@ -992,6 +997,19 @@ fn get_manifest_path_or_exit(path: Option<String>) -> PathBuf {
     }
 }
 
+fn get_manifest_path_or_warn(path: Option<String>) -> Option<PathBuf> {
+    match get_manifest_path(path) {
+        Some(manifest_path) => Some(manifest_path),
+        None => {
+            println!(
+                "{}: no manifest found. Continuing with default.",
+                green!("note")
+            );
+            None
+        }
+    }
+}
+
 fn load_manifest_or_exit(path: Option<String>) -> ProjectManifest {
     let manifest_path = get_manifest_path_or_exit(path);
     let manifest = match ProjectManifest::from_path(&manifest_path) {
@@ -1006,6 +1024,26 @@ fn load_manifest_or_exit(path: Option<String>) -> ProjectManifest {
         }
     };
     manifest
+}
+
+fn load_manifest_or_warn(path: Option<String>) -> ProjectManifest {
+    let manifest_path = get_manifest_path_or_warn(path);
+    if manifest_path.is_some() {
+        let manifest = match ProjectManifest::from_path(&manifest_path.unwrap()) {
+            Ok(manifest) => manifest,
+            Err(message) => {
+                println!(
+                    "{}: Syntax errors in Clarinet.toml\n{}",
+                    red!("error"),
+                    message,
+                );
+                process::exit(1);
+            }
+        };
+        manifest
+    } else {
+        ProjectManifest::default()
+    }
 }
 
 fn load_deployment_and_artifacts_or_exit(
