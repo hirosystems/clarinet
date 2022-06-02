@@ -336,7 +336,7 @@ balance = 100_000_000_000_000
 # stx_address: ST3NBRSFKX28FQ2ZJ1MAKX58HKHSDGNV5N7R21XCP
 # btc_address: n2v875jbJ4RjBnTjgbfikDfnwsDV5iUByw
 
-[accounts.wallet_9]
+[accounts.faucet]
 mnemonic = "shadow private easily thought say logic fault paddle word top book during ignore notable orange flight clock image wealth health outside kitten belt reform"
 balance = 100_000_000_000_000
 # secret_key: de433bdfa14ec43aa1098d5be594c8ffb20a31485ff9de2923b2689471c401b801
@@ -351,7 +351,7 @@ disable_stacks_api = false
 # stacks_node_events_observers = ["host.docker.internal:8002"]
 # miner_mnemonic = "twice kind fence tip hidden tilt action fragile skin nothing glory cousin green tomorrow spring wrist shed math olympic multiply hip blue scout claw"
 # miner_derivation_path = "m/44'/5757'/0'/0/0"
-# faucet_mnemonic = "twice kind fence tip hidden tilt action fragile skin nothing glory cousin green tomorrow spring wrist shed math olympic multiply hip blue scout claw"
+# faucet_mnemonic = "shadow private easily thought say logic fault paddle word top book during ignore notable orange flight clock image wealth health outside kitten belt reform"
 # faucet_derivation_path = "m/44'/5757'/0'/0/0"
 # orchestrator_port = 20445
 # bitcoin_node_p2p_port = 18444

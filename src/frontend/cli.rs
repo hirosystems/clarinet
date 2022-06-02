@@ -118,7 +118,7 @@ enum Deployments {
     #[clap(name = "check", bin_name = "check")]
     CheckDeployments(CheckDeployments),
     /// Generate new deployment
-    #[clap(name = "generate", bin_name = "generate")]
+    #[clap(name = "generate", bin_name = "generate", aliases = &["new"])]
     GenerateDeployment(GenerateDeployment),
     /// Apply deployment
     #[clap(name = "apply", bin_name = "apply")]
@@ -718,8 +718,9 @@ pub fn main() {
 
                 let change = TOMLEdition {
                     comment: format!(
-                        "Adding {} as a requirement to Clarinet.toml",
-                        cmd.contract_id
+                        "{} with requirement {}",
+                        yellow!("Updated Clarinet.toml"),
+                        green!(format!("{}", cmd.contract_id))
                     ),
                     manifest_path: manifest.path.clone(),
                     contracts_to_add: HashMap::new(),

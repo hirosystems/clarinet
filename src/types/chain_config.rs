@@ -308,7 +308,7 @@ impl ChainConfig {
             let (miner_stx_address, miner_btc_address, miner_secret_key_hex) =
                 compute_addresses(&miner_mnemonic, &miner_derivation_path, networks);
 
-            let faucet_mnemonic = devnet_config.faucet_mnemonic.take().unwrap_or("fragile loan twenty basic net assault jazz absorb diet talk art shock innocent float punch travel gadget embrace caught blossom hockey surround initial reduce".to_string());
+            let faucet_mnemonic = devnet_config.faucet_mnemonic.take().unwrap_or("shadow private easily thought say logic fault paddle word top book during ignore notable orange flight clock image wealth health outside kitten belt reform".to_string());
             let faucet_derivation_path = devnet_config
                 .faucet_derivation_path
                 .take()

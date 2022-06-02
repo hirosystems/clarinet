@@ -47,7 +47,7 @@ version: 1
 chain: bitcoin
 networks:
     regtest:
-        oreo_url: http://0.0.0.0:20446/
+        oreo-url: http://0.0.0.0:20446/
         predicate:
             confirmations: 1                                    # 1 to 7. 1 = optimistic and better UX except when the chain is forking
             tx-out:                                             # support tx-in, tx-out.
@@ -55,7 +55,7 @@ networks:
                     equals: muYdXKmX9bByAueDe6KFfHd5Ff1gdN9ErG  # support equals, starts-with, ends-with
         action:
             http: 
-                url: http://0.0.0.0:9000/chain-events/
+                url: http://0.0.0.0:3000/api/v1/<path>
                 method: POST
                 authorization-header: "Bearer cn389ncoiwuencr"
 "#
@@ -82,27 +82,27 @@ version: 1
 chain: stacks
 networks:
     devnet:
-        oreo_url: http://0.0.0.0:20446/
+        oreo-url: http://0.0.0.0:20446/
         predicate:
             print-event:
-                contract-id: ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM.cbtc-token
+                contract-identifier: ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM.cbtc-token
                 contains: vault
             # Also supports the following predicates:
             # nft-event:
-            #     asset-id: ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM.cbtc-token.cbtc
+            #     asset-identifier: ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM.cbtc-token::cbtc
             #     actions: [mint, transfer, burn]
             # ft-event:
-            #     asset-id: ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM.cbtc-token.cbtc
+            #     asset-identifier: ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM.cbtc-token::cbtc
             #     actions: [mint, transfer, burn]
             # stx-event:
-            #     asset-id: ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM.cbtc-token.cbtc
-            #     actions: [mint, transfer, burn]
+            #     asset-identifier: ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM.cbtc-token::cbtc
+            #     actions: [mint, transfer, lock]
             # contract-call:
             #     contract-identifier: ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM.cbtc-token
             #     method: mint
         action:
             http: 
-                url: http://0.0.0.0:9000/chain-events/
+                url: http://0.0.0.0:3000/api/v1/<path>
                 method: POST
                 authorization-header: "Bearer cn389ncoiwuencr"
 "#
