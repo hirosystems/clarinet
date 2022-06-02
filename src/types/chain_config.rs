@@ -54,6 +54,8 @@ pub struct DevnetConfigFile {
     pub bitcoin_node_password: Option<String>,
     pub miner_mnemonic: Option<String>,
     pub miner_derivation_path: Option<String>,
+    pub faucet_mnemonic: Option<String>,
+    pub faucet_derivation_path: Option<String>,
     pub bitcoin_controller_block_time: Option<u32>,
     pub bitcoin_controller_automining_disabled: Option<bool>,
     pub working_dir: Option<String>,
@@ -138,6 +140,11 @@ pub struct DevnetConfig {
     pub miner_btc_address: String,
     pub miner_mnemonic: String,
     pub miner_derivation_path: String,
+    pub faucet_stx_address: String,
+    pub faucet_secret_key_hex: String,
+    pub faucet_btc_address: String,
+    pub faucet_mnemonic: String,
+    pub faucet_derivation_path: String,
     pub working_dir: String,
     pub postgres_port: u16,
     pub postgres_username: String,
@@ -301,6 +308,14 @@ impl ChainConfig {
             let (miner_stx_address, miner_btc_address, miner_secret_key_hex) =
                 compute_addresses(&miner_mnemonic, &miner_derivation_path, networks);
 
+            let faucet_mnemonic = devnet_config.faucet_mnemonic.take().unwrap_or("fragile loan twenty basic net assault jazz absorb diet talk art shock innocent float punch travel gadget embrace caught blossom hockey surround initial reduce".to_string());
+            let faucet_derivation_path = devnet_config
+                .faucet_derivation_path
+                .take()
+                .unwrap_or(DEFAULT_DERIVATION_PATH.to_string());
+            let (faucet_stx_address, faucet_btc_address, faucet_secret_key_hex) =
+                compute_addresses(&faucet_mnemonic, &faucet_derivation_path, networks);
+
             let mut config = DevnetConfig {
                 orchestrator_ingestion_port: devnet_config.orchestrator_port.unwrap_or(20445),
                 orchestrator_control_port: devnet_config.orchestrator_control_port.unwrap_or(20446),
@@ -336,6 +351,11 @@ impl ChainConfig {
                 miner_mnemonic,
                 miner_secret_key_hex,
                 miner_derivation_path,
+                faucet_btc_address,
+                faucet_stx_address,
+                faucet_mnemonic,
+                faucet_secret_key_hex,
+                faucet_derivation_path,
                 working_dir: devnet_config
                     .working_dir
                     .take()

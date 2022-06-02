@@ -1994,9 +1994,6 @@ log_filters = "INFO"
             _ => return,
         };
 
-        const FAUCET_SECRET_KEY: &str = "cTYqAVPS7uJTAcxyzkXWjmRGoCjkPcb38wZVRjyXov1RiRDWPQj3";
-        const FAUCET_ADDRESS: &str = "n3k15aVS4rEWhVYn4YfAFjD8Em5mmsducg";
-
         let rpc = Client::new(
             &format!("http://localhost:{}", devnet_config.bitcoin_node_rpc_port),
             Auth::UserPass(
@@ -2018,17 +2015,20 @@ log_filters = "INFO"
         }
 
         let miner_address = Address::from_str(&devnet_config.miner_btc_address).unwrap();
+        let faucet_address = Address::from_str(&devnet_config.faucet_btc_address).unwrap();
 
         let _ = rpc.generate_to_address(3, &miner_address);
-        let _ = rpc.generate_to_address(97, &Address::from_str(&FAUCET_ADDRESS).unwrap());
+        let _ = rpc.generate_to_address(97, &Address::from_str(&devnet_config.faucet_btc_address).unwrap());
         let _ = rpc.generate_to_address(1, &miner_address);
         let _ = rpc.create_wallet("", None, None, None, None);
         let _ = rpc.import_address(&miner_address, None, None);
-        let _ = rpc.import_private_key(
-            &PrivateKey::from_str(&FAUCET_SECRET_KEY).unwrap(),
-            None,
-            None,
-        );
+        let _ = rpc.import_address(&faucet_address, None, None);
+
+        // let _ = rpc.import_private_key(
+        //     &PrivateKey::from_str(&devnet_config.faucet_secret_key_hex).unwrap(),
+        //     None,
+        //     None,
+        // );
     }
 }
 

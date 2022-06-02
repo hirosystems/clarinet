@@ -246,10 +246,12 @@ pub async fn start_chains_coordinator(
                         config.devnet_config.bitcoin_controller_automining_disabled;
                     let mining_command_tx_moved = mining_command_tx.clone();
                     let protocol_deployed_moved = protocol_deployed.clone();
+                    let (deployment_progress_tx, deployment_progress_rx) = channel();
 
                     if let Some(deployment_events_rx) = deployment_events_rx.take() {
                         perform_protocol_deployment(
                             deployment_events_rx,
+                            deployment_progress_tx,
                             &deployment_commands_tx,
                             &devnet_event_tx,
                             &chains_coordinator_commands_tx,
@@ -257,8 +259,6 @@ pub async fn start_chains_coordinator(
                     }
 
                     std::thread::spawn(move || {
-                        let (deployment_progress_tx, deployment_progress_rx) = channel();
-
                         loop {
                             match deployment_progress_rx.recv() {
                                 Ok(DeploymentEvent::ProtocolDeployed) => {
@@ -407,6 +407,7 @@ pub fn prepare_protocol_deployment(
 
 pub fn perform_protocol_deployment(
     deployment_events_rx: Receiver<DeploymentEvent>,
+    deployment_events_tx: Sender<DeploymentEvent>,
     deployment_commands_tx: &Sender<DeploymentCommand>,
     devnet_event_tx: &Sender<DevnetEvent>,
     chains_coordinator_commands_tx: &Sender<ChainsCoordinatorCommand>,
@@ -432,6 +433,7 @@ pub fn perform_protocol_deployment(
                     let _ = chains_coordinator_commands_tx
                         .send(ChainsCoordinatorCommand::ProtocolDeployed);
                     let _ = devnet_event_tx.send(DevnetEvent::ProtocolDeployed);
+                    let _ = deployment_events_tx.send(DeploymentEvent::ProtocolDeployed);
                     break;
                 }
             }
