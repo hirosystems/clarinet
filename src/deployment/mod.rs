@@ -1,3 +1,4 @@
+mod bitcoin_deployment;
 mod requirements;
 pub mod types;
 mod ui;
@@ -16,6 +17,7 @@ use crate::deployment::types::TransactionSpecification;
 
 use crate::types::{AccountConfig, ChainConfig, ProjectManifest};
 use crate::utils::mnemonic;
+use bitcoincore_rpc::bitcoin::Transaction;
 use clarity_repl::analysis::ast_dependency_detector::{ASTDependencyDetector, DependencySet};
 use clarity_repl::clarity::analysis::ContractAnalysis;
 use clarity_repl::clarity::ast::ContractAST;
@@ -49,6 +51,7 @@ use clarity_repl::repl::{ExecutionResult, Session};
 use libsecp256k1::{PublicKey, SecretKey};
 use orchestra_types::StacksNetwork;
 use serde_yaml;
+use stacks_rpc_client::StacksRpc;
 use std::collections::{BTreeMap, HashMap, HashSet, VecDeque};
 use std::fs::{self, File};
 use std::io::Write;
@@ -84,6 +87,24 @@ fn get_keypair(account: &AccountConfig) -> (ExtendedPrivKey, Secp256k1PrivateKey
     let secret_key = SecretKey::parse_slice(&ext.secret()).unwrap();
     let public_key = PublicKey::from_secret_key(&secret_key);
     (ext, wrapped_secret_key, public_key)
+}
+
+fn get_btc_keypair(
+    account: &AccountConfig,
+) -> (
+    bitcoincore_rpc::bitcoin::secp256k1::SecretKey,
+    bitcoincore_rpc::bitcoin::secp256k1::PublicKey,
+) {
+    use bitcoincore_rpc::bitcoin::secp256k1::{Message, PublicKey, Secp256k1, SecretKey};
+    let bip39_seed = match mnemonic::get_bip39_seed_from_mnemonic(&account.mnemonic, "") {
+        Ok(bip39_seed) => bip39_seed,
+        Err(_) => panic!(),
+    };
+    let secp = Secp256k1::new();
+    let ext = ExtendedPrivKey::derive(&bip39_seed[..], account.derivation.as_str()).unwrap();
+    let secret_key = SecretKey::from_slice(&ext.secret()).unwrap();
+    let public_key = PublicKey::from_secret_key(&secp, &secret_key);
+    (secret_key, public_key)
 }
 
 fn get_stacks_address(public_key: &PublicKey, network: &StacksNetwork) -> StacksAddress {
@@ -285,9 +306,10 @@ pub fn update_session_with_contracts_executions(
         for transaction in batch.transactions.iter() {
             match transaction {
                 TransactionSpecification::RequirementPublish(_)
+                | TransactionSpecification::BtcTransfer(_)
                 | TransactionSpecification::ContractCall(_)
                 | TransactionSpecification::ContractPublish(_) => {
-                    panic!("requirement-publish, contract-call and contract-publish are the only operations admitted in simnet deployments")
+                    panic!("emulated-contract-call and emulated-contract-publish are the only operations admitted in simnet deployments")
                 }
                 TransactionSpecification::EmulatedContractPublish(tx) => {
                     let default_tx_sender = session.get_tx_sender();
@@ -409,6 +431,7 @@ pub struct TransactionTracker {
 pub enum TransactionCheck {
     ContractCall(StandardPrincipalData, u64),
     ContractPublish(StandardPrincipalData, ContractName),
+    BtcTransfer(),
 }
 
 pub fn get_initial_transactions_trackers(
@@ -447,6 +470,14 @@ pub fn get_initial_transactions_trackers(
                         status: TransactionStatus::Queued,
                     }
                 }
+                TransactionSpecification::BtcTransfer(tx) => TransactionTracker {
+                    index,
+                    name: format!(
+                        "BTC transfer {} send {} to {}",
+                        tx.expected_sender, tx.sats_amount, tx.recipient
+                    ),
+                    status: TransactionStatus::Queued,
+                },
                 TransactionSpecification::EmulatedContractPublish(_)
                 | TransactionSpecification::EmulatedContractCall(_) => continue,
             };
@@ -464,7 +495,8 @@ pub fn apply_on_chain_deployment(
     deployment_command_rx: Receiver<DeploymentCommand>,
     fetch_initial_nonces: bool,
 ) {
-    let chain_config = ChainConfig::from_manifest_path(&manifest.path, &deployment.network);
+    let chain_config =
+        ChainConfig::from_manifest_path(&manifest.path, &deployment.network.get_networks());
     let delay_between_checks: u64 = 10;
     // Load deployers, deployment_fee_rate
     // Check fee, balances and deployers
@@ -472,18 +504,20 @@ pub fn apply_on_chain_deployment(
     let mut batches = VecDeque::new();
     let network = deployment.network.clone();
     let mut accounts_cached_nonces: BTreeMap<String, u64> = BTreeMap::new();
-    let mut accounts_lookup: BTreeMap<String, &AccountConfig> = BTreeMap::new();
+    let mut stx_accounts_lookup: BTreeMap<String, &AccountConfig> = BTreeMap::new();
+    let mut btc_accounts_lookup: BTreeMap<String, &AccountConfig> = BTreeMap::new();
 
     if !fetch_initial_nonces {
         if network == StacksNetwork::Devnet {
             for (_, account) in chain_config.accounts.iter() {
-                accounts_cached_nonces.insert(account.address.clone(), 0);
+                accounts_cached_nonces.insert(account.stx_address.clone(), 0);
             }
         }
     }
 
     for (_, account) in chain_config.accounts.iter() {
-        accounts_lookup.insert(account.address.clone(), account);
+        stx_accounts_lookup.insert(account.stx_address.clone(), account);
+        btc_accounts_lookup.insert(account.btc_address.clone(), account);
     }
 
     let node_url = deployment.node.expect("unable to get node rcp address");
@@ -499,6 +533,26 @@ pub fn apply_on_chain_deployment(
         let mut batch = Vec::new();
         for transaction in batch_spec.transactions.iter() {
             let tracker = match transaction {
+                TransactionSpecification::BtcTransfer(tx) => {
+                    let account = btc_accounts_lookup.get(&tx.expected_sender).unwrap();
+                    let (secret_key, _public_key) = get_btc_keypair(account);
+                    let res = bitcoin_deployment::send_transaction_spec(tx, &secret_key);
+                    println!("=> {:?}", res);
+
+                    // let name = format!(
+                    //     "Send {} Btc from {} to {}",
+                    //     tx.amount,
+                    //     tx.expected_sender.to_string(),
+                    //     tx.recipient
+                    // );
+                    // let check = TransactionCheck::BtcTransfer();
+                    // TransactionTracker {
+                    //     index,
+                    //     name: name.clone(),
+                    //     status: TransactionStatus::Encoded(transaction, check),
+                    // }
+                    continue;
+                }
                 TransactionSpecification::ContractCall(tx) => {
                     let issuer_address = tx.expected_sender.to_address();
                     let nonce = match accounts_cached_nonces.get(&issuer_address) {
@@ -507,7 +561,7 @@ pub fn apply_on_chain_deployment(
                             .get_nonce(&issuer_address)
                             .expect("Unable to retrieve account"),
                     };
-                    let account = accounts_lookup.get(&issuer_address).unwrap();
+                    let account = stx_accounts_lookup.get(&issuer_address).unwrap();
 
                     let function_args = tx
                         .parameters
@@ -559,7 +613,7 @@ pub fn apply_on_chain_deployment(
                             .get_nonce(&issuer_address)
                             .expect("Unable to retrieve account"),
                     };
-                    let account = accounts_lookup.get(&issuer_address).unwrap();
+                    let account = stx_accounts_lookup.get(&issuer_address).unwrap();
                     let source = if deployment.network.either_devnet_or_tesnet() {
                         // Remapping - This is happening
                         let mut source = tx.source.clone();
@@ -632,7 +686,7 @@ pub fn apply_on_chain_deployment(
                             .get_nonce(&issuer_address)
                             .expect("Unable to retrieve account"),
                     };
-                    let account = accounts_lookup.get(&issuer_address).unwrap();
+                    let account = stx_accounts_lookup.get(&issuer_address).unwrap();
 
                     let transaction = match encode_contract_publish(
                         &tx.contract_id.name,
@@ -920,7 +974,7 @@ pub fn generate_default_deployment(
     network: &StacksNetwork,
     no_batch: bool,
 ) -> Result<(DeploymentSpecification, DeploymentGenerationArtifacts), String> {
-    let chain_config = ChainConfig::from_manifest_path(&manifest.path, &network);
+    let chain_config = ChainConfig::from_manifest_path(&manifest.path, &network.get_networks());
 
     let node = match network {
         StacksNetwork::Simnet => None,
@@ -956,12 +1010,12 @@ pub fn generate_default_deployment(
         }
     };
     let default_deployer_address =
-        match PrincipalData::parse_standard_principal(&default_deployer.address) {
+        match PrincipalData::parse_standard_principal(&default_deployer.stx_address) {
             Ok(res) => res,
             Err(_) => {
                 return Err(format!(
                     "unable to turn address {} as a valid Stacks address",
-                    default_deployer.address
+                    default_deployer.stx_address
                 ))
             }
         };
@@ -1161,12 +1215,12 @@ pub fn generate_default_deployment(
             None => default_deployer,
         };
 
-        let sender = match PrincipalData::parse_standard_principal(&deployer.address) {
+        let sender = match PrincipalData::parse_standard_principal(&deployer.stx_address) {
             Ok(res) => res,
             Err(_) => {
                 return Err(format!(
                     "unable to turn emulated_sender {} as a valid Stacks address",
-                    deployer.address
+                    deployer.stx_address
                 ))
             }
         };
@@ -1290,12 +1344,12 @@ pub fn generate_default_deployment(
     let mut wallets = vec![];
     if network.is_simnet() {
         for (name, account) in chain_config.accounts.into_iter() {
-            let address = match PrincipalData::parse_standard_principal(&account.address) {
+            let address = match PrincipalData::parse_standard_principal(&account.stx_address) {
                 Ok(res) => res,
                 Err(_) => {
                     return Err(format!(
                         "unable to parse wallet {} in a valid Stacks address",
-                        account.address
+                        account.stx_address
                     ))
                 }
             };

@@ -73,14 +73,15 @@ impl DevnetEventObserverConfig {
         deployment: DeploymentSpecification,
     ) -> Self {
         info!("Checking contracts...");
-        let chain_config = ChainConfig::from_manifest_path(&manifest.path, &StacksNetwork::Devnet);
+        let chain_config =
+            ChainConfig::from_manifest_path(&manifest.path, &StacksNetwork::Devnet.get_networks());
 
         info!("Checking hooks...");
         let hooks = match load_chainhooks(
             &manifest.path,
             &(BitcoinNetwork::Regtest, StacksNetwork::Devnet),
         ) {
-            Ok(hooks) => HookFormation::new(), // hooks, // TODO(lgalabru)
+            Ok(hooks) => hooks,
             Err(e) => {
                 println!("{}", e);
                 std::process::exit(1);
@@ -276,7 +277,8 @@ pub async fn start_chains_coordinator(
                 let update = match &chain_event {
                     StacksChainEvent::ChainUpdatedWithBlock(block) => block.clone(),
                     StacksChainEvent::ChainUpdatedWithMicroblock(_) => {
-                        unreachable!() // TODO(lgalabru): good enough for now - code path unreachable in the context of Devnet
+                        continue;
+                        // TODO(lgalabru): good enough for now - code path unreachable in the context of Devnet
                     }
                     StacksChainEvent::ChainUpdatedWithMicroblockReorg(_) => {
                         unreachable!() // TODO(lgalabru): good enough for now - code path unreachable in the context of Devnet
@@ -487,11 +489,14 @@ pub async fn publish_stacking_orders(
                 let default_fee = fee_rate * 1000;
                 let stacks_rpc = StacksRpc::new(&node_url);
                 let nonce = stacks_rpc
-                    .get_nonce(&account.address)
+                    .get_nonce(&account.stx_address)
                     .expect("Unable to retrieve nonce");
 
-                let (_, _, account_secret_key) =
-                    types::compute_addresses(&account.mnemonic, &account.derivation, false);
+                let (_, _, account_secret_key) = types::compute_addresses(
+                    &account.mnemonic,
+                    &account.derivation,
+                    &StacksNetwork::Devnet.get_networks(),
+                );
 
                 let addr_bytes = Hash160::from_bytes(&addr_bytes[1..21]).unwrap();
                 let addr_version = AddressHashMode::SerializeP2PKH;

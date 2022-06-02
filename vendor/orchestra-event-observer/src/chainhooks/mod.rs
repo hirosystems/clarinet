@@ -12,7 +12,7 @@ use bitcoincore_rpc::bitcoin::{Address, PubkeyHash, PublicKey, Script, TxIn};
 use clarity_repl::clarity::util::hash::Hash160;
 use orchestra_types::{
     BitcoinChainEvent, BitcoinTransactionData, BlockIdentifier, StacksChainEvent, StacksNetwork,
-    StacksTransactionData, StacksTransactionKind,
+    StacksTransactionData, StacksTransactionEvent, StacksTransactionKind,
 };
 use reqwest::{Client, Method};
 use std::str::FromStr;
@@ -30,27 +30,197 @@ pub fn evaluate_stacks_chainhooks_on_chain_event<'a>(
         StacksChainEvent::ChainUpdatedWithBlock(update) => {
             for tx in update.new_block.transactions.iter() {
                 for hook in active_chainhooks.iter() {
+                    match (&tx.metadata.kind, &hook.predicate) {
+                        (
+                            StacksTransactionKind::ContractCall(actual_contract_call),
+                            StacksHookPredicate::ContractCall(expected_contract_call),
+                        ) => {
+                            if actual_contract_call.contract_identifier
+                                == expected_contract_call.contract_identifier
+                                && actual_contract_call.method == expected_contract_call.method
+                            {
+                                enabled.push((
+                                    hook.clone(),
+                                    tx,
+                                    &update.new_block.block_identifier,
+                                ));
+                                continue;
+                            }
+                        }
+                        (StacksTransactionKind::ContractCall(_), _)
+                        | (StacksTransactionKind::ContractDeployment(_), _) => {
+                            // Look for emitted events
+                            for event in tx.metadata.receipt.events.iter() {
+                                match (event, &hook.predicate) {
+                                    (
+                                        StacksTransactionEvent::NFTMintEvent(actual),
+                                        StacksHookPredicate::NftEvent(expected),
+                                    ) => {
+                                        if actual.asset_class_identifier
+                                            == expected.asset_identifier
+                                            && expected.actions.contains(&"mint".to_string())
+                                        {
+                                            enabled.push((
+                                                hook.clone(),
+                                                tx,
+                                                &update.new_block.block_identifier,
+                                            ));
+                                            break;
+                                        }
+                                    }
+                                    (
+                                        StacksTransactionEvent::NFTTransferEvent(actual),
+                                        StacksHookPredicate::NftEvent(expected),
+                                    ) => {
+                                        if actual.asset_class_identifier
+                                            == expected.asset_identifier
+                                            && expected.actions.contains(&"transfer".to_string())
+                                        {
+                                            enabled.push((
+                                                hook.clone(),
+                                                tx,
+                                                &update.new_block.block_identifier,
+                                            ));
+                                            break;
+                                        }
+                                    }
+                                    (
+                                        StacksTransactionEvent::NFTBurnEvent(actual),
+                                        StacksHookPredicate::NftEvent(expected),
+                                    ) => {
+                                        if actual.asset_class_identifier
+                                            == expected.asset_identifier
+                                            && expected.actions.contains(&"burn".to_string())
+                                        {
+                                            enabled.push((
+                                                hook.clone(),
+                                                tx,
+                                                &update.new_block.block_identifier,
+                                            ));
+                                            break;
+                                        }
+                                    }
+                                    (
+                                        StacksTransactionEvent::FTMintEvent(actual),
+                                        StacksHookPredicate::FtEvent(expected),
+                                    ) => {
+                                        if actual.asset_class_identifier
+                                            == expected.asset_identifier
+                                            && expected.actions.contains(&"mint".to_string())
+                                        {
+                                            enabled.push((
+                                                hook.clone(),
+                                                tx,
+                                                &update.new_block.block_identifier,
+                                            ));
+                                            break;
+                                        }
+                                    }
+                                    (
+                                        StacksTransactionEvent::FTTransferEvent(actual),
+                                        StacksHookPredicate::FtEvent(expected),
+                                    ) => {
+                                        if actual.asset_class_identifier
+                                            == expected.asset_identifier
+                                            && expected.actions.contains(&"transfer".to_string())
+                                        {
+                                            enabled.push((
+                                                hook.clone(),
+                                                tx,
+                                                &update.new_block.block_identifier,
+                                            ));
+                                            break;
+                                        }
+                                    }
+                                    (
+                                        StacksTransactionEvent::FTBurnEvent(actual),
+                                        StacksHookPredicate::FtEvent(expected),
+                                    ) => {
+                                        if actual.asset_class_identifier
+                                            == expected.asset_identifier
+                                            && expected.actions.contains(&"burn".to_string())
+                                        {
+                                            enabled.push((
+                                                hook.clone(),
+                                                tx,
+                                                &update.new_block.block_identifier,
+                                            ));
+                                            break;
+                                        }
+                                    }
+                                    (
+                                        StacksTransactionEvent::STXMintEvent(actual),
+                                        StacksHookPredicate::StxEvent(expected),
+                                    ) => {
+                                        if expected.actions.contains(&"mint".to_string()) {
+                                            enabled.push((
+                                                hook.clone(),
+                                                tx,
+                                                &update.new_block.block_identifier,
+                                            ));
+                                            break;
+                                        }
+                                    }
+                                    (
+                                        StacksTransactionEvent::STXTransferEvent(actual),
+                                        StacksHookPredicate::StxEvent(expected),
+                                    ) => {
+                                        if expected.actions.contains(&"transfer".to_string()) {
+                                            enabled.push((
+                                                hook.clone(),
+                                                tx,
+                                                &update.new_block.block_identifier,
+                                            ));
+                                            break;
+                                        }
+                                    }
+                                    (
+                                        StacksTransactionEvent::STXLockEvent(actual),
+                                        StacksHookPredicate::StxEvent(expected),
+                                    ) => {
+                                        if expected.actions.contains(&"lock".to_string()) {
+                                            enabled.push((
+                                                hook.clone(),
+                                                tx,
+                                                &update.new_block.block_identifier,
+                                            ));
+                                            break;
+                                        }
+                                    }
+                                    (
+                                        StacksTransactionEvent::SmartContractEvent(actual),
+                                        StacksHookPredicate::PrintEvent(expected),
+                                    ) => {
+                                        if actual.contract_identifier
+                                            == expected.contract_identifier
+                                        {
+                                            enabled.push((
+                                                hook.clone(),
+                                                tx,
+                                                &update.new_block.block_identifier,
+                                            ));
+                                            break;
+                                        }
+                                    }
+                                    _ => {}
+                                }
+                            }
+                        }
+                        (
+                            StacksTransactionKind::NativeTokenTransfer,
+                            StacksHookPredicate::StxEvent(expected_stx_event),
+                        ) => {}
+                        _ => {}
+                    }
                     if let StacksTransactionKind::ContractCall(actual_contract_call) =
                         &tx.metadata.kind
                     {
                         match &hook.predicate {
-                            StacksHookPredicate::ContractCall(expected_contract_call) => {
-                                if actual_contract_call.contract_identifier
-                                    == expected_contract_call.contract_identifier
-                                    && actual_contract_call.method == expected_contract_call.method
-                                {
-                                    enabled.push((
-                                        hook.clone(),
-                                        tx,
-                                        &update.new_block.block_identifier,
-                                    ));
-                                    continue;
-                                }
-                            }
-                            StacksHookPredicate::PrintEvent(event) => unimplemented!(),
-                            StacksHookPredicate::StxEvent(event) => unimplemented!(),
-                            StacksHookPredicate::NftEvent(event) => unimplemented!(),
-                            StacksHookPredicate::FtEvent(event) => unimplemented!(),
+                            StacksHookPredicate::ContractCall(expected_contract_call) => {}
+                            StacksHookPredicate::PrintEvent(expected_print_event) => {}
+                            StacksHookPredicate::StxEvent(expected_stx_event) => unimplemented!(),
+                            StacksHookPredicate::NftEvent(expected_nft_event) => unimplemented!(),
+                            StacksHookPredicate::FtEvent(expected_ft_event) => {}
                         }
                     }
                 }
@@ -105,7 +275,10 @@ pub async fn handle_bitcoin_hook_action<'a>(
                     "block_identifier": block_identifier,
                     "confirmations": 1,
                 })],
-                "hook_uuid": hook.uuid,
+                "hook": {
+                    "uuid": hook.uuid,
+                    "predicate": hook.predicate,
+                }
             });
             let body = serde_json::to_vec(&payload).unwrap();
             let _ = client
@@ -137,7 +310,10 @@ pub async fn handle_stacks_hook_action<'a>(
                     "block_identifier": block_identifier,
                     "confirmations": 1,
                 })],
-                "hook_uuid": hook.uuid,
+                "hook": {
+                    "uuid": hook.uuid,
+                    "predicate": hook.predicate,
+                }
             });
             let body = serde_json::to_vec(&payload).unwrap();
             let _ = client

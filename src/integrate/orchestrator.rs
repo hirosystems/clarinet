@@ -51,7 +51,7 @@ impl DevnetOrchestrator {
         network_config_path.push("Devnet.toml");
 
         let mut network_config =
-            ChainConfig::from_path(&network_config_path, &StacksNetwork::Devnet);
+            ChainConfig::from_path(&network_config_path, &StacksNetwork::Devnet.get_networks());
 
         let name = manifest.project.name.clone();
         let network_name = format!("{}.devnet", name);
@@ -913,7 +913,7 @@ events_keys = ["*"]
 address = "{}"
 amount = {}
 "#,
-                account.address, account.balance
+                account.stx_address, account.balance
             ));
         }
 

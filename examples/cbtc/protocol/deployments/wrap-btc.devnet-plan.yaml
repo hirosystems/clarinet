@@ -1,0 +1,22 @@
+---
+id: 0
+name: Devnet deployment
+network: devnet
+node: "http://localhost:20443"
+plan:
+  batches:
+    - id: 0
+      transactions:
+        - btc-transfer:
+            expected-sender: n2v875jbJ4RjBnTjgbfikDfnwsDV5iUByw
+            recipient: mjSrB3wS4xab3kYqFktwBzfTdPg367ZJ2d
+            sats-amount: 10000
+            sats-per-byte: 10
+
+        # - btc-transfer:
+        #     expected-signer: ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM
+        #     amount: 100_000
+        #     fee: 5_000
+        #     outputs:
+        #         - OP_DUP OP_HASH160 99e2ec69ac5b6e67b4e26edd0e2c1c1a6b9bbd23 OP_EQUALVERIFY
+        #         - OP_DUP OP_HASH160 99e2ec69ac5b6e67b4e26edd0e2c1c1a6b9bbd23 OP_EQUALVERIFY

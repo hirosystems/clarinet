@@ -458,6 +458,36 @@ impl StacksNetwork {
             _ => false,
         }
     }
+
+    pub fn either_devnet_or_tesnet(&self) -> bool {
+        match self {
+            StacksNetwork::Devnet | StacksNetwork::Testnet => true,
+            _ => false,
+        }
+    }
+
+    pub fn is_devnet(&self) -> bool {
+        match self {
+            StacksNetwork::Devnet => true,
+            _ => false,
+        }
+    }
+
+    pub fn is_mainnet(&self) -> bool {
+        match self {
+            StacksNetwork::Mainnet => true,
+            _ => false,
+        }
+    }
+
+    pub fn get_networks(&self) -> (BitcoinNetwork, StacksNetwork) {
+        match &self {
+            StacksNetwork::Simnet => (BitcoinNetwork::Regtest, StacksNetwork::Simnet),
+            StacksNetwork::Devnet => (BitcoinNetwork::Testnet, StacksNetwork::Devnet),
+            StacksNetwork::Testnet => (BitcoinNetwork::Testnet, StacksNetwork::Testnet),
+            StacksNetwork::Mainnet => (BitcoinNetwork::Mainnet, StacksNetwork::Mainnet),
+        }
+    }
 }
 
 #[allow(dead_code)]
