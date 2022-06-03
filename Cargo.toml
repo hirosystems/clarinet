@@ -83,7 +83,7 @@ hex = "0.4.3"
 dirs = "4.0.0"
 serde_yaml = "0.8.23"
 orchestra_event_observer = { package = "orchestra-event-observer", default-features = false, path = "./vendor/orchestra-event-observer" }
-orchestra_types = { package = "orchestra-types", path = "./vendor/orchestra-types" }
+orchestra_types = { package = "orchestra-types", path = "./vendor/orchestra-types-rs" }
 stacks_rpc_client = { package = "stacks-rpc-client", path = "./vendor/stacks-rpc-client" }
 num_cpus = "1.13.1"
 mio = "=0.8.2"
@@ -144,7 +144,7 @@ members = [
     "vendor/deno/cli/",
     "vendor/deno/runtime/",
     "vendor/deno/core/",
-    "vendor/orchestra-types",
+    "vendor/orchestra-types-rs",
     "vendor/orchestra-event-observer",
     "vendor/stacks-rpc-client",
     "xtask/",

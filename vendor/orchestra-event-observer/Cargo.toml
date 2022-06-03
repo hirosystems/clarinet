@@ -10,7 +10,7 @@ serde = "1"
 serde_json = "1"
 serde_derive = "1"
 stacks_rpc_client = { package = "stacks-rpc-client", path = "../stacks-rpc-client" }
-orchestra_types = { package = "orchestra-types", path = "../orchestra-types" }
+orchestra_types = { package = "orchestra-types", path = "../orchestra-types-rs" }
 rocket = { version = "=0.5.0-rc.1", features = ["json"] }
 bitcoincore-rpc = "0.14.0"
 bitcoincore-rpc-json = "0.14.0"
