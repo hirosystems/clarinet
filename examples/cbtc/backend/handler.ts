@@ -1,5 +1,5 @@
-import { BitcoinChainEvent } from "./bitcoin";
-import { StacksChainEvent } from "./stacks";
+import { BitcoinChainEvent, StacksChainEvent, StacksTransactionEventType, StacksFTBurnEventData } from "@hirosystems/orchestra-types";
+
 import {
   getNonce,
   makeContractCall,
@@ -104,10 +104,14 @@ module.exports.unwrapBtc = async (event: HttpEvent) => {
   let assetId = `${cbtcToken.contractAddress}.${cbtcToken.contractName}::${cbtcToken.assetName}`;
   let transfer = undefined;
 
-  for (let txEvent of chainEvent.apply[0].transaction.metadata.receipt.events) {
-    if (txEvent.FTBurnEvent && txEvent.FTBurnEvent.asset_identifier === assetId) {
-      transfer = { recipient: txEvent.FTBurnEvent.sender, amount: txEvent.FTBurnEvent.amount };
-      break
+  let receipt = chainEvent.apply[0].transaction.metadata.receipt;
+  for (let txEvent of receipt.events) {
+    if (txEvent.type === StacksTransactionEventType.StacksFTBurnEvent) {
+      let burnEvent = txEvent.data as StacksFTBurnEventData;
+      if (burnEvent.asset_identifier == assetId) {
+        transfer = { recipient: burnEvent.sender, amount: burnEvent.amount };
+        break  
+      }
     }
   }
 

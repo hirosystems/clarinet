@@ -262,6 +262,11 @@
     "@hapi/bourne" "2.x.x"
     "@hapi/hoek" "9.x.x"
 
+"@hirosystems/orchestra-types@^1.0.1-beta.0":
+  "integrity" "sha512-ZcR8sj7xjDBu26Cs7Gwt4To3l+c9eJxTQa7vbBlrNTfsiVP6volSvLEZOMfkMv4n/LK/E6HPeXJXa0/W5b5J8A=="
+  "resolved" "https://registry.npmjs.org/@hirosystems/orchestra-types/-/orchestra-types-1.0.1-beta.0.tgz"
+  "version" "1.0.1-beta.0"
+
 "@kwsites/file-exists@^1.1.1":
   "integrity" "sha512-m9/5YGR18lIwxSFDwfE3oA7bWuq9kdau6ugN4H2rJeyhFQZcG9AgSHkQtSD15a8WvTgfz9aikZMrKPHvbpqFiw=="
   "resolved" "https://registry.npmjs.org/@kwsites/file-exists/-/file-exists-1.1.1.tgz"
@@ -745,11 +750,6 @@
     "js-sha256" "^0.9.0"
     "randombytes" "^2.1.0"
     "safe-buffer" "^5.2.1"
-
-"bitcoind-rpc@^0.9.1":
-  "integrity" "sha512-fWjepYe3I6W8pw8WiDUrHAMKZXyRqtm6HfcUaDeLAQLr1KoKcVzqR4xzdJFJgUMBShNmN4GRMg0rLFr6ZKGZ6A=="
-  "resolved" "https://registry.npmjs.org/bitcoind-rpc/-/bitcoind-rpc-0.9.1.tgz"
-  "version" "0.9.1"
 
 "bitcore-lib@^8.25.28":
   "integrity" "sha512-UrNHh0Ba8GUiHUYRmm2IKlb8eomsbvk/Z6oQdaOPQoLiamiKnu45pAMqtcHg06wMDF8at54oIdoD2WEU+TQujw=="
