@@ -13,3 +13,4 @@ node-bindings/dist
 node-bindings/build
 **/settings/Mainnet.toml
 **/settings/Testnet.toml
+examples/cbtc/backend/.build
