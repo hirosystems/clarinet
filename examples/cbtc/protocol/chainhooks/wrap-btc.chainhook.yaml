@@ -7,10 +7,9 @@ networks:
     regtest:
         oreo-url: http://0.0.0.0:20446/
         predicate:
-            confirmations: 1                                    # 1 to 7. 1 = optimistic and better UX except when the chain is forking
-            tx-out:                                             # support tx-in, tx-out.
-                p2pkh:                                          # support hex, p2pkh, p2sh, p2wpkh, p2wsh.
-                    equals: mr1iPkD9N3RJZZxXRk7xF9d36gffa6exNC  # support equals, starts-with, ends-with
+            scope: outputs
+            p2pkh:                                          # support hex, p2pkh, p2sh, p2wpkh, p2wsh.
+                equals: mr1iPkD9N3RJZZxXRk7xF9d36gffa6exNC  # support equals, starts-with, ends-with
         action:
             http: 
                 url: http://0.0.0.0:3000/api/v1/wrapBtc

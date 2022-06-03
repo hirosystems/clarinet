@@ -14,7 +14,7 @@ use bitcoincore_rpc::bitcoin::{Address, PubkeyHash, PublicKey, Script, TxIn};
 use clarity_repl::clarity::util::hash::bytes_to_hex;
 use clarity_repl::clarity::util::hash::Hash160;
 use orchestra_event_observer::chainhooks::types::{
-    BitcoinChainhookSpecification, BitcoinPredicate, ChainhookSpecification, HookAction,
+    BitcoinChainhookSpecification, BitcoinHookPredicate, ChainhookSpecification, HookAction,
     HookFormation, MatchingRule, StacksChainhookSpecification,
 };
 use orchestra_types::{BitcoinNetwork, StacksNetwork};

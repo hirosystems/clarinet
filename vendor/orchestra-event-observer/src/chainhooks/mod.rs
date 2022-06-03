@@ -1,14 +1,13 @@
 pub mod types;
 
 use self::types::{
-    BitcoinChainhookSpecification, BitcoinPredicate, BitcoinTxInBasedPredicate,
-    ChainhookSpecification, HookAction, HookFormation, MatchingRule, StacksChainhookSpecification,
-    StacksHookPredicate,
+    BitcoinChainhookSpecification, BitcoinHookPredicate, ChainhookSpecification, HookAction,
+    HookFormation, MatchingRule, StacksChainhookSpecification, StacksHookPredicate,
 };
 use base58::FromBase58;
 use bitcoincore_rpc::bitcoin::blockdata::opcodes;
 use bitcoincore_rpc::bitcoin::blockdata::script::Builder as BitcoinScriptBuilder;
-use bitcoincore_rpc::bitcoin::{Address, PubkeyHash, PublicKey, Script, TxIn};
+use bitcoincore_rpc::bitcoin::{Address, PubkeyHash, PublicKey, Script};
 use clarity_repl::clarity::util::hash::Hash160;
 use orchestra_types::{
     BitcoinChainEvent, BitcoinTransactionData, BlockIdentifier, StacksChainEvent, StacksNetwork,
@@ -328,65 +327,13 @@ pub async fn handle_stacks_hook_action<'a>(
 
 impl BitcoinChainhookSpecification {
     pub fn evaluate_predicate(&self, tx: &BitcoinTransactionData) -> bool {
-        match &self.predicate {
-            types::BitcoinHookPredicate::TxIn(BitcoinPredicate::Hex(MatchingRule::Equals(
-                _address,
-            ))) => false,
-            types::BitcoinHookPredicate::TxIn(BitcoinPredicate::Hex(MatchingRule::StartsWith(
-                _address,
-            ))) => false,
-            types::BitcoinHookPredicate::TxIn(BitcoinPredicate::Hex(MatchingRule::EndsWith(
-                _address,
-            ))) => false,
-            types::BitcoinHookPredicate::TxIn(BitcoinPredicate::P2pkh(MatchingRule::Equals(
-                _address,
-            ))) => false,
-            types::BitcoinHookPredicate::TxIn(BitcoinPredicate::P2pkh(
-                MatchingRule::StartsWith(_address),
-            )) => false,
-            types::BitcoinHookPredicate::TxIn(BitcoinPredicate::P2pkh(MatchingRule::EndsWith(
-                _address,
-            ))) => false,
-            types::BitcoinHookPredicate::TxIn(BitcoinPredicate::P2sh(MatchingRule::Equals(
-                _address,
-            ))) => false,
-            types::BitcoinHookPredicate::TxIn(BitcoinPredicate::P2sh(
-                MatchingRule::StartsWith(_address),
-            )) => false,
-            types::BitcoinHookPredicate::TxIn(BitcoinPredicate::P2sh(MatchingRule::EndsWith(
-                _address,
-            ))) => false,
-            types::BitcoinHookPredicate::TxIn(BitcoinPredicate::P2wpkh(MatchingRule::Equals(
-                _address,
-            ))) => false,
-            types::BitcoinHookPredicate::TxIn(BitcoinPredicate::P2wpkh(
-                MatchingRule::StartsWith(_address),
-            )) => false,
-            types::BitcoinHookPredicate::TxIn(BitcoinPredicate::P2wpkh(
-                MatchingRule::EndsWith(_address),
-            )) => false,
-            types::BitcoinHookPredicate::TxIn(BitcoinPredicate::P2wsh(MatchingRule::Equals(
-                _address,
-            ))) => false,
-            types::BitcoinHookPredicate::TxIn(BitcoinPredicate::P2wsh(
-                MatchingRule::StartsWith(_address),
-            )) => false,
-            types::BitcoinHookPredicate::TxIn(BitcoinPredicate::P2wsh(MatchingRule::EndsWith(
-                _address,
-            ))) => false,
-            types::BitcoinHookPredicate::TxIn(BitcoinPredicate::Script(template)) => false,
-            types::BitcoinHookPredicate::TxOut(BitcoinPredicate::Hex(MatchingRule::Equals(
-                _address,
-            ))) => false,
-            types::BitcoinHookPredicate::TxOut(BitcoinPredicate::Hex(
-                MatchingRule::StartsWith(_address),
-            )) => false,
-            types::BitcoinHookPredicate::TxOut(BitcoinPredicate::Hex(MatchingRule::EndsWith(
-                _address,
-            ))) => false,
-            types::BitcoinHookPredicate::TxOut(BitcoinPredicate::P2pkh(MatchingRule::Equals(
-                address,
-            ))) => {
+        match &self.predicate.kind {
+            types::BitcoinPredicateType::Hex(MatchingRule::Equals(_address)) => false,
+            types::BitcoinPredicateType::Hex(MatchingRule::StartsWith(_address)) => false,
+            types::BitcoinPredicateType::Hex(MatchingRule::EndsWith(_address)) => false,
+            types::BitcoinPredicateType::P2pkh(MatchingRule::Equals(_address)) => false,
+            types::BitcoinPredicateType::P2pkh(MatchingRule::StartsWith(_address)) => false,
+            types::BitcoinPredicateType::P2pkh(MatchingRule::EndsWith(address)) => {
                 let pubkey_hash = address
                     .from_base58()
                     .expect("Unable to get bytes from btc address");
@@ -405,44 +352,16 @@ impl BitcoinChainhookSpecification {
                 }
                 false
             }
-            types::BitcoinHookPredicate::TxOut(BitcoinPredicate::P2pkh(
-                MatchingRule::StartsWith(_address),
-            )) => false,
-            types::BitcoinHookPredicate::TxOut(BitcoinPredicate::P2pkh(
-                MatchingRule::EndsWith(_address),
-            )) => false,
-            types::BitcoinHookPredicate::TxOut(BitcoinPredicate::P2sh(MatchingRule::Equals(
-                _address,
-            ))) => false,
-            types::BitcoinHookPredicate::TxOut(BitcoinPredicate::P2sh(
-                MatchingRule::StartsWith(_address),
-            )) => false,
-            types::BitcoinHookPredicate::TxOut(BitcoinPredicate::P2sh(MatchingRule::EndsWith(
-                _address,
-            ))) => false,
-            types::BitcoinHookPredicate::TxOut(BitcoinPredicate::P2wpkh(MatchingRule::Equals(
-                _address,
-            ))) => false,
-            types::BitcoinHookPredicate::TxOut(BitcoinPredicate::P2wpkh(
-                MatchingRule::StartsWith(_address),
-            )) => false,
-            types::BitcoinHookPredicate::TxOut(BitcoinPredicate::P2wpkh(
-                MatchingRule::EndsWith(_address),
-            )) => false,
-            types::BitcoinHookPredicate::TxOut(BitcoinPredicate::P2wsh(MatchingRule::Equals(
-                _address,
-            ))) => false,
-            types::BitcoinHookPredicate::TxOut(BitcoinPredicate::P2wsh(
-                MatchingRule::StartsWith(_address),
-            )) => false,
-            types::BitcoinHookPredicate::TxOut(BitcoinPredicate::P2wsh(
-                MatchingRule::EndsWith(_address),
-            )) => false,
-            types::BitcoinHookPredicate::TxOut(BitcoinPredicate::Script(template)) => {
-                // let mut hex = vec![];
-
-                false
-            }
+            types::BitcoinPredicateType::P2sh(MatchingRule::Equals(_address)) => false,
+            types::BitcoinPredicateType::P2sh(MatchingRule::StartsWith(_address)) => false,
+            types::BitcoinPredicateType::P2sh(MatchingRule::EndsWith(_address)) => false,
+            types::BitcoinPredicateType::P2wpkh(MatchingRule::Equals(_address)) => false,
+            types::BitcoinPredicateType::P2wpkh(MatchingRule::StartsWith(_address)) => false,
+            types::BitcoinPredicateType::P2wpkh(MatchingRule::EndsWith(_address)) => false,
+            types::BitcoinPredicateType::P2wsh(MatchingRule::Equals(_address)) => false,
+            types::BitcoinPredicateType::P2wsh(MatchingRule::StartsWith(_address)) => false,
+            types::BitcoinPredicateType::P2wsh(MatchingRule::EndsWith(_address)) => false,
+            types::BitcoinPredicateType::Script(template) => false,
         }
     }
 }

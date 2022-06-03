@@ -104,13 +104,6 @@ pub struct HttpHook {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
-pub enum BitcoinHookPredicate {
-    TxIn(BitcoinPredicate),
-    TxOut(BitcoinPredicate),
-}
-
-#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct ScriptTemplate {
     pub instructions: Vec<ScriptInstruction>,
 }
@@ -156,7 +149,25 @@ impl ScriptTemplate {
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
-pub enum BitcoinPredicate {
+pub struct BitcoinHookPredicate {
+    pub scope: Scope,
+    #[serde(flatten)]
+    pub kind: BitcoinPredicateType,
+}
+
+impl BitcoinHookPredicate {
+    pub fn new(scope: Scope, kind: BitcoinPredicateType) -> BitcoinHookPredicate {
+        BitcoinHookPredicate {
+            scope,
+            kind
+        }
+    }
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+#[serde(tag = "type", content = "rule")]
+pub enum BitcoinPredicateType {
     Hex(MatchingRule),
     P2pkh(MatchingRule),
     P2sh(MatchingRule),
@@ -167,20 +178,18 @@ pub enum BitcoinPredicate {
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
+
+pub enum Scope {
+    Inputs,
+    Outputs,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
 pub enum MatchingRule {
     Equals(String),
     StartsWith(String),
     EndsWith(String),
-}
-
-#[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct BitcoinTxInBasedPredicate {
-    pub rule: BitcoinPredicate,
-}
-
-#[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct BitcoinTxOutBasedPredicate {
-    pub rule: BitcoinPredicate,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -197,6 +206,7 @@ pub struct StacksChainhookSpecification {
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
+#[serde(tag = "type", content = "rule")]
 pub enum StacksHookPredicate {
     ContractCall(StacksContractCallBasedPredicate),
     PrintEvent(StacksPrintEventBasedPredicate),

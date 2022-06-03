@@ -1,11 +1,17 @@
 export interface BitcoinChainEvent {
   apply: BitcoinApply[];
-  chainhook: Chainhook;
+  chainhook: {
+    uuid: string;
+    predicate: BitcoinPredicate;
+  };
 }
 
 export interface StacksChainEvent {
   apply: StacksApply[];
-  chainhook: Chainhook;
+  chainhook: {
+    uuid: string;
+    predicate: StacksPredicate;
+  };
 }
 
 export interface BitcoinApply {
@@ -22,9 +28,92 @@ export interface StacksApply {
   confirmations: number;
 }
 
-export interface Chainhook {
+export interface StacksChainhook {
   uuid: string;
-  predicate: any;
+  predicate: StacksPredicate;
+}
+
+export interface StacksPredicate {
+  type: StacksPredicateType;
+  rule:
+    | StacksContractCallBasedPredicate
+    | StacksPrintEventBasedPredicate
+    | StacksFtEventBasedPredicate
+    | StacksNftEventBasedPredicate
+    | StacksStxEventBasedPredicate;
+}
+
+export enum StacksPredicateType {
+  ContractCall = "contract_call",
+  PrintEvent = "print_event",
+  FtEvent = "ft_event",
+  NftEvent = "nft_event",
+  StxEvent = "stx_event",
+}
+
+export interface BitcoinChainhook {
+  uuid: string;
+  predicate: BitcoinPredicate;
+}
+
+export enum BitcoinPredicateScope {
+  Inputs = "inputs",
+  Outputs = "outputs",
+}
+
+export interface BitcoinPredicate {
+  scope: BitcoinPredicateScope;
+  type: BitcoinPredicateType;
+  rule: BitcoinPredicateMatchingRule;
+}
+
+export enum BitcoinPredicateType {
+  Hex = "hex",
+  P2pkh = "p2pkh",
+  P2sh = "p2sh",
+  P2wpkh = "p2wpkh",
+  P2wsh = "p2wsh",
+  Script = "script",
+}
+
+export interface BitcoinPredicateMatchingRule {
+  equals?: string;
+  starts_with?: string;
+  ends_with?: string;
+}
+
+export interface StacksPrintEventBasedPredicate {
+  contract_identifier: string;
+  contains: string;
+}
+
+export interface StacksFtEventBasedPredicate {
+  asset_identifier: string;
+  actions: string[];
+}
+
+export interface StacksContractCallBasedPredicate {
+  contract_identifier: string;
+  method: string;
+}
+
+export interface StacksPrintEventBasedPredicate {
+  contract_identifier: string;
+  contains: string;
+}
+
+export interface StacksFtEventBasedPredicate {
+  asset_identifier: string;
+  actions: string[];
+}
+
+export interface StacksNftEventBasedPredicate {
+  asset_identifier: string;
+  actions: string[];
+}
+
+export interface StacksStxEventBasedPredicate {
+  actions: string[];
 }
 
 /**
@@ -32,15 +121,13 @@ export interface Chainhook {
  * @export
  * @interface SubNetworkIdentifier
  */
- export interface SubNetworkIdentifier {
+export interface SubNetworkIdentifier {
   /**
-   *
    * @type {string}
    * @memberof SubNetworkIdentifier
    */
   network: string;
   /**
-   *
    * @type {object}
    * @memberof SubNetworkIdentifier
    */
@@ -54,7 +141,6 @@ export interface Chainhook {
  */
 export interface NetworkIdentifier {
   /**
-   *
    * @type {string}
    * @memberof NetworkIdentifier
    */
@@ -66,7 +152,6 @@ export interface NetworkIdentifier {
    */
   network: string;
   /**
-   *
    * @type {SubNetworkIdentifier}
    * @memberof NetworkIdentifier
    */
@@ -90,19 +175,16 @@ export enum Direction {
  */
 export interface RelatedTransaction {
   /**
-   *
    * @type {NetworkIdentifier}
    * @memberof RelatedTransaction
    */
   network_identifier?: NetworkIdentifier;
   /**
-   *
    * @type {TransactionIdentifier}
    * @memberof RelatedTransaction
    */
   transaction_identifier: TransactionIdentifier;
   /**
-   *
    * @type {Direction}
    * @memberof RelatedTransaction
    */
@@ -130,67 +212,56 @@ export interface TransactionIdentifier {
  */
 export interface StacksTransactionMetadata {
   /**
-   *
    * @type {boolean}
    * @memberof StacksTransactionMetadata
    */
   success: boolean;
   /**
-   *
    * @type {string}
    * @memberof StacksTransactionMetadata
    */
   result: string;
   /**
-   *
    * @type {string[]}
    * @memberof StacksTransactionMetadata
    */
   events: string[];
   /**
-   *
    * @type {string}
    * @memberof StacksTransactionMetadata
    */
   description: string;
   /**
-   *
    * @type {boolean}
    * @memberof StacksTransactionMetadata
    */
   raw_tx: boolean;
   /**
-   *
    * @type {string}
    * @memberof StacksTransactionMetadata
    */
   sender: string;
   /**
-   *
    * @type {string}
    * @memberof StacksTransactionMetadata
    */
   sponsor?: string;
   /**
-   *
    * @type {number}
    * @memberof StacksTransactionMetadata
    */
   fee: number;
   /**
-   *
    * @type {StacksTransactionKind}
    * @memberof StacksTransactionMetadata
    */
   kind: StacksTransactionKind;
   /**
-   *
    * @type {StacksTransactionReceipt}
    * @memberof StacksTransactionMetadata
    */
   receipt: StacksTransactionReceipt;
   /**
-   *
    * @type {StacksTransactionExecutionCost}
    * @memberof StacksTransactionMetadata
    */
@@ -199,19 +270,16 @@ export interface StacksTransactionMetadata {
 
 export interface StacksTransactionReceipt {
   /**
-   *
    * @type {string[]}
    * @memberof StacksTransactionReceipt
    */
   mutated_contracts_radius: string[];
   /**
-   *
    * @type {string[]}
    * @memberof StacksTransactionReceipt
    */
   mutated_assets_radius: string[];
   /**
-   *
    * @type {StacksTransactionEvent[]}
    * @memberof StacksTransactionReceipt
    */
@@ -219,33 +287,32 @@ export interface StacksTransactionReceipt {
 }
 
 export interface StacksTransactionEvent {
-  type: StacksTransactionEventType,
-  data: StacksSTXTransferEventData
-      | StacksSTXMintEventData
-      | StacksSTXLockEventData
-      | StacksSTXBurnEventData
-      | StacksNFTTransferEventData
-      | StacksNFTMintEventData
-      | StacksNFTBurnEventData
-      | StacksFTTransferEventData
-      | StacksFTMintEventData
-      | StacksFTBurnEventData
-      | StacksDataVarSetEventData
-      | StacksDataMapInsertEventData
-      | StacksDataMapUpdateEventData
-      | StacksDataMapDeleteEventData
-      | StacksSmartContractEventData;
+  type: StacksTransactionEventType;
+  data:
+    | StacksSTXTransferEventData
+    | StacksSTXMintEventData
+    | StacksSTXLockEventData
+    | StacksSTXBurnEventData
+    | StacksNFTTransferEventData
+    | StacksNFTMintEventData
+    | StacksNFTBurnEventData
+    | StacksFTTransferEventData
+    | StacksFTMintEventData
+    | StacksFTBurnEventData
+    | StacksDataVarSetEventData
+    | StacksDataMapInsertEventData
+    | StacksDataMapUpdateEventData
+    | StacksDataMapDeleteEventData
+    | StacksSmartContractEventData;
 }
 
 export interface StacksContractDeploymentData {
   /**
-   *
    * @type {string}
    * @memberof StacksContractDeploymentData
    */
   contract_identifier: string;
   /**
-   *
    * @type {string[]}
    * @memberof StacksContractDeploymentData
    */
@@ -254,31 +321,26 @@ export interface StacksContractDeploymentData {
 
 export interface StacksTransactionExecutionCost {
   /**
-   *
    * @type {number}
    * @memberof StacksTransactionExecutionCost
    */
   write_length: number;
   /**
-   *
    * @type {number}
    * @memberof StacksTransactionExecutionCost
    */
   write_count: number;
   /**
-   *
    * @type {number}
    * @memberof StacksTransactionExecutionCost
    */
   read_length: number;
   /**
-   *
    * @type {number}
    * @memberof StacksTransactionExecutionCost
    */
   read_count: number;
   /**
-   *
    * @type {number}
    * @memberof StacksTransactionExecutionCost
    */
@@ -415,13 +477,13 @@ export interface BitcoinTransactionMetadata {
 
 export interface Input {
   previous_output: string;
-  script_sig:      string;
-  sequence:        number;
-  witness:         any[];
+  script_sig: string;
+  sequence: number;
+  witness: any[];
 }
 
 export interface Output {
-  value:         number;
+  value: number;
   script_pubkey: string;
 }
 
@@ -430,21 +492,18 @@ export interface Output {
  * @export
  * @interface StacksTransaction
  */
- export interface StacksTransaction {
+export interface StacksTransaction {
   /**
-   *
    * @type {TransactionIdentifier}
    * @memberof Transaction
    */
   transaction_identifier: TransactionIdentifier;
   /**
-   *
    * @type {Array<Operation>}
    * @memberof Transaction
    */
   operations: Array<Operation>;
   /**
-   *
    * @type {Array<RelatedTransaction>}
    * @memberof Transaction
    */
@@ -462,21 +521,18 @@ export interface Output {
  * @export
  * @interface BitcoinTransaction
  */
- export interface BitcoinTransaction {
+export interface BitcoinTransaction {
   /**
-   *
    * @type {TransactionIdentifier}
    * @memberof Transaction
    */
   transaction_identifier: TransactionIdentifier;
   /**
-   *
    * @type {Array<Operation>}
    * @memberof Transaction
    */
   operations: Array<Operation>;
   /**
-   *
    * @type {Array<RelatedTransaction>}
    * @memberof Transaction
    */
@@ -489,7 +545,6 @@ export interface Output {
   metadata: BitcoinTransactionMetadata;
 }
 
-
 /**
  * Transactions contain an array of Operations that are attributable to the same TransactionIdentifier.
  * @export
@@ -497,19 +552,16 @@ export interface Output {
  */
 export interface Transaction {
   /**
-   *
    * @type {TransactionIdentifier}
    * @memberof Transaction
    */
   transaction_identifier: TransactionIdentifier;
   /**
-   *
    * @type {Array<Operation>}
    * @memberof Transaction
    */
   operations: Array<Operation>;
   /**
-   *
    * @type {Array<RelatedTransaction>}
    * @memberof Transaction
    */
@@ -529,25 +581,21 @@ export interface Transaction {
  */
 export interface StacksBlockMetadata {
   /**
-   *
    * @type {BlockIdentifier}
    * @memberof StacksBlockMetadata
    */
   bitcoin_anchor_block_identifier: BlockIdentifier;
   /**
-   *
    * @type {number}
    * @memberof StacksBlockMetadata
    */
   pox_cycle_index: number;
   /**
-   *
    * @type {number}
    * @memberof StacksBlockMetadata
    */
   pox_cycle_position: number;
   /**
-   *
    * @type {number}
    * @memberof StacksBlockMetadata
    */
@@ -574,7 +622,6 @@ export interface BlockIdentifier {
    */
   index: number;
   /**
-   *
    * @type {string}
    * @memberof BlockIdentifier
    */
@@ -588,13 +635,11 @@ export interface BlockIdentifier {
  */
 export interface Block {
   /**
-   *
    * @type {BlockIdentifier}
    * @memberof Block
    */
   block_identifier: BlockIdentifier;
   /**
-   *
    * @type {BlockIdentifier}
    * @memberof Block
    */
@@ -606,13 +651,11 @@ export interface Block {
    */
   timestamp: number;
   /**
-   *
    * @type {Array<Transaction>}
    * @memberof Block
    */
   transactions: Array<Transaction>;
   /**
-   *
    * @type {object}
    * @memberof Block
    */
@@ -652,7 +695,6 @@ export interface AccountIdentifier {
    */
   address: string;
   /**
-   *
    * @type {SubAccountIdentifier}
    * @memberof AccountIdentifier
    */
@@ -692,7 +734,6 @@ export interface SubAccountIdentifier {
  */
 export interface Operation {
   /**
-   *
    * @type {OperationIdentifier}
    * @memberof Operation
    */
@@ -716,25 +757,21 @@ export interface Operation {
    */
   status?: string;
   /**
-   *
    * @type {AccountIdentifier}
    * @memberof Operation
    */
   account?: AccountIdentifier;
   /**
-   *
    * @type {Amount}
    * @memberof Operation
    */
   amount?: Amount;
   /**
-   *
    * @type {CoinChange}
    * @memberof Operation
    */
   coin_change?: CoinChange;
   /**
-   *
    * @type {object}
    * @memberof Operation
    */
@@ -754,13 +791,11 @@ export interface Amount {
    */
   value: string;
   /**
-   *
    * @type {Currency}
    * @memberof Amount
    */
   currency: Currency;
   /**
-   *
    * @type {object}
    * @memberof Amount
    */
@@ -814,13 +849,11 @@ export interface CoinIdentifier {
  */
 export interface CoinChange {
   /**
-   *
    * @type {CoinIdentifier}
    * @memberof CoinChange
    */
   coin_identifier: CoinIdentifier;
   /**
-   *
    * @type {CoinAction}
    * @memberof CoinChange
    */
