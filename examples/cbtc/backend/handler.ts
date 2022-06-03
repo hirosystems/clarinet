@@ -14,7 +14,6 @@ import {
   addressToString,
 } from '@stacks/transactions';
 import { StacksTestnet } from '@stacks/network';
-import BigNum from 'bn.js';
 import { principalCV } from "@stacks/transactions/dist/clarity/types/principalCV";
 const Script = require('bitcore-lib/lib/script');
 const Opcode = require('bitcore-lib/lib/opcode');
@@ -75,7 +74,7 @@ module.exports.wrapBtc = async (event: HttpEvent) => {
     contractName: cbtcToken.contractName,
     functionName: "mint",
     functionArgs: [uintCV(satsAmount), standardPrincipalCVFromAddress(recipientAddress)],
-    fee: new BigNum(1000),
+    fee: 1000,
     nonce,
     network,
     anchorMode: AnchorMode.OnChainOnly,

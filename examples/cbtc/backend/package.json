@@ -12,7 +12,6 @@
     "@stacks/network": "^4.2.1",
     "@stacks/transactions": "^4.2.1",
     "@hirosystems/orchestra-types": "^1.0.1-beta.1",
-    "bitcore-lib": "^8.25.28",
-    "bn.js": "^5.2.1"
+    "bitcore-lib": "^8.25.28"
   }
 }

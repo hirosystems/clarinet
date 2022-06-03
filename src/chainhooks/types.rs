@@ -227,7 +227,7 @@ impl ChainhookPredicateFile {
             let scope = self.extract_scope()?;
             return Ok(BitcoinHookPredicate::new(scope, rule));
         } else if let Some(ref specs) = self.p2wsh {
-            let rule = BitcoinPredicateType::P2sh(self.extract_matching_rule(specs)?);
+            let rule = BitcoinPredicateType::P2wsh(self.extract_matching_rule(specs)?);
             let scope = self.extract_scope()?;
             return Ok(BitcoinHookPredicate::new(scope, rule));
         } else if let Some(ref _specs) = self.script {

@@ -331,9 +331,7 @@ impl BitcoinChainhookSpecification {
             types::BitcoinPredicateType::Hex(MatchingRule::Equals(_address)) => false,
             types::BitcoinPredicateType::Hex(MatchingRule::StartsWith(_address)) => false,
             types::BitcoinPredicateType::Hex(MatchingRule::EndsWith(_address)) => false,
-            types::BitcoinPredicateType::P2pkh(MatchingRule::Equals(_address)) => false,
-            types::BitcoinPredicateType::P2pkh(MatchingRule::StartsWith(_address)) => false,
-            types::BitcoinPredicateType::P2pkh(MatchingRule::EndsWith(address)) => {
+            types::BitcoinPredicateType::P2pkh(MatchingRule::Equals(address)) => {
                 let pubkey_hash = address
                     .from_base58()
                     .expect("Unable to get bytes from btc address");
@@ -351,7 +349,9 @@ impl BitcoinChainhookSpecification {
                     }
                 }
                 false
-            }
+            },
+            types::BitcoinPredicateType::P2pkh(MatchingRule::StartsWith(_address)) => false,
+            types::BitcoinPredicateType::P2pkh(MatchingRule::EndsWith(_address)) => false,
             types::BitcoinPredicateType::P2sh(MatchingRule::Equals(_address)) => false,
             types::BitcoinPredicateType::P2sh(MatchingRule::StartsWith(_address)) => false,
             types::BitcoinPredicateType::P2sh(MatchingRule::EndsWith(_address)) => false,
