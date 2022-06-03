@@ -157,10 +157,7 @@ pub struct BitcoinHookPredicate {
 
 impl BitcoinHookPredicate {
     pub fn new(scope: Scope, kind: BitcoinPredicateType) -> BitcoinHookPredicate {
-        BitcoinHookPredicate {
-            scope,
-            kind
-        }
+        BitcoinHookPredicate { scope, kind }
     }
 }
 

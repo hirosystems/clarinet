@@ -234,9 +234,7 @@ impl ChainhookPredicateFile {
             // let rule = BitcoinPredicateType::Script(self.ex(specs)?);
             // let scope = self.extract_scope()?;
             // return Ok(BitcoinHookPredicate::new(scope, rule));
-            return Err(format!(
-                "trigger script unimplemented"
-            ));    
+            return Err(format!("trigger script unimplemented"));
         }
         return Err(format!(
             "trigger not specified (hex, p2pkh, p2sh, p2wpkh, p2wsh, script)"
