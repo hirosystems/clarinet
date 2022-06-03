@@ -6,7 +6,7 @@ RUN apt update && apt install -y ca-certificates pkg-config libssl-dev protobuf-
 
 RUN rustup update 1.59.0 && rustup default 1.59.0
 
-COPY ./orchestra-types /src/orchestra-types
+COPY ./orchestra-types-rs /src/orchestra-types-rs
 
 COPY ./orchestra-event-observer /src/orchestra-event-observer
 
