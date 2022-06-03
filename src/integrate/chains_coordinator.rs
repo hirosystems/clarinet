@@ -258,18 +258,16 @@ pub async fn start_chains_coordinator(
                         )
                     }
 
-                    std::thread::spawn(move || {
-                        loop {
-                            match deployment_progress_rx.recv() {
-                                Ok(DeploymentEvent::ProtocolDeployed) => {
-                                    protocol_deployed_moved.store(true, Ordering::SeqCst);
-                                    if !automining_disabled {
-                                        let _ = mining_command_tx_moved
-                                            .send(BitcoinMiningCommand::Start);
-                                    }
+                    std::thread::spawn(move || loop {
+                        match deployment_progress_rx.recv() {
+                            Ok(DeploymentEvent::ProtocolDeployed) => {
+                                protocol_deployed_moved.store(true, Ordering::SeqCst);
+                                if !automining_disabled {
+                                    let _ =
+                                        mining_command_tx_moved.send(BitcoinMiningCommand::Start);
                                 }
-                                _ => continue,
                             }
+                            _ => continue,
                         }
                     });
                 }

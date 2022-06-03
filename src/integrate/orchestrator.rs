@@ -1986,9 +1986,9 @@ log_filters = "INFO"
         use bitcoincore_rpc::{Auth, Client, RpcApi};
         use std::str::FromStr;
 
-        let devnet_config = match &self.network_config {
+        let (devnet_config, accounts) = match &self.network_config {
             Some(ref network_config) => match network_config.devnet {
-                Some(ref devnet_config) => devnet_config,
+                Some(ref devnet_config) => (devnet_config, &network_config.accounts),
                 _ => return,
             },
             _ => return,
@@ -2018,17 +2018,19 @@ log_filters = "INFO"
         let faucet_address = Address::from_str(&devnet_config.faucet_btc_address).unwrap();
 
         let _ = rpc.generate_to_address(3, &miner_address);
-        let _ = rpc.generate_to_address(97, &Address::from_str(&devnet_config.faucet_btc_address).unwrap());
+        let _ = rpc.generate_to_address(
+            97,
+            &Address::from_str(&devnet_config.faucet_btc_address).unwrap(),
+        );
         let _ = rpc.generate_to_address(1, &miner_address);
         let _ = rpc.create_wallet("", None, None, None, None);
         let _ = rpc.import_address(&miner_address, None, None);
         let _ = rpc.import_address(&faucet_address, None, None);
-
-        // let _ = rpc.import_private_key(
-        //     &PrivateKey::from_str(&devnet_config.faucet_secret_key_hex).unwrap(),
-        //     None,
-        //     None,
-        // );
+        // Index devnet's wallets by default
+        for (_, account) in accounts.iter() {
+            let address = Address::from_str(&account.btc_address).unwrap();
+            let _ = rpc.import_address(&address, None, None);
+        }
     }
 }
 

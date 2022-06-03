@@ -185,7 +185,7 @@ pub fn encode_contract_call(
     network: &StacksNetwork,
 ) -> Result<StacksTransaction, String> {
     let (_, _, public_key) = get_keypair(account);
-    
+
     let payload = TransactionContractCall {
         contract_name: contract_id.name.clone(),
         address: StacksAddress::from(contract_id.issuer.clone()),

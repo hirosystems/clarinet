@@ -12,13 +12,13 @@ functions:
     handler: handler.wrapBtc
     events:
       - httpApi:
-          path: /api/v1/wrap-btc
+          path: /api/v1/wrapBtc
           method: post
   unwrapBtc:
     handler: handler.unwrapBtc
     events:
       - httpApi:
-          path: /api/v1/unwrap-btc
+          path: /api/v1/unwrapBtc
           method: post
 
 plugins:

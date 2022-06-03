@@ -1,9 +1,5 @@
 (impl-trait 'SP3FBR2AGK5H9QBDH3EEN6DF8EK8JY7RX8QJ5SVTE.sip-010-trait-ft-standard.sip-010-trait)
 
-(define-constant ORACLE 'STNHKEPYEPJ8ET55ZZ0M5A34J0R3N5FM2CMMMAZ6)
-
-(define-data-var cbtc-usd uint u0)
-
 (define-fungible-token cbtc)
 
 ;; get the token balance of owner
@@ -40,12 +36,13 @@
 (define-public (get-token-uri)
   (ok (some u"https://example.com")))
 
+(define-constant AUTHORITY 'ST1SJ3DTE5DN7X54YDH5D64R3BCB6A2AG2ZQ8YPD5)
+
 (define-public (mint (amount uint) (recipient principal))
     (begin 
-        (asserts! (is-eq tx-sender ORACLE) (err u0))
+        (asserts! (is-eq tx-sender AUTHORITY) (err u0))
         (ft-mint? cbtc amount recipient)))
 
 (define-public (burn (amount uint))
     (begin 
-        (asserts! (is-eq tx-sender ORACLE) (err u0))
         (ft-burn? cbtc amount tx-sender)))

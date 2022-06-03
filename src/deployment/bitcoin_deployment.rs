@@ -13,7 +13,7 @@ use bitcoincore_rpc::bitcoin::Address;
 use bitcoincore_rpc::{Auth, Client};
 use bitcoincore_rpc::{RawTx, RpcApi};
 use bitcoincore_rpc_json::ListUnspentResultEntry;
-use clarity_repl::clarity::util::hash::{hex_bytes, bytes_to_hex};
+use clarity_repl::clarity::util::hash::{bytes_to_hex, hex_bytes};
 
 use super::types::BtcTransferSpecification;
 
