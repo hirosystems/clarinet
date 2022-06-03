@@ -14,3 +14,4 @@ node-bindings/build
 **/settings/Mainnet.toml
 **/settings/Testnet.toml
 examples/cbtc/backend/.build
+vendor/orchestra-types-js/dist

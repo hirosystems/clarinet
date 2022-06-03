@@ -262,10 +262,10 @@
     "@hapi/bourne" "2.x.x"
     "@hapi/hoek" "9.x.x"
 
-"@hirosystems/orchestra-types@^1.0.1-beta.0":
-  "integrity" "sha512-ZcR8sj7xjDBu26Cs7Gwt4To3l+c9eJxTQa7vbBlrNTfsiVP6volSvLEZOMfkMv4n/LK/E6HPeXJXa0/W5b5J8A=="
-  "resolved" "https://registry.npmjs.org/@hirosystems/orchestra-types/-/orchestra-types-1.0.1-beta.0.tgz"
-  "version" "1.0.1-beta.0"
+"@hirosystems/orchestra-types@^1.0.1-beta.1":
+  "integrity" "sha512-IjzKR8jkH2IYQj3F2PI2hry7u5i8axa5LzmE9BiIHjdSErUkQph8as8hso/lmda/nd/MqYgT+7WmZqXjWq25dQ=="
+  "resolved" "https://registry.npmjs.org/@hirosystems/orchestra-types/-/orchestra-types-1.0.1-beta.1.tgz"
+  "version" "1.0.1-beta.1"
 
 "@kwsites/file-exists@^1.1.1":
   "integrity" "sha512-m9/5YGR18lIwxSFDwfE3oA7bWuq9kdau6ugN4H2rJeyhFQZcG9AgSHkQtSD15a8WvTgfz9aikZMrKPHvbpqFiw=="
