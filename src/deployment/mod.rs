@@ -2,6 +2,7 @@ mod requirements;
 pub mod types;
 mod ui;
 
+use clarity_repl::clarity::diagnostic::DiagnosableError;
 use clarity_repl::clarity::types::StandardPrincipalData;
 use clarity_repl::clarity::{ClarityName, Value};
 pub use ui::start_ui;
@@ -1231,8 +1232,10 @@ pub fn generate_default_deployment(
 
     let mut dependencies = match dependencies {
         Ok(dependencies) => dependencies,
-        Err(_) => {
-            return Err(format!("unable to detect dependencies"));
+        Err((dependencies, _)) => {
+            // No need to report an error here, it will be caught and reported
+            // with proper location information by the later analyses.
+            dependencies
         }
     };
 
@@ -1244,7 +1247,7 @@ pub fn generate_default_deployment(
 
     let ordered_contracts_ids = match ASTDependencyDetector::order_contracts(&dependencies) {
         Ok(ordered_contracts_ids) => ordered_contracts_ids,
-        Err(e) => return Err(format!("unable to order contracts {}", e)),
+        Err(e) => return Err(e.err.message()),
     };
 
     for contract_id in ordered_contracts_ids.into_iter() {
