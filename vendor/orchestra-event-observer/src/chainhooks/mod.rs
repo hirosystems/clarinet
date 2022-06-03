@@ -274,7 +274,7 @@ pub async fn handle_bitcoin_hook_action<'a>(
                     "block_identifier": block_identifier,
                     "confirmations": 1,
                 })],
-                "hook": {
+                "chainhook": {
                     "uuid": hook.uuid,
                     "predicate": hook.predicate,
                 }
@@ -309,7 +309,7 @@ pub async fn handle_stacks_hook_action<'a>(
                     "block_identifier": block_identifier,
                     "confirmations": 1,
                 })],
-                "hook": {
+                "chainhook": {
                     "uuid": hook.uuid,
                     "predicate": hook.predicate,
                 }

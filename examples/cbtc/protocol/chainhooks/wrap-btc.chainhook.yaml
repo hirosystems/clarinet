@@ -1,17 +1,16 @@
-
 ---
-name: "Wrap BTC"
+name: Wrap BTC
 version: 1
 chain: bitcoin
 networks:
-    regtest:
-        oreo-url: http://0.0.0.0:20446/
-        predicate:
-            scope: outputs
-            p2pkh:                                          # support hex, p2pkh, p2sh, p2wpkh, p2wsh.
-                equals: mr1iPkD9N3RJZZxXRk7xF9d36gffa6exNC  # support equals, starts-with, ends-with
-        action:
-            http: 
-                url: http://0.0.0.0:3000/api/v1/wrapBtc
-                method: POST
-                authorization-header: "Bearer cn389ncoiwuencr"
+  regtest:
+    oreo-url: 'http://0.0.0.0:20446/'
+    predicate:
+      scope: outputs
+      p2pkh:
+        equals: mr1iPkD9N3RJZZxXRk7xF9d36gffa6exNC
+    action:
+      http:
+        url: 'http://0.0.0.0:3000/api/v1/wrapBtc'
+        method: POST
+        authorization-header: Bearer cn389ncoiwuencr
