@@ -9,10 +9,10 @@ use clarinet_lib::deployment;
 use clarinet_lib::integrate::{self, DevnetEvent, DevnetOrchestrator};
 use clarinet_lib::types::{
     compute_addresses, AccountConfig, DevnetConfigFile, PoxStackingOrder, ProjectManifest,
-    StacksNetwork, DEFAULT_DERIVATION_PATH,
+    DEFAULT_DERIVATION_PATH,
 };
 use orchestra_types::{
-    BitcoinBlockData, BitcoinChainEvent, ChainUpdatedWithBlockData, StacksChainEvent,
+    BitcoinBlockData, BitcoinChainEvent, ChainUpdatedWithBlockData, StacksChainEvent, StacksNetwork
 };
 
 use core::panic;
@@ -211,7 +211,7 @@ impl StacksDevnet {
             };
 
             let (stx_address, btc_address, _) =
-                compute_addresses(&mnemonic, &derivation, is_mainnet);
+                compute_addresses(&mnemonic, &derivation, &StacksNetwork::Devnet.get_networks());
 
             let account = AccountConfig {
                 label,
