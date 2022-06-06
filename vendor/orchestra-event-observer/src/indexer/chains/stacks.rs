@@ -48,7 +48,7 @@ pub struct NewTransaction {
     pub microblock_parent_hash: Option<String>,
 }
 
-#[derive(Deserialize)]
+#[derive(Debug, Deserialize)]
 pub struct NewEvent {
     pub txid: String,
     pub committed: bool,
@@ -69,7 +69,7 @@ pub struct NewEvent {
     pub data_map_insert_event: Option<JsonValue>,
     pub data_map_update_event: Option<JsonValue>,
     pub data_map_delete_event: Option<JsonValue>,
-    pub print_event: Option<JsonValue>,
+    pub contract_event: Option<JsonValue>,
 }
 
 pub fn get_stacks_currency() -> Currency {
@@ -805,7 +805,7 @@ pub fn get_standardized_stacks_operations(
                     .expect("Unable to decode event_data");
                 marshalled_events.push(StacksTransactionEvent::DataMapDeleteEvent(data.clone()));
                 mutated_contracts_radius.insert(data.contract_identifier.clone());
-            } else if let Some(ref event_data) = event.print_event {
+            } else if let Some(ref event_data) = event.contract_event {
                 let data: SmartContractEventData = serde_json::from_value(event_data.clone())
                     .expect("Unable to decode event_data");
                 marshalled_events.push(StacksTransactionEvent::SmartContractEvent(data.clone()));
