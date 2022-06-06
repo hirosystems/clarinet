@@ -3,7 +3,7 @@ mod app;
 #[allow(dead_code)]
 mod ui;
 
-use super::DeploymentEvent;
+use super::{DeploymentEvent, TransactionTracker};
 use app::App;
 use crossterm::{
     execute,
@@ -16,7 +16,7 @@ use tui::{backend::CrosstermBackend, Terminal};
 pub fn start_ui(
     node_url: &str,
     deployment_event_rx: Receiver<DeploymentEvent>,
-    contracts_ids: Vec<String>,
+    transaction_trackers: Vec<TransactionTracker>,
 ) -> Result<(), String> {
     enable_raw_mode().expect("unable to setup user interface");
 
@@ -25,14 +25,14 @@ pub fn start_ui(
 
     let backend = CrosstermBackend::new(stdout);
     let mut terminal = Terminal::new(backend).expect("unable to setup user interface");
-    let mut app = App::new(node_url, contracts_ids);
+    let mut app = App::new(node_url, transaction_trackers);
 
     let res = loop {
         terminal
             .draw(|f| ui::draw(f, &mut app))
             .expect("unable to setup user interface");
         match deployment_event_rx.recv() {
-            Ok(DeploymentEvent::ContractUpdate(update)) => {
+            Ok(DeploymentEvent::TransactionUpdate(update)) => {
                 app.display_contract_status_update(update);
             }
             Ok(DeploymentEvent::ProtocolDeployed) => {

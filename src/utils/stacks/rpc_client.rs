@@ -80,7 +80,7 @@ impl StacksRpc {
 
     pub fn post_transaction(
         &self,
-        transaction: StacksTransaction,
+        transaction: &StacksTransaction,
     ) -> Result<PostTransactionResult, RpcError> {
         let tx = transaction.serialize_to_vec();
         let path = format!("{}/v2/transactions", self.url);

@@ -1,8 +1,9 @@
 use crate::deployment::{
     self, apply_on_chain_deployment, check_deployments, generate_default_deployment,
-    get_absolute_deployment_path, get_default_deployment_path, load_deployment,
-    load_deployment_if_exists, setup_session_with_deployment, types::DeploymentSpecification,
-    write_deployment, DeploymentCommand, DeploymentEvent, DeploymentGenerationArtifacts,
+    get_absolute_deployment_path, get_default_deployment_path, get_initial_transactions_trackers,
+    load_deployment, load_deployment_if_exists, setup_session_with_deployment,
+    types::DeploymentSpecification, write_deployment, DeploymentCommand, DeploymentEvent,
+    DeploymentGenerationArtifacts,
 };
 use crate::generate::{
     self,
@@ -10,12 +11,12 @@ use crate::generate::{
 };
 use crate::integrate::{self, DevnetOrchestrator};
 use crate::lsp::run_lsp;
-use crate::runnner::run_scripts;
-use crate::runnner::DeploymentCache;
+use crate::runner::run_scripts;
+use crate::runner::DeploymentCache;
 use crate::types::{ProjectManifest, ProjectManifestFile, RequirementConfig, StacksNetwork};
 use clarity_repl::clarity::analysis::{AnalysisDatabase, ContractAnalysis};
 use clarity_repl::clarity::costs::LimitedCostTracker;
-use clarity_repl::clarity::diagnostic::Level;
+use clarity_repl::clarity::diagnostic::{Diagnostic, Level};
 use clarity_repl::clarity::types::QualifiedContractIdentifier;
 use clarity_repl::{analysis, repl, Terminal};
 use std::collections::HashMap;
@@ -56,7 +57,10 @@ enum Command {
     /// Subcommands for working with contracts
     #[clap(subcommand, name = "contracts")]
     Contracts(Contracts),
-    /// Subcommands for working with deployments
+    /// Interact with contracts deployed on Mainnet
+    #[clap(subcommand, name = "requirements")]
+    Requirements(Requirements),
+    /// Manage contracts deployments on Simnet/Devnet/Testnet/Mainnet
     #[clap(subcommand, name = "deployments")]
     Deployments(Deployments),
     /// Load contracts in a REPL for an interactive session
@@ -65,19 +69,19 @@ enum Command {
     /// Execute test suite
     #[clap(name = "test", bin_name = "test")]
     Test(Test),
-    /// Check syntax of your contracts
+    /// Check contracts syntax
     #[clap(name = "check", bin_name = "check")]
     Check(Check),
     /// Execute Clarinet extension
     #[clap(name = "run", bin_name = "run")]
     Run(Run),
-    /// Start devnet environment for integration testing
+    /// Start a local Devnet network for interacting with your contracts from your browser
     #[clap(name = "integrate", bin_name = "integrate")]
     Integrate(Integrate),
-    /// Start an LSP server (for integration with editors)
+    /// Get Clarity autocompletion and inline errors from your code editor (VSCode, vim, emacs, etc)
     #[clap(name = "lsp", bin_name = "lsp")]
     LSP,
-    /// Start a DAP server (for debugging from IDE)
+    /// Step by step debugging and breakpoints from your code editor (VSCode, vim, emacs, etc)
     #[clap(name = "dap", bin_name = "dap")]
     DAP,
     /// Generate shell completions scripts
@@ -91,13 +95,18 @@ enum Contracts {
     /// Generate files and settings for a new contract
     #[clap(name = "new", bin_name = "new")]
     NewContract(NewContract),
-    /// Add third-party requirements to this project
-    #[clap(name = "requirement", bin_name = "requirement")]
-    Requirement(Requirement),
 }
 
 #[derive(Subcommand, PartialEq, Clone, Debug)]
-#[clap(bin_name = "deployment", aliases = &["deployments"])]
+#[clap(bin_name = "req", aliases = &["requirement"])]
+enum Requirements {
+    /// Interact with contracts published on Mainnet
+    #[clap(name = "add", bin_name = "add")]
+    AddRequirement(AddRequirement),
+}
+
+#[derive(Subcommand, PartialEq, Clone, Debug)]
+#[clap(bin_name = "deployment", aliases = &["deployment"])]
 enum Deployments {
     /// Check deployments format
     #[clap(name = "check", bin_name = "check")]
@@ -129,8 +138,8 @@ struct NewContract {
 }
 
 #[derive(Parser, PartialEq, Clone, Debug)]
-struct Requirement {
-    /// Contract id (ex. " SP2PABAF9FTAJYNFZH93XENAJ8FVY99RRM50D2JG9.nft-trait")
+struct AddRequirement {
+    /// Contract id (ex. "SP2PABAF9FTAJYNFZH93XENAJ8FVY99RRM50D2JG9.nft-trait")
     pub contract_id: String,
     /// Path to Clarinet.toml
     #[clap(long = "manifest-path", short = 'm')]
@@ -146,18 +155,18 @@ struct CheckDeployments {
 
 #[derive(Parser, PartialEq, Clone, Debug)]
 struct GenerateDeployment {
-    /// Generate a deployment file for a test environment (console, tests, etc.)
+    /// Generate a deployment file for simnet environments (console, tests)
     #[clap(
-        long = "test",
+        long = "simnet",
         conflicts_with = "devnet",
         conflicts_with = "testnet",
         conflicts_with = "mainnet"
     )]
-    pub test: bool,
+    pub simnet: bool,
     /// Generate a deployment file for devnet, using settings/Devnet.toml
     #[clap(
         long = "devnet",
-        conflicts_with = "test",
+        conflicts_with = "simnet",
         conflicts_with = "testnet",
         conflicts_with = "mainnet"
     )]
@@ -165,7 +174,7 @@ struct GenerateDeployment {
     /// Generate a deployment file for devnet, using settings/Testnet.toml
     #[clap(
         long = "testnet",
-        conflicts_with = "test",
+        conflicts_with = "simnet",
         conflicts_with = "devnet",
         conflicts_with = "mainnet"
     )]
@@ -173,7 +182,7 @@ struct GenerateDeployment {
     /// Generate a deployment file for devnet, using settings/Mainnet.toml
     #[clap(
         long = "mainnet",
-        conflicts_with = "test",
+        conflicts_with = "simnet",
         conflicts_with = "testnet",
         conflicts_with = "devnet"
     )]
@@ -181,6 +190,14 @@ struct GenerateDeployment {
     /// Path to Clarinet.toml
     #[clap(long = "manifest-path", short = 'm')]
     pub manifest_path: Option<String>,
+    /// Generate a deployment file without trying to batch transactions (simnet only)
+    #[clap(
+        long = "no-batch",
+        conflicts_with = "devnet",
+        conflicts_with = "testnet",
+        conflicts_with = "mainnet"
+    )]
+    pub no_batch: bool,
 }
 
 #[derive(Parser, PartialEq, Clone, Debug)]
@@ -424,13 +441,14 @@ pub fn main() {
                 };
 
                 let default_deployment_path = get_default_deployment_path(&manifest, &network);
-                let (deployment, _) = match generate_default_deployment(&manifest, &network) {
-                    Ok(deployment) => deployment,
-                    Err(message) => {
-                        println!("{}", red!(message));
-                        std::process::exit(1);
-                    }
-                };
+                let (deployment, _) =
+                    match generate_default_deployment(&manifest, &network, cmd.no_batch) {
+                        Ok(deployment) => deployment,
+                        Err(message) => {
+                            println!("{}", red!(message));
+                            std::process::exit(1);
+                        }
+                    };
                 let res = write_deployment(&deployment, &default_deployment_path, true);
                 if let Err(message) = res {
                     println!("{}", message);
@@ -472,7 +490,7 @@ pub fn main() {
                             Some(Err(e)) => Err(e),
                             None => {
                                 let default_deployment_path = get_default_deployment_path(&manifest, &network);
-                                let (deployment, _) = match generate_default_deployment(&manifest, &network) {
+                                let (deployment, _) = match generate_default_deployment(&manifest, &network, false) {
                                     Ok(deployment) => deployment,
                                     Err(message) => {
                                         println!("{}", red!(message));
@@ -506,11 +524,6 @@ pub fn main() {
                     }
                 };
 
-                let contracts_ids = deployment
-                    .contracts
-                    .keys()
-                    .map(|contract_id| contract_id.to_string())
-                    .collect::<Vec<_>>();
                 let node_url = deployment.node.clone().unwrap();
 
                 println!(
@@ -520,7 +533,8 @@ pub fn main() {
                 );
                 let mut buffer = String::new();
                 std::io::stdin().read_line(&mut buffer).unwrap();
-                if !buffer.starts_with("Y") || !buffer.starts_with("") {
+                if !buffer.starts_with("Y") && !buffer.starts_with("y") && !buffer.starts_with("\n")
+                {
                     println!("Deployment aborted");
                     std::process::exit(1);
                 }
@@ -540,6 +554,12 @@ pub fn main() {
                     ));
                 }
 
+                let transaction_trackers = if cmd.no_dashboard {
+                    vec![]
+                } else {
+                    get_initial_transactions_trackers(&deployment)
+                };
+
                 std::thread::spawn(move || {
                     let manifest = manifest_moved;
                     apply_on_chain_deployment(&manifest, deployment, event_tx, command_rx, true);
@@ -558,13 +578,8 @@ pub fn main() {
                                 println!("{} Error deploying contracts: {}", red!("x"), message);
                                 break;
                             }
-                            DeploymentEvent::ContractUpdate(update) => {
-                                println!(
-                                    "{} {:?} {}",
-                                    blue!("➡"),
-                                    update.status,
-                                    update.contract_id
-                                );
+                            DeploymentEvent::TransactionUpdate(update) => {
+                                println!("{} {:?} {}", blue!("➡"), update.status, update.name);
                             }
                             DeploymentEvent::ProtocolDeployed => {
                                 println!(
@@ -577,7 +592,7 @@ pub fn main() {
                         }
                     }
                 } else {
-                    let res = deployment::start_ui(&node_url, event_rx, contracts_ids);
+                    let res = deployment::start_ui(&node_url, event_rx, transaction_trackers);
                     match res {
                         Ok(()) => println!(
                             "{} Contracts successfully deployed on {:?}",
@@ -604,7 +619,9 @@ pub fn main() {
                     display_post_check_hint();
                 }
             }
-            Contracts::Requirement(cmd) => {
+        },
+        Command::Requirements(subcommand) => match subcommand {
+            Requirements::AddRequirement(cmd) => {
                 let manifest = load_manifest_or_exit(cmd.manifest_path);
 
                 let change = TOMLEdition {
@@ -627,11 +644,32 @@ pub fn main() {
             }
         },
         Command::Console(cmd) => {
-            let manifest = load_manifest_or_exit(cmd.manifest_path);
+            let manifest = load_manifest_or_warn(cmd.manifest_path);
 
-            let cache = build_deployment_cache_or_exit(&manifest, &cmd.deployment_plan_path);
+            let mut terminal;
+            if manifest.path.as_os_str().is_empty() {
+                terminal = Terminal::new(repl::SessionSettings::default());
+            } else {
+                let (deployment, _, artifacts) =
+                    load_deployment_and_artifacts_or_exit(&manifest, &cmd.deployment_plan_path);
 
-            let mut terminal = Terminal::load(cache.session);
+                if !artifacts.success {
+                    let diags_digest = DiagnosticsDigest::new(&artifacts.diags, &deployment);
+                    if diags_digest.has_feedbacks() {
+                        println!("{}", diags_digest.message);
+                    }
+                    if diags_digest.errors > 0 {
+                        println!(
+                            "{} {} detected",
+                            red!("x"),
+                            pluralize!(diags_digest.errors, "error")
+                        );
+                    }
+                    std::process::exit(1);
+                }
+
+                terminal = Terminal::load(artifacts.session);
+            }
             terminal.start();
 
             if hints_enabled {
@@ -720,155 +758,38 @@ pub fn main() {
         }
         Command::Check(cmd) => {
             let manifest = load_manifest_or_exit(cmd.manifest_path);
+            let (deployment, _, results) =
+                load_deployment_and_artifacts_or_exit(&manifest, &cmd.deployment_plan_path);
 
-            let (deployment, _, artifacts) =
-                load_deployments_and_artifacts_or_exit(&manifest, &cmd.deployment_plan_path);
-
-            let contracts_asts = artifacts.and_then(|a| Some(a.asts));
-
-            let (_, results) =
-                setup_session_with_deployment(&manifest, &deployment, contracts_asts);
-
-            let mut success = 0;
-            let mut warnings = 0;
-            let mut errors = 0;
-            let mut contracts_checked = 0;
-            let mut outputs = vec![];
-            for (contract_id, result) in results.into_iter() {
-                contracts_checked += 1;
-                match result {
-                    Ok(result) => {
-                        if result.diagnostics.is_empty() {
-                            success += 1;
-                            continue;
-                        }
-
-                        let (source, contract_path) = deployment
-                            .contracts
-                            .get(&contract_id)
-                            .expect("unable to retrieve contract");
-
-                        let lines = source.lines();
-                        let formatted_lines: Vec<String> = lines.map(|l| l.to_string()).collect();
-
-                        for diagnostic in result.diagnostics {
-                            match diagnostic.level {
-                                Level::Error => {
-                                    errors += 1;
-                                    outputs.push(format!(
-                                        "{}: {}",
-                                        red!("error"),
-                                        diagnostic.message
-                                    ));
-                                }
-                                Level::Warning => {
-                                    warnings += 1;
-                                    outputs.push(format!(
-                                        "{}: {}",
-                                        yellow!("warning"),
-                                        diagnostic.message
-                                    ));
-                                }
-                                Level::Note => {
-                                    outputs.push(format!(
-                                        "{}: {}",
-                                        green!("note:"),
-                                        diagnostic.message
-                                    ));
-                                    outputs.append(&mut diagnostic.output_code(&formatted_lines));
-                                    continue;
-                                }
-                            }
-                            if let Some(span) = diagnostic.spans.first() {
-                                outputs.push(format!(
-                                    "{} {}:{}:{}",
-                                    blue!("-->"),
-                                    contract_path,
-                                    span.start_line,
-                                    span.start_column
-                                ));
-                            }
-                            outputs.append(&mut diagnostic.output_code(&formatted_lines));
-
-                            if let Some(suggestion) = diagnostic.suggestion {
-                                outputs.push(format!("{}", suggestion));
-                            }
-                        }
-                    }
-                    Err(diagnostics) => {
-                        let (source, contract_path) = deployment
-                            .contracts
-                            .get(&contract_id)
-                            .expect("unable to retrieve contract");
-                        let lines = source.lines();
-                        let formatted_lines: Vec<String> = lines.map(|l| l.to_string()).collect();
-
-                        for diagnostic in diagnostics {
-                            match diagnostic.level {
-                                Level::Error => {
-                                    errors += 1;
-                                    outputs.push(format!(
-                                        "{}: {}",
-                                        red!("error"),
-                                        diagnostic.message
-                                    ));
-                                }
-                                Level::Warning => {
-                                    warnings += 1;
-                                    outputs.push(format!(
-                                        "{}: {}",
-                                        yellow!("warning"),
-                                        diagnostic.message
-                                    ));
-                                }
-                                Level::Note => {
-                                    outputs.push(format!(
-                                        "{}: {}",
-                                        green!("note:"),
-                                        diagnostic.message
-                                    ));
-                                    outputs.append(&mut diagnostic.output_code(&formatted_lines));
-                                    continue;
-                                }
-                            }
-                            if let Some(span) = diagnostic.spans.first() {
-                                outputs.push(format!(
-                                    "{} {}:{}:{}",
-                                    blue!("-->"),
-                                    contract_path,
-                                    span.start_line,
-                                    span.start_column
-                                ));
-                            }
-                            outputs.append(&mut diagnostic.output_code(&formatted_lines));
-
-                            if let Some(suggestion) = diagnostic.suggestion {
-                                outputs.push(format!("{}", suggestion));
-                            }
-                        }
-                    }
-                }
+            let diags_digest = DiagnosticsDigest::new(&results.diags, &deployment);
+            if diags_digest.has_feedbacks() {
+                println!("{}", diags_digest.message);
             }
-            if !outputs.is_empty() {
-                println!("{}\n", outputs.join("\n"));
-            }
-            if warnings > 0 {
+
+            if diags_digest.warnings > 0 {
                 println!(
                     "{} {} detected",
                     yellow!("!"),
-                    pluralize!(warnings, "warning")
+                    pluralize!(diags_digest.warnings, "warning")
                 );
             }
-            if errors > 0 {
-                println!("{} {} detected", red!("x"), pluralize!(errors, "error"));
+            if diags_digest.errors > 0 {
+                println!(
+                    "{} {} detected",
+                    red!("x"),
+                    pluralize!(diags_digest.errors, "error")
+                );
             } else {
                 println!(
-                    "{} {} checked, {} successfully validated",
+                    "{} {} checked",
                     green!("✔"),
-                    pluralize!(contracts_checked, "contract"),
-                    success
+                    pluralize!(diags_digest.contracts_checked, "contract"),
                 );
             }
+            let exit_code = match results.success {
+                true => 0,
+                false => 1,
+            };
 
             if hints_enabled {
                 display_post_check_hint();
@@ -879,6 +800,7 @@ pub fn main() {
                     DeveloperUsageDigest::new(&manifest.project.name, &manifest.project.authors),
                 ));
             }
+            std::process::exit(exit_code);
         }
         Command::Test(cmd) => {
             let manifest = load_manifest_or_exit(cmd.manifest_path);
@@ -954,6 +876,7 @@ pub fn main() {
                             let (deployment, _) = match generate_default_deployment(
                                 &manifest,
                                 &StacksNetwork::Devnet,
+                                false,
                             ) {
                                 Ok(deployment) => deployment,
                                 Err(message) => {
@@ -1071,6 +994,19 @@ fn get_manifest_path_or_exit(path: Option<String>) -> PathBuf {
     }
 }
 
+fn get_manifest_path_or_warn(path: Option<String>) -> Option<PathBuf> {
+    match get_manifest_path(path) {
+        Some(manifest_path) => Some(manifest_path),
+        None => {
+            println!(
+                "{}: no manifest found. Continuing with default.",
+                green!("note")
+            );
+            None
+        }
+    }
+}
+
 fn load_manifest_or_exit(path: Option<String>) -> ProjectManifest {
     let manifest_path = get_manifest_path_or_exit(path);
     let manifest = match ProjectManifest::from_path(&manifest_path) {
@@ -1087,15 +1023,35 @@ fn load_manifest_or_exit(path: Option<String>) -> ProjectManifest {
     manifest
 }
 
-fn load_deployments_and_artifacts_or_exit(
+fn load_manifest_or_warn(path: Option<String>) -> ProjectManifest {
+    let manifest_path = get_manifest_path_or_warn(path);
+    if manifest_path.is_some() {
+        let manifest = match ProjectManifest::from_path(&manifest_path.unwrap()) {
+            Ok(manifest) => manifest,
+            Err(message) => {
+                println!(
+                    "{}: Syntax errors in Clarinet.toml\n{}",
+                    red!("error"),
+                    message,
+                );
+                process::exit(1);
+            }
+        };
+        manifest
+    } else {
+        ProjectManifest::default()
+    }
+}
+
+fn load_deployment_and_artifacts_or_exit(
     manifest: &ProjectManifest,
     deployment_plan_path: &Option<String>,
 ) -> (
     DeploymentSpecification,
     Option<String>,
-    Option<DeploymentGenerationArtifacts>,
+    DeploymentGenerationArtifacts,
 ) {
-    let (res, deployment_path, artifacts) = match deployment_plan_path {
+    let result = match deployment_plan_path {
         None => {
             let res = load_deployment_if_exists(&manifest, &StacksNetwork::Simnet);
             match res {
@@ -1104,42 +1060,58 @@ fn load_deployments_and_artifacts_or_exit(
                         "{}: using deployments/default.simnet-plan.yaml",
                         yellow!("note")
                     );
-                    (Ok(deployment), None, None)
+                    let artifacts = setup_session_with_deployment(&manifest, &deployment, None);
+                    Ok((deployment, None, artifacts))
                 }
-                Some(Err(e)) => {
-                    println!(
-                        "{}: loading deployments/default.simnet-plan.yaml failed with error: {}",
-                        red!("error"),
-                        e
-                    );
-                    std::process::exit(1);
-                }
-                None => match generate_default_deployment(&manifest, &StacksNetwork::Simnet) {
-                    Ok((deployment, artifacts)) => (Ok(deployment), None, Some(artifacts)),
-                    Err(e) => (Err(e), None, None),
+                Some(Err(e)) => Err(format!(
+                    "loading deployments/default.simnet-plan.yaml failed with error: {}",
+                    e
+                )),
+                None => match generate_default_deployment(&manifest, &StacksNetwork::Simnet, false)
+                {
+                    Ok((deployment, ast_artifacts)) if ast_artifacts.success => {
+                        let mut artifacts = setup_session_with_deployment(
+                            &manifest,
+                            &deployment,
+                            Some(&ast_artifacts.asts),
+                        );
+                        for (contract_id, mut parser_diags) in ast_artifacts.diags.into_iter() {
+                            // Merge parser's diags with analysis' diags.
+                            if let Some(ref mut diags) = artifacts.diags.remove(&contract_id) {
+                                parser_diags.append(diags);
+                            }
+                            artifacts.diags.insert(contract_id, parser_diags);
+                        }
+                        Ok((deployment, None, artifacts))
+                    }
+                    Ok((deployment, ast_artifacts)) => Ok((deployment, None, ast_artifacts)),
+                    Err(e) => Err(e),
                 },
             }
         }
         Some(path) => {
             let deployment_path = get_absolute_deployment_path(&manifest, &path);
-            let deployment = load_deployment(&manifest, &deployment_path);
-            (
-                deployment,
-                Some(format!("{}", deployment_path.display())),
-                None,
-            )
+            match load_deployment(&manifest, &deployment_path) {
+                Ok(deployment) => {
+                    let artifacts = setup_session_with_deployment(&manifest, &deployment, None);
+                    Ok((
+                        deployment,
+                        Some(format!("{}", deployment_path.display())),
+                        artifacts,
+                    ))
+                }
+                Err(e) => Err(format!("loading {} failed with error: {}", path, e)),
+            }
         }
     };
 
-    let deployment = match res {
+    match result {
         Ok(deployment) => deployment,
         Err(e) => {
             println!("{}: {}", red!("error"), e);
             process::exit(1);
         }
-    };
-
-    (deployment, deployment_path, artifacts)
+    }
 }
 
 pub fn build_deployment_cache_or_exit(
@@ -1147,11 +1119,9 @@ pub fn build_deployment_cache_or_exit(
     deployment_plan_path: &Option<String>,
 ) -> DeploymentCache {
     let (deployment, deployment_path, artifacts) =
-        load_deployments_and_artifacts_or_exit(manifest, deployment_plan_path);
+        load_deployment_and_artifacts_or_exit(manifest, deployment_plan_path);
 
-    let contracts_asts = artifacts.and_then(|a| Some(a.asts));
-
-    let cache = DeploymentCache::new(&manifest, deployment, &deployment_path, contracts_asts);
+    let cache = DeploymentCache::new(&manifest, deployment, &deployment_path, artifacts);
 
     cache
 }
@@ -1316,6 +1286,91 @@ fn execute_changes(changes: Vec<Changes>) -> bool {
     }
 
     true
+}
+
+#[allow(dead_code)]
+struct DiagnosticsDigest {
+    message: String,
+    errors: usize,
+    warnings: usize,
+    contracts_checked: usize,
+    full_success: usize,
+    total: usize,
+}
+
+impl DiagnosticsDigest {
+    fn new(
+        contracts_diags: &HashMap<QualifiedContractIdentifier, Vec<Diagnostic>>,
+        deployment: &DeploymentSpecification,
+    ) -> DiagnosticsDigest {
+        let mut full_success = 0;
+        let mut warnings = 0;
+        let mut errors = 0;
+        let mut contracts_checked = 0;
+        let mut outputs = vec![];
+        let total = deployment.contracts.len();
+
+        for (contract_id, diags) in contracts_diags.into_iter() {
+            contracts_checked += 1;
+            if diags.is_empty() {
+                full_success += 1;
+                continue;
+            }
+
+            let (source, contract_path) = deployment
+                .contracts
+                .get(&contract_id)
+                .expect("unable to retrieve contract");
+
+            let lines = source.lines();
+            let formatted_lines: Vec<String> = lines.map(|l| l.to_string()).collect();
+
+            for diagnostic in diags {
+                match diagnostic.level {
+                    Level::Error => {
+                        errors += 1;
+                        outputs.push(format!("{}: {}", red!("error"), diagnostic.message));
+                    }
+                    Level::Warning => {
+                        warnings += 1;
+                        outputs.push(format!("{}: {}", yellow!("warning"), diagnostic.message));
+                    }
+                    Level::Note => {
+                        outputs.push(format!("{}: {}", green!("note:"), diagnostic.message));
+                        outputs.append(&mut diagnostic.output_code(&formatted_lines));
+                        continue;
+                    }
+                }
+                if let Some(span) = diagnostic.spans.first() {
+                    outputs.push(format!(
+                        "{} {}:{}:{}",
+                        blue!("-->"),
+                        contract_path,
+                        span.start_line,
+                        span.start_column
+                    ));
+                }
+                outputs.append(&mut diagnostic.output_code(&formatted_lines));
+
+                if let Some(ref suggestion) = diagnostic.suggestion {
+                    outputs.push(format!("{}", suggestion));
+                }
+            }
+        }
+
+        DiagnosticsDigest {
+            full_success,
+            errors,
+            warnings,
+            total,
+            contracts_checked,
+            message: outputs.join("\n").to_string(),
+        }
+    }
+
+    pub fn has_feedbacks(&self) -> bool {
+        self.errors > 0 || self.warnings > 0
+    }
 }
 
 fn display_separator() {

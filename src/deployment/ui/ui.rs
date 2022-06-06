@@ -1,4 +1,4 @@
-use crate::deployment::ContractStatus;
+use crate::deployment::TransactionStatus;
 
 use super::App;
 use tui::{
@@ -17,25 +17,21 @@ fn draw_contracts_status<B>(f: &mut Frame<B>, app: &mut App, area: Rect)
 where
     B: Backend,
 {
-    let rows = app.contracts.items.iter().map(|contract| {
-        let (status, default_comment) = match contract.status {
-            ContractStatus::Queued => ("🟪", "Contract indexed".to_string()),
-            ContractStatus::Encoded => ("🟦", "Contract encoded and queued".to_string()),
-            ContractStatus::Broadcasted => ("🟨", "Contract broadcasted".to_string()),
-            ContractStatus::Published => ("🟩", "Contract published".to_string()),
-            ContractStatus::Error => ("🟥", "Error".to_string()),
+    let rows = app.transactions.items.iter().map(|tx| {
+        let (status, default_comment) = match &tx.status {
+            TransactionStatus::Queued => ("🟪", "Transaction indexed".to_string()),
+            TransactionStatus::Encoded(_, _) => {
+                ("🟦", "Transaction encoded and queued".to_string())
+            }
+            TransactionStatus::Broadcasted(_) => ("🟨", "Transaction broadcasted".to_string()),
+            TransactionStatus::Confirmed => ("🟩", "Transaction confirmed".to_string()),
+            TransactionStatus::Error(message) => ("🟥", message.to_string()),
         };
 
         Row::new(vec![
             Cell::from(status),
-            Cell::from(contract.contract_id.to_string()),
-            Cell::from(
-                contract
-                    .comment
-                    .clone()
-                    .unwrap_or(default_comment)
-                    .to_string(),
-            ),
+            Cell::from(tx.name.to_string()),
+            Cell::from(default_comment),
         ])
         .height(1)
         .bottom_margin(0)

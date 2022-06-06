@@ -88,7 +88,7 @@ Clarinet.run({
       `// Code generated with the stacksjs-helper-generator extension`,
       `// Manual edits will be overwritten`,
       ``,
-      `import { ClarityValue, BooleanCV, IntCV, UIntCV, BufferCV, OptionalCV, ResponseCV, PrincipalCV, ListCV, TupleCV, StringAsciiCV, StringUtf8CV } from "@stacks/transactions"`,
+      `import { ClarityValue, BooleanCV, IntCV, UIntCV, BufferCV, OptionalCV, ResponseCV, PrincipalCV, ListCV, TupleCV, StringAsciiCV, StringUtf8CV, NoneCV } from "@stacks/transactions"`,
       ``,
     ]);
 
