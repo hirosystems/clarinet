@@ -280,14 +280,13 @@ pub fn update_session_with_contracts_executions(
     code_coverage_enabled: bool,
 ) -> BTreeMap<QualifiedContractIdentifier, Result<ExecutionResult, Vec<Diagnostic>>> {
     let mut results = BTreeMap::new();
-    // let mut remap_to_perform = vec![];
     for batch in deployment.plan.batches.iter() {
         for transaction in batch.transactions.iter() {
             match transaction {
                 TransactionSpecification::RequirementPublish(_)
                 | TransactionSpecification::ContractCall(_)
                 | TransactionSpecification::ContractPublish(_) => {
-                    panic!("requirement-publish, contract-call and contract-publish are the only operations admitted in simnet deployments")
+                    panic!("emulated-contract-call and emulated-contract-publish are the only operations admitted in simnet deployments")
                 }
                 TransactionSpecification::EmulatedContractPublish(tx) => {
                     let default_tx_sender = session.get_tx_sender();
@@ -1108,7 +1107,7 @@ pub fn generate_default_deployment(
             };
         }
 
-        // Avoid listing requirements as deployment transactions to the deployment specification on Devnet / Testnet / Mainnet
+        // Avoid listing requirements as deployment transactions to the deployment specification on Mainnet
         if !network.is_mainnet() {
             let ordered_contracts_ids =
                 match ASTDependencyDetector::order_contracts(&requirements_deps) {
