@@ -433,7 +433,7 @@ pub fn get_initial_transactions_trackers(
                     status: TransactionStatus::Queued,
                 },
                 TransactionSpecification::RequirementPublish(tx) => {
-                    if !deployment.network.either_devnet_or_tesnet() {
+                    if !deployment.network.either_devnet_or_testnet() {
                         panic!("Deployment specification malformed - requirements publish not supported on mainnet");
                     }
                     TransactionTracker {
@@ -559,7 +559,7 @@ pub fn apply_on_chain_deployment(
                             .expect("Unable to retrieve account"),
                     };
                     let account = accounts_lookup.get(&issuer_address).unwrap();
-                    let source = if deployment.network.either_devnet_or_tesnet() {
+                    let source = if deployment.network.either_devnet_or_testnet() {
                         // Remapping - This is happening
                         let mut source = tx.source.clone();
                         for (old_contract_id, new_contract_id) in contracts_ids_to_remap.iter() {
@@ -1044,7 +1044,7 @@ pub fn generate_default_deployment(
                             relative_path: path,
                         };
                         emulated_contracts_publish.insert(contract_id.clone(), data);
-                    } else if network.either_devnet_or_tesnet() {
+                    } else if network.either_devnet_or_testnet() {
                         let data = RequirementPublishSpecification {
                             contract_id: contract_id.clone(),
                             remap_sender: default_deployer_address.clone(),
@@ -1123,7 +1123,7 @@ pub fn generate_default_deployment(
                     let tx = TransactionSpecification::EmulatedContractPublish(data);
                     transactions.push(tx);
                 }
-            } else if network.either_devnet_or_tesnet() {
+            } else if network.either_devnet_or_testnet() {
                 for contract_id in ordered_contracts_ids.iter() {
                     let data = requirements_publish
                         .remove(contract_id)
