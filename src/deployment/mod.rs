@@ -633,9 +633,24 @@ pub fn apply_on_chain_deployment(
                     };
                     let account = accounts_lookup.get(&issuer_address).unwrap();
 
+                    // Remapping principals - This is happening
+                    let mut source = tx.source.clone();
+                    for (src_principal, dst_principal) in tx.remap_principals.iter() {
+                        let src = src_principal.to_address();
+                        let dst = dst_principal.to_address();
+                        let mut matched_indices = source
+                            .match_indices(&src)
+                            .map(|(i, _)| i)
+                            .collect::<Vec<usize>>();
+                        matched_indices.reverse();
+                        for index in matched_indices {
+                            source.replace_range(index..index + src.len(), &dst);
+                        }
+                    }
+
                     let transaction = match encode_contract_publish(
                         &tx.contract_id.name,
-                        &tx.source,
+                        &source,
                         *account,
                         nonce,
                         tx.cost,
@@ -984,6 +999,24 @@ pub fn generate_default_deployment(
         .collect::<Vec<QualifiedContractIdentifier>>();
     requirements_asts.append(&mut boot_contracts_asts);
 
+    let mut queue = VecDeque::new();
+
+    if let Some(devnet) = chain_config.devnet {
+        if devnet.enable_hyperchain_node {
+            let contract_id =
+                match QualifiedContractIdentifier::parse(&devnet.hyperchain_contract_id) {
+                    Ok(contract_id) => contract_id,
+                    Err(_e) => {
+                        return Err(format!(
+                            "malformatted hyperchain_contract_id: {}",
+                            devnet.hyperchain_contract_id
+                        ))
+                    }
+                };
+            queue.push_front(contract_id)
+        }
+    }
+
     // Build the ASTs / DependencySet for requirements - step required for Simnet/Devnet/Testnet/Mainnet
     if let Some(ref requirements) = manifest.project.requirements {
         let default_cache_path = match PathBuf::from_str(&manifest.project.cache_dir) {
@@ -995,7 +1028,6 @@ pub fn generate_default_deployment(
 
         // Load all the requirements
         // Some requirements are explicitly listed, some are discovered as we compute the ASTs.
-        let mut queue = VecDeque::new();
 
         for requirement in requirements.iter() {
             let contract_id = match QualifiedContractIdentifier::parse(&requirement.contract_id) {
@@ -1051,6 +1083,7 @@ pub fn generate_default_deployment(
                             source: source.clone(),
                             relative_path: path,
                             cost: deployment_fee_rate * source.len() as u64,
+                            remap_principals: BTreeMap::new(),
                         };
                         requirements_publish.insert(contract_id.clone(), data);
                     }

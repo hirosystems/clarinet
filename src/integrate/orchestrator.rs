@@ -1172,7 +1172,7 @@ observer_port = {hyperchain_events_ingestion_port}
             stacks_node_p2p_port = devnet_config.stacks_node_p2p_port,
             orchestrator_port = devnet_config.orchestrator_port,
             hyperchain_events_ingestion_port = devnet_config.hyperchain_events_ingestion_port,
-            first_burn_header_height = 5,
+            first_burn_header_height = 0,
             hyperchain_contract_id = devnet_config.hyperchain_contract_id,
         );
 
@@ -1270,7 +1270,9 @@ events_keys = ["*"]
         Ok(config)
     }
 
-    pub async fn prepare_hyperchain_node_container(&mut self,         boot_index: u32,
+    pub async fn prepare_hyperchain_node_container(
+        &mut self,
+        boot_index: u32,
     ) -> Result<(), String> {
         let (docker, devnet_config) = match (&self.docker_client, &self.network_config) {
             (Some(ref docker), Some(ref network_config)) => match network_config.devnet {

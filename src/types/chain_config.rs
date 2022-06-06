@@ -19,7 +19,8 @@ pub const DEFAULT_STACKS_API_IMAGE: &str = "blockstack/stacks-blockchain-api:lat
 pub const DEFAULT_STACKS_EXPLORER_IMAGE: &str = "hirosystems/explorer:latest";
 pub const DEFAULT_HYPERCHAINS_IMAGE: &str = "quay.io/hirosystems/stacks-hyperchains:devnet-v1";
 pub const DEFAULT_POSTGRES_IMAGE: &str = "postgres:alpine";
-pub const DEFAULT_HYPERCHAIN_CONTRACT_ID: &str = "STFTX3F4XCY7RS5VRHXP2SED0WC0YRKNWTNXD74P.hc-alpha";
+pub const DEFAULT_HYPERCHAIN_CONTRACT_ID: &str =
+    "STFTX3F4XCY7RS5VRHXP2SED0WC0YRKNWTNXD74P.hc-alpha";
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct ChainConfigFile {
@@ -469,7 +470,9 @@ impl ChainConfig {
                     .hyperchain_node_events_observers
                     .take()
                     .unwrap_or(vec![]),
-                hyperchain_contract_id: devnet_config.hyperchain_contract_id.unwrap_or(DEFAULT_HYPERCHAIN_CONTRACT_ID.to_string()),
+                hyperchain_contract_id: devnet_config
+                    .hyperchain_contract_id
+                    .unwrap_or(DEFAULT_HYPERCHAIN_CONTRACT_ID.to_string()),
             };
             if !config.disable_stacks_api && config.disable_stacks_api {
                 config.disable_stacks_api = false;

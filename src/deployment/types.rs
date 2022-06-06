@@ -57,6 +57,7 @@ pub struct ContractCallSpecificationFile {
 pub struct RequirementPublishSpecificationFile {
     pub contract_id: String,
     pub remap_sender: String,
+    pub remap_principals: Option<BTreeMap<String, String>>,
     pub path: String,
     pub cost: u64,
 }
@@ -223,6 +224,7 @@ impl ContractPublishSpecification {
 pub struct RequirementPublishSpecification {
     pub contract_id: QualifiedContractIdentifier,
     pub remap_sender: StandardPrincipalData,
+    pub remap_principals: BTreeMap<StandardPrincipalData, StandardPrincipalData>,
     pub relative_path: String,
     pub source: String,
     pub cost: u64,
@@ -253,6 +255,31 @@ impl RequirementPublishSpecification {
             }
         };
 
+        let mut remap_principals = BTreeMap::new();
+        if let Some(ref remap_principals_spec) = specs.remap_principals {
+            for (src_spec, dst_spec) in remap_principals_spec {
+                let src = match PrincipalData::parse_standard_principal(&src_spec) {
+                    Ok(res) => res,
+                    Err(_) => {
+                        return Err(format!(
+                            "unable to parse remap source '{}' as a valid Stacks address",
+                            specs.remap_sender
+                        ))
+                    }
+                };
+                let dst = match PrincipalData::parse_standard_principal(&dst_spec) {
+                    Ok(res) => res,
+                    Err(_) => {
+                        return Err(format!(
+                            "unable to parse remap destination '{}' as a valid Stacks address",
+                            specs.remap_sender
+                        ))
+                    }
+                };
+                remap_principals.insert(src, dst);
+            }
+        }
+
         let path = match PathBuf::try_from(&specs.path) {
             Ok(res) => res,
             Err(_) => return Err(format!("unable to parse '{}' as a valid path", specs.path)),
@@ -274,6 +301,7 @@ impl RequirementPublishSpecification {
         Ok(RequirementPublishSpecification {
             contract_id,
             remap_sender,
+            remap_principals,
             source,
             relative_path: specs.path.clone(),
             cost: specs.cost,
@@ -762,10 +790,15 @@ impl TransactionPlanSpecification {
                         )
                     }
                     TransactionSpecification::RequirementPublish(tx) => {
+                        let mut remap_principals = BTreeMap::new();
+                        for (src, dst) in tx.remap_principals.iter() {
+                            remap_principals.insert(src.to_address(), dst.to_address());
+                        }
                         TransactionSpecificationFile::RequirementPublish(
                             RequirementPublishSpecificationFile {
                                 contract_id: tx.contract_id.to_string(),
                                 remap_sender: tx.remap_sender.to_address(),
+                                remap_principals: Some(remap_principals),
                                 path: tx.relative_path.clone(),
                                 cost: tx.cost,
                             },
