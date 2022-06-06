@@ -12,7 +12,7 @@ use clarinet_lib::types::{
     DEFAULT_DERIVATION_PATH,
 };
 use orchestra_types::{
-    BitcoinBlockData, BitcoinChainEvent, ChainUpdatedWithBlockData, StacksChainEvent, StacksNetwork
+    BitcoinBlockData, BitcoinChainEvent, ChainUpdatedWithBlockData, StacksChainEvent, StacksNetwork,
 };
 
 use core::panic;
@@ -210,8 +210,11 @@ impl StacksDevnet {
                 _ => DEFAULT_DERIVATION_PATH.to_string(),
             };
 
-            let (stx_address, btc_address, _) =
-                compute_addresses(&mnemonic, &derivation, &StacksNetwork::Devnet.get_networks());
+            let (stx_address, btc_address, _) = compute_addresses(
+                &mnemonic,
+                &derivation,
+                &StacksNetwork::Devnet.get_networks(),
+            );
 
             let account = AccountConfig {
                 label,

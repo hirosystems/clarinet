@@ -349,7 +349,7 @@ impl BitcoinChainhookSpecification {
                     }
                 }
                 false
-            },
+            }
             types::BitcoinPredicateType::P2pkh(MatchingRule::StartsWith(_address)) => false,
             types::BitcoinPredicateType::P2pkh(MatchingRule::EndsWith(_address)) => false,
             types::BitcoinPredicateType::P2sh(MatchingRule::Equals(_address)) => false,
