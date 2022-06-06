@@ -148,7 +148,7 @@ pub fn evaluate_stacks_chainhooks_on_chain_event<'a>(
                                         }
                                     }
                                     (
-                                        StacksTransactionEvent::STXMintEvent(actual),
+                                        StacksTransactionEvent::STXMintEvent(_),
                                         StacksHookPredicate::StxEvent(expected),
                                     ) => {
                                         if expected.actions.contains(&"mint".to_string()) {
@@ -161,7 +161,7 @@ pub fn evaluate_stacks_chainhooks_on_chain_event<'a>(
                                         }
                                     }
                                     (
-                                        StacksTransactionEvent::STXTransferEvent(actual),
+                                        StacksTransactionEvent::STXTransferEvent(_),
                                         StacksHookPredicate::StxEvent(expected),
                                     ) => {
                                         if expected.actions.contains(&"transfer".to_string()) {
@@ -174,7 +174,7 @@ pub fn evaluate_stacks_chainhooks_on_chain_event<'a>(
                                         }
                                     }
                                     (
-                                        StacksTransactionEvent::STXLockEvent(actual),
+                                        StacksTransactionEvent::STXLockEvent(_),
                                         StacksHookPredicate::StxEvent(expected),
                                     ) => {
                                         if expected.actions.contains(&"lock".to_string()) {
