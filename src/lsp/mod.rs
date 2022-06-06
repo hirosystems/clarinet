@@ -2,7 +2,7 @@ mod clarity_language_backend;
 mod utils;
 use crate::deployment::{
     generate_default_deployment, initiate_session_from_deployment,
-    update_session_with_contracts_analyses,
+    update_session_with_contracts_executions,
 };
 use crate::types::{ProjectManifest, StacksNetwork};
 use clarity_language_backend::ClarityLanguageBackend;
@@ -537,12 +537,22 @@ pub fn build_state(
         generate_default_deployment(&manifest, &StacksNetwork::Simnet, false)?;
 
     let mut session = initiate_session_from_deployment(&manifest);
-    let results =
-        update_session_with_contracts_analyses(&mut session, &deployment, &artifacts.asts);
-    for (contract_id, result) in results.into_iter() {
+    let results = update_session_with_contracts_executions(
+        &mut session,
+        &deployment,
+        Some(&artifacts.asts),
+        false,
+    );
+    for (contract_id, mut result) in results.into_iter() {
         let (url, path) = {
-            let (_, relative_path) = deployment.contracts.get(&contract_id).unwrap();
-            let relative_path = PathBuf::from_str(relative_path).unwrap();
+            let (_, relative_path) = match deployment.contracts.get(&contract_id) {
+                Some(entry) => entry,
+                None => continue,
+            };
+            let relative_path = PathBuf::from_str(relative_path).expect(&format!(
+                "Unable to build path for contract {}",
+                contract_id
+            ));
             let mut path = manifest_path.clone();
             path.pop();
             path.extend(&relative_path);
@@ -551,14 +561,23 @@ pub fn build_state(
         };
         paths.insert(contract_id.clone(), (url, path));
 
-        let (contract_analysis, mut analysis_diags) = match result {
-            Ok((contract_analysis, diags)) => (Some(contract_analysis), diags),
-            Err(diags) => (None, diags),
+        let contract_analysis = match result {
+            Ok(ref mut execution_result) => {
+                if let Some(entry) = artifacts.diags.get_mut(&contract_id) {
+                    entry.append(&mut execution_result.diagnostics);
+                }
+                execution_result.contract.take()
+            }
+            Err(ref mut diags) => {
+                if let Some(entry) = artifacts.diags.get_mut(&contract_id) {
+                    entry.append(diags);
+                }
+                continue;
+            }
         };
-        if let Some(entry) = artifacts.diags.get_mut(&contract_id) {
-            entry.append(&mut analysis_diags);
+        if let Some((_, _, _, _, contract_analysis)) = contract_analysis {
+            analyses.insert(contract_id.clone(), Some(contract_analysis));
         }
-        analyses.insert(contract_id.clone(), contract_analysis);
     }
 
     protocol_state.consolidate(
