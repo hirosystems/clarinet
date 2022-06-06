@@ -1,0 +1,32 @@
+---
+id: 0
+name: Devnet deployment
+network: devnet
+node: "http://localhost:20443"
+plan:
+  batches:
+    - id: 0
+      transactions:
+        - requirement-publish:
+            contract-id: STFTX3F4XCY7RS5VRHXP2SED0WC0YRKNWTNXD74P.ft-trait-standard
+            remap-sender: ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM
+            remap-principals: {}
+            path: "./.requirements/STFTX3F4XCY7RS5VRHXP2SED0WC0YRKNWTNXD74P.ft-trait-standard.clar"
+            cost: 8340
+        - requirement-publish:
+            contract-id: STFTX3F4XCY7RS5VRHXP2SED0WC0YRKNWTNXD74P.nft-trait-standard
+            remap-sender: ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM
+            remap-principals: {}
+            path: "./.requirements/STFTX3F4XCY7RS5VRHXP2SED0WC0YRKNWTNXD74P.nft-trait-standard.clar"
+            cost: 4670
+        - requirement-publish:
+            contract-id: STFTX3F4XCY7RS5VRHXP2SED0WC0YRKNWTNXD74P.hc-alpha
+            remap-sender: ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM
+            remap-principals: { STFTX3F4XCY7RS5VRHXP2SED0WC0YRKNWTNXD74P: ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM }
+            path: "./.requirements/STFTX3F4XCY7RS5VRHXP2SED0WC0YRKNWTNXD74P.hc-alpha.clar"
+            cost: 95010
+        - contract-publish:
+            contract-name: counter
+            expected-sender: ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM
+            path: contracts/counter.clar
+            cost: 5960
