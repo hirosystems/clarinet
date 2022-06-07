@@ -40,6 +40,16 @@ pub enum TransactionSpecificationFile {
     EmulatedContractCall(EmulatedContractCallSpecificationFile),
     EmulatedContractPublish(EmulatedContractPublishSpecificationFile),
     RequirementPublish(RequirementPublishSpecificationFile),
+    BtcTransfer(BtcTransferSpecificationFile),
+}
+
+#[derive(Debug, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub struct BtcTransferSpecificationFile {
+    pub expected_sender: String,
+    pub recipient: String,
+    pub sats_amount: u64,
+    pub sats_per_byte: u64,
 }
 
 #[derive(Debug, PartialEq, Serialize, Deserialize)]
@@ -100,6 +110,29 @@ pub enum TransactionSpecification {
     RequirementPublish(RequirementPublishSpecification),
     EmulatedContractCall(EmulatedContractCallSpecification),
     EmulatedContractPublish(EmulatedContractPublishSpecification),
+    BtcTransfer(BtcTransferSpecification),
+}
+
+#[derive(Debug, PartialEq, Clone)]
+pub struct BtcTransferSpecification {
+    pub expected_sender: String,
+    pub recipient: String,
+    pub sats_amount: u64,
+    pub sats_per_byte: u64,
+}
+
+impl BtcTransferSpecification {
+    pub fn from_specifications(
+        specs: &BtcTransferSpecificationFile,
+    ) -> Result<BtcTransferSpecification, String> {
+        // TODO(lgalabru): Data validation
+        Ok(BtcTransferSpecification {
+            expected_sender: specs.expected_sender.clone(),
+            recipient: specs.recipient.clone(),
+            sats_amount: specs.sats_amount,
+            sats_per_byte: specs.sats_per_byte,
+        })
+    }
 }
 
 #[derive(Debug, PartialEq, Clone)]
@@ -533,6 +566,10 @@ impl DeploymentSpecification {
                                     contracts.insert(contract_id, (spec.source.clone(), spec.relative_path.clone()));
                                     TransactionSpecification::ContractPublish(spec)
                                 }
+                                TransactionSpecificationFile::BtcTransfer(spec) => {
+                                    let spec = BtcTransferSpecification::from_specifications(spec)?;
+                                    TransactionSpecification::BtcTransfer(spec)
+                                }
                                 _ => {
                                     return Err(format!("{} only supports transactions of type 'contract-call' and 'contract-publish'", specs.network.to_lowercase()))
                                 }
@@ -770,6 +807,14 @@ impl TransactionPlanSpecification {
                                 cost: tx.cost,
                             },
                         )
+                    }
+                    TransactionSpecification::BtcTransfer(tx) => {
+                        TransactionSpecificationFile::BtcTransfer(BtcTransferSpecificationFile {
+                            expected_sender: tx.expected_sender.to_string(),
+                            recipient: tx.recipient.clone(),
+                            sats_amount: tx.sats_amount,
+                            sats_per_byte: tx.sats_per_byte,
+                        })
                     }
                 };
                 transactions.push(tx);
