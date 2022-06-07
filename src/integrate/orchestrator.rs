@@ -1,7 +1,7 @@
 use super::DevnetEvent;
 use crate::integrate::{ServiceStatusData, Status};
 use crate::types::{
-    ChainConfig, DevnetConfigFile, ProjectManifest, StacksNetwork, DEFAULT_DEVNET_BALANCE,
+    ChainConfig, DevnetConfigFile, ProjectManifest, DEFAULT_DEVNET_BALANCE,
 };
 use bollard::container::{
     Config, CreateContainerOptions, KillContainerOptions, ListContainersOptions,
@@ -13,6 +13,7 @@ use bollard::network::{ConnectNetworkOptions, CreateNetworkOptions, PruneNetwork
 use bollard::Docker;
 use crossterm::terminal::disable_raw_mode;
 use futures::stream::TryStreamExt;
+use orchestra_types::StacksNetwork;
 use std::collections::HashMap;
 use std::fs::{self, File};
 use std::io::Write;
@@ -50,7 +51,7 @@ impl DevnetOrchestrator {
         network_config_path.push("Devnet.toml");
 
         let mut network_config =
-            ChainConfig::from_path(&network_config_path, &StacksNetwork::Devnet);
+            ChainConfig::from_path(&network_config_path, &StacksNetwork::Devnet.get_networks());
 
         let name = manifest.project.name.clone();
         let network_name = format!("{}.devnet", name);
