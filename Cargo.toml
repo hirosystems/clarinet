@@ -50,7 +50,7 @@ atty = "0.2.14"
 termcolor = "1.1.2"
 ansi_term = "0.12.1"
 text-size = "=1.1.0"
-regex = "1.4.3"
+regex = "1.5.5"
 libc = "0.2.86"
 encoding_rs = "0.8.28"
 percent-encoding = "2.1.0"
@@ -65,7 +65,6 @@ reqwest = { version = "0.11", default-features = false, features = [
 ] }
 swc_common = { version = "0.10.20", features = ["sourcemap"], optional = true }
 bollard = "0.11.0"
-rocket = { version = "=0.5.0-rc.1", features = ["json"] }
 crossterm = "0.22.1"
 chrono = "0.4.19"
 base58 = "0.2.0"
@@ -82,6 +81,9 @@ tower-lsp = { version = "0.14.0", optional = true }
 hex = "0.4.3"
 dirs = "4.0.0"
 serde_yaml = "0.8.23"
+orchestra_event_observer = { package = "orchestra-event-observer", default-features = false, path = "./vendor/orchestra-event-observer" }
+orchestra_types = { package = "orchestra-types", path = "./vendor/orchestra-types-rs" }
+stacks_rpc_client = { package = "stacks-rpc-client", path = "./vendor/stacks-rpc-client" }
 num_cpus = "1.13.1"
 mio = "=0.8.2"
 
@@ -141,6 +143,9 @@ members = [
     "vendor/deno/cli/",
     "vendor/deno/runtime/",
     "vendor/deno/core/",
+    "vendor/orchestra-types-rs",
+    "vendor/orchestra-event-observer",
+    "vendor/stacks-rpc-client",
     "xtask/",
     "node-bindings",
 ]
