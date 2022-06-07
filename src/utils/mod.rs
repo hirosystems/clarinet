@@ -1,5 +1,4 @@
 pub mod mnemonic;
-pub mod stacks;
 
 use tokio;
 
