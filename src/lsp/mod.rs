@@ -4,13 +4,14 @@ use crate::deployment::{
     generate_default_deployment, initiate_session_from_deployment,
     update_session_with_contracts_executions,
 };
-use crate::types::{ProjectManifest, StacksNetwork};
+use crate::types::ProjectManifest;
 use clarity_language_backend::ClarityLanguageBackend;
 use clarity_repl::analysis::ast_dependency_detector::DependencySet;
 use clarity_repl::clarity::analysis::ContractAnalysis;
 use clarity_repl::clarity::diagnostic::{Diagnostic as ClarityDiagnostic, Level as ClarityLevel};
 use clarity_repl::clarity::types::QualifiedContractIdentifier;
 use clarity_repl::repl::ast::ContractAST;
+use orchestra_types::StacksNetwork;
 use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
 use std::str::FromStr;

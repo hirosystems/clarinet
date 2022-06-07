@@ -8,10 +8,13 @@ use clarinet_lib::bip39::{Language, Mnemonic};
 use clarinet_lib::deployment;
 use clarinet_lib::integrate::{self, DevnetEvent, DevnetOrchestrator};
 use clarinet_lib::types::{
-    compute_addresses, AccountConfig, BitcoinBlockData, BitcoinChainEvent,
-    ChainUpdatedWithBlockData, DevnetConfigFile, PoxStackingOrder, ProjectManifest,
-    StacksChainEvent, StacksNetwork, DEFAULT_DERIVATION_PATH,
+    compute_addresses, AccountConfig, DevnetConfigFile, PoxStackingOrder, ProjectManifest,
+    DEFAULT_DERIVATION_PATH,
 };
+use orchestra_types::{
+    BitcoinBlockData, BitcoinChainEvent, ChainUpdatedWithBlockData, StacksChainEvent, StacksNetwork,
+};
+
 use core::panic;
 use neon::prelude::*;
 use std::collections::BTreeMap;

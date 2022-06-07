@@ -6,13 +6,14 @@ mod ui;
 mod util;
 
 use super::DevnetEvent;
-use crate::types::{ChainsCoordinatorCommand, StacksChainEvent};
+use crate::types::ChainsCoordinatorCommand;
 use app::App;
 use crossterm::{
     event::{self, Event, KeyCode, KeyModifiers},
     execute,
     terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
 };
+use orchestra_types::StacksChainEvent;
 use std::sync::mpsc::{Receiver, Sender};
 use std::{
     error::Error,

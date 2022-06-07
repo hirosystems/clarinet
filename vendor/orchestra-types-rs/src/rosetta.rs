@@ -1,5 +1,5 @@
-use super::events::StacksTransactionEvent;
-use serde::{self, Deserialize, Serialize};
+use crate::events::*;
+use bitcoincore_rpc::bitcoin::{TxIn, TxOut};
 use std::collections::HashSet;
 
 /// BlockIdentifier uniquely identifies a block in a particular network.
@@ -94,11 +94,18 @@ pub struct StacksTransactionData {
 
 #[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
 pub enum StacksTransactionKind {
-    ContractCall,
+    ContractCall(StacksContractCallData),
     ContractDeployment(StacksContractDeploymentData),
     NativeTokenTransfer,
     Coinbase,
     Other,
+}
+
+#[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
+pub struct StacksContractCallData {
+    pub contract_identifier: String,
+    pub method: String,
+    pub args: Vec<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
@@ -137,6 +144,7 @@ pub struct StacksTransactionExecutionCost {
 pub struct StacksTransactionReceipt {
     pub mutated_contracts_radius: HashSet<String>,
     pub mutated_assets_radius: HashSet<String>,
+    pub contract_calls_stack: HashSet<String>,
     pub events: Vec<StacksTransactionEvent>,
 }
 
@@ -149,6 +157,7 @@ impl StacksTransactionReceipt {
         StacksTransactionReceipt {
             mutated_contracts_radius,
             mutated_assets_radius,
+            contract_calls_stack: HashSet::new(),
             events,
         }
     }
@@ -167,7 +176,10 @@ pub struct BitcoinTransactionData {
 
 /// Extra data for Transaction
 #[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
-pub struct BitcoinTransactionMetadata {}
+pub struct BitcoinTransactionMetadata {
+    pub inputs: Vec<TxIn>,
+    pub outputs: Vec<TxOut>,
+}
 
 /// The transaction_identifier uniquely identifies a transaction in a particular
 /// network and block or in the mempool.
@@ -285,7 +297,7 @@ pub struct OperationIdentifier {
     pub network_index: Option<i64>,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, serde::Serialize, serde::Deserialize, strum::EnumIter)]
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize, strum::EnumIter)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub enum OperationStatusKind {
     Success,
@@ -384,4 +396,105 @@ pub struct CurrencyMetadata {
     pub asset_class_identifier: String,
     pub asset_identifier: Option<String>,
     pub standard: CurrencyStandard,
+}
+
+#[allow(dead_code)]
+#[derive(Debug, Clone, PartialEq, Serialize)]
+pub enum BitcoinChainEvent {
+    ChainUpdatedWithBlock(BitcoinBlockData),
+    ChainUpdatedWithReorg(Vec<BitcoinBlockData>, Vec<BitcoinBlockData>),
+}
+
+#[allow(dead_code)]
+#[derive(Debug, Clone, PartialEq, Serialize)]
+pub enum StacksChainEvent {
+    ChainUpdatedWithBlock(ChainUpdatedWithBlockData),
+    ChainUpdatedWithReorg(ChainUpdatedWithReorgData),
+    ChainUpdatedWithMicroblock(ChainUpdatedWithMicroblockData),
+    ChainUpdatedWithMicroblockReorg(ChainUpdatedWithMicroblockReorgData),
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize)]
+pub struct ChainUpdatedWithBlockData {
+    pub new_block: StacksBlockData,
+    pub anchored_trail: Option<StacksMicroblocksTrail>,
+    pub confirmed_block: (StacksBlockData, Option<StacksMicroblocksTrail>),
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize)]
+pub struct ChainUpdatedWithReorgData {
+    pub old_blocks: Vec<(Option<StacksMicroblocksTrail>, StacksBlockData)>,
+    pub new_blocks: Vec<(Option<StacksMicroblocksTrail>, StacksBlockData)>,
+    pub confirmed_block: (StacksBlockData, Option<StacksMicroblocksTrail>),
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize)]
+pub struct ChainUpdatedWithMicroblockData {
+    pub anchored_block: StacksBlockData,
+    pub current_trail: StacksMicroblocksTrail,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize)]
+pub struct ChainUpdatedWithMicroblockReorgData {
+    pub new_block: StacksBlockData,
+    pub new_anchored_trail: Option<StacksMicroblocksTrail>,
+    pub old_trail: Option<StacksMicroblocksTrail>,
+}
+
+#[allow(dead_code)]
+#[serde(rename_all = "snake_case")]
+#[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize)]
+pub enum StacksNetwork {
+    Simnet,
+    Devnet,
+    Testnet,
+    Mainnet,
+}
+
+impl StacksNetwork {
+    pub fn is_simnet(&self) -> bool {
+        match self {
+            StacksNetwork::Simnet => true,
+            _ => false,
+        }
+    }
+
+    pub fn either_devnet_or_testnet(&self) -> bool {
+        match self {
+            StacksNetwork::Devnet | StacksNetwork::Testnet => true,
+            _ => false,
+        }
+    }
+
+    pub fn is_devnet(&self) -> bool {
+        match self {
+            StacksNetwork::Devnet => true,
+            _ => false,
+        }
+    }
+
+    pub fn is_mainnet(&self) -> bool {
+        match self {
+            StacksNetwork::Mainnet => true,
+            _ => false,
+        }
+    }
+
+    pub fn get_networks(&self) -> (BitcoinNetwork, StacksNetwork) {
+        match &self {
+            StacksNetwork::Simnet => (BitcoinNetwork::Regtest, StacksNetwork::Simnet),
+            StacksNetwork::Devnet => (BitcoinNetwork::Testnet, StacksNetwork::Devnet),
+            StacksNetwork::Testnet => (BitcoinNetwork::Testnet, StacksNetwork::Testnet),
+            StacksNetwork::Mainnet => (BitcoinNetwork::Mainnet, StacksNetwork::Mainnet),
+        }
+    }
+}
+
+#[allow(dead_code)]
+#[serde(rename_all = "snake_case")]
+#[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize)]
+pub enum BitcoinNetwork {
+    Regtest,
+    Testnet,
+    Mainnet,
 }

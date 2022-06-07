@@ -4,9 +4,7 @@ use crate::deployment::{apply_on_chain_deployment, DeploymentCommand, Deployment
 use crate::indexer::{chains, Indexer, IndexerConfig};
 use crate::integrate::{MempoolAdmissionData, ServiceStatusData, Status};
 use crate::types::{self, AccountConfig, ChainConfig, DevnetConfig, ProjectManifest};
-use crate::types::{BitcoinChainEvent, ChainsCoordinatorCommand, StacksChainEvent, StacksNetwork};
 use crate::utils;
-use crate::utils::stacks::{transactions, PoxInfo, StacksRpc};
 use base58::FromBase58;
 use clarity_repl::clarity::representations::ClarityName;
 use clarity_repl::clarity::types::{BuffData, SequenceData, TupleData, Value as ClarityValue};
@@ -18,6 +16,12 @@ use rocket::serde::json::{json, Json, Value as JsonValue};
 use rocket::serde::Deserialize;
 use rocket::State;
 
+use orchestra_event_observer::chainhooks::types::HookFormation;
+use orchestra_event_observer::observer::{
+    start_event_observer, EventObserverConfig, ObserverEvent,
+};
+use orchestra_types::{BitcoinChainEvent, BitcoinNetwork, StacksChainEvent, StacksNetwork};
+use stacks_rpc_client::{transactions, PoxInfo, StacksRpc};
 use std::convert::TryFrom;
 use std::error::Error;
 
