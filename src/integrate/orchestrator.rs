@@ -1,8 +1,6 @@
 use super::DevnetEvent;
 use crate::integrate::{ServiceStatusData, Status};
-use crate::types::{
-    ChainConfig, DevnetConfigFile, ProjectManifest, DEFAULT_DEVNET_BALANCE,
-};
+use crate::types::{ChainConfig, DevnetConfigFile, ProjectManifest, DEFAULT_DEVNET_BALANCE};
 use bollard::container::{
     Config, CreateContainerOptions, KillContainerOptions, ListContainersOptions,
     PruneContainersOptions, WaitContainerOptions,
