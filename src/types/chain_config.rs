@@ -40,6 +40,7 @@ pub struct NetworkConfigFile {
 #[derive(Serialize, Deserialize, Debug, Default)]
 pub struct DevnetConfigFile {
     pub orchestrator_port: Option<u16>,
+    pub orchestrator_control_port: Option<u16>,
     pub bitcoin_node_p2p_port: Option<u16>,
     pub bitcoin_node_rpc_port: Option<u16>,
     pub stacks_node_p2p_port: Option<u16>,
@@ -53,6 +54,8 @@ pub struct DevnetConfigFile {
     pub bitcoin_node_password: Option<String>,
     pub miner_mnemonic: Option<String>,
     pub miner_derivation_path: Option<String>,
+    pub faucet_mnemonic: Option<String>,
+    pub faucet_derivation_path: Option<String>,
     pub bitcoin_controller_block_time: Option<u32>,
     pub bitcoin_controller_automining_disabled: Option<bool>,
     pub working_dir: Option<String>,
@@ -123,7 +126,8 @@ pub struct NetworkConfig {
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct DevnetConfig {
-    pub orchestrator_port: u16,
+    pub orchestrator_ingestion_port: u16,
+    pub orchestrator_control_port: u16,
     pub bitcoin_node_p2p_port: u16,
     pub bitcoin_node_rpc_port: u16,
     pub bitcoin_node_username: String,
@@ -142,6 +146,11 @@ pub struct DevnetConfig {
     pub miner_btc_address: String,
     pub miner_mnemonic: String,
     pub miner_derivation_path: String,
+    pub faucet_stx_address: String,
+    pub faucet_secret_key_hex: String,
+    pub faucet_btc_address: String,
+    pub faucet_mnemonic: String,
+    pub faucet_derivation_path: String,
     pub working_dir: String,
     pub postgres_port: u16,
     pub postgres_username: String,
@@ -315,6 +324,13 @@ impl ChainConfig {
             let (miner_stx_address, miner_btc_address, miner_secret_key_hex) =
                 compute_addresses(&miner_mnemonic, &miner_derivation_path, networks);
 
+            let faucet_mnemonic = devnet_config.faucet_mnemonic.take().unwrap_or("shadow private easily thought say logic fault paddle word top book during ignore notable orange flight clock image wealth health outside kitten belt reform".to_string());
+            let faucet_derivation_path = devnet_config
+                .faucet_derivation_path
+                .take()
+                .unwrap_or(DEFAULT_DERIVATION_PATH.to_string());
+            let (faucet_stx_address, faucet_btc_address, faucet_secret_key_hex) =
+                compute_addresses(&faucet_mnemonic, &faucet_derivation_path, networks);
             // If unset, we'll reuse the miner's keypair for the hyperchain leader
             let (
                 hyperchain_leader_stx_address,
@@ -377,7 +393,8 @@ impl ChainConfig {
             }
 
             let mut config = DevnetConfig {
-                orchestrator_port: devnet_config.orchestrator_port.unwrap_or(20445),
+                orchestrator_ingestion_port: devnet_config.orchestrator_port.unwrap_or(20445),
+                orchestrator_control_port: devnet_config.orchestrator_control_port.unwrap_or(20446),
                 bitcoin_node_p2p_port: devnet_config.bitcoin_node_p2p_port.unwrap_or(18444),
                 bitcoin_node_rpc_port: devnet_config.bitcoin_node_rpc_port.unwrap_or(18443),
                 bitcoin_node_username: devnet_config
@@ -406,6 +423,11 @@ impl ChainConfig {
                 miner_mnemonic,
                 miner_secret_key_hex,
                 miner_derivation_path,
+                faucet_btc_address,
+                faucet_stx_address,
+                faucet_mnemonic,
+                faucet_secret_key_hex,
+                faucet_derivation_path,
                 working_dir: devnet_config
                     .working_dir
                     .take()
