@@ -3,10 +3,6 @@ use std::{fs::DirEntry, path::PathBuf};
 
 pub mod types;
 use crate::chainhooks::types::ChainhookSpecificationFile;
-use orchestra_types::{
-    BitcoinChainEvent, BitcoinTransactionData, BlockIdentifier, StacksChainEvent,
-    StacksTransactionData,
-};
 use base58::FromBase58;
 use bitcoincore_rpc::bitcoin::blockdata::opcodes;
 use bitcoincore_rpc::bitcoin::blockdata::script::Builder as BitcoinScriptBuilder;
@@ -16,6 +12,10 @@ use clarity_repl::clarity::util::hash::Hash160;
 use orchestra_event_observer::chainhooks::types::{
     BitcoinChainhookSpecification, BitcoinHookPredicate, ChainhookSpecification, HookAction,
     HookFormation, MatchingRule, StacksChainhookSpecification,
+};
+use orchestra_types::{
+    BitcoinChainEvent, BitcoinTransactionData, BlockIdentifier, StacksChainEvent,
+    StacksTransactionData,
 };
 use orchestra_types::{BitcoinNetwork, StacksNetwork};
 use reqwest::Client;
