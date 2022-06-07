@@ -373,6 +373,15 @@ disable_stacks_api = false
 # stacks_explorer_image_url = "blockstack/explorer:latest"
 # bitcoin_explorer_image_url = "quay.io/hirosystems/bitcoin-explorer:devnet"
 # postgres_image_url = "postgres:alpine"
+# enable_hyperchain_node = true
+# hyperchain_image_url = "hyrosystems/explorer:latest"
+# hyperchain_leader_mnemonic = "twice kind fence tip hidden tilt action fragile skin nothing glory cousin green tomorrow spring wrist shed math olympic multiply hip blue scout claw"
+# hyperchain_leader_derivation_path = "m/44'/5757'/0'/0/0"
+# hyperchain_node_p2p_port = 30444
+# hyperchain_node_rpc_port = 30443
+# hyperchain_events_ingestion_port = 30445
+# hyperchain_node_events_observers = ["host.docker.internal:8002"]
+
 
 # Send some stacking orders
 [[devnet.pox_stacking_orders]]

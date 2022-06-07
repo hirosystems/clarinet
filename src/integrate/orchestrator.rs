@@ -1,6 +1,8 @@
 use super::DevnetEvent;
 use crate::integrate::{ServiceStatusData, Status};
-use crate::types::{ChainConfig, DevnetConfigFile, ProjectManifest, StacksNetwork};
+use crate::types::{
+    ChainConfig, DevnetConfigFile, ProjectManifest, StacksNetwork, DEFAULT_DEVNET_BALANCE,
+};
 use bollard::container::{
     Config, CreateContainerOptions, KillContainerOptions, ListContainersOptions,
     PruneContainersOptions, WaitContainerOptions,
@@ -31,6 +33,7 @@ pub struct DevnetOrchestrator {
     bitcoin_blockchain_container_id: Option<String>,
     bitcoin_explorer_container_id: Option<String>,
     postgres_container_id: Option<String>,
+    hyperchain_container_id: Option<String>,
     docker_client: Option<Docker>,
 }
 
@@ -181,6 +184,42 @@ impl DevnetOrchestrator {
                 if let Some(val) = devnet_override.bitcoin_controller_automining_disabled {
                     devnet_config.bitcoin_controller_automining_disabled = val;
                 }
+
+                if let Some(val) = devnet_override.enable_hyperchain_node {
+                    devnet_config.enable_hyperchain_node = val;
+                }
+
+                if let Some(val) = devnet_override.hyperchain_node_p2p_port {
+                    devnet_config.hyperchain_node_p2p_port = val;
+                }
+
+                if let Some(val) = devnet_override.hyperchain_node_rpc_port {
+                    devnet_config.hyperchain_node_rpc_port = val;
+                }
+
+                if let Some(val) = devnet_override.hyperchain_events_ingestion_port {
+                    devnet_config.hyperchain_events_ingestion_port = val;
+                }
+
+                if let Some(ref val) = devnet_override.hyperchain_node_events_observers {
+                    devnet_config.hyperchain_node_events_observers = val.clone();
+                }
+
+                if let Some(ref val) = devnet_override.hyperchain_image_url {
+                    devnet_config.hyperchain_image_url = val.clone();
+                }
+
+                if let Some(ref val) = devnet_override.hyperchain_leader_derivation_path {
+                    devnet_config.hyperchain_leader_derivation_path = val.clone();
+                }
+
+                if let Some(ref val) = devnet_override.hyperchain_leader_mnemonic {
+                    devnet_config.hyperchain_leader_mnemonic = val.clone();
+                }
+
+                if let Some(ref val) = devnet_override.hyperchain_leader_mnemonic {
+                    devnet_config.hyperchain_leader_mnemonic = val.clone();
+                }
             }
             _ => {}
         };
@@ -231,6 +270,7 @@ impl DevnetOrchestrator {
         let disable_stacks_api = devnet_config.disable_stacks_api;
         let disable_stacks_explorer = devnet_config.disable_stacks_explorer;
         let disable_bitcoin_explorer = devnet_config.disable_bitcoin_explorer;
+        let enable_hyperchain_node = devnet_config.enable_hyperchain_node;
 
         let _ = fs::create_dir(format!("{}", devnet_config.working_dir));
         let _ = fs::create_dir(format!("{}/conf", devnet_config.working_dir));
@@ -284,6 +324,17 @@ impl DevnetOrchestrator {
                 "disabled".into()
             } else {
                 "initializing".into()
+            },
+        }));
+
+        let _ = event_tx.send(DevnetEvent::ServiceStatus(ServiceStatusData {
+            order: 5,
+            status: Status::Red,
+            name: "hyperchain-node".into(),
+            comment: if enable_hyperchain_node {
+                "initializing".into()
+            } else {
+                "disabled".into()
             },
         }));
 
@@ -395,6 +446,33 @@ impl DevnetOrchestrator {
             };
         }
 
+        // Start Hyperchain node
+        if enable_hyperchain_node {
+            let _ = event_tx.send(DevnetEvent::info(format!("Starting hyperchain-node")));
+            match self.prepare_hyperchain_node_container(boot_index).await {
+                Ok(_) => {}
+                Err(message) => {
+                    println!("{}", message);
+                    self.kill(true).await;
+                    return process_exit();
+                }
+            };
+            let _ = event_tx.send(DevnetEvent::ServiceStatus(ServiceStatusData {
+                order: 5,
+                status: Status::Yellow,
+                name: "hyperchain-node".into(),
+                comment: "booting".into(),
+            }));
+            match self.boot_hyperchain_node_container().await {
+                Ok(_) => {}
+                Err(message) => {
+                    println!("{}", message);
+                    self.kill(true).await;
+                    return process_exit();
+                }
+            };
+        }
+
         // Start stacks-blockchain
         let _ = event_tx.send(DevnetEvent::info(format!("Starting stacks-node")));
         let _ = event_tx.send(DevnetEvent::ServiceStatus(ServiceStatusData {
@@ -403,7 +481,7 @@ impl DevnetOrchestrator {
             name: "stacks-node".into(),
             comment: "updating image".into(),
         }));
-        match self.prepare_stacks_node_container().await {
+        match self.prepare_stacks_node_container(boot_index).await {
             Ok(_) => {}
             Err(message) => {
                 println!("{}", message);
@@ -742,7 +820,7 @@ rpcport={}
         docker
             .start_container::<String>(&container, None)
             .await
-            .map_err(|_| "Unable to start container".to_string())?;
+            .map_err(|e| format!("Unable to start container - {}", e))?;
 
         let res = docker
             .connect_network(
@@ -941,7 +1019,7 @@ events_keys = ["*"]
         Ok(config)
     }
 
-    pub async fn prepare_stacks_node_container(&mut self) -> Result<(), String> {
+    pub async fn prepare_stacks_node_container(&mut self, boot_index: u32) -> Result<(), String> {
         let (docker, devnet_config) = match (&self.docker_client, &self.network_config) {
             (Some(ref docker), Some(ref network_config)) => match network_config.devnet {
                 Some(ref devnet_config) => (docker, devnet_config),
@@ -963,7 +1041,7 @@ events_keys = ["*"]
             .await
             .map_err(|e| format!("Unable to create image: {}", e))?;
 
-        let config = self.prepare_stacks_node_config(1)?;
+        let config = self.prepare_stacks_node_config(boot_index)?;
 
         let options = CreateContainerOptions {
             name: format!("stacks-node.{}", self.network_name),
@@ -995,7 +1073,261 @@ events_keys = ["*"]
         docker
             .start_container::<String>(&container, None)
             .await
-            .map_err(|_| "Unable to start container".to_string())?;
+            .map_err(|e| format!("Unable to start container - {}", e))?;
+
+        let res = docker
+            .connect_network(
+                &self.network_name,
+                ConnectNetworkOptions {
+                    container,
+                    ..Default::default()
+                },
+            )
+            .await;
+
+        if let Err(e) = res {
+            let err = format!("Error connecting container: {}", e);
+            println!("{}", err);
+            return Err(err);
+        }
+
+        Ok(())
+    }
+
+    pub fn prepare_hyperchain_node_config(
+        &self,
+        boot_index: u32,
+    ) -> Result<Config<String>, String> {
+        let (_, devnet_config) = match &self.network_config {
+            Some(ref network_config) => match network_config.devnet {
+                Some(ref devnet_config) => (network_config, devnet_config),
+                _ => return Err("Unable to get devnet configuration".into()),
+            },
+            _ => return Err("Unable to get Docker client".into()),
+        };
+
+        let mut port_bindings = HashMap::new();
+        port_bindings.insert(
+            format!("{}/tcp", devnet_config.hyperchain_node_p2p_port),
+            Some(vec![PortBinding {
+                host_ip: Some(String::from("0.0.0.0")),
+                host_port: Some(format!("{}/tcp", devnet_config.hyperchain_node_p2p_port)),
+            }]),
+        );
+        port_bindings.insert(
+            format!("{}/tcp", devnet_config.hyperchain_node_rpc_port),
+            Some(vec![PortBinding {
+                host_ip: Some(String::from("0.0.0.0")),
+                host_port: Some(format!("{}/tcp", devnet_config.hyperchain_node_rpc_port)),
+            }]),
+        );
+        port_bindings.insert(
+            format!("{}/tcp", devnet_config.hyperchain_events_ingestion_port),
+            Some(vec![PortBinding {
+                host_ip: Some(String::from("0.0.0.0")),
+                host_port: Some(format!(
+                    "{}/tcp",
+                    devnet_config.hyperchain_events_ingestion_port
+                )),
+            }]),
+        );
+
+        let mut hyperchain_conf = format!(
+            r#"
+[node]
+working_dir = "/devnet"
+rpc_bind = "0.0.0.0:{hyperchain_node_rpc_port}"
+p2p_bind = "0.0.0.0:{hyperchain_node_p2p_port}"
+miner = true
+mining_key = "{hyperchain_leader_secret_key_hex}"
+local_peer_seed = "{hyperchain_leader_secret_key_hex}"
+wait_time_for_microblocks = 50_000
+
+[miner]
+first_attempt_time_ms = 10000
+subsequent_attempt_time_ms = 10000
+# microblock_attempt_time_ms = 15000
+
+[burnchain]
+chain = "stacks_layer_1"
+mode = "hyperchain"
+first_burn_header_height = {first_burn_header_height}
+peer_host = "0.0.0.0"
+rpc_port = {stacks_node_rpc_port}
+peer_port = {stacks_node_p2p_port}
+contract_identifier = "{hyperchain_contract_id}"
+observer_port = {hyperchain_events_ingestion_port}
+
+# Add orchestrator (docker-host) as an event observer
+# [[events_observer]]
+# endpoint = "host.docker.internal:{orchestrator_port}"
+# retry_count = 255
+# include_data_events = true
+# events_keys = ["*"]
+"#,
+            hyperchain_node_rpc_port = devnet_config.hyperchain_node_rpc_port,
+            hyperchain_node_p2p_port = devnet_config.hyperchain_node_p2p_port,
+            hyperchain_leader_secret_key_hex = devnet_config.hyperchain_leader_secret_key_hex,
+            stacks_node_rpc_port = devnet_config.stacks_node_rpc_port,
+            stacks_node_p2p_port = devnet_config.stacks_node_p2p_port,
+            orchestrator_port = devnet_config.orchestrator_port,
+            hyperchain_events_ingestion_port = devnet_config.hyperchain_events_ingestion_port,
+            first_burn_header_height = 0,
+            hyperchain_contract_id = devnet_config.hyperchain_contract_id,
+        );
+
+        hyperchain_conf.push_str(&format!(
+            r#"
+[[ustx_balance]]
+address = "{hyperchain_leader_stx_address}"
+amount = {default_balance}
+"#,
+            hyperchain_leader_stx_address = devnet_config.hyperchain_leader_stx_address,
+            default_balance = DEFAULT_DEVNET_BALANCE
+        ));
+
+        for events_observer in devnet_config.hyperchain_node_events_observers.iter() {
+            hyperchain_conf.push_str(&format!(
+                r#"
+[[events_observer]]
+endpoint = "{}"
+retry_count = 255
+events_keys = ["*"]
+"#,
+                events_observer,
+            ));
+        }
+
+        let mut hyperchain_conf_path = PathBuf::from(&devnet_config.working_dir);
+        hyperchain_conf_path.push("conf/Hyperchain.toml");
+        let mut file =
+            File::create(hyperchain_conf_path).expect("Unable to create Hyperchain.toml");
+        file.write_all(hyperchain_conf.as_bytes())
+            .expect("Unable to write Hyperchain.toml");
+
+        let mut stacks_node_data_path = PathBuf::from(&devnet_config.working_dir);
+        stacks_node_data_path.push("data");
+        stacks_node_data_path.push(format!("{}", boot_index));
+        let _ = fs::create_dir(stacks_node_data_path.clone());
+        stacks_node_data_path.push("hyperchain");
+        fs::create_dir(stacks_node_data_path).expect("Unable to create working dir");
+
+        let mut exposed_ports = HashMap::new();
+        exposed_ports.insert(
+            format!("{}/tcp", devnet_config.hyperchain_node_rpc_port),
+            HashMap::new(),
+        );
+        exposed_ports.insert(
+            format!("{}/tcp", devnet_config.hyperchain_node_p2p_port),
+            HashMap::new(),
+        );
+        exposed_ports.insert(
+            format!("{}/tcp", devnet_config.hyperchain_events_ingestion_port),
+            HashMap::new(),
+        );
+
+        let mut labels = HashMap::new();
+        labels.insert("project".to_string(), self.network_name.to_string());
+        labels.insert("reset".to_string(), "true".to_string());
+
+        let mut binds = vec![format!(
+            "{}/conf:/src/hyperchain-node/",
+            devnet_config.working_dir
+        )];
+
+        if devnet_config.bind_containers_volumes {
+            binds.push(format!(
+                "{}/data/{}/hyperchain:/devnet/",
+                devnet_config.working_dir, boot_index
+            ))
+        }
+
+        let config = Config {
+            labels: Some(labels),
+            image: Some(devnet_config.hyperchain_image_url.clone()),
+            domainname: Some(self.network_name.to_string()),
+            tty: None,
+            exposed_ports: Some(exposed_ports),
+            entrypoint: Some(vec![
+                "hyperchain-node".into(),
+                "start".into(),
+                "--config=/src/hyperchain-node/Hyperchain.toml".into(),
+            ]),
+            env: Some(vec![
+                "STACKS_LOG_PP=1".to_string(),
+                "STACKS_LOG_DEBUG=1".to_string(),
+                // "BLOCKSTACK_USE_TEST_GENESIS_CHAINSTATE=1".to_string(),
+            ]),
+            host_config: Some(HostConfig {
+                port_bindings: Some(port_bindings),
+                binds: Some(binds),
+                extra_hosts: Some(vec!["host.docker.internal:host-gateway".into()]),
+                ..Default::default()
+            }),
+            ..Default::default()
+        };
+
+        Ok(config)
+    }
+
+    pub async fn prepare_hyperchain_node_container(
+        &mut self,
+        boot_index: u32,
+    ) -> Result<(), String> {
+        let (docker, devnet_config) = match (&self.docker_client, &self.network_config) {
+            (Some(ref docker), Some(ref network_config)) => match network_config.devnet {
+                Some(ref devnet_config) => (docker, devnet_config),
+                _ => return Err("Unable to get devnet configuration".into()),
+            },
+            _ => return Err("Unable to get Docker client".into()),
+        };
+
+        let _info = docker
+            .create_image(
+                Some(CreateImageOptions {
+                    from_image: devnet_config.hyperchain_image_url.clone(),
+                    ..Default::default()
+                }),
+                None,
+                None,
+            )
+            .try_collect::<Vec<_>>()
+            .await
+            .map_err(|e| format!("Unable to create image: {}", e))?;
+
+        let config = self.prepare_hyperchain_node_config(boot_index)?;
+
+        let options = CreateContainerOptions {
+            name: format!("hyperchain-node.{}", self.network_name),
+        };
+
+        let container = docker
+            .create_container::<String, String>(Some(options), config)
+            .await
+            .map_err(|e| format!("Unable to create container: {}", e))?
+            .id;
+
+        info!("Created container hyperchain-node: {}", container);
+        self.hyperchain_container_id = Some(container.clone());
+
+        Ok(())
+    }
+
+    pub async fn boot_hyperchain_node_container(&self) -> Result<(), String> {
+        let container = match &self.hyperchain_container_id {
+            Some(container) => container.clone(),
+            _ => return Err(format!("Unable to boot container")),
+        };
+
+        let docker = match &self.docker_client {
+            Some(ref docker) => docker,
+            _ => return Err("Unable to get Docker client".into()),
+        };
+
+        docker
+            .start_container::<String>(&container, None)
+            .await
+            .map_err(|e| format!("Unable to start container - {}", e))?;
 
         let res = docker
             .connect_network(
@@ -1123,7 +1455,7 @@ events_keys = ["*"]
         docker
             .start_container::<String>(&container, None)
             .await
-            .map_err(|_| "Unable to start container".to_string())?;
+            .map_err(|e| format!("Unable to start container - {}", e))?;
 
         let res = docker
             .connect_network(
@@ -1228,7 +1560,7 @@ events_keys = ["*"]
         docker
             .start_container::<String>(&container, None)
             .await
-            .map_err(|_| "Unable to start container".to_string())?;
+            .map_err(|e| format!("Unable to start container - {}", e))?;
 
         let res = docker
             .connect_network(
@@ -1720,11 +2052,21 @@ events_keys = ["*"]
 
         if let Some(ref stacks_blockchain_container_id) = self.stacks_blockchain_container_id {
             let _ = docker
-                .kill_container(stacks_blockchain_container_id, options)
+                .kill_container(stacks_blockchain_container_id, options.clone())
                 .await;
             if terminate {
                 println!("Terminating stacks-node...");
                 let _ = docker.remove_container(stacks_blockchain_container_id, None);
+            }
+        }
+
+        if let Some(ref hyperchain_container_id) = self.hyperchain_container_id {
+            let _ = docker
+                .kill_container(hyperchain_container_id, options)
+                .await;
+            if terminate {
+                println!("Terminating hyperchain-node...");
+                let _ = docker.remove_container(hyperchain_container_id, None);
             }
         }
 
