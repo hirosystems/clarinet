@@ -8,7 +8,8 @@ const {
   stacksDevnetWaitForBitcoinBlock,
   stacksDevnetGetStacksNodeUrl,
 } = require("../native/index.node");
-import { Block } from "./types";
+import { Block } from "@hirosystems/orchestra-types";
+export * from "@hirosystems/orchestra-types";
 
 /**
  * Account to include in the genesis accounts
