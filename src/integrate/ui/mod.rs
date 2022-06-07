@@ -27,7 +27,6 @@ pub fn start_ui(
     devnet_events_tx: Sender<DevnetEvent>,
     devnet_events_rx: Receiver<DevnetEvent>,
     chains_coordinator_commands_tx: Sender<ChainsCoordinatorCommand>,
-    orchestrator_terminator_tx: Sender<bool>,
     orchestrator_terminated_rx: Receiver<bool>,
     devnet_path: &str,
 ) -> Result<(), Box<dyn Error>> {
@@ -74,24 +73,12 @@ pub fn start_ui(
                 (KeyModifiers::CONTROL, KeyCode::Char('c')) => {
                     app.display_log(DevnetEvent::log_warning("Ctrl+C received, initiating termination sequence.".into()));
                     let _ = trigger_reset(
-                        true,
-                        & chains_coordinator_commands_tx,
-                        &orchestrator_terminator_tx);
-
+                        & chains_coordinator_commands_tx);
                     let _ = terminate(
                         &mut terminal,
                         orchestrator_terminated_rx);
                     break;
                 }
-                (_, KeyCode::Char('0')) => {
-                    // Reset Testnet`
-                    app.reset();
-                    app.display_log(DevnetEvent::log_warning("Reset Devnet...".into()));
-                    let _ = trigger_reset(
-                        false,
-                        & chains_coordinator_commands_tx,
-                        &orchestrator_terminator_tx);
-                },
                 (_, KeyCode::Left) => app.on_left(),
                 (_, KeyCode::Up) => app.on_up(),
                 (_, KeyCode::Right) => app.on_right(),
@@ -122,8 +109,14 @@ pub fn start_ui(
             DevnetEvent::ProtocolDeployingProgress(_) => {
                 // Display something
             }
+            DevnetEvent::FatalError(message) => {
+                app.display_log(DevnetEvent::log_error(format!("Fatal: {}", message)));
+                let _ = terminate(
+                    &mut terminal,
+                    orchestrator_terminated_rx);
+                break;
+            },
             DevnetEvent::ProtocolDeployed => {
-                let _ = chains_coordinator_commands_tx.send(ChainsCoordinatorCommand::ProtocolDeployed);
                 app.display_log(DevnetEvent::log_success("Protocol successfully deployed".into()));
             }
             // DevnetEvent::Terminate => {
@@ -142,15 +135,10 @@ pub fn start_ui(
 }
 
 fn trigger_reset(
-    terminate: bool,
     chains_coordinator_commands_tx: &Sender<ChainsCoordinatorCommand>,
-    orchestrator_terminator_tx: &Sender<bool>,
 ) -> Result<(), Box<dyn Error>> {
     chains_coordinator_commands_tx
-        .send(ChainsCoordinatorCommand::Terminate(true))
-        .expect("Unable to terminate devnet");
-    orchestrator_terminator_tx
-        .send(terminate)
+        .send(ChainsCoordinatorCommand::Terminate)
         .expect("Unable to terminate devnet");
     Ok(())
 }

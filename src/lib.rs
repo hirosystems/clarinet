@@ -6,9 +6,6 @@ extern crate serde;
 extern crate serde_derive;
 
 #[macro_use]
-extern crate rocket;
-
-#[macro_use]
 extern crate serde_json;
 
 #[macro_use]
@@ -21,9 +18,9 @@ pub extern crate clarity_repl;
 #[macro_use]
 pub mod macros;
 
+pub mod chainhooks;
 pub mod deployment;
 pub mod generate;
-pub mod indexer;
 pub mod integrate;
 pub mod types;
 pub mod utils;
