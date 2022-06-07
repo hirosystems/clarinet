@@ -11,8 +11,4 @@ serde_json = "1"
 serde_derive = "1"
 strum = { version = "0.23.0", features = ["derive"] }
 prost = "0.10.1"
-prost-types = "0.10"
 bitcoincore-rpc = "0.14.0"
-
-[build-dependencies]
-prost-build = "0.10"
