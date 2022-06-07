@@ -1,0 +1,14 @@
+normalization_enabled = true
+bitcoin_rpc_proxy_enabled = false
+grpc_server_enabled = true
+hooks_enabled = true
+webhooks = []
+control_port = 9998
+ingestion_port = 9999
+bitcoin_node_username = "devnet"
+bitcoin_node_password = "devnet"
+bitcoin_node_rpc_host = "0.0.0.0"
+bitcoin_node_rpc_port = 18443
+stacks_node_rpc_host = "0.0.0.0"
+stacks_node_rpc_port = 20443
+operators = ["74738ff5-5367-5958-9aee-98fffdcd1876"]

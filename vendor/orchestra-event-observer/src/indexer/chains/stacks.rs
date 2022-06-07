@@ -1,17 +1,10 @@
 use crate::indexer::AssetClassCache;
 use crate::indexer::{IndexerConfig, StacksChainContext};
-use crate::types::events::*;
-use crate::types::{
-    AccountIdentifier, Amount, BlockIdentifier, Currency, CurrencyMetadata, CurrencyStandard,
-    Operation, OperationIdentifier, OperationStatusKind, OperationType, StacksBlockData,
-    StacksBlockMetadata, StacksContractDeploymentData, StacksMicroblockData, StacksTransactionData,
-    StacksTransactionExecutionCost, StacksTransactionKind, StacksTransactionMetadata,
-    StacksTransactionReceipt, TransactionIdentifier,
-};
 use clarity_repl::clarity::codec::transaction::{TransactionAuth, TransactionPayload};
 use clarity_repl::clarity::codec::{StacksMessageCodec, StacksTransaction};
 use clarity_repl::clarity::types::Value as ClarityValue;
 use clarity_repl::clarity::util::hash::hex_bytes;
+use orchestra_types::*;
 use rocket::serde::json::Value as JsonValue;
 use rocket::serde::Deserialize;
 use std::collections::{HashMap, HashSet};
@@ -55,7 +48,7 @@ pub struct NewTransaction {
     pub microblock_parent_hash: Option<String>,
 }
 
-#[derive(Deserialize)]
+#[derive(Debug, Deserialize)]
 pub struct NewEvent {
     pub txid: String,
     pub committed: bool,
@@ -76,7 +69,7 @@ pub struct NewEvent {
     pub data_map_insert_event: Option<JsonValue>,
     pub data_map_update_event: Option<JsonValue>,
     pub data_map_delete_event: Option<JsonValue>,
-    pub print_event: Option<JsonValue>,
+    pub contract_event: Option<JsonValue>,
 }
 
 pub fn get_stacks_currency() -> Currency {
@@ -301,17 +294,23 @@ pub fn get_tx_description(
                 .function_args
                 .iter()
                 .map(|v| format!("{}", v))
-                .collect::<Vec<String>>()
-                .join(", ");
+                .collect::<Vec<String>>();
             (
                 format!(
                     "invoked: {}.{}::{}({})",
                     contract_call.address,
                     contract_call.contract_name,
                     contract_call.function_name,
-                    formatted_args
+                    formatted_args.join(", ")
                 ),
-                StacksTransactionKind::ContractCall,
+                StacksTransactionKind::ContractCall(StacksContractCallData {
+                    contract_identifier: format!(
+                        "{}.{}",
+                        contract_call.address, contract_call.contract_name
+                    ),
+                    method: contract_call.function_name.to_string(),
+                    args: formatted_args,
+                }),
             )
         }
         TransactionPayload::SmartContract(ref smart_contract) => {
@@ -806,7 +805,7 @@ pub fn get_standardized_stacks_operations(
                     .expect("Unable to decode event_data");
                 marshalled_events.push(StacksTransactionEvent::DataMapDeleteEvent(data.clone()));
                 mutated_contracts_radius.insert(data.contract_identifier.clone());
-            } else if let Some(ref event_data) = event.print_event {
+            } else if let Some(ref event_data) = event.contract_event {
                 let data: SmartContractEventData = serde_json::from_value(event_data.clone())
                     .expect("Unable to decode event_data");
                 marshalled_events.push(StacksTransactionEvent::SmartContractEvent(data.clone()));
