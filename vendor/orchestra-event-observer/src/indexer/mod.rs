@@ -1,11 +1,11 @@
 pub mod chains;
 
-use crate::types::{
+use orchestra_types::{
     BitcoinChainEvent, BlockIdentifier, ChainUpdatedWithBlockData, ChainUpdatedWithMicroblockData,
     StacksBlockData, StacksChainEvent, StacksMicroblocksTrail,
 };
-use crate::utils::stacks::PoxInfo;
 use rocket::serde::json::Value as JsonValue;
+use stacks_rpc_client::PoxInfo;
 use std::collections::{HashMap, VecDeque};
 
 #[derive(Deserialize, Debug, Clone, Default)]
@@ -17,21 +17,6 @@ pub struct AssetClassCache {
 pub struct StacksChainContext {
     asset_class_map: HashMap<String, AssetClassCache>,
     pox_info: PoxInfo,
-}
-
-impl PoxInfo {
-    pub fn default() -> PoxInfo {
-        PoxInfo {
-            contract_id: "ST000000000000000000002AMW42H.pox".into(),
-            pox_activation_threshold_ustx: 0,
-            first_burnchain_block_height: 100,
-            prepare_phase_block_length: 5,
-            reward_phase_block_length: 10,
-            reward_slots: 20,
-            total_liquid_supply_ustx: 1000000000000000,
-            ..Default::default()
-        }
-    }
 }
 
 impl StacksChainContext {
