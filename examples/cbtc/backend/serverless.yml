@@ -1,0 +1,26 @@
+org: lgalabru
+app: cbtc-bridge
+service: cbtc-bridge
+frameworkVersion: '3'
+
+provider:
+  name: aws
+  runtime: nodejs14.x
+
+functions:
+  wrapBtc:
+    handler: handler.wrapBtc
+    events:
+      - httpApi:
+          path: /api/v1/wrapBtc
+          method: post
+  unwrapBtc:
+    handler: handler.unwrapBtc
+    events:
+      - httpApi:
+          path: /api/v1/unwrapBtc
+          method: post
+
+plugins:
+  - serverless-plugin-typescript
+  - serverless-offline
