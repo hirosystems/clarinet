@@ -27,6 +27,7 @@
     "version": "npm run build-release"
   },
   "dependencies": {
+    "@hirosystems/orchestra-types": "^1.0.1-beta.1",
     "@mapbox/node-pre-gyp": "^1.0.8",
     "neon-cli": "^0.9.1",
     "node-pre-gyp-github": "^1.4.3",
