@@ -210,12 +210,17 @@ impl StacksDevnet {
                 _ => DEFAULT_DERIVATION_PATH.to_string(),
             };
 
-            let (address, _, _) = compute_addresses(&mnemonic, &derivation, is_mainnet);
+            let (stx_address, btc_address, _) = compute_addresses(
+                &mnemonic,
+                &derivation,
+                &StacksNetwork::Devnet.get_networks(),
+            );
 
             let account = AccountConfig {
                 label,
                 mnemonic,
-                address,
+                stx_address,
+                btc_address,
                 derivation,
                 is_mainnet,
                 balance: balance as u64,
