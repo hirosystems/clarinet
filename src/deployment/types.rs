@@ -558,7 +558,6 @@ impl DeploymentSpecification {
                                         return Err(format!("{} only supports transactions of type 'contract-call' and 'contract-publish", specs.network.to_lowercase()))
                                     }
                                     let spec = RequirementPublishSpecification::from_specifications(spec, base_path)?;
-                                    // contracts.insert(contract_id, (spec.source.clone(), spec.relative_path.clone()));
                                     TransactionSpecification::RequirementPublish(spec)
                                 }
                                 TransactionSpecificationFile::ContractPublish(spec) => {

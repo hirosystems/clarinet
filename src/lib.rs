@@ -30,4 +30,4 @@ pub mod frontend;
 #[cfg(feature = "cli")]
 pub mod lsp;
 #[cfg(feature = "cli")]
-pub mod runnner;
+pub mod runner;

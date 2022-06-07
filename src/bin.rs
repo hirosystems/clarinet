@@ -15,7 +15,7 @@ mod frontend;
 mod generate;
 mod integrate;
 mod lsp;
-mod runnner;
+mod runner;
 mod types;
 mod utils;
 

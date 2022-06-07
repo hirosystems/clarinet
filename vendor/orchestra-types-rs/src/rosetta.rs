@@ -459,7 +459,7 @@ impl StacksNetwork {
         }
     }
 
-    pub fn either_devnet_or_tesnet(&self) -> bool {
+    pub fn either_devnet_or_testnet(&self) -> bool {
         match self {
             StacksNetwork::Devnet | StacksNetwork::Testnet => true,
             _ => false,

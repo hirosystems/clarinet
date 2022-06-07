@@ -3,6 +3,7 @@ mod requirements;
 pub mod types;
 mod ui;
 
+use clarity_repl::clarity::diagnostic::DiagnosableError;
 use clarity_repl::clarity::types::StandardPrincipalData;
 use clarity_repl::clarity::{ClarityName, Value};
 pub use ui::start_ui;
@@ -300,7 +301,6 @@ pub fn update_session_with_contracts_executions(
     code_coverage_enabled: bool,
 ) -> BTreeMap<QualifiedContractIdentifier, Result<ExecutionResult, Vec<Diagnostic>>> {
     let mut results = BTreeMap::new();
-    // let mut remap_to_perform = vec![];
     for batch in deployment.plan.batches.iter() {
         for transaction in batch.transactions.iter() {
             match transaction {
@@ -456,7 +456,7 @@ pub fn get_initial_transactions_trackers(
                     status: TransactionStatus::Queued,
                 },
                 TransactionSpecification::RequirementPublish(tx) => {
-                    if !deployment.network.either_devnet_or_tesnet() {
+                    if !deployment.network.either_devnet_or_testnet() {
                         panic!("Deployment specification malformed - requirements publish not supported on mainnet");
                     }
                     TransactionTracker {
@@ -613,7 +613,7 @@ pub fn apply_on_chain_deployment(
                             .expect("Unable to retrieve account"),
                     };
                     let account = stx_accounts_lookup.get(&issuer_address).unwrap();
-                    let source = if deployment.network.either_devnet_or_tesnet() {
+                    let source = if deployment.network.either_devnet_or_testnet() {
                         // Remapping - This is happening
                         let mut source = tx.source.clone();
                         for (old_contract_id, new_contract_id) in contracts_ids_to_remap.iter() {
@@ -1098,7 +1098,7 @@ pub fn generate_default_deployment(
                             relative_path: path,
                         };
                         emulated_contracts_publish.insert(contract_id.clone(), data);
-                    } else if network.either_devnet_or_tesnet() {
+                    } else if network.either_devnet_or_testnet() {
                         let data = RequirementPublishSpecification {
                             contract_id: contract_id.clone(),
                             remap_sender: default_deployer_address.clone(),
@@ -1161,7 +1161,7 @@ pub fn generate_default_deployment(
             };
         }
 
-        // Avoid listing requirements as deployment transactions to the deployment specification on Devnet / Testnet / Mainnet
+        // Avoid listing requirements as deployment transactions to the deployment specification on Mainnet
         if !network.is_mainnet() {
             let ordered_contracts_ids =
                 match ASTDependencyDetector::order_contracts(&requirements_deps) {
@@ -1177,7 +1177,7 @@ pub fn generate_default_deployment(
                     let tx = TransactionSpecification::EmulatedContractPublish(data);
                     transactions.push(tx);
                 }
-            } else if network.either_devnet_or_tesnet() {
+            } else if network.either_devnet_or_testnet() {
                 for contract_id in ordered_contracts_ids.iter() {
                     let data = requirements_publish
                         .remove(contract_id)
@@ -1285,8 +1285,10 @@ pub fn generate_default_deployment(
 
     let mut dependencies = match dependencies {
         Ok(dependencies) => dependencies,
-        Err(_) => {
-            return Err(format!("unable to detect dependencies"));
+        Err((dependencies, _)) => {
+            // No need to report an error here, it will be caught and reported
+            // with proper location information by the later analyses.
+            dependencies
         }
     };
 
@@ -1298,7 +1300,7 @@ pub fn generate_default_deployment(
 
     let ordered_contracts_ids = match ASTDependencyDetector::order_contracts(&dependencies) {
         Ok(ordered_contracts_ids) => ordered_contracts_ids,
-        Err(e) => return Err(format!("unable to order contracts {}", e)),
+        Err(e) => return Err(e.err.message()),
     };
 
     for contract_id in ordered_contracts_ids.into_iter() {
