@@ -72,17 +72,17 @@ pub struct PoxCycle {
 }
 
 #[derive(Deserialize, Debug)]
-struct Balance {
-    balance: String,
-    nonce: u64,
-    balance_proof: String,
-    nonce_proof: String,
+pub struct Balance {
+    pub balance: String,
+    pub nonce: u64,
+    pub balance_proof: String,
+    pub nonce_proof: String,
 }
 
 #[derive(Deserialize, Debug)]
 pub struct Contract {
-    source: String,
-    publish_height: u64,
+    pub source: String,
+    pub publish_height: u64,
 }
 
 impl StacksRpc {

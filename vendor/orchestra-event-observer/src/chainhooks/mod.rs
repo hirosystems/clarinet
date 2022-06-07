@@ -25,6 +25,7 @@ pub fn evaluate_stacks_chainhooks_on_chain_event<'a>(
     &'a BlockIdentifier,
 )> {
     let mut enabled = vec![];
+    // TODO(lgalabru): follow-up on this implementation
     match chain_event {
         StacksChainEvent::ChainUpdatedWithBlock(update) => {
             for tx in update.new_block.transactions.iter() {
@@ -207,27 +208,27 @@ pub fn evaluate_stacks_chainhooks_on_chain_event<'a>(
                         }
                         (
                             StacksTransactionKind::NativeTokenTransfer,
-                            StacksHookPredicate::StxEvent(expected_stx_event),
+                            StacksHookPredicate::StxEvent(_expected_stx_event),
                         ) => {}
                         _ => {}
                     }
-                    if let StacksTransactionKind::ContractCall(actual_contract_call) =
+                    if let StacksTransactionKind::ContractCall(_actual_contract_call) =
                         &tx.metadata.kind
                     {
                         match &hook.predicate {
-                            StacksHookPredicate::ContractCall(expected_contract_call) => {}
-                            StacksHookPredicate::PrintEvent(expected_print_event) => {}
-                            StacksHookPredicate::StxEvent(expected_stx_event) => unimplemented!(),
-                            StacksHookPredicate::NftEvent(expected_nft_event) => unimplemented!(),
-                            StacksHookPredicate::FtEvent(expected_ft_event) => {}
+                            StacksHookPredicate::ContractCall(_expected_contract_call) => {}
+                            StacksHookPredicate::PrintEvent(_expected_print_event) => {}
+                            StacksHookPredicate::StxEvent(_expected_stx_event) => {}
+                            StacksHookPredicate::NftEvent(_expected_nft_event) => {}
+                            StacksHookPredicate::FtEvent(_expected_ft_event) => {}
                         }
                     }
                 }
             }
         }
-        StacksChainEvent::ChainUpdatedWithMicroblock(update) => {}
-        StacksChainEvent::ChainUpdatedWithMicroblockReorg(update) => {}
-        StacksChainEvent::ChainUpdatedWithReorg(update) => {}
+        StacksChainEvent::ChainUpdatedWithMicroblock(_update) => {}
+        StacksChainEvent::ChainUpdatedWithMicroblockReorg(_update) => {}
+        StacksChainEvent::ChainUpdatedWithReorg(_update) => {}
     }
     enabled
 }
@@ -251,7 +252,7 @@ pub fn evaluate_bitcoin_chainhooks_on_chain_event<'a>(
                 }
             }
         }
-        BitcoinChainEvent::ChainUpdatedWithReorg(old_blocks, new_blocks) => {}
+        BitcoinChainEvent::ChainUpdatedWithReorg(_old_blocks, _new_blocks) => {}
     }
     enabled
 }
@@ -327,6 +328,7 @@ pub async fn handle_stacks_hook_action<'a>(
 
 impl BitcoinChainhookSpecification {
     pub fn evaluate_predicate(&self, tx: &BitcoinTransactionData) -> bool {
+        // TODO(lgalabru): follow-up on this implementation
         match &self.predicate.kind {
             types::BitcoinPredicateType::Hex(MatchingRule::Equals(_address)) => false,
             types::BitcoinPredicateType::Hex(MatchingRule::StartsWith(_address)) => false,
@@ -361,7 +363,7 @@ impl BitcoinChainhookSpecification {
             types::BitcoinPredicateType::P2wsh(MatchingRule::Equals(_address)) => false,
             types::BitcoinPredicateType::P2wsh(MatchingRule::StartsWith(_address)) => false,
             types::BitcoinPredicateType::P2wsh(MatchingRule::EndsWith(_address)) => false,
-            types::BitcoinPredicateType::Script(template) => false,
+            types::BitcoinPredicateType::Script(_template) => false,
         }
     }
 }

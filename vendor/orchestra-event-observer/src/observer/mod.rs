@@ -47,10 +47,10 @@ pub enum Event {
     StacksChainEvent(StacksChainEvent),
 }
 
+// TODO(lgalabru): Support for GRPC?
 #[derive(Clone, Debug)]
 pub enum EventHandler {
     WebHook(String),
-    GrpcStream(u64),
 }
 
 impl EventHandler {
@@ -69,8 +69,8 @@ impl EventHandler {
                     .body(body)
                     .send()
                     .await;
+                // TODO(lgalabru): handle response errors
             }
-            EventHandler::GrpcStream(stream) => {}
         }
     }
 
@@ -83,14 +83,14 @@ impl EventHandler {
                 let http_client = HttpClient::builder()
                     .build()
                     .expect("Unable to build http client");
-                let res = http_client
+                let _res = http_client
                     .post(url)
                     .header("Content-Type", "application/json")
                     .body(body)
                     .send()
                     .await;
+                // TODO(lgalabru): handle response errors
             }
-            EventHandler::GrpcStream(stream) => {}
         }
     }
 
@@ -136,8 +136,6 @@ pub struct ContractReadonlyCall {
 pub enum ObserverCommand {
     PropagateBitcoinChainEvent(BitcoinChainEvent),
     PropagateStacksChainEvent(StacksChainEvent),
-    SubscribeStreamer(u64),
-    UnsubscribeStreamer(u64),
     RegisterHook(ChainhookSpecification, ApiKey),
     DeregisterBitcoinHook(String, ApiKey),
     DeregisterStacksHook(String, ApiKey),
@@ -263,7 +261,7 @@ pub async fn start_event_observer(
     });
 
     // This loop is used for handling background jobs, emitted by HTTP calls.
-    let mut event_handlers = config.event_handlers.clone();
+    let event_handlers = config.event_handlers.clone();
 
     // If authorization not required, we create a default HookFormation
     if !config.is_authorization_required() {
@@ -392,12 +390,8 @@ pub async fn start_event_observer(
                     let _ = tx.send(ObserverEvent::NotifyBitcoinTransactionProxied);
                 }
             }
-            ObserverCommand::SubscribeStreamer(stream) => {
-                event_handlers.push(EventHandler::GrpcStream(stream));
-            }
-            ObserverCommand::UnsubscribeStreamer(stream) => {}
             ObserverCommand::RegisterHook(hook, api_key) => {
-                let mut hook_formation = config
+                let hook_formation = config
                     .operators
                     .get_mut(&api_key.0)
                     .expect("unable to retrieve hook formation");
@@ -407,7 +401,7 @@ pub async fn start_event_observer(
                 }
             }
             ObserverCommand::DeregisterStacksHook(hook_uuid, api_key) => {
-                let mut hook_formation = config
+                let hook_formation = config
                     .operators
                     .get_mut(&api_key.0)
                     .expect("unable to retrieve hook formation");
@@ -419,7 +413,7 @@ pub async fn start_event_observer(
                 }
             }
             ObserverCommand::DeregisterBitcoinHook(hook_uuid, api_key) => {
-                let mut hook_formation = config
+                let hook_formation = config
                     .operators
                     .get_mut(&api_key.0)
                     .expect("unable to retrieve hook formation");
@@ -485,7 +479,8 @@ pub fn handle_new_stacks_block(
     // Standardize the structure of the block, and identify the
     // kind of update that this new block would imply, taking
     // into account the last 7 blocks.
-    let (pox_info, chain_event) = match indexer_rw_lock.inner().write() {
+    // TODO(lgalabru): use _pox_info
+    let (_pox_info, chain_event) = match indexer_rw_lock.inner().write() {
         Ok(mut indexer) => {
             let pox_info = indexer.get_pox_info();
             let chain_event = indexer.handle_stacks_block(marshalled_block.into_inner());
@@ -555,9 +550,10 @@ pub fn handle_new_microblocks(
 #[post("/new_mempool_tx", format = "application/json", data = "<raw_txs>")]
 pub fn handle_new_mempool_tx(
     raw_txs: Json<Vec<String>>,
-    background_job_tx: &State<Arc<Mutex<Sender<ObserverCommand>>>>,
+    _background_job_tx: &State<Arc<Mutex<Sender<ObserverCommand>>>>,
 ) -> Json<JsonValue> {
-    let decoded_transactions = raw_txs
+    // TODO(lgalabru): use propagate mempool events
+    let _decoded_transactions = raw_txs
         .iter()
         .map(|t| {
             let (txid, ..) =
@@ -580,6 +576,7 @@ pub fn handle_new_mempool_tx(
 
 #[post("/drop_mempool_tx", format = "application/json")]
 pub fn handle_drop_mempool_tx() -> Json<JsonValue> {
+    // TODO(lgalabru): use propagate mempool events
     Json(json!({
         "status": 200,
         "result": "Ok",

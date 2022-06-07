@@ -442,8 +442,8 @@ pub struct ChainUpdatedWithMicroblockReorgData {
 }
 
 #[allow(dead_code)]
-#[serde(rename_all = "snake_case")]
 #[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
 pub enum StacksNetwork {
     Simnet,
     Devnet,
@@ -491,8 +491,8 @@ impl StacksNetwork {
 }
 
 #[allow(dead_code)]
-#[serde(rename_all = "snake_case")]
 #[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
 pub enum BitcoinNetwork {
     Regtest,
     Testnet,

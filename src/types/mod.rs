@@ -9,13 +9,6 @@ pub use project_manifest::{
     ContractConfig, ProjectManifest, ProjectManifestFile, RequirementConfig,
 };
 
-#[derive(Debug)]
-pub enum DeploymentEvent {
-    ContractCallBroadcasted,
-    ContractPublishBroadcasted,
-    ProtocolDeployed,
-}
-
 #[allow(dead_code)]
 #[derive(Debug)]
 pub enum ChainsCoordinatorCommand {

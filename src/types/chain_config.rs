@@ -1,6 +1,6 @@
 use crate::utils::mnemonic;
 use bip39::{Language, Mnemonic};
-use bitcoin::Address;
+
 use clarity_repl::clarity::util::hash::bytes_to_hex;
 use clarity_repl::clarity::util::secp256k1::Secp256k1PublicKey;
 use clarity_repl::clarity::util::StacksAddress;

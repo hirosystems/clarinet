@@ -1,6 +1,5 @@
-use clarity_repl::clarity::util::hash::hex_bytes;
 use orchestra_event_observer::chainhooks::types::*;
-use orchestra_types::{BitcoinNetwork, Chain, StacksNetwork};
+use orchestra_types::{BitcoinNetwork, StacksNetwork};
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 use std::fs::File;

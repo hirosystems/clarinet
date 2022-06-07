@@ -1,19 +1,16 @@
-use std::collections::HashSet;
-use std::hash::Hash;
-use std::io::Read;
 use std::str::FromStr;
 
 use base58::FromBase58;
 use bitcoin::blockdata::opcodes;
 use bitcoin::blockdata::script::Builder;
 use bitcoin::consensus::encode;
-use bitcoin::{OutPoint, PubkeyHash, Script, Transaction, TxIn, TxOut, Txid, Witness};
+use bitcoin::{OutPoint, Script, Transaction, TxIn, TxOut, Txid, Witness};
 use bitcoincore_rpc::bitcoin::secp256k1::{Message, PublicKey, Secp256k1, SecretKey};
 use bitcoincore_rpc::bitcoin::Address;
+use bitcoincore_rpc::RpcApi;
 use bitcoincore_rpc::{Auth, Client};
-use bitcoincore_rpc::{RawTx, RpcApi};
 use bitcoincore_rpc_json::ListUnspentResultEntry;
-use clarity_repl::clarity::util::hash::{bytes_to_hex, hex_bytes};
+use clarity_repl::clarity::util::hash::bytes_to_hex;
 
 use super::types::BtcTransferSpecification;
 

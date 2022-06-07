@@ -212,36 +212,36 @@ pub enum StacksHookPredicate {
     StxEvent(StacksStxEventBasedPredicate),
 }
 
-#[serde(rename_all = "snake_case")]
 #[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
 pub struct StacksContractCallBasedPredicate {
     pub contract_identifier: String,
     pub method: String,
 }
 
-#[serde(rename_all = "snake_case")]
 #[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
 pub struct StacksPrintEventBasedPredicate {
     pub contract_identifier: String,
     pub contains: String,
 }
 
-#[serde(rename_all = "snake_case")]
 #[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
 pub struct StacksFtEventBasedPredicate {
     pub asset_identifier: String,
     pub actions: Vec<String>,
 }
 
-#[serde(rename_all = "snake_case")]
 #[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
 pub struct StacksNftEventBasedPredicate {
     pub asset_identifier: String,
     pub actions: Vec<String>,
 }
 
-#[serde(rename_all = "snake_case")]
 #[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
 pub struct StacksStxEventBasedPredicate {
     pub actions: Vec<String>,
 }

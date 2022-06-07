@@ -2,7 +2,7 @@ use super::DevnetEvent;
 use crate::chainhooks::load_chainhooks;
 use crate::deployment::types::DeploymentSpecification;
 use crate::deployment::{apply_on_chain_deployment, DeploymentCommand, DeploymentEvent};
-use crate::integrate::{MempoolAdmissionData, ServiceStatusData, Status};
+use crate::integrate::{ServiceStatusData, Status};
 use crate::types::ChainsCoordinatorCommand;
 use crate::types::{self, AccountConfig, ChainConfig, DevnetConfig, ProjectManifest};
 use crate::utils;
@@ -12,22 +12,20 @@ use clarity_repl::clarity::representations::ClarityName;
 use clarity_repl::clarity::types::{BuffData, SequenceData, TupleData, Value as ClarityValue};
 use clarity_repl::clarity::util::address::AddressHashMode;
 use clarity_repl::clarity::util::hash::{hex_bytes, Hash160};
-use orchestra_event_observer::chainhooks::types::HookFormation;
+
 use orchestra_event_observer::observer::{
     start_event_observer, EventObserverConfig, ObserverEvent,
 };
 use orchestra_types::{BitcoinChainEvent, BitcoinNetwork, StacksChainEvent, StacksNetwork};
 use stacks_rpc_client::{transactions, PoxInfo, StacksRpc};
-use std::collections::{HashMap, VecDeque};
+use std::collections::HashMap;
 use std::convert::TryFrom;
 use std::error::Error;
-
-use std::net::{IpAddr, Ipv4Addr};
 
 use std::str;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc::{channel, Receiver, Sender};
-use std::sync::{Arc, Mutex, RwLock};
+use std::sync::Arc;
 use tracing::info;
 
 #[derive(Deserialize)]
@@ -59,6 +57,7 @@ pub struct ContractReadonlyCall {
     pub result: String,
 }
 
+#[allow(dead_code)]
 pub enum BitcoinMiningCommand {
     Start,
     Pause,
@@ -170,7 +169,6 @@ pub async fn start_chains_coordinator(
     let mut should_deploy_protocol = true;
     let protocol_deployed = Arc::new(AtomicBool::new(false));
 
-    let stop_miner = Arc::new(AtomicBool::new(false));
     let mut deployment_events_rx = Some(deployment_events_rx);
 
     loop {
@@ -181,8 +179,8 @@ pub async fn start_chains_coordinator(
         }
         let command = match observer_event_rx.recv() {
             Ok(cmd) => cmd,
-            Err(e) => {
-                // cascade termination
+            Err(_e) => {
+                // TODO(lgalabru): cascade termination
                 continue;
             }
         };
@@ -356,32 +354,6 @@ pub async fn start_chains_coordinator(
     }
     Ok(())
 }
-
-// #[post("/new_mempool_tx", format = "application/json", data = "<raw_txs>")]
-// pub fn handle_new_mempool_tx(
-//     devnet_events_tx: &State<Arc<Mutex<Sender<DevnetEvent>>>>,
-//     raw_txs: Json<Vec<String>>,
-// ) -> Json<JsonValue> {
-//     let decoded_transactions = raw_txs
-//         .iter()
-//         .map(|t| {
-//             let (txid, ..) =
-//                 chains::stacks::get_tx_description(t).expect("unable to parse transaction");
-//             txid
-//         })
-//         .collect::<Vec<String>>();
-
-//     if let Ok(tx_sender) = devnet_events_tx.lock() {
-//         for tx in decoded_transactions.into_iter() {
-//             let _ = tx_sender.send(DevnetEvent::MempoolAdmission(MempoolAdmissionData { tx }));
-//         }
-//     }
-
-//     Json(json!({
-//         "status": 200,
-//         "result": "Ok",
-//     }))
-// }
 
 pub fn prepare_protocol_deployment(
     manifest: &ProjectManifest,
@@ -580,7 +552,7 @@ pub fn mine_bitcoin_block(
     let _ = rpc.generate_to_address(1, &miner_address);
 }
 
-pub fn handle_bitcoin_mining(
+fn handle_bitcoin_mining(
     mining_command_rx: Receiver<BitcoinMiningCommand>,
     devnet_config: &DevnetConfig,
 ) {
@@ -589,7 +561,7 @@ pub fn handle_bitcoin_mining(
         let command = match mining_command_rx.recv() {
             Ok(cmd) => cmd,
             Err(_e) => {
-                // cascade termination
+                // TODO(lgalabru): cascade termination
                 continue;
             }
         };

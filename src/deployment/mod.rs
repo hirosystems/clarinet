@@ -18,7 +18,7 @@ use crate::deployment::types::TransactionSpecification;
 
 use crate::types::{AccountConfig, ChainConfig, ProjectManifest};
 use crate::utils::mnemonic;
-use bitcoincore_rpc::bitcoin::Transaction;
+
 use clarity_repl::analysis::ast_dependency_detector::{ASTDependencyDetector, DependencySet};
 use clarity_repl::clarity::analysis::ContractAnalysis;
 use clarity_repl::clarity::ast::ContractAST;
@@ -96,7 +96,7 @@ fn get_btc_keypair(
     bitcoincore_rpc::bitcoin::secp256k1::SecretKey,
     bitcoincore_rpc::bitcoin::secp256k1::PublicKey,
 ) {
-    use bitcoincore_rpc::bitcoin::secp256k1::{Message, PublicKey, Secp256k1, SecretKey};
+    use bitcoincore_rpc::bitcoin::secp256k1::{PublicKey, Secp256k1, SecretKey};
     let bip39_seed = match mnemonic::get_bip39_seed_from_mnemonic(&account.mnemonic, "") {
         Ok(bip39_seed) => bip39_seed,
         Err(_) => panic!(),
@@ -185,8 +185,6 @@ pub fn encode_contract_call(
     tx_fee: u64,
     network: &StacksNetwork,
 ) -> Result<StacksTransaction, String> {
-    let (_, _, public_key) = get_keypair(account);
-
     let payload = TransactionContractCall {
         contract_name: contract_id.name.clone(),
         address: StacksAddress::from(contract_id.issuer.clone()),
@@ -430,7 +428,8 @@ pub struct TransactionTracker {
 pub enum TransactionCheck {
     ContractCall(StandardPrincipalData, u64),
     ContractPublish(StandardPrincipalData, ContractName),
-    BtcTransfer(),
+    // TODO(lgalabru): Handle Bitcoin checks
+    // BtcTransfer(),
 }
 
 pub fn get_initial_transactions_trackers(

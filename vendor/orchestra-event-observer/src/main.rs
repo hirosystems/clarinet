@@ -11,10 +11,10 @@ extern crate serde_json;
 #[macro_use]
 extern crate rocket;
 
-mod chainhooks;
-mod indexer;
-mod observer;
-mod utils;
+pub mod chainhooks;
+pub mod indexer;
+pub mod observer;
+pub mod utils;
 
 use crate::chainhooks::types::HookFormation;
 use clap::Parser;

@@ -693,9 +693,9 @@ pub fn main() {
                 println!("Checking hooks");
                 let _ = check_chainhooks(&manifest_path, cmd.output_json);
             }
-            Chainhooks::DeployChainhook(cmd) => {
-                let manifest_path = get_manifest_path_or_exit(cmd.manifest_path);
-                // Deploy hooks
+            Chainhooks::DeployChainhook(_cmd) => {
+                // TODO(lgalabru): follow-up on this implementation
+                unimplemented!()
             }
         },
         Command::Contracts(subcommand) => match subcommand {

@@ -1,25 +1,12 @@
-use std::str::FromStr;
-use std::{fs::DirEntry, path::PathBuf};
+use std::path::PathBuf;
 
 pub mod types;
 use crate::chainhooks::types::ChainhookSpecificationFile;
-use base58::FromBase58;
-use bitcoincore_rpc::bitcoin::blockdata::opcodes;
-use bitcoincore_rpc::bitcoin::blockdata::script::Builder as BitcoinScriptBuilder;
-use bitcoincore_rpc::bitcoin::{Address, PubkeyHash, PublicKey, Script, TxIn};
-use clarity_repl::clarity::util::hash::bytes_to_hex;
-use clarity_repl::clarity::util::hash::Hash160;
-use orchestra_event_observer::chainhooks::types::{
-    BitcoinChainhookSpecification, BitcoinHookPredicate, ChainhookSpecification, HookAction,
-    HookFormation, MatchingRule, StacksChainhookSpecification,
-};
-use orchestra_types::{
-    BitcoinChainEvent, BitcoinTransactionData, BlockIdentifier, StacksChainEvent,
-    StacksTransactionData,
-};
+
+use orchestra_event_observer::chainhooks::types::{ChainhookSpecification, HookFormation};
+
 use orchestra_types::{BitcoinNetwork, StacksNetwork};
-use reqwest::Client;
-use reqwest::Method;
+
 use std::fs;
 
 pub fn load_chainhooks(

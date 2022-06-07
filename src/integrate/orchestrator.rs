@@ -2102,7 +2102,7 @@ events_keys = ["*"]
     }
 
     pub fn initialize_bitcoin_node(&self, devnet_event_tx: &Sender<DevnetEvent>) {
-        use bitcoincore_rpc::bitcoin::{Address, PrivateKey};
+        use bitcoincore_rpc::bitcoin::Address;
         use bitcoincore_rpc::{Auth, Client, RpcApi};
         use std::str::FromStr;
 

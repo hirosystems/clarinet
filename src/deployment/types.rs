@@ -12,7 +12,7 @@ use std::path::PathBuf;
 
 use std::fs;
 
-use orchestra_types::{BitcoinNetwork, StacksNetwork};
+use orchestra_types::StacksNetwork;
 
 #[derive(Debug, PartialEq, Clone)]
 pub struct TransactionPlanSpecification {

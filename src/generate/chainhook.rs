@@ -1,7 +1,6 @@
-use super::changes::{Changes, DirectoryCreation, FileCreation, TOMLEdition};
-use crate::types::{ContractConfig, ProjectManifest};
+use super::changes::{Changes, DirectoryCreation, FileCreation};
+use crate::types::ProjectManifest;
 use orchestra_types::Chain;
-use std::{collections::HashMap, path::PathBuf};
 
 pub struct GetChangesForNewChainhook<'a> {
     manifest: &'a ProjectManifest,
