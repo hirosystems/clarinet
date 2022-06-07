@@ -1,3 +1,4 @@
+use crate::chainhooks::check_chainhooks;
 use crate::deployment::{
     self, apply_on_chain_deployment, check_deployments, generate_default_deployment,
     get_absolute_deployment_path, get_default_deployment_path, get_initial_transactions_trackers,
@@ -62,6 +63,9 @@ enum Command {
     /// Interact with contracts deployed on Mainnet
     #[clap(subcommand, name = "requirements")]
     Requirements(Requirements),
+    /// Subcommands for working with chainhooks
+    #[clap(subcommand, name = "chainhooks")]
+    Chainhooks(Chainhooks),
     /// Manage contracts deployments on Simnet/Devnet/Testnet/Mainnet
     #[clap(subcommand, name = "deployments")]
     Deployments(Deployments),
@@ -114,11 +118,25 @@ enum Deployments {
     #[clap(name = "check", bin_name = "check")]
     CheckDeployments(CheckDeployments),
     /// Generate new deployment
-    #[clap(name = "generate", bin_name = "generate")]
+    #[clap(name = "generate", bin_name = "generate", aliases = &["new"])]
     GenerateDeployment(GenerateDeployment),
     /// Apply deployment
     #[clap(name = "apply", bin_name = "apply")]
     ApplyDeployment(ApplyDeployment),
+}
+
+#[derive(Subcommand, PartialEq, Clone, Debug)]
+#[clap(bin_name = "chainhook", aliases = &["chainhook"])]
+enum Chainhooks {
+    /// Generate files and settings for a new hook
+    #[clap(name = "new", bin_name = "new")]
+    NewChainhook(NewChainhook),
+    /// Check hooks format
+    #[clap(name = "check", bin_name = "check")]
+    CheckChainhooks(CheckChainhooks),
+    /// Publish contracts on chain
+    #[clap(name = "deploy", bin_name = "deploy")]
+    DeployChainhook(DeployChainhook),
 }
 
 #[derive(Parser, PartialEq, Clone, Debug)]
@@ -200,6 +218,38 @@ struct GenerateDeployment {
         conflicts_with = "mainnet"
     )]
     pub no_batch: bool,
+}
+
+#[derive(Parser, PartialEq, Clone, Debug)]
+struct NewChainhook {
+    /// Hook's name
+    pub name: String,
+    /// Path to Clarinet.toml
+    #[clap(long = "manifest-path")]
+    pub manifest_path: Option<String>,
+    /// Generate a Bitcoin chainhook
+    #[clap(long = "bitcoin", conflicts_with = "stacks")]
+    pub bitcoin: bool,
+    /// Generate a Stacks chainhook
+    #[clap(long = "stacks", conflicts_with = "bitcoin")]
+    pub stacks: bool,
+}
+
+#[derive(Parser, PartialEq, Clone, Debug)]
+struct CheckChainhooks {
+    /// Path to Clarinet.toml
+    #[clap(long = "manifest-path")]
+    pub manifest_path: Option<String>,
+    /// Path to Clarinet.toml
+    #[clap(long = "output-json")]
+    pub output_json: bool,
+}
+
+#[derive(Parser, PartialEq, Clone, Debug)]
+struct DeployChainhook {
+    /// Path to Clarinet.toml
+    #[clap(long = "manifest-path")]
+    pub manifest_path: Option<String>,
 }
 
 #[derive(Parser, PartialEq, Clone, Debug)]
@@ -525,6 +575,7 @@ pub fn main() {
                         std::process::exit(1);
                     }
                 };
+                let network = deployment.network.clone();
 
                 let node_url = deployment.node.clone().unwrap();
 
@@ -552,7 +603,7 @@ pub fn main() {
                             &manifest.project.name,
                             &manifest.project.authors,
                         ),
-                        deployment.network.clone(),
+                        network.clone(),
                     ));
                 }
 
@@ -577,7 +628,11 @@ pub fn main() {
                         };
                         match cmd {
                             DeploymentEvent::Interrupted(message) => {
-                                println!("{} Error deploying contracts: {}", red!("x"), message);
+                                println!(
+                                    "{} Error publishing transactions: {}",
+                                    red!("x"),
+                                    message
+                                );
                                 break;
                             }
                             DeploymentEvent::TransactionUpdate(update) => {
@@ -585,9 +640,9 @@ pub fn main() {
                             }
                             DeploymentEvent::ProtocolDeployed => {
                                 println!(
-                                    "{} Contracts successfully deployed on {:?}",
+                                    "{} Transactions successfully confirmed on {:?}",
                                     green!("✔"),
-                                    network.unwrap()
+                                    network
                                 );
                                 break;
                             }
@@ -597,15 +652,50 @@ pub fn main() {
                     let res = deployment::start_ui(&node_url, event_rx, transaction_trackers);
                     match res {
                         Ok(()) => println!(
-                            "{} Contracts successfully deployed on {:?}",
+                            "{} Transactions successfully confirmed on {:?}",
                             green!("✔"),
-                            network.unwrap()
+                            network
                         ),
                         Err(message) => {
-                            println!("{} Error deploying contracts: {}", red!("x"), message)
+                            println!("{} Error publishing transactions: {}", red!("x"), message)
                         }
                     }
                 }
+            }
+        },
+        Command::Chainhooks(subcommand) => match subcommand {
+            Chainhooks::NewChainhook(cmd) => {
+                let manifest = load_manifest_or_exit(cmd.manifest_path);
+
+                let chain = match (cmd.bitcoin, cmd.stacks) {
+                    (true, false) => Chain::Bitcoin,
+                    (false, true) => Chain::Stacks,
+                    (_, _) => {
+                        println!(
+                            "{}: either --bitcoin or --stacks must be passed",
+                            red!("error")
+                        );
+                        process::exit(1);
+                    }
+                };
+
+                let changes = generate::get_changes_for_new_chainhook(&manifest, cmd.name, chain);
+                if !execute_changes(changes) {
+                    std::process::exit(1);
+                }
+                if hints_enabled {
+                    display_post_check_hint();
+                }
+            }
+            Chainhooks::CheckChainhooks(cmd) => {
+                let manifest_path = get_manifest_path_or_exit(cmd.manifest_path);
+                // Ensure that all the hooks can correctly be deserialized.
+                println!("Checking hooks");
+                let _ = check_chainhooks(&manifest_path, cmd.output_json);
+            }
+            Chainhooks::DeployChainhook(cmd) => {
+                let manifest_path = get_manifest_path_or_exit(cmd.manifest_path);
+                // Deploy hooks
             }
         },
         Command::Contracts(subcommand) => match subcommand {
@@ -628,8 +718,9 @@ pub fn main() {
 
                 let change = TOMLEdition {
                     comment: format!(
-                        "Adding {} as a requirement to Clarinet.toml",
-                        cmd.contract_id
+                        "{} with requirement {}",
+                        yellow!("Updated Clarinet.toml"),
+                        green!(format!("{}", cmd.contract_id))
                     ),
                     manifest_path: manifest.path.clone(),
                     contracts_to_add: HashMap::new(),
