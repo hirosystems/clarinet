@@ -625,7 +625,7 @@ When running the command:
 $ clarinet integrate
 ```
 
-A hyperchain node will be spin-up. More documentation on how to use and interact with this incoming L2 can be found on the [Hyperchain repository](https://github.com/hirosystems/stacks-hyperchains).
+Clarinet will spin-up a hyperchain node. More documentation on how to use and interact with this incoming L2 can be found on the [Hyperchain repository](https://github.com/hirosystems/stacks-hyperchains).
 
 
 ## Contributing
