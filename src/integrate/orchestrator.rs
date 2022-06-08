@@ -455,7 +455,7 @@ impl DevnetOrchestrator {
                 Ok(_) => {}
                 Err(message) => {
                     println!("{}", message);
-                    self.kill(true).await;
+                    self.kill().await;
                     return process_exit();
                 }
             };
@@ -469,7 +469,7 @@ impl DevnetOrchestrator {
                 Ok(_) => {}
                 Err(message) => {
                     println!("{}", message);
-                    self.kill(true).await;
+                    self.kill().await;
                     return process_exit();
                 }
             };
@@ -1172,7 +1172,7 @@ observer_port = {hyperchain_events_ingestion_port}
             hyperchain_leader_secret_key_hex = devnet_config.hyperchain_leader_secret_key_hex,
             stacks_node_rpc_port = devnet_config.stacks_node_rpc_port,
             stacks_node_p2p_port = devnet_config.stacks_node_p2p_port,
-            orchestrator_port = devnet_config.orchestrator_port,
+            orchestrator_port = devnet_config.orchestrator_ingestion_port,
             hyperchain_events_ingestion_port = devnet_config.hyperchain_events_ingestion_port,
             first_burn_header_height = 0,
             hyperchain_contract_id = devnet_config.hyperchain_contract_id,
@@ -2054,10 +2054,8 @@ events_keys = ["*"]
             let _ = docker
                 .kill_container(hyperchain_container_id, options)
                 .await;
-            if terminate {
-                println!("Terminating hyperchain-node...");
-                let _ = docker.remove_container(hyperchain_container_id, None);
-            }
+            println!("Terminating hyperchain-node...");
+            let _ = docker.remove_container(hyperchain_container_id, None);
         }
 
         // Prune network

@@ -343,8 +343,11 @@ impl ChainConfig {
                     .hyperchain_leader_derivation_path
                     .take()
                     .unwrap_or(DEFAULT_DERIVATION_PATH.to_string());
-                let (stx_address, btc_address, secret_key_hex) =
-                    compute_addresses(&mnemonic, &derivation_path, is_mainnet);
+                let (stx_address, btc_address, secret_key_hex) = compute_addresses(
+                    &mnemonic,
+                    &derivation_path,
+                    &StacksNetwork::Devnet.get_networks(),
+                );
                 (
                     stx_address,
                     btc_address,
@@ -386,7 +389,8 @@ impl ChainConfig {
                         mnemonic: hyperchain_leader_mnemonic.clone(),
                         derivation: hyperchain_leader_derivation_path.clone(),
                         balance: super::DEFAULT_DEVNET_BALANCE,
-                        address: hyperchain_leader_stx_address.clone(),
+                        stx_address: hyperchain_leader_stx_address.clone(),
+                        btc_address: hyperchain_leader_btc_address.clone(),
                         is_mainnet,
                     },
                 );
