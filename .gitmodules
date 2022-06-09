@@ -1,4 +1,4 @@
-[submodule "vendor/deno"]
-	path = vendor/deno
+[submodule "components/deno/deno"]
+	path = components/deno/deno
 	url = https://github.com/hirosystems/deno.git
-	branch = clarinet/patch-v1
+	branch = clarinet/patch-v5

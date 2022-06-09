@@ -1,0 +1,56 @@
+{
+    "name": "@hiro/clarity-repl",
+    "description": "A read–eval–print loop program for Clarity, a decidable smart contract language",
+    "commitlint": {
+        "extends": [
+            "@commitlint/config-conventional"
+        ]
+    },
+    "husky": {
+        "hooks": {
+            "commit-msg": "commitlint -E HUSKY_GIT_PARAMS"
+        }
+    },
+    "release": {
+        "branches": [
+            "main"
+        ],
+        "plugins": [
+            "@semantic-release/commit-analyzer",
+            "@semantic-release/release-notes-generator",
+            [
+                "@semantic-release/exec",
+                {
+                    "prepareCmd": "sed -i -e '1h;2,$H;$!d;g' -e 's@name = \"clarity-repl\"\\nversion = \"[^\"]*\"@name = \"clarity-repl\"\\nversion = \"${nextRelease.version}\"@g' Cargo.toml"
+                }
+            ],
+            [
+                "@semantic-release/npm",
+                {
+                    "pkgRoot": "./pkg",
+                    "npmPublish": true
+                }
+            ],
+            "@semantic-release/github",
+            "@semantic-release/changelog",
+            [
+                "@semantic-release/git",
+                {
+                    "message": "chore(release): ${nextRelease.version}\n\n${nextRelease.notes}",
+                    "assets": [
+                        "CHANGELOG.md",
+                        "Cargo.toml"
+                    ]
+                }
+            ]
+        ]
+    },
+    "scripts": {
+        "prepare": "husky install"
+    },
+    "devDependencies": {
+        "@commitlint/cli": "^14.1.0",
+        "@commitlint/config-conventional": "^14.1.0",
+        "husky": "^7.0.4"
+    }
+}
