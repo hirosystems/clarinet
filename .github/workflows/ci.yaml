@@ -2,17 +2,10 @@ name: CI
 on:
   pull_request:
   push:
-    tags:
-      - 'v*'
-    paths-ignore:
-      - '**/CHANGELOG.md'
-      - '**/package.json'
-      - '**/package-lock.json'
-      - '**/Cargo.toml'
-      - '**/Cargo.lock'
     branches:
       - main
       - develop
+      - rc/next
   workflow_dispatch:
 
 jobs:
@@ -25,13 +18,47 @@ jobs:
         with:
           access_token: ${{ github.token }}
 
+  get_release_info:
+    name: Get Release Info
+    runs-on: ubuntu-latest
+    needs: pre_run
+    outputs:
+      tag: ${{ steps.new_release_tag.outputs.TAG }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+        with:
+          submodules: recursive
+
+      - name: Get latest release
+        if: startsWith(github.ref, 'refs/heads/main')
+        id: release
+        uses: pozetroninc/github-action-get-latest-release@master
+        with:
+          repository: ${{ github.repository }}
+          excludes: prerelease, draft
+
+      - name: Determine if release build
+        if: startsWith(github.ref, 'refs/heads/main')
+        id: new_release_tag
+        env:
+          LATEST_RELEASE: ${{ steps.release.outputs.release }}
+        run: |
+          CARGO_VERSION=v$(grep "version" Cargo.toml | head -n 1 | cut -d\" -f2)
+          if [[ "${CARGO_VERSION}" != "${LATEST_RELEASE}" ]]; then
+            echo "::set-output name=TAG::${CARGO_VERSION}"
+            echo "::warning::Will create release for version: ${CARGO_VERSION}"
+          else
+            echo "::warning::Will not create a release"
+          fi
+
   audit:
     name: Audit and format
     runs-on: ubuntu-latest
     needs: pre_run
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
         with:
           submodules: recursive
 
@@ -56,18 +83,28 @@ jobs:
         run: cargo install cargo-audit
 
       - name: Run audit
-        run: cargo audit --ignore RUSTSEC-2021-0076 --ignore RUSTSEC-2021-0119 --ignore RUSTSEC-2022-0028 --ignore RUSTSEC-2020-0071
+        run: cargo audit --ignore RUSTSEC-2021-0076 --ignore RUSTSEC-2021-0119 --ignore RUSTSEC-2022-0028 --ignore RUSTSEC-2020-0071 --ignore RUSTSEC-2021-0124
 
       - name: Run rustfmt
         run: cargo fmt --all -- --check
 
-  test:
-    name: Run tests
+  test_coverage_cargo:
+    name: Generate test coverage
     runs-on: ubuntu-latest
     needs: pre_run
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: clarinet
+            working-directory: "."
+          - name: oreo
+            working-directory: vendor/orchestra-event-observer
+          - name: clarity-repl
+            working-directory: components/clarity-repl
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
         with:
           submodules: recursive
 
@@ -105,13 +142,16 @@ jobs:
       - name: Unit Tests
         env:
           RUSTFLAGS: "-Zinstrument-coverage"
-          LLVM_PROFILE_FILE: "clarinet-%p-%m.profraw"
+          LLVM_PROFILE_FILE: "${{ matrix.name }}-%p-%m.profraw"
         run: cargo build --locked && cargo test
 
       - name: Generate coverage
         run: grcov . --binary-path ./target/debug/ -s . -t lcov --branch --ignore-not-existing --ignore "/*" -o lcov.info
 
+        # Run functional tests here in addition to the other jobs so we can fail fast
+        # Since these tests are reached much earlier in the pipeline
       - name: Functional Tests
+        if: matrix.name == 'clarinet'
         run: |
           for testdir in $(ls examples); do
             ./target/debug/clarinet test --manifest-path examples/${testdir}/Clarinet.toml
@@ -121,11 +161,11 @@ jobs:
         uses: codecov/codecov-action@v1
         with:
           flags: unittests
-          name: clarinet
+          name: ${{ matrix.name }}
           verbose: true
 
-  dist:
-    name: Build distributions
+  dist_clarinet:
+    name: Build Clarinet Distributions
     runs-on: ${{ matrix.os }}
     needs: pre_run
     # Related upstream issue:
@@ -143,11 +183,6 @@ jobs:
             target: x86_64-unknown-linux-gnu
             architecture: x64
             libc: glibc
-          - os: ubuntu-latest
-            platform: linux
-            target: x86_64-unknown-linux-musl
-            architecture: x64
-            libc: musl
           - os: windows-latest
             platform: windows
             target: x86_64-pc-windows-msvc
@@ -169,7 +204,7 @@ jobs:
           git config --global core.eol lf
 
       - name: Checkout repository
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
         with:
           submodules: recursive
 
@@ -181,17 +216,6 @@ jobs:
           profile: minimal
           components: llvm-tools-preview
           override: true
-
-      - name: Install and cache Node
-        if: matrix.target != 'x86_64-unknown-linux-musl'
-        uses: actions/setup-node@v2
-        with:
-          node-version: '14'
-          # Host nodejs arch does not matter in our usecase for compiling cross-platform npm packages,
-          # if enabled, this will fail after installing an arm64 nodejs runtime for an x86_64 arch macos system
-          # architecture: ${{ matrix.architecture }}
-          cache: npm
-          cache-dependency-path: node-bindings/package-lock.json
 
       - name: Install wix (Windows)
         if: matrix.os == 'windows-latest'
@@ -235,38 +259,9 @@ jobs:
       - name: Build - Cargo
         if: matrix.target != 'x86_64-unknown-linux-musl'
         run: cargo build --release --features=telemetry --locked --target ${{ matrix.target }}
-        # To be uncommented later when adding new distros
-        # env:
-        #   CC: ${{ matrix.cc }}
-        #   CC_aarch64_unknown_linux_gnu: ${{ matrix.cc }}
-        #   CC_armv7_unknown_linux_gnueabihf: ${{ matrix.cc }}
-        #   CC_x86_64_unknown_linux_musl: ${{ matrix.cc }}
-        #   CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER: ${{ matrix.cc }}
-        #   CARGO_TARGET_ARMV7_UNKNOWN_LINUX_GNUEABIHF_LINKER: ${{ matrix.cc }}
-        #   CARGO_TARGET_X86_64_UNKNOWN_LINUX_MUSL_LINKER: ${{ matrix.cc }}
-
-      - name: Build - Node
-        if: matrix.target != 'x86_64-unknown-linux-musl'
-        working-directory: node-bindings
-        run: |
-          npm install --ignore-scripts
-          npm run build-${{ env.SHORT_TARGET_NAME }}
-
-      - name: Build - Node (linux-musl)
-        if: matrix.target == 'x86_64-unknown-linux-musl'
-        uses: docker://rust:alpine3.15
-        env:
-          RUSTFLAGS: -C target-feature=-crt-static
-        with:
-          entrypoint: /bin/sh
-          args: -c "
-            cd node-bindings &&
-            apk add alpine-sdk nodejs npm git &&
-            npm install --ignore-scripts &&
-            npm run build-${{ env.SHORT_TARGET_NAME }}"
 
       - name: Code sign bin (Windows)
-        if: startsWith(github.ref, 'refs/tags/v') && matrix.os == 'windows-latest'
+        if: startsWith(github.ref, 'refs/heads/main') && matrix.os == 'windows-latest'
         run: |
           $certificate_file_name = "${env:TEMP}\certificate.pfx"
 
@@ -290,7 +285,7 @@ jobs:
         run: cargo wix -v --no-build --nocapture -p clarinet
 
       - name: Code sign installer (Windows)
-        if: startsWith(github.ref, 'refs/tags/v') && matrix.os == 'windows-latest'
+        if: startsWith(github.ref, 'refs/heads/main') && matrix.os == 'windows-latest'
         run: |
           $certificate_file_name = "${env:TEMP}\certificate.pfx"
 
@@ -310,8 +305,8 @@ jobs:
             "${msi_path}"
 
       # Don't compress for Windows because winget can't yet unzip files
-      - name: Compress cargo artifact (Not Windows)
-        if: matrix.os != 'windows-latest' && matrix.target != 'x86_64-unknown-linux-musl'
+      - name: Compress cargo artifact (Linux)
+        if: matrix.os != 'windows-latest'
         run: tar -C target/${{ matrix.target }}/release -zcvf clarinet-${{ env.SHORT_TARGET_NAME }}.tar.gz clarinet
 
       - name: Rename cargo artifact (Windows)
@@ -319,13 +314,9 @@ jobs:
         shell: bash
         run: mv target/wix/*.msi clarinet-${{ env.SHORT_TARGET_NAME }}.msi
 
-      - name: Compress node artifact
-        shell: bash
-        run: tar -C node-bindings -zcvf stacks-devnet-js-${{ env.PRE_GYP_TARGET_NAME }}.tar.gz native/index.node
-
       # Separate uploads to prevent paths from being preserved
-      - name: Upload cargo artifacts (Not Windows)
-        if: matrix.os != 'windows-latest' && matrix.target != 'x86_64-unknown-linux-musl'
+      - name: Upload cargo artifacts (Linux)
+        if: matrix.os != 'windows-latest'
         uses: actions/upload-artifact@v2
         with:
           name: clarinet-${{ env.SHORT_TARGET_NAME }}
@@ -338,24 +329,14 @@ jobs:
           name: clarinet-${{ env.SHORT_TARGET_NAME }}
           path: clarinet-${{ env.SHORT_TARGET_NAME }}.msi
 
-      - name: Upload node artifact
-        uses: actions/upload-artifact@v2
-        with:
-          name: stacks-devnet-js-${{ env.PRE_GYP_TARGET_NAME }}
-          path: stacks-devnet-js-${{ env.PRE_GYP_TARGET_NAME }}.tar.gz
-
       - name: Unit Tests - Cargo
         # can't easily run mac-arm64 tests in GH without native runners for that arch
-        if: matrix.target != 'aarch64-apple-darwin' && matrix.target != 'x86_64-unknown-linux-musl'
+        if: matrix.target != 'aarch64-apple-darwin'
         run: cargo test --release --locked --target ${{ matrix.target }}
 
-      # - name: Unit Tests - Node
-      #   working-directory: node-bindings
-      #   run: npm run spec
-
-      - name: Functional Tests (Not Windows)
+      - name: Functional Tests (Linux)
         # can't easily run mac-arm64 tests in GH without native runners for that arch
-        if: matrix.os != 'windows-latest' && matrix.target != 'aarch64-apple-darwin' && matrix.target != 'x86_64-unknown-linux-musl'
+        if: matrix.os != 'windows-latest' && matrix.target != 'aarch64-apple-darwin'
         run: |
           for testdir in $(ls examples); do
             ./target/${{ matrix.target }}/release/clarinet test --manifest-path examples/${testdir}/Clarinet.toml
@@ -368,9 +349,9 @@ jobs:
             ./target/${{ matrix.target }}/release/clarinet test --manifest-path ${testdir}/Clarinet.toml
           }
 
-      - name: Upload Cargo Artifact to GH release (Not Windows)
+      - name: Upload Cargo Artifact to GH release (Linux)
         uses: svenstaro/upload-release-action@v2
-        if: startsWith(github.ref, 'refs/tags/v') && matrix.os != 'windows-latest' && matrix.target != 'x86_64-unknown-linux-musl'
+        if: startsWith(github.ref, 'refs/heads/main') && matrix.os != 'windows-latest'
         with:
           repo_token: ${{ secrets.GITHUB_TOKEN }}
           file: clarinet-${{ env.SHORT_TARGET_NAME }}.tar.gz
@@ -378,106 +359,410 @@ jobs:
 
       - name: Upload Cargo Artifact to GH release (Windows)
         uses: svenstaro/upload-release-action@v2
-        if: startsWith(github.ref, 'refs/tags/v') && matrix.os == 'windows-latest'
+        if: startsWith(github.ref, 'refs/heads/main') && matrix.os == 'windows-latest'
         with:
           repo_token: ${{ secrets.GITHUB_TOKEN }}
           file: clarinet-${{ env.SHORT_TARGET_NAME }}.msi
-          tag: ${{ github.ref }}
-
-      - name: Upload Node Artifact to GH release
-        uses: svenstaro/upload-release-action@v2
-        if: startsWith(github.ref, 'refs/tags/v')
-        with:
-          repo_token: ${{ secrets.GITHUB_TOKEN }}
-          file: stacks-devnet-js-${{ env.PRE_GYP_TARGET_NAME }}.tar.gz
           tag: ${{ github.ref }}
 
       # Cleans the `./target` dir after the build such that only dependencies are cached on CI
       - name: Prepare cache
         run: cargo xtask pre-cache
 
-  build:
-    name: Docker build
-    runs-on: ubuntu-latest
-    needs: pre_run
-    outputs:
-      version: ${{ steps.docker_meta.outputs.version }}
+  dist_stacks_devnet_js:
+    name: Build Stacks Devnet JS Distributions
+    runs-on: ${{ matrix.os }}
+    needs:
+      - pre_run
+      - get_release_info
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            platform: linux
+            target: x86_64-unknown-linux-gnu
+            architecture: x64
+            libc: glibc
+          - os: ubuntu-latest
+            platform: linux
+            target: x86_64-unknown-linux-musl
+            architecture: x64
+            libc: musl
+          - os: windows-latest
+            platform: windows
+            target: x86_64-pc-windows-msvc
+            architecture: x64
+          - os: macos-latest
+            platform: darwin
+            target: x86_64-apple-darwin
+            architecture: x64
+          - os: macos-latest
+            platform: darwin
+            target: aarch64-apple-darwin
+            architecture: arm64
+
     steps:
-      - name: Checkout
+      - name: Configure git to use LF (Windows)
+        if: matrix.os == 'windows-latest' && github.event_name != 'pull_request'
+        run: |
+          git config --global core.autocrlf false
+          git config --global core.eol lf
+
+      - name: Checkout repository
+        if: github.event_name != 'pull_request' || matrix.target == 'x86_64-unknown-linux-gnu'
         uses: actions/checkout@v2
         with:
           submodules: recursive
 
-      - name: Docker meta
-        id: docker_meta
-        uses: docker/metadata-action@v3
+      - name: Install Rust toolchain
+        if: github.event_name != 'pull_request' || matrix.target == 'x86_64-unknown-linux-gnu'
+        uses: actions-rs/toolchain@v1
         with:
-          images: ${{ github.repository }}
+          toolchain: stable
+          target: ${{ matrix.target }}
+          profile: minimal
+          components: llvm-tools-preview
+          override: true
+
+      - name: Install and cache Node
+        if: github.event_name != 'pull_request' && matrix.target != 'x86_64-unknown-linux-musl'
+        uses: actions/setup-node@v2
+        with:
+          node-version: "14"
+          # Host nodejs arch does not matter in our usecase for compiling cross-platform npm packages,
+          # if enabled, this will fail after installing an arm64 nodejs runtime for an x86_64 arch macos system
+          # architecture: ${{ matrix.architecture }}
+          cache: npm
+          cache-dependency-path: node-bindings/package-lock.json
+
+      - name: Cache cargo
+        if: github.event_name != 'pull_request' || matrix.target == 'x86_64-unknown-linux-gnu'
+        uses: actions/cache@v2
+        with:
+          path: |
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            target/${{ matrix.target }}/release/
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+
+      # Set environment variables required from cross compiling from macos-x86_64 to macos-arm64
+      - name: Configure macos-arm64 cross compile config
+        if: github.event_name != 'pull_request' && matrix.target == 'aarch64-apple-darwin'
+        run: |
+          echo "SDKROOT=$(xcrun -sdk macosx --show-sdk-path)" >> $GITHUB_ENV
+          echo "MACOSX_DEPLOYMENT_TARGET=$(xcrun -sdk macosx --show-sdk-platform-version)" >> $GITHUB_ENV
+
+      - name: Configure artifact names (libc)
+        if: (github.event_name != 'pull_request' || matrix.target == 'x86_64-unknown-linux-gnu') && matrix.libc
+        shell: bash
+        run: |
+          echo "SHORT_TARGET_NAME=${{ matrix.platform }}-${{ matrix.architecture }}-${{ matrix.libc }}" >> $GITHUB_ENV
+          echo "PRE_GYP_TARGET_NAME=${{ matrix.platform }}-${{ matrix.architecture }}-${{ matrix.libc }}" >> $GITHUB_ENV
+
+      - name: Configure artifact names (not libc)
+        if: github.event_name != 'pull_request' && ! matrix.libc
+        shell: bash
+        run: |
+          echo "SHORT_TARGET_NAME=${{ matrix.platform }}-${{ matrix.architecture }}" >> $GITHUB_ENV
+          echo "PRE_GYP_TARGET_NAME=${{ matrix.platform }}-${{ matrix.architecture }}-unknown" >> $GITHUB_ENV
+
+      - name: Build - Node
+        if: (github.event_name != 'pull_request' || matrix.target == 'x86_64-unknown-linux-gnu') && matrix.target != 'x86_64-unknown-linux-musl'
+        working-directory: node-bindings
+        run: |
+          npm install --ignore-scripts
+          npm run build-${{ env.SHORT_TARGET_NAME }}
+
+      - name: Build - Node (linux-musl)
+        if: github.event_name != 'pull_request' && matrix.target == 'x86_64-unknown-linux-musl'
+        uses: docker://rust:alpine3.15
+        env:
+          RUSTFLAGS: -C target-feature=-crt-static
+        with:
+          entrypoint: /bin/sh
+          args: -c "
+            cd node-bindings &&
+            apk add alpine-sdk nodejs npm git &&
+            npm install --ignore-scripts &&
+            npm run build-${{ env.SHORT_TARGET_NAME }}"
+
+      - name: Compress node artifact
+        if: github.event_name != 'pull_request' || matrix.target == 'x86_64-unknown-linux-gnu'
+        shell: bash
+        run: tar -C node-bindings -zcvf stacks-devnet-js-${{ env.PRE_GYP_TARGET_NAME }}.tar.gz native/index.node
+
+      - name: Upload node artifact
+        if: github.event_name != 'pull_request' || matrix.target == 'x86_64-unknown-linux-gnu'
+        uses: actions/upload-artifact@v2
+        with:
+          name: stacks-devnet-js-${{ env.PRE_GYP_TARGET_NAME }}
+          path: stacks-devnet-js-${{ env.PRE_GYP_TARGET_NAME }}.tar.gz
+
+      # - name: Unit Tests - Node
+      #   working-directory: node-bindings
+      #   run: npm run spec
+
+      - name: Upload Node Artifact to GH release
+        uses: svenstaro/upload-release-action@v2
+        if: startsWith(github.ref, 'refs/heads/main') && needs.get_release_info.outputs.tag != ''
+        with:
+          repo_token: ${{ secrets.GITHUB_TOKEN }}
+          file: stacks-devnet-js-${{ env.PRE_GYP_TARGET_NAME }}.tar.gz
+          tag: ${{ github.ref }}
+
+      - name: NPM Publish
+        uses: JS-DevTools/npm-publish@v1
+        if: matrix.target == 'x86_64-unknown-linux-gnu' && startsWith(github.ref, 'refs/heads/main') && needs.get_release_info.outputs.tag != ''
+        with:
+          package: node-bindings/package.json
+          access: public
+          greater-version-only: true
+          token: ${{ secrets.NPM_TOKEN }}
+
+  dist_oreo:
+    name: Build Oreo Distribution
+    runs-on: ubuntu-latest
+    needs: pre_run
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+        with:
+          submodules: recursive
+
+      - name: Install Rust toolchain
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          target: x86_64-unknown-linux-gnu
+          profile: minimal
+          components: llvm-tools-preview
+          override: true
+
+      - name: Cache cargo
+        uses: actions/cache@v2
+        with:
+          path: |
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            target/x86_64-unknown-linux-gnu/release/
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: Configure artifact names
+        shell: bash
+        run: |
+          echo "SHORT_TARGET_NAME=linux-x64-glibc" >> $GITHUB_ENV
+          echo "PRE_GYP_TARGET_NAME=linux-x64-glibc" >> $GITHUB_ENV
+
+      - name: Build - Cargo
+        working-directory: vendor/orchestra-event-observer
+        run: cargo build --release --locked --target x86_64-unknown-linux-gnu
+
+      - name: Compress cargo artifact
+        run: tar -C target/x86_64-unknown-linux-gnu/release -zcvf oreo-${{ env.SHORT_TARGET_NAME }}.tar.gz orchestra-event-observer
+
+      - name: Upload cargo artifacts
+        uses: actions/upload-artifact@v2
+        with:
+          name: oreo-${{ env.SHORT_TARGET_NAME }}
+          path: oreo-${{ env.SHORT_TARGET_NAME }}.tar.gz
+
+      - name: Unit Tests - Cargo
+        run: cargo test --release --locked --target x86_64-unknown-linux-gnu
+
+      # Cleans the `./target` dir after the build such that only dependencies are cached on CI
+      - name: Prepare cache
+        working-directory: vendor/orchestra-event-observer
+        run: cargo xtask pre-cache
+
+  dist_clarity_repl:
+    name: Build Clarity REPL Distribution
+    runs-on: ubuntu-latest
+    needs: pre_run
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+        with:
+          submodules: recursive
+
+      - name: Install Rust toolchain
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          target: x86_64-unknown-linux-gnu
+          profile: minimal
+          components: llvm-tools-preview
+          override: true
+
+      - name: Cache cargo
+        uses: actions/cache@v2
+        with:
+          path: |
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            target/x86_64-unknown-linux-gnu/release/
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: Configure artifact names
+        shell: bash
+        run: |
+          echo "SHORT_TARGET_NAME=linux-x64-glibc" >> $GITHUB_ENV
+          echo "PRE_GYP_TARGET_NAME=linux-x64-glibc" >> $GITHUB_ENV
+
+      - name: Install dependencies
+        run: cargo install --force wasm-pack
+
+      - name: Build - Cargo
+        working-directory: components/clarity-repl
+        run: cargo build --release --locked --target x86_64-unknown-linux-gnu
+
+      - name: Build - WASM
+        working-directory: components/clarity-repl
+        run: wasm-pack build --target web --release -- --no-default-features --features wasm
+
+      - name: Compress cargo artifact
+        run: tar -C target/x86_64-unknown-linux-gnu/release -zcvf clarity-repl-${{ env.SHORT_TARGET_NAME }}.tar.gz clarity-repl
+
+      - name: Compress wasm artifact
+        run: tar -C target/wasm32-unknown-unknown/release -zcvf clarity-repl-wasm.tar.gz clarity_repl.wasm
+
+      - name: Upload cargo artifact
+        uses: actions/upload-artifact@v2
+        with:
+          name: clarity-repl-${{ env.SHORT_TARGET_NAME }}
+          path: clarity-repl-${{ env.SHORT_TARGET_NAME }}.tar.gz
+
+      - name: Upload wasm artifact
+        uses: actions/upload-artifact@v2
+        with:
+          name: clarity-repl-wasm
+          path: clarity-repl-wasm.tar.gz
+
+      - name: Unit Tests - Cargo
+        working-directory: components/clarity-repl
+        run: cargo test --release --locked --target x86_64-unknown-linux-gnu
+
+      - name: Publish clarity-repl to crates.io
+        if: startsWith(github.ref, 'refs/heads/main') && needs.get_release_info.outputs.tag != ''
+        working-directory: components/clarity-repl
+        run: |
+          cargo login ${{ secrets.CARGO_CRATES_IO_API_KEY }}
+          cargo publish
+
+      # Cleans the `./target` dir after the build such that only dependencies are cached on CI
+      - name: Prepare cache
+        working-directory: components/clarity-repl
+        run: cargo xtask pre-cache
+
+  docker_images:
+    name: Create ${{ matrix.name }} Docker Image
+    runs-on: ubuntu-latest
+    needs:
+      - get_release_info
+      - dist_clarinet
+      - dist_oreo
+    outputs:
+      version: ${{ steps.docker_meta.outputs.version }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: Clarinet
+            description: Clarinet is a simple, modern and opinionated runtime for testing, integrating and deploying Clarity smart contracts.
+            image: ${{ github.repository }}
+            artifact: clarinet-linux-x64-glibc
+            dockerfile: dockerfiles/ci/clarinet.dockerfile
+          - name: Orchestra Event Observer (Oreo)
+            description: A Stacks event observer.
+            image: ${{ github.repository_owner }}/orchestra-event-observer
+            artifact: oreo-linux-x64-glibc
+            dockerfile: dockerfiles/ci/oreo.dockerfile
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+        with:
+          submodules: recursive
+
+      - name: Generate Docker tags/labels
+        id: docker_meta
+        uses: docker/metadata-action@v4
+        with:
+          images: ${{ matrix.image }}
           tags: |
             type=ref,event=branch
             type=ref,event=pr
-            type=semver,pattern={{version}}
-            type=semver,pattern={{major}}.{{minor}}
+            type=semver,pattern={{version}},value=${{ needs.get_release_info.outputs.tag }},enable=${{ needs.get_release_info.outputs.tag != '' }}
+            type=semver,pattern={{major}}.{{minor}},value=${{ needs.get_release_info.outputs.tag }},enable=${{ needs.get_release_info.outputs.tag != '' }}
+          labels: |
+            org.opencontainers.image.title=${{ matrix.name }}
+            org.opencontainers.image.description=${{ matrix.description }}
 
       - name: Login to Dockerhub
-        uses: docker/login-action@v1
+        uses: docker/login-action@v2
         if: github.event_name != 'pull_request'
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_PASSWORD }}
 
-      - name: Build/Tag/Push Image
-        uses: docker/build-push-action@v2
+      - name: Download pre-built dist
+        uses: actions/download-artifact@v3
         with:
+          name: ${{ matrix.artifact }}
+
+      - name: Untar pre-built dist
+        run: tar zxvf *.tar.gz
+
+      - name: Create Image
+        uses: docker/build-push-action@v3
+        with:
+          context: .
+          file: ${{ matrix.dockerfile }}
           push: ${{ github.event_name != 'pull_request' }}
           tags: ${{ steps.docker_meta.outputs.tags }}
           labels: ${{ steps.docker_meta.outputs.labels }}
 
-  package-version-bump:
-    name: Trigger Package Version Bump workflow
+  release:
+    name: Release
     runs-on: ubuntu-latest
-    if: startsWith(github.ref, 'refs/tags/v')
+    if: startsWith(github.ref, 'refs/heads/main') && needs.get_release_info.outputs.tag != ''
     needs:
+      - get_release_info
       - audit
-      - dist
-      - test
-      - build
+      - test_coverage_cargo
+      - dist_stacks_devnet_js
+      - dist_clarity_repl
+      - docker_images
+    permissions:
+      actions: write
+      contents: write
     steps:
-      - name: Extract tag
-        run: echo "GITHUB_REF_SHORT=${GITHUB_REF##*/}" >> $GITHUB_ENV
+      - name: Checkout
+        uses: actions/checkout@v3
+        with:
+          submodules: recursive
+
+      - name: Download pre-built dists
+        uses: actions/download-artifact@v3
+
+      - name: Tag and Release
+        uses: ncipollo/release-action@v1
+        with:
+          artifacts: "**/*.tar.gz"
+          tag: ${{ needs.get_release_info.outputs.tag }}
+          commit: ${{ env.GITHUB_SHA }}
 
       - name: Trigger pkg-version-bump workflow
         uses: peter-evans/repository-dispatch@v1
         with:
-          token: ${{ secrets.GH_TOKEN }}
+          token: ${{ secrets.GITHUB_TOKEN }}
           event-type: released
-          client-payload: '{"tag": "${{ env.GITHUB_REF_SHORT }}"}'
-
-  release:
-    name: Release
-    runs-on: ubuntu-latest
-    if: contains(github.ref, 'main')
-    needs:
-      - audit
-      - dist
-      - test
-      - build
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v2
-        with:
-          # Necessary for Semantic Release
-          token: ${{ secrets.GH_TOKEN }}
-          submodules: recursive
-
-      - name: Semantic Release
-        uses: cycjimmy/semantic-release-action@v2
-        env:
-          GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
-          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
-          SEMANTIC_RELEASE_PACKAGE: ${{ github.event.repository.name }}
-        with:
-          extra_plugins: |
-            @semantic-release/changelog
-            @semantic-release/exec
-            @semantic-release/git
+          client-payload: '{"tag": "${{ needs.get_release_info.outputs.tag }}"}'

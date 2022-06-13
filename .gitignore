@@ -15,3 +15,5 @@ node-bindings/build
 **/settings/Testnet.toml
 examples/cbtc/backend/.build
 vendor/orchestra-types-js/dist
+*.tar.gz
+*.zip
