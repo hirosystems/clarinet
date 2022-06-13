@@ -5,3 +5,4 @@ Dockerfile
 .git*
 node_modules
 package-lock.json
+*.tar.gz

@@ -1,4 +1,4 @@
-FROM rust:stretch as build
+FROM rust:bullseye as build
 
 WORKDIR /src
 
@@ -14,7 +14,7 @@ RUN cargo build --features=telemetry --release --locked
 
 RUN cp target/release/clarinet /out
 
-FROM debian:stretch-slim
+FROM debian:bullseye-slim
 
 RUN apt update && apt install -y libssl-dev
 

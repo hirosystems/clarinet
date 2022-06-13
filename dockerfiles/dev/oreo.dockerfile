@@ -1,4 +1,4 @@
-FROM rust:stretch as build
+FROM rust:bullseye as build
 
 WORKDIR /src
 
@@ -22,7 +22,7 @@ RUN cargo build --release
 
 RUN cp target/release/orchestra-event-observer /out
 
-FROM debian:stretch-slim
+FROM debian:bullseye-slim
 
 RUN apt update && apt install -y libssl-dev
 
