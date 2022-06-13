@@ -62,8 +62,11 @@ impl DeploymentCache {
         for (contract_id, execution_result) in execution_results.into_iter() {
             let mut execution_result = match execution_result {
                 Ok(execution_result) => execution_result,
-                Err(_) => {
+                Err(diagnostics) => {
                     println!("Error found in contract {}", contract_id);
+                    for d in diagnostics {
+                        println!("{}", d);
+                    }
                     std::process::exit(1);
                 }
             };
