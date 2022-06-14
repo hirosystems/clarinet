@@ -444,22 +444,21 @@ requirements = [
 
 or with the command:
 
-
 ```bash
 clarinet requirements add SP2KAF9RF86PVX3NEE27DFV1CQX0T4WGR41X3S45C.bitcoin-whales
 ```
 
 From there, clarinet will be able to resolve the `contract-call?` statements invoking requirements present in your local contracts, by downloading and caching a copy of these contracts and use them during the execution of your testsuites, and all the different features available in `clarinet`.
 
-When deploying your protocol to Devnet / Testnet, for the contracts involving requirements, the setting `remap_requirements` in your deployment plans must be set. 
+When deploying your protocol to Devnet / Testnet, for the contracts involving requirements, the setting `remap_requirements` in your deployment plans must be set.
 
 Before Devnet / Testnet deployments, your contracts will be automatically remapped on the fly to point to the duplicated requirements deployed by an account that you control.
 
 ### Deploy contracts to Devnet / Testnet / Mainnet
 
-You can use Clarinet to publish your contracts to Devnet / Testnet / Mainnet environment for testing and evaluation on a blockchain. 
+You can use Clarinet to publish your contracts to Devnet / Testnet / Mainnet environment for testing and evaluation on a blockchain.
 
-The first step is to generate a deployment plan, with the following command: 
+The first step is to generate a deployment plan, with the following command:
 
 ```bash
 $ clarinet deployment generate --mainnet
@@ -472,7 +471,6 @@ $ clarinet deployment apply -p <path-to-plan.yaml>
 ```
 
 which will handle the deployments of your contracts, according to the plan.
-
 
 ### Use Clarinet in your CI workflow as a GitHub Action
 
@@ -623,7 +621,7 @@ This trace shows all function calls, both internal calls to private functions, a
 ### Deploy with Hyperchains on Devnet
 
 Clarinet can be used for facilitating experimentations with [Hyperchains](https://www.youtube.com/watch?v=PFPwuVCGGuI).
-To get started with hyperchains, in your `Devnet.toml`, enable the flag 
+To get started with hyperchains, in your `Devnet.toml`, enable the flag
 
 ```toml
 [devnet]
@@ -631,7 +629,7 @@ To get started with hyperchains, in your `Devnet.toml`, enable the flag
 enable_hyperchain_node = true
 ```
 
-This same file can be used for customizing the hyperchain-node (miner, etc). 
+This same file can be used for customizing the hyperchain-node (miner, etc).
 When running the command:
 
 ```bash
@@ -639,7 +637,6 @@ $ clarinet integrate
 ```
 
 Clarinet will spin-up a hyperchain node. More documentation on how to use and interact with this incoming L2 can be found on the [Hyperchain repository](https://github.com/hirosystems/stacks-hyperchains).
-
 
 ## Contributing
 
