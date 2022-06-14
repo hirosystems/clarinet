@@ -668,16 +668,15 @@ rpcport={}
         );
         let mut bitcoind_conf_path = PathBuf::from(&devnet_config.working_dir);
         bitcoind_conf_path.push("conf/bitcoin.conf");
-        let mut file = File::create(bitcoind_conf_path).expect("Unable to create bitcoind.conf");
+        let mut file = File::create(bitcoind_conf_path).expect("Unable to create bitcoin.conf");
         file.write_all(bitcoind_conf.as_bytes())
-            .expect("Unable to write bitcoind.conf");
+            .expect("Unable to write bitcoin.conf");
 
         let mut bitcoind_data_path = PathBuf::from(&devnet_config.working_dir);
         bitcoind_data_path.push("data");
         bitcoind_data_path.push(format!("{}", boot_index));
-        let _ = fs::create_dir(bitcoind_data_path.clone());
         bitcoind_data_path.push("bitcoin");
-        let _ = fs::create_dir(bitcoind_data_path);
+        fs::create_dir_all(bitcoind_data_path).expect("Unable to create bitcoin directory");
 
         let mut exposed_ports = HashMap::new();
         exposed_ports.insert(
@@ -963,9 +962,8 @@ events_keys = ["*"]
         let mut stacks_node_data_path = PathBuf::from(&devnet_config.working_dir);
         stacks_node_data_path.push("data");
         stacks_node_data_path.push(format!("{}", boot_index));
-        let _ = fs::create_dir(stacks_node_data_path.clone());
         stacks_node_data_path.push("stacks");
-        let _ = fs::create_dir(stacks_node_data_path);
+        fs::create_dir_all(stacks_node_data_path).expect("Unable to create stacks directory");
 
         let mut exposed_ports = HashMap::new();
         exposed_ports.insert(

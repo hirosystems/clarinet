@@ -6,8 +6,6 @@ package orchestra.messages;
 service ChainStateStreamer {
     // Get Bitcoin chain tip
     rpc GetBitcoinChainTip(None) returns (BitcoinBlockData);
-    // Get Stacks chain tip
-    rpc GetStacksChainTip(None) returns (BitcoinBlockData);
 }
 
 message None {}

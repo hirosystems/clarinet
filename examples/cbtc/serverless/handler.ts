@@ -1,5 +1,5 @@
+require('dotenv').config();
 import { BitcoinChainEvent, StacksChainEvent, StacksTransactionEventType, StacksFTBurnEventData } from "@hirosystems/orchestra-types";
-
 import {
   getNonce,
   makeContractCall,
@@ -30,7 +30,6 @@ interface HttpEvent {
 }
 
 const cbtcAuthority = {
-  secretKey: "7287ba251d44a4d3fd9276c88ce34c5c52a038955511cccaf77e61068649c17801",
   stxAddress: "ST1SJ3DTE5DN7X54YDH5D64R3BCB6A2AG2ZQ8YPD5",
   btcAddress: "mr1iPkD9N3RJZZxXRk7xF9d36gffa6exNC",
 }
@@ -79,7 +78,7 @@ module.exports.wrapBtc = async (event: HttpEvent) => {
     network,
     anchorMode: AnchorMode.OnChainOnly,
     postConditionMode: PostConditionMode.Allow,
-    senderKey: cbtcAuthority.secretKey
+    senderKey: process.env.AUTHORITY_SECRET_KEY!,
   };
   const tx = await makeContractCall(txOptions);
 
@@ -101,7 +100,7 @@ module.exports.wrapBtc = async (event: HttpEvent) => {
 module.exports.unwrapBtc = async (event: HttpEvent) => {
   let chainEvent: StacksChainEvent = JSON.parse(event.body);
   let assetId = `${cbtcToken.contractAddress}.${cbtcToken.contractName}::${cbtcToken.assetName}`;
-  let transfer = undefined;
+  let transfer = undefined as any;
 
   let receipt = chainEvent.apply[0].transaction.metadata.receipt;
   for (let txEvent of receipt.events) {
@@ -141,7 +140,7 @@ module.exports.unwrapBtc = async (event: HttpEvent) => {
   let typicalSize = 600;
   let txFee = 10 * typicalSize;
   let totalRequired = parseInt(transfer.amount) + txFee;
-  let selectedUtxosIndices = [];
+  let selectedUtxosIndices: number[] = [];
   let cumulatedAmount = 0;
   let i = 0;
   for (let utxo of unspentOutputs) {
@@ -163,7 +162,7 @@ module.exports.unwrapBtc = async (event: HttpEvent) => {
   selectedUtxosIndices.reverse();
   let transaction = new Transaction();
   transaction.setVersion(1);
-  let selectedUnspentOutput = [];
+  let selectedUnspentOutput: any[] = [];
   for (let index of selectedUtxosIndices) {
     let unspentOutput = unspentOutputs[index];
 
@@ -206,7 +205,7 @@ module.exports.unwrapBtc = async (event: HttpEvent) => {
   transaction.outputs.push(changeOutput);
   
   let secretKey = new PrivateKey(
-    cbtcAuthority.secretKey.slice(0, 64),
+    process.env.AUTHORITY_SECRET_KEY!.slice(0, 64),
     Networks.testnet,
   );
 

@@ -448,8 +448,8 @@ pub fn handle_new_bitcoin_block(
         Ok(mut indexer) => indexer.handle_bitcoin_block(marshalled_block.into_inner()),
         _ => {
             return Json(json!({
-                "status": 200,
-                "result": "Ok",
+                "status": 500,
+                "result": "Unable to acquire lock",
             }))
         }
     };
@@ -486,8 +486,8 @@ pub fn handle_new_stacks_block(
         }
         _ => {
             return Json(json!({
-                "status": 200,
-                "result": "Ok",
+                "status": 500,
+                "result": "Unable to acquire lock",
             }))
         }
     };
@@ -525,8 +525,8 @@ pub fn handle_new_microblocks(
         }
         _ => {
             return Json(json!({
-                "status": 200,
-                "result": "Ok",
+                "status": 500,
+                "result": "Unable to acquire lock",
             }))
         }
     };
