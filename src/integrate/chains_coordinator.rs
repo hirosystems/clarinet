@@ -20,7 +20,6 @@ use orchestra_types::{BitcoinChainEvent, BitcoinNetwork, StacksChainEvent, Stack
 use stacks_rpc_client::{transactions, PoxInfo, StacksRpc};
 use std::collections::HashMap;
 use std::convert::TryFrom;
-use std::error::Error;
 
 use std::str;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -122,7 +121,7 @@ pub async fn start_chains_coordinator(
     chains_coordinator_commands_rx: Receiver<ChainsCoordinatorCommand>,
     chains_coordinator_commands_tx: Sender<ChainsCoordinatorCommand>,
     chains_coordinator_terminator_tx: Sender<bool>,
-) -> Result<(), Box<dyn Error>> {
+) -> Result<(), String> {
     let (deployment_events_tx, deployment_events_rx) = channel();
     let (deployment_commands_tx, deployments_command_rx) = channel();
 

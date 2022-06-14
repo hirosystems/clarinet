@@ -97,7 +97,7 @@ pub async fn do_run_devnet(
             moved_orchestrator_terminator_tx,
         );
         let rt = utils::create_basic_runtime();
-        let _ = rt.block_on(future);
+        rt.block_on(future)
     });
 
     // Let's start the orchestration
@@ -108,7 +108,7 @@ pub async fn do_run_devnet(
     let orchestrator_handle = std::thread::spawn(move || {
         let future = devnet.start(orchestrator_event_tx, terminator_rx);
         let rt = utils::create_basic_runtime();
-        rt.block_on(future);
+        rt.block_on(future)
     });
 
     if display_dashboard {
@@ -160,8 +160,17 @@ pub async fn do_run_devnet(
         }
     }
 
-    chains_coordinator_handle.join().unwrap();
-    orchestrator_handle.join().unwrap();
+    if let Err(e) = chains_coordinator_handle.join() {
+        if let Ok(message) = e.downcast::<String>() {
+            return Err(*message);
+        }
+    }
+
+    if let Err(e) = orchestrator_handle.join() {
+        if let Ok(message) = e.downcast::<String>() {
+            return Err(*message);
+        }
+    }
 
     Ok((None, None, Some(chains_coordinator_commands_tx)))
 }

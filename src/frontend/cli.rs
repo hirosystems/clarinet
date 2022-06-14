@@ -1008,17 +1008,28 @@ pub fn main() {
                 }
             };
 
-            let devnet = DevnetOrchestrator::new(manifest, None);
-            if devnet.manifest.project.telemetry {
+            let orchestrator = match DevnetOrchestrator::new(manifest, None) {
+                Ok(orchestrator) => orchestrator,
+                Err(e) => {
+                    println!("{}: {}", red!("error"), e);
+                    process::exit(1);
+                }
+            };
+
+            if orchestrator.manifest.project.telemetry {
                 #[cfg(feature = "telemetry")]
                 telemetry_report_event(DeveloperUsageEvent::DevnetExecuted(
                     DeveloperUsageDigest::new(
-                        &devnet.manifest.project.name,
-                        &devnet.manifest.project.authors,
+                        &orchestrator.manifest.project.name,
+                        &orchestrator.manifest.project.authors,
                     ),
                 ));
             }
-            let _ = integrate::run_devnet(devnet, deployment, None, !cmd.no_dashboard);
+            if let Err(e) = integrate::run_devnet(orchestrator, deployment, None, !cmd.no_dashboard)
+            {
+                println!("{}: {}", red!("error"), e);
+                process::exit(1);
+            }
             if hints_enabled {
                 display_deploy_hint();
             }

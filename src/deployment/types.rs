@@ -614,10 +614,19 @@ impl DeploymentSpecification {
                 (TransactionPlanSpecification { batches }, None)
             }
         };
+        let stacks_node = match (&specs.stacks_node, &specs.node) {
+            (Some(node), _) | (None, Some(node)) => Some(node.clone()),
+            _ => None,
+        };
+        let bitcoin_node = match (&specs.bitcoin_node, &specs.node) {
+            (Some(node), _) | (None, Some(node)) => Some(node.clone()),
+            _ => None,
+        };
+
         Ok(DeploymentSpecification {
             id: specs.id.unwrap_or(0),
-            stacks_node: specs.stacks_node.clone(),
-            bitcoin_node: specs.bitcoin_node.clone(),
+            stacks_node,
+            bitcoin_node,
             name: specs.name.to_string(),
             network: network.clone(),
             genesis,
@@ -638,6 +647,7 @@ impl DeploymentSpecification {
             },
             stacks_node: self.stacks_node.clone(),
             bitcoin_node: self.bitcoin_node.clone(),
+            node: None,
             genesis: match self.genesis {
                 Some(ref g) => Some(g.to_specification_file()),
                 None => None,
@@ -689,6 +699,8 @@ pub struct DeploymentSpecificationFile {
     pub stacks_node: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub bitcoin_node: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub node: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub genesis: Option<GenesisSpecificationFile>,
     pub plan: Option<TransactionPlanSpecificationFile>,

@@ -248,13 +248,17 @@ impl DevnetOrchestrator {
         }
     }
 
-    pub async fn start(&mut self, event_tx: Sender<DevnetEvent>, terminator_rx: Receiver<bool>) {
+    pub async fn start(
+        &mut self,
+        event_tx: Sender<DevnetEvent>,
+        terminator_rx: Receiver<bool>,
+    ) -> Result<(), String> {
         let (docker, devnet_config) = match (&self.docker_client, &self.network_config) {
             (Some(ref docker), Some(ref network_config)) => match network_config.devnet {
                 Some(ref devnet_config) => (docker, devnet_config),
-                _ => return,
+                _ => return Err(format!("unable to get devnet config")),
             },
-            _ => return,
+            _ => return Err(format!("unable to get devnet config")),
         };
 
         // First, let's make sure that we pruned staled resources correctly
@@ -369,9 +373,9 @@ impl DevnetOrchestrator {
         match self.prepare_bitcoin_node_container().await {
             Ok(_) => {}
             Err(message) => {
+                let _ = event_tx.send(DevnetEvent::FatalError(message.clone()));
                 self.kill().await;
-                let _ = event_tx.send(DevnetEvent::FatalError(message));
-                return;
+                return Err(message);
             }
         };
         let _ = event_tx.send(DevnetEvent::ServiceStatus(ServiceStatusData {
@@ -382,12 +386,12 @@ impl DevnetOrchestrator {
         }));
         match self.boot_bitcoin_node_container().await {
             Ok(_) => {
-                self.initialize_bitcoin_node(&event_tx);
+                self.initialize_bitcoin_node(&event_tx)?;
             }
             Err(message) => {
-                let _ = event_tx.send(DevnetEvent::FatalError(message));
+                let _ = event_tx.send(DevnetEvent::FatalError(message.clone()));
                 self.kill().await;
-                return;
+                return Err(message);
             }
         };
 
@@ -404,17 +408,17 @@ impl DevnetOrchestrator {
             match self.prepare_postgres_container().await {
                 Ok(_) => {}
                 Err(message) => {
-                    let _ = event_tx.send(DevnetEvent::FatalError(message));
+                    let _ = event_tx.send(DevnetEvent::FatalError(message.clone()));
                     self.kill().await;
-                    return;
+                    return Err(message);
                 }
             };
             match self.boot_postgres_container().await {
                 Ok(_) => {}
                 Err(message) => {
-                    let _ = event_tx.send(DevnetEvent::FatalError(message));
+                    let _ = event_tx.send(DevnetEvent::FatalError(message.clone()));
                     self.kill().await;
-                    return;
+                    return Err(message);
                 }
             };
             let _ = event_tx.send(DevnetEvent::ServiceStatus(ServiceStatusData {
@@ -428,9 +432,9 @@ impl DevnetOrchestrator {
             match self.prepare_stacks_api_container().await {
                 Ok(_) => {}
                 Err(message) => {
-                    let _ = event_tx.send(DevnetEvent::FatalError(message));
+                    let _ = event_tx.send(DevnetEvent::FatalError(message.clone()));
                     self.kill().await;
-                    return;
+                    return Err(message);
                 }
             };
             let _ = event_tx.send(DevnetEvent::ServiceStatus(ServiceStatusData {
@@ -442,9 +446,9 @@ impl DevnetOrchestrator {
             match self.boot_stacks_api_container().await {
                 Ok(_) => {}
                 Err(message) => {
-                    let _ = event_tx.send(DevnetEvent::FatalError(message));
+                    let _ = event_tx.send(DevnetEvent::FatalError(message.clone()));
                     self.kill().await;
-                    return;
+                    return Err(message);
                 }
             };
         }
@@ -455,9 +459,9 @@ impl DevnetOrchestrator {
             match self.prepare_hyperchain_node_container(boot_index).await {
                 Ok(_) => {}
                 Err(message) => {
-                    println!("{}", message);
+                    let _ = event_tx.send(DevnetEvent::FatalError(message.clone()));
                     self.kill().await;
-                    return process_exit();
+                    return Err(message);
                 }
             };
             let _ = event_tx.send(DevnetEvent::ServiceStatus(ServiceStatusData {
@@ -469,9 +473,9 @@ impl DevnetOrchestrator {
             match self.boot_hyperchain_node_container().await {
                 Ok(_) => {}
                 Err(message) => {
-                    println!("{}", message);
+                    let _ = event_tx.send(DevnetEvent::FatalError(message.clone()));
                     self.kill().await;
-                    return process_exit();
+                    return Err(message);
                 }
             };
         }
@@ -487,9 +491,9 @@ impl DevnetOrchestrator {
         match self.prepare_stacks_node_container(boot_index).await {
             Ok(_) => {}
             Err(message) => {
-                let _ = event_tx.send(DevnetEvent::FatalError(message));
+                let _ = event_tx.send(DevnetEvent::FatalError(message.clone()));
                 self.kill().await;
-                return;
+                return Err(message);
             }
         };
         let _ = event_tx.send(DevnetEvent::ServiceStatus(ServiceStatusData {
@@ -501,9 +505,9 @@ impl DevnetOrchestrator {
         match self.boot_stacks_node_container().await {
             Ok(_) => {}
             Err(message) => {
-                let _ = event_tx.send(DevnetEvent::FatalError(message));
+                let _ = event_tx.send(DevnetEvent::FatalError(message.clone()));
                 self.kill().await;
-                return;
+                return Err(message);
             }
         };
 
@@ -518,18 +522,18 @@ impl DevnetOrchestrator {
             match self.prepare_stacks_explorer_container().await {
                 Ok(_) => {}
                 Err(message) => {
-                    let _ = event_tx.send(DevnetEvent::FatalError(message));
+                    let _ = event_tx.send(DevnetEvent::FatalError(message.clone()));
                     self.kill().await;
-                    return;
+                    return Err(message);
                 }
             };
             let _ = event_tx.send(DevnetEvent::info(format!("Starting stacks-explorer")));
             match self.boot_stacks_explorer_container().await {
                 Ok(_) => {}
                 Err(message) => {
-                    let _ = event_tx.send(DevnetEvent::FatalError(message));
+                    let _ = event_tx.send(DevnetEvent::FatalError(message.clone()));
                     self.kill().await;
-                    return;
+                    return Err(message);
                 }
             };
             let _ = event_tx.send(DevnetEvent::ServiceStatus(ServiceStatusData {
@@ -551,18 +555,18 @@ impl DevnetOrchestrator {
             match self.prepare_bitcoin_explorer_container().await {
                 Ok(_) => {}
                 Err(message) => {
-                    let _ = event_tx.send(DevnetEvent::FatalError(message));
+                    let _ = event_tx.send(DevnetEvent::FatalError(message.clone()));
                     self.kill().await;
-                    return;
+                    return Err(message);
                 }
             };
             let _ = event_tx.send(DevnetEvent::info(format!("Starting bitcoin-explorer")));
             match self.boot_bitcoin_explorer_container().await {
                 Ok(_) => {}
                 Err(message) => {
-                    let _ = event_tx.send(DevnetEvent::FatalError(message));
+                    let _ = event_tx.send(DevnetEvent::FatalError(message.clone()));
                     self.kill().await;
-                    return;
+                    return Err(message);
                 }
             };
             let _ = event_tx.send(DevnetEvent::ServiceStatus(ServiceStatusData {
@@ -610,6 +614,7 @@ impl DevnetOrchestrator {
                 }
             }
         }
+        Ok(())
     }
 
     pub fn prepare_bitcoin_node_config(&self, boot_index: u32) -> Result<Config<String>, String> {
@@ -1006,7 +1011,7 @@ events_keys = ["*"]
             entrypoint: Some(vec![
                 "stacks-node".into(),
                 "start".into(),
-                "--config=/src/stacks-node/Config.toml".into(),
+                "--config=/src/stacks-node/Stacks.toml".into(),
             ]),
             env: Some(vec![
                 "STACKS_LOG_PP=1".to_string(),
@@ -2102,7 +2107,10 @@ events_keys = ["*"]
             .await;
     }
 
-    pub fn initialize_bitcoin_node(&self, devnet_event_tx: &Sender<DevnetEvent>) {
+    pub fn initialize_bitcoin_node(
+        &self,
+        devnet_event_tx: &Sender<DevnetEvent>,
+    ) -> Result<(), String> {
         use bitcoincore_rpc::bitcoin::Address;
         use bitcoincore_rpc::{Auth, Client, RpcApi};
         use std::str::FromStr;
@@ -2110,9 +2118,9 @@ events_keys = ["*"]
         let (devnet_config, accounts) = match &self.network_config {
             Some(ref network_config) => match network_config.devnet {
                 Some(ref devnet_config) => (devnet_config, &network_config.accounts),
-                _ => return,
+                _ => return Err(format!("unable to initialize bitcoin node")),
             },
-            _ => return,
+            _ => return Err(format!("unable to initialize bitcoin node")),
         };
 
         let rpc = Client::new(
@@ -2153,6 +2161,7 @@ events_keys = ["*"]
                 .map_err(|e| format!("unable to create address: {:?}", e))?;
             let _ = rpc.import_address(&address, None, None);
         }
+        Ok(())
     }
 }
 
