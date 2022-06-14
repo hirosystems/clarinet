@@ -34,7 +34,10 @@ pub struct ChainConfigFile {
 pub struct NetworkConfigFile {
     name: String,
     node_rpc_address: Option<String>,
+    stacks_node_rpc_address: Option<String>,
+    bitcoin_node_rpc_address: Option<String>,
     deployment_fee_rate: Option<u64>,
+    sats_per_bytes: Option<u64>,
 }
 
 #[derive(Serialize, Deserialize, Debug, Default)]
@@ -120,8 +123,10 @@ pub struct ChainConfig {
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct NetworkConfig {
     name: String,
-    pub node_rpc_address: Option<String>,
+    pub stacks_node_rpc_address: Option<String>,
+    pub bitcoin_node_rpc_address: Option<String>,
     pub deployment_fee_rate: u64,
+    pub sats_per_bytes: u64,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -243,10 +248,19 @@ impl ChainConfig {
         chain_config_file: &mut ChainConfigFile,
         networks: &(BitcoinNetwork, StacksNetwork),
     ) -> ChainConfig {
+        let stacks_node_rpc_address = match (
+            &chain_config_file.network.node_rpc_address,
+            &chain_config_file.network.stacks_node_rpc_address,
+        ) {
+            (Some(_), Some(url)) | (None, Some(url)) | (Some(url), None) => Some(url.clone()),
+            _ => None,
+        };
         let network = NetworkConfig {
             name: chain_config_file.network.name.clone(),
-            node_rpc_address: chain_config_file.network.node_rpc_address.clone(),
+            stacks_node_rpc_address: stacks_node_rpc_address,
+            bitcoin_node_rpc_address: chain_config_file.network.bitcoin_node_rpc_address.clone(),
             deployment_fee_rate: chain_config_file.network.deployment_fee_rate.unwrap_or(10),
+            sats_per_bytes: chain_config_file.network.sats_per_bytes.unwrap_or(10),
         };
 
         let mut accounts = BTreeMap::new();

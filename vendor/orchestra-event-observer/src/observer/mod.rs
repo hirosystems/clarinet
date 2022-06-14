@@ -326,10 +326,8 @@ pub async fn start_event_observer(
                                 ),
                             )
                             .unwrap();
-                            let txid = Txid::from_str(&transaction.transaction_identifier.hash)
-                                .expect("Unable to retrieve txid");
-                            let block_hash = BlockHash::from_str(&block_identifier.hash)
-                                .expect("Unable to retrieve txid");
+                            let txid = Txid::from_str(&transaction.transaction_identifier.hash)?;
+                            let block_hash = BlockHash::from_str(&block_identifier.hash)?;
                             let res = rpc.get_tx_out_proof(&vec![txid], Some(&block_hash));
                             if let Ok(proof) = res {
                                 proofs.insert(

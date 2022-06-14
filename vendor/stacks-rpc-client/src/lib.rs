@@ -12,12 +12,3 @@ pub mod rpc_client;
 pub mod transactions;
 
 pub use rpc_client::{PoxInfo, StacksRpc};
-
-#[cfg(test)]
-mod tests {
-    #[test]
-    fn it_works() {
-        let result = 2 + 2;
-        assert_eq!(result, 4);
-    }
-}

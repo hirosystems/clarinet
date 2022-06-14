@@ -7,8 +7,8 @@ use bitcoin::consensus::encode;
 use bitcoin::{OutPoint, Script, Transaction, TxIn, TxOut, Txid, Witness};
 use bitcoincore_rpc::bitcoin::secp256k1::{Message, PublicKey, Secp256k1, SecretKey};
 use bitcoincore_rpc::bitcoin::Address;
+use bitcoincore_rpc::Client;
 use bitcoincore_rpc::RpcApi;
-use bitcoincore_rpc::{Auth, Client};
 use bitcoincore_rpc_json::ListUnspentResultEntry;
 use clarity_repl::clarity::util::hash::bytes_to_hex;
 
@@ -127,19 +127,16 @@ pub fn sign_transaction(
 }
 
 pub fn send_transaction_spec(
+    bitcoin_rpc: &Client,
     tx_spec: &BtcTransferSpecification,
     signer: &SecretKey,
 ) -> Result<bitcoincore_rpc::bitcoin::Txid, String> {
-    let auth = Auth::UserPass("devnet".to_string(), "devnet".to_string());
-    let bitcoin_node_rpc_url = "http://0.0.0.0:18443";
-    let rpc = Client::new(bitcoin_node_rpc_url, auth).unwrap();
-
     // In this v1, we're assuming that the bitcoin node is indexing sender's UTXOs.
     let sender_address =
         Address::from_str(&tx_spec.expected_sender).expect("Unable to parse address");
     let addresses = vec![&sender_address];
 
-    let mut utxos = rpc
+    let mut utxos = bitcoin_rpc
         .list_unspent(None, None, Some(&addresses), None, None)
         .expect("Unable to retrieve UTXOs");
 
@@ -152,7 +149,7 @@ pub fn send_transaction_spec(
 
     println!("-> Transaction HEX\n{:?}", bytes_to_hex(&encoded_tx));
 
-    let res = rpc.send_raw_transaction(&encoded_tx);
+    let res = bitcoin_rpc.send_raw_transaction(&encoded_tx);
 
     Ok(res.unwrap())
 }

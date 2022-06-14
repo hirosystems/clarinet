@@ -56,7 +56,7 @@ pub fn check_chainhooks(manifest_path: &PathBuf, output_json: bool) -> Result<()
 fn get_chainhooks_files(manifest_path: &PathBuf) -> Result<Vec<(PathBuf, String)>, String> {
     let mut hooks_home = manifest_path.clone();
     hooks_home.pop();
-    let suffix_len = hooks_home.to_str().unwrap().len() + 1;
+    let prefix_len = hooks_home.to_str().unwrap().len() + 1;
     hooks_home.push("chainhooks");
     let paths = match fs::read_dir(&hooks_home) {
         Ok(paths) => paths,
@@ -72,7 +72,7 @@ fn get_chainhooks_files(manifest_path: &PathBuf) -> Result<Vec<(PathBuf, String)
 
         if let Some(true) = is_extension_valid {
             let relative_path = file.clone();
-            let (_, relative_path) = relative_path.to_str().unwrap().split_at(suffix_len);
+            let (_, relative_path) = relative_path.to_str().unwrap().split_at(prefix_len);
             hook_paths.push((file, relative_path.to_string()));
         }
     }

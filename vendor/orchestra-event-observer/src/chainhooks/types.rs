@@ -128,11 +128,11 @@ impl ScriptTemplate {
                 let placeholder = &raw_instruction[1..raw_instruction.len() - 1];
                 let (name, size) = match placeholder.split_once(":") {
                     Some(res) => res,
-                    None => return Err(format!("malformated placeholder {}: should be {{placeholder-name:number-of-bytes}} (ex: {{id:4}}", raw_instruction))
+                    None => return Err(format!("malformed placeholder {}: should be {{placeholder-name:number-of-bytes}} (ex: {{id:4}}", raw_instruction))
                 };
                 let size = match size.parse::<u8>() {
                     Ok(res) => res,
-                    Err(_) => return Err(format!("malformated placeholder {}: should be {{placeholder-name:number-of-bytes}} (ex: {{id:4}}", raw_instruction))
+                    Err(_) => return Err(format!("malformed placeholder {}: should be {{placeholder-name:number-of-bytes}} (ex: {{id:4}}", raw_instruction))
                 };
                 instructions.push(ScriptInstruction::Placeholder(name.to_string(), size));
             } else if let Some(opcode) = opcode_to_hex(&raw_instruction) {

@@ -240,7 +240,7 @@ struct CheckChainhooks {
     /// Path to Clarinet.toml
     #[clap(long = "manifest-path")]
     pub manifest_path: Option<String>,
-    /// Path to Clarinet.toml
+    /// Display chainhooks JSON representation
     #[clap(long = "output-json")]
     pub output_json: bool,
 }
@@ -577,7 +577,7 @@ pub fn main() {
                 };
                 let network = deployment.network.clone();
 
-                let node_url = deployment.node.clone().unwrap();
+                let node_url = deployment.stacks_node.clone().unwrap();
 
                 println!(
                     "The following deployment plan will be applied:\n{}\n\n{}",

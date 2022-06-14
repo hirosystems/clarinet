@@ -482,7 +482,8 @@ pub struct DeploymentSpecification {
     pub id: u32,
     pub name: String,
     pub network: StacksNetwork,
-    pub node: Option<String>,
+    pub stacks_node: Option<String>,
+    pub bitcoin_node: Option<String>,
     pub genesis: Option<GenesisSpecification>,
     pub plan: TransactionPlanSpecification,
     // Keep a cache of contract's (source, relative_path)
@@ -615,7 +616,8 @@ impl DeploymentSpecification {
         };
         Ok(DeploymentSpecification {
             id: specs.id.unwrap_or(0),
-            node: specs.node.clone(),
+            stacks_node: specs.stacks_node.clone(),
+            bitcoin_node: specs.bitcoin_node.clone(),
             name: specs.name.to_string(),
             network: network.clone(),
             genesis,
@@ -634,7 +636,8 @@ impl DeploymentSpecification {
                 StacksNetwork::Testnet => "testnet".to_string(),
                 StacksNetwork::Mainnet => "mainnet".to_string(),
             },
-            node: self.node.clone(),
+            stacks_node: self.stacks_node.clone(),
+            bitcoin_node: self.bitcoin_node.clone(),
             genesis: match self.genesis {
                 Some(ref g) => Some(g.to_specification_file()),
                 None => None,
@@ -683,7 +686,9 @@ pub struct DeploymentSpecificationFile {
     pub name: String,
     pub network: String,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub node: Option<String>,
+    pub stacks_node: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub bitcoin_node: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub genesis: Option<GenesisSpecificationFile>,
     pub plan: Option<TransactionPlanSpecificationFile>,

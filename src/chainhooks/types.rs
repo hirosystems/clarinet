@@ -193,7 +193,7 @@ impl HookActionFile {
             }?;
             let authorization_header = match specs.get("authorization-header") {
                 Some(authorization_header) => Ok(authorization_header.to_string()),
-                None => Err(format!("method missing for http")),
+                None => Err(format!("authorization-header missing for http")),
             }?;
 
             Ok(HookAction::Http(HttpHook {
