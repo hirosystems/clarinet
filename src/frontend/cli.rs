@@ -314,7 +314,7 @@ struct Check {
     /// Path to Clarinet.toml
     #[clap(long = "manifest-path", short = 'm')]
     pub manifest_path: Option<String>,
-    /// If specified, check this file
+    /// If specified, perform a simple syntax-check on just this one file
     pub file: Option<String>,
     /// If specified, use this deployment file
     #[clap(long = "deployment-plan-path", short = 'p')]

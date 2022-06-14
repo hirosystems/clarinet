@@ -175,16 +175,29 @@ depends_on = []
 You can add contracts to your project by adding the files manually, however you must add the appropriate configuration
 to `Clarinet.toml` in order for Clarinet to recognize the contracts.
 
-### Check the syntax of your contracts
+### Check your contracts
 
-Clarinet provides a syntax checker for Clarity. You can check if your Clarity code is valid with the command:
+Clarinet provides syntax and semantics checkers for Clarity. You can check if the Clarity code in your project is valid with the command:
 
 ```bash
 $ clarinet check
 ```
 
-If the Clarity code is valid, the command will return no output. If there are errors in the code, the output of the
-command will indicate where the errors are present.
+This uses the `Clarinet.toml` file to locate and analyze all of the contracts in the project. If the Clarity code is valid, the command will indicate success:
+
+```
+✔ 3 contracts checked
+```
+
+It may also report warnings that indicate that the code is valid, but there is something that you should pay attention to, for example, the check-checker analysis discussed below will generate warnings. If there are errors in the code, the output of the command will indicate the kind and location of the errors.
+
+To perform only a syntax-check on just one file, the file to be checked can be passed to the command:
+
+```bash
+$ clarinet check hiro-coin.clar
+```
+
+Any syntactical errors in the Clarity code will be reported, but type-checking and other semantic checks are not performed, since clarinet is only looking at this one contract and does not have the full context to perform a complete check.
 
 ### Static Analysis
 
