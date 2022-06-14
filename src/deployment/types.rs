@@ -12,7 +12,7 @@ use std::path::PathBuf;
 
 use std::fs;
 
-use crate::types::StacksNetwork;
+use orchestra_types::StacksNetwork;
 
 #[derive(Debug, PartialEq, Clone)]
 pub struct TransactionPlanSpecification {
@@ -40,6 +40,16 @@ pub enum TransactionSpecificationFile {
     EmulatedContractCall(EmulatedContractCallSpecificationFile),
     EmulatedContractPublish(EmulatedContractPublishSpecificationFile),
     RequirementPublish(RequirementPublishSpecificationFile),
+    BtcTransfer(BtcTransferSpecificationFile),
+}
+
+#[derive(Debug, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub struct BtcTransferSpecificationFile {
+    pub expected_sender: String,
+    pub recipient: String,
+    pub sats_amount: u64,
+    pub sats_per_byte: u64,
 }
 
 #[derive(Debug, PartialEq, Serialize, Deserialize)]
@@ -101,6 +111,29 @@ pub enum TransactionSpecification {
     RequirementPublish(RequirementPublishSpecification),
     EmulatedContractCall(EmulatedContractCallSpecification),
     EmulatedContractPublish(EmulatedContractPublishSpecification),
+    BtcTransfer(BtcTransferSpecification),
+}
+
+#[derive(Debug, PartialEq, Clone)]
+pub struct BtcTransferSpecification {
+    pub expected_sender: String,
+    pub recipient: String,
+    pub sats_amount: u64,
+    pub sats_per_byte: u64,
+}
+
+impl BtcTransferSpecification {
+    pub fn from_specifications(
+        specs: &BtcTransferSpecificationFile,
+    ) -> Result<BtcTransferSpecification, String> {
+        // TODO(lgalabru): Data validation
+        Ok(BtcTransferSpecification {
+            expected_sender: specs.expected_sender.clone(),
+            recipient: specs.recipient.clone(),
+            sats_amount: specs.sats_amount,
+            sats_per_byte: specs.sats_per_byte,
+        })
+    }
 }
 
 #[derive(Debug, PartialEq, Clone)]
@@ -449,7 +482,8 @@ pub struct DeploymentSpecification {
     pub id: u32,
     pub name: String,
     pub network: StacksNetwork,
-    pub node: Option<String>,
+    pub stacks_node: Option<String>,
+    pub bitcoin_node: Option<String>,
     pub genesis: Option<GenesisSpecification>,
     pub plan: TransactionPlanSpecification,
     // Keep a cache of contract's (source, relative_path)
@@ -561,6 +595,10 @@ impl DeploymentSpecification {
                                     contracts.insert(contract_id, (spec.source.clone(), spec.relative_path.clone()));
                                     TransactionSpecification::ContractPublish(spec)
                                 }
+                                TransactionSpecificationFile::BtcTransfer(spec) => {
+                                    let spec = BtcTransferSpecification::from_specifications(spec)?;
+                                    TransactionSpecification::BtcTransfer(spec)
+                                }
                                 _ => {
                                     return Err(format!("{} only supports transactions of type 'contract-call' and 'contract-publish'", specs.network.to_lowercase()))
                                 }
@@ -576,9 +614,19 @@ impl DeploymentSpecification {
                 (TransactionPlanSpecification { batches }, None)
             }
         };
+        let stacks_node = match (&specs.stacks_node, &specs.node) {
+            (Some(node), _) | (None, Some(node)) => Some(node.clone()),
+            _ => None,
+        };
+        let bitcoin_node = match (&specs.bitcoin_node, &specs.node) {
+            (Some(node), _) | (None, Some(node)) => Some(node.clone()),
+            _ => None,
+        };
+
         Ok(DeploymentSpecification {
             id: specs.id.unwrap_or(0),
-            node: specs.node.clone(),
+            stacks_node,
+            bitcoin_node,
             name: specs.name.to_string(),
             network: network.clone(),
             genesis,
@@ -597,7 +645,9 @@ impl DeploymentSpecification {
                 StacksNetwork::Testnet => "testnet".to_string(),
                 StacksNetwork::Mainnet => "mainnet".to_string(),
             },
-            node: self.node.clone(),
+            stacks_node: self.stacks_node.clone(),
+            bitcoin_node: self.bitcoin_node.clone(),
+            node: None,
             genesis: match self.genesis {
                 Some(ref g) => Some(g.to_specification_file()),
                 None => None,
@@ -645,6 +695,10 @@ pub struct DeploymentSpecificationFile {
     pub id: Option<u32>,
     pub name: String,
     pub network: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub stacks_node: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub bitcoin_node: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub node: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -803,6 +857,14 @@ impl TransactionPlanSpecification {
                                 cost: tx.cost,
                             },
                         )
+                    }
+                    TransactionSpecification::BtcTransfer(tx) => {
+                        TransactionSpecificationFile::BtcTransfer(BtcTransferSpecificationFile {
+                            expected_sender: tx.expected_sender.to_string(),
+                            recipient: tx.recipient.clone(),
+                            sats_amount: tx.sats_amount,
+                            sats_per_byte: tx.sats_per_byte,
+                        })
                     }
                 };
                 transactions.push(tx);

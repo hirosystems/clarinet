@@ -51,23 +51,38 @@ pub struct PoxInfo {
     pub next_cycle: PoxCycle,
 }
 
+impl PoxInfo {
+    pub fn default() -> PoxInfo {
+        PoxInfo {
+            contract_id: "ST000000000000000000002AMW42H.pox".into(),
+            pox_activation_threshold_ustx: 0,
+            first_burnchain_block_height: 100,
+            prepare_phase_block_length: 5,
+            reward_phase_block_length: 10,
+            reward_slots: 20,
+            total_liquid_supply_ustx: 1000000000000000,
+            ..Default::default()
+        }
+    }
+}
+
 #[derive(Deserialize, Debug, Clone, Default)]
 pub struct PoxCycle {
     pub min_threshold_ustx: u64,
 }
 
 #[derive(Deserialize, Debug)]
-struct Balance {
-    balance: String,
-    nonce: u64,
-    balance_proof: String,
-    nonce_proof: String,
+pub struct Balance {
+    pub balance: String,
+    pub nonce: u64,
+    pub balance_proof: String,
+    pub nonce_proof: String,
 }
 
 #[derive(Deserialize, Debug)]
 pub struct Contract {
-    source: String,
-    publish_height: u64,
+    pub source: String,
+    pub publish_height: u64,
 }
 
 impl StacksRpc {

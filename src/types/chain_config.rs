@@ -1,10 +1,11 @@
-use super::StacksNetwork;
 use crate::utils::mnemonic;
 use bip39::{Language, Mnemonic};
+
 use clarity_repl::clarity::util::hash::bytes_to_hex;
 use clarity_repl::clarity::util::secp256k1::Secp256k1PublicKey;
 use clarity_repl::clarity::util::StacksAddress;
 use libsecp256k1::{PublicKey, SecretKey};
+use orchestra_types::{BitcoinNetwork, StacksNetwork};
 use std::io::{BufReader, Read};
 use std::path::PathBuf;
 use std::{collections::BTreeMap, fs::File};
@@ -33,12 +34,16 @@ pub struct ChainConfigFile {
 pub struct NetworkConfigFile {
     name: String,
     node_rpc_address: Option<String>,
+    stacks_node_rpc_address: Option<String>,
+    bitcoin_node_rpc_address: Option<String>,
     deployment_fee_rate: Option<u64>,
+    sats_per_bytes: Option<u64>,
 }
 
 #[derive(Serialize, Deserialize, Debug, Default)]
 pub struct DevnetConfigFile {
     pub orchestrator_port: Option<u16>,
+    pub orchestrator_control_port: Option<u16>,
     pub bitcoin_node_p2p_port: Option<u16>,
     pub bitcoin_node_rpc_port: Option<u16>,
     pub stacks_node_p2p_port: Option<u16>,
@@ -52,6 +57,8 @@ pub struct DevnetConfigFile {
     pub bitcoin_node_password: Option<String>,
     pub miner_mnemonic: Option<String>,
     pub miner_derivation_path: Option<String>,
+    pub faucet_mnemonic: Option<String>,
+    pub faucet_derivation_path: Option<String>,
     pub bitcoin_controller_block_time: Option<u32>,
     pub bitcoin_controller_automining_disabled: Option<bool>,
     pub working_dir: Option<String>,
@@ -116,13 +123,16 @@ pub struct ChainConfig {
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct NetworkConfig {
     name: String,
-    pub node_rpc_address: Option<String>,
+    pub stacks_node_rpc_address: Option<String>,
+    pub bitcoin_node_rpc_address: Option<String>,
     pub deployment_fee_rate: u64,
+    pub sats_per_bytes: u64,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct DevnetConfig {
-    pub orchestrator_port: u16,
+    pub orchestrator_ingestion_port: u16,
+    pub orchestrator_control_port: u16,
     pub bitcoin_node_p2p_port: u16,
     pub bitcoin_node_rpc_port: u16,
     pub bitcoin_node_username: String,
@@ -141,6 +151,11 @@ pub struct DevnetConfig {
     pub miner_btc_address: String,
     pub miner_mnemonic: String,
     pub miner_derivation_path: String,
+    pub faucet_stx_address: String,
+    pub faucet_secret_key_hex: String,
+    pub faucet_btc_address: String,
+    pub faucet_mnemonic: String,
+    pub faucet_derivation_path: String,
     pub working_dir: String,
     pub postgres_port: u16,
     pub postgres_username: String,
@@ -187,33 +202,31 @@ pub struct AccountConfig {
     pub mnemonic: String,
     pub derivation: String,
     pub balance: u64,
-    pub address: String,
+    pub stx_address: String,
+    pub btc_address: String,
     pub is_mainnet: bool,
 }
 
 impl ChainConfig {
     #[allow(non_fmt_panics)]
-    pub fn from_manifest_path(manifest_path: &PathBuf, network: &StacksNetwork) -> ChainConfig {
+    pub fn from_manifest_path(
+        manifest_path: &PathBuf,
+        networks: &(BitcoinNetwork, StacksNetwork),
+    ) -> ChainConfig {
         let mut chain_config_path = manifest_path.clone();
         chain_config_path.pop();
         chain_config_path.push("settings");
-        chain_config_path.push(match network {
+        chain_config_path.push(match networks.1 {
             StacksNetwork::Simnet | StacksNetwork::Devnet => "Devnet.toml",
             StacksNetwork::Testnet => "Testnet.toml",
             StacksNetwork::Mainnet => "Mainnet.toml",
         });
-        let chain_config = ChainConfig::from_path(
-            &chain_config_path,
-            match network {
-                StacksNetwork::Simnet => &StacksNetwork::Devnet, // TODO(lgalabru): handle backward compatibility
-                _ => network,
-            },
-        );
+        let chain_config = ChainConfig::from_path(&chain_config_path, networks);
         chain_config
     }
 
     #[allow(non_fmt_panics)]
-    pub fn from_path(path: &PathBuf, network: &StacksNetwork) -> ChainConfig {
+    pub fn from_path(path: &PathBuf, networks: &(BitcoinNetwork, StacksNetwork)) -> ChainConfig {
         let path = match File::open(path) {
             Ok(path) => path,
             Err(_) => {
@@ -228,21 +241,30 @@ impl ChainConfig {
             .unwrap();
         let mut chain_config_file: ChainConfigFile =
             toml::from_slice(&chain_config_file_buffer[..]).unwrap();
-        ChainConfig::from_chain_config_file(&mut chain_config_file, network)
+        ChainConfig::from_chain_config_file(&mut chain_config_file, networks)
     }
 
     pub fn from_chain_config_file(
         chain_config_file: &mut ChainConfigFile,
-        env: &StacksNetwork,
+        networks: &(BitcoinNetwork, StacksNetwork),
     ) -> ChainConfig {
+        let stacks_node_rpc_address = match (
+            &chain_config_file.network.node_rpc_address,
+            &chain_config_file.network.stacks_node_rpc_address,
+        ) {
+            (Some(_), Some(url)) | (None, Some(url)) | (Some(url), None) => Some(url.clone()),
+            _ => None,
+        };
         let network = NetworkConfig {
             name: chain_config_file.network.name.clone(),
-            node_rpc_address: chain_config_file.network.node_rpc_address.clone(),
+            stacks_node_rpc_address: stacks_node_rpc_address,
+            bitcoin_node_rpc_address: chain_config_file.network.bitcoin_node_rpc_address.clone(),
             deployment_fee_rate: chain_config_file.network.deployment_fee_rate.unwrap_or(10),
+            sats_per_bytes: chain_config_file.network.sats_per_bytes.unwrap_or(10),
         };
 
         let mut accounts = BTreeMap::new();
-        let is_mainnet = env == &StacksNetwork::Mainnet;
+        let is_mainnet = networks.1.is_mainnet();
 
         match &chain_config_file.accounts {
             Some(Value::Table(entries)) => {
@@ -274,8 +296,8 @@ impl ChainConfig {
                                 _ => DEFAULT_DERIVATION_PATH.to_string(),
                             };
 
-                            let (address, _, _) =
-                                compute_addresses(&mnemonic, &derivation, is_mainnet);
+                            let (stx_address, btc_address, _) =
+                                compute_addresses(&mnemonic, &derivation, networks);
 
                             accounts.insert(
                                 account_name.to_string(),
@@ -284,7 +306,8 @@ impl ChainConfig {
                                     mnemonic: mnemonic.to_string(),
                                     derivation,
                                     balance,
-                                    address,
+                                    stx_address,
+                                    btc_address,
                                     is_mainnet,
                                 },
                             );
@@ -296,7 +319,7 @@ impl ChainConfig {
             _ => {}
         };
 
-        let devnet = if chain_config_file.network.name == "devnet" {
+        let devnet = if networks.1.is_devnet() {
             let mut devnet_config = match chain_config_file.devnet.take() {
                 Some(conf) => conf,
                 _ => DevnetConfigFile::default(),
@@ -313,8 +336,15 @@ impl ChainConfig {
                 .take()
                 .unwrap_or(DEFAULT_DERIVATION_PATH.to_string());
             let (miner_stx_address, miner_btc_address, miner_secret_key_hex) =
-                compute_addresses(&miner_mnemonic, &miner_derivation_path, is_mainnet);
+                compute_addresses(&miner_mnemonic, &miner_derivation_path, networks);
 
+            let faucet_mnemonic = devnet_config.faucet_mnemonic.take().unwrap_or("shadow private easily thought say logic fault paddle word top book during ignore notable orange flight clock image wealth health outside kitten belt reform".to_string());
+            let faucet_derivation_path = devnet_config
+                .faucet_derivation_path
+                .take()
+                .unwrap_or(DEFAULT_DERIVATION_PATH.to_string());
+            let (faucet_stx_address, faucet_btc_address, faucet_secret_key_hex) =
+                compute_addresses(&faucet_mnemonic, &faucet_derivation_path, networks);
             // If unset, we'll reuse the miner's keypair for the hyperchain leader
             let (
                 hyperchain_leader_stx_address,
@@ -327,8 +357,11 @@ impl ChainConfig {
                     .hyperchain_leader_derivation_path
                     .take()
                     .unwrap_or(DEFAULT_DERIVATION_PATH.to_string());
-                let (stx_address, btc_address, secret_key_hex) =
-                    compute_addresses(&mnemonic, &derivation_path, is_mainnet);
+                let (stx_address, btc_address, secret_key_hex) = compute_addresses(
+                    &mnemonic,
+                    &derivation_path,
+                    &StacksNetwork::Devnet.get_networks(),
+                );
                 (
                     stx_address,
                     btc_address,
@@ -370,14 +403,16 @@ impl ChainConfig {
                         mnemonic: hyperchain_leader_mnemonic.clone(),
                         derivation: hyperchain_leader_derivation_path.clone(),
                         balance: super::DEFAULT_DEVNET_BALANCE,
-                        address: hyperchain_leader_stx_address.clone(),
+                        stx_address: hyperchain_leader_stx_address.clone(),
+                        btc_address: hyperchain_leader_btc_address.clone(),
                         is_mainnet,
                     },
                 );
             }
 
             let mut config = DevnetConfig {
-                orchestrator_port: devnet_config.orchestrator_port.unwrap_or(20445),
+                orchestrator_ingestion_port: devnet_config.orchestrator_port.unwrap_or(20445),
+                orchestrator_control_port: devnet_config.orchestrator_control_port.unwrap_or(20446),
                 bitcoin_node_p2p_port: devnet_config.bitcoin_node_p2p_port.unwrap_or(18444),
                 bitcoin_node_rpc_port: devnet_config.bitcoin_node_rpc_port.unwrap_or(18443),
                 bitcoin_node_username: devnet_config
@@ -406,6 +441,11 @@ impl ChainConfig {
                 miner_mnemonic,
                 miner_secret_key_hex,
                 miner_derivation_path,
+                faucet_btc_address,
+                faucet_stx_address,
+                faucet_mnemonic,
+                faucet_secret_key_hex,
+                faucet_derivation_path,
                 working_dir: devnet_config
                     .working_dir
                     .take()
@@ -495,7 +535,7 @@ impl ChainConfig {
 pub fn compute_addresses(
     mnemonic: &str,
     derivation_path: &str,
-    mainnet: bool,
+    networks: &(BitcoinNetwork, StacksNetwork),
 ) -> (String, String, String) {
     let bip39_seed = match mnemonic::get_bip39_seed_from_mnemonic(&mnemonic, "") {
         Ok(bip39_seed) => bip39_seed,
@@ -513,7 +553,7 @@ pub fn compute_addresses(
 
     let public_key = PublicKey::from_secret_key(&secret_key);
     let pub_key = Secp256k1PublicKey::from_slice(&public_key.serialize_compressed()).unwrap();
-    let version = if mainnet {
+    let version = if networks.1.is_mainnet() {
         clarity_repl::clarity::util::C32_ADDRESS_VERSION_MAINNET_SINGLESIG
     } else {
         clarity_repl::clarity::util::C32_ADDRESS_VERSION_TESTNET_SINGLESIG
@@ -521,8 +561,20 @@ pub fn compute_addresses(
 
     let stx_address = StacksAddress::from_public_key(version, pub_key).unwrap();
 
-    // TODO(ludo): de-hardcode this
-    let btc_address = "n3GRiDLKWuKLCw1DZmV75W1mE35qmW2tQm".to_string();
+    let btc_address = {
+        use bitcoincore_rpc::bitcoin::{Address, Network, PublicKey};
+        let public_key = PublicKey::from_slice(&public_key.serialize_compressed())
+            .expect("Unable to recreate public key");
+        let btc_address = Address::p2pkh(
+            &public_key,
+            match networks.0 {
+                BitcoinNetwork::Regtest => Network::Regtest,
+                BitcoinNetwork::Testnet => Network::Testnet,
+                BitcoinNetwork::Mainnet => Network::Bitcoin,
+            },
+        );
+        btc_address.to_string()
+    };
 
     (stx_address.to_string(), btc_address, miner_secret_key_hex)
 }

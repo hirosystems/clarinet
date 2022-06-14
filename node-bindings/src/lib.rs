@@ -8,14 +8,18 @@ use clarinet_lib::bip39::{Language, Mnemonic};
 use clarinet_lib::deployment;
 use clarinet_lib::integrate::{self, DevnetEvent, DevnetOrchestrator};
 use clarinet_lib::types::{
-    compute_addresses, AccountConfig, BitcoinBlockData, BitcoinChainEvent,
-    ChainUpdatedWithBlockData, DevnetConfigFile, PoxStackingOrder, ProjectManifest,
-    StacksChainEvent, StacksNetwork, DEFAULT_DERIVATION_PATH,
+    compute_addresses, AccountConfig, DevnetConfigFile, PoxStackingOrder, ProjectManifest,
+    DEFAULT_DERIVATION_PATH,
 };
+use orchestra_types::{
+    BitcoinBlockData, BitcoinChainEvent, ChainUpdatedWithBlockData, StacksChainEvent, StacksNetwork,
+};
+
 use core::panic;
 use neon::prelude::*;
 use std::collections::BTreeMap;
 use std::path::PathBuf;
+use std::process::exit;
 use std::sync::mpsc;
 use std::thread;
 use std::{env, process};
@@ -61,7 +65,13 @@ impl StacksDevnet {
         let (deployment, _) =
             deployment::read_deployment_or_generate_default(&manifest, &StacksNetwork::Devnet)
                 .expect("Unable to generate deployment");
-        let devnet = DevnetOrchestrator::new(manifest, Some(devnet_overrides));
+        let devnet = match DevnetOrchestrator::new(manifest, Some(devnet_overrides)) {
+            Ok(devnet) => devnet,
+            Err(message) => {
+                println!("{}", message);
+                std::process::exit(1);
+            }
+        };
 
         let node_url = devnet.get_stacks_node_url();
 
@@ -207,12 +217,17 @@ impl StacksDevnet {
                 _ => DEFAULT_DERIVATION_PATH.to_string(),
             };
 
-            let (address, _, _) = compute_addresses(&mnemonic, &derivation, is_mainnet);
+            let (stx_address, btc_address, _) = compute_addresses(
+                &mnemonic,
+                &derivation,
+                &StacksNetwork::Devnet.get_networks(),
+            );
 
             let account = AccountConfig {
                 label,
                 mnemonic,
-                address,
+                stx_address,
+                btc_address,
                 derivation,
                 is_mainnet,
                 balance: balance as u64,
