@@ -389,20 +389,32 @@ pub async fn start_event_observer(
                 }
             }
             ObserverCommand::RegisterHook(hook, api_key) => {
-                let hook_formation = config
-                    .operators
-                    .get_mut(&api_key.0)
-                    .expect("unable to retrieve hook formation");
+                let hook_formation = match config.operators.get_mut(&api_key.0) {
+                    Some(hook_formation) => hook_formation,
+                    None => {
+                        println!(
+                            "Unable to retrieve chainhooks associated with {:?}",
+                            api_key
+                        );
+                        continue;
+                    }
+                };
                 hook_formation.register_hook(hook.clone());
                 if let Some(ref tx) = observer_events_tx {
                     let _ = tx.send(ObserverEvent::HookRegistered(hook));
                 }
             }
             ObserverCommand::DeregisterStacksHook(hook_uuid, api_key) => {
-                let hook_formation = config
-                    .operators
-                    .get_mut(&api_key.0)
-                    .expect("unable to retrieve hook formation");
+                let hook_formation = match config.operators.get_mut(&api_key.0) {
+                    Some(hook_formation) => hook_formation,
+                    None => {
+                        println!(
+                            "Unable to retrieve chainhooks associated with {:?}",
+                            api_key
+                        );
+                        continue;
+                    }
+                };
                 let hook = hook_formation.deregister_stacks_hook(hook_uuid);
                 if let (Some(tx), Some(hook)) = (&observer_events_tx, hook) {
                     let _ = tx.send(ObserverEvent::HookDeregistered(
@@ -411,10 +423,16 @@ pub async fn start_event_observer(
                 }
             }
             ObserverCommand::DeregisterBitcoinHook(hook_uuid, api_key) => {
-                let hook_formation = config
-                    .operators
-                    .get_mut(&api_key.0)
-                    .expect("unable to retrieve hook formation");
+                let hook_formation = match config.operators.get_mut(&api_key.0) {
+                    Some(hook_formation) => hook_formation,
+                    None => {
+                        println!(
+                            "Unable to retrieve chainhooks associated with {:?}",
+                            api_key
+                        );
+                        continue;
+                    }
+                };
                 let hook = hook_formation.deregister_bitcoin_hook(hook_uuid);
                 if let (Some(tx), Some(hook)) = (&observer_events_tx, hook) {
                     let _ = tx.send(ObserverEvent::HookDeregistered(
