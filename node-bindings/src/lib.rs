@@ -19,6 +19,7 @@ use core::panic;
 use neon::prelude::*;
 use std::collections::BTreeMap;
 use std::path::PathBuf;
+use std::process::exit;
 use std::sync::mpsc;
 use std::thread;
 use std::{env, process};
@@ -64,7 +65,13 @@ impl StacksDevnet {
         let (deployment, _) =
             deployment::read_deployment_or_generate_default(&manifest, &StacksNetwork::Devnet)
                 .expect("Unable to generate deployment");
-        let devnet = DevnetOrchestrator::new(manifest, Some(devnet_overrides));
+        let devnet = match DevnetOrchestrator::new(manifest, Some(devnet_overrides)) {
+            Ok(devnet) => devnet,
+            Err(message) => {
+                println!("{}", message);
+                std::process::exit(1);
+            }
+        };
 
         let node_url = devnet.get_stacks_node_url();
 
