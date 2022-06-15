@@ -1,5 +1,5 @@
-use crate::deployment::{generate_default_deployment, setup_session_with_deployment};
-use crate::types::ProjectManifest;
+use clarinet_deployments::{generate_default_deployment, setup_session_with_deployment};
+use clarinet_types::ProjectManifest;
 use clarity_repl::clarity::debug::dap::DAPDebugger;
 use orchestra_types::StacksNetwork;
 use std::path::PathBuf;

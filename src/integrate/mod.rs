@@ -8,10 +8,10 @@ use chrono::prelude::*;
 use tracing::{self, debug, error, info, warn};
 use tracing_appender;
 
-use crate::deployment::types::DeploymentSpecification;
 use crate::types::ChainsCoordinatorCommand;
 use crate::utils;
 use chains_coordinator::start_chains_coordinator;
+use clarinet_deployments::types::DeploymentSpecification;
 use orchestra_types::{BitcoinChainEvent, StacksChainEvent};
 pub use orchestrator::DevnetOrchestrator;
 

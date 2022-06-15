@@ -1,5 +1,5 @@
 use super::changes::{Changes, DirectoryCreation, FileCreation};
-use crate::types::ProjectManifest;
+use clarinet_types::ProjectManifest;
 use orchestra_types::Chain;
 
 pub struct GetChangesForNewChainhook<'a> {

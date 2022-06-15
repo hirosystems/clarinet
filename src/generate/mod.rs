@@ -12,7 +12,7 @@ use orchestra_types::Chain;
 use project::GetChangesForNewProject;
 use std::path::PathBuf;
 
-use crate::types::ProjectManifest;
+use clarinet_types::ProjectManifest;
 
 pub fn get_changes_for_new_project(
     project_path: String,

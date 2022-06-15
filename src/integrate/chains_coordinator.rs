@@ -1,13 +1,13 @@
 use super::DevnetEvent;
 use crate::chainhooks::load_chainhooks;
-use crate::deployment::types::DeploymentSpecification;
 use crate::deployment::{apply_on_chain_deployment, DeploymentCommand, DeploymentEvent};
 use crate::integrate::{ServiceStatusData, Status};
 use crate::types::ChainsCoordinatorCommand;
-use crate::types::{self, AccountConfig, ChainConfig, DevnetConfig, ProjectManifest};
 use crate::utils;
 use base58::FromBase58;
 use bitcoincore_rpc::{Auth, Client, RpcApi};
+use clarinet_deployments::types::DeploymentSpecification;
+use clarinet_types::{self, AccountConfig, ChainConfig, DevnetConfig, ProjectManifest};
 use clarity_repl::clarity::representations::ClarityName;
 use clarity_repl::clarity::types::{BuffData, SequenceData, TupleData, Value as ClarityValue};
 use clarity_repl::clarity::util::address::AddressHashMode;
@@ -463,7 +463,7 @@ pub async fn publish_stacking_orders(
                     .get_nonce(&account.stx_address)
                     .expect("Unable to retrieve nonce");
 
-                let (_, _, account_secret_key) = types::compute_addresses(
+                let (_, _, account_secret_key) = clarinet_types::compute_addresses(
                     &account.mnemonic,
                     &account.derivation,
                     &StacksNetwork::Devnet.get_networks(),

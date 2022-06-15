@@ -1,4 +1,4 @@
-use crate::types::{ContractConfig, RequirementConfig};
+use clarinet_types::{ContractConfig, RequirementConfig};
 use std::{collections::HashMap, path::PathBuf};
 
 #[derive(Clone, Debug)]

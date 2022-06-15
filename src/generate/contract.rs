@@ -1,5 +1,5 @@
 use super::changes::{Changes, FileCreation, TOMLEdition};
-use crate::types::ContractConfig;
+use clarinet_types::ContractConfig;
 use std::{collections::HashMap, path::PathBuf};
 
 pub struct GetChangesForNewContract {

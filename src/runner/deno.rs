@@ -49,7 +49,7 @@ use std::sync::Mutex;
 use swc_common::comments::CommentKind;
 
 use crate::deployment::types::DeploymentSpecification;
-use crate::types::ProjectManifest;
+use clarinet_types::ProjectManifest;
 
 pub async fn do_run_scripts(
     include: Vec<String>,
