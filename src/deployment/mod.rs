@@ -16,9 +16,6 @@ use clarinet_deployments::types::{
 use clarinet_types::{AccountConfig, ChainConfig, ProjectManifest};
 use clarinet_utils::get_bip39_seed_from_mnemonic;
 
-
-
-
 use clarity_repl::clarity::codec::transaction::{
     StacksTransaction, StacksTransactionSigner, TransactionAnchorMode, TransactionAuth,
     TransactionContractCall, TransactionPayload, TransactionPostConditionMode,
@@ -26,7 +23,7 @@ use clarity_repl::clarity::codec::transaction::{
 };
 use clarity_repl::clarity::codec::StacksMessageCodec;
 
-use clarity_repl::clarity::types::{QualifiedContractIdentifier};
+use clarity_repl::clarity::types::QualifiedContractIdentifier;
 use clarity_repl::clarity::util::{
     C32_ADDRESS_VERSION_MAINNET_SINGLESIG, C32_ADDRESS_VERSION_TESTNET_SINGLESIG,
 };
@@ -44,8 +41,8 @@ use clarity_repl::clarity::{
         StacksAddress,
     },
 };
+use clarity_repl::repl::Session;
 use clarity_repl::repl::SessionSettings;
-use clarity_repl::repl::{Session};
 use libsecp256k1::{PublicKey, SecretKey};
 use orchestra_types::StacksNetwork;
 use serde_yaml;

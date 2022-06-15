@@ -4570,6 +4570,8 @@ name = "stacks-devnet-js"
 version = "0.31.1"
 dependencies = [
  "clarinet",
+ "clarinet-types",
+ "clarinet-utils",
  "error-chain",
  "neon",
  "num",

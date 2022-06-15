@@ -4,13 +4,13 @@ extern crate error_chain;
 
 mod serde;
 
-use clarinet_lib::bip39::{Language, Mnemonic};
 use clarinet_lib::deployment;
 use clarinet_lib::integrate::{self, DevnetEvent, DevnetOrchestrator};
-use clarinet_lib::types::{
+use clarinet_types::{
     compute_addresses, AccountConfig, DevnetConfigFile, PoxStackingOrder, ProjectManifest,
     DEFAULT_DERIVATION_PATH,
 };
+use clarinet_utils::bip39::{Language, Mnemonic};
 use orchestra_types::{
     BitcoinBlockData, BitcoinChainEvent, ChainUpdatedWithBlockData, StacksChainEvent, StacksNetwork,
 };

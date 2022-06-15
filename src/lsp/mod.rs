@@ -1,17 +1,12 @@
 mod clarity_language_backend;
 
-
 use clarity_language_backend::ClarityLanguageBackend;
 use clarity_lsp::lsp_types::{MessageType, Url};
 use clarity_lsp::state::{build_state, EditorState, ProtocolState};
-use clarity_lsp::types::{CompletionItemKind};
+use clarity_lsp::types::CompletionItemKind;
 use clarity_lsp::utils;
 
-
 use clarity_repl::clarity::diagnostic::{Diagnostic as ClarityDiagnostic, Level as ClarityLevel};
-
-
-
 
 use std::path::PathBuf;
 

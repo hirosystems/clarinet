@@ -3,6 +3,8 @@ extern crate serde;
 #[macro_use]
 extern crate serde_derive;
 
+pub extern crate bip39;
+
 mod chain_config;
 mod project_manifest;
 

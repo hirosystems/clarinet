@@ -12,6 +12,8 @@ crate-type = ["cdylib"]
 serde = "1"
 error-chain = "0.12"
 orchestra_types = { package = "orchestra-types", path = "../vendor/orchestra-types-rs" }
+clarinet_types = { package = "clarinet-types", path = "../vendor/clarinet-types-rs" }
+clarinet_utils = { package = "clarinet-utils", path = "../vendor/clarinet-utils" }
 
 [dependencies.clarinet_lib]
 package = "clarinet"
