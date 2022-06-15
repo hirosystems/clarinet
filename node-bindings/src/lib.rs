@@ -6,11 +6,11 @@ mod serde;
 
 use clarinet_lib::deployment;
 use clarinet_lib::integrate::{self, DevnetEvent, DevnetOrchestrator};
+use clarinet_types::bip39::{Language, Mnemonic};
 use clarinet_types::{
     compute_addresses, AccountConfig, DevnetConfigFile, PoxStackingOrder, ProjectManifest,
     DEFAULT_DERIVATION_PATH,
 };
-use clarinet_utils::bip39::{Language, Mnemonic};
 use orchestra_types::{
     BitcoinBlockData, BitcoinChainEvent, ChainUpdatedWithBlockData, StacksChainEvent, StacksNetwork,
 };
@@ -19,7 +19,6 @@ use core::panic;
 use neon::prelude::*;
 use std::collections::BTreeMap;
 use std::path::PathBuf;
-use std::process::exit;
 use std::sync::mpsc;
 use std::thread;
 use std::{env, process};
@@ -225,7 +224,7 @@ impl StacksDevnet {
 
             let account = AccountConfig {
                 label,
-                mnemonic,
+                mnemonic: mnemonic.to_string(),
                 stx_address,
                 btc_address,
                 derivation,
