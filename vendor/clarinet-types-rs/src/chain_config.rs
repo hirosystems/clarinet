@@ -1,14 +1,15 @@
-use crate::utils::mnemonic;
-use bip39::{Language, Mnemonic};
+use clarinet_utils::get_bip39_seed_from_mnemonic;
+use std::io::{BufReader, Read};
+use std::path::PathBuf;
+use std::{collections::BTreeMap, fs::File};
 
+use bip39::{Language, Mnemonic};
+use bitcoincore_rpc::bitcoin;
 use clarity_repl::clarity::util::hash::bytes_to_hex;
 use clarity_repl::clarity::util::secp256k1::Secp256k1PublicKey;
 use clarity_repl::clarity::util::StacksAddress;
 use libsecp256k1::{PublicKey, SecretKey};
 use orchestra_types::{BitcoinNetwork, StacksNetwork};
-use std::io::{BufReader, Read};
-use std::path::PathBuf;
-use std::{collections::BTreeMap, fs::File};
 use tiny_hderive::bip32::ExtendedPrivKey;
 use toml::value::Value;
 
@@ -537,7 +538,7 @@ pub fn compute_addresses(
     derivation_path: &str,
     networks: &(BitcoinNetwork, StacksNetwork),
 ) -> (String, String, String) {
-    let bip39_seed = match mnemonic::get_bip39_seed_from_mnemonic(&mnemonic, "") {
+    let bip39_seed = match get_bip39_seed_from_mnemonic(&mnemonic, "") {
         Ok(bip39_seed) => bip39_seed,
         Err(_) => panic!(),
     };
@@ -562,15 +563,14 @@ pub fn compute_addresses(
     let stx_address = StacksAddress::from_public_key(version, pub_key).unwrap();
 
     let btc_address = {
-        use bitcoincore_rpc::bitcoin::{Address, Network, PublicKey};
-        let public_key = PublicKey::from_slice(&public_key.serialize_compressed())
+        let public_key = bitcoin::PublicKey::from_slice(&public_key.serialize_compressed())
             .expect("Unable to recreate public key");
-        let btc_address = Address::p2pkh(
+        let btc_address = bitcoin::Address::p2pkh(
             &public_key,
             match networks.0 {
-                BitcoinNetwork::Regtest => Network::Regtest,
-                BitcoinNetwork::Testnet => Network::Testnet,
-                BitcoinNetwork::Mainnet => Network::Bitcoin,
+                BitcoinNetwork::Regtest => bitcoin::Network::Regtest,
+                BitcoinNetwork::Testnet => bitcoin::Network::Testnet,
+                BitcoinNetwork::Mainnet => bitcoin::Network::Bitcoin,
             },
         );
         btc_address.to_string()

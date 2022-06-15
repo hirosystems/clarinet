@@ -1,0 +1,22 @@
+[package]
+name = "clarinet-types"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+serde = "1"
+serde_json = "1"
+serde_derive = "1"
+clarinet_utils = { package = "clarinet-utils", path = "../clarinet-utils" }
+orchestra_types = { package = "orchestra-types", path = "../orchestra-types-rs" }
+bip39 = { version = "1.0.1", default-features = false }
+clarity_repl = { package = "clarity-repl", version = "=0.28.2" }
+libsecp256k1 = "0.7.0"
+toml = { version = "0.5.6", features = ["preserve_order"] }
+dirs = "4.0.0"
+tiny-hderive = "0.3.0"
+bitcoincore-rpc = "0.14.0"
+
+[lib]
+name = "clarinet_types"
+path = "src/lib.rs"
