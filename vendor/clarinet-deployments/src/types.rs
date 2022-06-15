@@ -5,14 +5,30 @@ use clarity_repl::clarity::types::{
 use clarity_repl::clarity::{ClarityName, ContractName};
 
 use serde::{Deserialize, Serialize};
+use serde_yaml;
 use std::collections::BTreeMap;
+use std::fs;
 use std::fs::File;
 use std::io::{BufReader, Read};
 use std::path::PathBuf;
 
-use std::fs;
-
 use orchestra_types::StacksNetwork;
+
+use clarity_repl::analysis::ast_dependency_detector::DependencySet;
+use clarity_repl::clarity::analysis::ContractAnalysis;
+use clarity_repl::clarity::ast::ContractAST;
+use clarity_repl::clarity::diagnostic::Diagnostic;
+use clarity_repl::repl::Session;
+use std::collections::HashMap;
+
+pub struct DeploymentGenerationArtifacts {
+    pub asts: HashMap<QualifiedContractIdentifier, ContractAST>,
+    pub deps: HashMap<QualifiedContractIdentifier, DependencySet>,
+    pub diags: HashMap<QualifiedContractIdentifier, Vec<Diagnostic>>,
+    pub analysis: HashMap<QualifiedContractIdentifier, ContractAnalysis>,
+    pub session: Session,
+    pub success: bool,
+}
 
 #[derive(Debug, PartialEq, Clone)]
 pub struct TransactionPlanSpecification {
@@ -824,61 +840,5 @@ impl TransactionPlanSpecification {
         }
 
         TransactionPlanSpecificationFile { batches }
-    }
-}
-
-pub struct DeploymentSynthesis {
-    pub blocks_count: u64,
-    pub total_cost: u64,
-    pub content: String,
-}
-
-impl std::fmt::Display for DeploymentSynthesis {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        let base: u64 = 10;
-        let int_part = self.total_cost / base.pow(6);
-        let frac_part = self.total_cost % base.pow(6);
-        let formatted_total_cost = format!("{}.{:08}", int_part, frac_part);
-        write!(
-            f,
-            "{}\n\n{}\n{}",
-            green!(format!("{}", self.content)),
-            blue!(format!("Total cost:\t{} STX", formatted_total_cost)),
-            blue!(format!("Duration:\t{} blocks", self.blocks_count))
-        )
-    }
-}
-
-impl DeploymentSynthesis {
-    pub fn from_deployment(
-        deployment: &clarinet_deployments::types::DeploymentSpecification,
-    ) -> DeploymentSynthesis {
-        let mut blocks_count = 0;
-        let mut total_cost = 0;
-        for batch in deployment.plan.batches.iter() {
-            blocks_count += 1;
-            for tx in batch.transactions.iter() {
-                match tx {
-                    clarinet_deployments::types::TransactionSpecification::ContractCall(tx) => {
-                        total_cost += tx.cost;
-                    }
-                    clarinet_deployments::types::TransactionSpecification::ContractPublish(tx) => {
-                        total_cost += tx.cost;
-                    }
-                    _ => {}
-                }
-            }
-        }
-        let file = deployment.to_specification_file();
-        let content = match serde_yaml::to_string(&file) {
-            Ok(res) => res,
-            Err(err) => panic!("unable to serialize deployment {}", err),
-        };
-
-        return DeploymentSynthesis {
-            total_cost,
-            blocks_count,
-            content,
-        };
     }
 }

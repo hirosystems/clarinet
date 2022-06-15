@@ -12,7 +12,7 @@ use bitcoincore_rpc::RpcApi;
 use bitcoincore_rpc_json::ListUnspentResultEntry;
 use clarity_repl::clarity::util::hash::bytes_to_hex;
 
-use super::types::BtcTransferSpecification;
+use clarinet_deployments::types::BtcTransferSpecification;
 
 pub fn build_transaction_spec(
     tx_spec: &BtcTransferSpecification,
