@@ -3,33 +3,30 @@ pub mod types;
 mod ui;
 
 use bitcoincore_rpc::{Auth, Client};
-use clarity_repl::clarity::diagnostic::DiagnosableError;
+
 use clarity_repl::clarity::types::StandardPrincipalData;
 use clarity_repl::clarity::{ClarityName, Value};
 use reqwest::Url;
 pub use ui::start_ui;
 
 use clarinet_deployments::types::{
-    ContractPublishSpecification, DeploymentGenerationArtifacts, DeploymentSpecification,
-    EmulatedContractPublishSpecification, GenesisSpecification, RequirementPublishSpecification,
-    TransactionPlanSpecification, TransactionSpecification, TransactionsBatchSpecification,
-    WalletSpecification,
+    DeploymentGenerationArtifacts, DeploymentSpecification, TransactionSpecification,
 };
 
 use clarinet_types::{AccountConfig, ChainConfig, ProjectManifest};
 use clarinet_utils::get_bip39_seed_from_mnemonic;
 
-use clarity_repl::analysis::ast_dependency_detector::{ASTDependencyDetector, DependencySet};
-use clarity_repl::clarity::analysis::ContractAnalysis;
-use clarity_repl::clarity::ast::ContractAST;
+
+
+
 use clarity_repl::clarity::codec::transaction::{
     StacksTransaction, StacksTransactionSigner, TransactionAnchorMode, TransactionAuth,
     TransactionContractCall, TransactionPayload, TransactionPostConditionMode,
     TransactionPublicKeyEncoding, TransactionSmartContract, TransactionSpendingCondition,
 };
 use clarity_repl::clarity::codec::StacksMessageCodec;
-use clarity_repl::clarity::diagnostic::Diagnostic;
-use clarity_repl::clarity::types::{PrincipalData, QualifiedContractIdentifier};
+
+use clarity_repl::clarity::types::{QualifiedContractIdentifier};
 use clarity_repl::clarity::util::{
     C32_ADDRESS_VERSION_MAINNET_SINGLESIG, C32_ADDRESS_VERSION_TESTNET_SINGLESIG,
 };
@@ -48,12 +45,12 @@ use clarity_repl::clarity::{
     },
 };
 use clarity_repl::repl::SessionSettings;
-use clarity_repl::repl::{ExecutionResult, Session};
+use clarity_repl::repl::{Session};
 use libsecp256k1::{PublicKey, SecretKey};
 use orchestra_types::StacksNetwork;
 use serde_yaml;
 use stacks_rpc_client::StacksRpc;
-use std::collections::{BTreeMap, HashMap, HashSet, VecDeque};
+use std::collections::{BTreeMap, HashSet, VecDeque};
 use std::fs::{self, File};
 use std::io::Write;
 use std::path::PathBuf;

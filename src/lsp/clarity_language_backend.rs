@@ -6,7 +6,14 @@ use std::sync::Arc;
 use std::sync::Mutex;
 
 use tower_lsp::jsonrpc::Result;
-use tower_lsp::lsp_types::*;
+use tower_lsp::lsp_types::{
+    CompletionOptions, CompletionParams, CompletionResponse, DeclarationCapability,
+    DidChangeTextDocumentParams, DidCloseTextDocumentParams, DidOpenTextDocumentParams,
+    DidSaveTextDocumentParams, ExecuteCommandParams, HoverProviderCapability, InitializeParams,
+    InitializeResult, InitializedParams, MessageType, ServerCapabilities,
+    TextDocumentSyncCapability, TextDocumentSyncKind, TextDocumentSyncOptions,
+    TextDocumentSyncSaveOptions,
+};
 use tower_lsp::{async_trait, Client, LanguageServer};
 
 // The LSP is being initialized when clarity files are being detected in the project.
@@ -140,7 +147,9 @@ impl LanguageServer for ClarityLanguageBackend {
             self.client.publish_diagnostics(url, diags, None).await;
         }
         if let Some((level, message)) = notification {
-            self.client.show_message(level, message).await;
+            self.client
+                .show_message(message_level_type_to_tower_lsp_type(&level), message)
+                .await;
         }
     }
 
@@ -179,7 +188,9 @@ impl LanguageServer for ClarityLanguageBackend {
             self.client.publish_diagnostics(url, diags, None).await;
         }
         if let Some((level, message)) = notification {
-            self.client.show_message(level, message).await;
+            self.client
+                .show_message(message_level_type_to_tower_lsp_type(&level), message)
+                .await;
         }
     }
 
@@ -215,4 +226,59 @@ impl LanguageServer for ClarityLanguageBackend {
     // fn document_highlight(&self, _: TextDocumentPositionParams) -> Self::HighlightFuture {
     //     Box::new(future::ok(None))
     // }
+}
+
+// pub fn diagnostic_lsp_type_to_tower_lsp_type(diagnostic: &mut clarity_lsp::lsp_types::Diagnostic) -> tower_lsp::lsp_types::Diagnostic {
+//     tower_lsp::lsp_types::Diagnostic {
+//         range: range_lsp_type_to_tower_lsp_type(diagnostic.range),
+//         severity: diagnostic.severity.and_then(|s| Some(severity_lsp_type_to_tower_lsp_type(s))),
+//         code: diagnostic.code.and_then(|s| Some(number_or_string_lsp_type_to_tower_lsp_type(s))),
+//         code_description: diagnostic.code_description.take(),
+//         source: diagnostic.source.take(),
+//         message: diagnostic.message.take(),
+//         related_information: diag.related_information,
+//         tags: diag.tags,
+//         data: diag.data,
+//     }
+// }
+
+// pub fn range_lsp_type_to_tower_lsp_type(range: clarity_lsp::lsp_types::Range) -> tower_lsp::lsp_types::Range {
+//     tower_lsp::lsp_types::Range {
+//         start: position_lsp_type_to_tower_lsp_type(range.start),
+//         end: position_lsp_type_to_tower_lsp_type(range.end),
+//     }
+// }
+
+// pub fn position_lsp_type_to_tower_lsp_type(position: clarity_lsp::lsp_types::Position) -> tower_lsp::lsp_types::Position {
+//     tower_lsp::lsp_types::Position {
+//         line: position.line,
+//         character: position.character,
+//     }
+// }
+
+// pub fn severity_lsp_type_to_tower_lsp_type(severity: clarity_lsp::lsp_types::DiagnosticSeverity) -> tower_lsp::lsp_types::DiagnosticSeverity {
+//     match severity {
+//         clarity_lsp::lsp_types::DiagnosticSeverity::ERROR => tower_lsp::lsp_types::DiagnosticSeverity::Error,
+//         clarity_lsp::lsp_types::DiagnosticSeverity::WARNING => tower_lsp::lsp_types::DiagnosticSeverity::Warning,
+//         clarity_lsp::lsp_types::DiagnosticSeverity::HINT => tower_lsp::lsp_types::DiagnosticSeverity::Hint,
+//         clarity_lsp::lsp_types::DiagnosticSeverity::INFORMATION => tower_lsp::lsp_types::DiagnosticSeverity::Information,
+//     }
+// }
+
+// pub fn number_or_string_lsp_type_to_tower_lsp_type(number_or_string: clarity_lsp::lsp_types::NumberOrString) -> tower_lsp::lsp_types::NumberOrString {
+//     match number_or_string {
+//         clarity_lsp::lsp_types::NumberOrString::Number(i) => tower_lsp::lsp_types::NumberOrString::Number(i),
+//         clarity_lsp::lsp_types::NumberOrString::String(s) => tower_lsp::lsp_types::NumberOrString::Number(s),
+//     }
+// }
+
+pub fn message_level_type_to_tower_lsp_type(
+    level: &clarity_lsp::lsp_types::MessageType,
+) -> tower_lsp::lsp_types::MessageType {
+    match level {
+        &clarity_lsp::lsp_types::MessageType::ERROR => tower_lsp::lsp_types::MessageType::Error,
+        &clarity_lsp::lsp_types::MessageType::WARNING => tower_lsp::lsp_types::MessageType::Warning,
+        &clarity_lsp::lsp_types::MessageType::INFO => tower_lsp::lsp_types::MessageType::Info,
+        _ => tower_lsp::lsp_types::MessageType::Log,
+    }
 }

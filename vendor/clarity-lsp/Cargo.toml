@@ -1,0 +1,20 @@
+[package]
+name = "clarity-lsp"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+clarity_repl = { package = "clarity-repl", version = "=0.28.2" }
+lsp-types = "0.93.0"
+orchestra_types = { package = "orchestra-types", path = "../orchestra-types-rs" }
+clarinet_types =  { package = "clarinet-types", path = "../clarinet-types-rs" }
+clarinet_deployments =  { package = "clarinet-deployments", path = "../clarinet-deployments" }
+
+# WASM
+wasm-bindgen = { version = "0.2", optional = true }
+wasm-bindgen-futures = { version = "0.4.24", optional = true }
+
+[lib]
+name = "clarity_lsp"
+path = "src/lib.rs"
+crate-type = ["cdylib", "rlib"]

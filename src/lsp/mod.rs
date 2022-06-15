@@ -1,23 +1,25 @@
 mod clarity_language_backend;
-mod utils;
-use crate::deployment::{
-    generate_default_deployment, initiate_session_from_deployment,
-    update_session_with_contracts_executions,
-};
-use crate::types::ProjectManifest;
+
+
 use clarity_language_backend::ClarityLanguageBackend;
-use clarity_repl::analysis::ast_dependency_detector::DependencySet;
-use clarity_repl::clarity::analysis::ContractAnalysis;
+use clarity_lsp::lsp_types::{MessageType, Url};
+use clarity_lsp::state::{build_state, EditorState, ProtocolState};
+use clarity_lsp::types::{CompletionItemKind};
+use clarity_lsp::utils;
+
+
 use clarity_repl::clarity::diagnostic::{Diagnostic as ClarityDiagnostic, Level as ClarityLevel};
-use clarity_repl::clarity::types::QualifiedContractIdentifier;
-use clarity_repl::repl::ast::ContractAST;
-use orchestra_types::StacksNetwork;
-use std::collections::{HashMap, HashSet};
+
+
+
+
 use std::path::PathBuf;
-use std::str::FromStr;
+
 use std::sync::mpsc::{self, Receiver, Sender};
 use tokio;
-use tower_lsp::lsp_types::*;
+use tower_lsp::lsp_types::{
+    Diagnostic, DiagnosticSeverity, Documentation, MarkupContent, MarkupKind, Position, Range,
+};
 use tower_lsp::{LspService, Server};
 
 pub fn run_lsp() {
@@ -52,282 +54,6 @@ async fn do_run_lsp() -> Result<(), String> {
     Ok(())
 }
 
-#[allow(dead_code)]
-#[derive(Debug, Clone)]
-enum Symbol {
-    PublicFunction,
-    ReadonlyFunction,
-    PrivateFunction,
-    ImportedTrait,
-    LocalVariable,
-    Constant,
-    DataMap,
-    DataVar,
-    FungibleToken,
-    NonFungibleToken,
-}
-
-#[derive(Debug, Clone, Default, PartialEq)]
-pub struct CompletionMaps {
-    pub inter_contract: Vec<CompletionItem>,
-    pub intra_contract: Vec<CompletionItem>,
-    pub data_fields: Vec<CompletionItem>,
-}
-
-#[derive(Debug, Clone, PartialEq)]
-pub struct ContractState {
-    intellisense: CompletionMaps,
-    errors: Vec<Diagnostic>,
-    warnings: Vec<Diagnostic>,
-    notes: Vec<Diagnostic>,
-    contract_id: QualifiedContractIdentifier,
-    analysis: Option<ContractAnalysis>,
-    path: PathBuf,
-}
-
-impl ContractState {
-    pub fn new(
-        contract_id: QualifiedContractIdentifier,
-        _ast: ContractAST,
-        _deps: DependencySet,
-        mut diags: Vec<ClarityDiagnostic>,
-        analysis: Option<ContractAnalysis>,
-        path: PathBuf,
-    ) -> ContractState {
-        let mut errors = vec![];
-        let mut warnings = vec![];
-        let mut notes = vec![];
-
-        for diag in diags.drain(..) {
-            match diag.level {
-                ClarityLevel::Error => {
-                    errors.push(utils::convert_clarity_diagnotic_to_lsp_diagnostic(&diag));
-                }
-                ClarityLevel::Warning => {
-                    warnings.push(utils::convert_clarity_diagnotic_to_lsp_diagnostic(&diag));
-                }
-                ClarityLevel::Note => {
-                    notes.push(utils::convert_clarity_diagnotic_to_lsp_diagnostic(&diag));
-                }
-            }
-        }
-
-        let intellisense = match analysis {
-            Some(ref analysis) => utils::build_intellisense(&analysis),
-            None => CompletionMaps::default(),
-        };
-
-        ContractState {
-            contract_id,
-            intellisense,
-            errors,
-            warnings,
-            notes,
-            analysis,
-            path,
-        }
-    }
-}
-
-#[derive(Clone, Default, Debug)]
-pub struct EditorState {
-    protocols: HashMap<PathBuf, ProtocolState>,
-    contracts_lookup: HashMap<Url, PathBuf>,
-    native_functions: Vec<CompletionItem>,
-}
-
-impl EditorState {
-    pub fn new() -> EditorState {
-        EditorState {
-            protocols: HashMap::new(),
-            contracts_lookup: HashMap::new(),
-            native_functions: utils::build_default_native_keywords_list(),
-        }
-    }
-
-    pub fn index_protocol(&mut self, manifest_path: PathBuf, protocol: ProtocolState) {
-        for (contract_uri, _) in protocol.contracts.iter() {
-            self.contracts_lookup
-                .insert(contract_uri.clone(), manifest_path.clone());
-        }
-        self.protocols.insert(manifest_path, protocol);
-    }
-
-    pub fn clear_protocol(&mut self, manifest_path: &PathBuf) {
-        if let Some(protocol) = self.protocols.remove(manifest_path) {
-            for (contract_uri, _) in protocol.contracts.iter() {
-                self.contracts_lookup.remove(contract_uri);
-            }
-        }
-    }
-
-    pub fn clear_protocol_associated_with_contract(
-        &mut self,
-        contract_url: &Url,
-    ) -> Option<PathBuf> {
-        match self.contracts_lookup.get(&contract_url) {
-            Some(manifest_path) => {
-                let manifest_path = manifest_path.clone();
-                self.clear_protocol(&manifest_path);
-                Some(manifest_path)
-            }
-            None => None,
-        }
-    }
-
-    pub fn get_completion_items_for_contract(&self, contract_url: &Url) -> Vec<CompletionItem> {
-        let mut keywords = self.native_functions.clone();
-
-        let mut user_defined_keywords = self
-            .contracts_lookup
-            .get(&contract_url)
-            .and_then(|p| self.protocols.get(p))
-            .and_then(|p| Some(p.get_completion_items_for_contract(contract_url)))
-            .unwrap_or_default();
-
-        keywords.append(&mut user_defined_keywords);
-        keywords
-    }
-
-    pub fn get_aggregated_diagnostics(
-        &self,
-    ) -> (Vec<(Url, Vec<Diagnostic>)>, Option<(MessageType, String)>) {
-        let mut contracts = vec![];
-        let mut erroring_files = HashSet::new();
-        let mut warning_files = HashSet::new();
-
-        for (_, protocol_state) in self.protocols.iter() {
-            for (contract_url, state) in protocol_state.contracts.iter() {
-                let mut diags = vec![];
-
-                // Convert and collect errors
-                if !state.errors.is_empty() {
-                    if let Some(file_name) = state.path.file_name().and_then(|f| f.to_str()) {
-                        erroring_files.insert(file_name);
-                    }
-                    for error in state.errors.iter() {
-                        diags.push(error.clone());
-                    }
-                }
-
-                // Convert and collect warnings
-                if !state.warnings.is_empty() {
-                    if let Some(file_name) = state.path.file_name().and_then(|f| f.to_str()) {
-                        warning_files.insert(file_name);
-                    }
-                    for warning in state.warnings.iter() {
-                        diags.push(warning.clone());
-                    }
-                }
-
-                // Convert and collect notes
-                for note in state.notes.iter() {
-                    diags.push(note.clone());
-                }
-                contracts.push((contract_url.clone(), diags));
-            }
-        }
-
-        let tldr = match (erroring_files.len(), warning_files.len()) {
-            (0, 0) => None,
-            (0, warnings) if warnings > 0 => Some((
-                MessageType::Warning,
-                format!(
-                    "Warning detected in following contracts: {}",
-                    warning_files.into_iter().collect::<Vec<_>>().join(", ")
-                ),
-            )),
-            (errors, 0) if errors > 0 => Some((
-                MessageType::Error,
-                format!(
-                    "Errors detected in following contracts: {}",
-                    erroring_files.into_iter().collect::<Vec<_>>().join(", ")
-                ),
-            )),
-            (_errors, _warnings) => Some((
-                MessageType::Error,
-                format!(
-                    "Errors and warnings detected in following contracts: {}",
-                    erroring_files.into_iter().collect::<Vec<_>>().join(", ")
-                ),
-            )),
-        };
-
-        (contracts, tldr)
-    }
-}
-
-#[derive(Clone, Default, Debug)]
-pub struct ProtocolState {
-    contracts: HashMap<Url, ContractState>,
-}
-
-impl ProtocolState {
-    pub fn new() -> ProtocolState {
-        ProtocolState {
-            contracts: HashMap::new(),
-        }
-    }
-
-    pub fn consolidate(
-        &mut self,
-        paths: &mut HashMap<QualifiedContractIdentifier, (Url, PathBuf)>,
-        asts: &mut HashMap<QualifiedContractIdentifier, ContractAST>,
-        deps: &mut HashMap<QualifiedContractIdentifier, DependencySet>,
-        diags: &mut HashMap<QualifiedContractIdentifier, Vec<ClarityDiagnostic>>,
-        analyses: &mut HashMap<QualifiedContractIdentifier, Option<ContractAnalysis>>,
-    ) {
-        // Remove old paths
-        // TODO(lgalabru)
-
-        // Add / Replace new paths
-        for (contract_id, (url, path)) in paths.iter() {
-            let (contract_id, ast) = match asts.remove_entry(&contract_id) {
-                Some(ast) => ast,
-                None => continue,
-            };
-            let deps = match deps.remove(&contract_id) {
-                Some(deps) => deps,
-                None => DependencySet::new(),
-            };
-            let diags = match diags.remove(&contract_id) {
-                Some(diags) => diags,
-                None => vec![],
-            };
-            let analysis = match analyses.remove(&contract_id) {
-                Some(analysis) => analysis,
-                None => None,
-            };
-
-            let contract_state =
-                ContractState::new(contract_id, ast, deps, diags, analysis, path.clone());
-            self.contracts.insert(url.clone(), contract_state);
-        }
-    }
-
-    pub fn get_completion_items_for_contract(&self, contract_uri: &Url) -> Vec<CompletionItem> {
-        let mut keywords = vec![];
-
-        let (mut contract_keywords, mut contract_calls) = {
-            let contract_keywords = match self.contracts.get(&contract_uri) {
-                Some(entry) => entry.intellisense.intra_contract.clone(),
-                _ => vec![],
-            };
-            let mut contract_calls = vec![];
-            for (url, contract_state) in self.contracts.iter() {
-                if !contract_uri.eq(url) {
-                    contract_calls.append(&mut contract_state.intellisense.inter_contract.clone());
-                }
-            }
-            (contract_keywords, contract_calls)
-        };
-
-        keywords.append(&mut contract_keywords);
-        keywords.append(&mut contract_calls);
-        keywords
-    }
-}
-
 pub enum LspRequest {
     ManifestOpened(PathBuf, Sender<Response>),
     ManifestChanged(PathBuf, Sender<Response>),
@@ -336,11 +62,21 @@ pub enum LspRequest {
     GetIntellisense(Url, Sender<Response>),
 }
 
-#[derive(Default, Debug, PartialEq)]
+#[derive(Debug, PartialEq)]
 pub struct Response {
     aggregated_diagnostics: Vec<(Url, Vec<Diagnostic>)>,
     notification: Option<(MessageType, String)>,
-    completion_items: Vec<CompletionItem>,
+    completion_items: Vec<tower_lsp::lsp_types::CompletionItem>,
+}
+
+impl Response {
+    pub fn default() -> Response {
+        Response {
+            aggregated_diagnostics: vec![],
+            notification: None,
+            completion_items: vec![],
+        }
+    }
 }
 
 impl Response {
@@ -348,7 +84,7 @@ impl Response {
         Response {
             aggregated_diagnostics: vec![],
             completion_items: vec![],
-            notification: Some((MessageType::Error, format!("Internal error: {}", message))),
+            notification: Some((MessageType::ERROR, format!("Internal error: {}", message))),
         }
     }
 }
@@ -365,9 +101,9 @@ fn start_server(command_rx: Receiver<LspRequest>) {
         };
         match command {
             LspRequest::GetIntellisense(contract_url, response_tx) => {
-                let mut completion_items =
+                let mut completion_items_src =
                     editor_state.get_completion_items_for_contract(&contract_url);
-
+                let mut completion_items = vec![];
                 // Little big detail: should we wrap the inserted_text with braces?
                 let should_wrap = {
                     // let line = params.text_document_position.position.line;
@@ -381,18 +117,18 @@ fn start_server(command_rx: Receiver<LspRequest>) {
                     true
                 };
                 if should_wrap {
-                    for item in completion_items.iter_mut() {
+                    for mut item in completion_items_src.drain(..) {
                         match item.kind {
-                            Some(CompletionItemKind::Event)
-                            | Some(CompletionItemKind::Function)
-                            | Some(CompletionItemKind::Module)
-                            | Some(CompletionItemKind::Class)
-                            | Some(CompletionItemKind::Method) => {
+                            CompletionItemKind::Event
+                            | CompletionItemKind::Function
+                            | CompletionItemKind::Module
+                            | CompletionItemKind::Class => {
                                 item.insert_text =
                                     Some(format!("({})", item.insert_text.take().unwrap()));
                             }
                             _ => {}
                         }
+                        completion_items.push(completion_item_type_to_tower_lsp_type(&mut item));
                     }
                 }
 
@@ -418,7 +154,12 @@ fn start_server(command_rx: Receiver<LspRequest>) {
                         let (aggregated_diagnostics, notification) =
                             editor_state.get_aggregated_diagnostics();
                         let _ = response_tx.send(Response {
-                            aggregated_diagnostics,
+                            aggregated_diagnostics: aggregated_diagnostics
+                                .into_iter()
+                                .map(|(url, mut diags)| {
+                                    (url, clarity_diagnotics_to_tower_lsp_type(&mut diags))
+                                })
+                                .collect::<Vec<_>>(),
                             notification,
                             completion_items: vec![],
                         });
@@ -453,7 +194,12 @@ fn start_server(command_rx: Receiver<LspRequest>) {
                         let (aggregated_diagnostics, notification) =
                             editor_state.get_aggregated_diagnostics();
                         let _ = response_tx.send(Response {
-                            aggregated_diagnostics,
+                            aggregated_diagnostics: aggregated_diagnostics
+                                .into_iter()
+                                .map(|(url, mut diags)| {
+                                    (url, clarity_diagnotics_to_tower_lsp_type(&mut diags))
+                                })
+                                .collect::<Vec<_>>(),
                             notification,
                             completion_items: vec![],
                         });
@@ -474,7 +220,12 @@ fn start_server(command_rx: Receiver<LspRequest>) {
                         let (aggregated_diagnostics, notification) =
                             editor_state.get_aggregated_diagnostics();
                         let _ = response_tx.send(Response {
-                            aggregated_diagnostics,
+                            aggregated_diagnostics: aggregated_diagnostics
+                                .into_iter()
+                                .map(|(url, mut diags)| {
+                                    (url, clarity_diagnotics_to_tower_lsp_type(&mut diags))
+                                })
+                                .collect::<Vec<_>>(),
                             notification,
                             completion_items: vec![],
                         });
@@ -506,7 +257,12 @@ fn start_server(command_rx: Receiver<LspRequest>) {
                         let (aggregated_diagnostics, notification) =
                             editor_state.get_aggregated_diagnostics();
                         let _ = response_tx.send(Response {
-                            aggregated_diagnostics,
+                            aggregated_diagnostics: aggregated_diagnostics
+                                .into_iter()
+                                .map(|(url, mut diags)| {
+                                    (url, clarity_diagnotics_to_tower_lsp_type(&mut diags))
+                                })
+                                .collect::<Vec<_>>(),
                             notification,
                             completion_items: vec![],
                         });
@@ -520,75 +276,117 @@ fn start_server(command_rx: Receiver<LspRequest>) {
     }
 }
 
-pub fn build_state(
-    manifest_path: &PathBuf,
-    protocol_state: &mut ProtocolState,
-) -> Result<(), String> {
-    let mut paths = HashMap::new();
-    let mut analyses = HashMap::new();
+pub fn completion_item_type_to_tower_lsp_type(
+    item: &mut clarity_lsp::types::CompletionItem,
+) -> tower_lsp::lsp_types::CompletionItem {
+    tower_lsp::lsp_types::CompletionItem {
+        label: item.label.clone(),
+        kind: Some(completion_item_kind_lsp_type_to_tower_lsp_type(&item.kind)),
+        detail: item.detail.take(),
+        documentation: item.markdown_documentation.take().and_then(|doc| {
+            Some(Documentation::MarkupContent(MarkupContent {
+                kind: MarkupKind::Markdown,
+                value: doc,
+            }))
+        }),
+        deprecated: None,
+        preselect: None,
+        sort_text: None,
+        filter_text: None,
+        insert_text: item.insert_text.take(),
+        insert_text_format: Some(insert_text_format_lsp_type_to_tower_lsp_type(
+            &item.insert_text_format,
+        )),
+        insert_text_mode: None,
+        text_edit: None,
+        additional_text_edits: None,
+        command: None,
+        commit_characters: None,
+        data: None,
+        tags: None,
+    }
+}
 
-    // In the LSP use case, trying to load an existing deployment
-    // might not be suitable, in an edition context, we should
-    // expect contracts to be created, edited, removed.
-    // A on-disk deployment could quickly lead to an outdated
-    // view of the repo.
-    let manifest = ProjectManifest::from_path(manifest_path)?;
-
-    let (deployment, mut artifacts) =
-        generate_default_deployment(&manifest, &StacksNetwork::Simnet, false)?;
-
-    let mut session = initiate_session_from_deployment(&manifest);
-    let results = update_session_with_contracts_executions(
-        &mut session,
-        &deployment,
-        Some(&artifacts.asts),
-        false,
-    );
-    for (contract_id, mut result) in results.into_iter() {
-        let (url, path) = {
-            let (_, relative_path) = match deployment.contracts.get(&contract_id) {
-                Some(entry) => entry,
-                None => continue,
-            };
-            let relative_path = PathBuf::from_str(relative_path).expect(&format!(
-                "Unable to build path for contract {}",
-                contract_id
-            ));
-            let mut path = manifest_path.clone();
-            path.pop();
-            path.extend(&relative_path);
-            let url = Url::from_file_path(&path).unwrap();
-            (url, path)
-        };
-        paths.insert(contract_id.clone(), (url, path));
-
-        let contract_analysis = match result {
-            Ok(ref mut execution_result) => {
-                if let Some(entry) = artifacts.diags.get_mut(&contract_id) {
-                    entry.append(&mut execution_result.diagnostics);
-                }
-                execution_result.contract.take()
-            }
-            Err(ref mut diags) => {
-                if let Some(entry) = artifacts.diags.get_mut(&contract_id) {
-                    entry.append(diags);
-                }
-                continue;
-            }
-        };
-        if let Some((_, _, _, _, contract_analysis)) = contract_analysis {
-            analyses.insert(contract_id.clone(), Some(contract_analysis));
+pub fn completion_item_kind_lsp_type_to_tower_lsp_type(
+    kind: &clarity_lsp::types::CompletionItemKind,
+) -> tower_lsp::lsp_types::CompletionItemKind {
+    match kind {
+        clarity_lsp::types::CompletionItemKind::Class => {
+            tower_lsp::lsp_types::CompletionItemKind::Class
+        }
+        clarity_lsp::types::CompletionItemKind::Event => {
+            tower_lsp::lsp_types::CompletionItemKind::Event
+        }
+        clarity_lsp::types::CompletionItemKind::Field => {
+            tower_lsp::lsp_types::CompletionItemKind::Field
+        }
+        clarity_lsp::types::CompletionItemKind::Function => {
+            tower_lsp::lsp_types::CompletionItemKind::Function
+        }
+        clarity_lsp::types::CompletionItemKind::Module => {
+            tower_lsp::lsp_types::CompletionItemKind::Module
+        }
+        clarity_lsp::types::CompletionItemKind::TypeParameter => {
+            tower_lsp::lsp_types::CompletionItemKind::TypeParameter
         }
     }
+}
 
-    protocol_state.consolidate(
-        &mut paths,
-        &mut artifacts.asts,
-        &mut artifacts.deps,
-        &mut artifacts.diags,
-        &mut analyses,
-    );
-    Ok(())
+pub fn insert_text_format_lsp_type_to_tower_lsp_type(
+    kind: &clarity_lsp::types::InsertTextFormat,
+) -> tower_lsp::lsp_types::InsertTextFormat {
+    match kind {
+        clarity_lsp::types::InsertTextFormat::PlainText => {
+            tower_lsp::lsp_types::InsertTextFormat::PlainText
+        }
+        clarity_lsp::types::InsertTextFormat::Snippet => {
+            tower_lsp::lsp_types::InsertTextFormat::Snippet
+        }
+    }
+}
+
+pub fn clarity_diagnotics_to_tower_lsp_type(
+    diagnostics: &mut Vec<ClarityDiagnostic>,
+) -> Vec<tower_lsp::lsp_types::Diagnostic> {
+    let mut dst = vec![];
+    for d in diagnostics.iter_mut() {
+        dst.push(clarity_diagnotic_to_tower_lsp_type(d));
+    }
+    dst
+}
+
+pub fn clarity_diagnotic_to_tower_lsp_type(
+    diagnostic: &ClarityDiagnostic,
+) -> tower_lsp::lsp_types::Diagnostic {
+    let range = match diagnostic.spans.len() {
+        0 => Range::default(),
+        _ => Range {
+            start: Position {
+                line: diagnostic.spans[0].start_line - 1,
+                character: diagnostic.spans[0].start_column - 1,
+            },
+            end: Position {
+                line: diagnostic.spans[0].end_line - 1,
+                character: diagnostic.spans[0].end_column,
+            },
+        },
+    };
+    // TODO(lgalabru): add hint for contracts not found errors
+    Diagnostic {
+        range,
+        severity: match diagnostic.level {
+            ClarityLevel::Error => Some(DiagnosticSeverity::Error),
+            ClarityLevel::Warning => Some(DiagnosticSeverity::Warning),
+            ClarityLevel::Note => Some(DiagnosticSeverity::Information),
+        },
+        code: None,
+        code_description: None,
+        source: Some("clarity".to_string()),
+        message: diagnostic.message.clone(),
+        related_information: None,
+        tags: None,
+        data: None,
+    }
 }
 
 #[test]

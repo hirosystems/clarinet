@@ -1,4 +1,4 @@
-use super::CompletionMaps;
+use super::types::*;
 use clarity_repl::clarity::analysis::ContractAnalysis;
 use clarity_repl::clarity::diagnostic::{Diagnostic as ClarityDiagnostic, Level as ClarityLevel};
 use clarity_repl::clarity::docs::{
@@ -8,9 +8,9 @@ use clarity_repl::clarity::functions::define::DefineFunctions;
 use clarity_repl::clarity::functions::NativeFunctions;
 use clarity_repl::clarity::types::{BlockInfoProperty, FunctionType};
 use clarity_repl::clarity::variables::NativeVariables;
+use lsp_types::Diagnostic as LspDiagnostic;
+use lsp_types::{DiagnosticSeverity, Position, Range, Url};
 use std::path::PathBuf;
-use tower_lsp::lsp_types::Diagnostic as LspDiagnostic;
-use tower_lsp::lsp_types::*;
 
 pub fn convert_clarity_diagnotic_to_lsp_diagnostic(
     diagnostic: &ClarityDiagnostic,
@@ -32,9 +32,9 @@ pub fn convert_clarity_diagnotic_to_lsp_diagnostic(
     LspDiagnostic {
         range,
         severity: match diagnostic.level {
-            ClarityLevel::Error => Some(DiagnosticSeverity::Error),
-            ClarityLevel::Warning => Some(DiagnosticSeverity::Warning),
-            ClarityLevel::Note => Some(DiagnosticSeverity::Information),
+            ClarityLevel::Error => Some(DiagnosticSeverity::ERROR),
+            ClarityLevel::Warning => Some(DiagnosticSeverity::WARNING),
+            ClarityLevel::Note => Some(DiagnosticSeverity::INFORMATION),
         },
         code: None,
         code_description: None,
@@ -67,22 +67,11 @@ pub fn build_intellisense(analysis: &ContractAnalysis) -> CompletionMaps {
         let insert_text = format!("{} {}", name, build_intellisense_args(signature).join(" "));
         intra_contract.push(CompletionItem {
             label: name.to_string(),
-            kind: Some(CompletionItemKind::Module),
+            kind: CompletionItemKind::Module,
             detail: None,
-            documentation: None,
-            deprecated: None,
-            preselect: None,
-            sort_text: None,
-            filter_text: None,
+            markdown_documentation: None,
             insert_text: Some(insert_text),
-            insert_text_format: Some(InsertTextFormat::Snippet),
-            insert_text_mode: None,
-            text_edit: None,
-            additional_text_edits: None,
-            command: None,
-            commit_characters: None,
-            data: None,
-            tags: None,
+            insert_text_format: InsertTextFormat::Snippet,
         });
 
         let label = format!(
@@ -99,22 +88,11 @@ pub fn build_intellisense(analysis: &ContractAnalysis) -> CompletionMaps {
         );
         inter_contract.push(CompletionItem {
             label,
-            kind: Some(CompletionItemKind::Event),
+            kind: CompletionItemKind::Event,
             detail: None,
-            documentation: None,
-            deprecated: None,
-            preselect: None,
-            sort_text: None,
-            filter_text: None,
+            markdown_documentation: None,
             insert_text: Some(insert_text),
-            insert_text_format: Some(InsertTextFormat::Snippet),
-            insert_text_mode: None,
-            text_edit: None,
-            additional_text_edits: None,
-            command: None,
-            commit_characters: None,
-            data: None,
-            tags: None,
+            insert_text_format: InsertTextFormat::Snippet,
         });
     }
 
@@ -122,22 +100,11 @@ pub fn build_intellisense(analysis: &ContractAnalysis) -> CompletionMaps {
         let insert_text = format!("{} {}", name, build_intellisense_args(signature).join(" "));
         intra_contract.push(CompletionItem {
             label: name.to_string(),
-            kind: Some(CompletionItemKind::Module),
+            kind: CompletionItemKind::Module,
             detail: None,
-            documentation: None,
-            deprecated: None,
-            preselect: None,
-            sort_text: None,
-            filter_text: None,
+            markdown_documentation: None,
             insert_text: Some(insert_text),
-            insert_text_format: Some(InsertTextFormat::Snippet),
-            insert_text_mode: None,
-            text_edit: None,
-            additional_text_edits: None,
-            command: None,
-            commit_characters: None,
-            data: None,
-            tags: None,
+            insert_text_format: InsertTextFormat::Snippet,
         });
 
         let label = format!(
@@ -152,23 +119,12 @@ pub fn build_intellisense(analysis: &ContractAnalysis) -> CompletionMaps {
             build_intellisense_args(signature).join(" ")
         );
         inter_contract.push(CompletionItem {
-            label,
-            kind: Some(CompletionItemKind::Event),
+            label: name.to_string(),
+            kind: CompletionItemKind::Event,
             detail: None,
-            documentation: None,
-            deprecated: None,
-            preselect: None,
-            sort_text: None,
-            filter_text: None,
+            markdown_documentation: None,
             insert_text: Some(insert_text),
-            insert_text_format: Some(InsertTextFormat::Snippet),
-            insert_text_mode: None,
-            text_edit: None,
-            additional_text_edits: None,
-            command: None,
-            commit_characters: None,
-            data: None,
-            tags: None,
+            insert_text_format: InsertTextFormat::Snippet,
         });
     }
 
@@ -176,22 +132,11 @@ pub fn build_intellisense(analysis: &ContractAnalysis) -> CompletionMaps {
         let insert_text = format!("{} {}", name, build_intellisense_args(signature).join(" "));
         intra_contract.push(CompletionItem {
             label: name.to_string(),
-            kind: Some(CompletionItemKind::Module),
+            kind: CompletionItemKind::Module,
             detail: None,
-            documentation: None,
-            deprecated: None,
-            preselect: None,
-            sort_text: None,
-            filter_text: None,
+            markdown_documentation: None,
             insert_text: Some(insert_text),
-            insert_text_format: Some(InsertTextFormat::Snippet),
-            insert_text_mode: None,
-            text_edit: None,
-            additional_text_edits: None,
-            command: None,
-            commit_characters: None,
-            data: None,
-            tags: None,
+            insert_text_format: InsertTextFormat::Snippet,
         });
     }
 
@@ -209,25 +154,11 @@ pub fn build_default_native_keywords_list() -> Vec<CompletionItem> {
             let api = make_api_reference(&func);
             CompletionItem {
                 label: api.name.to_string(),
-                kind: Some(CompletionItemKind::Function),
+                kind: CompletionItemKind::Function,
                 detail: Some(api.name.to_string()),
-                documentation: Some(Documentation::MarkupContent(MarkupContent {
-                    kind: MarkupKind::Markdown,
-                    value: api.description.to_string(),
-                })),
-                deprecated: None,
-                preselect: None,
-                sort_text: None,
-                filter_text: None,
+                markdown_documentation: Some(api.description.to_string()),
                 insert_text: Some(api.snippet.clone()),
-                insert_text_format: Some(InsertTextFormat::Snippet),
-                insert_text_mode: None,
-                text_edit: None,
-                additional_text_edits: None,
-                command: None,
-                commit_characters: None,
-                data: None,
-                tags: None,
+                insert_text_format: InsertTextFormat::Snippet,
             }
         })
         .collect();
@@ -238,25 +169,11 @@ pub fn build_default_native_keywords_list() -> Vec<CompletionItem> {
             let api = make_define_reference(&func);
             CompletionItem {
                 label: api.name.to_string(),
-                kind: Some(CompletionItemKind::Class),
+                kind: CompletionItemKind::Class,
                 detail: Some(api.name.to_string()),
-                documentation: Some(Documentation::MarkupContent(MarkupContent {
-                    kind: MarkupKind::Markdown,
-                    value: api.description.to_string(),
-                })),
-                deprecated: None,
-                preselect: None,
-                sort_text: None,
-                filter_text: None,
+                markdown_documentation: Some(api.description.to_string()),
                 insert_text: Some(api.snippet.clone()),
-                insert_text_format: Some(InsertTextFormat::Snippet),
-                insert_text_mode: None,
-                text_edit: None,
-                additional_text_edits: None,
-                command: None,
-                commit_characters: None,
-                data: None,
-                tags: None,
+                insert_text_format: InsertTextFormat::Snippet,
             }
         })
         .collect();
@@ -267,25 +184,11 @@ pub fn build_default_native_keywords_list() -> Vec<CompletionItem> {
             let api = make_keyword_reference(&var);
             CompletionItem {
                 label: api.name.to_string(),
-                kind: Some(CompletionItemKind::Field),
+                kind: CompletionItemKind::Field,
                 detail: Some(api.name.to_string()),
-                documentation: Some(Documentation::MarkupContent(MarkupContent {
-                    kind: MarkupKind::Markdown,
-                    value: api.description.to_string(),
-                })),
-                deprecated: None,
-                preselect: None,
-                sort_text: None,
-                filter_text: None,
+                markdown_documentation: Some(api.description.to_string()),
                 insert_text: Some(api.snippet.to_string()),
-                insert_text_format: Some(InsertTextFormat::PlainText),
-                insert_text_mode: None,
-                text_edit: None,
-                additional_text_edits: None,
-                command: None,
-                commit_characters: None,
-                data: None,
-                tags: None,
+                insert_text_format: InsertTextFormat::PlainText,
             }
         })
         .collect();
@@ -293,7 +196,14 @@ pub fn build_default_native_keywords_list() -> Vec<CompletionItem> {
     let block_properties: Vec<CompletionItem> = BlockInfoProperty::ALL_NAMES
         .to_vec()
         .iter()
-        .map(|func| CompletionItem::new_simple(func.to_string(), "".to_string()))
+        .map(|func| CompletionItem {
+            label: func.to_string(),
+            kind: CompletionItemKind::Field,
+            detail: None,
+            markdown_documentation: None,
+            insert_text: Some(func.to_string()),
+            insert_text_format: InsertTextFormat::PlainText,
+        })
         .collect();
 
     let types = vec![
@@ -312,22 +222,11 @@ pub fn build_default_native_keywords_list() -> Vec<CompletionItem> {
     .iter()
     .map(|var| CompletionItem {
         label: var.to_string(),
-        kind: Some(CompletionItemKind::TypeParameter),
+        kind: CompletionItemKind::TypeParameter,
         detail: None,
-        documentation: None,
-        deprecated: None,
-        preselect: None,
-        sort_text: None,
-        filter_text: None,
+        markdown_documentation: None,
         insert_text: Some(var.to_string()),
-        insert_text_format: Some(InsertTextFormat::PlainText),
-        insert_text_mode: None,
-        text_edit: None,
-        additional_text_edits: None,
-        command: None,
-        commit_characters: None,
-        data: None,
-        tags: None,
+        insert_text_format: InsertTextFormat::PlainText,
     })
     .collect();
 
