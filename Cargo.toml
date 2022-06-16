@@ -82,7 +82,7 @@ serde_yaml = "0.8.23"
 orchestra_event_observer = { package = "orchestra-event-observer", default-features = false, path = "./vendor/orchestra-event-observer" }
 orchestra_types = { package = "orchestra-types", path = "./vendor/orchestra-types-rs" }
 stacks_rpc_client = { package = "stacks-rpc-client", path = "./vendor/stacks-rpc-client" }
-clarinet_types = { package = "clarinet-types", path = "./vendor/clarinet-types-rs" }
+clarinet_files = { package = "clarinet-files", path = "./vendor/clarinet-files" }
 clarity_lsp = { package = "clarity-lsp", path = "./vendor/clarity-lsp", features = ["cli"]  }
 clarinet_deployments = { package = "clarinet-deployments", path = "./vendor/clarinet-deployments", features = ["cli"] }
 clarinet_utils = { package = "clarinet-utils", path = "./vendor/clarinet-utils" }
@@ -147,7 +147,7 @@ members = [
     "vendor/deno/runtime/",
     "vendor/deno/core/",
     "vendor/orchestra-types-rs",
-    "vendor/clarinet-types-rs",
+    "vendor/clarinet-files",
     "vendor/clarinet-utils",
     "vendor/clarity-lsp",
     "vendor/orchestra-event-observer",

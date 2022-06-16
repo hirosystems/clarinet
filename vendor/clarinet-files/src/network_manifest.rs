@@ -1,8 +1,7 @@
 use clarinet_utils::get_bip39_seed_from_mnemonic;
-use std::io::{BufReader, Read};
-use std::path::PathBuf;
-use std::{collections::BTreeMap, fs::File};
+use std::collections::BTreeMap;
 
+use super::FileLocation;
 use bip39::{Language, Mnemonic};
 use bitcoincore_rpc::bitcoin;
 use clarity_repl::clarity::util::hash::bytes_to_hex;
@@ -25,7 +24,7 @@ pub const DEFAULT_HYPERCHAIN_CONTRACT_ID: &str =
     "STFTX3F4XCY7RS5VRHXP2SED0WC0YRKNWTNXD74P.hc-alpha";
 
 #[derive(Serialize, Deserialize, Debug)]
-pub struct ChainConfigFile {
+pub struct NetworkManifestFile {
     network: NetworkConfigFile,
     accounts: Option<Value>,
     devnet: Option<DevnetConfigFile>,
@@ -115,7 +114,7 @@ pub struct AccountConfigFile {
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
-pub struct ChainConfig {
+pub struct NetworkManifest {
     pub network: NetworkConfig,
     pub accounts: BTreeMap<String, AccountConfig>,
     pub devnet: Option<DevnetConfig>,
@@ -208,66 +207,60 @@ pub struct AccountConfig {
     pub is_mainnet: bool,
 }
 
-impl ChainConfig {
+impl NetworkManifest {
     #[allow(non_fmt_panics)]
-    pub fn from_manifest_path(
-        manifest_path: &PathBuf,
+    pub fn from_manifest_location(
+        manifest_location: &FileLocation,
         networks: &(BitcoinNetwork, StacksNetwork),
-    ) -> ChainConfig {
-        let mut chain_config_path = manifest_path.clone();
-        chain_config_path.pop();
-        chain_config_path.push("settings");
-        chain_config_path.push(match networks.1 {
-            StacksNetwork::Simnet | StacksNetwork::Devnet => "Devnet.toml",
-            StacksNetwork::Testnet => "Testnet.toml",
-            StacksNetwork::Mainnet => "Mainnet.toml",
-        });
-        let chain_config = ChainConfig::from_path(&chain_config_path, networks);
-        chain_config
+    ) -> Result<NetworkManifest, String> {
+        let mut network_manifest_location =
+            manifest_location.get_network_manifest_location(&networks.1)?;
+        NetworkManifest::from_location(&network_manifest_location, networks)
     }
 
     #[allow(non_fmt_panics)]
-    pub fn from_path(path: &PathBuf, networks: &(BitcoinNetwork, StacksNetwork)) -> ChainConfig {
-        let path = match File::open(path) {
-            Ok(path) => path,
-            Err(_) => {
-                let error = format!("Unable to open file {:?}", path.to_str());
-                panic!("{}", error)
-            }
-        };
-        let mut chain_config_file_reader = BufReader::new(path);
-        let mut chain_config_file_buffer = vec![];
-        chain_config_file_reader
-            .read_to_end(&mut chain_config_file_buffer)
-            .unwrap();
-        let mut chain_config_file: ChainConfigFile =
-            toml::from_slice(&chain_config_file_buffer[..]).unwrap();
-        ChainConfig::from_chain_config_file(&mut chain_config_file, networks)
+    pub fn from_location(
+        location: &FileLocation,
+        networks: &(BitcoinNetwork, StacksNetwork),
+    ) -> Result<NetworkManifest, String> {
+        let network_manifest_file_content = location.read_content()?;
+        let mut network_manifest_file: NetworkManifestFile =
+            toml::from_slice(&network_manifest_file_content[..]).unwrap();
+        Ok(NetworkManifest::from_network_manifest_file(
+            &mut network_manifest_file,
+            networks,
+        ))
     }
 
-    pub fn from_chain_config_file(
-        chain_config_file: &mut ChainConfigFile,
+    pub fn from_network_manifest_file(
+        network_manifest_file: &mut NetworkManifestFile,
         networks: &(BitcoinNetwork, StacksNetwork),
-    ) -> ChainConfig {
+    ) -> NetworkManifest {
         let stacks_node_rpc_address = match (
-            &chain_config_file.network.node_rpc_address,
-            &chain_config_file.network.stacks_node_rpc_address,
+            &network_manifest_file.network.node_rpc_address,
+            &network_manifest_file.network.stacks_node_rpc_address,
         ) {
             (Some(_), Some(url)) | (None, Some(url)) | (Some(url), None) => Some(url.clone()),
             _ => None,
         };
         let network = NetworkConfig {
-            name: chain_config_file.network.name.clone(),
+            name: network_manifest_file.network.name.clone(),
             stacks_node_rpc_address: stacks_node_rpc_address,
-            bitcoin_node_rpc_address: chain_config_file.network.bitcoin_node_rpc_address.clone(),
-            deployment_fee_rate: chain_config_file.network.deployment_fee_rate.unwrap_or(10),
-            sats_per_bytes: chain_config_file.network.sats_per_bytes.unwrap_or(10),
+            bitcoin_node_rpc_address: network_manifest_file
+                .network
+                .bitcoin_node_rpc_address
+                .clone(),
+            deployment_fee_rate: network_manifest_file
+                .network
+                .deployment_fee_rate
+                .unwrap_or(10),
+            sats_per_bytes: network_manifest_file.network.sats_per_bytes.unwrap_or(10),
         };
 
         let mut accounts = BTreeMap::new();
         let is_mainnet = networks.1.is_mainnet();
 
-        match &chain_config_file.accounts {
+        match &network_manifest_file.accounts {
             Some(Value::Table(entries)) => {
                 for (account_name, account_settings) in entries.iter() {
                     match account_settings {
@@ -321,7 +314,7 @@ impl ChainConfig {
         };
 
         let devnet = if networks.1.is_devnet() {
-            let mut devnet_config = match chain_config_file.devnet.take() {
+            let mut devnet_config = match network_manifest_file.devnet.take() {
                 Some(conf) => conf,
                 _ => DevnetConfigFile::default(),
             };
@@ -523,7 +516,7 @@ impl ChainConfig {
         } else {
             None
         };
-        let config = ChainConfig {
+        let config = NetworkManifest {
             network,
             accounts,
             devnet,
