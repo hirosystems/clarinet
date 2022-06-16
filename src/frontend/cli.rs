@@ -740,30 +740,32 @@ pub fn main() {
         Command::Console(cmd) => {
             let manifest = load_manifest_or_warn(cmd.manifest_path);
 
-            let mut terminal;
-            if manifest.path.as_os_str().is_empty() {
-                terminal = Terminal::new(repl::SessionSettings::default());
-            } else {
-                let (deployment, _, artifacts) =
-                    load_deployment_and_artifacts_or_exit(&manifest, &cmd.deployment_plan_path);
+            let mut terminal = match manifest {
+                Some(manifest) => {
+                    let (deployment, _, artifacts) =
+                        load_deployment_and_artifacts_or_exit(&manifest, &cmd.deployment_plan_path);
 
-                if !artifacts.success {
-                    let diags_digest = DiagnosticsDigest::new(&artifacts.diags, &deployment);
-                    if diags_digest.has_feedbacks() {
-                        println!("{}", diags_digest.message);
+                    if !artifacts.success {
+                        let diags_digest = DiagnosticsDigest::new(&artifacts.diags, &deployment);
+                        if diags_digest.has_feedbacks() {
+                            println!("{}", diags_digest.message);
+                        }
+                        if diags_digest.errors > 0 {
+                            println!(
+                                "{} {} detected",
+                                red!("x"),
+                                pluralize!(diags_digest.errors, "error")
+                            );
+                        }
+                        std::process::exit(1);
                     }
-                    if diags_digest.errors > 0 {
-                        println!(
-                            "{} {} detected",
-                            red!("x"),
-                            pluralize!(diags_digest.errors, "error")
-                        );
-                    }
-                    std::process::exit(1);
+
+                    Terminal::load(artifacts.session);
                 }
-
-                terminal = Terminal::load(artifacts.session);
-            }
+                None => {
+                    Terminal::new(repl::SessionSettings::default());
+                }
+            };
             terminal.start();
 
             if hints_enabled {
@@ -1128,7 +1130,7 @@ fn load_manifest_or_exit(path: Option<String>) -> ProjectManifest {
     manifest
 }
 
-fn load_manifest_or_warn(path: Option<String>) -> ProjectManifest {
+fn load_manifest_or_warn(path: Option<String>) -> Option<ProjectManifest> {
     let manifest_path = get_manifest_path_or_warn(path);
     if manifest_path.is_some() {
         let manifest = match ProjectManifest::from_path(&manifest_path.unwrap()) {
@@ -1142,9 +1144,9 @@ fn load_manifest_or_warn(path: Option<String>) -> ProjectManifest {
                 process::exit(1);
             }
         };
-        manifest
+        Some(manifest)
     } else {
-        ProjectManifest::default()
+        None
     }
 }
 
