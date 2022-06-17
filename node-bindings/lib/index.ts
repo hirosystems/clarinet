@@ -317,7 +317,7 @@ export class StacksDevnetOrchestrator {
    * @memberof StacksDevnetOrchestrator
    */
   constructor(manifest: ClarinetManifest) {
-    let manifestPath = manifest.location;
+    let manifestPath = manifest.path;
     var logs = manifest.logs;
     logs ||= false;
     var accounts = manifest.accounts;
