@@ -4,13 +4,13 @@ extern crate error_chain;
 
 mod serde;
 
-use clarinet_lib::deployment;
-use clarinet_lib::integrate::{self, DevnetEvent, DevnetOrchestrator};
-use clarinet_types::bip39::{Language, Mnemonic};
-use clarinet_types::{
+use clarinet_files::bip39::{Language, Mnemonic};
+use clarinet_files::{
     compute_addresses, AccountConfig, DevnetConfigFile, PoxStackingOrder, ProjectManifest,
     DEFAULT_DERIVATION_PATH,
 };
+use clarinet_lib::deployment;
+use clarinet_lib::integrate::{self, DevnetEvent, DevnetOrchestrator};
 use orchestra_types::{
     BitcoinBlockData, BitcoinChainEvent, ChainUpdatedWithBlockData, StacksChainEvent, StacksNetwork,
 };
@@ -42,7 +42,7 @@ impl Finalize for StacksDevnet {}
 impl StacksDevnet {
     fn new<'a, C>(
         cx: &mut C,
-        manifest_path: String,
+        manifest_location: String,
         logs_enabled: bool,
         _accounts: BTreeMap<String, AccountConfig>,
         devnet_overrides: DevnetConfigFile,
@@ -58,9 +58,9 @@ impl StacksDevnet {
 
         let channel = cx.channel();
 
-        let manifest_path = get_manifest_path_or_exit(Some(manifest_path.into()));
-        let manifest =
-            ProjectManifest::from_path(&manifest_path).expect("Syntax error in Clarinet.toml.");
+        let manifest_location = get_manifest_location_or_exit(Some(manifest_location.into()));
+        let manifest = ProjectManifest::from_location(&manifest_location)
+            .expect("Syntax error in Clarinet.toml.");
         let (deployment, _) =
             deployment::read_deployment_or_generate_default(&manifest, &StacksNetwork::Devnet)
                 .expect("Unable to generate deployment");
@@ -161,7 +161,7 @@ impl StacksDevnet {
 
 impl StacksDevnet {
     fn js_new(mut cx: FunctionContext) -> JsResult<JsBox<StacksDevnet>> {
-        let manifest_path = cx.argument::<JsString>(0)?.value(&mut cx);
+        let manifest_location = cx.argument::<JsString>(0)?.value(&mut cx);
 
         let logs_enabled = cx.argument::<JsBoolean>(1)?.value(&mut cx);
 
@@ -525,7 +525,7 @@ impl StacksDevnet {
 
         let devnet = StacksDevnet::new(
             &mut cx,
-            manifest_path,
+            manifest_location,
             logs_enabled,
             genesis_accounts,
             overrides,
@@ -616,14 +616,14 @@ fn main(mut cx: ModuleContext) -> NeonResult<()> {
     Ok(())
 }
 
-fn get_manifest_path_or_exit(path: Option<String>) -> PathBuf {
+fn get_manifest_location_or_exit(path: Option<String>) -> PathBuf {
     if let Some(path) = path {
-        let manifest_path = PathBuf::from(path);
-        if !manifest_path.exists() {
+        let manifest_location = PathBuf::from(path);
+        if !manifest_location.exists() {
             println!("Could not find Clarinet.toml");
             process::exit(1);
         }
-        manifest_path
+        manifest_location
     } else {
         let mut current_dir = env::current_dir().unwrap();
         loop {

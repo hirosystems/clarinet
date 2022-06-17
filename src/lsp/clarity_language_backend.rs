@@ -1,10 +1,10 @@
 use super::{utils, LspRequest};
+use clarinet_files::FileLocation;
 use serde_json::Value;
 use std::sync::mpsc::channel;
 use std::sync::mpsc::Sender;
 use std::sync::Arc;
 use std::sync::Mutex;
-
 use tower_lsp::jsonrpc::Result;
 use tower_lsp::lsp_types::{
     CompletionOptions, CompletionParams, CompletionResponse, DeclarationCapability,
@@ -12,7 +12,7 @@ use tower_lsp::lsp_types::{
     DidSaveTextDocumentParams, ExecuteCommandParams, HoverProviderCapability, InitializeParams,
     InitializeResult, InitializedParams, MessageType, ServerCapabilities,
     TextDocumentSyncCapability, TextDocumentSyncKind, TextDocumentSyncOptions,
-    TextDocumentSyncSaveOptions,
+    TextDocumentSyncSaveOptions, Url,
 };
 use tower_lsp::{async_trait, Client, LanguageServer};
 
@@ -84,14 +84,15 @@ impl LanguageServer for ClarityLanguageBackend {
     async fn completion(&self, params: CompletionParams) -> Result<Option<CompletionResponse>> {
         // We receive notifications for toml and clar files, but only want to achieve this capability
         // for clar files.
-        let contract_url = params.text_document_position.text_document.uri;
-        if !contract_url.to_string().ends_with(".clar") {
-            return Ok(None);
-        }
+        let file_url = params.text_document_position.text_document.uri;
+        let contract_location = match utils::get_contract_location(&file_url) {
+            Some(location) => location,
+            _ => return Ok(None),
+        };
 
         let (response_tx, response_rx) = channel();
         let _ = match self.command_tx.lock() {
-            Ok(tx) => tx.send(LspRequest::GetIntellisense(contract_url, response_tx)),
+            Ok(tx) => tx.send(LspRequest::GetIntellisense(contract_location, response_tx)),
             Err(_) => return Ok(None),
         };
 
@@ -104,22 +105,21 @@ impl LanguageServer for ClarityLanguageBackend {
     }
 
     async fn did_open(&self, params: DidOpenTextDocumentParams) {
-        let response_rx = if let Some(_contract_path) =
-            utils::get_contract_file(&params.text_document.uri)
+        let response_rx = if let Some(contract_location) =
+            utils::get_contract_location(&params.text_document.uri)
         {
             let (response_tx, response_rx) = channel();
             let _ = match self.command_tx.lock() {
-                Ok(tx) => tx.send(LspRequest::ContractOpened(
-                    params.text_document.uri,
-                    response_tx,
-                )),
+                Ok(tx) => tx.send(LspRequest::ContractOpened(contract_location, response_tx)),
                 Err(_) => return,
             };
             response_rx
-        } else if let Some(manifest_path) = utils::get_manifest_file(&params.text_document.uri) {
+        } else if let Some(manifest_location) =
+            utils::get_manifest_location(&params.text_document.uri)
+        {
             let (response_tx, response_rx) = channel();
             let _ = match self.command_tx.lock() {
-                Ok(tx) => tx.send(LspRequest::ManifestOpened(manifest_path, response_tx)),
+                Ok(tx) => tx.send(LspRequest::ManifestOpened(manifest_location, response_tx)),
                 Err(_) => return,
             };
             response_rx
@@ -143,8 +143,12 @@ impl LanguageServer for ClarityLanguageBackend {
             notification = response.notification.take();
         }
 
-        for (url, diags) in aggregated_diagnostics.into_iter() {
-            self.client.publish_diagnostics(url, diags, None).await;
+        for (location, diags) in aggregated_diagnostics.into_iter() {
+            if let Ok(url) = location.to_url_string() {
+                self.client
+                    .publish_diagnostics(Url::parse(&url).unwrap(), diags, None)
+                    .await;
+            }
         }
         if let Some((level, message)) = notification {
             self.client
@@ -154,22 +158,21 @@ impl LanguageServer for ClarityLanguageBackend {
     }
 
     async fn did_save(&self, params: DidSaveTextDocumentParams) {
-        let response_rx = if let Some(_contract_path) =
-            utils::get_contract_file(&params.text_document.uri)
+        let response_rx = if let Some(contract_location) =
+            utils::get_contract_location(&params.text_document.uri)
         {
             let (response_tx, response_rx) = channel();
             let _ = match self.command_tx.lock() {
-                Ok(tx) => tx.send(LspRequest::ContractChanged(
-                    params.text_document.uri,
-                    response_tx,
-                )),
+                Ok(tx) => tx.send(LspRequest::ContractChanged(contract_location, response_tx)),
                 Err(_) => return,
             };
             response_rx
-        } else if let Some(manifest_path) = utils::get_contract_file(&params.text_document.uri) {
+        } else if let Some(manifest_location) =
+            utils::get_manifest_location(&params.text_document.uri)
+        {
             let (response_tx, response_rx) = channel();
             let _ = match self.command_tx.lock() {
-                Ok(tx) => tx.send(LspRequest::ManifestChanged(manifest_path, response_tx)),
+                Ok(tx) => tx.send(LspRequest::ManifestChanged(manifest_location, response_tx)),
                 Err(_) => return,
             };
             response_rx
@@ -184,8 +187,12 @@ impl LanguageServer for ClarityLanguageBackend {
             notification = response.notification.take();
         }
 
-        for (url, diags) in aggregated_diagnostics.into_iter() {
-            self.client.publish_diagnostics(url, diags, None).await;
+        for (location, diags) in aggregated_diagnostics.into_iter() {
+            if let Ok(url) = location.to_url_string() {
+                self.client
+                    .publish_diagnostics(Url::parse(&url).unwrap(), diags, None)
+                    .await;
+            }
         }
         if let Some((level, message)) = notification {
             self.client

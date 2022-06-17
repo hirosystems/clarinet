@@ -1,25 +1,19 @@
+use clarinet_files::FileLocation;
 use clarity_repl::clarity::types::QualifiedContractIdentifier;
-use std::fs::{self, File};
-use std::io::Write;
-use std::path::PathBuf;
 
 pub fn retrieve_contract(
     contract_id: &QualifiedContractIdentifier,
-    use_cache: bool,
-    cache_path: Option<PathBuf>,
-) -> Result<(String, PathBuf), String> {
+    cache_location: &FileLocation,
+) -> Result<(String, FileLocation), String> {
     let contract_deployer = contract_id.issuer.to_address();
     let contract_name = contract_id.name.to_string();
-    let mut file_path = PathBuf::new();
 
-    if use_cache {
-        if let Some(ref cache_path) = cache_path {
-            let mut path = PathBuf::from(cache_path);
-            path.push(format!("{}.clar", contract_id));
-            if let Ok(data) = fs::read_to_string(&path) {
-                return Ok((data, path));
-            }
-        }
+    let mut contract_location = cache_location.clone();
+    contract_location
+        .append_relative_path(&format!("{}.{}.clar", contract_deployer, contract_name))?;
+
+    if let Ok(contract_source) = contract_location.read_content_as_utf8() {
+        return Ok((contract_source, contract_location));
     }
 
     let stacks_node_addr = if contract_deployer.starts_with("SP") {
@@ -38,20 +32,9 @@ pub fn retrieve_contract(
     let rt = tokio::runtime::Runtime::new().unwrap();
     let response = rt.block_on(async { fetch_contract(request_url).await })?;
     let code = response.source.to_string();
+    contract_location.write_content(code.as_bytes());
 
-    if use_cache {
-        if let Some(ref cache_path) = cache_path {
-            file_path = PathBuf::from(cache_path);
-            let _ = fs::create_dir_all(&file_path);
-            file_path.push(format!("{}.clar", contract_id));
-
-            if let Ok(ref mut file) = File::create(&file_path) {
-                let _ = file.write_all(code.as_bytes());
-            }
-        }
-    }
-
-    Ok((code, file_path))
+    Ok((code, contract_location))
 }
 
 #[allow(dead_code)]

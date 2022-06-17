@@ -4,13 +4,14 @@ use clarinet_deployments::{
     generate_default_deployment, initiate_session_from_deployment,
     update_session_with_contracts_executions,
 };
-use clarinet_types::ProjectManifest;
+use clarinet_files::FileLocation;
+use clarinet_files::ProjectManifest;
 use clarity_repl::analysis::ast_dependency_detector::DependencySet;
 use clarity_repl::clarity::analysis::ContractAnalysis;
 use clarity_repl::clarity::diagnostic::{Diagnostic as ClarityDiagnostic, Level as ClarityLevel};
 use clarity_repl::clarity::types::QualifiedContractIdentifier;
 use clarity_repl::repl::ast::ContractAST;
-use lsp_types::{MessageType, Url};
+use lsp_types::MessageType;
 use orchestra_types::StacksNetwork;
 use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
@@ -24,7 +25,7 @@ pub struct ContractState {
     notes: Vec<ClarityDiagnostic>,
     contract_id: QualifiedContractIdentifier,
     analysis: Option<ContractAnalysis>,
-    path: PathBuf,
+    location: FileLocation,
 }
 
 impl ContractState {
@@ -34,7 +35,7 @@ impl ContractState {
         _deps: DependencySet,
         mut diags: Vec<ClarityDiagnostic>,
         analysis: Option<ContractAnalysis>,
-        path: PathBuf,
+        location: FileLocation,
     ) -> ContractState {
         let mut errors = vec![];
         let mut warnings = vec![];
@@ -66,15 +67,15 @@ impl ContractState {
             warnings,
             notes,
             analysis,
-            path,
+            location,
         }
     }
 }
 
 #[derive(Clone, Default, Debug)]
 pub struct EditorState {
-    pub protocols: HashMap<PathBuf, ProtocolState>,
-    pub contracts_lookup: HashMap<Url, PathBuf>,
+    pub protocols: HashMap<FileLocation, ProtocolState>,
+    pub contracts_lookup: HashMap<FileLocation, FileLocation>,
     pub native_functions: Vec<CompletionItem>,
 }
 
@@ -87,44 +88,47 @@ impl EditorState {
         }
     }
 
-    pub fn index_protocol(&mut self, manifest_path: PathBuf, protocol: ProtocolState) {
+    pub fn index_protocol(&mut self, manifest_location: FileLocation, protocol: ProtocolState) {
         for (contract_uri, _) in protocol.contracts.iter() {
             self.contracts_lookup
-                .insert(contract_uri.clone(), manifest_path.clone());
+                .insert(contract_uri.clone(), manifest_location.clone());
         }
-        self.protocols.insert(manifest_path, protocol);
+        self.protocols.insert(manifest_location, protocol);
     }
 
-    pub fn clear_protocol(&mut self, manifest_path: &PathBuf) {
-        if let Some(protocol) = self.protocols.remove(manifest_path) {
-            for (contract_uri, _) in protocol.contracts.iter() {
-                self.contracts_lookup.remove(contract_uri);
+    pub fn clear_protocol(&mut self, manifest_location: &FileLocation) {
+        if let Some(protocol) = self.protocols.remove(manifest_location) {
+            for (contract_location, _) in protocol.contracts.iter() {
+                self.contracts_lookup.remove(contract_location);
             }
         }
     }
 
     pub fn clear_protocol_associated_with_contract(
         &mut self,
-        contract_url: &Url,
-    ) -> Option<PathBuf> {
-        match self.contracts_lookup.get(&contract_url) {
-            Some(manifest_path) => {
-                let manifest_path = manifest_path.clone();
-                self.clear_protocol(&manifest_path);
-                Some(manifest_path)
+        contract_location: &FileLocation,
+    ) -> Option<FileLocation> {
+        match self.contracts_lookup.get(&contract_location) {
+            Some(manifest_location) => {
+                let manifest_location = manifest_location.clone();
+                self.clear_protocol(&manifest_location);
+                Some(manifest_location)
             }
             None => None,
         }
     }
 
-    pub fn get_completion_items_for_contract(&self, contract_url: &Url) -> Vec<CompletionItem> {
+    pub fn get_completion_items_for_contract(
+        &self,
+        contract_location: &FileLocation,
+    ) -> Vec<CompletionItem> {
         let mut keywords = self.native_functions.clone();
 
         let mut user_defined_keywords = self
             .contracts_lookup
-            .get(&contract_url)
+            .get(&contract_location)
             .and_then(|p| self.protocols.get(p))
-            .and_then(|p| Some(p.get_completion_items_for_contract(contract_url)))
+            .and_then(|p| Some(p.get_completion_items_for_contract(contract_location)))
             .unwrap_or_default();
 
         keywords.append(&mut user_defined_keywords);
@@ -134,7 +138,7 @@ impl EditorState {
     pub fn get_aggregated_diagnostics(
         &self,
     ) -> (
-        Vec<(Url, Vec<ClarityDiagnostic>)>,
+        Vec<(FileLocation, Vec<ClarityDiagnostic>)>,
         Option<(MessageType, String)>,
     ) {
         let mut contracts = vec![];
@@ -147,8 +151,8 @@ impl EditorState {
 
                 // Convert and collect errors
                 if !state.errors.is_empty() {
-                    if let Some(file_name) = state.path.file_name().and_then(|f| f.to_str()) {
-                        erroring_files.insert(file_name);
+                    if let Ok(contract_relative_path) = state.location.get_relative_location() {
+                        erroring_files.insert(contract_relative_path);
                     }
                     for error in state.errors.iter() {
                         diags.push(error.clone());
@@ -157,8 +161,8 @@ impl EditorState {
 
                 // Convert and collect warnings
                 if !state.warnings.is_empty() {
-                    if let Some(file_name) = state.path.file_name().and_then(|f| f.to_str()) {
-                        warning_files.insert(file_name);
+                    if let Ok(contract_relative_path) = state.location.get_relative_location() {
+                        warning_files.insert(contract_relative_path);
                     }
                     for warning in state.warnings.iter() {
                         diags.push(warning.clone());
@@ -204,7 +208,7 @@ impl EditorState {
 
 #[derive(Clone, Default, Debug)]
 pub struct ProtocolState {
-    contracts: HashMap<Url, ContractState>,
+    contracts: HashMap<FileLocation, ContractState>,
 }
 
 impl ProtocolState {
@@ -216,7 +220,7 @@ impl ProtocolState {
 
     pub fn consolidate(
         &mut self,
-        paths: &mut HashMap<QualifiedContractIdentifier, (Url, PathBuf)>,
+        locations: &mut HashMap<QualifiedContractIdentifier, FileLocation>,
         asts: &mut HashMap<QualifiedContractIdentifier, ContractAST>,
         deps: &mut HashMap<QualifiedContractIdentifier, DependencySet>,
         diags: &mut HashMap<QualifiedContractIdentifier, Vec<ClarityDiagnostic>>,
@@ -226,7 +230,7 @@ impl ProtocolState {
         // TODO(lgalabru)
 
         // Add / Replace new paths
-        for (contract_id, (url, path)) in paths.iter() {
+        for (contract_id, contract_location) in locations.iter() {
             let (contract_id, ast) = match asts.remove_entry(&contract_id) {
                 Some(ast) => ast,
                 None => continue,
@@ -244,13 +248,23 @@ impl ProtocolState {
                 None => None,
             };
 
-            let contract_state =
-                ContractState::new(contract_id, ast, deps, diags, analysis, path.clone());
-            self.contracts.insert(url.clone(), contract_state);
+            let contract_state = ContractState::new(
+                contract_id,
+                ast,
+                deps,
+                diags,
+                analysis,
+                contract_location.clone(),
+            );
+            self.contracts
+                .insert(contract_location.clone(), contract_state);
         }
     }
 
-    pub fn get_completion_items_for_contract(&self, contract_uri: &Url) -> Vec<CompletionItem> {
+    pub fn get_completion_items_for_contract(
+        &self,
+        contract_uri: &FileLocation,
+    ) -> Vec<CompletionItem> {
         let mut keywords = vec![];
 
         let (mut contract_keywords, mut contract_calls) = {
@@ -274,10 +288,10 @@ impl ProtocolState {
 }
 
 pub fn build_state(
-    manifest_path: &PathBuf,
+    manifest_location: &FileLocation,
     protocol_state: &mut ProtocolState,
 ) -> Result<(), String> {
-    let mut paths = HashMap::new();
+    let mut locations = HashMap::new();
     let mut analyses = HashMap::new();
 
     // In the LSP use case, trying to load an existing deployment
@@ -285,7 +299,7 @@ pub fn build_state(
     // expect contracts to be created, edited, removed.
     // A on-disk deployment could quickly lead to an outdated
     // view of the repo.
-    let manifest = ProjectManifest::from_path(manifest_path)?;
+    let manifest = ProjectManifest::from_location(manifest_location)?;
 
     let (deployment, mut artifacts) =
         generate_default_deployment(&manifest, &StacksNetwork::Simnet, false)?;
@@ -298,22 +312,11 @@ pub fn build_state(
         false,
     );
     for (contract_id, mut result) in results.into_iter() {
-        let (url, path) = {
-            let (_, relative_path) = match deployment.contracts.get(&contract_id) {
-                Some(entry) => entry,
-                None => continue,
-            };
-            let relative_path = PathBuf::from_str(relative_path).expect(&format!(
-                "Unable to build path for contract {}",
-                contract_id
-            ));
-            let mut path = manifest_path.clone();
-            path.pop();
-            path.extend(&relative_path);
-            let url = Url::from_file_path(&path).unwrap();
-            (url, path)
+        let (_, contract_location) = match deployment.contracts.get(&contract_id) {
+            Some(entry) => entry,
+            None => continue,
         };
-        paths.insert(contract_id.clone(), (url, path));
+        locations.insert(contract_id.clone(), contract_location.clone());
 
         let contract_analysis = match result {
             Ok(ref mut execution_result) => {
@@ -335,7 +338,7 @@ pub fn build_state(
     }
 
     protocol_state.consolidate(
-        &mut paths,
+        &mut locations,
         &mut artifacts.asts,
         &mut artifacts.deps,
         &mut artifacts.diags,

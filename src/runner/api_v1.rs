@@ -2,7 +2,7 @@ use super::utils;
 use super::DeploymentCache;
 use clarinet_deployments::types::DeploymentSpecification;
 use clarinet_deployments::update_session_with_contracts_executions;
-use clarinet_types::ProjectManifest;
+use clarinet_files::ProjectManifest;
 use clarity_repl::clarity::analysis::contract_interface_builder::{
     build_contract_interface, ContractInterface,
 };

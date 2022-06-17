@@ -101,7 +101,8 @@ impl ProjectManifest {
         let project_name = project_manifest_file.project.name;
         let mut project_root_location = manifest_location.get_project_root_location()?;
         let cache_location = match project_manifest_file.project.cache_dir {
-            Some(ref path) => FileLocation::try_parse(path, &project_root_location)?,
+            Some(ref path) => FileLocation::try_parse(path, Some(&project_root_location))
+                .ok_or(format!("unable to parse path {}", path))?,
             None => {
                 project_root_location.append_relative_path(".requirements")?;
                 project_root_location

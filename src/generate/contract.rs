@@ -1,18 +1,22 @@
 use super::changes::{Changes, FileCreation, TOMLEdition};
-use clarinet_types::ContractConfig;
+use clarinet_files::{ContractConfig, FileLocation};
 use std::{collections::HashMap, path::PathBuf};
 
 pub struct GetChangesForNewContract {
-    manifest_path: PathBuf,
+    manifest_location: FileLocation,
     contract_name: String,
     source: Option<String>,
     changes: Vec<Changes>,
 }
 
 impl GetChangesForNewContract {
-    pub fn new(manifest_path: PathBuf, contract_name: String, source: Option<String>) -> Self {
+    pub fn new(
+        manifest_location: FileLocation,
+        contract_name: String,
+        source: Option<String>,
+    ) -> Self {
         Self {
-            manifest_path,
+            manifest_location,
             contract_name,
             source,
             changes: vec![],
@@ -52,19 +56,15 @@ impl GetChangesForNewContract {
                 self.contract_name
             )
         };
-
         let name = format!("{}.clar", self.contract_name);
-        let project_path = {
-            let mut p = self.manifest_path.clone();
-            p.pop();
-            p
-        };
-        let path = format!("{}/contracts/{}", project_path.to_string_lossy(), name);
+        let mut contract_path = self.manifest_location.get_project_root_location().unwrap();
+        contract_path.append_relative_path("contracts");
+        contract_path.append_relative_path(&name);
         let change = FileCreation {
             comment: format!("{} contracts/{}", green!("Created file"), name),
             name,
             content,
-            path,
+            path: contract_path.to_string(),
         };
         self.changes.push(Changes::AddFile(change));
     }
@@ -99,25 +99,23 @@ Clarinet.test({{
 }});
 "#
         );
-        let project_path = {
-            let mut p = self.manifest_path.clone();
-            p.pop();
-            p
-        };
+
         let name = format!("{}_test.ts", self.contract_name);
-        let path = format!("{}/tests/{}", project_path.to_string_lossy(), name);
+        let mut contract_path = self.manifest_location.get_project_root_location().unwrap();
+        contract_path.append_relative_path("tests");
+        contract_path.append_relative_path(&name);
         let change = FileCreation {
             comment: format!("{} tests/{}", green!("Created file"), name),
             name,
             content,
-            path,
+            path: contract_path.to_string(),
         };
         self.changes.push(Changes::AddFile(change));
     }
 
     fn index_contract_in_clarinet_toml(&mut self) {
         let contract_file_name = format!("{}.clar", self.contract_name);
-        let manifest_path = self.manifest_path.clone();
+        let manifest_location = self.manifest_location.clone();
 
         let contract_config = ContractConfig {
             path: format!("contracts/{}", contract_file_name),
@@ -132,7 +130,7 @@ Clarinet.test({{
                 yellow!("Updated Clarinet.toml"),
                 self.contract_name
             ),
-            manifest_path,
+            manifest_location,
             contracts_to_add,
             requirements_to_add: vec![],
         };

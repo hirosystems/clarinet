@@ -13,7 +13,7 @@ use clarinet_deployments::types::{
     DeploymentGenerationArtifacts, DeploymentSpecification, TransactionSpecification,
 };
 
-use clarinet_types::{AccountConfig, ChainConfig, ProjectManifest};
+use clarinet_files::{AccountConfig, FileLocation, NetworkManifest, ProjectManifest};
 use clarinet_utils::get_bip39_seed_from_mnemonic;
 
 use clarity_repl::clarity::codec::transaction::{
@@ -209,29 +209,25 @@ pub fn encode_contract_publish(
 pub fn get_absolute_deployment_path(
     manifest: &ProjectManifest,
     relative_deployment_path: &str,
-) -> PathBuf {
-    let base_path = manifest.get_project_root_dir();
-    let path = match PathBuf::from_str(relative_deployment_path) {
-        Ok(path) => path,
-        Err(_e) => {
-            println!("unable to read path {}", relative_deployment_path);
-            std::process::exit(1);
-        }
-    };
-    base_path.join(path)
+) -> Result<FileLocation, String> {
+    let mut deployment_path = manifest.location.get_project_root_location()?;
+    deployment_path.append_relative_path(relative_deployment_path)?;
+    Ok(deployment_path)
 }
 
-pub fn get_default_deployment_path(manifest: &ProjectManifest, network: &StacksNetwork) -> PathBuf {
-    let mut deployment_path = manifest.get_project_root_dir();
-    deployment_path.push("deployments");
-    let file_path = match network {
+pub fn get_default_deployment_path(
+    manifest: &ProjectManifest,
+    network: &StacksNetwork,
+) -> Result<FileLocation, String> {
+    let mut deployment_path = manifest.location.get_project_root_location()?;
+    deployment_path.append_relative_path("deployments")?;
+    deployment_path.append_relative_path(match network {
         StacksNetwork::Simnet => "default.simnet-plan.yaml",
         StacksNetwork::Devnet => "default.devnet-plan.yaml",
         StacksNetwork::Testnet => "default.testnet-plan.yaml",
         StacksNetwork::Mainnet => "default.mainnet-plan.yaml",
-    };
-    deployment_path.push(file_path);
-    deployment_path
+    })?;
+    Ok(deployment_path)
 }
 
 pub fn read_deployment_or_generate_default(
@@ -244,7 +240,7 @@ pub fn read_deployment_or_generate_default(
     ),
     String,
 > {
-    let default_deployment_file_path = get_default_deployment_path(&manifest, network);
+    let default_deployment_file_path = get_default_deployment_path(&manifest, network)?;
     let (deployment, artifacts) = if default_deployment_file_path.exists() {
         (
             load_deployment(manifest, &default_deployment_file_path)?,
@@ -353,8 +349,11 @@ pub fn apply_on_chain_deployment(
     deployment_command_rx: Receiver<DeploymentCommand>,
     fetch_initial_nonces: bool,
 ) {
-    let chain_config =
-        ChainConfig::from_manifest_path(&manifest.path, &deployment.network.get_networks());
+    let network_manifest = NetworkManifest::from_project_manifest_location(
+        &manifest.location,
+        &deployment.network.get_networks(),
+    )
+    .expect("unable to load network manifest");
     let delay_between_checks: u64 = 10;
     // Load deployers, deployment_fee_rate
     // Check fee, balances and deployers
@@ -367,13 +366,13 @@ pub fn apply_on_chain_deployment(
 
     if !fetch_initial_nonces {
         if network == StacksNetwork::Devnet {
-            for (_, account) in chain_config.accounts.iter() {
+            for (_, account) in network_manifest.accounts.iter() {
                 accounts_cached_nonces.insert(account.stx_address.clone(), 0);
             }
         }
     }
 
-    for (_, account) in chain_config.accounts.iter() {
+    for (_, account) in network_manifest.accounts.iter() {
         stx_accounts_lookup.insert(account.stx_address.clone(), account);
         btc_accounts_lookup.insert(account.btc_address.clone(), account);
     }
@@ -718,10 +717,13 @@ pub fn apply_on_chain_deployment(
 }
 
 pub fn check_deployments(manifest: &ProjectManifest) -> Result<(), String> {
-    let base_path = manifest.get_project_root_dir();
-    let files = get_deployments_files(manifest)?;
+    let project_root_location = manifest.location.get_project_root_location()?;
+    let files = get_deployments_files(&project_root_location)?;
     for (path, relative_path) in files.into_iter() {
-        let _spec = match DeploymentSpecification::from_config_file(&path, &base_path) {
+        let _spec = match DeploymentSpecification::from_config_file(
+            &FileLocation::from_path(path),
+            &project_root_location,
+        ) {
             Ok(spec) => spec,
             Err(msg) => {
                 println!("{} {} syntax incorrect\n{}", red!("x"), relative_path, msg);
@@ -737,25 +739,31 @@ pub fn load_deployment_if_exists(
     manifest: &ProjectManifest,
     network: &StacksNetwork,
 ) -> Option<Result<DeploymentSpecification, String>> {
-    let default_deployment_path = get_default_deployment_path(manifest, network);
-    if !default_deployment_path.exists() {
+    let default_deployment_location = match get_default_deployment_path(manifest, network) {
+        Ok(location) => location,
+        Err(e) => return Some(Err(e)),
+    };
+    if !default_deployment_location.exists() {
         return None;
     }
-    Some(load_deployment(manifest, &default_deployment_path))
+    Some(load_deployment(manifest, &default_deployment_location))
 }
 
 pub fn load_deployment(
     manifest: &ProjectManifest,
-    deployment_plan_path: &PathBuf,
+    deployment_plan_location: &FileLocation,
 ) -> Result<DeploymentSpecification, String> {
-    let base_path = manifest.get_project_root_dir();
-    let spec = match DeploymentSpecification::from_config_file(&deployment_plan_path, &base_path) {
+    let project_root_location = manifest.location.get_project_root_location()?;
+    let spec = match DeploymentSpecification::from_config_file(
+        &deployment_plan_location,
+        &project_root_location,
+    ) {
         Ok(spec) => spec,
         Err(msg) => {
             return Err(format!(
                 "{} {} syntax incorrect\n{}",
                 red!("x"),
-                deployment_plan_path.display(),
+                deployment_plan_location.to_string(),
                 msg
             ));
         }
@@ -763,11 +771,13 @@ pub fn load_deployment(
     Ok(spec)
 }
 
-fn get_deployments_files(manifest: &ProjectManifest) -> Result<Vec<(PathBuf, String)>, String> {
-    let mut project_dir = manifest.get_project_root_dir();
-    let suffix_len = project_dir.to_str().unwrap().len() + 1;
-    project_dir.push("deployments");
-    let paths = match fs::read_dir(&project_dir) {
+fn get_deployments_files(
+    project_root_location: &FileLocation,
+) -> Result<Vec<(PathBuf, String)>, String> {
+    let mut project_dir = project_root_location.clone();
+    let prefix_len = project_dir.to_string().len() + 1;
+    project_dir.append_relative_path("deployments")?;
+    let paths = match fs::read_dir(&project_dir.to_string()) {
         Ok(paths) => paths,
         Err(_) => return Ok(vec![]),
     };
@@ -781,7 +791,7 @@ fn get_deployments_files(manifest: &ProjectManifest) -> Result<Vec<(PathBuf, Str
 
         if let Some(true) = is_extension_valid {
             let relative_path = file.clone();
-            let (_, relative_path) = relative_path.to_str().unwrap().split_at(suffix_len);
+            let (_, relative_path) = relative_path.to_str().unwrap().split_at(prefix_len);
             plans_paths.push((file, relative_path.to_string()));
         }
     }
@@ -791,31 +801,19 @@ fn get_deployments_files(manifest: &ProjectManifest) -> Result<Vec<(PathBuf, Str
 
 pub fn write_deployment(
     deployment: &DeploymentSpecification,
-    target_path: &PathBuf,
+    target_location: &FileLocation,
     prompt_override: bool,
 ) -> Result<(), String> {
-    if target_path.exists() && prompt_override {
+    if target_location.exists() && prompt_override {
         println!(
             "Deployment {} already exists.\n{}?",
-            target_path.display(),
+            target_location.to_string(),
             yellow!("Overwrite [Y/n]")
         );
         let mut buffer = String::new();
         std::io::stdin().read_line(&mut buffer).unwrap();
         if buffer.starts_with("n") {
             return Err(format!("deployment update aborted"));
-        }
-    } else {
-        let mut base_dir = target_path.clone();
-        base_dir.pop();
-        if !base_dir.exists() {
-            if let Err(e) = std::fs::create_dir(&base_dir) {
-                return Err(format!(
-                    "unable to create directory {}: {:?}",
-                    base_dir.display(),
-                    e
-                ));
-            }
         }
     }
 
@@ -826,25 +824,6 @@ pub fn write_deployment(
         Err(err) => return Err(format!("unable to serialize deployment {}", err)),
     };
 
-    let mut file = match File::create(&target_path) {
-        Ok(file) => file,
-        Err(e) => {
-            return Err(format!(
-                "unable to create file {}: {}",
-                target_path.display(),
-                e
-            ));
-        }
-    };
-    match file.write_all(content.as_bytes()) {
-        Ok(_) => (),
-        Err(e) => {
-            return Err(format!(
-                "unable to write file {}: {}",
-                target_path.display(),
-                e
-            ));
-        }
-    };
+    target_location.write_content(content.as_bytes())?;
     Ok(())
 }

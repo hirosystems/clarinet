@@ -32,26 +32,25 @@ pub enum FileLocation {
 impl FileLocation {
     pub fn try_parse(
         location_string: &str,
-        project_root_location: &FileLocation,
-    ) -> Result<FileLocation, String> {
-        let res = FileLocation::from_url_string(location_string);
-        if res.is_ok() {
-            return res;
+        project_root_location_hint: Option<&FileLocation>,
+    ) -> Option<FileLocation> {
+        if let Ok(location) = FileLocation::from_url_string(location_string) {
+            return Some(location);
         }
-        FileLocation::from_path_string(location_string)
-        // let path = match PathBuf::from_str(path) {
-        //     Ok(path) => path,
-        //     Err(_e) => {
-        //         return Err("setting cache_dir is not a valid path".to_string());
-        //     }
-        // };
-        // if path.is_relative() {
-        //     let mut absolute = manifest_location.get_project_root_location();
-        //     absolute.append_relative_path(&path)?;
-        //     (absolute, true)
-        // } else {
-        //     (Url::from_file_path(path).unwrap(), false)
-        // }
+        if let Ok(FileLocation::FileSystem { path }) =
+            FileLocation::from_path_string(location_string)
+        {
+            match (project_root_location_hint, path.is_relative()) {
+                (None, true) => return None,
+                (Some(hint), true) => {
+                    let mut location = hint.clone();
+                    let _ = location.append_relative_path(location_string);
+                    return Some(location);
+                }
+                (_, false) => return Some(FileLocation::FileSystem { path }),
+            }
+        }
+        None
     }
 
     pub fn from_path(path: PathBuf) -> FileLocation {
@@ -65,6 +64,15 @@ impl FileLocation {
     pub fn from_url_string(url_string: &str) -> Result<FileLocation, String> {
         let url = Url::from_str(url_string)
             .map_err(|e| format!("unable to parse {} as a url: {:?}", url_string, e))?;
+
+        #[cfg(not(feature = "wasm"))]
+        if url.scheme() == "file" {
+            let path = url
+                .to_file_path()
+                .map_err(|_| format!("unable to conver url {} to path", url))?;
+            return Ok(FileLocation::FileSystem { path })
+        }
+
         Ok(FileLocation::Url { url })
     }
 
@@ -113,6 +121,7 @@ impl FileLocation {
         let bytes = match &self {
             FileLocation::FileSystem { path } => FileLocation::fs_read_content(&path),
             FileLocation::Url { url } => match url.scheme() {
+                #[cfg(not(feature = "wasm"))]
                 "file" => {
                     let path = url
                         .to_file_path()
@@ -288,6 +297,20 @@ impl FileLocation {
                 format!("{}", path.display())
             }
             FileLocation::Url { url } => url.to_string(),
+        }
+    }
+
+    pub fn to_url_string(&self) -> Result<String, String> {
+        match self {
+            #[cfg(not(feature = "wasm"))]
+            FileLocation::FileSystem { path } => {
+                let file_path = self.to_string();
+                let url = Url::from_file_path(file_path)
+                    .map_err(|_| format!("unable to conver path {} to url", path.display()))?;
+                Ok(url.to_string())
+            }
+            FileLocation::Url { url } => Ok(url.to_string()),
+            _ => unreachable!()
         }
     }
 }

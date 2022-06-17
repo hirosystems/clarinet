@@ -1,18 +1,14 @@
+use clarinet_files::FileLocation;
 use clarity_repl::clarity::types::{
     PrincipalData, QualifiedContractIdentifier, StandardPrincipalData,
 };
 
 use clarity_repl::clarity::{ClarityName, ContractName};
 
+use orchestra_types::StacksNetwork;
 use serde::{Deserialize, Serialize};
 use serde_yaml;
 use std::collections::BTreeMap;
-use std::fs;
-use std::fs::File;
-use std::io::{BufReader, Read};
-use std::path::PathBuf;
-
-use orchestra_types::StacksNetwork;
 
 use clarity_repl::analysis::ast_dependency_detector::DependencySet;
 use clarity_repl::clarity::analysis::ContractAnalysis;
@@ -84,8 +80,9 @@ pub struct RequirementPublishSpecificationFile {
     pub contract_id: String,
     pub remap_sender: String,
     pub remap_principals: Option<BTreeMap<String, String>>,
-    pub path: String,
     pub cost: u64,
+    #[serde(flatten)]
+    pub location: FileLocation,
 }
 
 #[derive(Debug, PartialEq, Serialize, Deserialize)]
@@ -93,8 +90,9 @@ pub struct RequirementPublishSpecificationFile {
 pub struct ContractPublishSpecificationFile {
     pub contract_name: String,
     pub expected_sender: String,
-    pub path: String,
     pub cost: u64,
+    #[serde(flatten)]
+    pub location: FileLocation,
 }
 
 #[derive(Debug, PartialEq, Serialize, Deserialize)]
@@ -111,7 +109,8 @@ pub struct EmulatedContractCallSpecificationFile {
 pub struct EmulatedContractPublishSpecificationFile {
     pub contract_name: String,
     pub emulated_sender: String,
-    pub path: String,
+    #[serde(flatten)]
+    pub location: FileLocation,
 }
 
 #[derive(Debug, PartialEq, Clone)]
@@ -210,7 +209,7 @@ impl ContractCallSpecification {
 pub struct ContractPublishSpecification {
     pub contract_name: ContractName,
     pub expected_sender: StandardPrincipalData,
-    pub relative_path: String,
+    pub location: FileLocation,
     pub source: String,
     pub cost: u64,
 }
@@ -218,7 +217,7 @@ pub struct ContractPublishSpecification {
 impl ContractPublishSpecification {
     pub fn from_specifications(
         specs: &ContractPublishSpecificationFile,
-        base_path: &PathBuf,
+        project_root_location: &FileLocation,
     ) -> Result<ContractPublishSpecification, String> {
         let contract_name = match ContractName::try_from(specs.contract_name.to_string()) {
             Ok(res) => res,
@@ -241,29 +240,13 @@ impl ContractPublishSpecification {
             }
         };
 
-        let path = match PathBuf::try_from(&specs.path) {
-            Ok(res) => res,
-            Err(_) => return Err(format!("unable to parse '{}' as a valid path", specs.path)),
-        };
-
-        let mut contract_path = base_path.clone();
-        contract_path.push(path);
-
-        let source = match fs::read_to_string(&contract_path) {
-            Ok(code) => code,
-            Err(err) => {
-                return Err(format!(
-                    "unable to read contract at path {:?}: {}",
-                    contract_path, err
-                ))
-            }
-        };
+        let source = specs.location.read_content_as_utf8()?;
 
         Ok(ContractPublishSpecification {
             contract_name,
             expected_sender,
             source,
-            relative_path: specs.path.clone(),
+            location: specs.location.clone(),
             cost: specs.cost,
         })
     }
@@ -274,15 +257,15 @@ pub struct RequirementPublishSpecification {
     pub contract_id: QualifiedContractIdentifier,
     pub remap_sender: StandardPrincipalData,
     pub remap_principals: BTreeMap<StandardPrincipalData, StandardPrincipalData>,
-    pub relative_path: String,
     pub source: String,
     pub cost: u64,
+    pub location: FileLocation,
 }
 
 impl RequirementPublishSpecification {
     pub fn from_specifications(
         specs: &RequirementPublishSpecificationFile,
-        base_path: &PathBuf,
+        project_root_location: &FileLocation,
     ) -> Result<RequirementPublishSpecification, String> {
         let contract_id = match QualifiedContractIdentifier::parse(&specs.contract_id) {
             Ok(res) => res,
@@ -329,30 +312,14 @@ impl RequirementPublishSpecification {
             }
         }
 
-        let path = match PathBuf::try_from(&specs.path) {
-            Ok(res) => res,
-            Err(_) => return Err(format!("unable to parse '{}' as a valid path", specs.path)),
-        };
-
-        let mut contract_path = base_path.clone();
-        contract_path.push(path);
-
-        let source = match fs::read_to_string(&contract_path) {
-            Ok(code) => code,
-            Err(err) => {
-                return Err(format!(
-                    "unable to read contract at path {:?}: {}",
-                    contract_path, err
-                ))
-            }
-        };
+        let source = specs.location.read_content_as_utf8()?;
 
         Ok(RequirementPublishSpecification {
             contract_id,
             remap_sender,
             remap_principals,
             source,
-            relative_path: specs.path.clone(),
+            location: specs.location.clone(),
             cost: specs.cost,
         })
     }
@@ -415,13 +382,13 @@ pub struct EmulatedContractPublishSpecification {
     pub contract_name: ContractName,
     pub emulated_sender: StandardPrincipalData,
     pub source: String,
-    pub relative_path: String,
+    pub location: FileLocation,
 }
 
 impl EmulatedContractPublishSpecification {
     pub fn from_specifications(
         specs: &EmulatedContractPublishSpecificationFile,
-        base_path: &PathBuf,
+        project_root_location: &FileLocation,
     ) -> Result<EmulatedContractPublishSpecification, String> {
         let contract_name = match ContractName::try_from(specs.contract_name.to_string()) {
             Ok(res) => res,
@@ -444,29 +411,13 @@ impl EmulatedContractPublishSpecification {
             }
         };
 
-        let path = match PathBuf::try_from(&specs.path) {
-            Ok(res) => res,
-            Err(_) => return Err(format!("unable to parse '{}' as a valid path", specs.path)),
-        };
-
-        let mut contract_path = base_path.clone();
-        contract_path.push(path);
-
-        let source = match fs::read_to_string(&contract_path) {
-            Ok(code) => code,
-            Err(err) => {
-                return Err(format!(
-                    "unable to read contract at path {:?}: {}",
-                    contract_path, err
-                ))
-            }
-        };
+        let source = specs.location.read_content_as_utf8()?;
 
         Ok(EmulatedContractPublishSpecification {
             contract_name,
             emulated_sender,
             source,
-            relative_path: specs.path.clone(),
+            location: specs.location.clone(),
         })
     }
 }
@@ -481,26 +432,18 @@ pub struct DeploymentSpecification {
     pub genesis: Option<GenesisSpecification>,
     pub plan: TransactionPlanSpecification,
     // Keep a cache of contract's (source, relative_path)
-    pub contracts: BTreeMap<QualifiedContractIdentifier, (String, String)>,
+    pub contracts: BTreeMap<QualifiedContractIdentifier, (String, FileLocation)>,
 }
 
 impl DeploymentSpecification {
     pub fn from_config_file(
-        path: &PathBuf,
-        base_path: &PathBuf,
+        deployment_location: &FileLocation,
+        project_root_location: &FileLocation,
     ) -> Result<DeploymentSpecification, String> {
-        let path = match File::open(path) {
-            Ok(path) => path,
-            Err(_e) => {
-                panic!("unable to locate {}", path.display());
-            }
-        };
-        let mut spec_file_reader = BufReader::new(path);
-        let mut spec_file_buffer = vec![];
-        spec_file_reader.read_to_end(&mut spec_file_buffer).unwrap();
+        let spec_file_content = deployment_location.read_content()?;
 
         let specification_file: DeploymentSpecificationFile =
-            match serde_yaml::from_slice(&spec_file_buffer[..]) {
+            match serde_yaml::from_slice(&spec_file_content[..]) {
                 Ok(res) => res,
                 Err(msg) => return Err(format!("unable to read file {}", msg)),
             };
@@ -518,8 +461,11 @@ impl DeploymentSpecification {
             }
         };
 
-        let deployment_spec =
-            DeploymentSpecification::from_specifications(&specification_file, &network, base_path)?;
+        let deployment_spec = DeploymentSpecification::from_specifications(
+            &specification_file,
+            &network,
+            project_root_location,
+        )?;
 
         Ok(deployment_spec)
     }
@@ -527,7 +473,7 @@ impl DeploymentSpecification {
     pub fn from_specifications(
         specs: &DeploymentSpecificationFile,
         network: &StacksNetwork,
-        base_path: &PathBuf,
+        project_root_location: &FileLocation,
     ) -> Result<DeploymentSpecification, String> {
         let mut contracts = BTreeMap::new();
         let (plan, genesis) = match network {
@@ -543,9 +489,9 @@ impl DeploymentSpecification {
                                     TransactionSpecification::EmulatedContractCall(EmulatedContractCallSpecification::from_specifications(spec)?)
                                 }
                                 TransactionSpecificationFile::EmulatedContractPublish(spec) => {
-                                    let spec = EmulatedContractPublishSpecification::from_specifications(spec, base_path)?;
+                                    let spec = EmulatedContractPublishSpecification::from_specifications(spec, project_root_location)?;
                                     let contract_id = QualifiedContractIdentifier::new(spec.emulated_sender.clone(), spec.contract_name.clone());
-                                    contracts.insert(contract_id, (spec.source.clone(), spec.relative_path.clone()));
+                                    contracts.insert(contract_id, (spec.source.clone(), spec.location.clone()));
                                     TransactionSpecification::EmulatedContractPublish(spec)
                                 }
                                 _ => {
@@ -580,13 +526,13 @@ impl DeploymentSpecification {
                                     if network.is_mainnet() {
                                         return Err(format!("{} only supports transactions of type 'contract-call' and 'contract-publish", specs.network.to_lowercase()))
                                     }
-                                    let spec = RequirementPublishSpecification::from_specifications(spec, base_path)?;
+                                    let spec = RequirementPublishSpecification::from_specifications(spec, project_root_location)?;
                                     TransactionSpecification::RequirementPublish(spec)
                                 }
                                 TransactionSpecificationFile::ContractPublish(spec) => {
-                                    let spec = ContractPublishSpecification::from_specifications(spec, base_path)?;
+                                    let spec = ContractPublishSpecification::from_specifications(spec, project_root_location)?;
                                     let contract_id = QualifiedContractIdentifier::new(spec.expected_sender.clone(), spec.contract_name.clone());
-                                    contracts.insert(contract_id, (spec.source.clone(), spec.relative_path.clone()));
+                                    contracts.insert(contract_id, (spec.source.clone(), spec.location.clone()));
                                     TransactionSpecification::ContractPublish(spec)
                                 }
                                 TransactionSpecificationFile::BtcTransfer(spec) => {
@@ -782,7 +728,7 @@ impl TransactionPlanSpecification {
                             ContractPublishSpecificationFile {
                                 contract_name: tx.contract_name.to_string(),
                                 expected_sender: tx.expected_sender.to_address(),
-                                path: tx.relative_path.clone(),
+                                location: tx.location.clone(),
                                 cost: tx.cost,
                             },
                         )
@@ -802,7 +748,7 @@ impl TransactionPlanSpecification {
                             EmulatedContractPublishSpecificationFile {
                                 contract_name: tx.contract_name.to_string(),
                                 emulated_sender: tx.emulated_sender.to_address(),
-                                path: tx.relative_path.clone(),
+                                location: tx.location.clone(),
                             },
                         )
                     }
@@ -816,7 +762,7 @@ impl TransactionPlanSpecification {
                                 contract_id: tx.contract_id.to_string(),
                                 remap_sender: tx.remap_sender.to_address(),
                                 remap_principals: Some(remap_principals),
-                                path: tx.relative_path.clone(),
+                                location: tx.location.clone(),
                                 cost: tx.cost,
                             },
                         )

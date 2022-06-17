@@ -1,5 +1,6 @@
 mod clarity_language_backend;
 
+use clarinet_files::FileLocation;
 use clarity_language_backend::ClarityLanguageBackend;
 use clarity_lsp::lsp_types::{MessageType, Url};
 use clarity_lsp::state::{build_state, EditorState, ProtocolState};
@@ -50,16 +51,16 @@ async fn do_run_lsp() -> Result<(), String> {
 }
 
 pub enum LspRequest {
-    ManifestOpened(PathBuf, Sender<Response>),
-    ManifestChanged(PathBuf, Sender<Response>),
-    ContractOpened(Url, Sender<Response>),
-    ContractChanged(Url, Sender<Response>),
-    GetIntellisense(Url, Sender<Response>),
+    ManifestOpened(FileLocation, Sender<Response>),
+    ManifestChanged(FileLocation, Sender<Response>),
+    ContractOpened(FileLocation, Sender<Response>),
+    ContractChanged(FileLocation, Sender<Response>),
+    GetIntellisense(FileLocation, Sender<Response>),
 }
 
 #[derive(Debug, PartialEq)]
 pub struct Response {
-    aggregated_diagnostics: Vec<(Url, Vec<Diagnostic>)>,
+    aggregated_diagnostics: Vec<(FileLocation, Vec<Diagnostic>)>,
     notification: Option<(MessageType, String)>,
     completion_items: Vec<tower_lsp::lsp_types::CompletionItem>,
 }
@@ -95,9 +96,9 @@ fn start_server(command_rx: Receiver<LspRequest>) {
             }
         };
         match command {
-            LspRequest::GetIntellisense(contract_url, response_tx) => {
+            LspRequest::GetIntellisense(contract_location, response_tx) => {
                 let mut completion_items_src =
-                    editor_state.get_completion_items_for_contract(&contract_url);
+                    editor_state.get_completion_items_for_contract(&contract_location);
                 let mut completion_items = vec![];
                 // Little big detail: should we wrap the inserted_text with braces?
                 let should_wrap = {
@@ -133,26 +134,29 @@ fn start_server(command_rx: Receiver<LspRequest>) {
                     completion_items,
                 });
             }
-            LspRequest::ManifestOpened(opened_manifest_path, response_tx) => {
+            LspRequest::ManifestOpened(opened_manifest_location, response_tx) => {
                 // The only reason why we're waiting for this kind of events, is building our initial state
                 // if the system is initialized, move on.
-                if editor_state.protocols.contains_key(&opened_manifest_path) {
+                if editor_state
+                    .protocols
+                    .contains_key(&opened_manifest_location)
+                {
                     let _ = response_tx.send(Response::default());
                     continue;
                 }
 
-                // With this manifest_path, let's initialize our state.
+                // With this manifest_location, let's initialize our state.
                 let mut protocol_state = ProtocolState::new();
-                match build_state(&opened_manifest_path, &mut protocol_state) {
+                match build_state(&opened_manifest_location, &mut protocol_state) {
                     Ok(_) => {
-                        editor_state.index_protocol(opened_manifest_path, protocol_state);
+                        editor_state.index_protocol(opened_manifest_location, protocol_state);
                         let (aggregated_diagnostics, notification) =
                             editor_state.get_aggregated_diagnostics();
                         let _ = response_tx.send(Response {
                             aggregated_diagnostics: aggregated_diagnostics
                                 .into_iter()
-                                .map(|(url, mut diags)| {
-                                    (url, clarity_diagnotics_to_tower_lsp_type(&mut diags))
+                                .map(|(location, mut diags)| {
+                                    (location, clarity_diagnotics_to_tower_lsp_type(&mut diags))
                                 })
                                 .collect::<Vec<_>>(),
                             notification,
@@ -164,28 +168,27 @@ fn start_server(command_rx: Receiver<LspRequest>) {
                     }
                 };
             }
-            LspRequest::ContractOpened(contract_url, response_tx) => {
+            LspRequest::ContractOpened(contract_location, response_tx) => {
                 // The only reason why we're waiting for this kind of events, is building our initial state
                 // if the system is initialized, move on.
-                let manifest_path = match utils::get_manifest_path_from_contract_url(&contract_url)
-                {
-                    Some(manifest_path) => manifest_path,
-                    None => {
+                let manifest_location = match contract_location.get_project_manifest_location() {
+                    Ok(manifest_location) => manifest_location,
+                    _ => {
                         let _ = response_tx.send(Response::default());
                         continue;
                     }
                 };
 
-                if editor_state.protocols.contains_key(&manifest_path) {
+                if editor_state.protocols.contains_key(&manifest_location) {
                     let _ = response_tx.send(Response::default());
                     continue;
                 }
 
-                // With this manifest_path, let's initialize our state.
+                // With this manifest_location, let's initialize our state.
                 let mut protocol_state = ProtocolState::new();
-                match build_state(&manifest_path, &mut protocol_state) {
+                match build_state(&manifest_location, &mut protocol_state) {
                     Ok(_) => {
-                        editor_state.index_protocol(manifest_path, protocol_state);
+                        editor_state.index_protocol(manifest_location, protocol_state);
                         let (aggregated_diagnostics, notification) =
                             editor_state.get_aggregated_diagnostics();
                         let _ = response_tx.send(Response {
@@ -204,14 +207,14 @@ fn start_server(command_rx: Receiver<LspRequest>) {
                     }
                 };
             }
-            LspRequest::ManifestChanged(manifest_path, response_tx) => {
-                editor_state.clear_protocol(&manifest_path);
+            LspRequest::ManifestChanged(manifest_location, response_tx) => {
+                editor_state.clear_protocol(&manifest_location);
 
                 // We will rebuild the entire state, without to try any optimizations for now
                 let mut protocol_state = ProtocolState::new();
-                match build_state(&manifest_path, &mut protocol_state) {
+                match build_state(&manifest_location, &mut protocol_state) {
                     Ok(_) => {
-                        editor_state.index_protocol(manifest_path, protocol_state);
+                        editor_state.index_protocol(manifest_location, protocol_state);
                         let (aggregated_diagnostics, notification) =
                             editor_state.get_aggregated_diagnostics();
                         let _ = response_tx.send(Response {
@@ -230,25 +233,26 @@ fn start_server(command_rx: Receiver<LspRequest>) {
                     }
                 };
             }
-            LspRequest::ContractChanged(contract_url, response_tx) => {
-                let manifest_path =
-                    match editor_state.clear_protocol_associated_with_contract(&contract_url) {
-                        Some(manifest_path) => manifest_path,
-                        None => match utils::get_manifest_path_from_contract_url(&contract_url) {
-                            Some(manifest_path) => manifest_path,
-                            None => {
-                                let _ = response_tx.send(Response::default());
-                                continue;
-                            }
-                        },
-                    };
+            LspRequest::ContractChanged(contract_location, response_tx) => {
+                let manifest_location = match editor_state
+                    .clear_protocol_associated_with_contract(&contract_location)
+                {
+                    Some(manifest_location) => manifest_location,
+                    None => match contract_location.get_project_manifest_location() {
+                        Ok(manifest_location) => manifest_location,
+                        _ => {
+                            let _ = response_tx.send(Response::default());
+                            continue;
+                        }
+                    },
+                };
                 // TODO(lgalabru): introduce partial analysis
                 // https://github.com/hirosystems/clarity-lsp/issues/98
                 // We will rebuild the entire state, without trying any optimizations for now
                 let mut protocol_state = ProtocolState::new();
-                match build_state(&manifest_path, &mut protocol_state) {
+                match build_state(&manifest_location, &mut protocol_state) {
                     Ok(_contracts_updates) => {
-                        editor_state.index_protocol(manifest_path, protocol_state);
+                        editor_state.index_protocol(manifest_location, protocol_state);
                         let (aggregated_diagnostics, notification) =
                             editor_state.get_aggregated_diagnostics();
                         let _ = response_tx.send(Response {
@@ -427,14 +431,14 @@ fn test_opening_counter_manifest_should_return_fresh_analysis() {
         start_server(rx);
     });
 
-    let mut manifest_path = std::env::current_dir().expect("Unable to get current dir");
-    manifest_path.push("examples");
-    manifest_path.push("counter");
-    manifest_path.push("Clarinet.toml");
+    let mut manifest_location = std::env::current_dir().expect("Unable to get current dir");
+    manifest_location.push("examples");
+    manifest_location.push("counter");
+    manifest_location.push("Clarinet.toml");
 
     let (response_tx, response_rx) = channel();
     let _ = tx.send(LspRequest::ManifestOpened(
-        manifest_path.clone(),
+        manifest_location.clone(),
         response_tx.clone(),
     ));
     let response = response_rx.recv().expect("Unable to get response");
@@ -445,7 +449,7 @@ fn test_opening_counter_manifest_should_return_fresh_analysis() {
     assert_eq!(diags.len(), 4);
 
     // re-opening this manifest should not trigger a full analysis
-    let _ = tx.send(LspRequest::ManifestOpened(manifest_path, response_tx));
+    let _ = tx.send(LspRequest::ManifestOpened(manifest_location, response_tx));
     let response = response_rx.recv().expect("Unable to get response");
     assert_eq!(response, Response::default());
 }
@@ -459,14 +463,14 @@ fn test_opening_simple_nft_manifest_should_return_fresh_analysis() {
         start_server(rx);
     });
 
-    let mut manifest_path = std::env::current_dir().expect("Unable to get current dir");
-    manifest_path.push("examples");
-    manifest_path.push("simple-nft");
-    manifest_path.push("Clarinet.toml");
+    let mut manifest_location = std::env::current_dir().expect("Unable to get current dir");
+    manifest_location.push("examples");
+    manifest_location.push("simple-nft");
+    manifest_location.push("Clarinet.toml");
 
     let (response_tx, response_rx) = channel();
     let _ = tx.send(LspRequest::ManifestOpened(
-        manifest_path.clone(),
+        manifest_location.clone(),
         response_tx.clone(),
     ));
     let response = response_rx.recv().expect("Unable to get response");

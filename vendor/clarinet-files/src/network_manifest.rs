@@ -3,7 +3,7 @@ use std::collections::BTreeMap;
 
 use super::FileLocation;
 use bip39::{Language, Mnemonic};
-use bitcoincore_rpc::bitcoin;
+// use bitcoin;
 use clarity_repl::clarity::util::hash::bytes_to_hex;
 use clarity_repl::clarity::util::secp256k1::Secp256k1PublicKey;
 use clarity_repl::clarity::util::StacksAddress;
@@ -209,12 +209,12 @@ pub struct AccountConfig {
 
 impl NetworkManifest {
     #[allow(non_fmt_panics)]
-    pub fn from_manifest_location(
-        manifest_location: &FileLocation,
+    pub fn from_project_manifest_location(
+        project_manifest_location: &FileLocation,
         networks: &(BitcoinNetwork, StacksNetwork),
     ) -> Result<NetworkManifest, String> {
-        let mut network_manifest_location =
-            manifest_location.get_network_manifest_location(&networks.1)?;
+        let network_manifest_location =
+            project_manifest_location.get_network_manifest_location(&networks.1)?;
         NetworkManifest::from_location(&network_manifest_location, networks)
     }
 
@@ -556,17 +556,18 @@ pub fn compute_addresses(
     let stx_address = StacksAddress::from_public_key(version, pub_key).unwrap();
 
     let btc_address = {
-        let public_key = bitcoin::PublicKey::from_slice(&public_key.serialize_compressed())
-            .expect("Unable to recreate public key");
-        let btc_address = bitcoin::Address::p2pkh(
-            &public_key,
-            match networks.0 {
-                BitcoinNetwork::Regtest => bitcoin::Network::Regtest,
-                BitcoinNetwork::Testnet => bitcoin::Network::Testnet,
-                BitcoinNetwork::Mainnet => bitcoin::Network::Bitcoin,
-            },
-        );
-        btc_address.to_string()
+        // let public_key = bitcoin::PublicKey::from_slice(&public_key.serialize_compressed())
+        //     .expect("Unable to recreate public key");
+        // let btc_address = bitcoin::Address::p2pkh(
+        //     &public_key,
+        //     match networks.0 {
+        //         BitcoinNetwork::Regtest => bitcoin::Network::Regtest,
+        //         BitcoinNetwork::Testnet => bitcoin::Network::Testnet,
+        //         BitcoinNetwork::Mainnet => bitcoin::Network::Bitcoin,
+        //     },
+        // );
+        // btc_address.to_string()
+        "".to_string()
     };
 
     (stx_address.to_string(), btc_address, miner_secret_key_hex)
