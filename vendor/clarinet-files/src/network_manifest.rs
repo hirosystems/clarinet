@@ -3,7 +3,6 @@ use std::collections::BTreeMap;
 
 use super::FileLocation;
 use bip39::{Language, Mnemonic};
-// use bitcoin;
 use clarity_repl::clarity::util::hash::bytes_to_hex;
 use clarity_repl::clarity::util::secp256k1::Secp256k1PublicKey;
 use clarity_repl::clarity::util::StacksAddress;
@@ -11,6 +10,9 @@ use libsecp256k1::{PublicKey, SecretKey};
 use orchestra_types::{BitcoinNetwork, StacksNetwork};
 use tiny_hderive::bip32::ExtendedPrivKey;
 use toml::value::Value;
+
+#[cfg(not(feature = "wasm"))]
+use bitcoin;
 
 pub const DEFAULT_DERIVATION_PATH: &str = "m/44'/5757'/0'/0/0";
 pub const DEFAULT_BITCOIN_NODE_IMAGE: &str = "quay.io/hirosystems/bitcoind:devnet-v2";
@@ -555,20 +557,27 @@ pub fn compute_addresses(
 
     let stx_address = StacksAddress::from_public_key(version, pub_key).unwrap();
 
-    let btc_address = {
-        // let public_key = bitcoin::PublicKey::from_slice(&public_key.serialize_compressed())
-        //     .expect("Unable to recreate public key");
-        // let btc_address = bitcoin::Address::p2pkh(
-        //     &public_key,
-        //     match networks.0 {
-        //         BitcoinNetwork::Regtest => bitcoin::Network::Regtest,
-        //         BitcoinNetwork::Testnet => bitcoin::Network::Testnet,
-        //         BitcoinNetwork::Mainnet => bitcoin::Network::Bitcoin,
-        //     },
-        // );
-        // btc_address.to_string()
-        "".to_string()
-    };
+    let btc_address = compute_btc_address(&public_key, &networks.0);
 
     (stx_address.to_string(), btc_address, miner_secret_key_hex)
+}
+
+#[cfg(not(feature = "wasm"))]
+fn compute_btc_address(public_key: &PublicKey, network: &BitcoinNetwork) -> String {
+    let public_key = bitcoin::PublicKey::from_slice(&public_key.serialize_compressed())
+        .expect("Unable to recreate public key");
+    let btc_address = bitcoin::Address::p2pkh(
+        &public_key,
+        match network {
+            BitcoinNetwork::Regtest => bitcoin::Network::Regtest,
+            BitcoinNetwork::Testnet => bitcoin::Network::Testnet,
+            BitcoinNetwork::Mainnet => bitcoin::Network::Bitcoin,
+        },
+    );
+    btc_address.to_string()
+}
+
+#[cfg(feature = "wasm")]
+fn compute_btc_address(_public_key: &PublicKey, _network: &BitcoinNetwork) -> String {
+    format!("__not_implemented__")
 }

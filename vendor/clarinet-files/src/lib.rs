@@ -70,7 +70,7 @@ impl FileLocation {
             let path = url
                 .to_file_path()
                 .map_err(|_| format!("unable to conver url {} to path", url))?;
-            return Ok(FileLocation::FileSystem { path })
+            return Ok(FileLocation::FileSystem { path });
         }
 
         Ok(FileLocation::Url { url })
@@ -310,7 +310,7 @@ impl FileLocation {
                 Ok(url.to_string())
             }
             FileLocation::Url { url } => Ok(url.to_string()),
-            _ => unreachable!()
+            _ => unreachable!(),
         }
     }
 }
