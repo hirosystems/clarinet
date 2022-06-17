@@ -23,16 +23,16 @@ impl GetChangesForNewContract {
         }
     }
 
-    pub fn run(&mut self, include_test: bool) -> Vec<Changes> {
-        self.create_template_contract();
+    pub fn run(&mut self, include_test: bool) -> Result<Vec<Changes>, String> {
+        self.create_template_contract()?;
         if include_test {
-            self.create_template_test();
+            self.create_template_test()?;
         }
         self.index_contract_in_clarinet_toml();
-        self.changes.clone()
+        Ok(self.changes.clone())
     }
 
-    fn create_template_contract(&mut self) {
+    fn create_template_contract(&mut self) -> Result<(), String> {
         let content = if let Some(ref source) = self.source {
             source.to_string()
         } else {
@@ -57,19 +57,23 @@ impl GetChangesForNewContract {
             )
         };
         let name = format!("{}.clar", self.contract_name);
-        let mut contract_path = self.manifest_location.get_project_root_location().unwrap();
-        contract_path.append_path("contracts");
-        contract_path.append_path(&name);
+        let mut new_file = self.manifest_location.get_project_root_location().unwrap();
+        new_file.append_path("contracts")?;
+        new_file.append_path(&name)?;
+        if new_file.exists() {
+            return Err(format!("{} already exists", new_file.to_string()));
+        }
         let change = FileCreation {
             comment: format!("{} contracts/{}", green!("Created file"), name),
             name,
             content,
-            path: contract_path.to_string(),
+            path: new_file.to_string(),
         };
         self.changes.push(Changes::AddFile(change));
+        Ok(())
     }
 
-    fn create_template_test(&mut self) {
+    fn create_template_test(&mut self) -> Result<(), String> {
         let content = format!(
             r#"
 import {{ Clarinet, Tx, Chain, Account, types }} from 'https://deno.land/x/clarinet@v0.31.0/index.ts';
@@ -101,16 +105,20 @@ Clarinet.test({{
         );
 
         let name = format!("{}_test.ts", self.contract_name);
-        let mut contract_path = self.manifest_location.get_project_root_location().unwrap();
-        contract_path.append_path("tests");
-        contract_path.append_path(&name);
+        let mut new_file = self.manifest_location.get_project_root_location().unwrap();
+        new_file.append_path("tests")?;
+        new_file.append_path(&name)?;
+        if new_file.exists() {
+            return Err(format!("{} already exists", new_file.to_string()));
+        }
         let change = FileCreation {
             comment: format!("{} tests/{}", green!("Created file"), name),
             name,
             content,
-            path: contract_path.to_string(),
+            path: new_file.to_string(),
         };
         self.changes.push(Changes::AddFile(change));
+        Ok(())
     }
 
     fn index_contract_in_clarinet_toml(&mut self) {

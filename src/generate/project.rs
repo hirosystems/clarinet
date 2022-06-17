@@ -17,7 +17,7 @@ impl GetChangesForNewProject {
         }
     }
 
-    pub fn run(&mut self) -> Vec<Changes> {
+    pub fn run(&mut self) -> Result<Vec<Changes>, String> {
         self.create_root_directory();
         self.create_contracts_directory();
         self.create_settings_directory();
@@ -30,7 +30,7 @@ impl GetChangesForNewProject {
         self.create_vscode_settings_json();
         self.create_vscode_tasks_json();
         self.create_gitignore();
-        self.changes.clone()
+        Ok(self.changes.clone())
     }
 
     fn create_root_directory(&mut self) {

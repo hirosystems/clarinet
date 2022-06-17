@@ -31,7 +31,7 @@ pub async fn retrieve_contract(
 
     let response = fetch_contract(request_url).await?;
     let code = response.source.to_string();
-    contract_location.write_content(code.as_bytes());
+    contract_location.write_content(code.as_bytes())?;
 
     Ok((code, contract_location))
 }

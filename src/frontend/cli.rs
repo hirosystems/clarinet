@@ -454,8 +454,18 @@ pub fn main() {
                 );
             }
             let project_id = project_opts.name.clone();
-            let changes =
-                generate::get_changes_for_new_project(current_path, project_id, telemetry_enabled);
+            let changes = match generate::get_changes_for_new_project(
+                current_path,
+                project_id,
+                telemetry_enabled,
+            ) {
+                Ok(changes) => changes,
+                Err(message) => {
+                    println!("{}: {}", red!("error"), message);
+                    std::process::exit(1);
+                }
+            };
+
             if !execute_changes(changes) {
                 std::process::exit(1);
             }
@@ -477,7 +487,7 @@ pub fn main() {
                 println!("Checking deployments");
                 let res = check_deployments(&manifest);
                 if let Err(message) = res {
-                    println!("{}", message);
+                    println!("{}: {}", red!("error"), message);
                     process::exit(1);
                 }
             }
@@ -500,7 +510,7 @@ pub fn main() {
                     match generate_default_deployment(&manifest, &network, cmd.no_batch) {
                         Ok(deployment) => deployment,
                         Err(message) => {
-                            println!("{}", red!(message));
+                            println!("{}: {}", red!("error"), message);
                             std::process::exit(1);
                         }
                     };
@@ -682,7 +692,15 @@ pub fn main() {
                     }
                 };
 
-                let changes = generate::get_changes_for_new_chainhook(&manifest, cmd.name, chain);
+                let changes =
+                    match generate::get_changes_for_new_chainhook(&manifest, cmd.name, chain) {
+                        Ok(changes) => changes,
+                        Err(message) => {
+                            println!("{}: {}", red!("error"), message);
+                            std::process::exit(1);
+                        }
+                    };
+
                 if !execute_changes(changes) {
                     std::process::exit(1);
                 }
@@ -705,12 +723,19 @@ pub fn main() {
             Contracts::NewContract(cmd) => {
                 let manifest = load_manifest_or_exit(cmd.manifest_path);
 
-                let changes = generate::get_changes_for_new_contract(
+                let changes = match generate::get_changes_for_new_contract(
                     &manifest.location,
                     cmd.name,
                     None,
                     true,
-                );
+                ) {
+                    Ok(changes) => changes,
+                    Err(message) => {
+                        println!("{}: {}", red!("error"), message);
+                        std::process::exit(1);
+                    }
+                };
+
                 if !execute_changes(changes) {
                     std::process::exit(1);
                 }

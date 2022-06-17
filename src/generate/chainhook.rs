@@ -19,9 +19,9 @@ impl<'a> GetChangesForNewChainhook<'a> {
         }
     }
 
-    pub fn run(&mut self) -> Vec<Changes> {
+    pub fn run(&mut self) -> Result<Vec<Changes>, String> {
         let mut project_path = self.manifest.location.get_project_root_location().unwrap();
-        project_path.append_path("chainhooks");
+        project_path.append_path("chainhooks")?;
         if !project_path.exists() {
             let change = DirectoryCreation {
                 comment: format!("{} chainhooks/", green!("Created directory"),),
@@ -31,13 +31,13 @@ impl<'a> GetChangesForNewChainhook<'a> {
             self.changes.push(Changes::AddDirectory(change))
         }
         match &self.chain {
-            Chain::Bitcoin => self.create_template_bitcoin_chainhook(),
-            Chain::Stacks => self.create_template_stacks_chainhook(),
+            Chain::Bitcoin => self.create_template_bitcoin_chainhook()?,
+            Chain::Stacks => self.create_template_stacks_chainhook()?,
         };
-        self.changes.clone()
+        Ok(self.changes.clone())
     }
 
-    fn create_template_bitcoin_chainhook(&mut self) {
+    fn create_template_bitcoin_chainhook(&mut self) -> Result<(), String> {
         let content = format!(
             r#"
 ---
@@ -61,22 +61,26 @@ networks:
         );
 
         let name = format!("{}.chainhook.yaml", self.chainhook_name);
-        let mut project_path = self
+        let mut new_file = self
             .manifest
             .location
             .get_project_root_location()
             .expect("unable to retrieve project root");
-        project_path.append_path(&format!("chainhooks/{}", name));
+        new_file.append_path(&format!("chainhooks/{}", name))?;
+        if new_file.exists() {
+            return Err(format!("{} already exists", new_file.to_string()));
+        }
         let change = FileCreation {
             comment: format!("{} chainhooks/{}", green!("Created file"), name),
             name,
             content,
-            path: project_path.to_string(),
+            path: new_file.to_string(),
         };
         self.changes.push(Changes::AddFile(change));
+        Ok(())
     }
 
-    fn create_template_stacks_chainhook(&mut self) {
+    fn create_template_stacks_chainhook(&mut self) -> Result<(), String> {
         let content = format!(
             r#"
 ---
@@ -117,7 +121,7 @@ networks:
             .location
             .get_project_root_location()
             .expect("unable to retrieve project root");
-        project_path.append_path(&format!("chainhooks/{}", name));
+        project_path.append_path(&format!("chainhooks/{}", name))?;
         let change = FileCreation {
             comment: format!("{} chainhooks/{}", green!("Created file"), name),
             name,
@@ -125,6 +129,7 @@ networks:
             path: project_path.to_string(),
         };
         self.changes.push(Changes::AddFile(change));
+        Ok(())
     }
 
     // TODO(lgalabru): should we index chainhooks in project manifests?

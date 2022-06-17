@@ -16,7 +16,7 @@ pub fn get_changes_for_new_project(
     project_path: String,
     project_name: String,
     telemetry_enabled: bool,
-) -> Vec<Changes> {
+) -> Result<Vec<Changes>, String> {
     let mut command = GetChangesForNewProject::new(project_path, project_name, telemetry_enabled);
     command.run()
 }
@@ -26,7 +26,7 @@ pub fn get_changes_for_new_contract(
     contract_name: String,
     source: Option<String>,
     include_test: bool,
-) -> Vec<Changes> {
+) -> Result<Vec<Changes>, String> {
     let mut command =
         GetChangesForNewContract::new(manifest_location.clone(), contract_name, source);
     command.run(include_test)
@@ -36,7 +36,7 @@ pub fn get_changes_for_new_chainhook(
     manifest: &ProjectManifest,
     chainhook_name: String,
     chain: Chain,
-) -> Vec<Changes> {
+) -> Result<Vec<Changes>, String> {
     let mut command = GetChangesForNewChainhook::new(manifest, chainhook_name, chain);
     command.run()
 }
