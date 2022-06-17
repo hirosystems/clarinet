@@ -9,6 +9,8 @@ use clarity_repl::clarity::{ClarityName, Value};
 use reqwest::Url;
 pub use ui::start_ui;
 
+use crate::utils;
+
 use clarinet_deployments::types::{
     DeploymentGenerationArtifacts, DeploymentSpecification, TransactionSpecification,
 };
@@ -230,6 +232,15 @@ pub fn get_default_deployment_path(
     Ok(deployment_path)
 }
 
+pub fn generate_default_deployment(
+    manifest: &ProjectManifest,
+    network: &StacksNetwork,
+    no_batch: bool,
+) -> Result<(DeploymentSpecification, DeploymentGenerationArtifacts), String> {
+    let future = clarinet_deployments::generate_default_deployment(manifest, network, false);
+    utils::nestable_block_on(future)
+}
+
 pub fn read_deployment_or_generate_default(
     manifest: &ProjectManifest,
     network: &StacksNetwork,
@@ -247,8 +258,7 @@ pub fn read_deployment_or_generate_default(
             None,
         )
     } else {
-        let (deployment, artifacts) =
-            clarinet_deployments::generate_default_deployment(manifest, network, false)?;
+        let (deployment, artifacts) = generate_default_deployment(manifest, network, false)?;
         (deployment, Some(artifacts))
     };
     Ok((deployment, artifacts))

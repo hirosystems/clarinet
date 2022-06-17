@@ -3,7 +3,7 @@ extern crate serde;
 #[macro_use]
 extern crate serde_derive;
 
-// pub mod requirements;
+pub mod requirements;
 pub mod types;
 
 use self::types::{
@@ -27,8 +27,6 @@ use clarity_repl::repl::SessionSettings;
 use clarity_repl::repl::{ExecutionResult, Session};
 use orchestra_types::StacksNetwork;
 use std::collections::{BTreeMap, HashMap, VecDeque};
-use std::path::PathBuf;
-use std::str::FromStr;
 
 #[cfg(feature = "cli")]
 use reqwest::Url;
@@ -162,7 +160,7 @@ pub fn update_session_with_contracts_executions(
     results
 }
 
-pub fn generate_default_deployment(
+pub async fn generate_default_deployment(
     manifest: &ProjectManifest,
     network: &StacksNetwork,
     no_batch: bool,
@@ -277,141 +275,141 @@ pub fn generate_default_deployment(
     }
 
     // Build the ASTs / DependencySet for requirements - step required for Simnet/Devnet/Testnet/Mainnet
-    // if let Some(ref requirements) = manifest.project.requirements {
-    //     let cache_location = &manifest.project.cache_location;
-    //     let mut emulated_contracts_publish = HashMap::new();
-    //     let mut requirements_publish = HashMap::new();
+    if let Some(ref requirements) = manifest.project.requirements {
+        let cache_location = &manifest.project.cache_location;
+        let mut emulated_contracts_publish = HashMap::new();
+        let mut requirements_publish = HashMap::new();
 
-    //     // Load all the requirements
-    //     // Some requirements are explicitly listed, some are discovered as we compute the ASTs.
+        // Load all the requirements
+        // Some requirements are explicitly listed, some are discovered as we compute the ASTs.
 
-    //     for requirement in requirements.iter() {
-    //         let contract_id = match QualifiedContractIdentifier::parse(&requirement.contract_id) {
-    //             Ok(contract_id) => contract_id,
-    //             Err(_e) => {
-    //                 return Err(format!(
-    //                     "malformatted contract_id: {}",
-    //                     requirement.contract_id
-    //                 ))
-    //             }
-    //         };
-    //         queue.push_front(contract_id);
-    //     }
+        for requirement in requirements.iter() {
+            let contract_id = match QualifiedContractIdentifier::parse(&requirement.contract_id) {
+                Ok(contract_id) => contract_id,
+                Err(_e) => {
+                    return Err(format!(
+                        "malformatted contract_id: {}",
+                        requirement.contract_id
+                    ))
+                }
+            };
+            queue.push_front(contract_id);
+        }
 
-    //     while let Some(contract_id) = queue.pop_front() {
-    //         // Extract principal from contract_id
-    //         if requirements_deps.contains_key(&contract_id) {
-    //             continue;
-    //         }
+        while let Some(contract_id) = queue.pop_front() {
+            // Extract principal from contract_id
+            if requirements_deps.contains_key(&contract_id) {
+                continue;
+            }
 
-    //         // Did we already get the source in a prior cycle?
-    //         let ast = match requirements_asts.remove(&contract_id) {
-    //             Some(ast) => ast,
-    //             None => {
-    //                 // Download the code
-    //                 let (source, contract_location) =
-    //                     requirements::retrieve_contract(&contract_id, &cache_location)?;
+            // Did we already get the source in a prior cycle?
+            let ast = match requirements_asts.remove(&contract_id) {
+                Some(ast) => ast,
+                None => {
+                    // Download the code
+                    let (source, contract_location) =
+                        requirements::retrieve_contract(&contract_id, &cache_location).await?;
 
-    //                 // Build the struct representing the requirement in the deployment
-    //                 if network.is_simnet() {
-    //                     let data = EmulatedContractPublishSpecification {
-    //                         contract_name: contract_id.name.clone(),
-    //                         emulated_sender: contract_id.issuer.clone(),
-    //                         source: source.clone(),
-    //                         location: contract_location,
-    //                     };
-    //                     emulated_contracts_publish.insert(contract_id.clone(), data);
-    //                 } else if network.either_devnet_or_testnet() {
-    //                     let data = RequirementPublishSpecification {
-    //                         contract_id: contract_id.clone(),
-    //                         remap_sender: default_deployer_address.clone(),
-    //                         source: source.clone(),
-    //                         location: contract_location,
-    //                         cost: deployment_fee_rate * source.len() as u64,
-    //                         remap_principals: BTreeMap::new(),
-    //                     };
-    //                     requirements_publish.insert(contract_id.clone(), data);
-    //                 }
+                    // Build the struct representing the requirement in the deployment
+                    if network.is_simnet() {
+                        let data = EmulatedContractPublishSpecification {
+                            contract_name: contract_id.name.clone(),
+                            emulated_sender: contract_id.issuer.clone(),
+                            source: source.clone(),
+                            location: contract_location,
+                        };
+                        emulated_contracts_publish.insert(contract_id.clone(), data);
+                    } else if network.either_devnet_or_testnet() {
+                        let data = RequirementPublishSpecification {
+                            contract_id: contract_id.clone(),
+                            remap_sender: default_deployer_address.clone(),
+                            source: source.clone(),
+                            location: contract_location,
+                            cost: deployment_fee_rate * source.len() as u64,
+                            remap_principals: BTreeMap::new(),
+                        };
+                        requirements_publish.insert(contract_id.clone(), data);
+                    }
 
-    //                 // Compute the AST
-    //                 let (ast, _, _) = session.interpreter.build_ast(
-    //                     contract_id.clone(),
-    //                     source.to_string(),
-    //                     parser_version,
-    //                 );
-    //                 ast
-    //             }
-    //         };
+                    // Compute the AST
+                    let (ast, _, _) = session.interpreter.build_ast(
+                        contract_id.clone(),
+                        source.to_string(),
+                        parser_version,
+                    );
+                    ast
+                }
+            };
 
-    //         // Detect the eventual dependencies for this AST
-    //         let mut contract_ast = HashMap::new();
-    //         contract_ast.insert(contract_id.clone(), ast);
-    //         let dependencies =
-    //             ASTDependencyDetector::detect_dependencies(&contract_ast, &requirements_asts);
-    //         let ast = contract_ast
-    //             .remove(&contract_id)
-    //             .expect("unable to retrieve ast");
+            // Detect the eventual dependencies for this AST
+            let mut contract_ast = HashMap::new();
+            contract_ast.insert(contract_id.clone(), ast);
+            let dependencies =
+                ASTDependencyDetector::detect_dependencies(&contract_ast, &requirements_asts);
+            let ast = contract_ast
+                .remove(&contract_id)
+                .expect("unable to retrieve ast");
 
-    //         // Extract the known / unknown dependencies
-    //         match dependencies {
-    //             Ok(inferable_dependencies) => {
-    //                 // Looping could be confusing - in this case, we submitted a HashMap with one contract, so we have at most one
-    //                 // result in the `inferable_dependencies` map. We will just extract and keep the associated data (source, ast, deps).
-    //                 for (contract_id, dependencies) in inferable_dependencies.into_iter() {
-    //                     for dependency in dependencies.iter() {
-    //                         queue.push_back(dependency.contract_id.clone());
-    //                     }
-    //                     requirements_deps.insert(contract_id.clone(), dependencies);
-    //                     requirements_asts.insert(contract_id.clone(), ast);
-    //                     break;
-    //                 }
-    //             }
-    //             Err((inferable_dependencies, non_inferable_dependencies)) => {
-    //                 // In the case of unknown dependencies, we were unable to construct an exhaustive list of dependencies.
-    //                 // As such, we will re-enqueue the present (front) and push all the unknown contract_ids in front of it,
-    //                 // and we will keep the source in memory to avoid useless disk access.
-    //                 for (_, dependencies) in inferable_dependencies.iter() {
-    //                     for dependency in dependencies.iter() {
-    //                         queue.push_back(dependency.contract_id.clone());
-    //                     }
-    //                 }
-    //                 requirements_asts.insert(contract_id.clone(), ast);
-    //                 queue.push_front(contract_id);
+            // Extract the known / unknown dependencies
+            match dependencies {
+                Ok(inferable_dependencies) => {
+                    // Looping could be confusing - in this case, we submitted a HashMap with one contract, so we have at most one
+                    // result in the `inferable_dependencies` map. We will just extract and keep the associated data (source, ast, deps).
+                    for (contract_id, dependencies) in inferable_dependencies.into_iter() {
+                        for dependency in dependencies.iter() {
+                            queue.push_back(dependency.contract_id.clone());
+                        }
+                        requirements_deps.insert(contract_id.clone(), dependencies);
+                        requirements_asts.insert(contract_id.clone(), ast);
+                        break;
+                    }
+                }
+                Err((inferable_dependencies, non_inferable_dependencies)) => {
+                    // In the case of unknown dependencies, we were unable to construct an exhaustive list of dependencies.
+                    // As such, we will re-enqueue the present (front) and push all the unknown contract_ids in front of it,
+                    // and we will keep the source in memory to avoid useless disk access.
+                    for (_, dependencies) in inferable_dependencies.iter() {
+                        for dependency in dependencies.iter() {
+                            queue.push_back(dependency.contract_id.clone());
+                        }
+                    }
+                    requirements_asts.insert(contract_id.clone(), ast);
+                    queue.push_front(contract_id);
 
-    //                 for non_inferable_contract_id in non_inferable_dependencies.into_iter() {
-    //                     queue.push_front(non_inferable_contract_id);
-    //                 }
-    //             }
-    //         };
-    //     }
+                    for non_inferable_contract_id in non_inferable_dependencies.into_iter() {
+                        queue.push_front(non_inferable_contract_id);
+                    }
+                }
+            };
+        }
 
-    //     // Avoid listing requirements as deployment transactions to the deployment specification on Mainnet
-    //     if !network.is_mainnet() {
-    //         let ordered_contracts_ids =
-    //             match ASTDependencyDetector::order_contracts(&requirements_deps) {
-    //                 Ok(ordered_contracts) => ordered_contracts,
-    //                 Err(e) => return Err(format!("unable to order requirements {}", e)),
-    //             };
+        // Avoid listing requirements as deployment transactions to the deployment specification on Mainnet
+        if !network.is_mainnet() {
+            let ordered_contracts_ids =
+                match ASTDependencyDetector::order_contracts(&requirements_deps) {
+                    Ok(ordered_contracts) => ordered_contracts,
+                    Err(e) => return Err(format!("unable to order requirements {}", e)),
+                };
 
-    //         if network.is_simnet() {
-    //             for contract_id in ordered_contracts_ids.iter() {
-    //                 let data = emulated_contracts_publish
-    //                     .remove(contract_id)
-    //                     .expect("unable to retrieve contract");
-    //                 let tx = TransactionSpecification::EmulatedContractPublish(data);
-    //                 transactions.push(tx);
-    //             }
-    //         } else if network.either_devnet_or_testnet() {
-    //             for contract_id in ordered_contracts_ids.iter() {
-    //                 let data = requirements_publish
-    //                     .remove(contract_id)
-    //                     .expect("unable to retrieve contract");
-    //                 let tx = TransactionSpecification::RequirementPublish(data);
-    //                 transactions.push(tx);
-    //             }
-    //         }
-    //     }
-    // }
+            if network.is_simnet() {
+                for contract_id in ordered_contracts_ids.iter() {
+                    let data = emulated_contracts_publish
+                        .remove(contract_id)
+                        .expect("unable to retrieve contract");
+                    let tx = TransactionSpecification::EmulatedContractPublish(data);
+                    transactions.push(tx);
+                }
+            } else if network.either_devnet_or_testnet() {
+                for contract_id in ordered_contracts_ids.iter() {
+                    let data = requirements_publish
+                        .remove(contract_id)
+                        .expect("unable to retrieve contract");
+                    let tx = TransactionSpecification::RequirementPublish(data);
+                    transactions.push(tx);
+                }
+            }
+        }
+    }
 
     let mut contracts = HashMap::new();
     let mut contracts_sources = HashMap::new();

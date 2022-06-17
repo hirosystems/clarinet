@@ -287,7 +287,7 @@ impl ProtocolState {
     }
 }
 
-pub fn build_state(
+pub async fn build_state(
     manifest_location: &FileLocation,
     protocol_state: &mut ProtocolState,
 ) -> Result<(), String> {
@@ -302,7 +302,7 @@ pub fn build_state(
     let manifest = ProjectManifest::from_location(manifest_location)?;
 
     let (deployment, mut artifacts) =
-        generate_default_deployment(&manifest, &StacksNetwork::Simnet, false)?;
+        generate_default_deployment(&manifest, &StacksNetwork::Simnet, false).await?;
 
     let mut session = initiate_session_from_deployment(&manifest);
     let results = update_session_with_contracts_executions(

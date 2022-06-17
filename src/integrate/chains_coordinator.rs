@@ -1,6 +1,6 @@
 use super::DevnetEvent;
 use crate::chainhooks::load_chainhooks;
-use crate::deployment::{apply_on_chain_deployment, DeploymentCommand, DeploymentEvent};
+use crate::deployments::{apply_on_chain_deployment, DeploymentCommand, DeploymentEvent};
 use crate::integrate::{ServiceStatusData, Status};
 use crate::types::ChainsCoordinatorCommand;
 use crate::utils;

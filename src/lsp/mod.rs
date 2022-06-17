@@ -1,12 +1,12 @@
 mod clarity_language_backend;
 
+use bitcoincore_rpc::bitcoin::util;
 use clarinet_files::FileLocation;
 use clarity_language_backend::ClarityLanguageBackend;
 use clarity_lsp::lsp_types::{MessageType, Url};
 use clarity_lsp::state::{build_state, EditorState, ProtocolState};
 use clarity_lsp::types::CompletionItemKind;
 use clarity_lsp::utils;
-
 use clarity_repl::clarity::diagnostic::{Diagnostic as ClarityDiagnostic, Level as ClarityLevel};
 
 use std::path::PathBuf;
@@ -39,7 +39,7 @@ async fn do_run_lsp() -> Result<(), String> {
 
     let (tx, rx) = mpsc::channel();
     std::thread::spawn(move || {
-        start_server(rx);
+        crate::utils::nestable_block_on(start_server(rx));
     });
 
     let (service, messages) = LspService::new(|client| ClarityLanguageBackend::new(client, tx));
@@ -85,7 +85,7 @@ impl Response {
     }
 }
 
-fn start_server(command_rx: Receiver<LspRequest>) {
+async fn start_server(command_rx: Receiver<LspRequest>) {
     let mut editor_state = EditorState::new();
 
     loop {
@@ -147,7 +147,7 @@ fn start_server(command_rx: Receiver<LspRequest>) {
 
                 // With this manifest_location, let's initialize our state.
                 let mut protocol_state = ProtocolState::new();
-                match build_state(&opened_manifest_location, &mut protocol_state) {
+                match build_state(&opened_manifest_location, &mut protocol_state).await {
                     Ok(_) => {
                         editor_state.index_protocol(opened_manifest_location, protocol_state);
                         let (aggregated_diagnostics, notification) =
@@ -186,7 +186,7 @@ fn start_server(command_rx: Receiver<LspRequest>) {
 
                 // With this manifest_location, let's initialize our state.
                 let mut protocol_state = ProtocolState::new();
-                match build_state(&manifest_location, &mut protocol_state) {
+                match build_state(&manifest_location, &mut protocol_state).await {
                     Ok(_) => {
                         editor_state.index_protocol(manifest_location, protocol_state);
                         let (aggregated_diagnostics, notification) =
@@ -212,7 +212,7 @@ fn start_server(command_rx: Receiver<LspRequest>) {
 
                 // We will rebuild the entire state, without to try any optimizations for now
                 let mut protocol_state = ProtocolState::new();
-                match build_state(&manifest_location, &mut protocol_state) {
+                match build_state(&manifest_location, &mut protocol_state).await {
                     Ok(_) => {
                         editor_state.index_protocol(manifest_location, protocol_state);
                         let (aggregated_diagnostics, notification) =
@@ -250,7 +250,7 @@ fn start_server(command_rx: Receiver<LspRequest>) {
                 // https://github.com/hirosystems/clarity-lsp/issues/98
                 // We will rebuild the entire state, without trying any optimizations for now
                 let mut protocol_state = ProtocolState::new();
-                match build_state(&manifest_location, &mut protocol_state) {
+                match build_state(&manifest_location, &mut protocol_state).await {
                     Ok(_contracts_updates) => {
                         editor_state.index_protocol(manifest_location, protocol_state);
                         let (aggregated_diagnostics, notification) =

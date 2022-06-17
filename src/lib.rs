@@ -17,7 +17,7 @@ pub extern crate clarity_repl;
 pub mod macros;
 
 pub mod chainhooks;
-pub mod deployment;
+pub mod deployments;
 pub mod generate;
 pub mod integrate;
 pub mod types;

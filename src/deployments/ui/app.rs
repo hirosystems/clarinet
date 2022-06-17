@@ -1,4 +1,4 @@
-use crate::deployment::TransactionTracker;
+use crate::deployments::TransactionTracker;
 use tui::widgets::ListState;
 
 pub struct StatefulList<T> {

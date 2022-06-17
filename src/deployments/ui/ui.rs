@@ -1,4 +1,4 @@
-use crate::deployment::TransactionStatus;
+use crate::deployments::TransactionStatus;
 
 use super::App;
 use tui::{

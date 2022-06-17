@@ -1,4 +1,5 @@
-use clarinet_deployments::{generate_default_deployment, setup_session_with_deployment};
+use crate::deployments::generate_default_deployment;
+use clarinet_deployments::setup_session_with_deployment;
 use clarinet_files::{FileLocation, ProjectManifest};
 use clarity_repl::clarity::debug::dap::DAPDebugger;
 use orchestra_types::StacksNetwork;

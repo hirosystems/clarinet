@@ -6,10 +6,9 @@
 #![allow(non_upper_case_globals)]
 #![allow(unused_must_use)]
 
-use crate::deployment::{
+use crate::deployments::{
     apply_on_chain_deployment, check_deployments, get_absolute_deployment_path,
-    get_default_deployment_path, load_deployment, read_deployment_or_generate_default,
-    write_deployment,
+    get_default_deployment_path, load_deployment, write_deployment,
 };
 use clarinet_deployments::types::DeploymentGenerationArtifacts;
 use clarinet_deployments::{

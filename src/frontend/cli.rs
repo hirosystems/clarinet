@@ -1,9 +1,10 @@
 use crate::chainhooks::check_chainhooks;
-use crate::deployment::types::DeploymentSynthesis;
-use crate::deployment::{
-    self, apply_on_chain_deployment, check_deployments, get_absolute_deployment_path,
-    get_default_deployment_path, get_initial_transactions_trackers, load_deployment,
-    load_deployment_if_exists, write_deployment, DeploymentCommand, DeploymentEvent,
+use crate::deployments::types::DeploymentSynthesis;
+use crate::deployments::{
+    self, apply_on_chain_deployment, check_deployments, generate_default_deployment,
+    get_absolute_deployment_path, get_default_deployment_path, get_initial_transactions_trackers,
+    load_deployment, load_deployment_if_exists, write_deployment, DeploymentCommand,
+    DeploymentEvent,
 };
 use crate::generate::{
     self,
@@ -13,8 +14,8 @@ use crate::integrate::{self, DevnetOrchestrator};
 use crate::lsp::run_lsp;
 use crate::runner::run_scripts;
 use crate::runner::DeploymentCache;
+use clarinet_deployments::setup_session_with_deployment;
 use clarinet_deployments::types::{DeploymentGenerationArtifacts, DeploymentSpecification};
-use clarinet_deployments::{generate_default_deployment, setup_session_with_deployment};
 use clarinet_files::{FileLocation, ProjectManifest, ProjectManifestFile, RequirementConfig};
 use clarity_repl::clarity::analysis::{AnalysisDatabase, ContractAnalysis};
 use clarity_repl::clarity::costs::LimitedCostTracker;
@@ -651,7 +652,7 @@ pub fn main() {
                         }
                     }
                 } else {
-                    let res = deployment::start_ui(&node_url, event_rx, transaction_trackers);
+                    let res = deployments::start_ui(&node_url, event_rx, transaction_trackers);
                     match res {
                         Ok(()) => println!(
                             "{} Transactions successfully confirmed on {:?}",

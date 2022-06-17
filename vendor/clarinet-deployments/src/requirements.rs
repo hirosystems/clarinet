@@ -1,7 +1,8 @@
 use clarinet_files::FileLocation;
 use clarity_repl::clarity::types::QualifiedContractIdentifier;
+use reqwest;
 
-pub fn retrieve_contract(
+pub async fn retrieve_contract(
     contract_id: &QualifiedContractIdentifier,
     cache_location: &FileLocation,
 ) -> Result<(String, FileLocation), String> {
@@ -29,8 +30,7 @@ pub fn retrieve_contract(
         name = contract_name
     );
 
-    let rt = tokio::runtime::Runtime::new().unwrap();
-    let response = rt.block_on(async { fetch_contract(request_url).await })?;
+    let response = fetch_contract(request_url).await?;
     let code = response.source.to_string();
     contract_location.write_content(code.as_bytes());
 
