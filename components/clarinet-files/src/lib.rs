@@ -193,14 +193,6 @@ impl FileLocation {
         Ok(())
     }
 
-    pub fn get_parent(&self) -> Option<FileLocation> {
-        None
-    }
-
-    pub fn is_project_root_location(&self) -> bool {
-        false
-    }
-
     pub fn get_project_root_location(&self) -> Result<FileLocation, String> {
         let mut project_root_location = self.clone();
         match project_root_location.borrow_mut() {
