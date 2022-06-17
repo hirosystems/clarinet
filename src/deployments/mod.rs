@@ -240,6 +240,7 @@ pub fn generate_default_deployment(
     utils::nestable_block_on(future)
 }
 
+#[allow(dead_code)]
 pub fn read_deployment_or_generate_default(
     manifest: &ProjectManifest,
     network: &StacksNetwork,

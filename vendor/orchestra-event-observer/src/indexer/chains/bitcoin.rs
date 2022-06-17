@@ -2,7 +2,8 @@ use crate::indexer::IndexerConfig;
 use bitcoincore_rpc::bitcoin::hashes::Hash;
 use bitcoincore_rpc::bitcoin::BlockHash;
 use bitcoincore_rpc::{Auth, Client, RpcApi};
-use clarity_repl::clarity::util::hash::hex_bytes;
+use clarity_repl::clarity::util::hash::{hex_bytes, to_hex};
+use orchestra_types::bitcoin::{OutPoint, TxIn, TxOut};
 use orchestra_types::{
     BitcoinBlockData, BitcoinBlockMetadata, BitcoinTransactionData, BitcoinTransactionMetadata,
     BlockIdentifier, TransactionIdentifier,
@@ -42,15 +43,33 @@ pub fn standardize_bitcoin_block(
     let block = rpc.get_block(&block_hash).unwrap();
 
     for mut tx in block.txdata.into_iter() {
+        let mut inputs = vec![];
+        for input in tx.input.drain(..) {
+            inputs.push(TxIn {
+                previous_output: OutPoint {
+                    txid: input.previous_output.txid.to_string(),
+                    vout: input.previous_output.vout,
+                },
+                script_sig: to_hex(input.script_sig.as_bytes()),
+                sequence: input.sequence,
+                witness: input.witness,
+            })
+        }
+
+        let mut outputs = vec![];
+        for output in tx.output.drain(..) {
+            outputs.push(TxOut {
+                value: output.value,
+                script_pubkey: to_hex(output.script_pubkey.as_bytes()),
+            })
+        }
+
         let tx = BitcoinTransactionData {
             transaction_identifier: TransactionIdentifier {
                 hash: tx.txid().to_string(),
             },
             operations: vec![],
-            metadata: BitcoinTransactionMetadata {
-                inputs: vec![],  // tx.input.drain(..).collect::<Vec<_>>(),
-                outputs: vec![], //tx.output.drain(..).collect::<Vec<_>>(),
-            },
+            metadata: BitcoinTransactionMetadata { inputs, outputs },
         };
         transactions.push(tx);
     }
