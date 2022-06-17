@@ -1132,7 +1132,7 @@ dependencies = [
  "lazy_static",
  "libc",
  "log",
- "nix 0.20.0",
+ "nix 0.24.1",
  "notify",
  "num_cpus",
  "os_pipe",
@@ -1272,7 +1272,7 @@ dependencies = [
  "lazy_static",
  "libc",
  "log",
- "nix 0.20.0",
+ "nix 0.24.1",
  "notify",
  "percent-encoding",
  "regex",
@@ -2879,6 +2879,7 @@ dependencies = [
  "bitflags",
  "cfg-if 1.0.0",
  "libc",
+ "memoffset",
 ]
 
 [[package]]
