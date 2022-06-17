@@ -175,16 +175,29 @@ depends_on = []
 You can add contracts to your project by adding the files manually, however you must add the appropriate configuration
 to `Clarinet.toml` in order for Clarinet to recognize the contracts.
 
-### Check the syntax of your contracts
+### Check your contracts
 
-Clarinet provides a syntax checker for Clarity. You can check if your Clarity code is valid with the command:
+Clarinet provides syntax and semantics checkers for Clarity. You can check if the Clarity code in your project is valid with the command:
 
 ```bash
 $ clarinet check
 ```
 
-If the Clarity code is valid, the command will return no output. If there are errors in the code, the output of the
-command will indicate where the errors are present.
+This uses the `Clarinet.toml` file to locate and analyze all of the contracts in the project. If the Clarity code is valid, the command will indicate success:
+
+```
+✔ 3 contracts checked
+```
+
+It may also report warnings that indicate that the code is valid, but there is something that you should pay attention to, for example, the check-checker analysis discussed below will generate warnings. If there are errors in the code, the output of the command will indicate the kind and location of the errors.
+
+To perform only a syntax-check on just one file, the file to be checked can be passed to the command:
+
+```bash
+$ clarinet check hiro-coin.clar
+```
+
+Any syntactical errors in the Clarity code will be reported, but type-checking and other semantic checks are not performed, since clarinet is only looking at this one contract and does not have the full context to perform a complete check.
 
 ### Static Analysis
 
@@ -431,22 +444,21 @@ requirements = [
 
 or with the command:
 
-
 ```bash
 clarinet requirements add SP2KAF9RF86PVX3NEE27DFV1CQX0T4WGR41X3S45C.bitcoin-whales
 ```
 
 From there, clarinet will be able to resolve the `contract-call?` statements invoking requirements present in your local contracts, by downloading and caching a copy of these contracts and use them during the execution of your testsuites, and all the different features available in `clarinet`.
 
-When deploying your protocol to Devnet / Testnet, for the contracts involving requirements, the setting `remap_requirements` in your deployment plans must be set. 
+When deploying your protocol to Devnet / Testnet, for the contracts involving requirements, the setting `remap_requirements` in your deployment plans must be set.
 
 Before Devnet / Testnet deployments, your contracts will be automatically remapped on the fly to point to the duplicated requirements deployed by an account that you control.
 
 ### Deploy contracts to Devnet / Testnet / Mainnet
 
-You can use Clarinet to publish your contracts to Devnet / Testnet / Mainnet environment for testing and evaluation on a blockchain. 
+You can use Clarinet to publish your contracts to Devnet / Testnet / Mainnet environment for testing and evaluation on a blockchain.
 
-The first step is to generate a deployment plan, with the following command: 
+The first step is to generate a deployment plan, with the following command:
 
 ```bash
 $ clarinet deployment generate --mainnet
@@ -459,7 +471,6 @@ $ clarinet deployment apply -p <path-to-plan.yaml>
 ```
 
 which will handle the deployments of your contracts, according to the plan.
-
 
 ### Use Clarinet in your CI workflow as a GitHub Action
 
@@ -610,7 +621,7 @@ This trace shows all function calls, both internal calls to private functions, a
 ### Deploy with Hyperchains on Devnet
 
 Clarinet can be used for facilitating experimentations with [Hyperchains](https://www.youtube.com/watch?v=PFPwuVCGGuI).
-To get started with hyperchains, in your `Devnet.toml`, enable the flag 
+To get started with hyperchains, in your `Devnet.toml`, enable the flag
 
 ```toml
 [devnet]
@@ -618,7 +629,7 @@ To get started with hyperchains, in your `Devnet.toml`, enable the flag
 enable_hyperchain_node = true
 ```
 
-This same file can be used for customizing the hyperchain-node (miner, etc). 
+This same file can be used for customizing the hyperchain-node (miner, etc).
 When running the command:
 
 ```bash
@@ -626,7 +637,6 @@ $ clarinet integrate
 ```
 
 Clarinet will spin-up a hyperchain node. More documentation on how to use and interact with this incoming L2 can be found on the [Hyperchain repository](https://github.com/hirosystems/stacks-hyperchains).
-
 
 ## Contributing
 
