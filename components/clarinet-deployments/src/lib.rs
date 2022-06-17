@@ -28,12 +28,6 @@ use clarity_repl::repl::{ExecutionResult, Session};
 use orchestra_types::StacksNetwork;
 use std::collections::{BTreeMap, HashMap, VecDeque};
 
-#[cfg(feature = "cli")]
-use reqwest::Url;
-
-#[cfg(feature = "wasm")]
-use reqwest_wasm::Url;
-
 pub fn setup_session_with_deployment(
     manifest: &ProjectManifest,
     deployment: &DeploymentSpecification,
@@ -443,7 +437,7 @@ pub async fn generate_default_deployment(
         };
 
         let mut contract_location = manifest.location.get_project_root_location()?;
-        contract_location.append_relative_path(&contract_config.path)?;
+        contract_location.append_path(&contract_config.path)?;
         let source = contract_location.read_content_as_utf8()?;
 
         let contract_id = QualifiedContractIdentifier::new(sender.clone(), contract_name.clone());

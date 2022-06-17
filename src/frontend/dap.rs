@@ -4,7 +4,6 @@ use clarinet_files::{FileLocation, ProjectManifest};
 use clarity_repl::clarity::debug::dap::DAPDebugger;
 use orchestra_types::StacksNetwork;
 use std::path::PathBuf;
-use std::str::FromStr;
 
 #[cfg(feature = "telemetry")]
 use super::telemetry::{telemetry_report_event, DeveloperUsageDigest, DeveloperUsageEvent};

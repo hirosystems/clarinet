@@ -44,7 +44,7 @@ impl FileLocation {
                 (None, true) => return None,
                 (Some(hint), true) => {
                     let mut location = hint.clone();
-                    let _ = location.append_relative_path(location_string);
+                    location.append_path(location_string).ok()?;
                     return Some(location);
                 }
                 (_, false) => return Some(FileLocation::FileSystem { path }),
@@ -63,7 +63,7 @@ impl FileLocation {
 
     pub fn from_url_string(url_string: &str) -> Result<FileLocation, String> {
         let url = Url::from_str(url_string)
-            .map_err(|e| format!("unable to parse {} as a url: {:?}", url_string, e))?;
+            .map_err(|e| format!("unable to parse {} as a url\n{:?}", url_string, e))?;
 
         #[cfg(not(feature = "wasm"))]
         if url.scheme() == "file" {
@@ -78,13 +78,13 @@ impl FileLocation {
 
     pub fn from_path_string(path_string: &str) -> Result<FileLocation, String> {
         let path = PathBuf::from_str(path_string)
-            .map_err(|e| format!("unable to parse {} as a path: {:?}", path_string, e))?;
+            .map_err(|e| format!("unable to parse {} as a path\n{:?}", path_string, e))?;
         Ok(FileLocation::FileSystem { path })
     }
 
-    pub fn append_relative_path(&mut self, path_string: &str) -> Result<(), String> {
+    pub fn append_path(&mut self, path_string: &str) -> Result<(), String> {
         let path_to_append = PathBuf::from_str(path_string)
-            .map_err(|e| format!("unable to read relative path {}: {:?}", path_string, e))?;
+            .map_err(|e| format!("unable to read relative path {}\n{:?}", path_string, e))?;
         match self.borrow_mut() {
             FileLocation::FileSystem { path } => {
                 path.extend(&path_to_append);
@@ -109,7 +109,7 @@ impl FileLocation {
         let content = self.read_content()?;
         let contract_as_utf8 = String::from_utf8(content).map_err(|e| {
             format!(
-                "unable to read content as utf8 {}: {:?}",
+                "unable to read content as utf8 {}\n{:?}",
                 self.to_string(),
                 e
             )
@@ -125,7 +125,7 @@ impl FileLocation {
                 "file" => {
                     let path = url
                         .to_file_path()
-                        .map_err(|e| format!("unable to convert url {} to path: {:?}", url, e))?;
+                        .map_err(|e| format!("unable to convert url {} to path\n{:?}", url, e))?;
                     FileLocation::fs_read_content(&path)
                 }
                 "http" | "https" => {
@@ -143,19 +143,19 @@ impl FileLocation {
         use std::fs::File;
         use std::io::{BufReader, Read};
         let file = File::open(path.clone())
-            .map_err(|e| format!("unable to read file {}: {:?}", path.display(), e))?;
+            .map_err(|e| format!("unable to read file {}\n{:?}", path.display(), e))?;
         let mut file_reader = BufReader::new(file);
         let mut file_buffer = vec![];
         file_reader
             .read_to_end(&mut file_buffer)
-            .map_err(|e| format!("unable to read file {}: {:?}", path.display(), e))?;
+            .map_err(|e| format!("unable to read file {}\n{:?}", path.display(), e))?;
         Ok(file_buffer)
     }
 
     pub fn exists(&self) -> bool {
         match self {
             FileLocation::FileSystem { path } => FileLocation::fs_exists(path),
-            FileLocation::Url { url } => unimplemented!(),
+            FileLocation::Url { url: _url } => unimplemented!(),
         }
     }
 
@@ -163,14 +163,14 @@ impl FileLocation {
         path.exists()
     }
 
-    fn url_exists(path: &Url) -> bool {
+    fn url_exists(_path: &Url) -> bool {
         unimplemented!()
     }
 
     pub fn write_content(&self, content: &[u8]) -> Result<(), String> {
         match self {
             FileLocation::FileSystem { path } => FileLocation::fs_write_content(path, content),
-            FileLocation::Url { url } => unimplemented!(),
+            FileLocation::Url { url: _url } => unimplemented!(),
         }
     }
 
@@ -181,14 +181,15 @@ impl FileLocation {
         parent_directory.pop();
         fs::create_dir_all(&parent_directory).map_err(|e| {
             format!(
-                "unable to create parent directory {}",
-                parent_directory.display()
+                "unable to create parent directory {}\n{}",
+                parent_directory.display(),
+                e
             )
         })?;
         let mut file = File::create(&file_path)
-            .map_err(|e| format!("unable to open file {}", file_path.display()))?;
+            .map_err(|e| format!("unable to open file {}\n{}", file_path.display(), e))?;
         file.write_all(content)
-            .map_err(|e| format!("unable to write file {}", file_path.display()))?;
+            .map_err(|e| format!("unable to write file {}\n{}", file_path.display(), e))?;
         Ok(())
     }
 
@@ -265,7 +266,7 @@ impl FileLocation {
 
     pub fn get_project_manifest_location(&self) -> Result<FileLocation, String> {
         let mut project_root_location = self.get_project_root_location()?;
-        project_root_location.append_relative_path("Clarinet.toml")?;
+        project_root_location.append_path("Clarinet.toml")?;
         Ok(project_root_location)
     }
 
@@ -274,8 +275,8 @@ impl FileLocation {
         network: &StacksNetwork,
     ) -> Result<FileLocation, String> {
         let mut network_manifest_location = self.get_project_root_location()?;
-        network_manifest_location.append_relative_path("settings")?;
-        network_manifest_location.append_relative_path(match network {
+        network_manifest_location.append_path("settings")?;
+        network_manifest_location.append_path(match network {
             StacksNetwork::Devnet | StacksNetwork::Simnet => "Devnet.toml",
             StacksNetwork::Testnet => "Testnet.toml",
             StacksNetwork::Mainnet => "Mainnet.toml",
@@ -310,6 +311,7 @@ impl FileLocation {
                 Ok(url.to_string())
             }
             FileLocation::Url { url } => Ok(url.to_string()),
+            #[allow(unreachable_patterns)]
             _ => unreachable!(),
         }
     }

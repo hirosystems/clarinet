@@ -50,10 +50,9 @@ use orchestra_types::StacksNetwork;
 use serde_yaml;
 use stacks_rpc_client::StacksRpc;
 use std::collections::{BTreeMap, HashSet, VecDeque};
-use std::fs::{self, File};
-use std::io::Write;
+use std::fs::{self};
+
 use std::path::PathBuf;
-use std::str::FromStr;
 use std::sync::mpsc::{Receiver, Sender};
 use tiny_hderive::bip32::ExtendedPrivKey;
 
@@ -213,7 +212,7 @@ pub fn get_absolute_deployment_path(
     relative_deployment_path: &str,
 ) -> Result<FileLocation, String> {
     let mut deployment_path = manifest.location.get_project_root_location()?;
-    deployment_path.append_relative_path(relative_deployment_path)?;
+    deployment_path.append_path(relative_deployment_path)?;
     Ok(deployment_path)
 }
 
@@ -222,8 +221,8 @@ pub fn get_default_deployment_path(
     network: &StacksNetwork,
 ) -> Result<FileLocation, String> {
     let mut deployment_path = manifest.location.get_project_root_location()?;
-    deployment_path.append_relative_path("deployments")?;
-    deployment_path.append_relative_path(match network {
+    deployment_path.append_path("deployments")?;
+    deployment_path.append_path(match network {
         StacksNetwork::Simnet => "default.simnet-plan.yaml",
         StacksNetwork::Devnet => "default.devnet-plan.yaml",
         StacksNetwork::Testnet => "default.testnet-plan.yaml",
@@ -235,7 +234,7 @@ pub fn get_default_deployment_path(
 pub fn generate_default_deployment(
     manifest: &ProjectManifest,
     network: &StacksNetwork,
-    no_batch: bool,
+    _no_batch: bool,
 ) -> Result<(DeploymentSpecification, DeploymentGenerationArtifacts), String> {
     let future = clarinet_deployments::generate_default_deployment(manifest, network, false);
     utils::nestable_block_on(future)
@@ -786,7 +785,7 @@ fn get_deployments_files(
 ) -> Result<Vec<(PathBuf, String)>, String> {
     let mut project_dir = project_root_location.clone();
     let prefix_len = project_dir.to_string().len() + 1;
-    project_dir.append_relative_path("deployments")?;
+    project_dir.append_path("deployments")?;
     let paths = match fs::read_dir(&project_dir.to_string()) {
         Ok(paths) => paths,
         Err(_) => return Ok(vec![]),

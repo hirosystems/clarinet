@@ -1,5 +1,5 @@
 use clarinet_files::{ContractConfig, FileLocation, RequirementConfig};
-use std::{collections::HashMap, path::PathBuf};
+use std::collections::HashMap;
 
 #[derive(Clone, Debug)]
 pub struct FileCreation {

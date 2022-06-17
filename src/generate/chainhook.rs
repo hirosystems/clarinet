@@ -1,5 +1,5 @@
 use super::changes::{Changes, DirectoryCreation, FileCreation};
-use clarinet_files::{FileLocation, ProjectManifest};
+use clarinet_files::ProjectManifest;
 use orchestra_types::Chain;
 
 pub struct GetChangesForNewChainhook<'a> {
@@ -21,7 +21,7 @@ impl<'a> GetChangesForNewChainhook<'a> {
 
     pub fn run(&mut self) -> Vec<Changes> {
         let mut project_path = self.manifest.location.get_project_root_location().unwrap();
-        project_path.append_relative_path("chainhooks");
+        project_path.append_path("chainhooks");
         if !project_path.exists() {
             let change = DirectoryCreation {
                 comment: format!("{} chainhooks/", green!("Created directory"),),
@@ -66,7 +66,7 @@ networks:
             .location
             .get_project_root_location()
             .expect("unable to retrieve project root");
-        project_path.append_relative_path(&format!("chainhooks/{}", name));
+        project_path.append_path(&format!("chainhooks/{}", name));
         let change = FileCreation {
             comment: format!("{} chainhooks/{}", green!("Created file"), name),
             name,
@@ -117,7 +117,7 @@ networks:
             .location
             .get_project_root_location()
             .expect("unable to retrieve project root");
-        project_path.append_relative_path(&format!("chainhooks/{}", name));
+        project_path.append_path(&format!("chainhooks/{}", name));
         let change = FileCreation {
             comment: format!("{} chainhooks/{}", green!("Created file"), name),
             name,

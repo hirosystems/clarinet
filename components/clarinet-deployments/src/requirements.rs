@@ -10,8 +10,7 @@ pub async fn retrieve_contract(
     let contract_name = contract_id.name.to_string();
 
     let mut contract_location = cache_location.clone();
-    contract_location
-        .append_relative_path(&format!("{}.{}.clar", contract_deployer, contract_name))?;
+    contract_location.append_path(&format!("{}.{}.clar", contract_deployer, contract_name))?;
 
     if let Ok(contract_source) = contract_location.read_content_as_utf8() {
         return Ok((contract_source, contract_location));

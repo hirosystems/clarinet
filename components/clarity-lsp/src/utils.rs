@@ -11,7 +11,6 @@ use clarity_repl::clarity::types::{BlockInfoProperty, FunctionType};
 use clarity_repl::clarity::variables::NativeVariables;
 use lsp_types::Diagnostic as LspDiagnostic;
 use lsp_types::{DiagnosticSeverity, Position, Range, Url};
-use std::path::PathBuf;
 
 pub fn convert_clarity_diagnotic_to_lsp_diagnostic(
     diagnostic: &ClarityDiagnostic,
@@ -120,7 +119,7 @@ pub fn build_intellisense(analysis: &ContractAnalysis) -> CompletionMaps {
             build_intellisense_args(signature).join(" ")
         );
         inter_contract.push(CompletionItem {
-            label: name.to_string(),
+            label,
             kind: CompletionItemKind::Event,
             detail: None,
             markdown_documentation: None,

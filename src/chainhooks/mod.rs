@@ -58,7 +58,7 @@ fn get_chainhooks_files(
     manifest_location: &FileLocation,
 ) -> Result<Vec<(PathBuf, String)>, String> {
     let mut chainhooks_dir = manifest_location.get_project_root_location()?;
-    chainhooks_dir.append_relative_path("chainhooks")?;
+    chainhooks_dir.append_path("chainhooks")?;
     let prefix_len = chainhooks_dir.to_string().len() + 1;
     let paths = match fs::read_dir(&chainhooks_dir.to_string()) {
         Ok(paths) => paths,

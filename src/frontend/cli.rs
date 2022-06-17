@@ -26,7 +26,7 @@ use orchestra_types::Chain;
 use orchestra_types::StacksNetwork;
 use std::collections::HashMap;
 use std::fs::{self, File};
-use std::io::{prelude::*, BufReader, Read};
+use std::io::prelude::*;
 use std::path::PathBuf;
 use std::{env, process};
 

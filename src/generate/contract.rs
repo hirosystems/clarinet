@@ -1,6 +1,6 @@
 use super::changes::{Changes, FileCreation, TOMLEdition};
 use clarinet_files::{ContractConfig, FileLocation};
-use std::{collections::HashMap, path::PathBuf};
+use std::collections::HashMap;
 
 pub struct GetChangesForNewContract {
     manifest_location: FileLocation,
@@ -58,8 +58,8 @@ impl GetChangesForNewContract {
         };
         let name = format!("{}.clar", self.contract_name);
         let mut contract_path = self.manifest_location.get_project_root_location().unwrap();
-        contract_path.append_relative_path("contracts");
-        contract_path.append_relative_path(&name);
+        contract_path.append_path("contracts");
+        contract_path.append_path(&name);
         let change = FileCreation {
             comment: format!("{} contracts/{}", green!("Created file"), name),
             name,
@@ -102,8 +102,8 @@ Clarinet.test({{
 
         let name = format!("{}_test.ts", self.contract_name);
         let mut contract_path = self.manifest_location.get_project_root_location().unwrap();
-        contract_path.append_relative_path("tests");
-        contract_path.append_relative_path(&name);
+        contract_path.append_path("tests");
+        contract_path.append_path(&name);
         let change = FileCreation {
             comment: format!("{} tests/{}", green!("Created file"), name),
             name,

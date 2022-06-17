@@ -1,15 +1,12 @@
 mod clarity_language_backend;
 
-use bitcoincore_rpc::bitcoin::util;
 use clarinet_files::FileLocation;
 use clarity_language_backend::ClarityLanguageBackend;
-use clarity_lsp::lsp_types::{MessageType, Url};
+use clarity_lsp::lsp_types::MessageType;
 use clarity_lsp::state::{build_state, EditorState, ProtocolState};
 use clarity_lsp::types::CompletionItemKind;
 use clarity_lsp::utils;
 use clarity_repl::clarity::diagnostic::{Diagnostic as ClarityDiagnostic, Level as ClarityLevel};
-
-use std::path::PathBuf;
 
 use std::sync::mpsc::{self, Receiver, Sender};
 use tokio;
@@ -394,19 +391,20 @@ fn test_opening_counter_contract_should_return_fresh_analysis() {
 
     let (tx, rx) = mpsc::channel();
     std::thread::spawn(move || {
-        start_server(rx);
+        crate::utils::nestable_block_on(start_server(rx));
     });
 
-    let mut counter_path = std::env::current_dir().expect("Unable to get current dir");
-    counter_path.push("examples");
-    counter_path.push("counter");
-    counter_path.push("contracts");
-    counter_path.push("counter.clar");
-    let counter_url = Url::from_file_path(counter_path).unwrap();
-
+    let contract_location = {
+        let mut counter_path = std::env::current_dir().expect("Unable to get current dir");
+        counter_path.push("examples");
+        counter_path.push("counter");
+        counter_path.push("contracts");
+        counter_path.push("counter.clar");
+        FileLocation::from_path(counter_path)
+    };
     let (response_tx, response_rx) = channel();
     let _ = tx.send(LspRequest::ContractOpened(
-        counter_url.clone(),
+        contract_location.clone(),
         response_tx.clone(),
     ));
     let response = response_rx.recv().expect("Unable to get response");
@@ -417,7 +415,7 @@ fn test_opening_counter_contract_should_return_fresh_analysis() {
     assert_eq!(diags.len(), 4);
 
     // re-opening this contract should not trigger a full analysis
-    let _ = tx.send(LspRequest::ContractOpened(counter_url, response_tx));
+    let _ = tx.send(LspRequest::ContractOpened(contract_location, response_tx));
     let response = response_rx.recv().expect("Unable to get response");
     assert_eq!(response, Response::default());
 }
@@ -428,13 +426,16 @@ fn test_opening_counter_manifest_should_return_fresh_analysis() {
 
     let (tx, rx) = mpsc::channel();
     std::thread::spawn(move || {
-        start_server(rx);
+        crate::utils::nestable_block_on(start_server(rx));
     });
 
-    let mut manifest_location = std::env::current_dir().expect("Unable to get current dir");
-    manifest_location.push("examples");
-    manifest_location.push("counter");
-    manifest_location.push("Clarinet.toml");
+    let manifest_location = {
+        let mut manifest_path = std::env::current_dir().expect("Unable to get current dir");
+        manifest_path.push("examples");
+        manifest_path.push("counter");
+        manifest_path.push("Clarinet.toml");
+        FileLocation::from_path(manifest_path)
+    };
 
     let (response_tx, response_rx) = channel();
     let _ = tx.send(LspRequest::ManifestOpened(
@@ -460,7 +461,7 @@ fn test_opening_simple_nft_manifest_should_return_fresh_analysis() {
 
     let (tx, rx) = mpsc::channel();
     std::thread::spawn(move || {
-        start_server(rx);
+        crate::utils::nestable_block_on(start_server(rx));
     });
 
     let mut manifest_location = std::env::current_dir().expect("Unable to get current dir");
@@ -470,7 +471,7 @@ fn test_opening_simple_nft_manifest_should_return_fresh_analysis() {
 
     let (response_tx, response_rx) = channel();
     let _ = tx.send(LspRequest::ManifestOpened(
-        manifest_location.clone(),
+        FileLocation::from_path(manifest_location),
         response_tx.clone(),
     ));
     let response = response_rx.recv().expect("Unable to get response");

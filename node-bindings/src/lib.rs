@@ -6,10 +6,10 @@ mod serde;
 
 use clarinet_files::bip39::{Language, Mnemonic};
 use clarinet_files::{
-    compute_addresses, AccountConfig, DevnetConfigFile, PoxStackingOrder, ProjectManifest,
-    DEFAULT_DERIVATION_PATH,
+    compute_addresses, AccountConfig, DevnetConfigFile, FileLocation, PoxStackingOrder,
+    ProjectManifest, DEFAULT_DERIVATION_PATH,
 };
-use clarinet_lib::deployment;
+use clarinet_lib::deployments;
 use clarinet_lib::integrate::{self, DevnetEvent, DevnetOrchestrator};
 use orchestra_types::{
     BitcoinBlockData, BitcoinChainEvent, ChainUpdatedWithBlockData, StacksChainEvent, StacksNetwork,
@@ -62,7 +62,7 @@ impl StacksDevnet {
         let manifest = ProjectManifest::from_location(&manifest_location)
             .expect("Syntax error in Clarinet.toml.");
         let (deployment, _) =
-            deployment::read_deployment_or_generate_default(&manifest, &StacksNetwork::Devnet)
+            deployments::read_deployment_or_generate_default(&manifest, &StacksNetwork::Devnet)
                 .expect("Unable to generate deployment");
         let devnet = match DevnetOrchestrator::new(manifest, Some(devnet_overrides)) {
             Ok(devnet) => devnet,
@@ -616,28 +616,36 @@ fn main(mut cx: ModuleContext) -> NeonResult<()> {
     Ok(())
 }
 
-fn get_manifest_location_or_exit(path: Option<String>) -> PathBuf {
+fn get_manifest_location(path: Option<String>) -> Option<FileLocation> {
     if let Some(path) = path {
-        let manifest_location = PathBuf::from(path);
-        if !manifest_location.exists() {
-            println!("Could not find Clarinet.toml");
-            process::exit(1);
+        let manifest_path = PathBuf::from(path);
+        if !manifest_path.exists() {
+            return None;
         }
-        manifest_location
+        Some(FileLocation::from_path(manifest_path))
     } else {
         let mut current_dir = env::current_dir().unwrap();
         loop {
             current_dir.push("Clarinet.toml");
 
             if current_dir.exists() {
-                break current_dir;
+                return Some(FileLocation::from_path(current_dir));
             }
             current_dir.pop();
 
             if !current_dir.pop() {
-                println!("Could not find Clarinet.toml");
-                process::exit(1);
+                return None;
             }
+        }
+    }
+}
+
+fn get_manifest_location_or_exit(path: Option<String>) -> FileLocation {
+    match get_manifest_location(path) {
+        Some(manifest_location) => manifest_location,
+        None => {
+            println!("Could not find Clarinet.toml");
+            process::exit(1);
         }
     }
 }

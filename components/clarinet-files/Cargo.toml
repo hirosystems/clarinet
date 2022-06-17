@@ -8,7 +8,7 @@ serde = "1"
 serde_json = "1"
 serde_derive = "1"
 clarinet_utils = { package = "clarinet-utils", path = "../clarinet-utils" }
-orchestra_types = { package = "orchestra-types", path = "../orchestra-types-rs" }
+orchestra_types = { package = "orchestra-types", path = "../../vendor/orchestra-types-rs" }
 bip39 = { version = "1.0.1", default-features = false }
 clarity_repl = { package = "clarity-repl", version = "=0.28.2", default-features = false }
 # clarity_repl = { package = "clarity-repl", path = "../../../../clarity-repl", default-features = false }

@@ -82,10 +82,10 @@ serde_yaml = "0.8.23"
 orchestra_event_observer = { package = "orchestra-event-observer", default-features = false, path = "./vendor/orchestra-event-observer" }
 orchestra_types = { package = "orchestra-types", path = "./vendor/orchestra-types-rs" }
 stacks_rpc_client = { package = "stacks-rpc-client", path = "./vendor/stacks-rpc-client" }
-clarinet_files = { package = "clarinet-files", path = "./vendor/clarinet-files" }
-clarity_lsp = { package = "clarity-lsp", path = "./vendor/clarity-lsp", features = ["cli"]  }
-clarinet_deployments = { package = "clarinet-deployments", path = "./vendor/clarinet-deployments" }
-clarinet_utils = { package = "clarinet-utils", path = "./vendor/clarinet-utils" }
+clarinet_files = { package = "clarinet-files", path = "./components/clarinet-files" }
+clarity_lsp = { package = "clarity-lsp", path = "./components/clarity-lsp", features = ["cli"]  }
+clarinet_deployments = { package = "clarinet-deployments", path = "./components/clarinet-deployments" }
+clarinet_utils = { package = "clarinet-utils", path = "./components/clarinet-utils" }
 
 num_cpus = "1.13.1"
 mio = "=0.8.2"
@@ -143,13 +143,14 @@ telemetry = ["segment", "mac_address"]
 [workspace]
 members = [
     ".",
+    "components/clarinet-deployments",
+    "components/clarinet-files",
+    "components/clarinet-utils",
+    "components/clarity-lsp",
     "vendor/deno/cli/",
     "vendor/deno/runtime/",
     "vendor/deno/core/",
     "vendor/orchestra-types-rs",
-    "vendor/clarinet-files",
-    "vendor/clarinet-utils",
-    "vendor/clarity-lsp",
     "vendor/orchestra-event-observer",
     "vendor/stacks-rpc-client",
     "xtask/",

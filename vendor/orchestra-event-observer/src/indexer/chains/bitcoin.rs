@@ -48,8 +48,8 @@ pub fn standardize_bitcoin_block(
             },
             operations: vec![],
             metadata: BitcoinTransactionMetadata {
-                inputs: tx.input.drain(..).collect::<Vec<_>>(),
-                outputs: tx.output.drain(..).collect::<Vec<_>>(),
+                inputs: vec![],  // tx.input.drain(..).collect::<Vec<_>>(),
+                outputs: vec![], //tx.output.drain(..).collect::<Vec<_>>(),
             },
         };
         transactions.push(tx);

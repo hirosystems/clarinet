@@ -67,7 +67,7 @@ pub async fn do_run_scripts(
     flags.reload = true;
     if allow_disk_write {
         let mut write_path_location = manifest.location.get_project_root_location().unwrap();
-        write_path_location.append_relative_path("artifacts");
+        write_path_location.append_path("artifacts");
         let write_path = write_path_location.to_string();
         let _ = std::fs::create_dir_all(&write_path);
         flags.allow_write = Some(vec![PathBuf::from(write_path)])

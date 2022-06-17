@@ -9,7 +9,6 @@ use clarinet_files::FileLocation;
 use contract::GetChangesForNewContract;
 use orchestra_types::Chain;
 use project::GetChangesForNewProject;
-use std::path::PathBuf;
 
 use clarinet_files::ProjectManifest;
 

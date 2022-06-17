@@ -8,7 +8,7 @@ use base58::FromBase58;
 use bitcoincore_rpc::bitcoin::blockdata::opcodes;
 use bitcoincore_rpc::bitcoin::blockdata::script::Builder as BitcoinScriptBuilder;
 use bitcoincore_rpc::bitcoin::{Address, PubkeyHash, PublicKey, Script};
-use clarity_repl::clarity::util::hash::Hash160;
+use clarity_repl::clarity::util::hash::{to_hex, Hash160};
 use orchestra_types::{
     BitcoinChainEvent, BitcoinTransactionData, BlockIdentifier, StacksChainEvent, StacksNetwork,
     StacksTransactionData, StacksTransactionEvent, StacksTransactionKind,
@@ -346,7 +346,7 @@ impl BitcoinChainhookSpecification {
                     .into_script();
 
                 for output in tx.metadata.outputs.iter() {
-                    if output.script_pubkey == script {
+                    if output.script_pubkey == to_hex(script.as_bytes()) {
                         return true;
                     }
                 }

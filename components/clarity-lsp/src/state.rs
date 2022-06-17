@@ -14,8 +14,6 @@ use clarity_repl::repl::ast::ContractAST;
 use lsp_types::MessageType;
 use orchestra_types::StacksNetwork;
 use std::collections::{HashMap, HashSet};
-use std::path::PathBuf;
-use std::str::FromStr;
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct ContractState {
