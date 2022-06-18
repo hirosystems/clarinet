@@ -346,7 +346,7 @@ pub fn clarity_diagnostics_to_tower_lsp_type(
 ) -> Vec<tower_lsp::lsp_types::Diagnostic> {
     let mut dst = vec![];
     for d in diagnostics.iter_mut() {
-        dst.push(clarity_diagnotic_to_tower_lsp_type(d));
+        dst.push(clarity_diagnostic_to_tower_lsp_type(d));
     }
     dst
 }
