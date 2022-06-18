@@ -341,7 +341,7 @@ pub fn insert_text_format_lsp_type_to_tower_lsp_type(
     }
 }
 
-pub fn clarity_diagnotics_to_tower_lsp_type(
+pub fn clarity_diagnostics_to_tower_lsp_type(
     diagnostics: &mut Vec<ClarityDiagnostic>,
 ) -> Vec<tower_lsp::lsp_types::Diagnostic> {
     let mut dst = vec![];
