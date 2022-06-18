@@ -34,7 +34,7 @@ pub struct ProjectManifest {
     pub contracts: BTreeMap<String, ContractConfig>,
     #[serde(rename = "repl")]
     pub repl_settings: repl::Settings,
-    // #[serde(skip_serializing, skip_deserializing)]
+    #[serde(skip_serializing, skip_deserializing)]
     pub location: FileLocation,
 }
 
