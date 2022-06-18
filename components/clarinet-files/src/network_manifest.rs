@@ -210,7 +210,6 @@ pub struct AccountConfig {
 }
 
 impl NetworkManifest {
-
     pub fn from_project_manifest_location(
         project_manifest_location: &FileLocation,
         networks: &(BitcoinNetwork, StacksNetwork),
@@ -219,7 +218,6 @@ impl NetworkManifest {
             project_manifest_location.get_network_manifest_location(&networks.1)?;
         NetworkManifest::from_location(&network_manifest_location, networks)
     }
-
 
     pub fn from_location(
         location: &FileLocation,
