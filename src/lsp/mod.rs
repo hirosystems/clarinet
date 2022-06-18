@@ -351,7 +351,7 @@ pub fn clarity_diagnotics_to_tower_lsp_type(
     dst
 }
 
-pub fn clarity_diagnotic_to_tower_lsp_type(
+pub fn clarity_diagnostic_to_tower_lsp_type(
     diagnostic: &ClarityDiagnostic,
 ) -> tower_lsp::lsp_types::Diagnostic {
     let range = match diagnostic.spans.len() {
