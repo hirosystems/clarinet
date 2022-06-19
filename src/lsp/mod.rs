@@ -153,7 +153,7 @@ async fn start_server(command_rx: Receiver<LspRequest>) {
                             aggregated_diagnostics: aggregated_diagnostics
                                 .into_iter()
                                 .map(|(location, mut diags)| {
-                                    (location, clarity_diagnotics_to_tower_lsp_type(&mut diags))
+                                    (location, clarity_diagnostics_to_tower_lsp_type(&mut diags))
                                 })
                                 .collect::<Vec<_>>(),
                             notification,
