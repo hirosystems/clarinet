@@ -11,15 +11,13 @@ extern crate serde_json;
 #[macro_use]
 extern crate lazy_static;
 
-pub extern crate bip39;
-
 pub extern crate clarity_repl;
 
 #[macro_use]
 pub mod macros;
 
 pub mod chainhooks;
-pub mod deployment;
+pub mod deployments;
 pub mod generate;
 pub mod integrate;
 pub mod types;

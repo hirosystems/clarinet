@@ -3,7 +3,6 @@ name = "cbtc"
 authors = []
 description = ""
 telemetry = false
-cache_dir = "/Users/ludovic/Coding/clarinet/clarinet-cli/examples/cbtc/./.requirements"
 boot_contracts = ["pox", "costs-v2", "bns"]
 
 [[project.requirements]]

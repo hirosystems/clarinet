@@ -1,13 +1,13 @@
 use super::DevnetEvent;
 use crate::chainhooks::load_chainhooks;
-use crate::deployment::types::DeploymentSpecification;
-use crate::deployment::{apply_on_chain_deployment, DeploymentCommand, DeploymentEvent};
+use crate::deployments::{apply_on_chain_deployment, DeploymentCommand, DeploymentEvent};
 use crate::integrate::{ServiceStatusData, Status};
 use crate::types::ChainsCoordinatorCommand;
-use crate::types::{self, AccountConfig, ChainConfig, DevnetConfig, ProjectManifest};
 use crate::utils;
 use base58::FromBase58;
 use bitcoincore_rpc::{Auth, Client, RpcApi};
+use clarinet_deployments::types::DeploymentSpecification;
+use clarinet_files::{self, AccountConfig, DevnetConfig, NetworkManifest, ProjectManifest};
 use clarity_repl::clarity::representations::ClarityName;
 use clarity_repl::clarity::types::{BuffData, SequenceData, TupleData, Value as ClarityValue};
 use clarity_repl::clarity::util::address::AddressHashMode;
@@ -71,12 +71,15 @@ impl DevnetEventObserverConfig {
         deployment: DeploymentSpecification,
     ) -> Self {
         info!("Checking contracts...");
-        let chain_config =
-            ChainConfig::from_manifest_path(&manifest.path, &StacksNetwork::Devnet.get_networks());
+        let network_manifest = NetworkManifest::from_project_manifest_location(
+            &manifest.location,
+            &StacksNetwork::Devnet.get_networks(),
+        )
+        .expect("unable to load network manifest");
 
         info!("Checking hooks...");
         let hooks = match load_chainhooks(
-            &manifest.path,
+            &manifest.location,
             &(BitcoinNetwork::Regtest, StacksNetwork::Devnet),
         ) {
             Ok(hooks) => hooks,
@@ -107,10 +110,10 @@ impl DevnetEventObserverConfig {
         DevnetEventObserverConfig {
             devnet_config,
             event_observer_config,
-            accounts: chain_config.accounts.into_values().collect::<Vec<_>>(),
+            accounts: network_manifest.accounts.into_values().collect::<Vec<_>>(),
             manifest,
             deployment,
-            deployment_fee_rate: chain_config.network.deployment_fee_rate,
+            deployment_fee_rate: network_manifest.network.deployment_fee_rate,
         }
     }
 }
@@ -463,7 +466,7 @@ pub async fn publish_stacking_orders(
                     .get_nonce(&account.stx_address)
                     .expect("Unable to retrieve nonce");
 
-                let (_, _, account_secret_key) = types::compute_addresses(
+                let (_, _, account_secret_key) = clarinet_files::compute_addresses(
                     &account.mnemonic,
                     &account.derivation,
                     &StacksNetwork::Devnet.get_networks(),

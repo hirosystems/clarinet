@@ -1,4 +1,3 @@
-pub mod mnemonic;
 use std::future::Future;
 
 use tokio;

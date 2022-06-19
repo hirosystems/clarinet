@@ -1,5 +1,5 @@
 use super::api_v1::SessionArtifacts;
-use crate::deployment::types::DeploymentSpecification;
+use clarinet_deployments::types::DeploymentSpecification;
 use clarity_repl::prettytable::{color, format, Attr, Cell, Row, Table};
 use clarity_repl::repl::session::CostsReport;
 use clarity_repl::repl::{CostSynthesis, Session};

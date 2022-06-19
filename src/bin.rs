@@ -10,7 +10,7 @@ extern crate serde_json;
 mod macros;
 
 mod chainhooks;
-mod deployment;
+mod deployments;
 mod frontend;
 mod generate;
 mod integrate;

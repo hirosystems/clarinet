@@ -1,6 +1,5 @@
 use super::DevnetEvent;
 use crate::integrate::{ServiceStatusData, Status};
-use crate::types::{ChainConfig, DevnetConfigFile, ProjectManifest, DEFAULT_DEVNET_BALANCE};
 use bollard::container::{
     Config, CreateContainerOptions, KillContainerOptions, ListContainersOptions,
     PruneContainersOptions, WaitContainerOptions,
@@ -10,6 +9,7 @@ use bollard::image::CreateImageOptions;
 use bollard::models::{HostConfig, PortBinding};
 use bollard::network::{ConnectNetworkOptions, CreateNetworkOptions, PruneNetworksOptions};
 use bollard::Docker;
+use clarinet_files::{DevnetConfigFile, NetworkManifest, ProjectManifest, DEFAULT_DEVNET_BALANCE};
 use crossterm::terminal::disable_raw_mode;
 use futures::stream::TryStreamExt;
 use orchestra_types::StacksNetwork;
@@ -20,12 +20,12 @@ use std::path::PathBuf;
 use std::sync::mpsc::{Receiver, Sender};
 use tracing::info;
 
-#[derive(Default, Debug)]
+#[derive(Debug)]
 pub struct DevnetOrchestrator {
     pub name: String,
     network_name: String,
     pub manifest: ProjectManifest,
-    pub network_config: Option<ChainConfig>,
+    pub network_config: Option<NetworkManifest>,
     pub termination_success_tx: Option<Sender<bool>>,
     pub can_exit: bool,
     stacks_blockchain_container_id: Option<String>,
@@ -46,13 +46,10 @@ impl DevnetOrchestrator {
         let docker_client = Docker::connect_with_socket_defaults()
             .map_err(|e| format!("unable to connect to docker: {:?}", e))?;
 
-        let project_path = manifest.get_project_root_dir();
-        let mut network_config_path = project_path.clone();
-        network_config_path.push("settings");
-        network_config_path.push("Devnet.toml");
-
-        let mut network_config =
-            ChainConfig::from_path(&network_config_path, &StacksNetwork::Devnet.get_networks());
+        let mut network_config = NetworkManifest::from_project_manifest_location(
+            &manifest.location,
+            &StacksNetwork::Devnet.get_networks(),
+        )?;
 
         let name = manifest.project.name.clone();
         let network_name = format!("{}.devnet", name);
@@ -233,7 +230,14 @@ impl DevnetOrchestrator {
             network_config: Some(network_config),
             docker_client: Some(docker_client),
             can_exit: true,
-            ..Default::default()
+            termination_success_tx: None,
+            stacks_blockchain_container_id: None,
+            stacks_blockchain_api_container_id: None,
+            stacks_explorer_container_id: None,
+            bitcoin_blockchain_container_id: None,
+            bitcoin_explorer_container_id: None,
+            postgres_container_id: None,
+            hyperchain_container_id: None,
         })
     }
 
@@ -648,8 +652,8 @@ server=1
 regtest=1
 rpcallowip=0.0.0.0/0
 rpcallowip=::/0
-rpcuser={}
-rpcpassword={}
+rpcuser={bitcoin_node_username}
+rpcpassword={bitcoin_node_password}
 txindex=1
 listen=1
 discover=0
@@ -662,15 +666,14 @@ disablewallet=0
 fallbackfee=0.00001
 
 [regtest]
-bind=0.0.0.0:{}
-rpcbind=0.0.0.0:{}
-rpcport={}
+bind=0.0.0.0:{bitcoin_node_p2p_port}
+rpcbind=0.0.0.0:{bitcoin_node_rpc_port}
+rpcport={bitcoin_node_rpc_port}
 "#,
-            devnet_config.bitcoin_node_username,
-            devnet_config.bitcoin_node_password,
-            devnet_config.bitcoin_node_p2p_port,
-            devnet_config.bitcoin_node_rpc_port,
-            devnet_config.bitcoin_node_rpc_port,
+            bitcoin_node_username = devnet_config.bitcoin_node_username,
+            bitcoin_node_password = devnet_config.bitcoin_node_password,
+            bitcoin_node_p2p_port = devnet_config.bitcoin_node_p2p_port,
+            bitcoin_node_rpc_port = devnet_config.bitcoin_node_rpc_port,
         );
         let mut bitcoind_conf_path = PathBuf::from(&devnet_config.working_dir);
         bitcoind_conf_path.push("conf/bitcoin.conf");
@@ -880,11 +883,11 @@ rpcport={}
             r#"
 [node]
 working_dir = "/devnet"
-rpc_bind = "0.0.0.0:{}"
-p2p_bind = "0.0.0.0:{}"
+rpc_bind = "0.0.0.0:{stacks_node_rpc_port}"
+p2p_bind = "0.0.0.0:{stacks_node_p2p_port}"
 miner = true
-seed = "{}"
-local_peer_seed = "{}"
+seed = "{miner_secret_key_hex}"
+local_peer_seed = "{miner_secret_key_hex}"
 wait_time_for_microblocks = 5000
 pox_sync_sample_secs = 10
 microblock_frequency = 15000
@@ -894,10 +897,10 @@ chain = "bitcoin"
 mode = "krypton"
 poll_time_secs = 1
 peer_host = "host.docker.internal"
-username = "{}"
-password = "{}"
-rpc_port = {}
-peer_port = {}
+username = "{bitcoin_node_username}"
+password = "{bitcoin_node_password}"
+rpc_port = {orchestrator_ingestion_port}
+peer_port = {bitcoin_node_p2p_port}
 
 [miner]
 first_attempt_time_ms = 10000
@@ -906,20 +909,18 @@ subsequent_attempt_time_ms = 10000
 
 # Add orchestrator (docker-host) as an event observer
 [[events_observer]]
-endpoint = "host.docker.internal:{}"
+endpoint = "host.docker.internal:{orchestrator_ingestion_port}"
 retry_count = 255
 include_data_events = true
 events_keys = ["*"]
 "#,
-            devnet_config.stacks_node_rpc_port,
-            devnet_config.stacks_node_p2p_port,
-            devnet_config.miner_secret_key_hex,
-            devnet_config.miner_secret_key_hex,
-            devnet_config.bitcoin_node_username,
-            devnet_config.bitcoin_node_password,
-            devnet_config.orchestrator_ingestion_port,
-            devnet_config.bitcoin_node_p2p_port,
-            devnet_config.orchestrator_ingestion_port,
+            stacks_node_rpc_port = devnet_config.stacks_node_rpc_port,
+            stacks_node_p2p_port = devnet_config.stacks_node_p2p_port,
+            miner_secret_key_hex = devnet_config.miner_secret_key_hex,
+            bitcoin_node_username = devnet_config.bitcoin_node_username,
+            bitcoin_node_password = devnet_config.bitcoin_node_password,
+            bitcoin_node_p2p_port = devnet_config.bitcoin_node_p2p_port,
+            orchestrator_ingestion_port = devnet_config.orchestrator_ingestion_port,
         );
 
         if !devnet_config.disable_stacks_api {

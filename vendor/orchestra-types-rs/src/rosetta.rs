@@ -1,5 +1,5 @@
+use super::bitcoin::{TxIn, TxOut};
 use crate::events::*;
-use bitcoincore_rpc::bitcoin::{TxIn, TxOut};
 use std::collections::HashSet;
 
 /// BlockIdentifier uniquely identifies a block in a particular network.

@@ -48,8 +48,8 @@ use std::sync::Arc;
 use std::sync::Mutex;
 use swc_common::comments::CommentKind;
 
-use crate::deployment::types::DeploymentSpecification;
-use crate::types::ProjectManifest;
+use clarinet_deployments::types::DeploymentSpecification;
+use clarinet_files::ProjectManifest;
 
 pub async fn do_run_scripts(
     include: Vec<String>,
@@ -66,15 +66,20 @@ pub async fn do_run_scripts(
     flags.unstable = true;
     flags.reload = true;
     if allow_disk_write {
-        let mut write_path = manifest.get_project_root_dir();
-        write_path.push("artifacts");
+        let mut write_path_location = manifest.location.get_project_root_location().unwrap();
+        write_path_location.append_path("artifacts");
+        let write_path = write_path_location.to_string();
         let _ = std::fs::create_dir_all(&write_path);
-        flags.allow_write = Some(vec![write_path])
+        flags.allow_write = Some(vec![PathBuf::from(write_path)])
     }
     let program_state = ProgramState::build(flags.clone()).await?;
     let permissions = Permissions::from_options(&flags.clone().into());
-    let project_path = manifest.get_project_root_dir();
-    let cwd = Path::new(&project_path);
+    let project_root_path = manifest
+        .location
+        .get_project_root_location()
+        .unwrap()
+        .to_string();
+    let cwd = Path::new(&project_root_path);
     let mut include = if include.is_empty() {
         vec!["tests".into()]
     } else {
@@ -300,10 +305,10 @@ pub async fn do_run_scripts(
                     .asts
                     .insert(contract_id.clone(), analysis_artifacts.ast.clone());
             }
-            for (contract_id, (_, contract_path)) in cache.deployment.contracts.iter() {
+            for (contract_id, (_, contract_location)) in cache.deployment.contracts.iter() {
                 coverage_reporter
                     .contract_paths
-                    .insert(contract_id.name.to_string(), contract_path.clone());
+                    .insert(contract_id.name.to_string(), contract_location.to_string());
             }
             for artifact in sessions_artifacts.iter() {
                 let mut coverage_reports = artifact.coverage_reports.clone();

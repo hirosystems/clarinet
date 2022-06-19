@@ -1,8 +1,8 @@
 use super::utils;
 use super::DeploymentCache;
-use crate::deployment::types::DeploymentSpecification;
-use crate::deployment::update_session_with_contracts_executions;
-use crate::types::ProjectManifest;
+use clarinet_deployments::types::DeploymentSpecification;
+use clarinet_deployments::update_session_with_contracts_executions;
+use clarinet_files::ProjectManifest;
 use clarity_repl::clarity::analysis::contract_interface_builder::{
     build_contract_interface, ContractInterface,
 };

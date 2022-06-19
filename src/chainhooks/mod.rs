@@ -1,3 +1,4 @@
+use clarinet_files::FileLocation;
 use std::path::PathBuf;
 
 pub mod types;
@@ -10,10 +11,10 @@ use orchestra_types::{BitcoinNetwork, StacksNetwork};
 use std::fs;
 
 pub fn load_chainhooks(
-    manifest_path: &PathBuf,
+    manifest_location: &FileLocation,
     networks: &(BitcoinNetwork, StacksNetwork),
 ) -> Result<HookFormation, String> {
-    let hook_files = get_chainhooks_files(manifest_path)?;
+    let hook_files = get_chainhooks_files(manifest_location)?;
     let mut stacks_chainhooks = vec![];
     let mut bitcoin_chainhooks = vec![];
     for (path, relative_path) in hook_files.into_iter() {
@@ -31,8 +32,8 @@ pub fn load_chainhooks(
     })
 }
 
-pub fn check_chainhooks(manifest_path: &PathBuf, output_json: bool) -> Result<(), String> {
-    let hook_files = get_chainhooks_files(manifest_path)?;
+pub fn check_chainhooks(manifest_location: &FileLocation, output_json: bool) -> Result<(), String> {
+    let hook_files = get_chainhooks_files(manifest_location)?;
     for (path, relative_path) in hook_files.into_iter() {
         let _hook = match ChainhookSpecificationFile::parse(
             &path,
@@ -53,12 +54,13 @@ pub fn check_chainhooks(manifest_path: &PathBuf, output_json: bool) -> Result<()
     Ok(())
 }
 
-fn get_chainhooks_files(manifest_path: &PathBuf) -> Result<Vec<(PathBuf, String)>, String> {
-    let mut hooks_home = manifest_path.clone();
-    hooks_home.pop();
-    let prefix_len = hooks_home.to_str().unwrap().len() + 1;
-    hooks_home.push("chainhooks");
-    let paths = match fs::read_dir(&hooks_home) {
+fn get_chainhooks_files(
+    manifest_location: &FileLocation,
+) -> Result<Vec<(PathBuf, String)>, String> {
+    let mut chainhooks_dir = manifest_location.get_project_root_location()?;
+    chainhooks_dir.append_path("chainhooks")?;
+    let prefix_len = chainhooks_dir.to_string().len() + 1;
+    let paths = match fs::read_dir(&chainhooks_dir.to_string()) {
         Ok(paths) => paths,
         Err(_) => return Ok(vec![]),
     };

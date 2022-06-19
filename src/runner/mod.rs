@@ -6,14 +6,16 @@
 #![allow(non_upper_case_globals)]
 #![allow(unused_must_use)]
 
-use crate::deployment::{
-    apply_on_chain_deployment, check_deployments, display_deployment, generate_default_deployment,
-    get_absolute_deployment_path, get_default_deployment_path, initiate_session_from_deployment,
-    load_deployment, read_deployment_or_generate_default, setup_session_with_deployment,
-    update_session_with_contracts_executions, update_session_with_genesis_accounts,
-    write_deployment, DeploymentGenerationArtifacts,
+use crate::deployments::{
+    apply_on_chain_deployment, check_deployments, get_absolute_deployment_path,
+    get_default_deployment_path, load_deployment, write_deployment,
 };
-use crate::types::ProjectManifest;
+use clarinet_deployments::types::DeploymentGenerationArtifacts;
+use clarinet_deployments::{
+    generate_default_deployment, initiate_session_from_deployment, setup_session_with_deployment,
+    update_session_with_contracts_executions, update_session_with_genesis_accounts,
+};
+use clarinet_files::ProjectManifest;
 use clarity_repl::clarity::analysis::contract_interface_builder::{
     build_contract_interface, ContractInterface,
 };
@@ -24,7 +26,7 @@ use clarity_repl::repl::{ExecutionResult, Session};
 use std::collections::{BTreeMap, HashMap};
 use std::path::PathBuf;
 
-use crate::deployment::types::DeploymentSpecification;
+use clarinet_deployments::types::DeploymentSpecification;
 
 pub mod api_v1;
 mod costs;

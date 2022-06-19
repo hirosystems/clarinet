@@ -1,9 +1,6 @@
+use super::FileLocation;
 use clarity_repl::repl;
 use std::collections::BTreeMap;
-use std::fs::File;
-use std::io::{BufReader, Read};
-use std::path::PathBuf;
-use std::str::FromStr;
 use toml::value::Value;
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -30,27 +27,25 @@ pub struct ProjectConfigFile {
     cache_dir: Option<String>,
 }
 
-#[derive(Serialize, Deserialize, Debug, Default, Clone)]
+#[derive(Serialize, Debug, Clone)]
 pub struct ProjectManifest {
     pub project: ProjectConfig,
     #[serde(serialize_with = "toml::ser::tables_last")]
     pub contracts: BTreeMap<String, ContractConfig>,
     #[serde(rename = "repl")]
     pub repl_settings: repl::Settings,
-    #[serde(skip_serializing, skip_deserializing)]
-    pub path: PathBuf,
+    #[serde(skip_serializing)]
+    pub location: FileLocation,
 }
 
-#[derive(Serialize, Deserialize, Debug, Default, Clone)]
+#[derive(Serialize, Debug, Clone)]
 pub struct ProjectConfig {
     pub name: String,
     pub authors: Vec<String>,
     pub description: String,
     pub telemetry: bool,
     pub requirements: Option<Vec<RequirementConfig>>,
-    pub cache_dir: String,
-    #[serde(skip_serializing, skip_deserializing)]
-    pub cache_dir_relative: bool,
+    pub cache_location: FileLocation,
     pub boot_contracts: Vec<String>,
 }
 
@@ -72,33 +67,22 @@ pub struct NotebookConfig {
 }
 
 impl ProjectManifest {
-    pub fn from_path(path: &PathBuf) -> Result<ProjectManifest, String> {
-        let file = match File::open(path) {
-            Ok(path) => path,
-            Err(_e) => {
-                return Err("unable to locate Clarinet.toml in current directory".to_string());
-            }
-        };
-        let mut project_manifest_file_reader = BufReader::new(file);
-        let mut project_manifest_file_buffer = vec![];
-        project_manifest_file_reader
-            .read_to_end(&mut project_manifest_file_buffer)
-            .unwrap();
-
+    pub fn from_location(location: &FileLocation) -> Result<ProjectManifest, String> {
+        let project_manifest_file_content = location.read_content()?;
         let project_manifest_file: ProjectManifestFile =
-            match toml::from_slice(&project_manifest_file_buffer[..]) {
+            match toml::from_slice(&project_manifest_file_content[..]) {
                 Ok(s) => s,
                 Err(e) => {
                     return Err(format!("Clarinet.toml file malformatted {:?}", e));
                 }
             };
 
-        ProjectManifest::from_project_manifest_file(project_manifest_file, path)
+        ProjectManifest::from_project_manifest_file(project_manifest_file, location)
     }
 
     pub fn from_project_manifest_file(
         project_manifest_file: ProjectManifestFile,
-        manifest_path: &PathBuf,
+        manifest_location: &FileLocation,
     ) -> Result<ProjectManifest, String> {
         let mut repl_settings = if let Some(repl_settings) = project_manifest_file.repl {
             repl::Settings::from(repl_settings)
@@ -115,29 +99,13 @@ impl ProjectManifest {
         }
 
         let project_name = project_manifest_file.project.name;
-        let (cache_path, cache_dir_relative) = match project_manifest_file.project.cache_dir {
-            Some(ref path) => {
-                let path = match PathBuf::from_str(path) {
-                    Ok(path) => path,
-                    Err(_e) => {
-                        return Err("setting cache_dir is not a valid path".to_string());
-                    }
-                };
-                if path.is_relative() {
-                    let mut absolute_path = manifest_path.clone();
-                    absolute_path.pop();
-                    absolute_path.extend(&path);
-                    (absolute_path, true)
-                } else {
-                    (path, false)
-                }
-            }
+        let mut project_root_location = manifest_location.get_project_root_location()?;
+        let cache_location = match project_manifest_file.project.cache_dir {
+            Some(ref path) => FileLocation::try_parse(path, Some(&project_root_location))
+                .ok_or(format!("unable to parse path {}", path))?,
             None => {
-                let mut default_cache_path =
-                    dirs::home_dir().expect("Unable to retrieve home directory");
-                default_cache_path.push(".clarinet");
-                default_cache_path.push("cache");
-                (default_cache_path, false)
+                project_root_location.append_path(".requirements")?;
+                project_root_location
             }
         };
 
@@ -150,8 +118,7 @@ impl ProjectManifest {
                 .unwrap_or("".into()),
             authors: project_manifest_file.project.authors.unwrap_or(vec![]),
             telemetry: project_manifest_file.project.telemetry.unwrap_or(false),
-            cache_dir: cache_path.to_str().unwrap().to_string(),
-            cache_dir_relative,
+            cache_location,
             boot_contracts: project_manifest_file.project.boot_contracts.unwrap_or(vec![
                 "pox".to_string(),
                 format!("costs-v{}", repl_settings.costs_version),
@@ -163,7 +130,7 @@ impl ProjectManifest {
             project,
             contracts: BTreeMap::new(),
             repl_settings,
-            path: manifest_path.clone(),
+            location: manifest_location.clone(),
         };
         let mut config_contracts = BTreeMap::new();
         let mut config_requirements: Vec<RequirementConfig> = Vec::new();
@@ -217,11 +184,5 @@ impl ProjectManifest {
         config.contracts = config_contracts;
         config.project.requirements = Some(config_requirements);
         Ok(config)
-    }
-
-    pub fn get_project_root_dir(&self) -> PathBuf {
-        let mut dir = self.path.clone();
-        dir.pop();
-        dir
     }
 }

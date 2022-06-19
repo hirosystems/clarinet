@@ -1,5 +1,5 @@
 use super::changes::{Changes, DirectoryCreation, FileCreation};
-use crate::types::ProjectManifest;
+use clarinet_files::ProjectManifest;
 use orchestra_types::Chain;
 
 pub struct GetChangesForNewChainhook<'a> {
@@ -19,25 +19,25 @@ impl<'a> GetChangesForNewChainhook<'a> {
         }
     }
 
-    pub fn run(&mut self) -> Vec<Changes> {
-        let mut project_path = self.manifest.get_project_root_dir();
-        project_path.push("chainhooks");
+    pub fn run(&mut self) -> Result<Vec<Changes>, String> {
+        let mut project_path = self.manifest.location.get_project_root_location().unwrap();
+        project_path.append_path("chainhooks")?;
         if !project_path.exists() {
             let change = DirectoryCreation {
                 comment: format!("{} chainhooks/", green!("Created directory"),),
                 name: "chainhooks".to_string(),
-                path: format!("{}", project_path.display()),
+                path: project_path.to_string(),
             };
             self.changes.push(Changes::AddDirectory(change))
         }
         match &self.chain {
-            Chain::Bitcoin => self.create_template_bitcoin_chainhook(),
-            Chain::Stacks => self.create_template_stacks_chainhook(),
+            Chain::Bitcoin => self.create_template_bitcoin_chainhook()?,
+            Chain::Stacks => self.create_template_stacks_chainhook()?,
         };
-        self.changes.clone()
+        Ok(self.changes.clone())
     }
 
-    fn create_template_bitcoin_chainhook(&mut self) {
+    fn create_template_bitcoin_chainhook(&mut self) -> Result<(), String> {
         let content = format!(
             r#"
 ---
@@ -61,18 +61,26 @@ networks:
         );
 
         let name = format!("{}.chainhook.yaml", self.chainhook_name);
-        let project_path = self.manifest.get_project_root_dir();
-        let path = format!("{}/chainhooks/{}", project_path.display(), name);
+        let mut new_file = self
+            .manifest
+            .location
+            .get_project_root_location()
+            .expect("unable to retrieve project root");
+        new_file.append_path(&format!("chainhooks/{}", name))?;
+        if new_file.exists() {
+            return Err(format!("{} already exists", new_file.to_string()));
+        }
         let change = FileCreation {
             comment: format!("{} chainhooks/{}", green!("Created file"), name),
             name,
             content,
-            path,
+            path: new_file.to_string(),
         };
         self.changes.push(Changes::AddFile(change));
+        Ok(())
     }
 
-    fn create_template_stacks_chainhook(&mut self) {
+    fn create_template_stacks_chainhook(&mut self) -> Result<(), String> {
         let content = format!(
             r#"
 ---
@@ -108,21 +116,26 @@ networks:
         );
 
         let name = format!("{}.chainhook.yaml", self.chainhook_name);
-        let project_path = self.manifest.get_project_root_dir();
-        let path = format!("{}/chainhooks/{}", project_path.display(), name);
+        let mut project_path = self
+            .manifest
+            .location
+            .get_project_root_location()
+            .expect("unable to retrieve project root");
+        project_path.append_path(&format!("chainhooks/{}", name))?;
         let change = FileCreation {
             comment: format!("{} chainhooks/{}", green!("Created file"), name),
             name,
             content,
-            path,
+            path: project_path.to_string(),
         };
         self.changes.push(Changes::AddFile(change));
+        Ok(())
     }
 
     // TODO(lgalabru): should we index chainhooks in project manifests?
     // fn index_chainhook_in_clarinet_toml(&mut self) {
     //     let contract_file_name = format!("{}.chainhook.yaml", self.chainhook_name);
-    //     let project_path = self.manifest.get_project_root_dir();
+    //     let project_path = self.manifest.get_project_root_url();
 
     //     let contract_config = ContractConfig {
     //         path: format!("chainhooks/{}", contract_file_name),
@@ -137,7 +150,7 @@ networks:
     //             yellow!("Updated Clarinet.toml"),
     //             self.chainhook_name
     //         ),
-    //         manifest_path,
+    //         manifest_location,
     //         contracts_to_add,
     //         requirements_to_add: vec![],
     //     };
