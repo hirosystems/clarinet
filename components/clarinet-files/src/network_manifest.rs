@@ -11,7 +11,7 @@ use orchestra_types::{BitcoinNetwork, StacksNetwork};
 use tiny_hderive::bip32::ExtendedPrivKey;
 use toml::value::Value;
 
-#[cfg(not(feature = "wasm"))]
+#[cfg(feature = "cli")]
 use bitcoin;
 
 pub const DEFAULT_DERIVATION_PATH: &str = "m/44'/5757'/0'/0/0";
@@ -560,7 +560,7 @@ pub fn compute_addresses(
     (stx_address.to_string(), btc_address, miner_secret_key_hex)
 }
 
-#[cfg(not(feature = "wasm"))]
+#[cfg(feature = "cli")]
 fn compute_btc_address(public_key: &PublicKey, network: &BitcoinNetwork) -> String {
     let public_key = bitcoin::PublicKey::from_slice(&public_key.serialize_compressed())
         .expect("Unable to recreate public key");
