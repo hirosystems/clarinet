@@ -1,5 +1,6 @@
 use crate::clarity::analysis::errors::{CheckError, CheckErrors, CheckResult};
 use crate::clarity::analysis::types::ContractAnalysis;
+use crate::clarity::is_reserved;
 use crate::clarity::representations::{ClarityName, SymbolicExpression};
 use crate::clarity::types::signatures::FunctionSignature;
 use crate::clarity::types::{FunctionType, TraitIdentifier, TypeSignature};
@@ -73,7 +74,8 @@ impl ContractContext {
     }
 
     pub fn check_name_used(&self, name: &str) -> CheckResult<()> {
-        if self.variable_types.contains_key(name)
+        if is_reserved(name)
+            || self.variable_types.contains_key(name)
             || self.persisted_variable_types.contains_key(name)
             || self.private_function_types.contains_key(name)
             || self.public_function_types.contains_key(name)
