@@ -7,10 +7,10 @@ edition = "2021"
 serde = "1"
 serde_json = "1"
 serde_derive = "1"
-clarity_repl = { package = "clarity-repl", version = "=0.28.2", default-features = false }
-# clarity_repl = { package = "clarity-repl", path = "../../../../clarity-repl", default-features = false }
+# clarity_repl = { package = "clarity-repl", version = "=0.28.2", default-features = false }
+clarity_repl = { package = "clarity-repl", path = "../../../../clarity-repl", default-features = false }
+clarinet_files =  { package = "clarinet-files", path = "../clarinet-files", default-features = false }
 orchestra_types = { package = "orchestra-types", path = "../../vendor/orchestra-types-rs" }
-clarinet_files =  { package = "clarinet-files", path = "../clarinet-files" }
 serde_yaml = "0.8.23"
 
 # CLI
@@ -21,8 +21,8 @@ reqwest = { version = "0.11", default-features = false, features = [
 
 [features]
 default = ["cli"]
-cli = []
-wasm = []
+cli = ["clarity_repl/cli", "clarinet_files/cli"]
+wasm = ["clarity_repl/wasm", "clarinet_files/wasm"]
 
 [lib]
 name = "clarinet_deployments"
