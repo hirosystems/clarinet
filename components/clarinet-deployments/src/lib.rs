@@ -314,13 +314,16 @@ pub async fn generate_default_deployment(
                         };
                         emulated_contracts_publish.insert(contract_id.clone(), data);
                     } else if network.either_devnet_or_testnet() {
+                        let mut remap_principals = BTreeMap::new();
+                        remap_principals
+                            .insert(contract_id.issuer.clone(), default_deployer_address.clone());
                         let data = RequirementPublishSpecification {
                             contract_id: contract_id.clone(),
                             remap_sender: default_deployer_address.clone(),
                             source: source.clone(),
                             location: contract_location,
                             cost: deployment_fee_rate * source.len() as u64,
-                            remap_principals: BTreeMap::new(),
+                            remap_principals,
                         };
                         requirements_publish.insert(contract_id.clone(), data);
                     }
