@@ -169,9 +169,9 @@ pub async fn generate_default_deployment(
         StacksNetwork::Devnet => {
             let (stacks_node, bitcoin_node) = match network_manifest.devnet {
                 Some(ref devnet) => {
-                    let stacks_node = format!("http://0.0.0.0:{}", devnet.stacks_node_rpc_port);
+                    let stacks_node = format!("http://localhost:{}", devnet.stacks_node_rpc_port);
                     let bitcoin_node = format!(
-                        "http://{}:{}@0.0.0.0:{}",
+                        "http://{}:{}@localhost:{}",
                         devnet.bitcoin_node_username,
                         devnet.bitcoin_node_password,
                         devnet.bitcoin_node_rpc_port
@@ -179,8 +179,8 @@ pub async fn generate_default_deployment(
                     (stacks_node, bitcoin_node)
                 }
                 None => {
-                    let stacks_node = format!("http://0.0.0.0:20443");
-                    let bitcoin_node = format!("http://devnet:devnet@0.0.0.0:18443");
+                    let stacks_node = format!("http://localhost:20443");
+                    let bitcoin_node = format!("http://devnet:devnet@localhost18443");
                     (stacks_node, bitcoin_node)
                 }
             };
