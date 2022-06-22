@@ -14,7 +14,7 @@ use clarity_repl::clarity::util::address::AddressHashMode;
 use clarity_repl::clarity::util::hash::{hex_bytes, Hash160};
 
 use orchestra_event_observer::observer::{
-    start_event_observer, EventObserverConfig, ObserverEvent, ObserverCommand
+    start_event_observer, EventObserverConfig, ObserverCommand, ObserverEvent,
 };
 use orchestra_types::{BitcoinChainEvent, BitcoinNetwork, StacksChainEvent, StacksNetwork};
 use stacks_rpc_client::{transactions, PoxInfo, StacksRpc};

@@ -17,12 +17,13 @@ use orchestra_types::StacksNetwork;
 pub use project_manifest::{
     ContractConfig, ProjectManifest, ProjectManifestFile, RequirementConfig,
 };
+use serde::ser::{Serialize, SerializeMap, Serializer};
 use std::{borrow::BorrowMut, path::PathBuf, str::FromStr};
 use url::Url;
 
 pub const DEFAULT_DEVNET_BALANCE: u64 = 100_000_000_000_000;
 
-#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Deserialize, Debug, Clone, PartialEq, Eq, Hash)]
 #[serde(untagged)]
 pub enum FileLocation {
     FileSystem { path: PathBuf },
@@ -306,5 +307,27 @@ impl FileLocation {
             #[allow(unreachable_patterns)]
             _ => unreachable!(),
         }
+    }
+}
+
+impl Serialize for FileLocation {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        let mut map = serializer.serialize_map(Some(1))?;
+        match self {
+            FileLocation::FileSystem { path: _ } => {
+                let path = match self.get_relative_location() {
+                    Ok(relative_path) => relative_path, // Use relative path if possible
+                    Err(_) => self.to_string()                  // Fallback on fully qualified path
+                };
+                map.serialize_entry("path", &path)?;
+            }
+            FileLocation::Url { url } => {
+                map.serialize_entry("url", &url.to_string())?;
+            }
+        }
+        map.end()
     }
 }
