@@ -88,7 +88,7 @@ impl<'a> App<'a> {
         self.logs.items.push(log);
     }
 
-    pub fn update_mempool(&mut self, tx: MempoolAdmissionData) {
+    pub fn add_to_mempool(&mut self, tx: MempoolAdmissionData) {
         self.mempool.items.push(tx);
     }
 

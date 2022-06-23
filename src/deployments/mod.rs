@@ -831,7 +831,7 @@ pub fn write_deployment(
 
     let content = match serde_yaml::to_string(&file) {
         Ok(res) => res,
-        Err(err) => return Err(format!("unable to serialize deployment {}", err)),
+        Err(err) => return Err(format!("failed serializing deployment\n{}", err)),
     };
 
     target_location.write_content(content.as_bytes())?;

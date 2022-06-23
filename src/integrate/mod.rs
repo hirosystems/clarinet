@@ -5,6 +5,7 @@ mod ui;
 use std::sync::mpsc::{self, channel, Sender};
 
 use chrono::prelude::*;
+use orchestra_event_observer::observer::MempoolAdmissionData;
 use tracing::{self, debug, error, info, warn};
 use tracing_appender;
 
@@ -293,8 +294,3 @@ pub struct ProtocolDeployedData {
 //     pub seq: u32,
 //     pub transactions: Vec<Transaction>
 // }
-
-#[derive(Clone, Debug)]
-pub struct MempoolAdmissionData {
-    pub tx: String,
-}

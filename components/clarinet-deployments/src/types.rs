@@ -82,7 +82,11 @@ pub struct RequirementPublishSpecificationFile {
     pub remap_principals: Option<BTreeMap<String, String>>,
     pub cost: u64,
     #[serde(flatten)]
-    pub location: FileLocation,
+    pub location: Option<FileLocation>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub path: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub url: Option<String>,
 }
 
 #[derive(Debug, PartialEq, Serialize, Deserialize)]
@@ -92,7 +96,11 @@ pub struct ContractPublishSpecificationFile {
     pub expected_sender: String,
     pub cost: u64,
     #[serde(flatten)]
-    pub location: FileLocation,
+    pub location: Option<FileLocation>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub path: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub url: Option<String>,
 }
 
 #[derive(Debug, PartialEq, Serialize, Deserialize)]
@@ -110,7 +118,11 @@ pub struct EmulatedContractPublishSpecificationFile {
     pub contract_name: String,
     pub emulated_sender: String,
     #[serde(flatten)]
-    pub location: FileLocation,
+    pub location: Option<FileLocation>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub path: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub url: Option<String>,
 }
 
 #[derive(Debug, PartialEq, Clone)]
@@ -240,13 +252,23 @@ impl ContractPublishSpecification {
             }
         };
 
-        let source = specs.location.read_content_as_utf8()?;
+        let location = match (&specs.path, &specs.url) {
+            (Some(location_string), None) | (None, Some(location_string)) => {
+                FileLocation::try_parse(location_string, Some(project_root_location))
+            }
+            _ => None,
+        }
+        .ok_or(format!(
+            "unable to parse file location (can either be 'path' or 'url'",
+        ))?;
+
+        let source = location.read_content_as_utf8()?;
 
         Ok(ContractPublishSpecification {
             contract_name,
             expected_sender,
             source,
-            location: specs.location.clone(),
+            location: location,
             cost: specs.cost,
         })
     }
@@ -312,14 +334,24 @@ impl RequirementPublishSpecification {
             }
         }
 
-        let source = specs.location.read_content_as_utf8()?;
+        let location = match (&specs.path, &specs.url) {
+            (Some(location_string), None) | (None, Some(location_string)) => {
+                FileLocation::try_parse(location_string, Some(project_root_location))
+            }
+            _ => None,
+        }
+        .ok_or(format!(
+            "unable to parse file location (can either be 'path' or 'url'",
+        ))?;
+
+        let source = location.read_content_as_utf8()?;
 
         Ok(RequirementPublishSpecification {
             contract_id,
             remap_sender,
             remap_principals,
             source,
-            location: specs.location.clone(),
+            location: location,
             cost: specs.cost,
         })
     }
@@ -411,13 +443,23 @@ impl EmulatedContractPublishSpecification {
             }
         };
 
-        let source = specs.location.read_content_as_utf8()?;
+        let location = match (&specs.path, &specs.url) {
+            (Some(location_string), None) | (None, Some(location_string)) => {
+                FileLocation::try_parse(location_string, Some(project_root_location))
+            }
+            _ => None,
+        }
+        .ok_or(format!(
+            "unable to parse file location (can either be 'path' or 'url'",
+        ))?;
+
+        let source = location.read_content_as_utf8()?;
 
         Ok(EmulatedContractPublishSpecification {
             contract_name,
             emulated_sender,
             source,
-            location: specs.location.clone(),
+            location,
         })
     }
 }
@@ -728,7 +770,9 @@ impl TransactionPlanSpecification {
                             ContractPublishSpecificationFile {
                                 contract_name: tx.contract_name.to_string(),
                                 expected_sender: tx.expected_sender.to_address(),
-                                location: tx.location.clone(),
+                                location: Some(tx.location.clone()),
+                                path: None,
+                                url: None,
                                 cost: tx.cost,
                             },
                         )
@@ -748,7 +792,9 @@ impl TransactionPlanSpecification {
                             EmulatedContractPublishSpecificationFile {
                                 contract_name: tx.contract_name.to_string(),
                                 emulated_sender: tx.emulated_sender.to_address(),
-                                location: tx.location.clone(),
+                                location: Some(tx.location.clone()),
+                                path: None,
+                                url: None,
                             },
                         )
                     }
@@ -762,7 +808,9 @@ impl TransactionPlanSpecification {
                                 contract_id: tx.contract_id.to_string(),
                                 remap_sender: tx.remap_sender.to_address(),
                                 remap_principals: Some(remap_principals),
-                                location: tx.location.clone(),
+                                location: Some(tx.location.clone()),
+                                path: None,
+                                url: None,
                                 cost: tx.cost,
                             },
                         )

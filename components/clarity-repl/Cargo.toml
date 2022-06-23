@@ -82,10 +82,6 @@ dap = [
 ]
 wasm = ["wasm-bindgen", "wasm-bindgen-futures"]
 
-[profile.release]
-# Tell `rustc` to optimize for small code size.
-opt-level = "s"
-
 [package.metadata.wasm-pack.profile.release.wasm-bindgen]
 debug-js-glue = false
 demangle-name-section = true

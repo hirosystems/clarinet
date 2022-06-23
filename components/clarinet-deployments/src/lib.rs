@@ -171,7 +171,7 @@ pub async fn generate_default_deployment(
                 Some(ref devnet) => {
                     let stacks_node = format!("http://localhost:{}", devnet.stacks_node_rpc_port);
                     let bitcoin_node = format!(
-                        "http://{}:{}@0.0.0.0:{}",
+                        "http://{}:{}@localhost:{}",
                         devnet.bitcoin_node_username,
                         devnet.bitcoin_node_password,
                         devnet.bitcoin_node_rpc_port
@@ -314,13 +314,16 @@ pub async fn generate_default_deployment(
                         };
                         emulated_contracts_publish.insert(contract_id.clone(), data);
                     } else if network.either_devnet_or_testnet() {
+                        let mut remap_principals = BTreeMap::new();
+                        remap_principals
+                            .insert(contract_id.issuer.clone(), default_deployer_address.clone());
                         let data = RequirementPublishSpecification {
                             contract_id: contract_id.clone(),
                             remap_sender: default_deployer_address.clone(),
                             source: source.clone(),
                             location: contract_location,
                             cost: deployment_fee_rate * source.len() as u64,
-                            remap_principals: BTreeMap::new(),
+                            remap_principals,
                         };
                         requirements_publish.insert(contract_id.clone(), data);
                     }

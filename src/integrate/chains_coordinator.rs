@@ -14,7 +14,8 @@ use clarity_repl::clarity::util::address::AddressHashMode;
 use clarity_repl::clarity::util::hash::{hex_bytes, Hash160};
 
 use orchestra_event_observer::observer::{
-    start_event_observer, EventObserverConfig, ObserverEvent,
+    start_event_observer, EventObserverConfig, ObserverCommand, ObserverEvent,
+    StacksChainMempoolEvent,
 };
 use orchestra_types::{BitcoinChainEvent, BitcoinNetwork, StacksChainEvent, StacksNetwork};
 use stacks_rpc_client::{transactions, PoxInfo, StacksRpc};
@@ -149,10 +150,11 @@ pub async fn start_chains_coordinator(
     let (observer_event_tx, observer_event_rx) = channel();
     let event_observer_config = config.event_observer_config.clone();
     let observer_event_tx_moved = observer_event_tx.clone();
+    let observer_command_tx_moved = observer_command_tx.clone();
     let _ = std::thread::spawn(move || {
         let future = start_event_observer(
             event_observer_config,
-            observer_command_tx,
+            observer_command_tx_moved,
             observer_command_rx,
             Some(observer_event_tx_moved),
         );
@@ -177,6 +179,7 @@ pub async fn start_chains_coordinator(
         // Did we receive a termination notice?
         if let Ok(ChainsCoordinatorCommand::Terminate) = chains_coordinator_commands_rx.try_recv() {
             let _ = chains_coordinator_terminator_tx.send(true);
+            let _ = observer_command_tx.send(ObserverCommand::Terminate);
             break;
         }
         let command = match observer_event_rx.recv() {
@@ -352,6 +355,14 @@ pub async fn start_chains_coordinator(
                     devnet_event_tx.send(DevnetEvent::info(format!("{} hooks triggered", count)));
             }
             ObserverEvent::Terminate => {}
+            ObserverEvent::StacksChainMempoolEvent(mempool_event) => match mempool_event {
+                StacksChainMempoolEvent::TransactionsAdmitted(transactions) => {
+                    for tx in transactions.into_iter() {
+                        let _ = devnet_event_tx.send(DevnetEvent::MempoolAdmission(tx));
+                    }
+                }
+                StacksChainMempoolEvent::TransactionDropped(ref _transactions) => {}
+            },
         }
     }
     Ok(())

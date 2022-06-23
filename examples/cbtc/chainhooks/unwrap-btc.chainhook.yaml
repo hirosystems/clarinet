@@ -4,7 +4,7 @@ version: 1
 chain: stacks
 networks:
   devnet:
-    oreo-url: 'http://0.0.0.0:20446/'
+    oreo-url: 'http://localhost:20446/'
     predicate:
       ft-event:
         asset-identifier: 'ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM.cbtc-token::cbtc'
@@ -12,6 +12,6 @@ networks:
           - burn
     action:
       http:
-        url: 'http://0.0.0.0:3000/api/v1/unwrapBtc'
+        url: 'http://localhost:3000/api/v1/unwrapBtc'
         method: POST
         authorization-header: Bearer cn389ncoiwuencr
