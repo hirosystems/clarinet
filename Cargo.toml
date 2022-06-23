@@ -90,7 +90,7 @@ num_cpus = "1.13.1"
 mio = "=0.8.2"
 
 [dependencies.tui]
-version = "0.16.0"
+version = "0.18.0"
 default-features = false
 features = ["crossterm"]
 

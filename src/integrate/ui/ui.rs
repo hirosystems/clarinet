@@ -16,10 +16,10 @@ pub fn draw<B: Backend>(f: &mut Frame<B>, app: &mut App) {
         .direction(Direction::Vertical)
         .constraints(
             [
-                Constraint::Length(1),
+                Constraint::Length(0),
                 Constraint::Length(20),
-                Constraint::Min(1),
-                Constraint::Length(1),
+                Constraint::Min(0),
+                Constraint::Length(0),
             ]
             .as_ref(),
         )
@@ -27,7 +27,7 @@ pub fn draw<B: Backend>(f: &mut Frame<B>, app: &mut App) {
 
     let devnet_status_components = Layout::default()
         .direction(Direction::Horizontal)
-        .constraints([Constraint::Min(1), Constraint::Length(78)].as_ref())
+        .constraints([Constraint::Min(0), Constraint::Length(78)].as_ref())
         .split(page_components[1]);
 
     let top_right_components = Layout::default()
@@ -58,8 +58,6 @@ where
             Cell::from(service.name.to_string()),
             Cell::from(service.comment.to_string()),
         ])
-        .height(1)
-        .bottom_margin(0)
     });
 
     let t = Table::new(rows)
