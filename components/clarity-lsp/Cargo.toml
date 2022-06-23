@@ -4,20 +4,25 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-lsp-types = "0.93.0"
+lsp-types = "0.93"
 orchestra_types = { package = "orchestra-types", path = "../../vendor/orchestra-types-rs" }
 clarinet_files =  { package = "clarinet-files", path = "../clarinet-files", default-features = false }
 clarity_repl = { package = "clarity-repl", path = "../clarity-repl", default-features = false }
-clarinet_deployments =  { package = "clarinet-deployments", path = "../clarinet-deployments", default-features = false }
+clarinet_deployments = { package = "clarinet-deployments", path = "../clarinet-deployments", default-features = false }
 
 # WASM
-wasm-bindgen = { version = "0.2", optional = true }
-wasm-bindgen-futures = { version = "0.4.24", optional = true }
+wasm-bindgen = { version = "0.2", features = ["serde-serialize"] }
+wasm-bindgen-futures = { version  = "0.4" }
+serde = "1"
+serde_json = "1"
+serde-wasm-bindgen = "0.4"
+js-sys = "0.3"
+futures = "0.3"
 
 [features]
 default = ["cli"]
 cli = ["clarinet_deployments/cli", "clarinet_deployments/cli", "clarity_repl/cli", "clarinet_files/cli"]
-wasm = ["wasm-bindgen", "wasm-bindgen-futures", "clarinet_deployments/wasm", "clarity_repl/wasm", "clarinet_files/wasm"]
+wasm = ["clarinet_deployments/wasm", "clarity_repl/wasm", "clarinet_files/wasm"]
 
 [lib]
 name = "clarity_lsp"
