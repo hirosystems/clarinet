@@ -646,6 +646,7 @@ pub async fn handle_bitcoin_rpc_call(
 
     let bitcoin_rpc_call = bitcoin_rpc_call.into_inner().clone();
     let method = bitcoin_rpc_call.method.clone();
+
     let body = rocket::serde::json::serde_json::to_vec(&bitcoin_rpc_call).unwrap();
 
     let token = encode(format!(
@@ -659,6 +660,7 @@ pub async fn handle_bitcoin_rpc_call(
             config.bitcoin_node_rpc_host, config.bitcoin_node_rpc_port
         ))
         .header("Content-Type", "application/json")
+        .timeout(std::time::Duration::from_secs(5))
         .header("Authorization", format!("Basic {}", token));
 
     if method == "sendrawtransaction" {
@@ -671,9 +673,12 @@ pub async fn handle_bitcoin_rpc_call(
         };
     }
 
-    let res = builder.body(body).send().await.unwrap();
-
-    Json(res.json().await.unwrap())
+    match builder.body(body).send().await {
+        Ok(res) => Json(res.json().await.unwrap()),
+        Err(_) => Json(json!({
+            "status": 500
+        })),
+    }
 }
 
 #[post("/v1/chainhooks", format = "application/json", data = "<hook>")]
