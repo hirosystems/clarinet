@@ -608,7 +608,13 @@ pub fn generate_simnet_deployment_for_snippet(
     name: &str,
     source: &str,
     location: &FileLocation,
-) -> Result<(DeploymentSpecification, DeploymentGenerationArtifacts), String> {
+) -> Result<
+    (
+        DeploymentSpecification,
+        (QualifiedContractIdentifier, DeploymentGenerationArtifacts),
+    ),
+    String,
+> {
     let default_deployer_address = StandardPrincipalData::transient();
     let mut contract_map = BTreeMap::new();
     let parser_version = 2;
@@ -641,7 +647,7 @@ pub fn generate_simnet_deployment_for_snippet(
             .build_ast(contract_id.clone(), source.to_string(), parser_version);
     contract_asts.insert(contract_id.clone(), ast);
     contract_map.insert(contract_id.clone(), (source.to_string(), location.clone()));
-    contract_diags.insert(contract_id, diags);
+    contract_diags.insert(contract_id.clone(), diags);
 
     let dependencies = ASTDependencyDetector::detect_dependencies(&contract_asts, &BTreeMap::new());
 
@@ -673,14 +679,17 @@ pub fn generate_simnet_deployment_for_snippet(
         contracts: contract_map,
     };
 
-    let artifacts = DeploymentGenerationArtifacts {
-        asts: contract_asts,
-        deps: dependencies,
-        diags: contract_diags,
-        success: ast_success,
-        analysis: HashMap::new(),
-        session,
-    };
+    let artifacts = (
+        contract_id,
+        DeploymentGenerationArtifacts {
+            asts: contract_asts,
+            deps: dependencies,
+            diags: contract_diags,
+            success: ast_success,
+            analysis: HashMap::new(),
+            session,
+        },
+    );
 
     Ok((deployment, artifacts))
 }
