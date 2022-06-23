@@ -180,7 +180,7 @@ pub async fn generate_default_deployment(
                 }
                 None => {
                     let stacks_node = format!("http://localhost:20443");
-                    let bitcoin_node = format!("http://devnet:devnet@localhost18443");
+                    let bitcoin_node = format!("http://devnet:devnet@localhost:18443");
                     (stacks_node, bitcoin_node)
                 }
             };
