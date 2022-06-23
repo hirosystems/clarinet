@@ -5,16 +5,18 @@ mod ui;
 use std::sync::mpsc::{self, channel, Sender};
 
 use chrono::prelude::*;
+use orchestra_event_observer::observer::MempoolAdmissionData;
 use tracing::{self, debug, error, info, warn};
 use tracing_appender;
 
-use crate::deployment::types::DeploymentSpecification;
-use crate::types::{BitcoinChainEvent, ChainsCoordinatorCommand, StacksChainEvent};
+use crate::types::ChainsCoordinatorCommand;
 use crate::utils;
 use chains_coordinator::start_chains_coordinator;
+use clarinet_deployments::types::DeploymentSpecification;
+use orchestra_types::{BitcoinChainEvent, StacksChainEvent};
 pub use orchestrator::DevnetOrchestrator;
 
-use self::chains_coordinator::StacksEventObserverConfig;
+use self::chains_coordinator::DevnetEventObserverConfig;
 
 pub fn run_devnet(
     devnet: DevnetOrchestrator,
@@ -81,19 +83,22 @@ pub async fn do_run_devnet(
     // and should be able to be terminated
     let devnet_path = devnet_config.working_dir.clone();
     let config =
-        StacksEventObserverConfig::new(devnet_config.clone(), devnet.manifest.clone(), deployment);
+        DevnetEventObserverConfig::new(devnet_config.clone(), devnet.manifest.clone(), deployment);
     let chains_coordinator_tx = devnet_events_tx.clone();
     let (chains_coordinator_commands_tx, chains_coordinator_commands_rx) = channel();
-    let moved_events_observer_commands_tx = chains_coordinator_commands_tx.clone();
+    let (orchestrator_terminator_tx, terminator_rx) = channel();
+    let moved_orchestrator_terminator_tx = orchestrator_terminator_tx.clone();
+    let moved_chains_coordinator_commands_tx = chains_coordinator_commands_tx.clone();
     let chains_coordinator_handle = std::thread::spawn(move || {
         let future = start_chains_coordinator(
             config,
             chains_coordinator_tx,
             chains_coordinator_commands_rx,
-            moved_events_observer_commands_tx,
+            moved_chains_coordinator_commands_tx,
+            moved_orchestrator_terminator_tx,
         );
         let rt = utils::create_basic_runtime();
-        let _ = rt.block_on(future);
+        rt.block_on(future)
     });
 
     // Let's start the orchestration
@@ -101,11 +106,10 @@ pub async fn do_run_devnet(
     // The devnet orchestrator should be able to send some events to the UI thread,
     // and should be able to be restarted/terminated
     let orchestrator_event_tx = devnet_events_tx.clone();
-    let (orchestrator_terminator_tx, terminator_rx) = channel();
     let orchestrator_handle = std::thread::spawn(move || {
         let future = devnet.start(orchestrator_event_tx, terminator_rx);
         let rt = utils::create_basic_runtime();
-        rt.block_on(future);
+        rt.block_on(future)
     });
 
     if display_dashboard {
@@ -115,19 +119,14 @@ pub async fn do_run_devnet(
             devnet_events_tx,
             devnet_events_rx,
             moved_chains_coordinator_commands_tx,
-            orchestrator_terminator_tx,
             orchestrator_terminated_rx,
             &devnet_path,
         );
     } else {
-        let moved_orchestrator_terminator_tx = orchestrator_terminator_tx.clone();
         let moved_events_observer_commands_tx = chains_coordinator_commands_tx.clone();
         ctrlc::set_handler(move || {
             moved_events_observer_commands_tx
-                .send(ChainsCoordinatorCommand::Terminate(true))
-                .expect("Unable to terminate devnet");
-            moved_orchestrator_terminator_tx
-                .send(true)
+                .send(ChainsCoordinatorCommand::Terminate)
                 .expect("Unable to terminate devnet");
         })
         .expect("Error setting Ctrl-C handler");
@@ -150,10 +149,6 @@ pub async fn do_run_devnet(
                             }
                         }
                     }
-                    Ok(DevnetEvent::ProtocolDeployed) => {
-                        let _ = chains_coordinator_commands_tx
-                            .send(ChainsCoordinatorCommand::ProtocolDeployed);
-                    }
                     _ => {}
                 }
             }
@@ -166,8 +161,17 @@ pub async fn do_run_devnet(
         }
     }
 
-    chains_coordinator_handle.join().unwrap();
-    orchestrator_handle.join().unwrap();
+    if let Err(e) = chains_coordinator_handle.join() {
+        if let Ok(message) = e.downcast::<String>() {
+            return Err(*message);
+        }
+    }
+
+    if let Err(e) = orchestrator_handle.join() {
+        if let Ok(message) = e.downcast::<String>() {
+            return Err(*message);
+        }
+    }
 
     Ok((None, None, Some(chains_coordinator_commands_tx)))
 }
@@ -184,6 +188,7 @@ pub enum DevnetEvent {
     StacksChainEvent(StacksChainEvent),
     BitcoinChainEvent(BitcoinChainEvent),
     MempoolAdmission(MempoolAdmissionData),
+    FatalError(String),
     // Restart,
     // Terminate,
     // Microblock(MicroblockData),
@@ -289,8 +294,3 @@ pub struct ProtocolDeployedData {
 //     pub seq: u32,
 //     pub transactions: Vec<Transaction>
 // }
-
-#[derive(Clone, Debug)]
-pub struct MempoolAdmissionData {
-    pub tx: String,
-}

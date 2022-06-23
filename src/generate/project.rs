@@ -17,7 +17,7 @@ impl GetChangesForNewProject {
         }
     }
 
-    pub fn run(&mut self) -> Vec<Changes> {
+    pub fn run(&mut self) -> Result<Vec<Changes>, String> {
         self.create_root_directory();
         self.create_contracts_directory();
         self.create_settings_directory();
@@ -30,7 +30,7 @@ impl GetChangesForNewProject {
         self.create_vscode_settings_json();
         self.create_vscode_tasks_json();
         self.create_gitignore();
-        self.changes.clone()
+        Ok(self.changes.clone())
     }
 
     fn create_root_directory(&mut self) {
@@ -211,7 +211,7 @@ check_checker = {{ trusted_sender = false, trusted_caller = false, callee_filter
         let content = format!(
             r#"[network]
 name = "testnet"
-node_rpc_address = "https://stacks-node-api.testnet.stacks.co"
+stacks_node_rpc_address = "https://stacks-node-api.testnet.stacks.co"
 deployment_fee_rate = 10
 
 [accounts.deployer]
@@ -241,7 +241,7 @@ mnemonic = "<YOUR PRIVATE TESTNET MNEMONIC HERE>"
         let content = format!(
             r#"[network]
 name = "mainnet"
-node_rpc_address = "https://stacks-node-api.mainnet.stacks.co"
+stacks_node_rpc_address = "https://stacks-node-api.mainnet.stacks.co"
 deployment_fee_rate = 10
 
 [accounts.deployer]
@@ -336,7 +336,7 @@ balance = 100_000_000_000_000
 # stx_address: ST3NBRSFKX28FQ2ZJ1MAKX58HKHSDGNV5N7R21XCP
 # btc_address: n2v875jbJ4RjBnTjgbfikDfnwsDV5iUByw
 
-[accounts.wallet_9]
+[accounts.faucet]
 mnemonic = "shadow private easily thought say logic fault paddle word top book during ignore notable orange flight clock image wealth health outside kitten belt reform"
 balance = 100_000_000_000_000
 # secret_key: de433bdfa14ec43aa1098d5be594c8ffb20a31485ff9de2923b2689471c401b801
@@ -351,6 +351,8 @@ disable_stacks_api = false
 # stacks_node_events_observers = ["host.docker.internal:8002"]
 # miner_mnemonic = "twice kind fence tip hidden tilt action fragile skin nothing glory cousin green tomorrow spring wrist shed math olympic multiply hip blue scout claw"
 # miner_derivation_path = "m/44'/5757'/0'/0/0"
+# faucet_mnemonic = "shadow private easily thought say logic fault paddle word top book during ignore notable orange flight clock image wealth health outside kitten belt reform"
+# faucet_derivation_path = "m/44'/5757'/0'/0/0"
 # orchestrator_port = 20445
 # bitcoin_node_p2p_port = 18444
 # bitcoin_node_rpc_port = 18443
@@ -369,10 +371,19 @@ disable_stacks_api = false
 # postgres_database = "postgres"
 # bitcoin_node_image_url = "quay.io/hirosystems/bitcoind:devnet-v2"
 # stacks_node_image_url = "localhost:5000/stacks-node:devnet-v2"
-# stacks_api_image_url = "blockstack/stacks-blockchain-api:latest"
-# stacks_explorer_image_url = "blockstack/explorer:latest"
+# stacks_api_image_url = "hirosystems/stacks-blockchain-api:latest"
+# stacks_explorer_image_url = "hirosystems/explorer:latest"
 # bitcoin_explorer_image_url = "quay.io/hirosystems/bitcoin-explorer:devnet"
 # postgres_image_url = "postgres:alpine"
+# enable_hyperchain_node = true
+# hyperchain_image_url = "hirosystems/hyperchains:103-merge-stretch"
+# hyperchain_leader_mnemonic = "twice kind fence tip hidden tilt action fragile skin nothing glory cousin green tomorrow spring wrist shed math olympic multiply hip blue scout claw"
+# hyperchain_leader_derivation_path = "m/44'/5757'/0'/0/0"
+# hyperchain_node_rpc_port = 30443
+# hyperchain_node_p2p_port = 30444
+# hyperchain_events_ingestion_port = 30445
+# hyperchain_node_events_observers = ["host.docker.internal:8002"]
+
 
 # Send some stacking orders
 [[devnet.pox_stacking_orders]]

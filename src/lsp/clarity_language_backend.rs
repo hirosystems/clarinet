@@ -1,12 +1,19 @@
 use super::{utils, LspRequest};
+
 use serde_json::Value;
 use std::sync::mpsc::channel;
 use std::sync::mpsc::Sender;
 use std::sync::Arc;
 use std::sync::Mutex;
-
 use tower_lsp::jsonrpc::Result;
-use tower_lsp::lsp_types::*;
+use tower_lsp::lsp_types::{
+    CompletionOptions, CompletionParams, CompletionResponse, DeclarationCapability,
+    DidChangeTextDocumentParams, DidCloseTextDocumentParams, DidOpenTextDocumentParams,
+    DidSaveTextDocumentParams, ExecuteCommandParams, HoverProviderCapability, InitializeParams,
+    InitializeResult, InitializedParams, MessageType, ServerCapabilities,
+    TextDocumentSyncCapability, TextDocumentSyncKind, TextDocumentSyncOptions,
+    TextDocumentSyncSaveOptions, Url,
+};
 use tower_lsp::{async_trait, Client, LanguageServer};
 
 // The LSP is being initialized when clarity files are being detected in the project.
@@ -77,14 +84,15 @@ impl LanguageServer for ClarityLanguageBackend {
     async fn completion(&self, params: CompletionParams) -> Result<Option<CompletionResponse>> {
         // We receive notifications for toml and clar files, but only want to achieve this capability
         // for clar files.
-        let contract_url = params.text_document_position.text_document.uri;
-        if !contract_url.to_string().ends_with(".clar") {
-            return Ok(None);
-        }
+        let file_url = params.text_document_position.text_document.uri;
+        let contract_location = match utils::get_contract_location(&file_url) {
+            Some(location) => location,
+            _ => return Ok(None),
+        };
 
         let (response_tx, response_rx) = channel();
         let _ = match self.command_tx.lock() {
-            Ok(tx) => tx.send(LspRequest::GetIntellisense(contract_url, response_tx)),
+            Ok(tx) => tx.send(LspRequest::GetIntellisense(contract_location, response_tx)),
             Err(_) => return Ok(None),
         };
 
@@ -97,22 +105,21 @@ impl LanguageServer for ClarityLanguageBackend {
     }
 
     async fn did_open(&self, params: DidOpenTextDocumentParams) {
-        let response_rx = if let Some(_contract_path) =
-            utils::get_contract_file(&params.text_document.uri)
+        let response_rx = if let Some(contract_location) =
+            utils::get_contract_location(&params.text_document.uri)
         {
             let (response_tx, response_rx) = channel();
             let _ = match self.command_tx.lock() {
-                Ok(tx) => tx.send(LspRequest::ContractOpened(
-                    params.text_document.uri,
-                    response_tx,
-                )),
+                Ok(tx) => tx.send(LspRequest::ContractOpened(contract_location, response_tx)),
                 Err(_) => return,
             };
             response_rx
-        } else if let Some(manifest_path) = utils::get_manifest_file(&params.text_document.uri) {
+        } else if let Some(manifest_location) =
+            utils::get_manifest_location(&params.text_document.uri)
+        {
             let (response_tx, response_rx) = channel();
             let _ = match self.command_tx.lock() {
-                Ok(tx) => tx.send(LspRequest::ManifestOpened(manifest_path, response_tx)),
+                Ok(tx) => tx.send(LspRequest::ManifestOpened(manifest_location, response_tx)),
                 Err(_) => return,
             };
             response_rx
@@ -136,31 +143,36 @@ impl LanguageServer for ClarityLanguageBackend {
             notification = response.notification.take();
         }
 
-        for (url, diags) in aggregated_diagnostics.into_iter() {
-            self.client.publish_diagnostics(url, diags, None).await;
+        for (location, diags) in aggregated_diagnostics.into_iter() {
+            if let Ok(url) = location.to_url_string() {
+                self.client
+                    .publish_diagnostics(Url::parse(&url).unwrap(), diags, None)
+                    .await;
+            }
         }
         if let Some((level, message)) = notification {
-            self.client.show_message(level, message).await;
+            self.client
+                .show_message(message_level_type_to_tower_lsp_type(&level), message)
+                .await;
         }
     }
 
     async fn did_save(&self, params: DidSaveTextDocumentParams) {
-        let response_rx = if let Some(_contract_path) =
-            utils::get_contract_file(&params.text_document.uri)
+        let response_rx = if let Some(contract_location) =
+            utils::get_contract_location(&params.text_document.uri)
         {
             let (response_tx, response_rx) = channel();
             let _ = match self.command_tx.lock() {
-                Ok(tx) => tx.send(LspRequest::ContractChanged(
-                    params.text_document.uri,
-                    response_tx,
-                )),
+                Ok(tx) => tx.send(LspRequest::ContractChanged(contract_location, response_tx)),
                 Err(_) => return,
             };
             response_rx
-        } else if let Some(manifest_path) = utils::get_contract_file(&params.text_document.uri) {
+        } else if let Some(manifest_location) =
+            utils::get_manifest_location(&params.text_document.uri)
+        {
             let (response_tx, response_rx) = channel();
             let _ = match self.command_tx.lock() {
-                Ok(tx) => tx.send(LspRequest::ManifestChanged(manifest_path, response_tx)),
+                Ok(tx) => tx.send(LspRequest::ManifestChanged(manifest_location, response_tx)),
                 Err(_) => return,
             };
             response_rx
@@ -175,44 +187,32 @@ impl LanguageServer for ClarityLanguageBackend {
             notification = response.notification.take();
         }
 
-        for (url, diags) in aggregated_diagnostics.into_iter() {
-            self.client.publish_diagnostics(url, diags, None).await;
+        for (location, diags) in aggregated_diagnostics.into_iter() {
+            if let Ok(url) = location.to_url_string() {
+                self.client
+                    .publish_diagnostics(Url::parse(&url).unwrap(), diags, None)
+                    .await;
+            }
         }
         if let Some((level, message)) = notification {
-            self.client.show_message(level, message).await;
+            self.client
+                .show_message(message_level_type_to_tower_lsp_type(&level), message)
+                .await;
         }
     }
 
     async fn did_change(&self, _changes: DidChangeTextDocumentParams) {}
 
     async fn did_close(&self, _: DidCloseTextDocumentParams) {}
+}
 
-    // fn symbol(&self, params: WorkspaceSymbolParams) -> Self::SymbolFuture {
-    //     Box::new(future::ok(None))
-    // }
-
-    // fn goto_declaration(&self, _: TextDocumentPositionParams) -> Self::DeclarationFuture {
-    //     Box::new(future::ok(None))
-    // }
-
-    // fn goto_definition(&self, _: TextDocumentPositionParams) -> Self::DefinitionFuture {
-    //     Box::new(future::ok(None))
-    // }
-
-    // fn goto_type_definition(&self, _: TextDocumentPositionParams) -> Self::TypeDefinitionFuture {
-    //     Box::new(future::ok(None))
-    // }
-
-    // fn hover(&self, _: TextDocumentPositionParams) -> Self::HoverFuture {
-    //     // todo(ludo): to implement
-    //     let result = Hover {
-    //         contents: HoverContents::Scalar(MarkedString::String("".to_string())),
-    //         range: None,
-    //     };
-    //     Box::new(future::ok(None))
-    // }
-
-    // fn document_highlight(&self, _: TextDocumentPositionParams) -> Self::HighlightFuture {
-    //     Box::new(future::ok(None))
-    // }
+pub fn message_level_type_to_tower_lsp_type(
+    level: &clarity_lsp::lsp_types::MessageType,
+) -> tower_lsp::lsp_types::MessageType {
+    match level {
+        &clarity_lsp::lsp_types::MessageType::ERROR => tower_lsp::lsp_types::MessageType::Error,
+        &clarity_lsp::lsp_types::MessageType::WARNING => tower_lsp::lsp_types::MessageType::Warning,
+        &clarity_lsp::lsp_types::MessageType::INFO => tower_lsp::lsp_types::MessageType::Info,
+        _ => tower_lsp::lsp_types::MessageType::Log,
+    }
 }

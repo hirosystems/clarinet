@@ -1,0 +1,17 @@
+---
+name: Unwrap BTC
+version: 1
+chain: stacks
+networks:
+  devnet:
+    oreo-url: 'http://localhost:20446/'
+    predicate:
+      ft-event:
+        asset-identifier: 'ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM.cbtc-token::cbtc'
+        actions:
+          - burn
+    action:
+      http:
+        url: 'http://localhost:3000/api/v1/unwrapBtc'
+        method: POST
+        authorization-header: Bearer cn389ncoiwuencr

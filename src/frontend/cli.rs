@@ -1,8 +1,10 @@
-use crate::deployment::{
+use crate::chainhooks::check_chainhooks;
+use crate::deployments::types::DeploymentSynthesis;
+use crate::deployments::{
     self, apply_on_chain_deployment, check_deployments, generate_default_deployment,
-    get_absolute_deployment_path, get_default_deployment_path, load_deployment,
-    load_deployment_if_exists, setup_session_with_deployment, types::DeploymentSpecification,
-    write_deployment, DeploymentCommand, DeploymentEvent, DeploymentGenerationArtifacts,
+    get_absolute_deployment_path, get_default_deployment_path, get_initial_transactions_trackers,
+    load_deployment, load_deployment_if_exists, write_deployment, DeploymentCommand,
+    DeploymentEvent,
 };
 use crate::generate::{
     self,
@@ -10,17 +12,21 @@ use crate::generate::{
 };
 use crate::integrate::{self, DevnetOrchestrator};
 use crate::lsp::run_lsp;
-use crate::runnner::run_scripts;
-use crate::runnner::DeploymentCache;
-use crate::types::{ProjectManifest, ProjectManifestFile, RequirementConfig, StacksNetwork};
+use crate::runner::run_scripts;
+use crate::runner::DeploymentCache;
+use clarinet_deployments::setup_session_with_deployment;
+use clarinet_deployments::types::{DeploymentGenerationArtifacts, DeploymentSpecification};
+use clarinet_files::{FileLocation, ProjectManifest, ProjectManifestFile, RequirementConfig};
 use clarity_repl::clarity::analysis::{AnalysisDatabase, ContractAnalysis};
 use clarity_repl::clarity::costs::LimitedCostTracker;
 use clarity_repl::clarity::diagnostic::{Diagnostic, Level};
 use clarity_repl::clarity::types::QualifiedContractIdentifier;
 use clarity_repl::{analysis, repl, Terminal};
+use orchestra_types::Chain;
+use orchestra_types::StacksNetwork;
 use std::collections::HashMap;
 use std::fs::{self, File};
-use std::io::{prelude::*, BufReader, Read};
+use std::io::prelude::*;
 use std::path::PathBuf;
 use std::{env, process};
 
@@ -59,6 +65,9 @@ enum Command {
     /// Interact with contracts deployed on Mainnet
     #[clap(subcommand, name = "requirements")]
     Requirements(Requirements),
+    /// Subcommands for working with chainhooks
+    #[clap(subcommand, name = "chainhooks")]
+    Chainhooks(Chainhooks),
     /// Manage contracts deployments on Simnet/Devnet/Testnet/Mainnet
     #[clap(subcommand, name = "deployments")]
     Deployments(Deployments),
@@ -105,17 +114,31 @@ enum Requirements {
 }
 
 #[derive(Subcommand, PartialEq, Clone, Debug)]
-#[clap(bin_name = "deployment", aliases = &["deployments"])]
+#[clap(bin_name = "deployment", aliases = &["deployment"])]
 enum Deployments {
     /// Check deployments format
     #[clap(name = "check", bin_name = "check")]
     CheckDeployments(CheckDeployments),
     /// Generate new deployment
-    #[clap(name = "generate", bin_name = "generate")]
+    #[clap(name = "generate", bin_name = "generate", aliases = &["new"])]
     GenerateDeployment(GenerateDeployment),
     /// Apply deployment
     #[clap(name = "apply", bin_name = "apply")]
     ApplyDeployment(ApplyDeployment),
+}
+
+#[derive(Subcommand, PartialEq, Clone, Debug)]
+#[clap(bin_name = "chainhook", aliases = &["chainhook"])]
+enum Chainhooks {
+    /// Generate files and settings for a new hook
+    #[clap(name = "new", bin_name = "new")]
+    NewChainhook(NewChainhook),
+    /// Check hooks format
+    #[clap(name = "check", bin_name = "check")]
+    CheckChainhooks(CheckChainhooks),
+    /// Publish contracts on chain
+    #[clap(name = "deploy", bin_name = "deploy")]
+    DeployChainhook(DeployChainhook),
 }
 
 #[derive(Parser, PartialEq, Clone, Debug)]
@@ -165,7 +188,7 @@ struct GenerateDeployment {
     /// Generate a deployment file for devnet, using settings/Devnet.toml
     #[clap(
         long = "devnet",
-        conflicts_with = "test",
+        conflicts_with = "simnet",
         conflicts_with = "testnet",
         conflicts_with = "mainnet"
     )]
@@ -173,7 +196,7 @@ struct GenerateDeployment {
     /// Generate a deployment file for devnet, using settings/Testnet.toml
     #[clap(
         long = "testnet",
-        conflicts_with = "test",
+        conflicts_with = "simnet",
         conflicts_with = "devnet",
         conflicts_with = "mainnet"
     )]
@@ -181,7 +204,7 @@ struct GenerateDeployment {
     /// Generate a deployment file for devnet, using settings/Mainnet.toml
     #[clap(
         long = "mainnet",
-        conflicts_with = "test",
+        conflicts_with = "simnet",
         conflicts_with = "testnet",
         conflicts_with = "devnet"
     )]
@@ -197,6 +220,38 @@ struct GenerateDeployment {
         conflicts_with = "mainnet"
     )]
     pub no_batch: bool,
+}
+
+#[derive(Parser, PartialEq, Clone, Debug)]
+struct NewChainhook {
+    /// Hook's name
+    pub name: String,
+    /// Path to Clarinet.toml
+    #[clap(long = "manifest-path")]
+    pub manifest_path: Option<String>,
+    /// Generate a Bitcoin chainhook
+    #[clap(long = "bitcoin", conflicts_with = "stacks")]
+    pub bitcoin: bool,
+    /// Generate a Stacks chainhook
+    #[clap(long = "stacks", conflicts_with = "bitcoin")]
+    pub stacks: bool,
+}
+
+#[derive(Parser, PartialEq, Clone, Debug)]
+struct CheckChainhooks {
+    /// Path to Clarinet.toml
+    #[clap(long = "manifest-path")]
+    pub manifest_path: Option<String>,
+    /// Display chainhooks JSON representation
+    #[clap(long = "output-json")]
+    pub output_json: bool,
+}
+
+#[derive(Parser, PartialEq, Clone, Debug)]
+struct DeployChainhook {
+    /// Path to Clarinet.toml
+    #[clap(long = "manifest-path")]
+    pub manifest_path: Option<String>,
 }
 
 #[derive(Parser, PartialEq, Clone, Debug)]
@@ -313,7 +368,7 @@ struct Check {
     /// Path to Clarinet.toml
     #[clap(long = "manifest-path", short = 'm')]
     pub manifest_path: Option<String>,
-    /// If specified, check this file
+    /// If specified, perform a simple syntax-check on just this one file
     pub file: Option<String>,
     /// If specified, use this deployment file
     #[clap(long = "deployment-plan-path", short = 'p')]
@@ -399,8 +454,18 @@ pub fn main() {
                 );
             }
             let project_id = project_opts.name.clone();
-            let changes =
-                generate::get_changes_for_new_project(current_path, project_id, telemetry_enabled);
+            let changes = match generate::get_changes_for_new_project(
+                current_path,
+                project_id,
+                telemetry_enabled,
+            ) {
+                Ok(changes) => changes,
+                Err(message) => {
+                    println!("{}: {}", red!("error"), message);
+                    std::process::exit(1);
+                }
+            };
+
             if !execute_changes(changes) {
                 std::process::exit(1);
             }
@@ -422,7 +487,7 @@ pub fn main() {
                 println!("Checking deployments");
                 let res = check_deployments(&manifest);
                 if let Err(message) = res {
-                    println!("{}", message);
+                    println!("{}: {}", red!("error"), message);
                     process::exit(1);
                 }
             }
@@ -439,24 +504,27 @@ pub fn main() {
                     StacksNetwork::Simnet
                 };
 
-                let default_deployment_path = get_default_deployment_path(&manifest, &network);
+                let default_deployment_path =
+                    get_default_deployment_path(&manifest, &network).unwrap();
                 let (deployment, _) =
                     match generate_default_deployment(&manifest, &network, cmd.no_batch) {
                         Ok(deployment) => deployment,
                         Err(message) => {
-                            println!("{}", red!(message));
+                            println!("{}: {}", red!("error"), message);
                             std::process::exit(1);
                         }
                     };
                 let res = write_deployment(&deployment, &default_deployment_path, true);
                 if let Err(message) = res {
-                    println!("{}", message);
+                    println!("{}: {}", red!("error"), message);
                     process::exit(1);
                 }
 
-                let mut relative_path = PathBuf::from("deployments");
-                relative_path.push(default_deployment_path.file_name().unwrap());
-                println!("{} {}", green!("Generated file"), relative_path.display());
+                println!(
+                    "{} {}",
+                    green!("Generated file"),
+                    default_deployment_path.get_relative_location().unwrap()
+                );
             }
             Deployments::ApplyDeployment(cmd) => {
                 let manifest = load_manifest_or_exit(cmd.manifest_path);
@@ -488,7 +556,7 @@ pub fn main() {
                             }
                             Some(Err(e)) => Err(e),
                             None => {
-                                let default_deployment_path = get_default_deployment_path(&manifest, &network);
+                                let default_deployment_path = get_default_deployment_path(&manifest, &network).unwrap();
                                 let (deployment, _) = match generate_default_deployment(&manifest, &network, false) {
                                     Ok(deployment) => deployment,
                                     Err(message) => {
@@ -500,16 +568,14 @@ pub fn main() {
                                 if let Err(message) = res {
                                     Err(message)
                                 } else {
-                                    let mut relative_path = PathBuf::from("deployments");
-                                    relative_path.push(default_deployment_path.file_name().unwrap());
-                                    println!("{} {}", green!("Generated file"), relative_path.display());
+                                    println!("{} {}", green!("Generated file"), default_deployment_path.get_relative_location().unwrap());
                                     Ok(deployment)
                                 }
                             }
                         }
                     }
                     (None, Some(deployment_plan_path)) => {
-                        let deployment_path = get_absolute_deployment_path(&manifest, &deployment_plan_path);
+                        let deployment_path = get_absolute_deployment_path(&manifest, &deployment_plan_path).expect("unable to retrieve deployment");
                         load_deployment(&manifest, &deployment_path)
                     }
                     (_, _) => unreachable!()
@@ -522,17 +588,13 @@ pub fn main() {
                         std::process::exit(1);
                     }
                 };
+                let network = deployment.network.clone();
 
-                let contracts_ids = deployment
-                    .contracts
-                    .keys()
-                    .map(|contract_id| contract_id.to_string())
-                    .collect::<Vec<_>>();
-                let node_url = deployment.node.clone().unwrap();
+                let node_url = deployment.stacks_node.clone().unwrap();
 
                 println!(
                     "The following deployment plan will be applied:\n{}\n\n{}",
-                    deployment.get_synthesis(),
+                    DeploymentSynthesis::from_deployment(&deployment),
                     yellow!("Continue [Y/n]?")
                 );
                 let mut buffer = String::new();
@@ -554,9 +616,15 @@ pub fn main() {
                             &manifest.project.name,
                             &manifest.project.authors,
                         ),
-                        deployment.network.clone(),
+                        network.clone(),
                     ));
                 }
+
+                let transaction_trackers = if cmd.no_dashboard {
+                    vec![]
+                } else {
+                    get_initial_transactions_trackers(&deployment)
+                };
 
                 std::thread::spawn(move || {
                     let manifest = manifest_moved;
@@ -573,48 +641,101 @@ pub fn main() {
                         };
                         match cmd {
                             DeploymentEvent::Interrupted(message) => {
-                                println!("{} Error deploying contracts: {}", red!("x"), message);
+                                println!(
+                                    "{} Error publishing transactions: {}",
+                                    red!("x"),
+                                    message
+                                );
                                 break;
                             }
-                            DeploymentEvent::ContractUpdate(update) => {
-                                println!(
-                                    "{} {:?} {}",
-                                    blue!("➡"),
-                                    update.status,
-                                    update.contract_id
-                                );
+                            DeploymentEvent::TransactionUpdate(update) => {
+                                println!("{} {:?} {}", blue!("➡"), update.status, update.name);
                             }
                             DeploymentEvent::ProtocolDeployed => {
                                 println!(
-                                    "{} Contracts successfully deployed on {:?}",
+                                    "{} Transactions successfully confirmed on {:?}",
                                     green!("✔"),
-                                    network.unwrap()
+                                    network
                                 );
                                 break;
                             }
                         }
                     }
                 } else {
-                    let res = deployment::start_ui(&node_url, event_rx, contracts_ids);
+                    let res = deployments::start_ui(&node_url, event_rx, transaction_trackers);
                     match res {
                         Ok(()) => println!(
-                            "{} Contracts successfully deployed on {:?}",
+                            "{} Transactions successfully confirmed on {:?}",
                             green!("✔"),
-                            network.unwrap()
+                            network
                         ),
                         Err(message) => {
-                            println!("{} Error deploying contracts: {}", red!("x"), message)
+                            println!("{} Error publishing transactions: {}", red!("x"), message)
                         }
                     }
                 }
+            }
+        },
+        Command::Chainhooks(subcommand) => match subcommand {
+            Chainhooks::NewChainhook(cmd) => {
+                let manifest = load_manifest_or_exit(cmd.manifest_path);
+
+                let chain = match (cmd.bitcoin, cmd.stacks) {
+                    (true, false) => Chain::Bitcoin,
+                    (false, true) => Chain::Stacks,
+                    (_, _) => {
+                        println!(
+                            "{}: either --bitcoin or --stacks must be passed",
+                            red!("error")
+                        );
+                        process::exit(1);
+                    }
+                };
+
+                let changes =
+                    match generate::get_changes_for_new_chainhook(&manifest, cmd.name, chain) {
+                        Ok(changes) => changes,
+                        Err(message) => {
+                            println!("{}: {}", red!("error"), message);
+                            std::process::exit(1);
+                        }
+                    };
+
+                if !execute_changes(changes) {
+                    std::process::exit(1);
+                }
+                if hints_enabled {
+                    display_post_check_hint();
+                }
+            }
+            Chainhooks::CheckChainhooks(cmd) => {
+                let manifest_location = get_manifest_location_or_exit(cmd.manifest_path);
+                // Ensure that all the hooks can correctly be deserialized.
+                println!("Checking chainhooks");
+                let _ = check_chainhooks(&manifest_location, cmd.output_json);
+            }
+            Chainhooks::DeployChainhook(_cmd) => {
+                // TODO(lgalabru): follow-up on this implementation
+                unimplemented!()
             }
         },
         Command::Contracts(subcommand) => match subcommand {
             Contracts::NewContract(cmd) => {
                 let manifest = load_manifest_or_exit(cmd.manifest_path);
 
-                let changes =
-                    generate::get_changes_for_new_contract(&manifest.path, cmd.name, None, true);
+                let changes = match generate::get_changes_for_new_contract(
+                    &manifest.location,
+                    cmd.name,
+                    None,
+                    true,
+                ) {
+                    Ok(changes) => changes,
+                    Err(message) => {
+                        println!("{}: {}", red!("error"), message);
+                        std::process::exit(1);
+                    }
+                };
+
                 if !execute_changes(changes) {
                     std::process::exit(1);
                 }
@@ -629,10 +750,11 @@ pub fn main() {
 
                 let change = TOMLEdition {
                     comment: format!(
-                        "Adding {} as a requirement to Clarinet.toml",
-                        cmd.contract_id
+                        "{} with requirement {}",
+                        yellow!("Updated Clarinet.toml"),
+                        green!(format!("{}", cmd.contract_id))
                     ),
-                    manifest_path: manifest.path.clone(),
+                    manifest_location: manifest.location.clone(),
                     contracts_to_add: HashMap::new(),
                     requirements_to_add: vec![RequirementConfig {
                         contract_id: cmd.contract_id.clone(),
@@ -647,27 +769,32 @@ pub fn main() {
             }
         },
         Command::Console(cmd) => {
-            let manifest = load_manifest_or_exit(cmd.manifest_path);
+            let manifest = load_manifest_or_warn(cmd.manifest_path);
 
-            let (deployment, _, artifacts) =
-                load_deployment_and_artifacts_or_exit(&manifest, &cmd.deployment_plan_path);
+            let mut terminal = match manifest {
+                Some(ref manifest) => {
+                    let (deployment, _, artifacts) =
+                        load_deployment_and_artifacts_or_exit(manifest, &cmd.deployment_plan_path);
 
-            if !artifacts.success {
-                let diags_digest = DiagnosticsDigest::new(&artifacts.diags, &deployment);
-                if diags_digest.has_feedbacks() {
-                    println!("{}", diags_digest.message);
+                    if !artifacts.success {
+                        let diags_digest = DiagnosticsDigest::new(&artifacts.diags, &deployment);
+                        if diags_digest.has_feedbacks() {
+                            println!("{}", diags_digest.message);
+                        }
+                        if diags_digest.errors > 0 {
+                            println!(
+                                "{} {} detected",
+                                red!("x"),
+                                pluralize!(diags_digest.errors, "error")
+                            );
+                        }
+                        std::process::exit(1);
+                    }
+
+                    Terminal::load(artifacts.session)
                 }
-                if diags_digest.errors > 0 {
-                    println!(
-                        "{} {} detected",
-                        red!("x"),
-                        pluralize!(diags_digest.errors, "error")
-                    );
-                }
-                std::process::exit(1);
-            }
-
-            let mut terminal = Terminal::load(artifacts.session);
+                None => Terminal::new(repl::SessionSettings::default()),
+            };
             terminal.start();
 
             if hints_enabled {
@@ -675,27 +802,32 @@ pub fn main() {
             }
 
             // Report telemetry
-            if manifest.project.telemetry {
-                #[cfg(feature = "telemetry")]
-                telemetry_report_event(DeveloperUsageEvent::PokeExecuted(
-                    DeveloperUsageDigest::new(&manifest.project.name, &manifest.project.authors),
-                ));
-
-                #[cfg(feature = "telemetry")]
-                let mut debug_count = 0;
-                for command in terminal.session.executed {
-                    if command.starts_with("::debug") {
-                        debug_count += 1;
-                    }
-                }
-                if debug_count > 0 {
-                    telemetry_report_event(DeveloperUsageEvent::DebugStarted(
+            if let Some(manifest) = manifest {
+                if manifest.project.telemetry {
+                    #[cfg(feature = "telemetry")]
+                    telemetry_report_event(DeveloperUsageEvent::PokeExecuted(
                         DeveloperUsageDigest::new(
                             &manifest.project.name,
                             &manifest.project.authors,
                         ),
-                        debug_count,
                     ));
+
+                    #[cfg(feature = "telemetry")]
+                    let mut debug_count = 0;
+                    for command in terminal.session.executed {
+                        if command.starts_with("::debug") {
+                            debug_count += 1;
+                        }
+                    }
+                    if debug_count > 0 {
+                        telemetry_report_event(DeveloperUsageEvent::DebugStarted(
+                            DeveloperUsageDigest::new(
+                                &manifest.project.name,
+                                &manifest.project.authors,
+                            ),
+                            debug_count,
+                        ));
+                    }
                 }
             }
         }
@@ -870,7 +1002,8 @@ pub fn main() {
                         Some(Err(e)) => Err(e),
                         None => {
                             let default_deployment_path =
-                                get_default_deployment_path(&manifest, &StacksNetwork::Devnet);
+                                get_default_deployment_path(&manifest, &StacksNetwork::Devnet)
+                                    .unwrap();
                             let (deployment, _) = match generate_default_deployment(
                                 &manifest,
                                 &StacksNetwork::Devnet,
@@ -886,12 +1019,10 @@ pub fn main() {
                             if let Err(message) = res {
                                 Err(message)
                             } else {
-                                let mut relative_path = PathBuf::from("deployments");
-                                relative_path.push(default_deployment_path.file_name().unwrap());
                                 println!(
                                     "{} {}",
                                     green!("Generated file"),
-                                    relative_path.display()
+                                    default_deployment_path.get_relative_location().unwrap()
                                 );
                                 Ok(deployment)
                             }
@@ -900,7 +1031,8 @@ pub fn main() {
                 }
                 Some(deployment_plan_path) => {
                     let deployment_path =
-                        get_absolute_deployment_path(&manifest, &deployment_plan_path);
+                        get_absolute_deployment_path(&manifest, &deployment_plan_path)
+                            .expect("unable to retrieve deployment");
                     load_deployment(&manifest, &deployment_path)
                 }
             };
@@ -913,17 +1045,28 @@ pub fn main() {
                 }
             };
 
-            let devnet = DevnetOrchestrator::new(manifest, None);
-            if devnet.manifest.project.telemetry {
+            let orchestrator = match DevnetOrchestrator::new(manifest, None) {
+                Ok(orchestrator) => orchestrator,
+                Err(e) => {
+                    println!("{}: {}", red!("error"), e);
+                    process::exit(1);
+                }
+            };
+
+            if orchestrator.manifest.project.telemetry {
                 #[cfg(feature = "telemetry")]
                 telemetry_report_event(DeveloperUsageEvent::DevnetExecuted(
                     DeveloperUsageDigest::new(
-                        &devnet.manifest.project.name,
-                        &devnet.manifest.project.authors,
+                        &orchestrator.manifest.project.name,
+                        &orchestrator.manifest.project.authors,
                     ),
                 ));
             }
-            let _ = integrate::run_devnet(devnet, deployment, None, !cmd.no_dashboard);
+            if let Err(e) = integrate::run_devnet(orchestrator, deployment, None, !cmd.no_dashboard)
+            {
+                println!("{}: {}", red!("error"), e);
+                process::exit(1);
+            }
             if hints_enabled {
                 display_deploy_hint();
             }
@@ -958,20 +1101,20 @@ pub fn main() {
     };
 }
 
-fn get_manifest_path(path: Option<String>) -> Option<PathBuf> {
+fn get_manifest_location(path: Option<String>) -> Option<FileLocation> {
     if let Some(path) = path {
         let manifest_path = PathBuf::from(path);
         if !manifest_path.exists() {
             return None;
         }
-        Some(manifest_path)
+        Some(FileLocation::from_path(manifest_path))
     } else {
         let mut current_dir = env::current_dir().unwrap();
         loop {
             current_dir.push("Clarinet.toml");
 
             if current_dir.exists() {
-                return Some(current_dir);
+                return Some(FileLocation::from_path(current_dir));
             }
             current_dir.pop();
 
@@ -982,9 +1125,9 @@ fn get_manifest_path(path: Option<String>) -> Option<PathBuf> {
     }
 }
 
-fn get_manifest_path_or_exit(path: Option<String>) -> PathBuf {
-    match get_manifest_path(path) {
-        Some(manifest_path) => manifest_path,
+fn get_manifest_location_or_exit(path: Option<String>) -> FileLocation {
+    match get_manifest_location(path) {
+        Some(manifest_location) => manifest_location,
         None => {
             println!("Could not find Clarinet.toml");
             process::exit(1);
@@ -992,9 +1135,22 @@ fn get_manifest_path_or_exit(path: Option<String>) -> PathBuf {
     }
 }
 
+fn get_manifest_location_or_warn(path: Option<String>) -> Option<FileLocation> {
+    match get_manifest_location(path) {
+        Some(manifest_location) => Some(manifest_location),
+        None => {
+            println!(
+                "{}: no manifest found. Continuing with default.",
+                green!("note")
+            );
+            None
+        }
+    }
+}
+
 fn load_manifest_or_exit(path: Option<String>) -> ProjectManifest {
-    let manifest_path = get_manifest_path_or_exit(path);
-    let manifest = match ProjectManifest::from_path(&manifest_path) {
+    let manifest_location = get_manifest_location_or_exit(path);
+    let manifest = match ProjectManifest::from_location(&manifest_location) {
         Ok(manifest) => manifest,
         Err(message) => {
             println!(
@@ -1006,6 +1162,26 @@ fn load_manifest_or_exit(path: Option<String>) -> ProjectManifest {
         }
     };
     manifest
+}
+
+fn load_manifest_or_warn(path: Option<String>) -> Option<ProjectManifest> {
+    let manifest_location = get_manifest_location_or_warn(path);
+    if manifest_location.is_some() {
+        let manifest = match ProjectManifest::from_location(&manifest_location.unwrap()) {
+            Ok(manifest) => manifest,
+            Err(message) => {
+                println!(
+                    "{}: Syntax errors in Clarinet.toml\n{}",
+                    red!("error"),
+                    message,
+                );
+                process::exit(1);
+            }
+        };
+        Some(manifest)
+    } else {
+        None
+    }
 }
 
 fn load_deployment_and_artifacts_or_exit(
@@ -1055,15 +1231,12 @@ fn load_deployment_and_artifacts_or_exit(
             }
         }
         Some(path) => {
-            let deployment_path = get_absolute_deployment_path(&manifest, &path);
-            match load_deployment(&manifest, &deployment_path) {
+            let deployment_location = get_absolute_deployment_path(&manifest, &path)
+                .expect("unable to retrieve deployment");
+            match load_deployment(&manifest, &deployment_location) {
                 Ok(deployment) => {
                     let artifacts = setup_session_with_deployment(&manifest, &deployment, None);
-                    Ok((
-                        deployment,
-                        Some(format!("{}", deployment_path.display())),
-                        artifacts,
-                    ))
+                    Ok((deployment, Some(deployment_location.to_string()), artifacts))
                 }
                 Err(e) => Err(format!("loading {} failed with error: {}", path, e)),
             }
@@ -1093,7 +1266,6 @@ pub fn build_deployment_cache_or_exit(
 
 fn execute_changes(changes: Vec<Changes>) -> bool {
     let mut shared_config = None;
-    let mut path = PathBuf::new();
 
     for mut change in changes.into_iter() {
         match change {
@@ -1153,42 +1325,37 @@ fn execute_changes(changes: Vec<Changes>) -> bool {
                 let mut config = match shared_config.take() {
                     Some(config) => config,
                     None => {
-                        path = options.manifest_path.clone();
-                        let file = match File::open(path.clone()) {
-                            Ok(file) => file,
-                            Err(e) => {
-                                println!(
-                                    "{}: Unable to open file {}: {}",
-                                    red!("error"),
-                                    path.to_string_lossy(),
-                                    e
-                                );
+                        let manifest_location = options.manifest_location.clone();
+                        let project_manifest_content = match manifest_location.read_content() {
+                            Ok(content) => content,
+                            Err(message) => {
+                                println!("{}: {}", red!("error"), message);
                                 return false;
                             }
                         };
-                        let mut project_manifest_file_reader = BufReader::new(file);
-                        let mut project_manifest_file = vec![];
-                        match project_manifest_file_reader.read_to_end(&mut project_manifest_file) {
-                            Ok(_) => (),
-                            Err(e) => {
-                                println!("{}: Unable to read manifest file: {}", red!("error"), e);
-                                return false;
-                            }
-                        };
+
                         let project_manifest_file: ProjectManifestFile =
-                            match toml::from_slice(&project_manifest_file[..]) {
+                            match toml::from_slice(&project_manifest_content[..]) {
                                 Ok(manifest) => manifest,
-                                Err(e) => {
+                                Err(message) => {
                                     println!(
                                         "{}: Failed to process manifest file: {}",
                                         red!("error"),
-                                        e
+                                        message
                                     );
                                     return false;
                                 }
                             };
-                        ProjectManifest::from_project_manifest_file(project_manifest_file, &path)
-                            .unwrap()
+                        match ProjectManifest::from_project_manifest_file(
+                            project_manifest_file,
+                            &manifest_location,
+                        ) {
+                            Ok(content) => content,
+                            Err(message) => {
+                                println!("{}: {}", red!("error"), message);
+                                return false;
+                            }
+                        }
                     }
                 };
 
@@ -1213,8 +1380,8 @@ fn execute_changes(changes: Vec<Changes>) -> bool {
         }
     }
 
-    if let Some(config) = shared_config {
-        let toml_value = match toml::Value::try_from(&config) {
+    if let Some(project_manifest) = shared_config {
+        let toml_value = match toml::Value::try_from(&project_manifest) {
             Ok(value) => value,
             Err(e) => {
                 println!("{}: Failed to encode config file: {}", red!("error"), e);
@@ -1222,32 +1389,15 @@ fn execute_changes(changes: Vec<Changes>) -> bool {
             }
         };
         let toml = format!("{}", toml_value);
-        let mut file = match File::create(path.clone()) {
-            Ok(file) => file,
-            Err(e) => {
-                println!(
-                    "{}: Unable to create manifest file {}: {}",
-                    red!("error"),
-                    path.to_string_lossy(),
-                    e
-                );
-                return false;
-            }
-        };
-        match file.write_all(&toml.as_bytes()) {
-            Ok(_) => (),
-            Err(e) => {
-                println!("{}: Unable to write to manifest file: {}", red!("error"), e);
-                return false;
-            }
-        };
-        match file.sync_all() {
-            Ok(_) => (),
-            Err(e) => {
-                println!("{}: sync_all: {}", red!("error"), e);
-                return false;
-            }
-        };
+
+        if let Err(message) = project_manifest.location.write_content(toml.as_bytes()) {
+            println!(
+                "{}: Unable to update manifest file - {}",
+                red!("error"),
+                message
+            );
+            return false;
+        }
     }
 
     true
@@ -1282,7 +1432,7 @@ impl DiagnosticsDigest {
                 continue;
             }
 
-            let (source, contract_path) = deployment
+            let (source, contract_location) = deployment
                 .contracts
                 .get(&contract_id)
                 .expect("unable to retrieve contract");
@@ -1306,6 +1456,11 @@ impl DiagnosticsDigest {
                         continue;
                     }
                 }
+                let contract_path = match contract_location.get_relative_location() {
+                    Ok(contract_path) => contract_path,
+                    _ => contract_location.to_string(),
+                };
+
                 if let Some(span) = diagnostic.spans.first() {
                     outputs.push(format!(
                         "{} {}:{}:{}",

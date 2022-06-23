@@ -1,6 +1,6 @@
 use super::util::{StatefulList, TabsState};
 use crate::integrate::{LogData, MempoolAdmissionData, ServiceStatusData};
-use crate::types::{StacksBlockData, StacksTransactionData};
+use orchestra_types::{StacksBlockData, StacksTransactionData};
 use tui::style::{Color, Style};
 use tui::text::{Span, Spans};
 
@@ -88,7 +88,7 @@ impl<'a> App<'a> {
         self.logs.items.push(log);
     }
 
-    pub fn update_mempool(&mut self, tx: MempoolAdmissionData) {
+    pub fn add_to_mempool(&mut self, tx: MempoolAdmissionData) {
         self.mempool.items.push(tx);
     }
 

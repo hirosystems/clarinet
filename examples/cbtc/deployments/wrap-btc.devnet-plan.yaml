@@ -1,0 +1,15 @@
+---
+id: 0
+name: Devnet deployment
+network: devnet
+bitcoin-node: "http://devnet:devnet@localhost:18443"
+stacks-node: "http://localhost:20443"
+plan:
+  batches:
+    - id: 0
+      transactions:
+        - btc-transfer:
+            expected-sender: mjSrB3wS4xab3kYqFktwBzfTdPg367ZJ2d
+            recipient: mr1iPkD9N3RJZZxXRk7xF9d36gffa6exNC
+            sats-amount: 100000000
+            sats-per-byte: 10
