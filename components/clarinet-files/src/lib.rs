@@ -320,7 +320,7 @@ impl Serialize for FileLocation {
             FileLocation::FileSystem { path: _ } => {
                 let path = match self.get_relative_location() {
                     Ok(relative_path) => relative_path, // Use relative path if possible
-                    Err(_) => self.to_string()                  // Fallback on fully qualified path
+                    Err(_) => self.to_string(),         // Fallback on fully qualified path
                 };
                 map.serialize_entry("path", &path)?;
             }

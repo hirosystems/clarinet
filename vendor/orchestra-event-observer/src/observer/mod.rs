@@ -8,7 +8,10 @@ use crate::utils;
 use bitcoincore_rpc::bitcoin::{BlockHash, Txid};
 use bitcoincore_rpc::{Auth, Client, RpcApi};
 use clarity_repl::clarity::util::hash::bytes_to_hex;
-use orchestra_types::{BitcoinChainEvent, StacksChainEvent, StacksNetwork};
+use orchestra_types::{
+    BitcoinChainEvent, StacksChainEvent, StacksNetwork, StacksTransactionData,
+    TransactionIdentifier,
+};
 use reqwest::Client as HttpClient;
 use rocket::config::{Config, LogLevel};
 use rocket::http::Status;
@@ -136,11 +139,24 @@ pub struct ContractReadonlyCall {
 pub enum ObserverCommand {
     PropagateBitcoinChainEvent(BitcoinChainEvent),
     PropagateStacksChainEvent(StacksChainEvent),
+    PropagateStacksMempoolEvent(StacksChainMempoolEvent),
     RegisterHook(ChainhookSpecification, ApiKey),
     DeregisterBitcoinHook(String, ApiKey),
     DeregisterStacksHook(String, ApiKey),
     NotifyBitcoinTransactionProxied,
     Terminate,
+}
+
+#[derive(Clone, Debug)]
+pub enum StacksChainMempoolEvent {
+    TransactionsAdmitted(Vec<MempoolAdmissionData>),
+    TransactionDropped(String),
+}
+
+#[derive(Clone, Debug)]
+pub struct MempoolAdmissionData {
+    pub tx_data: String,
+    pub tx_description: String,
 }
 
 #[derive(Clone, Debug)]
@@ -155,6 +171,7 @@ pub enum ObserverEvent {
     HookDeregistered(ChainhookSpecification),
     HooksTriggered(usize),
     Terminate,
+    StacksChainMempoolEvent(StacksChainMempoolEvent),
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -380,6 +397,11 @@ pub async fn start_event_observer(
                     let _ = tx.send(ObserverEvent::StacksChainEvent(chain_event));
                 }
             }
+            ObserverCommand::PropagateStacksMempoolEvent(mempool_event) => {
+                if let Some(ref tx) = observer_events_tx {
+                    let _ = tx.send(ObserverEvent::StacksChainMempoolEvent(mempool_event));
+                }
+            }
             ObserverCommand::NotifyBitcoinTransactionProxied => {
                 for event_handler in event_handlers.iter() {
                     event_handler.notify_bitcoin_transaction_proxied().await;
@@ -566,23 +588,29 @@ pub fn handle_new_microblocks(
 #[post("/new_mempool_tx", format = "application/json", data = "<raw_txs>")]
 pub fn handle_new_mempool_tx(
     raw_txs: Json<Vec<String>>,
-    _background_job_tx: &State<Arc<Mutex<Sender<ObserverCommand>>>>,
+    background_job_tx: &State<Arc<Mutex<Sender<ObserverCommand>>>>,
 ) -> Json<JsonValue> {
-    // TODO(lgalabru): use propagate mempool events
-    let _decoded_transactions = raw_txs
+    let transactions = raw_txs
         .iter()
-        .map(|t| {
-            let (txid, ..) =
-                chains::stacks::get_tx_description(t).expect("unable to parse transaction");
-            txid
+        .map(|tx_data| {
+            let (tx_description, ..) =
+                chains::stacks::get_tx_description(&tx_data).expect("unable to parse transaction");
+            MempoolAdmissionData {
+                tx_data: tx_data.clone(),
+                tx_description,
+            }
         })
-        .collect::<Vec<String>>();
+        .collect::<Vec<_>>();
 
-    // if let Ok(tx_sender) = devnet_events_tx.lock() {
-    //     for tx in decoded_transactions.into_iter() {
-    //         let _ = tx_sender.send(DevnetEvent::MempoolAdmission(MempoolAdmissionData { tx }));
-    //     }
-    // }
+    let background_job_tx = background_job_tx.inner();
+    match background_job_tx.lock() {
+        Ok(tx) => {
+            let _ = tx.send(ObserverCommand::PropagateStacksMempoolEvent(
+                StacksChainMempoolEvent::TransactionsAdmitted(transactions),
+            ));
+        }
+        _ => {}
+    };
 
     Json(json!({
         "status": 200,

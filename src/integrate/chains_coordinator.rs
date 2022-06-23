@@ -15,6 +15,7 @@ use clarity_repl::clarity::util::hash::{hex_bytes, Hash160};
 
 use orchestra_event_observer::observer::{
     start_event_observer, EventObserverConfig, ObserverCommand, ObserverEvent,
+    StacksChainMempoolEvent,
 };
 use orchestra_types::{BitcoinChainEvent, BitcoinNetwork, StacksChainEvent, StacksNetwork};
 use stacks_rpc_client::{transactions, PoxInfo, StacksRpc};
@@ -354,6 +355,14 @@ pub async fn start_chains_coordinator(
                     devnet_event_tx.send(DevnetEvent::info(format!("{} hooks triggered", count)));
             }
             ObserverEvent::Terminate => {}
+            ObserverEvent::StacksChainMempoolEvent(mempool_event) => match mempool_event {
+                StacksChainMempoolEvent::TransactionsAdmitted(transactions) => {
+                    for tx in transactions.into_iter() {
+                        let _ = devnet_event_tx.send(DevnetEvent::MempoolAdmission(tx));
+                    }
+                }
+                StacksChainMempoolEvent::TransactionDropped(ref _transactions) => {}
+            },
         }
     }
     Ok(())
