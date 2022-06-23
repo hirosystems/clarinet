@@ -622,7 +622,7 @@ pub async fn generate_default_deployment(
     Ok((deployment, artifacts))
 }
 
-pub async fn generate_simnet_deployment_for_snippet(
+pub fn generate_simnet_deployment_for_snippet(
     name: &str,
     source: &str,
     location: &FileLocation,
