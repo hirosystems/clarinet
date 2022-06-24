@@ -1,13 +1,26 @@
 use super::bitcoin::{TxIn, TxOut};
 use crate::events::*;
 use std::collections::HashSet;
+use std::fmt::Display;
 
 /// BlockIdentifier uniquely identifies a block in a particular network.
-#[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
+#[derive(Debug, Clone, Eq, PartialEq, Deserialize, Serialize, Hash)]
 pub struct BlockIdentifier {
     /// Also known as the block height.
     pub index: u64,
     pub hash: String,
+}
+
+impl Display for BlockIdentifier {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(
+            f,
+            "Block #{} (0x{}...{})",
+            self.index,
+            &self.hash.as_str()[0..4],
+            &self.hash.as_str()[60..64]
+        )
+    }
 }
 
 /// StacksBlock contain an array of Transactions that occurred at a particular
@@ -418,14 +431,16 @@ pub enum StacksChainEvent {
 pub struct ChainUpdatedWithBlockData {
     pub new_block: StacksBlockData,
     pub anchored_trail: Option<StacksMicroblocksTrail>,
-    pub confirmed_block: (StacksBlockData, Option<StacksMicroblocksTrail>),
+    // TODO(lgalabru)
+    // pub confirmed_block: (StacksBlockData, Option<StacksMicroblocksTrail>)
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct ChainUpdatedWithReorgData {
-    pub old_blocks: Vec<(Option<StacksMicroblocksTrail>, StacksBlockData)>,
-    pub new_blocks: Vec<(Option<StacksMicroblocksTrail>, StacksBlockData)>,
-    pub confirmed_block: (StacksBlockData, Option<StacksMicroblocksTrail>),
+    pub blocks_to_rollback: Vec<(Option<StacksMicroblocksTrail>, StacksBlockData)>,
+    pub blocks_to_apply: Vec<(Option<StacksMicroblocksTrail>, StacksBlockData)>,
+    // TODO(lgalabru)
+    // pub confirmed_block: (StacksBlockData, Option<StacksMicroblocksTrail>)
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize)]

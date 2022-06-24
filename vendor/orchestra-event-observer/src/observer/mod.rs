@@ -518,7 +518,7 @@ pub fn handle_new_stacks_block(
     // kind of update that this new block would imply, taking
     // into account the last 7 blocks.
     // TODO(lgalabru): use _pox_info
-    let (_pox_info, chain_event) = match indexer_rw_lock.inner().write() {
+    let (_pox_info, mut chain_event) = match indexer_rw_lock.inner().write() {
         Ok(mut indexer) => {
             let pox_info = indexer.get_pox_info();
             let chain_event = indexer.handle_stacks_block(marshalled_block.into_inner());
@@ -532,13 +532,15 @@ pub fn handle_new_stacks_block(
         }
     };
 
-    let background_job_tx = background_job_tx.inner();
-    match background_job_tx.lock() {
-        Ok(tx) => {
-            let _ = tx.send(ObserverCommand::PropagateStacksChainEvent(chain_event));
-        }
-        _ => {}
-    };
+    if let Some(chain_event) = chain_event.take() {
+        let background_job_tx = background_job_tx.inner();
+        match background_job_tx.lock() {
+            Ok(tx) => {
+                let _ = tx.send(ObserverCommand::PropagateStacksChainEvent(chain_event));
+            }
+            _ => {}
+        };
+    }
 
     Json(json!({
         "status": 200,
@@ -558,7 +560,7 @@ pub fn handle_new_microblocks(
 ) -> Json<JsonValue> {
     // Standardize the structure of the microblock, and identify the
     // kind of update that this new microblock would imply
-    let chain_event = match indexer_rw_lock.inner().write() {
+    let mut chain_event = match indexer_rw_lock.inner().write() {
         Ok(mut indexer) => {
             let chain_event = indexer.handle_stacks_microblock(marshalled_microblock.into_inner());
             chain_event
@@ -571,13 +573,15 @@ pub fn handle_new_microblocks(
         }
     };
 
-    let background_job_tx = background_job_tx.inner();
-    match background_job_tx.lock() {
-        Ok(tx) => {
-            let _ = tx.send(ObserverCommand::PropagateStacksChainEvent(chain_event));
-        }
-        _ => {}
-    };
+    if let Some(chain_event) = chain_event.take() {
+        let background_job_tx = background_job_tx.inner();
+        match background_job_tx.lock() {
+            Ok(tx) => {
+                let _ = tx.send(ObserverCommand::PropagateStacksChainEvent(chain_event));
+            }
+            _ => {}
+        };
+    }
 
     Json(json!({
         "status": 200,
