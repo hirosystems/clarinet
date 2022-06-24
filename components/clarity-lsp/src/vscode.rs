@@ -29,14 +29,14 @@ pub struct VFSRequest {
 
 #[derive(Serialize, Deserialize)]
 pub struct CursorEvent {
-    pub text_document: TextDocumentIdentifier,
+    pub path: String,
     pub line: u32,
     pub char: u32,
 }
 
 #[wasm_bindgen]
 pub struct ClarityLanguageServer {
-    asts: BTreeMap<Url, ContractAST>,
+    asts: BTreeMap<String, ContractAST>,
     client_diagnostic_tx: js_sys::Function,
     _client_request_tx: js_sys::Function,
 }
@@ -102,12 +102,12 @@ impl ClarityLanguageServer {
         match method {
             "clarity/cursorMove" => {
                 let CursorEvent {
-                    text_document,
+                    path,
                     line,
                     char: _,
                 } = from_value(params).unwrap();
 
-                let ast = self.asts.get(&text_document.uri);
+                let ast = self.asts.get(&path);
                 if ast.is_none() {
                     return None;
                 };
@@ -161,7 +161,8 @@ impl ClarityLanguageServer {
                 let ast = artifacts.asts.get(&contract_id);
                 match ast {
                     Some(ast) => {
-                        self.asts.insert(text_document.uri.clone(), ast.to_owned());
+                        self.asts
+                            .insert(text_document.uri.path().to_string(), ast.clone());
                     }
 
                     None => {
