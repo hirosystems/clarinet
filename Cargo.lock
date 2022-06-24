@@ -678,7 +678,7 @@ dependencies = [
 
 [[package]]
 name = "clarinet"
-version = "0.31.1"
+version = "0.32.0"
 dependencies = [
  "aes",
  "ansi_term",
@@ -4540,7 +4540,7 @@ dependencies = [
 
 [[package]]
 name = "stacks-devnet-js"
-version = "0.31.1"
+version = "0.32.0"
 dependencies = [
  "clarinet",
  "clarinet-files",
