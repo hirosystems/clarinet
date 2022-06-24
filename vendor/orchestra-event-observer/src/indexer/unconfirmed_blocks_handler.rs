@@ -14,7 +14,7 @@ pub struct UnconfirmedBlocksProcessor {
     forks: Vec<ChainSegment>,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct ChainSegment {
     pub amount_of_btc_spent: u64,
     pub most_recent_confirmed_block_height: u64,
@@ -339,6 +339,10 @@ impl UnconfirmedBlocksProcessor {
         self.canonical_fork_id = canonical_fork_id;
         // Generate chain event from the previous and current canonical forks
         let canonical_fork = self.forks.get(canonical_fork_id).unwrap();
+        if canonical_fork.eq(&previous_canonical_fork) {
+            return None
+        }
+        
         Some(self.generate_chain_event(canonical_fork, &previous_canonical_fork))
     }
 

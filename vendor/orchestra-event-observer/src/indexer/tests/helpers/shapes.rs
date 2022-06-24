@@ -2,6 +2,19 @@ use super::super::ChainEventExpectation;
 use super::blocks;
 use orchestra_types::{StacksBlockData, StacksChainEvent};
 
+pub fn expect_no_chain_update() -> ChainEventExpectation {
+    Box::new(move |chain_event_to_check: Option<StacksChainEvent>| {
+        assert!(
+            match chain_event_to_check {
+                None => true,
+                _ => false,
+            },
+            "expected no Chain update, got {:?}",
+            chain_event_to_check
+        );
+    })
+}
+
 pub fn expect_chain_updated_with_block(expected_block: StacksBlockData) -> ChainEventExpectation {
     Box::new(move |chain_event_to_check: Option<StacksChainEvent>| {
         assert!(
@@ -114,13 +127,16 @@ pub fn get_vector_002() -> Vec<(StacksBlockData, ChainEventExpectation)> {
 /// A1(1)  -  B1(2)  -  C1(3)
 ///        \  B2(4)  -  C2(5)
 ///
-pub fn get_vector_003() -> Vec<StacksBlockData> {
+pub fn get_vector_003() -> Vec<(StacksBlockData, ChainEventExpectation)> {
     vec![
-        blocks::A1(),
-        blocks::B1(),
-        blocks::C1(),
-        blocks::B2(),
-        blocks::C2(),
+        (blocks::A1(), expect_chain_updated_with_block(blocks::A1())),
+        (blocks::B1(), expect_chain_updated_with_block(blocks::B1())),
+        (blocks::C1(), expect_chain_updated_with_block(blocks::C1())),
+        (blocks::B2(), expect_no_chain_update()),
+        (
+            blocks::C2(),
+            expect_chain_updated_with_reorg(vec![blocks::B1(), blocks::C1()], vec![blocks::B2(), blocks::C2()]),
+        ),
     ]
 }
 

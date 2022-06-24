@@ -15,11 +15,16 @@ fn process_blocks_and_check_expectations(steps: Vec<(StacksBlockData, ChainEvent
 }
 
 #[test]
-fn test_vector_1() {
+fn test_vector_001() {
     process_blocks_and_check_expectations(helpers::shapes::get_vector_001());
 }
 
 #[test]
-fn test_vector_2() {
+fn test_vector_002() {
     process_blocks_and_check_expectations(helpers::shapes::get_vector_002());
+}
+
+#[test]
+fn test_vector_003() {
+    process_blocks_and_check_expectations(helpers::shapes::get_vector_003());
 }
