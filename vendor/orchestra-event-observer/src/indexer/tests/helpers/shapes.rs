@@ -98,14 +98,14 @@ pub fn get_vector_002() -> Vec<(StacksBlockData, ChainEventExpectation)> {
             blocks::B2(),
             expect_chain_updated_with_reorg(vec![blocks::B1()], vec![blocks::B2()]),
         ),
-        // (
-        //     blocks::C1(),
-        //     expect_chain_updated_with_reorg(vec![blocks::B2()], vec![blocks::B1(), blocks::C1()]),
-        // ),
-        // (
-        //     blocks::C2(),
-        //     expect_chain_updated_with_reorg(vec![blocks::B1(), blocks::C1()], vec![blocks::B2(), blocks::C2()]),
-        // ),
+        (
+            blocks::C1(),
+            expect_chain_updated_with_reorg(vec![blocks::B2()], vec![blocks::B1(), blocks::C1()]),
+        ),
+        (
+            blocks::C2(),
+            expect_chain_updated_with_reorg(vec![blocks::B1(), blocks::C1()], vec![blocks::B2(), blocks::C2()]),
+        ),
     ]
 }
 

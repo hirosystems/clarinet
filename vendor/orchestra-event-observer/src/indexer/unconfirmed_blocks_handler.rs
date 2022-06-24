@@ -17,7 +17,7 @@ pub struct UnconfirmedBlocksProcessor {
 #[derive(Clone, Debug)]
 pub struct ChainSegment {
     pub amount_of_btc_spent: u64,
-    pub most_recent_confirmed_block_height: i64,
+    pub most_recent_confirmed_block_height: u64,
     block_ids: VecDeque<BlockIdentifier>,
     confirmed_blocks_inbox: Vec<BlockIdentifier>,
 }
@@ -34,7 +34,6 @@ pub enum ChainSegmentIncompatibility {
 
 #[derive(Debug)]
 pub struct ChainSegmentDivergence {
-    common_root: BlockIdentifier,
     blocks_to_apply: Vec<BlockIdentifier>,
     blocks_to_rollback: Vec<BlockIdentifier>,
 }
@@ -55,18 +54,15 @@ impl ChainSegment {
     }
 
     fn is_block_id_older_than_segment(&self, block_identifier: &BlockIdentifier) -> bool {
-        let block_index: i64 = block_identifier.index.try_into().unwrap();
-        block_index < self.most_recent_confirmed_block_height
+        block_identifier.index < self.most_recent_confirmed_block_height
     }
 
     fn is_block_id_newer_than_segment(&self, block_identifier: &BlockIdentifier) -> bool {
-        let block_index: i64 = block_identifier.index.try_into().unwrap();
-        block_index > self.most_recent_confirmed_block_height + 7
+        block_identifier.index > self.most_recent_confirmed_block_height + 7
     }
 
     fn get_relative_index(&self, block_identifier: &BlockIdentifier) -> usize {
-        let block_index: i64 = block_identifier.index.try_into().unwrap();
-        let segment_index = block_index - self.most_recent_confirmed_block_height;
+        let segment_index = block_identifier.index - self.most_recent_confirmed_block_height;
         segment_index.try_into().unwrap()
     }
 
@@ -92,6 +88,7 @@ impl ChainSegment {
                 false => return Err(ChainSegmentIncompatibility::ParentBlockUnknown),
             }
         }
+        println!("Index: {}", self.get_relative_index(&block.block_identifier));
         if let Some(colliding_block) = self.get_block_id(&block.block_identifier) {
             match colliding_block.eq(&block.block_identifier) {
                 true => return Err(ChainSegmentIncompatibility::AlreadyPresent),
@@ -109,28 +106,37 @@ impl ChainSegment {
     }
 
     pub fn append_block_identifier(&mut self, block_identifier: &BlockIdentifier) {
-        self.most_recent_confirmed_block_height += 1;
+        if self.block_ids.is_empty() {
+            self.most_recent_confirmed_block_height = block_identifier.index;
+        }
         self.block_ids.push_front(block_identifier.clone());
         if self.block_ids.len() > 7 {
+            let confirmed_block_id = self.block_ids.pop_back().unwrap();
+            self.most_recent_confirmed_block_height = confirmed_block_id.index;
             self.confirmed_blocks_inbox
-                .push(self.block_ids.pop_back().unwrap());
+                .push(confirmed_block_id);
         }
+    }
+
+    pub fn get_length(&self) -> u64 {
+        let len: u64 = self.block_ids.len().try_into().unwrap();
+        self.most_recent_confirmed_block_height + len
     }
 
     pub fn keep_blocks_from_oldest_to_block_identifier(
         &mut self,
         block_identifier: &BlockIdentifier,
-    ) {
+    ) -> bool {
         loop {
             match self.block_ids.pop_front() {
                 Some(tip) => {
                     if tip.eq(&block_identifier) {
                         self.block_ids.push_front(tip);
-                        break;
+                        break true
                     }
                 }
-                _ => break,
-            };
+                _ => break false,
+            }
         }
     }
 
@@ -158,8 +164,7 @@ impl ChainSegment {
         blocks_to_rollback.reverse();
         blocks_to_apply.reverse();
         match common_root.take() {
-            Some(common_root) => Ok(ChainSegmentDivergence {
-                common_root,
+            Some(_common_root) => Ok(ChainSegmentDivergence {
                 blocks_to_rollback,
                 blocks_to_apply,
             }),
@@ -172,12 +177,13 @@ impl std::fmt::Display for ChainSegment {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         write!(
             f,
-            "Fork [{}]",
+            "Fork [{}], height = {}",
             self.block_ids
                 .iter()
                 .map(|b| format!("{}", b))
                 .collect::<Vec<_>>()
-                .join(", ")
+                .join(", "),
+            self.get_length()
         )
     }
 }
@@ -207,92 +213,45 @@ impl UnconfirmedBlocksProcessor {
         let mut block_appended = false;
         match fork.can_append_block(block) {
             Ok(()) => {
+                println!("Appending {} to {}", block.block_identifier, fork);
                 fork.append_block_identifier(&block.block_identifier);
+                println!("-> {}", fork);
                 block_appended_in_forks.push(fork_id);
                 block_appended = true;
             }
-            Err(incompatibility) => match incompatibility {
-                ChainSegmentIncompatibility::BlockCollision
-                | ChainSegmentIncompatibility::ParentBlockUnknown => {
+            Err(incompatibility) => {
+                println!("{:?}", incompatibility);
+                match incompatibility {
+                ChainSegmentIncompatibility::BlockCollision => {
                     let mut new_fork = fork.clone();
-                    new_fork.keep_blocks_from_oldest_to_block_identifier(
+                    let parent_found = new_fork.keep_blocks_from_oldest_to_block_identifier(
                         &block.parent_block_identifier,
                     );
-                    new_fork.append_block_identifier(&block.block_identifier);
-                    new_forks.push(new_fork);
-                    let fork_id = self.forks.len() + new_forks.len() - 1;
-                    block_appended_in_forks.push(fork_id);
-                    block_appended = true;
+                    if parent_found {
+                        new_fork.append_block_identifier(&block.block_identifier);
+                        new_forks.push(new_fork);
+                        let fork_id = self.forks.len() + new_forks.len() - 1;
+                        block_appended_in_forks.push(fork_id);
+                        block_appended = true;        
+                    }
                 }
-                ChainSegmentIncompatibility::OutdatedBlock => {}
                 ChainSegmentIncompatibility::OutdatedSegment => {
                     fork_ids_to_prune.push(fork_id);
                 }
+                ChainSegmentIncompatibility::ParentBlockUnknown => {}
+                ChainSegmentIncompatibility::OutdatedBlock => {}
                 ChainSegmentIncompatibility::Unknown => {}
                 ChainSegmentIncompatibility::AlreadyPresent => {}
-            },
+            }},
         }
         block_appended
     }
 
-    pub fn generate_chain_event(
-        &self,
-        canonical_segment: &ChainSegment,
-        other_segment: &ChainSegment,
-    ) -> StacksChainEvent {
-        if other_segment.is_empty() {
-            let block_identifier = &canonical_segment.block_ids[0];
-            let block = match self.block_store.get(block_identifier) {
-                Some(block) => block.clone(),
-                None => panic!(),
-            };
-            return StacksChainEvent::ChainUpdatedWithBlock(ChainUpdatedWithBlockData {
-                new_block: block,
-                anchored_trail: None,
-            });
-        }
-        if let Ok(divergence) = canonical_segment.try_identify_divergence(other_segment) {
-            if divergence.blocks_to_rollback.is_empty() {
-                let block_identifier = &divergence.blocks_to_apply[0];
-                let block = match self.block_store.get(block_identifier) {
-                    Some(block) => block.clone(),
-                    None => panic!(),
-                };
-                return StacksChainEvent::ChainUpdatedWithBlock(ChainUpdatedWithBlockData {
-                    new_block: block,
-                    anchored_trail: None,
-                });
-            } else {
-                return StacksChainEvent::ChainUpdatedWithReorg(ChainUpdatedWithReorgData {
-                    blocks_to_rollback: divergence
-                        .blocks_to_rollback
-                        .iter()
-                        .map(|block_id| {
-                            let block = match self.block_store.get(block_id) {
-                                Some(block) => block.clone(),
-                                None => panic!(),
-                            };
-                            (None, block)
-                        })
-                        .collect::<Vec<_>>(),
-                    blocks_to_apply: divergence
-                        .blocks_to_apply
-                        .iter()
-                        .map(|block_id| {
-                            let block = match self.block_store.get(block_id) {
-                                Some(block) => block.clone(),
-                                None => panic!(),
-                            };
-                            (None, block)
-                        })
-                        .collect::<Vec<_>>(),
-                });
-            }
-        }
-        panic!()
-    }
-
     pub fn process_block(&mut self, block: &StacksBlockData) -> Option<StacksChainEvent> {
+        println!("Processing {}", block.block_identifier);
+        for fork in self.forks.iter() {
+            println!("{}", fork);
+        }
         // Retrieve previous canonical fork
         let previous_canonical_fork = match self.forks.get(self.canonical_fork_id) {
             Some(fork) => fork.clone(),
@@ -357,6 +316,7 @@ impl UnconfirmedBlocksProcessor {
         // Process prunable forks
         fork_ids_to_prune.reverse();
         for fork_id in fork_ids_to_prune {
+            println!("Pruning fork {}", fork_id);
             self.forks.remove(fork_id);
         }
 
@@ -365,18 +325,80 @@ impl UnconfirmedBlocksProcessor {
         let mut highest_height = 0;
         let mut highest_btc_spent = 0;
         for (fork_id, fork) in self.forks.iter().enumerate() {
-            if fork.most_recent_confirmed_block_height >= highest_height {
-                highest_height = fork.most_recent_confirmed_block_height;
+            println!("Fork Id: {} - {}", fork_id, fork);
+            if fork.get_length() >= highest_height {
+                highest_height = fork.get_length();
                 if fork.amount_of_btc_spent >= highest_btc_spent {
                     highest_btc_spent = fork.amount_of_btc_spent;
                     canonical_fork_id = fork_id;
                 }
             }
         }
-        self.canonical_fork_id = canonical_fork_id;
+        println!("Fork Id selected: {}", canonical_fork_id);
 
+        self.canonical_fork_id = canonical_fork_id;
         // Generate chain event from the previous and current canonical forks
         let canonical_fork = self.forks.get(canonical_fork_id).unwrap();
         Some(self.generate_chain_event(canonical_fork, &previous_canonical_fork))
     }
+
+    pub fn generate_chain_event(
+        &self,
+        canonical_segment: &ChainSegment,
+        other_segment: &ChainSegment,
+    ) -> StacksChainEvent {
+        println!("1: {}", other_segment);
+        println!("2: {}", canonical_segment);
+        if other_segment.is_empty() {
+            let block_identifier = &canonical_segment.block_ids[0];
+            let block = match self.block_store.get(block_identifier) {
+                Some(block) => block.clone(),
+                None => panic!(),
+            };
+            return StacksChainEvent::ChainUpdatedWithBlock(ChainUpdatedWithBlockData {
+                new_block: block,
+                anchored_trail: None,
+            });
+        }
+        if let Ok(divergence) = canonical_segment.try_identify_divergence(other_segment) {
+            if divergence.blocks_to_rollback.is_empty() {
+                let block_identifier = &divergence.blocks_to_apply[0];
+                let block = match self.block_store.get(block_identifier) {
+                    Some(block) => block.clone(),
+                    None => panic!(),
+                };
+                return StacksChainEvent::ChainUpdatedWithBlock(ChainUpdatedWithBlockData {
+                    new_block: block,
+                    anchored_trail: None,
+                });
+            } else {
+                return StacksChainEvent::ChainUpdatedWithReorg(ChainUpdatedWithReorgData {
+                    blocks_to_rollback: divergence
+                        .blocks_to_rollback
+                        .iter()
+                        .map(|block_id| {
+                            let block = match self.block_store.get(block_id) {
+                                Some(block) => block.clone(),
+                                None => panic!(),
+                            };
+                            (None, block)
+                        })
+                        .collect::<Vec<_>>(),
+                    blocks_to_apply: divergence
+                        .blocks_to_apply
+                        .iter()
+                        .map(|block_id| {
+                            let block = match self.block_store.get(block_id) {
+                                Some(block) => block.clone(),
+                                None => panic!(),
+                            };
+                            (None, block)
+                        })
+                        .collect::<Vec<_>>(),
+                });
+            }
+        }
+        panic!()
+    }
+
 }
