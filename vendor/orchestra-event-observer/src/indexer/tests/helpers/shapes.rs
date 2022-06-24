@@ -145,14 +145,20 @@ pub fn get_vector_003() -> Vec<(StacksBlockData, ChainEventExpectation)> {
 /// A1(1)  -  B1(2)  -  C1(3)  -  D1(6)
 ///        \  B2(4)  -  C2(5)
 ///
-pub fn get_vector_004() -> Vec<StacksBlockData> {
+pub fn get_vector_004() -> Vec<(StacksBlockData, ChainEventExpectation)> {
     vec![
-        blocks::A1(),
-        blocks::B1(),
-        blocks::C1(),
-        blocks::B2(),
-        blocks::C2(),
-        blocks::D1(),
+        (blocks::A1(), expect_chain_updated_with_block(blocks::A1())),
+        (blocks::B1(), expect_chain_updated_with_block(blocks::B1())),
+        (blocks::C1(), expect_chain_updated_with_block(blocks::C1())),
+        (blocks::B2(), expect_no_chain_update()),
+        (
+            blocks::C2(),
+            expect_chain_updated_with_reorg(vec![blocks::B1(), blocks::C1()], vec![blocks::B2(), blocks::C2()]),
+        ),
+        (
+            blocks::D1(),
+            expect_chain_updated_with_reorg(vec![blocks::B2(), blocks::C2()], vec![blocks::B1(), blocks::C1(), blocks::D1()]),
+        ),
     ]
 }
 
