@@ -289,22 +289,28 @@ pub fn get_vector_009() -> Vec<(StacksBlockData, ChainEventExpectation)>  {
 
 /// Vector 010: Generate the following blocks
 ///  
-/// A1(1)  -  B1(2)  -  C1(3)  -  D1(6)  -  E1(7)  -  F1(8)  -  G1(9)  -  H1(10)
-///        \  B2(4)  -  C2(5)  -  D2(11)
+/// A1(1)  -  B1(2)  -  C1(3)  -  D1(6)  -  E1(7)  -  F1(8)  -  G1(9)  -  H1(10) -  I1(11)
+///        \  B2(4)  -  C2(5)  -  D2(12)
 ///
-pub fn get_vector_010() -> Vec<StacksBlockData> {
+pub fn get_vector_010() -> Vec<(StacksBlockData, ChainEventExpectation)>  {
     vec![
-        blocks::A1(),
-        blocks::B1(),
-        blocks::C1(),
-        blocks::B2(),
-        blocks::C2(),
-        blocks::D1(),
-        blocks::E1(),
-        blocks::F1(),
-        blocks::G1(),
-        blocks::H1(),
-        blocks::D2(),
+        (blocks::A1(), expect_chain_updated_with_block(blocks::A1())),
+        (blocks::B1(), expect_chain_updated_with_block(blocks::B1())),
+        (blocks::C1(), expect_chain_updated_with_block(blocks::C1())),
+        (blocks::B2(), expect_no_chain_update()),
+        (
+            blocks::C2(),
+            expect_chain_updated_with_reorg(vec![blocks::B1(), blocks::C1()], vec![blocks::B2(), blocks::C2()]),
+        ),
+        (
+            blocks::D1(),
+            expect_chain_updated_with_reorg(vec![blocks::B2(), blocks::C2()], vec![blocks::B1(), blocks::C1(), blocks::D1()]),
+        ),
+        (blocks::E1(), expect_chain_updated_with_block(blocks::E1())),
+        (blocks::F1(), expect_chain_updated_with_block(blocks::F1())),
+        (blocks::G1(), expect_chain_updated_with_block(blocks::G1())),
+        (blocks::H1(), expect_chain_updated_with_block(blocks::H1())),
+        (blocks::I1(), expect_chain_updated_with_block(blocks::I1())),
     ]
 }
 
