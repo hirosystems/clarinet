@@ -74,3 +74,7 @@ fn test_vector_012() {
     process_blocks_and_check_expectations(helpers::shapes::get_vector_012());
 }
 
+#[test]
+fn test_vector_013() {
+    process_blocks_and_check_expectations(helpers::shapes::get_vector_013());
+}
