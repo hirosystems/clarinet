@@ -58,7 +58,7 @@ impl ChainSegment {
     }
 
     fn is_block_id_newer_than_segment(&self, block_identifier: &BlockIdentifier) -> bool {
-        block_identifier.index > self.most_recent_confirmed_block_height + 7
+        block_identifier.index > self.get_length() + 7
     }
 
     fn get_relative_index(&self, block_identifier: &BlockIdentifier) -> usize {
