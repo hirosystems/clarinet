@@ -62,7 +62,7 @@ impl ChainSegment {
     }
 
     fn get_relative_index(&self, block_identifier: &BlockIdentifier) -> usize {
-        let segment_index = block_identifier.index - self.most_recent_confirmed_block_height;
+        let segment_index = (block_identifier.index - self.most_recent_confirmed_block_height) - 1;
         segment_index.try_into().unwrap()
     }
 
@@ -88,7 +88,10 @@ impl ChainSegment {
                 false => return Err(ChainSegmentIncompatibility::ParentBlockUnknown),
             }
         }
-        println!("Index: {}", self.get_relative_index(&block.block_identifier));
+        println!(
+            "Index: {}",
+            self.get_relative_index(&block.block_identifier)
+        );
         if let Some(colliding_block) = self.get_block_id(&block.block_identifier) {
             match colliding_block.eq(&block.block_identifier) {
                 true => return Err(ChainSegmentIncompatibility::AlreadyPresent),
@@ -106,15 +109,11 @@ impl ChainSegment {
     }
 
     pub fn append_block_identifier(&mut self, block_identifier: &BlockIdentifier) {
-        if self.block_ids.is_empty() {
-            self.most_recent_confirmed_block_height = block_identifier.index;
-        }
         self.block_ids.push_front(block_identifier.clone());
         if self.block_ids.len() > 7 {
             let confirmed_block_id = self.block_ids.pop_back().unwrap();
             self.most_recent_confirmed_block_height = confirmed_block_id.index;
-            self.confirmed_blocks_inbox
-                .push(confirmed_block_id);
+            self.confirmed_blocks_inbox.push(confirmed_block_id);
         }
     }
 
@@ -130,9 +129,10 @@ impl ChainSegment {
         loop {
             match self.block_ids.pop_front() {
                 Some(tip) => {
+                    println!("{} = {}?", tip, block_identifier);
                     if tip.eq(&block_identifier) {
                         self.block_ids.push_front(tip);
-                        break true
+                        break true;
                     }
                 }
                 _ => break false,
@@ -222,27 +222,29 @@ impl UnconfirmedBlocksProcessor {
             Err(incompatibility) => {
                 println!("{:?}", incompatibility);
                 match incompatibility {
-                ChainSegmentIncompatibility::BlockCollision => {
-                    let mut new_fork = fork.clone();
-                    let parent_found = new_fork.keep_blocks_from_oldest_to_block_identifier(
-                        &block.parent_block_identifier,
-                    );
-                    if parent_found {
-                        new_fork.append_block_identifier(&block.block_identifier);
-                        new_forks.push(new_fork);
-                        let fork_id = self.forks.len() + new_forks.len() - 1;
-                        block_appended_in_forks.push(fork_id);
-                        block_appended = true;        
+                    ChainSegmentIncompatibility::BlockCollision => {
+                        let mut new_fork = fork.clone();
+                        let parent_found = new_fork.keep_blocks_from_oldest_to_block_identifier(
+                            &block.parent_block_identifier,
+                        );
+                        println!("Parent found: {}", parent_found);
+                        if parent_found {
+                            new_fork.append_block_identifier(&block.block_identifier);
+                            new_forks.push(new_fork);
+                            let fork_id = self.forks.len() + new_forks.len() - 1;
+                            block_appended_in_forks.push(fork_id);
+                            block_appended = true;
+                        }
                     }
+                    ChainSegmentIncompatibility::OutdatedSegment => {
+                        fork_ids_to_prune.push(fork_id);
+                    }
+                    ChainSegmentIncompatibility::ParentBlockUnknown => {}
+                    ChainSegmentIncompatibility::OutdatedBlock => {}
+                    ChainSegmentIncompatibility::Unknown => {}
+                    ChainSegmentIncompatibility::AlreadyPresent => {}
                 }
-                ChainSegmentIncompatibility::OutdatedSegment => {
-                    fork_ids_to_prune.push(fork_id);
-                }
-                ChainSegmentIncompatibility::ParentBlockUnknown => {}
-                ChainSegmentIncompatibility::OutdatedBlock => {}
-                ChainSegmentIncompatibility::Unknown => {}
-                ChainSegmentIncompatibility::AlreadyPresent => {}
-            }},
+            }
         }
         block_appended
     }
@@ -328,7 +330,10 @@ impl UnconfirmedBlocksProcessor {
             println!("Fork Id: {} - {}", fork_id, fork);
             if fork.get_length() >= highest_height {
                 highest_height = fork.get_length();
-                if fork.amount_of_btc_spent >= highest_btc_spent {
+                if fork.amount_of_btc_spent > highest_btc_spent
+                    || (fork.amount_of_btc_spent == highest_btc_spent
+                        && fork_id > canonical_fork_id)
+                {
                     highest_btc_spent = fork.amount_of_btc_spent;
                     canonical_fork_id = fork_id;
                 }
@@ -340,9 +345,9 @@ impl UnconfirmedBlocksProcessor {
         // Generate chain event from the previous and current canonical forks
         let canonical_fork = self.forks.get(canonical_fork_id).unwrap();
         if canonical_fork.eq(&previous_canonical_fork) {
-            return None
+            return None;
         }
-        
+
         Some(self.generate_chain_event(canonical_fork, &previous_canonical_fork))
     }
 
@@ -404,5 +409,4 @@ impl UnconfirmedBlocksProcessor {
         }
         panic!()
     }
-
 }
