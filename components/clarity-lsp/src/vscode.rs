@@ -3,7 +3,7 @@ use std::collections::BTreeMap;
 use crate::utils::convert_clarity_diagnotic_to_lsp_diagnostic;
 use clarinet_deployments::generate_simnet_deployment_for_snippet;
 use clarinet_files::FileLocation;
-use clarity_repl::repl::ast::ContractAST;
+use clarity_repl::{clarity::SymbolicExpressionType, repl::ast::ContractAST};
 use lsp_types::{
     notification::{
         DidChangeTextDocument, DidCloseTextDocument, DidOpenTextDocument, DidSaveTextDocument,
@@ -98,32 +98,50 @@ impl ClarityLanguageServer {
     }
 
     #[wasm_bindgen(js_name=onRequest)]
-    pub fn on_request(&mut self, method: &str, params: JsValue, _token: JsValue) -> bool {
+    pub fn on_request(&mut self, method: &str, params: JsValue, _token: JsValue) -> Option<String> {
         match method {
             "clarity/cursorMove" => {
                 let CursorEvent {
                     text_document,
                     line,
-                    char,
+                    char: _,
                 } = from_value(params).unwrap();
-                log(&format!("> uri: {}", text_document.uri));
-
-                log(&format!("> line: {}, char: {}", line, char));
 
                 let ast = self.asts.get(&text_document.uri);
-                match ast {
-                    Some(ast) => {
-                        log(&format!("> ast: {:?}", ast));
-                    }
-                    None => log("no ast found"),
+                if ast.is_none() {
+                    return None;
+                };
+                let ast = ast.unwrap();
+                let closest = ast
+                    .expressions
+                    .iter()
+                    .clone()
+                    .rev()
+                    .find(|expr| expr.span.start_line <= line && expr.span.end_line >= line);
+
+                if closest.is_none() {
+                    return None;
+                }
+                let closest = closest.unwrap();
+                if let SymbolicExpressionType::List(ref mut list) = closest.expr.clone() {
+                    let func_type = list[0].expr.clone();
+                    let func_name =
+                        if let SymbolicExpressionType::List(ref mut list) = list[1].expr.clone() {
+                            Some(list[0].expr.clone())
+                        } else {
+                            None
+                        };
+                    return Some(
+                        json!({ "funcType": func_type, "funcName": func_name }).to_string(),
+                    );
                 }
 
-                true
+                None
             }
 
             _ => {
                 log(&format!("unexpected request ({})", method));
-                false
+                None
             }
         }
     }
