@@ -1751,12 +1751,62 @@ pub fn get_vector_032() -> Vec<(StacksBlockData, ChainEventExpectation)> {
 
 /// Vector 033: Generate the following blocks
 ///  
-/// A1(1)  -  B1(12)  -  C1(13)  -  D1(6)  -  E1(9)  -  F1(6)  -  G1(5)  -  H1(4)  -  I1(2)
-///       \                                 \ E3(10) -  F3(7)  -  G3(3)
+/// A1(1)  -  B1(12)  -  C1(13)  -  D1(14) -  E1(9)  -  F1(6)  -  G1(5)  -  H1(4)  -  I1(2)
+///       \                       \ D3(10) -  E3(7)  -  F3(3)
 ///        \  B2(11)  -  C2(8)
 ///
 pub fn get_vector_033() -> Vec<(StacksBlockData, ChainEventExpectation)> {
-    vec![]
+    vec![
+        (
+            blocks::A1(None),
+            expect_chain_updated_with_block(blocks::A1(None)),
+        ),
+        (blocks::I1(None), expect_no_chain_update()),
+        (blocks::F3(None), expect_no_chain_update()),
+        (blocks::H1(None), expect_no_chain_update()),
+        (blocks::G1(None), expect_no_chain_update()),
+        (blocks::F1(None), expect_no_chain_update()),
+        (blocks::E3(None), expect_no_chain_update()),
+        (blocks::C2(None), expect_no_chain_update()),
+        (blocks::E1(None), expect_no_chain_update()),
+        (blocks::D3(Some(blocks::C1(None))), expect_no_chain_update()),
+        (
+            blocks::B2(None),
+            expect_chain_updated_with_blocks(vec![blocks::B2(None), blocks::C2(None)]),
+        ),
+        (blocks::B1(None), expect_no_chain_update()),
+        (
+            blocks::C1(None),
+            expect_chain_updated_with_reorg(
+                vec![blocks::B2(None), blocks::C2(None)],
+                vec![
+                    blocks::B1(None),
+                    blocks::C1(None),
+                    blocks::D3(None),
+                    blocks::E3(None),
+                    blocks::F3(None),
+                ],
+            ),
+        ),
+        (
+            blocks::D1(None),
+            expect_chain_updated_with_reorg(
+                vec![
+                    blocks::D3(Some(blocks::C1(None))),
+                    blocks::E3(None),
+                    blocks::F3(None),
+                ],
+                vec![
+                    blocks::D1(None),
+                    blocks::E1(None),
+                    blocks::F1(None),
+                    blocks::G1(None),
+                    blocks::H1(None),
+                    blocks::I1(None),
+                ],
+            ),
+        ),
+    ]
 }
 
 /// Vector 034: Generate the following blocks
