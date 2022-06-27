@@ -1270,13 +1270,34 @@ pub fn get_vector_021() -> Vec<(StacksBlockData, ChainEventExpectation)> {
     ]
 }
 
-/// Vector 023: Generate the following blocks
+/// Vector 022: Generate the following blocks
 ///  
 /// A1(1)  -  B1(2)  -  C1(3)
 ///        \  B2(5)  -  C2(4)
 ///
-pub fn get_vector_023() -> Vec<StacksBlockData> {
-    vec![]
+pub fn get_vector_022() -> Vec<(StacksBlockData, ChainEventExpectation)> {
+    vec![
+        (
+            blocks::A1(None),
+            expect_chain_updated_with_block(blocks::A1(None)),
+        ),
+        (
+            blocks::B1(None),
+            expect_chain_updated_with_block(blocks::B1(None)),
+        ),
+        (
+            blocks::C1(None),
+            expect_chain_updated_with_block(blocks::C1(None)),
+        ),
+        (blocks::C2(None), expect_no_chain_update()),
+        (
+            blocks::B2(None),
+            expect_chain_updated_with_reorg(
+                vec![blocks::B1(None), blocks::C1(None)],
+                vec![blocks::B2(None), blocks::C2(None)],
+            ),
+        ),
+    ]
 }
 
 /// Vector 024: Generate the following blocks
