@@ -66,7 +66,8 @@ impl ChainSegment {
     }
 
     fn get_relative_index(&self, block_identifier: &BlockIdentifier) -> usize {
-        let segment_index = (block_identifier.index - self.most_recent_confirmed_block_height) - 1;
+        let segment_index =
+            (block_identifier.index - self.most_recent_confirmed_block_height).saturating_sub(1);
         segment_index.try_into().unwrap()
     }
 
