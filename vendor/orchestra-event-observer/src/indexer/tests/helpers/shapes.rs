@@ -1543,13 +1543,56 @@ pub fn get_vector_028() -> Vec<(StacksBlockData, ChainEventExpectation)> {
     ]
 }
 
-/// Vector 030: Generate the following blocks
+/// Vector 029: Generate the following blocks
 ///  
 /// A1(1)  -  B1(7)  -  C1(6)  -  D1(9)  -  E1(10)  -  F1(2)  -  G1(3)  -  H1(4)  -  I1(11)
 ///        \  B2(8)  -  C2(5)
 ///
-pub fn get_vector_030() -> Vec<StacksBlockData> {
-    vec![]
+pub fn get_vector_029() -> Vec<(StacksBlockData, ChainEventExpectation)> {
+    vec![
+        (
+            blocks::A1(None),
+            expect_chain_updated_with_block(blocks::A1(None)),
+        ),
+        (blocks::F1(None), expect_no_chain_update()),
+        (blocks::G1(None), expect_no_chain_update()),
+        (blocks::H1(None), expect_no_chain_update()),
+        (blocks::C2(None), expect_no_chain_update()),
+        (blocks::C1(None), expect_no_chain_update()),
+        (
+            blocks::B1(None),
+            expect_chain_updated_with_blocks(vec![blocks::B1(None), blocks::C1(None)]),
+        ),
+        (
+            blocks::B2(None),
+            expect_chain_updated_with_reorg(
+                vec![blocks::B1(None), blocks::C1(None)],
+                vec![
+                    blocks::B2(None),
+                    blocks::C2(None),
+                ],
+            ),
+        ),
+        (
+            blocks::D1(None),
+            expect_chain_updated_with_reorg(
+                vec![blocks::B2(None), blocks::C2(None)],
+                vec![
+                    blocks::B1(None),
+                    blocks::C1(None),
+                    blocks::D1(None),
+                ],
+            ),
+        ),
+        (
+            blocks::E1(None),
+            expect_chain_updated_with_blocks(vec![blocks::E1(None), blocks::F1(None), blocks::G1(None), blocks::H1(None)]),
+        ),
+        (
+            blocks::I1(None),
+            expect_chain_updated_with_blocks(vec![blocks::I1(None)]),
+        ),
+    ]
 }
 
 /// Vector 031: Generate the following blocks
