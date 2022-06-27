@@ -112,9 +112,15 @@ impl ChainSegment {
         }
     }
 
-    pub fn append_block_identifier(&mut self, block_identifier: &BlockIdentifier) {
+    pub fn append_block_identifier(&mut self, block_identifier: &BlockIdentifier, prune: bool) {
         self.block_ids.push_front(block_identifier.clone());
-        if self.block_ids.len() > 7 {
+        if prune {
+            self.prune_confirmed_blocks()
+        }
+    }
+
+    pub fn prune_confirmed_blocks(&mut self) {
+        while self.block_ids.len() > 7 {
             let confirmed_block_id = self.block_ids.pop_back().unwrap();
             self.most_recent_confirmed_block_height = confirmed_block_id.index;
             self.confirmed_blocks_inbox.push(confirmed_block_id);
@@ -209,6 +215,7 @@ impl UnconfirmedBlocksProcessor {
         fork_ids_to_prune: &mut Vec<usize>,
         block_appended_in_forks: &mut Vec<usize>,
         block: &StacksBlockData,
+        prune: bool,
     ) -> bool {
         let fork = match self.forks.get_mut(fork_id) {
             Some(fork) => fork,
@@ -218,7 +225,7 @@ impl UnconfirmedBlocksProcessor {
         match fork.can_append_block(block) {
             Ok(()) => {
                 println!("Appending {} to {}", block.block_identifier, fork);
-                fork.append_block_identifier(&block.block_identifier);
+                fork.append_block_identifier(&block.block_identifier, prune);
                 println!("-> {}", fork);
                 block_appended_in_forks.push(fork_id);
                 block_appended = true;
@@ -233,7 +240,7 @@ impl UnconfirmedBlocksProcessor {
                         );
                         println!("Parent found: {}", parent_found);
                         if parent_found {
-                            new_fork.append_block_identifier(&block.block_identifier);
+                            new_fork.append_block_identifier(&block.block_identifier, prune);
                             new_forks.push(new_fork);
                             let fork_id = self.forks.len() + new_forks.len() - 1;
                             block_appended_in_forks.push(fork_id);
@@ -281,6 +288,7 @@ impl UnconfirmedBlocksProcessor {
                 &mut fork_ids_to_prune,
                 &mut block_appended_in_forks,
                 block,
+                true,
             );
             if !block_appended {
                 self.orphans.insert(block.block_identifier.clone());
@@ -316,6 +324,7 @@ impl UnconfirmedBlocksProcessor {
                         &mut vec![],
                         &mut vec![],
                         &block,
+                        false,
                     );
                     if orphan_appended {
                         applied.insert(orphan_block_identifier);
@@ -375,7 +384,13 @@ impl UnconfirmedBlocksProcessor {
             return None;
         }
 
-        Some(self.generate_chain_event(canonical_fork, &previous_canonical_fork))
+        let chain_event = Some(self.generate_chain_event(canonical_fork, &previous_canonical_fork));
+
+        for fork in self.forks.iter_mut() {
+            fork.prune_confirmed_blocks();
+        }
+
+        chain_event
     }
 
     pub fn generate_chain_event(

@@ -1435,10 +1435,15 @@ pub fn get_vector_026() -> Vec<(StacksBlockData, ChainEventExpectation)> {
             blocks::D1(None),
             expect_chain_updated_with_reorg(
                 vec![blocks::B2(None), blocks::C2(None)],
-                vec![blocks::B1(None), blocks::C1(None), blocks::D1(None), blocks::E1(None), blocks::F1(None)],
+                vec![
+                    blocks::B1(None),
+                    blocks::C1(None),
+                    blocks::D1(None),
+                    blocks::E1(None),
+                    blocks::F1(None),
+                ],
             ),
         ),
-
     ]
 }
 
@@ -1476,20 +1481,66 @@ pub fn get_vector_027() -> Vec<(StacksBlockData, ChainEventExpectation)> {
             blocks::D1(None),
             expect_chain_updated_with_reorg(
                 vec![blocks::B2(None), blocks::C2(None)],
-                vec![blocks::B1(None), blocks::C1(None), blocks::D1(None), blocks::E1(None), blocks::F1(None), blocks::G1(None)],
+                vec![
+                    blocks::B1(None),
+                    blocks::C1(None),
+                    blocks::D1(None),
+                    blocks::E1(None),
+                    blocks::F1(None),
+                    blocks::G1(None),
+                ],
             ),
         ),
-
     ]
 }
 
-/// Vector 029: Generate the following blocks
+/// Vector 028: Generate the following blocks
 ///  
-/// A1(1)  -  B1(9)  -  C1(7)  -  D1(3)  -  E1(7)  -  F1(2)  -  G1(5)  -  H1(4)
-///        \  B2(8)  -  C2(10)
+/// A1(1)  -  B1(8)  -  C1(10)  -  D1(3)  -  E1(6)  -  F1(2)  -  G1(5)  -  H1(4)
+///        \  B2(7)  -  C2(9)
 ///
-pub fn get_vector_029() -> Vec<StacksBlockData> {
-    vec![]
+pub fn get_vector_028() -> Vec<(StacksBlockData, ChainEventExpectation)> {
+    vec![
+        (
+            blocks::A1(None),
+            expect_chain_updated_with_block(blocks::A1(None)),
+        ),
+        (blocks::F1(None), expect_no_chain_update()),
+        (blocks::D1(None), expect_no_chain_update()),
+        (blocks::H1(None), expect_no_chain_update()),
+        (blocks::G1(None), expect_no_chain_update()),
+        (blocks::E1(None), expect_no_chain_update()),
+        (
+            blocks::B2(None),
+            expect_chain_updated_with_block(blocks::B2(None)),
+        ),
+        (
+            blocks::B1(None),
+            expect_chain_updated_with_reorg(vec![blocks::B2(None)], vec![blocks::B1(None)]),
+        ),
+        (
+            blocks::C2(None),
+            expect_chain_updated_with_reorg(
+                vec![blocks::B1(None)],
+                vec![blocks::B2(None), blocks::C2(None)],
+            ),
+        ),
+        (
+            blocks::C1(None),
+            expect_chain_updated_with_reorg(
+                vec![blocks::B2(None), blocks::C2(None)],
+                vec![
+                    blocks::B1(None),
+                    blocks::C1(None),
+                    blocks::D1(None),
+                    blocks::E1(None),
+                    blocks::F1(None),
+                    blocks::G1(None),
+                    blocks::H1(None),
+                ],
+            ),
+        ),
+    ]
 }
 
 /// Vector 030: Generate the following blocks
