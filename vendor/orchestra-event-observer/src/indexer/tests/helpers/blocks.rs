@@ -92,6 +92,10 @@ pub fn E2(parent: Option<StacksBlockData>) -> StacksBlockData {
     generate_test_block(2, 5, vec![], parent)
 }
 
+pub fn B3(parent: Option<StacksBlockData>) -> StacksBlockData {
+    generate_test_block(3, 2, vec![], parent)
+}
+
 pub fn C3(parent: Option<StacksBlockData>) -> StacksBlockData {
     generate_test_block(3, 3, vec![], parent)
 }
