@@ -1345,11 +1345,11 @@ pub fn get_vector_024() -> Vec<(StacksBlockData, ChainEventExpectation)> {
             blocks::B2(None),
             expect_chain_updated_with_block(blocks::B2(None)),
         ),
-        (blocks::C1(None), expect_no_chain_update()),
         (
             blocks::C2(None),
             expect_chain_updated_with_block(blocks::C2(None)),
         ),
+        (blocks::C1(None), expect_no_chain_update()),
         (
             blocks::B1(None),
             expect_chain_updated_with_reorg(
@@ -1402,13 +1402,44 @@ pub fn get_vector_025() -> Vec<(StacksBlockData, ChainEventExpectation)> {
     ]
 }
 
-/// Vector 027: Generate the following blocks
+/// Vector 026: Generate the following blocks
 ///  
 /// A1(1)  -  B1(2)  -  C1(3)  -  D1(8)  -  E1(7)  -  F1(6)
-///        \  B2(4)  -  C2(5)
+///        \  B2(5)  -  C2(4)
 ///
-pub fn get_vector_027() -> Vec<StacksBlockData> {
-    vec![]
+pub fn get_vector_026() -> Vec<(StacksBlockData, ChainEventExpectation)> {
+    vec![
+        (
+            blocks::A1(None),
+            expect_chain_updated_with_block(blocks::A1(None)),
+        ),
+        (
+            blocks::B1(None),
+            expect_chain_updated_with_block(blocks::B1(None)),
+        ),
+        (
+            blocks::C1(None),
+            expect_chain_updated_with_block(blocks::C1(None)),
+        ),
+        (blocks::C2(None), expect_no_chain_update()),
+        (
+            blocks::B2(None),
+            expect_chain_updated_with_reorg(
+                vec![blocks::B1(None), blocks::C1(None)],
+                vec![blocks::B2(None), blocks::C2(None)],
+            ),
+        ),
+        (blocks::F1(None), expect_no_chain_update()),
+        (blocks::E1(None), expect_no_chain_update()),
+        (
+            blocks::D1(None),
+            expect_chain_updated_with_reorg(
+                vec![blocks::B2(None), blocks::C2(None)],
+                vec![blocks::B1(None), blocks::C1(None), blocks::D1(None), blocks::E1(None), blocks::F1(None)],
+            ),
+        ),
+
+    ]
 }
 
 /// Vector 028: Generate the following blocks
