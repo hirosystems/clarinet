@@ -1875,12 +1875,89 @@ pub fn get_vector_034() -> Vec<(StacksBlockData, ChainEventExpectation)> {
 
 /// Vector 035: Generate the following blocks
 ///  
-/// A1(1)  -  B1(2)  -  C1(3)  -  D1(6)  -  E1(7)  -  F1(8)  -  G1(10)  -  H1(12)  -  I1(14)
-///       \                               \ E3(9)  -  F3(11) -  G3(13)  -  H3(15)  -  I3(16)
-///        \  B2(4)  -  C2(5)
+/// A1(1)  -  B1(5)  -  C1(4)  -  D1(8)  -  E1(10)  -  F1(13)  -  G1(12)  -  H1(15)  -  I1(14)
+///       \           \ C3(6)  -  D3(7)  -  E3(11)  -  F3(9)   -  G3(16)
+///        \  B2(2)  -  C2(3)
 ///
 pub fn get_vector_035() -> Vec<(StacksBlockData, ChainEventExpectation)> {
-    vec![]
+    vec![
+        (
+            blocks::A1(None),
+            expect_chain_updated_with_block(blocks::A1(None)),
+        ),
+        (
+            blocks::B2(None),
+            expect_chain_updated_with_blocks(vec![blocks::B2(None)]),
+        ),
+        (
+            blocks::C2(None),
+            expect_chain_updated_with_blocks(vec![blocks::C2(None)]),
+        ),
+        (blocks::C1(None), expect_no_chain_update()),
+        (
+            blocks::B1(None),
+            expect_chain_updated_with_reorg(
+                vec![blocks::B2(None), blocks::C2(None)],
+                vec![blocks::B1(None), blocks::C1(None)],
+            ),
+        ),
+        (
+            blocks::C3(Some(blocks::B1(None))),
+            expect_chain_updated_with_reorg(
+                vec![blocks::C1(None)],
+                vec![blocks::C3(Some(blocks::B1(None)))],
+            ),
+        ),
+        (
+            blocks::D3(None),
+            expect_chain_updated_with_blocks(vec![blocks::D3(None)]),
+        ),
+        (blocks::D1(None), expect_no_chain_update()),
+        (blocks::F3(None), expect_no_chain_update()),
+        (
+            blocks::E1(None),
+            expect_chain_updated_with_reorg(
+                vec![blocks::C3(Some(blocks::B1(None))), blocks::D3(None)],
+                vec![blocks::C1(None), blocks::D1(None), blocks::E1(None)],
+            ),
+        ),
+        (
+            blocks::E3(None),
+            expect_chain_updated_with_reorg(
+                vec![blocks::C1(None), blocks::D1(None), blocks::E1(None)],
+                vec![
+                    blocks::C3(Some(blocks::B1(None))),
+                    blocks::D3(None),
+                    blocks::E3(None),
+                    blocks::F3(None),
+                ],
+            ),
+        ),
+        (blocks::G1(None), expect_no_chain_update()),
+        (
+            blocks::F1(None),
+            expect_chain_updated_with_reorg(
+                vec![
+                    blocks::C3(Some(blocks::B1(None))),
+                    blocks::D3(None),
+                    blocks::E3(None),
+                    blocks::F3(None),
+                ],
+                vec![
+                    blocks::C1(None),
+                    blocks::D1(None),
+                    blocks::E1(None),
+                    blocks::F1(None),
+                    blocks::G1(None),
+                ],
+            ),
+        ),
+        (blocks::I1(None), expect_no_chain_update()),
+        (
+            blocks::H1(None),
+            expect_chain_updated_with_blocks(vec![blocks::H1(None), blocks::I1(None)]),
+        ),
+    ]
 }
 
 /// Vector 036: Generate the following blocks
