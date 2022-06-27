@@ -1,8 +1,8 @@
 pub mod chains;
 pub mod unconfirmed_blocks_handler;
 use orchestra_types::{
-    BitcoinChainEvent, BlockIdentifier, ChainUpdatedWithBlockData, ChainUpdatedWithMicroblockData,
-    StacksBlockData, StacksChainEvent, StacksMicroblocksTrail,
+    BitcoinChainEvent, BlockIdentifier, ChainUpdatedWithBlocksData,
+    ChainUpdatedWithMicroblocksData, StacksBlockData, StacksChainEvent, StacksMicroblocksTrail,
 };
 use rocket::serde::json::Value as JsonValue;
 use stacks_rpc_client::PoxInfo;
@@ -76,7 +76,7 @@ impl Indexer {
             self.bitcoin_last_7_blocks
                 .push_front(block.block_identifier.clone());
         }
-        BitcoinChainEvent::ChainUpdatedWithBlock(block)
+        BitcoinChainEvent::ChainUpdatedWithBlocks(block)
     }
 
     pub fn handle_stacks_block(&mut self, marshalled_block: JsonValue) -> Option<StacksChainEvent> {

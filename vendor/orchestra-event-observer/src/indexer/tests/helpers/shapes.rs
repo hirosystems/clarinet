@@ -16,24 +16,37 @@ pub fn expect_no_chain_update() -> ChainEventExpectation {
 }
 
 pub fn expect_chain_updated_with_block(expected_block: StacksBlockData) -> ChainEventExpectation {
+    expect_chain_updated_with_blocks(vec![expected_block])
+}
+
+pub fn expect_chain_updated_with_blocks(
+    expected_blocks: Vec<StacksBlockData>,
+) -> ChainEventExpectation {
     Box::new(move |chain_event_to_check: Option<StacksChainEvent>| {
         assert!(
             match chain_event_to_check {
-                Some(StacksChainEvent::ChainUpdatedWithBlock(ref event)) => {
-                    assert!(
-                        event
-                            .new_block
-                            .block_identifier
-                            .eq(&expected_block.block_identifier),
-                        "{} ≠ {}",
-                        event.new_block.block_identifier,
-                        expected_block.block_identifier
-                    );
+                Some(StacksChainEvent::ChainUpdatedWithBlocks(ref event)) => {
+                    assert_eq!(expected_blocks.len(), event.new_blocks.len());
+                    for (expected_block, new_block) in expected_blocks.iter().zip(&event.new_blocks)
+                    {
+                        println!(
+                            "Checking {} and {}",
+                            expected_block.block_identifier, new_block.block_identifier
+                        );
+                        assert!(
+                            new_block
+                                .block_identifier
+                                .eq(&expected_block.block_identifier),
+                            "{} ≠ {}",
+                            new_block.block_identifier,
+                            expected_block.block_identifier
+                        );
+                    }
                     true
                 }
                 _ => false,
             },
-            "expected ChainUpdatedWithBlock, got {:?}",
+            "expected ChainUpdatedWithBlocks, got {:?}",
             chain_event_to_check
         );
     })
@@ -1240,46 +1253,21 @@ pub fn get_vector_020() -> Vec<(StacksBlockData, ChainEventExpectation)> {
 }
 
 /// Vector 021: Generate the following blocks
-///  
-/// A1(1)  -  B1(2)  -  C1(3)  -  D1(6)  -  E1(7)  -  F1(8)  -  G1(10)  -  H1(12)  -  I1(14) - J1(24)
-///       \                               \ E3(9)  -  F3(11) -  G3(13)  -  H3(15)  -  I3(16) - J3(25)
-///        \  B2(4)  -  C2(5)  -  D2(17) -  E2(18)  - F2(19)  - G2(20)  -  H2(21)  -  I2(22) - J2(23) - K2(26)
-///
-pub fn get_vector_021() -> Vec<StacksBlockData> {
-    vec![
-        blocks::A1(None),
-        blocks::B1(None),
-        blocks::C1(None),
-        blocks::B2(None),
-        blocks::C2(None),
-        blocks::D1(None),
-        blocks::E1(None),
-        blocks::F1(None),
-        blocks::E3(None),
-        blocks::G1(None),
-        blocks::F3(None),
-        blocks::H1(None),
-        blocks::G3(None),
-        blocks::I1(None),
-        blocks::H3(None),
-        blocks::I3(None),
-        blocks::D2(None),
-        blocks::E2(None),
-        blocks::F2(None),
-        blocks::G2(None),
-        blocks::H2(None),
-        blocks::I2(None),
-        blocks::J2(None),
-        blocks::K2(None),
-    ]
-}
-
-/// Vector 022: Generate the following blocks
 ///
 /// A1(1)  -  B1(3)  -  C1(2)
 ///
-pub fn get_vector_022() -> Vec<StacksBlockData> {
-    vec![]
+pub fn get_vector_021() -> Vec<(StacksBlockData, ChainEventExpectation)> {
+    vec![
+        (
+            blocks::A1(None),
+            expect_chain_updated_with_block(blocks::A1(None)),
+        ),
+        (blocks::C1(None), expect_no_chain_update()),
+        (
+            blocks::B1(None),
+            expect_chain_updated_with_blocks(vec![blocks::B1(None), blocks::C1(None)]),
+        ),
+    ]
 }
 
 /// Vector 023: Generate the following blocks

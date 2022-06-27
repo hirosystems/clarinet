@@ -414,22 +414,22 @@ pub struct CurrencyMetadata {
 #[allow(dead_code)]
 #[derive(Debug, Clone, PartialEq, Serialize)]
 pub enum BitcoinChainEvent {
-    ChainUpdatedWithBlock(BitcoinBlockData),
+    ChainUpdatedWithBlocks(BitcoinBlockData),
     ChainUpdatedWithReorg(Vec<BitcoinBlockData>, Vec<BitcoinBlockData>),
 }
 
 #[allow(dead_code)]
 #[derive(Debug, Clone, PartialEq, Serialize)]
 pub enum StacksChainEvent {
-    ChainUpdatedWithBlock(ChainUpdatedWithBlockData),
+    ChainUpdatedWithBlocks(ChainUpdatedWithBlocksData),
     ChainUpdatedWithReorg(ChainUpdatedWithReorgData),
-    ChainUpdatedWithMicroblock(ChainUpdatedWithMicroblockData),
+    ChainUpdatedWithMicroblocks(ChainUpdatedWithMicroblocksData),
     ChainUpdatedWithMicroblockReorg(ChainUpdatedWithMicroblockReorgData),
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize)]
-pub struct ChainUpdatedWithBlockData {
-    pub new_block: StacksBlockData,
+pub struct ChainUpdatedWithBlocksData {
+    pub new_blocks: Vec<StacksBlockData>,
     pub anchored_trail: Option<StacksMicroblocksTrail>,
     // TODO(lgalabru)
     // pub confirmed_block: (StacksBlockData, Option<StacksMicroblocksTrail>)
@@ -444,7 +444,7 @@ pub struct ChainUpdatedWithReorgData {
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize)]
-pub struct ChainUpdatedWithMicroblockData {
+pub struct ChainUpdatedWithMicroblocksData {
     pub anchored_block: StacksBlockData,
     pub current_trail: StacksMicroblocksTrail,
 }

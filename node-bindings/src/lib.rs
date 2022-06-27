@@ -12,7 +12,8 @@ use clarinet_files::{
 use clarinet_lib::deployments;
 use clarinet_lib::integrate::{self, DevnetEvent, DevnetOrchestrator};
 use orchestra_types::{
-    BitcoinBlockData, BitcoinChainEvent, ChainUpdatedWithBlockData, StacksChainEvent, StacksNetwork,
+    BitcoinBlockData, BitcoinChainEvent, ChainUpdatedWithBlocksData, StacksChainEvent,
+    StacksNetwork,
 };
 
 use core::panic;
@@ -28,7 +29,7 @@ type DevnetCallback = Box<dyn FnOnce(&Channel) + Send>;
 struct StacksDevnet {
     tx: mpsc::Sender<DevnetCommand>,
     bitcoin_block_rx: mpsc::Receiver<BitcoinBlockData>,
-    stacks_block_rx: mpsc::Receiver<ChainUpdatedWithBlockData>,
+    stacks_block_rx: mpsc::Receiver<ChainUpdatedWithBlocksData>,
     node_url: String,
 }
 
@@ -115,15 +116,15 @@ impl StacksDevnet {
                 while let Ok(ref event) = devnet_rx.recv() {
                     match event {
                         DevnetEvent::BitcoinChainEvent(
-                            BitcoinChainEvent::ChainUpdatedWithBlock(block),
+                            BitcoinChainEvent::ChainUpdatedWithBlocks(block),
                         ) => {
                             bitcoin_block_tx
                                 .send(block.clone())
                                 .expect("Unable to transmit bitcoin block");
                         }
-                        DevnetEvent::StacksChainEvent(StacksChainEvent::ChainUpdatedWithBlock(
-                            block,
-                        )) => {
+                        DevnetEvent::StacksChainEvent(
+                            StacksChainEvent::ChainUpdatedWithBlocks(block),
+                        ) => {
                             stacks_block_tx
                                 .send(block.clone())
                                 .expect("Unable to transmit stacks block");

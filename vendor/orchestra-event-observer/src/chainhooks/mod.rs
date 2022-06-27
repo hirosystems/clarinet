@@ -27,206 +27,208 @@ pub fn evaluate_stacks_chainhooks_on_chain_event<'a>(
     let mut enabled = vec![];
     // TODO(lgalabru): follow-up on this implementation
     match chain_event {
-        StacksChainEvent::ChainUpdatedWithBlock(update) => {
-            for tx in update.new_block.transactions.iter() {
-                for hook in active_chainhooks.iter() {
-                    match (&tx.metadata.kind, &hook.predicate) {
-                        (
-                            StacksTransactionKind::ContractCall(actual_contract_call),
-                            StacksHookPredicate::ContractCall(expected_contract_call),
-                        ) => {
-                            if actual_contract_call.contract_identifier
-                                == expected_contract_call.contract_identifier
-                                && actual_contract_call.method == expected_contract_call.method
-                            {
-                                enabled.push((
-                                    hook.clone(),
-                                    tx,
-                                    &update.new_block.block_identifier,
-                                ));
-                                continue;
-                            }
-                        }
-                        (StacksTransactionKind::ContractCall(_), _)
-                        | (StacksTransactionKind::ContractDeployment(_), _) => {
-                            // Look for emitted events
-                            for event in tx.metadata.receipt.events.iter() {
-                                match (event, &hook.predicate) {
-                                    (
-                                        StacksTransactionEvent::NFTMintEvent(actual),
-                                        StacksHookPredicate::NftEvent(expected),
-                                    ) => {
-                                        if actual.asset_class_identifier
-                                            == expected.asset_identifier
-                                            && expected.actions.contains(&"mint".to_string())
-                                        {
-                                            enabled.push((
-                                                hook.clone(),
-                                                tx,
-                                                &update.new_block.block_identifier,
-                                            ));
-                                            break;
-                                        }
-                                    }
-                                    (
-                                        StacksTransactionEvent::NFTTransferEvent(actual),
-                                        StacksHookPredicate::NftEvent(expected),
-                                    ) => {
-                                        if actual.asset_class_identifier
-                                            == expected.asset_identifier
-                                            && expected.actions.contains(&"transfer".to_string())
-                                        {
-                                            enabled.push((
-                                                hook.clone(),
-                                                tx,
-                                                &update.new_block.block_identifier,
-                                            ));
-                                            break;
-                                        }
-                                    }
-                                    (
-                                        StacksTransactionEvent::NFTBurnEvent(actual),
-                                        StacksHookPredicate::NftEvent(expected),
-                                    ) => {
-                                        if actual.asset_class_identifier
-                                            == expected.asset_identifier
-                                            && expected.actions.contains(&"burn".to_string())
-                                        {
-                                            enabled.push((
-                                                hook.clone(),
-                                                tx,
-                                                &update.new_block.block_identifier,
-                                            ));
-                                            break;
-                                        }
-                                    }
-                                    (
-                                        StacksTransactionEvent::FTMintEvent(actual),
-                                        StacksHookPredicate::FtEvent(expected),
-                                    ) => {
-                                        if actual.asset_class_identifier
-                                            == expected.asset_identifier
-                                            && expected.actions.contains(&"mint".to_string())
-                                        {
-                                            enabled.push((
-                                                hook.clone(),
-                                                tx,
-                                                &update.new_block.block_identifier,
-                                            ));
-                                            break;
-                                        }
-                                    }
-                                    (
-                                        StacksTransactionEvent::FTTransferEvent(actual),
-                                        StacksHookPredicate::FtEvent(expected),
-                                    ) => {
-                                        if actual.asset_class_identifier
-                                            == expected.asset_identifier
-                                            && expected.actions.contains(&"transfer".to_string())
-                                        {
-                                            enabled.push((
-                                                hook.clone(),
-                                                tx,
-                                                &update.new_block.block_identifier,
-                                            ));
-                                            break;
-                                        }
-                                    }
-                                    (
-                                        StacksTransactionEvent::FTBurnEvent(actual),
-                                        StacksHookPredicate::FtEvent(expected),
-                                    ) => {
-                                        if actual.asset_class_identifier
-                                            == expected.asset_identifier
-                                            && expected.actions.contains(&"burn".to_string())
-                                        {
-                                            enabled.push((
-                                                hook.clone(),
-                                                tx,
-                                                &update.new_block.block_identifier,
-                                            ));
-                                            break;
-                                        }
-                                    }
-                                    (
-                                        StacksTransactionEvent::STXMintEvent(_),
-                                        StacksHookPredicate::StxEvent(expected),
-                                    ) => {
-                                        if expected.actions.contains(&"mint".to_string()) {
-                                            enabled.push((
-                                                hook.clone(),
-                                                tx,
-                                                &update.new_block.block_identifier,
-                                            ));
-                                            break;
-                                        }
-                                    }
-                                    (
-                                        StacksTransactionEvent::STXTransferEvent(_),
-                                        StacksHookPredicate::StxEvent(expected),
-                                    ) => {
-                                        if expected.actions.contains(&"transfer".to_string()) {
-                                            enabled.push((
-                                                hook.clone(),
-                                                tx,
-                                                &update.new_block.block_identifier,
-                                            ));
-                                            break;
-                                        }
-                                    }
-                                    (
-                                        StacksTransactionEvent::STXLockEvent(_),
-                                        StacksHookPredicate::StxEvent(expected),
-                                    ) => {
-                                        if expected.actions.contains(&"lock".to_string()) {
-                                            enabled.push((
-                                                hook.clone(),
-                                                tx,
-                                                &update.new_block.block_identifier,
-                                            ));
-                                            break;
-                                        }
-                                    }
-                                    (
-                                        StacksTransactionEvent::SmartContractEvent(actual),
-                                        StacksHookPredicate::PrintEvent(expected),
-                                    ) => {
-                                        if actual.contract_identifier
-                                            == expected.contract_identifier
-                                        {
-                                            enabled.push((
-                                                hook.clone(),
-                                                tx,
-                                                &update.new_block.block_identifier,
-                                            ));
-                                            break;
-                                        }
-                                    }
-                                    _ => {}
+        StacksChainEvent::ChainUpdatedWithBlocks(update) => {
+            for new_block in update.new_blocks.iter() {
+                for tx in new_block.transactions.iter() {
+                    for hook in active_chainhooks.iter() {
+                        match (&tx.metadata.kind, &hook.predicate) {
+                            (
+                                StacksTransactionKind::ContractCall(actual_contract_call),
+                                StacksHookPredicate::ContractCall(expected_contract_call),
+                            ) => {
+                                if actual_contract_call.contract_identifier
+                                    == expected_contract_call.contract_identifier
+                                    && actual_contract_call.method == expected_contract_call.method
+                                {
+                                    enabled.push((hook.clone(), tx, &new_block.block_identifier));
+                                    continue;
                                 }
                             }
+                            (StacksTransactionKind::ContractCall(_), _)
+                            | (StacksTransactionKind::ContractDeployment(_), _) => {
+                                // Look for emitted events
+                                for event in tx.metadata.receipt.events.iter() {
+                                    match (event, &hook.predicate) {
+                                        (
+                                            StacksTransactionEvent::NFTMintEvent(actual),
+                                            StacksHookPredicate::NftEvent(expected),
+                                        ) => {
+                                            if actual.asset_class_identifier
+                                                == expected.asset_identifier
+                                                && expected.actions.contains(&"mint".to_string())
+                                            {
+                                                enabled.push((
+                                                    hook.clone(),
+                                                    tx,
+                                                    &new_block.block_identifier,
+                                                ));
+                                                break;
+                                            }
+                                        }
+                                        (
+                                            StacksTransactionEvent::NFTTransferEvent(actual),
+                                            StacksHookPredicate::NftEvent(expected),
+                                        ) => {
+                                            if actual.asset_class_identifier
+                                                == expected.asset_identifier
+                                                && expected
+                                                    .actions
+                                                    .contains(&"transfer".to_string())
+                                            {
+                                                enabled.push((
+                                                    hook.clone(),
+                                                    tx,
+                                                    &new_block.block_identifier,
+                                                ));
+                                                break;
+                                            }
+                                        }
+                                        (
+                                            StacksTransactionEvent::NFTBurnEvent(actual),
+                                            StacksHookPredicate::NftEvent(expected),
+                                        ) => {
+                                            if actual.asset_class_identifier
+                                                == expected.asset_identifier
+                                                && expected.actions.contains(&"burn".to_string())
+                                            {
+                                                enabled.push((
+                                                    hook.clone(),
+                                                    tx,
+                                                    &new_block.block_identifier,
+                                                ));
+                                                break;
+                                            }
+                                        }
+                                        (
+                                            StacksTransactionEvent::FTMintEvent(actual),
+                                            StacksHookPredicate::FtEvent(expected),
+                                        ) => {
+                                            if actual.asset_class_identifier
+                                                == expected.asset_identifier
+                                                && expected.actions.contains(&"mint".to_string())
+                                            {
+                                                enabled.push((
+                                                    hook.clone(),
+                                                    tx,
+                                                    &new_block.block_identifier,
+                                                ));
+                                                break;
+                                            }
+                                        }
+                                        (
+                                            StacksTransactionEvent::FTTransferEvent(actual),
+                                            StacksHookPredicate::FtEvent(expected),
+                                        ) => {
+                                            if actual.asset_class_identifier
+                                                == expected.asset_identifier
+                                                && expected
+                                                    .actions
+                                                    .contains(&"transfer".to_string())
+                                            {
+                                                enabled.push((
+                                                    hook.clone(),
+                                                    tx,
+                                                    &new_block.block_identifier,
+                                                ));
+                                                break;
+                                            }
+                                        }
+                                        (
+                                            StacksTransactionEvent::FTBurnEvent(actual),
+                                            StacksHookPredicate::FtEvent(expected),
+                                        ) => {
+                                            if actual.asset_class_identifier
+                                                == expected.asset_identifier
+                                                && expected.actions.contains(&"burn".to_string())
+                                            {
+                                                enabled.push((
+                                                    hook.clone(),
+                                                    tx,
+                                                    &new_block.block_identifier,
+                                                ));
+                                                break;
+                                            }
+                                        }
+                                        (
+                                            StacksTransactionEvent::STXMintEvent(_),
+                                            StacksHookPredicate::StxEvent(expected),
+                                        ) => {
+                                            if expected.actions.contains(&"mint".to_string()) {
+                                                enabled.push((
+                                                    hook.clone(),
+                                                    tx,
+                                                    &new_block.block_identifier,
+                                                ));
+                                                break;
+                                            }
+                                        }
+                                        (
+                                            StacksTransactionEvent::STXTransferEvent(_),
+                                            StacksHookPredicate::StxEvent(expected),
+                                        ) => {
+                                            if expected.actions.contains(&"transfer".to_string()) {
+                                                enabled.push((
+                                                    hook.clone(),
+                                                    tx,
+                                                    &new_block.block_identifier,
+                                                ));
+                                                break;
+                                            }
+                                        }
+                                        (
+                                            StacksTransactionEvent::STXLockEvent(_),
+                                            StacksHookPredicate::StxEvent(expected),
+                                        ) => {
+                                            if expected.actions.contains(&"lock".to_string()) {
+                                                enabled.push((
+                                                    hook.clone(),
+                                                    tx,
+                                                    &new_block.block_identifier,
+                                                ));
+                                                break;
+                                            }
+                                        }
+                                        (
+                                            StacksTransactionEvent::SmartContractEvent(actual),
+                                            StacksHookPredicate::PrintEvent(expected),
+                                        ) => {
+                                            if actual.contract_identifier
+                                                == expected.contract_identifier
+                                            {
+                                                enabled.push((
+                                                    hook.clone(),
+                                                    tx,
+                                                    &new_block.block_identifier,
+                                                ));
+                                                break;
+                                            }
+                                        }
+                                        _ => {}
+                                    }
+                                }
+                            }
+                            (
+                                StacksTransactionKind::NativeTokenTransfer,
+                                StacksHookPredicate::StxEvent(_expected_stx_event),
+                            ) => {}
+                            _ => {}
                         }
-                        (
-                            StacksTransactionKind::NativeTokenTransfer,
-                            StacksHookPredicate::StxEvent(_expected_stx_event),
-                        ) => {}
-                        _ => {}
-                    }
-                    if let StacksTransactionKind::ContractCall(_actual_contract_call) =
-                        &tx.metadata.kind
-                    {
-                        match &hook.predicate {
-                            StacksHookPredicate::ContractCall(_expected_contract_call) => {}
-                            StacksHookPredicate::PrintEvent(_expected_print_event) => {}
-                            StacksHookPredicate::StxEvent(_expected_stx_event) => {}
-                            StacksHookPredicate::NftEvent(_expected_nft_event) => {}
-                            StacksHookPredicate::FtEvent(_expected_ft_event) => {}
+                        if let StacksTransactionKind::ContractCall(_actual_contract_call) =
+                            &tx.metadata.kind
+                        {
+                            match &hook.predicate {
+                                StacksHookPredicate::ContractCall(_expected_contract_call) => {}
+                                StacksHookPredicate::PrintEvent(_expected_print_event) => {}
+                                StacksHookPredicate::StxEvent(_expected_stx_event) => {}
+                                StacksHookPredicate::NftEvent(_expected_nft_event) => {}
+                                StacksHookPredicate::FtEvent(_expected_ft_event) => {}
+                            }
                         }
                     }
                 }
             }
         }
-        StacksChainEvent::ChainUpdatedWithMicroblock(_update) => {}
+        StacksChainEvent::ChainUpdatedWithMicroblocks(_update) => {}
         StacksChainEvent::ChainUpdatedWithMicroblockReorg(_update) => {}
         StacksChainEvent::ChainUpdatedWithReorg(_update) => {}
     }
@@ -243,7 +245,7 @@ pub fn evaluate_bitcoin_chainhooks_on_chain_event<'a>(
 )> {
     let mut enabled = vec![];
     match chain_event {
-        BitcoinChainEvent::ChainUpdatedWithBlock(block) => {
+        BitcoinChainEvent::ChainUpdatedWithBlocks(block) => {
             for hook in active_chainhooks.into_iter() {
                 for tx in block.transactions.iter() {
                     if hook.evaluate_predicate(&tx) {

@@ -95,7 +95,7 @@ pub fn start_ui(
                 app.display_service_status_update(status);
             }
             DevnetEvent::StacksChainEvent(chain_event) => {
-                if let StacksChainEvent::ChainUpdatedWithBlock(update) = chain_event {
+                if let StacksChainEvent::ChainUpdatedWithBlocks(update) = chain_event {
 
                     let raw_txs = if app.mempool.items.is_empty() {
                         vec![]

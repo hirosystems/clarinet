@@ -210,7 +210,7 @@ pub async fn start_chains_coordinator(
                 // Contextual shortcut: Devnet is an environment under control,
                 // with 1 miner. As such we will ignore Reorgs handling.
                 let (log, status) = match &chain_update {
-                    BitcoinChainEvent::ChainUpdatedWithBlock(block) => {
+                    BitcoinChainEvent::ChainUpdatedWithBlocks(block) => {
                         let log =
                             format!("Bitcoin block #{} received", block.block_identifier.index);
                         let status = format!(
@@ -275,9 +275,14 @@ pub async fn start_chains_coordinator(
                     });
                 }
 
-                let update = match &chain_event {
-                    StacksChainEvent::ChainUpdatedWithBlock(block) => block.clone(),
-                    StacksChainEvent::ChainUpdatedWithMicroblock(_) => {
+                let known_tip = match &chain_event {
+                    StacksChainEvent::ChainUpdatedWithBlocks(block) => {
+                        match block.new_blocks.last() {
+                            Some(known_tip) => known_tip.clone(),
+                            None => unreachable!(),
+                        }
+                    }
+                    StacksChainEvent::ChainUpdatedWithMicroblocks(_) => {
                         continue;
                         // TODO(lgalabru): good enough for now - code path unreachable in the context of Devnet
                     }
@@ -299,24 +304,20 @@ pub async fn start_chains_coordinator(
                     name: "stacks-node".into(),
                     comment: format!(
                         "mining blocks (chaintip = #{})",
-                        update.new_block.block_identifier.index
+                        known_tip.block_identifier.index
                     ),
                 }));
                 let _ = devnet_event_tx.send(DevnetEvent::info(format!(
                     "Block #{} anchored in Bitcoin block #{} includes {} transactions",
-                    update.new_block.block_identifier.index,
-                    update
-                        .new_block
-                        .metadata
-                        .bitcoin_anchor_block_identifier
-                        .index,
-                    update.new_block.transactions.len(),
+                    known_tip.block_identifier.index,
+                    known_tip.metadata.bitcoin_anchor_block_identifier.index,
+                    known_tip.transactions.len(),
                 )));
 
-                let should_submit_pox_orders = update.new_block.metadata.pox_cycle_position
-                    == (update.new_block.metadata.pox_cycle_length - 2);
+                let should_submit_pox_orders = known_tip.metadata.pox_cycle_position
+                    == (known_tip.metadata.pox_cycle_length - 2);
                 if should_submit_pox_orders {
-                    let bitcoin_block_height = update.new_block.block_identifier.index;
+                    let bitcoin_block_height = known_tip.block_identifier.index;
                     let res = publish_stacking_orders(
                         &config.devnet_config,
                         &config.accounts,
