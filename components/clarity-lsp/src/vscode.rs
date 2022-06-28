@@ -10,7 +10,7 @@ use lsp_types::{
         Initialized, Notification,
     },
     DidCloseTextDocumentParams, DidOpenTextDocumentParams, DidSaveTextDocumentParams,
-    PublishDiagnosticsParams, TextDocumentIdentifier, TextDocumentItem, Url,
+    PublishDiagnosticsParams, TextDocumentItem, Url,
 };
 use serde::{Deserialize, Serialize};
 use serde_wasm_bindgen::{from_value, to_value};
@@ -24,6 +24,11 @@ extern "C" {
 }
 #[derive(Serialize, Deserialize)]
 pub struct VFSRequest {
+    pub path: String,
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct FileEvent {
     pub path: String,
 }
 
@@ -101,11 +106,7 @@ impl ClarityLanguageServer {
     pub fn on_request(&mut self, method: &str, params: JsValue, _token: JsValue) -> Option<String> {
         match method {
             "clarity/cursorMove" => {
-                let CursorEvent {
-                    path,
-                    line,
-                    char: _,
-                } = from_value(params).unwrap();
+                let CursorEvent { path, line, .. } = from_value(params).unwrap();
 
                 let ast = self.asts.get(&path);
                 if ast.is_none() {
@@ -139,6 +140,20 @@ impl ClarityLanguageServer {
                 None
             }
 
+            "clarity/getAst" => match from_value(params) {
+                Ok(FileEvent { path }) => {
+                    let ast = self.asts.get(&path);
+                    match ast {
+                        Some(ast) => Some(serde_json::to_string(&ast.expressions.clone()).unwrap()),
+                        None => None,
+                    }
+                }
+                Err(_) => {
+                    log(&format!("> invalid params in getAst"));
+                    None
+                }
+            },
+
             _ => {
                 log(&format!("unexpected request ({})", method));
                 None
@@ -157,24 +172,21 @@ impl ClarityLanguageServer {
         match deployment {
             Ok(result) => {
                 let (_, (contract_id, artifacts)) = result;
-
                 let ast = artifacts.asts.get(&contract_id);
-                match ast {
-                    Some(ast) => {
-                        self.asts
-                            .insert(text_document.uri.path().to_string(), ast.clone());
-                    }
 
-                    None => {
-                        log("missing ast");
-                    }
+                if ast.is_some() {
+                    self.asts
+                        .insert(text_document.uri.path().to_string(), ast.unwrap().clone());
                 }
 
-                let iter = artifacts.diags.iter();
-                let dst = iter.flat_map(|(_, d)| d).fold(vec![], |mut acc, d| {
-                    acc.push(convert_clarity_diagnotic_to_lsp_diagnostic(d));
-                    acc
-                });
+                let dst = artifacts
+                    .diags
+                    .iter()
+                    .flat_map(|(_, d)| d)
+                    .fold(vec![], |mut acc, d| {
+                        acc.push(convert_clarity_diagnotic_to_lsp_diagnostic(d));
+                        acc
+                    });
 
                 let data = PublishDiagnosticsParams {
                     uri: Url::parse(&location.to_string()).unwrap(),
