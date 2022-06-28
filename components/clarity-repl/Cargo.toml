@@ -90,5 +90,4 @@ opt-level = "s"
 debug-js-glue = false
 demangle-name-section = true
 dwarf-debug-info = false
-wasm-opt = false
 
