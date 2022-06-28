@@ -1153,7 +1153,7 @@ pub fn get_vector_019() -> Vec<(StacksBlockData, ChainEventExpectation)> {
     ]
 }
 
-/// Vector 019: Generate the following blocks
+/// Vector 020: Generate the following blocks
 ///  
 /// A1(1)  -  B1(2)  -  C1(3)  -  D1(6)  -  E1(7)  -  F1(8)  - G1(15)
 ///       \                               \ E3(9)  -  F3(10) - G3(16)
@@ -2190,12 +2190,61 @@ pub fn get_vector_038() -> Vec<(StacksBlockData, ChainEventExpectation)> {
 
 /// Vector 039: Generate the following blocks
 ///  
-/// A1(1)  -  B1(21)  -  C1(19) -  D1(20) - E1(8)  -  F1(5)  -  G1(23)  -  H1(22) -  I1(15) - J1(2)
-///       \                               \ E3(3)  -  F3(11) -  G3(16)  -  H3(14) -  I3(12)
-///        \  B2(4)  -  C2(17) -  D2(18) -  E2(7)  -  F2(6)  -  G2(24)  -  H2(9)  -  I2(10) - J2(13)
+/// A1(1)  -  B1(15)  -  C1(8)  -  D1(7)  -  E1(6)   - F1(3) - G1(2)
+///       \                               \  E3(10)  - F3(9)
+///        \  B2(14)  -  C2(13)  -  D2(12) -  E2(11) - F2(5) - G2(4)
 ///
 pub fn get_vector_039() -> Vec<(StacksBlockData, ChainEventExpectation)> {
-    vec![]
+    vec![
+        (
+            blocks::A1(None),
+            expect_chain_updated_with_block(blocks::A1(None)),
+        ),
+        (blocks::G1(None), expect_no_chain_update()),
+        (blocks::F1(None), expect_no_chain_update()),
+        (blocks::G2(None), expect_no_chain_update()),
+        (blocks::F2(None), expect_no_chain_update()),
+        (blocks::E1(None), expect_no_chain_update()),
+        (blocks::D1(None), expect_no_chain_update()),
+        (blocks::C1(None), expect_no_chain_update()),
+        (blocks::F3(None), expect_no_chain_update()),
+        (blocks::E3(None), expect_no_chain_update()),
+        (blocks::E2(None), expect_no_chain_update()),
+        (blocks::D2(None), expect_no_chain_update()),
+        (blocks::C2(None), expect_no_chain_update()),
+        (
+            blocks::B2(None),
+            expect_chain_updated_with_blocks(vec![
+                blocks::B2(None),
+                blocks::C2(None),
+                blocks::D2(None),
+                blocks::E2(None),
+                blocks::F2(None),
+                blocks::G2(None),
+            ]),
+        ),
+        (
+            blocks::B1(None),
+            expect_chain_updated_with_reorg(
+                vec![
+                    blocks::B2(None),
+                    blocks::C2(None),
+                    blocks::D2(None),
+                    blocks::E2(None),
+                    blocks::F2(None),
+                    blocks::G2(None),
+                ],
+                vec![
+                    blocks::B1(None),
+                    blocks::C1(None),
+                    blocks::D1(None),
+                    blocks::E1(None),
+                    blocks::F1(None),
+                    blocks::G1(None),
+                ],
+            ),
+        ),
+    ]
 }
 
 /// Vector 040: Generate the following blocks
