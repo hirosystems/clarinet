@@ -1,5 +1,6 @@
 use super::bitcoin::{TxIn, TxOut};
 use crate::events::*;
+use std::cmp::Ordering;
 use std::collections::HashSet;
 use std::fmt::Display;
 
@@ -20,6 +21,18 @@ impl Display for BlockIdentifier {
             &self.hash.as_str()[0..4],
             &self.hash.as_str()[60..64]
         )
+    }
+}
+
+impl Ord for BlockIdentifier {
+    fn cmp(&self, other: &Self) -> Ordering {
+        (other.index, &other.hash).cmp(&(self.index, &self.hash))
+    }
+}
+
+impl PartialOrd for BlockIdentifier {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(other.cmp(self))
     }
 }
 

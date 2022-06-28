@@ -1,4 +1,4 @@
-use std::collections::{BTreeMap, HashMap, HashSet, VecDeque};
+use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet, VecDeque};
 
 use bitcoincore_rpc::bitcoin::Block;
 use clarity_repl::clarity::util::hash::to_hex;
@@ -10,7 +10,7 @@ use orchestra_types::{
 
 pub struct UnconfirmedBlocksProcessor {
     canonical_fork_id: usize,
-    orphans: HashSet<BlockIdentifier>,
+    orphans: BTreeSet<BlockIdentifier>,
     block_store: HashMap<BlockIdentifier, StacksBlockData>,
     forks: Vec<ChainSegment>,
 }
@@ -204,7 +204,7 @@ impl UnconfirmedBlocksProcessor {
         UnconfirmedBlocksProcessor {
             canonical_fork_id: 0,
             block_store: HashMap::new(),
-            orphans: HashSet::new(),
+            orphans: BTreeSet::new(),
             forks: vec![ChainSegment::new()],
         }
     }
