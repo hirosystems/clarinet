@@ -136,10 +136,6 @@ pub fn H1(parent: Option<StacksBlockData>) -> StacksBlockData {
     generate_test_block(1, 8, vec![], parent)
 }
 
-pub fn H2(parent: Option<StacksBlockData>) -> StacksBlockData {
-    generate_test_block(2, 8, vec![], parent)
-}
-
 pub fn H3(parent: Option<StacksBlockData>) -> StacksBlockData {
     generate_test_block(3, 8, vec![], parent)
 }
@@ -148,26 +144,6 @@ pub fn I1(parent: Option<StacksBlockData>) -> StacksBlockData {
     generate_test_block(1, 9, vec![], parent)
 }
 
-pub fn I2(parent: Option<StacksBlockData>) -> StacksBlockData {
-    generate_test_block(2, 9, vec![], parent)
-}
-
 pub fn I3(parent: Option<StacksBlockData>) -> StacksBlockData {
     generate_test_block(3, 9, vec![], parent)
-}
-
-pub fn J1(parent: Option<StacksBlockData>) -> StacksBlockData {
-    generate_test_block(1, 10, vec![], parent)
-}
-
-pub fn J2(parent: Option<StacksBlockData>) -> StacksBlockData {
-    generate_test_block(2, 10, vec![], parent)
-}
-
-pub fn J3(parent: Option<StacksBlockData>) -> StacksBlockData {
-    generate_test_block(3, 10, vec![], parent)
-}
-
-pub fn K2(parent: Option<StacksBlockData>) -> StacksBlockData {
-    generate_test_block(2, 11, vec![], parent)
 }

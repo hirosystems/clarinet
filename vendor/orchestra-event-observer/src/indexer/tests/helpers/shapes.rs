@@ -1712,27 +1712,30 @@ pub fn get_vector_032() -> Vec<(StacksBlockData, ChainEventExpectation)> {
         ),
         (blocks::C2(None), expect_no_chain_update()),
         (
-            blocks::D3(None),
-            expect_chain_updated_with_reorg(vec![blocks::D1(None)], vec![blocks::D3(None)]),
-        ),
-        (
-            blocks::E1(None),
+            blocks::D3(Some(blocks::C1(None))),
             expect_chain_updated_with_reorg(
-                vec![blocks::D3(None)],
-                vec![blocks::D1(None), blocks::E1(None)],
+                vec![blocks::D1(None)],
+                vec![blocks::D3(Some(blocks::C1(None)))],
             ),
         ),
         (
             blocks::E1(None),
             expect_chain_updated_with_reorg(
+                vec![blocks::D3(Some(blocks::C1(None)))],
                 vec![blocks::D1(None), blocks::E1(None)],
-                vec![blocks::D3(None), blocks::E3(None)],
+            ),
+        ),
+        (
+            blocks::E3(None),
+            expect_chain_updated_with_reorg(
+                vec![blocks::D1(None), blocks::E1(None)],
+                vec![blocks::D3(Some(blocks::C1(None))), blocks::E3(None)],
             ),
         ),
         (
             blocks::F1(None),
             expect_chain_updated_with_reorg(
-                vec![blocks::D3(None), blocks::E3(None)],
+                vec![blocks::D3(Some(blocks::C1(None))), blocks::E3(None)],
                 vec![blocks::D1(None), blocks::E1(None), blocks::F1(None)],
             ),
         ),
