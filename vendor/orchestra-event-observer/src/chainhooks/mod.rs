@@ -291,6 +291,7 @@ pub async fn handle_bitcoin_hook_action<'a>(
                 .send()
                 .await;
         }
+        HookAction::Noop => {}
     }
 }
 
@@ -325,6 +326,7 @@ pub async fn handle_stacks_hook_action<'a>(
                 .send()
                 .await;
         }
+        HookAction::Noop => {}
     }
 }
 

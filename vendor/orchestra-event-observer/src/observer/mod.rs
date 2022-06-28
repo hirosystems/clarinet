@@ -135,7 +135,7 @@ pub struct ContractReadonlyCall {
     pub result: String,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum ObserverCommand {
     PropagateBitcoinChainEvent(BitcoinChainEvent),
     PropagateStacksChainEvent(StacksChainEvent),
@@ -147,13 +147,13 @@ pub enum ObserverCommand {
     Terminate,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum StacksChainMempoolEvent {
     TransactionsAdmitted(Vec<MempoolAdmissionData>),
     TransactionDropped(String),
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct MempoolAdmissionData {
     pub tx_data: String,
     pub tx_description: String,
@@ -278,7 +278,17 @@ pub async fn start_event_observer(
     });
 
     // This loop is used for handling background jobs, emitted by HTTP calls.
+    start_observer_commands_handler(&mut config, observer_commands_rx, observer_events_tx).await
+}
+
+pub async fn start_observer_commands_handler(
+    config: &mut EventObserverConfig,
+    observer_commands_rx: Receiver<ObserverCommand>,
+    observer_events_tx: Option<Sender<ObserverEvent>>,
+) -> Result<(), Box<dyn Error>> {
+    let mut chainhooks_occurrences_tracker: HashMap<String, u64> = HashMap::new();
     let event_handlers = config.event_handlers.clone();
+    let mut chainhooks_lookup: HashMap<String, ApiKey> = HashMap::new();
 
     // If authorization not required, we create a default HookFormation
     if !config.is_authorization_required() {
@@ -373,6 +383,7 @@ pub async fn start_event_observer(
                 for event_handler in event_handlers.iter() {
                     event_handler.propagate_stacks_event(&chain_event).await;
                 }
+                let mut hooks_ids_to_deregister = vec![];
                 if config.hooks_enabled {
                     let stacks_chainhooks = config
                         .operators
@@ -382,16 +393,48 @@ pub async fn start_event_observer(
                         .collect();
 
                     // process hooks
-                    let hooks_to_trigger =
+                    let hooks_triggerable =
                         evaluate_stacks_chainhooks_on_chain_event(&chain_event, stacks_chainhooks);
-                    if hooks_to_trigger.len() > 0 {
-                        if let Some(ref tx) = observer_events_tx {
-                            let _ = tx.send(ObserverEvent::HooksTriggered(hooks_to_trigger.len()));
+
+                    let mut hooks_to_trigger = vec![];
+
+                    for (hook, tx, block_identifier) in hooks_triggerable.into_iter() {
+                        let mut total_occurrences: u64 =
+                            *chainhooks_occurrences_tracker.get(&hook.uuid).unwrap_or(&0);
+                        total_occurrences += 1;
+
+                        let limit = hook.expire_after_occurrence.unwrap_or(0);
+                        if limit == 0 || total_occurrences <= limit {
+                            hooks_to_trigger.push((hook, tx, block_identifier));
+                            chainhooks_occurrences_tracker
+                                .insert(hook.uuid.clone(), total_occurrences);
+                        } else {
+                            hooks_ids_to_deregister.push(hook.uuid.clone());
                         }
+                    }
+
+                    if let Some(ref tx) = observer_events_tx {
+                        let _ = tx.send(ObserverEvent::HooksTriggered(hooks_to_trigger.len()));
                     }
                     for (hook, transaction, block_identifier) in hooks_to_trigger.into_iter() {
                         handle_stacks_hook_action(hook, transaction, block_identifier, None).await;
                     }
+                }
+                for hook_uuid in hooks_ids_to_deregister.iter() {
+                    chainhooks_lookup
+                        .get(hook_uuid)
+                        .and_then(|api_key| config.operators.get_mut(&api_key.0))
+                        .and_then(|hook_formation| {
+                            hook_formation.deregister_stacks_hook(hook_uuid.clone())
+                        })
+                        .and_then(|chainhook| {
+                            if let Some(ref tx) = observer_events_tx {
+                                let _ = tx.send(ObserverEvent::HookDeregistered(
+                                    ChainhookSpecification::Stacks(chainhook.clone()),
+                                ));
+                            }
+                            Some(chainhook)
+                        });
                 }
                 if let Some(ref tx) = observer_events_tx {
                     let _ = tx.send(ObserverEvent::StacksChainEvent(chain_event));
@@ -437,6 +480,7 @@ pub async fn start_event_observer(
                         continue;
                     }
                 };
+                chainhooks_lookup.insert(hook_uuid.clone(), api_key.clone());
                 let hook = hook_formation.deregister_stacks_hook(hook_uuid);
                 if let (Some(tx), Some(hook)) = (&observer_events_tx, hook) {
                     let _ = tx.send(ObserverEvent::HookDeregistered(
@@ -746,7 +790,7 @@ pub fn handle_delete_bitcoin_hook(
     }))
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct ApiKey(Option<String>);
 
 #[derive(Debug)]
@@ -781,3 +825,6 @@ impl<'r> FromRequest<'r> for ApiKey {
         }
     }
 }
+
+#[cfg(test)]
+mod tests;

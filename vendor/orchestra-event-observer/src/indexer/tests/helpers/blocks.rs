@@ -4,7 +4,7 @@ use orchestra_types::{
     StacksTransactionMetadata,
 };
 
-fn generate_test_block(
+pub fn generate_test_block(
     fork_id: u8,
     block_height: u64,
     transactions: Vec<StacksTransactionData>,
