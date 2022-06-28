@@ -561,14 +561,14 @@ impl StacksDevnet {
             .this()
             .downcast_or_throw::<JsBox<StacksDevnet>, _>(&mut cx)?;
 
-        let block = match devnet.stacks_block_rx.recv() {
-            Ok(obj) => obj.new_block,
+        let blocks = match devnet.stacks_block_rx.recv() {
+            Ok(obj) => obj.new_blocks,
             Err(err) => panic!("{:?}", err),
         };
 
-        let js_block = serde::to_value(&mut cx, &block).expect("Unable to serialize block");
+        let js_blocks = serde::to_value(&mut cx, &blocks).expect("Unable to serialize block");
 
-        Ok(js_block)
+        Ok(js_blocks)
     }
 
     fn js_on_bitcoin_block(mut cx: FunctionContext) -> JsResult<JsValue> {

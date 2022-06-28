@@ -100,7 +100,7 @@ pub fn start_ui(
                     let raw_txs = if app.mempool.items.is_empty() {
                         vec![]
                     } else {
-                        update.new_block.transactions.iter().map(|tx| tx.metadata.raw_tx.as_str()).collect::<Vec<_>>()
+                        update.new_blocks.iter().flat_map(|b| b.transactions.iter().map(|tx| tx.metadata.raw_tx.as_str())).collect::<Vec<_>>()
                     };
 
                     let mut indices_to_remove = vec![];
@@ -114,8 +114,9 @@ pub fn start_ui(
                     for i in indices_to_remove {
                         app.mempool.items.remove(i);
                     }
-
-                    app.display_block(update.new_block);
+                    for block in update.new_blocks.into_iter() {
+                        app.display_block(block);
+                    }
                 } else {
                     // TODO(lgalabru)
                 }
