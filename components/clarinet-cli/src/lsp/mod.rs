@@ -1,7 +1,7 @@
 mod native_bridge;
 
+use clarity::vm::diagnostic::{Diagnostic as ClarityDiagnostic, Level as ClarityLevel};
 use clarity_lsp::utils;
-use clarity_repl::clarity::diagnostic::{Diagnostic as ClarityDiagnostic, Level as ClarityLevel};
 use native_bridge::LspNativeBridge;
 
 use crossbeam_channel::unbounded;

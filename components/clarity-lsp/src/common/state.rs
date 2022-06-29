@@ -6,11 +6,11 @@ use clarinet_deployments::{
 };
 use clarinet_files::ProjectManifest;
 use clarinet_files::{FileAccessor, FileLocation};
+use clarity::vm::analysis::ContractAnalysis;
+use clarity::vm::ast::ContractAST;
+use clarity::vm::diagnostic::{Diagnostic as ClarityDiagnostic, Level as ClarityLevel};
+use clarity::vm::types::QualifiedContractIdentifier;
 use clarity_repl::analysis::ast_dependency_detector::DependencySet;
-use clarity_repl::clarity::analysis::ContractAnalysis;
-use clarity_repl::clarity::diagnostic::{Diagnostic as ClarityDiagnostic, Level as ClarityLevel};
-use clarity_repl::clarity::types::QualifiedContractIdentifier;
-use clarity_repl::repl::ast::ContractAST;
 use lsp_types::MessageType;
 use orchestra_types::StacksNetwork;
 use std::collections::{HashMap, HashSet};

@@ -1,16 +1,16 @@
 use crate::analysis::annotation::Annotation;
 use crate::analysis::ast_visitor::{traverse, ASTVisitor};
 use crate::analysis::{AnalysisPass, AnalysisResult, Settings};
-use crate::clarity::analysis::analysis_db::AnalysisDatabase;
-pub use crate::clarity::analysis::types::ContractAnalysis;
-use crate::clarity::analysis::{CheckErrors, CheckResult};
-use crate::clarity::ast::ContractAST;
-use crate::clarity::representations::{SymbolicExpression, TraitDefinition};
-use crate::clarity::types::{
+use clarity::vm::analysis::analysis_db::AnalysisDatabase;
+pub use clarity::vm::analysis::types::ContractAnalysis;
+use clarity::vm::analysis::{CheckErrors, CheckResult};
+use clarity::vm::ast::ContractAST;
+use clarity::vm::representations::{SymbolicExpression, TraitDefinition};
+use clarity::vm::types::{
     FixedFunction, FunctionSignature, FunctionType, PrincipalData, QualifiedContractIdentifier,
     TraitIdentifier, TypeSignature, Value,
 };
-use crate::clarity::{ClarityName, SymbolicExpressionType};
+use clarity::vm::{ClarityName, SymbolicExpressionType};
 use std::collections::{BTreeMap, HashMap, HashSet};
 use std::convert::TryFrom;
 use std::hash::{Hash, Hasher};

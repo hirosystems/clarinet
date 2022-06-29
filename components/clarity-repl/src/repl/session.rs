@@ -1,23 +1,24 @@
-use super::{ClarityInterpreter, ExecutionResult};
+use super::diagnostic::output_diagnostic;
+use super::ClarityInterpreter;
 use crate::analysis::ast_dependency_detector::{ASTDependencyDetector, Dependency};
-use crate::clarity::analysis::ContractAnalysis;
-use crate::clarity::ast::ContractAST;
-use crate::clarity::codec::StacksMessageCodec;
-use crate::clarity::coverage::{CoverageReporter, TestCoverageReport};
-use crate::clarity::docs::{make_api_reference, make_define_reference, make_keyword_reference};
-use crate::clarity::errors::Error;
-use crate::clarity::functions::define::DefineFunctions;
-use crate::clarity::functions::NativeFunctions;
-use crate::clarity::types::{
+use crate::analysis::coverage::{self, TestCoverageReport};
+use crate::contracts::{BNS_CONTRACT, COSTS_V1_CONTRACT, COSTS_V2_CONTRACT, POX_CONTRACT};
+use crate::repl::settings::InitialContract;
+use ansi_term::{Colour, Style};
+use clarity::codec::StacksMessageCodec;
+use clarity::vm::analysis::ContractAnalysis;
+use clarity::vm::ast::ContractAST;
+use clarity::vm::diagnostic::Diagnostic;
+use clarity::vm::docs::{make_api_reference, make_define_reference, make_keyword_reference};
+use clarity::vm::errors::Error;
+use clarity::vm::functions::define::DefineFunctions;
+use clarity::vm::functions::NativeFunctions;
+use clarity::vm::types::{
     PrincipalData, QualifiedContractIdentifier, StandardPrincipalData, Value,
 };
-use crate::clarity::util::StacksAddress;
-use crate::clarity::variables::NativeVariables;
-use crate::clarity::{ContractName, EvalHook};
-use crate::contracts::{BNS_CONTRACT, COSTS_V1_CONTRACT, COSTS_V2_CONTRACT, POX_CONTRACT};
-use crate::repl::CostSynthesis;
-use crate::{clarity::diagnostic::Diagnostic, repl::settings::InitialContract};
-use ansi_term::{Colour, Style};
+use clarity::vm::variables::NativeVariables;
+use clarity::vm::{ContractName, CostSynthesis, EvalHook, ExecutionResult};
+use clarity::types::chainstate::StacksAddress;
 use std::collections::{BTreeMap, BTreeSet, HashMap, VecDeque};
 use std::convert::TryFrom;
 use std::fmt;
@@ -353,12 +354,10 @@ impl Session {
         let (pox_ast, _, _) = self.interpreter.build_ast(
             QualifiedContractIdentifier::transient(),
             POX_CONTRACT.to_string(),
-            2,
         );
         let (bns_ast, _, _) = self.interpreter.build_ast(
             QualifiedContractIdentifier::transient(),
             BNS_CONTRACT.to_string(),
-            2,
         );
 
         let bns_contract = ContractName::try_from("bns").unwrap();
@@ -510,12 +509,12 @@ impl Session {
         output.append(&mut result);
     }
 
-    pub fn formatted_interpretation(
-        &mut self,
+    pub fn formatted_interpretation<'a, 'hooks>(
+        &'a mut self,
         snippet: String,
         name: Option<String>,
         cost_track: bool,
-        eval_hooks: Option<Vec<Box<dyn EvalHook>>>,
+        eval_hooks: Option<Vec<&mut dyn EvalHook>>,
         test_name: Option<String>,
     ) -> Result<(Vec<String>, ExecutionResult), Vec<String>> {
         let light_red = Colour::Red.bold();
@@ -536,7 +535,11 @@ impl Session {
         match result {
             Ok(result) => {
                 for diagnostic in &result.diagnostics {
-                    output.append(&mut diagnostic.output(&contract_name, &formatted_lines));
+                    output.append(&mut output_diagnostic(
+                        diagnostic,
+                        &contract_name,
+                        &formatted_lines,
+                    ));
                 }
                 if result.events.len() > 0 {
                     output.push(black!("Events emitted"));
@@ -551,7 +554,7 @@ impl Session {
             }
             Err(diagnostics) => {
                 for d in diagnostics {
-                    output.append(&mut d.output(&contract_name, &formatted_lines));
+                    output.append(&mut output_diagnostic(&d, &contract_name, &formatted_lines));
                 }
                 Err(output)
             }
@@ -560,20 +563,20 @@ impl Session {
 
     #[cfg(feature = "cli")]
     pub fn debug(&mut self, output: &mut Vec<String>, cmd: &str) {
-        use crate::clarity::debug::cli::CLIDebugger;
+        use crate::repl::debug::cli::CLIDebugger;
 
         let snippet = match cmd.split_once(" ") {
             Some((_, snippet)) => snippet,
             _ => return output.push(red!("Usage: ::debug <expr>")),
         };
 
-        let debugger = CLIDebugger::new(&QualifiedContractIdentifier::transient(), snippet);
+        let mut debugger = CLIDebugger::new(&QualifiedContractIdentifier::transient(), snippet);
 
         let mut result = match self.formatted_interpretation(
             snippet.to_string(),
             None,
             true,
-            Some(vec![Box::new(debugger)]),
+            Some(vec![&mut debugger]),
             None,
         ) {
             Ok((mut output, result)) => {
@@ -597,12 +600,12 @@ impl Session {
             _ => return output.push(red!("Usage: ::trace <expr>")),
         };
 
-        let tracer = Tracer::new(snippet.to_string());
+        let mut tracer = Tracer::new(snippet.to_string());
 
         match self.interpret(
             snippet.to_string(),
             None,
-            Some(vec![Box::new(tracer)]),
+            Some(vec![&mut tracer]),
             false,
             None,
             None,
@@ -612,7 +615,7 @@ impl Session {
                 let lines = snippet.lines();
                 let formatted_lines: Vec<String> = lines.map(|l| l.to_string()).collect();
                 for d in diagnostics {
-                    output.append(&mut d.output("<snippet>", &formatted_lines));
+                    output.append(&mut output_diagnostic(&d, "<snippet>", &formatted_lines));
                 }
             }
         };
@@ -679,13 +682,13 @@ impl Session {
         self.run_snippet(output, self.show_costs, &snippet.to_string());
     }
 
-    pub fn formatted_interpretation_ast(
+    pub fn formatted_interpretation_ast<'hooks>(
         &mut self,
         snippet: String,
         ast: ContractAST,
         contract_identifier: QualifiedContractIdentifier,
         cost_track: bool,
-        eval_hooks: Option<Vec<Box<dyn EvalHook>>>,
+        eval_hooks: Option<Vec<&mut dyn EvalHook>>,
         test_name: Option<String>,
     ) -> Result<(Vec<String>, ExecutionResult), Vec<String>> {
         let light_red = Colour::Red.bold();
@@ -706,7 +709,11 @@ impl Session {
         match result {
             Ok(result) => {
                 for diagnostic in &result.diagnostics {
-                    output.append(&mut diagnostic.output(&contract_name, &formatted_lines));
+                    output.append(&mut output_diagnostic(
+                        &diagnostic,
+                        &contract_name,
+                        &formatted_lines,
+                    ));
                 }
                 if result.events.len() > 0 {
                     output.push(black!("Events emitted"));
@@ -721,7 +728,7 @@ impl Session {
             }
             Err(diagnostics) => {
                 for d in diagnostics {
-                    output.append(&mut d.output(&contract_name, &formatted_lines));
+                    output.append(&mut output_diagnostic(&d, &contract_name, &formatted_lines));
                 }
                 Err(output)
             }
@@ -787,17 +794,19 @@ impl Session {
         let id = format!("{}.{}", tx_sender, contract_name);
         let contract_identifier = QualifiedContractIdentifier::parse(&id).unwrap();
 
-        let (ast, diagnostics, success) = self.interpreter.build_ast(
-            contract_identifier.clone(),
-            snippet.to_string(),
-            self.settings.repl_settings.parser_version,
-        );
+        let (ast, diagnostics, success) = self
+            .interpreter
+            .build_ast(contract_identifier.clone(), snippet.to_string());
 
         let mut output = Vec::<String>::new();
         let lines = snippet.lines();
         let formatted_lines: Vec<String> = lines.map(|l| l.to_string()).collect();
         for diagnostic in &diagnostics {
-            output.append(&mut diagnostic.output(&contract_name, &formatted_lines));
+            output.append(&mut output_diagnostic(
+                &diagnostic,
+                &contract_name,
+                &formatted_lines,
+            ));
         }
         if success {
             Ok((contract_identifier, ast, output))
@@ -806,32 +815,40 @@ impl Session {
         }
     }
 
-    pub fn interpret_ast(
-        &mut self,
+    pub fn interpret_ast<'a, 'hooks>(
+        &'a mut self,
         contract_identifier: &QualifiedContractIdentifier,
         ast: ContractAST,
         snippet: String,
-        mut eval_hooks: Option<Vec<Box<dyn EvalHook>>>,
+        eval_hooks: Option<Vec<&mut dyn EvalHook>>,
         cost_track: bool,
         test_name: Option<String>,
     ) -> Result<ExecutionResult, Vec<Diagnostic>> {
-        if let Some(test_name) = test_name {
-            let coverage = TestCoverageReport::new(test_name.into());
-            if let Some(hooks) = &mut eval_hooks {
-                hooks.push(Box::new(coverage));
-            } else {
-                eval_hooks = Some(vec![Box::new(coverage)]);
-            };
+        let mut hooks: Vec<&mut dyn EvalHook> = Vec::new();
+        let mut coverage = if let Some(test_name) = test_name {
+            Some(TestCoverageReport::new(test_name.into()))
+        } else {
+            None
+        };
+        if let Some(coverage) = &mut coverage {
+            hooks.push(coverage);
+        };
+
+        if let Some(mut in_hooks) = eval_hooks {
+            for hook in in_hooks.drain(..) {
+                hooks.push(hook);
+            }
         }
+
         match self.interpreter.run_ast(
             ast,
             snippet,
             contract_identifier.clone(),
             cost_track,
-            eval_hooks,
+            Some(hooks),
         ) {
             Ok(result) => {
-                if let Some(ref coverage) = result.coverage {
+                if let Some(ref coverage) = coverage {
                     self.coverage_reports.push(coverage.clone());
                 }
                 if let Some((
@@ -852,29 +869,36 @@ impl Session {
         }
     }
 
-    pub fn interpret(
-        &mut self,
+    pub fn interpret<'a>(
+        &'a mut self,
         snippet: String,
         name: Option<String>,
-        mut eval_hooks: Option<Vec<Box<dyn EvalHook>>>,
+        eval_hooks: Option<Vec<&mut dyn EvalHook>>,
         cost_track: bool,
         test_name: Option<String>,
         ast: Option<&ContractAST>,
     ) -> Result<ExecutionResult, Vec<Diagnostic>> {
+        let mut hooks: Vec<&mut dyn EvalHook> = Vec::new();
+        let mut coverage = if let Some(test_name) = test_name {
+            Some(TestCoverageReport::new(test_name.into()))
+        } else {
+            None
+        };
+        if let Some(coverage) = &mut coverage {
+            hooks.push(coverage);
+        };
+
+        if let Some(mut in_hooks) = eval_hooks {
+            for hook in in_hooks.drain(..) {
+                hooks.push(hook);
+            }
+        }
+
         let (contract_name, is_tx) = match name {
             Some(name) => (name, false),
             None => (format!("contract-{}", self.contracts.len()), true),
         };
         let first_char = contract_name.chars().next().unwrap();
-
-        if let Some(test_name) = test_name {
-            let coverage = TestCoverageReport::new(test_name.into());
-            if let Some(hooks) = &mut eval_hooks {
-                hooks.push(Box::new(coverage));
-            } else {
-                eval_hooks = Some(vec![Box::new(coverage)]);
-            };
-        }
 
         // Kludge for handling fully qualified contract_id vs sugared syntax
         let contract_identifier = if first_char.to_string() == "S" {
@@ -891,16 +915,20 @@ impl Session {
                 snippet,
                 contract_identifier.clone(),
                 cost_track,
-                eval_hooks,
+                Some(hooks),
             )
         } else {
-            self.interpreter
-                .run(snippet, contract_identifier.clone(), cost_track, eval_hooks)
+            self.interpreter.run(
+                snippet,
+                contract_identifier.clone(),
+                cost_track,
+                Some(hooks),
+            )
         };
 
         match result {
             Ok(result) => {
-                if let Some(ref coverage) = result.coverage {
+                if let Some(ref coverage) = coverage {
                     self.coverage_reports.push(coverage.clone());
                 }
                 if let Some((
@@ -1113,7 +1141,7 @@ impl Session {
             Err(diagnostics) => {
                 let lines: Vec<String> = snippet.split('\n').map(|s| s.to_string()).collect();
                 for d in diagnostics {
-                    output.append(&mut d.output(&"encode".to_string(), &lines));
+                    output.append(&mut output_diagnostic(&d, &"encode".to_string(), &lines));
                 }
                 red!("encoding failed")
             }
@@ -1384,14 +1412,15 @@ fn build_api_reference() -> HashMap<String, String> {
     }
 
     for func in NativeVariables::ALL.iter() {
-        let api = make_keyword_reference(&func);
-        let description = {
-            let mut s = api.description.to_string();
-            s = s.replace("\n", " ");
-            s
-        };
-        let doc = format!("Description\n{}\n\nExamples\n{}", description, api.example);
-        api_reference.insert(api.name.to_string(), doc);
+        if let Some(api) = make_keyword_reference(&func) {
+            let description = {
+                let mut s = api.description.to_string();
+                s = s.replace("\n", " ");
+                s
+            };
+            let doc = format!("Description\n{}\n\nExamples\n{}", description, api.example);
+            api_reference.insert(api.name.to_string(), doc);
+        }
     }
     api_reference
 }

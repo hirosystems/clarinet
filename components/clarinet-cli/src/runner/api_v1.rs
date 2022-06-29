@@ -3,11 +3,8 @@ use super::DeploymentCache;
 use clarinet_deployments::types::DeploymentSpecification;
 use clarinet_deployments::update_session_with_contracts_executions;
 use clarinet_files::ProjectManifest;
-use clarity_repl::clarity::analysis::contract_interface_builder::{
-    build_contract_interface, ContractInterface,
-};
-use clarity_repl::clarity::coverage::TestCoverageReport;
-use clarity_repl::clarity::types;
+use clarity::vm::analysis::contract_interface_builder::build_contract_interface;
+use clarity_repl::analysis::coverage::TestCoverageReport;
 use clarity_repl::repl::session::CostsReport;
 use clarity_repl::repl::Session;
 use deno::tools::test_runner::TestEvent;

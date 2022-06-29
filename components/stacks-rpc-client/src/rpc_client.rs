@@ -1,8 +1,12 @@
-use clarity_repl::clarity::codec::{StacksMessageCodec, StacksTransaction};
-use clarity_repl::clarity::types::Value;
-use clarity_repl::clarity::util::hash::{bytes_to_hex, hex_bytes};
+use clarity::codec::StacksMessageCodec;
+use clarity::util::hash::{bytes_to_hex, hex_bytes};
+use clarity::vm::types::Value;
+use stacks_common::codec::{write_next, Error as CodecError};
+
 use reqwest::blocking::Client;
 use std::io::Cursor;
+
+use clarinet_utils::transactions::StacksTransaction;
 
 #[derive(Debug)]
 pub enum RpcError {

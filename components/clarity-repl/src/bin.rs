@@ -19,7 +19,6 @@ extern crate prettytable;
 mod macros;
 
 pub mod analysis;
-pub mod clarity;
 pub mod contracts;
 pub mod frontend;
 pub mod repl;

@@ -16,12 +16,12 @@ use clarinet_deployments::{
     update_session_with_contracts_executions, update_session_with_genesis_accounts,
 };
 use clarinet_files::ProjectManifest;
-use clarity_repl::clarity::analysis::contract_interface_builder::{
+use clarity::vm::analysis::contract_interface_builder::{
     build_contract_interface, ContractInterface,
 };
-use clarity_repl::clarity::types::QualifiedContractIdentifier;
-use clarity_repl::repl::ast::ContractAST;
-use clarity_repl::repl::{ExecutionResult, Session};
+use clarity::vm::ast::ContractAST;
+use clarity::vm::types::QualifiedContractIdentifier;
+use clarity_repl::repl::Session;
 
 use std::collections::{BTreeMap, HashMap};
 use std::path::PathBuf;

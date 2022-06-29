@@ -10,7 +10,7 @@ use bitcoincore_rpc::bitcoin::Address;
 use bitcoincore_rpc::Client;
 use bitcoincore_rpc::RpcApi;
 use bitcoincore_rpc_json::ListUnspentResultEntry;
-use clarity_repl::clarity::util::hash::bytes_to_hex;
+use clarity::util::hash::bytes_to_hex;
 
 use clarinet_deployments::types::BtcTransferSpecification;
 

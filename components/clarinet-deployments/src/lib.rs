@@ -11,23 +11,26 @@ use self::types::{
     TransactionPlanSpecification, TransactionsBatchSpecification, WalletSpecification,
 };
 use clarinet_files::FileAccessor;
-use clarity_repl::clarity::diagnostic::DiagnosableError;
-use types::ContractPublishSpecification;
-use types::DeploymentGenerationArtifacts;
-use types::RequirementPublishSpecification;
-use types::TransactionSpecification;
-
 use clarinet_files::{NetworkManifest, ProjectManifest};
-
+use clarity::vm::ast::ContractAST;
+use clarity::vm::diagnostic::Diagnostic;
+use clarity::vm::types::PrincipalData;
+use clarity::vm::types::QualifiedContractIdentifier;
+use clarity::vm::ContractName;
+use clarity::vm::ExecutionResult;
 use clarity_repl::analysis::ast_dependency_detector::{ASTDependencyDetector, DependencySet};
-use clarity_repl::clarity::ast::ContractAST;
-use clarity_repl::clarity::diagnostic::Diagnostic;
-use clarity_repl::clarity::types::{PrincipalData, QualifiedContractIdentifier};
-use clarity_repl::clarity::ContractName;
+use clarity_repl::repl::Session;
 use clarity_repl::repl::SessionSettings;
-use clarity_repl::repl::{ExecutionResult, Session};
 use orchestra_types::StacksNetwork;
 use std::collections::{BTreeMap, HashMap, VecDeque};
+use types::ContractPublishSpecification;
+use types::ContractPublishSpecification;
+use types::DeploymentGenerationArtifacts;
+use types::DeploymentGenerationArtifacts;
+use types::RequirementPublishSpecification;
+use types::RequirementPublishSpecification;
+use types::TransactionSpecification;
+use types::TransactionSpecification;
 
 pub fn setup_session_with_deployment(
     manifest: &ProjectManifest,
@@ -248,8 +251,6 @@ pub async fn generate_default_deployment(
     let mut requirements_asts = BTreeMap::new();
     let mut requirements_deps = HashMap::new();
 
-    let parser_version = manifest.repl_settings.parser_version;
-
     let mut settings = SessionSettings::default();
     settings.include_boot_contracts = manifest.project.boot_contracts.clone();
     settings.repl_settings = manifest.repl_settings.clone();
@@ -359,11 +360,9 @@ pub async fn generate_default_deployment(
                     }
 
                     // Compute the AST
-                    let (ast, _, _) = session.interpreter.build_ast(
-                        contract_id.clone(),
-                        source.to_string(),
-                        parser_version,
-                    );
+                    let (ast, _, _) = session
+                        .interpreter
+                        .build_ast(contract_id.clone(), source.to_string());
                     ast
                 }
             };
@@ -521,10 +520,7 @@ pub async fn generate_default_deployment(
     let mut asts_success = true;
 
     for (contract_id, source) in contracts_sources.into_iter() {
-        let (ast, diags, ast_success) =
-            session
-                .interpreter
-                .build_ast(contract_id.clone(), source, parser_version);
+        let (ast, diags, ast_success) = session.interpreter.build_ast(contract_id.clone(), source);
         contract_asts.insert(contract_id.clone(), ast);
         contract_diags.insert(contract_id, diags);
         asts_success = asts_success && ast_success;
@@ -550,7 +546,7 @@ pub async fn generate_default_deployment(
 
     let ordered_contracts_ids = match ASTDependencyDetector::order_contracts(&dependencies) {
         Ok(ordered_contracts_ids) => ordered_contracts_ids,
-        Err(e) => return Err(e.err.message()),
+        Err(e) => return Err(e.err.to_string()),
     };
 
     for contract_id in ordered_contracts_ids.into_iter() {

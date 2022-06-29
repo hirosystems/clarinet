@@ -5,10 +5,10 @@ pub use blocks_pool::StacksBlockPool;
 use crate::indexer::AssetClassCache;
 use crate::indexer::{IndexerConfig, StacksChainContext};
 use bitcoincore_rpc::bitcoin::Block;
-use clarity_repl::clarity::codec::transaction::{TransactionAuth, TransactionPayload};
-use clarity_repl::clarity::codec::{StacksMessageCodec, StacksTransaction};
-use clarity_repl::clarity::types::Value as ClarityValue;
-use clarity_repl::clarity::util::hash::hex_bytes;
+use clarinet_utils::transactions::{StacksTransaction, TransactionAuth, TransactionPayload};
+use clarity::codec::StacksMessageCodec;
+use clarity::util::hash::hex_bytes;
+use clarity::vm::Value as ClarityValue;
 use orchestra_types::*;
 use rocket::serde::json::Value as JsonValue;
 use rocket::serde::Deserialize;
@@ -410,7 +410,7 @@ pub fn get_tx_description(
                 StacksTransactionKind::ContractDeployment(data),
             )
         }
-        TransactionPayload::Coinbase(_) => (format!("coinbase"), StacksTransactionKind::Coinbase),
+        TransactionPayload::Coinbase(..) => (format!("coinbase"), StacksTransactionKind::Coinbase),
         _ => (format!("other"), StacksTransactionKind::Other),
     };
     Ok((description, tx_type, fee, sender, sponsor))

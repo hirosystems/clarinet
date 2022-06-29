@@ -8,17 +8,19 @@ use base58::FromBase58;
 use bitcoincore_rpc::{Auth, Client, RpcApi};
 use clarinet_deployments::types::DeploymentSpecification;
 use clarinet_files::{self, AccountConfig, DevnetConfig, NetworkManifest, ProjectManifest};
-use clarity_repl::clarity::representations::ClarityName;
-use clarity_repl::clarity::types::{BuffData, SequenceData, TupleData, Value as ClarityValue};
-use clarity_repl::clarity::util::address::AddressHashMode;
-use clarity_repl::clarity::util::hash::{hex_bytes, Hash160};
 
+use clarinet_utils::transactions;
+use clarity::address::AddressHashMode;
+use clarity::util::hash::{Hash160, hex_bytes};
+use clarity::vm::ClarityName;
+use clarity::vm::Value as ClarityValue;
+use clarity::vm::types::{TupleData, SequenceData, BuffData};
 use orchestra_event_observer::observer::{
     start_event_observer, EventObserverConfig, ObserverCommand, ObserverEvent,
     StacksChainMempoolEvent,
 };
 use orchestra_types::{BitcoinChainEvent, BitcoinNetwork, StacksChainEvent, StacksNetwork};
-use stacks_rpc_client::{transactions, PoxInfo, StacksRpc};
+use stacks_rpc_client::{PoxInfo, StacksRpc};
 use std::collections::HashSet;
 use std::convert::TryFrom;
 

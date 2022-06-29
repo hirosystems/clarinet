@@ -1,8 +1,8 @@
 use super::api_v1::SessionArtifacts;
 use super::{api_v1, costs, DeploymentCache};
 use crate::frontend::cli;
-use clarity_repl::clarity::coverage::CoverageReporter;
-use clarity_repl::clarity::types;
+use clarity_repl::analysis::coverage::CoverageReporter;
+use clarity::vm::types;
 use clarity_repl::repl::Session;
 use deno::ast;
 use deno::colors;

@@ -26,7 +26,7 @@ mod macros;
 use wasm_bindgen::prelude::*;
 
 pub mod analysis;
-pub mod clarity;
+// pub mod clarity;
 pub mod contracts;
 pub mod repl;
 
