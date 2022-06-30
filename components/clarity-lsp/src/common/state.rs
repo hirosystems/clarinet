@@ -1,11 +1,11 @@
-use super::types::{CompletionItem, CompletionMaps};
-use super::utils;
+use crate::types::{CompletionItem, CompletionMaps};
+use crate::utils;
 use clarinet_deployments::{
     generate_default_deployment, initiate_session_from_deployment,
     update_session_with_contracts_executions,
 };
-use clarinet_files::FileLocation;
 use clarinet_files::ProjectManifest;
+use clarinet_files::{FileAccessor, FileLocation};
 use clarity_repl::analysis::ast_dependency_detector::DependencySet;
 use clarity_repl::clarity::analysis::ContractAnalysis;
 use clarity_repl::clarity::diagnostic::{Diagnostic as ClarityDiagnostic, Level as ClarityLevel};
@@ -285,9 +285,10 @@ impl ProtocolState {
     }
 }
 
-pub async fn build_state(
+pub async fn build_state<'a>(
     manifest_location: &FileLocation,
     protocol_state: &mut ProtocolState,
+    file_accessor: Option<&Box<dyn FileAccessor>>,
 ) -> Result<(), String> {
     let mut locations = HashMap::new();
     let mut analyses = HashMap::new();
@@ -300,7 +301,8 @@ pub async fn build_state(
     let manifest = ProjectManifest::from_location(manifest_location)?;
 
     let (deployment, mut artifacts) =
-        generate_default_deployment(&manifest, &StacksNetwork::Simnet, false).await?;
+        generate_default_deployment(&manifest, &StacksNetwork::Simnet, false, file_accessor)
+            .await?;
 
     let mut session = initiate_session_from_deployment(&manifest);
     let results = update_session_with_contracts_executions(

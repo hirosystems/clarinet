@@ -1,6 +1,6 @@
 use std::{collections::BTreeMap, mem::take};
 
-use crate::utils::convert_clarity_diagnotic_to_lsp_diagnostic;
+use crate::utils::clarity_diagnostic_to_lsp_type;
 use clarinet_deployments::generate_simnet_deployment_for_snippet;
 use clarinet_files::FileLocation;
 use clarity_repl::{clarity::SymbolicExpressionType, repl::ast::ContractAST};
@@ -192,7 +192,7 @@ impl ClarityLanguageServer {
                     .iter()
                     .flat_map(|(_, d)| d)
                     .fold(vec![], |mut acc, d| {
-                        acc.push(convert_clarity_diagnotic_to_lsp_diagnostic(d));
+                        acc.push(clarity_diagnostic_to_lsp_type(d));
                         acc
                     });
 
