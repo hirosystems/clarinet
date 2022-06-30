@@ -1,3 +1,5 @@
+use crate::FileAccessor;
+
 use super::FileLocation;
 use clarity_repl::repl;
 use std::collections::BTreeMap;
@@ -67,6 +69,23 @@ pub struct NotebookConfig {
 }
 
 impl ProjectManifest {
+    pub async fn from_file_accessor(
+        location: &FileLocation,
+        file_accessor: &Box<dyn FileAccessor>,
+    ) -> Result<ProjectManifest, String> {
+        let perform_file_access = file_accessor.read_manifest_content(location.clone());
+        let (location, content) = perform_file_access.await?;
+
+        let project_manifest_file: ProjectManifestFile = match toml::from_slice(&content.as_bytes())
+        {
+            Ok(s) => s,
+            Err(e) => {
+                return Err(format!("Clarinet.toml file malformatted {:?}", e));
+            }
+        };
+        ProjectManifest::from_project_manifest_file(project_manifest_file, &location)
+    }
+
     pub fn from_location(location: &FileLocation) -> Result<ProjectManifest, String> {
         let project_manifest_file_content = location.read_content()?;
         let project_manifest_file: ProjectManifestFile =

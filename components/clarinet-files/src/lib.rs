@@ -9,6 +9,7 @@ pub extern crate url;
 mod network_manifest;
 mod project_manifest;
 
+use async_trait::*;
 pub use network_manifest::{
     compute_addresses, AccountConfig, DevnetConfig, DevnetConfigFile, NetworkManifest,
     NetworkManifestFile, PoxStackingOrder, DEFAULT_DERIVATION_PATH,
@@ -18,13 +19,23 @@ pub use project_manifest::{
     ContractConfig, ProjectManifest, ProjectManifestFile, RequirementConfig,
 };
 use serde::ser::{Serialize, SerializeMap, Serializer};
+use std::future::Future;
+use std::pin::Pin;
 use std::{borrow::BorrowMut, path::PathBuf, str::FromStr};
 use url::Url;
 
 pub const DEFAULT_DEVNET_BALANCE: u64 = 100_000_000_000_000;
 
+pub type PerformFileAccess = Pin<Box<dyn Future<Output = Result<(FileLocation, String), String>>>>;
+
+#[async_trait]
 pub trait FileAccessor {
-    fn read_file_content(&self, relative_path: String) -> Result<(FileLocation, String), String>;
+    fn read_manifest_content(&self, manifest_location: FileLocation) -> PerformFileAccess;
+    fn read_contract_content(
+        &self,
+        manifest_location: FileLocation,
+        relative_path: String,
+    ) -> PerformFileAccess;
 }
 
 #[derive(Deserialize, Debug, Clone, PartialEq, Eq, Hash)]
