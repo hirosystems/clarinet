@@ -1,5 +1,4 @@
 use super::types::*;
-use clarinet_files::FileLocation;
 use clarity_repl::clarity::analysis::ContractAnalysis;
 use clarity_repl::clarity::diagnostic::{Diagnostic as ClarityDiagnostic, Level as ClarityLevel};
 use clarity_repl::clarity::docs::{
@@ -10,11 +9,19 @@ use clarity_repl::clarity::functions::NativeFunctions;
 use clarity_repl::clarity::types::{BlockInfoProperty, FunctionType};
 use clarity_repl::clarity::variables::NativeVariables;
 use lsp_types::Diagnostic as LspDiagnostic;
-use lsp_types::{DiagnosticSeverity, Position, Range, Url};
+use lsp_types::{DiagnosticSeverity, Position, Range};
 
-pub fn convert_clarity_diagnotic_to_lsp_diagnostic(
-    diagnostic: &ClarityDiagnostic,
-) -> LspDiagnostic {
+pub fn clarity_diagnostics_to_lsp_type(
+    diagnostics: &mut Vec<ClarityDiagnostic>,
+) -> Vec<LspDiagnostic> {
+    let mut dst = vec![];
+    for d in diagnostics.iter_mut() {
+        dst.push(clarity_diagnostic_to_lsp_type(d));
+    }
+    dst
+}
+
+pub fn clarity_diagnostic_to_lsp_type(diagnostic: &ClarityDiagnostic) -> LspDiagnostic {
     let range = match diagnostic.spans.len() {
         0 => Range::default(),
         _ => Range {
@@ -242,6 +249,9 @@ pub fn build_default_native_keywords_list() -> Vec<CompletionItem> {
     .collect::<Vec<CompletionItem>>();
     items
 }
+
+use clarinet_files::FileLocation;
+use lsp_types::Url;
 
 pub fn get_manifest_location(text_document_uri: &Url) -> Option<FileLocation> {
     let file_location = text_document_uri.to_string();
