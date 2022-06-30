@@ -298,7 +298,15 @@ pub async fn build_state<'a>(
     // expect contracts to be created, edited, removed.
     // A on-disk deployment could quickly lead to an outdated
     // view of the repo.
-    let manifest = ProjectManifest::from_location(manifest_location)?;
+    let manifest = match file_accessor {
+        None => ProjectManifest::from_location(manifest_location)?,
+        Some(file_accessor) => {
+            // We should create a new async function in `ProjectManifest` that can take a `file_accessor: &Box<dyn FileAccessor>`
+            // as an argument, and that will use:
+            // file_accessor.read_manifest_content()
+            ProjectManifest::from_file_accessor(manifest_location, file_accessor).await?
+        }
+    };
 
     let (deployment, mut artifacts) =
         generate_default_deployment(&manifest, &StacksNetwork::Simnet, false, file_accessor)

@@ -1,13 +1,13 @@
-use clarinet_utils::get_bip39_seed_from_mnemonic;
-use std::collections::BTreeMap;
-
-use super::FileLocation;
+use super::{FileAccessor, FileLocation};
 use bip39::{Language, Mnemonic};
+use clarinet_utils::get_bip39_seed_from_mnemonic;
+use clarity_repl::clarity::util::hash::bytes_to_hex;
 use clarity_repl::clarity::util::secp256k1::Secp256k1PublicKey;
 use clarity_repl::clarity::util::StacksAddress;
 use clarity_repl::clarity::{types::QualifiedContractIdentifier, util::hash::bytes_to_hex};
 use libsecp256k1::{PublicKey, SecretKey};
 use orchestra_types::{BitcoinNetwork, StacksNetwork};
+use std::collections::BTreeMap;
 use tiny_hderive::bip32::ExtendedPrivKey;
 use toml::value::Value;
 
@@ -231,6 +231,22 @@ impl NetworkManifest {
         let network_manifest_location =
             project_manifest_location.get_network_manifest_location(&networks.1)?;
         NetworkManifest::from_location(&network_manifest_location, networks)
+    }
+
+    pub async fn from_file_accessor(
+        location: &FileLocation,
+        networks: &(BitcoinNetwork, StacksNetwork),
+        file_accessor: &Box<dyn FileAccessor>,
+    ) -> Result<NetworkManifest, String> {
+        let perform_file_access = file_accessor.read_manifest_content(location.clone());
+        let (_, content) = perform_file_access.await?;
+
+        let mut network_manifest_file: NetworkManifestFile =
+            toml::from_slice(&content.as_bytes()).unwrap();
+        Ok(NetworkManifest::from_network_manifest_file(
+            &mut network_manifest_file,
+            networks,
+        ))
     }
 
     pub fn from_location(
