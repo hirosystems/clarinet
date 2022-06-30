@@ -162,10 +162,20 @@ pub async fn generate_default_deployment<'a>(
     no_batch: bool,
     file_accessor: Option<&Box<dyn FileAccessor>>,
 ) -> Result<(DeploymentSpecification, DeploymentGenerationArtifacts), String> {
-    let network_manifest = NetworkManifest::from_project_manifest_location(
-        &manifest.location,
-        &network.get_networks(),
-    )?;
+    let network_manifest = match file_accessor {
+        None => NetworkManifest::from_project_manifest_location(
+            &manifest.location,
+            &network.get_networks(),
+        )?,
+        Some(file_accessor) => {
+            NetworkManifest::from_file_accessor(
+                &manifest.location,
+                &network.get_networks(),
+                file_accessor,
+            )
+            .await?
+        }
+    };
 
     let (stacks_node, bitcoin_node) = match network {
         StacksNetwork::Simnet => (None, None),
@@ -450,9 +460,9 @@ pub async fn generate_default_deployment<'a>(
                 (contract_location, source)
             }
             Some(file_accessor) => {
-                let (contract_location, source) =
-                    file_accessor.read_file_content(contract_config.path.clone())?;
-                (contract_location, source)
+                let perform_file_access = file_accessor
+                    .read_contract_content(manifest.location.clone(), contract_config.path.clone());
+                perform_file_access.await?
             }
         };
 
