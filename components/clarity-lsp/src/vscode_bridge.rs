@@ -1,6 +1,7 @@
 use crate::backend::{self, LspRequest};
 use crate::utils;
-use clarinet_files::{FileAccessor, FileLocation};
+use async_trait::*;
+use clarinet_files::{FileAccessor, FileLocation, PerformFileAccess};
 use js_sys::Function as JsFunction;
 use lsp_types::{
     notification::{
@@ -10,10 +11,11 @@ use lsp_types::{
     DidCloseTextDocumentParams, DidOpenTextDocumentParams, DidSaveTextDocumentParams,
     PublishDiagnosticsParams, TextDocumentItem, Url,
 };
+use serde::{Deserialize, Serialize};
 use serde_wasm_bindgen::{from_value as decode_from_wasm, to_value as encode_to_wasm};
 use std::sync::mpsc::{self, channel, Sender};
 use wasm_bindgen::prelude::*;
-use wasm_bindgen_futures::spawn_local;
+use wasm_bindgen_futures::{spawn_local, JsFuture};
 
 #[wasm_bindgen]
 extern "C" {
@@ -38,15 +40,19 @@ pub fn initialize_adapter_and_start_backend(
 ) -> LspVscodeBridge {
     let (backend_command_tx, backend_command_rx) = mpsc::channel();
 
-    // Initialize `file_system_accessor` with whatever future is required
-    let file_system_accessor = Box::new(VscodeFilesystemAccessor::new());
-
+    let cloned_client_request_tx = client_request_tx.clone();
     // Pass `file_system_accessor` to `start_language_server`, which will
     // be passed whenever the LSP needs to read the content of a file.
+    // std::thread::spawn(|| {
+    let file_accessor = VscodeFilesystemAccessor::new(cloned_client_request_tx);
+    // Initialize `file_system_accessor` with whatever future is required
+    let file_system_accessor = Box::new(file_accessor);
+
     spawn_local(backend::start_language_server(
         backend_command_rx,
         Some(file_system_accessor),
     ));
+    // });
 
     LspVscodeBridge {
         client_diagnostic_tx: client_diagnostic_tx,
@@ -154,16 +160,52 @@ impl LspVscodeBridge {
     }
 }
 
-pub struct VscodeFilesystemAccessor {}
+#[derive(Serialize, Deserialize)]
+pub struct VFSRequest {
+    pub path: String,
+}
+
+pub struct VscodeFilesystemAccessor {
+    client_request_tx: JsFunction,
+}
 
 impl VscodeFilesystemAccessor {
-    pub fn new() -> VscodeFilesystemAccessor {
-        VscodeFilesystemAccessor {}
+    pub fn new(client_request_tx: JsFunction) -> VscodeFilesystemAccessor {
+        VscodeFilesystemAccessor { client_request_tx }
     }
 }
 
+/// relative_path: "contracts/counter.clar"
+#[async_trait]
 impl FileAccessor for VscodeFilesystemAccessor {
-    fn read_file_content(&self, relative_path: String) -> Result<(FileLocation, String), String> {
+    fn read_manifest_content(&self, manifest_location: FileLocation) -> PerformFileAccess {
         unimplemented!()
+    }
+
+    fn read_contract_content(
+        &self,
+        manifest_location: FileLocation,
+        relative_path: String,
+    ) -> PerformFileAccess {
+        let path = relative_path.clone();
+        let req = self
+            .client_request_tx
+            .call2(
+                &JsValue::null(),
+                &JsValue::from("vfs/readFile"),
+                &encode_to_wasm(&VFSRequest { path }).unwrap(),
+            )
+            .unwrap();
+
+        return Box::pin(async move {
+            let response = JsFuture::from(js_sys::Promise::resolve(&req)).await;
+            match response {
+                Ok(manifest) => Ok((
+                    FileLocation::from_url_string(&String::from(relative_path)).unwrap(),
+                    decode_from_wasm(manifest).unwrap(),
+                )),
+                Err(_) => Err("error".into()),
+            }
+        });
     }
 }

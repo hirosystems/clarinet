@@ -774,6 +774,7 @@ dependencies = [
 name = "clarinet-files"
 version = "0.1.0"
 dependencies = [
+ "async-trait",
  "bip39",
  "bitcoin 0.28.1",
  "clarinet-utils",
@@ -801,6 +802,7 @@ dependencies = [
 name = "clarity-lsp"
 version = "0.1.0"
 dependencies = [
+ "async-trait",
  "clarinet-deployments",
  "clarinet-files",
  "clarity-repl",
