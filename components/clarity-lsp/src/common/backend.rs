@@ -3,7 +3,9 @@ use crate::state::{build_state, EditorState, ProtocolState};
 use crate::types::{CompletionItem, CompletionItemKind};
 use clarinet_files::{FileAccessor, FileLocation};
 use clarity_repl::clarity::diagnostic::Diagnostic;
+use serde_wasm_bindgen::to_value as encode_to_wasm;
 use std::sync::mpsc::{Receiver, Sender};
+use web_sys::console;
 
 pub enum LspRequest {
     ManifestOpened(FileLocation, Sender<LspResponse>),
@@ -51,13 +53,25 @@ pub async fn start_language_server<'a>(
         None => None,
     };
 
+    console::log_1(&encode_to_wasm("start_language_server").unwrap());
+
     loop {
+        console::log_1(&encode_to_wasm("loop").unwrap());
         let command = match command_rx.recv() {
-            Ok(command) => command,
+            Ok(command) => {
+                console::log_1(&encode_to_wasm("Ok(command)").unwrap());
+                command
+            }
             Err(_e) => {
+                console::log_2(
+                    &encode_to_wasm("error").unwrap(),
+                    &encode_to_wasm(&_e.to_string()).unwrap(),
+                );
                 break;
             }
         };
+
+        console::log_1(&encode_to_wasm("command").unwrap());
         match command {
             LspRequest::GetIntellisense(contract_location, response_tx) => {
                 let mut completion_items_src =

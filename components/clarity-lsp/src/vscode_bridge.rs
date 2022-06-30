@@ -32,7 +32,7 @@ pub struct LspVscodeBridge {
 }
 
 /// Entry point: the function `initialize_adapter_and_start_backend` is invoked from Javascript for constructing a `LspVscodeBridge`.
-#[wasm_bindgen]
+#[wasm_bindgen(js_name=initializeAdapterAndStartBackend)]
 pub fn initialize_adapter_and_start_backend(
     client_diagnostic_tx: JsFunction,
     client_notification_tx: JsFunction,
@@ -48,17 +48,18 @@ pub fn initialize_adapter_and_start_backend(
     // Initialize `file_system_accessor` with whatever future is required
     let file_system_accessor = Box::new(file_accessor);
 
+    log("> spawn_local!");
     spawn_local(backend::start_language_server(
         backend_command_rx,
         Some(file_system_accessor),
     ));
-    // });
 
+    log("> LspVscdeBridge!");
     LspVscodeBridge {
-        client_diagnostic_tx: client_diagnostic_tx,
-        client_notification_tx: client_notification_tx,
-        client_request_tx: client_request_tx,
-        backend_command_tx,
+        client_diagnostic_tx: client_diagnostic_tx.clone(),
+        client_notification_tx: client_notification_tx.clone(),
+        client_request_tx: client_request_tx.clone(),
+        backend_command_tx: backend_command_tx.clone(),
     }
 }
 
@@ -67,12 +68,16 @@ impl LspVscodeBridge {
     #[wasm_bindgen(js_name=onNotification)]
     pub fn on_notification(&self, method: &str, params: JsValue) {
         match method {
-            Initialized::METHOD => {}
+            Initialized::METHOD => {
+                log("> initialized!");
+            }
             DidOpenTextDocument::METHOD => {
                 let params: DidOpenTextDocumentParams = match decode_from_wasm(params) {
                     Ok(params) => params,
                     _ => return,
                 };
+                log(&format!("> opened: {}", params.text_document.uri));
+
                 let response_rx = if let Some(contract_location) =
                     utils::get_contract_location(&params.text_document.uri)
                 {
@@ -175,11 +180,29 @@ impl VscodeFilesystemAccessor {
     }
 }
 
-/// relative_path: "contracts/counter.clar"
 #[async_trait]
 impl FileAccessor for VscodeFilesystemAccessor {
     fn read_manifest_content(&self, manifest_location: FileLocation) -> PerformFileAccess {
-        unimplemented!()
+        let path = manifest_location.to_string();
+        let req = self
+            .client_request_tx
+            .call2(
+                &JsValue::null(),
+                &JsValue::from("vfs/readFile"),
+                &encode_to_wasm(&VFSRequest { path: path.clone() }).unwrap(),
+            )
+            .unwrap();
+
+        return Box::pin(async move {
+            let response = JsFuture::from(js_sys::Promise::resolve(&req)).await;
+            match response {
+                Ok(manifest) => Ok((
+                    FileLocation::from_url_string(&path).unwrap(),
+                    decode_from_wasm(manifest).unwrap(),
+                )),
+                Err(_) => Err("error".into()),
+            }
+        });
     }
 
     fn read_contract_content(
