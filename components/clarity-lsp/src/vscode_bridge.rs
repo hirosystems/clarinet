@@ -1,4 +1,5 @@
-use crate::backend::{self, LspRequest};
+use crate::backend::{self, LspRequest, LspResponse};
+use crate::state::EditorState;
 use crate::utils;
 use async_trait::*;
 use clarinet_files::{FileAccessor, FileLocation, PerformFileAccess};
@@ -25,10 +26,11 @@ extern "C" {
 
 #[wasm_bindgen]
 pub struct LspVscodeBridge {
+    editor_state: EditorState,
     client_diagnostic_tx: JsFunction,
     client_notification_tx: JsFunction,
-    client_request_tx: JsFunction,
-    backend_command_tx: Sender<LspRequest>,
+    backend_to_client_tx: JsFunction,
+    file_accessor: Box<dyn FileAccessor>,
 }
 
 /// Entry point: the function `initialize_adapter_and_start_backend` is invoked from Javascript for constructing a `LspVscodeBridge`.
@@ -36,38 +38,37 @@ pub struct LspVscodeBridge {
 pub fn initialize_adapter_and_start_backend(
     client_diagnostic_tx: JsFunction,
     client_notification_tx: JsFunction,
-    client_request_tx: JsFunction,
+    backend_to_client_tx: JsFunction,
 ) -> LspVscodeBridge {
-    let (backend_command_tx, backend_command_rx) = mpsc::channel();
-
-    let cloned_client_request_tx = client_request_tx.clone();
-    // Pass `file_system_accessor` to `start_language_server`, which will
-    // be passed whenever the LSP needs to read the content of a file.
-    // std::thread::spawn(|| {
-    let file_accessor = VscodeFilesystemAccessor::new(cloned_client_request_tx);
-    // Initialize `file_system_accessor` with whatever future is required
-    let file_system_accessor = Box::new(file_accessor);
-
-    log("> spawn_local!");
-    spawn_local(backend::start_language_server(
-        backend_command_rx,
-        Some(file_system_accessor),
-    ));
-
-    log("> LspVscdeBridge!");
-    LspVscodeBridge {
-        client_diagnostic_tx: client_diagnostic_tx.clone(),
-        client_notification_tx: client_notification_tx.clone(),
-        client_request_tx: client_request_tx.clone(),
-        backend_command_tx: backend_command_tx.clone(),
-    }
+    LspVscodeBridge::new(
+        client_diagnostic_tx,
+        client_notification_tx,
+        backend_to_client_tx,
+    )
 }
 
 #[wasm_bindgen]
 impl LspVscodeBridge {
+    #[wasm_bindgen(constructor)]
+    pub fn new(
+        client_diagnostic_tx: JsFunction,
+        client_notification_tx: JsFunction,
+        backend_to_client_tx: JsFunction,
+    ) -> LspVscodeBridge {
+        let file_accessor = VscodeFilesystemAccessor::new(backend_to_client_tx.clone());
+        LspVscodeBridge {
+            editor_state: EditorState::new(),
+            client_diagnostic_tx,
+            client_notification_tx,
+            backend_to_client_tx,
+            file_accessor: Box::new(file_accessor),
+        }
+    }
+
     #[wasm_bindgen(js_name=onNotification)]
-    pub fn on_notification(&self, method: &str, params: JsValue) {
-        match method {
+    pub async fn on_notification(mut self, method: String, params: JsValue) {
+        log("command");
+        match method.as_str() {
             Initialized::METHOD => {
                 log("> initialized!");
             }
@@ -78,32 +79,28 @@ impl LspVscodeBridge {
                 };
                 log(&format!("> opened: {}", params.text_document.uri));
 
-                let response_rx = if let Some(contract_location) =
+                let command = if let Some(contract_location) =
                     utils::get_contract_location(&params.text_document.uri)
                 {
-                    let (response_tx, response_rx) = channel();
-                    let _ = self
-                        .backend_command_tx
-                        .send(LspRequest::ContractOpened(contract_location, response_tx));
-                    response_rx
+                    LspRequest::ContractOpened(contract_location)
                 } else if let Some(manifest_location) =
                     utils::get_manifest_location(&params.text_document.uri)
                 {
-                    let (response_tx, response_rx) = channel();
-                    let _ = self
-                        .backend_command_tx
-                        .send(LspRequest::ManifestOpened(manifest_location, response_tx));
-                    response_rx
+                    LspRequest::ManifestOpened(manifest_location)
                 } else {
                     log("Unsupported file opened");
                     return;
                 };
-
-                log("Command submitted to server, waiting for response");
+                let mut result = backend::process_command(
+                    command,
+                    &mut self.editor_state,
+                    Some(&self.file_accessor),
+                )
+                .await;
 
                 let mut aggregated_diagnostics = vec![];
                 let mut notification = None;
-                if let Ok(ref mut response) = response_rx.recv() {
+                if let Ok(ref mut response) = result {
                     aggregated_diagnostics.append(&mut response.aggregated_diagnostics);
                     notification = response.notification.take();
                 }
