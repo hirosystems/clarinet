@@ -1,5 +1,6 @@
 use super::{utils, LspRequest};
 
+use crate::lsp::{clarity_diagnostics_to_tower_lsp_type, completion_item_type_to_tower_lsp_type};
 use serde_json::Value;
 use std::sync::mpsc::channel;
 use std::sync::mpsc::Sender;
@@ -28,12 +29,12 @@ use tower_lsp::{async_trait, Client, LanguageServer};
 // - Clarinet.toml file saved
 
 #[derive(Debug)]
-pub struct ClarityLanguageBackend {
+pub struct LspNativeBridge {
     client: Client,
     command_tx: Arc<Mutex<Sender<LspRequest>>>,
 }
 
-impl ClarityLanguageBackend {
+impl LspNativeBridge {
     pub fn new(client: Client, command_tx: Sender<LspRequest>) -> Self {
         Self {
             client,
@@ -43,7 +44,7 @@ impl ClarityLanguageBackend {
 }
 
 #[async_trait]
-impl LanguageServer for ClarityLanguageBackend {
+impl LanguageServer for LspNativeBridge {
     async fn initialize(&self, _params: InitializeParams) -> Result<InitializeResult> {
         Ok(InitializeResult {
             server_info: None,
@@ -101,7 +102,12 @@ impl LanguageServer for ClarityLanguageBackend {
             keywords.append(&mut response.completion_items);
         }
 
-        Ok(Some(CompletionResponse::from(keywords)))
+        let mut completion_items = vec![];
+        for mut item in keywords.drain(..) {
+            completion_items.push(completion_item_type_to_tower_lsp_type(&mut item));
+        }
+
+        Ok(Some(CompletionResponse::from(completion_items)))
     }
 
     async fn did_open(&self, params: DidOpenTextDocumentParams) {
@@ -143,10 +149,14 @@ impl LanguageServer for ClarityLanguageBackend {
             notification = response.notification.take();
         }
 
-        for (location, diags) in aggregated_diagnostics.into_iter() {
+        for (location, mut diags) in aggregated_diagnostics.drain(..) {
             if let Ok(url) = location.to_url_string() {
                 self.client
-                    .publish_diagnostics(Url::parse(&url).unwrap(), diags, None)
+                    .publish_diagnostics(
+                        Url::parse(&url).unwrap(),
+                        clarity_diagnostics_to_tower_lsp_type(&mut diags),
+                        None,
+                    )
                     .await;
             }
         }
@@ -187,10 +197,14 @@ impl LanguageServer for ClarityLanguageBackend {
             notification = response.notification.take();
         }
 
-        for (location, diags) in aggregated_diagnostics.into_iter() {
+        for (location, mut diags) in aggregated_diagnostics.drain(..) {
             if let Ok(url) = location.to_url_string() {
                 self.client
-                    .publish_diagnostics(Url::parse(&url).unwrap(), diags, None)
+                    .publish_diagnostics(
+                        Url::parse(&url).unwrap(),
+                        clarity_diagnostics_to_tower_lsp_type(&mut diags),
+                        None,
+                    )
                     .await;
             }
         }

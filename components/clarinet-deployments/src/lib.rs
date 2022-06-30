@@ -10,7 +10,7 @@ use self::types::{
     DeploymentSpecification, EmulatedContractPublishSpecification, GenesisSpecification,
     TransactionPlanSpecification, TransactionsBatchSpecification, WalletSpecification,
 };
-use clarinet_files::FileLocation;
+use clarinet_files::{FileAccessor, FileLocation};
 use clarity_repl::clarity::diagnostic::DiagnosableError;
 use clarity_repl::clarity::types::StandardPrincipalData;
 use types::ContractPublishSpecification;
@@ -156,10 +156,11 @@ pub fn update_session_with_contracts_executions(
     results
 }
 
-pub async fn generate_default_deployment(
+pub async fn generate_default_deployment<'a>(
     manifest: &ProjectManifest,
     network: &StacksNetwork,
     no_batch: bool,
+    file_accessor: Option<&Box<dyn FileAccessor>>,
 ) -> Result<(DeploymentSpecification, DeploymentGenerationArtifacts), String> {
     let network_manifest = NetworkManifest::from_project_manifest_location(
         &manifest.location,
@@ -438,9 +439,19 @@ pub async fn generate_default_deployment(
             }
         };
 
-        let mut contract_location = manifest.location.get_project_root_location()?;
-        contract_location.append_path(&contract_config.path)?;
-        let source = contract_location.read_content_as_utf8()?;
+        let (contract_location, source) = match file_accessor {
+            None => {
+                let mut contract_location = manifest.location.get_project_root_location()?;
+                contract_location.append_path(&contract_config.path)?;
+                let source = contract_location.read_content_as_utf8()?;
+                (contract_location, source)
+            }
+            Some(file_accessor) => {
+                let (contract_location, source) =
+                    file_accessor.read_file_content(contract_config.path.clone())?;
+                (contract_location, source)
+            }
+        };
 
         let contract_id = QualifiedContractIdentifier::new(sender.clone(), contract_name.clone());
 
