@@ -23,6 +23,10 @@ use url::Url;
 
 pub const DEFAULT_DEVNET_BALANCE: u64 = 100_000_000_000_000;
 
+pub trait FileAccessor {
+    fn read_file_content(&self, relative_path: String) -> Result<(FileLocation, String), String>;
+}
+
 #[derive(Deserialize, Debug, Clone, PartialEq, Eq, Hash)]
 #[serde(untagged)]
 pub enum FileLocation {
@@ -118,28 +122,6 @@ impl FileLocation {
         Ok(contract_as_utf8)
     }
 
-    pub fn read_content(&self) -> Result<Vec<u8>, String> {
-        let bytes = match &self {
-            FileLocation::FileSystem { path } => FileLocation::fs_read_content(&path),
-            FileLocation::Url { url } => match url.scheme() {
-                #[cfg(not(feature = "wasm"))]
-                "file" => {
-                    let path = url
-                        .to_file_path()
-                        .map_err(|e| format!("unable to convert url {} to path\n{:?}", url, e))?;
-                    FileLocation::fs_read_content(&path)
-                }
-                "http" | "https" => {
-                    unimplemented!()
-                }
-                _ => {
-                    unimplemented!()
-                }
-            },
-        }?;
-        Ok(bytes)
-    }
-
     fn fs_read_content(path: &PathBuf) -> Result<Vec<u8>, String> {
         use std::fs::File;
         use std::io::{BufReader, Read};
@@ -153,26 +135,12 @@ impl FileLocation {
         Ok(file_buffer)
     }
 
-    pub fn exists(&self) -> bool {
-        match self {
-            FileLocation::FileSystem { path } => FileLocation::fs_exists(path),
-            FileLocation::Url { url: _url } => unimplemented!(),
-        }
-    }
-
     fn fs_exists(path: &PathBuf) -> bool {
         path.exists()
     }
 
     fn url_exists(_path: &Url) -> bool {
         unimplemented!()
-    }
-
-    pub fn write_content(&self, content: &[u8]) -> Result<(), String> {
-        match self {
-            FileLocation::FileSystem { path } => FileLocation::fs_write_content(path, content),
-            FileLocation::Url { url: _url } => unimplemented!(),
-        }
     }
 
     fn fs_write_content(file_path: &PathBuf, content: &[u8]) -> Result<(), String> {
@@ -284,13 +252,42 @@ impl FileLocation {
         let file = self.to_string();
         Ok(file[(base.len() + 1)..].to_string())
     }
+}
 
-    pub fn to_string(&self) -> String {
+impl FileLocation {
+    pub fn read_content(&self) -> Result<Vec<u8>, String> {
+        let bytes = match &self {
+            FileLocation::FileSystem { path } => FileLocation::fs_read_content(&path),
+            FileLocation::Url { url } => match url.scheme() {
+                #[cfg(not(feature = "wasm"))]
+                "file" => {
+                    let path = url
+                        .to_file_path()
+                        .map_err(|e| format!("unable to convert url {} to path\n{:?}", url, e))?;
+                    FileLocation::fs_read_content(&path)
+                }
+                "http" | "https" => {
+                    unimplemented!()
+                }
+                _ => {
+                    unimplemented!()
+                }
+            },
+        }?;
+        Ok(bytes)
+    }
+
+    pub fn exists(&self) -> bool {
         match self {
-            FileLocation::FileSystem { path } => {
-                format!("{}", path.display())
-            }
-            FileLocation::Url { url } => url.to_string(),
+            FileLocation::FileSystem { path } => FileLocation::fs_exists(path),
+            FileLocation::Url { url: _url } => unimplemented!(),
+        }
+    }
+
+    pub fn write_content(&self, content: &[u8]) -> Result<(), String> {
+        match self {
+            FileLocation::FileSystem { path } => FileLocation::fs_write_content(path, content),
+            FileLocation::Url { url: _url } => unimplemented!(),
         }
     }
 
@@ -306,6 +303,15 @@ impl FileLocation {
             FileLocation::Url { url } => Ok(url.to_string()),
             #[allow(unreachable_patterns)]
             _ => unreachable!(),
+        }
+    }
+
+    pub fn to_string(&self) -> String {
+        match self {
+            FileLocation::FileSystem { path } => {
+                format!("{}", path.display())
+            }
+            FileLocation::Url { url } => url.to_string(),
         }
     }
 }
