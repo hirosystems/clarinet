@@ -4,13 +4,13 @@ version: 1
 chain: bitcoin
 networks:
   regtest:
-    oreo-url: 'http://0.0.0.0:20446/'
+    oreo-url: 'http://localhost:20446/'
     predicate:
       scope: outputs
       p2pkh:
         equals: mr1iPkD9N3RJZZxXRk7xF9d36gffa6exNC
     action:
       http:
-        url: 'http://0.0.0.0:3000/api/v1/wrapBtc'
+        url: 'http://localhost:3000/api/v1/wrapBtc'
         method: POST
         authorization-header: Bearer cn389ncoiwuencr

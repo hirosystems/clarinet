@@ -20,10 +20,10 @@ pub const DEFAULT_STACKS_NODE_IMAGE: &str = "quay.io/hirosystems/stacks-node:dev
 pub const DEFAULT_BITCOIN_EXPLORER_IMAGE: &str = "quay.io/hirosystems/bitcoin-explorer:devnet";
 pub const DEFAULT_STACKS_API_IMAGE: &str = "blockstack/stacks-blockchain-api:latest";
 pub const DEFAULT_STACKS_EXPLORER_IMAGE: &str = "hirosystems/explorer:latest";
-pub const DEFAULT_HYPERCHAINS_IMAGE: &str = "quay.io/hirosystems/stacks-hyperchains:devnet-v1";
 pub const DEFAULT_POSTGRES_IMAGE: &str = "postgres:alpine";
+pub const DEFAULT_HYPERCHAINS_IMAGE: &str = "hirosystems/hyperchains:103-merge-stretch";
 pub const DEFAULT_HYPERCHAIN_CONTRACT_ID: &str =
-    "STFTX3F4XCY7RS5VRHXP2SED0WC0YRKNWTNXD74P.hc-alpha";
+    "ST3A7S7GFKR8E3TVZ41Z2N441265CKXS0QPZ94N6B.hc-alpha-2";
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct NetworkManifestFile {
@@ -497,8 +497,8 @@ impl NetworkManifest {
                 hyperchain_leader_mnemonic,
                 hyperchain_leader_secret_key_hex,
                 hyperchain_leader_derivation_path,
-                hyperchain_node_p2p_port: devnet_config.stacks_node_p2p_port.unwrap_or(30443),
-                hyperchain_node_rpc_port: devnet_config.stacks_node_rpc_port.unwrap_or(30444),
+                hyperchain_node_p2p_port: devnet_config.stacks_node_p2p_port.unwrap_or(30444),
+                hyperchain_node_rpc_port: devnet_config.stacks_node_rpc_port.unwrap_or(30443),
                 hyperchain_events_ingestion_port,
                 hyperchain_node_events_observers: devnet_config
                     .hyperchain_node_events_observers

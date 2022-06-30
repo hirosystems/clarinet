@@ -96,6 +96,25 @@ pub fn start_ui(
             }
             DevnetEvent::StacksChainEvent(chain_event) => {
                 if let StacksChainEvent::ChainUpdatedWithBlock(update) = chain_event {
+
+                    let raw_txs = if app.mempool.items.is_empty() {
+                        vec![]
+                    } else {
+                        update.new_block.transactions.iter().map(|tx| tx.metadata.raw_tx.as_str()).collect::<Vec<_>>()
+                    };
+
+                    let mut indices_to_remove = vec![];
+                    for (idx, item) in app.mempool.items.iter().enumerate() {
+                        if raw_txs.contains(&item.tx_data.as_str()) {
+                            indices_to_remove.push(idx);
+                        }
+                    }
+
+                    indices_to_remove.reverse();
+                    for i in indices_to_remove {
+                        app.mempool.items.remove(i);
+                    }
+
                     app.display_block(update.new_block);
                 } else {
                     // TODO(lgalabru)
@@ -104,7 +123,7 @@ pub fn start_ui(
             DevnetEvent::BitcoinChainEvent(_chain_event) => {
             }
             DevnetEvent::MempoolAdmission(tx) => {
-                app.update_mempool(tx);
+                app.add_to_mempool(tx);
             }
             DevnetEvent::ProtocolDeployingProgress(_) => {
                 // Display something
