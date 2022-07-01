@@ -10,13 +10,20 @@ use orchestra_types::{
 };
 use rocket::serde::json::Value as JsonValue;
 
+#[derive(Deserialize)]
+pub struct NewBitcoinBlock {
+    pub burn_block_hash: String,
+    pub burn_block_height: u64,
+    pub reward_slot_holders: Vec<String>,
+    pub reward_recipients: Vec<RewardParticipant>,
+    pub burn_amount: u64,
+}
+
 #[allow(dead_code)]
 #[derive(Deserialize)]
-pub struct NewBurnBlock {
-    burn_block_hash: String,
-    burn_block_height: u64,
-    reward_slot_holders: Vec<String>,
-    burn_amount: u64,
+pub struct RewardParticipant {
+    recipient: String,
+    amt: u64,
 }
 
 pub fn standardize_bitcoin_block(
@@ -32,7 +39,7 @@ pub fn standardize_bitcoin_block(
 
     let rpc = Client::new(&indexer_config.bitcoin_node_rpc_url, auth).unwrap();
 
-    let partial_block: NewBurnBlock = serde_json::from_value(marshalled_block).unwrap();
+    let partial_block: NewBitcoinBlock = serde_json::from_value(marshalled_block).unwrap();
     let block_height = partial_block.burn_block_height;
     let block_hash = {
         let block_hash_str = partial_block.burn_block_hash.strip_prefix("0x").unwrap();

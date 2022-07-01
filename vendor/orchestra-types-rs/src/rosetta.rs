@@ -5,7 +5,7 @@ use std::collections::HashSet;
 use std::fmt::Display;
 
 /// BlockIdentifier uniquely identifies a block in a particular network.
-#[derive(Debug, Clone, Eq, PartialEq, Deserialize, Serialize, Hash)]
+#[derive(Debug, Clone, Deserialize, Serialize, Hash)]
 pub struct BlockIdentifier {
     /// Also known as the block height.
     pub index: u64,
@@ -36,6 +36,14 @@ impl PartialOrd for BlockIdentifier {
     }
 }
 
+impl PartialEq for BlockIdentifier {
+    fn eq(&self, other: &Self) -> bool {
+        self.hash == other.hash
+    }
+}
+
+impl Eq for BlockIdentifier {}
+
 /// StacksBlock contain an array of Transactions that occurred at a particular
 /// BlockIdentifier. A hard requirement for blocks returned by Rosetta
 /// implementations is that they MUST be _inalterable_: once a client has
@@ -54,17 +62,23 @@ pub struct StacksBlockData {
     pub metadata: StacksBlockMetadata,
 }
 
-/// StacksMicroblockData contain an array of Transactions that occurred at a particular
-/// BlockIdentifier. A hard requirement for blocks returned by Rosetta
-/// implementations is that they MUST be _inalterable_: once a client has
-/// requested and received a block identified by a specific BlockIndentifier,
-/// all future calls for that same BlockIdentifier must return the same block
-/// contents.
+/// StacksMicroblock contain an array of Transactions that occurred at a particular
+/// BlockIdentifier.
 #[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
 pub struct StacksMicroblockData {
     pub block_identifier: BlockIdentifier,
     pub parent_block_identifier: BlockIdentifier,
+    /// The timestamp of the block in milliseconds since the Unix Epoch. The
+    /// timestamp is stored in milliseconds because some blockchains produce
+    /// blocks more often than once a second.
+    pub timestamp: i64,
     pub transactions: Vec<StacksTransactionData>,
+    pub metadata: StacksMicroblockMetadata,
+}
+
+#[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
+pub struct StacksMicroblockMetadata {
+    pub anchor_block_identifier: BlockIdentifier,
 }
 
 #[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
@@ -149,11 +163,21 @@ pub struct StacksTransactionMetadata {
     pub sender: String,
     pub fee: u64,
     pub kind: StacksTransactionKind,
-    pub execution_cost: Option<StacksTransactionExecutionCost>,
     pub receipt: StacksTransactionReceipt,
     pub description: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub sponsor: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub execution_cost: Option<StacksTransactionExecutionCost>,
+    pub position: StacksTransactionPosition,
+}
+
+/// TODO
+#[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
+#[serde(untagged)]
+pub enum StacksTransactionPosition {
+    Index(usize),
+    Microblock(BlockIdentifier, usize),
 }
 
 #[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
@@ -458,8 +482,7 @@ pub struct ChainUpdatedWithReorgData {
 
 #[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct ChainUpdatedWithMicroblocksData {
-    pub anchored_block: StacksBlockData,
-    pub current_trail: StacksMicroblocksTrail,
+    pub new_microblocks: Vec<StacksMicroblockData>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize)]

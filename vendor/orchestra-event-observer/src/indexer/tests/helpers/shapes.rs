@@ -1,6 +1,7 @@
-use super::super::ChainEventExpectation;
-use super::blocks;
-use orchestra_types::{StacksBlockData, StacksChainEvent};
+use super::{super::ChainEventExpectation, BlockEvent};
+use super::{blocks, microblocks};
+use bitcoincore_rpc::bitcoin::Block;
+use orchestra_types::{StacksBlockData, StacksChainEvent, StacksMicroblockData};
 
 pub fn expect_no_chain_update() -> ChainEventExpectation {
     Box::new(move |chain_event_to_check: Option<StacksChainEvent>| {
@@ -15,13 +16,55 @@ pub fn expect_no_chain_update() -> ChainEventExpectation {
     })
 }
 
-pub fn expect_chain_updated_with_block(expected_block: StacksBlockData) -> ChainEventExpectation {
+pub fn expect_chain_updated_with_block(expected_block: BlockEvent) -> ChainEventExpectation {
     expect_chain_updated_with_blocks(vec![expected_block])
 }
 
-pub fn expect_chain_updated_with_blocks(
-    expected_blocks: Vec<StacksBlockData>,
+pub fn expect_chain_updated_with_microblock(
+    expected_microblock: BlockEvent,
 ) -> ChainEventExpectation {
+    expect_chain_updated_with_microblocks(vec![expected_microblock])
+}
+
+pub fn expect_chain_updated_with_microblocks(
+    expected_microblocks: Vec<BlockEvent>,
+) -> ChainEventExpectation {
+    Box::new(move |chain_event_to_check: Option<StacksChainEvent>| {
+        assert!(
+            match chain_event_to_check {
+                Some(StacksChainEvent::ChainUpdatedWithMicroblocks(ref event)) => {
+                    assert_eq!(expected_microblocks.len(), event.new_microblocks.len());
+                    for (expected_microblock, new_microblock) in
+                        expected_microblocks.iter().zip(&event.new_microblocks)
+                    {
+                        let expected_microblock = match expected_microblock {
+                            BlockEvent::Microblock(expected_microblock) => expected_microblock,
+                            _ => unreachable!(),
+                        };
+                        println!(
+                            "Checking {} and {}",
+                            expected_microblock.block_identifier, new_microblock.block_identifier
+                        );
+                        assert!(
+                            new_microblock
+                                .block_identifier
+                                .eq(&expected_microblock.block_identifier),
+                            "{} ≠ {}",
+                            new_microblock.block_identifier,
+                            expected_microblock.block_identifier
+                        );
+                    }
+                    true
+                }
+                _ => false,
+            },
+            "expected ChainUpdatedWithMicroblocks, got {:?}",
+            chain_event_to_check
+        );
+    })
+}
+
+pub fn expect_chain_updated_with_blocks(expected_blocks: Vec<BlockEvent>) -> ChainEventExpectation {
     Box::new(move |chain_event_to_check: Option<StacksChainEvent>| {
         assert!(
             match chain_event_to_check {
@@ -29,6 +72,10 @@ pub fn expect_chain_updated_with_blocks(
                     assert_eq!(expected_blocks.len(), event.new_blocks.len());
                     for (expected_block, new_block) in expected_blocks.iter().zip(&event.new_blocks)
                     {
+                        let expected_block = match expected_block {
+                            BlockEvent::Block(expected_block) => expected_block,
+                            _ => unreachable!(),
+                        };
                         println!(
                             "Checking {} and {}",
                             expected_block.block_identifier, new_block.block_identifier
@@ -53,8 +100,8 @@ pub fn expect_chain_updated_with_blocks(
 }
 
 pub fn expect_chain_updated_with_reorg(
-    blocks_to_rollback: Vec<StacksBlockData>,
-    blocks_to_apply: Vec<StacksBlockData>,
+    blocks_to_rollback: Vec<BlockEvent>,
+    blocks_to_apply: Vec<BlockEvent>,
 ) -> ChainEventExpectation {
     Box::new(move |chain_event_to_check: Option<StacksChainEvent>| {
         assert!(
@@ -65,6 +112,10 @@ pub fn expect_chain_updated_with_reorg(
                     for (expected, (_microblock_trail, block)) in
                         blocks_to_rollback.iter().zip(&event.blocks_to_rollback)
                     {
+                        let expected = match expected {
+                            BlockEvent::Block(expected) => expected,
+                            _ => unreachable!(),
+                        };
                         assert!(
                             expected.block_identifier.eq(&block.block_identifier),
                             "{} ≠ {}",
@@ -75,6 +126,10 @@ pub fn expect_chain_updated_with_reorg(
                     for (expected, (_microblock_trail, block)) in
                         blocks_to_apply.iter().zip(&event.blocks_to_apply)
                     {
+                        let expected = match expected {
+                            BlockEvent::Block(expected) => expected,
+                            _ => unreachable!(),
+                        };
                         assert!(
                             expected.block_identifier.eq(&block.block_identifier),
                             "{} ≠ {}",
@@ -103,7 +158,7 @@ pub fn expect_chain_updated_with_reorg(
 ///
 /// A1(1)  -  B1(2)  -  C1(3)
 ///
-pub fn get_vector_001() -> Vec<(StacksBlockData, ChainEventExpectation)> {
+pub fn get_vector_001() -> Vec<(BlockEvent, ChainEventExpectation)> {
     vec![
         (
             blocks::A1(None),
@@ -125,7 +180,7 @@ pub fn get_vector_001() -> Vec<(StacksBlockData, ChainEventExpectation)> {
 /// A1(1)  -  B1(2)  -  C1(4)
 ///        \  B2(3)  -  C2(5)
 ///
-pub fn get_vector_002() -> Vec<(StacksBlockData, ChainEventExpectation)> {
+pub fn get_vector_002() -> Vec<(BlockEvent, ChainEventExpectation)> {
     vec![
         (
             blocks::A1(None),
@@ -161,7 +216,7 @@ pub fn get_vector_002() -> Vec<(StacksBlockData, ChainEventExpectation)> {
 /// A1(1)  -  B1(2)  -  C1(3)
 ///        \  B2(4)  -  C2(5)
 ///
-pub fn get_vector_003() -> Vec<(StacksBlockData, ChainEventExpectation)> {
+pub fn get_vector_003() -> Vec<(BlockEvent, ChainEventExpectation)> {
     vec![
         (
             blocks::A1(None),
@@ -191,7 +246,7 @@ pub fn get_vector_003() -> Vec<(StacksBlockData, ChainEventExpectation)> {
 /// A1(1)  -  B1(2)  -  C1(3)  -  D1(6)
 ///        \  B2(4)  -  C2(5)
 ///
-pub fn get_vector_004() -> Vec<(StacksBlockData, ChainEventExpectation)> {
+pub fn get_vector_004() -> Vec<(BlockEvent, ChainEventExpectation)> {
     vec![
         (
             blocks::A1(None),
@@ -228,7 +283,7 @@ pub fn get_vector_004() -> Vec<(StacksBlockData, ChainEventExpectation)> {
 /// A1(1)  -  B1(2)  -  C1(3)  -  D1(6)  -  E1(7)
 ///        \  B2(4)  -  C2(5)
 ///
-pub fn get_vector_005() -> Vec<(StacksBlockData, ChainEventExpectation)> {
+pub fn get_vector_005() -> Vec<(BlockEvent, ChainEventExpectation)> {
     vec![
         (
             blocks::A1(None),
@@ -269,7 +324,7 @@ pub fn get_vector_005() -> Vec<(StacksBlockData, ChainEventExpectation)> {
 /// A1(1)  -  B1(2)  -  C1(3)  -  D1(6)  -  E1(7)  -  F1(8)
 ///        \  B2(4)  -  C2(5)
 ///
-pub fn get_vector_006() -> Vec<(StacksBlockData, ChainEventExpectation)> {
+pub fn get_vector_006() -> Vec<(BlockEvent, ChainEventExpectation)> {
     vec![
         (
             blocks::A1(None),
@@ -314,7 +369,7 @@ pub fn get_vector_006() -> Vec<(StacksBlockData, ChainEventExpectation)> {
 /// A1(1)  -  B1(2)  -  C1(3)  -  D1(6)  -  E1(7)  -  F1(8)  -  G1(9)
 ///        \  B2(4)  -  C2(5)
 ///
-pub fn get_vector_007() -> Vec<(StacksBlockData, ChainEventExpectation)> {
+pub fn get_vector_007() -> Vec<(BlockEvent, ChainEventExpectation)> {
     vec![
         (
             blocks::A1(None),
@@ -363,7 +418,7 @@ pub fn get_vector_007() -> Vec<(StacksBlockData, ChainEventExpectation)> {
 /// A1(1)  -  B1(2)  -  C1(3)  -  D1(6)  -  E1(7)  -  F1(8)  -  G1(9)  -  H1(10)
 ///        \  B2(4)  -  C2(5)
 ///
-pub fn get_vector_008() -> Vec<(StacksBlockData, ChainEventExpectation)> {
+pub fn get_vector_008() -> Vec<(BlockEvent, ChainEventExpectation)> {
     vec![
         (
             blocks::A1(None),
@@ -416,7 +471,7 @@ pub fn get_vector_008() -> Vec<(StacksBlockData, ChainEventExpectation)> {
 /// A1(1)  -  B1(2)  -  C1(3)  -  D1(6)  -  E1(7)  -  F1(8)  -  G1(9)  -  H1(10)  -  I1(11)
 ///        \  B2(4)  -  C2(5)
 ///
-pub fn get_vector_009() -> Vec<(StacksBlockData, ChainEventExpectation)> {
+pub fn get_vector_009() -> Vec<(BlockEvent, ChainEventExpectation)> {
     vec![
         (
             blocks::A1(None),
@@ -473,7 +528,7 @@ pub fn get_vector_009() -> Vec<(StacksBlockData, ChainEventExpectation)> {
 /// A1(1)  -  B1(2)  -  C1(3)  -  D1(6)  -  E1(7)  -  F1(8)  -  G1(9)  -  H1(10) -  I1(11)
 ///        \  B2(4)  -  C2(5)  -  D2(12)
 ///
-pub fn get_vector_010() -> Vec<(StacksBlockData, ChainEventExpectation)> {
+pub fn get_vector_010() -> Vec<(BlockEvent, ChainEventExpectation)> {
     vec![
         (
             blocks::A1(None),
@@ -531,7 +586,7 @@ pub fn get_vector_010() -> Vec<(StacksBlockData, ChainEventExpectation)> {
 ///       \                               \ E3(9)
 ///        \  B2(4)  -  C2(5)
 ///
-pub fn get_vector_011() -> Vec<(StacksBlockData, ChainEventExpectation)> {
+pub fn get_vector_011() -> Vec<(BlockEvent, ChainEventExpectation)> {
     vec![
         (
             blocks::A1(None),
@@ -590,7 +645,7 @@ pub fn get_vector_011() -> Vec<(StacksBlockData, ChainEventExpectation)> {
 ///       \                               \ E3(9)  -  F3(11)
 ///        \  B2(4)  -  C2(5)
 ///
-pub fn get_vector_012() -> Vec<(StacksBlockData, ChainEventExpectation)> {
+pub fn get_vector_012() -> Vec<(BlockEvent, ChainEventExpectation)> {
     vec![
         (
             blocks::A1(None),
@@ -651,7 +706,7 @@ pub fn get_vector_012() -> Vec<(StacksBlockData, ChainEventExpectation)> {
 ///       \                               \ E3(9)  -  F3(11) -  G3(13)
 ///        \  B2(4)  -  C2(5)
 ///
-pub fn get_vector_013() -> Vec<(StacksBlockData, ChainEventExpectation)> {
+pub fn get_vector_013() -> Vec<(BlockEvent, ChainEventExpectation)> {
     vec![
         (
             blocks::A1(None),
@@ -712,7 +767,7 @@ pub fn get_vector_013() -> Vec<(StacksBlockData, ChainEventExpectation)> {
 ///       \                               \ E3(9)  -  F3(11) -  G3(13)  -  H3(15)
 ///        \  B2(4)  -  C2(5)
 ///
-pub fn get_vector_014() -> Vec<(StacksBlockData, ChainEventExpectation)> {
+pub fn get_vector_014() -> Vec<(BlockEvent, ChainEventExpectation)> {
     vec![
         (
             blocks::A1(None),
@@ -774,7 +829,7 @@ pub fn get_vector_014() -> Vec<(StacksBlockData, ChainEventExpectation)> {
 ///       \                               \ E3(9)  -  F3(11) -  G3(13)  -  H3(15)  -  I3(16)
 ///        \  B2(4)  -  C2(5)
 ///
-pub fn get_vector_015() -> Vec<(StacksBlockData, ChainEventExpectation)> {
+pub fn get_vector_015() -> Vec<(BlockEvent, ChainEventExpectation)> {
     vec![
         (
             blocks::A1(None),
@@ -855,7 +910,7 @@ pub fn get_vector_015() -> Vec<(StacksBlockData, ChainEventExpectation)> {
 ///       \                               \ E3(9)  -  F3(11) -  G3(13)  -  H3(15)  -  I3(16)
 ///        \  B2(4)  -  C2(5)  -  D2(17)
 ///
-pub fn get_vector_016() -> Vec<(StacksBlockData, ChainEventExpectation)> {
+pub fn get_vector_016() -> Vec<(BlockEvent, ChainEventExpectation)> {
     vec![
         (
             blocks::A1(None),
@@ -937,7 +992,7 @@ pub fn get_vector_016() -> Vec<(StacksBlockData, ChainEventExpectation)> {
 ///       \                               \ E3(9)  -  F3(11) -  G3(12)
 ///        \  B2(4)  -  C2(5)  -  D2(13) -  E2(14)  - F2(15)  - G2(16)
 ///
-pub fn get_vector_017() -> Vec<(StacksBlockData, ChainEventExpectation)> {
+pub fn get_vector_017() -> Vec<(BlockEvent, ChainEventExpectation)> {
     vec![
         (
             blocks::A1(None),
@@ -1004,7 +1059,7 @@ pub fn get_vector_017() -> Vec<(StacksBlockData, ChainEventExpectation)> {
 ///       \                               \ E3(9)  -  F3(10)
 ///        \  B2(4)  -  C2(5)  -  D2(11) -  E2(12) -  F2(13)  - G2(14)
 ///
-pub fn get_vector_018() -> Vec<(StacksBlockData, ChainEventExpectation)> {
+pub fn get_vector_018() -> Vec<(BlockEvent, ChainEventExpectation)> {
     vec![
         (
             blocks::A1(None),
@@ -1081,7 +1136,7 @@ pub fn get_vector_018() -> Vec<(StacksBlockData, ChainEventExpectation)> {
 ///       \                               \ E3(9)  -  F3(10)
 ///        \  B2(4)  -  C2(5)  -  D2(11) -  E2(12) -  F2(13) - G2(14)
 ///
-pub fn get_vector_019() -> Vec<(StacksBlockData, ChainEventExpectation)> {
+pub fn get_vector_019() -> Vec<(BlockEvent, ChainEventExpectation)> {
     vec![
         (
             blocks::A1(None),
@@ -1159,7 +1214,7 @@ pub fn get_vector_019() -> Vec<(StacksBlockData, ChainEventExpectation)> {
 ///       \                               \ E3(9)  -  F3(10) - G3(16)
 ///        \  B2(4)  -  C2(5)  -  D2(11) -  E2(12) -  F2(13) - G2(14)
 ///
-pub fn get_vector_020() -> Vec<(StacksBlockData, ChainEventExpectation)> {
+pub fn get_vector_020() -> Vec<(BlockEvent, ChainEventExpectation)> {
     vec![
         (
             blocks::A1(None),
@@ -1256,7 +1311,7 @@ pub fn get_vector_020() -> Vec<(StacksBlockData, ChainEventExpectation)> {
 ///
 /// A1(1)  -  B1(3)  -  C1(2)
 ///
-pub fn get_vector_021() -> Vec<(StacksBlockData, ChainEventExpectation)> {
+pub fn get_vector_021() -> Vec<(BlockEvent, ChainEventExpectation)> {
     vec![
         (
             blocks::A1(None),
@@ -1275,7 +1330,7 @@ pub fn get_vector_021() -> Vec<(StacksBlockData, ChainEventExpectation)> {
 /// A1(1)  -  B1(2)  -  C1(3)
 ///        \  B2(5)  -  C2(4)
 ///
-pub fn get_vector_022() -> Vec<(StacksBlockData, ChainEventExpectation)> {
+pub fn get_vector_022() -> Vec<(BlockEvent, ChainEventExpectation)> {
     vec![
         (
             blocks::A1(None),
@@ -1305,7 +1360,7 @@ pub fn get_vector_022() -> Vec<(StacksBlockData, ChainEventExpectation)> {
 /// A1(1)  -  B1(5)  -  C1(3)
 ///        \  B2(2)  -  C2(4)
 ///
-pub fn get_vector_023() -> Vec<(StacksBlockData, ChainEventExpectation)> {
+pub fn get_vector_023() -> Vec<(BlockEvent, ChainEventExpectation)> {
     vec![
         (
             blocks::A1(None),
@@ -1335,7 +1390,7 @@ pub fn get_vector_023() -> Vec<(StacksBlockData, ChainEventExpectation)> {
 /// A1(1)  -  B1(5)  -  C1(4)  -  D1(6)
 ///        \  B2(2)  -  C2(3)
 ///
-pub fn get_vector_024() -> Vec<(StacksBlockData, ChainEventExpectation)> {
+pub fn get_vector_024() -> Vec<(BlockEvent, ChainEventExpectation)> {
     vec![
         (
             blocks::A1(None),
@@ -1369,7 +1424,7 @@ pub fn get_vector_024() -> Vec<(StacksBlockData, ChainEventExpectation)> {
 /// A1(1)  -  B1(2)  -  C1(4)  -  D1(5)  -  E1(6)
 ///        \  B2(3)  -  C2(7)
 ///
-pub fn get_vector_025() -> Vec<(StacksBlockData, ChainEventExpectation)> {
+pub fn get_vector_025() -> Vec<(BlockEvent, ChainEventExpectation)> {
     vec![
         (
             blocks::A1(None),
@@ -1407,7 +1462,7 @@ pub fn get_vector_025() -> Vec<(StacksBlockData, ChainEventExpectation)> {
 /// A1(1)  -  B1(2)  -  C1(3)  -  D1(8)  -  E1(7)  -  F1(6)
 ///        \  B2(5)  -  C2(4)
 ///
-pub fn get_vector_026() -> Vec<(StacksBlockData, ChainEventExpectation)> {
+pub fn get_vector_026() -> Vec<(BlockEvent, ChainEventExpectation)> {
     vec![
         (
             blocks::A1(None),
@@ -1452,7 +1507,7 @@ pub fn get_vector_026() -> Vec<(StacksBlockData, ChainEventExpectation)> {
 /// A1(1)  -  B1(2)  -  C1(4)  -  D1(9)  -  E1(8)  -  F1(7)  -  G1(6)
 ///        \  B2(5)  -  C2(3)
 ///
-pub fn get_vector_027() -> Vec<(StacksBlockData, ChainEventExpectation)> {
+pub fn get_vector_027() -> Vec<(BlockEvent, ChainEventExpectation)> {
     vec![
         (
             blocks::A1(None),
@@ -1499,7 +1554,7 @@ pub fn get_vector_027() -> Vec<(StacksBlockData, ChainEventExpectation)> {
 /// A1(1)  -  B1(8)  -  C1(10)  -  D1(3)  -  E1(6)  -  F1(2)  -  G1(5)  -  H1(4)
 ///        \  B2(7)  -  C2(9)
 ///
-pub fn get_vector_028() -> Vec<(StacksBlockData, ChainEventExpectation)> {
+pub fn get_vector_028() -> Vec<(BlockEvent, ChainEventExpectation)> {
     vec![
         (
             blocks::A1(None),
@@ -1548,7 +1603,7 @@ pub fn get_vector_028() -> Vec<(StacksBlockData, ChainEventExpectation)> {
 /// A1(1)  -  B1(7)  -  C1(6)  -  D1(9)  -  E1(10)  -  F1(2)  -  G1(3)  -  H1(4)  -  I1(11)
 ///        \  B2(8)  -  C2(5)
 ///
-pub fn get_vector_029() -> Vec<(StacksBlockData, ChainEventExpectation)> {
+pub fn get_vector_029() -> Vec<(BlockEvent, ChainEventExpectation)> {
     vec![
         (
             blocks::A1(None),
@@ -1598,7 +1653,7 @@ pub fn get_vector_029() -> Vec<(StacksBlockData, ChainEventExpectation)> {
 /// A1(1)  -  B1(9)  -  C1(8)  -  D1(7)  -  E1(6)  -  F1(5)  -  G1(4)  -  H1(3)  -  I1(2)
 ///        \  B2(11)  -  C2(10)
 ///
-pub fn get_vector_030() -> Vec<(StacksBlockData, ChainEventExpectation)> {
+pub fn get_vector_030() -> Vec<(BlockEvent, ChainEventExpectation)> {
     vec![
         (
             blocks::A1(None),
@@ -1635,7 +1690,7 @@ pub fn get_vector_030() -> Vec<(StacksBlockData, ChainEventExpectation)> {
 ///       \                               \ E3(2)
 ///        \  B2(3)  -  C2(5)
 ///
-pub fn get_vector_031() -> Vec<(StacksBlockData, ChainEventExpectation)> {
+pub fn get_vector_031() -> Vec<(BlockEvent, ChainEventExpectation)> {
     vec![
         (
             blocks::A1(None),
@@ -1688,7 +1743,7 @@ pub fn get_vector_031() -> Vec<(StacksBlockData, ChainEventExpectation)> {
 ///       \                     \ D3(7)  -  E3(9)
 ///        \  B2(4)  -  C2(6)
 ///
-pub fn get_vector_032() -> Vec<(StacksBlockData, ChainEventExpectation)> {
+pub fn get_vector_032() -> Vec<(BlockEvent, ChainEventExpectation)> {
     vec![
         (
             blocks::A1(None),
@@ -1758,7 +1813,7 @@ pub fn get_vector_032() -> Vec<(StacksBlockData, ChainEventExpectation)> {
 ///       \                       \ D3(10) -  E3(7)  -  F3(3)
 ///        \  B2(11)  -  C2(8)
 ///
-pub fn get_vector_033() -> Vec<(StacksBlockData, ChainEventExpectation)> {
+pub fn get_vector_033() -> Vec<(BlockEvent, ChainEventExpectation)> {
     vec![
         (
             blocks::A1(None),
@@ -1818,7 +1873,7 @@ pub fn get_vector_033() -> Vec<(StacksBlockData, ChainEventExpectation)> {
 ///       \            \ C3(5)   -  D3(3)  -  E3(8)  -  F3(15)
 ///        \  B2(10)  -  C2(11)
 ///
-pub fn get_vector_034() -> Vec<(StacksBlockData, ChainEventExpectation)> {
+pub fn get_vector_034() -> Vec<(BlockEvent, ChainEventExpectation)> {
     vec![
         (
             blocks::A1(None),
@@ -1882,7 +1937,7 @@ pub fn get_vector_034() -> Vec<(StacksBlockData, ChainEventExpectation)> {
 ///       \           \ C3(6)  -  D3(7)  -  E3(11)  -  F3(9)   -  G3(16)
 ///        \  B2(2)  -  C2(3)
 ///
-pub fn get_vector_035() -> Vec<(StacksBlockData, ChainEventExpectation)> {
+pub fn get_vector_035() -> Vec<(BlockEvent, ChainEventExpectation)> {
     vec![
         (
             blocks::A1(None),
@@ -1969,7 +2024,7 @@ pub fn get_vector_035() -> Vec<(StacksBlockData, ChainEventExpectation)> {
 ///       \          \  C3(6) - D3(7) -  E3(17)  -  F3(11) -  G3(12)
 ///        \  B2(3)  -  C2(8) - D2(5) -  E2(14)  -  F2(13) -  G2(10)
 ///
-pub fn get_vector_036() -> Vec<(StacksBlockData, ChainEventExpectation)> {
+pub fn get_vector_036() -> Vec<(BlockEvent, ChainEventExpectation)> {
     vec![
         (
             blocks::A1(None),
@@ -2058,7 +2113,7 @@ pub fn get_vector_036() -> Vec<(StacksBlockData, ChainEventExpectation)> {
 ///        \  B3(6) - C3(7) - D3(17) - E3(11) - F3(12)
 ///        \  B2(3) - C2(8) - D2(5)  - E2(14) - F2(13) -  G2(10)
 ///
-pub fn get_vector_037() -> Vec<(StacksBlockData, ChainEventExpectation)> {
+pub fn get_vector_037() -> Vec<(BlockEvent, ChainEventExpectation)> {
     vec![
         (
             blocks::A1(None),
@@ -2120,7 +2175,7 @@ pub fn get_vector_037() -> Vec<(StacksBlockData, ChainEventExpectation)> {
 ///        \  B3(17) - C3(10) - D3(9)  - E3(8)  - F3(7)
 ///        \  B2(18) - C2(15) - D2(14) - E2(13) - F2(12) - G2(11)
 ///
-pub fn get_vector_038() -> Vec<(StacksBlockData, ChainEventExpectation)> {
+pub fn get_vector_038() -> Vec<(BlockEvent, ChainEventExpectation)> {
     vec![
         (
             blocks::A1(None),
@@ -2197,7 +2252,7 @@ pub fn get_vector_038() -> Vec<(StacksBlockData, ChainEventExpectation)> {
 ///       \                               \  E3(10)  - F3(9)
 ///        \  B2(14)  -  C2(13)  -  D2(12) -  E2(11) - F2(5) - G2(4)
 ///
-pub fn get_vector_039() -> Vec<(StacksBlockData, ChainEventExpectation)> {
+pub fn get_vector_039() -> Vec<(BlockEvent, ChainEventExpectation)> {
     vec![
         (
             blocks::A1(None),
@@ -2256,7 +2311,7 @@ pub fn get_vector_039() -> Vec<(StacksBlockData, ChainEventExpectation)> {
 ///       \                               \  E3(9)  - F3(8) -  G3(7)
 ///        \  B2(15)  -  C2(14)  -  D2(13) - E2(12) - F2(11) - G2(10)
 ///
-pub fn get_vector_040() -> Vec<(StacksBlockData, ChainEventExpectation)> {
+pub fn get_vector_040() -> Vec<(BlockEvent, ChainEventExpectation)> {
     vec![
         (
             blocks::A1(None),
@@ -2306,6 +2361,48 @@ pub fn get_vector_040() -> Vec<(StacksBlockData, ChainEventExpectation)> {
                     blocks::G3(None),
                 ],
             ),
+        ),
+    ]
+}
+
+/// Vector 041: Generate the following blocks
+///  
+/// A1(1) - B1(2) - C1(3) -  D1(5) - E1(8) - F1(9)
+///               \ C2(4)  - D2(6) - E2(7) - F2(10) - G2(11)
+///
+pub fn get_vector_041() -> Vec<(BlockEvent, ChainEventExpectation)> {
+    vec![]
+}
+
+/// Vector 042: Generate the following blocks
+///
+/// A1(1) -  B1(2) - [a1](3) - [b1](4) - [c1](5) -  C1(6)
+///
+pub fn get_vector_042() -> Vec<(BlockEvent, ChainEventExpectation)> {
+    vec![
+        (
+            blocks::A1(None),
+            expect_chain_updated_with_block(blocks::A1(None)),
+        ),
+        (
+            blocks::B1(None),
+            expect_chain_updated_with_block(blocks::B1(None)),
+        ),
+        (
+            microblocks::a1(blocks::B1(None), None),
+            expect_chain_updated_with_microblock(microblocks::a1(blocks::B1(None), None)),
+        ),
+        (
+            microblocks::b1(blocks::B1(None), None),
+            expect_chain_updated_with_microblock(microblocks::b1(blocks::B1(None), None)),
+        ),
+        (
+            microblocks::c1(blocks::B1(None), None),
+            expect_chain_updated_with_microblock(microblocks::c1(blocks::B1(None), None)),
+        ),
+        (
+            blocks::C1(None),
+            expect_chain_updated_with_block(blocks::C1(None)),
         ),
     ]
 }

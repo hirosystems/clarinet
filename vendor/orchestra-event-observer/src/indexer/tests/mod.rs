@@ -4,13 +4,23 @@ use orchestra_types::{StacksBlockData, StacksChainEvent};
 
 type ChainEventExpectation = Box<dyn Fn(Option<StacksChainEvent>) -> ()>;
 
+use self::helpers::BlockEvent;
+
 use super::UnconfirmedBlocksProcessor;
 
-fn process_blocks_and_check_expectations(steps: Vec<(StacksBlockData, ChainEventExpectation)>) {
+fn process_blocks_and_check_expectations(steps: Vec<(BlockEvent, ChainEventExpectation)>) {
     let mut blocks_processor = UnconfirmedBlocksProcessor::new();
-    for (block, check_chain_event_expectations) in steps {
-        let chain_event = blocks_processor.process_block(&block);
-        check_chain_event_expectations(chain_event);
+    for (block_event, check_chain_event_expectations) in steps.into_iter() {
+        match block_event {
+            BlockEvent::Block(block) => {
+                let chain_event = blocks_processor.process_block(block);
+                check_chain_event_expectations(chain_event);
+            }
+            BlockEvent::Microblock(microblock) => {
+                let chain_event = blocks_processor.process_microblocks(vec![microblock]);
+                check_chain_event_expectations(chain_event);
+            }
+        }
     }
 }
 

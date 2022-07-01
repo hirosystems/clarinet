@@ -5,7 +5,7 @@ use clarity_repl::clarity::util::hash::to_hex;
 use orchestra_types::{
     BitcoinChainEvent, BlockIdentifier, ChainUpdatedWithBlocksData,
     ChainUpdatedWithMicroblocksData, ChainUpdatedWithReorgData, StacksBlockData, StacksChainEvent,
-    StacksMicroblocksTrail,
+    StacksMicroblockData, StacksMicroblocksTrail,
 };
 
 pub struct UnconfirmedBlocksProcessor {
@@ -13,6 +13,8 @@ pub struct UnconfirmedBlocksProcessor {
     orphans: BTreeSet<BlockIdentifier>,
     block_store: HashMap<BlockIdentifier, StacksBlockData>,
     forks: Vec<ChainSegment>,
+    microblock_store: HashMap<(BlockIdentifier, BlockIdentifier), StacksMicroblockData>,
+    micro_forks: HashMap<BlockIdentifier, Vec<ChainSegment>>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -182,6 +184,41 @@ impl ChainSegment {
             None => Err(ChainSegmentIncompatibility::Unknown),
         }
     }
+
+    pub fn try_append_block(&mut self, block: &StacksBlockData) -> (bool, Option<ChainSegment>) {
+        let mut block_appended = false;
+        let mut fork = None;
+        match self.can_append_block(block) {
+            Ok(()) => {
+                self.append_block_identifier(&block.block_identifier, false);
+                block_appended = true;
+            }
+            Err(incompatibility) => {
+                match incompatibility {
+                    ChainSegmentIncompatibility::BlockCollision => {
+                        let mut new_fork = self.clone();
+                        let parent_found = new_fork.keep_blocks_from_oldest_to_block_identifier(
+                            &block.parent_block_identifier,
+                        );
+                        if parent_found {
+                            new_fork.append_block_identifier(&block.block_identifier, false);
+                            fork = Some(new_fork);
+                            block_appended = true;
+                        }
+                    }
+                    ChainSegmentIncompatibility::OutdatedSegment => {
+                        // TODO(lgalabru): test depth
+                        // fork_ids_to_prune.push(fork_id);
+                    }
+                    ChainSegmentIncompatibility::ParentBlockUnknown => {}
+                    ChainSegmentIncompatibility::OutdatedBlock => {}
+                    ChainSegmentIncompatibility::Unknown => {}
+                    ChainSegmentIncompatibility::AlreadyPresent => {}
+                }
+            }
+        }
+        (block_appended, fork)
+    }
 }
 
 impl std::fmt::Display for ChainSegment {
@@ -206,11 +243,14 @@ impl UnconfirmedBlocksProcessor {
             block_store: HashMap::new(),
             orphans: BTreeSet::new(),
             forks: vec![ChainSegment::new()],
+            microblock_store: HashMap::new(),
+            micro_forks: HashMap::new(),
         }
     }
 
-    pub fn try_append_block_to_fork(
+    pub fn try_append_block_to_chain_segment(
         &mut self,
+        chain_segment: &mut ChainSegment,
         fork_id: usize,
         new_forks: &mut Vec<ChainSegment>,
         fork_ids_to_prune: &mut Vec<usize>,
@@ -218,16 +258,12 @@ impl UnconfirmedBlocksProcessor {
         block: &StacksBlockData,
         prune: bool,
     ) -> bool {
-        let fork = match self.forks.get_mut(fork_id) {
-            Some(fork) => fork,
-            None => return false,
-        };
         let mut block_appended = false;
-        match fork.can_append_block(block) {
+        match chain_segment.can_append_block(block) {
             Ok(()) => {
-                println!("Appending {} to {}", block.block_identifier, fork);
-                fork.append_block_identifier(&block.block_identifier, prune);
-                println!("-> {}", fork);
+                println!("Appending {} to {}", block.block_identifier, chain_segment);
+                chain_segment.append_block_identifier(&block.block_identifier, prune);
+                println!("-> {}", chain_segment);
                 block_appended_in_forks.push(fork_id);
                 block_appended = true;
             }
@@ -235,7 +271,7 @@ impl UnconfirmedBlocksProcessor {
                 println!("{:?}", incompatibility);
                 match incompatibility {
                     ChainSegmentIncompatibility::BlockCollision => {
-                        let mut new_fork = fork.clone();
+                        let mut new_fork = chain_segment.clone();
                         let parent_found = new_fork.keep_blocks_from_oldest_to_block_identifier(
                             &block.parent_block_identifier,
                         );
@@ -262,7 +298,7 @@ impl UnconfirmedBlocksProcessor {
         block_appended
     }
 
-    pub fn process_block(&mut self, block: &StacksBlockData) -> Option<StacksChainEvent> {
+    pub fn process_block(&mut self, block: StacksBlockData) -> Option<StacksChainEvent> {
         println!("Processing {}", block.block_identifier);
         for fork in self.forks.iter() {
             println!("{}", fork);
@@ -277,66 +313,54 @@ impl UnconfirmedBlocksProcessor {
         self.block_store
             .insert(block.block_identifier.clone(), block.clone());
 
-        let mut new_forks = vec![];
-        let mut fork_ids_to_prune = vec![];
-        let mut block_appended_in_forks = vec![];
-        let fork_ids = self.forks.len();
-        let mut block_appended = false;
-        for fork_id in 0..fork_ids {
-            block_appended = self.try_append_block_to_fork(
-                fork_id,
-                &mut new_forks,
-                &mut fork_ids_to_prune,
-                &mut block_appended_in_forks,
-                block,
-                true,
-            );
-            if !block_appended {
-                self.orphans.insert(block.block_identifier.clone());
+        let mut fork_updated = None;
+        for fork in self.forks.iter_mut() {
+            let (block_appended, mut new_fork) = fork.try_append_block(&block);
+            if block_appended {
+                if let Some(new_fork) = new_fork.take() {
+                    self.forks.push(new_fork);
+                    fork_updated = self.forks.last_mut();
+                } else {
+                    fork_updated = Some(fork);
+                }
+                // A block can only be added to one segment
+                break;
             }
         }
 
-        // Start tracking new forks
-        self.forks.append(&mut new_forks);
+        let fork_updated = match fork_updated.take() {
+            Some(fork) => fork,
+            None => {
+                self.orphans.insert(block.block_identifier.clone());
+                return None;
+            }
+        };
 
         // Process former orphans
         let orphans = self.orphans.clone();
         let mut orphans_to_untrack = HashSet::new();
-        // For each fork that were modified with the block being processed
-        for fork_id in block_appended_in_forks.into_iter() {
-            let mut at_least_one_orphan_appended = true;
-            // As long as we are successful appending blocks that were previously unprocessable,
-            // Keep looping on this backlog
-            let mut applied = HashSet::new();
-            while at_least_one_orphan_appended {
-                at_least_one_orphan_appended = false;
-                for orphan_block_identifier in orphans.iter() {
-                    if applied.contains(orphan_block_identifier) {
-                        continue;
-                    }
-                    println!("Considering orphaned {}", orphan_block_identifier);
-                    let block = match self.block_store.get(orphan_block_identifier) {
-                        Some(block) => block.clone(),
-                        None => continue,
-                    };
-                    let orphan_appended = self.try_append_block_to_fork(
-                        fork_id,
-                        &mut vec![],
-                        &mut vec![],
-                        &mut vec![],
-                        &block,
-                        false,
-                    );
-                    if orphan_appended {
-                        applied.insert(orphan_block_identifier);
-                    }
-                    block_appended = block_appended || orphan_appended;
-                    at_least_one_orphan_appended = at_least_one_orphan_appended || orphan_appended;
-                    println!("{} / {}", block_appended, at_least_one_orphan_appended);
-                    if orphan_appended {
-                        orphans_to_untrack.insert(orphan_block_identifier);
-                    }
+
+        let mut at_least_one_orphan_appended = true;
+        // As long as we are successful appending blocks that were previously unprocessable,
+        // Keep looping on this backlog
+        let mut applied = HashSet::new();
+        while at_least_one_orphan_appended {
+            at_least_one_orphan_appended = false;
+            for orphan_block_identifier in orphans.iter() {
+                if applied.contains(orphan_block_identifier) {
+                    continue;
                 }
+                let block = match self.block_store.get(orphan_block_identifier) {
+                    Some(block) => block.clone(),
+                    None => continue,
+                };
+
+                let (orphan_appended, new_fork) = fork_updated.try_append_block(&block);
+                if orphan_appended {
+                    applied.insert(orphan_block_identifier);
+                    orphans_to_untrack.insert(orphan_block_identifier);
+                }
+                at_least_one_orphan_appended = at_least_one_orphan_appended || orphan_appended;
             }
         }
 
@@ -349,15 +373,11 @@ impl UnconfirmedBlocksProcessor {
         // Collect confirmed blocks, remove from block store
 
         // Process prunable forks
-        fork_ids_to_prune.reverse();
-        for fork_id in fork_ids_to_prune {
-            println!("Pruning fork {}", fork_id);
-            self.forks.remove(fork_id);
-        }
-
-        if !block_appended {
-            return None;
-        }
+        // fork_ids_to_prune.reverse();
+        // for fork_id in fork_ids_to_prune {
+        //     println!("Pruning fork {}", fork_id);
+        //     self.forks.remove(fork_id);
+        // }
 
         // Select canonical fork
         let mut canonical_fork_id = 0;
@@ -392,6 +412,31 @@ impl UnconfirmedBlocksProcessor {
         }
 
         chain_event
+    }
+
+    pub fn process_microblocks(
+        &mut self,
+        microblocks: Vec<StacksMicroblockData>,
+    ) -> Option<StacksChainEvent> {
+        for mut microblock in microblocks.into_iter() {
+            // Temporary patch: the event observer is not returning the block height of the anchor block,
+            // we're using the local state to retrieve this missing piece of data.
+            if let Some(block) = self
+                .block_store
+                .get(&microblock.metadata.anchor_block_identifier)
+            {
+                microblock.metadata.anchor_block_identifier = block.block_identifier.clone();
+            }
+            // Keep microblock data in memory
+            self.microblock_store.insert(
+                (
+                    microblock.metadata.anchor_block_identifier.clone(),
+                    microblock.block_identifier.clone(),
+                ),
+                microblock.clone(),
+            );
+        }
+        None
     }
 
     pub fn generate_chain_event(

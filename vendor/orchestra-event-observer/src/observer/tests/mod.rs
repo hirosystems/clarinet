@@ -121,7 +121,7 @@ fn test_chainhook_register_deregister() {
         vec!["u1"],
     )];
     let chain_event = StacksChainEvent::ChainUpdatedWithBlocks(ChainUpdatedWithBlocksData {
-        new_blocks: vec![blocks::generate_test_block(0, 1, transactions, None)],
+        new_blocks: vec![blocks::generate_test_block(0, 1, transactions, None).expect_block()],
         anchored_trail: None,
     });
     let _ = observer_commands_tx.send(ObserverCommand::PropagateStacksChainEvent(chain_event));
@@ -150,7 +150,7 @@ fn test_chainhook_register_deregister() {
         vec!["u1"],
     )];
     let chain_event = StacksChainEvent::ChainUpdatedWithBlocks(ChainUpdatedWithBlocksData {
-        new_blocks: vec![blocks::generate_test_block(0, 2, transactions, None)],
+        new_blocks: vec![blocks::generate_test_block(0, 2, transactions, None).expect_block()],
         anchored_trail: None,
     });
     let _ = observer_commands_tx.send(ObserverCommand::PropagateStacksChainEvent(chain_event));
@@ -195,7 +195,7 @@ fn test_chainhook_register_deregister() {
         vec!["u1"],
     )];
     let chain_event = StacksChainEvent::ChainUpdatedWithBlocks(ChainUpdatedWithBlocksData {
-        new_blocks: vec![blocks::generate_test_block(0, 2, transactions, None)],
+        new_blocks: vec![blocks::generate_test_block(0, 2, transactions, None).expect_block()],
         anchored_trail: None,
     });
     let _ = observer_commands_tx.send(ObserverCommand::PropagateStacksChainEvent(chain_event));
@@ -224,7 +224,7 @@ fn test_chainhook_register_deregister() {
         vec!["u1"],
     )];
     let chain_event = StacksChainEvent::ChainUpdatedWithBlocks(ChainUpdatedWithBlocksData {
-        new_blocks: vec![blocks::generate_test_block(0, 3, transactions, None)],
+        new_blocks: vec![blocks::generate_test_block(0, 3, transactions, None).expect_block()],
         anchored_trail: None,
     });
     let _ = observer_commands_tx.send(ObserverCommand::PropagateStacksChainEvent(chain_event));
@@ -291,7 +291,7 @@ fn test_chainhook_auto_deregister() {
         vec!["u1"],
     )];
     let chain_event = StacksChainEvent::ChainUpdatedWithBlocks(ChainUpdatedWithBlocksData {
-        new_blocks: vec![blocks::generate_test_block(0, 1, transactions, None)],
+        new_blocks: vec![blocks::generate_test_block(0, 1, transactions, None).expect_block()],
         anchored_trail: None,
     });
     let _ = observer_commands_tx.send(ObserverCommand::PropagateStacksChainEvent(chain_event));
@@ -320,7 +320,7 @@ fn test_chainhook_auto_deregister() {
         vec!["u1"],
     )];
     let chain_event = StacksChainEvent::ChainUpdatedWithBlocks(ChainUpdatedWithBlocksData {
-        new_blocks: vec![blocks::generate_test_block(0, 2, transactions, None)],
+        new_blocks: vec![blocks::generate_test_block(0, 2, transactions, None).expect_block()],
         anchored_trail: None,
     });
     let _ = observer_commands_tx.send(ObserverCommand::PropagateStacksChainEvent(chain_event));
@@ -349,7 +349,7 @@ fn test_chainhook_auto_deregister() {
         vec!["u1"],
     )];
     let chain_event = StacksChainEvent::ChainUpdatedWithBlocks(ChainUpdatedWithBlocksData {
-        new_blocks: vec![blocks::generate_test_block(0, 3, transactions, None)],
+        new_blocks: vec![blocks::generate_test_block(0, 3, transactions, None).expect_block()],
         anchored_trail: None,
     });
     let _ = observer_commands_tx.send(ObserverCommand::PropagateStacksChainEvent(chain_event));

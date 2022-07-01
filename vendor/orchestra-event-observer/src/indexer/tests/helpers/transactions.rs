@@ -57,6 +57,7 @@ pub fn generate_test_tx_contract_call(
             },
             description: format!("contract call {}::{}", contract_identifier, method),
             sponsor: None,
+            position: orchestra_types::StacksTransactionPosition::Index(0),
         },
     }
 }

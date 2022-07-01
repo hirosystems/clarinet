@@ -86,14 +86,20 @@ impl Indexer {
             &mut self.stacks_context,
         );
         self.unconfirmed_stacks_blocks_processor
-            .process_block(&block)
+            .process_block(block)
     }
 
     pub fn handle_stacks_microblock(
         &mut self,
-        _marshalled_microblock: JsonValue,
+        marshalled_microblock: JsonValue,
     ) -> Option<StacksChainEvent> {
-        None
+        let microblocks = chains::standardize_stacks_microblock_trail(
+            &self.config,
+            marshalled_microblock,
+            &mut self.stacks_context,
+        );
+        self.unconfirmed_stacks_blocks_processor
+            .process_microblocks(microblocks)
     }
 
     pub fn get_pox_info(&mut self) -> PoxInfo {
