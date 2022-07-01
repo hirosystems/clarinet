@@ -55,10 +55,8 @@ pub async fn start_language_server(
     };
 
     loop {
-        let command = match bridge_to_backend_rx.recv().await {
-            Ok(command) => {
-                command
-            }
+        let command = match bridge_to_backend_rx.recv() {
+            Ok(command) => command,
             Err(_e) => {
                 continue;
             }
