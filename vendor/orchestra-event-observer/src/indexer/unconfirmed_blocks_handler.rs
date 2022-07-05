@@ -8,6 +8,31 @@ use orchestra_types::{
     StacksMicroblockData, StacksMicroblocksTrail,
 };
 
+trait AbstractBlock {
+    fn get_identifier(&self) -> &BlockIdentifier;
+    fn get_parent_identifier(&self) -> &BlockIdentifier;
+}
+
+impl AbstractBlock for StacksBlockData {
+    fn get_identifier(&self) -> &BlockIdentifier {
+        &self.block_identifier
+    }
+
+    fn get_parent_identifier(&self) -> &BlockIdentifier {
+        &self.parent_block_identifier
+    }
+}
+
+impl AbstractBlock for StacksMicroblockData {
+    fn get_identifier(&self) -> &BlockIdentifier {
+        &self.block_identifier
+    }
+
+    fn get_parent_identifier(&self) -> &BlockIdentifier {
+        &self.parent_block_identifier
+    }
+}
+
 pub struct UnconfirmedBlocksProcessor {
     canonical_fork_id: usize,
     orphans: BTreeSet<BlockIdentifier>,
@@ -15,6 +40,8 @@ pub struct UnconfirmedBlocksProcessor {
     forks: Vec<ChainSegment>,
     microblock_store: HashMap<(BlockIdentifier, BlockIdentifier), StacksMicroblockData>,
     micro_forks: HashMap<BlockIdentifier, Vec<ChainSegment>>,
+    micro_orphans: BTreeSet<(BlockIdentifier, BlockIdentifier)>,
+    canonical_micro_fork_id: HashMap<BlockIdentifier, usize>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -73,15 +100,15 @@ impl ChainSegment {
         segment_index.try_into().unwrap()
     }
 
-    pub fn can_append_block(
+    fn can_append_block(
         &self,
-        block: &StacksBlockData,
+        block: &dyn AbstractBlock,
     ) -> Result<(), ChainSegmentIncompatibility> {
-        if self.is_block_id_older_than_segment(&block.block_identifier) {
+        if self.is_block_id_older_than_segment(&block.get_identifier()) {
             // Could be facing a deep fork...
             return Err(ChainSegmentIncompatibility::OutdatedBlock);
         }
-        if self.is_block_id_newer_than_segment(&block.block_identifier) {
+        if self.is_block_id_newer_than_segment(&block.get_identifier()) {
             // Chain segment looks outdated, we should just prune it?
             return Err(ChainSegmentIncompatibility::OutdatedSegment);
         }
@@ -89,18 +116,18 @@ impl ChainSegment {
             Some(tip) => tip,
             None => return Ok(()),
         };
-        if tip.index == block.parent_block_identifier.index {
-            match tip.hash == block.parent_block_identifier.hash {
+        if tip.index == block.get_parent_identifier().index {
+            match tip.hash == block.get_parent_identifier().hash {
                 true => return Ok(()),
                 false => return Err(ChainSegmentIncompatibility::ParentBlockUnknown),
             }
         }
         println!(
             "Index: {}",
-            self.get_relative_index(&block.block_identifier)
+            self.get_relative_index(&block.get_identifier())
         );
-        if let Some(colliding_block) = self.get_block_id(&block.block_identifier) {
-            match colliding_block.eq(&block.block_identifier) {
+        if let Some(colliding_block) = self.get_block_id(&block.get_identifier()) {
+            match colliding_block.eq(&block.get_identifier()) {
                 true => return Err(ChainSegmentIncompatibility::AlreadyPresent),
                 false => return Err(ChainSegmentIncompatibility::BlockCollision),
             }
@@ -185,12 +212,12 @@ impl ChainSegment {
         }
     }
 
-    pub fn try_append_block(&mut self, block: &StacksBlockData) -> (bool, Option<ChainSegment>) {
+    fn try_append_block(&mut self, block: &dyn AbstractBlock) -> (bool, Option<ChainSegment>) {
         let mut block_appended = false;
         let mut fork = None;
         match self.can_append_block(block) {
             Ok(()) => {
-                self.append_block_identifier(&block.block_identifier, false);
+                self.append_block_identifier(&block.get_identifier(), false);
                 block_appended = true;
             }
             Err(incompatibility) => {
@@ -198,10 +225,10 @@ impl ChainSegment {
                     ChainSegmentIncompatibility::BlockCollision => {
                         let mut new_fork = self.clone();
                         let parent_found = new_fork.keep_blocks_from_oldest_to_block_identifier(
-                            &block.parent_block_identifier,
+                            &block.get_parent_identifier(),
                         );
                         if parent_found {
-                            new_fork.append_block_identifier(&block.block_identifier, false);
+                            new_fork.append_block_identifier(&block.get_identifier(), false);
                             fork = Some(new_fork);
                             block_appended = true;
                         }
@@ -245,6 +272,8 @@ impl UnconfirmedBlocksProcessor {
             forks: vec![ChainSegment::new()],
             microblock_store: HashMap::new(),
             micro_forks: HashMap::new(),
+            micro_orphans: BTreeSet::new(),
+            canonical_micro_fork_id: HashMap::new(),
         }
     }
 
@@ -405,7 +434,8 @@ impl UnconfirmedBlocksProcessor {
             return None;
         }
 
-        let chain_event = Some(self.generate_chain_event(canonical_fork, &previous_canonical_fork));
+        let chain_event =
+            Some(self.generate_block_chain_event(canonical_fork, &previous_canonical_fork));
 
         for fork in self.forks.iter_mut() {
             fork.prune_confirmed_blocks();
@@ -418,6 +448,32 @@ impl UnconfirmedBlocksProcessor {
         &mut self,
         microblocks: Vec<StacksMicroblockData>,
     ) -> Option<StacksChainEvent> {
+        println!("===============================\nprocess_microblocks");
+
+        // Retrieve anchor block being updated
+        let anchor_block_updated = match microblocks.first() {
+            Some(microcblock) => microcblock.metadata.anchor_block_identifier.clone(),
+            None => return None,
+        };
+
+        let mut previous_canonical_micro_fork = None;
+
+        if let (Some(microforks), Some(micro_fork_id)) = (
+            self.micro_forks.get(&anchor_block_updated),
+            self.canonical_micro_fork_id.get(&anchor_block_updated),
+        ) {
+            previous_canonical_micro_fork = Some(microforks[*micro_fork_id].clone());
+        }
+
+        println!(
+            "previous_canonical_micro_fork: {:?}",
+            previous_canonical_micro_fork
+        );
+
+        let mut micro_forks_updated = HashSet::new();
+
+        println!("Microblocks: {:?}", microblocks);
+
         for mut microblock in microblocks.into_iter() {
             // Temporary patch: the event observer is not returning the block height of the anchor block,
             // we're using the local state to retrieve this missing piece of data.
@@ -435,11 +491,149 @@ impl UnconfirmedBlocksProcessor {
                 ),
                 microblock.clone(),
             );
+
+            let mut micro_fork_updated = None;
+
+            if microblock.block_identifier.index == 0 {
+                println!("Initiating new micro fork {}", microblock.block_identifier);
+                let mut microfork = ChainSegment::new();
+                microfork.append_block_identifier(&&microblock.block_identifier, false);
+                self.micro_forks
+                    .insert(anchor_block_updated.clone(), vec![microfork]);
+                micro_fork_updated = self
+                    .micro_forks
+                    .get_mut(&anchor_block_updated)
+                    .and_then(|microfork| microfork.last_mut())
+            } else {
+                if let Some(microforks) = self.micro_forks.get_mut(&anchor_block_updated) {
+                    for micro_fork in microforks.iter_mut() {
+                        let (block_appended, mut new_micro_fork) =
+                            micro_fork.try_append_block(&microblock);
+                        if block_appended {
+                            if let Some(new_micro_fork) = new_micro_fork.take() {
+                                microforks.push(new_micro_fork);
+                                micro_fork_updated = microforks.last_mut();
+                            } else {
+                                micro_fork_updated = Some(micro_fork);
+                            }
+                            // A block can only be added to one segment
+                            break;
+                        }
+                    }
+                }
+            }
+
+            println!("{:?}", micro_fork_updated);
+
+            let micro_fork_updated = match micro_fork_updated.take() {
+                Some(micro_fork) => micro_fork,
+                None => {
+                    self.micro_orphans.insert((
+                        microblock.metadata.anchor_block_identifier.clone(),
+                        microblock.block_identifier.clone(),
+                    ));
+                    continue;
+                }
+            };
+
+            // Process former orphans
+            let orphans = self.orphans.clone();
+            let mut orphans_to_untrack = HashSet::new();
+
+            let mut at_least_one_orphan_appended = true;
+            // As long as we are successful appending blocks that were previously unprocessable,
+            // Keep looping on this backlog
+            let mut applied = HashSet::new();
+            while at_least_one_orphan_appended {
+                at_least_one_orphan_appended = false;
+                for orphan_block_identifier in orphans.iter() {
+                    if applied.contains(orphan_block_identifier) {
+                        continue;
+                    }
+                    let block = match self.block_store.get(orphan_block_identifier) {
+                        Some(block) => block.clone(),
+                        None => continue,
+                    };
+
+                    let (orphan_appended, new_fork) = micro_fork_updated.try_append_block(&block);
+                    if orphan_appended {
+                        applied.insert(orphan_block_identifier);
+                        orphans_to_untrack.insert(orphan_block_identifier);
+                    }
+                    at_least_one_orphan_appended = at_least_one_orphan_appended || orphan_appended;
+                }
+            }
+
+            // Update orphans
+            for orphan in orphans_to_untrack.into_iter() {
+                println!("Dequeuing orphan");
+                self.orphans.remove(orphan);
+            }
+
+            // Collect confirmed blocks, remove from block store
+
+            // Process prunable forks
+            // fork_ids_to_prune.reverse();
+            // for fork_id in fork_ids_to_prune {
+            //     println!("Pruning fork {}", fork_id);
+            //     self.forks.remove(fork_id);
+            // }
+
+            micro_forks_updated.insert(microblock.metadata.anchor_block_identifier);
         }
-        None
+
+        if micro_forks_updated.is_empty() {
+            return None;
+        }
+
+        assert_eq!(micro_forks_updated.len(), 1);
+        let (block_identifier, microforks) = {
+            let block_identifier = micro_forks_updated
+                .iter()
+                .next()
+                .expect("unable to retrieve microforks");
+            let microforks = self
+                .micro_forks
+                .get(block_identifier)
+                .expect("unable to retrieve microforks");
+            (block_identifier, microforks)
+        };
+
+        // Select canonical fork
+        let mut canonical_micro_fork_id = 0;
+        let mut highest_height = 0;
+        for (fork_id, fork) in microforks.iter().enumerate() {
+            println!("Fork Id: {} - {}", fork_id, fork);
+            if fork.get_length() >= highest_height {
+                highest_height = fork.get_length();
+                canonical_micro_fork_id = fork_id;
+            }
+        }
+
+        println!("Fork Id selected: {}", canonical_micro_fork_id);
+
+        self.canonical_micro_fork_id
+            .insert(block_identifier.clone(), canonical_micro_fork_id);
+
+        // Generate chain event from the previous and current canonical forks
+        let canonical_micro_fork = microforks.get(canonical_micro_fork_id).unwrap();
+
+        let chain_event = self.generate_microblock_chain_event(
+            block_identifier,
+            canonical_micro_fork,
+            &previous_canonical_micro_fork,
+        );
+
+        println!("==>: {:?}", chain_event);
+
+        for fork in self.forks.iter_mut() {
+            fork.prune_confirmed_blocks();
+        }
+
+        chain_event
     }
 
-    pub fn generate_chain_event(
+    pub fn generate_block_chain_event(
         &self,
         canonical_segment: &ChainSegment,
         other_segment: &ChainSegment,
@@ -505,5 +699,94 @@ impl UnconfirmedBlocksProcessor {
             }
         }
         panic!()
+    }
+
+    pub fn generate_microblock_chain_event(
+        &self,
+        anchor_block_identifier: &BlockIdentifier,
+        new_canonical_segment: &ChainSegment,
+        previous_canonical_segment: &Option<ChainSegment>,
+    ) -> Option<StacksChainEvent> {
+        let previous_canonical_segment = match previous_canonical_segment {
+            Some(previous_canonical_segment) if !previous_canonical_segment.is_empty() => {
+                previous_canonical_segment
+            }
+            _ => {
+                let mut new_microblocks = vec![];
+                for i in 0..new_canonical_segment.block_ids.len() {
+                    let block_identifier = &new_canonical_segment.block_ids
+                        [new_canonical_segment.block_ids.len() - 1 - i];
+                    let microblock_identifier =
+                        (anchor_block_identifier.clone(), block_identifier.clone());
+                    let block = match self.microblock_store.get(&microblock_identifier) {
+                        Some(block) => block.clone(),
+                        None => panic!("unable to retrive block from block store"),
+                    };
+                    new_microblocks.push(block)
+                }
+                return Some(StacksChainEvent::ChainUpdatedWithMicroblocks(
+                    ChainUpdatedWithMicroblocksData { new_microblocks },
+                ));
+            }
+        };
+
+        if new_canonical_segment.eq(&previous_canonical_segment) {
+            return None;
+        }
+
+        println!("1: {}", previous_canonical_segment);
+        println!("2: {}", new_canonical_segment);
+
+        if let Ok(divergence) =
+            new_canonical_segment.try_identify_divergence(previous_canonical_segment)
+        {
+            println!("{:?}", divergence);
+            if divergence.blocks_to_rollback.is_empty() {
+                let mut new_microblocks = vec![];
+                for i in 0..divergence.blocks_to_apply.len() {
+                    let block_identifier = &new_canonical_segment.block_ids[i];
+                    println!("{} -> {}", i, block_identifier);
+
+                    let microblock_identifier =
+                        (anchor_block_identifier.clone(), block_identifier.clone());
+                    let block = match self.microblock_store.get(&microblock_identifier) {
+                        Some(block) => block.clone(),
+                        None => panic!("unable to retrive block from block store"),
+                    };
+                    new_microblocks.push(block)
+                }
+                return Some(StacksChainEvent::ChainUpdatedWithMicroblocks(
+                    ChainUpdatedWithMicroblocksData { new_microblocks },
+                ));
+            } else {
+                return Some(StacksChainEvent::ChainUpdatedWithReorg(
+                    ChainUpdatedWithReorgData {
+                        blocks_to_rollback: divergence
+                            .blocks_to_rollback
+                            .iter()
+                            .map(|block_id| {
+                                let block = match self.block_store.get(block_id) {
+                                    Some(block) => block.clone(),
+                                    None => panic!(),
+                                };
+                                (None, block)
+                            })
+                            .collect::<Vec<_>>(),
+                        blocks_to_apply: divergence
+                            .blocks_to_apply
+                            .iter()
+                            .map(|block_id| {
+                                let block = match self.block_store.get(block_id) {
+                                    Some(block) => block.clone(),
+                                    None => panic!(),
+                                };
+                                (None, block)
+                            })
+                            .collect::<Vec<_>>(),
+                    },
+                ));
+            }
+        }
+        None
     }
 }
