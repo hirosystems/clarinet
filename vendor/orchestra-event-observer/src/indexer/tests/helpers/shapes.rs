@@ -2406,3 +2406,44 @@ pub fn get_vector_042() -> Vec<(BlockEvent, ChainEventExpectation)> {
         ),
     ]
 }
+
+/// Vector 043: Generate the following blocks
+///
+/// A1(1) -  B1(2) - [a1](3) - [b1](4) - [c1](5) - [d1](6) - [e1](7) -  C1(8)
+///
+pub fn get_vector_043() -> Vec<(BlockEvent, ChainEventExpectation)> {
+    vec![
+        (
+            blocks::A1(None),
+            expect_chain_updated_with_block(blocks::A1(None)),
+        ),
+        (
+            blocks::B1(None),
+            expect_chain_updated_with_block(blocks::B1(None)),
+        ),
+        (
+            microblocks::a1(blocks::B1(None), None),
+            expect_chain_updated_with_microblock(microblocks::a1(blocks::B1(None), None)),
+        ),
+        (
+            microblocks::b1(blocks::B1(None), None),
+            expect_chain_updated_with_microblock(microblocks::b1(blocks::B1(None), None)),
+        ),
+        (
+            microblocks::c1(blocks::B1(None), None),
+            expect_chain_updated_with_microblock(microblocks::c1(blocks::B1(None), None)),
+        ),
+        (
+            microblocks::d1(blocks::B1(None), None),
+            expect_chain_updated_with_microblock(microblocks::d1(blocks::B1(None), None)),
+        ),
+        (
+            microblocks::e1(blocks::B1(None), None),
+            expect_chain_updated_with_microblock(microblocks::e1(blocks::B1(None), None)),
+        ),
+        (
+            blocks::C1(None),
+            expect_chain_updated_with_block(blocks::C1(None)),
+        ),
+    ]
+}
