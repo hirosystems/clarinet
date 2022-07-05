@@ -487,9 +487,8 @@ pub struct ChainUpdatedWithMicroblocksData {
 
 #[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct ChainUpdatedWithMicroblockReorgData {
-    pub new_block: StacksBlockData,
-    pub new_anchored_trail: Option<StacksMicroblocksTrail>,
-    pub old_trail: Option<StacksMicroblocksTrail>,
+    pub microblocks_to_rollback: Vec<StacksMicroblockData>,
+    pub microblocks_to_apply: Vec<StacksMicroblockData>,
 }
 
 #[allow(dead_code)]

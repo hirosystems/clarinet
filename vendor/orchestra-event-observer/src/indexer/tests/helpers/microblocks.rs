@@ -13,7 +13,7 @@ pub fn generate_test_microblock(
     parent_microblock: Option<BlockEvent>,
 ) -> BlockEvent {
     let mut hash = vec![
-        fork_id, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+        fork_id, 255, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
     ];
     let anchor = match anchor {
         BlockEvent::Block(anchor) => anchor,
@@ -31,16 +31,9 @@ pub fn generate_test_microblock(
                 parent_microblock.block_identifier.clone()
             }
             _ => {
-                let mut parent_hash = if (microblock_height - 1) == 0 {
-                    vec![
-                        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                    ]
-                } else {
-                    vec![
-                        fork_id, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                        0,
-                    ]
-                };
+                let mut parent_hash = vec![
+                    fork_id, 255, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                ];
                 parent_hash.append(&mut (microblock_height - 1).to_be_bytes().to_vec());
 
                 BlockIdentifier {
@@ -66,7 +59,11 @@ pub fn generate_test_microblock(
 }
 
 pub fn a1(anchor: BlockEvent, parent_microblock: Option<BlockEvent>) -> BlockEvent {
-    generate_test_microblock(0, 0, vec![], anchor, parent_microblock)
+    generate_test_microblock(1, 0, vec![], anchor, parent_microblock)
+}
+
+pub fn a2(anchor: BlockEvent, parent_microblock: Option<BlockEvent>) -> BlockEvent {
+    generate_test_microblock(2, 0, vec![], anchor, parent_microblock)
 }
 
 pub fn b1(anchor: BlockEvent, parent_microblock: Option<BlockEvent>) -> BlockEvent {

@@ -1,11 +1,12 @@
-use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet, VecDeque};
+use std::collections::{hash_map::Entry, BTreeMap, BTreeSet, HashMap, HashSet, VecDeque};
 
 use bitcoincore_rpc::bitcoin::Block;
 use clarity_repl::clarity::util::hash::to_hex;
 use orchestra_types::{
     BitcoinChainEvent, BlockIdentifier, ChainUpdatedWithBlocksData,
-    ChainUpdatedWithMicroblocksData, ChainUpdatedWithReorgData, StacksBlockData, StacksChainEvent,
-    StacksMicroblockData, StacksMicroblocksTrail,
+    ChainUpdatedWithMicroblockReorgData, ChainUpdatedWithMicroblocksData,
+    ChainUpdatedWithReorgData, StacksBlockData, StacksChainEvent, StacksMicroblockData,
+    StacksMicroblocksTrail,
 };
 
 trait AbstractBlock {
@@ -183,28 +184,37 @@ impl ChainSegment {
     fn try_identify_divergence(
         &self,
         other_segment: &ChainSegment,
+        allow_reset: bool,
     ) -> Result<ChainSegmentDivergence, ChainSegmentIncompatibility> {
         let mut common_root = None;
         let mut blocks_to_rollback = vec![];
         let mut blocks_to_apply = vec![];
         for cursor_segment_1 in other_segment.block_ids.iter() {
+            blocks_to_apply.clear();
             for cursor_segment_2 in self.block_ids.iter() {
                 if cursor_segment_2.eq(cursor_segment_1) {
                     common_root = Some(cursor_segment_2.clone());
+                    println!("case 1: {} = {}", cursor_segment_2, cursor_segment_1);
                     break;
                 }
                 blocks_to_apply.push(cursor_segment_2.clone());
             }
             if common_root.is_some() {
+                println!("common_root: {:?}", common_root);
                 break;
             }
             blocks_to_rollback.push(cursor_segment_1.clone());
-            blocks_to_apply.clear();
         }
+        println!("TO ROLLBACK: {:?}", blocks_to_rollback);
+        println!("TO APPLY: {:?}", blocks_to_apply);
         blocks_to_rollback.reverse();
         blocks_to_apply.reverse();
         match common_root.take() {
             Some(_common_root) => Ok(ChainSegmentDivergence {
+                blocks_to_rollback,
+                blocks_to_apply,
+            }),
+            None if allow_reset => Ok(ChainSegmentDivergence {
                 blocks_to_rollback,
                 blocks_to_apply,
             }),
@@ -462,6 +472,11 @@ impl UnconfirmedBlocksProcessor {
             self.micro_forks.get(&anchor_block_updated),
             self.canonical_micro_fork_id.get(&anchor_block_updated),
         ) {
+            println!(
+                "Previous fork selected as canonical: {}",
+                microforks[*micro_fork_id]
+            );
+
             previous_canonical_micro_fork = Some(microforks[*micro_fork_id].clone());
         }
 
@@ -498,8 +513,13 @@ impl UnconfirmedBlocksProcessor {
                 println!("Initiating new micro fork {}", microblock.block_identifier);
                 let mut microfork = ChainSegment::new();
                 microfork.append_block_identifier(&&microblock.block_identifier, false);
-                self.micro_forks
-                    .insert(anchor_block_updated.clone(), vec![microfork]);
+
+                match self.micro_forks.entry(anchor_block_updated.clone()) {
+                    Entry::Occupied(microforks) => microforks.into_mut().push(microfork),
+                    Entry::Vacant(v) => {
+                        v.insert(vec![microfork]);
+                    }
+                };
                 micro_fork_updated = self
                     .micro_forks
                     .get_mut(&anchor_block_updated)
@@ -587,16 +607,12 @@ impl UnconfirmedBlocksProcessor {
         }
 
         assert_eq!(micro_forks_updated.len(), 1);
-        let (block_identifier, microforks) = {
-            let block_identifier = micro_forks_updated
-                .iter()
-                .next()
-                .expect("unable to retrieve microforks");
+        let microforks = {
             let microforks = self
                 .micro_forks
-                .get(block_identifier)
+                .get(&anchor_block_updated)
                 .expect("unable to retrieve microforks");
-            (block_identifier, microforks)
+            microforks
         };
 
         // Select canonical fork
@@ -610,16 +626,16 @@ impl UnconfirmedBlocksProcessor {
             }
         }
 
-        println!("Fork Id selected: {}", canonical_micro_fork_id);
-
         self.canonical_micro_fork_id
-            .insert(block_identifier.clone(), canonical_micro_fork_id);
+            .insert(anchor_block_updated.clone(), canonical_micro_fork_id);
 
         // Generate chain event from the previous and current canonical forks
         let canonical_micro_fork = microforks.get(canonical_micro_fork_id).unwrap();
 
+        println!("Fork selected as canonical: {}", canonical_micro_fork);
+
         let chain_event = self.generate_microblock_chain_event(
-            block_identifier,
+            &anchor_block_updated,
             canonical_micro_fork,
             &previous_canonical_micro_fork,
         );
@@ -656,7 +672,7 @@ impl UnconfirmedBlocksProcessor {
                 anchored_trail: None,
             });
         }
-        if let Ok(divergence) = canonical_segment.try_identify_divergence(other_segment) {
+        if let Ok(divergence) = canonical_segment.try_identify_divergence(other_segment, false) {
             if divergence.blocks_to_rollback.is_empty() {
                 let mut new_blocks = vec![];
                 for i in 0..divergence.blocks_to_apply.len() {
@@ -738,7 +754,7 @@ impl UnconfirmedBlocksProcessor {
         println!("2: {}", new_canonical_segment);
 
         if let Ok(divergence) =
-            new_canonical_segment.try_identify_divergence(previous_canonical_segment)
+            new_canonical_segment.try_identify_divergence(previous_canonical_segment, true)
         {
             println!("{:?}", divergence);
             if divergence.blocks_to_rollback.is_empty() {
@@ -759,28 +775,42 @@ impl UnconfirmedBlocksProcessor {
                     ChainUpdatedWithMicroblocksData { new_microblocks },
                 ));
             } else {
-                return Some(StacksChainEvent::ChainUpdatedWithReorg(
-                    ChainUpdatedWithReorgData {
-                        blocks_to_rollback: divergence
+                return Some(StacksChainEvent::ChainUpdatedWithMicroblockReorg(
+                    ChainUpdatedWithMicroblockReorgData {
+                        microblocks_to_rollback: divergence
                             .blocks_to_rollback
                             .iter()
-                            .map(|block_id| {
-                                let block = match self.block_store.get(block_id) {
+                            .map(|microblock_identifier| {
+                                let microblock_identifier = (
+                                    anchor_block_identifier.clone(),
+                                    microblock_identifier.clone(),
+                                );
+                                let block = match self.microblock_store.get(&microblock_identifier)
+                                {
                                     Some(block) => block.clone(),
-                                    None => panic!(),
+                                    None => {
+                                        panic!("unable to retrive microblock from microblock store")
+                                    }
                                 };
-                                (None, block)
+                                block
                             })
                             .collect::<Vec<_>>(),
-                        blocks_to_apply: divergence
+                        microblocks_to_apply: divergence
                             .blocks_to_apply
                             .iter()
-                            .map(|block_id| {
-                                let block = match self.block_store.get(block_id) {
+                            .map(|microblock_identifier| {
+                                let microblock_identifier = (
+                                    anchor_block_identifier.clone(),
+                                    microblock_identifier.clone(),
+                                );
+                                let block = match self.microblock_store.get(&microblock_identifier)
+                                {
                                     Some(block) => block.clone(),
-                                    None => panic!(),
+                                    None => {
+                                        panic!("unable to retrive microblock from microblock store")
+                                    }
                                 };
-                                (None, block)
+                                block
                             })
                             .collect::<Vec<_>>(),
                     },

@@ -99,7 +99,7 @@ pub fn expect_chain_updated_with_blocks(expected_blocks: Vec<BlockEvent>) -> Cha
     })
 }
 
-pub fn expect_chain_updated_with_reorg(
+pub fn expect_chain_updated_with_block_reorg(
     blocks_to_rollback: Vec<BlockEvent>,
     blocks_to_apply: Vec<BlockEvent>,
 ) -> ChainEventExpectation {
@@ -142,6 +142,58 @@ pub fn expect_chain_updated_with_reorg(
                 _ => false,
             },
             "expected ChainUpdatedWithReorg, got {:?}",
+            chain_event_to_check
+        );
+    })
+}
+
+pub fn expect_chain_updated_with_microblock_reorg(
+    microblocks_to_rollback: Vec<BlockEvent>,
+    microblocks_to_apply: Vec<BlockEvent>,
+) -> ChainEventExpectation {
+    Box::new(move |chain_event_to_check: Option<StacksChainEvent>| {
+        assert!(
+            match chain_event_to_check {
+                Some(StacksChainEvent::ChainUpdatedWithMicroblockReorg(ref event)) => {
+                    assert_eq!(
+                        microblocks_to_rollback.len(),
+                        event.microblocks_to_rollback.len()
+                    );
+                    assert_eq!(microblocks_to_apply.len(), event.microblocks_to_apply.len());
+                    for (expected, microblock) in microblocks_to_rollback
+                        .iter()
+                        .zip(&event.microblocks_to_rollback)
+                    {
+                        let expected = match expected {
+                            BlockEvent::Microblock(expected) => expected,
+                            _ => unreachable!(),
+                        };
+                        assert!(
+                            expected.block_identifier.eq(&microblock.block_identifier),
+                            "{} ≠ {}",
+                            expected.block_identifier,
+                            microblock.block_identifier
+                        );
+                    }
+                    for (expected, microblock) in
+                        microblocks_to_apply.iter().zip(&event.microblocks_to_apply)
+                    {
+                        let expected = match expected {
+                            BlockEvent::Microblock(expected) => expected,
+                            _ => unreachable!(),
+                        };
+                        assert!(
+                            expected.block_identifier.eq(&microblock.block_identifier),
+                            "{} ≠ {}",
+                            expected.block_identifier,
+                            microblock.block_identifier
+                        );
+                    }
+                    true
+                }
+                _ => false,
+            },
+            "expected ChainUpdatedWithMicroblockReorg, got {:?}",
             chain_event_to_check
         );
     })
@@ -192,18 +244,18 @@ pub fn get_vector_002() -> Vec<(BlockEvent, ChainEventExpectation)> {
         ),
         (
             blocks::B2(None),
-            expect_chain_updated_with_reorg(vec![blocks::B1(None)], vec![blocks::B2(None)]),
+            expect_chain_updated_with_block_reorg(vec![blocks::B1(None)], vec![blocks::B2(None)]),
         ),
         (
             blocks::C1(None),
-            expect_chain_updated_with_reorg(
+            expect_chain_updated_with_block_reorg(
                 vec![blocks::B2(None)],
                 vec![blocks::B1(None), blocks::C1(None)],
             ),
         ),
         (
             blocks::C2(None),
-            expect_chain_updated_with_reorg(
+            expect_chain_updated_with_block_reorg(
                 vec![blocks::B1(None), blocks::C1(None)],
                 vec![blocks::B2(None), blocks::C2(None)],
             ),
@@ -233,7 +285,7 @@ pub fn get_vector_003() -> Vec<(BlockEvent, ChainEventExpectation)> {
         (blocks::B2(None), expect_no_chain_update()),
         (
             blocks::C2(None),
-            expect_chain_updated_with_reorg(
+            expect_chain_updated_with_block_reorg(
                 vec![blocks::B1(None), blocks::C1(None)],
                 vec![blocks::B2(None), blocks::C2(None)],
             ),
@@ -263,14 +315,14 @@ pub fn get_vector_004() -> Vec<(BlockEvent, ChainEventExpectation)> {
         (blocks::B2(None), expect_no_chain_update()),
         (
             blocks::C2(None),
-            expect_chain_updated_with_reorg(
+            expect_chain_updated_with_block_reorg(
                 vec![blocks::B1(None), blocks::C1(None)],
                 vec![blocks::B2(None), blocks::C2(None)],
             ),
         ),
         (
             blocks::D1(None),
-            expect_chain_updated_with_reorg(
+            expect_chain_updated_with_block_reorg(
                 vec![blocks::B2(None), blocks::C2(None)],
                 vec![blocks::B1(None), blocks::C1(None), blocks::D1(None)],
             ),
@@ -300,14 +352,14 @@ pub fn get_vector_005() -> Vec<(BlockEvent, ChainEventExpectation)> {
         (blocks::B2(None), expect_no_chain_update()),
         (
             blocks::C2(None),
-            expect_chain_updated_with_reorg(
+            expect_chain_updated_with_block_reorg(
                 vec![blocks::B1(None), blocks::C1(None)],
                 vec![blocks::B2(None), blocks::C2(None)],
             ),
         ),
         (
             blocks::D1(None),
-            expect_chain_updated_with_reorg(
+            expect_chain_updated_with_block_reorg(
                 vec![blocks::B2(None), blocks::C2(None)],
                 vec![blocks::B1(None), blocks::C1(None), blocks::D1(None)],
             ),
@@ -341,14 +393,14 @@ pub fn get_vector_006() -> Vec<(BlockEvent, ChainEventExpectation)> {
         (blocks::B2(None), expect_no_chain_update()),
         (
             blocks::C2(None),
-            expect_chain_updated_with_reorg(
+            expect_chain_updated_with_block_reorg(
                 vec![blocks::B1(None), blocks::C1(None)],
                 vec![blocks::B2(None), blocks::C2(None)],
             ),
         ),
         (
             blocks::D1(None),
-            expect_chain_updated_with_reorg(
+            expect_chain_updated_with_block_reorg(
                 vec![blocks::B2(None), blocks::C2(None)],
                 vec![blocks::B1(None), blocks::C1(None), blocks::D1(None)],
             ),
@@ -386,14 +438,14 @@ pub fn get_vector_007() -> Vec<(BlockEvent, ChainEventExpectation)> {
         (blocks::B2(None), expect_no_chain_update()),
         (
             blocks::C2(None),
-            expect_chain_updated_with_reorg(
+            expect_chain_updated_with_block_reorg(
                 vec![blocks::B1(None), blocks::C1(None)],
                 vec![blocks::B2(None), blocks::C2(None)],
             ),
         ),
         (
             blocks::D1(None),
-            expect_chain_updated_with_reorg(
+            expect_chain_updated_with_block_reorg(
                 vec![blocks::B2(None), blocks::C2(None)],
                 vec![blocks::B1(None), blocks::C1(None), blocks::D1(None)],
             ),
@@ -435,14 +487,14 @@ pub fn get_vector_008() -> Vec<(BlockEvent, ChainEventExpectation)> {
         (blocks::B2(None), expect_no_chain_update()),
         (
             blocks::C2(None),
-            expect_chain_updated_with_reorg(
+            expect_chain_updated_with_block_reorg(
                 vec![blocks::B1(None), blocks::C1(None)],
                 vec![blocks::B2(None), blocks::C2(None)],
             ),
         ),
         (
             blocks::D1(None),
-            expect_chain_updated_with_reorg(
+            expect_chain_updated_with_block_reorg(
                 vec![blocks::B2(None), blocks::C2(None)],
                 vec![blocks::B1(None), blocks::C1(None), blocks::D1(None)],
             ),
@@ -488,14 +540,14 @@ pub fn get_vector_009() -> Vec<(BlockEvent, ChainEventExpectation)> {
         (blocks::B2(None), expect_no_chain_update()),
         (
             blocks::C2(None),
-            expect_chain_updated_with_reorg(
+            expect_chain_updated_with_block_reorg(
                 vec![blocks::B1(None), blocks::C1(None)],
                 vec![blocks::B2(None), blocks::C2(None)],
             ),
         ),
         (
             blocks::D1(None),
-            expect_chain_updated_with_reorg(
+            expect_chain_updated_with_block_reorg(
                 vec![blocks::B2(None), blocks::C2(None)],
                 vec![blocks::B1(None), blocks::C1(None), blocks::D1(None)],
             ),
@@ -545,14 +597,14 @@ pub fn get_vector_010() -> Vec<(BlockEvent, ChainEventExpectation)> {
         (blocks::B2(None), expect_no_chain_update()),
         (
             blocks::C2(None),
-            expect_chain_updated_with_reorg(
+            expect_chain_updated_with_block_reorg(
                 vec![blocks::B1(None), blocks::C1(None)],
                 vec![blocks::B2(None), blocks::C2(None)],
             ),
         ),
         (
             blocks::D1(None),
-            expect_chain_updated_with_reorg(
+            expect_chain_updated_with_block_reorg(
                 vec![blocks::B2(None), blocks::C2(None)],
                 vec![blocks::B1(None), blocks::C1(None), blocks::D1(None)],
             ),
@@ -603,14 +655,14 @@ pub fn get_vector_011() -> Vec<(BlockEvent, ChainEventExpectation)> {
         (blocks::B2(None), expect_no_chain_update()),
         (
             blocks::C2(None),
-            expect_chain_updated_with_reorg(
+            expect_chain_updated_with_block_reorg(
                 vec![blocks::B1(None), blocks::C1(None)],
                 vec![blocks::B2(None), blocks::C2(None)],
             ),
         ),
         (
             blocks::D1(None),
-            expect_chain_updated_with_reorg(
+            expect_chain_updated_with_block_reorg(
                 vec![blocks::B2(None), blocks::C2(None)],
                 vec![blocks::B1(None), blocks::C1(None), blocks::D1(None)],
             ),
@@ -662,14 +714,14 @@ pub fn get_vector_012() -> Vec<(BlockEvent, ChainEventExpectation)> {
         (blocks::B2(None), expect_no_chain_update()),
         (
             blocks::C2(None),
-            expect_chain_updated_with_reorg(
+            expect_chain_updated_with_block_reorg(
                 vec![blocks::B1(None), blocks::C1(None)],
                 vec![blocks::B2(None), blocks::C2(None)],
             ),
         ),
         (
             blocks::D1(None),
-            expect_chain_updated_with_reorg(
+            expect_chain_updated_with_block_reorg(
                 vec![blocks::B2(None), blocks::C2(None)],
                 vec![blocks::B1(None), blocks::C1(None), blocks::D1(None)],
             ),
@@ -723,14 +775,14 @@ pub fn get_vector_013() -> Vec<(BlockEvent, ChainEventExpectation)> {
         (blocks::B2(None), expect_no_chain_update()),
         (
             blocks::C2(None),
-            expect_chain_updated_with_reorg(
+            expect_chain_updated_with_block_reorg(
                 vec![blocks::B1(None), blocks::C1(None)],
                 vec![blocks::B2(None), blocks::C2(None)],
             ),
         ),
         (
             blocks::D1(None),
-            expect_chain_updated_with_reorg(
+            expect_chain_updated_with_block_reorg(
                 vec![blocks::B2(None), blocks::C2(None)],
                 vec![blocks::B1(None), blocks::C1(None), blocks::D1(None)],
             ),
@@ -784,14 +836,14 @@ pub fn get_vector_014() -> Vec<(BlockEvent, ChainEventExpectation)> {
         (blocks::B2(None), expect_no_chain_update()),
         (
             blocks::C2(None),
-            expect_chain_updated_with_reorg(
+            expect_chain_updated_with_block_reorg(
                 vec![blocks::B1(None), blocks::C1(None)],
                 vec![blocks::B2(None), blocks::C2(None)],
             ),
         ),
         (
             blocks::D1(None),
-            expect_chain_updated_with_reorg(
+            expect_chain_updated_with_block_reorg(
                 vec![blocks::B2(None), blocks::C2(None)],
                 vec![blocks::B1(None), blocks::C1(None), blocks::D1(None)],
             ),
@@ -846,14 +898,14 @@ pub fn get_vector_015() -> Vec<(BlockEvent, ChainEventExpectation)> {
         (blocks::B2(None), expect_no_chain_update()),
         (
             blocks::C2(None),
-            expect_chain_updated_with_reorg(
+            expect_chain_updated_with_block_reorg(
                 vec![blocks::B1(None), blocks::C1(None)],
                 vec![blocks::B2(None), blocks::C2(None)],
             ),
         ),
         (
             blocks::D1(None),
-            expect_chain_updated_with_reorg(
+            expect_chain_updated_with_block_reorg(
                 vec![blocks::B2(None), blocks::C2(None)],
                 vec![blocks::B1(None), blocks::C1(None), blocks::D1(None)],
             ),
@@ -884,7 +936,7 @@ pub fn get_vector_015() -> Vec<(BlockEvent, ChainEventExpectation)> {
         (blocks::H3(None), expect_no_chain_update()),
         (
             blocks::I3(None),
-            expect_chain_updated_with_reorg(
+            expect_chain_updated_with_block_reorg(
                 vec![
                     blocks::E1(None),
                     blocks::F1(None),
@@ -927,14 +979,14 @@ pub fn get_vector_016() -> Vec<(BlockEvent, ChainEventExpectation)> {
         (blocks::B2(None), expect_no_chain_update()),
         (
             blocks::C2(None),
-            expect_chain_updated_with_reorg(
+            expect_chain_updated_with_block_reorg(
                 vec![blocks::B1(None), blocks::C1(None)],
                 vec![blocks::B2(None), blocks::C2(None)],
             ),
         ),
         (
             blocks::D1(None),
-            expect_chain_updated_with_reorg(
+            expect_chain_updated_with_block_reorg(
                 vec![blocks::B2(None), blocks::C2(None)],
                 vec![blocks::B1(None), blocks::C1(None), blocks::D1(None)],
             ),
@@ -965,7 +1017,7 @@ pub fn get_vector_016() -> Vec<(BlockEvent, ChainEventExpectation)> {
         (blocks::H3(None), expect_no_chain_update()),
         (
             blocks::I3(None),
-            expect_chain_updated_with_reorg(
+            expect_chain_updated_with_block_reorg(
                 vec![
                     blocks::E1(None),
                     blocks::F1(None),
@@ -1009,14 +1061,14 @@ pub fn get_vector_017() -> Vec<(BlockEvent, ChainEventExpectation)> {
         (blocks::B2(None), expect_no_chain_update()),
         (
             blocks::C2(None),
-            expect_chain_updated_with_reorg(
+            expect_chain_updated_with_block_reorg(
                 vec![blocks::B1(None), blocks::C1(None)],
                 vec![blocks::B2(None), blocks::C2(None)],
             ),
         ),
         (
             blocks::D1(None),
-            expect_chain_updated_with_reorg(
+            expect_chain_updated_with_block_reorg(
                 vec![blocks::B2(None), blocks::C2(None)],
                 vec![blocks::B1(None), blocks::C1(None), blocks::D1(None)],
             ),
@@ -1037,7 +1089,7 @@ pub fn get_vector_017() -> Vec<(BlockEvent, ChainEventExpectation)> {
         (blocks::F3(None), expect_no_chain_update()),
         (
             blocks::G3(None),
-            expect_chain_updated_with_reorg(
+            expect_chain_updated_with_block_reorg(
                 vec![blocks::E1(None), blocks::F1(None), blocks::G1(None)],
                 vec![
                     blocks::E3(Some(blocks::D1(None))),
@@ -1076,14 +1128,14 @@ pub fn get_vector_018() -> Vec<(BlockEvent, ChainEventExpectation)> {
         (blocks::B2(None), expect_no_chain_update()),
         (
             blocks::C2(None),
-            expect_chain_updated_with_reorg(
+            expect_chain_updated_with_block_reorg(
                 vec![blocks::B1(None), blocks::C1(None)],
                 vec![blocks::B2(None), blocks::C2(None)],
             ),
         ),
         (
             blocks::D1(None),
-            expect_chain_updated_with_reorg(
+            expect_chain_updated_with_block_reorg(
                 vec![blocks::B2(None), blocks::C2(None)],
                 vec![blocks::B1(None), blocks::C1(None), blocks::D1(None)],
             ),
@@ -1099,7 +1151,7 @@ pub fn get_vector_018() -> Vec<(BlockEvent, ChainEventExpectation)> {
         (blocks::E3(Some(blocks::D1(None))), expect_no_chain_update()),
         (
             blocks::F3(None),
-            expect_chain_updated_with_reorg(
+            expect_chain_updated_with_block_reorg(
                 vec![blocks::E1(None), blocks::F1(None)],
                 vec![blocks::E3(Some(blocks::D1(None))), blocks::F3(None)],
             ),
@@ -1109,7 +1161,7 @@ pub fn get_vector_018() -> Vec<(BlockEvent, ChainEventExpectation)> {
         (blocks::F2(None), expect_no_chain_update()),
         (
             blocks::G2(None),
-            expect_chain_updated_with_reorg(
+            expect_chain_updated_with_block_reorg(
                 vec![
                     blocks::B1(None),
                     blocks::C1(None),
@@ -1153,14 +1205,14 @@ pub fn get_vector_019() -> Vec<(BlockEvent, ChainEventExpectation)> {
         (blocks::B2(None), expect_no_chain_update()),
         (
             blocks::C2(None),
-            expect_chain_updated_with_reorg(
+            expect_chain_updated_with_block_reorg(
                 vec![blocks::B1(None), blocks::C1(None)],
                 vec![blocks::B2(None), blocks::C2(None)],
             ),
         ),
         (
             blocks::D1(None),
-            expect_chain_updated_with_reorg(
+            expect_chain_updated_with_block_reorg(
                 vec![blocks::B2(None), blocks::C2(None)],
                 vec![blocks::B1(None), blocks::C1(None), blocks::D1(None)],
             ),
@@ -1176,7 +1228,7 @@ pub fn get_vector_019() -> Vec<(BlockEvent, ChainEventExpectation)> {
         (blocks::E3(Some(blocks::D1(None))), expect_no_chain_update()),
         (
             blocks::F3(None),
-            expect_chain_updated_with_reorg(
+            expect_chain_updated_with_block_reorg(
                 vec![blocks::E1(None), blocks::F1(None)],
                 vec![blocks::E3(Some(blocks::D1(None))), blocks::F3(None)],
             ),
@@ -1186,7 +1238,7 @@ pub fn get_vector_019() -> Vec<(BlockEvent, ChainEventExpectation)> {
         (blocks::F2(None), expect_no_chain_update()),
         (
             blocks::G2(None),
-            expect_chain_updated_with_reorg(
+            expect_chain_updated_with_block_reorg(
                 vec![
                     blocks::B1(None),
                     blocks::C1(None),
@@ -1231,14 +1283,14 @@ pub fn get_vector_020() -> Vec<(BlockEvent, ChainEventExpectation)> {
         (blocks::B2(None), expect_no_chain_update()),
         (
             blocks::C2(None),
-            expect_chain_updated_with_reorg(
+            expect_chain_updated_with_block_reorg(
                 vec![blocks::B1(None), blocks::C1(None)],
                 vec![blocks::B2(None), blocks::C2(None)],
             ),
         ),
         (
             blocks::D1(None),
-            expect_chain_updated_with_reorg(
+            expect_chain_updated_with_block_reorg(
                 vec![blocks::B2(None), blocks::C2(None)],
                 vec![blocks::B1(None), blocks::C1(None), blocks::D1(None)],
             ),
@@ -1254,7 +1306,7 @@ pub fn get_vector_020() -> Vec<(BlockEvent, ChainEventExpectation)> {
         (blocks::E3(Some(blocks::D1(None))), expect_no_chain_update()),
         (
             blocks::F3(None),
-            expect_chain_updated_with_reorg(
+            expect_chain_updated_with_block_reorg(
                 vec![blocks::E1(None), blocks::F1(None)],
                 vec![blocks::E3(Some(blocks::D1(None))), blocks::F3(None)],
             ),
@@ -1264,7 +1316,7 @@ pub fn get_vector_020() -> Vec<(BlockEvent, ChainEventExpectation)> {
         (blocks::F2(None), expect_no_chain_update()),
         (
             blocks::G2(None),
-            expect_chain_updated_with_reorg(
+            expect_chain_updated_with_block_reorg(
                 vec![
                     blocks::B1(None),
                     blocks::C1(None),
@@ -1285,7 +1337,7 @@ pub fn get_vector_020() -> Vec<(BlockEvent, ChainEventExpectation)> {
         (blocks::G1(None), expect_no_chain_update()),
         (
             blocks::G3(None),
-            expect_chain_updated_with_reorg(
+            expect_chain_updated_with_block_reorg(
                 vec![
                     blocks::B2(None),
                     blocks::C2(None),
@@ -1347,7 +1399,7 @@ pub fn get_vector_022() -> Vec<(BlockEvent, ChainEventExpectation)> {
         (blocks::C2(None), expect_no_chain_update()),
         (
             blocks::B2(None),
-            expect_chain_updated_with_reorg(
+            expect_chain_updated_with_block_reorg(
                 vec![blocks::B1(None), blocks::C1(None)],
                 vec![blocks::B2(None), blocks::C2(None)],
             ),
@@ -1377,7 +1429,7 @@ pub fn get_vector_023() -> Vec<(BlockEvent, ChainEventExpectation)> {
         ),
         (
             blocks::B1(None),
-            expect_chain_updated_with_reorg(
+            expect_chain_updated_with_block_reorg(
                 vec![blocks::B2(None), blocks::C2(None)],
                 vec![blocks::B1(None), blocks::C1(None)],
             ),
@@ -1407,7 +1459,7 @@ pub fn get_vector_024() -> Vec<(BlockEvent, ChainEventExpectation)> {
         (blocks::C1(None), expect_no_chain_update()),
         (
             blocks::B1(None),
-            expect_chain_updated_with_reorg(
+            expect_chain_updated_with_block_reorg(
                 vec![blocks::B2(None), blocks::C2(None)],
                 vec![blocks::B1(None), blocks::C1(None)],
             ),
@@ -1436,11 +1488,11 @@ pub fn get_vector_025() -> Vec<(BlockEvent, ChainEventExpectation)> {
         ),
         (
             blocks::B2(None),
-            expect_chain_updated_with_reorg(vec![blocks::B1(None)], vec![blocks::B2(None)]),
+            expect_chain_updated_with_block_reorg(vec![blocks::B1(None)], vec![blocks::B2(None)]),
         ),
         (
             blocks::C1(None),
-            expect_chain_updated_with_reorg(
+            expect_chain_updated_with_block_reorg(
                 vec![blocks::B2(None)],
                 vec![blocks::B1(None), blocks::C1(None)],
             ),
@@ -1479,7 +1531,7 @@ pub fn get_vector_026() -> Vec<(BlockEvent, ChainEventExpectation)> {
         (blocks::C2(None), expect_no_chain_update()),
         (
             blocks::B2(None),
-            expect_chain_updated_with_reorg(
+            expect_chain_updated_with_block_reorg(
                 vec![blocks::B1(None), blocks::C1(None)],
                 vec![blocks::B2(None), blocks::C2(None)],
             ),
@@ -1488,7 +1540,7 @@ pub fn get_vector_026() -> Vec<(BlockEvent, ChainEventExpectation)> {
         (blocks::E1(None), expect_no_chain_update()),
         (
             blocks::D1(None),
-            expect_chain_updated_with_reorg(
+            expect_chain_updated_with_block_reorg(
                 vec![blocks::B2(None), blocks::C2(None)],
                 vec![
                     blocks::B1(None),
@@ -1524,7 +1576,7 @@ pub fn get_vector_027() -> Vec<(BlockEvent, ChainEventExpectation)> {
         ),
         (
             blocks::B2(None),
-            expect_chain_updated_with_reorg(
+            expect_chain_updated_with_block_reorg(
                 vec![blocks::B1(None), blocks::C1(None)],
                 vec![blocks::B2(None), blocks::C2(None)],
             ),
@@ -1534,7 +1586,7 @@ pub fn get_vector_027() -> Vec<(BlockEvent, ChainEventExpectation)> {
         (blocks::E1(None), expect_no_chain_update()),
         (
             blocks::D1(None),
-            expect_chain_updated_with_reorg(
+            expect_chain_updated_with_block_reorg(
                 vec![blocks::B2(None), blocks::C2(None)],
                 vec![
                     blocks::B1(None),
@@ -1571,18 +1623,18 @@ pub fn get_vector_028() -> Vec<(BlockEvent, ChainEventExpectation)> {
         ),
         (
             blocks::B1(None),
-            expect_chain_updated_with_reorg(vec![blocks::B2(None)], vec![blocks::B1(None)]),
+            expect_chain_updated_with_block_reorg(vec![blocks::B2(None)], vec![blocks::B1(None)]),
         ),
         (
             blocks::C2(None),
-            expect_chain_updated_with_reorg(
+            expect_chain_updated_with_block_reorg(
                 vec![blocks::B1(None)],
                 vec![blocks::B2(None), blocks::C2(None)],
             ),
         ),
         (
             blocks::C1(None),
-            expect_chain_updated_with_reorg(
+            expect_chain_updated_with_block_reorg(
                 vec![blocks::B2(None), blocks::C2(None)],
                 vec![
                     blocks::B1(None),
@@ -1620,14 +1672,14 @@ pub fn get_vector_029() -> Vec<(BlockEvent, ChainEventExpectation)> {
         ),
         (
             blocks::B2(None),
-            expect_chain_updated_with_reorg(
+            expect_chain_updated_with_block_reorg(
                 vec![blocks::B1(None), blocks::C1(None)],
                 vec![blocks::B2(None), blocks::C2(None)],
             ),
         ),
         (
             blocks::D1(None),
-            expect_chain_updated_with_reorg(
+            expect_chain_updated_with_block_reorg(
                 vec![blocks::B2(None), blocks::C2(None)],
                 vec![blocks::B1(None), blocks::C1(None), blocks::D1(None)],
             ),
@@ -1710,7 +1762,7 @@ pub fn get_vector_031() -> Vec<(BlockEvent, ChainEventExpectation)> {
         (blocks::C1(None), expect_no_chain_update()),
         (
             blocks::B1(None),
-            expect_chain_updated_with_reorg(
+            expect_chain_updated_with_block_reorg(
                 vec![blocks::B2(None), blocks::C2(None)],
                 vec![
                     blocks::B1(None),
@@ -1756,11 +1808,11 @@ pub fn get_vector_032() -> Vec<(BlockEvent, ChainEventExpectation)> {
         ),
         (
             blocks::B2(None),
-            expect_chain_updated_with_reorg(vec![blocks::B1(None)], vec![blocks::B2(None)]),
+            expect_chain_updated_with_block_reorg(vec![blocks::B1(None)], vec![blocks::B2(None)]),
         ),
         (
             blocks::C1(None),
-            expect_chain_updated_with_reorg(
+            expect_chain_updated_with_block_reorg(
                 vec![blocks::B2(None)],
                 vec![blocks::B1(None), blocks::C1(None), blocks::D1(None)],
             ),
@@ -1768,28 +1820,28 @@ pub fn get_vector_032() -> Vec<(BlockEvent, ChainEventExpectation)> {
         (blocks::C2(None), expect_no_chain_update()),
         (
             blocks::D3(Some(blocks::C1(None))),
-            expect_chain_updated_with_reorg(
+            expect_chain_updated_with_block_reorg(
                 vec![blocks::D1(None)],
                 vec![blocks::D3(Some(blocks::C1(None)))],
             ),
         ),
         (
             blocks::E1(None),
-            expect_chain_updated_with_reorg(
+            expect_chain_updated_with_block_reorg(
                 vec![blocks::D3(Some(blocks::C1(None)))],
                 vec![blocks::D1(None), blocks::E1(None)],
             ),
         ),
         (
             blocks::E3(None),
-            expect_chain_updated_with_reorg(
+            expect_chain_updated_with_block_reorg(
                 vec![blocks::D1(None), blocks::E1(None)],
                 vec![blocks::D3(Some(blocks::C1(None))), blocks::E3(None)],
             ),
         ),
         (
             blocks::F1(None),
-            expect_chain_updated_with_reorg(
+            expect_chain_updated_with_block_reorg(
                 vec![blocks::D3(Some(blocks::C1(None))), blocks::E3(None)],
                 vec![blocks::D1(None), blocks::E1(None), blocks::F1(None)],
             ),
@@ -1835,7 +1887,7 @@ pub fn get_vector_033() -> Vec<(BlockEvent, ChainEventExpectation)> {
         (blocks::B1(None), expect_no_chain_update()),
         (
             blocks::C1(None),
-            expect_chain_updated_with_reorg(
+            expect_chain_updated_with_block_reorg(
                 vec![blocks::B2(None), blocks::C2(None)],
                 vec![
                     blocks::B1(None),
@@ -1848,7 +1900,7 @@ pub fn get_vector_033() -> Vec<(BlockEvent, ChainEventExpectation)> {
         ),
         (
             blocks::D1(None),
-            expect_chain_updated_with_reorg(
+            expect_chain_updated_with_block_reorg(
                 vec![
                     blocks::D3(Some(blocks::C1(None))),
                     blocks::E3(None),
@@ -1897,7 +1949,7 @@ pub fn get_vector_034() -> Vec<(BlockEvent, ChainEventExpectation)> {
         ),
         (
             blocks::B1(None),
-            expect_chain_updated_with_reorg(
+            expect_chain_updated_with_block_reorg(
                 vec![blocks::B2(None), blocks::C2(None)],
                 vec![
                     blocks::B1(None),
@@ -1910,7 +1962,7 @@ pub fn get_vector_034() -> Vec<(BlockEvent, ChainEventExpectation)> {
         (blocks::I1(None), expect_no_chain_update()),
         (
             blocks::C1(None),
-            expect_chain_updated_with_reorg(
+            expect_chain_updated_with_block_reorg(
                 vec![
                     blocks::C3(Some(blocks::B1(None))),
                     blocks::D3(None),
@@ -1954,14 +2006,14 @@ pub fn get_vector_035() -> Vec<(BlockEvent, ChainEventExpectation)> {
         (blocks::C1(None), expect_no_chain_update()),
         (
             blocks::B1(None),
-            expect_chain_updated_with_reorg(
+            expect_chain_updated_with_block_reorg(
                 vec![blocks::B2(None), blocks::C2(None)],
                 vec![blocks::B1(None), blocks::C1(None)],
             ),
         ),
         (
             blocks::C3(Some(blocks::B1(None))),
-            expect_chain_updated_with_reorg(
+            expect_chain_updated_with_block_reorg(
                 vec![blocks::C1(None)],
                 vec![blocks::C3(Some(blocks::B1(None)))],
             ),
@@ -1974,14 +2026,14 @@ pub fn get_vector_035() -> Vec<(BlockEvent, ChainEventExpectation)> {
         (blocks::F3(None), expect_no_chain_update()),
         (
             blocks::E1(None),
-            expect_chain_updated_with_reorg(
+            expect_chain_updated_with_block_reorg(
                 vec![blocks::C3(Some(blocks::B1(None))), blocks::D3(None)],
                 vec![blocks::C1(None), blocks::D1(None), blocks::E1(None)],
             ),
         ),
         (
             blocks::E3(None),
-            expect_chain_updated_with_reorg(
+            expect_chain_updated_with_block_reorg(
                 vec![blocks::C1(None), blocks::D1(None), blocks::E1(None)],
                 vec![
                     blocks::C3(Some(blocks::B1(None))),
@@ -1994,7 +2046,7 @@ pub fn get_vector_035() -> Vec<(BlockEvent, ChainEventExpectation)> {
         (blocks::G1(None), expect_no_chain_update()),
         (
             blocks::F1(None),
-            expect_chain_updated_with_reorg(
+            expect_chain_updated_with_block_reorg(
                 vec![
                     blocks::C3(Some(blocks::B1(None))),
                     blocks::D3(None),
@@ -2036,11 +2088,11 @@ pub fn get_vector_036() -> Vec<(BlockEvent, ChainEventExpectation)> {
         ),
         (
             blocks::B2(None),
-            expect_chain_updated_with_reorg(vec![blocks::B1(None)], vec![blocks::B2(None)]),
+            expect_chain_updated_with_block_reorg(vec![blocks::B1(None)], vec![blocks::B2(None)]),
         ),
         (
             blocks::C1(None),
-            expect_chain_updated_with_reorg(
+            expect_chain_updated_with_block_reorg(
                 vec![blocks::B2(None)],
                 vec![blocks::B1(None), blocks::C1(None)],
             ),
@@ -2048,7 +2100,7 @@ pub fn get_vector_036() -> Vec<(BlockEvent, ChainEventExpectation)> {
         (blocks::D2(None), expect_no_chain_update()),
         (
             blocks::C3(Some(blocks::B1(None))),
-            expect_chain_updated_with_reorg(
+            expect_chain_updated_with_block_reorg(
                 vec![blocks::C1(None)],
                 vec![blocks::C3(Some(blocks::B1(None)))],
             ),
@@ -2065,7 +2117,7 @@ pub fn get_vector_036() -> Vec<(BlockEvent, ChainEventExpectation)> {
         (blocks::F2(None), expect_no_chain_update()),
         (
             blocks::E2(None),
-            expect_chain_updated_with_reorg(
+            expect_chain_updated_with_block_reorg(
                 vec![
                     blocks::B1(None),
                     blocks::C3(Some(blocks::B1(None))),
@@ -2085,7 +2137,7 @@ pub fn get_vector_036() -> Vec<(BlockEvent, ChainEventExpectation)> {
         (blocks::E1(None), expect_no_chain_update()),
         (
             blocks::E3(None),
-            expect_chain_updated_with_reorg(
+            expect_chain_updated_with_block_reorg(
                 vec![
                     blocks::B2(None),
                     blocks::C2(None),
@@ -2125,11 +2177,11 @@ pub fn get_vector_037() -> Vec<(BlockEvent, ChainEventExpectation)> {
         ),
         (
             blocks::B2(None),
-            expect_chain_updated_with_reorg(vec![blocks::B1(None)], vec![blocks::B2(None)]),
+            expect_chain_updated_with_block_reorg(vec![blocks::B1(None)], vec![blocks::B2(None)]),
         ),
         (
             blocks::C1(None),
-            expect_chain_updated_with_reorg(
+            expect_chain_updated_with_block_reorg(
                 vec![blocks::B2(None)],
                 vec![blocks::B1(None), blocks::C1(None)],
             ),
@@ -2138,14 +2190,14 @@ pub fn get_vector_037() -> Vec<(BlockEvent, ChainEventExpectation)> {
         (blocks::B3(None), expect_no_chain_update()),
         (
             blocks::C3(None),
-            expect_chain_updated_with_reorg(
+            expect_chain_updated_with_block_reorg(
                 vec![blocks::B1(None), blocks::C1(None)],
                 vec![blocks::B3(None), blocks::C3(None)],
             ),
         ),
         (
             blocks::C2(None),
-            expect_chain_updated_with_reorg(
+            expect_chain_updated_with_block_reorg(
                 vec![blocks::B3(None), blocks::C3(None)],
                 vec![blocks::B2(None), blocks::C2(None), blocks::D2(None)],
             ),
@@ -2206,7 +2258,7 @@ pub fn get_vector_038() -> Vec<(BlockEvent, ChainEventExpectation)> {
         ),
         (
             blocks::B3(None),
-            expect_chain_updated_with_reorg(
+            expect_chain_updated_with_block_reorg(
                 vec![
                     blocks::B1(None),
                     blocks::C1(None),
@@ -2225,7 +2277,7 @@ pub fn get_vector_038() -> Vec<(BlockEvent, ChainEventExpectation)> {
         ),
         (
             blocks::B2(None),
-            expect_chain_updated_with_reorg(
+            expect_chain_updated_with_block_reorg(
                 vec![
                     blocks::B3(None),
                     blocks::C3(None),
@@ -2283,7 +2335,7 @@ pub fn get_vector_039() -> Vec<(BlockEvent, ChainEventExpectation)> {
         ),
         (
             blocks::B1(None),
-            expect_chain_updated_with_reorg(
+            expect_chain_updated_with_block_reorg(
                 vec![
                     blocks::B2(None),
                     blocks::C2(None),
@@ -2343,7 +2395,7 @@ pub fn get_vector_040() -> Vec<(BlockEvent, ChainEventExpectation)> {
         ),
         (
             blocks::B1(None),
-            expect_chain_updated_with_reorg(
+            expect_chain_updated_with_block_reorg(
                 vec![
                     blocks::B2(None),
                     blocks::C2(None),
@@ -2444,6 +2496,49 @@ pub fn get_vector_043() -> Vec<(BlockEvent, ChainEventExpectation)> {
         (
             blocks::C1(None),
             expect_chain_updated_with_block(blocks::C1(None)),
+        ),
+    ]
+}
+
+/// Vector 044: Generate the following blocks
+///
+/// A1(1) -  B1(2) - [a1](3) - [b1](4)
+///                \ [a2](4) - [b2](5) - [c2](6)
+///
+pub fn get_vector_044() -> Vec<(BlockEvent, ChainEventExpectation)> {
+    vec![
+        (
+            blocks::A1(None),
+            expect_chain_updated_with_block(blocks::A1(None)),
+        ),
+        (
+            blocks::B1(None),
+            expect_chain_updated_with_block(blocks::B1(None)),
+        ),
+        (
+            microblocks::a1(blocks::B1(None), None),
+            expect_chain_updated_with_microblock(microblocks::a1(blocks::B1(None), None)),
+        ),
+        (
+            microblocks::b1(blocks::B1(None), None),
+            expect_chain_updated_with_microblock(microblocks::b1(blocks::B1(None), None)),
+        ),
+        (
+            microblocks::a2(blocks::B1(None), None),
+            expect_no_chain_update(),
+        ),
+        (
+            microblocks::b2(blocks::B1(None), None),
+            expect_chain_updated_with_microblock_reorg(
+                vec![
+                    microblocks::a1(blocks::B1(None), None),
+                    microblocks::b1(blocks::B1(None), None),
+                ],
+                vec![
+                    microblocks::a2(blocks::B1(None), None),
+                    microblocks::b2(blocks::B1(None), None),
+                ],
+            ),
         ),
     ]
 }
