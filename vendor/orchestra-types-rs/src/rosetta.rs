@@ -92,6 +92,7 @@ pub struct StacksBlockMetadata {
     pub pox_cycle_index: u32,
     pub pox_cycle_position: u32,
     pub pox_cycle_length: u32,
+    pub confirm_microblock_identifier: Option<BlockIdentifier>,
 }
 
 /// BitcoinBlock contain an array of Transactions that occurred at a particular

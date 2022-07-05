@@ -165,6 +165,20 @@ pub fn standardize_stacks_block(
         })
         .collect();
 
+    let confirm_microblock_identifier = if block.parent_microblock
+        == "0x0000000000000000000000000000000000000000000000000000000000000000"
+    {
+        None
+    } else {
+        Some(BlockIdentifier {
+            index: block
+                .parent_microblock_sequence
+                .try_into()
+                .expect("unable to get microblock sequence"),
+            hash: block.parent_microblock.clone(),
+        })
+    };
+
     StacksBlockData {
         block_identifier: BlockIdentifier {
             hash: block.index_block_hash.clone(),
@@ -183,6 +197,7 @@ pub fn standardize_stacks_block(
             pox_cycle_index: pox_cycle_id,
             pox_cycle_position: (current_len % pox_cycle_length) as u32,
             pox_cycle_length: pox_cycle_length.try_into().unwrap(),
+            confirm_microblock_identifier,
         },
         transactions,
     }

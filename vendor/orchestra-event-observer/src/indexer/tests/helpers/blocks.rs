@@ -14,10 +14,20 @@ pub fn generate_test_block(
     let mut hash = vec![
         fork_id, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
     ];
-    let parent_hash = match parent {
+    let (parent_block_identifier, confirm_microblock_identifier) = match parent {
         Some(BlockEvent::Block(parent)) => {
             assert_eq!(parent.block_identifier.index, block_height - 1);
-            parent.block_identifier.hash.clone()
+            (parent.block_identifier.clone(), None)
+        }
+        Some(BlockEvent::Microblock(microblock_parent)) => {
+            assert_eq!(
+                microblock_parent.metadata.anchor_block_identifier.index,
+                block_height - 1
+            );
+            (
+                microblock_parent.metadata.anchor_block_identifier.clone(),
+                Some(microblock_parent.block_identifier.clone()),
+            )
         }
         _ => {
             let mut parent_hash = if (block_height - 1) == 1 {
@@ -30,7 +40,13 @@ pub fn generate_test_block(
                 ]
             };
             parent_hash.append(&mut (block_height - 1).to_be_bytes().to_vec());
-            to_hex(&parent_hash[..])
+            (
+                BlockIdentifier {
+                    index: block_height - 1,
+                    hash: to_hex(&parent_hash[..]),
+                },
+                None,
+            )
         }
     };
     hash.append(&mut block_height.to_be_bytes().to_vec());
@@ -39,10 +55,7 @@ pub fn generate_test_block(
             index: block_height,
             hash: to_hex(&hash[..]),
         },
-        parent_block_identifier: BlockIdentifier {
-            index: block_height - 1,
-            hash: parent_hash,
-        },
+        parent_block_identifier,
         timestamp: 0,
         transactions,
         metadata: StacksBlockMetadata {
@@ -53,6 +66,7 @@ pub fn generate_test_block(
             pox_cycle_index: 1,
             pox_cycle_position: block_height.try_into().unwrap(),
             pox_cycle_length: 100,
+            confirm_microblock_identifier,
         },
     })
 }

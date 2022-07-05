@@ -2660,3 +2660,68 @@ pub fn get_vector_046() -> Vec<(BlockEvent, ChainEventExpectation)> {
         ),
     ]
 }
+
+/// Vector 047: Generate the following blocks
+///
+/// A1(1) -  B1(2) - [a1](3) - [b1](4) - [c1](6) - [d1](7) - C1(8)
+///                \ [a2](4) - [b2](5)
+///
+pub fn get_vector_047() -> Vec<(BlockEvent, ChainEventExpectation)> {
+    vec![
+        (
+            blocks::A1(None),
+            expect_chain_updated_with_block(blocks::A1(None)),
+        ),
+        (
+            blocks::B1(None),
+            expect_chain_updated_with_block(blocks::B1(None)),
+        ),
+        (
+            microblocks::a1(blocks::B1(None), None),
+            expect_chain_updated_with_microblock(microblocks::a1(blocks::B1(None), None)),
+        ),
+        (
+            microblocks::b1(blocks::B1(None), None),
+            expect_chain_updated_with_microblock(microblocks::b1(blocks::B1(None), None)),
+        ),
+        (
+            microblocks::a2(blocks::B1(None), None),
+            expect_no_chain_update(),
+        ),
+        (
+            microblocks::b2(blocks::B1(None), None),
+            expect_chain_updated_with_microblock_reorg(
+                vec![
+                    microblocks::a1(blocks::B1(None), None),
+                    microblocks::b1(blocks::B1(None), None),
+                ],
+                vec![
+                    microblocks::a2(blocks::B1(None), None),
+                    microblocks::b2(blocks::B1(None), None),
+                ],
+            ),
+        ),
+        (
+            microblocks::c1(blocks::B1(None), None),
+            expect_chain_updated_with_microblock_reorg(
+                vec![
+                    microblocks::a2(blocks::B1(None), None),
+                    microblocks::b2(blocks::B1(None), None),
+                ],
+                vec![
+                    microblocks::a1(blocks::B1(None), None),
+                    microblocks::b1(blocks::B1(None), None),
+                    microblocks::c1(blocks::B1(None), None),
+                ],
+            ),
+        ),
+        (
+            microblocks::d1(blocks::B1(None), None),
+            expect_chain_updated_with_microblock(microblocks::d1(blocks::B1(None), None)),
+        ),
+        (
+            blocks::C1(None),
+            expect_chain_updated_with_block(blocks::C1(Some(microblocks::d1(blocks::B1(None), None)))),
+        ),
+    ]
+}

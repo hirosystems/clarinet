@@ -248,3 +248,8 @@ fn test_vector_045() {
 fn test_vector_046() {
     process_blocks_and_check_expectations(helpers::shapes::get_vector_046());
 }
+
+#[test]
+fn test_vector_047() {
+    process_blocks_and_check_expectations(helpers::shapes::get_vector_047());
+}

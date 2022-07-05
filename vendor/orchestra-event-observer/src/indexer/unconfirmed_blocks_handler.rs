@@ -3,7 +3,7 @@ use std::collections::{hash_map::Entry, BTreeMap, BTreeSet, HashMap, HashSet, Ve
 use bitcoincore_rpc::bitcoin::Block;
 use clarity_repl::clarity::util::hash::to_hex;
 use orchestra_types::{
-    BitcoinChainEvent, BlockIdentifier, ChainUpdatedWithBlocksData,
+    BitcoinChainEvent, BlockIdentifier, Chain, ChainUpdatedWithBlocksData,
     ChainUpdatedWithMicroblockReorgData, ChainUpdatedWithMicroblocksData,
     ChainUpdatedWithReorgData, StacksBlockData, StacksChainEvent, StacksMicroblockData,
     StacksMicroblocksTrail,
@@ -649,6 +649,31 @@ impl UnconfirmedBlocksProcessor {
         chain_event
     }
 
+    pub fn retrieve_confirmed_microblocks_for_block(
+        &self,
+        block: &StacksBlockData,
+    ) -> Option<ChainSegment> {
+        match (
+            &block.metadata.confirm_microblock_identifier,
+            self.micro_forks.get(&block.parent_block_identifier),
+        ) {
+            (Some(last_microblock), Some(microforks)) => {
+                for microfork in microforks.iter() {
+                    if microfork.block_ids.contains(&last_microblock) {
+                        let mut confirmed_microblocks = microfork.clone();
+                        let parent_found = confirmed_microblocks
+                            .keep_blocks_from_oldest_to_block_identifier(&last_microblock);
+                        if parent_found {
+                            return Some(confirmed_microblocks);
+                        }
+                    }
+                }
+                None
+            }
+            _ => None,
+        }
+    }
+
     pub fn generate_block_chain_event(
         &self,
         canonical_segment: &ChainSegment,
@@ -695,7 +720,7 @@ impl UnconfirmedBlocksProcessor {
                         .map(|block_id| {
                             let block = match self.block_store.get(block_id) {
                                 Some(block) => block.clone(),
-                                None => panic!(),
+                                None => panic!("unable to retrive block from block store"),
                             };
                             (None, block)
                         })
@@ -706,7 +731,7 @@ impl UnconfirmedBlocksProcessor {
                         .map(|block_id| {
                             let block = match self.block_store.get(block_id) {
                                 Some(block) => block.clone(),
-                                None => panic!(),
+                                None => panic!("unable to retrive block from block store"),
                             };
                             (None, block)
                         })
@@ -736,7 +761,7 @@ impl UnconfirmedBlocksProcessor {
                         (anchor_block_identifier.clone(), block_identifier.clone());
                     let block = match self.microblock_store.get(&microblock_identifier) {
                         Some(block) => block.clone(),
-                        None => panic!("unable to retrive block from block store"),
+                        None => panic!("unable to retrive microblock from microblock store"),
                     };
                     new_microblocks.push(block)
                 }
@@ -767,9 +792,11 @@ impl UnconfirmedBlocksProcessor {
                         (anchor_block_identifier.clone(), block_identifier.clone());
                     let block = match self.microblock_store.get(&microblock_identifier) {
                         Some(block) => block.clone(),
-                        None => panic!("unable to retrive block from block store"),
+                        None => {
+                            panic!("unable to retrive microblock from microblock store")
+                        }
                     };
-                    new_microblocks.push(block)
+                    new_microblocks.push(block);
                 }
                 return Some(StacksChainEvent::ChainUpdatedWithMicroblocks(
                     ChainUpdatedWithMicroblocksData { new_microblocks },
