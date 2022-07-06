@@ -462,21 +462,35 @@ pub enum StacksChainEvent {
     ChainUpdatedWithBlocks(ChainUpdatedWithBlocksData),
     ChainUpdatedWithReorg(ChainUpdatedWithReorgData),
     ChainUpdatedWithMicroblocks(ChainUpdatedWithMicroblocksData),
-    ChainUpdatedWithMicroblockReorg(ChainUpdatedWithMicroblockReorgData),
+    ChainUpdatedWithMicroblocksReorg(ChainUpdatedWithMicroblocksReorgData),
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize)]
+pub struct StacksBlockUpdate {
+    pub block: StacksBlockData,
+    pub parents_microblocks_to_rollback: Vec<StacksMicroblockData>,
+    pub parents_microblocks_to_apply: Vec<StacksMicroblockData>,
+}
+
+impl StacksBlockUpdate {
+    pub fn new(block: StacksBlockData) -> StacksBlockUpdate {
+        StacksBlockUpdate {
+            block,
+            parents_microblocks_to_rollback: vec![],
+            parents_microblocks_to_apply: vec![],
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct ChainUpdatedWithBlocksData {
-    pub new_blocks: Vec<StacksBlockData>,
-    pub anchored_trail: Option<StacksMicroblocksTrail>,
-    // TODO(lgalabru)
-    // pub confirmed_block: (StacksBlockData, Option<StacksMicroblocksTrail>)
+    pub new_blocks: Vec<StacksBlockUpdate>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct ChainUpdatedWithReorgData {
-    pub blocks_to_rollback: Vec<(Option<StacksMicroblocksTrail>, StacksBlockData)>,
-    pub blocks_to_apply: Vec<(Option<StacksMicroblocksTrail>, StacksBlockData)>,
+    pub blocks_to_rollback: Vec<StacksBlockUpdate>,
+    pub blocks_to_apply: Vec<StacksBlockUpdate>,
     // TODO(lgalabru)
     // pub confirmed_block: (StacksBlockData, Option<StacksMicroblocksTrail>)
 }
@@ -487,7 +501,7 @@ pub struct ChainUpdatedWithMicroblocksData {
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize)]
-pub struct ChainUpdatedWithMicroblockReorgData {
+pub struct ChainUpdatedWithMicroblocksReorgData {
     pub microblocks_to_rollback: Vec<StacksMicroblockData>,
     pub microblocks_to_apply: Vec<StacksMicroblockData>,
 }

@@ -4,9 +4,9 @@ use bitcoincore_rpc::bitcoin::Block;
 use clarity_repl::clarity::util::hash::to_hex;
 use orchestra_types::{
     BitcoinChainEvent, BlockIdentifier, Chain, ChainUpdatedWithBlocksData,
-    ChainUpdatedWithMicroblockReorgData, ChainUpdatedWithMicroblocksData,
-    ChainUpdatedWithReorgData, StacksBlockData, StacksChainEvent, StacksMicroblockData,
-    StacksMicroblocksTrail,
+    ChainUpdatedWithMicroblocksData, ChainUpdatedWithMicroblocksReorgData,
+    ChainUpdatedWithReorgData, StacksBlockData, StacksBlockUpdate, StacksChainEvent,
+    StacksMicroblockData, StacksMicroblocksTrail,
 };
 
 trait AbstractBlock {
@@ -166,18 +166,20 @@ impl ChainSegment {
     pub fn keep_blocks_from_oldest_to_block_identifier(
         &mut self,
         block_identifier: &BlockIdentifier,
-    ) -> bool {
+    ) -> (bool, bool) {
+        let mut mutated = false;
         loop {
             match self.block_ids.pop_front() {
                 Some(tip) => {
                     println!("{} = {}?", tip, block_identifier);
                     if tip.eq(&block_identifier) {
                         self.block_ids.push_front(tip);
-                        break true;
+                        break (true, mutated);
                     }
                 }
-                _ => break false,
+                _ => break (false, mutated),
             }
+            mutated = true;
         }
     }
 
@@ -234,9 +236,10 @@ impl ChainSegment {
                 match incompatibility {
                     ChainSegmentIncompatibility::BlockCollision => {
                         let mut new_fork = self.clone();
-                        let parent_found = new_fork.keep_blocks_from_oldest_to_block_identifier(
-                            &block.get_parent_identifier(),
-                        );
+                        let (parent_found, _) = new_fork
+                            .keep_blocks_from_oldest_to_block_identifier(
+                                &block.get_parent_identifier(),
+                            );
                         if parent_found {
                             new_fork.append_block_identifier(&block.get_identifier(), false);
                             fork = Some(new_fork);
@@ -311,9 +314,10 @@ impl UnconfirmedBlocksProcessor {
                 match incompatibility {
                     ChainSegmentIncompatibility::BlockCollision => {
                         let mut new_fork = chain_segment.clone();
-                        let parent_found = new_fork.keep_blocks_from_oldest_to_block_identifier(
-                            &block.parent_block_identifier,
-                        );
+                        let (parent_found, _) = new_fork
+                            .keep_blocks_from_oldest_to_block_identifier(
+                                &block.parent_block_identifier,
+                            );
                         println!("Parent found: {}", parent_found);
                         if parent_found {
                             new_fork.append_block_identifier(&block.block_identifier, prune);
@@ -439,13 +443,13 @@ impl UnconfirmedBlocksProcessor {
 
         self.canonical_fork_id = canonical_fork_id;
         // Generate chain event from the previous and current canonical forks
-        let canonical_fork = self.forks.get(canonical_fork_id).unwrap();
+        let canonical_fork = self.forks.get(canonical_fork_id).unwrap().clone();
         if canonical_fork.eq(&previous_canonical_fork) {
             return None;
         }
 
         let chain_event =
-            Some(self.generate_block_chain_event(canonical_fork, &previous_canonical_fork));
+            Some(self.generate_block_chain_event(&canonical_fork, &previous_canonical_fork));
 
         for fork in self.forks.iter_mut() {
             fork.prune_confirmed_blocks();
@@ -649,25 +653,88 @@ impl UnconfirmedBlocksProcessor {
         chain_event
     }
 
-    pub fn retrieve_confirmed_microblocks_for_block(
-        &self,
+    // We got the confirmed canonical microblock trail,
+    // and we want to send a diff with whatever was sent
+    // in the past.
+    // The issue comes from the following case. If we
+    // condider the 3 following forks
+    //
+    // 1) A1 - B1 - a1 - b1 - c1 - C1
+    //
+    // 2) A1 - B1 - a1 - b1 - C2
+    //
+    // 3) A1 - B1 - a1 - b1 - c1 - d1 - C3
+    //
+    // How can we always be sending back the right diff?
+    // As is, if 1) 2) #), we will be sending:
+    // - BlockUpdate(C1)
+    // - BlockReorg(C2, rollback: [c1], apply: [])
+    // - BlockReorg(C3, rollback: [], apply: [c1, d1])
+
+    pub fn confirm_microblocks_for_block(
+        &mut self,
         block: &StacksBlockData,
-    ) -> Option<ChainSegment> {
+    ) -> Option<StacksChainEvent> {
         match (
             &block.metadata.confirm_microblock_identifier,
             self.micro_forks.get(&block.parent_block_identifier),
         ) {
             (Some(last_microblock), Some(microforks)) => {
-                for microfork in microforks.iter() {
+                let previous_canonical_segment = match self
+                    .canonical_micro_fork_id
+                    .get(&block.parent_block_identifier)
+                {
+                    Some(id) => Some(microforks[*id].clone()),
+                    None => None,
+                };
+
+                let mut new_canonical_segment = None;
+                for (microfork_id, microfork) in microforks.iter().enumerate() {
+                    self.canonical_micro_fork_id
+                        .insert(block.parent_block_identifier.clone(), microfork_id);
                     if microfork.block_ids.contains(&last_microblock) {
                         let mut confirmed_microblocks = microfork.clone();
-                        let parent_found = confirmed_microblocks
+                        let (_, mutated) = confirmed_microblocks
                             .keep_blocks_from_oldest_to_block_identifier(&last_microblock);
-                        if parent_found {
-                            return Some(confirmed_microblocks);
-                        }
+                        new_canonical_segment = Some((
+                            confirmed_microblocks,
+                            if mutated {
+                                microforks.len()
+                            } else {
+                                microfork_id
+                            },
+                        ));
+                        break;
                     }
                 }
+
+                if let Some((new_canonical_segment, microfork_id)) = new_canonical_segment {
+                    let chain_event = self.generate_microblock_chain_event(
+                        &block.parent_block_identifier,
+                        &new_canonical_segment,
+                        &previous_canonical_segment,
+                    );
+
+                    // insert confirmed_microblocks in self.micro_forks
+                    self.canonical_micro_fork_id
+                        .insert(block.parent_block_identifier.clone(), microfork_id);
+
+                    // update self.canonical_micro_fork_id
+                    match self
+                        .micro_forks
+                        .entry(block.parent_block_identifier.clone())
+                    {
+                        Entry::Occupied(microforks) => {
+                            microforks.into_mut().push(new_canonical_segment)
+                        }
+                        Entry::Vacant(v) => {
+                            v.insert(vec![new_canonical_segment]);
+                        }
+                    };
+
+                    return chain_event;
+                }
+
                 None
             }
             _ => None,
@@ -675,7 +742,7 @@ impl UnconfirmedBlocksProcessor {
     }
 
     pub fn generate_block_chain_event(
-        &self,
+        &mut self,
         canonical_segment: &ChainSegment,
         other_segment: &ChainSegment,
     ) -> StacksChainEvent {
@@ -690,11 +757,33 @@ impl UnconfirmedBlocksProcessor {
                     Some(block) => block.clone(),
                     None => panic!("unable to retrive block from block store"),
                 };
-                new_blocks.push(block)
+                let block_update = match self.confirm_microblocks_for_block(&block) {
+                    Some(ref mut chain_event) => {
+                        let mut update = StacksBlockUpdate::new(block);
+                        match chain_event {
+                            StacksChainEvent::ChainUpdatedWithMicroblocks(data) => {
+                                update
+                                    .parents_microblocks_to_apply
+                                    .append(&mut data.new_microblocks);
+                            }
+                            StacksChainEvent::ChainUpdatedWithMicroblocksReorg(data) => {
+                                update
+                                    .parents_microblocks_to_apply
+                                    .append(&mut data.microblocks_to_apply);
+                                update
+                                    .parents_microblocks_to_rollback
+                                    .append(&mut data.microblocks_to_rollback);
+                            }
+                            _ => unreachable!(),
+                        };
+                        update
+                    }
+                    None => StacksBlockUpdate::new(block),
+                };
+                new_blocks.push(block_update)
             }
             return StacksChainEvent::ChainUpdatedWithBlocks(ChainUpdatedWithBlocksData {
                 new_blocks,
-                anchored_trail: None,
             });
         }
         if let Ok(divergence) = canonical_segment.try_identify_divergence(other_segment, false) {
@@ -706,11 +795,33 @@ impl UnconfirmedBlocksProcessor {
                         Some(block) => block.clone(),
                         None => panic!("unable to retrive block from block store"),
                     };
-                    new_blocks.push(block)
+                    let block_update = match self.confirm_microblocks_for_block(&block) {
+                        Some(ref mut chain_event) => {
+                            let mut update = StacksBlockUpdate::new(block);
+                            match chain_event {
+                                StacksChainEvent::ChainUpdatedWithMicroblocks(data) => {
+                                    update
+                                        .parents_microblocks_to_apply
+                                        .append(&mut data.new_microblocks);
+                                }
+                                StacksChainEvent::ChainUpdatedWithMicroblocksReorg(data) => {
+                                    update
+                                        .parents_microblocks_to_apply
+                                        .append(&mut data.microblocks_to_apply);
+                                    update
+                                        .parents_microblocks_to_rollback
+                                        .append(&mut data.microblocks_to_rollback);
+                                }
+                                _ => unreachable!(),
+                            };
+                            update
+                        }
+                        None => StacksBlockUpdate::new(block),
+                    };
+                    new_blocks.push(block_update)
                 }
                 return StacksChainEvent::ChainUpdatedWithBlocks(ChainUpdatedWithBlocksData {
                     new_blocks,
-                    anchored_trail: None,
                 });
             } else {
                 return StacksChainEvent::ChainUpdatedWithReorg(ChainUpdatedWithReorgData {
@@ -722,7 +833,32 @@ impl UnconfirmedBlocksProcessor {
                                 Some(block) => block.clone(),
                                 None => panic!("unable to retrive block from block store"),
                             };
-                            (None, block)
+                            let block_update = match self.confirm_microblocks_for_block(&block) {
+                                Some(ref mut chain_event) => {
+                                    let mut update = StacksBlockUpdate::new(block);
+                                    match chain_event {
+                                        StacksChainEvent::ChainUpdatedWithMicroblocks(data) => {
+                                            update
+                                                .parents_microblocks_to_apply
+                                                .append(&mut data.new_microblocks);
+                                        }
+                                        StacksChainEvent::ChainUpdatedWithMicroblocksReorg(
+                                            data,
+                                        ) => {
+                                            update
+                                                .parents_microblocks_to_apply
+                                                .append(&mut data.microblocks_to_apply);
+                                            update
+                                                .parents_microblocks_to_rollback
+                                                .append(&mut data.microblocks_to_rollback);
+                                        }
+                                        _ => unreachable!(),
+                                    };
+                                    update
+                                }
+                                None => StacksBlockUpdate::new(block),
+                            };
+                            block_update
                         })
                         .collect::<Vec<_>>(),
                     blocks_to_apply: divergence
@@ -733,7 +869,32 @@ impl UnconfirmedBlocksProcessor {
                                 Some(block) => block.clone(),
                                 None => panic!("unable to retrive block from block store"),
                             };
-                            (None, block)
+                            let block_update = match self.confirm_microblocks_for_block(&block) {
+                                Some(ref mut chain_event) => {
+                                    let mut update = StacksBlockUpdate::new(block);
+                                    match chain_event {
+                                        StacksChainEvent::ChainUpdatedWithMicroblocks(data) => {
+                                            update
+                                                .parents_microblocks_to_apply
+                                                .append(&mut data.new_microblocks);
+                                        }
+                                        StacksChainEvent::ChainUpdatedWithMicroblocksReorg(
+                                            data,
+                                        ) => {
+                                            update
+                                                .parents_microblocks_to_apply
+                                                .append(&mut data.microblocks_to_apply);
+                                            update
+                                                .parents_microblocks_to_rollback
+                                                .append(&mut data.microblocks_to_rollback);
+                                        }
+                                        _ => unreachable!(),
+                                    };
+                                    update
+                                }
+                                None => StacksBlockUpdate::new(block),
+                            };
+                            block_update
                         })
                         .collect::<Vec<_>>(),
                 });
@@ -802,8 +963,8 @@ impl UnconfirmedBlocksProcessor {
                     ChainUpdatedWithMicroblocksData { new_microblocks },
                 ));
             } else {
-                return Some(StacksChainEvent::ChainUpdatedWithMicroblockReorg(
-                    ChainUpdatedWithMicroblockReorgData {
+                return Some(StacksChainEvent::ChainUpdatedWithMicroblocksReorg(
+                    ChainUpdatedWithMicroblocksReorgData {
                         microblocks_to_rollback: divergence
                             .blocks_to_rollback
                             .iter()

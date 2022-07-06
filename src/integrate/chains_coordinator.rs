@@ -286,7 +286,7 @@ pub async fn start_chains_coordinator(
                         continue;
                         // TODO(lgalabru): good enough for now - code path unreachable in the context of Devnet
                     }
-                    StacksChainEvent::ChainUpdatedWithMicroblockReorg(_) => {
+                    StacksChainEvent::ChainUpdatedWithMicroblocksReorg(_) => {
                         unreachable!() // TODO(lgalabru): good enough for now - code path unreachable in the context of Devnet
                     }
                     StacksChainEvent::ChainUpdatedWithReorg(_) => {

@@ -29,7 +29,8 @@ pub fn evaluate_stacks_chainhooks_on_chain_event<'a>(
     match chain_event {
         StacksChainEvent::ChainUpdatedWithBlocks(update) => {
             for new_block in update.new_blocks.iter() {
-                for tx in new_block.transactions.iter() {
+                for tx in new_block.block.transactions.iter() {
+                    // TODO(lgalabru)
                     for hook in active_chainhooks.iter() {
                         match (&tx.metadata.kind, &hook.predicate) {
                             (
@@ -40,7 +41,11 @@ pub fn evaluate_stacks_chainhooks_on_chain_event<'a>(
                                     == expected_contract_call.contract_identifier
                                     && actual_contract_call.method == expected_contract_call.method
                                 {
-                                    enabled.push((hook.clone(), tx, &new_block.block_identifier));
+                                    enabled.push((
+                                        hook.clone(),
+                                        tx,
+                                        &new_block.block.block_identifier,
+                                    ));
                                     continue;
                                 }
                             }
@@ -60,7 +65,7 @@ pub fn evaluate_stacks_chainhooks_on_chain_event<'a>(
                                                 enabled.push((
                                                     hook.clone(),
                                                     tx,
-                                                    &new_block.block_identifier,
+                                                    &new_block.block.block_identifier,
                                                 ));
                                                 break;
                                             }
@@ -78,7 +83,7 @@ pub fn evaluate_stacks_chainhooks_on_chain_event<'a>(
                                                 enabled.push((
                                                     hook.clone(),
                                                     tx,
-                                                    &new_block.block_identifier,
+                                                    &new_block.block.block_identifier,
                                                 ));
                                                 break;
                                             }
@@ -94,7 +99,7 @@ pub fn evaluate_stacks_chainhooks_on_chain_event<'a>(
                                                 enabled.push((
                                                     hook.clone(),
                                                     tx,
-                                                    &new_block.block_identifier,
+                                                    &new_block.block.block_identifier,
                                                 ));
                                                 break;
                                             }
@@ -110,7 +115,7 @@ pub fn evaluate_stacks_chainhooks_on_chain_event<'a>(
                                                 enabled.push((
                                                     hook.clone(),
                                                     tx,
-                                                    &new_block.block_identifier,
+                                                    &new_block.block.block_identifier,
                                                 ));
                                                 break;
                                             }
@@ -128,7 +133,7 @@ pub fn evaluate_stacks_chainhooks_on_chain_event<'a>(
                                                 enabled.push((
                                                     hook.clone(),
                                                     tx,
-                                                    &new_block.block_identifier,
+                                                    &new_block.block.block_identifier,
                                                 ));
                                                 break;
                                             }
@@ -144,7 +149,7 @@ pub fn evaluate_stacks_chainhooks_on_chain_event<'a>(
                                                 enabled.push((
                                                     hook.clone(),
                                                     tx,
-                                                    &new_block.block_identifier,
+                                                    &new_block.block.block_identifier,
                                                 ));
                                                 break;
                                             }
@@ -157,7 +162,7 @@ pub fn evaluate_stacks_chainhooks_on_chain_event<'a>(
                                                 enabled.push((
                                                     hook.clone(),
                                                     tx,
-                                                    &new_block.block_identifier,
+                                                    &new_block.block.block_identifier,
                                                 ));
                                                 break;
                                             }
@@ -170,7 +175,7 @@ pub fn evaluate_stacks_chainhooks_on_chain_event<'a>(
                                                 enabled.push((
                                                     hook.clone(),
                                                     tx,
-                                                    &new_block.block_identifier,
+                                                    &new_block.block.block_identifier,
                                                 ));
                                                 break;
                                             }
@@ -183,7 +188,7 @@ pub fn evaluate_stacks_chainhooks_on_chain_event<'a>(
                                                 enabled.push((
                                                     hook.clone(),
                                                     tx,
-                                                    &new_block.block_identifier,
+                                                    &new_block.block.block_identifier,
                                                 ));
                                                 break;
                                             }
@@ -198,7 +203,7 @@ pub fn evaluate_stacks_chainhooks_on_chain_event<'a>(
                                                 enabled.push((
                                                     hook.clone(),
                                                     tx,
-                                                    &new_block.block_identifier,
+                                                    &new_block.block.block_identifier,
                                                 ));
                                                 break;
                                             }
@@ -229,7 +234,7 @@ pub fn evaluate_stacks_chainhooks_on_chain_event<'a>(
             }
         }
         StacksChainEvent::ChainUpdatedWithMicroblocks(_update) => {}
-        StacksChainEvent::ChainUpdatedWithMicroblockReorg(_update) => {}
+        StacksChainEvent::ChainUpdatedWithMicroblocksReorg(_update) => {}
         StacksChainEvent::ChainUpdatedWithReorg(_update) => {}
     }
     enabled

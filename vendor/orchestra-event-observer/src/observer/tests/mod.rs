@@ -12,7 +12,7 @@ use crate::observer::{
 use crate::utils;
 use clarity_repl::clarity::types::QualifiedContractIdentifier;
 use orchestra_types::{
-    ChainUpdatedWithBlocksData, StacksBlockData, StacksChainEvent, StacksNetwork,
+    ChainUpdatedWithBlocksData, StacksBlockData, StacksBlockUpdate, StacksChainEvent, StacksNetwork,
 };
 use std::collections::HashMap;
 use std::sync::mpsc::{channel, Receiver, Sender};
@@ -121,8 +121,9 @@ fn test_chainhook_register_deregister() {
         vec!["u1"],
     )];
     let chain_event = StacksChainEvent::ChainUpdatedWithBlocks(ChainUpdatedWithBlocksData {
-        new_blocks: vec![blocks::generate_test_block(0, 1, transactions, None).expect_block()],
-        anchored_trail: None,
+        new_blocks: vec![StacksBlockUpdate::new(
+            blocks::generate_test_block(0, 1, transactions, None).expect_block(),
+        )],
     });
     let _ = observer_commands_tx.send(ObserverCommand::PropagateStacksChainEvent(chain_event));
     // Should signal that no hook were triggered
@@ -150,8 +151,9 @@ fn test_chainhook_register_deregister() {
         vec!["u1"],
     )];
     let chain_event = StacksChainEvent::ChainUpdatedWithBlocks(ChainUpdatedWithBlocksData {
-        new_blocks: vec![blocks::generate_test_block(0, 2, transactions, None).expect_block()],
-        anchored_trail: None,
+        new_blocks: vec![StacksBlockUpdate::new(
+            blocks::generate_test_block(0, 2, transactions, None).expect_block(),
+        )],
     });
     let _ = observer_commands_tx.send(ObserverCommand::PropagateStacksChainEvent(chain_event));
     // Should signal that no hook were triggered
@@ -195,8 +197,9 @@ fn test_chainhook_register_deregister() {
         vec!["u1"],
     )];
     let chain_event = StacksChainEvent::ChainUpdatedWithBlocks(ChainUpdatedWithBlocksData {
-        new_blocks: vec![blocks::generate_test_block(0, 2, transactions, None).expect_block()],
-        anchored_trail: None,
+        new_blocks: vec![StacksBlockUpdate::new(
+            blocks::generate_test_block(0, 2, transactions, None).expect_block(),
+        )],
     });
     let _ = observer_commands_tx.send(ObserverCommand::PropagateStacksChainEvent(chain_event));
     // Should signal that no hook were triggered
@@ -224,8 +227,9 @@ fn test_chainhook_register_deregister() {
         vec!["u1"],
     )];
     let chain_event = StacksChainEvent::ChainUpdatedWithBlocks(ChainUpdatedWithBlocksData {
-        new_blocks: vec![blocks::generate_test_block(0, 3, transactions, None).expect_block()],
-        anchored_trail: None,
+        new_blocks: vec![StacksBlockUpdate::new(
+            blocks::generate_test_block(0, 3, transactions, None).expect_block(),
+        )],
     });
     let _ = observer_commands_tx.send(ObserverCommand::PropagateStacksChainEvent(chain_event));
     // Should signal that no hook were triggered
@@ -291,8 +295,9 @@ fn test_chainhook_auto_deregister() {
         vec!["u1"],
     )];
     let chain_event = StacksChainEvent::ChainUpdatedWithBlocks(ChainUpdatedWithBlocksData {
-        new_blocks: vec![blocks::generate_test_block(0, 1, transactions, None).expect_block()],
-        anchored_trail: None,
+        new_blocks: vec![StacksBlockUpdate::new(
+            blocks::generate_test_block(0, 1, transactions, None).expect_block(),
+        )],
     });
     let _ = observer_commands_tx.send(ObserverCommand::PropagateStacksChainEvent(chain_event));
     // Should signal that no hook were triggered
@@ -320,8 +325,9 @@ fn test_chainhook_auto_deregister() {
         vec!["u1"],
     )];
     let chain_event = StacksChainEvent::ChainUpdatedWithBlocks(ChainUpdatedWithBlocksData {
-        new_blocks: vec![blocks::generate_test_block(0, 2, transactions, None).expect_block()],
-        anchored_trail: None,
+        new_blocks: vec![StacksBlockUpdate::new(
+            blocks::generate_test_block(0, 2, transactions, None).expect_block(),
+        )],
     });
     let _ = observer_commands_tx.send(ObserverCommand::PropagateStacksChainEvent(chain_event));
     // Should signal that no hook were triggered
@@ -349,8 +355,9 @@ fn test_chainhook_auto_deregister() {
         vec!["u1"],
     )];
     let chain_event = StacksChainEvent::ChainUpdatedWithBlocks(ChainUpdatedWithBlocksData {
-        new_blocks: vec![blocks::generate_test_block(0, 3, transactions, None).expect_block()],
-        anchored_trail: None,
+        new_blocks: vec![StacksBlockUpdate::new(
+            blocks::generate_test_block(0, 3, transactions, None).expect_block(),
+        )],
     });
     let _ = observer_commands_tx.send(ObserverCommand::PropagateStacksChainEvent(chain_event));
     // Should signal that no hook were triggered

@@ -78,15 +78,106 @@ pub fn expect_chain_updated_with_blocks(expected_blocks: Vec<BlockEvent>) -> Cha
                         };
                         println!(
                             "Checking {} and {}",
-                            expected_block.block_identifier, new_block.block_identifier
+                            expected_block.block_identifier, new_block.block.block_identifier
                         );
                         assert!(
                             new_block
+                                .block
                                 .block_identifier
                                 .eq(&expected_block.block_identifier),
                             "{} ≠ {}",
-                            new_block.block_identifier,
+                            new_block.block.block_identifier,
                             expected_block.block_identifier
+                        );
+                    }
+                    true
+                }
+                _ => false,
+            },
+            "expected ChainUpdatedWithBlocks, got {:?}",
+            chain_event_to_check
+        );
+    })
+}
+
+pub fn expect_chain_updated_with_block_and_microblock_updates(
+    expected_block: BlockEvent,
+    microblocks_to_rollback: Vec<BlockEvent>,
+    microblocks_to_apply: Vec<BlockEvent>,
+) -> ChainEventExpectation {
+    Box::new(move |chain_event_to_check: Option<StacksChainEvent>| {
+        assert!(
+            match chain_event_to_check {
+                Some(StacksChainEvent::ChainUpdatedWithBlocks(ref event)) => {
+                    assert_eq!(event.new_blocks.len(), 1);
+                    assert_eq!(
+                        microblocks_to_rollback.len(),
+                        event.new_blocks[0].parents_microblocks_to_rollback.len()
+                    );
+                    assert_eq!(
+                        microblocks_to_apply.len(),
+                        event.new_blocks[0].parents_microblocks_to_apply.len()
+                    );
+                    let expected_block = match expected_block {
+                        BlockEvent::Block(ref expected_block) => expected_block,
+                        _ => unreachable!(),
+                    };
+
+                    assert!(
+                        event.new_blocks[0]
+                            .block
+                            .block_identifier
+                            .eq(&expected_block.block_identifier),
+                        "{} ≠ {}",
+                        event.new_blocks[0].block.block_identifier,
+                        expected_block.block_identifier
+                    );
+                    let expected_microblock_id = event.new_blocks[0]
+                        .block
+                        .metadata
+                        .confirm_microblock_identifier
+                        .as_ref()
+                        .unwrap();
+                    let microblock_id = expected_block
+                        .metadata
+                        .confirm_microblock_identifier
+                        .as_ref()
+                        .unwrap();
+                    assert!(
+                        &expected_microblock_id.eq(&microblock_id),
+                        "{} ≠ {}",
+                        expected_microblock_id,
+                        microblock_id
+                    );
+
+                    for (expected, microblock) in microblocks_to_rollback
+                        .iter()
+                        .zip(&event.new_blocks[0].parents_microblocks_to_rollback)
+                    {
+                        let expected = match expected {
+                            BlockEvent::Microblock(expected) => expected,
+                            _ => unreachable!(),
+                        };
+                        assert!(
+                            expected.block_identifier.eq(&microblock.block_identifier),
+                            "{} ≠ {}",
+                            expected.block_identifier,
+                            microblock.block_identifier
+                        );
+                    }
+                    for (expected, microblock) in microblocks_to_apply
+                        .iter()
+                        .zip(&event.new_blocks[0].parents_microblocks_to_apply)
+                    {
+                        let expected = match expected {
+                            BlockEvent::Microblock(expected) => expected,
+                            _ => unreachable!(),
+                        };
+                        assert!(
+                            expected.block_identifier.eq(&microblock.block_identifier),
+                            "{} ≠ {}",
+                            expected.block_identifier,
+                            microblock.block_identifier
                         );
                     }
                     true
@@ -109,7 +200,7 @@ pub fn expect_chain_updated_with_block_reorg(
                 Some(StacksChainEvent::ChainUpdatedWithReorg(ref event)) => {
                     assert_eq!(blocks_to_rollback.len(), event.blocks_to_rollback.len());
                     assert_eq!(blocks_to_apply.len(), event.blocks_to_apply.len());
-                    for (expected, (_microblock_trail, block)) in
+                    for (expected, block_update) in
                         blocks_to_rollback.iter().zip(&event.blocks_to_rollback)
                     {
                         let expected = match expected {
@@ -117,13 +208,15 @@ pub fn expect_chain_updated_with_block_reorg(
                             _ => unreachable!(),
                         };
                         assert!(
-                            expected.block_identifier.eq(&block.block_identifier),
+                            expected
+                                .block_identifier
+                                .eq(&block_update.block.block_identifier),
                             "{} ≠ {}",
                             expected.block_identifier,
-                            block.block_identifier
+                            block_update.block.block_identifier
                         );
                     }
-                    for (expected, (_microblock_trail, block)) in
+                    for (expected, block_update) in
                         blocks_to_apply.iter().zip(&event.blocks_to_apply)
                     {
                         let expected = match expected {
@@ -131,10 +224,12 @@ pub fn expect_chain_updated_with_block_reorg(
                             _ => unreachable!(),
                         };
                         assert!(
-                            expected.block_identifier.eq(&block.block_identifier),
+                            expected
+                                .block_identifier
+                                .eq(&block_update.block.block_identifier),
                             "{} ≠ {}",
                             expected.block_identifier,
-                            block.block_identifier
+                            block_update.block.block_identifier
                         );
                     }
                     true
@@ -154,7 +249,7 @@ pub fn expect_chain_updated_with_microblock_reorg(
     Box::new(move |chain_event_to_check: Option<StacksChainEvent>| {
         assert!(
             match chain_event_to_check {
-                Some(StacksChainEvent::ChainUpdatedWithMicroblockReorg(ref event)) => {
+                Some(StacksChainEvent::ChainUpdatedWithMicroblocksReorg(ref event)) => {
                     assert_eq!(
                         microblocks_to_rollback.len(),
                         event.microblocks_to_rollback.len()
@@ -193,7 +288,7 @@ pub fn expect_chain_updated_with_microblock_reorg(
                 }
                 _ => false,
             },
-            "expected ChainUpdatedWithMicroblockReorg, got {:?}",
+            "expected ChainUpdatedWithMicroblocksReorg, got {:?}",
             chain_event_to_check
         );
     })
@@ -2720,8 +2815,88 @@ pub fn get_vector_047() -> Vec<(BlockEvent, ChainEventExpectation)> {
             expect_chain_updated_with_microblock(microblocks::d1(blocks::B1(None), None)),
         ),
         (
-            blocks::C1(None),
-            expect_chain_updated_with_block(blocks::C1(Some(microblocks::d1(blocks::B1(None), None)))),
+            blocks::C1(Some(microblocks::d1(blocks::B1(None), None))),
+            expect_chain_updated_with_block(blocks::C1(Some(microblocks::d1(
+                blocks::B1(None),
+                None,
+            )))),
+        ),
+    ]
+}
+
+/// Vector 048: Generate the following blocks
+///
+/// A1(1) -  B1(2) - [a1](3) - [b1](4) - [c1](6) - [d1](7)
+///                \ [a2](4) - [b2](5)                    - C1(8)      
+///
+pub fn get_vector_048() -> Vec<(BlockEvent, ChainEventExpectation)> {
+    vec![
+        (
+            blocks::A1(None),
+            expect_chain_updated_with_block(blocks::A1(None)),
+        ),
+        (
+            blocks::B1(None),
+            expect_chain_updated_with_block(blocks::B1(None)),
+        ),
+        (
+            microblocks::a1(blocks::B1(None), None),
+            expect_chain_updated_with_microblock(microblocks::a1(blocks::B1(None), None)),
+        ),
+        (
+            microblocks::b1(blocks::B1(None), None),
+            expect_chain_updated_with_microblock(microblocks::b1(blocks::B1(None), None)),
+        ),
+        (
+            microblocks::a2(blocks::B1(None), None),
+            expect_no_chain_update(),
+        ),
+        (
+            microblocks::b2(blocks::B1(None), None),
+            expect_chain_updated_with_microblock_reorg(
+                vec![
+                    microblocks::a1(blocks::B1(None), None),
+                    microblocks::b1(blocks::B1(None), None),
+                ],
+                vec![
+                    microblocks::a2(blocks::B1(None), None),
+                    microblocks::b2(blocks::B1(None), None),
+                ],
+            ),
+        ),
+        (
+            microblocks::c1(blocks::B1(None), None),
+            expect_chain_updated_with_microblock_reorg(
+                vec![
+                    microblocks::a2(blocks::B1(None), None),
+                    microblocks::b2(blocks::B1(None), None),
+                ],
+                vec![
+                    microblocks::a1(blocks::B1(None), None),
+                    microblocks::b1(blocks::B1(None), None),
+                    microblocks::c1(blocks::B1(None), None),
+                ],
+            ),
+        ),
+        (
+            microblocks::d1(blocks::B1(None), None),
+            expect_chain_updated_with_microblock(microblocks::d1(blocks::B1(None), None)),
+        ),
+        (
+            blocks::C1(Some(microblocks::b2(blocks::B1(None), None))),
+            expect_chain_updated_with_block_and_microblock_updates(
+                blocks::C1(Some(microblocks::b2(blocks::B1(None), None))),
+                vec![
+                    microblocks::a1(blocks::B1(None), None),
+                    microblocks::b1(blocks::B1(None), None),
+                    microblocks::c1(blocks::B1(None), None),
+                    microblocks::d1(blocks::B1(None), None),
+                ],
+                vec![
+                    microblocks::a2(blocks::B1(None), None),
+                    microblocks::b2(blocks::B1(None), None),
+                ],
+            ),
         ),
     ]
 }
