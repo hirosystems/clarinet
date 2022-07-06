@@ -79,7 +79,10 @@ impl Indexer {
         BitcoinChainEvent::ChainUpdatedWithBlocks(block)
     }
 
-    pub fn handle_stacks_block(&mut self, marshalled_block: JsonValue) -> Option<StacksChainEvent> {
+    pub fn handle_stacks_block(
+        &mut self,
+        marshalled_block: JsonValue,
+    ) -> Result<Option<StacksChainEvent>, ()> {
         let block = chains::standardize_stacks_block(
             &self.config,
             marshalled_block,

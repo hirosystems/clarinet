@@ -585,7 +585,7 @@ pub fn handle_new_stacks_block(
         }
     };
 
-    if let Some(chain_event) = chain_event.take() {
+    if let Ok(Some(chain_event)) = chain_event {
         let background_job_tx = background_job_tx.inner();
         match background_job_tx.lock() {
             Ok(tx) => {

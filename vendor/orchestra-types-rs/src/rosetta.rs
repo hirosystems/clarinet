@@ -485,14 +485,14 @@ impl StacksBlockUpdate {
 #[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct ChainUpdatedWithBlocksData {
     pub new_blocks: Vec<StacksBlockUpdate>,
+    pub confirmed_blocks: Vec<StacksBlockData>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct ChainUpdatedWithReorgData {
     pub blocks_to_rollback: Vec<StacksBlockUpdate>,
     pub blocks_to_apply: Vec<StacksBlockUpdate>,
-    // TODO(lgalabru)
-    // pub confirmed_block: (StacksBlockData, Option<StacksMicroblocksTrail>)
+    pub confirmed_blocks: Vec<StacksBlockData>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize)]

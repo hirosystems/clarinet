@@ -124,6 +124,7 @@ fn test_chainhook_register_deregister() {
         new_blocks: vec![StacksBlockUpdate::new(
             blocks::generate_test_block(0, 1, transactions, None).expect_block(),
         )],
+        confirmed_blocks: vec![],
     });
     let _ = observer_commands_tx.send(ObserverCommand::PropagateStacksChainEvent(chain_event));
     // Should signal that no hook were triggered
@@ -154,6 +155,7 @@ fn test_chainhook_register_deregister() {
         new_blocks: vec![StacksBlockUpdate::new(
             blocks::generate_test_block(0, 2, transactions, None).expect_block(),
         )],
+        confirmed_blocks: vec![],
     });
     let _ = observer_commands_tx.send(ObserverCommand::PropagateStacksChainEvent(chain_event));
     // Should signal that no hook were triggered
@@ -200,6 +202,7 @@ fn test_chainhook_register_deregister() {
         new_blocks: vec![StacksBlockUpdate::new(
             blocks::generate_test_block(0, 2, transactions, None).expect_block(),
         )],
+        confirmed_blocks: vec![],
     });
     let _ = observer_commands_tx.send(ObserverCommand::PropagateStacksChainEvent(chain_event));
     // Should signal that no hook were triggered
@@ -230,6 +233,7 @@ fn test_chainhook_register_deregister() {
         new_blocks: vec![StacksBlockUpdate::new(
             blocks::generate_test_block(0, 3, transactions, None).expect_block(),
         )],
+        confirmed_blocks: vec![],
     });
     let _ = observer_commands_tx.send(ObserverCommand::PropagateStacksChainEvent(chain_event));
     // Should signal that no hook were triggered
@@ -298,6 +302,7 @@ fn test_chainhook_auto_deregister() {
         new_blocks: vec![StacksBlockUpdate::new(
             blocks::generate_test_block(0, 1, transactions, None).expect_block(),
         )],
+        confirmed_blocks: vec![],
     });
     let _ = observer_commands_tx.send(ObserverCommand::PropagateStacksChainEvent(chain_event));
     // Should signal that no hook were triggered
@@ -328,6 +333,7 @@ fn test_chainhook_auto_deregister() {
         new_blocks: vec![StacksBlockUpdate::new(
             blocks::generate_test_block(0, 2, transactions, None).expect_block(),
         )],
+        confirmed_blocks: vec![],
     });
     let _ = observer_commands_tx.send(ObserverCommand::PropagateStacksChainEvent(chain_event));
     // Should signal that no hook were triggered
@@ -358,6 +364,7 @@ fn test_chainhook_auto_deregister() {
         new_blocks: vec![StacksBlockUpdate::new(
             blocks::generate_test_block(0, 3, transactions, None).expect_block(),
         )],
+        confirmed_blocks: vec![],
     });
     let _ = observer_commands_tx.send(ObserverCommand::PropagateStacksChainEvent(chain_event));
     // Should signal that no hook were triggered
