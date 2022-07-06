@@ -49,7 +49,7 @@ pub struct UnconfirmedBlocksProcessor {
 pub struct ChainSegment {
     pub amount_of_btc_spent: u64,
     pub most_recent_confirmed_block_height: u64,
-    block_ids: VecDeque<BlockIdentifier>,
+    pub block_ids: VecDeque<BlockIdentifier>,
     confirmed_blocks_inbox: Vec<BlockIdentifier>,
 }
 
@@ -674,7 +674,8 @@ impl UnconfirmedBlocksProcessor {
     pub fn confirm_microblocks_for_block(
         &mut self,
         block: &StacksBlockData,
-    ) -> Option<StacksChainEvent> {
+        diff_enabled: bool,
+    ) -> (Option<StacksChainEvent>, Option<Vec<StacksMicroblockData>>) {
         match (
             &block.metadata.confirm_microblock_identifier,
             self.micro_forks.get(&block.parent_block_identifier),
@@ -709,12 +710,22 @@ impl UnconfirmedBlocksProcessor {
                 }
 
                 if let Some((new_canonical_segment, microfork_id)) = new_canonical_segment {
-                    let chain_event = self.generate_microblock_chain_event(
-                        &block.parent_block_identifier,
-                        &new_canonical_segment,
-                        &previous_canonical_segment,
-                    );
-
+                    let result = if diff_enabled {
+                        let chain_event = self.generate_microblock_chain_event(
+                            &block.parent_block_identifier,
+                            &new_canonical_segment,
+                            &previous_canonical_segment,
+                        );
+                        (chain_event, None)
+                    } else {
+                        (
+                            None,
+                            Some(self.get_microblocks_data(
+                                &block.parent_block_identifier,
+                                &new_canonical_segment,
+                            )),
+                        )
+                    };
                     // insert confirmed_microblocks in self.micro_forks
                     self.canonical_micro_fork_id
                         .insert(block.parent_block_identifier.clone(), microfork_id);
@@ -731,13 +742,50 @@ impl UnconfirmedBlocksProcessor {
                             v.insert(vec![new_canonical_segment]);
                         }
                     };
-
-                    return chain_event;
+                    return result;
                 }
-
-                None
+                (None, None)
             }
-            _ => None,
+            _ => (None, None),
+        }
+    }
+
+    pub fn get_microblocks_data(
+        &self,
+        anchor_block_identifier: &BlockIdentifier,
+        chain_segment: &ChainSegment,
+    ) -> Vec<StacksMicroblockData> {
+        let mut microblocks = vec![];
+        for i in 0..chain_segment.block_ids.len() {
+            let block_identifier = &chain_segment.block_ids[chain_segment.block_ids.len() - 1 - i];
+            let microblock_identifier = (anchor_block_identifier.clone(), block_identifier.clone());
+            let block = match self.microblock_store.get(&microblock_identifier) {
+                Some(block) => block.clone(),
+                None => panic!("unable to retrive microblock from microblock store"),
+            };
+            microblocks.push(block)
+        }
+        microblocks
+    }
+
+    pub fn get_confirmed_parent_microblocks(
+        &self,
+        block: &StacksBlockData,
+    ) -> Vec<StacksMicroblockData> {
+        match self.micro_forks.get(&block.parent_block_identifier) {
+            Some(microforks) => {
+                let previous_canonical_segment = match self
+                    .canonical_micro_fork_id
+                    .get(&block.parent_block_identifier)
+                {
+                    Some(id) => {
+                        self.get_microblocks_data(&block.parent_block_identifier, &microforks[*id])
+                    }
+                    None => vec![],
+                };
+                previous_canonical_segment
+            }
+            _ => vec![],
         }
     }
 
@@ -757,8 +805,8 @@ impl UnconfirmedBlocksProcessor {
                     Some(block) => block.clone(),
                     None => panic!("unable to retrive block from block store"),
                 };
-                let block_update = match self.confirm_microblocks_for_block(&block) {
-                    Some(ref mut chain_event) => {
+                let block_update = match self.confirm_microblocks_for_block(&block, true) {
+                    (Some(ref mut chain_event), _) => {
                         let mut update = StacksBlockUpdate::new(block);
                         match chain_event {
                             StacksChainEvent::ChainUpdatedWithMicroblocks(data) => {
@@ -778,7 +826,7 @@ impl UnconfirmedBlocksProcessor {
                         };
                         update
                     }
-                    None => StacksBlockUpdate::new(block),
+                    _ => StacksBlockUpdate::new(block),
                 };
                 new_blocks.push(block_update)
             }
@@ -795,8 +843,8 @@ impl UnconfirmedBlocksProcessor {
                         Some(block) => block.clone(),
                         None => panic!("unable to retrive block from block store"),
                     };
-                    let block_update = match self.confirm_microblocks_for_block(&block) {
-                        Some(ref mut chain_event) => {
+                    let block_update = match self.confirm_microblocks_for_block(&block, true) {
+                        (Some(ref mut chain_event), None) => {
                             let mut update = StacksBlockUpdate::new(block);
                             match chain_event {
                                 StacksChainEvent::ChainUpdatedWithMicroblocks(data) => {
@@ -816,7 +864,7 @@ impl UnconfirmedBlocksProcessor {
                             };
                             update
                         }
-                        None => StacksBlockUpdate::new(block),
+                        _ => StacksBlockUpdate::new(block),
                     };
                     new_blocks.push(block_update)
                 }
@@ -833,32 +881,12 @@ impl UnconfirmedBlocksProcessor {
                                 Some(block) => block.clone(),
                                 None => panic!("unable to retrive block from block store"),
                             };
-                            let block_update = match self.confirm_microblocks_for_block(&block) {
-                                Some(ref mut chain_event) => {
-                                    let mut update = StacksBlockUpdate::new(block);
-                                    match chain_event {
-                                        StacksChainEvent::ChainUpdatedWithMicroblocks(data) => {
-                                            update
-                                                .parents_microblocks_to_apply
-                                                .append(&mut data.new_microblocks);
-                                        }
-                                        StacksChainEvent::ChainUpdatedWithMicroblocksReorg(
-                                            data,
-                                        ) => {
-                                            update
-                                                .parents_microblocks_to_apply
-                                                .append(&mut data.microblocks_to_apply);
-                                            update
-                                                .parents_microblocks_to_rollback
-                                                .append(&mut data.microblocks_to_rollback);
-                                        }
-                                        _ => unreachable!(),
-                                    };
-                                    update
-                                }
-                                None => StacksBlockUpdate::new(block),
-                            };
-                            block_update
+                            let parents_microblocks_to_rollback =
+                                self.get_confirmed_parent_microblocks(&block);
+                            let mut update = StacksBlockUpdate::new(block);
+                            update.parents_microblocks_to_rollback =
+                                parents_microblocks_to_rollback;
+                            update
                         })
                         .collect::<Vec<_>>(),
                     blocks_to_apply: divergence
@@ -869,31 +897,15 @@ impl UnconfirmedBlocksProcessor {
                                 Some(block) => block.clone(),
                                 None => panic!("unable to retrive block from block store"),
                             };
-                            let block_update = match self.confirm_microblocks_for_block(&block) {
-                                Some(ref mut chain_event) => {
-                                    let mut update = StacksBlockUpdate::new(block);
-                                    match chain_event {
-                                        StacksChainEvent::ChainUpdatedWithMicroblocks(data) => {
-                                            update
-                                                .parents_microblocks_to_apply
-                                                .append(&mut data.new_microblocks);
-                                        }
-                                        StacksChainEvent::ChainUpdatedWithMicroblocksReorg(
-                                            data,
-                                        ) => {
-                                            update
-                                                .parents_microblocks_to_apply
-                                                .append(&mut data.microblocks_to_apply);
-                                            update
-                                                .parents_microblocks_to_rollback
-                                                .append(&mut data.microblocks_to_rollback);
-                                        }
-                                        _ => unreachable!(),
-                                    };
-                                    update
-                                }
-                                None => StacksBlockUpdate::new(block),
-                            };
+                            let block_update =
+                                match self.confirm_microblocks_for_block(&block, false) {
+                                    (_, Some(microblocks_to_apply)) => {
+                                        let mut update = StacksBlockUpdate::new(block);
+                                        update.parents_microblocks_to_apply = microblocks_to_apply;
+                                        update
+                                    }
+                                    _ => StacksBlockUpdate::new(block),
+                                };
                             block_update
                         })
                         .collect::<Vec<_>>(),
