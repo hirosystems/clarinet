@@ -41,7 +41,7 @@ pub fn expect_chain_updated_with_microblocks(
                             BlockEvent::Microblock(expected_microblock) => expected_microblock,
                             _ => unreachable!(),
                         };
-                        println!(
+                        debug!(
                             "Checking {} and {}",
                             expected_microblock.block_identifier, new_microblock.block_identifier
                         );
@@ -76,7 +76,7 @@ pub fn expect_chain_updated_with_blocks(expected_blocks: Vec<BlockEvent>) -> Cha
                             BlockEvent::Block(expected_block) => expected_block,
                             _ => unreachable!(),
                         };
-                        println!(
+                        debug!(
                             "Checking {} and {}",
                             expected_block.block_identifier, new_block.block.block_identifier
                         );
@@ -3029,7 +3029,7 @@ pub fn get_vector_048() -> Vec<(BlockEvent, ChainEventExpectation)> {
 /// Vector 049: Generate the following blocks
 ///
 /// A1(1) -  B1(2) - [a1](3) - [b1](4) - [c1](6) - [d1](7)  - C1(10)
-///                \ [a2](4) - [b2](5)                      - C2(9) 
+///                \ [a2](4) - [b2](5)                      - C2(9)
 ///
 pub fn get_vector_049() -> Vec<(BlockEvent, ChainEventExpectation)> {
     vec![
@@ -3124,3 +3124,31 @@ pub fn get_vector_049() -> Vec<(BlockEvent, ChainEventExpectation)> {
     ]
 }
 
+/// Vector 050: Generate the following blocks
+///
+/// A1(1) -  B1(2) - [a1](3) - [b1](4) - [c1](6) - [d1](7)  - C1(10)
+///                \ [a2](4) - [b2](5)                      - C2(9)  - D2(12)     
+///                                    \ [c2](8)            - C3(11)
+///
+pub fn get_vector_050() -> Vec<(BlockEvent, ChainEventExpectation)> {
+    let mut base = get_vector_049();
+    base.append(&mut vec![(
+        blocks::C3(Some(microblocks::c2(blocks::B1(None), None))),
+        expect_chain_updated_with_block_reorg_and_microblock_updates(
+            blocks::C1(Some(microblocks::d1(blocks::B1(None), None))),
+            blocks::C3(Some(microblocks::c2(blocks::B1(None), None))),
+            vec![
+                microblocks::a1(blocks::B1(None), None),
+                microblocks::b1(blocks::B1(None), None),
+                microblocks::c1(blocks::B1(None), None),
+                microblocks::d1(blocks::B1(None), None),
+            ],
+            vec![
+                microblocks::a2(blocks::B1(None), None),
+                microblocks::b2(blocks::B1(None), None),
+                microblocks::c2(blocks::B1(None), None),
+            ],
+        ),
+    )]);
+    base
+}

@@ -304,20 +304,24 @@ pub async fn start_chains_coordinator(
                     name: "stacks-node".into(),
                     comment: format!(
                         "mining blocks (chaintip = #{})",
-                        known_tip.block_identifier.index
+                        known_tip.block.block_identifier.index
                     ),
                 }));
                 let _ = devnet_event_tx.send(DevnetEvent::info(format!(
                     "Block #{} anchored in Bitcoin block #{} includes {} transactions",
-                    known_tip.block_identifier.index,
-                    known_tip.metadata.bitcoin_anchor_block_identifier.index,
-                    known_tip.transactions.len(),
+                    known_tip.block.block_identifier.index,
+                    known_tip
+                        .block
+                        .metadata
+                        .bitcoin_anchor_block_identifier
+                        .index,
+                    known_tip.block.transactions.len(),
                 )));
 
-                let should_submit_pox_orders = known_tip.metadata.pox_cycle_position
-                    == (known_tip.metadata.pox_cycle_length - 2);
+                let should_submit_pox_orders = known_tip.block.metadata.pox_cycle_position
+                    == (known_tip.block.metadata.pox_cycle_length - 2);
                 if should_submit_pox_orders {
-                    let bitcoin_block_height = known_tip.block_identifier.index;
+                    let bitcoin_block_height = known_tip.block.block_identifier.index;
                     let res = publish_stacking_orders(
                         &config.devnet_config,
                         &config.accounts,

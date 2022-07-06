@@ -307,7 +307,7 @@ pub fn get_value_description(raw_value: &str) -> String {
     let value = match ClarityValue::consensus_deserialize(&mut Cursor::new(&value_bytes)) {
         Ok(value) => format!("{}", value),
         Err(e) => {
-            println!("{:?}", e);
+            error!("unable to deserialize clarity value {:?}", e);
             return raw_value.to_string();
         }
     };

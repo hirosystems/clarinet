@@ -206,6 +206,12 @@ pub async fn start_event_observer(
         bitcoin_node_rpc_password: config.bitcoin_node_password.clone(),
     });
 
+    let log_level = if cfg!(feature = "cli") {
+        LogLevel::Critical
+    } else {
+        LogLevel::Debug
+    };
+
     let managed_config = config.clone();
     let indexer_rw_lock = Arc::new(RwLock::new(indexer));
 
@@ -217,11 +223,11 @@ pub async fn start_event_observer(
         address: IpAddr::V4(Ipv4Addr::new(0, 0, 0, 0)),
         keep_alive: 5,
         temp_dir: std::env::temp_dir(),
-        log_level: LogLevel::Debug,
+        log_level: log_level.clone(),
         ..Config::default()
     };
 
-    let mut routes = routes![
+    let mut routes = rocket::routes![
         handle_ping,
         handle_new_bitcoin_block,
         handle_new_stacks_block,
@@ -254,7 +260,7 @@ pub async fn start_event_observer(
         address: IpAddr::V4(Ipv4Addr::new(0, 0, 0, 0)),
         keep_alive: 5,
         temp_dir: std::env::temp_dir(),
-        log_level: LogLevel::Debug,
+        log_level,
         ..Config::default()
     };
 
@@ -457,7 +463,7 @@ pub async fn start_observer_commands_handler(
                 let hook_formation = match config.operators.get_mut(&api_key.0) {
                     Some(hook_formation) => hook_formation,
                     None => {
-                        println!(
+                        error!(
                             "Unable to retrieve chainhooks associated with {:?}",
                             api_key
                         );
@@ -473,7 +479,7 @@ pub async fn start_observer_commands_handler(
                 let hook_formation = match config.operators.get_mut(&api_key.0) {
                     Some(hook_formation) => hook_formation,
                     None => {
-                        println!(
+                        error!(
                             "Unable to retrieve chainhooks associated with {:?}",
                             api_key
                         );
@@ -492,7 +498,7 @@ pub async fn start_observer_commands_handler(
                 let hook_formation = match config.operators.get_mut(&api_key.0) {
                     Some(hook_formation) => hook_formation,
                     None => {
-                        println!(
+                        error!(
                             "Unable to retrieve chainhooks associated with {:?}",
                             api_key
                         );
@@ -511,8 +517,9 @@ pub async fn start_observer_commands_handler(
     Ok(())
 }
 
-#[get("/ping", format = "application/json")]
+#[rocket::get("/ping", format = "application/json")]
 pub fn handle_ping() -> Json<JsonValue> {
+    info!("GET /ping");
     Json(json!({
         "status": 200,
         "result": "Ok",
@@ -525,6 +532,7 @@ pub fn handle_new_bitcoin_block(
     marshalled_block: Json<JsonValue>,
     background_job_tx: &State<Arc<Mutex<Sender<ObserverCommand>>>>,
 ) -> Json<JsonValue> {
+    info!("POST /new_burn_block");
     // Standardize the structure of the block, and identify the
     // kind of update that this new block would imply, taking
     // into account the last 7 blocks.
@@ -558,6 +566,7 @@ pub fn handle_new_stacks_block(
     marshalled_block: Json<JsonValue>,
     background_job_tx: &State<Arc<Mutex<Sender<ObserverCommand>>>>,
 ) -> Json<JsonValue> {
+    info!("POST /new_block");
     // Standardize the structure of the block, and identify the
     // kind of update that this new block would imply, taking
     // into account the last 7 blocks.
@@ -602,6 +611,7 @@ pub fn handle_new_microblocks(
     marshalled_microblock: Json<JsonValue>,
     background_job_tx: &State<Arc<Mutex<Sender<ObserverCommand>>>>,
 ) -> Json<JsonValue> {
+    info!("POST /new_microblocks");
     // Standardize the structure of the microblock, and identify the
     // kind of update that this new microblock would imply
     let mut chain_event = match indexer_rw_lock.inner().write() {
@@ -638,6 +648,7 @@ pub fn handle_new_mempool_tx(
     raw_txs: Json<Vec<String>>,
     background_job_tx: &State<Arc<Mutex<Sender<ObserverCommand>>>>,
 ) -> Json<JsonValue> {
+    info!("POST /new_mempool_tx");
     let transactions = raw_txs
         .iter()
         .map(|tx_data| {
@@ -668,6 +679,7 @@ pub fn handle_new_mempool_tx(
 
 #[post("/drop_mempool_tx", format = "application/json")]
 pub fn handle_drop_mempool_tx() -> Json<JsonValue> {
+    info!("POST /drop_mempool_tx");
     // TODO(lgalabru): use propagate mempool events
     Json(json!({
         "status": 200,
@@ -677,6 +689,7 @@ pub fn handle_drop_mempool_tx() -> Json<JsonValue> {
 
 #[post("/attachments/new", format = "application/json")]
 pub fn handle_new_attachement() -> Json<JsonValue> {
+    info!("POST /attachments/new");
     Json(json!({
         "status": 200,
         "result": "Ok",
@@ -689,6 +702,8 @@ pub async fn handle_bitcoin_rpc_call(
     bitcoin_rpc_call: Json<BitcoinRPCRequest>,
     background_job_tx: &State<Arc<Mutex<Sender<ObserverCommand>>>>,
 ) -> Json<JsonValue> {
+    info!("POST /");
+
     use base64::encode;
     use reqwest::Client;
 
@@ -735,6 +750,7 @@ pub fn handle_create_hook(
     background_job_tx: &State<Arc<Mutex<Sender<ObserverCommand>>>>,
     api_key: ApiKey,
 ) -> Json<JsonValue> {
+    info!("POST /v1/chainhooks");
     let hook = hook.into_inner();
     let background_job_tx = background_job_tx.inner();
     match background_job_tx.lock() {
@@ -756,6 +772,7 @@ pub fn handle_delete_stacks_hook(
     background_job_tx: &State<Arc<Mutex<Sender<ObserverCommand>>>>,
     api_key: ApiKey,
 ) -> Json<JsonValue> {
+    info!("POST /v1/chainhooks/stacks/<hook_uuid>");
     let background_job_tx = background_job_tx.inner();
     match background_job_tx.lock() {
         Ok(tx) => {
@@ -776,6 +793,7 @@ pub fn handle_delete_bitcoin_hook(
     background_job_tx: &State<Arc<Mutex<Sender<ObserverCommand>>>>,
     api_key: ApiKey,
 ) -> Json<JsonValue> {
+    info!("DELETE /v1/chainhooks/bitcoin/<hook_uuid>");
     let background_job_tx = background_job_tx.inner();
     match background_job_tx.lock() {
         Ok(tx) => {
