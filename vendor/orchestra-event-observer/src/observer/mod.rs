@@ -399,31 +399,32 @@ pub async fn start_observer_commands_handler(
                         .collect();
 
                     // process hooks
-                    let hooks_triggerable =
+                    let chainhooks_candidates =
                         evaluate_stacks_chainhooks_on_chain_event(&chain_event, stacks_chainhooks);
 
-                    let mut hooks_to_trigger = vec![];
+                    let mut chainhooks_to_trigger = vec![];
 
-                    for (hook, tx, block_identifier) in hooks_triggerable.into_iter() {
-                        let mut total_occurrences: u64 =
-                            *chainhooks_occurrences_tracker.get(&hook.uuid).unwrap_or(&0);
+                    for trigger in chainhooks_candidates.into_iter() {
+                        let mut total_occurrences: u64 = *chainhooks_occurrences_tracker
+                            .get(&trigger.chainhook.uuid)
+                            .unwrap_or(&0);
                         total_occurrences += 1;
 
-                        let limit = hook.expire_after_occurrence.unwrap_or(0);
+                        let limit = trigger.chainhook.expire_after_occurrence.unwrap_or(0);
                         if limit == 0 || total_occurrences <= limit {
-                            hooks_to_trigger.push((hook, tx, block_identifier));
                             chainhooks_occurrences_tracker
-                                .insert(hook.uuid.clone(), total_occurrences);
+                                .insert(trigger.chainhook.uuid.clone(), total_occurrences);
+                            chainhooks_to_trigger.push(trigger);
                         } else {
-                            hooks_ids_to_deregister.push(hook.uuid.clone());
+                            hooks_ids_to_deregister.push(trigger.chainhook.uuid.clone());
                         }
                     }
 
                     if let Some(ref tx) = observer_events_tx {
-                        let _ = tx.send(ObserverEvent::HooksTriggered(hooks_to_trigger.len()));
+                        let _ = tx.send(ObserverEvent::HooksTriggered(chainhooks_to_trigger.len()));
                     }
-                    for (hook, transaction, block_identifier) in hooks_to_trigger.into_iter() {
-                        handle_stacks_hook_action(hook, transaction, block_identifier, None).await;
+                    for hook_to_trigger in chainhooks_to_trigger.into_iter() {
+                        handle_stacks_hook_action(hook_to_trigger, None).await;
                     }
                 }
                 for hook_uuid in hooks_ids_to_deregister.iter() {

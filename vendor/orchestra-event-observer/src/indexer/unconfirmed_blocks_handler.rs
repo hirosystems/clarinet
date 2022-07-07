@@ -6,12 +6,13 @@ use orchestra_types::{
     BitcoinChainEvent, BlockIdentifier, Chain, ChainUpdatedWithBlocksData,
     ChainUpdatedWithMicroblocksData, ChainUpdatedWithMicroblocksReorgData,
     ChainUpdatedWithReorgData, StacksBlockData, StacksBlockUpdate, StacksChainEvent,
-    StacksMicroblockData, StacksMicroblocksTrail,
+    StacksMicroblockData, StacksMicroblocksTrail, StacksTransactionData,
 };
 
-trait AbstractBlock {
+pub trait AbstractBlock {
     fn get_identifier(&self) -> &BlockIdentifier;
     fn get_parent_identifier(&self) -> &BlockIdentifier;
+    fn get_transactions(&self) -> &Vec<StacksTransactionData>;
 }
 
 impl AbstractBlock for StacksBlockData {
@@ -22,6 +23,10 @@ impl AbstractBlock for StacksBlockData {
     fn get_parent_identifier(&self) -> &BlockIdentifier {
         &self.parent_block_identifier
     }
+
+    fn get_transactions(&self) -> &Vec<StacksTransactionData> {
+        &self.transactions
+    }
 }
 
 impl AbstractBlock for StacksMicroblockData {
@@ -31,6 +36,10 @@ impl AbstractBlock for StacksMicroblockData {
 
     fn get_parent_identifier(&self) -> &BlockIdentifier {
         &self.parent_block_identifier
+    }
+
+    fn get_transactions(&self) -> &Vec<StacksTransactionData> {
+        &self.transactions
     }
 }
 
@@ -583,6 +592,7 @@ impl UnconfirmedBlocksProcessor {
             self.block_store.remove(&block_to_prune);
             self.micro_forks.remove(&block_to_prune);
             self.canonical_micro_fork_id.remove(&block_to_prune);
+            // TODO(lgalabru): cascade pruning down to micro_orphans and microblocks_store
         }
         for fork_id in forks_to_prune {
             self.forks.remove(&fork_id);
