@@ -210,17 +210,15 @@ pub async fn start_chains_coordinator(
                 // Contextual shortcut: Devnet is an environment under control,
                 // with 1 miner. As such we will ignore Reorgs handling.
                 let (log, status) = match &chain_update {
-                    BitcoinChainEvent::ChainUpdatedWithBlocks(block) => {
-                        let log =
-                            format!("Bitcoin block #{} received", block.block_identifier.index);
-                        let status = format!(
-                            "mining blocks (chaintip = #{})",
-                            block.block_identifier.index
-                        );
+                    BitcoinChainEvent::ChainUpdatedWithBlocks(event) => {
+                        let tip = event.new_blocks.last().unwrap();
+                        let log = format!("Bitcoin block #{} received", tip.block_identifier.index);
+                        let status =
+                            format!("mining blocks (chaintip = #{})", tip.block_identifier.index);
                         (log, status)
                     }
-                    BitcoinChainEvent::ChainUpdatedWithReorg(_old_blocks, new_blocks) => {
-                        let tip = new_blocks.last().unwrap();
+                    BitcoinChainEvent::ChainUpdatedWithReorg(events) => {
+                        let tip = events.blocks_to_apply.last().unwrap();
                         let log = format!(
                             "Bitcoin reorg received (new height: {})",
                             tip.block_identifier.index

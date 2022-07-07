@@ -148,6 +148,7 @@ impl ChainhookSpecificationFile {
             network: network.clone(),
             start_block: network_spec.start_block,
             end_block: network_spec.end_block,
+            expire_after_occurrence: network_spec.expire_after_occurrence,
             predicate: network_spec.predicate.to_bitcoin_predicate()?,
             action: network_spec.action.to_specifications()?,
         })
