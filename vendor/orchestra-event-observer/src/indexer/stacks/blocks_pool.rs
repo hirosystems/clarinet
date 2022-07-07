@@ -682,15 +682,15 @@ impl StacksBlockPool {
                         match chain_event {
                             StacksChainEvent::ChainUpdatedWithMicroblocks(data) => {
                                 update
-                                    .parents_microblocks_to_apply
+                                    .parent_microblocks_to_apply
                                     .append(&mut data.new_microblocks);
                             }
                             StacksChainEvent::ChainUpdatedWithMicroblocksReorg(data) => {
                                 update
-                                    .parents_microblocks_to_apply
+                                    .parent_microblocks_to_apply
                                     .append(&mut data.microblocks_to_apply);
                                 update
-                                    .parents_microblocks_to_rollback
+                                    .parent_microblocks_to_rollback
                                     .append(&mut data.microblocks_to_rollback);
                             }
                             _ => unreachable!(),
@@ -723,15 +723,15 @@ impl StacksBlockPool {
                             match chain_event {
                                 StacksChainEvent::ChainUpdatedWithMicroblocks(data) => {
                                     update
-                                        .parents_microblocks_to_apply
+                                        .parent_microblocks_to_apply
                                         .append(&mut data.new_microblocks);
                                 }
                                 StacksChainEvent::ChainUpdatedWithMicroblocksReorg(data) => {
                                     update
-                                        .parents_microblocks_to_apply
+                                        .parent_microblocks_to_apply
                                         .append(&mut data.microblocks_to_apply);
                                     update
-                                        .parents_microblocks_to_rollback
+                                        .parent_microblocks_to_rollback
                                         .append(&mut data.microblocks_to_rollback);
                                 }
                                 _ => unreachable!(),
@@ -759,11 +759,11 @@ impl StacksBlockPool {
                                     Some(block) => block.clone(),
                                     None => panic!("unable to retrive block from block store"),
                                 };
-                                let parents_microblocks_to_rollback =
+                                let parent_microblocks_to_rollback =
                                     self.get_confirmed_parent_microblocks(&block);
                                 let mut update = StacksBlockUpdate::new(block);
-                                update.parents_microblocks_to_rollback =
-                                    parents_microblocks_to_rollback;
+                                update.parent_microblocks_to_rollback =
+                                    parent_microblocks_to_rollback;
                                 update
                             })
                             .collect::<Vec<_>>(),
@@ -780,7 +780,7 @@ impl StacksBlockPool {
                                 {
                                     (_, Some(microblocks_to_apply)) => {
                                         let mut update = StacksBlockUpdate::new(block);
-                                        update.parents_microblocks_to_apply = microblocks_to_apply;
+                                        update.parent_microblocks_to_apply = microblocks_to_apply;
                                         update
                                     }
                                     _ => StacksBlockUpdate::new(block),

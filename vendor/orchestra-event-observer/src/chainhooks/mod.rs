@@ -45,7 +45,7 @@ pub fn evaluate_stacks_chainhooks_on_chain_event<'a>(
                 let mut rollback = vec![];
                 for block_update in update.new_blocks.iter() {
                     for parents_microblock_to_apply in
-                        block_update.parents_microblocks_to_apply.iter()
+                        block_update.parent_microblocks_to_apply.iter()
                     {
                         apply.append(&mut evaluate_stacks_chainhook_on_blocks(
                             vec![parents_microblock_to_apply],
@@ -53,7 +53,7 @@ pub fn evaluate_stacks_chainhooks_on_chain_event<'a>(
                         ));
                     }
                     for parents_microblock_to_rolllback in
-                        block_update.parents_microblocks_to_rollback.iter()
+                        block_update.parent_microblocks_to_rollback.iter()
                     {
                         rollback.append(&mut evaluate_stacks_chainhook_on_blocks(
                             vec![parents_microblock_to_rolllback],
@@ -127,7 +127,7 @@ pub fn evaluate_stacks_chainhooks_on_chain_event<'a>(
 
                 for block_update in update.blocks_to_apply.iter() {
                     for parents_microblock_to_apply in
-                        block_update.parents_microblocks_to_apply.iter()
+                        block_update.parent_microblocks_to_apply.iter()
                     {
                         apply.append(&mut evaluate_stacks_chainhook_on_blocks(
                             vec![parents_microblock_to_apply],
@@ -141,7 +141,7 @@ pub fn evaluate_stacks_chainhooks_on_chain_event<'a>(
                 }
                 for block_update in update.blocks_to_rollback.iter() {
                     for parents_microblock_to_rollback in
-                        block_update.parents_microblocks_to_rollback.iter()
+                        block_update.parent_microblocks_to_rollback.iter()
                     {
                         rollback.append(&mut evaluate_stacks_chainhook_on_blocks(
                             vec![parents_microblock_to_rollback],

@@ -12,8 +12,8 @@ use clarinet_files::{
 use clarinet_lib::deployments;
 use clarinet_lib::integrate::{self, DevnetEvent, DevnetOrchestrator};
 use orchestra_types::{
-    BitcoinBlockData, BitcoinChainEvent, StacksChainEvent, StacksChainUpdatedWithBlocksData,
-    StacksNetwork,
+    BitcoinChainEvent, BitcoinChainUpdatedWithBlocksData, StacksChainEvent,
+    StacksChainUpdatedWithBlocksData, StacksNetwork,
 };
 
 use core::panic;
@@ -28,7 +28,7 @@ type DevnetCallback = Box<dyn FnOnce(&Channel) + Send>;
 
 struct StacksDevnet {
     tx: mpsc::Sender<DevnetCommand>,
-    bitcoin_block_rx: mpsc::Receiver<BitcoinBlockData>,
+    bitcoin_block_rx: mpsc::Receiver<BitcoinChainUpdatedWithBlocksData>,
     stacks_block_rx: mpsc::Receiver<StacksChainUpdatedWithBlocksData>,
     node_url: String,
 }
@@ -562,7 +562,7 @@ impl StacksDevnet {
             .downcast_or_throw::<JsBox<StacksDevnet>, _>(&mut cx)?;
 
         let blocks = match devnet.stacks_block_rx.recv() {
-            Ok(obj) => obj.new_blocks,
+            Ok(obj) => obj,
             Err(err) => panic!("{:?}", err),
         };
 

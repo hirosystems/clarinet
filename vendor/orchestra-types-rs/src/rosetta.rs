@@ -491,16 +491,16 @@ impl StacksChainEvent {
 #[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct StacksBlockUpdate {
     pub block: StacksBlockData,
-    pub parents_microblocks_to_rollback: Vec<StacksMicroblockData>,
-    pub parents_microblocks_to_apply: Vec<StacksMicroblockData>,
+    pub parent_microblocks_to_rollback: Vec<StacksMicroblockData>,
+    pub parent_microblocks_to_apply: Vec<StacksMicroblockData>,
 }
 
 impl StacksBlockUpdate {
     pub fn new(block: StacksBlockData) -> StacksBlockUpdate {
         StacksBlockUpdate {
             block,
-            parents_microblocks_to_rollback: vec![],
-            parents_microblocks_to_apply: vec![],
+            parent_microblocks_to_rollback: vec![],
+            parent_microblocks_to_apply: vec![],
         }
     }
 }

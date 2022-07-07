@@ -141,11 +141,11 @@ pub fn expect_chain_updated_with_block_and_microblock_updates(
                     assert_eq!(event.new_blocks.len(), 1);
                     assert_eq!(
                         microblocks_to_rollback.len(),
-                        event.new_blocks[0].parents_microblocks_to_rollback.len()
+                        event.new_blocks[0].parent_microblocks_to_rollback.len()
                     );
                     assert_eq!(
                         microblocks_to_apply.len(),
-                        event.new_blocks[0].parents_microblocks_to_apply.len()
+                        event.new_blocks[0].parent_microblocks_to_apply.len()
                     );
                     let expected_block = match expected_block {
                         BlockEvent::Block(ref expected_block) => expected_block,
@@ -181,7 +181,7 @@ pub fn expect_chain_updated_with_block_and_microblock_updates(
 
                     for (expected, microblock) in microblocks_to_rollback
                         .iter()
-                        .zip(&event.new_blocks[0].parents_microblocks_to_rollback)
+                        .zip(&event.new_blocks[0].parent_microblocks_to_rollback)
                     {
                         let expected = match expected {
                             BlockEvent::Microblock(expected) => expected,
@@ -196,7 +196,7 @@ pub fn expect_chain_updated_with_block_and_microblock_updates(
                     }
                     for (expected, microblock) in microblocks_to_apply
                         .iter()
-                        .zip(&event.new_blocks[0].parents_microblocks_to_apply)
+                        .zip(&event.new_blocks[0].parent_microblocks_to_apply)
                     {
                         let expected = match expected {
                             BlockEvent::Microblock(expected) => expected,
@@ -235,12 +235,12 @@ pub fn expect_chain_updated_with_block_reorg_and_microblock_updates(
                     assert_eq!(
                         microblocks_to_rollback.len(),
                         event.blocks_to_rollback[0]
-                            .parents_microblocks_to_rollback
+                            .parent_microblocks_to_rollback
                             .len()
                     );
                     assert_eq!(
                         microblocks_to_apply.len(),
-                        event.blocks_to_apply[0].parents_microblocks_to_apply.len()
+                        event.blocks_to_apply[0].parent_microblocks_to_apply.len()
                     );
                     let previous_block = match previous_block {
                         BlockEvent::Block(ref previous_block) => previous_block,
@@ -307,7 +307,7 @@ pub fn expect_chain_updated_with_block_reorg_and_microblock_updates(
 
                     for (expected, microblock) in microblocks_to_rollback
                         .iter()
-                        .zip(&event.blocks_to_rollback[0].parents_microblocks_to_rollback)
+                        .zip(&event.blocks_to_rollback[0].parent_microblocks_to_rollback)
                     {
                         let expected = match expected {
                             BlockEvent::Microblock(expected) => expected,
@@ -322,7 +322,7 @@ pub fn expect_chain_updated_with_block_reorg_and_microblock_updates(
                     }
                     for (expected, microblock) in microblocks_to_apply
                         .iter()
-                        .zip(&event.blocks_to_apply[0].parents_microblocks_to_apply)
+                        .zip(&event.blocks_to_apply[0].parent_microblocks_to_apply)
                     {
                         let expected = match expected {
                             BlockEvent::Microblock(expected) => expected,
