@@ -1,10 +1,12 @@
 use orchestra_types::{StacksBlockData, StacksMicroblockData};
 
 pub mod accounts;
-#[allow(non_snake_case, unreachable_code)]
-pub mod blocks;
+pub mod bitcoin_blocks;
+pub mod bitcoin_shapes;
 pub mod microblocks;
-pub mod shapes;
+#[allow(non_snake_case, unreachable_code)]
+pub mod stacks_blocks;
+pub mod stacks_shapes;
 pub mod transactions;
 
 pub enum BlockEvent {

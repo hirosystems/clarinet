@@ -85,6 +85,7 @@ pub struct BitcoinChainhookSpecification {
     pub version: u32,
     pub start_block: Option<u64>,
     pub end_block: Option<u64>,
+    pub expire_after_occurrence: Option<u64>,
     pub predicate: BitcoinHookPredicate,
     pub action: HookAction,
 }

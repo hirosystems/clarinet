@@ -5,7 +5,7 @@ use orchestra_types::{
     StacksTransactionMetadata,
 };
 
-pub fn generate_test_block(
+pub fn generate_test_stacks_block(
     fork_id: u8,
     block_height: u64,
     transactions: Vec<StacksTransactionData>,
@@ -72,93 +72,93 @@ pub fn generate_test_block(
 }
 
 pub fn A1(parent: Option<BlockEvent>) -> BlockEvent {
-    generate_test_block(0, 1, vec![], parent)
+    generate_test_stacks_block(0, 1, vec![], parent)
 }
 
 pub fn B1(parent: Option<BlockEvent>) -> BlockEvent {
-    generate_test_block(1, 2, vec![], parent)
+    generate_test_stacks_block(1, 2, vec![], parent)
 }
 
 pub fn B2(parent: Option<BlockEvent>) -> BlockEvent {
-    generate_test_block(2, 2, vec![], parent)
+    generate_test_stacks_block(2, 2, vec![], parent)
 }
 
 pub fn C1(parent: Option<BlockEvent>) -> BlockEvent {
-    generate_test_block(1, 3, vec![], parent)
+    generate_test_stacks_block(1, 3, vec![], parent)
 }
 
 pub fn C2(parent: Option<BlockEvent>) -> BlockEvent {
-    generate_test_block(2, 3, vec![], parent)
+    generate_test_stacks_block(2, 3, vec![], parent)
 }
 
 pub fn D1(parent: Option<BlockEvent>) -> BlockEvent {
-    generate_test_block(1, 4, vec![], parent)
+    generate_test_stacks_block(1, 4, vec![], parent)
 }
 
 pub fn D2(parent: Option<BlockEvent>) -> BlockEvent {
-    generate_test_block(2, 4, vec![], parent)
+    generate_test_stacks_block(2, 4, vec![], parent)
 }
 
 pub fn E1(parent: Option<BlockEvent>) -> BlockEvent {
-    generate_test_block(1, 5, vec![], parent)
+    generate_test_stacks_block(1, 5, vec![], parent)
 }
 
 pub fn E2(parent: Option<BlockEvent>) -> BlockEvent {
-    generate_test_block(2, 5, vec![], parent)
+    generate_test_stacks_block(2, 5, vec![], parent)
 }
 
 pub fn B3(parent: Option<BlockEvent>) -> BlockEvent {
-    generate_test_block(3, 2, vec![], parent)
+    generate_test_stacks_block(3, 2, vec![], parent)
 }
 
 pub fn C3(parent: Option<BlockEvent>) -> BlockEvent {
-    generate_test_block(3, 3, vec![], parent)
+    generate_test_stacks_block(3, 3, vec![], parent)
 }
 
 pub fn D3(parent: Option<BlockEvent>) -> BlockEvent {
-    generate_test_block(3, 4, vec![], parent)
+    generate_test_stacks_block(3, 4, vec![], parent)
 }
 
 pub fn E3(parent: Option<BlockEvent>) -> BlockEvent {
-    generate_test_block(3, 5, vec![], parent)
+    generate_test_stacks_block(3, 5, vec![], parent)
 }
 
 pub fn F1(parent: Option<BlockEvent>) -> BlockEvent {
-    generate_test_block(1, 6, vec![], parent)
+    generate_test_stacks_block(1, 6, vec![], parent)
 }
 
 pub fn F2(parent: Option<BlockEvent>) -> BlockEvent {
-    generate_test_block(2, 6, vec![], parent)
+    generate_test_stacks_block(2, 6, vec![], parent)
 }
 
 pub fn F3(parent: Option<BlockEvent>) -> BlockEvent {
-    generate_test_block(3, 6, vec![], parent)
+    generate_test_stacks_block(3, 6, vec![], parent)
 }
 
 pub fn G1(parent: Option<BlockEvent>) -> BlockEvent {
-    generate_test_block(1, 7, vec![], parent)
+    generate_test_stacks_block(1, 7, vec![], parent)
 }
 
 pub fn G2(parent: Option<BlockEvent>) -> BlockEvent {
-    generate_test_block(2, 7, vec![], parent)
+    generate_test_stacks_block(2, 7, vec![], parent)
 }
 
 pub fn G3(parent: Option<BlockEvent>) -> BlockEvent {
-    generate_test_block(3, 7, vec![], parent)
+    generate_test_stacks_block(3, 7, vec![], parent)
 }
 
 pub fn H1(parent: Option<BlockEvent>) -> BlockEvent {
-    generate_test_block(1, 8, vec![], parent)
+    generate_test_stacks_block(1, 8, vec![], parent)
 }
 
 pub fn H3(parent: Option<BlockEvent>) -> BlockEvent {
-    generate_test_block(3, 8, vec![], parent)
+    generate_test_stacks_block(3, 8, vec![], parent)
 }
 
 pub fn I1(parent: Option<BlockEvent>) -> BlockEvent {
-    generate_test_block(1, 9, vec![], parent)
+    generate_test_stacks_block(1, 9, vec![], parent)
 }
 
 pub fn I3(parent: Option<BlockEvent>) -> BlockEvent {
-    generate_test_block(3, 9, vec![], parent)
+    generate_test_stacks_block(3, 9, vec![], parent)
 }

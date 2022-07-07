@@ -3,7 +3,7 @@ use crate::chainhooks::{
     evaluate_bitcoin_chainhooks_on_chain_event, evaluate_stacks_chainhooks_on_chain_event,
     handle_bitcoin_hook_action, handle_stacks_hook_action,
 };
-use crate::indexer::{chains, Indexer, IndexerConfig};
+use crate::indexer::{self, Indexer, IndexerConfig};
 use crate::utils;
 use bitcoincore_rpc::bitcoin::{BlockHash, Txid};
 use bitcoincore_rpc::{Auth, Client, RpcApi};
@@ -333,6 +333,7 @@ pub async fn start_observer_commands_handler(
                     event_handler.propagate_bitcoin_event(&chain_event).await;
                 }
                 // process hooks
+                let mut hooks_ids_to_deregister = vec![];
                 if config.hooks_enabled {
                     let bitcoin_chainhooks = config
                         .operators
@@ -341,43 +342,59 @@ pub async fn start_observer_commands_handler(
                         .flatten()
                         .collect();
 
-                    let hooks_to_trigger = evaluate_bitcoin_chainhooks_on_chain_event(
+                    let chainhooks_candidates = evaluate_bitcoin_chainhooks_on_chain_event(
                         &chain_event,
                         bitcoin_chainhooks,
                     );
+
+                    let mut chainhooks_to_trigger = vec![];
+
+                    for trigger in chainhooks_candidates.into_iter() {
+                        let mut total_occurrences: u64 = *chainhooks_occurrences_tracker
+                            .get(&trigger.chainhook.uuid)
+                            .unwrap_or(&0);
+                        total_occurrences += 1;
+
+                        let limit = trigger.chainhook.expire_after_occurrence.unwrap_or(0);
+                        if limit == 0 || total_occurrences <= limit {
+                            chainhooks_occurrences_tracker
+                                .insert(trigger.chainhook.uuid.clone(), total_occurrences);
+                            chainhooks_to_trigger.push(trigger);
+                        } else {
+                            hooks_ids_to_deregister.push(trigger.chainhook.uuid.clone());
+                        }
+                    }
+
                     let mut proofs = HashMap::new();
-                    for (_, transaction, block_identifier) in hooks_to_trigger.iter() {
-                        if !proofs.contains_key(&transaction.transaction_identifier.hash) {
-                            let rpc = Client::new(
-                                &format!(
-                                    "{}:{}",
-                                    config.bitcoin_node_rpc_host, config.bitcoin_node_rpc_port
-                                ),
-                                Auth::UserPass(
-                                    config.bitcoin_node_username.to_string(),
-                                    config.bitcoin_node_password.to_string(),
-                                ),
-                            )
-                            .unwrap();
-                            let txid = Txid::from_str(&transaction.transaction_identifier.hash)?;
-                            let block_hash = BlockHash::from_str(&block_identifier.hash)?;
-                            let res = rpc.get_tx_out_proof(&vec![txid], Some(&block_hash));
-                            if let Ok(proof) = res {
-                                proofs.insert(
-                                    transaction.transaction_identifier.hash.clone(),
-                                    bytes_to_hex(&proof),
-                                );
+                    for hook_to_trigger in chainhooks_to_trigger.iter() {
+                        for (transaction, block_identifier) in hook_to_trigger.apply.iter() {
+                            if !proofs.contains_key(&transaction.transaction_identifier) {
+                                let rpc = Client::new(
+                                    &format!(
+                                        "{}:{}",
+                                        config.bitcoin_node_rpc_host, config.bitcoin_node_rpc_port
+                                    ),
+                                    Auth::UserPass(
+                                        config.bitcoin_node_username.to_string(),
+                                        config.bitcoin_node_password.to_string(),
+                                    ),
+                                )
+                                .unwrap();
+                                let txid =
+                                    Txid::from_str(&transaction.transaction_identifier.hash)?;
+                                let block_hash = BlockHash::from_str(&block_identifier.hash)?;
+                                let res = rpc.get_tx_out_proof(&vec![txid], Some(&block_hash));
+                                if let Ok(proof) = res {
+                                    proofs.insert(
+                                        &transaction.transaction_identifier,
+                                        bytes_to_hex(&proof),
+                                    );
+                                }
                             }
                         }
                     }
-                    for (hook, transaction, block_identifier) in hooks_to_trigger.into_iter() {
-                        handle_bitcoin_hook_action(
-                            hook,
-                            transaction,
-                            block_identifier,
-                            proofs.get(&transaction.transaction_identifier.hash),
-                        )
-                        .await;
+                    for chainhook_to_trigger in chainhooks_to_trigger.into_iter() {
+                        handle_bitcoin_hook_action(chainhook_to_trigger, &proofs).await;
                     }
                 }
 
@@ -423,8 +440,9 @@ pub async fn start_observer_commands_handler(
                     if let Some(ref tx) = observer_events_tx {
                         let _ = tx.send(ObserverEvent::HooksTriggered(chainhooks_to_trigger.len()));
                     }
+                    let proofs = HashMap::new();
                     for hook_to_trigger in chainhooks_to_trigger.into_iter() {
-                        handle_stacks_hook_action(hook_to_trigger, None).await;
+                        handle_stacks_hook_action(hook_to_trigger, &proofs).await;
                     }
                 }
                 for hook_uuid in hooks_ids_to_deregister.iter() {
@@ -547,13 +565,15 @@ pub fn handle_new_bitcoin_block(
         }
     };
 
-    let background_job_tx = background_job_tx.inner();
-    match background_job_tx.lock() {
-        Ok(tx) => {
-            let _ = tx.send(ObserverCommand::PropagateBitcoinChainEvent(chain_update));
-        }
-        _ => {}
-    };
+    if let Ok(Some(chain_event)) = chain_update {
+        let background_job_tx = background_job_tx.inner();
+        match background_job_tx.lock() {
+            Ok(tx) => {
+                let _ = tx.send(ObserverCommand::PropagateBitcoinChainEvent(chain_event));
+            }
+            _ => {}
+        };
+    }
 
     Json(json!({
         "status": 200,
@@ -654,7 +674,7 @@ pub fn handle_new_mempool_tx(
         .iter()
         .map(|tx_data| {
             let (tx_description, ..) =
-                chains::stacks::get_tx_description(&tx_data).expect("unable to parse transaction");
+                indexer::stacks::get_tx_description(&tx_data).expect("unable to parse transaction");
             MempoolAdmissionData {
                 tx_data: tx_data.clone(),
                 tx_description,

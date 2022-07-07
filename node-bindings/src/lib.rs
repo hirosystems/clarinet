@@ -12,7 +12,7 @@ use clarinet_files::{
 use clarinet_lib::deployments;
 use clarinet_lib::integrate::{self, DevnetEvent, DevnetOrchestrator};
 use orchestra_types::{
-    BitcoinBlockData, BitcoinChainEvent, ChainUpdatedWithBlocksData, StacksChainEvent,
+    BitcoinBlockData, BitcoinChainEvent, StacksChainEvent, StacksChainUpdatedWithBlocksData,
     StacksNetwork,
 };
 
@@ -29,7 +29,7 @@ type DevnetCallback = Box<dyn FnOnce(&Channel) + Send>;
 struct StacksDevnet {
     tx: mpsc::Sender<DevnetCommand>,
     bitcoin_block_rx: mpsc::Receiver<BitcoinBlockData>,
-    stacks_block_rx: mpsc::Receiver<ChainUpdatedWithBlocksData>,
+    stacks_block_rx: mpsc::Receiver<StacksChainUpdatedWithBlocksData>,
     node_url: String,
 }
 

@@ -3,7 +3,7 @@ use crate::chainhooks::types::{
     StacksContractCallBasedPredicate, StacksHookPredicate,
 };
 use crate::indexer::tests::helpers::{
-    accounts, blocks, transactions::generate_test_tx_contract_call,
+    accounts, stacks_blocks, transactions::generate_test_tx_contract_call,
 };
 use crate::observer::{
     self, start_observer_commands_handler, ApiKey, EventHandler, EventObserverConfig,
@@ -12,7 +12,8 @@ use crate::observer::{
 use crate::utils;
 use clarity_repl::clarity::types::QualifiedContractIdentifier;
 use orchestra_types::{
-    ChainUpdatedWithBlocksData, StacksBlockData, StacksBlockUpdate, StacksChainEvent, StacksNetwork,
+    StacksBlockData, StacksBlockUpdate, StacksChainEvent, StacksChainUpdatedWithBlocksData,
+    StacksNetwork,
 };
 use std::collections::HashMap;
 use std::sync::mpsc::{channel, Receiver, Sender};
@@ -120,9 +121,9 @@ fn test_chainhook_register_deregister() {
         "decrement",
         vec!["u1"],
     )];
-    let chain_event = StacksChainEvent::ChainUpdatedWithBlocks(ChainUpdatedWithBlocksData {
+    let chain_event = StacksChainEvent::ChainUpdatedWithBlocks(StacksChainUpdatedWithBlocksData {
         new_blocks: vec![StacksBlockUpdate::new(
-            blocks::generate_test_block(0, 1, transactions, None).expect_block(),
+            stacks_blocks::generate_test_stacks_block(0, 1, transactions, None).expect_block(),
         )],
         confirmed_blocks: vec![],
     });
@@ -151,9 +152,9 @@ fn test_chainhook_register_deregister() {
         "increment",
         vec!["u1"],
     )];
-    let chain_event = StacksChainEvent::ChainUpdatedWithBlocks(ChainUpdatedWithBlocksData {
+    let chain_event = StacksChainEvent::ChainUpdatedWithBlocks(StacksChainUpdatedWithBlocksData {
         new_blocks: vec![StacksBlockUpdate::new(
-            blocks::generate_test_block(0, 2, transactions, None).expect_block(),
+            stacks_blocks::generate_test_stacks_block(0, 2, transactions, None).expect_block(),
         )],
         confirmed_blocks: vec![],
     });
@@ -198,9 +199,9 @@ fn test_chainhook_register_deregister() {
         "decrement",
         vec!["u1"],
     )];
-    let chain_event = StacksChainEvent::ChainUpdatedWithBlocks(ChainUpdatedWithBlocksData {
+    let chain_event = StacksChainEvent::ChainUpdatedWithBlocks(StacksChainUpdatedWithBlocksData {
         new_blocks: vec![StacksBlockUpdate::new(
-            blocks::generate_test_block(0, 2, transactions, None).expect_block(),
+            stacks_blocks::generate_test_stacks_block(0, 2, transactions, None).expect_block(),
         )],
         confirmed_blocks: vec![],
     });
@@ -229,9 +230,9 @@ fn test_chainhook_register_deregister() {
         "increment",
         vec!["u1"],
     )];
-    let chain_event = StacksChainEvent::ChainUpdatedWithBlocks(ChainUpdatedWithBlocksData {
+    let chain_event = StacksChainEvent::ChainUpdatedWithBlocks(StacksChainUpdatedWithBlocksData {
         new_blocks: vec![StacksBlockUpdate::new(
-            blocks::generate_test_block(0, 3, transactions, None).expect_block(),
+            stacks_blocks::generate_test_stacks_block(0, 3, transactions, None).expect_block(),
         )],
         confirmed_blocks: vec![],
     });
@@ -298,9 +299,9 @@ fn test_chainhook_auto_deregister() {
         "decrement",
         vec!["u1"],
     )];
-    let chain_event = StacksChainEvent::ChainUpdatedWithBlocks(ChainUpdatedWithBlocksData {
+    let chain_event = StacksChainEvent::ChainUpdatedWithBlocks(StacksChainUpdatedWithBlocksData {
         new_blocks: vec![StacksBlockUpdate::new(
-            blocks::generate_test_block(0, 1, transactions, None).expect_block(),
+            stacks_blocks::generate_test_stacks_block(0, 1, transactions, None).expect_block(),
         )],
         confirmed_blocks: vec![],
     });
@@ -329,9 +330,9 @@ fn test_chainhook_auto_deregister() {
         "increment",
         vec!["u1"],
     )];
-    let chain_event = StacksChainEvent::ChainUpdatedWithBlocks(ChainUpdatedWithBlocksData {
+    let chain_event = StacksChainEvent::ChainUpdatedWithBlocks(StacksChainUpdatedWithBlocksData {
         new_blocks: vec![StacksBlockUpdate::new(
-            blocks::generate_test_block(0, 2, transactions, None).expect_block(),
+            stacks_blocks::generate_test_stacks_block(0, 2, transactions, None).expect_block(),
         )],
         confirmed_blocks: vec![],
     });
@@ -360,9 +361,9 @@ fn test_chainhook_auto_deregister() {
         "increment",
         vec!["u1"],
     )];
-    let chain_event = StacksChainEvent::ChainUpdatedWithBlocks(ChainUpdatedWithBlocksData {
+    let chain_event = StacksChainEvent::ChainUpdatedWithBlocks(StacksChainUpdatedWithBlocksData {
         new_blocks: vec![StacksBlockUpdate::new(
-            blocks::generate_test_block(0, 3, transactions, None).expect_block(),
+            stacks_blocks::generate_test_stacks_block(0, 3, transactions, None).expect_block(),
         )],
         confirmed_blocks: vec![],
     });

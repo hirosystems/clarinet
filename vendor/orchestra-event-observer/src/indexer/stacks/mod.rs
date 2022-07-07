@@ -1,3 +1,7 @@
+mod blocks_pool;
+
+pub use blocks_pool::StacksBlockPool;
+
 use crate::indexer::AssetClassCache;
 use crate::indexer::{IndexerConfig, StacksChainContext};
 use bitcoincore_rpc::bitcoin::Block;
@@ -912,3 +916,6 @@ fn get_mutated_ids(asset_class_id: &str) -> (String, String) {
     let contract_id = asset_class_id.split("::").collect::<Vec<_>>()[0];
     (asset_class_id.into(), contract_id.into())
 }
+
+#[cfg(test)]
+pub mod tests;

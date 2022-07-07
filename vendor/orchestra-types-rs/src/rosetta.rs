@@ -234,7 +234,7 @@ pub struct BitcoinTransactionMetadata {
 
 /// The transaction_identifier uniquely identifies a transaction in a particular
 /// network and block or in the mempool.
-#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize, Hash)]
 pub struct TransactionIdentifier {
     /// Any transactions that are attributable only to a block (ex: a block
     /// event) should use the hash of the block as the identifier.
@@ -452,17 +452,40 @@ pub struct CurrencyMetadata {
 #[allow(dead_code)]
 #[derive(Debug, Clone, PartialEq, Serialize)]
 pub enum BitcoinChainEvent {
-    ChainUpdatedWithBlocks(BitcoinBlockData),
-    ChainUpdatedWithReorg(Vec<BitcoinBlockData>, Vec<BitcoinBlockData>),
+    ChainUpdatedWithBlocks(BitcoinChainUpdatedWithBlocksData),
+    ChainUpdatedWithReorg(BitcoinChainUpdatedWithReorgData),
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize)]
+pub struct BitcoinChainUpdatedWithBlocksData {
+    pub new_blocks: Vec<BitcoinBlockData>,
+    pub confirmed_blocks: Vec<BitcoinBlockData>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize)]
+pub struct BitcoinChainUpdatedWithReorgData {
+    pub blocks_to_rollback: Vec<BitcoinBlockData>,
+    pub blocks_to_apply: Vec<BitcoinBlockData>,
+    pub confirmed_blocks: Vec<BitcoinBlockData>,
 }
 
 #[allow(dead_code)]
 #[derive(Debug, Clone, PartialEq, Serialize)]
 pub enum StacksChainEvent {
-    ChainUpdatedWithBlocks(ChainUpdatedWithBlocksData),
-    ChainUpdatedWithReorg(ChainUpdatedWithReorgData),
-    ChainUpdatedWithMicroblocks(ChainUpdatedWithMicroblocksData),
-    ChainUpdatedWithMicroblocksReorg(ChainUpdatedWithMicroblocksReorgData),
+    ChainUpdatedWithBlocks(StacksChainUpdatedWithBlocksData),
+    ChainUpdatedWithReorg(StacksChainUpdatedWithReorgData),
+    ChainUpdatedWithMicroblocks(StacksChainUpdatedWithMicroblocksData),
+    ChainUpdatedWithMicroblocksReorg(StacksChainUpdatedWithMicroblocksReorgData),
+}
+
+impl StacksChainEvent {
+    pub fn get_confirmed_blocks(self) -> Vec<StacksBlockData> {
+        match self {
+            StacksChainEvent::ChainUpdatedWithBlocks(event) => event.confirmed_blocks,
+            StacksChainEvent::ChainUpdatedWithReorg(event) => event.confirmed_blocks,
+            _ => vec![],
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize)]
@@ -483,25 +506,25 @@ impl StacksBlockUpdate {
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize)]
-pub struct ChainUpdatedWithBlocksData {
+pub struct StacksChainUpdatedWithBlocksData {
     pub new_blocks: Vec<StacksBlockUpdate>,
     pub confirmed_blocks: Vec<StacksBlockData>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize)]
-pub struct ChainUpdatedWithReorgData {
+pub struct StacksChainUpdatedWithReorgData {
     pub blocks_to_rollback: Vec<StacksBlockUpdate>,
     pub blocks_to_apply: Vec<StacksBlockUpdate>,
     pub confirmed_blocks: Vec<StacksBlockData>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize)]
-pub struct ChainUpdatedWithMicroblocksData {
+pub struct StacksChainUpdatedWithMicroblocksData {
     pub new_microblocks: Vec<StacksMicroblockData>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize)]
-pub struct ChainUpdatedWithMicroblocksReorgData {
+pub struct StacksChainUpdatedWithMicroblocksReorgData {
     pub microblocks_to_rollback: Vec<StacksMicroblockData>,
     pub microblocks_to_apply: Vec<StacksMicroblockData>,
 }
