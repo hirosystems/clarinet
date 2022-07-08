@@ -28,7 +28,7 @@ export interface StacksChainUpdate {
    */
   new_blocks: Array<StacksBlockUpdate>;
   /**
-   * @type {Array<StacksBlockUpdate>}
+   * @type {Array<Block>}
    * @memberof StacksChainUpdate
    */
   confirmed_blocks: Array<Block>;

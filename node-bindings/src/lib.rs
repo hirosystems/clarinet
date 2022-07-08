@@ -113,7 +113,7 @@ impl StacksDevnet {
 
         thread::spawn(move || {
             if let Ok(ref devnet_rx) = meta_rx.recv() {
-                while let Ok(ref event) = devnet_rx.recv() {
+                while let Ok(event) = devnet_rx.recv() {
                     match event {
                         DevnetEvent::BitcoinChainEvent(
                             BitcoinChainEvent::ChainUpdatedWithBlocks(update),

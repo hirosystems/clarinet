@@ -130,7 +130,6 @@ impl BitcoinBlockPool {
         // Select canonical fork
         let mut canonical_fork_id = 0;
         let mut highest_height = 0;
-        let mut highest_btc_spent = 0;
         for (fork_id, fork) in self.forks.iter() {
             info!("Active fork: {} - {}", fork_id, fork);
             if fork.get_length() >= highest_height {
