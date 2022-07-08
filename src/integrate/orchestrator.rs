@@ -5,7 +5,7 @@ use bollard::container::{
     PruneContainersOptions, WaitContainerOptions,
 };
 use bollard::errors::Error as DockerError;
-use bollard::exec::{CreateExecOptions, StartExecOptions, StartExecResults};
+use bollard::exec::CreateExecOptions;
 use bollard::image::CreateImageOptions;
 use bollard::models::{HostConfig, PortBinding};
 use bollard::network::{ConnectNetworkOptions, CreateNetworkOptions, PruneNetworksOptions};
