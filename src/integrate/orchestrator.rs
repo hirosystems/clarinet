@@ -2313,7 +2313,7 @@ events_keys = ["*"]
 
         if let Some(ref hyperchain_node_container_id) = self.hyperchain_node_container_id {
             let _ = docker
-                .kill_container(hyperchain_node_container_id, options)
+                .kill_container(hyperchain_node_container_id, options.clone())
                 .await;
             println!("Terminating hyperchain-node...");
             let _ = docker.remove_container(hyperchain_node_container_id, None);
