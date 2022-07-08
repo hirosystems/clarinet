@@ -11,6 +11,14 @@ use clarity_repl::clarity::variables::NativeVariables;
 use lsp_types::Diagnostic as LspDiagnostic;
 use lsp_types::{DiagnosticSeverity, Position, Range};
 
+macro_rules! log {
+    ( $( $t:tt )* ) => {
+        web_sys::console::log_1(&format!( $( $t )* ).into());
+    }
+}
+
+pub(crate) use log;
+
 pub fn clarity_diagnostics_to_lsp_type(
     diagnostics: &mut Vec<ClarityDiagnostic>,
 ) -> Vec<LspDiagnostic> {

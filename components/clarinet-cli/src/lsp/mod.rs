@@ -1,7 +1,7 @@
 mod native_bridge;
 
 use clarinet_files::FileLocation;
-use clarity_lsp::backend::{self, LspRequest, LspResponse};
+use clarity_lsp::backend::{self, LspRequestAsync, LspResponse};
 use clarity_lsp::lsp_types::MessageType;
 use clarity_lsp::state::{build_state, EditorState, ProtocolState};
 use clarity_lsp::types::CompletionItemKind;
@@ -179,7 +179,7 @@ fn test_opening_counter_contract_should_return_fresh_analysis() {
         FileLocation::from_path(counter_path)
     };
     let (response_tx, response_rx) = channel();
-    let _ = tx.send(LspRequest::ContractOpened(
+    let _ = tx.send(LspRequestAsync::ContractOpened(
         contract_location.clone(),
         response_tx.clone(),
     ));
@@ -191,7 +191,10 @@ fn test_opening_counter_contract_should_return_fresh_analysis() {
     assert_eq!(diags.len(), 4);
 
     // re-opening this contract should not trigger a full analysis
-    let _ = tx.send(LspRequest::ContractOpened(contract_location, response_tx));
+    let _ = tx.send(LspRequestAsync::ContractOpened(
+        contract_location,
+        response_tx,
+    ));
     let response = response_rx.recv().expect("Unable to get response");
     assert_eq!(response, LspResponse::default());
 }
@@ -214,7 +217,7 @@ fn test_opening_counter_manifest_should_return_fresh_analysis() {
     };
 
     let (response_tx, response_rx) = channel();
-    let _ = tx.send(LspRequest::ManifestOpened(
+    let _ = tx.send(LspRequestAsync::ManifestOpened(
         manifest_location.clone(),
         response_tx.clone(),
     ));
@@ -226,7 +229,10 @@ fn test_opening_counter_manifest_should_return_fresh_analysis() {
     assert_eq!(diags.len(), 4);
 
     // re-opening this manifest should not trigger a full analysis
-    let _ = tx.send(LspRequest::ManifestOpened(manifest_location, response_tx));
+    let _ = tx.send(LspRequestAsync::ManifestOpened(
+        manifest_location,
+        response_tx,
+    ));
     let response = response_rx.recv().expect("Unable to get response");
     assert_eq!(response, LspResponse::default());
 }
@@ -246,7 +252,7 @@ fn test_opening_simple_nft_manifest_should_return_fresh_analysis() {
     manifest_location.push("Clarinet.toml");
 
     let (response_tx, response_rx) = channel();
-    let _ = tx.send(LspRequest::ManifestOpened(
+    let _ = tx.send(LspRequestAsync::ManifestOpened(
         FileLocation::from_path(manifest_location),
         response_tx.clone(),
     ));

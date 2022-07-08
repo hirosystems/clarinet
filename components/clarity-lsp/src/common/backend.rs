@@ -7,11 +7,15 @@ use serde::{Deserialize, Serialize};
 use std::sync::mpsc::{Receiver, Sender};
 
 #[derive(Debug, Serialize, Deserialize)]
-pub enum LspRequest {
+pub enum LspRequestAsync {
     ManifestOpened(FileLocation),
     ManifestChanged(FileLocation),
     ContractOpened(FileLocation),
     ContractChanged(FileLocation),
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub enum LspRequestSync {
     GetIntellisense(FileLocation),
 }
 
@@ -43,7 +47,7 @@ impl LspResponse {
 }
 
 pub async fn start_language_server(
-    bridge_to_backend_rx: Receiver<LspRequest>,
+    bridge_to_backend_rx: Receiver<LspRequestAsync>,
     backend_to_bridge_tx: Sender<LspResponse>,
     file_accessor: Option<Box<dyn FileAccessor>>,
 ) {
@@ -70,50 +74,12 @@ pub async fn start_language_server(
 }
 
 pub async fn process_command(
-    command: LspRequest,
+    command: LspRequestAsync,
     editor_state: &mut EditorState,
     file_accessor: Option<&Box<dyn FileAccessor>>,
 ) -> Result<LspResponse, String> {
     match command {
-        LspRequest::GetIntellisense(contract_location) => {
-            let mut completion_items_src =
-                editor_state.get_completion_items_for_contract(&contract_location);
-            let mut completion_items = vec![];
-            // Little big detail: should we wrap the inserted_text with braces?
-            let should_wrap = {
-                // let line = params.text_document_position.position.line;
-                // let char = params.text_document_position.position.character;
-                // let doc = params.text_document_position.text_document.uri;
-                //
-                // TODO(lgalabru): from there, we'd need to get the prior char
-                // and see if a parenthesis was opened. If not, we need to wrap.
-                // The LSP would need to update its local document cache, via
-                // the did_change method.
-                true
-            };
-            if should_wrap {
-                for mut item in completion_items_src.drain(..) {
-                    match item.kind {
-                        CompletionItemKind::Event
-                        | CompletionItemKind::Function
-                        | CompletionItemKind::Module
-                        | CompletionItemKind::Class => {
-                            item.insert_text =
-                                Some(format!("({})", item.insert_text.take().unwrap()));
-                        }
-                        _ => {}
-                    }
-                    completion_items.push(item);
-                }
-            }
-
-            return Ok(LspResponse {
-                aggregated_diagnostics: vec![],
-                notification: None,
-                completion_items,
-            });
-        }
-        LspRequest::ManifestOpened(opened_manifest_location) => {
+        LspRequestAsync::ManifestOpened(opened_manifest_location) => {
             // The only reason why we're waiting for this kind of events, is building our initial state
             // if the system is initialized, move on.
             if editor_state
@@ -145,13 +111,40 @@ pub async fn process_command(
                 Err(e) => return Ok(LspResponse::error(&e)),
             };
         }
-        LspRequest::ContractOpened(contract_location) => {
+        LspRequestAsync::ContractOpened(contract_location) => {
             // The only reason why we're waiting for this kind of events, is building our initial state
             // if the system is initialized, move on.
-            let manifest_location = match contract_location.get_project_manifest_location() {
-                Ok(manifest_location) => manifest_location,
-                _ => {
-                    return Ok(LspResponse::default());
+            let manifest_location = match file_accessor {
+                None => match contract_location.get_project_manifest_location() {
+                    Ok(manifest_location) => manifest_location,
+                    _ => {
+                        return Ok(LspResponse::default());
+                    }
+                },
+                Some(file_accessor) => {
+                    let mut manifest_location = None;
+                    let mut parent_location = contract_location.get_parent_location();
+                    while let Ok(ref parent) = parent_location {
+                        let mut candidate = parent.clone();
+                        let _ = candidate.append_path("Clarinet.toml");
+
+                        if let Ok((location, _)) =
+                            file_accessor.read_manifest_content(candidate).await
+                        {
+                            manifest_location = Some(location);
+                            break;
+                        }
+                        if &parent.get_parent_location().unwrap() == parent {
+                            break;
+                        }
+                        parent_location = parent.get_parent_location();
+                    }
+                    match manifest_location {
+                        Some(location) => location,
+                        _ => {
+                            return Ok(LspResponse::default());
+                        }
+                    }
                 }
             };
 
@@ -175,7 +168,7 @@ pub async fn process_command(
                 Err(e) => return Ok(LspResponse::error(&e)),
             };
         }
-        LspRequest::ManifestChanged(manifest_location) => {
+        LspRequestAsync::ManifestChanged(manifest_location) => {
             editor_state.clear_protocol(&manifest_location);
 
             // We will rebuild the entire state, without to try any optimizations for now
@@ -194,7 +187,7 @@ pub async fn process_command(
                 Err(e) => return Ok(LspResponse::error(&e)),
             };
         }
-        LspRequest::ContractChanged(contract_location) => {
+        LspRequestAsync::ContractChanged(contract_location) => {
             let manifest_location =
                 match editor_state.clear_protocol_associated_with_contract(&contract_location) {
                     Some(manifest_location) => manifest_location,
@@ -222,6 +215,49 @@ pub async fn process_command(
                 }
                 Err(e) => return Ok(LspResponse::error(&e)),
             };
+        }
+    }
+}
+
+pub fn process_command_sync(command: LspRequestSync, editor_state: &EditorState) -> LspResponse {
+    match command {
+        LspRequestSync::GetIntellisense(contract_location) => {
+            let mut completion_items_src =
+                editor_state.get_completion_items_for_contract(&contract_location);
+            let mut completion_items = vec![];
+            // Little big detail: should we wrap the inserted_text with braces?
+            let should_wrap = {
+                // let line = params.text_document_position.position.line;
+                // let char = params.text_document_position.position.character;
+                // let doc = params.text_document_position.text_document.uri;
+                //
+                // TODO(lgalabru): from there, we'd need to get the prior char
+                // and see if a parenthesis was opened. If not, we need to wrap.
+                // The LSP would need to update its local document cache, via
+                // the did_change method.
+                true
+            };
+            if should_wrap {
+                for mut item in completion_items_src.drain(..) {
+                    match item.kind {
+                        CompletionItemKind::Event
+                        | CompletionItemKind::Function
+                        | CompletionItemKind::Module
+                        | CompletionItemKind::Class => {
+                            item.insert_text =
+                                Some(format!("({})", item.insert_text.take().unwrap()));
+                        }
+                        _ => {}
+                    }
+                    completion_items.push(item);
+                }
+            }
+
+            LspResponse {
+                aggregated_diagnostics: vec![],
+                notification: None,
+                completion_items,
+            }
         }
     }
 }
