@@ -1489,7 +1489,10 @@ events_keys = ["*"]
             env: Some(vec![
                 format!("STACKS_CORE_RPC_HOST=stacks-node.{}", self.network_name),
                 format!("STACKS_BLOCKCHAIN_API_DB=pg"),
-                format!("STACKS_CORE_RPC_PORT={}", devnet_config.stacks_node_rpc_port),
+                format!(
+                    "STACKS_CORE_RPC_PORT={}",
+                    devnet_config.stacks_node_rpc_port
+                ),
                 format!(
                     "STACKS_BLOCKCHAIN_API_PORT={}",
                     devnet_config.stacks_api_port
@@ -1618,7 +1621,10 @@ events_keys = ["*"]
             env: Some(vec![
                 format!("STACKS_CORE_RPC_HOST=hyperchain-node.{}", self.network_name),
                 format!("STACKS_BLOCKCHAIN_API_DB=pg"),
-                format!("STACKS_CORE_RPC_PORT={}", devnet_config.hyperchain_node_rpc_port),
+                format!(
+                    "STACKS_CORE_RPC_PORT={}",
+                    devnet_config.hyperchain_node_rpc_port
+                ),
                 format!(
                     "STACKS_BLOCKCHAIN_API_PORT={}",
                     devnet_config.hyperchain_api_port
