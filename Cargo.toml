@@ -12,5 +12,6 @@ members = [
     "vendor/deno/core/",
     "vendor/orchestra-types-rs",
     "vendor/orchestra-event-observer",
+    "vendor/orchestra-event-indexer"
 ]
 default-members = ["components/clarinet-cli", "vendor/orchestra-event-observer"]
