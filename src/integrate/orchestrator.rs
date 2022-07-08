@@ -2319,6 +2319,14 @@ events_keys = ["*"]
             let _ = docker.remove_container(hyperchain_node_container_id, None);
         }
 
+        if let Some(ref hyperchain_api_container_id) = self.hyperchain_api_container_id {
+            let _ = docker
+                .kill_container(hyperchain_api_container_id, options)
+                .await;
+            println!("Terminating hyperchain-api...");
+            let _ = docker.remove_container(hyperchain_api_container_id, None);
+        }
+
         // Prune network
         println!("Pruning network and containers...");
         self.prune().await;

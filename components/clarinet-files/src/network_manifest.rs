@@ -371,7 +371,11 @@ impl NetworkManifest {
                 hyperchain_leader_stx_address,
                 hyperchain_leader_btc_address,
                 hyperchain_leader_secret_key_hex,
-            ) = compute_addresses(&hyperchain_leader_mnemonic, &hyperchain_leader_derivation_path, networks);
+            ) = compute_addresses(
+                &hyperchain_leader_mnemonic,
+                &hyperchain_leader_derivation_path,
+                networks,
+            );
 
             let enable_hyperchain_node = devnet_config.enable_hyperchain_node.unwrap_or(false);
             let hyperchain_events_ingestion_port = devnet_config
