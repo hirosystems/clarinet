@@ -363,13 +363,6 @@ impl StacksDevnet {
         }
 
         if let Ok(res) = devnet_settings
-            .get(&mut cx, "postgres_database")?
-            .downcast::<JsString, _>(&mut cx)
-        {
-            overrides.postgres_database = Some(res.value(&mut cx));
-        }
-
-        if let Ok(res) = devnet_settings
             .get(&mut cx, "bitcoin_node_image_url")?
             .downcast::<JsString, _>(&mut cx)
         {

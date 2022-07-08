@@ -5,6 +5,7 @@ use bollard::container::{
     PruneContainersOptions, WaitContainerOptions,
 };
 use bollard::errors::Error as DockerError;
+use bollard::exec::{CreateExecOptions, StartExecOptions, StartExecResults};
 use bollard::image::CreateImageOptions;
 use bollard::models::{HostConfig, PortBinding};
 use bollard::network::{ConnectNetworkOptions, CreateNetworkOptions, PruneNetworksOptions};
@@ -28,13 +29,14 @@ pub struct DevnetOrchestrator {
     pub network_config: Option<NetworkManifest>,
     pub termination_success_tx: Option<Sender<bool>>,
     pub can_exit: bool,
-    stacks_blockchain_container_id: Option<String>,
-    stacks_blockchain_api_container_id: Option<String>,
+    stacks_node_container_id: Option<String>,
+    stacks_api_container_id: Option<String>,
     stacks_explorer_container_id: Option<String>,
-    bitcoin_blockchain_container_id: Option<String>,
+    bitcoin_node_container_id: Option<String>,
     bitcoin_explorer_container_id: Option<String>,
     postgres_container_id: Option<String>,
-    hyperchain_container_id: Option<String>,
+    hyperchain_node_container_id: Option<String>,
+    hyperchain_api_container_id: Option<String>,
     docker_client: Option<Docker>,
 }
 
@@ -132,8 +134,12 @@ impl DevnetOrchestrator {
                     devnet_config.postgres_password = val.clone();
                 }
 
-                if let Some(ref val) = devnet_override.postgres_database {
-                    devnet_config.postgres_database = val.clone();
+                if let Some(ref val) = devnet_override.stacks_api_postgres_database {
+                    devnet_config.stacks_api_postgres_database = val.clone();
+                }
+
+                if let Some(ref val) = devnet_override.hyperchain_api_postgres_database {
+                    devnet_config.hyperchain_api_postgres_database = val.clone();
                 }
 
                 if let Some(ref val) = devnet_override.pox_stacking_orders {
@@ -204,8 +210,8 @@ impl DevnetOrchestrator {
                     devnet_config.hyperchain_node_events_observers = val.clone();
                 }
 
-                if let Some(ref val) = devnet_override.hyperchain_image_url {
-                    devnet_config.hyperchain_image_url = val.clone();
+                if let Some(ref val) = devnet_override.hyperchain_node_image_url {
+                    devnet_config.hyperchain_node_image_url = val.clone();
                 }
 
                 if let Some(ref val) = devnet_override.hyperchain_leader_derivation_path {
@@ -231,13 +237,14 @@ impl DevnetOrchestrator {
             docker_client: Some(docker_client),
             can_exit: true,
             termination_success_tx: None,
-            stacks_blockchain_container_id: None,
-            stacks_blockchain_api_container_id: None,
+            stacks_node_container_id: None,
+            stacks_api_container_id: None,
             stacks_explorer_container_id: None,
-            bitcoin_blockchain_container_id: None,
+            bitcoin_node_container_id: None,
             bitcoin_explorer_container_id: None,
             postgres_container_id: None,
-            hyperchain_container_id: None,
+            hyperchain_node_container_id: None,
+            hyperchain_api_container_id: None,
         })
     }
 
@@ -282,6 +289,7 @@ impl DevnetOrchestrator {
         let disable_stacks_explorer = devnet_config.disable_stacks_explorer;
         let disable_bitcoin_explorer = devnet_config.disable_bitcoin_explorer;
         let enable_hyperchain_node = devnet_config.enable_hyperchain_node;
+        let disable_hyperchain_api = devnet_config.disable_hyperchain_api;
 
         let _ = fs::create_dir(format!("{}", devnet_config.working_dir));
         let _ = fs::create_dir(format!("{}/conf", devnet_config.working_dir));
@@ -290,6 +298,7 @@ impl DevnetOrchestrator {
         let bitcoin_explorer_port = devnet_config.bitcoin_explorer_port;
         let stacks_explorer_port = devnet_config.stacks_explorer_port;
         let stacks_api_port = devnet_config.stacks_api_port;
+        let hyperchain_api_port = devnet_config.hyperchain_api_port;
 
         let _ = event_tx.send(DevnetEvent::ServiceStatus(ServiceStatusData {
             order: 0,
@@ -338,16 +347,25 @@ impl DevnetOrchestrator {
             },
         }));
 
-        let _ = event_tx.send(DevnetEvent::ServiceStatus(ServiceStatusData {
-            order: 5,
-            status: Status::Red,
-            name: "hyperchain-node".into(),
-            comment: if enable_hyperchain_node {
-                "initializing".into()
-            } else {
-                "disabled".into()
-            },
-        }));
+        if enable_hyperchain_node {
+            let _ = event_tx.send(DevnetEvent::ServiceStatus(ServiceStatusData {
+                order: 5,
+                status: Status::Red,
+                name: "hyperchain-node".into(),
+                comment: "initializing".into(),
+            }));
+
+            let _ = event_tx.send(DevnetEvent::ServiceStatus(ServiceStatusData {
+                order: 6,
+                status: Status::Red,
+                name: "hyperchain-api".into(),
+                comment: if disable_hyperchain_api {
+                    "disabled".into()
+                } else {
+                    "initializing".into()
+                },
+            }));
+        }
 
         let _ = event_tx.send(DevnetEvent::info(format!(
             "Creating network {}",
@@ -482,6 +500,32 @@ impl DevnetOrchestrator {
                     return Err(message);
                 }
             };
+
+            if !disable_hyperchain_api {
+                let _ = event_tx.send(DevnetEvent::info(format!("Starting hyperchain-api")));
+                match self.prepare_hyperchain_api_container().await {
+                    Ok(_) => {}
+                    Err(message) => {
+                        let _ = event_tx.send(DevnetEvent::FatalError(message.clone()));
+                        self.kill().await;
+                        return Err(message);
+                    }
+                };
+                let _ = event_tx.send(DevnetEvent::ServiceStatus(ServiceStatusData {
+                    order: 6,
+                    status: Status::Green,
+                    name: "hyperchain-api".into(),
+                    comment: format!("http://localhost:{}/doc", hyperchain_api_port),
+                }));
+                match self.boot_hyperchain_api_container().await {
+                    Ok(_) => {}
+                    Err(message) => {
+                        let _ = event_tx.send(DevnetEvent::FatalError(message.clone()));
+                        self.kill().await;
+                        return Err(message);
+                    }
+                };
+            }
         }
 
         // Start stacks-blockchain
@@ -610,8 +654,8 @@ impl DevnetOrchestrator {
                         .start_containers(boot_index)
                         .await
                         .map_err(|e| format!("unable to reboot: {:?}", e))?;
-                    self.bitcoin_blockchain_container_id = Some(bitcoin_node_c_id);
-                    self.stacks_blockchain_container_id = Some(stacks_node_c_id);
+                    self.bitcoin_node_container_id = Some(bitcoin_node_c_id);
+                    self.stacks_node_container_id = Some(stacks_node_c_id);
                 }
                 Err(_) => {
                     break;
@@ -771,7 +815,7 @@ rpcport={bitcoin_node_rpc_port}
             .map_err(|e| formatted_docker_error("unable to create bitcoind container", e))?
             .id;
         info!("Created container bitcoin-node: {}", container);
-        self.bitcoin_blockchain_container_id = Some(container);
+        self.bitcoin_node_container_id = Some(container);
 
         Ok(())
     }
@@ -820,7 +864,7 @@ rpcport={bitcoin_node_rpc_port}
     }
 
     pub async fn boot_bitcoin_node_container(&self) -> Result<(), String> {
-        let container = match &self.bitcoin_blockchain_container_id {
+        let container = match &self.bitcoin_node_container_id {
             Some(container) => container.clone(),
             _ => return Err(format!("unable to boot container")),
         };
@@ -906,13 +950,6 @@ peer_port = {bitcoin_node_p2p_port}
 first_attempt_time_ms = 10000
 subsequent_attempt_time_ms = 10000
 # microblock_attempt_time_ms = 15000
-
-# Add orchestrator (docker-host) as an event observer
-[[events_observer]]
-endpoint = "host.docker.internal:{orchestrator_ingestion_port}"
-retry_count = 255
-include_data_events = true
-events_keys = ["*"]
 "#,
             stacks_node_rpc_port = devnet_config.stacks_node_rpc_port,
             stacks_node_p2p_port = devnet_config.stacks_node_p2p_port,
@@ -922,6 +959,29 @@ events_keys = ["*"]
             bitcoin_node_p2p_port = devnet_config.bitcoin_node_p2p_port,
             orchestrator_ingestion_port = devnet_config.orchestrator_ingestion_port,
         );
+
+        for (_, account) in network_config.accounts.iter() {
+            stacks_conf.push_str(&format!(
+                r#"
+[[ustx_balance]]
+address = "{}"
+amount = {}
+"#,
+                account.stx_address, account.balance
+            ));
+        }
+
+        stacks_conf.push_str(&format!(
+            r#"
+# Add orchestrator (docker-host) as an event observer
+[[events_observer]]
+endpoint = "host.docker.internal:{orchestrator_ingestion_port}"
+retry_count = 255
+include_data_events = true
+events_keys = ["*"]
+"#,
+            orchestrator_ingestion_port = devnet_config.orchestrator_ingestion_port,
+        ));
 
         if !devnet_config.disable_stacks_api {
             stacks_conf.push_str(&format!(
@@ -937,17 +997,6 @@ events_keys = ["*"]
                     "stacks-api.{}:{}",
                     self.network_name, devnet_config.stacks_api_events_port
                 ),
-            ));
-        }
-
-        for (_, account) in network_config.accounts.iter() {
-            stacks_conf.push_str(&format!(
-                r#"
-[[ustx_balance]]
-address = "{}"
-amount = {}
-"#,
-                account.stx_address, account.balance
             ));
         }
 
@@ -1066,13 +1115,13 @@ events_keys = ["*"]
             .id;
 
         info!("Created container stacks-node: {}", container);
-        self.stacks_blockchain_container_id = Some(container.clone());
+        self.stacks_node_container_id = Some(container.clone());
 
         Ok(())
     }
 
     pub async fn boot_stacks_node_container(&self) -> Result<(), String> {
-        let container = match &self.stacks_blockchain_container_id {
+        let container = match &self.stacks_node_container_id {
             Some(container) => container.clone(),
             _ => return Err(format!("unable to boot container")),
         };
@@ -1110,7 +1159,7 @@ events_keys = ["*"]
         &self,
         boot_index: u32,
     ) -> Result<Config<String>, String> {
-        let (_, devnet_config) = match &self.network_config {
+        let (network_config, devnet_config) = match &self.network_config {
             Some(ref network_config) => match network_config.devnet {
                 Some(ref devnet_config) => (network_config, devnet_config),
                 _ => return Err("unable to get devnet configuration".into()),
@@ -1154,12 +1203,13 @@ miner = true
 seed = "{hyperchain_leader_secret_key_hex}"
 mining_key = "{hyperchain_leader_secret_key_hex}"
 local_peer_seed = "{hyperchain_leader_secret_key_hex}"
-wait_time_for_microblocks = 50_000
+wait_time_for_microblocks = 3_000
+wait_before_first_anchored_block = 0
 
 [miner]
-first_attempt_time_ms = 10000
-subsequent_attempt_time_ms = 10000
-# microblock_attempt_time_ms = 15000
+first_attempt_time_ms = 5_000
+subsequent_attempt_time_ms = 5_000
+# microblock_attempt_time_ms = 15_000
 
 [burnchain]
 chain = "stacks_layer_1"
@@ -1186,7 +1236,7 @@ observer_port = {hyperchain_events_ingestion_port}
             orchestrator_port = devnet_config.orchestrator_ingestion_port,
             hyperchain_events_ingestion_port = devnet_config.hyperchain_events_ingestion_port,
             first_burn_header_height = 0,
-            hyperchain_contract_id = devnet_config.hyperchain_contract_id,
+            hyperchain_contract_id = "ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM.hc" //devnet_config.hyperchain_contract_id,
         );
 
         hyperchain_conf.push_str(&format!(
@@ -1199,6 +1249,17 @@ amount = {default_balance}
             default_balance = DEFAULT_DEVNET_BALANCE
         ));
 
+        for (_, account) in network_config.accounts.iter() {
+            hyperchain_conf.push_str(&format!(
+                r#"
+[[ustx_balance]]
+address = "{}"
+amount = {}
+"#,
+                account.stx_address, account.balance
+            ));
+        }
+
         for events_observer in devnet_config.hyperchain_node_events_observers.iter() {
             hyperchain_conf.push_str(&format!(
                 r#"
@@ -1208,6 +1269,23 @@ retry_count = 255
 events_keys = ["*"]
 "#,
                 events_observer,
+            ));
+        }
+
+        if !devnet_config.disable_hyperchain_api {
+            hyperchain_conf.push_str(&format!(
+                r#"
+# Add hyperchain-api as an event observer
+[[events_observer]]
+endpoint = "{}"
+retry_count = 255
+include_data_events = false
+events_keys = ["*"]
+"#,
+                format!(
+                    "hyperchain-api.{}:{}",
+                    self.network_name, devnet_config.hyperchain_api_events_port
+                ),
             ));
         }
 
@@ -1258,7 +1336,7 @@ events_keys = ["*"]
 
         let config = Config {
             labels: Some(labels),
-            image: Some(devnet_config.hyperchain_image_url.clone()),
+            image: Some(devnet_config.hyperchain_node_image_url.clone()),
             domainname: Some(self.network_name.to_string()),
             tty: None,
             exposed_ports: Some(exposed_ports),
@@ -1299,7 +1377,7 @@ events_keys = ["*"]
         let _info = docker
             .create_image(
                 Some(CreateImageOptions {
-                    from_image: devnet_config.hyperchain_image_url.clone(),
+                    from_image: devnet_config.hyperchain_node_image_url.clone(),
                     ..Default::default()
                 }),
                 None,
@@ -1322,13 +1400,13 @@ events_keys = ["*"]
             .id;
 
         info!("Created container hyperchain-node: {}", container);
-        self.hyperchain_container_id = Some(container.clone());
+        self.hyperchain_node_container_id = Some(container.clone());
 
         Ok(())
     }
 
     pub async fn boot_hyperchain_node_container(&self) -> Result<(), String> {
-        let container = match &self.hyperchain_container_id {
+        let container = match &self.hyperchain_node_container_id {
             Some(container) => container.clone(),
             _ => return Err(format!("unable to boot container")),
         };
@@ -1410,7 +1488,10 @@ events_keys = ["*"]
             exposed_ports: Some(exposed_ports),
             env: Some(vec![
                 format!("STACKS_CORE_RPC_HOST=stacks-node.{}", self.network_name),
-                format!("STACKS_BLOCKCHAIN_API_DB=pg"),
+                format!(
+                    "STACKS_BLOCKCHAIN_API_DB={}",
+                    devnet_config.stacks_api_postgres_database
+                ),
                 format!(
                     "STACKS_BLOCKCHAIN_API_PORT={}",
                     devnet_config.stacks_api_port
@@ -1426,7 +1507,7 @@ events_keys = ["*"]
                 format!("PG_PORT=5432"),
                 format!("PG_USER={}", devnet_config.postgres_username),
                 format!("PG_PASSWORD={}", devnet_config.postgres_password),
-                format!("PG_DATABASE={}", devnet_config.postgres_database),
+                format!("PG_DATABASE={}", devnet_config.stacks_api_postgres_database),
                 format!("STACKS_CHAIN_ID=2147483648"),
                 format!("V2_POX_MIN_AMOUNT_USTX=90000000260"),
                 "NODE_ENV=development".to_string(),
@@ -1450,13 +1531,183 @@ events_keys = ["*"]
             .id;
 
         info!("Created container stacks-api: {}", container);
-        self.stacks_blockchain_api_container_id = Some(container);
+        self.stacks_api_container_id = Some(container);
 
         Ok(())
     }
 
     pub async fn boot_stacks_api_container(&self) -> Result<(), String> {
-        let container = match &self.stacks_blockchain_api_container_id {
+        let container = match &self.stacks_api_container_id {
+            Some(container) => container.clone(),
+            _ => return Err(format!("unable to boot container")),
+        };
+
+        let docker = match &self.docker_client {
+            Some(ref docker) => docker,
+            _ => return Err("unable to get Docker client".into()),
+        };
+
+        docker
+            .start_container::<String>(&container, None)
+            .await
+            .map_err(|e| formatted_docker_error("unable to start stacks-api container", e))?;
+
+        let res = docker
+            .connect_network(
+                &self.network_name,
+                ConnectNetworkOptions {
+                    container,
+                    ..Default::default()
+                },
+            )
+            .await;
+
+        if let Err(e) = res {
+            let err = format!("Error connecting container: {}", e);
+            println!("{}", err);
+            return Err(err);
+        }
+
+        Ok(())
+    }
+
+    pub async fn prepare_hyperchain_api_container(&mut self) -> Result<(), String> {
+        let (docker, _, devnet_config) = match (&self.docker_client, &self.network_config) {
+            (Some(ref docker), Some(ref network_config)) => match network_config.devnet {
+                Some(ref devnet_config) => (docker, network_config, devnet_config),
+                _ => return Err("unable to get devnet configuration".into()),
+            },
+            _ => return Err("unable to get Docker client".into()),
+        };
+
+        let _info = docker
+            .create_image(
+                Some(CreateImageOptions {
+                    from_image: devnet_config.hyperchain_api_image_url.clone(),
+                    ..Default::default()
+                }),
+                None,
+                None,
+            )
+            .try_collect::<Vec<_>>()
+            .await
+            .map_err(|_| "unable to create image".to_string())?;
+
+        let mut port_bindings = HashMap::new();
+        port_bindings.insert(
+            format!("{}/tcp", devnet_config.hyperchain_api_port),
+            Some(vec![PortBinding {
+                host_ip: Some(String::from("0.0.0.0")),
+                host_port: Some(format!("{}/tcp", devnet_config.hyperchain_api_port)),
+            }]),
+        );
+
+        let mut exposed_ports = HashMap::new();
+        exposed_ports.insert(
+            format!("{}/tcp", devnet_config.hyperchain_api_port),
+            HashMap::new(),
+        );
+
+        let mut labels = HashMap::new();
+        labels.insert("project".to_string(), self.network_name.to_string());
+
+        let config = Config {
+            labels: Some(labels),
+            image: Some(devnet_config.hyperchain_api_image_url.clone()),
+            domainname: Some(self.network_name.to_string()),
+            tty: None,
+            exposed_ports: Some(exposed_ports),
+            env: Some(vec![
+                format!("STACKS_CORE_RPC_HOST=hyperchain-node.{}", self.network_name),
+                format!(
+                    "STACKS_BLOCKCHAIN_API_DB={}",
+                    devnet_config.hyperchain_api_postgres_database
+                ),
+                format!(
+                    "STACKS_BLOCKCHAIN_API_PORT={}",
+                    devnet_config.hyperchain_api_port
+                ),
+                format!("STACKS_BLOCKCHAIN_API_HOST=0.0.0.0"),
+                format!(
+                    "STACKS_CORE_EVENT_PORT={}",
+                    devnet_config.hyperchain_api_events_port
+                ),
+                format!("STACKS_CORE_EVENT_HOST=0.0.0.0"),
+                format!("STACKS_API_ENABLE_FT_METADATA=1"),
+                format!("PG_HOST=postgres.{}", self.network_name),
+                format!("PG_PORT=5432"),
+                format!("PG_USER={}", devnet_config.postgres_username),
+                format!("PG_PASSWORD={}", devnet_config.postgres_password),
+                format!(
+                    "PG_DATABASE={}",
+                    devnet_config.hyperchain_api_postgres_database
+                ),
+                format!("STACKS_CHAIN_ID=2147483648"),
+                format!("V2_POX_MIN_AMOUNT_USTX=90000000260"),
+                "NODE_ENV=development".to_string(),
+            ]),
+            host_config: Some(HostConfig {
+                port_bindings: Some(port_bindings),
+                extra_hosts: Some(vec!["host.docker.internal:host-gateway".into()]),
+                ..Default::default()
+            }),
+            ..Default::default()
+        };
+
+        let options = CreateContainerOptions {
+            name: format!("hyperchain-api.{}", self.network_name),
+        };
+
+        let container = docker
+            .create_container::<String, String>(Some(options), config)
+            .await
+            .map_err(|e| format!("unable to create container: {}", e))?
+            .id;
+
+        info!("Created container hyperchain-api: {}", container);
+        self.hyperchain_api_container_id = Some(container);
+
+        Ok(())
+    }
+
+    pub async fn boot_hyperchain_api_container(&self) -> Result<(), String> {
+        // Before booting the hyperchain-api, we need to create an additional DB in the postgres container.
+        let (docker, _, devnet_config) = match (&self.docker_client, &self.network_config) {
+            (Some(ref docker), Some(ref network_config)) => match network_config.devnet {
+                Some(ref devnet_config) => (docker, network_config, devnet_config),
+                _ => return Err("unable to get devnet configuration".into()),
+            },
+            _ => return Err("unable to get Docker client".into()),
+        };
+
+        let postgres_container = match &self.postgres_container_id {
+            Some(container) => container.clone(),
+            _ => return Err(format!("unable to boot container")),
+        };
+
+        let psql_command = format!(
+            "CREATE DATABASE {};",
+            devnet_config.hyperchain_api_postgres_database
+        );
+
+        let config = CreateExecOptions {
+            cmd: Some(vec!["psql", "-U", "postgres", "-c", psql_command.as_str()]),
+            attach_stdout: Some(false),
+            attach_stderr: Some(false),
+            ..Default::default()
+        };
+
+        let exec = docker
+            .create_exec::<&str>(&postgres_container, config)
+            .await
+            .map_err(|e| formatted_docker_error("unable to create exec command", e))?;
+
+        let _ = docker
+            .start_exec(&exec.id, None)
+            .await
+            .map_err(|e| formatted_docker_error("unable to start exec command", e))?;
+
+        let container = match &self.hyperchain_api_container_id {
             Some(container) => container.clone(),
             _ => return Err(format!("unable to boot container")),
         };
@@ -1532,10 +1783,10 @@ events_keys = ["*"]
             domainname: Some(self.network_name.to_string()),
             tty: None,
             exposed_ports: Some(exposed_ports),
-            env: Some(vec![format!(
-                "POSTGRES_PASSWORD={}",
-                devnet_config.postgres_password
-            )]),
+            env: Some(vec![
+                format!("POSTGRES_PASSWORD={}", devnet_config.postgres_password),
+                format!("POSTGRES_DB={}", devnet_config.stacks_api_postgres_database),
+            ]),
             host_config: Some(HostConfig {
                 port_bindings: Some(port_bindings),
                 extra_hosts: Some(vec!["host.docker.internal:host-gateway".into()]),
@@ -1842,10 +2093,10 @@ events_keys = ["*"]
 
     pub async fn stop_containers(&self) -> Result<(), String> {
         let containers_ids = match (
-            &self.stacks_blockchain_container_id,
-            &self.stacks_blockchain_api_container_id,
+            &self.stacks_node_container_id,
+            &self.stacks_api_container_id,
             &self.stacks_explorer_container_id,
-            &self.bitcoin_blockchain_container_id,
+            &self.bitcoin_node_container_id,
             &self.bitcoin_explorer_container_id,
             &self.postgres_container_id,
         ) {
@@ -1904,7 +2155,7 @@ events_keys = ["*"]
 
     pub async fn start_containers(&self, boot_index: u32) -> Result<(String, String), String> {
         let containers_ids = match (
-            &self.stacks_blockchain_api_container_id,
+            &self.stacks_api_container_id,
             &self.stacks_explorer_container_id,
             &self.bitcoin_explorer_container_id,
             &self.postgres_container_id,
@@ -2028,22 +2279,20 @@ events_keys = ["*"]
             let _ = docker.remove_container(stacks_explorer_container_id, None);
         }
 
-        if let Some(ref bitcoin_blockchain_container_id) = self.bitcoin_blockchain_container_id {
+        if let Some(ref bitcoin_node_container_id) = self.bitcoin_node_container_id {
             let _ = docker
-                .kill_container(bitcoin_blockchain_container_id, options.clone())
+                .kill_container(bitcoin_node_container_id, options.clone())
                 .await;
             println!("Terminating bitcoin-node...");
-            let _ = docker.remove_container(bitcoin_blockchain_container_id, None);
+            let _ = docker.remove_container(bitcoin_node_container_id, None);
         }
 
-        if let Some(ref stacks_blockchain_api_container_id) =
-            self.stacks_blockchain_api_container_id
-        {
+        if let Some(ref stacks_api_container_id) = self.stacks_api_container_id {
             let _ = docker
-                .kill_container(stacks_blockchain_api_container_id, options.clone())
+                .kill_container(stacks_api_container_id, options.clone())
                 .await;
             println!("Terminating stacks-api...");
-            let _ = docker.remove_container(stacks_blockchain_api_container_id, None);
+            let _ = docker.remove_container(stacks_api_container_id, None);
         }
 
         if let Some(ref postgres_container_id) = self.postgres_container_id {
@@ -2054,20 +2303,20 @@ events_keys = ["*"]
             let _ = docker.remove_container(postgres_container_id, None);
         }
 
-        if let Some(ref stacks_blockchain_container_id) = self.stacks_blockchain_container_id {
+        if let Some(ref stacks_node_container_id) = self.stacks_node_container_id {
             let _ = docker
-                .kill_container(stacks_blockchain_container_id, options.clone())
+                .kill_container(stacks_node_container_id, options.clone())
                 .await;
             println!("Terminating stacks-node...");
-            let _ = docker.remove_container(stacks_blockchain_container_id, None);
+            let _ = docker.remove_container(stacks_node_container_id, None);
         }
 
-        if let Some(ref hyperchain_container_id) = self.hyperchain_container_id {
+        if let Some(ref hyperchain_node_container_id) = self.hyperchain_node_container_id {
             let _ = docker
-                .kill_container(hyperchain_container_id, options)
+                .kill_container(hyperchain_node_container_id, options)
                 .await;
             println!("Terminating hyperchain-node...");
-            let _ = docker.remove_container(hyperchain_container_id, None);
+            let _ = docker.remove_container(hyperchain_node_container_id, None);
         }
 
         // Prune network
