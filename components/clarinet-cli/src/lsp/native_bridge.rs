@@ -1,4 +1,4 @@
-use super::{utils, LspRequest};
+use super::{utils, LspRequestAsync};
 
 use crate::lsp::{clarity_diagnostics_to_tower_lsp_type, completion_item_type_to_tower_lsp_type};
 use serde_json::Value;
@@ -31,11 +31,11 @@ use tower_lsp::{async_trait, Client, LanguageServer};
 #[derive(Debug)]
 pub struct LspNativeBridge {
     client: Client,
-    command_tx: Arc<Mutex<Sender<LspRequest>>>,
+    command_tx: Arc<Mutex<Sender<LspRequestAsync>>>,
 }
 
 impl LspNativeBridge {
-    pub fn new(client: Client, command_tx: Sender<LspRequest>) -> Self {
+    pub fn new(client: Client, command_tx: Sender<LspRequestAsync>) -> Self {
         Self {
             client,
             command_tx: Arc::new(Mutex::new(command_tx)),
@@ -93,7 +93,10 @@ impl LanguageServer for LspNativeBridge {
 
         let (response_tx, response_rx) = channel();
         let _ = match self.command_tx.lock() {
-            Ok(tx) => tx.send(LspRequest::GetIntellisense(contract_location, response_tx)),
+            Ok(tx) => tx.send(LspRequestAsync::GetIntellisense(
+                contract_location,
+                response_tx,
+            )),
             Err(_) => return Ok(None),
         };
 
@@ -116,7 +119,10 @@ impl LanguageServer for LspNativeBridge {
         {
             let (response_tx, response_rx) = channel();
             let _ = match self.command_tx.lock() {
-                Ok(tx) => tx.send(LspRequest::ContractOpened(contract_location, response_tx)),
+                Ok(tx) => tx.send(LspRequestAsync::ContractOpened(
+                    contract_location,
+                    response_tx,
+                )),
                 Err(_) => return,
             };
             response_rx
@@ -125,7 +131,10 @@ impl LanguageServer for LspNativeBridge {
         {
             let (response_tx, response_rx) = channel();
             let _ = match self.command_tx.lock() {
-                Ok(tx) => tx.send(LspRequest::ManifestOpened(manifest_location, response_tx)),
+                Ok(tx) => tx.send(LspRequestAsync::ManifestOpened(
+                    manifest_location,
+                    response_tx,
+                )),
                 Err(_) => return,
             };
             response_rx
@@ -173,7 +182,10 @@ impl LanguageServer for LspNativeBridge {
         {
             let (response_tx, response_rx) = channel();
             let _ = match self.command_tx.lock() {
-                Ok(tx) => tx.send(LspRequest::ContractChanged(contract_location, response_tx)),
+                Ok(tx) => tx.send(LspRequestAsync::ContractChanged(
+                    contract_location,
+                    response_tx,
+                )),
                 Err(_) => return,
             };
             response_rx
@@ -182,7 +194,10 @@ impl LanguageServer for LspNativeBridge {
         {
             let (response_tx, response_rx) = channel();
             let _ = match self.command_tx.lock() {
-                Ok(tx) => tx.send(LspRequest::ManifestChanged(manifest_location, response_tx)),
+                Ok(tx) => tx.send(LspRequestAsync::ManifestChanged(
+                    manifest_location,
+                    response_tx,
+                )),
                 Err(_) => return,
             };
             response_rx

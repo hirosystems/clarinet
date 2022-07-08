@@ -242,6 +242,27 @@ impl FileLocation {
         Ok(project_root_location)
     }
 
+    pub fn get_parent_location(&self) -> Result<FileLocation, String> {
+        let mut parent_location = self.clone();
+        match parent_location.borrow_mut() {
+            FileLocation::FileSystem { path } => {
+                let mut parent = path.clone();
+                parent.pop();
+                if parent.to_str() == path.to_str() {
+                    return Err(String::from("reached root"));
+                }
+                path.pop();
+            }
+            FileLocation::Url { url } => {
+                let mut segments = url
+                    .path_segments_mut()
+                    .map_err(|_| format!("unable to mutate url"))?;
+                segments.pop();
+            }
+        }
+        Ok(parent_location)
+    }
+
     pub fn get_network_manifest_location(
         &self,
         network: &StacksNetwork,
