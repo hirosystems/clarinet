@@ -1426,16 +1426,20 @@ impl DiagnosticsDigest {
         let total = deployment.contracts.len();
 
         for (contract_id, diags) in contracts_diags.into_iter() {
-            contracts_checked += 1;
+            let (source, contract_location) = match deployment.contracts.get(&contract_id) {
+                Some(entry) => {
+                    contracts_checked += 1;
+                    entry
+                }
+                None => {
+                    // `deployment.contracts` only includes contracts from the project, requirements should be ignored
+                    continue;
+                }
+            };
             if diags.is_empty() {
                 full_success += 1;
                 continue;
             }
-
-            let (source, contract_location) = deployment
-                .contracts
-                .get(&contract_id)
-                .expect("unable to retrieve contract");
 
             let lines = source.lines();
             let formatted_lines: Vec<String> = lines.map(|l| l.to_string()).collect();
