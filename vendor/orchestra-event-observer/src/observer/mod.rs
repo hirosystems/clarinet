@@ -193,6 +193,8 @@ pub async fn start_event_observer(
     observer_commands_rx: Receiver<ObserverCommand>,
     observer_events_tx: Option<Sender<ObserverEvent>>,
 ) -> Result<(), Box<dyn Error>> {
+    info!("Event observer starting with config {:?}", config);
+
     let indexer = Indexer::new(IndexerConfig {
         stacks_node_rpc_url: format!(
             "{}:{}",
@@ -592,7 +594,7 @@ pub fn handle_new_stacks_block(
     // kind of update that this new block would imply, taking
     // into account the last 7 blocks.
     // TODO(lgalabru): use _pox_info
-    let (_pox_info, mut chain_event) = match indexer_rw_lock.inner().write() {
+    let (_pox_info, chain_event) = match indexer_rw_lock.inner().write() {
         Ok(mut indexer) => {
             let pox_info = indexer.get_pox_info();
             let chain_event = indexer.handle_stacks_block(marshalled_block.into_inner());

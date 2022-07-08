@@ -300,18 +300,14 @@ fn evaluate_stacks_chainhook_on_blocks<'a>(
                 }
                 (
                     StacksTransactionKind::NativeTokenTransfer,
-                    StacksHookPredicate::StxEvent(_expected_stx_event),
-                ) => {}
-                _ => {}
-            }
-            if let StacksTransactionKind::ContractCall(_actual_contract_call) = &tx.metadata.kind {
-                match &chainhook.predicate {
-                    StacksHookPredicate::ContractCall(_expected_contract_call) => {}
-                    StacksHookPredicate::PrintEvent(_expected_print_event) => {}
-                    StacksHookPredicate::StxEvent(_expected_stx_event) => {}
-                    StacksHookPredicate::NftEvent(_expected_nft_event) => {}
-                    StacksHookPredicate::FtEvent(_expected_ft_event) => {}
+                    StacksHookPredicate::StxEvent(expected_stx_event),
+                ) => {
+                    if expected_stx_event.actions.contains(&"transfer".to_string()) {
+                        occurrences.push((tx, block.get_identifier()));
+                        continue;
+                    }
                 }
+                _ => {}
             }
         }
     }
@@ -337,7 +333,7 @@ pub fn evaluate_bitcoin_chainhooks_on_chain_event<'a>(
                     }
                 }
 
-                if !apply.is_empty() || !rollback.is_empty() {
+                if !apply.is_empty() {
                     triggered_chainhooks.push(BitcoinTriggerChainhook {
                         chainhook,
                         apply,
@@ -392,7 +388,7 @@ pub async fn handle_bitcoin_hook_action<'a>(
                     json!({
                         "transaction": transaction,
                         "block_identifier": block_identifier,
-                        "confirmations": 1,
+                        "confirmations": 1, // TODO(lgalabru)
                         "proof": proofs.get(&transaction.transaction_identifier),
                     })
                 }).collect::<Vec<_>>(),
@@ -400,7 +396,7 @@ pub async fn handle_bitcoin_hook_action<'a>(
                     json!({
                         "transaction": transaction,
                         "block_identifier": block_identifier,
-                        "confirmations": 1,
+                        "confirmations": 1, // TODO(lgalabru)
                     })
                 }).collect::<Vec<_>>(),
                 "chainhook": {
@@ -435,7 +431,7 @@ pub async fn handle_stacks_hook_action<'a>(
                     json!({
                         "transaction": transaction,
                         "block_identifier": block_identifier,
-                        "confirmations": 1,
+                        "confirmations": 1, // TODO(lgalabru)
                         "proof": proofs.get(&transaction.transaction_identifier),
                     })
                 }).collect::<Vec<_>>(),
@@ -443,7 +439,7 @@ pub async fn handle_stacks_hook_action<'a>(
                     json!({
                         "transaction": transaction,
                         "block_identifier": block_identifier,
-                        "confirmations": 1,
+                        "confirmations": 1, // TODO(lgalabru)
                     })
                 }).collect::<Vec<_>>(),
                 "chainhook": {

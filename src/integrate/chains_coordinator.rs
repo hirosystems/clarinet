@@ -347,10 +347,12 @@ pub async fn start_chains_coordinator(
                 }
             }
             ObserverEvent::HookRegistered(hook) => {
-                let _ = devnet_event_tx.send(DevnetEvent::info(format!(
+                let message = format!(
                     "New hook \"{}\" registered",
                     hook.name()
-                )));
+                );
+                info!("{}", message);
+                let _ = devnet_event_tx.send(DevnetEvent::info(message));
             }
             ObserverEvent::HookDeregistered(_hook) => {}
             ObserverEvent::HooksTriggered(count) => {

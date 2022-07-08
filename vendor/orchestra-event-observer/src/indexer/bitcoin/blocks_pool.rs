@@ -97,6 +97,7 @@ impl BitcoinBlockPool {
         // As long as we are successful appending blocks that were previously unprocessable,
         // Keep looping on this backlog
         let mut applied = HashSet::new();
+        let mut forks_created = vec![];
         while at_least_one_orphan_appended {
             at_least_one_orphan_appended = false;
             for orphan_block_identifier in orphans.iter() {
@@ -108,10 +109,13 @@ impl BitcoinBlockPool {
                     None => continue,
                 };
 
-                let (orphan_appended, new_fork) = fork_updated.try_append_block(&block);
+                let (orphan_appended, mut new_fork) = fork_updated.try_append_block(&block);
                 if orphan_appended {
                     applied.insert(orphan_block_identifier);
                     orphans_to_untrack.insert(orphan_block_identifier);
+                    if let Some(new_fork) = new_fork.take() {
+                        forks_created.push(new_fork);
+                    }
                 }
                 at_least_one_orphan_appended = at_least_one_orphan_appended || orphan_appended;
             }
@@ -131,13 +135,7 @@ impl BitcoinBlockPool {
             info!("Active fork: {} - {}", fork_id, fork);
             if fork.get_length() >= highest_height {
                 highest_height = fork.get_length();
-                if fork.amount_of_btc_spent > highest_btc_spent
-                    || (fork.amount_of_btc_spent == highest_btc_spent
-                        && fork_id > &canonical_fork_id)
-                {
-                    highest_btc_spent = fork.amount_of_btc_spent;
-                    canonical_fork_id = *fork_id;
-                }
+                canonical_fork_id = *fork_id;
             }
         }
         info!("Active fork selected as canonical: {}", canonical_fork_id);
@@ -179,7 +177,6 @@ impl BitcoinBlockPool {
                     None => return,
                 }
             }
-            _ => return,
         };
 
         let mut forks_to_prune = vec![];

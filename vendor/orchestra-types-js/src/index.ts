@@ -6,12 +6,12 @@
 export interface BitcoinChainUpdate {
   /**
    * @type {Array<Block>}
-   * @memberof ChainUpdate
+   * @memberof BitcoinChainUpdate
    */
   new_blocks: Array<Block>;
   /**
    * @type {Array<Block>}
-   * @memberof ChainUpdate
+   * @memberof BitcoinChainUpdate
    */
   confirmed_blocks: Array<Block>;
 }
@@ -68,7 +68,7 @@ export interface BitcoinChainEvent {
 
 export interface StacksChainEvent {
   apply: StacksApply[];
-  rollback: StacksRollback;
+  rollback: StacksRollback[];
   chainhook: {
     uuid: string;
     predicate: StacksPredicate;

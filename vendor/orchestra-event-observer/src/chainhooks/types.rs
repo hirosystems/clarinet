@@ -83,8 +83,11 @@ pub struct BitcoinChainhookSpecification {
     pub name: String,
     pub network: BitcoinNetwork,
     pub version: u32,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub start_block: Option<u64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub end_block: Option<u64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub expire_after_occurrence: Option<u64>,
     pub predicate: BitcoinHookPredicate,
     pub action: HookAction,
@@ -196,8 +199,11 @@ pub struct StacksChainhookSpecification {
     pub name: String,
     pub network: StacksNetwork,
     pub version: u32,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub start_block: Option<u64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub end_block: Option<u64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub expire_after_occurrence: Option<u64>,
     pub predicate: StacksHookPredicate,
     pub action: HookAction,

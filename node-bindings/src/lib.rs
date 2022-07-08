@@ -116,17 +116,17 @@ impl StacksDevnet {
                 while let Ok(ref event) = devnet_rx.recv() {
                     match event {
                         DevnetEvent::BitcoinChainEvent(
-                            BitcoinChainEvent::ChainUpdatedWithBlocks(block),
+                            BitcoinChainEvent::ChainUpdatedWithBlocks(update),
                         ) => {
                             bitcoin_block_tx
-                                .send(block.clone())
+                                .send(update)
                                 .expect("Unable to transmit bitcoin block");
                         }
                         DevnetEvent::StacksChainEvent(
-                            StacksChainEvent::ChainUpdatedWithBlocks(block),
+                            StacksChainEvent::ChainUpdatedWithBlocks(update),
                         ) => {
                             stacks_block_tx
-                                .send(block.clone())
+                                .send(update)
                                 .expect("Unable to transmit stacks block");
                         }
                         DevnetEvent::Log(log) => {

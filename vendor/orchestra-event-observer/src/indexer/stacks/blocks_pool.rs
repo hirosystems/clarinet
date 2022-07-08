@@ -533,7 +533,7 @@ impl StacksBlockPool {
     // 3) A1 - B1 - a1 - b1 - c1 - d1 - C3
     //
     // How can we always be sending back the right diff?
-    // As is, if 1) 2) #), we will be sending:
+    // As is, if 1) 2) 3), we will be sending:
     // - BlockUpdate(C1)
     // - BlockReorg(C2, rollback: [c1], apply: [])
     // - BlockReorg(C3, rollback: [], apply: [c1, d1])
