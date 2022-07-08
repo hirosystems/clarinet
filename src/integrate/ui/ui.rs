@@ -30,9 +30,14 @@ pub fn draw<B: Backend>(f: &mut Frame<B>, app: &mut App) {
         .constraints([Constraint::Min(0), Constraint::Length(78)].as_ref())
         .split(page_components[1]);
 
+    let service_len = match app.hyperchain_enabled {
+        false => 7,
+        true => 9,
+    };
+
     let top_right_components = Layout::default()
         .direction(Direction::Vertical)
-        .constraints([Constraint::Length(8), Constraint::Min(1)].as_ref())
+        .constraints([Constraint::Length(service_len), Constraint::Min(1)].as_ref())
         .split(devnet_status_components[1]);
 
     draw_devnet_status(f, app, devnet_status_components[0]);
@@ -127,7 +132,7 @@ where
         .borders(Borders::ALL)
         .title("Stacks Devnet");
     let mut inner_area = block.inner(area);
-    inner_area.height -= 1;
+    inner_area.height = inner_area.height.saturating_sub(1);
     f.render_widget(block, area);
 
     let logs_component = List::new(logs).start_corner(Corner::BottomLeft);
@@ -313,7 +318,7 @@ where
         )
         .highlight_symbol("* ");
     let mut inner_area = area.clone();
-    inner_area.height -= 1;
+    inner_area.height = inner_area.height.saturating_sub(1);
     f.render_widget(list, inner_area);
 }
 

@@ -29,6 +29,7 @@ pub fn start_ui(
     chains_coordinator_commands_tx: Sender<ChainsCoordinatorCommand>,
     orchestrator_terminated_rx: Receiver<bool>,
     devnet_path: &str,
+    hyperchain_enabled: bool,
 ) -> Result<(), Box<dyn Error>> {
     enable_raw_mode()?;
 
@@ -62,7 +63,8 @@ pub fn start_ui(
         }
     });
 
-    let mut app = App::new("Clarinet", devnet_path);
+    let mut app = App::new("Clarinet", devnet_path, hyperchain_enabled);
+
     terminal.clear()?;
 
     loop {

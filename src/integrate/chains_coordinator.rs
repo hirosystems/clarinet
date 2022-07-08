@@ -303,7 +303,7 @@ pub async fn start_chains_coordinator(
                     ),
                 }));
                 let _ = devnet_event_tx.send(DevnetEvent::info(format!(
-                    "Block #{} anchored in Bitcoin block #{} includes {} transactions",
+                    "Stacks block #{} anchored in Bitcoin block #{} includes {} transactions",
                     update.new_block.block_identifier.index,
                     update
                         .new_block
