@@ -233,12 +233,14 @@ impl NetworkManifest {
         NetworkManifest::from_location(&network_manifest_location, networks)
     }
 
-    pub async fn from_file_accessor(
+    pub async fn from_project_manifest_location_using_file_accessor(
         location: &FileLocation,
         networks: &(BitcoinNetwork, StacksNetwork),
         file_accessor: &Box<dyn FileAccessor>,
     ) -> Result<NetworkManifest, String> {
-        let perform_file_access = file_accessor.read_manifest_content(location.clone());
+        let mut network_manifest_location = location.get_parent_location()?;
+        let _ = network_manifest_location.append_path("settings/Devnet.toml");
+        let perform_file_access = file_accessor.read_manifest_content(network_manifest_location);
         let (_, content) = perform_file_access.await?;
 
         let mut network_manifest_file: NetworkManifestFile =

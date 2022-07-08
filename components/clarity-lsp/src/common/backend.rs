@@ -148,10 +148,38 @@ pub async fn process_command(
         LspRequest::ContractOpened(contract_location) => {
             // The only reason why we're waiting for this kind of events, is building our initial state
             // if the system is initialized, move on.
-            let manifest_location = match contract_location.get_project_manifest_location() {
-                Ok(manifest_location) => manifest_location,
-                _ => {
-                    return Ok(LspResponse::default());
+
+            let manifest_location = match file_accessor {
+                None => match contract_location.get_project_manifest_location() {
+                    Ok(manifest_location) => manifest_location,
+                    _ => {
+                        return Ok(LspResponse::default());
+                    }
+                },
+                Some(file_accessor) => {
+                    let mut manifest_location = None;
+                    let mut parent_location = contract_location.get_parent_location();
+                    while let Ok(ref parent) = parent_location {
+                        let mut candidate = parent.clone();
+                        let _ = candidate.append_path("Clarinet.toml");
+
+                        if let Ok((location, _)) =
+                            file_accessor.read_manifest_content(candidate).await
+                        {
+                            manifest_location = Some(location);
+                            break;
+                        }
+                        if &parent.get_parent_location().unwrap() == parent {
+                            break;
+                        }
+                        parent_location = parent.get_parent_location();
+                    }
+                    match manifest_location {
+                        Some(location) => location,
+                        _ => {
+                            return Ok(LspResponse::default());
+                        }
+                    }
                 }
             };
 

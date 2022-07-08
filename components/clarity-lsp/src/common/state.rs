@@ -149,9 +149,7 @@ impl EditorState {
 
                 // Convert and collect errors
                 if !state.errors.is_empty() {
-                    if let Ok(contract_relative_path) = state.location.get_relative_location() {
-                        erroring_files.insert(contract_relative_path);
-                    }
+                    erroring_files.insert(state.location.to_string());
                     for error in state.errors.iter() {
                         diags.push(error.clone());
                     }
@@ -159,9 +157,7 @@ impl EditorState {
 
                 // Convert and collect warnings
                 if !state.warnings.is_empty() {
-                    if let Ok(contract_relative_path) = state.location.get_relative_location() {
-                        warning_files.insert(contract_relative_path);
-                    }
+                    warning_files.insert(state.location.to_string());
                     for warning in state.warnings.iter() {
                         diags.push(warning.clone());
                     }
