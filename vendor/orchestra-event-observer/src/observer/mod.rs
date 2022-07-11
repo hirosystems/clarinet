@@ -3,7 +3,7 @@ use crate::chainhooks::{
     evaluate_bitcoin_chainhooks_on_chain_event, evaluate_stacks_chainhooks_on_chain_event,
     handle_bitcoin_hook_action, handle_stacks_hook_action,
 };
-use crate::indexer::{chains, Indexer, IndexerConfig};
+use crate::indexer::{self, Indexer, IndexerConfig};
 use crate::utils;
 use bitcoincore_rpc::bitcoin::{BlockHash, Txid};
 use bitcoincore_rpc::{Auth, Client, RpcApi};
@@ -135,7 +135,7 @@ pub struct ContractReadonlyCall {
     pub result: String,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum ObserverCommand {
     PropagateBitcoinChainEvent(BitcoinChainEvent),
     PropagateStacksChainEvent(StacksChainEvent),
@@ -147,13 +147,13 @@ pub enum ObserverCommand {
     Terminate,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum StacksChainMempoolEvent {
     TransactionsAdmitted(Vec<MempoolAdmissionData>),
     TransactionDropped(String),
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct MempoolAdmissionData {
     pub tx_data: String,
     pub tx_description: String,
@@ -193,6 +193,8 @@ pub async fn start_event_observer(
     observer_commands_rx: Receiver<ObserverCommand>,
     observer_events_tx: Option<Sender<ObserverEvent>>,
 ) -> Result<(), Box<dyn Error>> {
+    info!("Event observer starting with config {:?}", config);
+
     let indexer = Indexer::new(IndexerConfig {
         stacks_node_rpc_url: format!(
             "{}:{}",
@@ -206,6 +208,12 @@ pub async fn start_event_observer(
         bitcoin_node_rpc_password: config.bitcoin_node_password.clone(),
     });
 
+    let log_level = if cfg!(feature = "cli") {
+        LogLevel::Critical
+    } else {
+        LogLevel::Debug
+    };
+
     let managed_config = config.clone();
     let indexer_rw_lock = Arc::new(RwLock::new(indexer));
 
@@ -217,11 +225,11 @@ pub async fn start_event_observer(
         address: IpAddr::V4(Ipv4Addr::new(0, 0, 0, 0)),
         keep_alive: 5,
         temp_dir: std::env::temp_dir(),
-        log_level: LogLevel::Debug,
+        log_level: log_level.clone(),
         ..Config::default()
     };
 
-    let mut routes = routes![
+    let mut routes = rocket::routes![
         handle_ping,
         handle_new_bitcoin_block,
         handle_new_stacks_block,
@@ -254,7 +262,7 @@ pub async fn start_event_observer(
         address: IpAddr::V4(Ipv4Addr::new(0, 0, 0, 0)),
         keep_alive: 5,
         temp_dir: std::env::temp_dir(),
-        log_level: LogLevel::Debug,
+        log_level,
         ..Config::default()
     };
 
@@ -278,7 +286,17 @@ pub async fn start_event_observer(
     });
 
     // This loop is used for handling background jobs, emitted by HTTP calls.
+    start_observer_commands_handler(&mut config, observer_commands_rx, observer_events_tx).await
+}
+
+pub async fn start_observer_commands_handler(
+    config: &mut EventObserverConfig,
+    observer_commands_rx: Receiver<ObserverCommand>,
+    observer_events_tx: Option<Sender<ObserverEvent>>,
+) -> Result<(), Box<dyn Error>> {
+    let mut chainhooks_occurrences_tracker: HashMap<String, u64> = HashMap::new();
     let event_handlers = config.event_handlers.clone();
+    let mut chainhooks_lookup: HashMap<String, ApiKey> = HashMap::new();
 
     // If authorization not required, we create a default HookFormation
     if !config.is_authorization_required() {
@@ -317,6 +335,7 @@ pub async fn start_event_observer(
                     event_handler.propagate_bitcoin_event(&chain_event).await;
                 }
                 // process hooks
+                let mut hooks_ids_to_deregister = vec![];
                 if config.hooks_enabled {
                     let bitcoin_chainhooks = config
                         .operators
@@ -325,43 +344,59 @@ pub async fn start_event_observer(
                         .flatten()
                         .collect();
 
-                    let hooks_to_trigger = evaluate_bitcoin_chainhooks_on_chain_event(
+                    let chainhooks_candidates = evaluate_bitcoin_chainhooks_on_chain_event(
                         &chain_event,
                         bitcoin_chainhooks,
                     );
+
+                    let mut chainhooks_to_trigger = vec![];
+
+                    for trigger in chainhooks_candidates.into_iter() {
+                        let mut total_occurrences: u64 = *chainhooks_occurrences_tracker
+                            .get(&trigger.chainhook.uuid)
+                            .unwrap_or(&0);
+                        total_occurrences += 1;
+
+                        let limit = trigger.chainhook.expire_after_occurrence.unwrap_or(0);
+                        if limit == 0 || total_occurrences <= limit {
+                            chainhooks_occurrences_tracker
+                                .insert(trigger.chainhook.uuid.clone(), total_occurrences);
+                            chainhooks_to_trigger.push(trigger);
+                        } else {
+                            hooks_ids_to_deregister.push(trigger.chainhook.uuid.clone());
+                        }
+                    }
+
                     let mut proofs = HashMap::new();
-                    for (_, transaction, block_identifier) in hooks_to_trigger.iter() {
-                        if !proofs.contains_key(&transaction.transaction_identifier.hash) {
-                            let rpc = Client::new(
-                                &format!(
-                                    "{}:{}",
-                                    config.bitcoin_node_rpc_host, config.bitcoin_node_rpc_port
-                                ),
-                                Auth::UserPass(
-                                    config.bitcoin_node_username.to_string(),
-                                    config.bitcoin_node_password.to_string(),
-                                ),
-                            )
-                            .unwrap();
-                            let txid = Txid::from_str(&transaction.transaction_identifier.hash)?;
-                            let block_hash = BlockHash::from_str(&block_identifier.hash)?;
-                            let res = rpc.get_tx_out_proof(&vec![txid], Some(&block_hash));
-                            if let Ok(proof) = res {
-                                proofs.insert(
-                                    transaction.transaction_identifier.hash.clone(),
-                                    bytes_to_hex(&proof),
-                                );
+                    for hook_to_trigger in chainhooks_to_trigger.iter() {
+                        for (transaction, block_identifier) in hook_to_trigger.apply.iter() {
+                            if !proofs.contains_key(&transaction.transaction_identifier) {
+                                let rpc = Client::new(
+                                    &format!(
+                                        "{}:{}",
+                                        config.bitcoin_node_rpc_host, config.bitcoin_node_rpc_port
+                                    ),
+                                    Auth::UserPass(
+                                        config.bitcoin_node_username.to_string(),
+                                        config.bitcoin_node_password.to_string(),
+                                    ),
+                                )
+                                .unwrap();
+                                let txid =
+                                    Txid::from_str(&transaction.transaction_identifier.hash)?;
+                                let block_hash = BlockHash::from_str(&block_identifier.hash)?;
+                                let res = rpc.get_tx_out_proof(&vec![txid], Some(&block_hash));
+                                if let Ok(proof) = res {
+                                    proofs.insert(
+                                        &transaction.transaction_identifier,
+                                        bytes_to_hex(&proof),
+                                    );
+                                }
                             }
                         }
                     }
-                    for (hook, transaction, block_identifier) in hooks_to_trigger.into_iter() {
-                        handle_bitcoin_hook_action(
-                            hook,
-                            transaction,
-                            block_identifier,
-                            proofs.get(&transaction.transaction_identifier.hash),
-                        )
-                        .await;
+                    for chainhook_to_trigger in chainhooks_to_trigger.into_iter() {
+                        handle_bitcoin_hook_action(chainhook_to_trigger, &proofs).await;
                     }
                 }
 
@@ -373,6 +408,7 @@ pub async fn start_event_observer(
                 for event_handler in event_handlers.iter() {
                     event_handler.propagate_stacks_event(&chain_event).await;
                 }
+                let mut hooks_ids_to_deregister = vec![];
                 if config.hooks_enabled {
                     let stacks_chainhooks = config
                         .operators
@@ -382,16 +418,50 @@ pub async fn start_event_observer(
                         .collect();
 
                     // process hooks
-                    let hooks_to_trigger =
+                    let chainhooks_candidates =
                         evaluate_stacks_chainhooks_on_chain_event(&chain_event, stacks_chainhooks);
-                    if hooks_to_trigger.len() > 0 {
-                        if let Some(ref tx) = observer_events_tx {
-                            let _ = tx.send(ObserverEvent::HooksTriggered(hooks_to_trigger.len()));
+
+                    let mut chainhooks_to_trigger = vec![];
+
+                    for trigger in chainhooks_candidates.into_iter() {
+                        let mut total_occurrences: u64 = *chainhooks_occurrences_tracker
+                            .get(&trigger.chainhook.uuid)
+                            .unwrap_or(&0);
+                        total_occurrences += 1;
+
+                        let limit = trigger.chainhook.expire_after_occurrence.unwrap_or(0);
+                        if limit == 0 || total_occurrences <= limit {
+                            chainhooks_occurrences_tracker
+                                .insert(trigger.chainhook.uuid.clone(), total_occurrences);
+                            chainhooks_to_trigger.push(trigger);
+                        } else {
+                            hooks_ids_to_deregister.push(trigger.chainhook.uuid.clone());
                         }
                     }
-                    for (hook, transaction, block_identifier) in hooks_to_trigger.into_iter() {
-                        handle_stacks_hook_action(hook, transaction, block_identifier, None).await;
+
+                    if let Some(ref tx) = observer_events_tx {
+                        let _ = tx.send(ObserverEvent::HooksTriggered(chainhooks_to_trigger.len()));
                     }
+                    let proofs = HashMap::new();
+                    for hook_to_trigger in chainhooks_to_trigger.into_iter() {
+                        handle_stacks_hook_action(hook_to_trigger, &proofs).await;
+                    }
+                }
+                for hook_uuid in hooks_ids_to_deregister.iter() {
+                    chainhooks_lookup
+                        .get(hook_uuid)
+                        .and_then(|api_key| config.operators.get_mut(&api_key.0))
+                        .and_then(|hook_formation| {
+                            hook_formation.deregister_stacks_hook(hook_uuid.clone())
+                        })
+                        .and_then(|chainhook| {
+                            if let Some(ref tx) = observer_events_tx {
+                                let _ = tx.send(ObserverEvent::HookDeregistered(
+                                    ChainhookSpecification::Stacks(chainhook.clone()),
+                                ));
+                            }
+                            Some(chainhook)
+                        });
                 }
                 if let Some(ref tx) = observer_events_tx {
                     let _ = tx.send(ObserverEvent::StacksChainEvent(chain_event));
@@ -414,7 +484,7 @@ pub async fn start_event_observer(
                 let hook_formation = match config.operators.get_mut(&api_key.0) {
                     Some(hook_formation) => hook_formation,
                     None => {
-                        println!(
+                        error!(
                             "Unable to retrieve chainhooks associated with {:?}",
                             api_key
                         );
@@ -430,13 +500,14 @@ pub async fn start_event_observer(
                 let hook_formation = match config.operators.get_mut(&api_key.0) {
                     Some(hook_formation) => hook_formation,
                     None => {
-                        println!(
+                        error!(
                             "Unable to retrieve chainhooks associated with {:?}",
                             api_key
                         );
                         continue;
                     }
                 };
+                chainhooks_lookup.insert(hook_uuid.clone(), api_key.clone());
                 let hook = hook_formation.deregister_stacks_hook(hook_uuid);
                 if let (Some(tx), Some(hook)) = (&observer_events_tx, hook) {
                     let _ = tx.send(ObserverEvent::HookDeregistered(
@@ -448,7 +519,7 @@ pub async fn start_event_observer(
                 let hook_formation = match config.operators.get_mut(&api_key.0) {
                     Some(hook_formation) => hook_formation,
                     None => {
-                        println!(
+                        error!(
                             "Unable to retrieve chainhooks associated with {:?}",
                             api_key
                         );
@@ -467,8 +538,9 @@ pub async fn start_event_observer(
     Ok(())
 }
 
-#[get("/ping", format = "application/json")]
+#[rocket::get("/ping", format = "application/json")]
 pub fn handle_ping() -> Json<JsonValue> {
+    info!("GET /ping");
     Json(json!({
         "status": 200,
         "result": "Ok",
@@ -481,6 +553,7 @@ pub fn handle_new_bitcoin_block(
     marshalled_block: Json<JsonValue>,
     background_job_tx: &State<Arc<Mutex<Sender<ObserverCommand>>>>,
 ) -> Json<JsonValue> {
+    info!("POST /new_burn_block");
     // Standardize the structure of the block, and identify the
     // kind of update that this new block would imply, taking
     // into account the last 7 blocks.
@@ -494,13 +567,15 @@ pub fn handle_new_bitcoin_block(
         }
     };
 
-    let background_job_tx = background_job_tx.inner();
-    match background_job_tx.lock() {
-        Ok(tx) => {
-            let _ = tx.send(ObserverCommand::PropagateBitcoinChainEvent(chain_update));
-        }
-        _ => {}
-    };
+    if let Ok(Some(chain_event)) = chain_update {
+        let background_job_tx = background_job_tx.inner();
+        match background_job_tx.lock() {
+            Ok(tx) => {
+                let _ = tx.send(ObserverCommand::PropagateBitcoinChainEvent(chain_event));
+            }
+            _ => {}
+        };
+    }
 
     Json(json!({
         "status": 200,
@@ -514,6 +589,7 @@ pub fn handle_new_stacks_block(
     marshalled_block: Json<JsonValue>,
     background_job_tx: &State<Arc<Mutex<Sender<ObserverCommand>>>>,
 ) -> Json<JsonValue> {
+    info!("POST /new_block");
     // Standardize the structure of the block, and identify the
     // kind of update that this new block would imply, taking
     // into account the last 7 blocks.
@@ -532,13 +608,15 @@ pub fn handle_new_stacks_block(
         }
     };
 
-    let background_job_tx = background_job_tx.inner();
-    match background_job_tx.lock() {
-        Ok(tx) => {
-            let _ = tx.send(ObserverCommand::PropagateStacksChainEvent(chain_event));
-        }
-        _ => {}
-    };
+    if let Ok(Some(chain_event)) = chain_event {
+        let background_job_tx = background_job_tx.inner();
+        match background_job_tx.lock() {
+            Ok(tx) => {
+                let _ = tx.send(ObserverCommand::PropagateStacksChainEvent(chain_event));
+            }
+            _ => {}
+        };
+    }
 
     Json(json!({
         "status": 200,
@@ -556,9 +634,10 @@ pub fn handle_new_microblocks(
     marshalled_microblock: Json<JsonValue>,
     background_job_tx: &State<Arc<Mutex<Sender<ObserverCommand>>>>,
 ) -> Json<JsonValue> {
+    info!("POST /new_microblocks");
     // Standardize the structure of the microblock, and identify the
     // kind of update that this new microblock would imply
-    let chain_event = match indexer_rw_lock.inner().write() {
+    let mut chain_event = match indexer_rw_lock.inner().write() {
         Ok(mut indexer) => {
             let chain_event = indexer.handle_stacks_microblock(marshalled_microblock.into_inner());
             chain_event
@@ -571,13 +650,15 @@ pub fn handle_new_microblocks(
         }
     };
 
-    let background_job_tx = background_job_tx.inner();
-    match background_job_tx.lock() {
-        Ok(tx) => {
-            let _ = tx.send(ObserverCommand::PropagateStacksChainEvent(chain_event));
-        }
-        _ => {}
-    };
+    if let Some(chain_event) = chain_event.take() {
+        let background_job_tx = background_job_tx.inner();
+        match background_job_tx.lock() {
+            Ok(tx) => {
+                let _ = tx.send(ObserverCommand::PropagateStacksChainEvent(chain_event));
+            }
+            _ => {}
+        };
+    }
 
     Json(json!({
         "status": 200,
@@ -590,11 +671,12 @@ pub fn handle_new_mempool_tx(
     raw_txs: Json<Vec<String>>,
     background_job_tx: &State<Arc<Mutex<Sender<ObserverCommand>>>>,
 ) -> Json<JsonValue> {
+    info!("POST /new_mempool_tx");
     let transactions = raw_txs
         .iter()
         .map(|tx_data| {
             let (tx_description, ..) =
-                chains::stacks::get_tx_description(&tx_data).expect("unable to parse transaction");
+                indexer::stacks::get_tx_description(&tx_data).expect("unable to parse transaction");
             MempoolAdmissionData {
                 tx_data: tx_data.clone(),
                 tx_description,
@@ -620,6 +702,7 @@ pub fn handle_new_mempool_tx(
 
 #[post("/drop_mempool_tx", format = "application/json")]
 pub fn handle_drop_mempool_tx() -> Json<JsonValue> {
+    info!("POST /drop_mempool_tx");
     // TODO(lgalabru): use propagate mempool events
     Json(json!({
         "status": 200,
@@ -629,6 +712,7 @@ pub fn handle_drop_mempool_tx() -> Json<JsonValue> {
 
 #[post("/attachments/new", format = "application/json")]
 pub fn handle_new_attachement() -> Json<JsonValue> {
+    info!("POST /attachments/new");
     Json(json!({
         "status": 200,
         "result": "Ok",
@@ -641,6 +725,8 @@ pub async fn handle_bitcoin_rpc_call(
     bitcoin_rpc_call: Json<BitcoinRPCRequest>,
     background_job_tx: &State<Arc<Mutex<Sender<ObserverCommand>>>>,
 ) -> Json<JsonValue> {
+    info!("POST /");
+
     use base64::encode;
     use reqwest::Client;
 
@@ -687,6 +773,7 @@ pub fn handle_create_hook(
     background_job_tx: &State<Arc<Mutex<Sender<ObserverCommand>>>>,
     api_key: ApiKey,
 ) -> Json<JsonValue> {
+    info!("POST /v1/chainhooks");
     let hook = hook.into_inner();
     let background_job_tx = background_job_tx.inner();
     match background_job_tx.lock() {
@@ -708,6 +795,7 @@ pub fn handle_delete_stacks_hook(
     background_job_tx: &State<Arc<Mutex<Sender<ObserverCommand>>>>,
     api_key: ApiKey,
 ) -> Json<JsonValue> {
+    info!("POST /v1/chainhooks/stacks/<hook_uuid>");
     let background_job_tx = background_job_tx.inner();
     match background_job_tx.lock() {
         Ok(tx) => {
@@ -728,6 +816,7 @@ pub fn handle_delete_bitcoin_hook(
     background_job_tx: &State<Arc<Mutex<Sender<ObserverCommand>>>>,
     api_key: ApiKey,
 ) -> Json<JsonValue> {
+    info!("DELETE /v1/chainhooks/bitcoin/<hook_uuid>");
     let background_job_tx = background_job_tx.inner();
     match background_job_tx.lock() {
         Ok(tx) => {
@@ -742,7 +831,7 @@ pub fn handle_delete_bitcoin_hook(
     }))
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct ApiKey(Option<String>);
 
 #[derive(Debug)]
@@ -777,3 +866,6 @@ impl<'r> FromRequest<'r> for ApiKey {
         }
     }
 }
+
+#[cfg(test)]
+mod tests;

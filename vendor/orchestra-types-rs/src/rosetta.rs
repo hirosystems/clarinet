@@ -1,14 +1,48 @@
 use super::bitcoin::{TxIn, TxOut};
 use crate::events::*;
+use std::cmp::Ordering;
 use std::collections::HashSet;
+use std::fmt::Display;
 
 /// BlockIdentifier uniquely identifies a block in a particular network.
-#[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
+#[derive(Debug, Clone, Deserialize, Serialize, Hash)]
 pub struct BlockIdentifier {
     /// Also known as the block height.
     pub index: u64,
     pub hash: String,
 }
+
+impl Display for BlockIdentifier {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(
+            f,
+            "Block #{} (0x{}...{})",
+            self.index,
+            &self.hash.as_str()[0..4],
+            &self.hash.as_str()[60..64]
+        )
+    }
+}
+
+impl Ord for BlockIdentifier {
+    fn cmp(&self, other: &Self) -> Ordering {
+        (other.index, &other.hash).cmp(&(self.index, &self.hash))
+    }
+}
+
+impl PartialOrd for BlockIdentifier {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(other.cmp(self))
+    }
+}
+
+impl PartialEq for BlockIdentifier {
+    fn eq(&self, other: &Self) -> bool {
+        self.hash == other.hash
+    }
+}
+
+impl Eq for BlockIdentifier {}
 
 /// StacksBlock contain an array of Transactions that occurred at a particular
 /// BlockIdentifier. A hard requirement for blocks returned by Rosetta
@@ -28,17 +62,23 @@ pub struct StacksBlockData {
     pub metadata: StacksBlockMetadata,
 }
 
-/// StacksMicroblockData contain an array of Transactions that occurred at a particular
-/// BlockIdentifier. A hard requirement for blocks returned by Rosetta
-/// implementations is that they MUST be _inalterable_: once a client has
-/// requested and received a block identified by a specific BlockIndentifier,
-/// all future calls for that same BlockIdentifier must return the same block
-/// contents.
+/// StacksMicroblock contain an array of Transactions that occurred at a particular
+/// BlockIdentifier.
 #[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
 pub struct StacksMicroblockData {
     pub block_identifier: BlockIdentifier,
     pub parent_block_identifier: BlockIdentifier,
+    /// The timestamp of the block in milliseconds since the Unix Epoch. The
+    /// timestamp is stored in milliseconds because some blockchains produce
+    /// blocks more often than once a second.
+    pub timestamp: i64,
     pub transactions: Vec<StacksTransactionData>,
+    pub metadata: StacksMicroblockMetadata,
+}
+
+#[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
+pub struct StacksMicroblockMetadata {
+    pub anchor_block_identifier: BlockIdentifier,
 }
 
 #[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
@@ -52,6 +92,7 @@ pub struct StacksBlockMetadata {
     pub pox_cycle_index: u32,
     pub pox_cycle_position: u32,
     pub pox_cycle_length: u32,
+    pub confirm_microblock_identifier: Option<BlockIdentifier>,
 }
 
 /// BitcoinBlock contain an array of Transactions that occurred at a particular
@@ -123,11 +164,21 @@ pub struct StacksTransactionMetadata {
     pub sender: String,
     pub fee: u64,
     pub kind: StacksTransactionKind,
-    pub execution_cost: Option<StacksTransactionExecutionCost>,
     pub receipt: StacksTransactionReceipt,
     pub description: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub sponsor: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub execution_cost: Option<StacksTransactionExecutionCost>,
+    pub position: StacksTransactionPosition,
+}
+
+/// TODO
+#[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
+#[serde(untagged)]
+pub enum StacksTransactionPosition {
+    Index(usize),
+    Microblock(BlockIdentifier, usize),
 }
 
 #[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
@@ -183,7 +234,7 @@ pub struct BitcoinTransactionMetadata {
 
 /// The transaction_identifier uniquely identifies a transaction in a particular
 /// network and block or in the mempool.
-#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize, Hash)]
 pub struct TransactionIdentifier {
     /// Any transactions that are attributable only to a block (ex: a block
     /// event) should use the hash of the block as the identifier.
@@ -401,44 +452,81 @@ pub struct CurrencyMetadata {
 #[allow(dead_code)]
 #[derive(Debug, Clone, PartialEq, Serialize)]
 pub enum BitcoinChainEvent {
-    ChainUpdatedWithBlock(BitcoinBlockData),
-    ChainUpdatedWithReorg(Vec<BitcoinBlockData>, Vec<BitcoinBlockData>),
+    ChainUpdatedWithBlocks(BitcoinChainUpdatedWithBlocksData),
+    ChainUpdatedWithReorg(BitcoinChainUpdatedWithReorgData),
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize)]
+pub struct BitcoinChainUpdatedWithBlocksData {
+    pub new_blocks: Vec<BitcoinBlockData>,
+    pub confirmed_blocks: Vec<BitcoinBlockData>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize)]
+pub struct BitcoinChainUpdatedWithReorgData {
+    pub blocks_to_rollback: Vec<BitcoinBlockData>,
+    pub blocks_to_apply: Vec<BitcoinBlockData>,
+    pub confirmed_blocks: Vec<BitcoinBlockData>,
 }
 
 #[allow(dead_code)]
 #[derive(Debug, Clone, PartialEq, Serialize)]
 pub enum StacksChainEvent {
-    ChainUpdatedWithBlock(ChainUpdatedWithBlockData),
-    ChainUpdatedWithReorg(ChainUpdatedWithReorgData),
-    ChainUpdatedWithMicroblock(ChainUpdatedWithMicroblockData),
-    ChainUpdatedWithMicroblockReorg(ChainUpdatedWithMicroblockReorgData),
+    ChainUpdatedWithBlocks(StacksChainUpdatedWithBlocksData),
+    ChainUpdatedWithReorg(StacksChainUpdatedWithReorgData),
+    ChainUpdatedWithMicroblocks(StacksChainUpdatedWithMicroblocksData),
+    ChainUpdatedWithMicroblocksReorg(StacksChainUpdatedWithMicroblocksReorgData),
+}
+
+impl StacksChainEvent {
+    pub fn get_confirmed_blocks(self) -> Vec<StacksBlockData> {
+        match self {
+            StacksChainEvent::ChainUpdatedWithBlocks(event) => event.confirmed_blocks,
+            StacksChainEvent::ChainUpdatedWithReorg(event) => event.confirmed_blocks,
+            _ => vec![],
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize)]
-pub struct ChainUpdatedWithBlockData {
-    pub new_block: StacksBlockData,
-    pub anchored_trail: Option<StacksMicroblocksTrail>,
-    pub confirmed_block: (StacksBlockData, Option<StacksMicroblocksTrail>),
+pub struct StacksBlockUpdate {
+    pub block: StacksBlockData,
+    pub parent_microblocks_to_rollback: Vec<StacksMicroblockData>,
+    pub parent_microblocks_to_apply: Vec<StacksMicroblockData>,
+}
+
+impl StacksBlockUpdate {
+    pub fn new(block: StacksBlockData) -> StacksBlockUpdate {
+        StacksBlockUpdate {
+            block,
+            parent_microblocks_to_rollback: vec![],
+            parent_microblocks_to_apply: vec![],
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize)]
-pub struct ChainUpdatedWithReorgData {
-    pub old_blocks: Vec<(Option<StacksMicroblocksTrail>, StacksBlockData)>,
-    pub new_blocks: Vec<(Option<StacksMicroblocksTrail>, StacksBlockData)>,
-    pub confirmed_block: (StacksBlockData, Option<StacksMicroblocksTrail>),
+pub struct StacksChainUpdatedWithBlocksData {
+    pub new_blocks: Vec<StacksBlockUpdate>,
+    pub confirmed_blocks: Vec<StacksBlockData>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize)]
-pub struct ChainUpdatedWithMicroblockData {
-    pub anchored_block: StacksBlockData,
-    pub current_trail: StacksMicroblocksTrail,
+pub struct StacksChainUpdatedWithReorgData {
+    pub blocks_to_rollback: Vec<StacksBlockUpdate>,
+    pub blocks_to_apply: Vec<StacksBlockUpdate>,
+    pub confirmed_blocks: Vec<StacksBlockData>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize)]
-pub struct ChainUpdatedWithMicroblockReorgData {
-    pub new_block: StacksBlockData,
-    pub new_anchored_trail: Option<StacksMicroblocksTrail>,
-    pub old_trail: Option<StacksMicroblocksTrail>,
+pub struct StacksChainUpdatedWithMicroblocksData {
+    pub new_microblocks: Vec<StacksMicroblockData>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize)]
+pub struct StacksChainUpdatedWithMicroblocksReorgData {
+    pub microblocks_to_rollback: Vec<StacksMicroblockData>,
+    pub microblocks_to_apply: Vec<StacksMicroblockData>,
 }
 
 #[allow(dead_code)]

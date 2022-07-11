@@ -1,5 +1,10 @@
+mod blocks_pool;
+
+pub use blocks_pool::StacksBlockPool;
+
 use crate::indexer::AssetClassCache;
 use crate::indexer::{IndexerConfig, StacksChainContext};
+use bitcoincore_rpc::bitcoin::Block;
 use clarity_repl::clarity::codec::transaction::{TransactionAuth, TransactionPayload};
 use clarity_repl::clarity::codec::{StacksMessageCodec, StacksTransaction};
 use clarity_repl::clarity::types::Value as ClarityValue;
@@ -7,45 +12,75 @@ use clarity_repl::clarity::util::hash::hex_bytes;
 use orchestra_types::*;
 use rocket::serde::json::Value as JsonValue;
 use rocket::serde::Deserialize;
-use std::collections::{HashMap, HashSet};
+use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 use std::convert::TryInto;
 use std::io::Cursor;
 use std::str;
 
-#[allow(dead_code)]
 #[derive(Deserialize)]
 pub struct NewBlock {
-    block_height: u64,
-    block_hash: String,
-    burn_block_height: u64,
-    burn_block_hash: String,
-    parent_block_hash: String,
-    index_block_hash: String,
-    parent_index_block_hash: String,
-    transactions: Vec<NewTransaction>,
-    events: Vec<NewEvent>,
-    // reward_slot_holders: Vec<String>,
-    // burn_amount: u32,
+    pub block_height: u64,
+    pub block_hash: String,
+    pub index_block_hash: String,
+    pub burn_block_height: u64,
+    pub burn_block_hash: String,
+    pub parent_block_hash: String,
+    pub parent_index_block_hash: String,
+    pub parent_microblock: String,
+    pub parent_microblock_sequence: u64,
+    pub parent_burn_block_hash: String,
+    pub parent_burn_block_height: u64,
+    pub parent_burn_block_timestamp: u64,
+    pub transactions: Vec<NewTransaction>,
+    pub events: Vec<NewEvent>,
+    pub matured_miner_rewards: Vec<MaturedMinerReward>,
 }
 
-#[allow(dead_code)]
 #[derive(Deserialize)]
-pub struct NewMicroblock {
-    transactions: Vec<NewTransaction>,
-    events: Vec<NewEvent>,
+pub struct MaturedMinerReward {
+    pub from_index_consensus_hash: String,
+    pub from_stacks_block_hash: String,
+    pub recipient: String,
+    pub coinbase_amount: String,
+    /// micro-STX amount
+    pub tx_fees_anchored: String,
+    /// micro-STX amount
+    pub tx_fees_streamed_confirmed: String,
+    /// micro-STX amount
+    pub tx_fees_streamed_produced: String,
+}
+
+#[derive(Deserialize)]
+pub struct NewMicroblockTrail {
+    pub parent_index_block_hash: String,
+    pub burn_block_hash: String,
+    pub burn_block_height: u64,
+    pub burn_block_timestamp: u64,
+    pub transactions: Vec<NewMicroblockTransaction>,
+    pub events: Vec<NewEvent>,
 }
 
 #[derive(Deserialize)]
 pub struct NewTransaction {
     pub txid: String,
-    pub tx_index: u32,
+    pub tx_index: usize,
     pub status: String,
     pub raw_result: String,
     pub raw_tx: String,
     pub execution_cost: Option<StacksTransactionExecutionCost>,
-    pub microblock_sequence: Option<u32>,
-    pub microblock_hash: Option<String>,
-    pub microblock_parent_hash: Option<String>,
+}
+
+#[derive(Deserialize)]
+pub struct NewMicroblockTransaction {
+    pub txid: String,
+    pub tx_index: usize,
+    pub status: String,
+    pub raw_result: String,
+    pub raw_tx: String,
+    pub execution_cost: Option<StacksTransactionExecutionCost>,
+    pub microblock_sequence: usize,
+    pub microblock_hash: String,
+    pub microblock_parent_hash: String,
 }
 
 #[derive(Debug, Deserialize)]
@@ -103,35 +138,50 @@ pub fn standardize_stacks_block(
     let transactions = block
         .transactions
         .iter()
-        .map(|t| {
+        .map(|tx| {
             let (description, tx_type, fee, sender, sponsor) =
-                get_tx_description(&t.raw_tx).expect("unable to parse transaction");
+                get_tx_description(&tx.raw_tx).expect("unable to parse transaction");
             let (operations, receipt) = get_standardized_stacks_operations(
-                &t.txid,
+                &tx.txid,
                 &mut events,
                 &mut ctx.asset_class_map,
                 &indexer_config.stacks_node_rpc_url,
             );
             StacksTransactionData {
                 transaction_identifier: TransactionIdentifier {
-                    hash: t.txid.clone(),
+                    hash: tx.txid.clone(),
                 },
                 operations,
                 metadata: StacksTransactionMetadata {
-                    success: t.status == "success",
-                    result: get_value_description(&t.raw_result),
-                    raw_tx: t.raw_tx.clone(),
+                    success: tx.status == "success",
+                    result: get_value_description(&tx.raw_result),
+                    raw_tx: tx.raw_tx.clone(),
                     sender,
                     fee,
                     sponsor,
                     kind: tx_type,
-                    execution_cost: t.execution_cost.clone(),
+                    execution_cost: tx.execution_cost.clone(),
                     receipt,
                     description,
+                    position: StacksTransactionPosition::Index(tx.tx_index),
                 },
             }
         })
         .collect();
+
+    let confirm_microblock_identifier = if block.parent_microblock
+        == "0x0000000000000000000000000000000000000000000000000000000000000000"
+    {
+        None
+    } else {
+        Some(BlockIdentifier {
+            index: block
+                .parent_microblock_sequence
+                .try_into()
+                .expect("unable to get microblock sequence"),
+            hash: block.parent_microblock.clone(),
+        })
+    };
 
     StacksBlockData {
         block_identifier: BlockIdentifier {
@@ -151,62 +201,101 @@ pub fn standardize_stacks_block(
             pox_cycle_index: pox_cycle_id,
             pox_cycle_position: (current_len % pox_cycle_length) as u32,
             pox_cycle_length: pox_cycle_length.try_into().unwrap(),
+            confirm_microblock_identifier,
         },
         transactions,
     }
 }
 
-pub fn standardize_stacks_microblock(
+pub fn standardize_stacks_microblock_trail(
     indexer_config: &IndexerConfig,
-    marshalled_microblock: JsonValue,
-    anchored_block_identifier: &BlockIdentifier,
+    marshalled_microblock_trail: JsonValue,
     ctx: &mut StacksChainContext,
-) -> StacksMicroblockData {
-    let mut microblock: NewMicroblock = serde_json::from_value(marshalled_microblock).unwrap();
+) -> Vec<StacksMicroblockData> {
+    let mut microblock_trail: NewMicroblockTrail =
+        serde_json::from_value(marshalled_microblock_trail).unwrap();
 
     let mut events = vec![];
-    events.append(&mut microblock.events);
-    let transactions = microblock
-        .transactions
-        .iter()
-        .map(|t| {
-            let (description, tx_type, fee, sender, sponsor) =
-                get_tx_description(&t.raw_tx).expect("unable to parse transaction");
-            let (operations, receipt) = get_standardized_stacks_operations(
-                &t.txid,
-                &mut events,
-                &mut ctx.asset_class_map,
-                &indexer_config.stacks_node_rpc_url,
-            );
-            StacksTransactionData {
-                transaction_identifier: TransactionIdentifier {
-                    hash: t.txid.clone(),
-                },
-                operations,
-                metadata: StacksTransactionMetadata {
-                    success: t.status == "success",
-                    result: get_value_description(&t.raw_result),
-                    raw_tx: t.raw_tx.clone(),
-                    sender,
-                    fee,
-                    sponsor,
-                    kind: tx_type,
-                    execution_cost: t.execution_cost.clone(),
-                    receipt,
-                    description,
-                },
-            }
-        })
-        .collect();
+    events.append(&mut microblock_trail.events);
 
-    StacksMicroblockData {
-        block_identifier: BlockIdentifier {
-            hash: "".into(),
-            index: 0,
-        },
-        parent_block_identifier: anchored_block_identifier.clone(),
-        transactions,
+    let mut microblocks_set: BTreeMap<
+        (BlockIdentifier, BlockIdentifier),
+        Vec<StacksTransactionData>,
+    > = BTreeMap::new();
+    for tx in microblock_trail.transactions.iter() {
+        let (description, tx_type, fee, sender, sponsor) =
+            get_tx_description(&tx.raw_tx).expect("unable to parse transaction");
+        let (operations, receipt) = get_standardized_stacks_operations(
+            &tx.txid,
+            &mut events,
+            &mut ctx.asset_class_map,
+            &indexer_config.stacks_node_rpc_url,
+        );
+
+        let microblock_identifier = BlockIdentifier {
+            hash: tx.microblock_hash.clone(),
+            index: u64::try_from(tx.microblock_sequence).unwrap(),
+        };
+
+        let parent_microblock_identifier = if tx.microblock_sequence >= 1 {
+            BlockIdentifier {
+                hash: tx.microblock_hash.clone(),
+                index: microblock_identifier.index.saturating_sub(1),
+            }
+        } else {
+            BlockIdentifier {
+                hash: microblock_trail.parent_index_block_hash.clone(),
+                index: 0,
+            }
+        };
+
+        let transaction = StacksTransactionData {
+            transaction_identifier: TransactionIdentifier {
+                hash: tx.txid.clone(),
+            },
+            operations,
+            metadata: StacksTransactionMetadata {
+                success: tx.status == "success",
+                result: get_value_description(&tx.raw_result),
+                raw_tx: tx.raw_tx.clone(),
+                sender,
+                fee,
+                sponsor,
+                kind: tx_type,
+                execution_cost: tx.execution_cost.clone(),
+                receipt,
+                description,
+                position: StacksTransactionPosition::Microblock(
+                    microblock_identifier.clone(),
+                    tx.tx_index,
+                ),
+            },
+        };
+
+        microblocks_set
+            .entry((microblock_identifier, parent_microblock_identifier))
+            .and_modify(|transactions| transactions.push(transaction.clone()))
+            .or_insert(vec![transaction]);
     }
+
+    let mut microblocks = vec![];
+    for ((block_identifier, parent_block_identifier), transactions) in microblocks_set.into_iter() {
+        microblocks.push(StacksMicroblockData {
+            block_identifier,
+            parent_block_identifier,
+            timestamp: 0,
+            transactions,
+            metadata: StacksMicroblockMetadata {
+                anchor_block_identifier: BlockIdentifier {
+                    hash: microblock_trail.parent_index_block_hash.clone(),
+                    index: 0,
+                },
+            },
+        })
+    }
+    microblocks.sort_by(|a, b| a.block_identifier.cmp(&b.block_identifier));
+
+    microblocks
 }
 
 pub fn get_value_description(raw_value: &str) -> String {
@@ -222,7 +311,7 @@ pub fn get_value_description(raw_value: &str) -> String {
     let value = match ClarityValue::consensus_deserialize(&mut Cursor::new(&value_bytes)) {
         Ok(value) => format!("{}", value),
         Err(e) => {
-            println!("{:?}", e);
+            error!("unable to deserialize clarity value {:?}", e);
             return raw_value.to_string();
         }
     };
@@ -827,3 +916,6 @@ fn get_mutated_ids(asset_class_id: &str) -> (String, String) {
     let contract_id = asset_class_id.split("::").collect::<Vec<_>>()[0];
     (asset_class_id.into(), contract_id.into())
 }
+
+#[cfg(test)]
+pub mod tests;
