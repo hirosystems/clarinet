@@ -1,6 +1,6 @@
 {
   "name": "@hirosystems/orchestra-types",
-  "version": "1.0.1-beta.1",
+  "version": "1.0.1-beta.3",
   "description": "",
   "main": "dist/index.js",
   "scripts": {

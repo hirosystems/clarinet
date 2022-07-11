@@ -1,5 +1,12 @@
 #![allow(unused_imports)]
 
+#[macro_use]
+extern crate rocket;
+
+#[macro_use]
+extern crate slog_scope;
+
+#[macro_use]
 extern crate serde;
 
 #[macro_use]
@@ -7,9 +14,6 @@ extern crate serde_derive;
 
 #[macro_use]
 extern crate serde_json;
-
-#[macro_use]
-extern crate rocket;
 
 pub mod chainhooks;
 pub mod indexer;
@@ -27,6 +31,9 @@ use std::path::PathBuf;
 use std::sync::mpsc::{channel, Receiver, Sender};
 use toml::value::Value;
 
+use slog::Drain;
+use std::sync::Mutex;
+
 /// Simple program to greet a person
 #[derive(Parser, Debug)]
 #[clap(author, version, about, long_about = None)]
@@ -38,6 +45,14 @@ struct Args {
 
 #[rocket::main]
 async fn main() {
+    let logger = slog::Logger::root(
+        Mutex::new(slog_json::Json::default(std::io::stderr())).map(slog::Fuse),
+        slog::o!("version" => env!("CARGO_PKG_VERSION")),
+    );
+
+    // slog_stdlog uses the logger from slog_scope, so set a logger there
+    let _guard = slog_scope::set_global_logger(logger);
+
     let args = Args::parse();
     let config_path = get_config_path_or_exit(&args.config_path);
     let config = EventObserverConfig::from_path(&config_path);
@@ -77,7 +92,7 @@ impl EventObserverConfig {
         let path = match File::open(path) {
             Ok(path) => path,
             Err(_e) => {
-                println!("Error: unable to locate Clarinet.toml in current directory");
+                error!("Error: unable to locate Clarinet.toml in current directory");
                 std::process::exit(1);
             }
         };
@@ -88,7 +103,7 @@ impl EventObserverConfig {
         let file: EventObserverConfigFile = match toml::from_slice(&file_buffer[..]) {
             Ok(s) => s,
             Err(e) => {
-                println!("Unable to read config {}", e);
+                error!("Unable to read config {}", e);
                 std::process::exit(1);
             }
         };
@@ -140,7 +155,7 @@ fn get_config_path_or_exit(path: &Option<String>) -> PathBuf {
     if let Some(path) = path {
         let manifest_path = PathBuf::from(path);
         if !manifest_path.exists() {
-            println!("Could not find Observer.toml");
+            error!("Could not find Observer.toml");
             std::process::exit(1);
         }
         manifest_path
@@ -155,7 +170,7 @@ fn get_config_path_or_exit(path: &Option<String>) -> PathBuf {
             current_dir.pop();
 
             if !current_dir.pop() {
-                println!("Could not find Observer.toml");
+                error!("Could not find Observer.toml");
                 std::process::exit(1);
             }
         }

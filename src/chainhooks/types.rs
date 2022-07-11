@@ -20,6 +20,7 @@ pub struct ChainhookSpecificationFile {
 pub struct ChainhookNetworkSpecificationFile {
     start_block: Option<u64>,
     end_block: Option<u64>,
+    expire_after_occurrence: Option<u64>,
     predicate: ChainhookPredicateFile,
     action: HookActionFile,
     oreo_url: String,
@@ -147,6 +148,7 @@ impl ChainhookSpecificationFile {
             network: network.clone(),
             start_block: network_spec.start_block,
             end_block: network_spec.end_block,
+            expire_after_occurrence: network_spec.expire_after_occurrence,
             predicate: network_spec.predicate.to_bitcoin_predicate()?,
             action: network_spec.action.to_specifications()?,
         })
@@ -174,6 +176,7 @@ impl ChainhookSpecificationFile {
             network: network.clone(),
             start_block: network_spec.start_block,
             end_block: network_spec.end_block,
+            expire_after_occurrence: network_spec.expire_after_occurrence,
             predicate: network_spec.predicate.to_stacks_predicate()?,
             action: network_spec.action.to_specifications()?,
         })

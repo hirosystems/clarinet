@@ -48,7 +48,7 @@ message TransactionIdentifier {
 message BitcoinChainUpdate {
     oneof bitcoin_chain_event {
         ChainUpdatedWithBlockData chain_updated_with_block = 1;
-        ChainUpdatedWithReorgData chain_updated_with_reorg = 2;
+        StacksChainUpdatedWithReorgData chain_updated_with_reorg = 2;
     }
 }
 
@@ -56,7 +56,7 @@ message ChainUpdatedWithBlockData {
     BitcoinBlockData new_block = 1;
 }
 
-message ChainUpdatedWithReorgData {
+message StacksChainUpdatedWithReorgData {
     repeated BitcoinBlockData old_blocks = 1;
     repeated BitcoinBlockData new_blocks = 2;
 }

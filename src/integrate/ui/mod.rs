@@ -97,12 +97,12 @@ pub fn start_ui(
                 app.display_service_status_update(status);
             }
             DevnetEvent::StacksChainEvent(chain_event) => {
-                if let StacksChainEvent::ChainUpdatedWithBlock(update) = chain_event {
+                if let StacksChainEvent::ChainUpdatedWithBlocks(update) = chain_event {
 
                     let raw_txs = if app.mempool.items.is_empty() {
                         vec![]
                     } else {
-                        update.new_block.transactions.iter().map(|tx| tx.metadata.raw_tx.as_str()).collect::<Vec<_>>()
+                        update.new_blocks.iter().flat_map(|b| b.block.transactions.iter().map(|tx| tx.metadata.raw_tx.as_str())).collect::<Vec<_>>()
                     };
 
                     let mut indices_to_remove = vec![];
@@ -116,8 +116,9 @@ pub fn start_ui(
                     for i in indices_to_remove {
                         app.mempool.items.remove(i);
                     }
-
-                    app.display_block(update.new_block);
+                    for block_update in update.new_blocks.into_iter() {
+                        app.display_block(block_update.block);
+                    }
                 } else {
                     // TODO(lgalabru)
                 }

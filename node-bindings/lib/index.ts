@@ -8,7 +8,10 @@ const {
   stacksDevnetWaitForBitcoinBlock,
   stacksDevnetGetStacksNodeUrl,
 } = require("../native/index.node");
-import { Block } from "@hirosystems/orchestra-types";
+import {
+  BitcoinChainUpdate,
+  StacksChainUpdate,
+} from "@hirosystems/orchestra-types";
 export * from "@hirosystems/orchestra-types";
 
 /**
@@ -347,7 +350,7 @@ export class StacksDevnetOrchestrator {
    * @summary Wait for the next Stacks block
    * @memberof StacksDevnetOrchestrator
    */
-  waitForStacksBlock(): Block {
+  waitForStacksBlock(): StacksChainUpdate {
     return stacksDevnetWaitForStacksBlock.call(this.handle);
   }
 
@@ -355,7 +358,7 @@ export class StacksDevnetOrchestrator {
    * @summary Wait for the next Bitcoin block
    * @memberof StacksDevnetOrchestrator
    */
-  waitForBitcoinBlock(): Block {
+  waitForBitcoinBlock(): BitcoinChainUpdate {
     return stacksDevnetWaitForBitcoinBlock.call(this.handle);
   }
 

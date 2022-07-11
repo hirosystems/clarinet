@@ -1,5 +1,65 @@
+/**
+ * BitcoinChainUpdate provide informations about new blocks and confirmed blocks.
+ * @export
+ * @interface BitcoinChainUpdate
+ */
+export interface BitcoinChainUpdate {
+  /**
+   * @type {Array<Block>}
+   * @memberof BitcoinChainUpdate
+   */
+  new_blocks: Array<Block>;
+  /**
+   * @type {Array<Block>}
+   * @memberof BitcoinChainUpdate
+   */
+  confirmed_blocks: Array<Block>;
+}
+
+/**
+ * StacksChainUpdate provide informations about new blocks and confirmed blocks.
+ * @export
+ * @interface StacksChainUpdate
+ */
+export interface StacksChainUpdate {
+  /**
+   * @type {Array<StacksBlockUpdate>}
+   * @memberof StacksChainUpdate
+   */
+  new_blocks: Array<StacksBlockUpdate>;
+  /**
+   * @type {Array<Block>}
+   * @memberof StacksChainUpdate
+   */
+  confirmed_blocks: Array<Block>;
+}
+
+/**
+ * StacksBlockUpdate provide informations about new blocks and confirmed blocks.
+ * @export
+ * @interface StacksBlockUpdate
+ */
+export interface StacksBlockUpdate {
+  /**
+   * @type {Array<Block>}
+   * @memberof StacksBlockUpdate
+   */
+  new_blocks: Array<Block>;
+  /**
+   * @type {Array<Block>}
+   * @memberof StacksBlockUpdate
+   */
+  parent_microblocks_to_rollback: Array<Block>;
+  /**
+   * @type {Array<Block>}
+   * @memberof StacksBlockUpdate
+   */
+  parent_microblocks_to_apply: Array<Block>;
+}
+
 export interface BitcoinChainEvent {
   apply: BitcoinApply[];
+  rollback: BitcoinRollback[];
   chainhook: {
     uuid: string;
     predicate: BitcoinPredicate;
@@ -8,6 +68,7 @@ export interface BitcoinChainEvent {
 
 export interface StacksChainEvent {
   apply: StacksApply[];
+  rollback: StacksRollback[];
   chainhook: {
     uuid: string;
     predicate: StacksPredicate;
@@ -21,11 +82,21 @@ export interface BitcoinApply {
   confirmations: number;
 }
 
+export interface BitcoinRollback {
+  transaction: BitcoinTransaction;
+  block_identifier: BlockIdentifier;
+}
+
 export interface StacksApply {
   transaction: StacksTransaction;
   proof: string;
   block_identifier: BlockIdentifier;
   confirmations: number;
+}
+
+export interface StacksRollback {
+  transaction: BitcoinTransaction;
+  block_identifier: BlockIdentifier;
 }
 
 export interface StacksChainhook {
@@ -266,6 +337,11 @@ export interface StacksTransactionMetadata {
    * @memberof StacksTransactionMetadata
    */
   execution_cost?: StacksTransactionExecutionCost;
+  /**
+   * @type {number|any}
+   * @memberof StacksTransactionMetadata
+   */
+  position: number | any;
 }
 
 export interface StacksTransactionReceipt {
@@ -585,6 +661,11 @@ export interface StacksBlockMetadata {
    * @memberof StacksBlockMetadata
    */
   bitcoin_anchor_block_identifier: BlockIdentifier;
+  /**
+   * @type {BlockIdentifier}
+   * @memberof StacksBlockMetadata
+   */
+  confirm_microblock_identifier?: BlockIdentifier;
   /**
    * @type {number}
    * @memberof StacksBlockMetadata
