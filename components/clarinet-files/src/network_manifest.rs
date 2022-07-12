@@ -21,9 +21,11 @@ pub const DEFAULT_BITCOIN_EXPLORER_IMAGE: &str = "quay.io/hirosystems/bitcoin-ex
 pub const DEFAULT_STACKS_API_IMAGE: &str = "blockstack/stacks-blockchain-api:latest";
 pub const DEFAULT_STACKS_EXPLORER_IMAGE: &str = "hirosystems/explorer:latest";
 pub const DEFAULT_POSTGRES_IMAGE: &str = "postgres:alpine";
-pub const DEFAULT_HYPERCHAINS_IMAGE: &str = "hirosystems/hyperchains:103-merge-stretch";
-pub const DEFAULT_HYPERCHAIN_CONTRACT_ID: &str =
-    "ST3A7S7GFKR8E3TVZ41Z2N441265CKXS0QPZ94N6B.hc-alpha-2";
+pub const DEFAULT_HYPERCHAIN_NODE_IMAGE: &str = "hirosystems/hyperchains:0.0.2-stretch";
+pub const DEFAULT_HYPERCHAIN_CONTRACT_ID: &str = "STXMJXCJDCT4WPF2X1HE42T6ZCCK3TPMBRZ51JEG.hc";
+pub const DEFAULT_STACKS_MINER_MNEMONIC: &str = "fragile loan twenty basic net assault jazz absorb diet talk art shock innocent float punch travel gadget embrace caught blossom hockey surround initial reduce";
+pub const DEFAULT_FAUCET_MNEMONIC: &str = "shadow private easily thought say logic fault paddle word top book during ignore notable orange flight clock image wealth health outside kitten belt reform";
+pub const DEFAULT_HYPERCHAIN_MNEMONIC: &str = "female adjust gallery certain visit token during great side clown fitness like hurt clip knife warm bench start reunion globe detail dream depend fortune";
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct NetworkManifestFile {
@@ -67,7 +69,8 @@ pub struct DevnetConfigFile {
     pub postgres_port: Option<u16>,
     pub postgres_username: Option<String>,
     pub postgres_password: Option<String>,
-    pub postgres_database: Option<String>,
+    pub stacks_api_postgres_database: Option<String>,
+    pub hyperchain_api_postgres_database: Option<String>,
     pub pox_stacking_orders: Option<Vec<PoxStackingOrder>>,
     pub execute_script: Option<Vec<ExecuteScript>>,
     pub bitcoin_node_image_url: Option<String>,
@@ -81,7 +84,7 @@ pub struct DevnetConfigFile {
     pub disable_stacks_api: Option<bool>,
     pub bind_containers_volumes: Option<bool>,
     pub enable_hyperchain_node: Option<bool>,
-    pub hyperchain_image_url: Option<String>,
+    pub hyperchain_node_image_url: Option<String>,
     pub hyperchain_leader_mnemonic: Option<String>,
     pub hyperchain_leader_derivation_path: Option<String>,
     pub hyperchain_node_p2p_port: Option<u16>,
@@ -89,6 +92,10 @@ pub struct DevnetConfigFile {
     pub hyperchain_events_ingestion_port: Option<u16>,
     pub hyperchain_node_events_observers: Option<Vec<String>>,
     pub hyperchain_contract_id: Option<String>,
+    pub hyperchain_api_image_url: Option<String>,
+    pub hyperchain_api_port: Option<u16>,
+    pub hyperchain_api_events_port: Option<u16>,
+    pub disable_hyperchain_api: Option<bool>,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -162,7 +169,8 @@ pub struct DevnetConfig {
     pub postgres_port: u16,
     pub postgres_username: String,
     pub postgres_password: String,
-    pub postgres_database: String,
+    pub stacks_api_postgres_database: String,
+    pub hyperchain_api_postgres_database: String,
     pub pox_stacking_orders: Vec<PoxStackingOrder>,
     pub execute_script: Vec<ExecuteScript>,
     pub bitcoin_node_image_url: String,
@@ -176,7 +184,7 @@ pub struct DevnetConfig {
     pub disable_stacks_api: bool,
     pub bind_containers_volumes: bool,
     pub enable_hyperchain_node: bool,
-    pub hyperchain_image_url: String,
+    pub hyperchain_node_image_url: String,
     pub hyperchain_leader_stx_address: String,
     pub hyperchain_leader_secret_key_hex: String,
     pub hyperchain_leader_btc_address: String,
@@ -187,6 +195,10 @@ pub struct DevnetConfig {
     pub hyperchain_events_ingestion_port: u16,
     pub hyperchain_node_events_observers: Vec<String>,
     pub hyperchain_contract_id: String,
+    pub hyperchain_api_image_url: String,
+    pub hyperchain_api_port: u16,
+    pub hyperchain_api_events_port: u16,
+    pub disable_hyperchain_api: bool,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -324,7 +336,10 @@ impl NetworkManifest {
             dir.push(format!("stacks-devnet-{}/", now));
             let default_working_dir = dir.display().to_string();
 
-            let miner_mnemonic = devnet_config.miner_mnemonic.take().unwrap_or("fragile loan twenty basic net assault jazz absorb diet talk art shock innocent float punch travel gadget embrace caught blossom hockey surround initial reduce".to_string());
+            let miner_mnemonic = devnet_config
+                .miner_mnemonic
+                .take()
+                .unwrap_or(DEFAULT_STACKS_MINER_MNEMONIC.to_string());
             let miner_derivation_path = devnet_config
                 .miner_derivation_path
                 .take()
@@ -332,46 +347,34 @@ impl NetworkManifest {
             let (miner_stx_address, miner_btc_address, miner_secret_key_hex) =
                 compute_addresses(&miner_mnemonic, &miner_derivation_path, networks);
 
-            let faucet_mnemonic = devnet_config.faucet_mnemonic.take().unwrap_or("shadow private easily thought say logic fault paddle word top book during ignore notable orange flight clock image wealth health outside kitten belt reform".to_string());
+            let faucet_mnemonic = devnet_config
+                .faucet_mnemonic
+                .take()
+                .unwrap_or(DEFAULT_FAUCET_MNEMONIC.to_string());
             let faucet_derivation_path = devnet_config
                 .faucet_derivation_path
                 .take()
                 .unwrap_or(DEFAULT_DERIVATION_PATH.to_string());
             let (faucet_stx_address, faucet_btc_address, faucet_secret_key_hex) =
                 compute_addresses(&faucet_mnemonic, &faucet_derivation_path, networks);
-            // If unset, we'll reuse the miner's keypair for the hyperchain leader
+
+            let hyperchain_leader_mnemonic = devnet_config
+                .hyperchain_leader_mnemonic
+                .take()
+                .unwrap_or(DEFAULT_HYPERCHAIN_MNEMONIC.to_string());
+            let hyperchain_leader_derivation_path = devnet_config
+                .hyperchain_leader_derivation_path
+                .take()
+                .unwrap_or(DEFAULT_DERIVATION_PATH.to_string());
             let (
                 hyperchain_leader_stx_address,
                 hyperchain_leader_btc_address,
                 hyperchain_leader_secret_key_hex,
-                hyperchain_leader_derivation_path,
-                hyperchain_leader_mnemonic,
-            ) = if let Some(mnemonic) = devnet_config.hyperchain_leader_mnemonic.take() {
-                let derivation_path = devnet_config
-                    .hyperchain_leader_derivation_path
-                    .take()
-                    .unwrap_or(DEFAULT_DERIVATION_PATH.to_string());
-                let (stx_address, btc_address, secret_key_hex) = compute_addresses(
-                    &mnemonic,
-                    &derivation_path,
-                    &StacksNetwork::Devnet.get_networks(),
-                );
-                (
-                    stx_address,
-                    btc_address,
-                    secret_key_hex,
-                    derivation_path,
-                    mnemonic,
-                )
-            } else {
-                (
-                    miner_stx_address.clone(),
-                    miner_btc_address.clone(),
-                    miner_secret_key_hex.clone(),
-                    miner_derivation_path.clone(),
-                    miner_mnemonic.clone(),
-                )
-            };
+            ) = compute_addresses(
+                &hyperchain_leader_mnemonic,
+                &hyperchain_leader_derivation_path,
+                networks,
+            );
 
             let enable_hyperchain_node = devnet_config.enable_hyperchain_node.unwrap_or(false);
             let hyperchain_events_ingestion_port = devnet_config
@@ -453,10 +456,14 @@ impl NetworkManifest {
                     .postgres_password
                     .take()
                     .unwrap_or("postgres".to_string()),
-                postgres_database: devnet_config
-                    .postgres_database
+                stacks_api_postgres_database: devnet_config
+                    .stacks_api_postgres_database
                     .take()
-                    .unwrap_or("postgres".to_string()),
+                    .unwrap_or("stacks_api".to_string()),
+                hyperchain_api_postgres_database: devnet_config
+                    .hyperchain_api_postgres_database
+                    .take()
+                    .unwrap_or("hyperchain_api".to_string()),
                 execute_script: devnet_config.execute_script.take().unwrap_or(vec![]),
                 bitcoin_node_image_url: devnet_config
                     .bitcoin_node_image_url
@@ -488,10 +495,10 @@ impl NetworkManifest {
                 disable_stacks_explorer: devnet_config.disable_stacks_explorer.unwrap_or(false),
                 bind_containers_volumes: devnet_config.bind_containers_volumes.unwrap_or(false),
                 enable_hyperchain_node,
-                hyperchain_image_url: devnet_config
-                    .hyperchain_image_url
+                hyperchain_node_image_url: devnet_config
+                    .hyperchain_node_image_url
                     .take()
-                    .unwrap_or(DEFAULT_HYPERCHAINS_IMAGE.to_string()),
+                    .unwrap_or(DEFAULT_HYPERCHAIN_NODE_IMAGE.to_string()),
                 hyperchain_leader_btc_address,
                 hyperchain_leader_stx_address,
                 hyperchain_leader_mnemonic,
@@ -507,11 +514,17 @@ impl NetworkManifest {
                 hyperchain_contract_id: devnet_config
                     .hyperchain_contract_id
                     .unwrap_or(DEFAULT_HYPERCHAIN_CONTRACT_ID.to_string()),
+                hyperchain_api_image_url: devnet_config
+                    .hyperchain_api_image_url
+                    .take()
+                    .unwrap_or(DEFAULT_STACKS_API_IMAGE.to_string()),
+                hyperchain_api_port: devnet_config.hyperchain_api_port.unwrap_or(13999),
+                hyperchain_api_events_port: devnet_config.stacks_api_events_port.unwrap_or(13700),
+                disable_hyperchain_api: devnet_config.disable_stacks_api.unwrap_or(false),
             };
             if !config.disable_stacks_api && config.disable_stacks_api {
                 config.disable_stacks_api = false;
             }
-
             Some(config)
         } else {
             None

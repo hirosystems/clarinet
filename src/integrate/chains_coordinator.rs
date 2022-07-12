@@ -174,6 +174,7 @@ pub async fn start_chains_coordinator(
     let protocol_deployed = Arc::new(AtomicBool::new(false));
 
     let mut deployment_events_rx = Some(deployment_events_rx);
+    let mut hyperchain_initialized = false;
 
     loop {
         // Did we receive a termination notice?
@@ -306,7 +307,7 @@ pub async fn start_chains_coordinator(
                     ),
                 }));
                 let _ = devnet_event_tx.send(DevnetEvent::info(format!(
-                    "Block #{} anchored in Bitcoin block #{} includes {} transactions",
+                    "Stacks Block #{} anchored in Bitcoin block #{} includes {} transactions",
                     known_tip.block.block_identifier.index,
                     known_tip
                         .block
@@ -353,12 +354,31 @@ pub async fn start_chains_coordinator(
             }
             ObserverEvent::HookDeregistered(_hook) => {}
             ObserverEvent::HooksTriggered(count) => {
-                let _ =
-                    devnet_event_tx.send(DevnetEvent::info(format!("{} hooks triggered", count)));
+                if count > 0 {
+                    let _ = devnet_event_tx
+                        .send(DevnetEvent::info(format!("{} hooks triggered", count)));
+                }
             }
             ObserverEvent::Terminate => {}
             ObserverEvent::StacksChainMempoolEvent(mempool_event) => match mempool_event {
                 StacksChainMempoolEvent::TransactionsAdmitted(transactions) => {
+                    // Temporary UI patch
+                    if config.devnet_config.enable_hyperchain_node && !hyperchain_initialized {
+                        for tx in transactions.iter() {
+                            if tx.tx_description.contains("::commit-block") {
+                                let _ = devnet_event_tx.send(DevnetEvent::ServiceStatus(
+                                    ServiceStatusData {
+                                        order: 5,
+                                        status: Status::Green,
+                                        name: "hyperchain-node".into(),
+                                        comment: format!("⚡️"),
+                                    },
+                                ));
+                                hyperchain_initialized = true;
+                                break;
+                            }
+                        }
+                    }
                     for tx in transactions.into_iter() {
                         let _ = devnet_event_tx.send(DevnetEvent::MempoolAdmission(tx));
                     }

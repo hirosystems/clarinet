@@ -6,6 +6,7 @@ use tui::text::{Span, Spans};
 
 pub struct App<'a> {
     pub title: &'a str,
+    pub hyperchain_enabled: bool,
     pub devnet_path: &'a str,
     pub should_quit: bool,
     pub blocks: Vec<StacksBlockData>,
@@ -17,7 +18,7 @@ pub struct App<'a> {
 }
 
 impl<'a> App<'a> {
-    pub fn new(title: &'a str, devnet_path: &'a str) -> App<'a> {
+    pub fn new(title: &'a str, devnet_path: &'a str, hyperchain_enabled: bool) -> App<'a> {
         App {
             title,
             devnet_path,
@@ -28,6 +29,7 @@ impl<'a> App<'a> {
             mempool: StatefulList::with_items(vec![]),
             logs: StatefulList::with_items(vec![]),
             services: StatefulList::with_items(vec![]),
+            hyperchain_enabled,
         }
     }
 

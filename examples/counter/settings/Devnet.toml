@@ -78,7 +78,7 @@ balance = 100_000_000_000_000
 # bitcoin_node_rpc_port = 18443
 # bitcoin_node_username = "devnet"
 # bitcoin_node_password = "devnet"
-# bitcoin_controller_block_time = 30_000
+bitcoin_controller_block_time = 30_000
 # stacks_node_rpc_port = 20443
 # stacks_node_p2p_port = 20444
 # stacks_node_events_observers = ["localhot:8002"]
@@ -101,9 +101,12 @@ balance = 100_000_000_000_000
 # postgres_image_url = "postgres:alpine"
 # bitcoin_controller_automining_disabled = true
 # disable_bitcoin_explorer = false
-disable_stacks_explorer = true
-disable_stacks_api = true
+# disable_stacks_explorer = true
+# disable_stacks_api = false
 enable_hyperchain_node = true
+# hyperchain_contract_id = "ST3A7S7GFKR8E3TVZ41Z2N441265CKXS0QPZ94N6B.hc"
+# hyperchain_leader_mnemonic = "female adjust gallery certain visit token during great side clown fitness like hurt clip knife warm bench start reunion globe detail dream depend fortune"
+# disable_hyperchain_api = true
 
 [[devnet.pox_stacking_orders]]
 start_at_cycle = 3
