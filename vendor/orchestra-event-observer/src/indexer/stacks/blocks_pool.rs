@@ -118,7 +118,7 @@ impl StacksBlockPool {
                     None => continue,
                 };
 
-                let (orphan_appended, new_fork) = fork_updated.try_append_block(&block);
+                let (orphan_appended, _new_fork) = fork_updated.try_append_block(&block);
                 if orphan_appended {
                     applied.insert(orphan_block_identifier);
                     orphans_to_untrack.insert(orphan_block_identifier);
@@ -455,7 +455,7 @@ impl StacksBlockPool {
                         None => continue,
                     };
 
-                    let (orphan_appended, new_fork) = micro_fork_updated.try_append_block(&block);
+                    let (orphan_appended, _new_fork) = micro_fork_updated.try_append_block(&block);
                     if orphan_appended {
                         applied.insert(orphan_key);
                         orphans_to_untrack.insert(orphan_key);

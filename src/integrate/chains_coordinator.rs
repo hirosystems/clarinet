@@ -354,8 +354,10 @@ pub async fn start_chains_coordinator(
             }
             ObserverEvent::HookDeregistered(_hook) => {}
             ObserverEvent::HooksTriggered(count) => {
-                let _ =
-                    devnet_event_tx.send(DevnetEvent::info(format!("{} hooks triggered", count)));
+                if count > 0 {
+                    let _ = devnet_event_tx
+                        .send(DevnetEvent::info(format!("{} hooks triggered", count)));
+                }
             }
             ObserverEvent::Terminate => {}
             ObserverEvent::StacksChainMempoolEvent(mempool_event) => match mempool_event {
