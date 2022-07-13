@@ -50,7 +50,7 @@ pub struct MaturedMinerReward {
     pub tx_fees_streamed_produced: String,
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Debug)]
 pub struct NewMicroblockTrail {
     pub parent_index_block_hash: String,
     pub burn_block_hash: String,
@@ -70,7 +70,7 @@ pub struct NewTransaction {
     pub execution_cost: Option<StacksTransactionExecutionCost>,
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Debug)]
 pub struct NewMicroblockTransaction {
     pub txid: String,
     pub tx_index: usize,
@@ -237,16 +237,13 @@ pub fn standardize_stacks_microblock_trail(
             index: u64::try_from(tx.microblock_sequence).unwrap(),
         };
 
-        let parent_microblock_identifier = if tx.microblock_sequence >= 1 {
+        let parent_microblock_identifier = if tx.microblock_sequence > 0 {
             BlockIdentifier {
-                hash: tx.microblock_hash.clone(),
+                hash: tx.microblock_parent_hash.clone(),
                 index: microblock_identifier.index.saturating_sub(1),
             }
         } else {
-            BlockIdentifier {
-                hash: microblock_trail.parent_index_block_hash.clone(),
-                index: 0,
-            }
+            microblock_identifier.clone()
         };
 
         let transaction = StacksTransactionData {
