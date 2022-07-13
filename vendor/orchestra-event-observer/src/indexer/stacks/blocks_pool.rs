@@ -41,7 +41,7 @@ impl StacksBlockPool {
         &mut self,
         block: StacksBlockData,
     ) -> Result<Option<StacksChainEvent>, ()> {
-        info!("Start processing block {}", block.block_identifier);
+        info!("Start processing Stacks {}", block.block_identifier);
 
         // Keep block data in memory
         let existing_entry = self
@@ -49,7 +49,7 @@ impl StacksBlockPool {
             .insert(block.block_identifier.clone(), block.clone());
         if existing_entry.is_some() {
             warn!(
-                "Block {} has already been processed",
+                "Stacks {} has already been processed",
                 block.block_identifier
             );
             return Ok(None);
@@ -84,14 +84,14 @@ impl StacksBlockPool {
         let fork_updated = match fork_updated.take() {
             Some(fork) => {
                 info!(
-                    "Block {} successfully appended to {}",
+                    "Stacks {} successfully appended to {}",
                     block.block_identifier, fork
                 );
                 fork
             }
             None => {
                 info!(
-                    "Unable to process block {} - inboxed for later",
+                    "Unable to process Stacks {} - inboxed for later",
                     block.block_identifier
                 );
                 self.orphans.insert(block.block_identifier.clone());
@@ -670,7 +670,7 @@ impl StacksBlockPool {
                     Some(block) => block.clone(),
                     None => {
                         error!(
-                            "unable to retrive block {} from block store",
+                            "unable to retrive Stacks {} from block store",
                             block_identifier
                         );
                         return Err(ChainSegmentIncompatibility::Unknown);
