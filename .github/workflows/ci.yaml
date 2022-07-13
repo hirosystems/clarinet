@@ -585,6 +585,9 @@ jobs:
     name: Build Clarity REPL Distribution
     runs-on: ubuntu-latest
     needs: pre_run
+    defaults:
+      run:
+        working-directory: components/clarity-repl
 
     steps:
       - name: Checkout repository
@@ -613,7 +616,6 @@ jobs:
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
 
       - name: Configure artifact names
-        shell: bash
         run: |
           echo "SHORT_TARGET_NAME=linux-x64-glibc" >> $GITHUB_ENV
           echo "PRE_GYP_TARGET_NAME=linux-x64-glibc" >> $GITHUB_ENV
@@ -622,17 +624,17 @@ jobs:
         run: cargo install --force wasm-pack
 
       - name: Build - Cargo
-        working-directory: components/clarity-repl
         run: cargo build --release --locked --target x86_64-unknown-linux-gnu
 
       - name: Build - WASM
-        working-directory: components/clarity-repl
         run: wasm-pack build --target web --release -- --no-default-features --features wasm
 
       - name: Compress cargo artifact
+        working-directory: "."
         run: tar -C target/x86_64-unknown-linux-gnu/release -zcvf clarity-repl-${{ env.SHORT_TARGET_NAME }}.tar.gz clarity-repl
 
       - name: Compress wasm artifact
+        working-directory: "."
         run: tar -C target/wasm32-unknown-unknown/release -zcvf clarity-repl-wasm.tar.gz clarity_repl.wasm
 
       - name: Upload cargo artifact
@@ -648,19 +650,16 @@ jobs:
           path: clarity-repl-wasm.tar.gz
 
       - name: Unit Tests - Cargo
-        working-directory: components/clarity-repl
         run: cargo test --release --locked --target x86_64-unknown-linux-gnu
 
       - name: Publish clarity-repl to crates.io
         if: startsWith(github.ref, 'refs/heads/main') && needs.get_release_info.outputs.tag != ''
-        working-directory: components/clarity-repl
         run: |
           cargo login ${{ secrets.CARGO_CRATES_IO_API_KEY }}
           cargo publish
 
       # Cleans the `./target` dir after the build such that only dependencies are cached on CI
       - name: Prepare cache
-        working-directory: components/clarity-repl
         run: cargo xtask pre-cache
 
   docker_images:
