@@ -17,10 +17,10 @@ impl Display for BlockIdentifier {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         write!(
             f,
-            "Block #{} (0x{}...{})",
+            "Block #{} ({}...{})",
             self.index,
-            &self.hash.as_str()[0..4],
-            &self.hash.as_str()[60..64]
+            &self.hash.as_str()[0..6],
+            &self.hash.as_str()[62..]
         )
     }
 }

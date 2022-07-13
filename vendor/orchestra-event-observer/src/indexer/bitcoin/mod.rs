@@ -76,7 +76,7 @@ pub fn standardize_bitcoin_block(
 
         let tx = BitcoinTransactionData {
             transaction_identifier: TransactionIdentifier {
-                hash: tx.txid().to_string(),
+                hash: format!("0x{}", tx.txid().to_string()),
             },
             operations: vec![],
             metadata: BitcoinTransactionMetadata { inputs, outputs },
@@ -86,7 +86,7 @@ pub fn standardize_bitcoin_block(
 
     BitcoinBlockData {
         block_identifier: BlockIdentifier {
-            hash: block.header.block_hash().to_string(),
+            hash: format!("0x{}", block.header.block_hash().to_string()),
             index: block_height,
         },
         parent_block_identifier: BlockIdentifier {
