@@ -282,8 +282,9 @@ pub async fn start_chains_coordinator(
                         }
                     }
                     StacksChainEvent::ChainUpdatedWithMicroblocks(_) => {
+                        let _ = devnet_event_tx.send(DevnetEvent::StacksChainEvent(chain_event));
                         continue;
-                        // TODO(lgalabru): good enough for now - code path unreachable in the context of Devnet
+                        // TODO(lgalabru): good enough for now
                     }
                     StacksChainEvent::ChainUpdatedWithMicroblocksReorg(_) => {
                         unreachable!() // TODO(lgalabru): good enough for now - code path unreachable in the context of Devnet
@@ -359,7 +360,11 @@ pub async fn start_chains_coordinator(
                         .send(DevnetEvent::info(format!("{} hooks triggered", count)));
                 }
             }
-            ObserverEvent::Terminate => {}
+            ObserverEvent::Terminate => {
+                let _ = chains_coordinator_terminator_tx.send(true);
+                let _ = observer_command_tx.send(ObserverCommand::Terminate);
+                break;
+            }
             ObserverEvent::StacksChainMempoolEvent(mempool_event) => match mempool_event {
                 StacksChainMempoolEvent::TransactionsAdmitted(transactions) => {
                     // Temporary UI patch

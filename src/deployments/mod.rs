@@ -117,12 +117,11 @@ fn sign_transaction_payload(
     payload: TransactionPayload,
     nonce: u64,
     tx_fee: u64,
+    anchor_mode: TransactionAnchorMode,
     network: &StacksNetwork,
 ) -> Result<StacksTransaction, String> {
     let (_, secret_key, public_key) = get_keypair(account);
     let signer_addr = get_stacks_address(&public_key, network);
-
-    let anchor_mode = TransactionAnchorMode::OnChainOnly;
 
     let spending_condition = TransactionSpendingCondition::Singlesig(SinglesigSpendingCondition {
         signer: signer_addr.bytes.clone(),
@@ -169,6 +168,7 @@ pub fn encode_contract_call(
     account: &AccountConfig,
     nonce: u64,
     tx_fee: u64,
+    anchor_mode: TransactionAnchorMode,
     network: &StacksNetwork,
 ) -> Result<StacksTransaction, String> {
     let payload = TransactionContractCall {
@@ -182,6 +182,7 @@ pub fn encode_contract_call(
         TransactionPayload::ContractCall(payload),
         nonce,
         tx_fee,
+        anchor_mode,
         network,
     )
 }
@@ -192,6 +193,7 @@ pub fn encode_contract_publish(
     account: &AccountConfig,
     nonce: u64,
     tx_fee: u64,
+    anchor_mode: TransactionAnchorMode,
     network: &StacksNetwork,
 ) -> Result<StacksTransaction, String> {
     let payload = TransactionSmartContract {
@@ -203,6 +205,7 @@ pub fn encode_contract_publish(
         TransactionPayload::SmartContract(payload),
         nonce,
         tx_fee,
+        anchor_mode,
         network,
     )
 }
@@ -448,6 +451,11 @@ pub fn apply_on_chain_deployment(
                         })
                         .collect::<Vec<_>>();
 
+                    let anchor_mode = match tx.anchor_block_only {
+                        true => TransactionAnchorMode::OnChainOnly,
+                        false => TransactionAnchorMode::Any,
+                    };
+
                     let transaction = match encode_contract_call(
                         &tx.contract_id,
                         tx.method.clone(),
@@ -455,6 +463,7 @@ pub fn apply_on_chain_deployment(
                         *account,
                         nonce,
                         tx.cost,
+                        anchor_mode,
                         &network,
                     ) {
                         Ok(res) => res,
@@ -509,12 +518,18 @@ pub fn apply_on_chain_deployment(
                         tx.source.clone()
                     };
 
+                    let anchor_mode = match tx.anchor_block_only {
+                        true => TransactionAnchorMode::OnChainOnly,
+                        false => TransactionAnchorMode::Any,
+                    };
+
                     let transaction = match encode_contract_publish(
                         &tx.contract_name,
                         &source,
                         *account,
                         nonce,
                         tx.cost,
+                        anchor_mode,
                         &network,
                     ) {
                         Ok(res) => res,
@@ -577,12 +592,15 @@ pub fn apply_on_chain_deployment(
                         }
                     }
 
+                    let anchor_mode = TransactionAnchorMode::OnChainOnly;
+
                     let transaction = match encode_contract_publish(
                         &tx.contract_id.name,
                         &source,
                         *account,
                         nonce,
                         tx.cost,
+                        anchor_mode,
                         &network,
                     ) {
                         Ok(res) => res,

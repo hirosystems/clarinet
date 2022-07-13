@@ -97,30 +97,52 @@ pub fn start_ui(
                 app.display_service_status_update(status);
             }
             DevnetEvent::StacksChainEvent(chain_event) => {
-                if let StacksChainEvent::ChainUpdatedWithBlocks(update) = chain_event {
+                match chain_event {
+                    StacksChainEvent::ChainUpdatedWithBlocks(update) => {
+                        let raw_txs = if app.mempool.items.is_empty() {
+                            vec![]
+                        } else {
+                            update.new_blocks.iter().flat_map(|b| b.block.transactions.iter().map(|tx| tx.metadata.raw_tx.as_str())).collect::<Vec<_>>()
+                        };
 
-                    let raw_txs = if app.mempool.items.is_empty() {
-                        vec![]
-                    } else {
-                        update.new_blocks.iter().flat_map(|b| b.block.transactions.iter().map(|tx| tx.metadata.raw_tx.as_str())).collect::<Vec<_>>()
-                    };
+                        let mut indices_to_remove = vec![];
+                        for (idx, item) in app.mempool.items.iter().enumerate() {
+                            if raw_txs.contains(&item.tx_data.as_str()) {
+                                indices_to_remove.push(idx);
+                            }
+                        }
 
-                    let mut indices_to_remove = vec![];
-                    for (idx, item) in app.mempool.items.iter().enumerate() {
-                        if raw_txs.contains(&item.tx_data.as_str()) {
-                            indices_to_remove.push(idx);
+                        indices_to_remove.reverse();
+                        for i in indices_to_remove {
+                            app.mempool.items.remove(i);
+                        }
+                        for block_update in update.new_blocks.into_iter() {
+                            app.display_block(block_update.block);
                         }
                     }
+                    StacksChainEvent::ChainUpdatedWithMicroblocks(update) => {
+                        let raw_txs = if app.mempool.items.is_empty() {
+                            vec![]
+                        } else {
+                            update.new_microblocks.iter().flat_map(|b| b.transactions.iter().map(|tx| tx.metadata.raw_tx.as_str())).collect::<Vec<_>>()
+                        };
 
-                    indices_to_remove.reverse();
-                    for i in indices_to_remove {
-                        app.mempool.items.remove(i);
+                        let mut indices_to_remove = vec![];
+                        for (idx, item) in app.mempool.items.iter().enumerate() {
+                            if raw_txs.contains(&item.tx_data.as_str()) {
+                                indices_to_remove.push(idx);
+                            }
+                        }
+
+                        indices_to_remove.reverse();
+                        for i in indices_to_remove {
+                            app.mempool.items.remove(i);
+                        }
+                        for block_update in update.new_microblocks.into_iter() {
+                            app.display_microblock(block_update);
+                        }
                     }
-                    for block_update in update.new_blocks.into_iter() {
-                        app.display_block(block_update.block);
-                    }
-                } else {
-                    // TODO(lgalabru)
+                    _ => {} // handle display on re-org, theorically unreachable in context of devnet
                 }
             }
             DevnetEvent::BitcoinChainEvent(_chain_event) => {

@@ -478,6 +478,7 @@ pub async fn generate_default_deployment(
                 cost: deployment_fee_rate
                     .saturating_mul(source.as_bytes().len().try_into().unwrap()),
                 source,
+                anchor_block_only: true,
             })
         };
 

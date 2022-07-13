@@ -1,7 +1,7 @@
 use crate::integrate::{LogLevel, Status};
-use orchestra_types::StacksBlockData;
+use orchestra_types::{StacksBlockData, StacksMicroblockData, StacksTransactionData};
 
-use super::App;
+use super::{app::BlockData, App};
 use tui::{
     backend::Backend,
     layout::{Constraint, Corner, Direction, Layout, Rect},
@@ -174,13 +174,20 @@ where
     if app.tabs.titles.is_empty() {
         return;
     }
-    let selected_block = &app.blocks[(app.tabs.titles.len() - 1) - app.tabs.index].clone();
-
-    draw_block_details(f, app, block_details_components[0], &selected_block);
-    draw_transactions(f, app, block_details_components[1], &selected_block);
+    let transactions = match &app.blocks[(app.tabs.titles.len() - 1) - app.tabs.index] {
+        BlockData::Block(selected_block) => {
+            draw_block_details(f, block_details_components[0], &selected_block);
+            &selected_block.transactions
+        }
+        BlockData::Microblock(selected_microblock) => {
+            draw_microblock_details(f, block_details_components[0], &selected_microblock);
+            &selected_microblock.transactions
+        }
+    };
+    draw_transactions(f, block_details_components[1], &transactions);
 }
 
-fn draw_block_details<B>(f: &mut Frame<B>, _app: &mut App, area: Rect, block: &StacksBlockData)
+fn draw_block_details<B>(f: &mut Frame<B>, area: Rect, block: &StacksBlockData)
 where
     B: Backend,
 {
@@ -276,12 +283,92 @@ where
     // TODO(ludo): Mining informations (miner, VRF)
 }
 
-fn draw_transactions<B>(f: &mut Frame<B>, _app: &mut App, area: Rect, block: &StacksBlockData)
+fn draw_microblock_details<B>(f: &mut Frame<B>, area: Rect, microblock: &StacksMicroblockData)
 where
     B: Backend,
 {
-    let transactions: Vec<ListItem> = block
-        .transactions
+    let paragraph = Paragraph::new(String::new()).block(
+        Block::default()
+            .borders(Borders::NONE)
+            .style(Style::default().fg(Color::White))
+            .title("Microblock Informations"),
+    );
+    f.render_widget(paragraph, area);
+
+    let labels = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints(
+            [
+                Constraint::Length(2),
+                Constraint::Length(1),
+                Constraint::Length(2),
+                Constraint::Length(1),
+                Constraint::Length(2),
+                Constraint::Length(1),
+                Constraint::Length(2),
+                Constraint::Length(1),
+                Constraint::Length(2),
+                Constraint::Length(1),
+                Constraint::Length(2),
+            ]
+            .as_ref(),
+        )
+        .split(area);
+
+    let label = "Microblock height:".to_string();
+    let paragraph = Paragraph::new(label)
+        .style(Style::default().fg(Color::White))
+        .block(Block::default().borders(Borders::NONE));
+    f.render_widget(paragraph, labels[1]);
+
+    let value = format!("{}", microblock.block_identifier.index);
+    let paragraph = Paragraph::new(value)
+        .style(Style::default().fg(Color::White))
+        .block(Block::default().borders(Borders::NONE));
+    f.render_widget(paragraph, labels[2]);
+
+    let label = "Microblock hash:".to_string();
+    let paragraph = Paragraph::new(label)
+        .style(Style::default().fg(Color::White))
+        .block(Block::default().borders(Borders::NONE));
+    f.render_widget(paragraph, labels[3]);
+
+    let value = format!("{}", microblock.block_identifier.hash);
+    let paragraph = Paragraph::new(value)
+        .style(Style::default().fg(Color::White))
+        .block(Block::default().borders(Borders::NONE));
+    f.render_widget(paragraph, labels[4]);
+
+    let label = "Anchor block height:".to_string();
+    let paragraph = Paragraph::new(label)
+        .style(Style::default().fg(Color::White))
+        .block(Block::default().borders(Borders::NONE));
+    f.render_widget(paragraph, labels[5]);
+
+    let value = format!("{}", microblock.metadata.anchor_block_identifier.index);
+    let paragraph = Paragraph::new(value)
+        .style(Style::default().fg(Color::White))
+        .block(Block::default().borders(Borders::NONE));
+    f.render_widget(paragraph, labels[6]);
+
+    let label = "Anchor block hash:".to_string();
+    let paragraph = Paragraph::new(label)
+        .style(Style::default().fg(Color::White))
+        .block(Block::default().borders(Borders::NONE));
+    f.render_widget(paragraph, labels[7]);
+
+    let value = format!("{}", microblock.metadata.anchor_block_identifier.hash);
+    let paragraph = Paragraph::new(value)
+        .style(Style::default().fg(Color::White))
+        .block(Block::default().borders(Borders::NONE));
+    f.render_widget(paragraph, labels[8]);
+}
+
+fn draw_transactions<B>(f: &mut Frame<B>, area: Rect, transactions: &Vec<StacksTransactionData>)
+where
+    B: Backend,
+{
+    let transactions: Vec<ListItem> = transactions
         .iter()
         .map(|t| {
             let tx_info = Spans::from(vec![
