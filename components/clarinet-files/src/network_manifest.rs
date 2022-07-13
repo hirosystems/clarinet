@@ -3,9 +3,9 @@ use std::collections::BTreeMap;
 
 use super::FileLocation;
 use bip39::{Language, Mnemonic};
-use clarity_repl::clarity::util::hash::bytes_to_hex;
 use clarity_repl::clarity::util::secp256k1::Secp256k1PublicKey;
 use clarity_repl::clarity::util::StacksAddress;
+use clarity_repl::clarity::{types::QualifiedContractIdentifier, util::hash::bytes_to_hex};
 use libsecp256k1::{PublicKey, SecretKey};
 use orchestra_types::{BitcoinNetwork, StacksNetwork};
 use tiny_hderive::bip32::ExtendedPrivKey;
@@ -195,6 +195,7 @@ pub struct DevnetConfig {
     pub hyperchain_events_ingestion_port: u16,
     pub hyperchain_node_events_observers: Vec<String>,
     pub hyperchain_contract_id: String,
+    pub remapped_hyperchain_contract_id: String,
     pub hyperchain_api_image_url: String,
     pub hyperchain_api_port: u16,
     pub hyperchain_api_events_port: u16,
@@ -406,6 +407,16 @@ impl NetworkManifest {
                     },
                 );
             }
+            let hyperchain_contract_id = devnet_config
+                .hyperchain_contract_id
+                .unwrap_or(DEFAULT_HYPERCHAIN_CONTRACT_ID.to_string());
+            let contract_id = QualifiedContractIdentifier::parse(&hyperchain_contract_id)
+                .expect("hyperchain contract_id invalid");
+            let default_deployer = accounts
+                .get("deployer")
+                .expect("default deployer account unavailable");
+            let remapped_hyperchain_contract_id =
+                format!("{}.{}", default_deployer.stx_address, contract_id.name);
 
             let mut config = DevnetConfig {
                 orchestrator_ingestion_port: devnet_config.orchestrator_port.unwrap_or(20445),
@@ -422,7 +433,7 @@ impl NetworkManifest {
                     .unwrap_or("devnet".to_string()),
                 bitcoin_controller_block_time: devnet_config
                     .bitcoin_controller_block_time
-                    .unwrap_or(30_000),
+                    .unwrap_or(90_000),
                 bitcoin_controller_automining_disabled: devnet_config
                     .bitcoin_controller_automining_disabled
                     .unwrap_or(false),
@@ -511,9 +522,8 @@ impl NetworkManifest {
                     .hyperchain_node_events_observers
                     .take()
                     .unwrap_or(vec![]),
-                hyperchain_contract_id: devnet_config
-                    .hyperchain_contract_id
-                    .unwrap_or(DEFAULT_HYPERCHAIN_CONTRACT_ID.to_string()),
+                hyperchain_contract_id,
+                remapped_hyperchain_contract_id,
                 hyperchain_api_image_url: devnet_config
                     .hyperchain_api_image_url
                     .take()
