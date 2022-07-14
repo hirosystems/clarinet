@@ -1,6 +1,0 @@
-[network]
-name = "devnet"
-node_rpc_address = "http://localhost:20443"
-
-[accounts.deployer]
-mnemonic = "point approve language letter cargo rough similar wrap focus edge polar task olympic tobacco cinnamon drop lawn boring sort trade senior screen tiger climb"
