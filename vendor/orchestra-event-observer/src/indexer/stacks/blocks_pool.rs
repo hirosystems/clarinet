@@ -691,7 +691,7 @@ impl StacksBlockPool {
                     Some(block) => block.clone(),
                     None => {
                         error!(
-                            "unable to retrive Stacks {} from block store",
+                            "unable to retrieve Stacks {} from block store",
                             block_identifier
                         );
                         return Err(ChainSegmentIncompatibility::Unknown);
