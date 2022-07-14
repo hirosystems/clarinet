@@ -153,8 +153,8 @@ jobs:
       - name: Functional Tests
         if: matrix.name == 'clarinet'
         run: |
-          for testdir in $(ls examples); do
-            ./target/debug/clarinet test --manifest-path examples/${testdir}/Clarinet.toml
+          for testdir in $(ls components/clarinet-cli/examples); do
+            ./target/debug/clarinet test --manifest-path components/clarinet-cli/examples/${testdir}/Clarinet.toml
           done
 
       - name: Upload coverage report
@@ -338,14 +338,14 @@ jobs:
         # can't easily run mac-arm64 tests in GH without native runners for that arch
         if: matrix.os != 'windows-latest' && matrix.target != 'aarch64-apple-darwin'
         run: |
-          for testdir in $(ls examples); do
-            ./target/${{ matrix.target }}/release/clarinet test --manifest-path examples/${testdir}/Clarinet.toml
+          for testdir in $(ls components/clarinet-cli/examples); do
+            ./target/${{ matrix.target }}/release/clarinet test --manifest-path components/clarinet-cli/examples/${testdir}/Clarinet.toml
           done
 
       - name: Functional Tests (Windows)
         if: matrix.os == 'windows-latest'
         run: |
-          foreach($testdir in Get-ChildItem examples) {
+          foreach($testdir in Get-ChildItem components/clarinet-cli/examples) {
             ./target/${{ matrix.target }}/release/clarinet test --manifest-path ${testdir}/Clarinet.toml
           }
 
