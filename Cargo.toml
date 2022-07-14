@@ -1,5 +1,6 @@
 [workspace]
 members = [
+    "components/clarinet-cli",
     "components/clarinet-deployments",
     "components/clarinet-files",
     "components/clarinet-utils",
