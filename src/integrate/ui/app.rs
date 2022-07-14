@@ -1,15 +1,20 @@
 use super::util::{StatefulList, TabsState};
 use crate::integrate::{LogData, MempoolAdmissionData, ServiceStatusData};
-use orchestra_types::{StacksBlockData, StacksTransactionData};
+use orchestra_types::{StacksBlockData, StacksMicroblockData, StacksTransactionData};
 use tui::style::{Color, Style};
 use tui::text::{Span, Spans};
+
+pub enum BlockData {
+    Block(StacksBlockData),
+    Microblock(StacksMicroblockData),
+}
 
 pub struct App<'a> {
     pub title: &'a str,
     pub hyperchain_enabled: bool,
     pub devnet_path: &'a str,
     pub should_quit: bool,
-    pub blocks: Vec<StacksBlockData>,
+    pub blocks: Vec<BlockData>,
     pub tabs: TabsState<'a>,
     pub transactions: StatefulList<StacksTransactionData>,
     pub mempool: StatefulList<MempoolAdmissionData>,
@@ -119,7 +124,18 @@ impl<'a> App<'a> {
                 Style::default().fg(Color::LightYellow)
             },
         )));
-        self.blocks.push(block);
+        self.blocks.push(BlockData::Block(block));
+        if self.tabs.index != 0 {
+            self.tabs.index += 1;
+        }
+    }
+
+    pub fn display_microblock(&mut self, block: StacksMicroblockData) {
+        self.tabs.titles.push_front(Spans::from(Span::styled(
+            format!("[·]"),
+            Style::default().fg(Color::White),
+        )));
+        self.blocks.push(BlockData::Microblock(block));
         if self.tabs.index != 0 {
             self.tabs.index += 1;
         }

@@ -31,7 +31,7 @@ impl BitcoinBlockPool {
         &mut self,
         block: BitcoinBlockData,
     ) -> Result<Option<BitcoinChainEvent>, ()> {
-        info!("Start processing block {}", block.block_identifier);
+        info!("Start processing Bitcoin {}", block.block_identifier);
 
         // Keep block data in memory
         let existing_entry = self
@@ -39,7 +39,7 @@ impl BitcoinBlockPool {
             .insert(block.block_identifier.clone(), block.clone());
         if existing_entry.is_some() {
             warn!(
-                "Block {} has already been processed",
+                "Bitcoin {} has already been processed",
                 block.block_identifier
             );
             return Ok(None);
@@ -74,14 +74,14 @@ impl BitcoinBlockPool {
         let fork_updated = match fork_updated.take() {
             Some(fork) => {
                 info!(
-                    "Block {} successfully appended to {}",
+                    "Bitcoin {} successfully appended to {}",
                     block.block_identifier, fork
                 );
                 fork
             }
             None => {
                 info!(
-                    "Unable to process block {} - inboxed for later",
+                    "Unable to process Bitcoin {} - inboxed for later",
                     block.block_identifier
                 );
                 self.orphans.insert(block.block_identifier.clone());
@@ -251,7 +251,7 @@ impl BitcoinBlockPool {
                     Some(block) => block.clone(),
                     None => {
                         error!(
-                            "unable to retrive block {} from block store",
+                            "unable to retrive Bitcoin {} from block store",
                             block_identifier
                         );
                         return Err(ChainSegmentIncompatibility::Unknown);

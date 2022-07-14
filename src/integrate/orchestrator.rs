@@ -1236,7 +1236,7 @@ observer_port = {hyperchain_events_ingestion_port}
             orchestrator_port = devnet_config.orchestrator_ingestion_port,
             hyperchain_events_ingestion_port = devnet_config.hyperchain_events_ingestion_port,
             first_burn_header_height = 0,
-            hyperchain_contract_id = "ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM.hc" //devnet_config.hyperchain_contract_id,
+            hyperchain_contract_id = devnet_config.remapped_hyperchain_contract_id,
         );
 
         hyperchain_conf.push_str(&format!(

@@ -41,7 +41,7 @@ impl StacksBlockPool {
         &mut self,
         block: StacksBlockData,
     ) -> Result<Option<StacksChainEvent>, ()> {
-        info!("Start processing block {}", block.block_identifier);
+        info!("Start processing Stacks {}", block.block_identifier);
 
         // Keep block data in memory
         let existing_entry = self
@@ -49,7 +49,7 @@ impl StacksBlockPool {
             .insert(block.block_identifier.clone(), block.clone());
         if existing_entry.is_some() {
             warn!(
-                "Block {} has already been processed",
+                "Stacks {} has already been processed",
                 block.block_identifier
             );
             return Ok(None);
@@ -84,14 +84,14 @@ impl StacksBlockPool {
         let fork_updated = match fork_updated.take() {
             Some(fork) => {
                 info!(
-                    "Block {} successfully appended to {}",
+                    "Stacks {} successfully appended to {}",
                     block.block_identifier, fork
                 );
                 fork
             }
             None => {
                 info!(
-                    "Unable to process block {} - inboxed for later",
+                    "Unable to process Stacks {} - inboxed for later",
                     block.block_identifier
                 );
                 self.orphans.insert(block.block_identifier.clone());
@@ -341,35 +341,13 @@ impl StacksBlockPool {
         &mut self,
         microblocks: Vec<StacksMicroblockData>,
     ) -> Option<StacksChainEvent> {
-        // Retrieve anchor block being updated
-        let anchor_block_updated = match microblocks.first() {
-            Some(microcblock) => {
-                info!(
-                    "Start processing microblocks anchored to {}",
-                    microcblock.metadata.anchor_block_identifier
-                );
-                microcblock.metadata.anchor_block_identifier.clone()
-            }
-            None => {
-                error!("No microblock to process");
-                return None;
-            }
-        };
+        info!("Start processing {} microblocks", microblocks.len());
 
         let mut previous_canonical_micro_fork = None;
 
-        if let (Some(microforks), Some(micro_fork_id)) = (
-            self.micro_forks.get(&anchor_block_updated),
-            self.canonical_micro_fork_id.get(&anchor_block_updated),
-        ) {
-            info!(
-                "Previous fork selected as canonical: {}",
-                microforks[*micro_fork_id]
-            );
-            previous_canonical_micro_fork = Some(microforks[*micro_fork_id].clone());
-        }
-
         let mut micro_forks_updated = HashSet::new();
+
+        let mut anchor_block_updated = None;
 
         for mut microblock in microblocks.into_iter() {
             // Temporary patch: the event observer is not returning the block height of the anchor block,
@@ -378,8 +356,14 @@ impl StacksBlockPool {
                 .block_store
                 .get(&microblock.metadata.anchor_block_identifier)
             {
+                anchor_block_updated = Some(block.block_identifier.clone());
                 microblock.metadata.anchor_block_identifier = block.block_identifier.clone();
             }
+            info!(
+                "Processing microblock {}, extending anchor {}",
+                microblock.block_identifier, microblock.metadata.anchor_block_identifier
+            );
+
             // Keep microblock data in memory
             self.microblock_store.insert(
                 (
@@ -389,6 +373,19 @@ impl StacksBlockPool {
                 microblock.clone(),
             );
 
+            if let (Some(microforks), Some(micro_fork_id)) = (
+                self.micro_forks
+                    .get(&microblock.metadata.anchor_block_identifier),
+                self.canonical_micro_fork_id
+                    .get(&microblock.metadata.anchor_block_identifier),
+            ) {
+                info!(
+                    "Previous fork selected as canonical: {}",
+                    microforks[*micro_fork_id]
+                );
+                previous_canonical_micro_fork = Some(microforks[*micro_fork_id].clone());
+            }
+
             let mut micro_fork_updated = None;
 
             if microblock.block_identifier.index == 0 {
@@ -396,7 +393,10 @@ impl StacksBlockPool {
                 let mut microfork = ChainSegment::new();
                 microfork.append_block_identifier(&&microblock.block_identifier);
 
-                match self.micro_forks.entry(anchor_block_updated.clone()) {
+                match self
+                    .micro_forks
+                    .entry(microblock.metadata.anchor_block_identifier.clone())
+                {
                     Entry::Occupied(microforks) => microforks.into_mut().push(microfork),
                     Entry::Vacant(v) => {
                         v.insert(vec![microfork]);
@@ -404,14 +404,23 @@ impl StacksBlockPool {
                 };
                 micro_fork_updated = self
                     .micro_forks
-                    .get_mut(&anchor_block_updated)
+                    .get_mut(&microblock.metadata.anchor_block_identifier)
                     .and_then(|microfork| microfork.last_mut())
             } else {
-                if let Some(microforks) = self.micro_forks.get_mut(&anchor_block_updated) {
+                if let Some(microforks) = self
+                    .micro_forks
+                    .get_mut(&microblock.metadata.anchor_block_identifier)
+                {
                     for micro_fork in microforks.iter_mut() {
                         let (block_appended, mut new_micro_fork) =
                             micro_fork.try_append_block(&microblock);
                         if block_appended {
+                            info!(
+                                "Attempt to append micro fork {} with {} (parent = {}) succeeded",
+                                micro_fork,
+                                microblock.block_identifier,
+                                microblock.parent_block_identifier
+                            );
                             if let Some(new_micro_fork) = new_micro_fork.take() {
                                 microforks.push(new_micro_fork);
                                 micro_fork_updated = microforks.last_mut();
@@ -420,6 +429,13 @@ impl StacksBlockPool {
                             }
                             // A block can only be added to one segment
                             break;
+                        } else {
+                            info!(
+                                "Attempt to append micro fork {} with {} (parent = {}) failed",
+                                micro_fork,
+                                microblock.block_identifier,
+                                microblock.parent_block_identifier
+                            );
                         }
                     }
                 }
@@ -479,6 +495,11 @@ impl StacksBlockPool {
         } else {
             info!("Microblocks successfully appended");
         }
+
+        let anchor_block_updated = match anchor_block_updated {
+            Some(anchor_block_updated) => anchor_block_updated,
+            _ => unreachable!(),
+        };
 
         assert_eq!(micro_forks_updated.len(), 1);
         let microforks = {
@@ -670,7 +691,7 @@ impl StacksBlockPool {
                     Some(block) => block.clone(),
                     None => {
                         error!(
-                            "unable to retrive block {} from block store",
+                            "unable to retrieve Stacks {} from block store",
                             block_identifier
                         );
                         return Err(ChainSegmentIncompatibility::Unknown);

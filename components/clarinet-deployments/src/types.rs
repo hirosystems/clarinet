@@ -72,6 +72,8 @@ pub struct ContractCallSpecificationFile {
     pub method: String,
     pub parameters: Vec<String>,
     pub cost: u64,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub anchor_block_only: Option<bool>,
 }
 
 #[derive(Debug, PartialEq, Serialize, Deserialize)]
@@ -101,6 +103,8 @@ pub struct ContractPublishSpecificationFile {
     pub path: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub url: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub anchor_block_only: Option<bool>,
 }
 
 #[derive(Debug, PartialEq, Serialize, Deserialize)]
@@ -170,6 +174,7 @@ pub struct ContractCallSpecification {
     pub method: ClarityName,
     pub parameters: Vec<String>,
     pub cost: u64,
+    pub anchor_block_only: bool,
 }
 
 impl ContractCallSpecification {
@@ -213,6 +218,7 @@ impl ContractCallSpecification {
             method,
             parameters: specs.parameters.clone(),
             cost: specs.cost,
+            anchor_block_only: specs.anchor_block_only.unwrap_or(true),
         })
     }
 }
@@ -224,6 +230,7 @@ pub struct ContractPublishSpecification {
     pub location: FileLocation,
     pub source: String,
     pub cost: u64,
+    pub anchor_block_only: bool,
 }
 
 impl ContractPublishSpecification {
@@ -270,6 +277,7 @@ impl ContractPublishSpecification {
             source,
             location: location,
             cost: specs.cost,
+            anchor_block_only: specs.anchor_block_only.unwrap_or(true),
         })
     }
 }
@@ -763,6 +771,7 @@ impl TransactionPlanSpecification {
                             method: tx.method.to_string(),
                             parameters: tx.parameters.clone(),
                             cost: tx.cost,
+                            anchor_block_only: Some(tx.anchor_block_only),
                         })
                     }
                     TransactionSpecification::ContractPublish(tx) => {
@@ -774,6 +783,7 @@ impl TransactionPlanSpecification {
                                 path: None,
                                 url: None,
                                 cost: tx.cost,
+                                anchor_block_only: Some(tx.anchor_block_only),
                             },
                         )
                     }

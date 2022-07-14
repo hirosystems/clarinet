@@ -125,6 +125,8 @@ pub async fn start_chains_coordinator(
     chains_coordinator_commands_rx: Receiver<ChainsCoordinatorCommand>,
     chains_coordinator_commands_tx: Sender<ChainsCoordinatorCommand>,
     chains_coordinator_terminator_tx: Sender<bool>,
+    observer_command_tx: Sender<ObserverCommand>,
+    observer_command_rx: Receiver<ObserverCommand>,
 ) -> Result<(), String> {
     let (deployment_events_tx, deployment_events_rx) = channel();
     let (deployment_commands_tx, deployments_command_rx) = channel();
@@ -146,7 +148,6 @@ pub async fn start_chains_coordinator(
     }
 
     // Spawn event observer
-    let (observer_command_tx, observer_command_rx) = channel();
     let (observer_event_tx, observer_event_rx) = channel();
     let event_observer_config = config.event_observer_config.clone();
     let observer_event_tx_moved = observer_event_tx.clone();
@@ -282,8 +283,9 @@ pub async fn start_chains_coordinator(
                         }
                     }
                     StacksChainEvent::ChainUpdatedWithMicroblocks(_) => {
+                        let _ = devnet_event_tx.send(DevnetEvent::StacksChainEvent(chain_event));
                         continue;
-                        // TODO(lgalabru): good enough for now - code path unreachable in the context of Devnet
+                        // TODO(lgalabru): good enough for now
                     }
                     StacksChainEvent::ChainUpdatedWithMicroblocksReorg(_) => {
                         unreachable!() // TODO(lgalabru): good enough for now - code path unreachable in the context of Devnet
@@ -359,7 +361,9 @@ pub async fn start_chains_coordinator(
                         .send(DevnetEvent::info(format!("{} hooks triggered", count)));
                 }
             }
-            ObserverEvent::Terminate => {}
+            ObserverEvent::Terminate => {
+                break;
+            }
             ObserverEvent::StacksChainMempoolEvent(mempool_event) => match mempool_event {
                 StacksChainMempoolEvent::TransactionsAdmitted(transactions) => {
                     // Temporary UI patch

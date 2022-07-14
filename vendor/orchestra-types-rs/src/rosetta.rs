@@ -3,9 +3,10 @@ use crate::events::*;
 use std::cmp::Ordering;
 use std::collections::HashSet;
 use std::fmt::Display;
+use std::hash::{Hash, Hasher};
 
 /// BlockIdentifier uniquely identifies a block in a particular network.
-#[derive(Debug, Clone, Deserialize, Serialize, Hash)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct BlockIdentifier {
     /// Also known as the block height.
     pub index: u64,
@@ -16,11 +17,17 @@ impl Display for BlockIdentifier {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         write!(
             f,
-            "Block #{} (0x{}...{})",
+            "Block #{} ({}...{})",
             self.index,
-            &self.hash.as_str()[0..4],
-            &self.hash.as_str()[60..64]
+            &self.hash.as_str()[0..6],
+            &self.hash.as_str()[62..]
         )
+    }
+}
+
+impl Hash for BlockIdentifier {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.hash.hash(state);
     }
 }
 
