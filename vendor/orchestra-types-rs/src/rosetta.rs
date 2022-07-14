@@ -536,7 +536,6 @@ pub struct StacksChainUpdatedWithMicroblocksReorgData {
     pub microblocks_to_apply: Vec<StacksMicroblockData>,
 }
 
-#[allow(dead_code)]
 #[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum StacksNetwork {

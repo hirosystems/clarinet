@@ -97,11 +97,11 @@ jobs:
       matrix:
         include:
           - name: clarinet
-            working-directory: "."
-          - name: oreo
-            working-directory: vendor/orchestra-event-observer
+            working-directory: components/clarinet-cli
           - name: clarity-repl
             working-directory: components/clarity-repl
+          - name: oreo
+            working-directory: vendor/orchestra-event-observer
     steps:
       - name: Checkout repository
         uses: actions/checkout@v3
@@ -131,17 +131,17 @@ jobs:
         if: steps.cache-cargo.outputs.cache-hit != 'true'
         run: RUSTC_BOOTSTRAP=1 cargo install grcov
 
-      - name: Install Rust toolchain nightly
+      - name: Install Rust toolchain
         uses: actions-rs/toolchain@v1
         with:
-          toolchain: nightly-2022-01-01
+          toolchain: stable
           profile: minimal
           components: llvm-tools-preview
           override: true
 
       - name: Unit Tests
         env:
-          RUSTFLAGS: "-Zinstrument-coverage"
+          RUSTFLAGS: "-C instrument-coverage"
           LLVM_PROFILE_FILE: "${{ matrix.name }}-%p-%m.profraw"
         run: cargo build --locked && cargo test
 
