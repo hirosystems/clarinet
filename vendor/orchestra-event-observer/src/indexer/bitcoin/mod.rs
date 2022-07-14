@@ -90,7 +90,7 @@ pub fn standardize_bitcoin_block(
             index: block_height,
         },
         parent_block_identifier: BlockIdentifier {
-            hash: block.header.prev_blockhash.to_string(),
+            hash: format!("0x{}", block.header.prev_blockhash.to_string()),
             index: block_height - 1,
         },
         timestamp: block.header.time,
