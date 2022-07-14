@@ -13,6 +13,7 @@ use crossterm::{
     execute,
     terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
 };
+use orchestra_event_observer::observer::ObserverCommand;
 use orchestra_types::StacksChainEvent;
 use std::sync::mpsc::{Receiver, Sender};
 use std::{
@@ -27,6 +28,7 @@ pub fn start_ui(
     devnet_events_tx: Sender<DevnetEvent>,
     devnet_events_rx: Receiver<DevnetEvent>,
     chains_coordinator_commands_tx: Sender<ChainsCoordinatorCommand>,
+    observer_command_tx: Sender<ObserverCommand>,
     orchestrator_terminated_rx: Receiver<bool>,
     devnet_path: &str,
     hyperchain_enabled: bool,
@@ -74,10 +76,10 @@ pub fn start_ui(
             DevnetEvent::KeyEvent(event) => match (event.modifiers, event.code) {
                 (KeyModifiers::CONTROL, KeyCode::Char('c')) => {
                     app.display_log(DevnetEvent::log_warning("Ctrl+C received, initiating termination sequence.".into()));
-                    let _ = trigger_reset(
-                        & chains_coordinator_commands_tx);
                     let _ = terminate(
                         &mut terminal,
+                        chains_coordinator_commands_tx,
+                        observer_command_tx,
                         orchestrator_terminated_rx);
                     break;
                 }
@@ -157,6 +159,8 @@ pub fn start_ui(
                 app.display_log(DevnetEvent::log_error(format!("Fatal: {}", message)));
                 let _ = terminate(
                     &mut terminal,
+                    chains_coordinator_commands_tx,
+                    observer_command_tx,
                     orchestrator_terminated_rx);
                 break;
             },
@@ -178,21 +182,20 @@ pub fn start_ui(
     Ok(())
 }
 
-fn trigger_reset(
-    chains_coordinator_commands_tx: &Sender<ChainsCoordinatorCommand>,
-) -> Result<(), Box<dyn Error>> {
-    chains_coordinator_commands_tx
-        .send(ChainsCoordinatorCommand::Terminate)
-        .expect("Unable to terminate devnet");
-    Ok(())
-}
-
 fn terminate(
     terminal: &mut Terminal<CrosstermBackend<Stdout>>,
+    chains_coordinator_commands_tx: Sender<ChainsCoordinatorCommand>,
+    observer_command_tx: Sender<ObserverCommand>,
     orchestrator_terminated_rx: Receiver<bool>,
 ) -> Result<(), Box<dyn Error>> {
     disable_raw_mode()?;
     execute!(terminal.backend_mut(), LeaveAlternateScreen,)?;
+    chains_coordinator_commands_tx
+        .send(ChainsCoordinatorCommand::Terminate)
+        .expect("Unable to terminate devnet");
+    observer_command_tx
+        .send(ObserverCommand::Terminate)
+        .expect("Unable to terminate devnet");
     match orchestrator_terminated_rx.recv()? {
         _ => {}
     }

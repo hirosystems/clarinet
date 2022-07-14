@@ -125,6 +125,8 @@ pub async fn start_chains_coordinator(
     chains_coordinator_commands_rx: Receiver<ChainsCoordinatorCommand>,
     chains_coordinator_commands_tx: Sender<ChainsCoordinatorCommand>,
     chains_coordinator_terminator_tx: Sender<bool>,
+    observer_command_tx: Sender<ObserverCommand>,
+    observer_command_rx: Receiver<ObserverCommand>,
 ) -> Result<(), String> {
     let (deployment_events_tx, deployment_events_rx) = channel();
     let (deployment_commands_tx, deployments_command_rx) = channel();
@@ -146,7 +148,6 @@ pub async fn start_chains_coordinator(
     }
 
     // Spawn event observer
-    let (observer_command_tx, observer_command_rx) = channel();
     let (observer_event_tx, observer_event_rx) = channel();
     let event_observer_config = config.event_observer_config.clone();
     let observer_event_tx_moved = observer_event_tx.clone();
@@ -361,8 +362,6 @@ pub async fn start_chains_coordinator(
                 }
             }
             ObserverEvent::Terminate => {
-                let _ = chains_coordinator_terminator_tx.send(true);
-                let _ = observer_command_tx.send(ObserverCommand::Terminate);
                 break;
             }
             ObserverEvent::StacksChainMempoolEvent(mempool_event) => match mempool_event {
