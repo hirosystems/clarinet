@@ -44,7 +44,7 @@ jobs:
         env:
           LATEST_RELEASE: ${{ steps.release.outputs.release }}
         run: |
-          CARGO_VERSION=v$(grep "version" Cargo.toml | head -n 1 | cut -d\" -f2)
+          CARGO_VERSION=v$(grep "version" components/clarinet-cli/Cargo.toml | head -n 1 | cut -d\" -f2)
           if [[ "${CARGO_VERSION}" != "${LATEST_RELEASE}" ]]; then
             echo "::set-output name=TAG::${CARGO_VERSION}"
             echo "::warning::Will create release for version: ${CARGO_VERSION}"
@@ -435,7 +435,7 @@ jobs:
           # if enabled, this will fail after installing an arm64 nodejs runtime for an x86_64 arch macos system
           # architecture: ${{ matrix.architecture }}
           cache: npm
-          cache-dependency-path: node-bindings/package-lock.json
+          cache-dependency-path: components/stacks-devnet-js/package-lock.json
 
       - name: Cache cargo
         if: github.event_name != 'pull_request' || matrix.target == 'x86_64-unknown-linux-gnu'
@@ -472,7 +472,7 @@ jobs:
 
       - name: Build - Node
         if: (github.event_name != 'pull_request' || matrix.target == 'x86_64-unknown-linux-gnu') && matrix.target != 'x86_64-unknown-linux-musl'
-        working-directory: node-bindings
+        working-directory: components/stacks-devnet-js
         run: |
           npm install --ignore-scripts
           npm run build-${{ env.SHORT_TARGET_NAME }}
@@ -485,7 +485,7 @@ jobs:
         with:
           entrypoint: /bin/sh
           args: -c "
-            cd node-bindings &&
+            cd components/stacks-devnet-js &&
             apk add alpine-sdk nodejs npm git &&
             npm install --ignore-scripts &&
             npm run build-${{ env.SHORT_TARGET_NAME }}"
@@ -493,7 +493,7 @@ jobs:
       - name: Compress node artifact
         if: github.event_name != 'pull_request' || matrix.target == 'x86_64-unknown-linux-gnu'
         shell: bash
-        run: tar -C node-bindings -zcvf stacks-devnet-js-${{ env.PRE_GYP_TARGET_NAME }}.tar.gz native/index.node
+        run: tar -C components/stacks-devnet-js -zcvf stacks-devnet-js-${{ env.PRE_GYP_TARGET_NAME }}.tar.gz native/index.node
 
       - name: Upload node artifact
         if: github.event_name != 'pull_request' || matrix.target == 'x86_64-unknown-linux-gnu'
@@ -518,7 +518,7 @@ jobs:
         uses: JS-DevTools/npm-publish@v1
         if: matrix.target == 'x86_64-unknown-linux-gnu' && startsWith(github.ref, 'refs/heads/main') && needs.get_release_info.outputs.tag != ''
         with:
-          package: node-bindings/package.json
+          package: components/stacks-devnet-js/package.json
           access: public
           greater-version-only: true
           token: ${{ secrets.NPM_TOKEN }}
