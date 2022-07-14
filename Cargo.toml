@@ -13,3 +13,4 @@ members = [
     "vendor/orchestra-types-rs",
     "vendor/orchestra-event-observer",
 ]
+default-members = ["components/clarinet-cli", "vendor/orchestra-event-observer"]
