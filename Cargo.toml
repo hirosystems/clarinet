@@ -152,6 +152,5 @@ members = [
     "vendor/orchestra-types-rs",
     "vendor/orchestra-event-observer",
     "vendor/stacks-rpc-client",
-    "xtask/",
     "node-bindings",
 ]
