@@ -42,16 +42,16 @@ pub const MAX_CONTEXT_DEPTH: u16 = 256;
 // TODO:
 //    hide the environment's instance variables.
 //     we don't want many of these changing after instantiation.
-pub struct Environment<'a, 'b> {
-    pub global_context: &'a mut GlobalContext<'b>,
+pub struct Environment<'a, 'b, 'hooks> {
+    pub global_context: &'a mut GlobalContext<'b, 'hooks>,
     pub contract_context: &'a ContractContext,
     pub call_stack: &'a mut CallStack,
     pub sender: Option<PrincipalData>,
     pub caller: Option<PrincipalData>,
 }
 
-pub struct OwnedEnvironment<'a> {
-    context: GlobalContext<'a>,
+pub struct OwnedEnvironment<'a, 'hooks> {
+    context: GlobalContext<'a, 'hooks>,
     default_contract: ContractContext,
     call_stack: CallStack,
 }
@@ -87,7 +87,7 @@ pub struct EventBatch {
      and is responsible for committing/rolling-back transactions as they error or
      abort.
 */
-pub struct GlobalContext<'a> {
+pub struct GlobalContext<'a, 'hooks> {
     asset_maps: Vec<AssetMap>,
     pub event_batches: Vec<EventBatch>,
     pub database: ClarityDatabase<'a>,
@@ -96,7 +96,7 @@ pub struct GlobalContext<'a> {
     pub mainnet: bool,
     pub coverage_reporting: Option<TestCoverageReport>,
     pub costs_reporting: Option<CostsReport>,
-    pub eval_hooks: Option<Vec<Box<dyn EvalHook>>>,
+    pub eval_hooks: Option<Vec<Box<&'hooks mut dyn EvalHook>>>,
 }
 
 #[derive(Serialize, Deserialize, Clone)]
@@ -429,8 +429,8 @@ impl EventBatch {
     }
 }
 
-impl<'a> OwnedEnvironment<'a> {
-    pub fn new(database: ClarityDatabase<'a>) -> OwnedEnvironment<'a> {
+impl<'a, 'hooks> OwnedEnvironment<'a, 'hooks> {
+    pub fn new(database: ClarityDatabase<'a>) -> OwnedEnvironment<'a, '_> {
         OwnedEnvironment {
             context: GlobalContext::new(false, database, LimitedCostTracker::new_free()),
             default_contract: ContractContext::new(QualifiedContractIdentifier::transient()),
@@ -439,7 +439,7 @@ impl<'a> OwnedEnvironment<'a> {
     }
 
     #[cfg(test)]
-    pub fn new_max_limit(mut database: ClarityDatabase<'a>) -> OwnedEnvironment<'a> {
+    pub fn new_max_limit(mut database: ClarityDatabase<'a>) -> OwnedEnvironment<'a, '_> {
         let cost_track =
             LimitedCostTracker::new(false, ExecutionCost::max_value(), &mut database, 0)
                 .expect("FAIL: problem instantiating cost tracking");
@@ -451,7 +451,7 @@ impl<'a> OwnedEnvironment<'a> {
         }
     }
 
-    pub fn new_free(mainnet: bool, database: ClarityDatabase<'a>) -> OwnedEnvironment<'a> {
+    pub fn new_free(mainnet: bool, database: ClarityDatabase<'a>) -> OwnedEnvironment<'a, '_> {
         OwnedEnvironment {
             context: GlobalContext::new(mainnet, database, LimitedCostTracker::new_free()),
             default_contract: ContractContext::new(QualifiedContractIdentifier::transient()),
@@ -463,7 +463,7 @@ impl<'a> OwnedEnvironment<'a> {
         mainnet: bool,
         database: ClarityDatabase<'a>,
         cost_tracker: LimitedCostTracker,
-    ) -> OwnedEnvironment<'a> {
+    ) -> OwnedEnvironment<'a, '_> {
         OwnedEnvironment {
             context: GlobalContext::new(mainnet, database, cost_tracker),
             default_contract: ContractContext::new(QualifiedContractIdentifier::transient()),
@@ -474,7 +474,7 @@ impl<'a> OwnedEnvironment<'a> {
     pub fn get_exec_environment<'b>(
         &'b mut self,
         sender: Option<PrincipalData>,
-    ) -> Environment<'b, 'a> {
+    ) -> Environment<'b, 'a, 'hooks> {
         Environment::new(
             &mut self.context,
             &self.default_contract,
@@ -607,7 +607,7 @@ impl<'a> OwnedEnvironment<'a> {
     }
 }
 
-impl CostTracker for Environment<'_, '_> {
+impl CostTracker for Environment<'_, '_, '_> {
     fn compute_cost(
         &mut self,
         cost_function: ClarityCostFunction,
@@ -641,7 +641,7 @@ impl CostTracker for Environment<'_, '_> {
     }
 }
 
-impl CostTracker for GlobalContext<'_> {
+impl CostTracker for GlobalContext<'_, '_> {
     fn compute_cost(
         &mut self,
         cost_function: ClarityCostFunction,
@@ -673,7 +673,7 @@ impl CostTracker for GlobalContext<'_> {
     }
 }
 
-impl<'a, 'b> Environment<'a, 'b> {
+impl<'a, 'b, 'hooks> Environment<'a, 'b, 'hooks> {
     // Environments pack a reference to the global context (which is basically the db),
     //   the current contract context, a call stack, and the current sender.
     // Essentially, the point of the Environment struct is to prevent all the eval functions
@@ -682,12 +682,12 @@ impl<'a, 'b> Environment<'a, 'b> {
     //   contract context), a single "invocation" will end up creating multiple environment
     //   objects as context changes occur.
     pub fn new(
-        global_context: &'a mut GlobalContext<'b>,
+        global_context: &'a mut GlobalContext<'b, 'hooks>,
         contract_context: &'a ContractContext,
         call_stack: &'a mut CallStack,
         sender: Option<PrincipalData>,
         caller: Option<PrincipalData>,
-    ) -> Environment<'a, 'b> {
+    ) -> Environment<'a, 'b, 'hooks> {
         Environment {
             global_context,
             contract_context,
@@ -697,7 +697,7 @@ impl<'a, 'b> Environment<'a, 'b> {
         }
     }
 
-    pub fn nest_as_principal<'c>(&'c mut self, sender: PrincipalData) -> Environment<'c, 'b> {
+    pub fn nest_as_principal<'c>(&'c mut self, sender: PrincipalData) -> Environment<'c, 'b, 'hooks> {
         Environment::new(
             self.global_context,
             self.contract_context,
@@ -707,7 +707,7 @@ impl<'a, 'b> Environment<'a, 'b> {
         )
     }
 
-    pub fn nest_with_caller<'c>(&'c mut self, caller: PrincipalData) -> Environment<'c, 'b> {
+    pub fn nest_with_caller<'c>(&'c mut self, caller: PrincipalData) -> Environment<'c, 'b, 'hooks> {
         Environment::new(
             self.global_context,
             self.contract_context,
@@ -1187,7 +1187,7 @@ impl<'a, 'b> Environment<'a, 'b> {
     }
 }
 
-impl<'a> GlobalContext<'a> {
+impl<'a, 'hooks> GlobalContext<'a, 'hooks> {
     // Instantiate a new Global Context
     pub fn new(
         mainnet: bool,

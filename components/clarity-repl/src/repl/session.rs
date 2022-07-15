@@ -509,12 +509,12 @@ impl Session {
         output.append(&mut result);
     }
 
-    pub fn formatted_interpretation(
+    pub fn formatted_interpretation<'hooks>(
         &mut self,
         snippet: String,
         name: Option<String>,
         cost_track: bool,
-        eval_hooks: Option<Vec<Box<dyn EvalHook>>>,
+        eval_hooks: Option<Vec<Box<&'hooks mut dyn EvalHook>>>,
         test_name: Option<String>,
     ) -> Result<(Vec<String>, ExecutionResult), Vec<String>> {
         let light_red = Colour::Red.bold();
@@ -572,7 +572,7 @@ impl Session {
             snippet.to_string(),
             None,
             true,
-            Some(vec![Box::new(debugger)]),
+            Some(vec![Box::new(&mut debugger)]),
             None,
         ) {
             Ok((mut output, result)) => {
@@ -601,7 +601,7 @@ impl Session {
         match self.interpret(
             snippet.to_string(),
             None,
-            Some(vec![Box::new(tracer)]),
+            Some(vec![Box::new(&mut tracer)]),
             false,
             None,
             None,
@@ -678,13 +678,13 @@ impl Session {
         self.run_snippet(output, self.show_costs, &snippet.to_string());
     }
 
-    pub fn formatted_interpretation_ast(
+    pub fn formatted_interpretation_ast<'hooks>(
         &mut self,
         snippet: String,
         ast: ContractAST,
         contract_identifier: QualifiedContractIdentifier,
         cost_track: bool,
-        eval_hooks: Option<Vec<Box<dyn EvalHook>>>,
+        eval_hooks: Option<Vec<Box<&'hooks mut dyn EvalHook>>>,
         test_name: Option<String>,
     ) -> Result<(Vec<String>, ExecutionResult), Vec<String>> {
         let light_red = Colour::Red.bold();
@@ -798,21 +798,21 @@ impl Session {
         }
     }
 
-    pub fn interpret_ast(
+    pub fn interpret_ast<'hooks>(
         &mut self,
         contract_identifier: &QualifiedContractIdentifier,
         ast: ContractAST,
         snippet: String,
-        mut eval_hooks: Option<Vec<Box<dyn EvalHook>>>,
+        mut eval_hooks: Option<Vec<Box<&'hooks mut dyn EvalHook>>>,
         cost_track: bool,
         test_name: Option<String>,
     ) -> Result<ExecutionResult, Vec<Diagnostic>> {
         if let Some(test_name) = test_name {
             let coverage = TestCoverageReport::new(test_name.into());
             if let Some(hooks) = &mut eval_hooks {
-                hooks.push(Box::new(coverage));
+                hooks.push(Box::new(&mut coverage));
             } else {
-                eval_hooks = Some(vec![Box::new(coverage)]);
+                eval_hooks = Some(vec![Box::new(&mut coverage)]);
             };
         }
         match self.interpreter.run_ast(
@@ -844,11 +844,11 @@ impl Session {
         }
     }
 
-    pub fn interpret(
+    pub fn interpret<'hooks>(
         &mut self,
         snippet: String,
         name: Option<String>,
-        mut eval_hooks: Option<Vec<Box<dyn EvalHook>>>,
+        mut eval_hooks: Option<Vec<Box<&'hooks mut dyn EvalHook>>>,
         cost_track: bool,
         test_name: Option<String>,
         ast: Option<&ContractAST>,
@@ -862,9 +862,9 @@ impl Session {
         if let Some(test_name) = test_name {
             let coverage = TestCoverageReport::new(test_name.into());
             if let Some(hooks) = &mut eval_hooks {
-                hooks.push(Box::new(coverage));
+                hooks.push(Box::new(&mut coverage));
             } else {
-                eval_hooks = Some(vec![Box::new(coverage)]);
+                eval_hooks = Some(vec![Box::new(&mut coverage)]);
             };
         }
 

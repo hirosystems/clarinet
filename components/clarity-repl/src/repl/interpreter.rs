@@ -108,12 +108,12 @@ impl ClarityInterpreter {
         }
     }
 
-    pub fn run(
+    pub fn run<'hooks>(
         &mut self,
         snippet: String,
         contract_identifier: QualifiedContractIdentifier,
         cost_track: bool,
-        eval_hooks: Option<Vec<Box<dyn EvalHook>>>,
+        eval_hooks: Option<Vec<Box<&'hooks mut dyn EvalHook>>>,
     ) -> Result<ExecutionResult, Vec<Diagnostic>> {
         let (mut ast, mut diagnostics, success) = self.build_ast(
             contract_identifier.clone(),
@@ -172,13 +172,13 @@ impl ClarityInterpreter {
         Ok(result)
     }
 
-    pub fn run_ast(
+    pub fn run_ast<'hooks>(
         &mut self,
         mut ast: ContractAST,
         snippet: String,
         contract_identifier: QualifiedContractIdentifier,
         cost_track: bool,
-        eval_hooks: Option<Vec<Box<dyn EvalHook>>>,
+        eval_hooks: Option<Vec<Box<&'hooks mut dyn EvalHook>>>,
     ) -> Result<ExecutionResult, Vec<Diagnostic>> {
         let (annotations, mut diagnostics) = self.collect_annotations(&ast, &snippet);
 
@@ -438,14 +438,14 @@ https://github.com/hirosystems/clarinet/issues/new/choose"#
     }
 
     #[allow(unused_assignments)]
-    pub fn execute(
-        &mut self,
+    pub fn execute<'a, 'hooks>(
+        &'a mut self,
         contract_identifier: QualifiedContractIdentifier,
         contract_ast: &mut ContractAST,
         snippet: String,
         contract_analysis: ContractAnalysis,
         cost_track: bool,
-        eval_hooks: Option<Vec<Box<dyn EvalHook>>>,
+        eval_hooks: Option<Vec<Box<&'hooks mut dyn EvalHook>>>,
     ) -> Result<ExecutionResult, (String, Option<Diagnostic>, Option<Error>)> {
         let mut execution_result = ExecutionResult::default();
         let mut contract_saved = false;
@@ -453,7 +453,7 @@ https://github.com/hirosystems/clarinet/issues/new/choose"#
         let mut accounts_to_debit = vec![];
         let mut accounts_to_credit = vec![];
         let mut contract_context = ContractContext::new(contract_identifier.clone());
-        let (value, eval_hooks) = {
+        let value = {
             let tx_sender: PrincipalData = self.tx_sender.clone().into();
 
             let mut conn = self.datastore.as_clarity_db(&NULL_HEADER_DB);
@@ -698,7 +698,7 @@ https://github.com/hirosystems/clarinet/issues/new/choose"#
             }
             global_context.commit().unwrap();
 
-            (value, global_context.eval_hooks)
+            value
         };
 
         execution_result.events = serialized_events;
