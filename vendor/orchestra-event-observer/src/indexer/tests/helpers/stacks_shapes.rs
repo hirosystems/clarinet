@@ -132,7 +132,7 @@ pub fn expect_chain_updated_with_block_and_microblock_updates(
     expected_block: BlockEvent,
     microblocks_to_rollback: Vec<BlockEvent>,
     microblocks_to_apply: Vec<BlockEvent>,
-    confirmed_blocks: Vec<BlockEvent>,
+    _confirmed_blocks: Vec<BlockEvent>,
 ) -> StacksChainEventExpectation {
     Box::new(move |chain_event_to_check: Option<StacksChainEvent>| {
         assert!(
@@ -224,7 +224,7 @@ pub fn expect_chain_updated_with_block_reorg_and_microblock_updates(
     new_block: BlockEvent,
     microblocks_to_rollback: Vec<BlockEvent>,
     microblocks_to_apply: Vec<BlockEvent>,
-    confirmed_blocks: Vec<BlockEvent>,
+    _confirmed_blocks: Vec<BlockEvent>,
 ) -> StacksChainEventExpectation {
     Box::new(move |chain_event_to_check: Option<StacksChainEvent>| {
         assert!(
@@ -348,7 +348,7 @@ pub fn expect_chain_updated_with_block_reorg_and_microblock_updates(
 pub fn expect_chain_updated_with_block_reorg(
     blocks_to_rollback: Vec<BlockEvent>,
     blocks_to_apply: Vec<BlockEvent>,
-    confirmed_blocks: Vec<BlockEvent>,
+    _confirmed_blocks: Vec<BlockEvent>,
 ) -> StacksChainEventExpectation {
     Box::new(move |chain_event_to_check: Option<StacksChainEvent>| {
         assert!(

@@ -10,7 +10,7 @@ COPY ./vendor/orchestra-types-rs /src/components/orchestra-types-rs
 
 COPY ./vendor/orchestra-event-observer /src/components/orchestra-event-observer
 
-COPY ./vendor/stacks-rpc-client /src/components/stacks-rpc-client
+COPY ./components/stacks-rpc-client /src/components/stacks-rpc-client
 
 COPY ./components/clarity-repl /src/components/clarity-repl
 

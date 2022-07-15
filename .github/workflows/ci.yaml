@@ -44,7 +44,7 @@ jobs:
         env:
           LATEST_RELEASE: ${{ steps.release.outputs.release }}
         run: |
-          CARGO_VERSION=v$(grep "version" Cargo.toml | head -n 1 | cut -d\" -f2)
+          CARGO_VERSION=v$(grep "version" components/clarinet-cli/Cargo.toml | head -n 1 | cut -d\" -f2)
           if [[ "${CARGO_VERSION}" != "${LATEST_RELEASE}" ]]; then
             echo "::set-output name=TAG::${CARGO_VERSION}"
             echo "::warning::Will create release for version: ${CARGO_VERSION}"
@@ -97,11 +97,11 @@ jobs:
       matrix:
         include:
           - name: clarinet
-            working-directory: "."
-          - name: oreo
-            working-directory: vendor/orchestra-event-observer
+            working-directory: components/clarinet-cli
           - name: clarity-repl
             working-directory: components/clarity-repl
+          - name: oreo
+            working-directory: vendor/orchestra-event-observer
     steps:
       - name: Checkout repository
         uses: actions/checkout@v3
@@ -131,17 +131,17 @@ jobs:
         if: steps.cache-cargo.outputs.cache-hit != 'true'
         run: RUSTC_BOOTSTRAP=1 cargo install grcov
 
-      - name: Install Rust toolchain nightly
+      - name: Install Rust toolchain
         uses: actions-rs/toolchain@v1
         with:
-          toolchain: nightly-2022-01-01
+          toolchain: stable
           profile: minimal
           components: llvm-tools-preview
           override: true
 
       - name: Unit Tests
         env:
-          RUSTFLAGS: "-Zinstrument-coverage"
+          RUSTFLAGS: "-C instrument-coverage"
           LLVM_PROFILE_FILE: "${{ matrix.name }}-%p-%m.profraw"
         run: cargo build --locked && cargo test
 
@@ -153,8 +153,8 @@ jobs:
       - name: Functional Tests
         if: matrix.name == 'clarinet'
         run: |
-          for testdir in $(ls examples); do
-            ./target/debug/clarinet test --manifest-path examples/${testdir}/Clarinet.toml
+          for testdir in $(ls components/clarinet-cli/examples); do
+            ./target/debug/clarinet test --manifest-path components/clarinet-cli/examples/${testdir}/Clarinet.toml
           done
 
       - name: Upload coverage report
@@ -282,7 +282,7 @@ jobs:
 
       - name: Build Installer (Windows)
         if: matrix.os == 'windows-latest'
-        run: cargo wix -v --no-build --nocapture -p clarinet
+        run: cargo wix -v --no-build --nocapture -p clarinet-cli
 
       - name: Code sign installer (Windows)
         if: startsWith(github.ref, 'refs/heads/main') && matrix.os == 'windows-latest'
@@ -338,14 +338,14 @@ jobs:
         # can't easily run mac-arm64 tests in GH without native runners for that arch
         if: matrix.os != 'windows-latest' && matrix.target != 'aarch64-apple-darwin'
         run: |
-          for testdir in $(ls examples); do
-            ./target/${{ matrix.target }}/release/clarinet test --manifest-path examples/${testdir}/Clarinet.toml
+          for testdir in $(ls components/clarinet-cli/examples); do
+            ./target/${{ matrix.target }}/release/clarinet test --manifest-path components/clarinet-cli/examples/${testdir}/Clarinet.toml
           done
 
       - name: Functional Tests (Windows)
         if: matrix.os == 'windows-latest'
         run: |
-          foreach($testdir in Get-ChildItem examples) {
+          foreach($testdir in Get-ChildItem components/clarinet-cli/examples) {
             ./target/${{ matrix.target }}/release/clarinet test --manifest-path ${testdir}/Clarinet.toml
           }
 
@@ -364,10 +364,6 @@ jobs:
           repo_token: ${{ secrets.GITHUB_TOKEN }}
           file: clarinet-${{ env.SHORT_TARGET_NAME }}.msi
           tag: ${{ github.ref }}
-
-      # Cleans the `./target` dir after the build such that only dependencies are cached on CI
-      - name: Prepare cache
-        run: cargo xtask pre-cache
 
   dist_stacks_devnet_js:
     name: Build Stacks Devnet JS Distributions
@@ -435,7 +431,7 @@ jobs:
           # if enabled, this will fail after installing an arm64 nodejs runtime for an x86_64 arch macos system
           # architecture: ${{ matrix.architecture }}
           cache: npm
-          cache-dependency-path: node-bindings/package-lock.json
+          cache-dependency-path: components/stacks-devnet-js/package-lock.json
 
       - name: Cache cargo
         if: github.event_name != 'pull_request' || matrix.target == 'x86_64-unknown-linux-gnu'
@@ -472,7 +468,7 @@ jobs:
 
       - name: Build - Node
         if: (github.event_name != 'pull_request' || matrix.target == 'x86_64-unknown-linux-gnu') && matrix.target != 'x86_64-unknown-linux-musl'
-        working-directory: node-bindings
+        working-directory: components/stacks-devnet-js
         run: |
           npm install --ignore-scripts
           npm run build-${{ env.SHORT_TARGET_NAME }}
@@ -485,7 +481,7 @@ jobs:
         with:
           entrypoint: /bin/sh
           args: -c "
-            cd node-bindings &&
+            cd components/stacks-devnet-js &&
             apk add alpine-sdk nodejs npm git &&
             npm install --ignore-scripts &&
             npm run build-${{ env.SHORT_TARGET_NAME }}"
@@ -493,7 +489,7 @@ jobs:
       - name: Compress node artifact
         if: github.event_name != 'pull_request' || matrix.target == 'x86_64-unknown-linux-gnu'
         shell: bash
-        run: tar -C node-bindings -zcvf stacks-devnet-js-${{ env.PRE_GYP_TARGET_NAME }}.tar.gz native/index.node
+        run: tar -C components/stacks-devnet-js -zcvf stacks-devnet-js-${{ env.PRE_GYP_TARGET_NAME }}.tar.gz native/index.node
 
       - name: Upload node artifact
         if: github.event_name != 'pull_request' || matrix.target == 'x86_64-unknown-linux-gnu'
@@ -518,7 +514,7 @@ jobs:
         uses: JS-DevTools/npm-publish@v1
         if: matrix.target == 'x86_64-unknown-linux-gnu' && startsWith(github.ref, 'refs/heads/main') && needs.get_release_info.outputs.tag != ''
         with:
-          package: node-bindings/package.json
+          package: components/stacks-devnet-js/package.json
           access: public
           greater-version-only: true
           token: ${{ secrets.NPM_TOKEN }}
@@ -575,11 +571,6 @@ jobs:
 
       - name: Unit Tests - Cargo
         run: cargo test --release --locked --target x86_64-unknown-linux-gnu
-
-      # Cleans the `./target` dir after the build such that only dependencies are cached on CI
-      - name: Prepare cache
-        working-directory: vendor/orchestra-event-observer
-        run: cargo xtask pre-cache
 
   dist_clarity_repl:
     name: Build Clarity REPL Distribution
@@ -657,10 +648,6 @@ jobs:
         run: |
           cargo login ${{ secrets.CARGO_CRATES_IO_API_KEY }}
           cargo publish
-
-      # Cleans the `./target` dir after the build such that only dependencies are cached on CI
-      - name: Prepare cache
-        run: cargo xtask pre-cache
 
   docker_images:
     name: Create ${{ matrix.name }} Docker Image

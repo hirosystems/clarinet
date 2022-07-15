@@ -1,5 +1,6 @@
 target/
 examples/
+dockerfiles/
 Dockerfile
 .dockerignore
 .git*

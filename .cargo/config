@@ -1,2 +1,2 @@
 [alias]
-xtask = "run --package xtask --bin xtask --"
+clarinet-install = "install --path components/clarinet-cli --locked --force"

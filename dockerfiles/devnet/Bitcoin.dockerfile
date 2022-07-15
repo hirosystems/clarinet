@@ -1,13 +1,6 @@
 FROM alpine
-
-ARG BTC_URL="https://github.com/blockstackpbc/bitcoin-docker/releases/download/0.20.99.0.0/musl-v0.20.99.0.0.tar.gz"
-
+ARG BTC_URL="https://github.com/hirosystems/bitcoin-docker/releases/download/0.21.1/musl-v0.21.1.tar.gz"
 WORKDIR /
-
-EXPOSE 18443/tcp
-
-EXPOSE 18444/tcp
-
 RUN apk add --update \
     curl \
     gnupg \
@@ -20,11 +13,10 @@ RUN apk add --update \
     libgcc \
     tini \
     jq
-
 RUN curl -L -o /bitcoin.tar.gz ${BTC_URL}
 RUN tar -xzvf /bitcoin.tar.gz
 RUN mkdir -p /root/.bitcoin
 RUN mv /bitcoin-*/bin/* /usr/local/bin/
 RUN rm -rf /bitcoin-*
-
-ENTRYPOINT ["/usr/local/bin/bitcoind"]
+ENTRYPOINT ["/sbin/tini", "--"]
+CMD [ "/usr/local/bin/bitcoind -conf=/etc/bitcoin/bitcoin.conf -nodebuglogfile -pid=/run/bitcoind.pid -datadir=/root/.bitcoin"]

@@ -683,7 +683,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "clarinet"
+name = "clarinet-cli"
 version = "0.32.0"
 dependencies = [
  "aes",
@@ -824,7 +824,7 @@ dependencies = [
  "libsecp256k1 0.5.0",
  "log",
  "memchr",
- "pico-args 0.4.2",
+ "pico-args",
  "prettytable-rs",
  "rand 0.7.3",
  "rand_pcg 0.3.1",
@@ -862,7 +862,7 @@ dependencies = [
  "libsecp256k1 0.5.0",
  "log",
  "memchr",
- "pico-args 0.4.2",
+ "pico-args",
  "prettytable-rs",
  "rand 0.7.3",
  "rand_pcg 0.3.1",
@@ -3363,12 +3363,6 @@ dependencies = [
 
 [[package]]
 name = "pico-args"
-version = "0.3.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "28b9b4df73455c861d7cbf8be42f01d3b373ed7f02e378d55fa84eafc6f638b1"
-
-[[package]]
-name = "pico-args"
 version = "0.4.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "db8bcd96cb740d03149cbad5518db9fd87126a10ab519c011893b1754134c468"
@@ -4580,7 +4574,7 @@ dependencies = [
 name = "stacks-devnet-js"
 version = "0.32.0"
 dependencies = [
- "clarinet",
+ "clarinet-cli",
  "clarinet-files",
  "clarinet-utils",
  "error-chain",
@@ -6289,17 +6283,6 @@ name = "wyz"
 version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "85e60b0d1b5f99db2556934e21937020776a5d31520bf169e851ac44e6420214"
-
-[[package]]
-name = "xtask"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "pico-args 0.3.4",
- "proc-macro2 1.0.36",
- "quote 1.0.17",
- "walkdir",
-]
 
 [[package]]
 name = "yaml-rust"

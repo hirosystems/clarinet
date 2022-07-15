@@ -1,5 +1,4 @@
 /target
-/xtask/target
 .DS_Store
 clarinet.code-workspace
 history.txt
@@ -9,11 +8,12 @@ package-lock.json
 target
 index.node
 npm-debug.log*
-node-bindings/dist
-node-bindings/build
 **/settings/Mainnet.toml
 **/settings/Testnet.toml
-examples/cbtc/backend/.build
+**/.requirements
+**/.build
+components/stacks-devnet-js/dist
+components/stacks-devnet-js/build
 vendor/orchestra-types-js/dist
 *.tar.gz
 *.zip

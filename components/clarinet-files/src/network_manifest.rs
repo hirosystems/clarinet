@@ -530,7 +530,7 @@ impl NetworkManifest {
                     .unwrap_or(DEFAULT_STACKS_API_IMAGE.to_string()),
                 hyperchain_api_port: devnet_config.hyperchain_api_port.unwrap_or(13999),
                 hyperchain_api_events_port: devnet_config.stacks_api_events_port.unwrap_or(13700),
-                disable_hyperchain_api: devnet_config.disable_stacks_api.unwrap_or(false),
+                disable_hyperchain_api: devnet_config.disable_hyperchain_api.unwrap_or(true),
             };
             if !config.disable_stacks_api && config.disable_stacks_api {
                 config.disable_stacks_api = false;
