@@ -763,20 +763,6 @@ pub fn check_deployments(manifest: &ProjectManifest) -> Result<(), String> {
     Ok(())
 }
 
-pub fn load_deployment_if_exists(
-    manifest: &ProjectManifest,
-    network: &StacksNetwork,
-) -> Option<Result<DeploymentSpecification, String>> {
-    let default_deployment_location = match get_default_deployment_path(manifest, network) {
-        Ok(location) => location,
-        Err(e) => return Some(Err(e)),
-    };
-    if !default_deployment_location.exists() {
-        return None;
-    }
-    Some(load_deployment(manifest, &default_deployment_location))
-}
-
 pub fn load_deployment(
     manifest: &ProjectManifest,
     deployment_plan_location: &FileLocation,
