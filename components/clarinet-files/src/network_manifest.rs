@@ -1,10 +1,10 @@
 use super::{FileAccessor, FileLocation};
 use bip39::{Language, Mnemonic};
 use clarinet_utils::get_bip39_seed_from_mnemonic;
+use clarity_repl::clarity::types::QualifiedContractIdentifier;
 use clarity_repl::clarity::util::hash::bytes_to_hex;
 use clarity_repl::clarity::util::secp256k1::Secp256k1PublicKey;
 use clarity_repl::clarity::util::StacksAddress;
-use clarity_repl::clarity::{types::QualifiedContractIdentifier, util::hash::bytes_to_hex};
 use libsecp256k1::{PublicKey, SecretKey};
 use orchestra_types::{BitcoinNetwork, StacksNetwork};
 use std::collections::BTreeMap;
