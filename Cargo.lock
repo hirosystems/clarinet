@@ -773,7 +773,6 @@ dependencies = [
 name = "clarinet-files"
 version = "0.1.0"
 dependencies = [
- "async-trait",
  "bip39",
  "bitcoin 0.28.1",
  "clarinet-utils",
@@ -801,18 +800,15 @@ dependencies = [
 name = "clarity-lsp"
 version = "0.1.0"
 dependencies = [
- "async-trait",
  "clarinet-deployments",
  "clarinet-files",
  "clarity-repl",
  "console_error_panic_hook",
- "futures",
  "js-sys",
  "lsp-types 0.93.0",
  "orchestra-types",
  "serde",
  "serde-wasm-bindgen",
- "serde_json",
  "wasm-bindgen",
  "wasm-bindgen-futures",
  "web-sys",
@@ -5999,8 +5995,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "25f1af7423d8588a3d840681122e72e6a24ddbcb3f0ec385cac0d12d24256c06"
 dependencies = [
  "cfg-if 1.0.0",
- "serde",
- "serde_json",
  "wasm-bindgen-macro",
 ]
 
