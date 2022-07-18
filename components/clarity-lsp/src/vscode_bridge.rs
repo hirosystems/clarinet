@@ -1,9 +1,12 @@
 extern crate console_error_panic_hook;
-use crate::backend::{self, LspRequestAsync, LspRequestSync};
+use crate::backend::{process_command, process_command_sync, LspRequestAsync, LspRequestSync};
 use crate::state::EditorState;
-use crate::utils::{self, get_contract_location, get_manifest_location, log};
-use async_trait::*;
-use clarinet_files::{FileAccessor, FileLocation, PerformFileAccess};
+use crate::utils::log;
+use crate::utils::{
+    clarity_diagnostics_to_lsp_type, get_contract_location, get_manifest_location,
+    vscode_vfs::VscodeFilesystemAccessor,
+};
+use clarinet_files::FileAccessor;
 use js_sys::{Function as JsFunction, Promise};
 use lsp_types::{
     notification::{DidOpenTextDocument, DidSaveTextDocument, Initialized, Notification},
@@ -11,13 +14,13 @@ use lsp_types::{
     DidOpenTextDocumentParams, PublishDiagnosticsParams, Url,
 };
 use lsp_types::{CompletionParams, DidSaveTextDocumentParams};
-use serde::{Deserialize, Serialize};
-use serde_wasm_bindgen::{from_value as decode_from_wasm, to_value as encode_to_wasm};
-use std::panic;
-use std::sync::{Arc, RwLock};
-
+use serde_wasm_bindgen::{from_value as decode_from_js, to_value as encode_to_js};
+use std::{
+    panic,
+    sync::{Arc, RwLock},
+};
 use wasm_bindgen::prelude::*;
-use wasm_bindgen_futures::{future_to_promise, JsFuture};
+use wasm_bindgen_futures::future_to_promise;
 
 #[wasm_bindgen]
 pub struct LspVscodeBridge {
@@ -55,16 +58,14 @@ impl LspVscodeBridge {
         ));
 
         match method.as_str() {
-            Initialized::METHOD => {
-                log!("> initialized");
-            }
+            Initialized::METHOD => {}
             DidOpenTextDocument::METHOD => {
-                let params: DidOpenTextDocumentParams = match decode_from_wasm(params) {
+                let params: DidOpenTextDocumentParams = match decode_from_js(params) {
                     Ok(params) => params,
                     _ => return Promise::resolve(&JsValue::null()),
                 };
-                let uri = &params.text_document.uri;
-                log!("> opened: {}", uri);
+                let uri = params.text_document.uri;
+                log!("> opened: {}", &uri);
 
                 let command = if let Some(contract_location) = get_contract_location(&uri) {
                     LspRequestAsync::ContractOpened(contract_location)
@@ -81,10 +82,9 @@ impl LspVscodeBridge {
                 return future_to_promise(async move {
                     let mut result = match editor_state.try_write() {
                         Ok(mut state) => {
-                            backend::process_command(command, &mut state, Some(&file_accessor))
-                                .await
+                            process_command(command, &mut state, Some(&file_accessor)).await
                         }
-                        Err(_) => return Err(JsValue::from("unable to lock")),
+                        Err(_) => return Err(JsValue::from("unable to lock editor_state")),
                     };
 
                     let mut aggregated_diagnostics = vec![];
@@ -96,11 +96,11 @@ impl LspVscodeBridge {
                         if let Ok(url) = Url::parse(&location.to_string()) {
                             let value = PublishDiagnosticsParams {
                                 uri: url,
-                                diagnostics: utils::clarity_diagnostics_to_lsp_type(&mut diags),
+                                diagnostics: clarity_diagnostics_to_lsp_type(&mut diags),
                                 version: None,
                             };
 
-                            let value = match encode_to_wasm(&value) {
+                            let value = match encode_to_js(&value) {
                                 Ok(value) => value,
                                 Err(_) => return Err(JsValue::from("unable to encode value")),
                             };
@@ -113,15 +113,16 @@ impl LspVscodeBridge {
             }
 
             DidSaveTextDocument::METHOD => {
-                let params: DidSaveTextDocumentParams = match decode_from_wasm(params) {
+                let params: DidSaveTextDocumentParams = match decode_from_js(params) {
                     Ok(params) => params,
                     _ => return Promise::resolve(&JsValue::null()),
                 };
                 let uri = &params.text_document.uri;
                 log!("> saved: {}", uri);
-                let command = if let Some(contract_location) = utils::get_contract_location(uri) {
+
+                let command = if let Some(contract_location) = get_contract_location(uri) {
                     LspRequestAsync::ContractChanged(contract_location)
-                } else if let Some(manifest_location) = utils::get_manifest_location(uri) {
+                } else if let Some(manifest_location) = get_manifest_location(uri) {
                     LspRequestAsync::ManifestChanged(manifest_location)
                 } else {
                     log!("Unsupported file opened");
@@ -134,10 +135,9 @@ impl LspVscodeBridge {
                 return future_to_promise(async move {
                     let mut result = match editor_state.try_write() {
                         Ok(mut state) => {
-                            backend::process_command(command, &mut state, Some(&file_accessor))
-                                .await
+                            process_command(command, &mut state, Some(&file_accessor)).await
                         }
-                        Err(_) => return Err(JsValue::from("unable to lock")),
+                        Err(_) => return Err(JsValue::from("unable to lock editor_state")),
                     };
 
                     let mut aggregated_diagnostics = vec![];
@@ -149,11 +149,11 @@ impl LspVscodeBridge {
                         if let Ok(url) = Url::parse(&location.to_string()) {
                             let value = PublishDiagnosticsParams {
                                 uri: url,
-                                diagnostics: utils::clarity_diagnostics_to_lsp_type(&mut diags),
+                                diagnostics: clarity_diagnostics_to_lsp_type(&mut diags),
                                 version: None,
                             };
 
-                            let value = match encode_to_wasm(&value) {
+                            let value = match encode_to_js(&value) {
                                 Ok(value) => value,
                                 Err(_) => return Err(JsValue::from("unable to encode value")),
                             };
@@ -177,23 +177,23 @@ impl LspVscodeBridge {
 
         match method.as_str() {
             Completion::METHOD => {
-                let params: CompletionParams = match decode_from_wasm(params) {
+                let params: CompletionParams = match decode_from_js(params) {
                     Ok(params) => params,
                     _ => return JsValue::null(),
                 };
                 let file_url = params.text_document_position.text_document.uri;
 
-                let command = match utils::get_contract_location(&file_url) {
+                let command = match get_contract_location(&file_url) {
                     Some(location) => LspRequestSync::GetIntellisense(location),
                     _ => return JsValue::null(),
                 };
 
                 let result = match self.editor_state.try_read() {
-                    Ok(editor_state) => backend::process_command_sync(command, &editor_state),
+                    Ok(editor_state) => process_command_sync(command, &editor_state),
                     Err(_) => return JsValue::null(),
                 };
 
-                let value = match encode_to_wasm(&result.completion_items) {
+                let value = match encode_to_js(&result.completion_items) {
                     Ok(value) => value,
                     Err(_) => {
                         log!("unable to encode value");
@@ -208,78 +208,5 @@ impl LspVscodeBridge {
         }
 
         return JsValue::null();
-    }
-}
-
-#[derive(Serialize, Deserialize)]
-pub struct VFSRequest {
-    pub path: String,
-}
-
-pub struct VscodeFilesystemAccessor {
-    client_request_tx: JsFunction,
-}
-
-impl VscodeFilesystemAccessor {
-    pub fn new(client_request_tx: JsFunction) -> VscodeFilesystemAccessor {
-        VscodeFilesystemAccessor { client_request_tx }
-    }
-}
-
-#[async_trait]
-impl FileAccessor for VscodeFilesystemAccessor {
-    fn read_manifest_content(&self, manifest_location: FileLocation) -> PerformFileAccess {
-        log!("reading manifest");
-        let path = manifest_location.to_string();
-        let req = self
-            .client_request_tx
-            .call2(
-                &JsValue::null(),
-                &JsValue::from("vfs/readFile"),
-                &encode_to_wasm(&VFSRequest { path: path.clone() }).unwrap(),
-            )
-            .unwrap();
-
-        return Box::pin(async move {
-            let response = JsFuture::from(Promise::resolve(&req)).await;
-            match response {
-                Ok(manifest) => Ok((
-                    FileLocation::from_url_string(&path).unwrap(),
-                    decode_from_wasm(manifest).unwrap(),
-                )),
-                Err(_) => Err("error".into()),
-            }
-        });
-    }
-
-    fn read_contract_content(
-        &self,
-        manifest_location: FileLocation,
-        relative_path: String,
-    ) -> PerformFileAccess {
-        log!("reading contract");
-        let mut contract_location = manifest_location.get_parent_location().unwrap();
-        let _ = contract_location.append_path(&relative_path);
-
-        let req = self
-            .client_request_tx
-            .call2(
-                &JsValue::null(),
-                &JsValue::from("vfs/readFile"),
-                &encode_to_wasm(&VFSRequest {
-                    path: contract_location.to_string(),
-                })
-                .unwrap(),
-            )
-            .unwrap();
-
-        return Box::pin(async move {
-            let response = JsFuture::from(Promise::resolve(&req)).await;
-
-            match response {
-                Ok(manifest) => Ok((contract_location, decode_from_wasm(manifest).unwrap())),
-                Err(_) => Err("error".into()),
-            }
-        });
     }
 }

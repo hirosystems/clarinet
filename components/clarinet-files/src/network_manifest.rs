@@ -11,9 +11,6 @@ use std::collections::BTreeMap;
 use tiny_hderive::bip32::ExtendedPrivKey;
 use toml::value::Value;
 
-#[cfg(feature = "cli")]
-use bitcoin;
-
 pub const DEFAULT_DERIVATION_PATH: &str = "m/44'/5757'/0'/0/0";
 pub const DEFAULT_BITCOIN_NODE_IMAGE: &str = "quay.io/hirosystems/bitcoind:devnet-v2";
 pub const DEFAULT_STACKS_NODE_IMAGE: &str = "quay.io/hirosystems/stacks-node:devnet-v2";
@@ -602,7 +599,10 @@ pub fn compute_addresses(
     (stx_address.to_string(), btc_address, miner_secret_key_hex)
 }
 
-#[cfg(feature = "cli")]
+#[cfg(not(feature = "wasm"))]
+use bitcoin;
+
+#[cfg(not(feature = "wasm"))]
 fn compute_btc_address(public_key: &PublicKey, network: &BitcoinNetwork) -> String {
     let public_key = bitcoin::PublicKey::from_slice(&public_key.serialize_compressed())
         .expect("Unable to recreate public key");
