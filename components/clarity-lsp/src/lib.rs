@@ -1,10 +1,7 @@
-// #[macro_use]
-// extern crate serde_json;
-
 mod common;
 pub mod types;
 pub mod utils;
-// pub mod vscode;
+#[cfg(feature = "wasm")]
 pub mod vscode_bridge;
 
 pub use common::backend;

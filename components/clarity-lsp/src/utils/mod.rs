@@ -11,12 +11,17 @@ use clarity_repl::clarity::variables::NativeVariables;
 use lsp_types::Diagnostic as LspDiagnostic;
 use lsp_types::{DiagnosticSeverity, Position, Range};
 
+#[cfg(feature = "wasm")]
+pub mod vscode_vfs;
+
+#[cfg(feature = "wasm")]
 macro_rules! log {
     ( $( $t:tt )* ) => {
         web_sys::console::log_1(&format!( $( $t )* ).into());
     }
 }
 
+#[cfg(feature = "wasm")]
 pub(crate) use log;
 
 pub fn clarity_diagnostics_to_lsp_type(

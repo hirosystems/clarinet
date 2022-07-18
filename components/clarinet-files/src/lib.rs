@@ -9,7 +9,6 @@ pub extern crate url;
 mod network_manifest;
 mod project_manifest;
 
-use async_trait::*;
 pub use network_manifest::{
     compute_addresses, AccountConfig, DevnetConfig, DevnetConfigFile, NetworkManifest,
     NetworkManifestFile, PoxStackingOrder, DEFAULT_DERIVATION_PATH,
@@ -28,7 +27,6 @@ pub const DEFAULT_DEVNET_BALANCE: u64 = 100_000_000_000_000;
 
 pub type PerformFileAccess = Pin<Box<dyn Future<Output = Result<(FileLocation, String), String>>>>;
 
-#[async_trait]
 pub trait FileAccessor {
     fn read_manifest_content(&self, manifest_location: FileLocation) -> PerformFileAccess;
     fn read_contract_content(

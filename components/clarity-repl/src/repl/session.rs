@@ -118,7 +118,7 @@ impl Session {
         self.interpreter.set_tx_sender(default_tx_sender);
     }
 
-    #[cfg(not(feature = "wasm"))]
+    #[cfg(feature = "cli")]
     pub fn start(&mut self) -> Result<(String, Vec<(ContractAnalysis, String, String)>), String> {
         let mut output_err = Vec::<String>::new();
         let mut output = Vec::<String>::new();
@@ -180,6 +180,7 @@ impl Session {
         }
     }
 
+    #[cfg(feature = "cli")]
     fn handle_initial_contracts(
         &mut self,
     ) -> Result<(Vec<String>, Vec<(ContractAnalysis, String, String)>), Vec<String>> {
@@ -272,7 +273,7 @@ impl Session {
         Ok((output, contracts))
     }
 
-    #[cfg(not(feature = "wasm"))]
+    #[cfg(feature = "cli")]
     pub fn interpret_initial_contracts(
         &mut self,
     ) -> Result<(Vec<String>, Vec<(ContractAnalysis, String, String)>), Vec<String>> {
@@ -1499,7 +1500,7 @@ mod tests {
 
             (define-read-only (get-x)
                 (var-get x))
-            
+
             (define-public (incr)
                 (begin
                     (var-set x (+ (var-get x) u1))

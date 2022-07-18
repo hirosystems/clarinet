@@ -348,5 +348,6 @@ pub async fn build_state<'a>(
         &mut artifacts.diags,
         &mut analyses,
     );
+
     Ok(())
 }

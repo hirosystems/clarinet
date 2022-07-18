@@ -1,7 +1,7 @@
 mod native_bridge;
 
 use clarinet_files::FileLocation;
-use clarity_lsp::backend::{self, LspRequestAsync, LspResponse};
+use clarity_lsp::backend::{self, LspRequestAsync, LspRequestSync, LspResponse};
 use clarity_lsp::lsp_types::MessageType;
 use clarity_lsp::state::{build_state, EditorState, ProtocolState};
 use clarity_lsp::types::CompletionItemKind;
@@ -37,7 +37,7 @@ async fn do_run_lsp() -> Result<(), String> {
 
     let (tx, rx) = mpsc::channel();
     std::thread::spawn(move || {
-        crate::utils::nestable_block_on(backend::start_language_server(rx, None));
+        crate::utils::nestable_block_on(backend::start_language_server(rx, tx, None));
     });
 
     let (service, messages) = LspService::new(|client| LspNativeBridge::new(client, tx));
