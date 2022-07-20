@@ -1,3 +1,30 @@
+#### 0.33.0 (2022-07-20)
+
+##### Chores
+
+*  migrate to mono-repo layout ([#481](https://github.com/hirosystems/clarinet/pull/481))
+* **deps:**
+  *  bump crossbeam-utils in /components/stacks-devnet-js ([9a0dedfd](https://github.com/hirosystems/clarinet/commit/9a0dedfd41aeed36ec503bd969e595b7c9dc207d))
+  *  bump thread_local in /components/stacks-devnet-js ([a6b5065f](https://github.com/hirosystems/clarinet/commit/a6b5065fa9d59df2701bf7cc968203c0b8f7d30d))
+  *  bump nix in /components/stacks-devnet-js ([f453b4aa](https://github.com/hirosystems/clarinet/commit/f453b4aae32dee20f9d4f006e70b2518c2878bb3))
+
+##### Continuous Integration
+
+*  revisit CI and release process ([423c3d36](https://github.com/hirosystems/clarinet/commit/423c3d36c7cb571156bb6553162dbac0b24a2e1c))
+
+##### Documentation Changes
+
+*  README.md. Removed depends_on() field in the clarinet.toml file and added success message for clarinet check command. ([84d0a327](https://github.com/hirosystems/clarinet/commit/84d0a32776b69520228d2e5149a4a3428e970b56))
+
+##### New Features
+
+*  polish hyperchain integration ([#432](https://github.com/hirosystems/clarinet/pull/432), [#480](https://github.com/hirosystems/clarinet/pull/480), [#494](https://github.com/hirosystems/clarinet/pull/494) )
+*  display microblocks in clarinet terminal UI ([77535aa6](https://github.com/hirosystems/clarinet/commit/77535aa62637f4f42af8f5316c42ea78688efce7))
+*  improve block / microblock fork handling ([#480](https://github.com/hirosystems/clarinet/pull/480))
+*  various chainhooks improvements ([#429](https://github.com/hirosystems/clarinet/pull/429))
+*  suggest changes to default deployment plans when updates available ([#488](https://github.com/hirosystems/clarinet/pull/488), [#489](https://github.com/hirosystems/clarinet/pull/489))
+
+
 # [0.32.0](https://github.com/hirosystems/clarinet/compare/v0.31.1...v0.32.0) (2022-06-23)
 
 
