@@ -21,8 +21,9 @@ pub const DEFAULT_BITCOIN_EXPLORER_IMAGE: &str = "quay.io/hirosystems/bitcoin-ex
 pub const DEFAULT_STACKS_API_IMAGE: &str = "blockstack/stacks-blockchain-api:latest";
 pub const DEFAULT_STACKS_EXPLORER_IMAGE: &str = "hirosystems/explorer:latest";
 pub const DEFAULT_POSTGRES_IMAGE: &str = "postgres:alpine";
-pub const DEFAULT_HYPERCHAIN_NODE_IMAGE: &str = "hirosystems/hyperchains:0.0.2-stretch";
-pub const DEFAULT_HYPERCHAIN_CONTRACT_ID: &str = "STXMJXCJDCT4WPF2X1HE42T6ZCCK3TPMBRZ51JEG.hc";
+pub const DEFAULT_HYPERCHAIN_NODE_IMAGE: &str = "hirosystems/hyperchains:0.0.4-stretch";
+pub const DEFAULT_HYPERCHAIN_CONTRACT_ID: &str =
+    "STXMJXCJDCT4WPF2X1HE42T6ZCCK3TPMBRZ51JEG.hyperchain";
 pub const DEFAULT_STACKS_MINER_MNEMONIC: &str = "fragile loan twenty basic net assault jazz absorb diet talk art shock innocent float punch travel gadget embrace caught blossom hockey surround initial reduce";
 pub const DEFAULT_FAUCET_MNEMONIC: &str = "shadow private easily thought say logic fault paddle word top book during ignore notable orange flight clock image wealth health outside kitten belt reform";
 pub const DEFAULT_HYPERCHAIN_MNEMONIC: &str = "female adjust gallery certain visit token during great side clown fitness like hurt clip knife warm bench start reunion globe detail dream depend fortune";
