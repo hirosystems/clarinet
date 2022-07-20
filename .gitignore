@@ -17,3 +17,5 @@ components/stacks-devnet-js/build
 vendor/orchestra-types-js/dist
 *.tar.gz
 *.zip
+*.rdb
+
