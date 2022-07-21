@@ -431,6 +431,7 @@ jobs:
           # if enabled, this will fail after installing an arm64 nodejs runtime for an x86_64 arch macos system
           # architecture: ${{ matrix.architecture }}
           cache: npm
+          cache-dependency-path: components/stacks-devnet-js/package-lock.json
 
       - name: Cache cargo
         if: github.event_name != 'pull_request' || matrix.target == 'x86_64-unknown-linux-gnu'
