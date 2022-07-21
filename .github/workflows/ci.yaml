@@ -424,14 +424,13 @@ jobs:
 
       - name: Install and cache Node
         if: github.event_name != 'pull_request' && matrix.target != 'x86_64-unknown-linux-musl'
-        uses: actions/setup-node@v2
+        uses: actions/setup-node@v3
         with:
           node-version: "14"
           # Host nodejs arch does not matter in our usecase for compiling cross-platform npm packages,
           # if enabled, this will fail after installing an arm64 nodejs runtime for an x86_64 arch macos system
           # architecture: ${{ matrix.architecture }}
           cache: npm
-          cache-dependency-path: components/stacks-devnet-js/package-lock.json
 
       - name: Cache cargo
         if: github.event_name != 'pull_request' || matrix.target == 'x86_64-unknown-linux-gnu'
