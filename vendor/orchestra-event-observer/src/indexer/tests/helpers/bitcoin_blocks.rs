@@ -31,7 +31,7 @@ pub fn generate_test_bitcoin_block(
             parent_hash.append(&mut (block_height - 1).to_be_bytes().to_vec());
             BlockIdentifier {
                 index: block_height - 1,
-                hash: to_hex(&parent_hash[..]),
+                hash: format!("0x{}", to_hex(&parent_hash[..])),
             }
         }
     };
@@ -39,7 +39,7 @@ pub fn generate_test_bitcoin_block(
     BitcoinBlockData {
         block_identifier: BlockIdentifier {
             index: block_height,
-            hash: to_hex(&hash[..]),
+            hash: format!("0x{}", to_hex(&hash[..])),
         },
         parent_block_identifier,
         timestamp: 0,

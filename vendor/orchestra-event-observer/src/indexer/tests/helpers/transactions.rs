@@ -96,7 +96,7 @@ pub fn generate_test_tx_bitcoin_p2pkh_transfer(
 
     BitcoinTransactionData {
         transaction_identifier: TransactionIdentifier {
-            hash: to_hex(&hash[..]),
+            hash: format!("0x{}", to_hex(&hash[..])),
         },
         operations: vec![],
         metadata: BitcoinTransactionMetadata {
