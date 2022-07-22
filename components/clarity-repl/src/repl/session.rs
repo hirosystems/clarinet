@@ -752,7 +752,14 @@ impl Session {
         );
 
         self.set_tx_sender(sender.into());
-        let result = self.interpret(snippet, None, None, true, Some(test_name.clone()), None)?;
+        let result = match self.interpret(snippet, None, None, true, Some(test_name.clone()), None)
+        {
+            Ok(result) => result,
+            Err(e) => {
+                self.set_tx_sender(initial_tx_sender);
+                return Err(e);
+            }
+        };
         if let Some(ref cost) = result.cost {
             self.costs_reports.push(CostsReport {
                 test_name,
