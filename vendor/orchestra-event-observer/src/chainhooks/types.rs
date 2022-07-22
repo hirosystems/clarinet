@@ -1,4 +1,5 @@
 use clarity_repl::clarity::util::hash::hex_bytes;
+use serde::ser::{SerializeSeq, Serializer};
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 use std::fs::File;
@@ -61,6 +62,24 @@ impl HookFormation {
     }
 }
 
+impl Serialize for HookFormation {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        let mut seq = serializer.serialize_seq(Some(
+            self.bitcoin_chainhooks.len() + self.stacks_chainhooks.len(),
+        ))?;
+        for chainhook in self.bitcoin_chainhooks.iter() {
+            seq.serialize_element(chainhook)?;
+        }
+        for chainhook in self.stacks_chainhooks.iter() {
+            seq.serialize_element(chainhook)?;
+        }
+        seq.end()
+    }
+}
+
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "snake_case")]
 pub enum ChainhookSpecification {
@@ -73,6 +92,13 @@ impl ChainhookSpecification {
         match &self {
             Self::Bitcoin(data) => &data.name,
             Self::Stacks(data) => &data.name,
+        }
+    }
+
+    pub fn uuid(&self) -> &str {
+        match &self {
+            Self::Bitcoin(data) => &data.uuid,
+            Self::Stacks(data) => &data.uuid,
         }
     }
 }

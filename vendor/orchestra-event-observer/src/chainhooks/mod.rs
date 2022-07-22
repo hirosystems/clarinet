@@ -374,10 +374,13 @@ pub fn evaluate_bitcoin_chainhooks_on_chain_event<'a>(
     triggered_chainhooks
 }
 
-pub async fn handle_bitcoin_hook_action<'a>(
+use reqwest::{Error, RequestBuilder, Response};
+use std::future::Future;
+
+pub fn handle_bitcoin_hook_action<'a>(
     trigger: BitcoinTriggerChainhook<'a>,
     proofs: &HashMap<&'a TransactionIdentifier, String>,
-) {
+) -> Option<RequestBuilder> {
     match &trigger.chainhook.action {
         HookAction::Http(http) => {
             let client = Client::builder().build().unwrap();
@@ -405,22 +408,22 @@ pub async fn handle_bitcoin_hook_action<'a>(
                 }
             });
             let body = serde_json::to_vec(&payload).unwrap();
-            let _ = client
-                .request(method, &host)
-                .header("Content-Type", "application/json")
-                .header("Authorization", http.authorization_header.clone())
-                .body(body)
-                .send()
-                .await;
+            Some(
+                client
+                    .request(method, &host)
+                    .header("Content-Type", "application/json")
+                    .header("Authorization", http.authorization_header.clone())
+                    .body(body),
+            )
         }
-        HookAction::Noop => {}
+        HookAction::Noop => None,
     }
 }
 
-pub async fn handle_stacks_hook_action<'a>(
+pub fn handle_stacks_hook_action<'a>(
     trigger: StacksTriggerChainhook<'a>,
     proofs: &HashMap<&'a TransactionIdentifier, String>,
-) {
+) -> Option<RequestBuilder> {
     match &trigger.chainhook.action {
         HookAction::Http(http) => {
             let client = Client::builder().build().unwrap();
@@ -448,14 +451,14 @@ pub async fn handle_stacks_hook_action<'a>(
                 }
             });
             let body = serde_json::to_vec(&payload).unwrap();
-            let _ = client
-                .request(method, &host)
-                .header("Content-Type", "application/json")
-                .body(body)
-                .send()
-                .await;
+            Some(
+                client
+                    .request(method, &host)
+                    .header("Content-Type", "application/json")
+                    .body(body),
+            )
         }
-        HookAction::Noop => {}
+        HookAction::Noop => None,
     }
 }
 
