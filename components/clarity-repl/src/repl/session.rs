@@ -994,7 +994,7 @@ impl Session {
         ));
         output.push(format!(
             "{}",
-            help_colour.paint("::read <filename>\t\t\t\tRead expressions from a file")
+            help_colour.paint("::read <filename>\t\t\tRead expressions from a file")
         ));
     }
 

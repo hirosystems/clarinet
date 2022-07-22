@@ -1,6 +1,6 @@
 [package]
 name = "clarity-repl"
-version = "0.28.2"
+version = "0.33.0"
 description = "Clarity REPL"
 authors = ["Ludo Galabru <ludo@hiro.so>", "Brice Dobry <brice@hiro.so>", "Reed Rosenbluth <reed@hiro.so>"]
 readme = "README.md"

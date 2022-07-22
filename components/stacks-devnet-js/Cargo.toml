@@ -1,0 +1,30 @@
+[package]
+name = "stacks-devnet-js"
+version = "0.33.0"
+license = "ISC"
+edition = "2018"
+exclude = ["index.node"]
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+serde = "1"
+error-chain = "0.12"
+orchestra_types = { package = "orchestra-types", path = "../../vendor/orchestra-types-rs" }
+clarinet_files = { package = "clarinet-files", path = "../../components/clarinet-files" }
+clarinet_utils = { package = "clarinet-utils", path = "../../components/clarinet-utils" }
+
+[dependencies.clarinet_lib]
+package = "clarinet-cli"
+path = "../clarinet-cli"
+default-features = false
+
+[dependencies.neon]
+version = "0.9.1"
+default-features = false
+features = ["napi-4", "channel-api", "event-queue-api", "try-catch-api"]
+
+[dependencies.num]
+version = "0.2"
+default-features = false

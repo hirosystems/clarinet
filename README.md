@@ -74,7 +74,7 @@ You can build Clarinet from source using Cargo with the following commands:
 ```bash
 git clone https://github.com/hirosystems/clarinet.git --recursive
 cd clarinet
-cargo install --path . --locked
+cargo clarinet-install
 ```
 
 By default, you will be in our development branch, `develop`, with code that has not been released yet. If you plan to submit any changes to the code, then this is the right branch for you. If you just want the latest stable version, switch to the main branch:
@@ -118,7 +118,6 @@ Clarinet will create a project directory with the following directory layout:
 ```bash
 .
 ├── Clarinet.toml
-├── README.md
 ├── contracts
 ├── settings
 │   └── Devnet.toml
@@ -147,7 +146,6 @@ in the `tests` directory.
 ```bash
 .
 ├── Clarinet.toml
-├── README.md
 ├── contracts
 │   └── bbtc.clar
 ├── settings
@@ -158,18 +156,13 @@ in the `tests` directory.
     └── bbtc_test.ts
 ```
 
-Clarinet will also add configuration to the `Clarinet.toml` file for your contract. You add entries to the `depends_on`
-field for each contract to indicate any contract dependencies a particular contract may have. This can be useful for
-contracts that implement standard traits such as for fungible tokens.
+Clarinet will also add configuration to the `Clarinet.toml` file for your contract.
 
 ```toml
-[project]
-name = "my-project"
-requirements = []
-
+[project.cache_location]
+path = ".requirements"
 [contracts.bbtc]
 path = "contracts/bbtc.clar"
-depends_on = []
 ```
 
 You can add contracts to your project by adding the files manually, however you must add the appropriate configuration
@@ -186,15 +179,21 @@ $ clarinet check
 This uses the `Clarinet.toml` file to locate and analyze all of the contracts in the project. If the Clarity code is valid, the command will indicate success:
 
 ```
-✔ 3 contracts checked
+✔ 2 contracts checked
 ```
 
 It may also report warnings that indicate that the code is valid, but there is something that you should pay attention to, for example, the check-checker analysis discussed below will generate warnings. If there are errors in the code, the output of the command will indicate the kind and location of the errors.
 
-To perform only a syntax-check on just one file, the file to be checked can be passed to the command:
+You can also perform syntax-check on a single file by using the following command.
 
 ```bash
-$ clarinet check hiro-coin.clar
+$ clarinet check <path/to/file.clar>
+```
+
+If there are no syntax errors, the output of the command will be a success message.
+
+```
+✔ Syntax of contract successfully checked
 ```
 
 Any syntactical errors in the Clarity code will be reported, but type-checking and other semantic checks are not performed, since clarinet is only looking at this one contract and does not have the full context to perform a complete check.

@@ -1,7 +1,9 @@
 target/
 examples/
+dockerfiles/
 Dockerfile
 .dockerignore
 .git*
 node_modules
 package-lock.json
+*.tar.gz

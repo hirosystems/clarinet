@@ -317,6 +317,20 @@ pub async fn generate_default_deployment(
                         let mut remap_principals = BTreeMap::new();
                         remap_principals
                             .insert(contract_id.issuer.clone(), default_deployer_address.clone());
+                        match network_manifest.devnet {
+                            Some(ref devnet)
+                                if devnet.hyperchain_contract_id == contract_id.to_string() =>
+                            {
+                                remap_principals.insert(
+                                    contract_id.issuer.clone(),
+                                    PrincipalData::parse_standard_principal(
+                                        &devnet.hyperchain_leader_stx_address,
+                                    )
+                                    .unwrap(),
+                                );
+                            }
+                            _ => {}
+                        }
                         let data = RequirementPublishSpecification {
                             contract_id: contract_id.clone(),
                             remap_sender: default_deployer_address.clone(),
@@ -464,6 +478,7 @@ pub async fn generate_default_deployment(
                 cost: deployment_fee_rate
                     .saturating_mul(source.as_bytes().len().try_into().unwrap()),
                 source,
+                anchor_block_only: true,
             })
         };
 
