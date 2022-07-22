@@ -360,11 +360,11 @@ export namespace types {
   }
 
   export function ascii(val: string) {
-    return `"${val}"`;
+    return JSON.stringify(val);
   }
 
   export function utf8(val: string) {
-    return `u"${val}"`;
+    return `u${JSON.stringify(val)}`;
   }
 
   export function buff(val: ArrayBuffer | string) {
