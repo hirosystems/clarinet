@@ -424,7 +424,7 @@ jobs:
 
       - name: Install and cache Node
         if: github.event_name != 'pull_request' && matrix.target != 'x86_64-unknown-linux-musl'
-        uses: actions/setup-node@v2
+        uses: actions/setup-node@v3
         with:
           node-version: "14"
           # Host nodejs arch does not matter in our usecase for compiling cross-platform npm packages,
