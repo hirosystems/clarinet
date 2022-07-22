@@ -186,7 +186,7 @@ pub async fn start_chains_coordinator(
         }
         let command = match observer_event_rx.recv() {
             Ok(cmd) => cmd,
-            Err(e) => {
+            Err(_e) => {
                 // TODO(lgalabru): cascade termination
                 continue;
             }
