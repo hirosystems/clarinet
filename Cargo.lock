@@ -703,7 +703,7 @@ dependencies = [
  "clarinet-files",
  "clarinet-utils",
  "clarity-lsp",
- "clarity-repl 0.28.2",
+ "clarity-repl 0.33.0",
  "crossterm 0.22.1",
  "ctrlc",
  "deno",
@@ -760,7 +760,7 @@ name = "clarinet-deployments"
 version = "0.1.0"
 dependencies = [
  "clarinet-files",
- "clarity-repl 0.28.2",
+ "clarity-repl 0.33.0",
  "orchestra-types",
  "reqwest",
  "serde",
@@ -776,7 +776,7 @@ dependencies = [
  "bip39",
  "bitcoin 0.28.1",
  "clarinet-utils",
- "clarity-repl 0.28.2",
+ "clarity-repl 0.33.0",
  "libsecp256k1 0.7.0",
  "orchestra-types",
  "serde",
@@ -802,45 +802,9 @@ version = "0.1.0"
 dependencies = [
  "clarinet-deployments",
  "clarinet-files",
- "clarity-repl 0.28.2",
+ "clarity-repl 0.33.0",
  "lsp-types 0.93.0",
  "orchestra-types",
- "wasm-bindgen",
- "wasm-bindgen-futures",
-]
-
-[[package]]
-name = "clarity-repl"
-version = "0.28.2"
-dependencies = [
- "ansi_term",
- "atty",
- "bytes",
- "debug_types",
- "futures",
- "getrandom 0.2.6",
- "httparse",
- "integer-sqrt",
- "lazy_static",
- "libsecp256k1 0.5.0",
- "log",
- "memchr",
- "pico-args",
- "prettytable-rs",
- "rand 0.7.3",
- "rand_pcg 0.3.1",
- "rand_seeder",
- "regex",
- "ripemd160",
- "rustyline 9.1.2",
- "serde",
- "serde_derive",
- "serde_json",
- "serde_stacker",
- "sha2 0.9.9",
- "sha3",
- "tokio",
- "tokio-util 0.7.1",
  "wasm-bindgen",
  "wasm-bindgen-futures",
 ]
@@ -879,6 +843,42 @@ dependencies = [
  "sha3",
  "tokio",
  "tokio-util 0.7.1",
+]
+
+[[package]]
+name = "clarity-repl"
+version = "0.33.0"
+dependencies = [
+ "ansi_term",
+ "atty",
+ "bytes",
+ "debug_types",
+ "futures",
+ "getrandom 0.2.6",
+ "httparse",
+ "integer-sqrt",
+ "lazy_static",
+ "libsecp256k1 0.5.0",
+ "log",
+ "memchr",
+ "pico-args",
+ "prettytable-rs",
+ "rand 0.7.3",
+ "rand_pcg 0.3.1",
+ "rand_seeder",
+ "regex",
+ "ripemd160",
+ "rustyline 9.1.2",
+ "serde",
+ "serde_derive",
+ "serde_json",
+ "serde_stacker",
+ "sha2 0.9.9",
+ "sha3",
+ "tokio",
+ "tokio-util 0.7.1",
+ "wasm-bindgen",
+ "wasm-bindgen-futures",
 ]
 
 [[package]]
@@ -3118,7 +3118,7 @@ checksum = "624a8340c38c1b80fd549087862da4ba43e08858af025b236e509b6649fc13d5"
 
 [[package]]
 name = "orchestra-event-observer"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "base58 0.2.0",
  "base64 0.13.0",
@@ -3126,7 +3126,7 @@ dependencies = [
  "bitcoincore-rpc-json",
  "clap 3.1.6",
  "clap_generate",
- "clarity-repl 0.28.2 (registry+https://github.com/rust-lang/crates.io-index)",
+ "clarity-repl 0.28.2",
  "ctrlc",
  "orchestra-types",
  "reqwest",
@@ -4579,7 +4579,7 @@ dependencies = [
 
 [[package]]
 name = "stacks-devnet-js"
-version = "0.32.0"
+version = "0.33.0"
 dependencies = [
  "clarinet-cli",
  "clarinet-files",
@@ -4595,7 +4595,7 @@ dependencies = [
 name = "stacks-rpc-client"
 version = "0.1.0"
 dependencies = [
- "clarity-repl 0.28.2",
+ "clarity-repl 0.33.0",
  "reqwest",
  "serde",
  "serde_derive",
