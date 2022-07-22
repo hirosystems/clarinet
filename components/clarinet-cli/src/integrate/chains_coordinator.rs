@@ -19,7 +19,7 @@ use orchestra_event_observer::observer::{
 };
 use orchestra_types::{BitcoinChainEvent, BitcoinNetwork, StacksChainEvent, StacksNetwork};
 use stacks_rpc_client::{transactions, PoxInfo, StacksRpc};
-use std::collections::HashMap;
+use std::collections::HashSet;
 use std::convert::TryFrom;
 
 use std::str;
@@ -105,7 +105,7 @@ impl DevnetEventObserverConfig {
             bitcoin_node_rpc_port: devnet_config.bitcoin_node_rpc_port,
             stacks_node_rpc_host: "http://localhost".into(),
             stacks_node_rpc_port: devnet_config.stacks_node_rpc_port,
-            operators: HashMap::new(),
+            operators: HashSet::new(),
         };
 
         DevnetEventObserverConfig {

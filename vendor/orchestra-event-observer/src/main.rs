@@ -24,7 +24,7 @@ use crate::chainhooks::types::HookFormation;
 use clap::Parser;
 use ctrlc;
 use observer::{EventHandler, EventObserverConfig, ObserverCommand};
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::fs::File;
 use std::io::{BufReader, Read};
 use std::path::PathBuf;
@@ -119,10 +119,10 @@ impl EventObserverConfig {
                 .collect::<Vec<_>>(),
             None => vec![],
         };
-        let mut operators = HashMap::new();
+        let mut operators = HashSet::new();
         if let Some(operator_keys) = config_file.operators.take() {
             for operator_key in operator_keys.into_iter() {
-                operators.insert(Some(operator_key), HookFormation::new());
+                operators.insert(operator_key);
             }
         }
 
