@@ -349,22 +349,6 @@ jobs:
             ./target/${{ matrix.target }}/release/clarinet test --manifest-path ${testdir}/Clarinet.toml
           }
 
-      - name: Upload Cargo Artifact to GH release (Linux)
-        uses: svenstaro/upload-release-action@v2
-        if: startsWith(github.ref, 'refs/heads/main') && matrix.os != 'windows-latest'
-        with:
-          repo_token: ${{ secrets.GITHUB_TOKEN }}
-          file: clarinet-${{ env.SHORT_TARGET_NAME }}.tar.gz
-          tag: ${{ github.ref }}
-
-      - name: Upload Cargo Artifact to GH release (Windows)
-        uses: svenstaro/upload-release-action@v2
-        if: startsWith(github.ref, 'refs/heads/main') && matrix.os == 'windows-latest'
-        with:
-          repo_token: ${{ secrets.GITHUB_TOKEN }}
-          file: clarinet-${{ env.SHORT_TARGET_NAME }}.msi
-          tag: ${{ github.ref }}
-
   dist_stacks_devnet_js:
     name: Build Stacks Devnet JS Distributions
     runs-on: ${{ matrix.os }}
@@ -501,14 +485,6 @@ jobs:
       # - name: Unit Tests - Node
       #   working-directory: node-bindings
       #   run: npm run spec
-
-      - name: Upload Node Artifact to GH release
-        uses: svenstaro/upload-release-action@v2
-        if: startsWith(github.ref, 'refs/heads/main') && needs.get_release_info.outputs.tag != ''
-        with:
-          repo_token: ${{ secrets.GITHUB_TOKEN }}
-          file: stacks-devnet-js-${{ env.PRE_GYP_TARGET_NAME }}.tar.gz
-          tag: ${{ github.ref }}
 
       - name: NPM Publish
         uses: JS-DevTools/npm-publish@v1
