@@ -718,7 +718,7 @@ jobs:
       - name: Tag and Release
         uses: ncipollo/release-action@v1
         with:
-          artifacts: "**/*.tar.gz"
+          artifacts: "**/*.tar.gz,**/*.msi"
           tag: ${{ needs.get_release_info.outputs.tag }}
           commit: ${{ env.GITHUB_SHA }}
 
