@@ -1653,6 +1653,149 @@ one of the following error codes:
 "
 };
 
+const SLICE_API: SpecialAPI = SpecialAPI {
+    input_type: "sequence_A, uint, uint",
+    output_type: "(optional sequence_A)",
+    snippet: "slice ${1:sequence} ${2:start-index} ${3:end-index}",
+    signature: "(slice sequence left-position right-position)",
+    description:
+        "The `slice` function attempts to return a sub-sequence of that starts at `left-position` (inclusive), and
+ends at `right-position` (non-inclusive).
+If `left_position`==`right_position`, the function returns an empty sequence.
+If either `left_position` or `right_position` are out of bounds OR if `right_position` is less than
+`left_position`, the function returns `none`.",
+    example: "(slice \"blockstack\" u5 u10) ;; Returns (some \"stack\")
+(slice (list 1 2 3 4 5) u5 u9) ;; Returns none
+(slice (list 1 2 3 4 5) u3 u4) ;; Returns (some (4))
+(slice \"abcd\" u1 u3) ;; Returns (some \"bc\")
+(slice \"abcd\" u2 u2) ;; Returns (some \"\")
+(slice \"abcd\" u3 u1) ;; Returns none
+",
+};
+
+const BUFF_TO_INT_LE_API: SimpleFunctionAPI = SimpleFunctionAPI {
+    name: None,
+    signature: "(buff-to-int-le (buff 16))",
+    snippet: "buff-to-int-le ${1:buffer}",
+    description: "Converts a byte buffer to a signed integer use a little-endian encoding.
+The byte buffer can be up to 16 bytes in length. If there are fewer than 16 bytes, as
+this function uses a little-endian encoding, the input behaves as if it is
+zero-padded on the _right_.
+
+Note: This function is only available starting with Stacks 2.1.",
+    example: r#"
+(buff-to-int-le 0x01) ;; Returns 1
+(buff-to-int-le 0x01000000000000000000000000000000) ;; Returns 1
+(buff-to-int-le 0xffffffffffffffffffffffffffffffff) ;; Returns -1
+(buff-to-int-le 0x) ;; Returns 0
+"#,
+};
+
+const BUFF_TO_UINT_LE_API: SimpleFunctionAPI = SimpleFunctionAPI {
+    name: None,
+    signature: "(buff-to-uint-le (buff 16))",
+    snippet: "buff-to-uint-le ${1:buffer}",
+    description: "Converts a byte buffer to an unsigned integer use a little-endian encoding..
+The byte buffer can be up to 16 bytes in length. If there are fewer than 16 bytes, as
+this function uses a little-endian encoding, the input behaves as if it is
+zero-padded on the _right_.
+
+Note: This function is only available starting with Stacks 2.1.",
+    example: r#"
+(buff-to-uint-le 0x01) ;; Returns u1
+(buff-to-uint-le 0x01000000000000000000000000000000) ;; Returns u1
+(buff-to-uint-le 0xffffffffffffffffffffffffffffffff) ;; Returns u340282366920938463463374607431768211455
+(buff-to-uint-le 0x) ;; Returns u0
+"#,
+};
+
+const BUFF_TO_INT_BE_API: SimpleFunctionAPI = SimpleFunctionAPI {
+    name: None,
+    signature: "(buff-to-int-be (buff 16))",
+    snippet: "buff-to-int-be ${1:buffer}",
+    description: "Converts a byte buffer to a signed integer use a big-endian encoding.
+The byte buffer can be up to 16 bytes in length. If there are fewer than 16 bytes, as
+this function uses a big-endian encoding, the input behaves as if it is
+zero-padded on the _left_.
+
+Note: This function is only available starting with Stacks 2.1.",
+    example: r#"
+(buff-to-int-be 0x01) ;; Returns 1
+(buff-to-int-be 0x00000000000000000000000000000001) ;; Returns 1
+(buff-to-int-be 0xffffffffffffffffffffffffffffffff) ;; Returns -1
+(buff-to-int-be 0x) ;; Returns 0
+"#,
+};
+
+const BUFF_TO_UINT_BE_API: SimpleFunctionAPI = SimpleFunctionAPI {
+    name: None,
+    signature: "(buff-to-uint-be (buff 16))",
+    snippet: "buff-to-uint-be ${1:buffer}",
+    description: "Converts a byte buffer to an unsigned integer use a big-endian encoding.
+The byte buffer can be up to 16 bytes in length. If there are fewer than 16 bytes, as
+this function uses a big-endian encoding, the input behaves as if it is
+zero-padded on the _left_.
+
+Note: This function is only available starting with Stacks 2.1.",
+    example: r#"
+(buff-to-uint-be 0x01) ;; Returns u1
+(buff-to-uint-be 0x00000000000000000000000000000001) ;; Returns u1
+(buff-to-uint-be 0xffffffffffffffffffffffffffffffff) ;; Returns u340282366920938463463374607431768211455
+(buff-to-uint-be 0x) ;; Returns u0
+"#,
+};
+
+const TO_CONSENSUS_BUFF: SpecialAPI = SpecialAPI {
+    input_type: "any",
+    output_type: "(optional buff)",
+    signature: "(to-consensus-buff value)",
+    snippet: "to-consensus-buff ${1:value}",
+    description: "`to-consensus-buff` is a special function that will serialize any
+Clarity value into a buffer, using the SIP-005 serialization of the
+Clarity value. Not all values can be serialized: some value's
+consensus serialization is too large to fit in a Clarity buffer (this
+is because of the type prefix in the consensus serialization).
+
+If the value cannot fit as serialized into the maximum buffer size,
+this returns `none`, otherwise, it will be
+`(some consensus-serialized-buffer)`. During type checking, the
+analyzed type of the result of this method will be the maximum possible
+consensus buffer length based on the inferred type of the supplied value.
+",
+    example: r#"
+(to-consensus-buff 1) ;; Returns (some 0x0000000000000000000000000000000001)
+(to-consensus-buff u1) ;; Returns (some 0x0100000000000000000000000000000001)
+(to-consensus-buff true) ;; Returns (some 0x03)
+(to-consensus-buff false) ;; Returns (some 0x04)
+(to-consensus-buff none) ;; Returns (some 0x09)
+(to-consensus-buff 'SZ2J6ZY48GV1EZ5V2V5RB9MP66SW86PYKKQ9H6DPR) ;; Returns (some 0x051fa46ff88886c2ef9762d970b4d2c63678835bd39d)
+(to-consensus-buff { abc: 3, def: 4 }) ;; Returns (some 0x0c00000002036162630000000000000000000000000000000003036465660000000000000000000000000000000004)
+"#,
+};
+
+const FROM_CONSENSUS_BUFF: SpecialAPI = SpecialAPI {
+    input_type: "type-signature(t), buff",
+    output_type: "(optional t)",
+    snippet: "to-consensus-buff ${1:out-type-signature} ${2:buffer}",
+    signature: "(from-consensus-buff type-signature buffer)",
+    description: "`from-consensus-buff` is a special function that will deserialize a
+buffer into a Clarity value, using the SIP-005 serialization of the
+Clarity value. The type that `from-consensus-buff` tries to deserialize
+into is provided by the first parameter to the function. If it fails
+to deserialize the type, the method returns `none`.
+",
+    example: r#"
+(from-consensus-buff int 0x0000000000000000000000000000000001) ;; Returns (some 1)
+(from-consensus-buff uint 0x0000000000000000000000000000000001) ;; Returns none
+(from-consensus-buff uint 0x0100000000000000000000000000000001) ;; Returns (some u1)
+(from-consensus-buff bool 0x0000000000000000000000000000000001) ;; Returns none
+(from-consensus-buff bool 0x03) ;; Returns (some true)
+(from-consensus-buff bool 0x04) ;; Returns (some false)
+(from-consensus-buff principal 0x051fa46ff88886c2ef9762d970b4d2c63678835bd39d) ;; Returns (some SZ2J6ZY48GV1EZ5V2V5RB9MP66SW86PYKKQ9H6DPR)
+(from-consensus-buff { abc: int, def: int } 0x0c00000002036162630000000000000000000000000000000003036465660000000000000000000000000000000004) ;; Returns (some (tuple (abc 3) (def 4)))
+"#,
+};
+
 pub fn make_api_reference(function: &NativeFunctions) -> FunctionAPI {
     use crate::clarity::functions::NativeFunctions::*;
     let name = function.get_name();
@@ -1739,6 +1882,13 @@ pub fn make_api_reference(function: &NativeFunctions) -> FunctionAPI {
         GetStxBalance => make_for_simple_native(&STX_GET_BALANCE, &GetStxBalance, name),
         StxTransfer => make_for_simple_native(&STX_TRANSFER, &StxTransfer, name),
         StxBurn => make_for_simple_native(&STX_BURN, &StxBurn, name),
+        BuffToIntLe => make_for_simple_native(&BUFF_TO_INT_LE_API, &BuffToIntLe, name),
+        BuffToUIntLe => make_for_simple_native(&BUFF_TO_UINT_LE_API, &BuffToUIntLe, name),
+        BuffToIntBe => make_for_simple_native(&BUFF_TO_INT_BE_API, &BuffToIntBe, name),
+        BuffToUIntBe => make_for_simple_native(&BUFF_TO_UINT_BE_API, &BuffToUIntBe, name),
+        Slice => make_for_special(&SLICE_API, name),
+        ToConsensusBuff => make_for_special(&TO_CONSENSUS_BUFF, name),
+        FromConsensusBuff => make_for_special(&FROM_CONSENSUS_BUFF, name),                
     }
 }
 

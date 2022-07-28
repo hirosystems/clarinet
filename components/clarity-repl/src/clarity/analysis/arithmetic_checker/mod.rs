@@ -167,11 +167,14 @@ impl ArithmeticOnlyChecker {
             FetchVar | GetBlockInfo | GetTokenBalance | GetAssetOwner | FetchEntry | SetEntry
             | DeleteEntry | InsertEntry | SetVar | MintAsset | MintToken | TransferAsset
             | TransferToken | ContractCall | StxTransfer | StxBurn | AtBlock | GetStxBalance
-            | GetTokenSupply | BurnToken | BurnAsset => {
+            | FromConsensusBuff | ToConsensusBuff | GetTokenSupply | BurnToken | BurnAsset => {
                 return Err(Error::FunctionNotPermitted(function));
             }
             Append | Concat | AsMaxLen | ContractOf | PrincipalOf | ListCons | Print
-            | AsContract | ElementAt | IndexOf | Map | Filter | Fold => {
+            | AsContract | ElementAt | IndexOf | Map | Filter | Fold | Slice => {
+                return Err(Error::FunctionNotPermitted(function));
+            }
+            BuffToIntLe | BuffToUIntLe | BuffToIntBe | BuffToUIntBe => {
                 return Err(Error::FunctionNotPermitted(function));
             }
             Sha512 | Sha512Trunc256 | Secp256k1Recover | Secp256k1Verify | Hash160 | Sha256

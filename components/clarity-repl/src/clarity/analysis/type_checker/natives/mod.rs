@@ -1,6 +1,8 @@
 use super::{
     check_argument_count, check_arguments_at_least, no_type, TypeChecker, TypeResult, TypingContext,
 };
+use crate::clarity::analysis::type_checker::natives::sequences::BufferLength;
+use crate::clarity::types::SequenceSubtype;
 use crate::clarity::analysis::errors::{CheckError, CheckErrors, CheckResult};
 use crate::clarity::errors::{Error as InterpError, RuntimeErrorType};
 use crate::clarity::functions::{handle_binding_list, NativeFunctions};
@@ -21,6 +23,7 @@ mod assets;
 mod maps;
 mod options;
 mod sequences;
+mod conversions;
 
 pub enum TypedNativeFunction {
     Special(SpecialNativeFunction),
@@ -554,6 +557,30 @@ impl TypedNativeFunction {
                 )],
                 returns: TypeSignature::IntType,
             }))),
+            BuffToIntLe | BuffToIntBe => {
+                Simple(SimpleNativeFunction(FunctionType::Fixed(FixedFunction {
+                    args: vec![FunctionArg::new(
+                        TypeSignature::SequenceType(SequenceSubtype::BufferType(
+                            BufferLength::try_from(16_u32).unwrap(),
+                        )),
+                        ClarityName::try_from("value".to_owned())
+                            .expect("FAIL: ClarityName failed to accept default arg name"),
+                    )],
+                    returns: TypeSignature::IntType,
+                })))
+            }
+            BuffToUIntLe | BuffToUIntBe => {
+                Simple(SimpleNativeFunction(FunctionType::Fixed(FixedFunction {
+                    args: vec![FunctionArg::new(
+                        TypeSignature::SequenceType(SequenceSubtype::BufferType(
+                            BufferLength::try_from(16_u32).unwrap(),
+                        )),
+                        ClarityName::try_from("value".to_owned())
+                            .expect("FAIL: ClarityName failed to accept default arg name"),
+                    )],
+                    returns: TypeSignature::UIntType,
+                })))
+            }
             Not => Simple(SimpleNativeFunction(FunctionType::Fixed(FixedFunction {
                 args: vec![FunctionArg::new(
                     TypeSignature::BoolType,
@@ -680,6 +707,7 @@ impl TypedNativeFunction {
             Len => Special(SpecialNativeFunction(&sequences::check_special_len)),
             ElementAt => Special(SpecialNativeFunction(&sequences::check_special_element_at)),
             IndexOf => Special(SpecialNativeFunction(&sequences::check_special_index_of)),
+            Slice => Special(SpecialNativeFunction(&sequences::check_special_slice)),
             ListCons => Special(SpecialNativeFunction(&check_special_list_cons)),
             FetchEntry => Special(SpecialNativeFunction(&maps::check_special_fetch_entry)),
             SetEntry => Special(SpecialNativeFunction(&maps::check_special_set_entry)),
@@ -713,6 +741,12 @@ impl TypedNativeFunction {
             IsNone => Special(SpecialNativeFunction(&options::check_special_is_optional)),
             IsSome => Special(SpecialNativeFunction(&options::check_special_is_optional)),
             AtBlock => Special(SpecialNativeFunction(&check_special_at_block)),
+            ToConsensusBuff => Special(SpecialNativeFunction(
+                &conversions::check_special_to_consensus_buff,
+            )),
+            FromConsensusBuff => Special(SpecialNativeFunction(
+                &conversions::check_special_from_consensus_buff,
+            )),
         }
     }
 }

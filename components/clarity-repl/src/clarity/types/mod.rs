@@ -384,6 +384,49 @@ impl SequenceData {
         }?;
         Ok(())
     }
+
+    pub fn slice(self, left_position: usize, right_position: usize) -> Result<Value> {
+        let empty_seq = left_position == right_position;
+
+        let result = match self {
+            SequenceData::Buffer(data) => {
+                let data = if empty_seq {
+                    vec![]
+                } else {
+                    data.data[left_position..right_position].to_vec()
+                };
+                Value::buff_from(data)
+            }
+            SequenceData::List(data) => {
+                let data = if empty_seq {
+                    vec![]
+                } else {
+                    data.data[left_position..right_position].to_vec()
+                };
+                Value::list_from(data)
+            }
+            SequenceData::String(CharType::ASCII(data)) => {
+                let data = if empty_seq {
+                    vec![]
+                } else {
+                    data.data[left_position..right_position].to_vec()
+                };
+                Value::string_ascii_from_bytes(data)
+            }
+            SequenceData::String(CharType::UTF8(data)) => {
+                let data = if empty_seq {
+                    vec![]
+                } else {
+                    data.data[left_position..right_position].to_vec()
+                };
+                Ok(Value::Sequence(SequenceData::String(CharType::UTF8(
+                    UTF8Data { data },
+                ))))
+            }
+        }?;
+
+        Ok(result)
+    }
 }
 
 #[derive(Clone, Eq, PartialEq, Serialize, Deserialize)]
@@ -949,6 +992,10 @@ impl BuffData {
         self.data.len().try_into().unwrap()
     }
 
+    pub fn as_slice(&self) -> &[u8] {
+        self.data.as_slice()
+    }
+
     fn append(&mut self, other_seq: &mut BuffData) -> Result<()> {
         self.data.append(&mut other_seq.data);
         Ok(())
@@ -1253,4 +1300,10 @@ impl fmt::Display for TupleData {
         }
         write!(f, "}}")
     }
+}
+
+/// Given the serialized string representation of a Clarity value,
+///  return the size of the same byte representation.
+pub fn byte_len_of_serialization(serialized: &str) -> u64 {
+    serialized.len() as u64 / 2
 }

@@ -52,6 +52,7 @@ pub enum CheckErrors {
     ExpectedOptionalOrResponseValue(Value),
     CouldNotDetermineResponseOkType,
     CouldNotDetermineResponseErrType,
+    CouldNotDetermineSerializationType,
     UncheckedIntermediaryResponses,
 
     CouldNotDetermineMatchTypes,
@@ -287,6 +288,7 @@ fn formatted_expected_types(expected_types: &Vec<TypeSignature>) -> String {
 impl DiagnosableError for CheckErrors {
     fn message(&self) -> String {
         match &self {
+            CheckErrors::CouldNotDetermineSerializationType => "could not determine the type being serialized".into(),
             CheckErrors::ExpectedLiteral => "expected a literal argument".into(),
             CheckErrors::BadMatchOptionSyntax(source) =>
                 format!("match on a optional type uses the following syntax: (match input some-name if-some-expression if-none-expression). Caused by: {}",

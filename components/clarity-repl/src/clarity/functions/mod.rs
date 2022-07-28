@@ -8,6 +8,7 @@ mod options;
 mod sequences;
 mod special;
 pub mod tuples;
+mod conversions;
 
 use crate::clarity::callables::{CallableType, NativeHandle};
 use crate::clarity::costs::cost_functions::ClarityCostFunction;
@@ -112,6 +113,14 @@ define_named_enum!(NativeFunctions {
     GetStxBalance("stx-get-balance"),
     StxTransfer("stx-transfer?"),
     StxBurn("stx-burn?"),
+
+    BuffToIntLe("buff-to-int-le"),
+    BuffToUIntLe("buff-to-uint-le"),
+    BuffToIntBe("buff-to-int-be"),
+    BuffToUIntBe("buff-to-uint-be"),
+    Slice("slice"),
+    ToConsensusBuff("to-consensus-buff"),
+    FromConsensusBuff("from-consensus-buff"),
 });
 
 pub fn lookup_reserved_functions(name: &str) -> Option<CallableType> {
@@ -377,6 +386,35 @@ pub fn lookup_reserved_functions(name: &str) -> Option<CallableType> {
             GetStxBalance => SpecialFunction("special_stx_balance", &assets::special_stx_balance),
             StxTransfer => SpecialFunction("special_stx_transfer", &assets::special_stx_transfer),
             StxBurn => SpecialFunction("special_stx_burn", &assets::special_stx_burn),
+            BuffToIntLe => NativeFunction(
+                "native_buff_to_int_le",
+                NativeHandle::SingleArg(&conversions::native_buff_to_int_le),
+                ClarityCostFunction::Add,
+            ),
+            BuffToUIntLe => NativeFunction(
+                "native_buff_to_uint_le",
+                NativeHandle::SingleArg(&conversions::native_buff_to_uint_le),
+                ClarityCostFunction::Add,
+            ),
+            BuffToIntBe => NativeFunction(
+                "native_buff_to_int_be",
+                NativeHandle::SingleArg(&conversions::native_buff_to_int_be),
+                ClarityCostFunction::Add,
+            ),
+            BuffToUIntBe => NativeFunction(
+                "native_buff_to_uint_be",
+                NativeHandle::SingleArg(&conversions::native_buff_to_uint_be),
+                ClarityCostFunction::Add,
+            ),
+            Slice => SpecialFunction("special_slice", &sequences::special_slice),
+            ToConsensusBuff => NativeFunction(
+                "to_consensus_buff",
+                NativeHandle::SingleArg(&conversions::to_consensus_buff),
+                ClarityCostFunction::Add,
+            ),
+            FromConsensusBuff => {
+                SpecialFunction("from_consensus_buff", &conversions::from_consensus_buff)
+            },
         };
         Some(callable)
     } else {

@@ -426,6 +426,9 @@ pub trait ASTVisitor<'a> {
                                 )
                             }
                         }
+                        BuffToIntLe | BuffToUIntLe | BuffToIntBe | BuffToUIntBe | ToConsensusBuff | Slice | FromConsensusBuff => {
+                            return true
+                        }
                         AsContract => {
                             self.traverse_as_contract(expr, args.get(0).unwrap_or(&DEFAULT_EXPR))
                         }
