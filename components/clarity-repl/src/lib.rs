@@ -22,6 +22,8 @@ extern crate serde_derive;
 #[macro_use]
 mod macros;
 
+use clarity::{diagnostic::Diagnostic, types};
+use serde_json::Value;
 #[cfg(feature = "wasm")]
 use wasm_bindgen::prelude::*;
 
@@ -84,4 +86,48 @@ pub fn handle_command(command: &str) -> String {
     }
 
     output_lines.join("\n").to_string()
+}
+
+#[cfg(feature = "wasm")]
+#[derive(Serialize, Deserialize)]
+pub struct InterpretResult {
+    pub result: Option<String>,
+    pub events: Vec<Value>,
+    pub diagnostics: Vec<String>,
+}
+
+#[cfg(feature = "wasm")]
+#[wasm_bindgen]
+pub fn interpret(snippet: &str) -> JsValue {
+    let settings = SessionSettings::default();
+    let mut session = Session::new(settings);
+
+    let result = match session.interpret(
+        snippet.to_string(),
+        Some("playground".to_string()),
+        None,
+        false,
+        None,
+        None,
+    ) {
+        Ok(result) => InterpretResult {
+            result: match result.result {
+                Some(result) => Some(result.to_string()),
+                None => None,
+            },
+            events: result.events.clone(),
+            diagnostics: result
+                .diagnostics
+                .iter()
+                .map(|diag| diag.to_string())
+                .collect(),
+        },
+        Err(diagnostics) => InterpretResult {
+            result: None,
+            events: Vec::new(),
+            diagnostics: diagnostics.iter().map(|diag| diag.to_string()).collect(),
+        },
+    };
+
+    JsValue::from_serde(&result).unwrap()
 }

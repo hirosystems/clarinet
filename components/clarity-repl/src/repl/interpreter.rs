@@ -700,9 +700,8 @@ impl ClarityInterpreter {
             self.debit_token(account, token, value);
         }
 
+        execution_result.result = Some(value);
         if !contract_saved {
-            execution_result.result = Some(value);
-
             if let Some(mut eval_hooks) = eval_hooks {
                 for hook in eval_hooks.iter_mut() {
                     hook.did_complete(Ok(&mut execution_result));
