@@ -435,9 +435,8 @@ Before referring to contracts deployed on Mainnet, they should be explicitily be
 ```toml
 [project]
 name = "my-project"
-requirements = [
-  "SP2KAF9RF86PVX3NEE27DFV1CQX0T4WGR41X3S45C.bitcoin-whales"
-]
+[[project.requirements]]
+contract_id = "SP2KAF9RF86PVX3NEE27DFV1CQX0T4WGR41X3S45C.bitcoin-whales"
 
 ```
 
@@ -450,6 +449,49 @@ clarinet requirements add SP2KAF9RF86PVX3NEE27DFV1CQX0T4WGR41X3S45C.bitcoin-whal
 From there, clarinet will be able to resolve the `contract-call?` statements invoking requirements present in your local contracts, by downloading and caching a copy of these contracts and use them during the execution of your testsuites, and all the different features available in `clarinet`.
 
 When deploying your protocol to Devnet / Testnet, for the contracts involving requirements, the setting `remap_requirements` in your deployment plans must be set.
+
+Similar to the deployment on Mainnet, the requirements should be listed in the manifest `Clarinet.toml`
+
+```toml
+[project]
+name = "my-project"
+[[project.requirements]]
+contract_id = "ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM.bitcoin-whales"
+
+```
+
+This contract 
+`Mainnet`:`"SP2KAF9RF86PVX3NEE27DFV1CQX0T4WGR41X3S45C.bitcoin-whales"`
+`Devnet`:`"ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM.bitcoin-whales"`
+is using the trait identifiers `(impl-trait 'SP2PABAF9FTAJYNFZH93XENAJ8FVY99RRM50D2JG9.nft-trait.nft-trait)`
+
+Therefore, the deployment plan for the Devnet, for example, should look like this
+
+```yaml
+---
+id: 0
+name: Devnet deployment
+network: devnet
+stacks-node: "http://localhost:20443"
+bitcoin-node: "http://devnet:devnet@localhost:18443"
+plan:
+  batches:
+    - id: 0
+      transactions:
+        - requirement-publish:
+            contract-id: SP2PABAF9FTAJYNFZH93XENAJ8FVY99RRM50D2JG9.nft-trait.nft-trait
+            remap-sender: ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM
+            remap-principals:
+              SP2PABAF9FTAJYNFZH93XENAJ8FVY99RRM50D2JG9: ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM
+            cost: 8400
+            path: ".requirements\\ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM.sip-010-trait-ft-standard.clar"
+        - contract-publish:
+            contract-name: bitcoin-whales
+            expected-sender: ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM
+            cost: 72420
+            path: "contracts\\bitcoin-whales.clar"
+            anchor-block-only: true
+```
 
 Before Devnet / Testnet deployments, your contracts will be automatically remapped on the fly to point to the duplicated requirements deployed by an account that you control.
 
