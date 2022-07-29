@@ -222,6 +222,14 @@ fn test_stacks_chainhook_register_deregister() {
         }
         _ => false,
     });
+
+    assert!(match observer_events_rx.recv() {
+        Ok(ObserverEvent::StacksChainhookTriggered(_)) => {
+            true
+        }
+        _ => false,
+    });
+
     // Should propagate block
     assert!(match observer_events_rx.recv() {
         Ok(ObserverEvent::StacksChainEvent(_)) => {
@@ -401,6 +409,14 @@ fn test_stacks_chainhook_auto_deregister() {
         }
         _ => false,
     });
+
+    assert!(match observer_events_rx.recv() {
+        Ok(ObserverEvent::StacksChainhookTriggered(_)) => {
+            true
+        }
+        _ => false,
+    });
+
     // Should propagate block
     assert!(match observer_events_rx.recv() {
         Ok(ObserverEvent::StacksChainEvent(_)) => {
@@ -552,6 +568,14 @@ fn test_bitcoin_chainhook_register_deregister() {
         }
         _ => false,
     });
+
+    assert!(match observer_events_rx.recv() {
+        Ok(ObserverEvent::BitcoinChainhookTriggered(_)) => {
+            true
+        }
+        _ => false,
+    });
+
     // Should propagate block
     assert!(match observer_events_rx.recv() {
         Ok(ObserverEvent::BitcoinChainEvent(_)) => {
@@ -732,6 +756,14 @@ fn test_bitcoin_chainhook_auto_deregister() {
         }
         _ => false,
     });
+
+    assert!(match observer_events_rx.recv() {
+        Ok(ObserverEvent::BitcoinChainhookTriggered(_)) => {
+            true
+        }
+        _ => false,
+    });
+
     // Should propagate block
     assert!(match observer_events_rx.recv() {
         Ok(ObserverEvent::BitcoinChainEvent(_)) => {

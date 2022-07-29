@@ -4,7 +4,7 @@ use base58::FromBase58;
 use bitcoin::blockdata::opcodes;
 use bitcoin::blockdata::script::Builder;
 use bitcoin::consensus::encode;
-use bitcoin::{OutPoint, Script, Transaction, TxIn, TxOut, Txid, Witness, PubkeyHash, WPubkeyHash};
+use bitcoin::{OutPoint, Script, Transaction, TxIn, TxOut, Txid, Witness};
 use bitcoincore_rpc::bitcoin::secp256k1::{Message, PublicKey, Secp256k1, SecretKey};
 use bitcoincore_rpc::bitcoin::Address;
 use bitcoincore_rpc::Client;
@@ -61,7 +61,6 @@ pub fn build_transaction_spec(
         selected_utxos.push(utxo);
     }
 
-    
     // Prepare Recipient output
     let address = {
         use bitcoin::Address;
@@ -73,7 +72,7 @@ pub fn build_transaction_spec(
 
     let txout = TxOut {
         value: tx_spec.sats_amount,
-        script_pubkey: address.script_pubkey()
+        script_pubkey: address.script_pubkey(),
     };
     transaction.output.push(txout);
 
