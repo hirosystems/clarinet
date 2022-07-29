@@ -450,14 +450,66 @@ From there, clarinet will be able to resolve the `contract-call?` statements inv
 
 When deploying your protocol to Devnet / Testnet, for the contracts involving requirements, the setting `remap_requirements` in your deployment plans must be set.
 
+As an example we use here the following contract **bitcoin-whales** you can find [here](https://explorer.stacks.co/txid/SP2KAF9RF86PVX3NEE27DFV1CQX0T4WGR41X3S45C.bitcoin-whales?chain=mainnet)
+
+If you examine this, you will see that we have 3 different dependencies within the contract. Two from the **same**
+ deployer, one reffering to an contract deployed by an **external** deployer
+
+### Same Deployer 
+
+```clarity
+(define-read-only (get-token-uri (token-id uint))
+  (if (< token-id u5001)
+    (ok (some (concat (concat (var-get ipfs-root) (unwrap-panic (contract-call? .conversion lookup token-id))) ".json")))
+    (ok (some (concat (concat (var-get ipfs-root) (unwrap-panic (contract-call? .conversion-v2 lookup (- token-id u5001)))) ".json")))
+    )
+)
+```
+
+### External Deployer 
+
+```clarity
+(impl-trait 'SP2PABAF9FTAJYNFZH93XENAJ8FVY99RRM50D2JG9.nft-trait.nft-trait)
+```
+
 Similar to the deployment on Mainnet, the requirements should be listed in the manifest `Clarinet.toml`
+The dependency which are coming from a **external** contract *(e.g., not from our Devnet deploy address)* should be set in ```toml [[project.requirements]]```
+Dependencies which are based on our own contracts *(here, ```toml ["conversion","conversion-v2"]```)* should be set in ```toml depends_on```
 
 ```toml
 [project]
 name = "my-project"
-[[project.requirements]]
-contract_id = "ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM.bitcoin-whales"
 
+[[project.requirements]]
+contract_id = "SP2PABAF9FTAJYNFZH93XENAJ8FVY99RRM50D2JG9.nft-trait"
+
+boot_contracts = ["pox", "costs-v2", "bns"]
+
+[project.cache_location]
+path = ".requirements"
+
+[contracts.bitcoin-whales]
+path = "contracts/bitcoin-whales.clar"
+depends_om = ["conversion","conversion-v2"]
+
+[contracts.conversion]
+path = "contracts/conversion.clar"
+
+[contracts.conversion-v2]
+path = "contracts/conversion-v2.clar"
+
+[repl]
+costs_version = 2
+parser_version = 2
+
+[repl.analysis]
+passes = ["check_checker"]
+
+[repl.analysis.check_checker]
+strict = false
+trusted_sender = false
+trusted_caller = false
+callee_filter = false
 ```
 
 This contract
