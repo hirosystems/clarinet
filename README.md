@@ -517,7 +517,8 @@ callee_filter = false
 As a next step we have to generate the `default.devnet-plan.yaml`
 
 If running `$ clarinet integrate` for the first time. This file should be created by clarinet.
-In addition you can run $ clarinet deployment `generate --devnet` to create or overwrite.
+
+In addition you can run `$ clarinet deployment generate --devnet` to create or overwrite.
 
 ```yaml
 ---
