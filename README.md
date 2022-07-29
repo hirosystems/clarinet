@@ -474,9 +474,9 @@ If you examine this, you will see that we have 3 different dependencies within t
 
 Similar to the deployment on Mainnet, the requirements should be listed in the manifest `Clarinet.toml`
 
-Dependencies coming from **external** contracts should be set in `[[project.requirements]]`
+Dependencies from **external** contracts should be set in `[[project.requirements]]`
 
-Dependencies coming from **internal** contracts should be set in `toml depends_on`
+Dependencies from **internal** contracts should be set in `depends_on`
 
 ```toml
 [project]
