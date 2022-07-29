@@ -450,9 +450,9 @@ From there, clarinet will be able to resolve the `contract-call?` statements inv
 
 When deploying your protocol to Devnet / Testnet, for the contracts involving requirements, the setting `remap_requirements` in your deployment plans must be set.
 
-As an example we use here the following contract **bitcoin-whales** you can find [here](https://explorer.stacks.co/txid/SP2KAF9RF86PVX3NEE27DFV1CQX0T4WGR41X3S45C.bitcoin-whales?chain=mainnet)
+As an step-by-step example we use here the following contract **bitcoin-whales** you can find [here](https://explorer.stacks.co/txid/SP2KAF9RF86PVX3NEE27DFV1CQX0T4WGR41X3S45C.bitcoin-whales?chain=mainnet)
 
-If you examine this, you will see that we have 3 different dependencies within the contract. Two from the **same**
+If you examine this, you will see that we have 3 different dependencies within the contract. Two from the **internal**
  deployer, one reffering to an contract deployed by an **external** deployer
 
 ### Same Deployer 
@@ -473,8 +473,10 @@ If you examine this, you will see that we have 3 different dependencies within t
 ```
 
 Similar to the deployment on Mainnet, the requirements should be listed in the manifest `Clarinet.toml`
-The dependency which are coming from a **external** contract *(e.g., not from our Devnet deploy address)* should be set in ```toml [[project.requirements]]```
-Dependencies which are based on our own contracts *(here, ```toml ["conversion","conversion-v2"]```)* should be set in ```toml depends_on```
+
+Dependencies coming from **external** contracts *(e.g., not from our Devnet deploy address)* should be set in ```toml [[project.requirements]]```
+
+Dependencies coming from **internal** contracts *(here, ```toml ["conversion","conversion-v2"]```)* should be set in ```toml depends_on```
 
 ```toml
 [project]
