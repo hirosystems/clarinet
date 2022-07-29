@@ -460,9 +460,12 @@ contract_id = "ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM.bitcoin-whales"
 
 ```
 
-This contract 
+This contract
+
 `Mainnet`:`"SP2KAF9RF86PVX3NEE27DFV1CQX0T4WGR41X3S45C.bitcoin-whales"`
+
 `Devnet`:`"ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM.bitcoin-whales"`
+
 is using the trait identifiers `(impl-trait 'SP2PABAF9FTAJYNFZH93XENAJ8FVY99RRM50D2JG9.nft-trait.nft-trait)`
 
 Therefore, the deployment plan for the Devnet, for example, should look like this
