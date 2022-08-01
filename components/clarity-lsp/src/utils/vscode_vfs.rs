@@ -11,6 +11,11 @@ use wasm_bindgen_futures::JsFuture;
 struct VFSRequest {
     pub path: String,
 }
+#[derive(Serialize, Deserialize)]
+struct VFSWriteRequest<'a> {
+    pub path: String,
+    pub content: &'a [u8],
+}
 
 pub struct VscodeFilesystemAccessor {
     client_request_tx: JsFunction,
@@ -70,9 +75,41 @@ impl FileAccessor for VscodeFilesystemAccessor {
 
         return Box::pin(async move {
             let response = JsFuture::from(Promise::resolve(&req)).await;
-
             match response {
-                Ok(manifest) => Ok((contract_location, decode_from_js(manifest).unwrap())),
+                Ok(contract) => Ok((contract_location, decode_from_js(contract).unwrap())),
+                Err(_) => Err("error".into()),
+            }
+        });
+    }
+
+    fn write_file(
+        &self,
+        manifest_location: FileLocation,
+        relative_path: String,
+        content: &[u8],
+    ) -> PerformFileAccess {
+        log!("writting contract");
+        let mut contract_location = manifest_location.get_parent_location().unwrap();
+        let _ = contract_location.append_path(&relative_path);
+
+        let req = self
+            .client_request_tx
+            .call2(
+                &JsValue::null(),
+                &JsValue::from("vfs/writeFile"),
+                &encode_to_js(&VFSWriteRequest {
+                    path: relative_path,
+                    content,
+                })
+                .unwrap(),
+            )
+            .unwrap();
+
+        return Box::pin(async move {
+            let response = JsFuture::from(Promise::resolve(&req)).await;
+            match response {
+                // TODO: add type for PerformFileWrite
+                Ok(_) => Ok((contract_location, "success".to_string())),
                 Err(_) => Err("error".into()),
             }
         });
