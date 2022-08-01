@@ -314,8 +314,13 @@ pub async fn generate_default_deployment<'a>(
                 Some(ast) => ast,
                 None => {
                     // Download the code
-                    let (source, contract_location) =
-                        requirements::retrieve_contract(&contract_id, &cache_location).await?;
+                    let (source, contract_location) = requirements::retrieve_contract(
+                        manifest.location.clone(),
+                        &contract_id,
+                        &cache_location,
+                        &file_accessor,
+                    )
+                    .await?;
 
                     // Build the struct representing the requirement in the deployment
                     if network.is_simnet() {
@@ -474,9 +479,9 @@ pub async fn generate_default_deployment<'a>(
                 (contract_location, source)
             }
             Some(file_accessor) => {
-                let perform_file_access = file_accessor
-                    .read_contract_content(manifest.location.clone(), contract_config.path.clone());
-                perform_file_access.await?
+                file_accessor
+                    .read_contract_content(manifest.location.clone(), contract_config.path.clone())
+                    .await?
             }
         };
 
