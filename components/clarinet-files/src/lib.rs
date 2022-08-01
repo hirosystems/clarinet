@@ -34,6 +34,12 @@ pub trait FileAccessor {
         manifest_location: FileLocation,
         relative_path: String,
     ) -> PerformFileAccess;
+    fn write_file(
+        &self,
+        manifest_location: FileLocation,
+        relative_path: String,
+        content: &[u8],
+    ) -> PerformFileAccess;
 }
 
 #[derive(Deserialize, Debug, Clone, PartialEq, Eq, Hash)]
