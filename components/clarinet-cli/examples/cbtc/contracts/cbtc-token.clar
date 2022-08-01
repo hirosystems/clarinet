@@ -39,10 +39,10 @@
 (define-constant AUTHORITY 'ST1SJ3DTE5DN7X54YDH5D64R3BCB6A2AG2ZQ8YPD5)
 
 (define-public (mint (amount uint) (recipient principal))
-    (begin 
+    (begin
         (asserts! (is-eq tx-sender AUTHORITY) (err u0))
         (ft-mint? cbtc amount recipient)))
 
 (define-public (burn (amount uint))
-    (begin 
+    (begin
         (ft-burn? cbtc amount tx-sender)))

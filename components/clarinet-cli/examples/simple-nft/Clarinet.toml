@@ -1,16 +1,22 @@
-
 [project]
 name = "simple-nft"
-cache_dir = "./.requirements"
+authors = []
+description = ""
+telemetry = false
+boot_contracts = ["pox", "costs-v2", "bns"]
 
 [contracts.simple-nft]
 path = "contracts/simple-nft.clar"
-depends_on = ["sip-009-trait-ft-standard"]
 
 # EXTERNAL CONTRACTS
 [contracts.sip-009-trait-ft-standard]
 path = "contracts/external/sip-009-nft-trait-standard.clar"
 depends_on = []
+
+
+[repl]
+costs_version = 2
+parser_version = 2
 
 [repl.analysis]
 passes = ["check_checker"]
