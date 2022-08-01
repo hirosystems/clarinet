@@ -435,10 +435,9 @@ Before referring to contracts deployed on Mainnet, they should be explicitily be
 ```toml
 [project]
 name = "my-project"
-requirements = [
-  "SP2KAF9RF86PVX3NEE27DFV1CQX0T4WGR41X3S45C.bitcoin-whales"
-]
 
+[[project.requirements]]
+contract_id = "SP2KAF9RF86PVX3NEE27DFV1CQX0T4WGR41X3S45C.bitcoin-whales"
 ```
 
 or with the command:
