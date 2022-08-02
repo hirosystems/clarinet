@@ -453,7 +453,7 @@ When deploying your protocol to Devnet / Testnet, for the contracts involving re
 As a step-by-step example, we use here the following contract, [**bitcoin-whales**](https://explorer.stacks.co/txid/SP2KAF9RF86PVX3NEE27DFV1CQX0T4WGR41X3S45C.bitcoin-whales?chain=mainnet)
 
 If you examine this contract, you will see that  there are 3 different dependencies: two from the **same**
- deployer, one reffering to an contract deployed by an **external** deployer
+project (included in the same Clarinet.toml file), and one referring to a contract deployed outside of the current project.
 
 ### Same Deployer 
 
