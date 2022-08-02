@@ -514,7 +514,7 @@ trusted_caller = false
 callee_filter = false
 ```
 
-As a next step we have to generate the `default.devnet-plan.yaml`
+As a next step we can generate a deployment plan for this project.
 
 If running `$ clarinet integrate` for the first time. This file should be created by clarinet.
 
