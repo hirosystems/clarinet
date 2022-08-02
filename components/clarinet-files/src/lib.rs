@@ -38,7 +38,7 @@ pub trait FileAccessor {
         &self,
         manifest_location: FileLocation,
         relative_path: String,
-        content: String,
+        content: &[u8],
     ) -> PerformFileAccess;
 }
 

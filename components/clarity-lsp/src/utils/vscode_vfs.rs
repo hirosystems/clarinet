@@ -12,9 +12,9 @@ struct VFSRequest {
     pub path: String,
 }
 #[derive(Serialize, Deserialize)]
-struct VFSWriteRequest {
+struct VFSWriteRequest<'a> {
     pub path: String,
-    pub content: String,
+    pub content: &'a [u8],
 }
 
 pub struct VscodeFilesystemAccessor {
@@ -86,7 +86,7 @@ impl FileAccessor for VscodeFilesystemAccessor {
         &self,
         manifest_location: FileLocation,
         relative_path: String,
-        content: String,
+        content: &[u8],
     ) -> PerformFileAccess {
         log!("writting contract");
         let mut contract_location = manifest_location.get_parent_location().unwrap();
@@ -99,7 +99,7 @@ impl FileAccessor for VscodeFilesystemAccessor {
                 &JsValue::from("vfs/writeFile"),
                 &encode_to_js(&VFSWriteRequest {
                     path: relative_path,
-                    content: content,
+                    content,
                 })
                 .unwrap(),
             )

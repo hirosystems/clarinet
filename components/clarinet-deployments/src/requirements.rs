@@ -26,6 +26,7 @@ pub async fn retrieve_contract(
             }
         }
     };
+
     if contract_source.is_ok() {
         return Ok((contract_source.unwrap(), contract_location));
     }
@@ -44,7 +45,7 @@ pub async fn retrieve_contract(
     );
 
     let response = fetch_contract(request_url).await?;
-    let code = response.source.to_string();
+    let code = response.source;
 
     let _ = match file_accessor {
         None => contract_location.write_content(code.as_bytes()),
@@ -53,7 +54,7 @@ pub async fn retrieve_contract(
                 .write_file(
                     manifest_location,
                     contract_location.to_string(),
-                    code.clone(),
+                    code.as_bytes(),
                 )
                 .await
             {
