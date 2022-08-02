@@ -455,7 +455,7 @@ As a step-by-step example, we use here the following contract, [**bitcoin-whales
 If you examine this contract, you will see that  there are 3 different dependencies: two from the **same**
 project (included in the same Clarinet.toml file), and one referring to a contract deployed outside of the current project.
 
-### Same Deployer 
+### Same Project
 
 ```clarity
 (define-read-only (get-token-uri (token-id uint))
