@@ -457,6 +457,8 @@ project (included in the same Clarinet.toml file), and one referring to a contra
 
 ### Same Project
 
+In the contract snippet below *(line:260-265)*, there are dependencies on the contracts conversion and conversion-v2 which are included in the same `Clarinet.toml` file.
+
 ```clarity
 (define-read-only (get-token-uri (token-id uint))
   (if (< token-id u5001)
@@ -468,15 +470,15 @@ project (included in the same Clarinet.toml file), and one referring to a contra
 
 ### External Deployer 
 
+In this snippet, there is a dependency on the `nft-trait` *(line:001)* deployed by `'SP2PABAF9FTAJYNFZH93XENAJ8FVY99RRM50D2JG9`.
+
 ```clarity
 (impl-trait 'SP2PABAF9FTAJYNFZH93XENAJ8FVY99RRM50D2JG9.nft-trait.nft-trait)
 ```
 
-Similar to the deployment on Mainnet, the requirements should be listed in the manifest `Clarinet.toml`
-
 Dependencies from **external** contracts should be set in `[[project.requirements]]`
 
-Dependencies from **internal** contracts should be set in `depends_on`
+Dependencies from **internal** contracts no longer need to be set in `depends_on`. However, this is still present in many contracts, tutorials and documentations. 
 
 ```toml
 [project]
@@ -492,7 +494,7 @@ path = ".requirements"
 
 [contracts.bitcoin-whales]
 path = "contracts/bitcoin-whales.clar"
-depends_om = ["conversion","conversion-v2"]
+#depends_om = ["conversion","conversion-v2"] #optional deprecated
 
 [contracts.conversion]
 path = "contracts/conversion.clar"
