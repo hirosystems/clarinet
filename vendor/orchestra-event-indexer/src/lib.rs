@@ -8,8 +8,3 @@ extern crate serde_derive;
 extern crate serde_json;
 
 pub mod ingestion;
-mod cli;
-
-fn main() {
-    cli::main();
-}

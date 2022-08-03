@@ -1,0 +1,10 @@
+use criterion::{black_box, criterion_group, criterion_main, Criterion};
+use orchestra_event_indexer::ingestion::start_ingesting;
+
+
+fn criterion_benchmark(c: &mut Criterion) {
+    c.bench_function("redis", |b| b.iter(|| start_ingesting("/Users/ludovic/Downloads/stacks-blockchain-api.tsv".into())));
+}
+
+criterion_group!(benches, criterion_benchmark);
+criterion_main!(benches);

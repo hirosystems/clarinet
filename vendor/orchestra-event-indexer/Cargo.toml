@@ -13,3 +13,16 @@ serde = "1"
 serde_json = "1"
 serde_derive = "1"
 redis = "0.21.5"
+
+[dev-dependencies]
+criterion = "0.3"
+redis = "0.21.5"
+
+[lib]
+name = "orchestra_event_indexer"
+path = "src/lib.rs"
+
+[[bench]]
+name = "storage-redis"
+path = "benches/storage/redis.rs"
+harness = false
