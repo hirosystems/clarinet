@@ -82,7 +82,7 @@ impl LspVscodeBridge {
                 return future_to_promise(async move {
                     let mut result = match editor_state.try_write() {
                         Ok(mut state) => {
-                            process_command(command, &mut state, Some(&file_accessor)).await
+                            process_notification(command, &mut state, Some(&file_accessor)).await
                         }
                         Err(_) => return Err(JsValue::from("unable to lock editor_state")),
                     };
@@ -135,7 +135,7 @@ impl LspVscodeBridge {
                 return future_to_promise(async move {
                     let mut result = match editor_state.try_write() {
                         Ok(mut state) => {
-                            process_command(command, &mut state, Some(&file_accessor)).await
+                            process_notification(command, &mut state, Some(&file_accessor)).await
                         }
                         Err(_) => return Err(JsValue::from("unable to lock editor_state")),
                     };
