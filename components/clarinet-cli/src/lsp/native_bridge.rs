@@ -1,9 +1,11 @@
-use super::{utils, LspRequestAsync};
+use super::utils;
 
 use crate::lsp::{clarity_diagnostics_to_tower_lsp_type, completion_item_type_to_tower_lsp_type};
+use clarity_lsp::backend::{process_notification, LspNotification, LspRequest, LspResponse};
+use clarity_lsp::state::EditorState;
+use crossbeam_channel::{select, Receiver as MultiplexableReceiver, Sender as MultiplexableSender};
 use serde_json::Value;
-use std::sync::mpsc::channel;
-use std::sync::mpsc::Sender;
+use std::sync::mpsc::{Receiver, Sender};
 use std::sync::Arc;
 use std::sync::Mutex;
 use tower_lsp::jsonrpc::Result;
@@ -28,17 +30,62 @@ use tower_lsp::{async_trait, Client, LanguageServer};
 //      - if not indexed:
 // - Clarinet.toml file saved
 
+pub async fn start_language_server(
+    notification_rx: MultiplexableReceiver<LspNotification>,
+    request_rx: MultiplexableReceiver<LspRequest>,
+    response_tx: Sender<LspResponse>,
+) {
+    let mut editor_state = EditorState::new();
+    loop {
+        select! {
+            recv(notification_rx) -> msg => {
+                match msg {
+                    Ok(notification) => {
+                        let result = process_notification(notification, &mut editor_state, None).await;
+                        if let Ok(lsp_response) = result {
+                            let _ = response_tx.send(lsp_response);
+                        }
+                    }
+                    Err(_e) => {
+                        continue;
+                    }
+                };
+            },
+            recv(request_rx) -> msg => {
+                match msg {
+                    Ok(_request) => {
+
+                    }
+                    Err(_e) => {
+                        continue;
+                    }
+                }
+            },
+            default => println!("not ready"),
+        }
+    }
+}
+
 #[derive(Debug)]
 pub struct LspNativeBridge {
     client: Client,
-    command_tx: Arc<Mutex<Sender<LspRequestAsync>>>,
+    request_tx: Arc<Mutex<MultiplexableSender<LspRequest>>>,
+    notification_tx: Arc<Mutex<MultiplexableSender<LspNotification>>>,
+    response_rx: Arc<Mutex<Receiver<LspResponse>>>,
 }
 
 impl LspNativeBridge {
-    pub fn new(client: Client, command_tx: Sender<LspRequestAsync>) -> Self {
+    pub fn new(
+        client: Client,
+        request_tx: MultiplexableSender<LspRequest>,
+        notification_tx: MultiplexableSender<LspNotification>,
+        response_rx: Receiver<LspResponse>,
+    ) -> Self {
         Self {
             client,
-            command_tx: Arc::new(Mutex::new(command_tx)),
+            request_tx: Arc::new(Mutex::new(request_tx)),
+            notification_tx: Arc::new(Mutex::new(notification_tx)),
+            response_rx: Arc::new(Mutex::new(response_rx)),
         }
     }
 }
@@ -91,18 +138,16 @@ impl LanguageServer for LspNativeBridge {
             _ => return Ok(None),
         };
 
-        let (response_tx, response_rx) = channel();
-        let _ = match self.command_tx.lock() {
-            Ok(tx) => tx.send(LspRequestAsync::GetIntellisense(
-                contract_location,
-                response_tx,
-            )),
+        let _ = match self.request_tx.lock() {
+            Ok(tx) => tx.send(LspRequest::GetIntellisense(contract_location)),
             Err(_) => return Ok(None),
         };
 
         let mut keywords = vec![];
-        if let Ok(ref mut response) = response_rx.recv() {
-            keywords.append(&mut response.completion_items);
+        if let Ok(response_rx) = self.response_rx.lock() {
+            if let Ok(ref mut response) = response_rx.recv() {
+                keywords.append(&mut response.completion_items);
+            }
         }
 
         let mut completion_items = vec![];
@@ -114,30 +159,18 @@ impl LanguageServer for LspNativeBridge {
     }
 
     async fn did_open(&self, params: DidOpenTextDocumentParams) {
-        let response_rx = if let Some(contract_location) =
-            utils::get_contract_location(&params.text_document.uri)
-        {
-            let (response_tx, response_rx) = channel();
-            let _ = match self.command_tx.lock() {
-                Ok(tx) => tx.send(LspRequestAsync::ContractOpened(
-                    contract_location,
-                    response_tx,
-                )),
+        if let Some(contract_location) = utils::get_contract_location(&params.text_document.uri) {
+            let _ = match self.notification_tx.lock() {
+                Ok(tx) => tx.send(LspNotification::ContractOpened(contract_location)),
                 Err(_) => return,
             };
-            response_rx
         } else if let Some(manifest_location) =
             utils::get_manifest_location(&params.text_document.uri)
         {
-            let (response_tx, response_rx) = channel();
-            let _ = match self.command_tx.lock() {
-                Ok(tx) => tx.send(LspRequestAsync::ManifestOpened(
-                    manifest_location,
-                    response_tx,
-                )),
+            let _ = match self.notification_tx.lock() {
+                Ok(tx) => tx.send(LspNotification::ManifestOpened(manifest_location)),
                 Err(_) => return,
             };
-            response_rx
         } else {
             self.client
                 .log_message(MessageType::Warning, "Unsupported file opened")
@@ -153,11 +186,12 @@ impl LanguageServer for LspNativeBridge {
             .await;
         let mut aggregated_diagnostics = vec![];
         let mut notification = None;
-        if let Ok(ref mut response) = response_rx.recv() {
-            aggregated_diagnostics.append(&mut response.aggregated_diagnostics);
-            notification = response.notification.take();
+        if let Ok(response_rx) = self.response_rx.lock() {
+            if let Ok(ref mut response) = response_rx.recv() {
+                aggregated_diagnostics.append(&mut response.aggregated_diagnostics);
+                notification = response.notification.take();
+            }
         }
-
         for (location, mut diags) in aggregated_diagnostics.drain(..) {
             if let Ok(url) = location.to_url_string() {
                 self.client
@@ -177,39 +211,29 @@ impl LanguageServer for LspNativeBridge {
     }
 
     async fn did_save(&self, params: DidSaveTextDocumentParams) {
-        let response_rx = if let Some(contract_location) =
-            utils::get_contract_location(&params.text_document.uri)
-        {
-            let (response_tx, response_rx) = channel();
-            let _ = match self.command_tx.lock() {
-                Ok(tx) => tx.send(LspRequestAsync::ContractChanged(
-                    contract_location,
-                    response_tx,
-                )),
+        if let Some(contract_location) = utils::get_contract_location(&params.text_document.uri) {
+            let _ = match self.notification_tx.lock() {
+                Ok(tx) => tx.send(LspNotification::ContractChanged(contract_location)),
                 Err(_) => return,
             };
-            response_rx
         } else if let Some(manifest_location) =
             utils::get_manifest_location(&params.text_document.uri)
         {
-            let (response_tx, response_rx) = channel();
-            let _ = match self.command_tx.lock() {
-                Ok(tx) => tx.send(LspRequestAsync::ManifestChanged(
-                    manifest_location,
-                    response_tx,
-                )),
+            let _ = match self.notification_tx.lock() {
+                Ok(tx) => tx.send(LspNotification::ManifestChanged(manifest_location)),
                 Err(_) => return,
             };
-            response_rx
         } else {
             return;
         };
 
         let mut aggregated_diagnostics = vec![];
         let mut notification = None;
-        if let Ok(ref mut response) = response_rx.recv() {
-            aggregated_diagnostics.append(&mut response.aggregated_diagnostics);
-            notification = response.notification.take();
+        if let Ok(response_rx) = self.response_rx.lock() {
+            if let Ok(ref mut response) = response_rx.recv() {
+                aggregated_diagnostics.append(&mut response.aggregated_diagnostics);
+                notification = response.notification.take();
+            }
         }
 
         for (location, mut diags) in aggregated_diagnostics.drain(..) {
