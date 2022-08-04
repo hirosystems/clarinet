@@ -1,15 +1,11 @@
 mod native_bridge;
 
-use clarinet_files::FileLocation;
-use clarity_lsp::backend::{self, LspRequestAsync, LspRequestSync, LspResponse};
-use clarity_lsp::lsp_types::MessageType;
-use clarity_lsp::state::{build_state, EditorState, ProtocolState};
-use clarity_lsp::types::CompletionItemKind;
 use clarity_lsp::utils;
 use clarity_repl::clarity::diagnostic::{Diagnostic as ClarityDiagnostic, Level as ClarityLevel};
 use native_bridge::LspNativeBridge;
 
-use std::sync::mpsc::{self, Receiver, Sender};
+use crossbeam_channel::unbounded;
+use std::sync::mpsc;
 use tokio;
 use tower_lsp::lsp_types::{
     Diagnostic, DiagnosticSeverity, Documentation, MarkupContent, MarkupKind, Position, Range,
@@ -35,12 +31,20 @@ async fn do_run_lsp() -> Result<(), String> {
     let stdin = tokio::io::stdin();
     let stdout = tokio::io::stdout();
 
-    let (tx, rx) = mpsc::channel();
+    let (notification_tx, notification_rx) = unbounded();
+    let (request_tx, request_rx) = unbounded();
+    let (response_tx, response_rx) = mpsc::channel();
     std::thread::spawn(move || {
-        crate::utils::nestable_block_on(backend::start_language_server(rx, tx, None));
+        crate::utils::nestable_block_on(native_bridge::start_language_server(
+            notification_rx,
+            request_rx,
+            response_tx,
+        ));
     });
 
-    let (service, messages) = LspService::new(|client| LspNativeBridge::new(client, tx));
+    let (service, messages) = LspService::new(|client| {
+        LspNativeBridge::new(client, request_tx, notification_tx, response_rx)
+    });
     Server::new(stdin, stdout)
         .interleave(messages)
         .serve(service)
@@ -163,11 +167,20 @@ pub fn clarity_diagnostic_to_tower_lsp_type(
 
 #[test]
 fn test_opening_counter_contract_should_return_fresh_analysis() {
+    use clarinet_files::FileLocation;
+    use clarity_lsp::backend::{LspNotification, LspResponse};
+    use crossbeam_channel::unbounded;
     use std::sync::mpsc::channel;
 
-    let (tx, rx) = mpsc::channel();
+    let (notification_tx, notification_rx) = unbounded();
+    let (_request_tx, request_rx) = unbounded();
+    let (response_tx, response_rx) = channel();
     std::thread::spawn(move || {
-        crate::utils::nestable_block_on(backend::start_language_server(rx, None));
+        crate::utils::nestable_block_on(native_bridge::start_language_server(
+            notification_rx,
+            request_rx,
+            response_tx,
+        ));
     });
 
     let contract_location = {
@@ -178,11 +191,8 @@ fn test_opening_counter_contract_should_return_fresh_analysis() {
         counter_path.push("counter.clar");
         FileLocation::from_path(counter_path)
     };
-    let (response_tx, response_rx) = channel();
-    let _ = tx.send(LspRequestAsync::ContractOpened(
-        contract_location.clone(),
-        response_tx.clone(),
-    ));
+
+    let _ = notification_tx.send(LspNotification::ContractOpened(contract_location.clone()));
     let response = response_rx.recv().expect("Unable to get response");
 
     // the counter project should emit 2 warnings and 2 notes coming from counter.clar
@@ -191,21 +201,27 @@ fn test_opening_counter_contract_should_return_fresh_analysis() {
     assert_eq!(diags.len(), 4);
 
     // re-opening this contract should not trigger a full analysis
-    let _ = tx.send(LspRequestAsync::ContractOpened(
-        contract_location,
-        response_tx,
-    ));
+    let _ = notification_tx.send(LspNotification::ContractOpened(contract_location));
     let response = response_rx.recv().expect("Unable to get response");
     assert_eq!(response, LspResponse::default());
 }
 
 #[test]
 fn test_opening_counter_manifest_should_return_fresh_analysis() {
+    use clarinet_files::FileLocation;
+    use clarity_lsp::backend::{LspNotification, LspResponse};
+    use crossbeam_channel::unbounded;
     use std::sync::mpsc::channel;
 
-    let (tx, rx) = mpsc::channel();
+    let (notification_tx, notification_rx) = unbounded();
+    let (_request_tx, request_rx) = unbounded();
+    let (response_tx, response_rx) = channel();
     std::thread::spawn(move || {
-        crate::utils::nestable_block_on(backend::start_language_server(rx, None));
+        crate::utils::nestable_block_on(native_bridge::start_language_server(
+            notification_rx,
+            request_rx,
+            response_tx,
+        ));
     });
 
     let manifest_location = {
@@ -216,11 +232,7 @@ fn test_opening_counter_manifest_should_return_fresh_analysis() {
         FileLocation::from_path(manifest_path)
     };
 
-    let (response_tx, response_rx) = channel();
-    let _ = tx.send(LspRequestAsync::ManifestOpened(
-        manifest_location.clone(),
-        response_tx.clone(),
-    ));
+    let _ = notification_tx.send(LspNotification::ManifestOpened(manifest_location.clone()));
     let response = response_rx.recv().expect("Unable to get response");
 
     // the counter project should emit 2 warnings and 2 notes coming from counter.clar
@@ -229,21 +241,27 @@ fn test_opening_counter_manifest_should_return_fresh_analysis() {
     assert_eq!(diags.len(), 4);
 
     // re-opening this manifest should not trigger a full analysis
-    let _ = tx.send(LspRequestAsync::ManifestOpened(
-        manifest_location,
-        response_tx,
-    ));
+    let _ = notification_tx.send(LspNotification::ManifestOpened(manifest_location));
     let response = response_rx.recv().expect("Unable to get response");
     assert_eq!(response, LspResponse::default());
 }
 
 #[test]
 fn test_opening_simple_nft_manifest_should_return_fresh_analysis() {
+    use clarinet_files::FileLocation;
+    use clarity_lsp::backend::LspNotification;
+    use crossbeam_channel::unbounded;
     use std::sync::mpsc::channel;
 
-    let (tx, rx) = mpsc::channel();
+    let (notification_tx, notification_rx) = unbounded();
+    let (_request_tx, request_rx) = unbounded();
+    let (response_tx, response_rx) = channel();
     std::thread::spawn(move || {
-        crate::utils::nestable_block_on(backend::start_language_server(rx, None));
+        crate::utils::nestable_block_on(native_bridge::start_language_server(
+            notification_rx,
+            request_rx,
+            response_tx,
+        ));
     });
 
     let mut manifest_location = std::env::current_dir().expect("Unable to get current dir");
@@ -251,11 +269,9 @@ fn test_opening_simple_nft_manifest_should_return_fresh_analysis() {
     manifest_location.push("simple-nft");
     manifest_location.push("Clarinet.toml");
 
-    let (response_tx, response_rx) = channel();
-    let _ = tx.send(LspRequestAsync::ManifestOpened(
-        FileLocation::from_path(manifest_location),
-        response_tx.clone(),
-    ));
+    let _ = notification_tx.send(LspNotification::ManifestOpened(FileLocation::from_path(
+        manifest_location,
+    )));
     let response = response_rx.recv().expect("Unable to get response");
 
     // the counter project should emit 2 warnings and 2 notes coming from counter.clar

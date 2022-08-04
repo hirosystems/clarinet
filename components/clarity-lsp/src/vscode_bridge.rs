@@ -1,5 +1,5 @@
 extern crate console_error_panic_hook;
-use crate::backend::{process_command, process_command_sync, LspRequestAsync, LspRequestSync};
+use crate::backend::{process_notification, process_request, LspNotification, LspRequest};
 use crate::state::EditorState;
 use crate::utils::log;
 use crate::utils::{
@@ -68,9 +68,9 @@ impl LspVscodeBridge {
                 log!("> opened: {}", &uri);
 
                 let command = if let Some(contract_location) = get_contract_location(&uri) {
-                    LspRequestAsync::ContractOpened(contract_location)
+                    LspNotification::ContractOpened(contract_location)
                 } else if let Some(manifest_location) = get_manifest_location(&uri) {
-                    LspRequestAsync::ManifestOpened(manifest_location)
+                    LspNotification::ManifestOpened(manifest_location)
                 } else {
                     log!("Unsupported file opened");
                     return Promise::resolve(&JsValue::null());
@@ -121,9 +121,9 @@ impl LspVscodeBridge {
                 log!("> saved: {}", uri);
 
                 let command = if let Some(contract_location) = get_contract_location(uri) {
-                    LspRequestAsync::ContractChanged(contract_location)
+                    LspNotification::ContractChanged(contract_location)
                 } else if let Some(manifest_location) = get_manifest_location(uri) {
-                    LspRequestAsync::ManifestChanged(manifest_location)
+                    LspNotification::ManifestChanged(manifest_location)
                 } else {
                     log!("Unsupported file opened");
                     return Promise::resolve(&JsValue::null());
@@ -184,12 +184,12 @@ impl LspVscodeBridge {
                 let file_url = params.text_document_position.text_document.uri;
 
                 let command = match get_contract_location(&file_url) {
-                    Some(location) => LspRequestSync::GetIntellisense(location),
+                    Some(location) => LspRequest::GetIntellisense(location),
                     _ => return JsValue::null(),
                 };
 
                 let result = match self.editor_state.try_read() {
-                    Ok(editor_state) => process_command_sync(command, &editor_state),
+                    Ok(editor_state) => process_request(command, &editor_state),
                     Err(_) => return JsValue::null(),
                 };
 

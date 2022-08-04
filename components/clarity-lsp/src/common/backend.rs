@@ -7,7 +7,7 @@ use serde::{Deserialize, Serialize};
 use std::sync::mpsc::{Receiver, Sender};
 
 #[derive(Debug, Serialize, Deserialize)]
-pub enum LspRequestAsync {
+pub enum LspNotification {
     ManifestOpened(FileLocation),
     ManifestChanged(FileLocation),
     ContractOpened(FileLocation),
@@ -15,7 +15,7 @@ pub enum LspRequestAsync {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-pub enum LspRequestSync {
+pub enum LspRequest {
     GetIntellisense(FileLocation),
 }
 
@@ -47,8 +47,8 @@ impl LspResponse {
 }
 
 pub async fn start_language_server(
-    bridge_to_backend_rx: Receiver<LspRequestAsync>,
-    backend_to_bridge_tx: Sender<LspResponse>,
+    notification_rx: Receiver<LspNotification>,
+    response_tx: Sender<LspResponse>,
     file_accessor: Option<Box<dyn FileAccessor>>,
 ) {
     let mut editor_state = EditorState::new();
@@ -59,27 +59,27 @@ pub async fn start_language_server(
     };
 
     loop {
-        let command = match bridge_to_backend_rx.recv() {
+        let command = match notification_rx.recv() {
             Ok(command) => command,
             Err(_e) => {
                 continue;
             }
         };
 
-        let result = process_command(command, &mut editor_state, file_accessor_ref).await;
+        let result = process_notification(command, &mut editor_state, file_accessor_ref).await;
         if let Ok(lsp_response) = result {
-            let _ = backend_to_bridge_tx.send(lsp_response);
+            let _ = response_tx.send(lsp_response);
         }
     }
 }
 
-pub async fn process_command(
-    command: LspRequestAsync,
+pub async fn process_notification(
+    command: LspNotification,
     editor_state: &mut EditorState,
     file_accessor: Option<&Box<dyn FileAccessor>>,
 ) -> Result<LspResponse, String> {
     match command {
-        LspRequestAsync::ManifestOpened(opened_manifest_location) => {
+        LspNotification::ManifestOpened(opened_manifest_location) => {
             // The only reason why we're waiting for this kind of events, is building our initial state
             // if the system is initialized, move on.
             if editor_state
@@ -111,7 +111,7 @@ pub async fn process_command(
                 Err(e) => return Ok(LspResponse::error(&e)),
             };
         }
-        LspRequestAsync::ContractOpened(contract_location) => {
+        LspNotification::ContractOpened(contract_location) => {
             // The only reason why we're waiting for this kind of events, is building our initial state
             // if the system is initialized, move on.
             let manifest_location = match file_accessor {
@@ -168,7 +168,7 @@ pub async fn process_command(
                 Err(e) => return Ok(LspResponse::error(&e)),
             };
         }
-        LspRequestAsync::ManifestChanged(manifest_location) => {
+        LspNotification::ManifestChanged(manifest_location) => {
             editor_state.clear_protocol(&manifest_location);
 
             // We will rebuild the entire state, without to try any optimizations for now
@@ -187,7 +187,7 @@ pub async fn process_command(
                 Err(e) => return Ok(LspResponse::error(&e)),
             };
         }
-        LspRequestAsync::ContractChanged(contract_location) => {
+        LspNotification::ContractChanged(contract_location) => {
             let manifest_location =
                 match editor_state.clear_protocol_associated_with_contract(&contract_location) {
                     Some(manifest_location) => manifest_location,
@@ -219,9 +219,9 @@ pub async fn process_command(
     }
 }
 
-pub fn process_command_sync(command: LspRequestSync, editor_state: &EditorState) -> LspResponse {
+pub fn process_request(command: LspRequest, editor_state: &EditorState) -> LspResponse {
     match command {
-        LspRequestSync::GetIntellisense(contract_location) => {
+        LspRequest::GetIntellisense(contract_location) => {
             let mut completion_items_src =
                 editor_state.get_completion_items_for_contract(&contract_location);
             let mut completion_items = vec![];
