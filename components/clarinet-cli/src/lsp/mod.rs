@@ -167,10 +167,10 @@ pub fn clarity_diagnostic_to_tower_lsp_type(
 
 #[test]
 fn test_opening_counter_contract_should_return_fresh_analysis() {
+    use clarinet_files::FileLocation;
+    use clarity_lsp::backend::{LspNotification, LspResponse};
     use crossbeam_channel::unbounded;
     use std::sync::mpsc::channel;
-    use clarity_lsp::backend::{LspNotification, LspResponse};
-    use clarinet_files::FileLocation;
 
     let (notification_tx, notification_rx) = unbounded();
     let (_request_tx, request_rx) = unbounded();
@@ -208,10 +208,10 @@ fn test_opening_counter_contract_should_return_fresh_analysis() {
 
 #[test]
 fn test_opening_counter_manifest_should_return_fresh_analysis() {
+    use clarinet_files::FileLocation;
+    use clarity_lsp::backend::{LspNotification, LspResponse};
     use crossbeam_channel::unbounded;
     use std::sync::mpsc::channel;
-    use clarity_lsp::backend::{LspNotification, LspResponse};
-    use clarinet_files::FileLocation;
 
     let (notification_tx, notification_rx) = unbounded();
     let (_request_tx, request_rx) = unbounded();
@@ -248,10 +248,10 @@ fn test_opening_counter_manifest_should_return_fresh_analysis() {
 
 #[test]
 fn test_opening_simple_nft_manifest_should_return_fresh_analysis() {
+    use clarinet_files::FileLocation;
+    use clarity_lsp::backend::LspNotification;
     use crossbeam_channel::unbounded;
     use std::sync::mpsc::channel;
-    use clarity_lsp::backend::LspNotification;
-    use clarinet_files::FileLocation;
 
     let (notification_tx, notification_rx) = unbounded();
     let (_request_tx, request_rx) = unbounded();
