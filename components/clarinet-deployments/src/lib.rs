@@ -10,9 +10,8 @@ use self::types::{
     DeploymentSpecification, EmulatedContractPublishSpecification, GenesisSpecification,
     TransactionPlanSpecification, TransactionsBatchSpecification, WalletSpecification,
 };
-use clarinet_files::{FileAccessor, FileLocation};
+use clarinet_files::FileAccessor;
 use clarity_repl::clarity::diagnostic::DiagnosableError;
-use clarity_repl::clarity::types::StandardPrincipalData;
 use types::ContractPublishSpecification;
 use types::DeploymentGenerationArtifacts;
 use types::RequirementPublishSpecification;
@@ -644,96 +643,6 @@ pub async fn generate_default_deployment<'a>(
         analysis: HashMap::new(),
         session,
     };
-
-    Ok((deployment, artifacts))
-}
-
-pub fn generate_simnet_deployment_for_snippet(
-    name: &str,
-    source: &str,
-    location: &FileLocation,
-) -> Result<
-    (
-        DeploymentSpecification,
-        (QualifiedContractIdentifier, DeploymentGenerationArtifacts),
-    ),
-    String,
-> {
-    let default_deployer_address = StandardPrincipalData::transient();
-    let mut contract_map = BTreeMap::new();
-    let parser_version = 2;
-    let mut settings = SessionSettings::default();
-    settings.include_boot_contracts = vec!["costs-v2".to_string()];
-    let session = Session::new(settings);
-
-    let mut contract_asts = HashMap::new();
-    let mut contract_diags = HashMap::new();
-
-    let contract_name = match ContractName::try_from(name.to_string()) {
-        Ok(res) => res,
-        Err(_) => return Err(format!("unable to use {} as a valid contract name", name)),
-    };
-
-    let contract_id =
-        QualifiedContractIdentifier::new(default_deployer_address.clone(), contract_name.clone());
-
-    let contract_spec =
-        TransactionSpecification::EmulatedContractPublish(EmulatedContractPublishSpecification {
-            contract_name,
-            emulated_sender: default_deployer_address,
-            source: source.to_string(),
-            location: location.clone(),
-        });
-
-    let (ast, diags, ast_success) =
-        session
-            .interpreter
-            .build_ast(contract_id.clone(), source.to_string(), parser_version);
-    contract_asts.insert(contract_id.clone(), ast);
-    contract_map.insert(contract_id.clone(), (source.to_string(), location.clone()));
-    contract_diags.insert(contract_id.clone(), diags);
-
-    let dependencies = ASTDependencyDetector::detect_dependencies(&contract_asts, &BTreeMap::new());
-
-    let dependencies = match dependencies {
-        Ok(dependencies) => dependencies,
-        Err((dependencies, _)) => {
-            // No need to report an error here, it will be caught and reported
-            // with proper location information by the later analyses.
-            dependencies
-        }
-    };
-
-    let batches = vec![TransactionsBatchSpecification {
-        id: 1,
-        transactions: vec![contract_spec],
-    }];
-
-    let deployment = DeploymentSpecification {
-        id: 0,
-        name: "Simnet deployment".to_string(),
-        stacks_node: None,
-        bitcoin_node: None,
-        network: StacksNetwork::Simnet,
-        genesis: Some(GenesisSpecification {
-            wallets: vec![],
-            contracts: vec!["costs-v2".to_string()],
-        }),
-        plan: TransactionPlanSpecification { batches },
-        contracts: contract_map,
-    };
-
-    let artifacts = (
-        contract_id,
-        DeploymentGenerationArtifacts {
-            asts: contract_asts,
-            deps: dependencies,
-            diags: contract_diags,
-            success: ast_success,
-            analysis: HashMap::new(),
-            session,
-        },
-    );
 
     Ok((deployment, artifacts))
 }

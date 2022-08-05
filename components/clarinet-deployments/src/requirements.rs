@@ -47,24 +47,23 @@ pub async fn retrieve_contract(
     let response = fetch_contract(request_url).await?;
     let code = response.source;
 
-    let _ = match file_accessor {
+    let result = match file_accessor {
         None => contract_location.write_content(code.as_bytes()),
         Some(file_accessor) => {
-            match file_accessor
+            file_accessor
                 .write_file(
                     manifest_location,
                     contract_location.to_string(),
                     code.as_bytes(),
                 )
                 .await
-            {
-                Ok(_) => Ok(()),
-                Err(err) => Err(err),
-            }
         }
     };
 
-    Ok((code, contract_location))
+    match result {
+        Ok(_) => Ok((code, contract_location)),
+        Err(err) => Err(err),
+    }
 }
 
 #[allow(dead_code)]

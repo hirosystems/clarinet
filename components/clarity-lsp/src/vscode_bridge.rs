@@ -24,7 +24,7 @@ use wasm_bindgen_futures::future_to_promise;
 
 #[wasm_bindgen]
 pub struct LspVscodeBridge {
-    editor_state: Arc<RwLock<EditorState>>,
+    editor_state_lock: Arc<RwLock<EditorState>>,
     client_diagnostic_tx: JsFunction,
     _client_notification_tx: JsFunction,
     backend_to_client_tx: JsFunction,
@@ -40,9 +40,9 @@ impl LspVscodeBridge {
     ) -> LspVscodeBridge {
         panic::set_hook(Box::new(console_error_panic_hook::hook));
 
-        let editor_state = Arc::new(RwLock::new(EditorState::new()));
+        let editor_state_lock = Arc::new(RwLock::new(EditorState::new()));
         LspVscodeBridge {
-            editor_state,
+            editor_state_lock,
             client_diagnostic_tx,
             _client_notification_tx,
             backend_to_client_tx,
@@ -76,13 +76,14 @@ impl LspVscodeBridge {
                     return Promise::resolve(&JsValue::null());
                 };
 
-                let editor_state = self.editor_state.clone();
+                let editor_state_lock = self.editor_state_lock.clone();
                 let send_diagnostic = self.client_diagnostic_tx.clone();
 
                 return future_to_promise(async move {
-                    let mut result = match editor_state.try_write() {
-                        Ok(mut state) => {
-                            process_notification(command, &mut state, Some(&file_accessor)).await
+                    let mut result = match editor_state_lock.try_write() {
+                        Ok(mut editor_state) => {
+                            process_notification(command, &mut editor_state, Some(&file_accessor))
+                                .await
                         }
                         Err(_) => return Err(JsValue::from("unable to lock editor_state")),
                     };
@@ -129,13 +130,14 @@ impl LspVscodeBridge {
                     return Promise::resolve(&JsValue::null());
                 };
 
-                let editor_state = self.editor_state.clone();
+                let editor_state_lock = self.editor_state_lock.clone();
                 let send_diagnostic = self.client_diagnostic_tx.clone();
 
                 return future_to_promise(async move {
-                    let mut result = match editor_state.try_write() {
-                        Ok(mut state) => {
-                            process_notification(command, &mut state, Some(&file_accessor)).await
+                    let mut result = match editor_state_lock.try_write() {
+                        Ok(mut editor_state) => {
+                            process_notification(command, &mut editor_state, Some(&file_accessor))
+                                .await
                         }
                         Err(_) => return Err(JsValue::from("unable to lock editor_state")),
                     };
@@ -188,7 +190,7 @@ impl LspVscodeBridge {
                     _ => return JsValue::null(),
                 };
 
-                let result = match self.editor_state.try_read() {
+                let result = match self.editor_state_lock.try_read() {
                     Ok(editor_state) => process_request(command, &editor_state),
                     Err(_) => return JsValue::null(),
                 };

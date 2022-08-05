@@ -281,7 +281,7 @@ impl ProtocolState {
     }
 }
 
-pub async fn build_state<'a>(
+pub async fn build_state(
     manifest_location: &FileLocation,
     protocol_state: &mut ProtocolState,
     file_accessor: Option<&Box<dyn FileAccessor>>,
@@ -297,9 +297,6 @@ pub async fn build_state<'a>(
     let manifest = match file_accessor {
         None => ProjectManifest::from_location(manifest_location)?,
         Some(file_accessor) => {
-            // We should create a new async function in `ProjectManifest` that can take a `file_accessor: &Box<dyn FileAccessor>`
-            // as an argument, and that will use:
-            // file_accessor.read_manifest_content()
             ProjectManifest::from_file_accessor(manifest_location, file_accessor).await?
         }
     };

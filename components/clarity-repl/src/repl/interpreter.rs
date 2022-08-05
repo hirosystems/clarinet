@@ -282,20 +282,40 @@ impl ClarityInterpreter {
                 // If they don't match, report a warning and use v1. Once v2 is battle-tested,
                 // this can be removed. If there are errors when parsing, then the ASTs are not
                 // expected to match, and v2 is still used.
-                // let (ast, diagnostics, success) =
-                //     ast::build_ast(&contract_identifier, &snippet, &mut ());
-                // let (ast_old, mut diagnostics_old, success_old) =
-                //     match clarity::ast::build_ast(&contract_identifier, &snippet, &mut ()) {
-                //         Ok(res) => (res, vec![], true),
-                //         Err(error) => (
-                //             ContractAST::new(contract_identifier, vec![]),
-                //             vec![error.diagnostic],
-                //             false,
-                //         ),
-                //     };
+                let (ast, diagnostics, success) =
+                    ast::build_ast(&contract_identifier, &snippet, &mut ());
 
-                // switch to v2 for now for performances
-                ast::build_ast(&contract_identifier, &snippet, &mut ())
+                #[cfg(not(feature = "wasm"))]
+                {
+                    let (ast_old, mut diagnostics_old, success_old) =
+                        match clarity::ast::build_ast(&contract_identifier, &snippet, &mut ()) {
+                            Ok(res) => (res, vec![], true),
+                            Err(error) => (
+                                ContractAST::new(contract_identifier, vec![]),
+                                vec![error.diagnostic],
+                                false,
+                            ),
+                        };
+                    if (success && !ast.equivalent(&ast_old)) || success != success_old {
+                        diagnostics_old.push(Diagnostic {
+                            // switch to v2 for now for performances
+                            level: Level::Warning,
+                            message: r#"conflict between parser versions, reverting to parser v1
+Help improve clarinet by sharing the code that triggered this warning:
+https://github.com/hirosystems/clarinet/issues/new/choose"#
+                                .to_string(),
+                            spans: vec![],
+                            suggestion: None,
+                        });
+                        (ast_old, diagnostics_old, success_old)
+                    } else {
+                        (ast, diagnostics, success)
+                    }
+                }
+
+                // use only v2 in wasm context for performances
+                #[cfg(feature = "wasm")]
+                (ast, diagnostics, success)
             }
         }
     }
