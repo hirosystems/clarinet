@@ -26,6 +26,7 @@ use url::Url;
 pub const DEFAULT_DEVNET_BALANCE: u64 = 100_000_000_000_000;
 
 pub type PerformFileAccess = Pin<Box<dyn Future<Output = Result<(FileLocation, String), String>>>>;
+pub type PerformFileWrite = Pin<Box<dyn Future<Output = Result<(), String>>>>;
 
 pub trait FileAccessor {
     fn read_manifest_content(&self, manifest_location: FileLocation) -> PerformFileAccess;
@@ -39,7 +40,7 @@ pub trait FileAccessor {
         manifest_location: FileLocation,
         relative_path: String,
         content: &[u8],
-    ) -> PerformFileAccess;
+    ) -> PerformFileWrite;
 }
 
 #[derive(Deserialize, Debug, Clone, PartialEq, Eq, Hash)]
@@ -248,7 +249,7 @@ impl FileLocation {
 
     pub fn get_parent_location(&self) -> Result<FileLocation, String> {
         let mut parent_location = self.clone();
-        match parent_location.borrow_mut() {
+        match &mut parent_location {
             FileLocation::FileSystem { path } => {
                 let mut parent = path.clone();
                 parent.pop();
