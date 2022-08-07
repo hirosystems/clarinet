@@ -245,13 +245,13 @@ pub struct TestSummary {
 }
 
 #[derive(Debug, Clone)]
-struct TestSpecifierOptions {
-    compat_mode: bool,
-    concurrent_jobs: NonZeroUsize,
-    fail_fast: Option<NonZeroUsize>,
-    filter: TestFilter,
-    shuffle: Option<u64>,
-    trace_ops: bool,
+pub struct TestSpecifierOptions {
+    pub compat_mode: bool,
+    pub concurrent_jobs: NonZeroUsize,
+    pub fail_fast: Option<NonZeroUsize>,
+    pub filter: TestFilter,
+    pub shuffle: Option<u64>,
+    pub trace_ops: bool,
 }
 
 impl TestSummary {
@@ -277,18 +277,18 @@ impl TestSummary {
     }
 }
 
-struct PrettyTestReporter {
-    parallel: bool,
-    echo_output: bool,
-    in_new_line: bool,
-    last_wait_id: Option<usize>,
-    cwd: Url,
-    did_have_user_output: bool,
-    started_tests: bool,
+pub struct PrettyTestReporter {
+    pub parallel: bool,
+    pub echo_output: bool,
+    pub in_new_line: bool,
+    pub last_wait_id: Option<usize>,
+    pub cwd: Url,
+    pub did_have_user_output: bool,
+    pub started_tests: bool,
 }
 
 impl PrettyTestReporter {
-    fn new(parallel: bool, echo_output: bool) -> PrettyTestReporter {
+    pub fn new(parallel: bool, echo_output: bool) -> PrettyTestReporter {
         PrettyTestReporter {
             parallel,
             echo_output,
@@ -300,7 +300,7 @@ impl PrettyTestReporter {
         }
     }
 
-    fn force_report_wait(&mut self, description: &TestDescription) {
+    pub fn force_report_wait(&mut self, description: &TestDescription) {
         if !self.in_new_line {
             println!();
         }
@@ -320,7 +320,7 @@ impl PrettyTestReporter {
         self.last_wait_id = Some(description.id);
     }
 
-    fn to_relative_path_or_remote_url(&self, path_or_url: &str) -> String {
+    pub fn to_relative_path_or_remote_url(&self, path_or_url: &str) -> String {
         let url = Url::parse(path_or_url).unwrap();
         if url.scheme() == "file" {
             if let Some(mut r) = self.cwd.make_relative(&url) {
@@ -333,7 +333,7 @@ impl PrettyTestReporter {
         path_or_url.to_string()
     }
 
-    fn force_report_step_wait(&mut self, description: &TestStepDescription) {
+    pub fn force_report_step_wait(&mut self, description: &TestStepDescription) {
         self.write_output_end();
         if !self.in_new_line {
             println!();
@@ -345,7 +345,7 @@ impl PrettyTestReporter {
         self.last_wait_id = Some(description.id);
     }
 
-    fn force_report_step_result(
+    pub fn force_report_step_result(
         &mut self,
         description: &TestStepDescription,
         result: &TestStepResult,
@@ -379,7 +379,7 @@ impl PrettyTestReporter {
         self.in_new_line = true;
     }
 
-    fn write_output_end(&mut self) {
+    pub fn write_output_end(&mut self) {
         if self.did_have_user_output {
             println!("{}", colors::gray("----- output end -----"));
             self.in_new_line = true;
@@ -387,9 +387,9 @@ impl PrettyTestReporter {
         }
     }
 
-    fn report_register(&mut self, _description: &TestDescription) {}
+    pub fn report_register(&mut self, _description: &TestDescription) {}
 
-    fn report_plan(&mut self, plan: &TestPlan) {
+    pub fn report_plan(&mut self, plan: &TestPlan) {
         if self.parallel {
             return;
         }
@@ -406,14 +406,14 @@ impl PrettyTestReporter {
         self.in_new_line = true;
     }
 
-    fn report_wait(&mut self, description: &TestDescription) {
+    pub fn report_wait(&mut self, description: &TestDescription) {
         if !self.parallel {
             self.force_report_wait(description);
         }
         self.started_tests = true;
     }
 
-    fn report_output(&mut self, output: &[u8]) {
+    pub fn report_output(&mut self, output: &[u8]) {
         if !self.echo_output {
             return;
         }
@@ -432,7 +432,7 @@ impl PrettyTestReporter {
         std::io::stdout().write_all(output).unwrap();
     }
 
-    fn report_result(&mut self, description: &TestDescription, result: &TestResult, elapsed: u64) {
+    pub fn report_result(&mut self, description: &TestDescription, result: &TestResult, elapsed: u64) {
         if self.parallel {
             self.force_report_wait(description);
         }
@@ -457,7 +457,7 @@ impl PrettyTestReporter {
         self.in_new_line = true;
     }
 
-    fn report_uncaught_error(&mut self, origin: &str, _error: &JsError) {
+    pub fn report_uncaught_error(&mut self, origin: &str, _error: &JsError) {
         if !self.in_new_line {
             println!();
         }
@@ -470,15 +470,15 @@ impl PrettyTestReporter {
         self.did_have_user_output = false;
     }
 
-    fn report_step_register(&mut self, _description: &TestStepDescription) {}
+    pub fn report_step_register(&mut self, _description: &TestStepDescription) {}
 
-    fn report_step_wait(&mut self, description: &TestStepDescription) {
+    pub fn report_step_wait(&mut self, description: &TestStepDescription) {
         if !self.parallel {
             self.force_report_step_wait(description);
         }
     }
 
-    fn report_step_result(
+    pub fn report_step_result(
         &mut self,
         description: &TestStepDescription,
         result: &TestStepResult,
@@ -519,7 +519,7 @@ impl PrettyTestReporter {
         self.force_report_step_result(description, result, elapsed);
     }
 
-    fn report_summary(&mut self, summary: &TestSummary, elapsed: &Duration) {
+    pub fn report_summary(&mut self, summary: &TestSummary, elapsed: &Duration) {
         if !summary.failures.is_empty() || !summary.uncaught_errors.is_empty() {
             #[allow(clippy::type_complexity)] // Type alias doesn't look better here
             let mut failures_by_origin: BTreeMap<

@@ -1,54 +1,60 @@
-use super::api_v1::SessionArtifacts;
-use super::{api_v1, costs, DeploymentCache};
-use crate::frontend::cli;
-use clarity_repl::clarity::coverage::CoverageReporter;
-use clarity_repl::clarity::types;
-use clarity_repl::repl::Session;
-use deno::ast;
-use deno::colors;
-use deno::create_main_worker;
-use deno::file_watcher::{self, ResolutionResult};
-use deno::fs_util;
-use deno::module_graph::{self, GraphBuilder, Module};
-use deno::specifier_handler::FetchHandler;
-use deno::tokio_util;
-use deno::tools;
-use deno::tools::coverage::CoverageCollector;
-use deno::tools::test_runner::{self, create_reporter, TestEvent, TestMessage, TestResult};
-use deno::tsc::{op, State};
-use deno::File;
-use deno::Flags;
-use deno::MediaType;
-use deno::ProgramState;
+// Copyright 2018-2022 the Deno authors. All rights reserved. MIT license.
+
+use super::vendor::deno_cli::args::{Flags, TestFlags, DenoSubcommand};
+use super::vendor::deno_cli::args::TypeCheckMode;
+use super::vendor::deno_cli::compat;
+use super::vendor::deno_cli::create_main_worker;
+use super::vendor::deno_cli::file_fetcher::File;
+use super::vendor::deno_cli::file_watcher;
+use super::vendor::deno_cli::file_watcher::ResolutionResult;
+use super::vendor::deno_cli::fmt_errors::format_js_error;
+use super::vendor::deno_cli::fs_util::collect_specifiers;
+use super::vendor::deno_cli::fs_util::is_supported_test_ext;
+use super::vendor::deno_cli::fs_util::is_supported_test_path;
+use super::vendor::deno_cli::fs_util::specifier_to_file_path;
+use super::vendor::deno_cli::graph_util::contains_specifier;
+use super::vendor::deno_cli::graph_util::graph_valid;
+use super::vendor::deno_cli::ops;
+use super::vendor::deno_cli::proc_state::ProcState;
+use super::vendor::deno_cli::tools::coverage::CoverageCollector;
+use super::vendor::deno_cli::tools::test::{TestEventSender, TestEvent, TestFilter, TestResult, TestMode, TestStepResult, TestSummary, TestSpecifierOptions, PrettyTestReporter};
+
+use super::vendor::deno_runtime::ops::io::Stdio;
+use super::vendor::deno_runtime::ops::io::StdioPipe;
+use super::vendor::deno_runtime::permissions::Permissions;
+use super::vendor::deno_runtime::tokio_util::run_local;
+use deno_ast::swc::common::comments::CommentKind;
+use deno_ast::MediaType;
+use deno_ast::SourceRangedForSpanned;
+use deno_core::error::generic_error;
 use deno_core::error::AnyError;
+use deno_core::error::JsError;
 use deno_core::futures::future;
 use deno_core::futures::stream;
 use deno_core::futures::FutureExt;
 use deno_core::futures::StreamExt;
-use deno_core::op_sync;
-use deno_core::serde_json::{self, json, Value};
-use deno_core::url::Url;
+use deno_core::located_script_name;
+use deno_core::parking_lot::Mutex;
+use deno_core::serde_json::json;
 use deno_core::ModuleSpecifier;
-use deno_core::{OpFn, OpState};
-use deno_runtime::permissions::Permissions;
+use deno_graph::ModuleKind;
+use indexmap::IndexMap;
+use log::Level;
+use rand::rngs::SmallRng;
+use rand::seq::SliceRandom;
+use rand::SeedableRng;
 use regex::Regex;
-use serde::de::DeserializeOwned;
-use serde::Serialize;
-use std::collections::{btree_map::Entry, BTreeMap};
-use std::collections::{HashMap, HashSet};
-use std::convert::TryFrom;
-use std::fmt::Write;
-use std::ops::Index;
-use std::path::Path;
+use std::collections::HashSet;
+use std::fmt::Write as _;
+use std::io::Read;
+use std::io::Write;
+use std::num::NonZeroUsize;
 use std::path::PathBuf;
-use std::rc::Rc;
-use std::sync::mpsc::channel;
-use std::sync::mpsc::Sender;
 use std::sync::Arc;
-use std::sync::Mutex;
-use swc_common::comments::CommentKind;
-
-use clarinet_deployments::types::DeploymentSpecification;
+use std::time::Instant;
+use tokio::sync::mpsc::unbounded_channel;
+use tokio::sync::mpsc::UnboundedSender;
+use super::{DeploymentCache, api_v1};
 use clarinet_files::ProjectManifest;
 
 pub async fn do_run_scripts(
@@ -62,528 +68,1085 @@ pub async fn do_run_scripts(
     cache: DeploymentCache,
     deployment_plan_path: Option<String>,
 ) -> Result<u32, AnyError> {
-    let mut flags = Flags::default();
-    flags.unstable = true;
-    flags.reload = true;
-    if allow_disk_write {
-        let mut write_path_location = manifest.location.get_project_root_location().unwrap();
-        write_path_location.append_path("artifacts");
-        let write_path = write_path_location.to_string();
-        let _ = std::fs::create_dir_all(&write_path);
-        flags.allow_write = Some(vec![PathBuf::from(write_path)])
-    }
-    let program_state = ProgramState::build(flags.clone()).await?;
-    let permissions = Permissions::from_options(&flags.clone().into());
-    let project_root_path = manifest
-        .location
-        .get_project_root_location()
-        .unwrap()
-        .to_string();
-    let cwd = Path::new(&project_root_path);
-    let mut include = if include.is_empty() {
-        vec!["tests".into()]
-    } else {
-        include.clone()
+    let concurrent_jobs = NonZeroUsize::new(num_cpus::get()).expect("unable to determine num_cp");
+    let test_flags = TestFlags {
+        ignore: vec![],             // todo(lgalabru)
+        no_run: true,               // todo(lgalabru)
+        fail_fast: None,            // todo(lgalabru)
+        allow_none: true,           // todo(lgalabru)
+        include: vec![],            // todo(lgalabru)
+        filter: None,               // todo(lgalabru)
+        shuffle: None,
+        doc: false,
+        concurrent_jobs,
+        trace_ops: false,           // todo(lgalabru)
+    };
+    let flags = Flags { 
+        argv: vec![], 
+        subcommand: DenoSubcommand::Test(test_flags.clone()), 
+        allow_all: false, 
+        allow_env: None, 
+        allow_hrtime: false, 
+        allow_net: None, 
+        allow_ffi: None, 
+        allow_read: None,           // todo(lgalabru)
+        allow_run: None,            // todo(lgalabru)
+        allow_write: None,          // todo(lgalabru)
+        cache_blocklist: vec![],    // todo(lgalabru)
+        cache_path: None,           // todo(lgalabru)
+        cached_only: false,         // todo(lgalabru)
+        coverage_dir: None,         // todo(lgalabru)
+        ignore: vec![],             // todo(lgalabru)
+        import_map_path: None,      // todo(lgalabru)
+        watch: None,                // todo(lgalabru)
+        type_check_mode: TypeCheckMode::Local, 
+        ..Default::default()
     };
 
-    let allow_none = true;
-    let no_run = false;
-    let concurrent_jobs = num_cpus::get();
-    let quiet = false;
-    let filter: Option<String> = None;
-    let fail_fast = true;
-    let lib = if flags.unstable {
-        module_graph::TypeLib::UnstableDenoWindow
+    if flags.watch.is_some() {
+        run_tests_with_watch(flags, test_flags, allow_wallets).await?;
     } else {
-        module_graph::TypeLib::DenoWindow
-    };
-
-    if watch {
-        let handler = Arc::new(Mutex::new(FetchHandler::new(
-            &program_state,
-            Permissions::allow_all(),
-            Permissions::allow_all(),
-        )?));
-
-        include.push("contracts".into());
-
-        let paths_to_watch: Vec<_> = include.iter().map(PathBuf::from).collect();
-
-        let resolver = |changed: Option<Vec<PathBuf>>| {
-            let doc_modules_result = test_runner::collect_test_module_specifiers(
-                include.clone(),
-                &cwd,
-                is_supported_ext,
-            );
-
-            let test_modules_result = test_runner::collect_test_module_specifiers(
-                include.clone(),
-                &cwd,
-                test_runner::is_supported,
-            );
-
-            let paths_to_watch = paths_to_watch.clone();
-            let paths_to_watch_clone = paths_to_watch.clone();
-
-            let handler = handler.clone();
-            let program_state = program_state.clone();
-            let files_changed = changed.is_some();
-            async move {
-                let doc_modules = doc_modules_result?;
-
-                let test_modules = test_modules_result?;
-
-                let mut paths_to_watch = paths_to_watch_clone;
-                let mut modules_to_reload = if files_changed {
-                    Vec::new()
-                } else {
-                    test_modules
-                        .iter()
-                        .filter_map(|url| deno_core::resolve_url(url.as_str()).ok())
-                        .collect()
-                };
-
-                let mut builder = GraphBuilder::new(
-                    handler,
-                    program_state.maybe_import_map.clone(),
-                    program_state.lockfile.clone(),
-                );
-                for specifier in test_modules.iter() {
-                    builder.add(specifier, false).await?;
-                }
-                let graph = builder.get_graph();
-
-                for specifier in test_modules {
-                    fn get_dependencies<'a>(
-                        graph: &'a module_graph::Graph,
-                        module: &'a Module,
-                        // This needs to be accessible to skip getting dependencies if they're already there,
-                        // otherwise this will cause a stack overflow with circular dependencies
-                        output: &mut HashSet<&'a ModuleSpecifier>,
-                    ) -> Result<(), AnyError> {
-                        for dep in module.dependencies.values() {
-                            if let Some(specifier) = &dep.maybe_code {
-                                if !output.contains(specifier) {
-                                    output.insert(specifier);
-
-                                    get_dependencies(
-                                        &graph,
-                                        graph.get_specifier(specifier)?,
-                                        output,
-                                    )?;
-                                }
-                            }
-                            if let Some(specifier) = &dep.maybe_type {
-                                if !output.contains(specifier) {
-                                    output.insert(specifier);
-
-                                    get_dependencies(
-                                        &graph,
-                                        graph.get_specifier(specifier)?,
-                                        output,
-                                    )?;
-                                }
-                            }
-                        }
-
-                        Ok(())
-                    }
-
-                    // This test module and all it's dependencies
-                    let mut modules = HashSet::new();
-                    modules.insert(&specifier);
-                    get_dependencies(&graph, graph.get_specifier(&specifier)?, &mut modules)?;
-
-                    paths_to_watch.extend(
-                        modules
-                            .iter()
-                            .filter_map(|specifier| specifier.to_file_path().ok()),
-                    );
-
-                    if let Some(changed) = &changed {
-                        for path in changed.iter().filter_map(|path| {
-                            deno_core::resolve_url_or_path(&path.to_string_lossy()).ok()
-                        }) {
-                            if path.path().ends_with(".clar") {
-                                modules_to_reload.push(specifier.clone());
-                            } else {
-                                if modules.contains(&&path) {
-                                    modules_to_reload.push(specifier);
-                                    break;
-                                }
-                            }
-                        }
-                    }
-                }
-
-                Ok((paths_to_watch, modules_to_reload))
-            }
-            .map(move |result| match result {
-                Ok((paths_to_watch, modules_to_reload)) => ResolutionResult::Restart {
-                    paths_to_watch,
-                    result: Ok(modules_to_reload),
-                },
-                Err(e) => ResolutionResult::Restart {
-                    paths_to_watch,
-                    result: Err(e),
-                },
-            })
-        };
-
-        file_watcher::watch_func(
-            resolver,
-            |modules_to_reload| {
-                // Clear the screen
-                print!("{esc}c", esc = 27 as char);
-                // Clear eventual previous sessions
-                let cache = cli::build_deployment_cache_or_exit(manifest, &deployment_plan_path);
-
-                run_scripts(
-                    program_state.clone(),
-                    permissions.clone(),
-                    lib.clone(),
-                    modules_to_reload.clone(),
-                    modules_to_reload,
-                    no_run,
-                    fail_fast,
-                    quiet,
-                    true,
-                    filter.clone(),
-                    concurrent_jobs,
-                    allow_wallets,
-                    Some(cache),
-                )
-                .map(|mut res| {
-                    match res.as_mut() {
-                        Ok((failed, sessions_artifacts)) if !*failed => {
-                            if include_costs_report {
-                                costs::display_costs_report(sessions_artifacts)
-                            }
-                        }
-                        _ => {}
-                    };
-                    res.map(|_| ())
-                })
-            },
-            "Test",
-        )
-        .await?;
-    } else {
-        let doc_modules = vec![];
-
-        let test_modules = test_runner::collect_test_module_specifiers(
-            include.clone(),
-            &cwd,
-            tools::test_runner::is_supported,
-        )?;
-
-        let (failed, sessions_artifacts) = run_scripts(
-            program_state.clone(),
-            permissions,
-            lib,
-            doc_modules,
-            test_modules,
-            no_run,
-            fail_fast,
-            quiet,
-            allow_none,
-            filter,
-            concurrent_jobs,
-            allow_wallets,
-            Some(cache.clone()),
-        )
-        .await?;
-
-        if failed {
-            std::process::exit(1);
-        }
-
-        if include_coverage {
-            let mut coverage_reporter = CoverageReporter::new();
-            for (contract_id, analysis_artifacts) in cache.contracts_artifacts.iter() {
-                coverage_reporter
-                    .asts
-                    .insert(contract_id.clone(), analysis_artifacts.ast.clone());
-            }
-            for (contract_id, (_, contract_location)) in cache.deployment.contracts.iter() {
-                coverage_reporter
-                    .contract_paths
-                    .insert(contract_id.name.to_string(), contract_location.to_string());
-            }
-            for artifact in sessions_artifacts.iter() {
-                let mut coverage_reports = artifact.coverage_reports.clone();
-                coverage_reporter.reports.append(&mut coverage_reports);
-            }
-            coverage_reporter.write_lcov_file("coverage.lcov");
-        }
-
-        if include_costs_report {
-            costs::display_costs_report(&sessions_artifacts);
-        }
+        run_tests(flags, test_flags, allow_wallets, Some(cache)).await?;
     }
-    Ok(0 as u32)
+
+    Ok(1)
 }
 
-pub fn is_supported_ext(path: &Path) -> bool {
-    if let Some(ext) = fs_util::get_extension(path) {
-        matches!(ext.as_str(), "ts" | "js" | "clar")
-    } else {
-        false
-    }
-}
+fn abbreviate_test_error(js_error: &JsError) -> JsError {
+    let mut js_error = js_error.clone();
+    let frames = std::mem::take(&mut js_error.frames);
 
-#[allow(clippy::too_many_arguments)]
-pub async fn run_scripts(
-    program_state: Arc<ProgramState>,
-    permissions: Permissions,
-    lib: module_graph::TypeLib,
-    doc_modules: Vec<ModuleSpecifier>,
-    test_modules: Vec<ModuleSpecifier>,
-    no_run: bool,
-    fail_fast: bool,
-    quiet: bool,
-    allow_none: bool,
-    filter: Option<String>,
-    concurrent_jobs: usize,
-    allow_wallets: bool,
-    cache: Option<DeploymentCache>,
-) -> Result<(bool, Vec<SessionArtifacts>), AnyError> {
-    if !doc_modules.is_empty() {
-        let mut test_programs = Vec::new();
-
-        let blocks_regex = Regex::new(r"```([^\n]*)\n([\S\s]*?)```")?;
-        let lines_regex = Regex::new(r"(?:\* ?)(?:\# ?)?(.*)")?;
-
-        for specifier in &doc_modules {
-            let mut fetch_permissions = Permissions::allow_all();
-            let file = program_state
-                .file_fetcher
-                .fetch(&specifier, &mut fetch_permissions)
-                .await?;
-
-            let parsed_module =
-                ast::parse(&file.specifier.as_str(), &file.source, &file.media_type)?;
-
-            let mut comments = parsed_module.get_comments();
-            comments.sort_by_key(|comment| {
-                let location = parsed_module.get_location(&comment.span);
-                location.line
-            });
-
-            for comment in comments {
-                if comment.kind != CommentKind::Block || !comment.text.starts_with('*') {
-                    continue;
-                }
-
-                for block in blocks_regex.captures_iter(&comment.text) {
-                    let body = block.get(2).unwrap();
-                    let text = body.as_str();
-
-                    // TODO(caspervonb) generate an inline source map
-                    let mut source = String::new();
-                    for line in lines_regex.captures_iter(&text) {
-                        let text = line.get(1).unwrap();
-                        source.push_str(&format!("{}\n", text.as_str()));
-                    }
-
-                    source.push_str("export {};");
-
-                    let element = block.get(0).unwrap();
-                    let span = comment
-                        .span
-                        .from_inner_byte_pos(element.start(), element.end());
-                    let location = parsed_module.get_location(&span);
-
-                    let specifier = deno_core::resolve_url_or_path(&format!(
-                        "{}${}-{}",
-                        location.filename,
-                        location.line,
-                        location.line + element.as_str().split('\n').count(),
-                    ))?;
-
-                    let file = File {
-                        local: specifier.to_file_path().unwrap(),
-                        maybe_types: None,
-                        media_type: MediaType::TypeScript, // media_type.clone(),
-                        source: source.clone(),
-                        specifier: specifier.clone(),
-                    };
-
-                    program_state.file_fetcher.insert_cached(file.clone());
-                    test_programs.push(file.specifier.clone());
-                }
-            }
+    // check if there are any stack frames coming from user code
+    let should_filter = frames.iter().any(|f| {
+        if let Some(file_name) = &f.file_name {
+            !(file_name.starts_with("[deno:") || file_name.starts_with("deno:"))
+        } else {
+            true
         }
-
-        program_state
-            .prepare_module_graph(
-                test_programs.clone(),
-                lib.clone(),
-                Permissions::allow_all(),
-                permissions.clone(),
-                program_state.maybe_import_map.clone(),
-            )
-            .await?;
-    } else if test_modules.is_empty() {
-        println!("No matching test modules found");
-        if !allow_none {
-            std::process::exit(1);
-        }
-
-        return Ok((false, vec![]));
-    }
-
-    let execution_result = program_state
-        .prepare_module_graph(
-            test_modules.clone(),
-            lib.clone(),
-            Permissions::allow_all(),
-            permissions.clone(),
-            program_state.maybe_import_map.clone(),
-        )
-        .await;
-    if let Err(e) = execution_result {
-        println!("{}", e);
-        return Err(e);
-    }
-
-    if no_run {
-        return Ok((false, vec![]));
-    }
-
-    // Because scripts, and therefore worker.execute cannot detect unresolved promises at the moment
-    // we generate a module for the actual test execution.
-    let test_options = json!({
-        "disableLog": quiet,
-        "filter": filter,
     });
 
-    let test_module = deno_core::resolve_path("$deno$test.js")?;
-    let test_source = format!("await Deno[Deno.internal].runTests({});", test_options);
-    let test_file = File {
-        local: test_module.to_file_path().unwrap(),
-        maybe_types: None,
-        media_type: MediaType::JavaScript,
-        source: test_source.clone(),
-        specifier: test_module.clone(),
+    if should_filter {
+        let mut frames = frames
+            .into_iter()
+            .rev()
+            .skip_while(|f| {
+                if let Some(file_name) = &f.file_name {
+                    file_name.starts_with("[deno:") || file_name.starts_with("deno:")
+                } else {
+                    false
+                }
+            })
+            .into_iter()
+            .collect::<Vec<_>>();
+        frames.reverse();
+        js_error.frames = frames;
+    } else {
+        js_error.frames = frames;
+    }
+
+    js_error.cause = js_error
+        .cause
+        .as_ref()
+        .map(|e| Box::new(abbreviate_test_error(e)));
+    js_error.aggregated = js_error
+        .aggregated
+        .as_ref()
+        .map(|es| es.iter().map(abbreviate_test_error).collect());
+    js_error
+}
+
+// This function prettifies `JsError` and applies some changes specifically for
+// test runner purposes:
+//
+// - filter out stack frames:
+//   - if stack trace consists of mixed user and internal code, the frames
+//     below the first user code frame are filtered out
+//   - if stack trace consists only of internal code it is preserved as is
+pub fn format_test_error(js_error: &JsError) -> String {
+    let mut js_error = abbreviate_test_error(js_error);
+    js_error.exception_message = js_error
+        .exception_message
+        .trim_start_matches("Uncaught ")
+        .to_string();
+    format_js_error(&js_error)
+}
+
+/// Test a single specifier as documentation containing test programs, an executable test module or
+/// both.
+async fn test_specifier(
+    ps: ProcState,
+    permissions: Permissions,
+    specifier: ModuleSpecifier,
+    mode: TestMode,
+    sender: &TestEventSender,
+    options: TestSpecifierOptions,
+) -> Result<(), AnyError> {
+    let mut worker = create_main_worker(
+        &ps,
+        specifier.clone(),
+        permissions,
+        vec![ops::testing::init(sender.clone(), options.filter.clone())],
+        Stdio {
+            stdin: StdioPipe::Inherit,
+            stdout: StdioPipe::File(sender.stdout()),
+            stderr: StdioPipe::File(sender.stderr()),
+        },
+    );
+
+    worker.js_runtime.execute_script(
+        &located_script_name!(),
+        r#"Deno[Deno.internal].enableTestAndBench()"#,
+    )?;
+
+    let mut maybe_coverage_collector = if let Some(ref coverage_dir) = ps.coverage_dir {
+        let session = worker.create_inspector_session().await;
+        let coverage_dir = PathBuf::from(coverage_dir);
+        let mut coverage_collector = CoverageCollector::new(coverage_dir, session);
+        worker
+            .with_event_loop(coverage_collector.start_collecting().boxed_local())
+            .await?;
+
+        Some(coverage_collector)
+    } else {
+        None
     };
 
-    program_state.file_fetcher.insert_cached(test_file);
+    // Enable op call tracing in core to enable better debugging of op sanitizer
+    // failures.
+    if options.trace_ops {
+        worker
+            .execute_script(&located_script_name!(), "Deno.core.enableOpCallTracing();")
+            .unwrap();
+    }
 
-    let (sender, receiver) = channel::<TestEvent>();
+    // We only execute the specifier as a module if it is tagged with TestMode::Module or
+    // TestMode::Both.
+    if mode != TestMode::Documentation {
+        if options.compat_mode {
+            worker.execute_side_module(&compat::GLOBAL_URL).await?;
+            worker.execute_side_module(&compat::MODULE_URL).await?;
 
-    let join_handles = test_modules.iter().map(move |main_module| {
-        let program_state = program_state.clone();
-        let main_module = main_module.clone();
-        let test_module = test_module.clone();
+            let use_esm_loader = compat::check_if_should_use_esm_loader(&specifier)?;
+
+            if use_esm_loader {
+                worker.execute_side_module(&specifier).await?;
+            } else {
+                compat::load_cjs_module(
+                    &mut worker.js_runtime,
+                    &specifier.to_file_path().unwrap().display().to_string(),
+                    false,
+                )?;
+                worker.run_event_loop(false).await?;
+            }
+        } else {
+            // We execute the module module as a side module so that import.meta.main is not set.
+            worker.execute_side_module(&specifier).await?;
+        }
+    }
+
+    worker.dispatch_load_event(&located_script_name!())?;
+
+    let test_result = worker.js_runtime.execute_script(
+        &located_script_name!(),
+        &format!(
+            r#"Deno[Deno.internal].runTests({})"#,
+            json!({ "shuffle": options.shuffle }),
+        ),
+    )?;
+
+    worker.js_runtime.resolve_value(test_result).await?;
+
+    loop {
+        if !worker.dispatch_beforeunload_event(&located_script_name!())? {
+            break;
+        }
+        worker.run_event_loop(false).await?;
+    }
+
+    worker.dispatch_unload_event(&located_script_name!())?;
+
+    if let Some(coverage_collector) = maybe_coverage_collector.as_mut() {
+        worker
+            .with_event_loop(coverage_collector.stop_collecting().boxed_local())
+            .await?;
+    }
+
+    Ok(())
+}
+
+fn extract_files_from_regex_blocks(
+    specifier: &ModuleSpecifier,
+    source: &str,
+    media_type: MediaType,
+    file_line_index: usize,
+    blocks_regex: &Regex,
+    lines_regex: &Regex,
+) -> Result<Vec<File>, AnyError> {
+    let files = blocks_regex
+        .captures_iter(source)
+        .filter_map(|block| {
+            if block.get(1) == None {
+                return None;
+            }
+
+            let maybe_attributes: Option<Vec<_>> = block
+                .get(1)
+                .map(|attributes| attributes.as_str().split(' ').collect());
+
+            let file_media_type = if let Some(attributes) = maybe_attributes {
+                if attributes.contains(&"ignore") {
+                    return None;
+                }
+
+                match attributes.get(0) {
+                    Some(&"js") => MediaType::JavaScript,
+                    Some(&"javascript") => MediaType::JavaScript,
+                    Some(&"mjs") => MediaType::Mjs,
+                    Some(&"cjs") => MediaType::Cjs,
+                    Some(&"jsx") => MediaType::Jsx,
+                    Some(&"ts") => MediaType::TypeScript,
+                    Some(&"typescript") => MediaType::TypeScript,
+                    Some(&"mts") => MediaType::Mts,
+                    Some(&"cts") => MediaType::Cts,
+                    Some(&"tsx") => MediaType::Tsx,
+                    Some(&"") => media_type,
+                    _ => MediaType::Unknown,
+                }
+            } else {
+                media_type
+            };
+
+            if file_media_type == MediaType::Unknown {
+                return None;
+            }
+
+            let line_offset = source[0..block.get(0).unwrap().start()]
+                .chars()
+                .filter(|c| *c == '\n')
+                .count();
+
+            let line_count = block.get(0).unwrap().as_str().split('\n').count();
+
+            let body = block.get(2).unwrap();
+            let text = body.as_str();
+
+            // TODO(caspervonb) generate an inline source map
+            let mut file_source = String::new();
+            for line in lines_regex.captures_iter(text) {
+                let text = line.get(1).unwrap();
+                writeln!(file_source, "{}", text.as_str()).unwrap();
+            }
+
+            let file_specifier = deno_core::resolve_url_or_path(&format!(
+                "{}${}-{}{}",
+                specifier,
+                file_line_index + line_offset + 1,
+                file_line_index + line_offset + line_count + 1,
+                file_media_type.as_ts_extension(),
+            ))
+            .unwrap();
+
+            Some(File {
+                local: file_specifier.to_file_path().unwrap(),
+                maybe_types: None,
+                media_type: file_media_type,
+                source: file_source.into(),
+                specifier: file_specifier,
+                maybe_headers: None,
+            })
+        })
+        .collect();
+
+    Ok(files)
+}
+
+fn extract_files_from_source_comments(
+    specifier: &ModuleSpecifier,
+    source: Arc<str>,
+    media_type: MediaType,
+) -> Result<Vec<File>, AnyError> {
+    let parsed_source = deno_ast::parse_module(deno_ast::ParseParams {
+        specifier: specifier.as_str().to_string(),
+        text_info: deno_ast::SourceTextInfo::new(source),
+        media_type,
+        capture_tokens: false,
+        maybe_syntax: None,
+        scope_analysis: false,
+    })?;
+    let comments = parsed_source.comments().get_vec();
+    let blocks_regex = Regex::new(r"```([^\r\n]*)\r?\n([\S\s]*?)```")?;
+    let lines_regex = Regex::new(r"(?:\* ?)(?:\# ?)?(.*)")?;
+
+    let files = comments
+        .iter()
+        .filter(|comment| {
+            if comment.kind != CommentKind::Block || !comment.text.starts_with('*') {
+                return false;
+            }
+
+            true
+        })
+        .flat_map(|comment| {
+            extract_files_from_regex_blocks(
+                specifier,
+                &comment.text,
+                media_type,
+                parsed_source.text_info().line_index(comment.start()),
+                &blocks_regex,
+                &lines_regex,
+            )
+        })
+        .flatten()
+        .collect();
+
+    Ok(files)
+}
+
+fn extract_files_from_fenced_blocks(
+    specifier: &ModuleSpecifier,
+    source: &str,
+    media_type: MediaType,
+) -> Result<Vec<File>, AnyError> {
+    // The pattern matches code blocks as well as anything in HTML comment syntax,
+    // but it stores the latter without any capturing groups. This way, a simple
+    // check can be done to see if a block is inside a comment (and skip typechecking)
+    // or not by checking for the presence of capturing groups in the matches.
+    let blocks_regex = Regex::new(r"(?s)<!--.*?-->|```([^\r\n]*)\r?\n([\S\s]*?)```")?;
+    let lines_regex = Regex::new(r"(?:\# ?)?(.*)")?;
+
+    extract_files_from_regex_blocks(
+        specifier,
+        source,
+        media_type,
+        /* file line index */ 0,
+        &blocks_regex,
+        &lines_regex,
+    )
+}
+
+async fn fetch_inline_files(
+    ps: ProcState,
+    specifiers: Vec<ModuleSpecifier>,
+) -> Result<Vec<File>, AnyError> {
+    let mut files = Vec::new();
+    for specifier in specifiers {
+        let mut fetch_permissions = Permissions::allow_all();
+        let file = ps
+            .file_fetcher
+            .fetch(&specifier, &mut fetch_permissions)
+            .await?;
+
+        let inline_files = if file.media_type == MediaType::Unknown {
+            extract_files_from_fenced_blocks(&file.specifier, &file.source, file.media_type)
+        } else {
+            extract_files_from_source_comments(
+                &file.specifier,
+                file.source.clone(),
+                file.media_type,
+            )
+        };
+
+        files.extend(inline_files?);
+    }
+
+    Ok(files)
+}
+
+/// Type check a collection of module and document specifiers.
+pub async fn check_specifiers(
+    ps: &ProcState,
+    permissions: Permissions,
+    specifiers: Vec<(ModuleSpecifier, TestMode)>,
+) -> Result<(), AnyError> {
+    let lib = ps.options.ts_type_lib_window();
+    let inline_files = fetch_inline_files(
+        ps.clone(),
+        specifiers
+            .iter()
+            .filter_map(|(specifier, mode)| {
+                if *mode != TestMode::Executable {
+                    Some(specifier.clone())
+                } else {
+                    None
+                }
+            })
+            .collect(),
+    )
+    .await?;
+
+    if !inline_files.is_empty() {
+        let specifiers = inline_files
+            .iter()
+            .map(|file| file.specifier.clone())
+            .collect();
+
+        for file in inline_files {
+            ps.file_fetcher.insert_cached(file);
+        }
+
+        ps.prepare_module_load(
+            specifiers,
+            false,
+            lib,
+            Permissions::allow_all(),
+            permissions.clone(),
+            false,
+        )
+        .await?;
+    }
+
+    let module_specifiers = specifiers
+        .iter()
+        .filter_map(|(specifier, mode)| {
+            if *mode != TestMode::Documentation {
+                Some(specifier.clone())
+            } else {
+                None
+            }
+        })
+        .collect();
+
+    ps.prepare_module_load(
+        module_specifiers,
+        false,
+        lib,
+        Permissions::allow_all(),
+        permissions,
+        true,
+    )
+    .await?;
+
+    Ok(())
+}
+
+/// Test a collection of specifiers with test modes concurrently.
+async fn test_specifiers(
+    ps: ProcState,
+    permissions: Permissions,
+    specifiers_with_mode: Vec<(ModuleSpecifier, TestMode)>,
+    options: TestSpecifierOptions,
+    allow_wallets: bool,
+    deployment_cache: Option<DeploymentCache>,
+) -> Result<(), AnyError> {
+    let log_level = ps.options.log_level();
+    let specifiers_with_mode = if let Some(seed) = options.shuffle {
+        let mut rng = SmallRng::seed_from_u64(seed);
+        let mut specifiers_with_mode = specifiers_with_mode.clone();
+        specifiers_with_mode.sort_by_key(|(specifier, _)| specifier.clone());
+        specifiers_with_mode.shuffle(&mut rng);
+        specifiers_with_mode
+    } else {
+        specifiers_with_mode
+    };
+
+    let (sender, mut receiver) = unbounded_channel::<TestEvent>();
+    let sender = TestEventSender::new(sender);
+    let concurrent_jobs = options.concurrent_jobs;
+    let fail_fast = options.fail_fast;
+
+    let join_handles = specifiers_with_mode.iter().map(move |(specifier, mode)| {
+        let ps = ps.clone();
         let permissions = permissions.clone();
-        let sender = sender.clone();
-        let cache = cache.clone();
+        let specifier = specifier.clone();
+        let mode = mode.clone();
+        let mut sender = sender.clone();
+        let options = options.clone();
+        let deployment_cache = deployment_cache.clone();
 
         tokio::task::spawn_blocking(move || {
-            let join_handle = std::thread::spawn(move || {
-                let future = api_v1::run_bridge(
-                    program_state,
-                    main_module,
-                    test_module,
-                    permissions,
-                    sender,
-                    allow_wallets,
-                    cache,
-                );
+            let origin = specifier.to_string();
+            let channel = sender.clone();
+            let file_result = run_local(api_v1::run_bridge(
+                ps,
+                permissions,
+                specifier,
+                mode,
+                options,
+                channel,
+                allow_wallets,
+                deployment_cache,
+            ));
 
-                tokio_util::run_basic(future)
-            });
-
-            join_handle.join().unwrap()
+            if let Err(error) = file_result {
+                if error.is::<JsError>() {
+                    sender.send(TestEvent::UncaughtError(
+                        origin,
+                        Box::new(error.downcast::<JsError>().unwrap()),
+                    ))?;
+                } else {
+                    return Err(error);
+                }
+            }
+            Ok(())
         })
     });
 
-    let join_futures = stream::iter(join_handles)
-        .buffer_unordered(concurrent_jobs)
-        .collect::<Vec<Result<Result<Vec<SessionArtifacts>, AnyError>, tokio::task::JoinError>>>();
+    let join_stream = stream::iter(join_handles)
+        .buffer_unordered(concurrent_jobs.get())
+        .collect::<Vec<Result<Result<(), AnyError>, tokio::task::JoinError>>>();
 
-    let mut reporter = create_reporter(concurrent_jobs > 1);
+    let mut reporter = Box::new(PrettyTestReporter::new(
+        concurrent_jobs.get() > 1,
+        log_level != Some(Level::Error),
+    ));
+
     let handler = {
-        tokio::task::spawn_blocking(move || {
+        tokio::task::spawn(async move {
+            let earlier = Instant::now();
+            let mut tests = IndexMap::new();
+            let mut test_steps = IndexMap::new();
+            let mut tests_with_result = HashSet::new();
+            let mut summary = TestSummary::new();
             let mut used_only = false;
-            let mut has_error = false;
-            let mut planned = 0;
-            let mut reported = 0;
 
-            for event in receiver.iter() {
-                match event.message.clone() {
-                    TestMessage::Plan {
-                        pending,
-                        filtered: _,
-                        only,
-                    } => {
-                        if only {
+            while let Some(event) = receiver.recv().await {
+                match event {
+                    TestEvent::Register(description) => {
+                        reporter.report_register(&description);
+                        tests.insert(description.id, description);
+                    }
+
+                    TestEvent::Plan(plan) => {
+                        summary.total += plan.total;
+                        summary.filtered_out += plan.filtered_out;
+
+                        if plan.used_only {
                             used_only = true;
                         }
 
-                        planned += pending;
+                        reporter.report_plan(&plan);
                     }
-                    TestMessage::Result {
-                        name: _,
-                        duration: _,
-                        result,
-                    } => {
-                        reported += 1;
 
-                        if let TestResult::Failed(_) = result {
-                            has_error = true;
+                    TestEvent::Wait(id) => {
+                        reporter.report_wait(tests.get(&id).unwrap());
+                    }
+
+                    TestEvent::Output(output) => {
+                        reporter.report_output(&output);
+                    }
+
+                    TestEvent::Result(id, result, elapsed) => {
+                        if tests_with_result.insert(id) {
+                            let description = tests.get(&id).unwrap().clone();
+                            match &result {
+                                TestResult::Ok => {
+                                    summary.passed += 1;
+                                }
+                                TestResult::Ignored => {
+                                    summary.ignored += 1;
+                                }
+                                TestResult::Failed(error) => {
+                                    summary.failed += 1;
+                                    summary.failures.push((description.clone(), error.clone()));
+                                }
+                                TestResult::Cancelled => {
+                                    unreachable!("should be handled in TestEvent::UncaughtError");
+                                }
+                            }
+                            reporter.report_result(&description, &result, elapsed);
                         }
                     }
-                    _ => {}
+
+                    TestEvent::UncaughtError(origin, error) => {
+                        reporter.report_uncaught_error(&origin, &error);
+                        summary.failed += 1;
+                        summary.uncaught_errors.push((origin.clone(), error));
+                        for desc in tests.values() {
+                            if desc.origin == origin && tests_with_result.insert(desc.id) {
+                                summary.failed += 1;
+                                reporter.report_result(desc, &TestResult::Cancelled, 0);
+                            }
+                        }
+                    }
+
+                    TestEvent::StepRegister(description) => {
+                        reporter.report_step_register(&description);
+                        test_steps.insert(description.id, description);
+                    }
+
+                    TestEvent::StepWait(id) => {
+                        reporter.report_step_wait(test_steps.get(&id).unwrap());
+                    }
+
+                    TestEvent::StepResult(id, result, duration) => {
+                        match &result {
+                            TestStepResult::Ok => {
+                                summary.passed_steps += 1;
+                            }
+                            TestStepResult::Ignored => {
+                                summary.ignored_steps += 1;
+                            }
+                            TestStepResult::Failed(_) => {
+                                summary.failed_steps += 1;
+                            }
+                            TestStepResult::Pending(_) => {
+                                summary.pending_steps += 1;
+                            }
+                        }
+
+                        reporter.report_step_result(
+                            test_steps.get(&id).unwrap(),
+                            &result,
+                            duration,
+                            &tests,
+                            &test_steps,
+                        );
+                    }
                 }
 
-                reporter.visit_event(event);
-
-                if has_error && fail_fast {
-                    break;
+                if let Some(x) = fail_fast {
+                    if summary.failed >= x.get() {
+                        break;
+                    }
                 }
             }
 
-            if planned > reported {
-                has_error = true;
-            }
-
-            reporter.done();
-
-            if planned > reported {
-                has_error = true;
-            }
+            let elapsed = Instant::now().duration_since(earlier);
+            reporter.report_summary(&summary, &elapsed);
 
             if used_only {
-                println!(
-                    "{} because the \"only\" option was used\n",
-                    colors::red("FAILED")
-                );
-
-                has_error = true;
+                return Err(generic_error(
+                    "Test failed because the \"only\" option was used",
+                ));
             }
 
-            has_error
+            if summary.failed > 0 {
+                return Err(generic_error("Test failed"));
+            }
+
+            Ok(())
         })
     };
 
-    let (result, mut join_results) = future::join(handler, join_futures).await;
+    let (join_results, result) = future::join(join_stream, handler).await;
 
-    let mut reports = vec![];
-    let mut error = None;
-    for mut res in join_results.drain(..) {
-        if let Ok(Ok(artifacts)) = res.as_mut() {
-            reports.append(artifacts);
-        } else if let Ok(Err(e)) = res {
-            error = Some(e);
-            break;
+    // propagate any errors
+    for join_result in join_results {
+        join_result??;
+    }
+
+    result??;
+
+    Ok(())
+}
+
+/// Collects specifiers marking them with the appropriate test mode while maintaining the natural
+/// input order.
+///
+/// - Specifiers matching the `is_supported_test_ext` predicate are marked as
+/// `TestMode::Documentation`.
+/// - Specifiers matching the `is_supported_test_path` are marked as `TestMode::Executable`.
+/// - Specifiers matching both predicates are marked as `TestMode::Both`
+fn collect_specifiers_with_test_mode(
+    include: Vec<String>,
+    ignore: Vec<PathBuf>,
+    include_inline: bool,
+) -> Result<Vec<(ModuleSpecifier, TestMode)>, AnyError> {
+    let module_specifiers = collect_specifiers(include.clone(), &ignore, is_supported_test_path)?;
+
+    if include_inline {
+        return collect_specifiers(include, &ignore, is_supported_test_ext).map(|specifiers| {
+            specifiers
+                .into_iter()
+                .map(|specifier| {
+                    let mode = if module_specifiers.contains(&specifier) {
+                        TestMode::Both
+                    } else {
+                        TestMode::Documentation
+                    };
+
+                    (specifier, mode)
+                })
+                .collect()
+        });
+    }
+
+    let specifiers_with_mode = module_specifiers
+        .into_iter()
+        .map(|specifier| (specifier, TestMode::Executable))
+        .collect();
+
+    Ok(specifiers_with_mode)
+}
+
+/// Collects module and document specifiers with test modes via
+/// `collect_specifiers_with_test_mode` which are then pre-fetched and adjusted
+/// based on the media type.
+///
+/// Specifiers that do not have a known media type that can be executed as a
+/// module are marked as `TestMode::Documentation`. Type definition files
+/// cannot be run, and therefore need to be marked as `TestMode::Documentation`
+/// as well.
+async fn fetch_specifiers_with_test_mode(
+    ps: &ProcState,
+    include: Vec<String>,
+    ignore: Vec<PathBuf>,
+    include_inline: bool,
+) -> Result<Vec<(ModuleSpecifier, TestMode)>, AnyError> {
+    let maybe_test_config = ps.options.to_test_config()?;
+
+    let mut include_files = include.clone();
+    let mut exclude_files = ignore.clone();
+
+    if let Some(test_config) = maybe_test_config.as_ref() {
+        if include_files.is_empty() {
+            include_files = test_config
+                .files
+                .include
+                .iter()
+                .map(|s| s.to_string())
+                .collect::<Vec<_>>();
+        }
+
+        if exclude_files.is_empty() {
+            exclude_files = test_config
+                .files
+                .exclude
+                .iter()
+                .filter_map(|s| specifier_to_file_path(s).ok())
+                .collect::<Vec<_>>();
         }
     }
 
-    if let Some(e) = error {
-        Err(e)
-    } else {
-        Ok((result.unwrap_or(false), reports))
+    if include_files.is_empty() {
+        include_files.push(".".to_string());
     }
+
+    let mut specifiers_with_mode =
+        collect_specifiers_with_test_mode(include_files, exclude_files, include_inline)?;
+    for (specifier, mode) in &mut specifiers_with_mode {
+        let file = ps
+            .file_fetcher
+            .fetch(specifier, &mut Permissions::allow_all())
+            .await?;
+
+        if file.media_type == MediaType::Unknown || file.media_type == MediaType::Dts {
+            *mode = TestMode::Documentation
+        }
+    }
+
+    Ok(specifiers_with_mode)
+}
+
+pub async fn run_tests(flags: Flags, test_flags: TestFlags, allow_wallets: bool, deployment_cache: Option<DeploymentCache>) -> Result<(), AnyError> {
+    let ps = ProcState::build(flags).await?;
+    let permissions = Permissions::from_options(&ps.options.permissions_options());
+    let specifiers_with_mode = fetch_specifiers_with_test_mode(
+        &ps,
+        test_flags.include,
+        test_flags.ignore.clone(),
+        test_flags.doc,
+    )
+    .await?;
+
+    if !test_flags.allow_none && specifiers_with_mode.is_empty() {
+        return Err(generic_error("No test modules found"));
+    }
+
+    check_specifiers(&ps, permissions.clone(), specifiers_with_mode.clone()).await?;
+
+    if test_flags.no_run {
+        return Ok(());
+    }
+
+    let compat = ps.options.compat();
+    test_specifiers(
+        ps,
+        permissions,
+        specifiers_with_mode,
+        TestSpecifierOptions {
+            compat_mode: compat,
+            concurrent_jobs: test_flags.concurrent_jobs,
+            fail_fast: test_flags.fail_fast,
+            filter: TestFilter::from_flag(&test_flags.filter),
+            shuffle: test_flags.shuffle,
+            trace_ops: test_flags.trace_ops,
+        },
+        allow_wallets,
+        deployment_cache,
+    )
+    .await?;
+
+    Ok(())
+}
+
+pub async fn run_tests_with_watch(flags: Flags, test_flags: TestFlags, allow_wallets: bool) -> Result<(), AnyError> {
+    let ps = ProcState::build(flags).await?;
+    let permissions = Permissions::from_options(&ps.options.permissions_options());
+
+    let include = test_flags.include;
+    let ignore = test_flags.ignore.clone();
+    let paths_to_watch: Vec<_> = include.iter().map(PathBuf::from).collect();
+    let no_check = ps.options.type_check_mode() == TypeCheckMode::None;
+
+    let resolver = |changed: Option<Vec<PathBuf>>| {
+        let paths_to_watch = paths_to_watch.clone();
+        let paths_to_watch_clone = paths_to_watch.clone();
+
+        let files_changed = changed.is_some();
+        let include = include.clone();
+        let ignore = ignore.clone();
+        let ps = ps.clone();
+
+        async move {
+            let test_modules = if test_flags.doc {
+                collect_specifiers(include.clone(), &ignore, is_supported_test_ext)
+            } else {
+                collect_specifiers(include.clone(), &ignore, is_supported_test_path)
+            }?;
+
+            let mut paths_to_watch = paths_to_watch_clone;
+            let mut modules_to_reload = if files_changed {
+                Vec::new()
+            } else {
+                test_modules
+                    .iter()
+                    .map(|url| (url.clone(), ModuleKind::Esm))
+                    .collect()
+            };
+            let graph = ps
+                .create_graph(
+                    test_modules
+                        .iter()
+                        .map(|s| (s.clone(), ModuleKind::Esm))
+                        .collect(),
+                )
+                .await?;
+            graph_valid(&graph, !no_check, ps.options.check_js())?;
+
+            // TODO(@kitsonk) - This should be totally derivable from the graph.
+            for specifier in test_modules {
+                fn get_dependencies<'a>(
+                    graph: &'a deno_graph::ModuleGraph,
+                    maybe_module: Option<&'a deno_graph::Module>,
+                    // This needs to be accessible to skip getting dependencies if they're already there,
+                    // otherwise this will cause a stack overflow with circular dependencies
+                    output: &mut HashSet<&'a ModuleSpecifier>,
+                    no_check: bool,
+                ) {
+                    if let Some(module) = maybe_module {
+                        for dep in module.dependencies.values() {
+                            if let Some(specifier) = &dep.get_code() {
+                                if !output.contains(specifier) {
+                                    output.insert(specifier);
+                                    get_dependencies(graph, graph.get(specifier), output, no_check);
+                                }
+                            }
+                            if !no_check {
+                                if let Some(specifier) = &dep.get_type() {
+                                    if !output.contains(specifier) {
+                                        output.insert(specifier);
+                                        get_dependencies(
+                                            graph,
+                                            graph.get(specifier),
+                                            output,
+                                            no_check,
+                                        );
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // This test module and all it's dependencies
+                let mut modules = HashSet::new();
+                modules.insert(&specifier);
+                get_dependencies(&graph, graph.get(&specifier), &mut modules, no_check);
+
+                paths_to_watch.extend(
+                    modules
+                        .iter()
+                        .filter_map(|specifier| specifier.to_file_path().ok()),
+                );
+
+                if let Some(changed) = &changed {
+                    for path in changed.iter().filter_map(|path| {
+                        deno_core::resolve_url_or_path(&path.to_string_lossy()).ok()
+                    }) {
+                        if modules.contains(&&path) {
+                            modules_to_reload.push((specifier, ModuleKind::Esm));
+                            break;
+                        }
+                    }
+                }
+            }
+
+            Ok((paths_to_watch, modules_to_reload))
+        }
+        .map(move |result| {
+            if files_changed && matches!(result, Ok((_, ref modules)) if modules.is_empty()) {
+                ResolutionResult::Ignore
+            } else {
+                match result {
+                    Ok((paths_to_watch, modules_to_reload)) => ResolutionResult::Restart {
+                        paths_to_watch,
+                        result: Ok(modules_to_reload),
+                    },
+                    Err(e) => ResolutionResult::Restart {
+                        paths_to_watch,
+                        result: Err(e),
+                    },
+                }
+            }
+        })
+    };
+
+    let cli_options = ps.options.clone();
+    let operation = |modules_to_reload: Vec<(ModuleSpecifier, ModuleKind)>| {
+        let cli_options = cli_options.clone();
+        let filter = test_flags.filter.clone();
+        let include = include.clone();
+        let ignore = ignore.clone();
+        let permissions = permissions.clone();
+        let ps = ps.clone();
+
+        async move {
+            let specifiers_with_mode = fetch_specifiers_with_test_mode(
+                &ps,
+                include.clone(),
+                ignore.clone(),
+                test_flags.doc,
+            )
+            .await?
+            .iter()
+            .filter(|(specifier, _)| contains_specifier(&modules_to_reload, specifier))
+            .cloned()
+            .collect::<Vec<(ModuleSpecifier, TestMode)>>();
+
+            check_specifiers(&ps, permissions.clone(), specifiers_with_mode.clone()).await?;
+
+            if test_flags.no_run {
+                return Ok(());
+            }
+
+            test_specifiers(
+                ps,
+                permissions.clone(),
+                specifiers_with_mode,
+                TestSpecifierOptions {
+                    compat_mode: cli_options.compat(),
+                    concurrent_jobs: test_flags.concurrent_jobs,
+                    fail_fast: test_flags.fail_fast,
+                    filter: TestFilter::from_flag(&filter),
+                    shuffle: test_flags.shuffle,
+                    trace_ops: test_flags.trace_ops,
+                },
+                allow_wallets, 
+                None,
+            )
+            .await?;
+
+            Ok(())
+        }
+    };
+
+    file_watcher::watch_func(
+        resolver,
+        operation,
+        file_watcher::PrintConfig {
+            job_name: "Test".to_string(),
+            clear_screen: !cli_options.no_clear_screen(),
+        },
+    )
+    .await?;
+
+    Ok(())
+}
+
+// use a string that if it ends up in the output won't affect how things are displayed
+const ZERO_WIDTH_SPACE: &str = "\u{200B}";
+
+struct TestOutputPipe {
+    writer: os_pipe::PipeWriter,
+    state: Arc<Mutex<Option<std::sync::mpsc::Sender<()>>>>,
+}
+
+impl Clone for TestOutputPipe {
+    fn clone(&self) -> Self {
+        Self {
+            writer: self.writer.try_clone().unwrap(),
+            state: self.state.clone(),
+        }
+    }
+}
+
+impl TestOutputPipe {
+    pub fn new(sender: UnboundedSender<TestEvent>) -> Self {
+        let (reader, writer) = os_pipe::pipe().unwrap();
+        let state = Arc::new(Mutex::new(None));
+
+        start_output_redirect_thread(reader, sender, state.clone());
+
+        Self { writer, state }
+    }
+
+    pub fn flush(&mut self) {
+        // We want to wake up the other thread and have it respond back
+        // that it's done clearing out its pipe before returning.
+        let (sender, receiver) = std::sync::mpsc::channel();
+        if let Some(sender) = self.state.lock().replace(sender) {
+            let _ = sender.send(()); // just in case
+        }
+        // Bit of a hack to send a zero width space in order to wake
+        // the thread up. It seems that sending zero bytes here does
+        // not work on windows.
+        self.writer.write_all(ZERO_WIDTH_SPACE.as_bytes()).unwrap();
+        self.writer.flush().unwrap();
+        // ignore the error as it might have been picked up and closed
+        let _ = receiver.recv();
+    }
+
+    pub fn as_file(&self) -> std::fs::File {
+        pipe_writer_to_file(self.writer.try_clone().unwrap())
+    }
+}
+
+#[cfg(windows)]
+fn pipe_writer_to_file(writer: os_pipe::PipeWriter) -> std::fs::File {
+    use std::os::windows::prelude::FromRawHandle;
+    use std::os::windows::prelude::IntoRawHandle;
+    // SAFETY: Requires consuming ownership of the provided handle
+    unsafe { std::fs::File::from_raw_handle(writer.into_raw_handle()) }
+}
+
+#[cfg(unix)]
+fn pipe_writer_to_file(writer: os_pipe::PipeWriter) -> std::fs::File {
+    use std::os::unix::io::FromRawFd;
+    use std::os::unix::io::IntoRawFd;
+    // SAFETY: Requires consuming ownership of the provided handle
+    unsafe { std::fs::File::from_raw_fd(writer.into_raw_fd()) }
+}
+
+fn start_output_redirect_thread(
+    mut pipe_reader: os_pipe::PipeReader,
+    sender: UnboundedSender<TestEvent>,
+    flush_state: Arc<Mutex<Option<std::sync::mpsc::Sender<()>>>>,
+) {
+    tokio::task::spawn_blocking(move || loop {
+        let mut buffer = [0; 512];
+        let size = match pipe_reader.read(&mut buffer) {
+            Ok(0) | Err(_) => break,
+            Ok(size) => size,
+        };
+        let oneshot_sender = flush_state.lock().take();
+        let mut data = &buffer[0..size];
+        if data.ends_with(ZERO_WIDTH_SPACE.as_bytes()) {
+            data = &data[0..data.len() - ZERO_WIDTH_SPACE.len()];
+        }
+
+        if !data.is_empty()
+            && sender
+                .send(TestEvent::Output(buffer[0..size].to_vec()))
+                .is_err()
+        {
+            break;
+        }
+
+        // Always respond back if this was set. Ideally we would also check to
+        // ensure the pipe reader is empty before sending back this response.
+        if let Some(sender) = oneshot_sender {
+            let _ignore = sender.send(());
+        }
+    });
 }

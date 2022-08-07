@@ -1,9 +1,7 @@
-use super::api_v1::SessionArtifacts;
-use clarinet_deployments::types::DeploymentSpecification;
+use super::SessionArtifacts;
 use clarity_repl::prettytable::{color, format, Attr, Cell, Row, Table};
 use clarity_repl::repl::session::CostsReport;
-use clarity_repl::repl::{CostSynthesis, Session};
-use std::collections::HashMap;
+use clarity_repl::repl::{CostSynthesis};
 use std::collections::{btree_map::Entry, BTreeMap};
 
 #[derive(Clone)]

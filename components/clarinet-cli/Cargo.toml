@@ -42,35 +42,36 @@ toml = { version = "0.5.6", features = ["preserve_order"] }
 serde = { version = "1.0.136", features = ["derive"] }
 serde_json = { version = "1.0.79", features = ["preserve_order"] }
 serde_derive = "1"
-deno_emit = { version = "=0.4.0", optional = true }
-deno_graph = { version = "=0.29.0", optional = true }
-deno_core =  { version = "=0.146.0", optional = true }
-deno_ast = { version = "=0.17.0", features = ["cjs"], optional = true }
-deno_tls = { version = "=0.51.0", optional = true }
-deno_web = { version = "=0.95.0", optional = true }
-deno_net = "=0.56.0"
-deno_url = "=0.64.0"
-lzzzz = '=1.0'
+deno_emit = { version = "0.4.0", optional = true }
+deno_graph = { version = "0.29.0", optional = true }
+deno_core =  { version = "0.146.0", optional = true }
+deno_ast = { version = "0.17.0", features = ["cjs"], optional = true }
+deno_tls = { version = "0.51.0", optional = true }
+deno_web = { version = "0.95.0", optional = true }
+deno_ops = "0.24.0"
+deno_net = "0.56.0"
+deno_url = "0.64.0"
+lzzzz = '1.0'
 ### To eliminate
-deno_webidl = { version = "=0.64.0" }
-deno_http = { version = "=0.58.0" }
-deno_ffi = { version = "=0.51.0" }
-deno_console = { version = "=0.64.0" }
-deno_websocket = { version = "=0.69.0" }
-deno_webstorage = { version = "=0.59.0" }
-deno_broadcast_channel = "=0.58.0"
-hyper = { version = "=0.14.18", features = ["server", "stream", "http1", "http2", "runtime"] }
-http = "=0.2.6"
+deno_webidl = { version = "0.64.0" }
+deno_http = { version = "0.58.0" }
+deno_ffi = { version = "0.51.0" }
+deno_console = { version = "0.64.0" }
+deno_websocket = { version = "0.69.0" }
+deno_webstorage = { version = "0.59.0" }
+deno_broadcast_channel = "0.58.0"
+hyper = { version = "0.14.18", features = ["server", "stream", "http1", "http2", "runtime"] }
+http = "0.2.6"
 ###
-deno_fetch = { version = "=0.87.0", optional = true }
-deno_crypto = { version = "=0.78.0", optional = true }
+deno_fetch = { version = "0.87.0", optional = true }
+deno_crypto = { version = "0.78.0", optional = true }
 import_map = { version = "=0.12.1", optional = true }
-once_cell = { version = "=1.13.0", optional = true }
+once_cell = { version = "1.13.0", optional = true }
 walkdir =  { version = "=2.3.2", optional = true }
-node_resolver = { version = "=0.1.1", optional = true }
+node_resolver = { version = "0.1.1", optional = true }
 cache_control = { version = "=0.2.0", optional = true }
 notify = "=5.0.0-pre.7"
-dlopen = "=0.1.8"
+dlopen = "0.1.8"
 dissimilar = "=1.0.3"
 log = { version = "=0.4.17", features = ["serde"] }
 filetime = "0.2.16"
@@ -123,10 +124,9 @@ reqwest = { version = "0.11", default-features = false, features = [
     "json",
     "rustls-tls",
 ] }
-swc_common = { version = "0.10.20", features = ["sourcemap"], optional = true }
 bollard = "0.11.0"
 crossterm = "0.22.1"
-chrono = "0.4.20"
+chrono = "0.4.19"
 base58 = "0.2.0"
 tracing = "0.1"
 tracing-subscriber = "0.3.3"
@@ -151,7 +151,6 @@ clarinet_utils = { package = "clarinet-utils", path = "../clarinet-utils" }
 num_cpus = "1.13.1"
 mio = "=0.8.2"
 similar = "2.1.0"
-crossbeam-channel = "0.5.6"
 
 [dependencies.tui]
 version = "0.18.0"
@@ -196,7 +195,6 @@ path = "src/bin.rs"
 [features]
 default = ["cli", "telemetry"]
 cli = [
-    "swc_common",
     "deno_emit",
     "deno_graph",
     "deno_core",

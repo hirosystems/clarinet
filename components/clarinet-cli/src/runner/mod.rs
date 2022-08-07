@@ -1,10 +1,6 @@
-#![allow(unused_imports)]
-#![allow(unused_variables)]
-#![allow(dead_code)]
 #![allow(non_camel_case_types)]
 #![allow(non_snake_case)]
 #![allow(non_upper_case_globals)]
-#![allow(unused_must_use)]
 
 use crate::deployments::{
     apply_on_chain_deployment, check_deployments, get_absolute_deployment_path,
@@ -19,20 +15,21 @@ use clarinet_files::ProjectManifest;
 use clarity_repl::clarity::analysis::contract_interface_builder::{
     build_contract_interface, ContractInterface,
 };
+use clarity_repl::clarity::coverage::TestCoverageReport;
 use clarity_repl::clarity::types::QualifiedContractIdentifier;
 use clarity_repl::repl::ast::ContractAST;
+use clarity_repl::repl::session::CostsReport;
 use clarity_repl::repl::{ExecutionResult, Session};
-
 use std::collections::{BTreeMap, HashMap};
 use std::path::PathBuf;
 
 use clarinet_deployments::types::DeploymentSpecification;
 
-pub mod api_v1;
-mod costs;
-pub mod deno;
-mod utils;
 mod vendor;
+mod deno;
+mod api_v1;
+mod costs;
+mod utils;
 
 #[derive(Clone)]
 pub struct DeploymentCache {
@@ -137,4 +134,8 @@ where
 {
     let rt = crate::utils::create_basic_runtime();
     rt.block_on(future)
+}
+pub struct SessionArtifacts {
+    pub coverage_reports: Vec<TestCoverageReport>,
+    pub costs_reports: Vec<CostsReport>,
 }
