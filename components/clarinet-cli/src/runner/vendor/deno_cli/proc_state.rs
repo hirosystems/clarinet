@@ -25,7 +25,6 @@ use super::lockfile::Lockfile;
 use super::resolver::ImportMapResolver;
 use super::resolver::JsxResolver;
 
-use super::super::deno_runtime::inspector_server::InspectorServer;
 use super::super::deno_runtime::permissions::Permissions;
 use deno_broadcast_channel::InMemoryBroadcastChannel;
 use deno_core::anyhow::anyhow;
@@ -73,7 +72,6 @@ pub struct Inner {
     pub graph_data: Arc<RwLock<GraphData>>,
     pub lockfile: Option<Arc<Mutex<Lockfile>>>,
     pub maybe_import_map: Option<Arc<ImportMap>>,
-    pub maybe_inspector_server: Option<Arc<InspectorServer>>,
     pub root_cert_store: RootCertStore,
     pub blob_store: BlobStore,
     pub broadcast_channel: InMemoryBroadcastChannel,
@@ -166,8 +164,6 @@ impl ProcState {
             None
         };
 
-        let maybe_inspector_server = cli_options.resolve_inspector_server().map(Arc::new);
-
         let coverage_dir = cli_options
             .coverage_dir()
             .map(ToOwned::to_owned)
@@ -219,7 +215,6 @@ impl ProcState {
             graph_data: Default::default(),
             lockfile,
             maybe_import_map,
-            maybe_inspector_server,
             root_cert_store,
             blob_store,
             broadcast_channel,

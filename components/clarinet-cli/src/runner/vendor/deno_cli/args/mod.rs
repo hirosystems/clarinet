@@ -19,7 +19,6 @@ pub use config_file::TsConfig;
 pub use flags::*;
 
 use super::super::deno_runtime::colors;
-use super::super::deno_runtime::inspector_server::InspectorServer;
 use super::super::deno_runtime::permissions::PermissionsOptions;
 use deno_ast::ModuleSpecifier;
 use deno_core::anyhow::anyhow;
@@ -175,11 +174,6 @@ impl CliOptions {
             // otherwise we will use the path to the main module
             Some(main_module.to_string())
         }
-    }
-
-    pub fn resolve_inspector_server(&self) -> Option<InspectorServer> {
-        let maybe_inspect_host = self.flags.inspect.or(self.flags.inspect_brk);
-        maybe_inspect_host.map(|host| InspectorServer::new(host, version::get_user_agent()))
     }
 
     pub fn resolve_lock_file(&self) -> Result<Option<Lockfile>, AnyError> {

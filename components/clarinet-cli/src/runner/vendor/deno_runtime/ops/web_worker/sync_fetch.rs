@@ -10,7 +10,6 @@ use deno_core::OpState;
 use deno_fetch::data_url::DataUrl;
 use deno_fetch::reqwest;
 use deno_web::BlobStore;
-use deno_websocket::DomExceptionNetworkError;
 use hyper::body::Bytes;
 use serde::{Deserialize, Serialize};
 use tokio::task::JoinHandle;
@@ -127,17 +126,8 @@ pub fn op_worker_sync_fetch(
                         // TODO(andreubotella) Check properly for a Javascript MIME type.
                         match mime_type.as_deref() {
                             Some("application/javascript" | "text/javascript") => {}
-                            Some(mime_type) => {
-                                return Err(DomExceptionNetworkError {
-                                    msg: format!("Invalid MIME type {:?}.", mime_type),
-                                }
-                                .into())
-                            }
-                            None => {
-                                return Err(
-                                    DomExceptionNetworkError::new("Missing MIME type.").into()
-                                )
-                            }
+                            Some(mime_type) => {}
+                            None => {}
                         }
                     }
 

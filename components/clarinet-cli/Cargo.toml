@@ -57,11 +57,7 @@ deno_net = "0.56.0"
 deno_url = "0.64.0"
 lzzzz = '1.0'
 ### To eliminate
-deno_webidl = { version = "0.64.0" }
-deno_http = { version = "0.58.0" }
-deno_ffi = { version = "0.51.0" }
 deno_console = { version = "0.64.0" }
-deno_websocket = { version = "0.69.0" }
 deno_webstorage = { version = "0.59.0" }
 deno_broadcast_channel = "0.58.0"
 hyper = { version = "0.14.18", features = ["server", "stream", "http1", "http2", "runtime"] }
@@ -76,7 +72,6 @@ node_resolver = { version = "0.1.1", optional = true }
 cache_control = { version = "=0.2.0", optional = true }
 notify = "=5.0.0-pre.7"
 dlopen = "0.1.8"
-dissimilar = "=1.0.3"
 log = { version = "=0.4.17", features = ["serde"] }
 filetime = "0.2.16"
 mitata = '=0.0.7'

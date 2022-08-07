@@ -77,8 +77,6 @@ fn create_web_worker_callback(
     stdio: super::deno_runtime::ops::io::Stdio,
 ) -> Arc<CreateWebWorkerCb> {
     Arc::new(move |args| {
-        let maybe_inspector_server = ps.maybe_inspector_server.clone();
-
         let module_loader =
             CliModuleLoader::new_for_worker(ps.clone(), args.parent_permissions.clone());
         let create_web_worker_cb = create_web_worker_callback(ps.clone(), stdio.clone());
@@ -118,7 +116,6 @@ fn create_web_worker_callback(
             source_map_getter: Some(Box::new(module_loader.clone())),
             module_loader,
             worker_type: args.worker_type,
-            maybe_inspector_server,
             get_error_class_fn: Some(&errors::get_error_class_name),
             blob_store: ps.blob_store.clone(),
             broadcast_channel: ps.broadcast_channel.clone(),
@@ -146,7 +143,6 @@ pub fn create_main_worker(
 ) -> MainWorker {
     let module_loader = CliModuleLoader::new(ps.clone());
 
-    let maybe_inspector_server = ps.maybe_inspector_server.clone();
     let should_break_on_first_statement = ps.options.inspect_brk().is_some();
 
     let create_web_worker_cb = create_web_worker_callback(ps.clone(), stdio.clone());
@@ -194,7 +190,6 @@ pub fn create_main_worker(
         format_js_error_fn: Some(Arc::new(format_js_error)),
         create_web_worker_cb,
         web_worker_preload_module_cb,
-        maybe_inspector_server,
         should_break_on_first_statement,
         module_loader,
         get_error_class_fn: Some(&errors::get_error_class_name),
@@ -254,7 +249,6 @@ fn init_v8_flags(v8_flags: &[String]) {
         std::process::exit(0);
     }
 }
-
 
 fn unwrap_or_exit<T>(result: Result<T, AnyError>) -> T {
     match result {

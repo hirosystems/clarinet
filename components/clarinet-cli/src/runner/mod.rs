@@ -111,7 +111,9 @@ pub fn run_scripts(
     manifest: &ProjectManifest,
     cache: DeploymentCache,
     deployment_plan_path: Option<String>,
-    fail_fast: bool,
+    fail_fast: Option<u16>,
+    filter: Option<String>,
+    import_map: Option<String>,
 ) -> Result<u32, (String, u32)> {
     match block_on(deno::do_run_scripts(
         files,
@@ -124,6 +126,8 @@ pub fn run_scripts(
         cache,
         deployment_plan_path,
         fail_fast,
+        filter,
+        import_map,
     )) {
         Err(e) => Err((format!("{:?}", e), 0)),
         Ok(res) => Ok(res),

@@ -1,6 +1,5 @@
 // Copyright 2018-2022 the Deno authors. All rights reserved. MIT license.
 
-use super::inspector_server::InspectorServer;
 use super::js;
 use super::ops;
 use super::ops::io::Stdio;
@@ -72,7 +71,6 @@ pub struct WorkerOptions {
     pub web_worker_preload_module_cb: Arc<ops::worker_host::PreloadModuleCb>,
     pub format_js_error_fn: Option<Arc<FormatJsErrorFn>>,
     pub source_map_getter: Option<Box<dyn SourceMapGetter>>,
-    pub maybe_inspector_server: Option<Arc<InspectorServer>>,
     pub should_break_on_first_statement: bool,
     pub get_error_class_fn: Option<GetErrorClassFn>,
     pub origin_storage_dir: Option<std::path::PathBuf>,
@@ -116,7 +114,6 @@ impl MainWorker {
         // Internal modules
         let mut extensions: Vec<Extension> = vec![
             // Web APIs
-            deno_webidl::init(),
             deno_console::init(),
             deno_url::init(),
             deno_web::init::<Permissions>(
@@ -132,16 +129,9 @@ impl MainWorker {
                 file_fetch_handler: Rc::new(deno_fetch::FsFetchHandler),
                 ..Default::default()
             }),
-            deno_websocket::init::<Permissions>(
-                options.bootstrap.user_agent.clone(),
-                options.root_cert_store.clone(),
-                options.unsafely_ignore_certificate_errors.clone(),
-            ),
             deno_webstorage::init(options.origin_storage_dir.clone()),
             deno_broadcast_channel::init(options.broadcast_channel.clone(), unstable),
             deno_crypto::init(options.seed),
-            // ffi
-            deno_ffi::init::<Permissions>(unstable),
             // Runtime ops
             ops::runtime::init(main_module.clone()),
             ops::worker_host::init(
@@ -165,8 +155,6 @@ impl MainWorker {
             ops::process::init(),
             ops::signal::init(),
             ops::tty::init(),
-            deno_http::init(),
-            ops::http::init(),
             // Permissions ext (worker specific state)
             perm_ext,
         ];
@@ -182,14 +170,6 @@ impl MainWorker {
             extensions,
             ..Default::default()
         });
-
-        if let Some(server) = options.maybe_inspector_server.clone() {
-            server.register_inspector(
-                main_module.to_string(),
-                &mut js_runtime,
-                options.should_break_on_first_statement,
-            );
-        }
 
         Self {
             js_runtime,

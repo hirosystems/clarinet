@@ -62,21 +62,28 @@ pub async fn do_run_scripts(
     manifest: &ProjectManifest,
     cache: DeploymentCache,
     deployment_plan_path: Option<String>,
-    fail_fast: bool,
+    fail_fast: Option<u16>,
+    filter: Option<String>,
+    import_map: Option<String>,
 ) -> Result<u32, AnyError> {
     let concurrent_jobs = NonZeroUsize::new(num_cpus::get()).expect("unable to determine num_cp");
+    let fail_fast = match fail_fast {
+        None | Some(0) => None,
+        Some(limit) => Some(NonZeroUsize::new(limit.into()).unwrap()),
+    };
     let test_flags = TestFlags {
         ignore: vec![],    // todo(lgalabru)
         trace_ops: true,   // todo(lgalabru)
-        fail_fast: None,   // todo(lgalabru)
         allow_none: false, // todo(lgalabru)
-        include: vec![],   // todo(lgalabru)
-        filter: None,      // todo(lgalabru)
+        fail_fast,
+        include,
+        filter,
         shuffle: None,
         doc: false,
         concurrent_jobs,
         no_run: false,
     };
+    // let watch = if
     let flags = Flags {
         argv: vec![],
         subcommand: DenoSubcommand::Test(test_flags.clone()),
@@ -93,9 +100,9 @@ pub async fn do_run_scripts(
         cached_only: false,      // todo(lgalabru)
         coverage_dir: None,      // todo(lgalabru)
         ignore: vec![],          // todo(lgalabru)
-        import_map_path: None,   // todo(lgalabru)
         watch: None,             // todo(lgalabru)
-        type_check_mode: TypeCheckMode::None,
+        import_map_path: import_map,
+        type_check_mode: TypeCheckMode::None, // todo(lgalabru)
         compat: false,
         ..Default::default()
     };
@@ -751,7 +758,7 @@ pub async fn run_tests(
         return Err(generic_error("No test modules found"));
     }
 
-    check_specifiers(&ps, permissions.clone(), specifiers_with_mode.clone()).await?;
+    let res = check_specifiers(&ps, permissions.clone(), specifiers_with_mode.clone()).await;
 
     if test_flags.no_run {
         return Ok(());
@@ -774,8 +781,6 @@ pub async fn run_tests(
         deployment_cache,
     )
     .await?;
-    println!("5");
-
     Ok(())
 }
 

@@ -1258,18 +1258,6 @@ impl deno_web::TimersPermission for Permissions {
     }
 }
 
-impl deno_websocket::WebSocketPermissions for Permissions {
-    fn check_net_url(&mut self, url: &url::Url) -> Result<(), AnyError> {
-        self.net.check_url(url)
-    }
-}
-
-impl deno_ffi::FfiPermissions for Permissions {
-    fn check(&mut self, path: Option<&Path>) -> Result<(), AnyError> {
-        self.ffi.check(path)
-    }
-}
-
 fn unit_permission_from_flag_bool(
     flag: bool,
     name: &'static str,

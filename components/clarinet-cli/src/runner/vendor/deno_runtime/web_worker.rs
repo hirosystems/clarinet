@@ -1,6 +1,5 @@
 // Copyright 2018-2022 the Deno authors. All rights reserved. MIT license.
 use super::colors;
-use super::inspector_server::InspectorServer;
 use super::js;
 use super::ops;
 use super::ops::io::Stdio;
@@ -322,7 +321,6 @@ pub struct WebWorkerOptions {
     pub format_js_error_fn: Option<Arc<FormatJsErrorFn>>,
     pub source_map_getter: Option<Box<dyn SourceMapGetter>>,
     pub worker_type: WebWorkerType,
-    pub maybe_inspector_server: Option<Arc<InspectorServer>>,
     pub get_error_class_fn: Option<GetErrorClassFn>,
     pub blob_store: BlobStore,
     pub broadcast_channel: InMemoryBroadcastChannel,
@@ -367,7 +365,6 @@ impl WebWorker {
 
         let mut extensions: Vec<Extension> = vec![
             // Web APIs
-            deno_webidl::init(),
             deno_console::init(),
             deno_url::init(),
             deno_web::init::<Permissions>(options.blob_store.clone(), Some(main_module.clone())),
@@ -380,16 +377,9 @@ impl WebWorker {
                 file_fetch_handler: Rc::new(deno_fetch::FsFetchHandler),
                 ..Default::default()
             }),
-            deno_websocket::init::<Permissions>(
-                options.bootstrap.user_agent.clone(),
-                options.root_cert_store.clone(),
-                options.unsafely_ignore_certificate_errors.clone(),
-            ),
             deno_webstorage::init(None).disable(),
             deno_broadcast_channel::init(options.broadcast_channel.clone(), unstable),
             deno_crypto::init(options.seed),
-            // ffi
-            deno_ffi::init::<Permissions>(unstable),
             // Runtime ops that are always initialized for WebWorkers
             ops::web_worker::init(),
             ops::runtime::init(main_module.clone()),
@@ -415,8 +405,6 @@ impl WebWorker {
             ops::spawn::init(),
             ops::signal::init(),
             ops::tty::init(),
-            deno_http::init(),
-            ops::http::init(),
             // Permissions ext (worker specific state)
             perm_ext,
         ];
@@ -434,10 +422,6 @@ impl WebWorker {
             extensions,
             ..Default::default()
         });
-
-        if let Some(server) = options.maybe_inspector_server.clone() {
-            server.register_inspector(main_module.to_string(), &mut js_runtime, false);
-        }
 
         let (internal_handle, external_handle) = {
             let handle = js_runtime.v8_isolate().thread_safe_handle();

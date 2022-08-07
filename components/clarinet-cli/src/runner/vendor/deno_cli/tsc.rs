@@ -36,10 +36,7 @@ use std::sync::Arc;
 pub static COMPILER_SNAPSHOT: Lazy<Box<[u8]>> = Lazy::new(
     #[cold]
     #[inline(never)]
-    || {
-        vec![]
-        .into_boxed_slice()
-    },
+    || vec![].into_boxed_slice(),
 );
 
 pub fn compiler_snapshot() -> Snapshot {
