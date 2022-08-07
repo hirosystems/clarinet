@@ -1,14 +1,14 @@
 // Copyright 2018-2022 the Deno authors. All rights reserved. MIT license.
 
-use crate::auth_tokens::AuthTokens;
+use super::auth_tokens::AuthTokens;
 use crate::colors;
-use crate::http_cache::HttpCache;
-use crate::http_util::fetch_once;
-use crate::http_util::CacheSemantics;
-use crate::http_util::FetchOnceArgs;
-use crate::http_util::FetchOnceResult;
-use crate::text_encoding;
-use crate::version::get_user_agent;
+use super::http_cache::HttpCache;
+use super::http_util::fetch_once;
+use super::http_util::CacheSemantics;
+use super::http_util::FetchOnceArgs;
+use super::http_util::FetchOnceResult;
+use super::text_encoding;
+use super::version::get_user_agent;
 
 use data_url::DataUrl;
 use deno_ast::MediaType;
@@ -21,14 +21,14 @@ use deno_core::futures;
 use deno_core::futures::future::FutureExt;
 use deno_core::parking_lot::Mutex;
 use deno_core::ModuleSpecifier;
-use deno_runtime::deno_fetch::create_http_client;
-use deno_runtime::deno_fetch::reqwest;
-use deno_runtime::deno_tls::rustls;
-use deno_runtime::deno_tls::rustls::RootCertStore;
-use deno_runtime::deno_tls::rustls_native_certs::load_native_certs;
-use deno_runtime::deno_tls::rustls_pemfile;
-use deno_runtime::deno_tls::webpki_roots;
-use deno_runtime::deno_web::BlobStore;
+use deno_fetch::create_http_client;
+use deno_fetch::reqwest;
+use deno_tls::rustls;
+use deno_tls::rustls::RootCertStore;
+use deno_tls::rustls_native_certs::load_native_certs;
+use deno_tls::rustls_pemfile;
+use deno_tls::webpki_roots;
+use deno_web::BlobStore;
 use deno_runtime::permissions::Permissions;
 use log::debug;
 use std::borrow::Borrow;

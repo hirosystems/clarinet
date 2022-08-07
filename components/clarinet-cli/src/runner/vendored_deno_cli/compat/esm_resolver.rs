@@ -1,7 +1,7 @@
 // Copyright 2018-2022 the Deno authors. All rights reserved. MIT license.
 
 use super::errors;
-use crate::resolver::ImportMapResolver;
+use super::super::resolver::ImportMapResolver;
 use deno_core::error::generic_error;
 use deno_core::error::AnyError;
 use deno_core::serde_json;
@@ -85,7 +85,7 @@ fn node_resolve(
 ) -> Result<ResolveResponse, AnyError> {
   // TODO(bartlomieju): skipped "policy" part as we don't plan to support it
 
-  if let Some(resolved) = crate::compat::try_resolve_builtin_module(specifier) {
+  if let Some(resolved) = super::super::compat::try_resolve_builtin_module(specifier) {
     return Ok(ResolveResponse::Esm(resolved));
   }
 
@@ -100,7 +100,7 @@ fn node_resolve(
       let split_specifier = url.as_str().split(':');
       let specifier = split_specifier.skip(1).collect::<String>();
       if let Some(resolved) =
-        crate::compat::try_resolve_builtin_module(&specifier)
+        super::super::compat::try_resolve_builtin_module(&specifier)
       {
         return Ok(ResolveResponse::Esm(resolved));
       } else {
@@ -1155,7 +1155,7 @@ fn legacy_main_resolve(
 #[cfg(test)]
 mod tests {
   use super::*;
-  use crate::compat::STD_URL_STR;
+  use super::super::super::compat::STD_URL_STR;
 
   fn testdir(name: &str) -> PathBuf {
     let c = PathBuf::from(env!("CARGO_MANIFEST_DIR"));

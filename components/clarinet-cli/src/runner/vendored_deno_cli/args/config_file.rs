@@ -1,12 +1,12 @@
 // Copyright 2018-2022 the Deno authors. All rights reserved. MIT license.
 
-use crate::args::ConfigFlag;
-use crate::args::Flags;
-use crate::args::TaskFlags;
-use crate::fs_util;
-use crate::fs_util::canonicalize_path;
-use crate::fs_util::specifier_parent;
-use crate::fs_util::specifier_to_file_path;
+use super::ConfigFlag;
+use super::Flags;
+use super::TaskFlags;
+use super::super::fs_util;
+use super::super::fs_util::canonicalize_path;
+use super::super::fs_util::specifier_parent;
+use super::super::fs_util::specifier_to_file_path;
 
 use deno_core::anyhow::anyhow;
 use deno_core::anyhow::bail;

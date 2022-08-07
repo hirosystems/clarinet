@@ -1,11 +1,11 @@
 // Copyright 2018-2022 the Deno authors. All rights reserved. MIT license.
 
-use crate::tools::test::TestDescription;
-use crate::tools::test::TestEvent;
-use crate::tools::test::TestEventSender;
-use crate::tools::test::TestFilter;
-use crate::tools::test::TestLocation;
-use crate::tools::test::TestStepDescription;
+use super::super::tools::test::TestDescription;
+use super::super::tools::test::TestEvent;
+use super::super::tools::test::TestEventSender;
+use super::super::tools::test::TestFilter;
+use super::super::tools::test::TestLocation;
+use super::super::tools::test::TestStepDescription;
 
 use deno_core::error::generic_error;
 use deno_core::error::AnyError;

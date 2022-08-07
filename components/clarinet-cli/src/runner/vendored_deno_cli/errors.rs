@@ -9,7 +9,7 @@
 //!   Diagnostics are compile-time type errors, whereas JsErrors are runtime
 //!   exceptions.
 
-use crate::emit::GraphError;
+use super::emit::GraphError;
 
 use deno_ast::Diagnostic;
 use deno_core::error::AnyError;

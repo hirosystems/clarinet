@@ -1,7 +1,7 @@
 // Copyright 2018-2022 the Deno authors. All rights reserved. MIT license.
 
-use crate::errors::get_error_class_name;
-use crate::file_fetcher::FileFetcher;
+use super::errors::get_error_class_name;
+use super::file_fetcher::FileFetcher;
 
 use deno_core::futures::FutureExt;
 use deno_core::ModuleSpecifier;

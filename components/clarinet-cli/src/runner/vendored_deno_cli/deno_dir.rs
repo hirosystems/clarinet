@@ -1,6 +1,6 @@
 // Copyright 2018-2022 the Deno authors. All rights reserved. MIT license.
 
-use crate::cache::DiskCache;
+use super::cache::DiskCache;
 
 use std::path::PathBuf;
 

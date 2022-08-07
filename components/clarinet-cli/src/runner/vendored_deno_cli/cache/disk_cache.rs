@@ -1,7 +1,7 @@
 // Copyright 2018-2022 the Deno authors. All rights reserved. MIT license.
 
-use crate::fs_util;
-use crate::http_cache::url_to_filename;
+use super::super::fs_util;
+use http_cache::url_to_filename;
 
 use deno_core::url::Host;
 use deno_core::url::Url;

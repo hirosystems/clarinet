@@ -1,11 +1,11 @@
 // Copyright 2018-2022 the Deno authors. All rights reserved. MIT license.
 
-use crate::emit::emit_parsed_source;
-use crate::emit::TsTypeLib;
-use crate::graph_util::ModuleEntry;
-use crate::proc_state::ProcState;
-use crate::text_encoding::code_without_source_map;
-use crate::text_encoding::source_map_from_code;
+use super::emit::emit_parsed_source;
+use super::emit::TsTypeLib;
+use super::graph_util::ModuleEntry;
+use super::proc_state::ProcState;
+use super::text_encoding::code_without_source_map;
+use super::text_encoding::source_map_from_code;
 
 use deno_ast::MediaType;
 use deno_core::anyhow::anyhow;

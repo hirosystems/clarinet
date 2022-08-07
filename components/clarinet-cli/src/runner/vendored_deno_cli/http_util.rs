@@ -1,5 +1,5 @@
 // Copyright 2018-2022 the Deno authors. All rights reserved. MIT license.
-use crate::auth_tokens::AuthToken;
+use super::auth_tokens::AuthToken;
 
 use cache_control::Cachability;
 use cache_control::CacheControl;
@@ -8,13 +8,13 @@ use deno_core::error::custom_error;
 use deno_core::error::generic_error;
 use deno_core::error::AnyError;
 use deno_core::url::Url;
-use deno_runtime::deno_fetch::reqwest::header::HeaderValue;
-use deno_runtime::deno_fetch::reqwest::header::ACCEPT;
-use deno_runtime::deno_fetch::reqwest::header::AUTHORIZATION;
-use deno_runtime::deno_fetch::reqwest::header::IF_NONE_MATCH;
-use deno_runtime::deno_fetch::reqwest::header::LOCATION;
-use deno_runtime::deno_fetch::reqwest::Client;
-use deno_runtime::deno_fetch::reqwest::StatusCode;
+use deno_fetch::reqwest::header::HeaderValue;
+use deno_fetch::reqwest::header::ACCEPT;
+use deno_fetch::reqwest::header::AUTHORIZATION;
+use deno_fetch::reqwest::header::IF_NONE_MATCH;
+use deno_fetch::reqwest::header::LOCATION;
+use deno_fetch::reqwest::Client;
+use deno_fetch::reqwest::StatusCode;
 use log::debug;
 use std::collections::HashMap;
 use std::time::Duration;
@@ -304,8 +304,8 @@ pub async fn fetch_once(
 #[cfg(test)]
 mod tests {
   use super::*;
-  use crate::version;
-  use deno_runtime::deno_fetch::create_http_client;
+  use super::version;
+  use deno_fetch::create_http_client;
   use std::fs::read;
 
   fn create_test_client() -> Client {

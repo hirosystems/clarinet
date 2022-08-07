@@ -26,7 +26,7 @@ use deno_core::error::AnyError;
 use deno_core::normalize_path;
 use deno_core::url::Url;
 use deno_runtime::colors;
-use deno_runtime::deno_tls::rustls::RootCertStore;
+use deno_tls::rustls::RootCertStore;
 use deno_runtime::inspector_server::InspectorServer;
 use deno_runtime::permissions::PermissionsOptions;
 use std::collections::BTreeMap;
@@ -34,16 +34,16 @@ use std::env;
 use std::net::SocketAddr;
 use std::path::PathBuf;
 
-use crate::compat;
-use crate::deno_dir::DenoDir;
-use crate::emit::get_ts_config_for_emit;
-use crate::emit::TsConfigType;
-use crate::emit::TsConfigWithIgnoredOptions;
-use crate::emit::TsTypeLib;
-use crate::file_fetcher::get_root_cert_store;
-use crate::file_fetcher::CacheSetting;
-use crate::lockfile::Lockfile;
-use crate::version;
+use super::compat;
+use super::deno_dir::DenoDir;
+use super::emit::get_ts_config_for_emit;
+use super::emit::TsConfigType;
+use super::emit::TsConfigWithIgnoredOptions;
+use super::emit::TsTypeLib;
+use super::file_fetcher::get_root_cert_store;
+use super::file_fetcher::CacheSetting;
+use super::lockfile::Lockfile;
+use super::version;
 
 /// Overrides for the options below that when set will
 /// use these values over the values derived from the

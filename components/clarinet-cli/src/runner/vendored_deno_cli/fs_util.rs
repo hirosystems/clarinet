@@ -4,7 +4,7 @@ use deno_core::anyhow::Context;
 use deno_core::error::{uri_error, AnyError};
 pub use deno_core::normalize_path;
 use deno_core::ModuleSpecifier;
-use deno_runtime::deno_crypto::rand;
+use deno_crypto::rand;
 use std::borrow::Cow;
 use std::env::current_dir;
 use std::fs::OpenOptions;

@@ -4,20 +4,20 @@
 //! populate a cache, emit files, and transform a graph into the structures for
 //! loading into an isolate.
 
-use crate::args::config_file::IgnoredCompilerOptions;
-use crate::args::ConfigFile;
-use crate::args::EmitConfigOptions;
-use crate::args::TsConfig;
-use crate::args::TypeCheckMode;
-use crate::cache::EmitCache;
-use crate::cache::FastInsecureHasher;
-use crate::cache::TypeCheckCache;
+use super::args::config_file::IgnoredCompilerOptions;
+use super::args::ConfigFile;
+use super::args::EmitConfigOptions;
+use super::args::TsConfig;
+use super::args::TypeCheckMode;
+use super::cache::EmitCache;
+use super::cache::FastInsecureHasher;
+use super::cache::TypeCheckCache;
 use crate::colors;
-use crate::diagnostics::Diagnostics;
-use crate::graph_util::GraphData;
-use crate::graph_util::ModuleEntry;
-use crate::tsc;
-use crate::version;
+use super::diagnostics::Diagnostics;
+use super::graph_util::GraphData;
+use super::graph_util::ModuleEntry;
+use super::tsc;
+use super::version;
 
 use deno_ast::swc::bundler::Hook;
 use deno_ast::swc::bundler::ModuleRecord;

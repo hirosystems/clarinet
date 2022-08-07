@@ -1,10 +1,10 @@
 // Copyright 2018-2022 the Deno authors. All rights reserved. MIT license.
 
-use crate::args::TsConfig;
-use crate::diagnostics::Diagnostics;
-use crate::emit;
-use crate::graph_util::GraphData;
-use crate::graph_util::ModuleEntry;
+use super::args::TsConfig;
+use super::diagnostics::Diagnostics;
+use super::emit;
+use super::graph_util::GraphData;
+use super::graph_util::ModuleEntry;
 
 use deno_ast::MediaType;
 use deno_core::anyhow::anyhow;
@@ -127,7 +127,7 @@ fn get_maybe_hash(
   if let Some(source) = maybe_source {
     let mut data = vec![source.as_bytes().to_owned()];
     data.extend_from_slice(hash_data);
-    Some(crate::checksum::gen(&data))
+    Some(super::checksum::gen(&data))
   } else {
     None
   }
@@ -135,7 +135,7 @@ fn get_maybe_hash(
 
 /// Hash the URL so it can be sent to `tsc` in a supportable way
 fn hash_url(specifier: &ModuleSpecifier, media_type: &MediaType) -> String {
-  let hash = crate::checksum::gen(&[specifier.path().as_bytes()]);
+  let hash = super::checksum::gen(&[specifier.path().as_bytes()]);
   format!(
     "{}:///{}{}",
     specifier.scheme(),
@@ -310,7 +310,7 @@ fn op_create_hash(s: &mut OpState, args: Value) -> Result<Value, AnyError> {
     .context("Invalid request from JavaScript for \"op_create_hash\".")?;
   let mut data = vec![v.data.as_bytes().to_owned()];
   data.extend_from_slice(&state.hash_data);
-  let hash = crate::checksum::gen(&data);
+  let hash = super::checksum::gen(&data);
   Ok(json!({ "hash": hash }))
 }
 
@@ -677,10 +677,10 @@ pub fn exec(request: Request) -> Result<Response, AnyError> {
 #[cfg(test)]
 mod tests {
   use super::*;
-  use crate::args::TsConfig;
-  use crate::diagnostics::Diagnostic;
-  use crate::diagnostics::DiagnosticCategory;
-  use crate::emit::Stats;
+  use super::super::args::TsConfig;
+  use super::super::diagnostics::Diagnostic;
+  use super::super::diagnostics::DiagnosticCategory;
+  use super::super::emit::Stats;
   use deno_core::futures::future;
   use deno_core::OpState;
   use deno_graph::ModuleKind;

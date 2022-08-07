@@ -12,7 +12,7 @@ use std::path::PathBuf;
 use std::rc::Rc;
 use std::sync::Arc;
 
-use crate::tools::fmt::format_json;
+use super::tools::fmt::format_json;
 
 #[derive(Debug, Clone)]
 pub struct Lockfile {
@@ -77,7 +77,7 @@ impl Lockfile {
       return true;
     }
     if let Some(lockfile_checksum) = self.map.get(specifier) {
-      let compiled_checksum = crate::checksum::gen(&[code.as_bytes()]);
+      let compiled_checksum = super::checksum::gen(&[code.as_bytes()]);
       lockfile_checksum == &compiled_checksum
     } else {
       false
@@ -88,7 +88,7 @@ impl Lockfile {
     if specifier.starts_with("file:") {
       return;
     }
-    let checksum = crate::checksum::gen(&[code.as_bytes()]);
+    let checksum = super::checksum::gen(&[code.as_bytes()]);
     self.map.insert(specifier.to_string(), checksum);
   }
 }
@@ -111,7 +111,7 @@ impl deno_graph::source::Locker for Locker {
   }
 
   fn get_checksum(&self, content: &str) -> String {
-    crate::checksum::gen(&[content.as_bytes()])
+    super::checksum::gen(&[content.as_bytes()])
   }
 
   fn get_filename(&self) -> Option<String> {

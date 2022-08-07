@@ -3,7 +3,7 @@
 mod errors;
 mod esm_resolver;
 
-use crate::file_fetcher::FileFetcher;
+use super::file_fetcher::FileFetcher;
 use deno_ast::MediaType;
 use deno_core::error::AnyError;
 use deno_core::located_script_name;

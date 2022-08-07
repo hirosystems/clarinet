@@ -1,6 +1,6 @@
-use crate::tools::bench::BenchDescription;
-use crate::tools::bench::BenchEvent;
-use crate::tools::test::TestFilter;
+use super::super::tools::bench::BenchDescription;
+use super::super::tools::bench::BenchEvent;
+use super::super::tools::test::TestFilter;
 use deno_core::error::generic_error;
 use deno_core::error::AnyError;
 use deno_core::op;

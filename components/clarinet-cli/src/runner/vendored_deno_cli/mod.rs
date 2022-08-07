@@ -21,12 +21,10 @@ mod http_cache;
 mod http_util;
 mod lockfile;
 mod logger;
-mod lsp;
 mod module_loader;
 mod ops;
 mod proc_state;
 mod resolver;
-mod standalone;
 mod text_encoding;
 mod tools;
 mod tsc;
@@ -34,41 +32,41 @@ mod unix_util;
 mod version;
 mod windows_util;
 
-use crate::args::flags_from_vec;
-use crate::args::BenchFlags;
-use crate::args::BundleFlags;
-use crate::args::CacheFlags;
-use crate::args::CheckFlags;
-use crate::args::CompileFlags;
-use crate::args::CompletionsFlags;
-use crate::args::CoverageFlags;
-use crate::args::DenoSubcommand;
-use crate::args::DocFlags;
-use crate::args::EvalFlags;
-use crate::args::Flags;
-use crate::args::FmtFlags;
-use crate::args::InfoFlags;
-use crate::args::InstallFlags;
-use crate::args::LintFlags;
-use crate::args::ReplFlags;
-use crate::args::RunFlags;
-use crate::args::TaskFlags;
-use crate::args::TestFlags;
-use crate::args::TypeCheckMode;
-use crate::args::UninstallFlags;
-use crate::args::UpgradeFlags;
-use crate::args::VendorFlags;
-use crate::cache::TypeCheckCache;
-use crate::emit::TsConfigType;
-use crate::file_fetcher::File;
-use crate::file_watcher::ResolutionResult;
-use crate::fmt_errors::format_js_error;
-use crate::graph_util::graph_lock_or_exit;
-use crate::graph_util::graph_valid;
-use crate::module_loader::CliModuleLoader;
-use crate::proc_state::ProcState;
-use crate::resolver::ImportMapResolver;
-use crate::resolver::JsxResolver;
+use args::flags_from_vec;
+use args::BenchFlags;
+use args::BundleFlags;
+use args::CacheFlags;
+use args::CheckFlags;
+use args::CompileFlags;
+use args::CompletionsFlags;
+use args::CoverageFlags;
+use args::DenoSubcommand;
+use args::DocFlags;
+use args::EvalFlags;
+use args::Flags;
+use args::FmtFlags;
+use args::InfoFlags;
+use args::InstallFlags;
+use args::LintFlags;
+use args::ReplFlags;
+use args::RunFlags;
+use args::TaskFlags;
+use args::TestFlags;
+use args::TypeCheckMode;
+use args::UninstallFlags;
+use args::UpgradeFlags;
+use args::VendorFlags;
+use cache::TypeCheckCache;
+use emit::TsConfigType;
+use file_fetcher::File;
+use file_watcher::ResolutionResult;
+use fmt_errors::format_js_error;
+use graph_util::graph_lock_or_exit;
+use graph_util::graph_valid;
+use module_loader::CliModuleLoader;
+use proc_state::ProcState;
+use resolver::ImportMapResolver;
+use resolver::JsxResolver;
 
 use args::CliOptions;
 use deno_ast::MediaType;
@@ -291,76 +289,6 @@ where
   Ok(())
 }
 
-fn print_cache_info(
-  state: &ProcState,
-  json: bool,
-  location: Option<&deno_core::url::Url>,
-) -> Result<(), AnyError> {
-  let deno_dir = &state.dir.root;
-  let modules_cache = &state.file_fetcher.get_http_cache_location();
-  let typescript_cache = &state.dir.gen_cache.location;
-  let registry_cache =
-    &state.dir.root.join(lsp::language_server::REGISTRIES_PATH);
-  let mut origin_dir = state.dir.root.join("location_data");
-
-  if let Some(location) = &location {
-    origin_dir =
-      origin_dir.join(&checksum::gen(&[location.to_string().as_bytes()]));
-  }
-
-  let local_storage_dir = origin_dir.join("local_storage");
-
-  if json {
-    let mut output = json!({
-      "denoDir": deno_dir,
-      "modulesCache": modules_cache,
-      "typescriptCache": typescript_cache,
-      "registryCache": registry_cache,
-      "originStorage": origin_dir,
-    });
-
-    if location.is_some() {
-      output["localStorage"] = serde_json::to_value(local_storage_dir)?;
-    }
-
-    write_json_to_stdout(&output)
-  } else {
-    println!(
-      "{} {}",
-      colors::bold("DENO_DIR location:"),
-      deno_dir.display()
-    );
-    println!(
-      "{} {}",
-      colors::bold("Remote modules cache:"),
-      modules_cache.display()
-    );
-    println!(
-      "{} {}",
-      colors::bold("Emitted modules cache:"),
-      typescript_cache.display()
-    );
-    println!(
-      "{} {}",
-      colors::bold("Language server registries cache:"),
-      registry_cache.display(),
-    );
-    println!(
-      "{} {}",
-      colors::bold("Origin storage:"),
-      origin_dir.display()
-    );
-    if location.is_some() {
-      println!(
-        "{} {}",
-        colors::bold("Local Storage:"),
-        local_storage_dir.display(),
-      );
-    }
-    Ok(())
-  }
-}
-
 pub fn get_types(unstable: bool) -> String {
   let mut types = vec![
     tsc::DENO_NS_LIB,
@@ -383,62 +311,6 @@ pub fn get_types(unstable: bool) -> String {
   }
 
   types.join("\n")
-}
-
-async fn compile_command(
-  flags: Flags,
-  compile_flags: CompileFlags,
-) -> Result<i32, AnyError> {
-  let debug = flags.log_level == Some(log::Level::Debug);
-
-  let run_flags = tools::standalone::compile_to_runtime_flags(
-    &flags,
-    compile_flags.args.clone(),
-  )?;
-
-  let module_specifier = resolve_url_or_path(&compile_flags.source_file)?;
-  let ps = ProcState::build(flags).await?;
-  let deno_dir = &ps.dir;
-
-  let output_path =
-    tools::standalone::resolve_compile_executable_output_path(&compile_flags)?;
-
-  let graph = Arc::try_unwrap(
-    create_graph_and_maybe_check(module_specifier.clone(), &ps, debug).await?,
-  )
-  .map_err(|_| {
-    generic_error("There should only be one reference to ModuleGraph")
-  })?;
-
-  graph.valid().unwrap();
-
-  let eszip = eszip::EszipV2::from_graph(graph, Default::default())?;
-
-  info!(
-    "{} {}",
-    colors::green("Compile"),
-    module_specifier.to_string()
-  );
-
-  // Select base binary based on target
-  let original_binary =
-    tools::standalone::get_base_binary(deno_dir, compile_flags.target.clone())
-      .await?;
-
-  let final_bin = tools::standalone::create_standalone_binary(
-    original_binary,
-    eszip,
-    module_specifier.clone(),
-    run_flags,
-    ps,
-  )
-  .await?;
-
-  info!("{} {}", colors::green("Emit"), output_path.display());
-
-  tools::standalone::write_standalone_binary(output_path, final_bin).await?;
-
-  Ok(0)
 }
 
 async fn info_command(

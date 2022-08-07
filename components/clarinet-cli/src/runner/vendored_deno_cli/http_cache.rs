@@ -3,8 +3,8 @@
 //! as defined in RFC 7234 (<https://tools.ietf.org/html/rfc7234>).
 //! Currently it's a very simplified version to fulfill Deno needs
 //! at hand.
-use crate::fs_util;
-use crate::http_util::HeadersMap;
+use super::fs_util;
+use super::http_util::HeadersMap;
 use deno_core::error::generic_error;
 use deno_core::error::AnyError;
 use deno_core::serde::Deserialize;
@@ -68,7 +68,7 @@ pub fn url_to_filename(url: &Url) -> Option<PathBuf> {
   // NOTE: fragment is omitted on purpose - it's not taken into
   // account when caching - it denotes parts of webpage, which
   // in case of static resources doesn't make much sense
-  let hashed_filename = crate::checksum::gen(&[rest_str.as_bytes()]);
+  let hashed_filename = super::checksum::gen(&[rest_str.as_bytes()]);
   cache_filename.push(hashed_filename);
   Some(cache_filename)
 }
