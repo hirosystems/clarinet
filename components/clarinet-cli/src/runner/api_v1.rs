@@ -71,7 +71,6 @@ pub async fn run_bridge(
         .build();
     custom_extensions.push(clarinet);
 
-    println!("Extension configured");
     let mut worker = create_main_worker(
         &program_state,
         specifier.clone(),
@@ -83,7 +82,7 @@ pub async fn run_bridge(
             stderr: StdioPipe::File(channel.stderr()),
         },
     );
-    println!("Worker configured");
+
     worker.js_runtime.execute_script(
         &located_script_name!(),
         r#"Deno[Deno.internal].enableTestAndBench()"#,
