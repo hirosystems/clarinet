@@ -3,7 +3,7 @@ name = "counter"
 authors = []
 description = ""
 telemetry = false
-cache_dir = "./.requirements"
+cache_dir = "./.cache"
 boot_contracts = ["pox", "costs-v2", "bns"]
 
 [contracts.counter]

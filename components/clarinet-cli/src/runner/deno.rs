@@ -21,7 +21,7 @@ use super::vendor::deno_cli::tools::test::{
 use super::vendor::deno_runtime::permissions::Permissions;
 use super::vendor::deno_runtime::tokio_util::run_local;
 use super::{api_v1, DeploymentCache};
-use clarinet_files::ProjectManifest;
+use clarinet_files::{ProjectManifest, FileLocation};
 use deno_ast::swc::common::comments::CommentKind;
 use deno_ast::MediaType;
 use deno_ast::SourceRangedForSpanned;
@@ -65,6 +65,8 @@ pub async fn do_run_scripts(
     fail_fast: Option<u16>,
     filter: Option<String>,
     import_map: Option<String>,
+    allow_net: bool,
+    cache_location: FileLocation,
 ) -> Result<u32, AnyError> {
     let concurrent_jobs = NonZeroUsize::new(num_cpus::get()).expect("unable to determine num_cp");
     let fail_fast = match fail_fast {
@@ -90,18 +92,17 @@ pub async fn do_run_scripts(
         allow_all: false,
         allow_env: None,
         allow_hrtime: false,
-        allow_net: None,
+        allow_net: if allow_net { Some(vec!["deno.land".into()]) } else { None },
+        cache_path: Some(cache_location.to_string().into()),
+        import_map_path: import_map,
         allow_ffi: None,
         allow_read: None,        // todo(lgalabru)
         allow_run: None,         // todo(lgalabru)
         allow_write: None,       // todo(lgalabru)
         cache_blocklist: vec![], // todo(lgalabru)
-        cache_path: None,        // todo(lgalabru)
         cached_only: false,      // todo(lgalabru)
-        coverage_dir: None,      // todo(lgalabru)
         ignore: vec![],          // todo(lgalabru)
         watch: None,             // todo(lgalabru)
-        import_map_path: import_map,
         type_check_mode: TypeCheckMode::None, // todo(lgalabru)
         compat: false,
         ..Default::default()

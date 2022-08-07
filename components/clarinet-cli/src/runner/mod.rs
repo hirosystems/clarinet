@@ -11,7 +11,7 @@ use clarinet_deployments::{
     generate_default_deployment, initiate_session_from_deployment, setup_session_with_deployment,
     update_session_with_contracts_executions, update_session_with_genesis_accounts,
 };
-use clarinet_files::ProjectManifest;
+use clarinet_files::{ProjectManifest, FileLocation};
 use clarity_repl::clarity::analysis::contract_interface_builder::{
     build_contract_interface, ContractInterface,
 };
@@ -114,6 +114,8 @@ pub fn run_scripts(
     fail_fast: Option<u16>,
     filter: Option<String>,
     import_map: Option<String>,
+    allow_net: bool,
+    cache_location: FileLocation,
 ) -> Result<u32, (String, u32)> {
     match block_on(deno::do_run_scripts(
         files,
@@ -128,6 +130,8 @@ pub fn run_scripts(
         fail_fast,
         filter,
         import_map,
+        allow_net,
+        cache_location
     )) {
         Err(e) => Err((format!("{:?}", e), 0)),
         Ok(res) => Ok(res),
