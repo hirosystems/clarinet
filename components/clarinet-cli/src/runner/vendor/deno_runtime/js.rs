@@ -1,6 +1,5 @@
 // Copyright 2018-2022 the Deno authors. All rights reserved. MIT license.
 use deno_core::Snapshot;
-use log::debug;
 use once_cell::sync::Lazy;
 
 pub static CLI_SNAPSHOT: Lazy<Box<[u8]>> = Lazy::new(

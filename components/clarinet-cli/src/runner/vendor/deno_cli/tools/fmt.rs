@@ -12,7 +12,6 @@ use super::super::args::CliOptions;
 use super::super::args::FmtFlags;
 use super::super::args::FmtOptionsConfig;
 use super::super::args::ProseWrap;
-use super::super::diff::diff;
 use super::super::file_watcher;
 use super::super::file_watcher::ResolutionResult;
 use super::super::fs_util::collect_files;
@@ -288,10 +287,8 @@ async fn check_source_files(
                 Ok(Some(formatted_text)) => {
                     not_formatted_files_count.fetch_add(1, Ordering::Relaxed);
                     let _g = output_lock.lock();
-                    let diff = diff(&file_text, &formatted_text);
                     info!("");
                     info!("{} {}:", colors::bold("from"), file_path.display());
-                    info!("{}", diff);
                 }
                 Ok(None) => {
                     // When checking formatting, only update the incremental cache when
