@@ -16,6 +16,12 @@ use std::env;
 use std::path::Path;
 use std::path::PathBuf;
 
+macro_rules! print_log {
+    ($($tokens: tt)*) => {
+        println!("cargo:warning={}", format!($($tokens)*))
+    }
+}
+
 // TODO(bartlomieju): this module contains a lot of duplicated
 // logic with `runtime/build.rs`, factor out to `deno_core`.
 fn create_snapshot(mut js_runtime: JsRuntime, snapshot_path: &Path, files: Vec<PathBuf>) {
@@ -36,7 +42,7 @@ fn create_snapshot(mut js_runtime: JsRuntime, snapshot_path: &Path, files: Vec<P
 
     let snapshot = js_runtime.snapshot();
     let snapshot_slice: &[u8] = &*snapshot;
-    println!("Snapshot size: {}", snapshot_slice.len());
+    print_log!("Snapshot size: {}", snapshot_slice.len());
 
     let compressed_snapshot_with_size = {
         let mut vec = vec![];
@@ -47,20 +53,18 @@ fn create_snapshot(mut js_runtime: JsRuntime, snapshot_path: &Path, files: Vec<P
                 .to_le_bytes(),
         );
 
-        vec.extend_from_slice(
-            &zstd::bulk::compress(snapshot_slice, 22).expect("snapshot compression failed"),
-        );
-
+        lzzzz::lz4_hc::compress_to_vec(snapshot_slice, &mut vec, lzzzz::lz4_hc::CLEVEL_MAX)
+            .expect("snapshot compression failed");
         vec
     };
 
-    println!(
+    print_log!(
         "Snapshot compressed size: {}",
         compressed_snapshot_with_size.len()
     );
 
     std::fs::write(&snapshot_path, compressed_snapshot_with_size).unwrap();
-    println!("Snapshot written to: {} ", snapshot_path.display());
+    print_log!("Snapshot written to: {} ", snapshot_path.display());
 }
 
 #[derive(Debug, Deserialize)]
@@ -76,6 +80,7 @@ fn create_compiler_snapshot(snapshot_path: &Path, files: Vec<PathBuf>, cwd: &Pat
     op_crate_libs.insert("deno.url", deno_url::get_declaration());
     op_crate_libs.insert("deno.web", deno_web::get_declaration());
     op_crate_libs.insert("deno.fetch", deno_fetch::get_declaration());
+    op_crate_libs.insert("deno.webgpu", deno_webgpu_get_declaration());
     op_crate_libs.insert("deno.websocket", deno_websocket::get_declaration());
     op_crate_libs.insert("deno.webstorage", deno_webstorage::get_declaration());
     op_crate_libs.insert("deno.crypto", deno_crypto::get_declaration());
@@ -349,6 +354,10 @@ fn main() {
         deno_websocket::get_declaration().display()
     );
     println!(
+        "cargo:rustc-env=DENO_WEBGPU_LIB_PATH={}",
+        deno_webgpu_get_declaration().display()
+    );
+    println!(
         "cargo:rustc-env=DENO_WEBSTORAGE_LIB_PATH={}",
         deno_webstorage::get_declaration().display()
     );
@@ -375,6 +384,7 @@ fn main() {
     let compiler_snapshot_path = o.join("COMPILER_SNAPSHOT.bin");
 
     let js_files = get_js_files("tsc");
+    print_log!("{:?}", js_files);
     create_compiler_snapshot(&compiler_snapshot_path, js_files, &c);
 
     // #[cfg(target_os = "windows")]
@@ -387,6 +397,11 @@ fn main() {
     //   ));
     //   res.compile().unwrap();
     // }
+}
+
+fn deno_webgpu_get_declaration() -> PathBuf {
+    let manifest_dir = Path::new(env!("CARGO_MANIFEST_DIR"));
+    manifest_dir.join("dts").join("lib.deno_webgpu.d.ts")
 }
 
 fn get_js_files(d: &str) -> Vec<PathBuf> {
