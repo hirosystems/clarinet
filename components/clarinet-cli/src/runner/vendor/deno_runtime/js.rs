@@ -9,7 +9,7 @@ pub static CLI_SNAPSHOT: Lazy<Box<[u8]>> = Lazy::new(
     #[inline(never)]
     || {
         static COMPRESSED_CLI_SNAPSHOT: &[u8] =
-            include_bytes!(concat!(env!("OUT_DIR"), "/COMPILER_SNAPSHOT.bin"));
+            include_bytes!(concat!(env!("OUT_DIR"), "/CLI_SNAPSHOT.bin"));
 
         let size = u32::from_le_bytes(COMPRESSED_CLI_SNAPSHOT[0..4].try_into().unwrap()) as usize;
         let mut vec = Vec::with_capacity(size);
@@ -27,7 +27,6 @@ pub static CLI_SNAPSHOT: Lazy<Box<[u8]>> = Lazy::new(
 );
 
 pub fn deno_isolate_init() -> Snapshot {
-    debug!("Deno isolate init with snapshots.");
     Snapshot::Static(&*CLI_SNAPSHOT)
 }
 

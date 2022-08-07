@@ -1,29 +1,31 @@
 use super::utils;
+use super::vendor::deno_cli::compat;
+use super::vendor::deno_cli::create_main_worker;
+use super::vendor::deno_cli::ops;
+use super::vendor::deno_cli::proc_state::ProcState;
+use super::vendor::deno_cli::tools::test::{
+    PrettyTestReporter, TestEvent, TestEventSender, TestMode, TestResult, TestSpecifierOptions,
+    TestStepResult, TestSummary,
+};
+use super::vendor::deno_runtime::ops::io::Stdio;
+use super::vendor::deno_runtime::ops::io::StdioPipe;
+use super::vendor::deno_runtime::permissions::Permissions;
 use super::DeploymentCache;
-use deno_core::{op, Extension};
+use super::SessionArtifacts;
 use clarinet_deployments::types::DeploymentSpecification;
 use clarinet_deployments::update_session_with_contracts_executions;
 use clarity_repl::clarity::analysis::contract_interface_builder::{
     build_contract_interface, ContractInterface,
 };
 use clarity_repl::repl::Session;
-use super::vendor::deno_cli::create_main_worker;
-use super::vendor::deno_cli::proc_state::ProcState;
 use deno_core::error::AnyError;
+use deno_core::located_script_name;
 use deno_core::serde_json::{json, Value};
+use deno_core::{op, Extension};
 use deno_core::{ModuleSpecifier, OpState};
-use super::vendor::deno_cli::ops;
-use super::vendor::deno_cli::tools::test::{TestEventSender, TestEvent, TestResult, TestMode, TestStepResult, TestSummary, TestSpecifierOptions, PrettyTestReporter};
-use super::vendor::deno_runtime::permissions::Permissions;
 use std::collections::{BTreeMap, HashMap};
 use std::sync::mpsc::{self, Sender};
 use std::sync::Arc;
-use super::SessionArtifacts;
-use super::vendor::deno_runtime::ops::io::Stdio;
-use super::vendor::deno_runtime::ops::io::StdioPipe;
-use deno_core::located_script_name;
-use super::vendor::deno_cli::compat;
-
 
 pub enum ClarinetTestEvent {
     SessionTerminated(SessionArtifacts),
@@ -39,7 +41,6 @@ pub async fn run_bridge(
     allow_wallets: bool,
     mut cache: Option<DeploymentCache>,
 ) -> Result<Vec<SessionArtifacts>, AnyError> {
-
     let mut custom_extensions = vec![ops::testing::init(channel.clone(), options.filter.clone())];
 
     // Build Clarinet extenstion
@@ -58,23 +59,40 @@ pub async fn run_bridge(
     let mut get_assets_maps_decl = get_assets_maps::decl();
     get_assets_maps_decl.name = "api/v1/get_assets_maps";
     let clarinet = Extension::builder()
-    .ops(vec![
-        new_session_decl, 
-        load_deployment_decl,
-        terminate_session_decl,
-        mine_block_decl,
-        mine_empty_blocks_decl,
-        call_read_only_fn_decl,
-        get_assets_maps_decl
-    ])
-    .build();
+        .ops(vec![
+            new_session_decl,
+            load_deployment_decl,
+            terminate_session_decl,
+            mine_block_decl,
+            mine_empty_blocks_decl,
+            call_read_only_fn_decl,
+            get_assets_maps_decl,
+        ])
+        .build();
     custom_extensions.push(clarinet);
 
-    let mut worker = create_main_worker(&program_state, specifier.clone(), permissions, custom_extensions, Stdio {
-        stdin: StdioPipe::Inherit,
-        stdout: StdioPipe::File(channel.stdout()),
-        stderr: StdioPipe::File(channel.stderr()),
-    },);
+    println!("Extension configured");
+    let mut worker = create_main_worker(
+        &program_state,
+        specifier.clone(),
+        permissions,
+        custom_extensions,
+        Stdio {
+            stdin: StdioPipe::Inherit,
+            stdout: StdioPipe::File(channel.stdout()),
+            stderr: StdioPipe::File(channel.stderr()),
+        },
+    );
+    println!("Worker configured");
+    worker.js_runtime.execute_script(
+        &located_script_name!(),
+        r#"Deno[Deno.internal].enableTestAndBench()"#,
+    )?;
+
+    // let bootstrap_options = options.bootstrap.clone();
+    // let mut worker = Self::from_options(main_module, permissions, options);
+    // worker.bootstrap(&bootstrap_options);
+
     let (event_tx, event_rx) = mpsc::channel();
 
     let sessions: HashMap<u32, (String, Session)> = HashMap::new();
@@ -88,19 +106,16 @@ pub async fn run_bridge(
     worker.js_runtime.op_state().borrow_mut().put(deployments);
     worker.js_runtime.op_state().borrow_mut().put(sessions);
     worker.js_runtime.op_state().borrow_mut().put(0u32);
-    worker.js_runtime
+    worker
+        .js_runtime
         .op_state()
         .borrow_mut()
         .put::<Sender<ClarinetTestEvent>>(event_tx.clone());
-        worker.js_runtime
+    worker
+        .js_runtime
         .op_state()
         .borrow_mut()
         .put::<TestEventSender>(channel);
-
-    worker.js_runtime.execute_script(
-        &located_script_name!(),
-        r#"Deno[Deno.internal].enableTestAndBench()"#,
-    )?;
 
     // Enable op call tracing in core to enable better debugging of op sanitizer
     // failures.
@@ -362,7 +377,7 @@ struct TerminateSessionArgs {
 }
 
 #[op]
-fn terminate_session(state: &mut OpState, args: TerminateSessionArgs) -> Result<(), AnyError> {
+fn terminate_session(state: &mut OpState, args: TerminateSessionArgs) -> Result<bool, AnyError> {
     // Retrieve session
     let session_artifacts = {
         let sessions = state
@@ -387,7 +402,7 @@ fn terminate_session(state: &mut OpState, args: TerminateSessionArgs) -> Result<
     let tx = state.borrow::<Sender<ClarinetTestEvent>>();
     let _ = tx.send(ClarinetTestEvent::SessionTerminated(session_artifacts));
 
-    Ok(())
+    Ok(true)
 }
 
 #[derive(Deserialize)]

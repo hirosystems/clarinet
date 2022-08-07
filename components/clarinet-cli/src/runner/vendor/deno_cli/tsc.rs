@@ -33,32 +33,11 @@ use std::sync::Arc;
 
 // Declaration files
 
-pub static DENO_NS_LIB: &str = include_str!("dts/lib.deno.ns.d.ts");
-pub static DENO_CONSOLE_LIB: &str = include_str!(env!("DENO_CONSOLE_LIB_PATH"));
-pub static DENO_URL_LIB: &str = include_str!(env!("DENO_URL_LIB_PATH"));
-pub static DENO_WEB_LIB: &str = include_str!(env!("DENO_WEB_LIB_PATH"));
-pub static DENO_FETCH_LIB: &str = include_str!(env!("DENO_FETCH_LIB_PATH"));
-pub static DENO_WEBSOCKET_LIB: &str = include_str!(env!("DENO_WEBSOCKET_LIB_PATH"));
-pub static DENO_WEBSTORAGE_LIB: &str = include_str!(env!("DENO_WEBSTORAGE_LIB_PATH"));
-pub static DENO_CRYPTO_LIB: &str = include_str!(env!("DENO_CRYPTO_LIB_PATH"));
-pub static DENO_BROADCAST_CHANNEL_LIB: &str = include_str!(env!("DENO_BROADCAST_CHANNEL_LIB_PATH"));
-pub static DENO_NET_LIB: &str = include_str!(env!("DENO_NET_LIB_PATH"));
-pub static SHARED_GLOBALS_LIB: &str = include_str!("dts/lib.deno.shared_globals.d.ts");
-pub static WINDOW_LIB: &str = include_str!("dts/lib.deno.window.d.ts");
-pub static UNSTABLE_NS_LIB: &str = include_str!("dts/lib.deno.unstable.d.ts");
-
 pub static COMPILER_SNAPSHOT: Lazy<Box<[u8]>> = Lazy::new(
     #[cold]
     #[inline(never)]
     || {
-        static COMPRESSED_COMPILER_SNAPSHOT: &[u8] =
-            include_bytes!(concat!(env!("OUT_DIR"), "/COMPILER_SNAPSHOT.bin"));
-
-        zstd::bulk::decompress(
-            &COMPRESSED_COMPILER_SNAPSHOT[4..],
-            u32::from_le_bytes(COMPRESSED_COMPILER_SNAPSHOT[0..4].try_into().unwrap()) as usize,
-        )
-        .unwrap()
+        vec![]
         .into_boxed_slice()
     },
 );
@@ -69,7 +48,7 @@ pub fn compiler_snapshot() -> Snapshot {
 
 macro_rules! inc {
     ($e:expr) => {
-        include_str!(concat!("dts/", $e))
+        include_str!(concat!("../../../../dts/", $e))
     };
 }
 

@@ -25,11 +25,11 @@ use std::path::PathBuf;
 
 use clarinet_deployments::types::DeploymentSpecification;
 
-mod vendor;
-mod deno;
 mod api_v1;
 mod costs;
+mod deno;
 mod utils;
+mod vendor;
 
 #[derive(Clone)]
 pub struct DeploymentCache {
@@ -111,6 +111,7 @@ pub fn run_scripts(
     manifest: &ProjectManifest,
     cache: DeploymentCache,
     deployment_plan_path: Option<String>,
+    fail_fast: bool,
 ) -> Result<u32, (String, u32)> {
     match block_on(deno::do_run_scripts(
         files,
@@ -122,6 +123,7 @@ pub fn run_scripts(
         manifest,
         cache,
         deployment_plan_path,
+        fail_fast,
     )) {
         Err(e) => Err((format!("{:?}", e), 0)),
         Ok(res) => Ok(res),

@@ -432,7 +432,12 @@ impl PrettyTestReporter {
         std::io::stdout().write_all(output).unwrap();
     }
 
-    pub fn report_result(&mut self, description: &TestDescription, result: &TestResult, elapsed: u64) {
+    pub fn report_result(
+        &mut self,
+        description: &TestDescription,
+        result: &TestResult,
+        elapsed: u64,
+    ) {
         if self.parallel {
             self.force_report_wait(description);
         }

@@ -266,29 +266,6 @@ where
     Ok(())
 }
 
-pub fn get_types(unstable: bool) -> String {
-    let mut types = vec![
-        tsc::DENO_NS_LIB,
-        tsc::DENO_CONSOLE_LIB,
-        tsc::DENO_URL_LIB,
-        tsc::DENO_WEB_LIB,
-        tsc::DENO_FETCH_LIB,
-        tsc::DENO_WEBSOCKET_LIB,
-        tsc::DENO_WEBSTORAGE_LIB,
-        tsc::DENO_CRYPTO_LIB,
-        tsc::DENO_BROADCAST_CHANNEL_LIB,
-        tsc::DENO_NET_LIB,
-        tsc::SHARED_GLOBALS_LIB,
-        tsc::WINDOW_LIB,
-    ];
-
-    if unstable {
-        types.push(tsc::UNSTABLE_NS_LIB);
-    }
-
-    types.join("\n")
-}
-
 async fn cache_command(flags: Flags, cache_flags: CacheFlags) -> Result<i32, AnyError> {
     let ps = ProcState::build(flags).await?;
     load_and_type_check(&ps, &cache_flags.files).await?;
@@ -867,12 +844,6 @@ async fn completions_command(
     Ok(0)
 }
 
-async fn types_command(flags: Flags) -> Result<i32, AnyError> {
-    let types = get_types(flags.unstable);
-    write_to_stdout_ignore_sigpipe(types.as_bytes())?;
-    Ok(0)
-}
-
 async fn vendor_command(flags: Flags, vendor_flags: VendorFlags) -> Result<i32, AnyError> {
     tools::vendor::vendor(flags, vendor_flags).await?;
     Ok(0)
@@ -917,7 +888,6 @@ fn get_subcommand(flags: Flags) -> Pin<Box<dyn Future<Output = Result<i32, AnyEr
         DenoSubcommand::Completions(completions_flags) => {
             completions_command(flags, completions_flags).boxed_local()
         }
-        DenoSubcommand::Types => types_command(flags).boxed_local(),
         DenoSubcommand::Vendor(vendor_flags) => vendor_command(flags, vendor_flags).boxed_local(),
         _ => unreachable!(),
     }

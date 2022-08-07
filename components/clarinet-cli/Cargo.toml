@@ -31,9 +31,13 @@ deno_url = { version = "0.64.0" }
 deno_web = { version = "0.95.0" }
 deno_websocket = { version = "0.69.0" }
 deno_webstorage = { version = "0.59.0" }
+deno_webidl = { version = "0.64.0" }
+deno_tls = { version = "0.51.0" }
+deno_http = { version = "0.58.0" }
+deno_ffi = { version = "0.51.0" }
 regex = "=1.5.6"
 serde = { version = "1.0.136", features = ["derive"] }
-zstd = '=0.11.1'
+lzzzz = '1.0'
 
 [dependencies]
 clap = { version = "3.1.6", features = ["derive"], optional = true }
