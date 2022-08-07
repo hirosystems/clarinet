@@ -296,7 +296,6 @@ pub fn get_types(unstable: bool) -> String {
     tsc::DENO_URL_LIB,
     tsc::DENO_WEB_LIB,
     tsc::DENO_FETCH_LIB,
-    tsc::DENO_WEBGPU_LIB,
     tsc::DENO_WEBSOCKET_LIB,
     tsc::DENO_WEBSTORAGE_LIB,
     tsc::DENO_CRYPTO_LIB,
