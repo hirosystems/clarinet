@@ -102,7 +102,7 @@ fn op_fs_events_open(
   let (sender, receiver) = mpsc::channel::<Result<FsEvent, AnyError>>(16);
   let sender = Mutex::new(sender);
   let mut watcher: RecommendedWatcher =
-    Watcher::new(move |res: Result<NotifyEvent, NotifyError>| {
+    Watcher::new_immediate(move |res: Result<NotifyEvent, NotifyError>| {
       let res2 = res.map(FsEvent::from).map_err(AnyError::from);
       let sender = sender.lock();
       // Ignore result, if send failed it means that watcher was already closed,

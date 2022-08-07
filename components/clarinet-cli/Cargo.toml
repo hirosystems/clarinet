@@ -32,15 +32,15 @@ deno_web = { version = "0.95.0" }
 deno_websocket = { version = "0.69.0" }
 deno_webstorage = { version = "0.59.0" }
 regex = "=1.5.6"
-serde = { version = "=1.0.139", features = ["derive"] }
+serde = { version = "1.0.136", features = ["derive"] }
 zstd = '=0.11.1'
 
 [dependencies]
 clap = { version = "3.1.6", features = ["derive"], optional = true }
 clap_generate = { version = "3.0.3", optional = true }
 toml = { version = "0.5.6", features = ["preserve_order"] }
-serde = "1"
-serde_json = "1"
+serde = { version = "1.0.136", features = ["derive"] }
+serde_json = { version = "1.0.79", features = ["preserve_order"] }
 serde_derive = "1"
 deno_emit = { version = "=0.4.0", optional = true }
 deno_graph = { version = "=0.29.0", optional = true }
@@ -100,7 +100,7 @@ block-modes = "0.8.1"
 rand = "0.8.3"
 ring = "0.16.20"
 libsecp256k1 = "0.7.0"
-uuid = { version = "0.8.2", features = ["v4"] }
+uuid = { version = "=1.0.0", features = ["v4", "serde"] }
 hmac = "0.12.0"
 pbkdf2 = { version = "0.11.0", features = ["simple"], default-features = false }
 futures = "0.3.12"

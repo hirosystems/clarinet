@@ -345,7 +345,7 @@ fn new_watcher(
   sender: Arc<mpsc::UnboundedSender<Vec<PathBuf>>>,
 ) -> Result<RecommendedWatcher, AnyError> {
   let mut watcher: RecommendedWatcher =
-    Watcher::new(move |res: Result<NotifyEvent, NotifyError>| {
+    Watcher::new_immediate(move |res: Result<NotifyEvent, NotifyError>| {
       if let Ok(event) = res {
         if matches!(
           event.kind,

@@ -1006,7 +1006,7 @@ fn get_subcommand(
     DenoSubcommand::Vendor(vendor_flags) => {
       vendor_command(flags, vendor_flags).boxed_local()
     }
-    _ => {}
+    _ => unreachable!()
   }
 }
 
