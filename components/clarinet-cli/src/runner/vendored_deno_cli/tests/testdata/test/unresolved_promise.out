@@ -1,0 +1,5 @@
+Check [WILDCARD]/test/unresolved_promise.ts
+
+ok | 0 passed | 0 failed ([WILDCARD])
+
+error: Module evaluation is still pending but there are no pending ops or dynamic imports. This situation is often caused by unresolved promises.
