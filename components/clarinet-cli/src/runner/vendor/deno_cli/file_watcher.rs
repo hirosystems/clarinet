@@ -1,6 +1,6 @@
 // Copyright 2018-2022 the Deno authors. All rights reserved. MIT license.
 
-use crate::colors;
+use super::super::deno_runtime::colors;
 use super::fmt_errors::format_js_error;
 use super::fs_util::canonicalize_path;
 

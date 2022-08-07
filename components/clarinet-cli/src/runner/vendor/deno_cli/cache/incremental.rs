@@ -7,10 +7,11 @@ use std::path::PathBuf;
 use deno_core::error::AnyError;
 use deno_core::parking_lot::Mutex;
 use deno_core::serde_json;
-use deno_runtime::deno_webstorage::rusqlite::params;
-use deno_runtime::deno_webstorage::rusqlite::Connection;
+use deno_webstorage::rusqlite::params;
+use deno_webstorage::rusqlite::Connection;
 use serde::Serialize;
 use tokio::task::JoinHandle;
+use super::super::version;
 
 use super::common::run_sqlite_pragma;
 use super::common::FastInsecureHasher;
@@ -165,7 +166,7 @@ struct SqlIncrementalCache {
 impl SqlIncrementalCache {
   pub fn new(db_file_path: &Path, state_hash: u64) -> Result<Self, AnyError> {
     let conn = Connection::open(db_file_path)?;
-    Self::from_connection(conn, state_hash, crate::version::deno())
+    Self::from_connection(conn, state_hash, version::deno())
   }
 
   fn from_connection(

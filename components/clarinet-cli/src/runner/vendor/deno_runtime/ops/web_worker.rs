@@ -2,8 +2,8 @@
 
 mod sync_fetch;
 
-use crate::web_worker::WebWorkerInternalHandle;
-use crate::web_worker::WebWorkerType;
+use super::super::web_worker::WebWorkerInternalHandle;
+use super::super::web_worker::WebWorkerType;
 use deno_core::error::AnyError;
 use deno_core::op;
 

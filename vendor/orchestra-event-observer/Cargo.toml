@@ -12,7 +12,7 @@ serde_derive = "1"
 stacks_rpc_client = { package = "stacks-rpc-client", path = "../../components/stacks-rpc-client" }
 clarity_repl = { package = "clarity-repl", path = "../../components/clarity-repl" }
 orchestra_types = { package = "orchestra-types", path = "../orchestra-types-rs" }
-rocket = { version = "=0.5.0-rc.1", features = ["json"] }
+rocket = { version = "=0.5.0-rc.2", features = ["json"] }
 bitcoincore-rpc = "0.14.0"
 bitcoincore-rpc-json = "0.14.0"
 base64 = "0.13.0"

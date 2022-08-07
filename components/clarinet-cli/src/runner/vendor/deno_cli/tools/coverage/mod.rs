@@ -1,12 +1,12 @@
 // Copyright 2018-2022 the Deno authors. All rights reserved. MIT license.
 
-use crate::args::CoverageFlags;
-use crate::args::Flags;
-use crate::colors;
-use crate::fs_util::collect_files;
-use crate::proc_state::ProcState;
-use crate::text_encoding::source_map_from_code;
-use crate::tools::fmt::format_json;
+use super::super::args::CoverageFlags;
+use super::super::args::Flags;
+use super::super::super::deno_runtime::colors;
+use super::super::fs_util::collect_files;
+use super::super::proc_state::ProcState;
+use super::super::text_encoding::source_map_from_code;
+use super::fmt::format_json;
 
 use deno_ast::MediaType;
 use deno_ast::ModuleSpecifier;

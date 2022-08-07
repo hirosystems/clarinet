@@ -4,7 +4,7 @@ use super::io::ChildStderrResource;
 use super::io::ChildStdinResource;
 use super::io::ChildStdoutResource;
 use super::io::StdFileResource;
-use crate::permissions::Permissions;
+use super::super::permissions::Permissions;
 use deno_core::error::AnyError;
 use deno_core::op;
 

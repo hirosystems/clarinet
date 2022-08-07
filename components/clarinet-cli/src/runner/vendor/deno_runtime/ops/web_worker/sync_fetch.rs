@@ -1,7 +1,7 @@
 // Copyright 2018-2022 the Deno authors. All rights reserved. MIT license.
 
-use crate::web_worker::WebWorkerInternalHandle;
-use crate::web_worker::WebWorkerType;
+use super::WebWorkerInternalHandle;
+use super::WebWorkerType;
 use deno_core::error::type_error;
 use deno_core::error::AnyError;
 use deno_core::op;

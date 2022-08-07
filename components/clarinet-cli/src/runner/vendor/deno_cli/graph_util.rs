@@ -1,6 +1,6 @@
 // Copyright 2018-2022 the Deno authors. All rights reserved. MIT license.
 
-use crate::colors;
+use super::super::deno_runtime::colors;
 use super::emit::TsTypeLib;
 use super::errors::get_error_class_name;
 

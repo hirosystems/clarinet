@@ -84,16 +84,16 @@ use deno_core::serde_json::json;
 use deno_core::v8_set_flags;
 use deno_core::Extension;
 use deno_core::ModuleSpecifier;
-use deno_runtime::colors;
-use deno_runtime::ops::worker_host::CreateWebWorkerCb;
-use deno_runtime::ops::worker_host::PreloadModuleCb;
-use deno_runtime::permissions::Permissions;
-use deno_runtime::tokio_util::run_local;
-use deno_runtime::web_worker::WebWorker;
-use deno_runtime::web_worker::WebWorkerOptions;
-use deno_runtime::worker::MainWorker;
-use deno_runtime::worker::WorkerOptions;
-use deno_runtime::BootstrapOptions;
+use super::deno_runtime::colors;
+use super::deno_runtime::ops::worker_host::CreateWebWorkerCb;
+use super::deno_runtime::ops::worker_host::PreloadModuleCb;
+use super::deno_runtime::permissions::Permissions;
+use super::deno_runtime::tokio_util::run_local;
+use super::deno_runtime::web_worker::WebWorker;
+use super::deno_runtime::web_worker::WebWorkerOptions;
+use super::deno_runtime::worker::MainWorker;
+use super::deno_runtime::worker::WorkerOptions;
+use super::deno_runtime::BootstrapOptions;
 use log::debug;
 use log::info;
 use std::env;
@@ -124,7 +124,7 @@ fn create_web_worker_preload_module_callback(
 
 fn create_web_worker_callback(
   ps: ProcState,
-  stdio: deno_runtime::ops::io::Stdio,
+  stdio: super::deno_runtime::ops::io::Stdio,
 ) -> Arc<CreateWebWorkerCb> {
   Arc::new(move |args| {
     let maybe_inspector_server = ps.maybe_inspector_server.clone();
@@ -196,7 +196,7 @@ pub fn create_main_worker(
   main_module: ModuleSpecifier,
   permissions: Permissions,
   mut custom_extensions: Vec<Extension>,
-  stdio: deno_runtime::ops::io::Stdio,
+  stdio: super::deno_runtime::ops::io::Stdio,
 ) -> MainWorker {
   let module_loader = CliModuleLoader::new(ps.clone());
 
@@ -311,78 +311,6 @@ pub fn get_types(unstable: bool) -> String {
   }
 
   types.join("\n")
-}
-
-async fn info_command(
-  flags: Flags,
-  info_flags: InfoFlags,
-) -> Result<i32, AnyError> {
-  let ps = ProcState::build(flags).await?;
-  if let Some(specifier) = info_flags.file {
-    let specifier = resolve_url_or_path(&specifier)?;
-    let graph = ps
-      .create_graph(vec![(specifier, deno_graph::ModuleKind::Esm)])
-      .await?;
-
-    if info_flags.json {
-      write_json_to_stdout(&json!(graph))?;
-    } else {
-      write_to_stdout_ignore_sigpipe(graph.to_string().as_bytes())?;
-    }
-  } else {
-    // If it was just "deno info" print location of caches and exit
-    print_cache_info(&ps, info_flags.json, ps.options.location_flag())?;
-  }
-  Ok(0)
-}
-
-async fn install_command(
-  flags: Flags,
-  install_flags: InstallFlags,
-) -> Result<i32, AnyError> {
-  let mut preload_flags = flags.clone();
-  preload_flags.inspect = None;
-  preload_flags.inspect_brk = None;
-  let permissions =
-    Permissions::from_options(&preload_flags.permissions_options());
-  let ps = ProcState::build(preload_flags).await?;
-  let main_module = resolve_url_or_path(&install_flags.module_url)?;
-  let mut worker = create_main_worker(
-    &ps,
-    main_module.clone(),
-    permissions,
-    vec![],
-    Default::default(),
-  );
-  // First, fetch and compile the module; this step ensures that the module exists.
-  worker.preload_module(&main_module, true).await?;
-  tools::installer::install(flags, install_flags)?;
-  Ok(0)
-}
-
-async fn uninstall_command(
-  uninstall_flags: UninstallFlags,
-) -> Result<i32, AnyError> {
-  tools::installer::uninstall(uninstall_flags.name, uninstall_flags.root)?;
-  Ok(0)
-}
-
-async fn lsp_command() -> Result<i32, AnyError> {
-  lsp::start().await?;
-  Ok(0)
-}
-
-async fn lint_command(
-  flags: Flags,
-  lint_flags: LintFlags,
-) -> Result<i32, AnyError> {
-  if lint_flags.rules {
-    tools::lint::print_rules_list(lint_flags.json);
-    return Ok(0);
-  }
-
-  tools::lint::lint(flags, lint_flags).await?;
-  Ok(0)
 }
 
 async fn cache_command(
@@ -698,57 +626,6 @@ async fn bundle_command(
   Ok(0)
 }
 
-async fn doc_command(
-  flags: Flags,
-  doc_flags: DocFlags,
-) -> Result<i32, AnyError> {
-  tools::doc::print_docs(flags, doc_flags).await?;
-  Ok(0)
-}
-
-async fn format_command(
-  flags: Flags,
-  fmt_flags: FmtFlags,
-) -> Result<i32, AnyError> {
-  let config = CliOptions::from_flags(flags)?;
-
-  if fmt_flags.files.len() == 1 && fmt_flags.files[0].to_string_lossy() == "-" {
-    let maybe_fmt_config = config.to_fmt_config()?;
-    tools::fmt::format_stdin(
-      fmt_flags,
-      maybe_fmt_config.map(|c| c.options).unwrap_or_default(),
-    )?;
-    return Ok(0);
-  }
-
-  tools::fmt::format(&config, fmt_flags).await?;
-  Ok(0)
-}
-
-async fn repl_command(
-  flags: Flags,
-  repl_flags: ReplFlags,
-) -> Result<i32, AnyError> {
-  let main_module = resolve_url_or_path("./$deno$repl.ts").unwrap();
-  let ps = ProcState::build(flags).await?;
-  let mut worker = create_main_worker(
-    &ps,
-    main_module.clone(),
-    Permissions::from_options(&ps.options.permissions_options()),
-    vec![],
-    Default::default(),
-  );
-  if ps.options.compat() {
-    worker.execute_side_module(&compat::GLOBAL_URL).await?;
-    compat::add_global_require(&mut worker.js_runtime, main_module.as_str())?;
-    worker.run_event_loop(false).await?;
-    compat::setup_builtin_modules(&mut worker.js_runtime)?;
-  }
-  worker.run_event_loop(false).await?;
-
-  tools::repl::run(&ps, worker, repl_flags.eval_files, repl_flags.eval).await
-}
-
 async fn run_from_stdin(flags: Flags) -> Result<i32, AnyError> {
   let ps = ProcState::build(flags).await?;
   let main_module = resolve_url_or_path("./$deno$stdin.ts").unwrap();
@@ -1003,13 +880,6 @@ async fn run_command(
   Ok(worker.get_exit_code())
 }
 
-async fn task_command(
-  flags: Flags,
-  task_flags: TaskFlags,
-) -> Result<i32, AnyError> {
-  tools::task::execute_script(flags, task_flags).await
-}
-
 async fn coverage_command(
   flags: Flags,
   coverage_flags: CoverageFlags,
@@ -1070,14 +940,6 @@ async fn types_command(flags: Flags) -> Result<i32, AnyError> {
   Ok(0)
 }
 
-async fn upgrade_command(
-  _flags: Flags,
-  upgrade_flags: UpgradeFlags,
-) -> Result<i32, AnyError> {
-  tools::upgrade::upgrade(upgrade_flags).await?;
-  Ok(0)
-}
-
 async fn vendor_command(
   flags: Flags,
   vendor_flags: VendorFlags,
@@ -1120,9 +982,6 @@ fn get_subcommand(
     DenoSubcommand::Bundle(bundle_flags) => {
       bundle_command(flags, bundle_flags).boxed_local()
     }
-    DenoSubcommand::Doc(doc_flags) => {
-      doc_command(flags, doc_flags).boxed_local()
-    }
     DenoSubcommand::Eval(eval_flags) => {
       eval_command(flags, eval_flags).boxed_local()
     }
@@ -1132,36 +991,11 @@ fn get_subcommand(
     DenoSubcommand::Check(check_flags) => {
       check_command(flags, check_flags).boxed_local()
     }
-    DenoSubcommand::Compile(compile_flags) => {
-      compile_command(flags, compile_flags).boxed_local()
-    }
     DenoSubcommand::Coverage(coverage_flags) => {
       coverage_command(flags, coverage_flags).boxed_local()
     }
-    DenoSubcommand::Fmt(fmt_flags) => {
-      format_command(flags, fmt_flags).boxed_local()
-    }
-    DenoSubcommand::Info(info_flags) => {
-      info_command(flags, info_flags).boxed_local()
-    }
-    DenoSubcommand::Install(install_flags) => {
-      install_command(flags, install_flags).boxed_local()
-    }
-    DenoSubcommand::Uninstall(uninstall_flags) => {
-      uninstall_command(uninstall_flags).boxed_local()
-    }
-    DenoSubcommand::Lsp => lsp_command().boxed_local(),
-    DenoSubcommand::Lint(lint_flags) => {
-      lint_command(flags, lint_flags).boxed_local()
-    }
-    DenoSubcommand::Repl(repl_flags) => {
-      repl_command(flags, repl_flags).boxed_local()
-    }
     DenoSubcommand::Run(run_flags) => {
       run_command(flags, run_flags).boxed_local()
-    }
-    DenoSubcommand::Task(task_flags) => {
-      task_command(flags, task_flags).boxed_local()
     }
     DenoSubcommand::Test(test_flags) => {
       test_command(flags, test_flags).boxed_local()
@@ -1170,12 +1004,10 @@ fn get_subcommand(
       completions_command(flags, completions_flags).boxed_local()
     }
     DenoSubcommand::Types => types_command(flags).boxed_local(),
-    DenoSubcommand::Upgrade(upgrade_flags) => {
-      upgrade_command(flags, upgrade_flags).boxed_local()
-    }
     DenoSubcommand::Vendor(vendor_flags) => {
       vendor_command(flags, vendor_flags).boxed_local()
     }
+    _ => {}
   }
 }
 

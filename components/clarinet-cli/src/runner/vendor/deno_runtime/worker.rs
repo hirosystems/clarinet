@@ -1,11 +1,11 @@
 // Copyright 2018-2022 the Deno authors. All rights reserved. MIT license.
 
-use crate::inspector_server::InspectorServer;
-use crate::js;
-use crate::ops;
-use crate::ops::io::Stdio;
-use crate::permissions::Permissions;
-use crate::BootstrapOptions;
+use super::inspector_server::InspectorServer;
+use super::js;
+use super::ops;
+use super::ops::io::Stdio;
+use super::permissions::Permissions;
+use super::BootstrapOptions;
 use deno_broadcast_channel::InMemoryBroadcastChannel;
 use deno_core::error::AnyError;
 use deno_core::error::JsError;
@@ -140,7 +140,6 @@ impl MainWorker {
       deno_webstorage::init(options.origin_storage_dir.clone()),
       deno_broadcast_channel::init(options.broadcast_channel.clone(), unstable),
       deno_crypto::init(options.seed),
-      deno_webgpu::init(unstable),
       // ffi
       deno_ffi::init::<Permissions>(unstable),
       // Runtime ops
@@ -385,103 +384,5 @@ impl MainWorker {
     )?;
     let local_value = value.open(&mut self.js_runtime.handle_scope());
     Ok(local_value.is_false())
-  }
-}
-
-#[cfg(test)]
-mod tests {
-  use super::*;
-  use deno_core::resolve_url_or_path;
-
-  fn create_test_worker() -> MainWorker {
-    let main_module = resolve_url_or_path("./hello.js").unwrap();
-    let permissions = Permissions::default();
-
-    let options = WorkerOptions {
-      bootstrap: BootstrapOptions {
-        args: vec![],
-        cpu_count: 1,
-        debug_flag: false,
-        enable_testing_features: false,
-        location: None,
-        no_color: true,
-        is_tty: false,
-        runtime_version: "x".to_string(),
-        ts_version: "x".to_string(),
-        unstable: false,
-        user_agent: "x".to_string(),
-      },
-      extensions: vec![],
-      unsafely_ignore_certificate_errors: None,
-      root_cert_store: None,
-      seed: None,
-      format_js_error_fn: None,
-      source_map_getter: None,
-      web_worker_preload_module_cb: Arc::new(|_| unreachable!()),
-      create_web_worker_cb: Arc::new(|_| unreachable!()),
-      maybe_inspector_server: None,
-      should_break_on_first_statement: false,
-      module_loader: Rc::new(deno_core::FsModuleLoader),
-      get_error_class_fn: None,
-      origin_storage_dir: None,
-      blob_store: BlobStore::default(),
-      broadcast_channel: InMemoryBroadcastChannel::default(),
-      shared_array_buffer_store: None,
-      compiled_wasm_module_store: None,
-      stdio: Default::default(),
-    };
-
-    MainWorker::bootstrap_from_options(main_module, permissions, options)
-  }
-
-  #[tokio::test]
-  async fn execute_mod_esm_imports_a() {
-    let p = test_util::testdata_path().join("esm_imports_a.js");
-    let module_specifier = resolve_url_or_path(&p.to_string_lossy()).unwrap();
-    let mut worker = create_test_worker();
-    let result = worker.execute_main_module(&module_specifier).await;
-    if let Err(err) = result {
-      eprintln!("execute_mod err {:?}", err);
-    }
-    if let Err(e) = worker.run_event_loop(false).await {
-      panic!("Future got unexpected error: {:?}", e);
-    }
-  }
-
-  #[tokio::test]
-  async fn execute_mod_circular() {
-    let p = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-      .parent()
-      .unwrap()
-      .join("tests/circular1.js");
-    let module_specifier = resolve_url_or_path(&p.to_string_lossy()).unwrap();
-    let mut worker = create_test_worker();
-    let result = worker.execute_main_module(&module_specifier).await;
-    if let Err(err) = result {
-      eprintln!("execute_mod err {:?}", err);
-    }
-    if let Err(e) = worker.run_event_loop(false).await {
-      panic!("Future got unexpected error: {:?}", e);
-    }
-  }
-
-  #[tokio::test]
-  async fn execute_mod_resolve_error() {
-    // "foo" is not a valid module specifier so this should return an error.
-    let mut worker = create_test_worker();
-    let module_specifier = resolve_url_or_path("does-not-exist").unwrap();
-    let result = worker.execute_main_module(&module_specifier).await;
-    assert!(result.is_err());
-  }
-
-  #[tokio::test]
-  async fn execute_mod_002_hello() {
-    // This assumes cwd is project root (an assumption made throughout the
-    // tests).
-    let mut worker = create_test_worker();
-    let p = test_util::testdata_path().join("001_hello.js");
-    let module_specifier = resolve_url_or_path(&p.to_string_lossy()).unwrap();
-    let result = worker.execute_main_module(&module_specifier).await;
-    assert!(result.is_ok());
   }
 }

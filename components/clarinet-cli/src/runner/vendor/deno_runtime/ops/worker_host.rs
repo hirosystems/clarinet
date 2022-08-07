@@ -1,17 +1,17 @@
 // Copyright 2018-2022 the Deno authors. All rights reserved. MIT license.
 
-use crate::ops::TestingFeaturesEnabled;
-use crate::permissions::create_child_permissions;
-use crate::permissions::ChildPermissionsArg;
-use crate::permissions::Permissions;
-use crate::web_worker::run_web_worker;
-use crate::web_worker::SendableWebWorkerHandle;
-use crate::web_worker::WebWorker;
-use crate::web_worker::WebWorkerHandle;
-use crate::web_worker::WebWorkerType;
-use crate::web_worker::WorkerControlEvent;
-use crate::web_worker::WorkerId;
-use crate::worker::FormatJsErrorFn;
+use super::TestingFeaturesEnabled;
+use super::super::permissions::create_child_permissions;
+use super::super::permissions::ChildPermissionsArg;
+use super::super::permissions::Permissions;
+use super::super::web_worker::run_web_worker;
+use super::super::web_worker::SendableWebWorkerHandle;
+use super::super::web_worker::WebWorker;
+use super::super::web_worker::WebWorkerHandle;
+use super::super::web_worker::WebWorkerType;
+use super::super::web_worker::WorkerControlEvent;
+use super::super::web_worker::WorkerId;
+use super::super::worker::FormatJsErrorFn;
 use deno_core::error::AnyError;
 use deno_core::futures::future::LocalFutureObj;
 use deno_core::op;

@@ -1,13 +1,13 @@
 // Copyright 2018-2022 the Deno authors. All rights reserved. MIT license.
-use crate::colors;
-use crate::inspector_server::InspectorServer;
-use crate::js;
-use crate::ops;
-use crate::ops::io::Stdio;
-use crate::permissions::Permissions;
-use crate::tokio_util::run_local;
-use crate::worker::FormatJsErrorFn;
-use crate::BootstrapOptions;
+use super::colors;
+use super::inspector_server::InspectorServer;
+use super::js;
+use super::ops;
+use super::ops::io::Stdio;
+use super::permissions::Permissions;
+use super::tokio_util::run_local;
+use super::worker::FormatJsErrorFn;
+use super::BootstrapOptions;
 use deno_broadcast_channel::InMemoryBroadcastChannel;
 use deno_core::error::AnyError;
 use deno_core::error::JsError;
@@ -16,8 +16,8 @@ use deno_core::futures::future::poll_fn;
 use deno_core::futures::stream::StreamExt;
 use deno_core::futures::task::AtomicWaker;
 use deno_core::located_script_name;
-use deno_core::serde::Deserialize;
-use deno_core::serde::Serialize;
+use serde::Deserialize;
+use serde::Serialize;
 use deno_core::serde_json::json;
 use deno_core::v8;
 use deno_core::CancelHandle;
@@ -397,7 +397,6 @@ impl WebWorker {
       deno_webstorage::init(None).disable(),
       deno_broadcast_channel::init(options.broadcast_channel.clone(), unstable),
       deno_crypto::init(options.seed),
-      deno_webgpu::init(unstable),
       // ffi
       deno_ffi::init::<Permissions>(unstable),
       // Runtime ops that are always initialized for WebWorkers

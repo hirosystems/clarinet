@@ -7,18 +7,18 @@
 //! the future it can be easily extended to provide
 //! the same functions as ops available in JS runtime.
 
-use crate::args::CliOptions;
-use crate::args::FmtFlags;
-use crate::args::FmtOptionsConfig;
-use crate::args::ProseWrap;
-use crate::colors;
-use crate::diff::diff;
-use crate::file_watcher;
-use crate::file_watcher::ResolutionResult;
-use crate::fs_util::collect_files;
-use crate::fs_util::get_extension;
-use crate::fs_util::specifier_to_file_path;
-use crate::text_encoding;
+use super::super::args::CliOptions;
+use super::super::args::FmtFlags;
+use super::super::args::FmtOptionsConfig;
+use super::super::args::ProseWrap;
+use super::super::super::deno_runtime::colors;
+use super::super::diff::diff;
+use super::super::file_watcher;
+use super::super::file_watcher::ResolutionResult;
+use super::super::fs_util::collect_files;
+use super::super::fs_util::get_extension;
+use super::super::fs_util::specifier_to_file_path;
+use super::super::text_encoding;
 use deno_ast::ParsedSource;
 use deno_core::anyhow::bail;
 use deno_core::anyhow::Context;
@@ -39,7 +39,7 @@ use std::sync::atomic::AtomicUsize;
 use std::sync::atomic::Ordering;
 use std::sync::Arc;
 
-use crate::cache::IncrementalCache;
+use super::super::cache::IncrementalCache;
 
 /// Format JavaScript/TypeScript files.
 pub async fn format(

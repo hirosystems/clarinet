@@ -1,9 +1,9 @@
 // Copyright 2018-2022 the Deno authors. All rights reserved. MIT license.
 //! This mod provides DenoError to unify errors across Deno.
-use crate::colors::cyan;
-use crate::colors::italic_bold;
-use crate::colors::red;
-use crate::colors::yellow;
+use super::super::deno_runtime::colors::cyan;
+use super::super::deno_runtime::colors::italic_bold;
+use super::super::deno_runtime::colors::red;
+use super::super::deno_runtime::colors::yellow;
 use deno_core::error::format_file_name;
 use deno_core::error::JsError;
 use deno_core::error::JsStackFrame;
@@ -191,26 +191,4 @@ fn format_js_error_inner(js_error: &JsError, is_child: bool) -> String {
 
 pub fn format_js_error(js_error: &JsError) -> String {
   format_js_error_inner(js_error, false)
-}
-
-#[cfg(test)]
-mod tests {
-  use super::*;
-  use test_util::strip_ansi_codes;
-
-  #[test]
-  fn test_format_none_source_line() {
-    let actual = format_maybe_source_line(None, None, false, 0);
-    assert_eq!(actual, "");
-  }
-
-  #[test]
-  fn test_format_some_source_line() {
-    let actual =
-      format_maybe_source_line(Some("console.log('foo');"), Some(9), true, 0);
-    assert_eq!(
-      strip_ansi_codes(&actual),
-      "\nconsole.log(\'foo\');\n        ^"
-    );
-  }
 }

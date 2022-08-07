@@ -54,7 +54,7 @@ fn get_resolution_error_class(err: &ResolutionError) -> &'static str {
 }
 
 pub fn get_error_class_name(e: &AnyError) -> &'static str {
-  deno_runtime::errors::get_error_class_name(e)
+  super::super::deno_runtime::errors::get_error_class_name(e)
     .or_else(|| {
       e.downcast_ref::<ImportMapError>()
         .map(get_import_map_error_class)

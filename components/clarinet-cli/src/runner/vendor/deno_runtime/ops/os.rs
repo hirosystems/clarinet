@@ -1,8 +1,8 @@
 // Copyright 2018-2022 the Deno authors. All rights reserved. MIT license.
 
 use super::utils::into_string;
-use crate::permissions::Permissions;
-use crate::worker::ExitCode;
+use super::super::permissions::Permissions;
+use super::super::worker::ExitCode;
 use deno_core::error::{type_error, AnyError};
 use deno_core::url::Url;
 use deno_core::Extension;

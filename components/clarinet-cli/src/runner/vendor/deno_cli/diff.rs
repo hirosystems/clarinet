@@ -1,6 +1,6 @@
 // Copyright 2018-2022 the Deno authors. All rights reserved. MIT license.
 
-use crate::colors;
+use super::super::deno_runtime::colors;
 use dissimilar::{diff as difference, Chunk};
 use std::fmt::Write as _;
 
@@ -166,62 +166,4 @@ fn fmt_rem_text(x: &str) -> String {
 
 fn fmt_rem_text_highlight(x: &str) -> String {
   colors::white_on_red(x).to_string()
-}
-
-#[cfg(test)]
-mod tests {
-  use super::*;
-
-  #[test]
-  fn test_diff() {
-    run_test(
-      "console.log('Hello World')",
-      "console.log(\"Hello World\");",
-      concat!(
-        "1 | -console.log('Hello World')\n",
-        "1 | +console.log(\"Hello World\");\n",
-      ),
-    );
-
-    run_test(
-      "\n\n\n\nconsole.log(\n'Hello World'\n)",
-      "console.log(\n\"Hello World\"\n);",
-      concat!(
-        "1 | -\n",
-        "2 | -\n",
-        "3 | -\n",
-        "4 | -\n",
-        "5 | -console.log(\n",
-        "1 | +console.log(\n",
-        "6 | -'Hello World'\n",
-        "2 | +\"Hello World\"\n",
-        "7 | -)\n3 | +);\n",
-      ),
-    );
-  }
-
-  #[test]
-  fn test_eof_newline_missing() {
-    run_test(
-      "test\nsome line text test",
-      "test\nsome line text test\n",
-      concat!(
-        "2 | -some line text test\n",
-        "2 | +some line text test\n",
-        "3 | +\n",
-      ),
-    );
-  }
-
-  #[test]
-  fn test_newlines_differing() {
-    run_test("test\n", "test\r\n", " | Text differed by line endings.\n");
-  }
-
-  fn run_test(diff_text1: &str, diff_text2: &str, expected_output: &str) {
-    assert_eq!(
-      test_util::strip_ansi_codes(&diff(diff_text1, diff_text2,)),
-      expected_output,
-    );
-  }
 }

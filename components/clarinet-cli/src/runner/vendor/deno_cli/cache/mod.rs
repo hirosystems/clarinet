@@ -9,7 +9,7 @@ use deno_graph::source::CacheInfo;
 use deno_graph::source::LoadFuture;
 use deno_graph::source::LoadResponse;
 use deno_graph::source::Loader;
-use deno_runtime::permissions::Permissions;
+use super::super::deno_runtime::permissions::Permissions;
 use std::sync::Arc;
 
 mod check;

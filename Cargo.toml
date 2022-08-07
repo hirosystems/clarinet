@@ -2,14 +2,12 @@
 members = [
     "components/clarinet-cli",
     "components/clarinet-deployments",
+    "components/clarinet-deno",
     "components/clarinet-files",
     "components/clarinet-utils",
     "components/clarity-lsp",
     "components/stacks-rpc-client",
     "components/stacks-devnet-js",
-    "vendor/deno/cli/",
-    "vendor/deno/runtime/",
-    "vendor/deno/core/",
     "vendor/orchestra-types-rs",
     "vendor/orchestra-event-observer",
 ]

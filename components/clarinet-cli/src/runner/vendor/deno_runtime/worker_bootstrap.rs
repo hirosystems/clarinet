@@ -1,4 +1,4 @@
-use crate::ops::runtime::ppid;
+use super::ops::runtime::ppid;
 use deno_core::serde_json;
 use deno_core::serde_json::json;
 use deno_core::ModuleSpecifier;

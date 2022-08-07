@@ -19,7 +19,7 @@ use deno_core::ModuleSpecifier;
 use deno_core::ModuleType;
 use deno_core::OpState;
 use deno_core::SourceMapGetter;
-use deno_runtime::permissions::Permissions;
+use super::super::deno_runtime::permissions::Permissions;
 use std::cell::RefCell;
 use std::pin::Pin;
 use std::rc::Rc;
@@ -232,7 +232,7 @@ impl SourceMapGetter for CliModuleLoader {
     if line_number >= lines.len() {
       Some(format!(
         "{} Couldn't format source line: Line {} is out of bounds (source may have changed at runtime)",
-        crate::colors::yellow("Warning"), line_number + 1,
+        super::super::deno_runtime::colors::yellow("Warning"), line_number + 1,
       ))
     } else {
       Some(lines[line_number].to_string())

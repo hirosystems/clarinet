@@ -1,22 +1,22 @@
 // Copyright 2018-2022 the Deno authors. All rights reserved. MIT license.
 
-use crate::args::BenchFlags;
-use crate::args::Flags;
-use crate::args::TypeCheckMode;
-use crate::colors;
-use crate::compat;
-use crate::create_main_worker;
-use crate::file_watcher;
-use crate::file_watcher::ResolutionResult;
-use crate::fs_util::collect_specifiers;
-use crate::fs_util::is_supported_bench_path;
-use crate::graph_util::contains_specifier;
-use crate::graph_util::graph_valid;
-use crate::located_script_name;
-use crate::ops;
-use crate::proc_state::ProcState;
-use crate::tools::test::format_test_error;
-use crate::tools::test::TestFilter;
+use super::super::args::BenchFlags;
+use super::super::args::Flags;
+use super::super::args::TypeCheckMode;
+use super::super::super::deno_runtime::colors;
+use super::super::compat;
+use super::super::create_main_worker;
+use super::super::file_watcher;
+use super::super::file_watcher::ResolutionResult;
+use super::super::fs_util::collect_specifiers;
+use super::super::fs_util::is_supported_bench_path;
+use super::super::graph_util::contains_specifier;
+use super::super::graph_util::graph_valid;
+use deno_core::located_script_name;
+use super::super::ops;
+use super::super::proc_state::ProcState;
+use super::test::format_test_error;
+use super::test::TestFilter;
 
 use deno_core::error::generic_error;
 use deno_core::error::AnyError;
@@ -27,8 +27,8 @@ use deno_core::futures::FutureExt;
 use deno_core::futures::StreamExt;
 use deno_core::ModuleSpecifier;
 use deno_graph::ModuleKind;
-use deno_runtime::permissions::Permissions;
-use deno_runtime::tokio_util::run_local;
+use super::super::super::deno_runtime::permissions::Permissions;
+use super::super::super::deno_runtime::tokio_util::run_local;
 use indexmap::IndexMap;
 use log::Level;
 use serde::Deserialize;
@@ -179,7 +179,7 @@ impl BenchReporter for ConsoleReporter {
         "{}\n",
         colors::gray(format!(
           "runtime: deno {} ({})",
-          crate::version::deno(),
+          super::super::version::deno(),
           env!("TARGET")
         ))
       );

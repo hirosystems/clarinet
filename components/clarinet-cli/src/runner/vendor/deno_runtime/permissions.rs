@@ -1,17 +1,17 @@
 // Copyright 2018-2022 the Deno authors. All rights reserved. MIT license.
 
-use crate::colors;
-use crate::fs_util::resolve_from_cwd;
+use super::colors;
+use super::fs_util::resolve_from_cwd;
 use deno_core::error::custom_error;
 use deno_core::error::uri_error;
 use deno_core::error::AnyError;
 #[cfg(test)]
 use deno_core::parking_lot::Mutex;
-use deno_core::serde::de;
-use deno_core::serde::Deserialize;
-use deno_core::serde::Deserializer;
-use deno_core::serde::Serialize;
-use deno_core::serde_json;
+use serde::de;
+use serde::Deserialize;
+use serde::Deserializer;
+use serde::Serialize;
+use serde_json;
 use deno_core::url;
 use deno_core::ModuleSpecifier;
 use deno_core::OpState;
@@ -1326,7 +1326,7 @@ impl deno_web::TimersPermission for Permissions {
   }
 
   fn check_unstable(&self, state: &OpState, api_name: &'static str) {
-    crate::ops::check_unstable(state, api_name);
+    super::ops::check_unstable(state, api_name);
   }
 }
 

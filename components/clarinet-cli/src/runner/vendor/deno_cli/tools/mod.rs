@@ -2,11 +2,6 @@
 
 pub mod bench;
 pub mod coverage;
-pub mod doc;
 pub mod fmt;
-pub mod installer;
-pub mod lint;
-pub mod task;
 pub mod test;
-pub mod upgrade;
 pub mod vendor;

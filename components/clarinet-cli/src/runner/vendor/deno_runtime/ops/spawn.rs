@@ -5,7 +5,7 @@ use super::io::ChildStdinResource;
 use super::io::ChildStdoutResource;
 use super::process::Stdio;
 use super::process::StdioOrRid;
-use crate::permissions::Permissions;
+use super::super::permissions::Permissions;
 use deno_core::error::AnyError;
 use deno_core::op;
 use deno_core::Extension;
@@ -92,7 +92,7 @@ impl TryFrom<ExitStatus> for ChildStatus {
         code: 128 + signal,
         #[cfg(unix)]
         signal: Some(
-          crate::ops::signal::signal_int_to_str(signal)?.to_string(),
+          super::signal::signal_int_to_str(signal)?.to_string(),
         ),
         #[cfg(not(unix))]
         signal: None,

@@ -12,7 +12,7 @@ use super::args::TypeCheckMode;
 use super::cache::EmitCache;
 use super::cache::FastInsecureHasher;
 use super::cache::TypeCheckCache;
-use crate::colors;
+use super::super::deno_runtime::colors;
 use super::diagnostics::Diagnostics;
 use super::graph_util::GraphData;
 use super::graph_util::ModuleEntry;

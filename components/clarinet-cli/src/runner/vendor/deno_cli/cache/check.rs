@@ -4,8 +4,8 @@ use std::path::Path;
 
 use deno_ast::ModuleSpecifier;
 use deno_core::error::AnyError;
-use deno_runtime::deno_webstorage::rusqlite::params;
-use deno_runtime::deno_webstorage::rusqlite::Connection;
+use deno_webstorage::rusqlite::params;
+use deno_webstorage::rusqlite::Connection;
 
 use super::common::run_sqlite_pragma;
 
@@ -52,7 +52,7 @@ impl TypeCheckCache {
 
   fn try_new(db_file_path: &Path) -> Result<Self, AnyError> {
     let conn = Connection::open(db_file_path)?;
-    Self::from_connection(conn, crate::version::deno())
+    Self::from_connection(conn, super::super::version::deno())
   }
 
   fn from_connection(

@@ -11,15 +11,15 @@ use deno_core::error::AnyError;
 use deno_core::resolve_url_or_path;
 use log::warn;
 
-use crate::args::CliOptions;
-use crate::args::Flags;
-use crate::args::FmtOptionsConfig;
-use crate::args::VendorFlags;
-use crate::fs_util;
-use crate::fs_util::relative_specifier;
-use crate::fs_util::specifier_to_file_path;
-use crate::proc_state::ProcState;
-use crate::tools::fmt::format_json;
+use super::super::args::CliOptions;
+use super::super::args::Flags;
+use super::super::args::FmtOptionsConfig;
+use super::super::args::VendorFlags;
+use super::super::fs_util;
+use super::super::fs_util::relative_specifier;
+use super::super::fs_util::specifier_to_file_path;
+use super::super::proc_state::ProcState;
+use super::super::tools::fmt::format_json;
 
 mod analyze;
 mod build;
@@ -270,72 +270,4 @@ async fn create_graph(
     .collect::<Result<Vec<_>, AnyError>>()?;
 
   ps.create_graph(entry_points).await
-}
-
-#[cfg(test)]
-mod internal_test {
-  use super::*;
-  use pretty_assertions::assert_eq;
-
-  #[test]
-  fn update_config_text_no_existing_props_add_prop() {
-    let text = update_config_text(
-      "{\n}",
-      "./vendor/import_map.json",
-      &Default::default(),
-    )
-    .unwrap();
-    assert_eq!(
-      text,
-      r#"{
-  "importMap": "./vendor/import_map.json"
-}
-"#
-    );
-  }
-
-  #[test]
-  fn update_config_text_existing_props_add_prop() {
-    let text = update_config_text(
-      r#"{
-  "tasks": {
-    "task1": "other"
-  }
-}
-"#,
-      "./vendor/import_map.json",
-      &Default::default(),
-    )
-    .unwrap();
-    assert_eq!(
-      text,
-      r#"{
-  "tasks": {
-    "task1": "other"
-  },
-  "importMap": "./vendor/import_map.json"
-}
-"#
-    );
-  }
-
-  #[test]
-  fn update_config_text_update_prop() {
-    let text = update_config_text(
-      r#"{
-  "importMap": "./local.json"
-}
-"#,
-      "./vendor/import_map.json",
-      &Default::default(),
-    )
-    .unwrap();
-    assert_eq!(
-      text,
-      r#"{
-  "importMap": "./vendor/import_map.json"
-}
-"#
-    );
-  }
 }

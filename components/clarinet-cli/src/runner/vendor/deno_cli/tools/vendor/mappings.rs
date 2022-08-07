@@ -13,8 +13,8 @@ use deno_graph::ModuleGraph;
 use deno_graph::Position;
 use deno_graph::Resolved;
 
-use crate::fs_util::path_with_stem_suffix;
-use crate::fs_util::relative_specifier;
+use super::super::super::fs_util::path_with_stem_suffix;
+use super::super::super::fs_util::relative_specifier;
 
 use super::specifiers::dir_name_for_root;
 use super::specifiers::get_unique_path;
@@ -208,45 +208,4 @@ fn path_with_extension(path: &Path, new_ext: &str) -> PathBuf {
     }
   }
   path.with_extension(new_ext)
-}
-
-#[cfg(test)]
-mod test {
-  use pretty_assertions::assert_eq;
-
-  use super::*;
-
-  #[test]
-  fn test_path_with_extension() {
-    assert_eq!(
-      path_with_extension(&PathBuf::from("/test.D.TS"), "ts"),
-      PathBuf::from("/test.ts")
-    );
-    assert_eq!(
-      path_with_extension(&PathBuf::from("/test.D.MTS"), "js"),
-      PathBuf::from("/test.js")
-    );
-    assert_eq!(
-      path_with_extension(&PathBuf::from("/test.D.TS"), "d.ts"),
-      // maintains casing
-      PathBuf::from("/test.D.TS"),
-    );
-    assert_eq!(
-      path_with_extension(&PathBuf::from("/test.TS"), "ts"),
-      // maintains casing
-      PathBuf::from("/test.TS"),
-    );
-    assert_eq!(
-      path_with_extension(&PathBuf::from("/test.ts"), "js"),
-      PathBuf::from("/test.js")
-    );
-    assert_eq!(
-      path_with_extension(&PathBuf::from("/test.js"), "js"),
-      PathBuf::from("/test.js")
-    );
-    assert_eq!(
-      path_with_extension(&PathBuf::from("/chai@1.2.3"), "js"),
-      PathBuf::from("/chai@1.2.3.js")
-    );
-  }
 }

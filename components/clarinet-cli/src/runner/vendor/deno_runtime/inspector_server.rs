@@ -47,7 +47,7 @@ impl InspectorServer {
     let (shutdown_server_tx, shutdown_server_rx) = oneshot::channel();
 
     let thread_handle = thread::spawn(move || {
-      let rt = crate::tokio_util::create_basic_runtime();
+      let rt = super::tokio_util::create_basic_runtime();
       let local = tokio::task::LocalSet::new();
       local.block_on(
         &rt,

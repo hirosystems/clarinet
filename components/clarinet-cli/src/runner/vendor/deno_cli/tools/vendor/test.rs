@@ -20,7 +20,7 @@ use deno_graph::ModuleGraph;
 use deno_graph::ModuleKind;
 use import_map::ImportMap;
 
-use crate::resolver::ImportMapResolver;
+use super::super::super::resolver::ImportMapResolver;
 
 use super::build::VendorEnvironment;
 

@@ -2,8 +2,8 @@
 // Some deserializer fields are only used on Unix and Windows build fails without it
 use super::io::StdFileResource;
 use super::utils::into_string;
-use crate::fs_util::canonicalize_path;
-use crate::permissions::Permissions;
+use super::super::fs_util::canonicalize_path;
+use super::super::permissions::Permissions;
 use deno_core::error::custom_error;
 use deno_core::error::type_error;
 use deno_core::error::AnyError;
@@ -646,7 +646,7 @@ fn op_chown_sync(state: &mut OpState, args: ChownArgs) -> Result<(), AnyError> {
   );
   #[cfg(unix)]
   {
-    use crate::errors::get_nix_error_class;
+    use super::super::errors::get_nix_error_class;
     use nix::unistd::{chown, Gid, Uid};
     let nix_uid = args.uid.map(Uid::from_raw);
     let nix_gid = args.gid.map(Gid::from_raw);
@@ -686,7 +686,7 @@ async fn op_chown_async(
     );
     #[cfg(unix)]
     {
-      use crate::errors::get_nix_error_class;
+      use super::super::errors::get_nix_error_class;
       use nix::unistd::{chown, Gid, Uid};
       let nix_uid = args.uid.map(Uid::from_raw);
       let nix_gid = args.gid.map(Gid::from_raw);
