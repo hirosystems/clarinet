@@ -32,7 +32,7 @@ pub mod api_v1;
 mod costs;
 pub mod deno;
 mod utils;
-mod vendored_deno_cli;
+mod vendor;
 
 #[derive(Clone)]
 pub struct DeploymentCache {
