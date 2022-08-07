@@ -18,65 +18,62 @@ use deno_graph::ResolutionError;
 use import_map::ImportMapError;
 
 fn get_import_map_error_class(_: &ImportMapError) -> &'static str {
-  "URIError"
+    "URIError"
 }
 
 fn get_diagnostic_class(_: &Diagnostic) -> &'static str {
-  "SyntaxError"
+    "SyntaxError"
 }
 
 fn get_graph_error_class(err: &GraphError) -> &'static str {
-  get_module_graph_error_class(&err.0)
+    get_module_graph_error_class(&err.0)
 }
 
 pub fn get_module_graph_error_class(err: &ModuleGraphError) -> &'static str {
-  match err {
-    ModuleGraphError::LoadingErr(_, err) => get_error_class_name(err.as_ref()),
-    ModuleGraphError::InvalidSource(_, _)
-    | ModuleGraphError::InvalidTypeAssertion { .. } => "SyntaxError",
-    ModuleGraphError::ParseErr(_, diagnostic) => {
-      get_diagnostic_class(diagnostic)
+    match err {
+        ModuleGraphError::LoadingErr(_, err) => get_error_class_name(err.as_ref()),
+        ModuleGraphError::InvalidSource(_, _) | ModuleGraphError::InvalidTypeAssertion { .. } => {
+            "SyntaxError"
+        }
+        ModuleGraphError::ParseErr(_, diagnostic) => get_diagnostic_class(diagnostic),
+        ModuleGraphError::ResolutionError(err) => get_resolution_error_class(err),
+        ModuleGraphError::UnsupportedMediaType(_, _)
+        | ModuleGraphError::UnsupportedImportAssertionType(_, _) => "TypeError",
+        ModuleGraphError::Missing(_) => "NotFound",
     }
-    ModuleGraphError::ResolutionError(err) => get_resolution_error_class(err),
-    ModuleGraphError::UnsupportedMediaType(_, _)
-    | ModuleGraphError::UnsupportedImportAssertionType(_, _) => "TypeError",
-    ModuleGraphError::Missing(_) => "NotFound",
-  }
 }
 
 fn get_resolution_error_class(err: &ResolutionError) -> &'static str {
-  match err {
-    ResolutionError::ResolverError { error, .. } => {
-      get_error_class_name(error.as_ref())
+    match err {
+        ResolutionError::ResolverError { error, .. } => get_error_class_name(error.as_ref()),
+        _ => "TypeError",
     }
-    _ => "TypeError",
-  }
 }
 
 pub fn get_error_class_name(e: &AnyError) -> &'static str {
-  super::super::deno_runtime::errors::get_error_class_name(e)
-    .or_else(|| {
-      e.downcast_ref::<ImportMapError>()
-        .map(get_import_map_error_class)
-    })
-    .or_else(|| e.downcast_ref::<Diagnostic>().map(get_diagnostic_class))
-    .or_else(|| e.downcast_ref::<GraphError>().map(get_graph_error_class))
-    .or_else(|| {
-      e.downcast_ref::<ModuleGraphError>()
-        .map(get_module_graph_error_class)
-    })
-    .or_else(|| {
-      e.downcast_ref::<ResolutionError>()
-        .map(get_resolution_error_class)
-    })
-    .unwrap_or_else(|| {
-      eprintln!(
-        "Error '{}' contains boxed error of unknown type:{}",
-        e,
-        e.chain()
-          .map(|e| format!("\n  {:?}", e))
-          .collect::<String>()
-      );
-      "Error"
-    })
+    super::super::deno_runtime::errors::get_error_class_name(e)
+        .or_else(|| {
+            e.downcast_ref::<ImportMapError>()
+                .map(get_import_map_error_class)
+        })
+        .or_else(|| e.downcast_ref::<Diagnostic>().map(get_diagnostic_class))
+        .or_else(|| e.downcast_ref::<GraphError>().map(get_graph_error_class))
+        .or_else(|| {
+            e.downcast_ref::<ModuleGraphError>()
+                .map(get_module_graph_error_class)
+        })
+        .or_else(|| {
+            e.downcast_ref::<ResolutionError>()
+                .map(get_resolution_error_class)
+        })
+        .unwrap_or_else(|| {
+            eprintln!(
+                "Error '{}' contains boxed error of unknown type:{}",
+                e,
+                e.chain()
+                    .map(|e| format!("\n  {:?}", e))
+                    .collect::<String>()
+            );
+            "Error"
+        })
 }

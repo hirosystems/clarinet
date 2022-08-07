@@ -7,14 +7,14 @@ pub mod bench;
 pub mod testing;
 
 pub fn cli_exts(ps: ProcState) -> Vec<Extension> {
-  vec![init_proc_state(ps)]
+    vec![init_proc_state(ps)]
 }
 
 fn init_proc_state(ps: ProcState) -> Extension {
-  Extension::builder()
-    .state(move |state| {
-      state.put(ps.clone());
-      Ok(())
-    })
-    .build()
+    Extension::builder()
+        .state(move |state| {
+            state.put(ps.clone());
+            Ok(())
+        })
+        .build()
 }

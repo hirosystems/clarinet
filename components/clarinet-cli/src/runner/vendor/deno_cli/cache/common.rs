@@ -10,39 +10,39 @@ use deno_webstorage::rusqlite::Connection;
 pub struct FastInsecureHasher(twox_hash::XxHash64);
 
 impl FastInsecureHasher {
-  pub fn new() -> Self {
-    Self::default()
-  }
+    pub fn new() -> Self {
+        Self::default()
+    }
 
-  pub fn write_str(&mut self, text: &str) -> &mut Self {
-    self.write(text.as_bytes());
-    self
-  }
+    pub fn write_str(&mut self, text: &str) -> &mut Self {
+        self.write(text.as_bytes());
+        self
+    }
 
-  pub fn write(&mut self, bytes: &[u8]) -> &mut Self {
-    self.0.write(bytes);
-    self
-  }
+    pub fn write(&mut self, bytes: &[u8]) -> &mut Self {
+        self.0.write(bytes);
+        self
+    }
 
-  pub fn write_u8(&mut self, value: u8) -> &mut Self {
-    self.0.write_u8(value);
-    self
-  }
+    pub fn write_u8(&mut self, value: u8) -> &mut Self {
+        self.0.write_u8(value);
+        self
+    }
 
-  pub fn write_u64(&mut self, value: u64) -> &mut Self {
-    self.0.write_u64(value);
-    self
-  }
+    pub fn write_u64(&mut self, value: u64) -> &mut Self {
+        self.0.write_u64(value);
+        self
+    }
 
-  pub fn finish(&self) -> u64 {
-    self.0.finish()
-  }
+    pub fn finish(&self) -> u64 {
+        self.0.finish()
+    }
 }
 
 /// Runs the common sqlite pragma.
 pub fn run_sqlite_pragma(conn: &Connection) -> Result<(), AnyError> {
-  // Enable write-ahead-logging and tweak some other stuff
-  let initial_pragmas = "
+    // Enable write-ahead-logging and tweak some other stuff
+    let initial_pragmas = "
     -- enable write-ahead-logging mode
     PRAGMA journal_mode=WAL;
     PRAGMA synchronous=NORMAL;
@@ -52,6 +52,6 @@ pub fn run_sqlite_pragma(conn: &Connection) -> Result<(), AnyError> {
     PRAGMA optimize;
   ";
 
-  conn.execute_batch(initial_pragmas)?;
-  Ok(())
+    conn.execute_batch(initial_pragmas)?;
+    Ok(())
 }

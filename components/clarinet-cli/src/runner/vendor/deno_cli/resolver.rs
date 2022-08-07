@@ -14,66 +14,58 @@ use std::sync::Arc;
 pub struct ImportMapResolver(Arc<ImportMap>);
 
 impl ImportMapResolver {
-  pub fn new(import_map: Arc<ImportMap>) -> Self {
-    Self(import_map)
-  }
+    pub fn new(import_map: Arc<ImportMap>) -> Self {
+        Self(import_map)
+    }
 
-  pub fn as_resolver(&self) -> &dyn Resolver {
-    self
-  }
+    pub fn as_resolver(&self) -> &dyn Resolver {
+        self
+    }
 }
 
 impl Resolver for ImportMapResolver {
-  fn resolve(
-    &self,
-    specifier: &str,
-    referrer: &ModuleSpecifier,
-  ) -> ResolveResponse {
-    match self.0.resolve(specifier, referrer) {
-      Ok(resolved_specifier) => ResolveResponse::Specifier(resolved_specifier),
-      Err(err) => ResolveResponse::Err(err.into()),
+    fn resolve(&self, specifier: &str, referrer: &ModuleSpecifier) -> ResolveResponse {
+        match self.0.resolve(specifier, referrer) {
+            Ok(resolved_specifier) => ResolveResponse::Specifier(resolved_specifier),
+            Err(err) => ResolveResponse::Err(err.into()),
+        }
     }
-  }
 }
 
 #[derive(Debug, Default, Clone)]
 pub struct JsxResolver {
-  jsx_import_source_module: String,
-  maybe_import_map_resolver: Option<ImportMapResolver>,
+    jsx_import_source_module: String,
+    maybe_import_map_resolver: Option<ImportMapResolver>,
 }
 
 impl JsxResolver {
-  pub fn new(
-    jsx_import_source_module: String,
-    maybe_import_map_resolver: Option<ImportMapResolver>,
-  ) -> Self {
-    Self {
-      jsx_import_source_module,
-      maybe_import_map_resolver,
+    pub fn new(
+        jsx_import_source_module: String,
+        maybe_import_map_resolver: Option<ImportMapResolver>,
+    ) -> Self {
+        Self {
+            jsx_import_source_module,
+            maybe_import_map_resolver,
+        }
     }
-  }
 
-  pub fn as_resolver(&self) -> &dyn Resolver {
-    self
-  }
+    pub fn as_resolver(&self) -> &dyn Resolver {
+        self
+    }
 }
 
 impl Resolver for JsxResolver {
-  fn jsx_import_source_module(&self) -> &str {
-    self.jsx_import_source_module.as_str()
-  }
+    fn jsx_import_source_module(&self) -> &str {
+        self.jsx_import_source_module.as_str()
+    }
 
-  fn resolve(
-    &self,
-    specifier: &str,
-    referrer: &ModuleSpecifier,
-  ) -> ResolveResponse {
-    self.maybe_import_map_resolver.as_ref().map_or_else(
-      || match resolve_import(specifier, referrer.as_str()) {
-        Ok(specifier) => ResolveResponse::Specifier(specifier),
-        Err(err) => ResolveResponse::Err(err.into()),
-      },
-      |r| r.resolve(specifier, referrer),
-    )
-  }
+    fn resolve(&self, specifier: &str, referrer: &ModuleSpecifier) -> ResolveResponse {
+        self.maybe_import_map_resolver.as_ref().map_or_else(
+            || match resolve_import(specifier, referrer.as_str()) {
+                Ok(specifier) => ResolveResponse::Specifier(specifier),
+                Err(err) => ResolveResponse::Err(err.into()),
+            },
+            |r| r.resolve(specifier, referrer),
+        )
+    }
 }
