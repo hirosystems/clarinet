@@ -1084,7 +1084,6 @@ pub fn main() {
                 None,
                 false,
                 cache_location,
-
             );
         }
         Command::Integrate(cmd) => {

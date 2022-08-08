@@ -21,7 +21,7 @@ use super::vendor::deno_cli::tools::test::{
 use super::vendor::deno_runtime::permissions::Permissions;
 use super::vendor::deno_runtime::tokio_util::run_local;
 use super::{api_v1, DeploymentCache};
-use clarinet_files::{ProjectManifest, FileLocation};
+use clarinet_files::{FileLocation, ProjectManifest};
 use deno_ast::swc::common::comments::CommentKind;
 use deno_ast::MediaType;
 use deno_ast::SourceRangedForSpanned;
@@ -92,17 +92,21 @@ pub async fn do_run_scripts(
         allow_all: false,
         allow_env: None,
         allow_hrtime: false,
-        allow_net: if allow_net { Some(vec!["deno.land".into()]) } else { None },
+        allow_net: if allow_net {
+            Some(vec!["deno.land".into()])
+        } else {
+            None
+        },
         cache_path: Some(cache_location.to_string().into()),
         import_map_path: import_map,
         allow_ffi: None,
-        allow_read: None,        // todo(lgalabru)
-        allow_run: None,         // todo(lgalabru)
-        allow_write: None,       // todo(lgalabru)
-        cache_blocklist: vec![], // todo(lgalabru)
-        cached_only: false,      // todo(lgalabru)
-        ignore: vec![],          // todo(lgalabru)
-        watch: None,             // todo(lgalabru)
+        allow_read: None,                     // todo(lgalabru)
+        allow_run: None,                      // todo(lgalabru)
+        allow_write: None,                    // todo(lgalabru)
+        cache_blocklist: vec![],              // todo(lgalabru)
+        cached_only: false,                   // todo(lgalabru)
+        ignore: vec![],                       // todo(lgalabru)
+        watch: None,                          // todo(lgalabru)
         type_check_mode: TypeCheckMode::None, // todo(lgalabru)
         compat: false,
         ..Default::default()
