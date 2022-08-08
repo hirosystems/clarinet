@@ -3,20 +3,14 @@ use super::vendor::deno_cli::compat;
 use super::vendor::deno_cli::create_main_worker;
 use super::vendor::deno_cli::ops;
 use super::vendor::deno_cli::proc_state::ProcState;
-use super::vendor::deno_cli::tools::test::{
-    PrettyTestReporter, TestEvent, TestEventSender, TestMode, TestResult, TestSpecifierOptions,
-    TestStepResult, TestSummary,
-};
+use super::vendor::deno_cli::tools::test::{TestEventSender, TestMode, TestSpecifierOptions};
 use super::vendor::deno_runtime::ops::io::Stdio;
 use super::vendor::deno_runtime::ops::io::StdioPipe;
 use super::vendor::deno_runtime::permissions::Permissions;
 use super::DeploymentCache;
 use super::SessionArtifacts;
-use clarinet_deployments::types::DeploymentSpecification;
 use clarinet_deployments::update_session_with_contracts_executions;
-use clarity_repl::clarity::analysis::contract_interface_builder::{
-    build_contract_interface, ContractInterface,
-};
+use clarity_repl::clarity::analysis::contract_interface_builder::build_contract_interface;
 use clarity_repl::repl::Session;
 use deno_core::error::AnyError;
 use deno_core::located_script_name;
@@ -25,7 +19,6 @@ use deno_core::{op, Extension};
 use deno_core::{ModuleSpecifier, OpState};
 use std::collections::{BTreeMap, HashMap};
 use std::sync::mpsc::{self, Sender};
-use std::sync::Arc;
 
 pub enum ClarinetTestEvent {
     SessionTerminated(SessionArtifacts),

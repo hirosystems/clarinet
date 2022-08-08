@@ -21,7 +21,6 @@ use super::super::graph_util::graph_valid;
 use super::super::located_script_name;
 use super::super::ops;
 use super::super::proc_state::ProcState;
-use super::coverage::CoverageCollector;
 
 use super::super::super::deno_runtime::ops::io::Stdio;
 use super::super::super::deno_runtime::ops::io::StdioPipe;
@@ -61,6 +60,8 @@ use std::time::Duration;
 use std::time::Instant;
 use tokio::sync::mpsc::unbounded_channel;
 use tokio::sync::mpsc::UnboundedSender;
+
+pub struct CoverageCollector;
 
 /// The test mode is used to determine how a specifier is to be tested.
 #[derive(Debug, Clone, PartialEq)]
@@ -729,19 +730,6 @@ async fn test_specifier(
         r#"Deno[Deno.internal].enableTestAndBench()"#,
     )?;
 
-    let mut maybe_coverage_collector = if let Some(ref coverage_dir) = ps.coverage_dir {
-        let session = worker.create_inspector_session().await;
-        let coverage_dir = PathBuf::from(coverage_dir);
-        let mut coverage_collector = CoverageCollector::new(coverage_dir, session);
-        worker
-            .with_event_loop(coverage_collector.start_collecting().boxed_local())
-            .await?;
-
-        Some(coverage_collector)
-    } else {
-        None
-    };
-
     // Enable op call tracing in core to enable better debugging of op sanitizer
     // failures.
     if options.trace_ops {
@@ -795,12 +783,6 @@ async fn test_specifier(
     }
 
     worker.dispatch_unload_event(&located_script_name!())?;
-
-    if let Some(coverage_collector) = maybe_coverage_collector.as_mut() {
-        worker
-            .with_event_loop(coverage_collector.stop_collecting().boxed_local())
-            .await?;
-    }
 
     Ok(())
 }

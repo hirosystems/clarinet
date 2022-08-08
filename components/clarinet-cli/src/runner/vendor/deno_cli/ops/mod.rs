@@ -3,7 +3,6 @@
 use super::proc_state::ProcState;
 use deno_core::Extension;
 
-pub mod bench;
 pub mod testing;
 
 pub fn cli_exts(ps: ProcState) -> Vec<Extension> {
