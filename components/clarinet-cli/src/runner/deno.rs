@@ -73,6 +73,18 @@ pub async fn do_run_scripts(
         None | Some(0) => None,
         Some(limit) => Some(NonZeroUsize::new(limit.into()).unwrap()),
     };
+    let mut include = if include.is_empty() {
+        vec!["tests".into()]
+    } else {
+        include.clone()
+    };
+    let watched = if watch {
+        include.push("contracts".into());
+        let paths_to_watch: Vec<_> = include.iter().map(PathBuf::from).collect();
+        Some(paths_to_watch)
+    } else {
+        None
+    };
     let test_flags = TestFlags {
         ignore: vec![],    // todo(lgalabru)
         trace_ops: true,   // todo(lgalabru)
@@ -98,6 +110,7 @@ pub async fn do_run_scripts(
             None
         },
         cache_path: Some(cache_location.to_string().into()),
+        watch: watched,
         import_map_path: import_map,
         allow_ffi: None,
         allow_read: None,                     // todo(lgalabru)
@@ -106,7 +119,6 @@ pub async fn do_run_scripts(
         cache_blocklist: vec![],              // todo(lgalabru)
         cached_only: false,                   // todo(lgalabru)
         ignore: vec![],                       // todo(lgalabru)
-        watch: None,                          // todo(lgalabru)
         type_check_mode: TypeCheckMode::None, // todo(lgalabru)
         compat: false,
         ..Default::default()
