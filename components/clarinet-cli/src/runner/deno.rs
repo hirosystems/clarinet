@@ -53,6 +53,7 @@ use tokio::sync::mpsc::unbounded_channel;
 use tokio::sync::mpsc::UnboundedSender;
 
 pub async fn do_run_scripts(
+    cwd: PathBuf,
     include: Vec<String>,
     include_coverage: bool,
     include_costs_report: bool,
@@ -73,14 +74,18 @@ pub async fn do_run_scripts(
         None | Some(0) => None,
         Some(limit) => Some(NonZeroUsize::new(limit.into()).unwrap()),
     };
-    let mut include = if include.is_empty() {
-        vec!["tests".into()]
+    let include = if include.is_empty() {
+        let mut tests_default = cwd.clone();
+        tests_default.push("tests");
+        vec![format!("{}", tests_default.display())]
     } else {
         include.clone()
     };
     let watched = if watch {
-        include.push("contracts".into());
-        let paths_to_watch: Vec<_> = include.iter().map(PathBuf::from).collect();
+        let mut paths_to_watch: Vec<_> = include.iter().map(PathBuf::from).collect();
+        let mut contracts_default = cwd.clone();
+        contracts_default.push("contracts");
+        paths_to_watch.push(contracts_default);
         Some(paths_to_watch)
     } else {
         None

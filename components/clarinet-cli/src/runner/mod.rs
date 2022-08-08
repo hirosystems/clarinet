@@ -117,7 +117,10 @@ pub fn run_scripts(
     allow_net: bool,
     cache_location: FileLocation,
 ) -> Result<u32, (String, u32)> {
+    let project_root = manifest.location.get_project_root_location().unwrap();
+    let cwd = PathBuf::from(&project_root.to_string());
     match block_on(deno::do_run_scripts(
+        cwd,
         files,
         include_coverage,
         include_costs_report,
