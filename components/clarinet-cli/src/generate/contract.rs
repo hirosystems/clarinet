@@ -76,7 +76,7 @@ impl GetChangesForNewContract {
     fn create_template_test(&mut self) -> Result<(), String> {
         let content = format!(
             r#"
-import {{ Clarinet, Tx, Chain, Account, types }} from 'https://deno.land/x/clarinet@v0.34.0/index.ts';
+import {{ Clarinet, Tx, Chain, Account, types }} from 'https://deno.land/x/clarinet@v{}/index.ts';
 import {{ assertEquals }} from 'https://deno.land/std@0.90.0/testing/asserts.ts';
 
 Clarinet.test({{
@@ -101,7 +101,8 @@ Clarinet.test({{
         assertEquals(block.height, 3);
     }},
 }});
-"#
+"#,
+            env!("CARGO_PKG_VERSION")
         );
 
         let name = format!("{}_test.ts", self.contract_name);
