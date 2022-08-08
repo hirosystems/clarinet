@@ -5,7 +5,6 @@ use super::vendor::deno_cli::args::{DenoSubcommand, Flags, TestFlags};
 use super::vendor::deno_cli::file_fetcher::File;
 use super::vendor::deno_cli::file_watcher;
 use super::vendor::deno_cli::file_watcher::ResolutionResult;
-use super::vendor::deno_cli::fmt_errors::format_js_error;
 use super::vendor::deno_cli::fs_util::collect_specifiers;
 use super::vendor::deno_cli::fs_util::is_supported_test_ext;
 use super::vendor::deno_cli::fs_util::is_supported_test_path;
@@ -20,8 +19,9 @@ use super::vendor::deno_cli::tools::test::{
 
 use super::vendor::deno_runtime::permissions::Permissions;
 use super::vendor::deno_runtime::tokio_util::run_local;
-use super::{api_v1, DeploymentCache};
+use super::{api_v1, costs, DeploymentCache, SessionArtifacts};
 use clarinet_files::{FileLocation, ProjectManifest};
+use clarity_repl::clarity::coverage::CoverageReporter;
 use deno_ast::swc::common::comments::CommentKind;
 use deno_ast::MediaType;
 use deno_ast::SourceRangedForSpanned;
@@ -32,7 +32,6 @@ use deno_core::futures::future;
 use deno_core::futures::stream;
 use deno_core::futures::FutureExt;
 use deno_core::futures::StreamExt;
-use deno_core::parking_lot::Mutex;
 use deno_core::ModuleSpecifier;
 use deno_graph::ModuleKind;
 use indexmap::IndexMap;
@@ -43,20 +42,16 @@ use rand::SeedableRng;
 use regex::Regex;
 use std::collections::HashSet;
 use std::fmt::Write as _;
-use std::io::Read;
-use std::io::Write;
 use std::num::NonZeroUsize;
 use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::Instant;
 use tokio::sync::mpsc::unbounded_channel;
-use tokio::sync::mpsc::UnboundedSender;
 
 pub async fn do_run_scripts(
-    cwd: PathBuf,
     include: Vec<String>,
-    include_coverage: bool,
-    include_costs_report: bool,
+    generate_coverage: bool,
+    display_costs_report: bool,
     watch: bool,
     allow_wallets: bool,
     allow_disk_write: bool,
@@ -68,7 +63,9 @@ pub async fn do_run_scripts(
     import_map: Option<String>,
     allow_net: bool,
     cache_location: FileLocation,
-) -> Result<u32, AnyError> {
+) -> Result<bool, AnyError> {
+    let project_root = manifest.location.get_project_root_location().unwrap();
+    let cwd = PathBuf::from(&project_root.to_string());
     let concurrent_jobs = NonZeroUsize::new(num_cpus::get()).expect("unable to determine num_cp");
     let fail_fast = match fail_fast {
         None | Some(0) => None,
@@ -129,13 +126,22 @@ pub async fn do_run_scripts(
         ..Default::default()
     };
 
-    if flags.watch.is_some() {
-        run_tests_with_watch(flags, test_flags, allow_wallets).await?;
+    let success = if flags.watch.is_some() {
+        run_tests_with_watch(flags, test_flags, allow_wallets, display_costs_report).await?;
+        true
     } else {
-        run_tests(flags, test_flags, allow_wallets, Some(cache)).await?;
-    }
+        run_tests(
+            flags,
+            test_flags,
+            allow_wallets,
+            Some(cache),
+            display_costs_report,
+            generate_coverage,
+        )
+        .await?
+    };
 
-    Ok(1)
+    Ok(success)
 }
 
 // pub fn is_supported_ext(path: &Path) -> bool {
@@ -145,65 +151,6 @@ pub async fn do_run_scripts(
 //         false
 //     }
 // }
-
-fn abbreviate_test_error(js_error: &JsError) -> JsError {
-    let mut js_error = js_error.clone();
-    let frames = std::mem::take(&mut js_error.frames);
-
-    // check if there are any stack frames coming from user code
-    let should_filter = frames.iter().any(|f| {
-        if let Some(file_name) = &f.file_name {
-            !(file_name.starts_with("[deno:") || file_name.starts_with("deno:"))
-        } else {
-            true
-        }
-    });
-
-    if should_filter {
-        let mut frames = frames
-            .into_iter()
-            .rev()
-            .skip_while(|f| {
-                if let Some(file_name) = &f.file_name {
-                    file_name.starts_with("[deno:") || file_name.starts_with("deno:")
-                } else {
-                    false
-                }
-            })
-            .into_iter()
-            .collect::<Vec<_>>();
-        frames.reverse();
-        js_error.frames = frames;
-    } else {
-        js_error.frames = frames;
-    }
-
-    js_error.cause = js_error
-        .cause
-        .as_ref()
-        .map(|e| Box::new(abbreviate_test_error(e)));
-    js_error.aggregated = js_error
-        .aggregated
-        .as_ref()
-        .map(|es| es.iter().map(abbreviate_test_error).collect());
-    js_error
-}
-
-// This function prettifies `JsError` and applies some changes specifically for
-// test runner purposes:
-//
-// - filter out stack frames:
-//   - if stack trace consists of mixed user and internal code, the frames
-//     below the first user code frame are filtered out
-//   - if stack trace consists only of internal code it is preserved as is
-pub fn format_test_error(js_error: &JsError) -> String {
-    let mut js_error = abbreviate_test_error(js_error);
-    js_error.exception_message = js_error
-        .exception_message
-        .trim_start_matches("Uncaught ")
-        .to_string();
-    format_js_error(&js_error)
-}
 
 fn extract_files_from_regex_blocks(
     specifier: &ModuleSpecifier,
@@ -459,7 +406,7 @@ async fn test_specifiers(
     options: TestSpecifierOptions,
     allow_wallets: bool,
     deployment_cache: Option<DeploymentCache>,
-) -> Result<(), AnyError> {
+) -> Result<(bool, Vec<SessionArtifacts>), AnyError> {
     let log_level = ps.options.log_level();
     let specifiers_with_mode = if let Some(seed) = options.shuffle {
         let mut rng = SmallRng::seed_from_u64(seed);
@@ -499,23 +446,23 @@ async fn test_specifiers(
                 deployment_cache,
             ));
 
-            if let Err(error) = file_result {
-                if error.is::<JsError>() {
-                    sender.send(TestEvent::UncaughtError(
+            match file_result {
+                Err(error) if error.is::<JsError>() => {
+                    let _ = sender.send(TestEvent::UncaughtError(
                         origin,
-                        Box::new(error.downcast::<JsError>().unwrap()),
-                    ))?;
-                } else {
-                    return Err(error);
+                        Box::new(error.downcast::<JsError>().unwrap().clone()),
+                    ));
+                    Ok(vec![])
                 }
+                Err(error) => Err(error),
+                Ok(artifacts) => Ok(artifacts),
             }
-            Ok(())
         })
     });
 
     let join_stream = stream::iter(join_handles)
         .buffer_unordered(concurrent_jobs.get())
-        .collect::<Vec<Result<Result<(), AnyError>, tokio::task::JoinError>>>();
+        .collect::<Vec<Result<Result<Vec<SessionArtifacts>, AnyError>, tokio::task::JoinError>>>();
 
     let mut reporter = Box::new(PrettyTestReporter::new(
         concurrent_jobs.get() > 1,
@@ -650,16 +597,24 @@ async fn test_specifiers(
         })
     };
 
-    let (join_results, result) = future::join(join_stream, handler).await;
+    let (mut join_results, result) = future::join(join_stream, handler).await;
 
-    // propagate any errors
-    for join_result in join_results {
-        join_result??;
+    let mut reports = vec![];
+    let mut error = None;
+    for mut res in join_results.drain(..) {
+        if let Ok(Ok(artifacts)) = res.as_mut() {
+            reports.append(artifacts);
+        } else if let Ok(Err(e)) = res {
+            error = Some(e);
+            break;
+        }
     }
 
-    result??;
-
-    Ok(())
+    if let Some(e) = error {
+        Err(e)
+    } else {
+        Ok((result.is_ok(), reports))
+    }
 }
 
 /// Collects specifiers marking them with the appropriate test mode while maintaining the natural
@@ -765,7 +720,9 @@ pub async fn run_tests(
     test_flags: TestFlags,
     allow_wallets: bool,
     deployment_cache: Option<DeploymentCache>,
-) -> Result<(), AnyError> {
+    display_costs_report: bool,
+    generate_coverage: bool,
+) -> Result<bool, AnyError> {
     let ps = ProcState::build(flags).await?;
     let permissions = Permissions::from_options(&ps.options.permissions_options());
     let specifiers_with_mode = fetch_specifiers_with_test_mode(
@@ -780,14 +737,14 @@ pub async fn run_tests(
         return Err(generic_error("No test modules found"));
     }
 
-    let res = check_specifiers(&ps, permissions.clone(), specifiers_with_mode.clone()).await;
+    check_specifiers(&ps, permissions.clone(), specifiers_with_mode.clone()).await?;
 
     if test_flags.no_run {
         return Ok(());
     }
 
     let compat = ps.options.compat();
-    test_specifiers(
+    let (failed, artifacts) = test_specifiers(
         ps,
         permissions,
         specifiers_with_mode,
@@ -800,16 +757,43 @@ pub async fn run_tests(
             trace_ops: test_flags.trace_ops,
         },
         allow_wallets,
-        deployment_cache,
+        deployment_cache.clone(),
     )
     .await?;
-    Ok(())
+
+    if display_costs_report {
+        costs::display_costs_report(&artifacts)
+    }
+
+    if let Some(ref cache) = deployment_cache {
+        if generate_coverage {
+            let mut coverage_reporter = CoverageReporter::new();
+            for (contract_id, analysis_artifacts) in cache.contracts_artifacts.iter() {
+                coverage_reporter
+                    .asts
+                    .insert(contract_id.clone(), analysis_artifacts.ast.clone());
+            }
+            for (contract_id, (_, contract_location)) in cache.deployment.contracts.iter() {
+                coverage_reporter
+                    .contract_paths
+                    .insert(contract_id.name.to_string(), contract_location.to_string());
+            }
+            for artifact in artifacts.iter() {
+                let mut coverage_reports = artifact.coverage_reports.clone();
+                coverage_reporter.reports.append(&mut coverage_reports);
+            }
+            coverage_reporter.write_lcov_file("coverage.lcov");
+        }
+    }
+
+    Ok(!failed)
 }
 
 pub async fn run_tests_with_watch(
     flags: Flags,
     test_flags: TestFlags,
     allow_wallets: bool,
+    display_costs_report: bool,
 ) -> Result<(), AnyError> {
     let ps = ProcState::build(flags).await?;
     let permissions = Permissions::from_options(&ps.options.permissions_options());
@@ -960,7 +944,7 @@ pub async fn run_tests_with_watch(
                 return Ok(());
             }
 
-            test_specifiers(
+            let (_failed, artifacts) = test_specifiers(
                 ps,
                 permissions.clone(),
                 specifiers_with_mode,
@@ -977,6 +961,10 @@ pub async fn run_tests_with_watch(
             )
             .await?;
 
+            if display_costs_report {
+                costs::display_costs_report(&artifacts)
+            }
+
             Ok(())
         }
     };
@@ -992,101 +980,4 @@ pub async fn run_tests_with_watch(
     .await?;
 
     Ok(())
-}
-
-// use a string that if it ends up in the output won't affect how things are displayed
-const ZERO_WIDTH_SPACE: &str = "\u{200B}";
-
-struct TestOutputPipe {
-    writer: os_pipe::PipeWriter,
-    state: Arc<Mutex<Option<std::sync::mpsc::Sender<()>>>>,
-}
-
-impl Clone for TestOutputPipe {
-    fn clone(&self) -> Self {
-        Self {
-            writer: self.writer.try_clone().unwrap(),
-            state: self.state.clone(),
-        }
-    }
-}
-
-impl TestOutputPipe {
-    pub fn new(sender: UnboundedSender<TestEvent>) -> Self {
-        let (reader, writer) = os_pipe::pipe().unwrap();
-        let state = Arc::new(Mutex::new(None));
-
-        start_output_redirect_thread(reader, sender, state.clone());
-
-        Self { writer, state }
-    }
-
-    pub fn flush(&mut self) {
-        // We want to wake up the other thread and have it respond back
-        // that it's done clearing out its pipe before returning.
-        let (sender, receiver) = std::sync::mpsc::channel();
-        if let Some(sender) = self.state.lock().replace(sender) {
-            let _ = sender.send(()); // just in case
-        }
-        // Bit of a hack to send a zero width space in order to wake
-        // the thread up. It seems that sending zero bytes here does
-        // not work on windows.
-        self.writer.write_all(ZERO_WIDTH_SPACE.as_bytes()).unwrap();
-        self.writer.flush().unwrap();
-        // ignore the error as it might have been picked up and closed
-        let _ = receiver.recv();
-    }
-
-    pub fn as_file(&self) -> std::fs::File {
-        pipe_writer_to_file(self.writer.try_clone().unwrap())
-    }
-}
-
-#[cfg(windows)]
-fn pipe_writer_to_file(writer: os_pipe::PipeWriter) -> std::fs::File {
-    use std::os::windows::prelude::FromRawHandle;
-    use std::os::windows::prelude::IntoRawHandle;
-    // SAFETY: Requires consuming ownership of the provided handle
-    unsafe { std::fs::File::from_raw_handle(writer.into_raw_handle()) }
-}
-
-#[cfg(unix)]
-fn pipe_writer_to_file(writer: os_pipe::PipeWriter) -> std::fs::File {
-    use std::os::unix::io::FromRawFd;
-    use std::os::unix::io::IntoRawFd;
-    // SAFETY: Requires consuming ownership of the provided handle
-    unsafe { std::fs::File::from_raw_fd(writer.into_raw_fd()) }
-}
-
-fn start_output_redirect_thread(
-    mut pipe_reader: os_pipe::PipeReader,
-    sender: UnboundedSender<TestEvent>,
-    flush_state: Arc<Mutex<Option<std::sync::mpsc::Sender<()>>>>,
-) {
-    tokio::task::spawn_blocking(move || loop {
-        let mut buffer = [0; 512];
-        let size = match pipe_reader.read(&mut buffer) {
-            Ok(0) | Err(_) => break,
-            Ok(size) => size,
-        };
-        let oneshot_sender = flush_state.lock().take();
-        let mut data = &buffer[0..size];
-        if data.ends_with(ZERO_WIDTH_SPACE.as_bytes()) {
-            data = &data[0..data.len() - ZERO_WIDTH_SPACE.len()];
-        }
-
-        if !data.is_empty()
-            && sender
-                .send(TestEvent::Output(buffer[0..size].to_vec()))
-                .is_err()
-        {
-            break;
-        }
-
-        // Always respond back if this was set. Ideally we would also check to
-        // ensure the pipe reader is empty before sending back this response.
-        if let Some(sender) = oneshot_sender {
-            let _ignore = sender.send(());
-        }
-    });
 }

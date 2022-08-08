@@ -1,15 +1,7 @@
-#![allow(non_camel_case_types)]
-#![allow(non_snake_case)]
-#![allow(non_upper_case_globals)]
-
-use crate::deployments::{
-    apply_on_chain_deployment, check_deployments, get_absolute_deployment_path,
-    get_default_deployment_path, load_deployment, write_deployment,
-};
 use clarinet_deployments::types::DeploymentGenerationArtifacts;
 use clarinet_deployments::{
-    generate_default_deployment, initiate_session_from_deployment, setup_session_with_deployment,
-    update_session_with_contracts_executions, update_session_with_genesis_accounts,
+    initiate_session_from_deployment, update_session_with_contracts_executions,
+    update_session_with_genesis_accounts,
 };
 use clarinet_files::{FileLocation, ProjectManifest};
 use clarity_repl::clarity::analysis::contract_interface_builder::{
@@ -19,9 +11,8 @@ use clarity_repl::clarity::coverage::TestCoverageReport;
 use clarity_repl::clarity::types::QualifiedContractIdentifier;
 use clarity_repl::repl::ast::ContractAST;
 use clarity_repl::repl::session::CostsReport;
-use clarity_repl::repl::{ExecutionResult, Session};
-use std::collections::{BTreeMap, HashMap};
-use std::path::PathBuf;
+use clarity_repl::repl::Session;
+use std::collections::HashMap;
 
 use clarinet_deployments::types::DeploymentSpecification;
 
@@ -70,7 +61,7 @@ impl DeploymentCache {
                     std::process::exit(1);
                 }
             };
-            if let Some((_, source, functions, ast, analysis)) = execution_result.contract.take() {
+            if let Some((_, source, _functions, ast, analysis)) = execution_result.contract.take() {
                 contracts_artifacts.insert(
                     contract_id.clone(),
                     AnalysisArtifacts {
@@ -102,7 +93,7 @@ pub struct AnalysisArtifacts {
 }
 
 pub fn run_scripts(
-    files: Vec<String>,
+    include: Vec<String>,
     include_coverage: bool,
     include_costs_report: bool,
     watch: bool,
@@ -117,11 +108,8 @@ pub fn run_scripts(
     allow_net: bool,
     cache_location: FileLocation,
 ) -> Result<u32, (String, u32)> {
-    let project_root = manifest.location.get_project_root_location().unwrap();
-    let cwd = PathBuf::from(&project_root.to_string());
     match block_on(deno::do_run_scripts(
-        cwd,
-        files,
+        include,
         include_coverage,
         include_costs_report,
         watch,

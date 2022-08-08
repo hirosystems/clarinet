@@ -28,7 +28,7 @@ pub async fn run_bridge(
     program_state: ProcState,
     permissions: Permissions,
     specifier: ModuleSpecifier,
-    mode: TestMode,
+    _mode: TestMode,
     options: TestSpecifierOptions,
     channel: TestEventSender,
     allow_wallets: bool,
@@ -189,7 +189,7 @@ pub async fn run_bridge(
     Ok(artifacts)
 }
 
-pub fn deprecation_notice(state: &mut OpState, args: Value, _: ()) -> Result<(), AnyError> {
+pub fn deprecation_notice(_state: &mut OpState, _args: Value, _: ()) -> Result<(), AnyError> {
     println!("{}: clarinet v{} is incompatible with the version of the library being imported in the test files.", red!("error"), option_env!("CARGO_PKG_VERSION").expect("Unable to detect version"));
     println!("The test files should import the latest version.");
     std::process::exit(1);
@@ -274,7 +274,7 @@ fn new_session(state: &mut OpState, args: NewSessionArgs) -> Result<String, AnyE
             Some(sessions) => sessions,
             None => panic!(),
         };
-        let session_id = sessions.insert(session_id, (args.name, session));
+        let _ = sessions.insert(session_id, (args.name, session));
     }
 
     Ok(json!({
@@ -322,7 +322,7 @@ fn load_deployment(state: &mut OpState, args: LoadDeploymentArgs) -> Result<Stri
     for (contract_id, result) in results.into_iter() {
         match result {
             Ok(execution) => {
-                if let Some((_, source, functions, ast, analysis)) = execution.contract {
+                if let Some((_, source, _functions, _ast, analysis)) = execution.contract {
                     serialized_contracts.push(json!({
                         "contract_id": contract_id.to_string(),
                         "contract_interface": build_contract_interface(&analysis),
@@ -330,7 +330,7 @@ fn load_deployment(state: &mut OpState, args: LoadDeploymentArgs) -> Result<Stri
                     }))
                 }
             }
-            Err(e) => {
+            Err(_e) => {
                 println!(
                     "{}: unable to load deployment {:?} in test {}",
                     red!("Error"),
@@ -375,7 +375,7 @@ fn terminate_session(state: &mut OpState, args: TerminateSessionArgs) -> Result<
         let sessions = state
             .try_borrow_mut::<HashMap<u32, (String, Session)>>()
             .expect("unable to retrieve sessions");
-        let (label, mut session) = sessions
+        let (_, mut session) = sessions
             .remove(&args.session_id)
             .expect("unable to retrieve session");
 
@@ -406,7 +406,7 @@ struct MineEmptyBlocksArgs {
 
 #[op]
 fn mine_empty_blocks(state: &mut OpState, args: MineEmptyBlocksArgs) -> Result<String, AnyError> {
-    let block_height = perform_block(state, args.session_id, |name, session| {
+    let block_height = perform_block(state, args.session_id, |_name, session| {
         let block_height = session.advance_chain_tip(args.count);
         Ok(block_height)
     })?;
@@ -430,7 +430,7 @@ struct CallReadOnlyFnArgs {
 
 #[op]
 fn call_read_only_fn(state: &mut OpState, args: CallReadOnlyFnArgs) -> Result<String, AnyError> {
-    let (result, events) = perform_block(state, args.session_id, |name, session| {
+    let (result, events) = perform_block(state, args.session_id, |_name, session| {
         let execution = session
             .invoke_contract_call(
                 &args.contract,
@@ -462,7 +462,7 @@ struct GetAssetsMapsArgs {
 
 #[op]
 fn get_assets_maps(state: &mut OpState, args: GetAssetsMapsArgs) -> Result<String, AnyError> {
-    let assets_maps = perform_block(state, args.session_id, |name, session| {
+    let assets_maps = perform_block(state, args.session_id, |_name, session| {
         let assets_maps = session.get_assets_maps();
         let mut lev1 = BTreeMap::new();
         for (key1, map1) in assets_maps.into_iter() {

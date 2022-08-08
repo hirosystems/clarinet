@@ -8,14 +8,14 @@ pub fn value_to_string(value: &types::Value) -> String {
     match value {
         Value::Tuple(tup_data) => {
             let mut out = String::new();
-            write!(out, "{{");
+            let _ = write!(out, "{{");
             for (i, (name, value)) in tup_data.data_map.iter().enumerate() {
-                write!(out, "{}: {}", &**name, value_to_string(value));
+                let _ = write!(out, "{}: {}", &**name, value_to_string(value));
                 if i < tup_data.data_map.len() - 1 {
-                    write!(out, ", ");
+                    let _ = write!(out, ", ");
                 }
             }
-            write!(out, "}}");
+            let _ = write!(out, "}}");
             out
         }
         Value::Optional(opt_data) => match opt_data.data {
@@ -43,14 +43,14 @@ pub fn value_to_string(value: &types::Value) -> String {
         }
         Value::Sequence(SequenceData::List(list_data)) => {
             let mut out = String::new();
-            write!(out, "[");
+            let _ = write!(out, "[");
             for (ix, v) in list_data.data.iter().enumerate() {
                 if ix > 0 {
-                    write!(out, ", ");
+                    let _ = write!(out, ", ");
                 }
-                write!(out, "{}", value_to_string(v));
+                let _ = write!(out, "{}", value_to_string(v));
             }
-            write!(out, "]");
+            let _ = write!(out, "]");
             out
         }
         _ => format!("{}", value),
