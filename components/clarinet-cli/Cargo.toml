@@ -85,7 +85,7 @@ clarinet_files = { package = "clarinet-files", path = "../clarinet-files", featu
 clarity_lsp = { package = "clarity-lsp", path = "../clarity-lsp", features = ["cli"]  }
 clarinet_deployments = { package = "clarinet-deployments", path = "../clarinet-deployments", features = ["cli"]  }
 clarinet_utils = { package = "clarinet-utils", path = "../clarinet-utils" }
-clarity = { path = "../../../stacks-blockchain/clarity" }
+clarity = { git = "https://github.com/stacks-network/stacks-blockchain.git", branch = "refactor/clarity-lib-merge" }
 num_cpus = "1.13.1"
 mio = "=0.8.2"
 similar = "2.1.0"

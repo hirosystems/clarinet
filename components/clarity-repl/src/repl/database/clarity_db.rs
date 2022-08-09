@@ -4,8 +4,20 @@ use rand_seeder::Seeder;
 use std::collections::{HashMap, VecDeque};
 use std::convert::TryFrom;
 
+use crate::repl::database::structures::{
+    ClarityDeserializable, ClaritySerializable, ContractMetadata, DataMapMetadata,
+    DataVariableMetadata, FungibleTokenMetadata, NonFungibleTokenMetadata, STXBalance,
+    STXBalanceSnapshot, SimmedBlock,
+};
+use clarity::types::chainstate::{
+    BlockHeaderHash, BurnchainHeaderHash, StacksAddress, StacksBlockId, VRFSeed,
+};
+use clarity::util::hash::{Sha256Sum, Sha512Trunc256Sum};
 use clarity::vm::analysis::{AnalysisDatabase, ContractAnalysis};
 use clarity::vm::contracts::Contract;
+use clarity::vm::costs::CostOverflowingMath;
+use clarity::vm::database::ClarityBackingStore;
+use clarity::vm::database::RollbackWrapper;
 use clarity::vm::errors::{
     CheckErrors, Error, IncomparableError, InterpreterError, InterpreterResult as Result,
     RuntimeErrorType,
@@ -14,19 +26,6 @@ use clarity::vm::types::{
     OptionalData, PrincipalData, QualifiedContractIdentifier, StandardPrincipalData,
     TupleTypeSignature, TypeSignature, Value, NONE,
 };
-
-use crate::repl::database::structures::{
-    ClarityDeserializable, ClaritySerializable, ContractMetadata, DataMapMetadata,
-    DataVariableMetadata, FungibleTokenMetadata, NonFungibleTokenMetadata, STXBalance,
-    STXBalanceSnapshot, SimmedBlock,
-};
-use clarity::vm::costs::CostOverflowingMath;
-use clarity::vm::database::ClarityBackingStore;
-use clarity::vm::database::RollbackWrapper;
-use stacks_common::types::chainstate::{
-    BlockHeaderHash, BurnchainHeaderHash, StacksAddress, StacksBlockId, VRFSeed,
-};
-use stacks_common::util::hash::{Sha256Sum, Sha512Trunc256Sum};
 
 const SIMMED_BLOCK_TIME: u64 = 10 * 60; // 10 min
 

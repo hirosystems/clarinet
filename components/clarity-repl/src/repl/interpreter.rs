@@ -32,8 +32,8 @@ use clarity::vm::{analysis::AnalysisDatabase, database::ClarityBackingStore};
 use clarity::vm::{eval, eval_all};
 use clarity::vm::{events::*, ClarityVersion};
 use clarity::vm::{CostSynthesis, ExecutionResult};
-use stacks_common::consts::CHAIN_ID_TESTNET;
-use stacks_common::types::chainstate::StacksAddress;
+use clarity::consts::CHAIN_ID_TESTNET;
+use clarity::types::chainstate::StacksAddress;
 
 pub const BLOCK_LIMIT_MAINNET: ExecutionCost = ExecutionCost {
     write_length: 15_000_000,
@@ -381,7 +381,7 @@ impl ClarityInterpreter {
             let cost_tracker = LimitedCostTracker::new_free();
             let mut global_context = GlobalContext::new(
                 mainnet,
-                stacks_common::consts::CHAIN_ID_TESTNET,
+                clarity::consts::CHAIN_ID_TESTNET,
                 conn,
                 cost_tracker,
                 self.repl_settings.epoch,

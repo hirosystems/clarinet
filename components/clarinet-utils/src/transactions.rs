@@ -5,16 +5,19 @@ use std::ops::Deref;
 use std::ops::DerefMut;
 
 use crate::impl_byte_array_newtype;
+use clarity::address::AddressHashMode;
 use clarity::address::{
     C32_ADDRESS_VERSION_MAINNET_MULTISIG, C32_ADDRESS_VERSION_MAINNET_SINGLESIG,
     C32_ADDRESS_VERSION_TESTNET_MULTISIG, C32_ADDRESS_VERSION_TESTNET_SINGLESIG,
 };
-use clarity::codec::{StacksMessageCodec, MAX_MESSAGE_LEN};
+use clarity::codec::MAX_MESSAGE_LEN;
+use clarity::codec::{read_next, write_next, Error as CodecError, StacksMessageCodec};
 use clarity::types::chainstate::{
     BlockHeaderHash, BurnchainHeaderHash, ConsensusHash, StacksWorkScore, TrieHash,
 };
+use clarity::types::chainstate::{StacksAddress, StacksPublicKey};
 use clarity::types::PrivateKey;
-use clarity::util::hash::Sha512Trunc256Sum;
+use clarity::util::hash::{Hash160, Sha512Trunc256Sum};
 use clarity::util::retry::BoundReader;
 use clarity::util::secp256k1::{
     MessageSignature, Secp256k1PrivateKey, Secp256k1PublicKey, MESSAGE_SIGNATURE_ENCODED_SIZE,
@@ -25,14 +28,11 @@ use clarity::vm::types::{
     PrincipalData, QualifiedContractIdentifier, StandardPrincipalData, Value,
 };
 use clarity::vm::{ClarityName, ContractName};
+use clarity::{
+    impl_array_hexstring_fmt, impl_array_newtype, impl_byte_array_message_codec,
+    impl_byte_array_serde,
+};
 use serde::{Deserialize, Serialize};
-use stacks_common::address::AddressHashMode;
-use stacks_common::codec::{read_next, write_next, Error as CodecError};
-use stacks_common::impl_byte_array_serde;
-use stacks_common::types::chainstate::StacksAddress;
-use stacks_common::types::chainstate::StacksPublicKey;
-use stacks_common::util::hash::Hash160;
-use stacks_common::{impl_array_hexstring_fmt, impl_array_newtype, impl_byte_array_message_codec};
 
 pub const MAX_BLOCK_LEN: u32 = 2 * 1024 * 1024;
 pub const MAX_TRANSACTION_LEN: u32 = MAX_BLOCK_LEN;

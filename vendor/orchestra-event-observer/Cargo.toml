@@ -10,7 +10,7 @@ serde = "1"
 serde_json = "1"
 serde_derive = "1"
 stacks_rpc_client = { package = "stacks-rpc-client", path = "../../components/stacks-rpc-client" }
-clarity = { path = "../../../stacks-blockchain/clarity" }
+clarity = { git = "https://github.com/stacks-network/stacks-blockchain.git", branch = "refactor/clarity-lib-merge" }
 clarinet_utils = { package = "clarinet-utils", path = "../../components/clarinet-utils" }
 orchestra_types = { package = "orchestra-types", path = "../orchestra-types-rs" }
 rocket = { version = "=0.5.0-rc.1", features = ["json"] }

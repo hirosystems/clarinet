@@ -4,15 +4,13 @@ use std::path::PathBuf;
 use crate::repl::database::{
     ClarityDatabase, ClarityDeserializable, ClaritySerializable, HeadersDB, NULL_HEADER_DB,
 };
+use clarity::types::chainstate::{BlockHeaderHash, BurnchainHeaderHash, StacksBlockId, VRFSeed};
+use clarity::util::hash::{hex_bytes, to_hex, Sha512Trunc256Sum};
 use clarity::vm::analysis::AnalysisDatabase;
 use clarity::vm::errors::{
     CheckErrors, IncomparableError, InterpreterError, InterpreterResult as Result, RuntimeErrorType,
 };
 use clarity::vm::types::QualifiedContractIdentifier;
-use stacks_common::types::chainstate::{
-    BlockHeaderHash, BurnchainHeaderHash, StacksBlockId, VRFSeed,
-};
-use stacks_common::util::hash::{hex_bytes, to_hex, Sha512Trunc256Sum};
 
 // These functions generally _do not_ return errors, rather, any errors in the underlying storage
 //    will _panic_. The rationale for this is that under no condition should the interpreter

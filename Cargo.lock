@@ -794,7 +794,6 @@ dependencies = [
  "serde",
  "serde-wasm-bindgen",
  "serde_derive",
- "stacks-common",
  "tiny-hderive",
  "toml",
  "url",
@@ -812,12 +811,12 @@ dependencies = [
  "pbkdf2",
  "serde",
  "sha2 0.10.2",
- "stacks-common",
 ]
 
 [[package]]
 name = "clarity"
 version = "0.0.1"
+source = "git+https://github.com/stacks-network/stacks-blockchain.git?branch=refactor/clarity-lib-merge#dbd5256f0662536ecd95c9bc189cddb90985d54d"
 dependencies = [
  "integer-sqrt",
  "lazy_static",
@@ -888,7 +887,6 @@ dependencies = [
  "serde_stacker",
  "sha2 0.10.2",
  "sha3 0.9.1",
- "stacks-common",
  "tokio",
  "tokio-util 0.7.1",
  "wasm-bindgen",
@@ -4834,6 +4832,7 @@ dependencies = [
 [[package]]
 name = "stacks-common"
 version = "0.0.1"
+source = "git+https://github.com/stacks-network/stacks-blockchain.git?branch=refactor/clarity-lib-merge#dbd5256f0662536ecd95c9bc189cddb90985d54d"
 dependencies = [
  "chrono",
  "curve25519-dalek",
@@ -4881,7 +4880,6 @@ dependencies = [
  "serde",
  "serde_derive",
  "serde_json",
- "stacks-common",
 ]
 
 [[package]]

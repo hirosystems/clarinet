@@ -1,9 +1,9 @@
 use super::{ClarityBackingStore, ClarityDeserializable};
+use clarity::types::chainstate::StacksBlockId;
+use clarity::util::hash::Sha512Trunc256Sum;
 use clarity::vm::errors::InterpreterResult as Result;
 use clarity::vm::types::{QualifiedContractIdentifier, TypeSignature};
 use clarity::vm::Value;
-use stacks_common::types::chainstate::StacksBlockId;
-use stacks_common::util::hash::Sha512Trunc256Sum;
 use std::collections::HashMap;
 use std::{clone::Clone, cmp::Eq, hash::Hash};
 
