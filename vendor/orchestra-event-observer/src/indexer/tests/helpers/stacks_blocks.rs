@@ -1,5 +1,5 @@
 use super::BlockEvent;
-use clarity_repl::clarity::util::hash::{hex_bytes, to_hex};
+use clarity::util::hash::to_hex;
 use orchestra_types::{
     BlockIdentifier, StacksBlockData, StacksBlockMetadata, StacksTransactionData,
     StacksTransactionMetadata,

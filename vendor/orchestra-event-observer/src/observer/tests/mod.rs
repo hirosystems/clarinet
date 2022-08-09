@@ -12,7 +12,6 @@ use crate::observer::{
     EventObserverConfig, ObserverCommand,
 };
 use crate::utils;
-use clarity_repl::clarity::types::QualifiedContractIdentifier;
 use orchestra_types::{
     BitcoinChainEvent, BitcoinChainUpdatedWithBlocksData, BitcoinNetwork, StacksBlockData,
     StacksBlockUpdate, StacksChainEvent, StacksChainUpdatedWithBlocksData, StacksNetwork,
