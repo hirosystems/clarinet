@@ -494,7 +494,7 @@ path = ".requirements"
 
 [contracts.bitcoin-whales]
 path = "contracts/bitcoin-whales.clar"
-#depends_om = ["conversion","conversion-v2"] #optional deprecated
+# depends_on = ["conversion","conversion-v2"] # no longer needed, ignored if provided
 
 [contracts.conversion]
 path = "contracts/conversion.clar"
