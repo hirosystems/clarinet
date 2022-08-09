@@ -1,9 +1,9 @@
 use clarinet_files::FileLocation;
-use clarity::vm::{ClarityName, ContractName};
 use clarity::vm::analysis::ContractAnalysis;
 use clarity::vm::ast::ContractAST;
 use clarity::vm::diagnostic::Diagnostic;
-use clarity::vm::types::{QualifiedContractIdentifier, StandardPrincipalData, PrincipalData};
+use clarity::vm::types::{PrincipalData, QualifiedContractIdentifier, StandardPrincipalData};
+use clarity::vm::{ClarityName, ContractName};
 use orchestra_types::StacksNetwork;
 use serde::{Deserialize, Serialize};
 use serde_yaml;

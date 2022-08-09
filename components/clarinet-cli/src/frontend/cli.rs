@@ -21,7 +21,7 @@ use clarity::vm::costs::LimitedCostTracker;
 use clarity::vm::diagnostic::{Diagnostic, Level};
 use clarity::vm::types::QualifiedContractIdentifier;
 use clarity_repl::analysis::call_checker::ContractAnalysis;
-use clarity_repl::repl::diagnostic::{output_diagnostic, output_code};
+use clarity_repl::repl::diagnostic::{output_code, output_diagnostic};
 use clarity_repl::{analysis, repl, Terminal};
 use orchestra_types::Chain;
 use orchestra_types::StacksNetwork;

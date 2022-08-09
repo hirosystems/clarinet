@@ -7,6 +7,8 @@ use crate::analysis::coverage::TestCoverageReport;
 use crate::analysis::{self, AnalysisPass as REPLAnalysisPass};
 use crate::repl::datastore::Datastore;
 use crate::repl::Settings;
+use clarity::consts::CHAIN_ID_TESTNET;
+use clarity::types::chainstate::StacksAddress;
 use clarity::types::StacksEpochId;
 use clarity::vm::analysis::{types::AnalysisPass, ContractAnalysis};
 use clarity::vm::ast::definition_sorter::DefinitionSorter;
@@ -32,8 +34,6 @@ use clarity::vm::{analysis::AnalysisDatabase, database::ClarityBackingStore};
 use clarity::vm::{eval, eval_all};
 use clarity::vm::{events::*, ClarityVersion};
 use clarity::vm::{CostSynthesis, ExecutionResult};
-use clarity::consts::CHAIN_ID_TESTNET;
-use clarity::types::chainstate::StacksAddress;
 
 pub const BLOCK_LIMIT_MAINNET: ExecutionCost = ExecutionCost {
     write_length: 15_000_000,

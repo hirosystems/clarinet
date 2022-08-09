@@ -6,6 +6,7 @@ use crate::contracts::{BNS_CONTRACT, COSTS_V1_CONTRACT, COSTS_V2_CONTRACT, POX_C
 use crate::repl::settings::InitialContract;
 use ansi_term::{Colour, Style};
 use clarity::codec::StacksMessageCodec;
+use clarity::types::chainstate::StacksAddress;
 use clarity::vm::analysis::ContractAnalysis;
 use clarity::vm::ast::ContractAST;
 use clarity::vm::diagnostic::Diagnostic;
@@ -18,7 +19,6 @@ use clarity::vm::types::{
 };
 use clarity::vm::variables::NativeVariables;
 use clarity::vm::{ContractName, CostSynthesis, EvalHook, ExecutionResult};
-use clarity::types::chainstate::StacksAddress;
 use std::collections::{BTreeMap, BTreeSet, HashMap, VecDeque};
 use std::convert::TryFrom;
 use std::fmt;

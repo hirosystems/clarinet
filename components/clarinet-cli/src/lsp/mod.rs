@@ -1,6 +1,8 @@
 mod native_bridge;
 
+use clarinet_files::FileLocation;
 use clarity::vm::diagnostic::{Diagnostic as ClarityDiagnostic, Level as ClarityLevel};
+use clarity_lsp::types::CompletionItemKind;
 use clarity_lsp::utils;
 use native_bridge::LspNativeBridge;
 

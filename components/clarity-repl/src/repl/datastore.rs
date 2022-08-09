@@ -1,14 +1,14 @@
 use rusqlite::Connection;
 use sha2::{Digest, Sha512_256};
 
+use clarity::types::chainstate::StacksBlockId;
+use clarity::util::hash::Sha512Trunc256Sum;
 use clarity::vm::analysis::AnalysisDatabase;
 use clarity::vm::database::{ClarityBackingStore, ClarityDatabase, HeadersDB, NULL_BURN_STATE_DB};
 use clarity::vm::errors::{
     CheckErrors, IncomparableError, InterpreterError, InterpreterResult as Result, RuntimeErrorType,
 };
 use clarity::vm::types::QualifiedContractIdentifier;
-use clarity::types::chainstate::StacksBlockId;
-use clarity::util::hash::Sha512Trunc256Sum;
 use std::collections::HashMap;
 use std::hash::Hash;
 

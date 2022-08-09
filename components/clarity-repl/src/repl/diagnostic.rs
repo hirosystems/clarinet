@@ -1,5 +1,5 @@
 use clarity::vm::{
-    diagnostic::{DiagnosableError, Level, Diagnostic},
+    diagnostic::{DiagnosableError, Diagnostic, Level},
     representations::Span,
 };
 use std::fmt;
@@ -26,7 +26,11 @@ pub fn output_diagnostic(diagnostic: &Diagnostic, name: &str, lines: &Vec<String
             diagnostic.message,
         ));
     } else {
-        output.push(format!("{}: {}", level_to_string(&diagnostic.level), diagnostic.message,));
+        output.push(format!(
+            "{}: {}",
+            level_to_string(&diagnostic.level),
+            diagnostic.message,
+        ));
     }
     output.append(&mut output_code(diagnostic, lines));
     output
