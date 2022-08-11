@@ -6,7 +6,7 @@ use std::fmt::Display;
 use std::hash::{Hash, Hasher};
 
 /// BlockIdentifier uniquely identifies a block in a particular network.
-#[derive(Debug, Clone, Deserialize, Serialize)]
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
 pub struct BlockIdentifier {
     /// Also known as the block height.
     pub index: u64,
@@ -198,7 +198,7 @@ pub struct StacksTransactionExecutionCost {
 }
 
 /// Extra event data for Transaction
-#[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
+#[derive(Debug, Clone, PartialEq, Deserialize, Serialize, Default)]
 pub struct StacksTransactionReceipt {
     pub mutated_contracts_radius: HashSet<String>,
     pub mutated_assets_radius: HashSet<String>,
@@ -413,7 +413,7 @@ pub struct Amount {
     /// Value of the transaction in atomic units represented as an
     /// arbitrary-sized signed integer.  For example, 1 BTC would be represented
     /// by a value of 100000000.
-    pub value: u64,
+    pub value: u128,
 
     pub currency: Currency,
     /* Rosetta Spec also optionally provides:

@@ -1,9 +1,7 @@
 use crate::config::Config;
-use orchestra_event_observer::indexer::stacks::NewBlockHeader;
 use orchestra_event_observer::indexer::{self, Indexer};
 use orchestra_types::{
-    BlockIdentifier, StacksBlockData, StacksChainEvent, StacksChainUpdatedWithBlocksData,
-    StacksChainUpdatedWithMicroblocksData, StacksMicroblocksTrail,
+    BlockIdentifier
 };
 use redis;
 use redis::Commands;
@@ -82,7 +80,6 @@ pub fn start(
         let mut indexer = Indexer::new(stacks_thread_config.indexer_config.clone());
         let mut tip = 0;
 
-        println!("Initial seeding");
         while let Ok(Some(record)) = stacks_record_rx.recv() {
             let (block_identifer, parent_block_identifier) = match &record.kind {
                 RecordKind::StacksBlockReceived => {
@@ -118,7 +115,7 @@ pub fn start(
             .into_iter()
             .collect();
 
-        println!("Retrieve chain tip");
+        info!("Retrieve chain tip");
         // Retrieve all the headers stored at this height (SCAN - expensive)
         let mut selected_tip = BlockIdentifier::default();
         for key in chain_tips.into_iter() {
@@ -129,9 +126,9 @@ pub fn start(
             break;
         }
 
-        println!("Reverse traversal");
+        info!("Reverse traversal");
         let mut cursor = selected_tip.clone();
-        while cursor.index > 1 {
+        while cursor.index > 0 {
             let key = format!("stx:{}:{}", cursor.index, cursor.hash);
             let parent_block_identifier: BlockIdentifier = {
                 let payload: String = con
@@ -144,14 +141,7 @@ pub fn start(
             cursor = parent_block_identifier.clone();
         }
 
-        // Garbage collect
-        println!("Garbage collecting");
-        let keys_to_prune: Vec<String> = con
-            .scan_match("stx:*:*")
-            .expect("unable to retrieve prunable entries")
-            .into_iter()
-            .collect();
-        let _: Result<(), redis::RedisError> = con.del(&keys_to_prune);
+        let _ = digestion_tx.send(DigestingCommand::GarbageCollect);
         Ok(selected_tip)
     });
 

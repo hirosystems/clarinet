@@ -7,8 +7,10 @@ use redis::Commands;
 use std::cmp::Ordering;
 use std::{collections::BinaryHeap, process, sync::mpsc::Receiver};
 
+const JOB_TERMINATION_HIGH_PRIORITY: u64 = 100_000_000;
 const JOB_DIGEST_BLOCK_SEED_PRIORITY: u64 = 100_000;
-const JOB_TERMINATION_PRIORITY: u64 = 100_000_000;
+const JOB_LOW_PRIORITY: u64 = 10;
+const JOB_TERMINATION_LOW_PRIORITY: u64 = 1;
 
 #[derive(Debug, Clone, Eq, PartialEq)]
 struct Job {
@@ -44,20 +46,27 @@ pub fn start(command_rx: Receiver<DigestingCommand>, config: &Config) {
                         ],
                     );
                 }
-                DigestingCommand::Terminate => {
-                    println!("Terminating");
+                DigestingCommand::GarbageCollect => {
+                    let keys_to_prune: Vec<String> = con
+                        .scan_match("stx:*:*")
+                        .expect("unable to retrieve prunable entries")
+                        .into_iter()
+                        .collect();
+                    let _: Result<(), redis::RedisError> = con.del(&keys_to_prune);
+                }
+                DigestingCommand::Terminate | DigestingCommand::Kill => {
+                    info!("Terminating");
                     return;
                 }
             }
-
-            if let Ok(new_command) = command_rx.try_recv() {
+            while let Ok(new_command) = command_rx.try_recv() {
                 job_queue.push(new_job(new_command));
             };
         }
         let command = match command_rx.recv() {
             Ok(command) => command,
             Err(e) => {
-                println!("block digestion halted.");
+                error!("block digestion channel broken {:?}", e);
                 process::exit(1);
             }
         };
@@ -71,13 +80,25 @@ fn new_job(command: DigestingCommand) -> Job {
             priority: JOB_DIGEST_BLOCK_SEED_PRIORITY + block_identifier.index,
             command: DigestingCommand::DigestSeedBlock(block_identifier),
         },
-        DigestingCommand::Terminate => {
-            println!("Inserting Terminate");
+        DigestingCommand::GarbageCollect => {
             Job {
-                priority: JOB_TERMINATION_PRIORITY,
+                priority: JOB_LOW_PRIORITY,
+                command: DigestingCommand::GarbageCollect,
+            }
+        }
+        DigestingCommand::Terminate => {
+            Job {
+                priority: JOB_TERMINATION_LOW_PRIORITY,
                 command: DigestingCommand::Terminate,
             }
         }
+        DigestingCommand::Kill => {
+            Job {
+                priority: JOB_TERMINATION_HIGH_PRIORITY,
+                command: DigestingCommand::Kill,
+            }
+        }
+
     }
 }
 
