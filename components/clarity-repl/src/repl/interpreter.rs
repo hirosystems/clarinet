@@ -33,7 +33,7 @@ use clarity::vm::EvalHook;
 use clarity::vm::{analysis::AnalysisDatabase, database::ClarityBackingStore};
 use clarity::vm::{eval, eval_all};
 use clarity::vm::{events::*, ClarityVersion};
-use clarity::vm::{CostSynthesis, ExecutionResult};
+use clarity::vm::{CostSynthesis, ExecutionResult, ParsedContract};
 
 pub const BLOCK_LIMIT_MAINNET: ExecutionCost = ExecutionCost {
     write_length: 15_000_000,
@@ -668,13 +668,13 @@ impl ClarityInterpreter {
 
                     functions.insert(name.to_string(), args);
                 }
-                execution_result.contract = Some((
-                    contract_identifier.to_string(),
-                    snippet.clone(),
-                    functions,
-                    contract_ast.clone(),
-                    contract_analysis.clone(),
-                ));
+                execution_result.contract = Some(ParsedContract {
+                    contract_identifier: contract_identifier.to_string(),
+                    code: snippet.clone(),
+                    function_args: functions,
+                    ast: contract_ast.clone(),
+                    analysis: contract_analysis.clone(),
+                });
 
                 for defined_trait in contract_context.defined_traits.iter() {}
 

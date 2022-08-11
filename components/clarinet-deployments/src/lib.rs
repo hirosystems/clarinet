@@ -51,9 +51,9 @@ pub fn setup_session_with_deployment(
         match res {
             Ok(execution_result) => {
                 diags.insert(contract_id.clone(), execution_result.diagnostics);
-                if let Some((_, _, _, ast, analysis)) = execution_result.contract {
-                    asts.insert(contract_id.clone(), ast);
-                    contracts_analysis.insert(contract_id, analysis);
+                if let Some(contract) = execution_result.contract {
+                    asts.insert(contract_id.clone(), contract.ast);
+                    contracts_analysis.insert(contract_id, contract.analysis);
                 }
             }
             Err(errors) => {

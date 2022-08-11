@@ -253,8 +253,8 @@ impl Session {
                                 }
                                 let analysis_result = result.contract.unwrap();
                                 contracts.push((
-                                    analysis_result.4.clone(),
-                                    analysis_result.1.clone(),
+                                    analysis_result.analysis.clone(),
+                                    analysis_result.code.clone(),
                                     contract.path.clone(),
                                 ))
                             }
@@ -462,8 +462,8 @@ impl Session {
             None,
         ) {
             Ok((mut output, result)) => {
-                if let Some((ref contract_name, _, _, _, _)) = result.contract {
-                    let snippet = format!("→ .{} contract successfully stored. Use (contract-call? ...) for invoking the public functions:", contract_name.clone());
+                if let Some(contract) = result.contract {
+                    let snippet = format!("→ .{} contract successfully stored. Use (contract-call? ...) for invoking the public functions:", contract.contract_identifier.clone());
                     output.push(green!(snippet));
                 }
                 (output, result.cost.clone())
@@ -580,8 +580,8 @@ impl Session {
             None,
         ) {
             Ok((mut output, result)) => {
-                if let Some((ref contract_name, _, _, _, _)) = result.contract {
-                    let snippet = format!("→ .{} contract successfully stored. Use (contract-call? ...) for invoking the public functions:", contract_name.clone());
+                if let Some(contract) = result.contract {
+                    let snippet = format!("→ .{} contract successfully stored. Use (contract-call? ...) for invoking the public functions:", contract.contract_identifier.clone());
                     output.push(green!(snippet));
                 }
                 output
@@ -851,17 +851,13 @@ impl Session {
                 if let Some(ref coverage) = coverage {
                     self.coverage_reports.push(coverage.clone());
                 }
-                if let Some((
-                    ref contract_identifier_str,
-                    ref source,
-                    ref contract,
-                    ref ast,
-                    ref analysis,
-                )) = result.contract
-                {
-                    self.asts.insert(contract_identifier.clone(), ast.clone());
-                    self.contracts
-                        .insert(contract_identifier_str.clone(), contract.clone());
+                if let Some(contract) = &result.contract {
+                    self.asts
+                        .insert(contract_identifier.clone(), contract.ast.clone());
+                    self.contracts.insert(
+                        contract.contract_identifier.clone(),
+                        contract.function_args.clone(),
+                    );
                 }
                 Ok(result)
             }
@@ -931,17 +927,13 @@ impl Session {
                 if let Some(ref coverage) = coverage {
                     self.coverage_reports.push(coverage.clone());
                 }
-                if let Some((
-                    ref contract_identifier_str,
-                    ref source,
-                    ref contract,
-                    ref ast,
-                    ref analysis,
-                )) = result.contract
-                {
-                    self.asts.insert(contract_identifier.clone(), ast.clone());
-                    self.contracts
-                        .insert(contract_identifier_str.clone(), contract.clone());
+                if let Some(contract) = &result.contract {
+                    self.asts
+                        .insert(contract_identifier.clone(), contract.ast.clone());
+                    self.contracts.insert(
+                        contract.contract_identifier.clone(),
+                        contract.function_args.clone(),
+                    );
                 }
                 Ok(result)
             }

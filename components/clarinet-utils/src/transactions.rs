@@ -23,7 +23,6 @@ use clarity::util::secp256k1::{
     MessageSignature, Secp256k1PrivateKey, Secp256k1PublicKey, MESSAGE_SIGNATURE_ENCODED_SIZE,
 };
 use clarity::util::vrf::VRFProof;
-use clarity::vm::ast::parser::{lex, LexItem};
 use clarity::vm::types::{
     PrincipalData, QualifiedContractIdentifier, StandardPrincipalData, Value,
 };
@@ -1273,19 +1272,7 @@ impl StacksString {
     }
 
     pub fn is_clarity_variable(&self) -> bool {
-        // must parse to a single Clarity variable
-        match lex(&self.to_string()) {
-            Ok(lexed) => {
-                if lexed.len() != 1 {
-                    return false;
-                }
-                match lexed[0].0 {
-                    LexItem::Variable(_) => true,
-                    _ => false,
-                }
-            }
-            Err(_) => false,
-        }
+        ClarityName::try_from(self.to_string()).is_ok()
     }
 
     pub fn from_string(s: &String) -> Option<StacksString> {

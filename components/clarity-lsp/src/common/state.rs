@@ -333,8 +333,8 @@ pub async fn build_state(
                 continue;
             }
         };
-        if let Some((_, _, _, _, contract_analysis)) = contract_analysis {
-            analyses.insert(contract_id.clone(), Some(contract_analysis));
+        if let Some(contract) = contract_analysis {
+            analyses.insert(contract_id.clone(), Some(contract.analysis));
         }
     }
 

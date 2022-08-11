@@ -259,11 +259,11 @@ pub fn load_deployment(state: &mut OpState, args: Value, _: ()) -> Result<String
     for (contract_id, result) in results.into_iter() {
         match result {
             Ok(execution) => {
-                if let Some((_, source, functions, ast, analysis)) = execution.contract {
+                if let Some(contract) = execution.contract {
                     serialized_contracts.push(json!({
                         "contract_id": contract_id.to_string(),
-                        "contract_interface": build_contract_interface(&analysis),
-                        "source": source,
+                        "contract_interface": build_contract_interface(&contract.analysis),
+                        "source": contract.code,
                     }))
                 }
             }

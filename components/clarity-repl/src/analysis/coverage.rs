@@ -10,7 +10,6 @@ use clarity::vm::functions::define::DefineFunctionsParsed;
 use clarity::vm::representations::SymbolicExpression;
 use clarity::vm::types::QualifiedContractIdentifier;
 use clarity::vm::EvalHook;
-use clarity::vm::ExecutionResult;
 use serde_json::Value as JsonValue;
 
 #[derive(Serialize, Deserialize, Debug, Default, Clone)]

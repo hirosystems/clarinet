@@ -245,9 +245,9 @@ impl<'a> ASTDependencyDetector<'a> {
             let mut contracts = vec![];
             for index in deps.iter() {
                 let contract = reverse_lookup[*index];
-                contracts.push(contract.name.as_str());
+                contracts.push(contract.name.to_string());
             }
-            return Err(CheckErrors::CircularContractDependency(contracts.join(", ")).into());
+            return Err(CheckErrors::CircularReference(contracts).into());
         }
 
         Ok(sorted_indexes

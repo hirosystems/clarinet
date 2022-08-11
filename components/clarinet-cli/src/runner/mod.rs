@@ -72,13 +72,13 @@ impl DeploymentCache {
                     std::process::exit(1);
                 }
             };
-            if let Some((_, source, functions, ast, analysis)) = execution_result.contract.take() {
+            if let Some(contract) = execution_result.contract.take() {
                 contracts_artifacts.insert(
                     contract_id.clone(),
                     AnalysisArtifacts {
-                        ast,
-                        interface: build_contract_interface(&analysis),
-                        source,
+                        ast: contract.ast,
+                        interface: build_contract_interface(&contract.analysis),
+                        source: contract.code,
                         dependencies: vec![],
                     },
                 );
