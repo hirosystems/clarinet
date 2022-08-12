@@ -7,7 +7,7 @@ edition = "2021"
 
 [dependencies]
 serde = "1"
-serde_json = "1"
+serde_json = { version = "1", features = ["arbitrary_precision"]}
 serde_derive = "1"
 stacks_rpc_client = { package = "stacks-rpc-client", path = "../../components/stacks-rpc-client" }
 clarity_repl = { package = "clarity-repl", path = "../../components/clarity-repl" }
@@ -30,3 +30,9 @@ slog-scope = { version = "4.4.0", optional = true }
 [features]
 default = ["cli"]
 cli = ["clap", "clap_generate", "toml", "ctrlc", "slog-json", "slog-scope"]
+
+[profile.release]
+debug = 1
+
+[rust]
+debuginfo-level = 1

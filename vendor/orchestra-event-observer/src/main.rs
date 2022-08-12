@@ -20,6 +20,9 @@ pub mod indexer;
 pub mod observer;
 pub mod utils;
 
+use slog::Drain;
+use std::sync::Mutex;
+
 use crate::chainhooks::types::HookFormation;
 use clap::Parser;
 use ctrlc;
@@ -30,9 +33,6 @@ use std::io::{BufReader, Read};
 use std::path::PathBuf;
 use std::sync::mpsc::{channel, Receiver, Sender};
 use toml::value::Value;
-
-use slog::Drain;
-use std::sync::Mutex;
 
 /// Simple program to greet a person
 #[derive(Parser, Debug)]

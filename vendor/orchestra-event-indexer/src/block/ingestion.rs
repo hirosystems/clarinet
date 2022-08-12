@@ -51,6 +51,17 @@ pub fn start(
             .from_path(&seed_tsv_path)
             .expect("unable to create csv reader");
 
+        // TODO
+        // let mut record = csv::StringRecord::new();
+        // let mut rdr = Reader::from_reader(data.as_bytes());
+        // let mut record = StringRecord::new();
+        // if rdr.read_record(&mut record)? {
+        //     assert_eq!(record, vec!["Boston", "United States", "4628910"]);
+        //     Ok(())
+        // } else {
+        //     Err(From::from("expected at least one record but got none"))
+        // }
+
         for result in reader_builder.deserialize() {
             // Notice that we need to provide a type hint for automatic
             // deserialization.

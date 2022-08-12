@@ -503,12 +503,12 @@ impl StacksMessageCodec for TransactionContractCall {
         }?;
 
         // function name must be valid Clarity variable
-        if !StacksString::from(function_name.clone()).is_clarity_variable() {
-            return Err(CodecError::DeserializeError(
-                "Failed to parse transaction: invalid function name -- not a Clarity variable"
-                    .to_string(),
-            ));
-        }
+        // if !StacksString::from(function_name.clone()).is_clarity_variable() {
+        //     return Err(CodecError::DeserializeError(
+        //         "Failed to parse transaction: invalid function name -- not a Clarity variable"
+        //             .to_string(),
+        //     ));
+        // }
 
         Ok(TransactionContractCall {
             address,

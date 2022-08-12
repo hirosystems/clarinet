@@ -825,7 +825,7 @@ pub fn handle_new_stacks_block(
     let (_pox_info, chain_event) = match indexer_rw_lock.inner().write() {
         Ok(mut indexer) => {
             let pox_info = indexer.get_pox_info();
-            let chain_event = indexer.handle_stacks_block(marshalled_block.into_inner());
+            let chain_event = indexer.handle_stacks_marshalled_block(marshalled_block.into_inner());
             (pox_info, chain_event)
         }
         _ => {
@@ -867,7 +867,8 @@ pub fn handle_new_microblocks(
     // kind of update that this new microblock would imply
     let mut chain_event = match indexer_rw_lock.inner().write() {
         Ok(mut indexer) => {
-            let chain_event = indexer.handle_stacks_microblock(marshalled_microblock.into_inner());
+            let chain_event = indexer
+                .handle_stacks_marshalled_microblock_trail(marshalled_microblock.into_inner());
             chain_event
         }
         _ => {
@@ -903,8 +904,8 @@ pub fn handle_new_mempool_tx(
     let transactions = raw_txs
         .iter()
         .map(|tx_data| {
-            let (tx_description, ..) =
-                indexer::stacks::get_tx_description(&tx_data).expect("unable to parse transaction");
+            let (tx_description, ..) = indexer::stacks::get_tx_description(&tx_data, &vec![])
+                .expect("unable to parse transaction");
             MempoolAdmissionData {
                 tx_data: tx_data.clone(),
                 tx_description,

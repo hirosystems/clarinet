@@ -34,6 +34,7 @@ impl StacksChainContext {
     }
 }
 
+#[derive(Debug, Clone)]
 pub struct IndexerConfig {
     pub stacks_node_rpc_url: String,
     pub bitcoin_node_rpc_url: String,
@@ -42,7 +43,7 @@ pub struct IndexerConfig {
 }
 
 pub struct Indexer {
-    config: IndexerConfig,
+    pub config: IndexerConfig,
     stacks_blocks_pool: StacksBlockPool,
     bitcoin_blocks_pool: BitcoinBlockPool,
     pub stacks_context: StacksChainContext,
@@ -69,11 +70,23 @@ impl Indexer {
         self.bitcoin_blocks_pool.process_block(block)
     }
 
-    pub fn handle_stacks_block(
+    pub fn handle_stacks_serialized_block(
+        &mut self,
+        serialized_block: &str,
+    ) -> Result<Option<StacksChainEvent>, ()> {
+        let block = stacks::standardize_stacks_serialized_block(
+            &self.config,
+            serialized_block,
+            &mut self.stacks_context,
+        );
+        self.stacks_blocks_pool.process_block(block)
+    }
+
+    pub fn handle_stacks_marshalled_block(
         &mut self,
         marshalled_block: JsonValue,
     ) -> Result<Option<StacksChainEvent>, ()> {
-        let block = stacks::standardize_stacks_block(
+        let block = stacks::standardize_stacks_marshalled_block(
             &self.config,
             marshalled_block,
             &mut self.stacks_context,
@@ -81,13 +94,25 @@ impl Indexer {
         self.stacks_blocks_pool.process_block(block)
     }
 
-    pub fn handle_stacks_microblock(
+    pub fn handle_stacks_serialized_microblock_trail(
         &mut self,
-        marshalled_microblock: JsonValue,
+        serialized_microblock_trail: &str,
     ) -> Option<StacksChainEvent> {
-        let microblocks = stacks::standardize_stacks_microblock_trail(
+        let microblocks = stacks::standardize_stacks_serialized_microblock_trail(
             &self.config,
-            marshalled_microblock,
+            serialized_microblock_trail,
+            &mut self.stacks_context,
+        );
+        self.stacks_blocks_pool.process_microblocks(microblocks)
+    }
+
+    pub fn handle_stacks_marshalled_microblock_trail(
+        &mut self,
+        marshalled_microblock_trail: JsonValue,
+    ) -> Option<StacksChainEvent> {
+        let microblocks = stacks::standardize_stacks_marshalled_microblock_trail(
+            &self.config,
+            marshalled_microblock_trail,
             &mut self.stacks_context,
         );
         self.stacks_blocks_pool.process_microblocks(microblocks)
@@ -149,9 +174,11 @@ impl ChainSegment {
     }
 
     fn get_relative_index(&self, block_identifier: &BlockIdentifier) -> usize {
-        let segment_index =
-            (block_identifier.index - self.most_recent_confirmed_block_height).saturating_sub(1);
-        segment_index.try_into().unwrap()
+        if let Some(tip) = self.block_ids.front() {
+            let segment_index = tip.index.saturating_sub(block_identifier.index);
+            return segment_index.try_into().unwrap();
+        }
+        return 0;
     }
 
     fn can_append_block(
@@ -170,6 +197,7 @@ impl ChainSegment {
             Some(tip) => tip,
             None => return Ok(()),
         };
+        println!("Comparing {} with {}", tip, block.get_identifier());
         if tip.index == block.get_parent_identifier().index {
             match tip.hash == block.get_parent_identifier().hash {
                 true => return Ok(()),
@@ -186,6 +214,7 @@ impl ChainSegment {
     }
 
     fn get_block_id(&self, block_id: &BlockIdentifier) -> Option<&BlockIdentifier> {
+        println!("=> {}", self.get_relative_index(block_id));
         match self.block_ids.get(self.get_relative_index(block_id)) {
             Some(res) => Some(res),
             None => None,
@@ -200,7 +229,7 @@ impl ChainSegment {
         let mut keep = vec![];
         let mut prune = vec![];
 
-        for block_id in self.block_ids.drain(..) {
+        for (index, block_id) in self.block_ids.drain(..).enumerate() {
             if block_id.index >= cut_off.index {
                 keep.push(block_id);
             } else {
@@ -211,6 +240,10 @@ impl ChainSegment {
             self.block_ids.push_back(block_id);
         }
         prune
+    }
+
+    pub fn get_tip(&self) -> &BlockIdentifier {
+        self.block_ids.front().unwrap()
     }
 
     pub fn get_length(&self) -> u64 {
@@ -279,12 +312,14 @@ impl ChainSegment {
     fn try_append_block(&mut self, block: &dyn AbstractBlock) -> (bool, Option<ChainSegment>) {
         let mut block_appended = false;
         let mut fork = None;
+        println!("Trying to append {} to {}", block.get_identifier(), self);
         match self.can_append_block(block) {
             Ok(()) => {
                 self.append_block_identifier(&block.get_identifier());
                 block_appended = true;
             }
             Err(incompatibility) => {
+                println!("Will have to fork: {:?}", incompatibility);
                 match incompatibility {
                     ChainSegmentIncompatibility::BlockCollision => {
                         let mut new_fork = self.clone();
@@ -293,6 +328,7 @@ impl ChainSegment {
                                 &block.get_parent_identifier(),
                             );
                         if parent_found {
+                            println!("Success");
                             new_fork.append_block_identifier(&block.get_identifier());
                             fork = Some(new_fork);
                             block_appended = true;

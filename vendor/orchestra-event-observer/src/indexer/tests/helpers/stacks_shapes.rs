@@ -3406,10 +3406,73 @@ pub fn get_vector_050() -> Vec<(BlockEvent, StacksChainEventExpectation)> {
 
 /// Vector 051: Generate the following blocks
 ///
-/// A1(1) -  B1(2) -   [a1](3) - [b1](4) - [c1](6) - [d1](7) - C1(10)
-///                \__ [a2](4) - [b2](5)                     - C2(9)  - D2(12)     
-///                 \_ C3(11)
+/// A1(1)  -  B1(2)  -  C1(3)  -  D1(1)  -  E1(2)  -  F1(3)  -  G1(1)  -  H1(2)  -  I1(3)  -  J1(1)  -  K1(2)  -  L1(3)  -  M1(1)  -  N1(2)  -  O1(3)  -  P1(1)
 ///
 pub fn get_vector_051() -> Vec<(BlockEvent, StacksChainEventExpectation)> {
-    vec![]
+    vec![
+        (
+            stacks_blocks::A1(None),
+            expect_chain_updated_with_block(stacks_blocks::A1(None), vec![]),
+        ),
+        (
+            stacks_blocks::B1(None),
+            expect_chain_updated_with_block(stacks_blocks::B1(None), vec![]),
+        ),
+        (
+            stacks_blocks::C1(None),
+            expect_chain_updated_with_block(stacks_blocks::C1(None), vec![]),
+        ),
+        (
+            stacks_blocks::D1(None),
+            expect_chain_updated_with_block(stacks_blocks::D1(None), vec![]),
+        ),
+        (
+            stacks_blocks::E1(None),
+            expect_chain_updated_with_block(stacks_blocks::E1(None), vec![]),
+        ),
+        (
+            stacks_blocks::F1(None),
+            expect_chain_updated_with_block(stacks_blocks::F1(None), vec![]),
+        ),
+        (
+            stacks_blocks::G1(None),
+            expect_chain_updated_with_block(stacks_blocks::G1(None), vec![stacks_blocks::A1(None)]),
+        ),
+        (
+            stacks_blocks::H1(None),
+            expect_chain_updated_with_block(stacks_blocks::H1(None), vec![stacks_blocks::B1(None)]),
+        ),
+        (
+            stacks_blocks::I1(None),
+            expect_chain_updated_with_block(stacks_blocks::I1(None), vec![stacks_blocks::C1(None)]),
+        ),
+        (
+            stacks_blocks::J1(None),
+            expect_chain_updated_with_block(stacks_blocks::J1(None), vec![stacks_blocks::D1(None)]),
+        ),
+        (
+            stacks_blocks::K1(None),
+            expect_chain_updated_with_block(stacks_blocks::K1(None), vec![stacks_blocks::E1(None)]),
+        ),
+        (
+            stacks_blocks::L1(None),
+            expect_chain_updated_with_block(stacks_blocks::L1(None), vec![stacks_blocks::F1(None)]),
+        ),
+        (
+            stacks_blocks::M1(None),
+            expect_chain_updated_with_block(stacks_blocks::M1(None), vec![stacks_blocks::G1(None)]),
+        ),
+        (
+            stacks_blocks::N1(None),
+            expect_chain_updated_with_block(stacks_blocks::N1(None), vec![stacks_blocks::H1(None)]),
+        ),
+        (
+            stacks_blocks::O1(None),
+            expect_chain_updated_with_block(stacks_blocks::O1(None), vec![stacks_blocks::I1(None)]),
+        ),
+        (
+            stacks_blocks::P1(None),
+            expect_chain_updated_with_block(stacks_blocks::P1(None), vec![stacks_blocks::J1(None)]),
+        ),
+    ]
 }
