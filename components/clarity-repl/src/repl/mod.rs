@@ -1,3 +1,4 @@
+pub mod boot;
 pub mod datastore;
 pub mod debug;
 pub mod diagnostic;

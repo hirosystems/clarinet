@@ -437,6 +437,9 @@ impl ClarityInterpreter {
             let tx_sender: PrincipalData = self.tx_sender.clone().into();
 
             let mut conn = self.datastore.as_clarity_db(&NULL_HEADER_DB);
+            conn.begin();
+            conn.set_clarity_epoch_version(self.repl_settings.epoch);
+            conn.commit();
             let cost_tracker = if cost_track {
                 LimitedCostTracker::new(
                     false,
@@ -445,7 +448,7 @@ impl ClarityInterpreter {
                     &mut conn,
                     self.repl_settings.epoch,
                 )
-                .unwrap()
+                .expect("failed to initialize cost tracker")
             } else {
                 LimitedCostTracker::new_free()
             };

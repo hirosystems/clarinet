@@ -1,12 +1,13 @@
+use super::boot::{STACKS_BOOT_CODE_MAINNET, STACKS_BOOT_CODE_TESTNET};
 use super::diagnostic::output_diagnostic;
 use super::ClarityInterpreter;
 use crate::analysis::ast_dependency_detector::{ASTDependencyDetector, Dependency};
 use crate::analysis::coverage::{self, TestCoverageReport};
-use crate::contracts::{BNS_CONTRACT, COSTS_V1_CONTRACT, COSTS_V2_CONTRACT, POX_CONTRACT};
 use crate::repl::settings::InitialContract;
 use ansi_term::{Colour, Style};
 use clarity::codec::StacksMessageCodec;
 use clarity::types::chainstate::StacksAddress;
+use clarity::types::StacksEpochId;
 use clarity::vm::analysis::ContractAnalysis;
 use clarity::vm::ast::ContractAST;
 use clarity::vm::diagnostic::Diagnostic;
@@ -111,11 +112,11 @@ impl Session {
 
         let boot_testnet_deployer = BOOT_TESTNET_PRINCIPAL.clone();
         self.interpreter.set_tx_sender(boot_testnet_deployer);
-        self.include_boot_contracts();
+        self.include_boot_contracts(false);
 
         let boot_mainnet_deployer = BOOT_MAINNET_PRINCIPAL.clone();
         self.interpreter.set_tx_sender(boot_mainnet_deployer);
-        self.include_boot_contracts();
+        self.include_boot_contracts(true);
         self.interpreter.set_tx_sender(default_tx_sender);
     }
 
@@ -290,95 +291,61 @@ impl Session {
         }
     }
 
-    pub fn include_boot_contracts(&mut self) {
-        if self
-            .settings
-            .include_boot_contracts
-            .contains(&"pox".to_string())
-        {
-            self.formatted_interpretation(
-                POX_CONTRACT.to_string(),
-                Some("pox".to_string()),
-                false,
-                None,
-                None,
-            )
-            .expect("Unable to deploy POX");
+    pub fn include_boot_contracts(&mut self, mainnet: bool) {
+        let boot_code = if mainnet {
+            *STACKS_BOOT_CODE_MAINNET
+        } else {
+            *STACKS_BOOT_CODE_TESTNET
+        };
+
+        for (name, code) in boot_code.iter() {
+            if self
+                .settings
+                .include_boot_contracts
+                .contains(&name.to_string())
+            {
+                self.formatted_interpretation(
+                    code.to_string(),
+                    Some(name.to_string()),
+                    false,
+                    None,
+                    None,
+                )
+                .expect(&format!("Unable to deploy {}", name));
+            }
         }
-        if self
-            .settings
-            .include_boot_contracts
-            .contains(&"bns".to_string())
-        {
-            self.formatted_interpretation(
-                BNS_CONTRACT.to_string(),
-                Some("bns".to_string()),
-                false,
-                None,
-                None,
-            )
-            .expect("Unable to deploy BNS");
-        }
-        if self
-            .settings
-            .include_boot_contracts
-            .contains(&"costs-v1".to_string())
-        {
-            self.formatted_interpretation(
-                COSTS_V1_CONTRACT.to_string(),
-                Some("costs-v1".to_string()),
-                false,
-                None,
-                None,
-            )
-            .expect("Unable to deploy COSTS");
-        }
-        if self
-            .settings
-            .include_boot_contracts
-            .contains(&"costs-v2".to_string())
-        {
-            self.formatted_interpretation(
-                COSTS_V2_CONTRACT.to_string(),
-                Some("costs-v2".to_string()),
-                false,
-                None,
-                None,
-            )
-            .expect("Unable to deploy COSTS");
-        }
+
+        if self.settings.repl_settings.epoch >= StacksEpochId::Epoch2_05 {}
     }
 
     pub fn get_boot_contracts_asts(&self) -> BTreeMap<QualifiedContractIdentifier, ContractAST> {
         let mut asts = BTreeMap::new();
-        let (pox_ast, _, _) = self.interpreter.build_ast(
-            QualifiedContractIdentifier::transient(),
-            POX_CONTRACT.to_string(),
-        );
-        let (bns_ast, _, _) = self.interpreter.build_ast(
-            QualifiedContractIdentifier::transient(),
-            BNS_CONTRACT.to_string(),
-        );
-
-        let bns_contract = ContractName::try_from("bns").unwrap();
-        let pox_contract = ContractName::try_from("pox").unwrap();
-
-        asts.insert(
-            QualifiedContractIdentifier::new(BOOT_TESTNET_PRINCIPAL.clone(), bns_contract.clone()),
-            bns_ast.clone(),
-        );
-        asts.insert(
-            QualifiedContractIdentifier::new(BOOT_MAINNET_PRINCIPAL.clone(), bns_contract),
-            bns_ast,
-        );
-        asts.insert(
-            QualifiedContractIdentifier::new(BOOT_TESTNET_PRINCIPAL.clone(), pox_contract.clone()),
-            pox_ast.clone(),
-        );
-        asts.insert(
-            QualifiedContractIdentifier::new(BOOT_MAINNET_PRINCIPAL.clone(), pox_contract),
-            pox_ast,
-        );
+        let deploy: [(&StandardPrincipalData, [(&str, &str); 9]); 2] = [
+            (&*BOOT_TESTNET_PRINCIPAL, *STACKS_BOOT_CODE_TESTNET),
+            (&*BOOT_MAINNET_PRINCIPAL, *STACKS_BOOT_CODE_MAINNET),
+        ];
+        // for (deployer, boot_code) in deploy.iter() {
+        for contract in deploy.iter() {
+            let deployer = contract.0;
+            let boot_code = contract.1;
+            for (name, code) in boot_code.iter() {
+                if self
+                    .settings
+                    .include_boot_contracts
+                    .contains(&name.to_string())
+                {
+                    let contract_identifier = QualifiedContractIdentifier::new(
+                        deployer.clone(),
+                        ContractName::try_from(*name)
+                            .expect("unable to create `ContractName` from boot contract"),
+                    );
+                    let (ast, _, _) = self
+                        .interpreter
+                        .build_ast(contract_identifier.clone(), code.to_string());
+                    asts.insert(contract_identifier, ast);
+                }
+            }
+        }
         asts
     }
 
@@ -393,13 +360,13 @@ impl Session {
                 PrincipalData::parse_standard_principal(&BOOT_TESTNET_ADDRESS)
                     .expect("Unable to parse deployer's address");
             self.interpreter.set_tx_sender(boot_testnet_deployer);
-            self.include_boot_contracts();
+            self.include_boot_contracts(false);
 
             let boot_mainnet_deployer =
                 PrincipalData::parse_standard_principal(&BOOT_MAINNET_ADDRESS)
                     .expect("Unable to parse deployer's address");
             self.interpreter.set_tx_sender(boot_mainnet_deployer);
-            self.include_boot_contracts();
+            self.include_boot_contracts(true);
 
             self.interpreter.set_tx_sender(default_tx_sender);
         }
@@ -1508,8 +1475,8 @@ mod tests {
     #[test]
     fn evaluate_at_block() {
         let mut settings = SessionSettings::default();
-        settings.include_boot_contracts = vec!["costs-v1".into()];
-        settings.repl_settings.costs_version = 1;
+        settings.include_boot_contracts = vec!["costs-2".into()];
+        settings.repl_settings.costs_version = 2;
 
         let mut session = Session::new(settings);
         session.start().expect("session could not start");
