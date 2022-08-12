@@ -679,8 +679,6 @@ impl ClarityInterpreter {
                     analysis: contract_analysis.clone(),
                 });
 
-                for defined_trait in contract_context.defined_traits.iter() {}
-
                 global_context
                     .database
                     .insert_contract_hash(&contract_identifier, &snippet)
@@ -708,6 +706,14 @@ impl ClarityInterpreter {
             for hook in eval_hooks.iter_mut() {
                 hook.did_complete(Ok(&mut execution_result));
             }
+        }
+
+        for (account, token, value) in accounts_to_credit.drain(..) {
+            self.credit_token(account, token, value);
+        }
+
+        for (account, token, value) in accounts_to_debit.drain(..) {
+            self.debit_token(account, token, value);
         }
 
         if contract_saved {
