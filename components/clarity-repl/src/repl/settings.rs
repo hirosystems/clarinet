@@ -74,7 +74,7 @@ impl Default for Settings {
             analysis: analysis::Settings::default(),
             costs_version: DEFAULT_COSTS_VERSION,
             clarity_version: ClarityVersion::latest(),
-            epoch: StacksEpochId::latest(),
+            epoch: StacksEpochId::Epoch2_05, // TODO(brice): Once 2.1 is live, use `::latest()`
         }
     }
 }
