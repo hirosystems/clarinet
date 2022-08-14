@@ -160,7 +160,7 @@ impl MainWorker {
         ];
         extensions.extend(std::mem::take(&mut options.extensions));
 
-        let mut js_runtime = JsRuntime::new(RuntimeOptions {
+        let js_runtime = JsRuntime::new(RuntimeOptions {
             module_loader: Some(options.module_loader.clone()),
             startup_snapshot: Some(js::deno_isolate_init()),
             source_map_getter: options.source_map_getter,

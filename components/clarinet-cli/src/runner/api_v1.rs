@@ -51,6 +51,9 @@ pub async fn run_bridge(
     call_read_only_fn_decl.name = "api/v1/call_read_only_fn";
     let mut get_assets_maps_decl = get_assets_maps::decl();
     get_assets_maps_decl.name = "api/v1/get_assets_maps";
+    let mut deprecation_notice_decl = deprecation_notice::decl();
+    deprecation_notice_decl.name = "api/v1/mine_empty_blocks";
+
     let clarinet = Extension::builder()
         .ops(vec![
             new_session_decl,
@@ -189,6 +192,7 @@ pub async fn run_bridge(
     Ok(artifacts)
 }
 
+#[op]
 pub fn deprecation_notice(_state: &mut OpState, _args: Value, _: ()) -> Result<(), AnyError> {
     println!("{}: clarinet v{} is incompatible with the version of the library being imported in the test files.", red!("error"), option_env!("CARGO_PKG_VERSION").expect("Unable to detect version"));
     println!("The test files should import the latest version.");

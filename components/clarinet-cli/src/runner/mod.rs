@@ -12,6 +12,7 @@ use clarity_repl::clarity::types::QualifiedContractIdentifier;
 use clarity_repl::repl::ast::ContractAST;
 use clarity_repl::repl::session::CostsReport;
 use clarity_repl::repl::Session;
+use deno_core::error::AnyError;
 use std::collections::HashMap;
 
 use clarinet_deployments::types::DeploymentSpecification;
@@ -107,8 +108,8 @@ pub fn run_scripts(
     import_map: Option<String>,
     allow_net: bool,
     cache_location: FileLocation,
-) -> Result<u32, (String, u32)> {
-    match block_on(deno::do_run_scripts(
+) -> Result<usize, (AnyError, usize)> {
+    block_on(deno::do_run_scripts(
         include,
         include_coverage,
         include_costs_report,
@@ -123,10 +124,7 @@ pub fn run_scripts(
         import_map,
         allow_net,
         cache_location,
-    )) {
-        Err(e) => Err((format!("{:?}", e), 0)),
-        Ok(res) => Ok(res),
-    }
+    ))
 }
 
 pub fn block_on<F, R>(future: F) -> R

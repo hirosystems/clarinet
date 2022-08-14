@@ -54,16 +54,16 @@ pub async fn do_run_scripts(
     display_costs_report: bool,
     watch: bool,
     allow_wallets: bool,
-    allow_disk_write: bool,
+    _allow_disk_write: bool,
     manifest: &ProjectManifest,
     cache: DeploymentCache,
-    deployment_plan_path: Option<String>,
+    _deployment_plan_path: Option<String>,
     fail_fast: Option<u16>,
     filter: Option<String>,
     import_map: Option<String>,
     allow_net: bool,
     cache_location: FileLocation,
-) -> Result<bool, AnyError> {
+) -> Result<usize, (AnyError, usize)> {
     let project_root = manifest.location.get_project_root_location().unwrap();
     let cwd = PathBuf::from(&project_root.to_string());
     let concurrent_jobs = NonZeroUsize::new(num_cpus::get()).expect("unable to determine num_cp");
@@ -127,8 +127,10 @@ pub async fn do_run_scripts(
     };
 
     let success = if flags.watch.is_some() {
-        run_tests_with_watch(flags, test_flags, allow_wallets, display_costs_report).await?;
-        true
+        run_tests_with_watch(flags, test_flags, allow_wallets, display_costs_report)
+            .await
+            .map_err(|e| (e, 0))?;
+        0
     } else {
         run_tests(
             flags,
@@ -722,8 +724,8 @@ pub async fn run_tests(
     deployment_cache: Option<DeploymentCache>,
     display_costs_report: bool,
     generate_coverage: bool,
-) -> Result<bool, AnyError> {
-    let ps = ProcState::build(flags).await?;
+) -> Result<usize, (AnyError, usize)> {
+    let ps = ProcState::build(flags).await.map_err(|e| (e, 0))?;
     let permissions = Permissions::from_options(&ps.options.permissions_options());
     let specifiers_with_mode = fetch_specifiers_with_test_mode(
         &ps,
@@ -731,16 +733,19 @@ pub async fn run_tests(
         test_flags.ignore.clone(),
         test_flags.doc,
     )
-    .await?;
+    .await
+    .map_err(|e| (e, 0))?;
 
     if !test_flags.allow_none && specifiers_with_mode.is_empty() {
-        return Err(generic_error("No test modules found"));
+        return Err((generic_error("No test modules found"), 0));
     }
 
-    check_specifiers(&ps, permissions.clone(), specifiers_with_mode.clone()).await?;
+    check_specifiers(&ps, permissions.clone(), specifiers_with_mode.clone())
+        .await
+        .map_err(|e| (e, 0))?;
 
     if test_flags.no_run {
-        return Ok(());
+        return Ok(0);
     }
 
     let compat = ps.options.compat();
@@ -759,7 +764,12 @@ pub async fn run_tests(
         allow_wallets,
         deployment_cache.clone(),
     )
-    .await?;
+    .await
+    .map_err(|e| (e, 0))?;
+
+    if failed {
+        return Err((AnyError::msg("Test suite failed"), artifacts.len()));
+    }
 
     if display_costs_report {
         costs::display_costs_report(&artifacts)
@@ -782,11 +792,13 @@ pub async fn run_tests(
                 let mut coverage_reports = artifact.coverage_reports.clone();
                 coverage_reporter.reports.append(&mut coverage_reports);
             }
-            coverage_reporter.write_lcov_file("coverage.lcov");
+            coverage_reporter
+                .write_lcov_file("coverage.lcov")
+                .map_err(|e| (AnyError::from(e), 0))?;
         }
     }
 
-    Ok(!failed)
+    Ok(artifacts.len())
 }
 
 pub async fn run_tests_with_watch(
