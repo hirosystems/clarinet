@@ -97,12 +97,6 @@ struct TaintedNode<'a> {
     sources: HashSet<Node<'a>>,
 }
 
-// impl Hash for &SymbolicExpression {
-//     fn hash<H: Hasher>(&self, state: &mut H) {
-//         self.id.hash(state)
-//     }
-// }
-
 struct FunctionInfo {
     // Parameters which are allowed to be unchecked when passed into this
     // function.
