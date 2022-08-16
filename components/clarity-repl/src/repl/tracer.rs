@@ -9,7 +9,7 @@ use clarity::vm::{
     types::Value,
     EvalHook, SymbolicExpression, SymbolicExpressionType,
 };
-use clarity::vm::{eval, ClarityVersion};
+use clarity::vm::{eval, ClarityVersion, EvaluationResult};
 
 pub struct Tracer {
     snippet: String,
@@ -212,9 +212,16 @@ impl EvalHook for Tracer {
     ) {
         match result {
             Ok(result) => {
-                if let Some(value) = &result.result {
-                    println!("└── {}", blue!(format!("{}", value)));
-                }
+                match &result.result {
+                    EvaluationResult::Contract(contract_result) => {
+                        if let Some(value) = &contract_result.result {
+                            println!("└── {}", blue!(format!("{}", value)));
+                        }
+                    }
+                    EvaluationResult::Snippet(snippet_result) => {
+                        println!("└── {}", blue!(format!("{}", snippet_result.result)));
+                    }
+                };
             }
             Err(e) => println!("{}", e),
         }

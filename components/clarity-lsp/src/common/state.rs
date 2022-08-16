@@ -10,6 +10,7 @@ use clarity::vm::analysis::ContractAnalysis;
 use clarity::vm::ast::ContractAST;
 use clarity::vm::diagnostic::{Diagnostic as ClarityDiagnostic, Level as ClarityLevel};
 use clarity::vm::types::QualifiedContractIdentifier;
+use clarity::vm::EvaluationResult;
 use clarity_repl::analysis::ast_dependency_detector::DependencySet;
 use lsp_types::MessageType;
 use orchestra_types::StacksNetwork;
@@ -319,12 +320,18 @@ pub async fn build_state(
         };
         locations.insert(contract_id.clone(), contract_location.clone());
 
-        let contract_analysis = match result {
-            Ok(ref mut execution_result) => {
+        match result {
+            Ok(mut execution_result) => {
                 if let Some(entry) = artifacts.diags.get_mut(&contract_id) {
                     entry.append(&mut execution_result.diagnostics);
                 }
-                execution_result.contract.take()
+                match execution_result.result {
+                    EvaluationResult::Contract(contract_result) => {
+                        analyses
+                            .insert(contract_id.clone(), Some(contract_result.contract.analysis));
+                    }
+                    _ => (),
+                };
             }
             Err(ref mut diags) => {
                 if let Some(entry) = artifacts.diags.get_mut(&contract_id) {
@@ -333,9 +340,6 @@ pub async fn build_state(
                 continue;
             }
         };
-        if let Some(contract) = contract_analysis {
-            analyses.insert(contract_id.clone(), Some(contract.analysis));
-        }
     }
 
     protocol_state.consolidate(

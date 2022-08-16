@@ -17,6 +17,7 @@ use clarity::vm::diagnostic::Diagnostic;
 use clarity::vm::types::PrincipalData;
 use clarity::vm::types::QualifiedContractIdentifier;
 use clarity::vm::ContractName;
+use clarity::vm::EvaluationResult;
 use clarity::vm::ExecutionResult;
 use clarity_repl::analysis::ast_dependency_detector::{ASTDependencyDetector, DependencySet};
 use clarity_repl::repl::Session;
@@ -51,9 +52,12 @@ pub fn setup_session_with_deployment(
         match res {
             Ok(execution_result) => {
                 diags.insert(contract_id.clone(), execution_result.diagnostics);
-                if let Some(contract) = execution_result.contract {
-                    asts.insert(contract_id.clone(), contract.ast);
-                    contracts_analysis.insert(contract_id, contract.analysis);
+                match execution_result.result {
+                    EvaluationResult::Contract(contract_result) => {
+                        asts.insert(contract_id.clone(), contract_result.contract.ast);
+                        contracts_analysis.insert(contract_id, contract_result.contract.analysis);
+                    }
+                    _ => (),
                 }
             }
             Err(errors) => {

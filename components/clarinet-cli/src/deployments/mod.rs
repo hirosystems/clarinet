@@ -7,7 +7,7 @@ use bitcoincore_rpc::{Auth, Client};
 use clarity::types::chainstate::StacksAddress;
 use clarity::util::secp256k1::{MessageSignature, Secp256k1PrivateKey, Secp256k1PublicKey};
 use clarity::vm::types::StandardPrincipalData;
-use clarity::vm::{ClarityName, Value};
+use clarity::vm::{ClarityName, EvaluationResult, Value};
 use reqwest::Url;
 pub use ui::start_ui;
 
@@ -438,7 +438,10 @@ pub fn apply_on_chain_deployment(
                             let execution = session
                                 .interpret(value.to_string(), None, None, false, None, None)
                                 .unwrap();
-                            execution.result.unwrap()
+                            match execution.result {
+                                EvaluationResult::Snippet(result) => result.result,
+                                _ => unreachable!("Contract result from snippet"),
+                            }
                         })
                         .collect::<Vec<_>>();
 

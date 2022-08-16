@@ -19,7 +19,7 @@ use clarity::vm::types::{
     PrincipalData, QualifiedContractIdentifier, StandardPrincipalData, Value,
 };
 use clarity::vm::variables::NativeVariables;
-use clarity::vm::{ContractName, CostSynthesis, EvalHook, ExecutionResult};
+use clarity::vm::{ContractName, CostSynthesis, EvalHook, EvaluationResult, ExecutionResult};
 use std::collections::{BTreeMap, BTreeSet, HashMap, VecDeque};
 use std::convert::TryFrom;
 use std::fmt;
@@ -249,13 +249,13 @@ impl Session {
                         ) {
                             Ok((ref mut res_output, result)) => {
                                 output.append(res_output);
-                                if result.contract.is_none() {
-                                    continue;
-                                }
-                                let analysis_result = result.contract.unwrap();
+                                let contract_result = match result.result {
+                                    EvaluationResult::Contract(result) => result,
+                                    _ => continue,
+                                };
                                 contracts.push((
-                                    analysis_result.analysis.clone(),
-                                    analysis_result.code.clone(),
+                                    contract_result.contract.analysis.clone(),
+                                    contract_result.contract.code.clone(),
                                     contract.path.clone(),
                                 ))
                             }
@@ -429,10 +429,13 @@ impl Session {
             None,
         ) {
             Ok((mut output, result)) => {
-                if let Some(contract) = result.contract {
-                    let snippet = format!("→ .{} contract successfully stored. Use (contract-call? ...) for invoking the public functions:", contract.contract_identifier.clone());
-                    output.push(green!(snippet));
-                }
+                match result.result {
+                    EvaluationResult::Contract(contract_result) => {
+                        let snippet = format!("→ .{} contract successfully stored. Use (contract-call? ...) for invoking the public functions:", contract_result.contract.contract_identifier.clone());
+                        output.push(green!(snippet));
+                    }
+                    _ => (),
+                };
                 (output, result.cost.clone())
             }
             Err(output) => (output, None),
@@ -514,8 +517,15 @@ impl Session {
                         output.push(black!(format!("{}", event)));
                     }
                 }
-                if let Some(ref result) = result.result {
-                    output.push(green!(format!("{}", result)));
+                match &result.result {
+                    EvaluationResult::Contract(contract_result) => {
+                        if let Some(value) = &contract_result.result {
+                            output.push(green!(format!("{}", value)));
+                        }
+                    }
+                    EvaluationResult::Snippet(snippet_result) => {
+                        output.push(green!(format!("{}", snippet_result.result)))
+                    }
                 }
                 Ok((output, result))
             }
@@ -547,10 +557,13 @@ impl Session {
             None,
         ) {
             Ok((mut output, result)) => {
-                if let Some(contract) = result.contract {
-                    let snippet = format!("→ .{} contract successfully stored. Use (contract-call? ...) for invoking the public functions:", contract.contract_identifier.clone());
-                    output.push(green!(snippet));
-                }
+                match result.result {
+                    EvaluationResult::Contract(contract_result) => {
+                        let snippet = format!("→ .{} contract successfully stored. Use (contract-call? ...) for invoking the public functions:", contract_result.contract.contract_identifier.clone());
+                        output.push(green!(snippet));
+                    }
+                    _ => (),
+                };
                 output
             }
             Err(result) => result,
@@ -688,8 +701,15 @@ impl Session {
                         output.push(black!(format!("{}", event)));
                     }
                 }
-                if let Some(ref result) = result.result {
-                    output.push(green!(format!("{}", result)));
+                match &result.result {
+                    EvaluationResult::Contract(contract_result) => {
+                        if let Some(value) = &contract_result.result {
+                            output.push(green!(format!("{}", value)));
+                        }
+                    }
+                    EvaluationResult::Snippet(snippet_result) => {
+                        output.push(green!(format!("{}", snippet_result.result)))
+                    }
                 }
                 Ok((output, result))
             }
@@ -818,14 +838,19 @@ impl Session {
                 if let Some(ref coverage) = coverage {
                     self.coverage_reports.push(coverage.clone());
                 }
-                if let Some(contract) = &result.contract {
-                    self.asts
-                        .insert(contract_identifier.clone(), contract.ast.clone());
-                    self.contracts.insert(
-                        contract.contract_identifier.clone(),
-                        contract.function_args.clone(),
-                    );
-                }
+                match &result.result {
+                    EvaluationResult::Contract(contract_result) => {
+                        self.asts.insert(
+                            contract_identifier.clone(),
+                            contract_result.contract.ast.clone(),
+                        );
+                        self.contracts.insert(
+                            contract_result.contract.contract_identifier.clone(),
+                            contract_result.contract.function_args.clone(),
+                        );
+                    }
+                    _ => (),
+                };
                 Ok(result)
             }
             Err(res) => Err(res),
@@ -894,14 +919,19 @@ impl Session {
                 if let Some(ref coverage) = coverage {
                     self.coverage_reports.push(coverage.clone());
                 }
-                if let Some(contract) = &result.contract {
-                    self.asts
-                        .insert(contract_identifier.clone(), contract.ast.clone());
-                    self.contracts.insert(
-                        contract.contract_identifier.clone(),
-                        contract.function_args.clone(),
-                    );
-                }
+                match &result.result {
+                    EvaluationResult::Contract(contract_result) => {
+                        self.asts.insert(
+                            contract_identifier.clone(),
+                            contract_result.contract.ast.clone(),
+                        );
+                        self.contracts.insert(
+                            contract_result.contract.contract_identifier.clone(),
+                            contract_result.contract.function_args.clone(),
+                        );
+                    }
+                    _ => (),
+                };
                 Ok(result)
             }
             Err(res) => Err(res),
@@ -1084,8 +1114,14 @@ impl Session {
             Ok(result) => {
                 let mut tx_bytes = vec![];
                 let value = match result.result {
-                    Some(value) => value,
-                    None => return output.push("No value".to_string()),
+                    EvaluationResult::Contract(contract_result) => {
+                        if let Some(value) = contract_result.result {
+                            value
+                        } else {
+                            return output.push("No value".to_string());
+                        }
+                    }
+                    EvaluationResult::Snippet(snippet_result) => snippet_result.result,
                 };
                 match value.consensus_serialize(&mut tx_bytes) {
                     Err(e) => return output.push(red!(format!("{}", e))),

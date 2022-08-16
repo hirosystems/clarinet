@@ -9,12 +9,14 @@ use clarity::vm::contexts::{ContractContext, GlobalContext};
 use clarity::vm::errors::Error;
 use clarity::vm::representations::Span;
 use clarity::vm::types::{PrincipalData, SequenceData, StandardPrincipalData, Value};
-use clarity::vm::ExecutionResult;
 use clarity::vm::SymbolicExpressionType::List;
 use clarity::vm::{
     contexts::{Environment, LocalContext},
     types::QualifiedContractIdentifier,
     EvalHook, SymbolicExpression,
+};
+use clarity::vm::{
+    ContractEvaluationResult, EvaluationResult, ExecutionResult, SnippetEvaluationResult,
 };
 use debug_types::events::*;
 use debug_types::requests::*;
@@ -1133,9 +1135,18 @@ impl EvalHook for DAPDebugger {
                     }
                 }
 
-                if let Some(value) = &result.result {
-                    self.log("\nReturn value:");
-                    self.stdout(format!("{}\n", value))
+                match &result.result {
+                    EvaluationResult::Snippet(snippet) => {
+                        self.log("\nReturn value:");
+                        self.stdout(format!("{}\n", snippet.result))
+                    }
+                    EvaluationResult::Contract(contract) => {
+                        self.log("\nContract published.");
+                        if let Some(value) = &contract.result {
+                            self.log("\nReturn value:");
+                            self.stdout(format!("{}\n", value))
+                        }
+                    }
                 }
             }
             Err(e) => self.stderr(e),

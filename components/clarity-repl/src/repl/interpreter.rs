@@ -29,10 +29,10 @@ use clarity::vm::representations::{Span, SymbolicExpression};
 use clarity::vm::types::{
     self, PrincipalData, QualifiedContractIdentifier, StandardPrincipalData, Value,
 };
-use clarity::vm::EvalHook;
 use clarity::vm::{analysis::AnalysisDatabase, database::ClarityBackingStore};
-use clarity::vm::{eval, eval_all};
+use clarity::vm::{eval, eval_all, EvaluationResult, SnippetEvaluationResult};
 use clarity::vm::{events::*, ClarityVersion};
+use clarity::vm::{ContractEvaluationResult, EvalHook};
 use clarity::vm::{CostSynthesis, ExecutionResult, ParsedContract};
 
 pub const BLOCK_LIMIT_MAINNET: ExecutionCost = ExecutionCost {
@@ -424,7 +424,7 @@ impl ClarityInterpreter {
         cost_track: bool,
         eval_hooks: Option<Vec<&mut dyn EvalHook>>,
     ) -> Result<ExecutionResult, (String, Option<Diagnostic>, Option<Error>)> {
-        let mut execution_result = ExecutionResult::default();
+        let mut cost = None;
         let mut contract_saved = false;
         let mut serialized_events = vec![];
         let mut accounts_to_debit = vec![];
@@ -433,7 +433,7 @@ impl ClarityInterpreter {
             contract_identifier.clone(),
             self.repl_settings.clarity_version,
         );
-        let (value, eval_hooks) = {
+        let (eval_result, eval_hooks) = {
             let tx_sender: PrincipalData = self.tx_sender.clone().into();
 
             let mut conn = self.datastore.as_clarity_db(&NULL_HEADER_DB);
@@ -522,8 +522,7 @@ impl ClarityInterpreter {
             });
 
             let value = match result {
-                Ok(Some(value)) => value,
-                Ok(None) => Value::none(),
+                Ok(value) => value,
                 Err(e) => {
                     let err = format!(
                         "Runtime error while interpreting {}: {:?}",
@@ -540,8 +539,7 @@ impl ClarityInterpreter {
             };
 
             if cost_track {
-                execution_result.cost =
-                    Some(CostSynthesis::from_cost_tracker(&global_context.cost_track));
+                cost = Some(CostSynthesis::from_cost_tracker(&global_context.cost_track));
             }
 
             let mut emitted_events = global_context
@@ -655,7 +653,7 @@ impl ClarityInterpreter {
             contract_saved =
                 contract_context.functions.len() > 0 || contract_context.defined_traits.len() > 0;
 
-            if contract_saved {
+            let eval_result = if contract_saved {
                 let mut functions = BTreeMap::new();
                 for (name, defined_func) in contract_context.functions.iter() {
                     if !defined_func.is_public() {
@@ -671,13 +669,13 @@ impl ClarityInterpreter {
 
                     functions.insert(name.to_string(), args);
                 }
-                execution_result.contract = Some(ParsedContract {
+                let parsed_contract = ParsedContract {
                     contract_identifier: contract_identifier.to_string(),
                     code: snippet.clone(),
                     function_args: functions,
                     ast: contract_ast.clone(),
                     analysis: contract_analysis.clone(),
-                });
+                };
 
                 global_context
                     .database
@@ -691,16 +689,30 @@ impl ClarityInterpreter {
                     .database
                     .set_contract_data_size(&contract_identifier, 0)
                     .unwrap();
-            }
+
+                EvaluationResult::Contract(ContractEvaluationResult {
+                    result: value,
+                    contract: parsed_contract,
+                })
+            } else {
+                let result = match value {
+                    Some(value) => value,
+                    None => Value::none(),
+                };
+                EvaluationResult::Snippet(SnippetEvaluationResult { result })
+            };
             global_context.commit().unwrap();
 
-            (value, global_context.eval_hooks)
+            (eval_result, global_context.eval_hooks)
         };
 
-        execution_result.events = serialized_events;
-        if !contract_saved {
-            execution_result.result = Some(value);
-        }
+        let events = serialized_events;
+        let mut execution_result = ExecutionResult {
+            result: eval_result,
+            events,
+            cost,
+            diagnostics: Vec::new(),
+        };
 
         if let Some(mut eval_hooks) = eval_hooks {
             for hook in eval_hooks.iter_mut() {
