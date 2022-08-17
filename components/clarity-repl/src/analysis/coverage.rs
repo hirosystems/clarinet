@@ -248,6 +248,21 @@ impl EvalHook for TestCoverageReport {
         self.contracts_coverage
             .insert(contract.clone(), contract_report);
     }
+
+    fn did_finish_eval(
+        &mut self,
+        _env: &mut clarity::vm::Environment,
+        _context: &clarity::vm::LocalContext,
+        _expr: &SymbolicExpression,
+        _res: &core::result::Result<clarity::vm::Value, clarity::vm::errors::Error>,
+    ) {
+    }
+
+    fn did_complete(
+        &mut self,
+        _result: core::result::Result<&mut clarity::vm::ExecutionResult, String>,
+    ) {
+    }
 }
 
 impl ContractCoverageReport {

@@ -515,6 +515,12 @@ impl EvalHook for CLIDebugger {
             }
         }
     }
+
+    fn did_complete(
+        &mut self,
+        _result: core::result::Result<&mut clarity::vm::ExecutionResult, String>,
+    ) {
+    }
 }
 
 fn print_help(args: &str) {

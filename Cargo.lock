@@ -816,7 +816,7 @@ dependencies = [
 [[package]]
 name = "clarity"
 version = "0.0.1"
-source = "git+https://github.com/stacks-network/stacks-blockchain.git?branch=refactor/clarity-lib-merge#f46985e06ab491ffce71a938bf982166f34b1787"
+source = "git+https://github.com/stacks-network/stacks-blockchain.git?branch=refactor/clarity-lib-merge#b3dff39299fa09e09b11dc65f7bc38d64ea2fd44"
 dependencies = [
  "integer-sqrt",
  "lazy_static",
@@ -4832,7 +4832,7 @@ dependencies = [
 [[package]]
 name = "stacks-common"
 version = "0.0.1"
-source = "git+https://github.com/stacks-network/stacks-blockchain.git?branch=refactor/clarity-lib-merge#f46985e06ab491ffce71a938bf982166f34b1787"
+source = "git+https://github.com/stacks-network/stacks-blockchain.git?branch=refactor/clarity-lib-merge#b3dff39299fa09e09b11dc65f7bc38d64ea2fd44"
 dependencies = [
  "chrono",
  "curve25519-dalek",
