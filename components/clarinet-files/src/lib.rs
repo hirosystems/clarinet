@@ -25,22 +25,25 @@ use url::Url;
 
 pub const DEFAULT_DEVNET_BALANCE: u64 = 100_000_000_000_000;
 
-pub type PerformFileAccess = Pin<Box<dyn Future<Output = Result<(FileLocation, String), String>>>>;
-pub type PerformFileWrite = Pin<Box<dyn Future<Output = Result<(), String>>>>;
+pub type PerformVFSAction<T> = Pin<Box<dyn Future<Output = Result<T, String>>>>;
 
 pub trait FileAccessor {
-    fn read_manifest_content(&self, manifest_location: FileLocation) -> PerformFileAccess;
+    fn file_exists(&self, location: FileLocation) -> PerformVFSAction<bool>;
+    fn read_manifest_content(
+        &self,
+        manifest_location: FileLocation,
+    ) -> PerformVFSAction<(FileLocation, String)>;
     fn read_contract_content(
         &self,
         manifest_location: FileLocation,
         relative_path: String,
-    ) -> PerformFileAccess;
+    ) -> PerformVFSAction<(FileLocation, String)>;
     fn write_file(
         &self,
         manifest_location: FileLocation,
         relative_path: String,
         content: &[u8],
-    ) -> PerformFileWrite;
+    ) -> PerformVFSAction<()>;
 }
 
 #[derive(Deserialize, Debug, Clone, PartialEq, Eq, Hash)]
@@ -241,10 +244,41 @@ impl FileLocation {
         }
     }
 
-    pub fn get_project_manifest_location(&self) -> Result<FileLocation, String> {
-        let mut project_root_location = self.get_project_root_location()?;
-        project_root_location.append_path("Clarinet.toml")?;
-        Ok(project_root_location)
+    pub async fn get_project_manifest_location(
+        &self,
+        file_accessor: Option<&Box<dyn FileAccessor>>,
+    ) -> Result<FileLocation, String> {
+        match file_accessor {
+            None => {
+                let mut project_root_location = self.get_project_root_location()?;
+                project_root_location.append_path("Clarinet.toml")?;
+                Ok(project_root_location)
+            }
+            Some(file_accessor) => {
+                let mut manifest_location = None;
+                let mut parent_location = self.get_parent_location();
+                while let Ok(ref parent) = parent_location {
+                    let mut candidate = parent.clone();
+                    let _ = candidate.append_path("Clarinet.toml");
+
+                    if let Ok(_) = file_accessor.file_exists(candidate.clone()).await {
+                        manifest_location = Some(candidate);
+                        break;
+                    }
+                    if &parent.get_parent_location().unwrap() == parent {
+                        break;
+                    }
+                    parent_location = parent.get_parent_location();
+                }
+                match manifest_location {
+                    Some(manifest_location) => Ok(manifest_location),
+                    None => Err(format!(
+                        "unable to find manifest location from {}",
+                        self.to_string()
+                    )),
+                }
+            }
+        }
     }
 
     pub fn get_parent_location(&self) -> Result<FileLocation, String> {

@@ -155,7 +155,7 @@ pub fn update_session_with_contracts_executions(
     results
 }
 
-pub async fn generate_default_deployment<'a>(
+pub async fn generate_default_deployment(
     manifest: &ProjectManifest,
     network: &StacksNetwork,
     no_batch: bool,

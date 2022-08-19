@@ -114,39 +114,9 @@ pub async fn process_notification(
         LspNotification::ContractOpened(contract_location) => {
             // The only reason why we're waiting for this kind of events, is building our initial state
             // if the system is initialized, move on.
-            let manifest_location = match file_accessor {
-                None => match contract_location.get_project_manifest_location() {
-                    Ok(manifest_location) => manifest_location,
-                    _ => {
-                        return Ok(LspResponse::default());
-                    }
-                },
-                Some(file_accessor) => {
-                    let mut manifest_location = None;
-                    let mut parent_location = contract_location.get_parent_location();
-                    while let Ok(ref parent) = parent_location {
-                        let mut candidate = parent.clone();
-                        let _ = candidate.append_path("Clarinet.toml");
-
-                        if let Ok((location, _)) =
-                            file_accessor.read_manifest_content(candidate).await
-                        {
-                            manifest_location = Some(location);
-                            break;
-                        }
-                        if &parent.get_parent_location().unwrap() == parent {
-                            break;
-                        }
-                        parent_location = parent.get_parent_location();
-                    }
-                    match manifest_location {
-                        Some(location) => location,
-                        _ => {
-                            return Ok(LspResponse::default());
-                        }
-                    }
-                }
-            };
+            let manifest_location = contract_location
+                .get_project_manifest_location(file_accessor)
+                .await?;
 
             if editor_state.protocols.contains_key(&manifest_location) {
                 return Ok(LspResponse::default());
@@ -191,13 +161,13 @@ pub async fn process_notification(
             let manifest_location =
                 match editor_state.clear_protocol_associated_with_contract(&contract_location) {
                     Some(manifest_location) => manifest_location,
-                    None => match contract_location.get_project_manifest_location() {
-                        Ok(manifest_location) => manifest_location,
-                        _ => {
-                            return Ok(LspResponse::default());
-                        }
-                    },
+                    None => {
+                        contract_location
+                            .get_project_manifest_location(file_accessor)
+                            .await?
+                    }
                 };
+
             // TODO(lgalabru): introduce partial analysis
             // https://github.com/hirosystems/clarity-lsp/issues/98
             // We will rebuild the entire state, without trying any optimizations for now
