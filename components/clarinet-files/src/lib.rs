@@ -35,15 +35,9 @@ pub trait FileAccessor {
     ) -> PerformVFSAction<(FileLocation, String)>;
     fn read_contract_content(
         &self,
-        manifest_location: FileLocation,
-        relative_path: String,
+        contract_location: FileLocation,
     ) -> PerformVFSAction<(FileLocation, String)>;
-    fn write_file(
-        &self,
-        manifest_location: FileLocation,
-        relative_path: String,
-        content: &[u8],
-    ) -> PerformVFSAction<()>;
+    fn write_file(&self, location: FileLocation, content: &[u8]) -> PerformVFSAction<()>;
 }
 
 #[derive(Deserialize, Debug, Clone, PartialEq, Eq, Hash)]

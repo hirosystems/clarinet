@@ -17,10 +17,9 @@ pub async fn retrieve_contract(
     let contract_source = match file_accessor {
         None => contract_location.read_content_as_utf8(),
         Some(file_accessor) => {
-            match file_accessor
-                .read_contract_content(manifest_location.clone(), contract_location.to_string())
-                .await
-            {
+            let mut contract_location = manifest_location.get_parent_location()?;
+            contract_location.append_path(&contract_location.to_string())?;
+            match file_accessor.read_contract_content(contract_location).await {
                 Ok((_, source)) => Ok(source),
                 Err(err) => Err(err),
             }
@@ -51,11 +50,7 @@ pub async fn retrieve_contract(
         None => contract_location.write_content(code.as_bytes()),
         Some(file_accessor) => {
             file_accessor
-                .write_file(
-                    manifest_location,
-                    contract_location.to_string(),
-                    code.as_bytes(),
-                )
+                .write_file(contract_location.clone(), code.as_bytes())
                 .await
         }
     };

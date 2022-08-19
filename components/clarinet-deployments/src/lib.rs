@@ -478,8 +478,10 @@ pub async fn generate_default_deployment(
                 (contract_location, source)
             }
             Some(file_accessor) => {
+                let mut contract_location = manifest.location.clone().get_parent_location()?;
+                contract_location.append_path(&contract_config.path.to_string())?;
                 file_accessor
-                    .read_contract_content(manifest.location.clone(), contract_config.path.clone())
+                    .read_contract_content(contract_location.clone())
                     .await?
             }
         };

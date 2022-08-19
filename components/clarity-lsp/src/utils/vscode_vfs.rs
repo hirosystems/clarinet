@@ -89,13 +89,12 @@ impl FileAccessor for VscodeFilesystemAccessor {
 
     fn read_contract_content(
         &self,
-        manifest_location: FileLocation,
-        relative_path: String,
+        contract_location: FileLocation,
     ) -> PerformVFSAction<(FileLocation, String)> {
         log!("reading contract");
         let req = (|| -> Result<(FileLocation, JsValue), String> {
-            let mut contract_location = manifest_location.get_parent_location()?;
-            contract_location.append_path(&relative_path)?;
+            // let mut contract_location = manifest_location.get_parent_location()?;
+            // contract_location.append_path(&relative_path)?;
 
             let req = self
                 .get_request_promise(
@@ -122,17 +121,12 @@ impl FileAccessor for VscodeFilesystemAccessor {
         })
     }
 
-    fn write_file(
-        &self,
-        _manifest_location: FileLocation,
-        relative_path: String,
-        content: &[u8],
-    ) -> PerformVFSAction<()> {
+    fn write_file(&self, location: FileLocation, content: &[u8]) -> PerformVFSAction<()> {
         log!("writting contract");
         let write_file_promise = self.get_request_promise(
             "vfs/writeFile".into(),
             &VFSWriteRequest {
-                path: relative_path.to_string(),
+                path: location.to_string(),
                 content,
             },
         );
