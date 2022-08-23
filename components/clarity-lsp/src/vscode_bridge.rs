@@ -50,7 +50,7 @@ impl LspVscodeBridge {
     }
 
     #[wasm_bindgen(js_name=onNotification)]
-    pub fn notification_handler(&self, method: String, params: JsValue) -> Promise {
+    pub fn notification_handler(&self, method: String, js_params: JsValue) -> Promise {
         log!("> notification method: {}", method);
 
         let file_accessor: Box<dyn FileAccessor> = Box::new(VscodeFilesystemAccessor::new(
@@ -60,7 +60,7 @@ impl LspVscodeBridge {
         match method.as_str() {
             Initialized::METHOD => {}
             DidOpenTextDocument::METHOD => {
-                let params: DidOpenTextDocumentParams = match decode_from_js(params) {
+                let params: DidOpenTextDocumentParams = match decode_from_js(js_params) {
                     Ok(params) => params,
                     _ => return Promise::resolve(&JsValue::null()),
                 };
@@ -114,7 +114,7 @@ impl LspVscodeBridge {
             }
 
             DidSaveTextDocument::METHOD => {
-                let params: DidSaveTextDocumentParams = match decode_from_js(params) {
+                let params: DidSaveTextDocumentParams = match decode_from_js(js_params) {
                     Ok(params) => params,
                     _ => return Promise::resolve(&JsValue::null()),
                 };
@@ -174,41 +174,28 @@ impl LspVscodeBridge {
     }
 
     #[wasm_bindgen(js_name=onRequest)]
-    pub fn request_handler(&self, method: String, params: JsValue) -> JsValue {
+    pub fn request_handler(&self, method: String, js_params: JsValue) -> Result<JsValue, JsValue> {
         log!("> request method: {}", method);
 
         match method.as_str() {
             Completion::METHOD => {
-                let params: CompletionParams = match decode_from_js(params) {
-                    Ok(params) => params,
-                    _ => return JsValue::null(),
-                };
+                let params: CompletionParams = decode_from_js(js_params)?;
                 let file_url = params.text_document_position.text_document.uri;
+                let location = get_contract_location(&file_url).ok_or(JsValue::NULL)?;
+                let command = LspRequest::GetIntellisense(location);
+                let editor_state = self
+                    .editor_state_lock
+                    .try_read()
+                    .map_err(|_| JsValue::NULL)?;
+                let lsp_response = process_request(command, &editor_state);
 
-                let command = match get_contract_location(&file_url) {
-                    Some(location) => LspRequest::GetIntellisense(location),
-                    _ => return JsValue::null(),
-                };
-
-                let result = match self.editor_state_lock.try_read() {
-                    Ok(editor_state) => process_request(command, &editor_state),
-                    Err(_) => return JsValue::null(),
-                };
-
-                let value = match encode_to_js(&result.completion_items) {
-                    Ok(value) => value,
-                    Err(_) => {
-                        log!("unable to encode value");
-                        return JsValue::null();
-                    }
-                };
-                return value;
+                return encode_to_js(&lsp_response.completion_items).map_err(|_| JsValue::NULL);
             }
             _ => {
                 log!("unexpected request ({})", method);
             }
         }
 
-        return JsValue::null();
+        return Err(JsValue::NULL);
     }
 }
