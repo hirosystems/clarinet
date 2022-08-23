@@ -93,9 +93,6 @@ impl FileAccessor for VscodeFilesystemAccessor {
     ) -> PerformVFSAction<(FileLocation, String)> {
         log!("reading contract");
         let req = (|| -> Result<(FileLocation, JsValue), String> {
-            // let mut contract_location = manifest_location.get_parent_location()?;
-            // contract_location.append_path(&relative_path)?;
-
             let req = self
                 .get_request_promise(
                     "vfs/readFile".into(),
