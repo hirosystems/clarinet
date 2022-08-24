@@ -17,12 +17,12 @@ use std::collections::{HashMap, HashSet};
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct ContractState {
+    pub analysis: Option<ContractAnalysis>,
     intellisense: CompletionMaps,
     errors: Vec<ClarityDiagnostic>,
     warnings: Vec<ClarityDiagnostic>,
     notes: Vec<ClarityDiagnostic>,
     contract_id: QualifiedContractIdentifier,
-    analysis: Option<ContractAnalysis>,
     location: FileLocation,
 }
 
@@ -202,7 +202,7 @@ impl EditorState {
 
 #[derive(Clone, Default, Debug)]
 pub struct ProtocolState {
-    contracts: HashMap<FileLocation, ContractState>,
+    pub contracts: HashMap<FileLocation, ContractState>,
 }
 
 impl ProtocolState {

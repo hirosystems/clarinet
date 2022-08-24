@@ -4,7 +4,11 @@ use crate::state::EditorState;
 use crate::utils::{
     clarity_diagnostics_to_lsp_type, get_contract_location, get_manifest_location, log,
 };
-use clarinet_files::{FileAccessor, WASMFileSystemAccessor};
+
+use clarinet_files::{FileAccessor, FileLocation, WASMFileSystemAccessor};
+use clarity_repl::clarity::analysis::ContractAnalysis;
+use clarity_repl::clarity::types::FunctionType;
+use clarity_repl::clarity::SymbolicExpressionType;
 use js_sys::{Function as JsFunction, Promise};
 use lsp_types::{
     notification::{DidOpenTextDocument, DidSaveTextDocument, Initialized, Notification},
@@ -12,13 +16,27 @@ use lsp_types::{
     CompletionParams, DidOpenTextDocumentParams, DidSaveTextDocumentParams,
     PublishDiagnosticsParams, ShowMessageParams, Url,
 };
-use serde_wasm_bindgen::{from_value as decode_from_js, to_value as encode_to_js};
+use serde::{Deserialize, Serialize};
+use serde_json::json;
+use serde_wasm_bindgen::{from_value as decode_from_js, to_value as encode_to_js, Serializer};
 use std::{
     panic,
     sync::{Arc, RwLock},
 };
 use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::future_to_promise;
+
+#[derive(Serialize, Deserialize)]
+pub struct FileEvent {
+    pub path: String,
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct CursorEvent {
+    pub path: String,
+    pub line: u32,
+    pub char: u32,
+}
 
 #[wasm_bindgen]
 pub struct LspVscodeBridge {
@@ -209,11 +227,109 @@ impl LspVscodeBridge {
 
                 return encode_to_js(&lsp_response.completion_items).map_err(|_| JsValue::NULL);
             }
+
+            "clarity/getAst" => {
+                let FileEvent { path } = decode_from_js(js_params)?;
+                let contract_location = FileLocation::from_url_string(&path).unwrap();
+                log!("location: {:?}", contract_location);
+                match self.get_contract_analysis(&contract_location) {
+                    Some(contract_data) => {
+                        let analysis = contract_data;
+                        // log!(">> analysis: {:?}", analysis.public_function_types);
+
+                        let serializer =
+                            Serializer::new().serialize_large_number_types_as_bigints(true);
+
+                        match analysis.expressions.serialize(&serializer) {
+                            Ok(data) => return Ok(data),
+                            Err(err) => {
+                                log!("> format: {:?}", err);
+                            }
+                        }
+                    }
+                    None => {
+                        log!(">> no analysis");
+                    }
+                }
+            }
+
+            "clarity/cursorMove" => {
+                let CursorEvent { path, line, .. } = decode_from_js(js_params)?;
+                let contract_location = FileLocation::from_url_string(&path)?;
+
+                let contract_analysis = self
+                    .get_contract_analysis(&contract_location)
+                    .ok_or(JsValue::NULL)?;
+
+                log!(
+                    ">> contract_analysis.is_cost_contract_eligible: {:?}",
+                    contract_analysis.is_cost_contract_eligible
+                );
+
+                let closest_block = contract_analysis
+                    .expressions
+                    .iter()
+                    .rev()
+                    .find(|expr| expr.span.start_line <= line && expr.span.end_line >= line)
+                    .ok_or(JsValue::NULL)?;
+
+                let define_block = match &closest_block.expr {
+                    SymbolicExpressionType::List(define_block) => Some(define_block),
+                    _ => None,
+                }
+                .ok_or(JsValue::NULL)?;
+
+                let inner_block = match &define_block[1].expr {
+                    SymbolicExpressionType::List(inner_block) => Some(inner_block),
+                    _ => None,
+                }
+                .ok_or(JsValue::NULL)?;
+
+                let fn_name = match &inner_block[0].expr {
+                    SymbolicExpressionType::Atom(fn_name) => Some(fn_name),
+                    _ => None,
+                }
+                .ok_or(JsValue::NULL)?
+                .as_str();
+
+                let (fn_type, fn_analysis) = contract_analysis
+                    .get_function_type(&fn_name)
+                    .ok_or(JsValue::NULL)?;
+
+                let (fn_args, fn_returns) = match fn_analysis {
+                    FunctionType::Fixed(func) => Some((&func.args, &func.returns)),
+                    _ => None,
+                }
+                .ok_or(JsValue::NULL)?;
+
+                return encode_to_js(
+                    &json!({ "fnType": fn_type, "fnName": fn_name, "fnArgs": fn_args, "fnReturns": fn_returns })
+                        .to_string(),
+                )
+                .map_err(|err| {
+                    log!("> error encoding json: {:?}", err);
+                    JsValue::NULL
+                });
+            }
+
             _ => {
                 log!("unexpected request ({})", method);
             }
         }
 
         return Err(JsValue::NULL);
+    }
+
+    fn get_contract_analysis(&self, contract_location: &FileLocation) -> Option<ContractAnalysis> {
+        match self.editor_state_lock.try_read() {
+            Ok(editor_state) => {
+                let manifest_location = editor_state.contracts_lookup.get(&contract_location)?;
+                let protocol = editor_state.protocols.get(&manifest_location)?;
+                let contract = protocol.contracts.get(&contract_location)?;
+
+                Some(contract.analysis.clone()?)
+            }
+            Err(_) => None,
+        }
     }
 }

@@ -151,8 +151,21 @@ impl ContractAnalysis {
         self.read_only_function_types.get(name)
     }
 
-    pub fn get_private_function(&self, name: &str) -> Option<&FunctionType> {
+    pub fn get_private_function_type(&self, name: &str) -> Option<&FunctionType> {
         self.private_function_types.get(name)
+    }
+
+    pub fn get_function_type(&self, name: &str) -> Option<(&str, &FunctionType)> {
+        if let Some(function_type) = self.public_function_types.get(name) {
+            return Some(("public".into(), function_type));
+        }
+        if let Some(function_type) = self.read_only_function_types.get(name) {
+            return Some(("read_only".into(), function_type));
+        }
+        if let Some(function_type) = self.private_function_types.get(name) {
+            return Some(("private".into(), function_type));
+        }
+        None
     }
 
     pub fn get_map_type(&self, name: &str) -> Option<&(TypeSignature, TypeSignature)> {
