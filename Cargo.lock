@@ -783,7 +783,6 @@ dependencies = [
  "orchestra-types",
  "serde",
  "serde_derive",
- "serde_json",
  "tiny-hderive",
  "toml",
  "url",

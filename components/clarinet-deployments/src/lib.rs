@@ -314,7 +314,6 @@ pub async fn generate_default_deployment(
                 None => {
                     // Download the code
                     let (source, contract_location) = requirements::retrieve_contract(
-                        manifest.location.clone(),
                         &contract_id,
                         &cache_location,
                         &file_accessor,

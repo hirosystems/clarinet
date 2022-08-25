@@ -5,7 +5,6 @@ edition = "2021"
 
 [dependencies]
 serde = "1"
-serde_json = "1"
 serde_derive = "1"
 clarinet_utils = { package = "clarinet-utils", path = "../clarinet-utils" }
 orchestra_types = { package = "orchestra-types", path = "../../vendor/orchestra-types-rs" }
