@@ -3,7 +3,6 @@ use clarity_repl::clarity::types::QualifiedContractIdentifier;
 use reqwest;
 
 pub async fn retrieve_contract(
-    manifest_location: FileLocation,
     contract_id: &QualifiedContractIdentifier,
     cache_location: &FileLocation,
     file_accessor: &Option<&Box<dyn FileAccessor>>,
@@ -17,9 +16,10 @@ pub async fn retrieve_contract(
     let contract_source = match file_accessor {
         None => contract_location.read_content_as_utf8(),
         Some(file_accessor) => {
-            let mut contract_location = manifest_location.get_parent_location()?;
-            contract_location.append_path(&contract_location.to_string())?;
-            match file_accessor.read_contract_content(contract_location).await {
+            match file_accessor
+                .read_contract_content(contract_location.clone())
+                .await
+            {
                 Ok((_, source)) => Ok(source),
                 Err(err) => Err(err),
             }
@@ -43,8 +43,7 @@ pub async fn retrieve_contract(
         name = contract_name
     );
 
-    let response = fetch_contract(request_url).await?;
-    let code = response.source;
+    let code = fetch_contract(request_url).await?.source;
 
     let result = match file_accessor {
         None => contract_location.write_content(code.as_bytes()),

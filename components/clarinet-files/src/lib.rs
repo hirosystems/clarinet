@@ -152,10 +152,6 @@ impl FileLocation {
         path.exists()
     }
 
-    fn url_exists(_path: &Url) -> bool {
-        unimplemented!()
-    }
-
     fn fs_write_content(file_path: &PathBuf, content: &[u8]) -> Result<(), String> {
         use std::fs::{self, File};
         use std::io::Write;
@@ -198,42 +194,8 @@ impl FileLocation {
                     )),
                 }
             }
-            FileLocation::Url { url } => {
-                let mut manifest_found = false;
-
-                while url.path() != "/" {
-                    {
-                        let mut segments = url
-                            .path_segments_mut()
-                            .map_err(|_| format!("unable to mutate url"))?;
-                        segments.pop();
-                        segments.push("Clarinet.toml");
-                    }
-                    if FileLocation::url_exists(url) {
-                        {
-                            let mut segments = url
-                                .path_segments_mut()
-                                .map_err(|_| format!("unable to mutate url"))?;
-                            segments.pop();
-                        }
-                        manifest_found = true;
-                        break;
-                    }
-                    {
-                        let mut segments = url
-                            .path_segments_mut()
-                            .map_err(|_| format!("unable to mutate url"))?;
-                        segments.pop();
-                    }
-                }
-
-                match manifest_found {
-                    true => Ok(project_root_location),
-                    false => Err(format!(
-                        "unable to find root location from {}",
-                        self.to_string()
-                    )),
-                }
+            _ => {
+                unimplemented!();
             }
         }
     }
@@ -253,7 +215,7 @@ impl FileLocation {
                 let mut parent_location = self.get_parent_location();
                 while let Ok(ref parent) = parent_location {
                     let mut candidate = parent.clone();
-                    let _ = candidate.append_path("Clarinet.toml");
+                    candidate.append_path("Clarinet.toml")?;
 
                     if let Ok(_) = file_accessor.file_exists(candidate.clone()).await {
                         manifest_location = Some(candidate);
