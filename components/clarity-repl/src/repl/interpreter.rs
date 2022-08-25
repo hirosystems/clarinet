@@ -298,7 +298,6 @@ impl ClarityInterpreter {
                         };
                     if (success && !ast.equivalent(&ast_old)) || success != success_old {
                         diagnostics_old.push(Diagnostic {
-                            // switch to v2 for now for performances
                             level: Level::Warning,
                             message: r#"conflict between parser versions, reverting to parser v1
 Help improve clarinet by sharing the code that triggered this warning:

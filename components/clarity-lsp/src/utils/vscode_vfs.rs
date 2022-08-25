@@ -53,7 +53,7 @@ impl FileAccessor for VscodeFilesystemAccessor {
             match file_exists_promise {
                 Ok(promise) => match JsFuture::from(Promise::resolve(&promise)).await {
                     Ok(res) => Ok(res.is_truthy()),
-                    Err(_) => Err("error".into()),
+                    Err(err) => Err(format!("error: {:?}", &err)),
                 },
                 Err(err) => Err(format!("error: {:?}", &err)),
             }
@@ -80,9 +80,9 @@ impl FileAccessor for VscodeFilesystemAccessor {
                         decode_from_js(manifest)
                             .map_err(|err| format!("decode_from_js error: {:?}", err))?,
                     )),
-                    Err(_) => Err("error".into()),
+                    Err(err) => Err(format!("error: {:?}", &err)),
                 },
-                Err(_) => Err("error".into()),
+                Err(err) => Err(format!("error: {:?}", &err)),
             }
         })
     }
@@ -100,7 +100,7 @@ impl FileAccessor for VscodeFilesystemAccessor {
                         path: contract_location.to_string(),
                     },
                 )
-                .map_err(|_| "failed to read_file")?;
+                .map_err(|err| format!("failed to read_file {:?}", &err))?;
 
             Ok((contract_location, req))
         })();
@@ -110,10 +110,10 @@ impl FileAccessor for VscodeFilesystemAccessor {
                 Ok((contract_location, req)) => {
                     match JsFuture::from(Promise::resolve(&req)).await {
                         Ok(contract) => Ok((contract_location, decode_from_js(contract).unwrap())),
-                        Err(_) => Err("error".into()),
+                        Err(err) => Err(format!("error: {:?}", &err)),
                     }
                 }
-                Err(_) => Err("error".into()),
+                Err(err) => Err(format!("error: {}", &err)),
             }
         })
     }
@@ -132,7 +132,7 @@ impl FileAccessor for VscodeFilesystemAccessor {
             match write_file_promise {
                 Ok(promise) => match JsFuture::from(Promise::resolve(&promise)).await {
                     Ok(_) => Ok(()),
-                    Err(_) => Err("error".into()),
+                    Err(err) => Err(format!("error: {:?}", &err)),
                 },
                 Err(err) => Err(format!("error: {:?}", &err)),
             }
