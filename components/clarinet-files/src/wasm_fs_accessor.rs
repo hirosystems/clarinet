@@ -1,30 +1,36 @@
-extern crate console_error_panic_hook;
-use crate::utils::log;
-use clarinet_files::{FileAccessor, FileLocation, PerformVFSAction};
+use super::{FileAccessor, FileLocation, PerformWFSAction};
 use js_sys::{Function as JsFunction, Promise};
 use serde::{Deserialize, Serialize};
 use serde_wasm_bindgen::{from_value as decode_from_js, to_value as encode_to_js};
 use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::JsFuture;
 
+macro_rules! log {
+    ( $( $t:tt )* ) => {
+        web_sys::console::log_1(&format!( $( $t )* ).into());
+    }
+}
+
+pub(crate) use log;
+
 #[derive(Serialize, Deserialize)]
-struct VFSRequest {
+struct WFSRequest {
     pub path: String,
 }
 
 #[derive(Serialize, Deserialize)]
-struct VFSWriteRequest<'a> {
+struct WFSWriteRequest<'a> {
     pub path: String,
     pub content: &'a [u8],
 }
 
-pub struct VscodeFilesystemAccessor {
+pub struct WASMFileSystemAccessor {
     client_request_tx: JsFunction,
 }
 
-impl VscodeFilesystemAccessor {
-    pub fn new(client_request_tx: JsFunction) -> VscodeFilesystemAccessor {
-        VscodeFilesystemAccessor { client_request_tx }
+impl WASMFileSystemAccessor {
+    pub fn new(client_request_tx: JsFunction) -> WASMFileSystemAccessor {
+        WASMFileSystemAccessor { client_request_tx }
     }
 
     fn get_request_promise<T: Serialize>(
@@ -40,11 +46,12 @@ impl VscodeFilesystemAccessor {
     }
 }
 
-impl FileAccessor for VscodeFilesystemAccessor {
-    fn file_exists(&self, location: FileLocation) -> PerformVFSAction<bool> {
+impl FileAccessor for WASMFileSystemAccessor {
+    fn file_exists(&self, location: FileLocation) -> PerformWFSAction<bool> {
+        log!("checking if file exists");
         let file_exists_promise = self.get_request_promise(
             "vfs/exists".into(),
-            &VFSRequest {
+            &WFSRequest {
                 path: location.to_string(),
             },
         );
@@ -63,11 +70,11 @@ impl FileAccessor for VscodeFilesystemAccessor {
     fn read_manifest_content(
         &self,
         manifest_location: FileLocation,
-    ) -> PerformVFSAction<(FileLocation, String)> {
+    ) -> PerformWFSAction<(FileLocation, String)> {
         log!("reading manifest");
         let read_file_promise = self.get_request_promise(
             "vfs/readFile".into(),
-            &VFSRequest {
+            &WFSRequest {
                 path: manifest_location.to_string(),
             },
         );
@@ -90,13 +97,13 @@ impl FileAccessor for VscodeFilesystemAccessor {
     fn read_contract_content(
         &self,
         contract_location: FileLocation,
-    ) -> PerformVFSAction<(FileLocation, String)> {
+    ) -> PerformWFSAction<(FileLocation, String)> {
         log!("reading contract");
         let req = (|| -> Result<(FileLocation, JsValue), String> {
             let req = self
                 .get_request_promise(
                     "vfs/readFile".into(),
-                    &VFSRequest {
+                    &WFSRequest {
                         path: contract_location.to_string(),
                     },
                 )
@@ -118,11 +125,11 @@ impl FileAccessor for VscodeFilesystemAccessor {
         })
     }
 
-    fn write_file(&self, location: FileLocation, content: &[u8]) -> PerformVFSAction<()> {
+    fn write_file(&self, location: FileLocation, content: &[u8]) -> PerformWFSAction<()> {
         log!("writting contract");
         let write_file_promise = self.get_request_promise(
             "vfs/writeFile".into(),
-            &VFSWriteRequest {
+            &WFSWriteRequest {
                 path: location.to_string(),
                 content,
             },

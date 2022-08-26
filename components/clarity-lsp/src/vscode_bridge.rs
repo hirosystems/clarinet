@@ -1,12 +1,10 @@
 extern crate console_error_panic_hook;
 use crate::backend::{process_notification, process_request, LspNotification, LspRequest};
 use crate::state::EditorState;
-use crate::utils::log;
 use crate::utils::{
-    clarity_diagnostics_to_lsp_type, get_contract_location, get_manifest_location,
-    vscode_vfs::VscodeFilesystemAccessor,
+    clarity_diagnostics_to_lsp_type, get_contract_location, get_manifest_location, log,
 };
-use clarinet_files::FileAccessor;
+use clarinet_files::{FileAccessor, WASMFileSystemAccessor};
 use js_sys::{Function as JsFunction, Promise};
 use lsp_types::{
     notification::{DidOpenTextDocument, DidSaveTextDocument, Initialized, Notification},
@@ -53,7 +51,7 @@ impl LspVscodeBridge {
     pub fn notification_handler(&self, method: String, js_params: JsValue) -> Promise {
         log!("> notification method: {}", method);
 
-        let file_accessor: Box<dyn FileAccessor> = Box::new(VscodeFilesystemAccessor::new(
+        let file_accessor: Box<dyn FileAccessor> = Box::new(WASMFileSystemAccessor::new(
             self.backend_to_client_tx.clone(),
         ));
 
