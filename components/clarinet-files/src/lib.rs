@@ -30,19 +30,19 @@ use url::Url;
 
 pub const DEFAULT_DEVNET_BALANCE: u64 = 100_000_000_000_000;
 
-pub type PerformWFSAction<T> = Pin<Box<dyn Future<Output = Result<T, String>>>>;
+pub type FileAccessorResult<T> = Pin<Box<dyn Future<Output = Result<T, String>>>>;
 
 pub trait FileAccessor {
-    fn file_exists(&self, location: FileLocation) -> PerformWFSAction<bool>;
+    fn file_exists(&self, location: FileLocation) -> FileAccessorResult<bool>;
     fn read_manifest_content(
         &self,
         manifest_location: FileLocation,
-    ) -> PerformWFSAction<(FileLocation, String)>;
+    ) -> FileAccessorResult<(FileLocation, String)>;
     fn read_contract_content(
         &self,
         contract_location: FileLocation,
-    ) -> PerformWFSAction<(FileLocation, String)>;
-    fn write_file(&self, location: FileLocation, content: &[u8]) -> PerformWFSAction<()>;
+    ) -> FileAccessorResult<(FileLocation, String)>;
+    fn write_file(&self, location: FileLocation, content: &[u8]) -> FileAccessorResult<()>;
 }
 
 #[derive(Deserialize, Debug, Clone, PartialEq, Eq, Hash)]
