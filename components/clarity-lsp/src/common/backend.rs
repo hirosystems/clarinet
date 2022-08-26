@@ -4,7 +4,6 @@ use crate::types::{CompletionItem, CompletionItemKind};
 use clarinet_files::{FileAccessor, FileLocation};
 use clarity_repl::clarity::diagnostic::Diagnostic;
 use serde::{Deserialize, Serialize};
-use std::sync::mpsc::{Receiver, Sender};
 
 #[derive(Debug, Serialize, Deserialize)]
 pub enum LspNotification {
@@ -42,33 +41,6 @@ impl LspResponse {
             aggregated_diagnostics: vec![],
             completion_items: vec![],
             notification: Some((MessageType::ERROR, format!("Internal error: {}", message))),
-        }
-    }
-}
-
-pub async fn start_language_server(
-    notification_rx: Receiver<LspNotification>,
-    response_tx: Sender<LspResponse>,
-    file_accessor: Option<Box<dyn FileAccessor>>,
-) {
-    let mut editor_state = EditorState::new();
-
-    let file_accessor_ref = match file_accessor {
-        Some(ref file_accessor) => Some(file_accessor),
-        None => None,
-    };
-
-    loop {
-        let command = match notification_rx.recv() {
-            Ok(command) => command,
-            Err(_e) => {
-                continue;
-            }
-        };
-
-        let result = process_notification(command, &mut editor_state, file_accessor_ref).await;
-        if let Ok(lsp_response) = result {
-            let _ = response_tx.send(lsp_response);
         }
     }
 }
