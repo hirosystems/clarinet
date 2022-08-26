@@ -11,8 +11,6 @@ macro_rules! log {
     }
 }
 
-pub(crate) use log;
-
 #[derive(Serialize, Deserialize)]
 struct WFSRequest {
     pub path: String,
