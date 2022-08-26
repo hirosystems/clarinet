@@ -1,4 +1,4 @@
-use super::{FileAccessor, FileLocation, PerformWFSAction};
+use super::{FileAccessor, FileAccessorResult, FileLocation};
 use js_sys::{Function as JsFunction, Promise};
 use serde::{Deserialize, Serialize};
 use serde_wasm_bindgen::{from_value as decode_from_js, to_value as encode_to_js};
@@ -47,7 +47,7 @@ impl WASMFileSystemAccessor {
 }
 
 impl FileAccessor for WASMFileSystemAccessor {
-    fn file_exists(&self, location: FileLocation) -> PerformWFSAction<bool> {
+    fn file_exists(&self, location: FileLocation) -> FileAccessorResult<bool> {
         log!("checking if file exists");
         let file_exists_promise = self.get_request_promise(
             "vfs/exists".into(),
@@ -70,7 +70,7 @@ impl FileAccessor for WASMFileSystemAccessor {
     fn read_manifest_content(
         &self,
         manifest_location: FileLocation,
-    ) -> PerformWFSAction<(FileLocation, String)> {
+    ) -> FileAccessorResult<(FileLocation, String)> {
         log!("reading manifest");
         let read_file_promise = self.get_request_promise(
             "vfs/readFile".into(),
@@ -97,7 +97,7 @@ impl FileAccessor for WASMFileSystemAccessor {
     fn read_contract_content(
         &self,
         contract_location: FileLocation,
-    ) -> PerformWFSAction<(FileLocation, String)> {
+    ) -> FileAccessorResult<(FileLocation, String)> {
         log!("reading contract");
         let req = (|| -> Result<(FileLocation, JsValue), String> {
             let req = self
@@ -125,7 +125,7 @@ impl FileAccessor for WASMFileSystemAccessor {
         })
     }
 
-    fn write_file(&self, location: FileLocation, content: &[u8]) -> PerformWFSAction<()> {
+    fn write_file(&self, location: FileLocation, content: &[u8]) -> FileAccessorResult<()> {
         log!("writting contract");
         let write_file_promise = self.get_request_promise(
             "vfs/writeFile".into(),
