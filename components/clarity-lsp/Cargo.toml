@@ -4,12 +4,13 @@ name = "clarity-lsp"
 version = "0.1.0"
 
 [dependencies]
+lsp-types = "0.93"
+serde = "1"
+clarity_repl = { package = "clarity-repl", path = "../clarity-repl", default-features = false }
 clarinet_deployments = { package = "clarinet-deployments", path = "../clarinet-deployments", default-features = false }
 clarinet_files = { package = "clarinet-files", path = "../clarinet-files", default-features = false }
-clarity_repl = { package = "clarity-repl", path = "../clarity-repl", default-features = false }
-lsp-types = "0.93"
 orchestra_types = { package = "orchestra-types", path = "../../vendor/orchestra-types-rs" }
-serde = { version = "1" }
+
 
 # WASM
 console_error_panic_hook = { version = "0.1", optional = true }
@@ -28,15 +29,15 @@ cli = [
   "clarinet_files/cli",
 ]
 wasm = [
-  "clarinet_deployments/wasm",
-  "clarity_repl/wasm",
-  "clarinet_files/wasm",
   "wasm-bindgen",
   "wasm-bindgen-futures",
   "serde-wasm-bindgen",
   "js-sys",
   "web-sys",
   "console_error_panic_hook",
+  "clarinet_deployments/wasm",
+  "clarity_repl/wasm",
+  "clarinet_files/wasm",
 ]
 
 [lib]

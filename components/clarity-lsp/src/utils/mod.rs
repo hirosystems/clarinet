@@ -14,9 +14,6 @@ use lsp_types::Url;
 use lsp_types::{DiagnosticSeverity, Position, Range};
 
 #[cfg(feature = "wasm")]
-pub mod vscode_vfs;
-
-#[cfg(feature = "wasm")]
 macro_rules! log {
     ( $( $t:tt )* ) => {
         web_sys::console::log_1(&format!( $( $t )* ).into());

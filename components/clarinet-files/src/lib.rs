@@ -9,6 +9,11 @@ pub extern crate url;
 mod network_manifest;
 mod project_manifest;
 
+#[cfg(feature = "wasm")]
+mod wasm_fs_accessor;
+#[cfg(feature = "wasm")]
+pub use wasm_fs_accessor::WASMFileSystemAccessor;
+
 pub use network_manifest::{
     compute_addresses, AccountConfig, DevnetConfig, DevnetConfigFile, NetworkManifest,
     NetworkManifestFile, PoxStackingOrder, DEFAULT_DERIVATION_PATH,
@@ -25,19 +30,19 @@ use url::Url;
 
 pub const DEFAULT_DEVNET_BALANCE: u64 = 100_000_000_000_000;
 
-pub type PerformVFSAction<T> = Pin<Box<dyn Future<Output = Result<T, String>>>>;
+pub type PerformWFSAction<T> = Pin<Box<dyn Future<Output = Result<T, String>>>>;
 
 pub trait FileAccessor {
-    fn file_exists(&self, location: FileLocation) -> PerformVFSAction<bool>;
+    fn file_exists(&self, location: FileLocation) -> PerformWFSAction<bool>;
     fn read_manifest_content(
         &self,
         manifest_location: FileLocation,
-    ) -> PerformVFSAction<(FileLocation, String)>;
+    ) -> PerformWFSAction<(FileLocation, String)>;
     fn read_contract_content(
         &self,
         contract_location: FileLocation,
-    ) -> PerformVFSAction<(FileLocation, String)>;
-    fn write_file(&self, location: FileLocation, content: &[u8]) -> PerformVFSAction<()>;
+    ) -> PerformWFSAction<(FileLocation, String)>;
+    fn write_file(&self, location: FileLocation, content: &[u8]) -> PerformWFSAction<()>;
 }
 
 #[derive(Deserialize, Debug, Clone, PartialEq, Eq, Hash)]
