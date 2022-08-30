@@ -17,8 +17,7 @@ use lsp_types::{
     PublishDiagnosticsParams, ShowMessageParams, Url,
 };
 use serde::{Deserialize, Serialize};
-use serde_json::json;
-use serde_wasm_bindgen::{from_value as decode_from_js, to_value as encode_to_js, Serializer};
+use serde_wasm_bindgen::{from_value as decode_from_js, to_value as encode_to_js};
 use std::{
     panic,
     sync::{Arc, RwLock},
@@ -231,21 +230,12 @@ impl LspVscodeBridge {
             "clarity/getAst" => {
                 let FileEvent { path } = decode_from_js(js_params)?;
                 let contract_location = FileLocation::from_url_string(&path).unwrap();
-                log!("location: {:?}", contract_location);
                 match self.get_contract_analysis(&contract_location) {
-                    Some(contract_data) => {
-                        let analysis = contract_data;
-                        // log!(">> analysis: {:?}", analysis.public_function_types);
+                    Some(analysis) => {
+                        let json_analysis = serde_json::to_string(&analysis.expressions.clone())
+                            .map_err(|_| JsValue::NULL)?;
 
-                        let serializer =
-                            Serializer::new().serialize_large_number_types_as_bigints(true);
-
-                        match analysis.expressions.serialize(&serializer) {
-                            Ok(data) => return Ok(data),
-                            Err(err) => {
-                                log!("> format: {:?}", err);
-                            }
-                        }
+                        return Ok(encode_to_js(&json_analysis)?);
                     }
                     None => {
                         log!(">> no analysis");
@@ -253,18 +243,13 @@ impl LspVscodeBridge {
                 }
             }
 
-            "clarity/cursorMove" => {
+            "clarity/getFunctionAnalysis" => {
                 let CursorEvent { path, line, .. } = decode_from_js(js_params)?;
                 let contract_location = FileLocation::from_url_string(&path)?;
 
                 let contract_analysis = self
                     .get_contract_analysis(&contract_location)
                     .ok_or(JsValue::NULL)?;
-
-                log!(
-                    ">> contract_analysis.is_cost_contract_eligible: {:?}",
-                    contract_analysis.is_cost_contract_eligible
-                );
 
                 let closest_block = contract_analysis
                     .expressions
@@ -303,7 +288,7 @@ impl LspVscodeBridge {
                 .ok_or(JsValue::NULL)?;
 
                 return encode_to_js(
-                    &json!({ "fnType": fn_type, "fnName": fn_name, "fnArgs": fn_args, "fnReturns": fn_returns })
+                    &serde_json::json!({ "fnType": fn_type, "fnName": fn_name, "fnArgs": fn_args, "fnReturns": fn_returns })
                         .to_string(),
                 )
                 .map_err(|err| {
@@ -326,10 +311,12 @@ impl LspVscodeBridge {
                 let manifest_location = editor_state.contracts_lookup.get(&contract_location)?;
                 let protocol = editor_state.protocols.get(&manifest_location)?;
                 let contract = protocol.contracts.get(&contract_location)?;
-
                 Some(contract.analysis.clone()?)
             }
-            Err(_) => None,
+            Err(err) => {
+                log!("> error: {:?}", err);
+                None
+            }
         }
     }
 }
