@@ -9,9 +9,9 @@ use js_sys::{Function as JsFunction, Promise};
 use lsp_types::{
     notification::{DidOpenTextDocument, DidSaveTextDocument, Initialized, Notification},
     request::{Completion, Request},
-    DidOpenTextDocumentParams, PublishDiagnosticsParams, Url,
+    CompletionParams, DidOpenTextDocumentParams, DidSaveTextDocumentParams,
+    PublishDiagnosticsParams, ShowMessageParams, Url,
 };
-use lsp_types::{CompletionParams, DidSaveTextDocumentParams};
 use serde_wasm_bindgen::{from_value as decode_from_js, to_value as encode_to_js};
 use std::{
     panic,
@@ -24,7 +24,7 @@ use wasm_bindgen_futures::future_to_promise;
 pub struct LspVscodeBridge {
     editor_state_lock: Arc<RwLock<EditorState>>,
     client_diagnostic_tx: JsFunction,
-    _client_notification_tx: JsFunction,
+    client_notification_tx: JsFunction,
     backend_to_client_tx: JsFunction,
 }
 
@@ -33,7 +33,7 @@ impl LspVscodeBridge {
     #[wasm_bindgen(constructor)]
     pub fn new(
         client_diagnostic_tx: JsFunction,
-        _client_notification_tx: JsFunction,
+        client_notification_tx: JsFunction,
         backend_to_client_tx: JsFunction,
     ) -> LspVscodeBridge {
         panic::set_hook(Box::new(console_error_panic_hook::hook));
@@ -42,25 +42,24 @@ impl LspVscodeBridge {
         LspVscodeBridge {
             editor_state_lock,
             client_diagnostic_tx,
-            _client_notification_tx,
+            client_notification_tx,
             backend_to_client_tx,
         }
     }
 
     #[wasm_bindgen(js_name=onNotification)]
     pub fn notification_handler(&self, method: String, js_params: JsValue) -> Promise {
-        log!("> notification method: {}", method);
-
         let file_accessor: Box<dyn FileAccessor> = Box::new(WASMFileSystemAccessor::new(
             self.backend_to_client_tx.clone(),
         ));
 
         match method.as_str() {
             Initialized::METHOD => {}
+
             DidOpenTextDocument::METHOD => {
                 let params: DidOpenTextDocumentParams = match decode_from_js(js_params) {
                     Ok(params) => params,
-                    _ => return Promise::resolve(&JsValue::null()),
+                    Err(err) => return Promise::reject(&JsValue::from(format!("error: {}", err))),
                 };
                 let uri = params.text_document.uri;
                 log!("> opened: {}", &uri);
@@ -70,12 +69,12 @@ impl LspVscodeBridge {
                 } else if let Some(manifest_location) = get_manifest_location(&uri) {
                     LspNotification::ManifestOpened(manifest_location)
                 } else {
-                    log!("Unsupported file opened");
-                    return Promise::resolve(&JsValue::null());
+                    return Promise::reject(&JsValue::from_str("Unsupported file opened"));
                 };
 
                 let editor_state_lock = self.editor_state_lock.clone();
                 let send_diagnostic = self.client_diagnostic_tx.clone();
+                let send_notification = self.client_notification_tx.clone();
 
                 return future_to_promise(async move {
                     let mut result = match editor_state_lock.try_write() {
@@ -87,26 +86,36 @@ impl LspVscodeBridge {
                     };
 
                     let mut aggregated_diagnostics = vec![];
+                    let mut notification = None;
+
                     if let Ok(ref mut response) = result {
                         aggregated_diagnostics.append(&mut response.aggregated_diagnostics);
+                        notification = response.notification.take();
                     }
 
                     for (location, mut diags) in aggregated_diagnostics.into_iter() {
-                        if let Ok(url) = Url::parse(&location.to_string()) {
+                        if let Ok(uri) = Url::parse(&location.to_string()) {
                             let value = PublishDiagnosticsParams {
-                                uri: url,
+                                uri,
                                 diagnostics: clarity_diagnostics_to_lsp_type(&mut diags),
                                 version: None,
                             };
 
-                            let value = match encode_to_js(&value) {
-                                Ok(value) => value,
-                                Err(_) => return Err(JsValue::from("unable to encode value")),
-                            };
-
-                            let _ = send_diagnostic.call1(&JsValue::null(), &value);
+                            let _ = send_diagnostic.call1(&JsValue::NULL, &encode_to_js(&value)?);
                         }
                     }
+
+                    if let Some((level, message)) = notification {
+                        let _ = send_notification.call2(
+                            &JsValue::NULL,
+                            &JsValue::from("window/showMessage"),
+                            &encode_to_js(&ShowMessageParams {
+                                message,
+                                typ: level,
+                            })?,
+                        );
+                    }
+
                     Ok(JsValue::TRUE)
                 });
             }
@@ -114,7 +123,7 @@ impl LspVscodeBridge {
             DidSaveTextDocument::METHOD => {
                 let params: DidSaveTextDocumentParams = match decode_from_js(js_params) {
                     Ok(params) => params,
-                    _ => return Promise::resolve(&JsValue::null()),
+                    Err(err) => return Promise::reject(&JsValue::from(format!("error: {}", err))),
                 };
                 let uri = &params.text_document.uri;
                 log!("> saved: {}", uri);
@@ -125,11 +134,12 @@ impl LspVscodeBridge {
                     LspNotification::ManifestChanged(manifest_location)
                 } else {
                     log!("Unsupported file opened");
-                    return Promise::resolve(&JsValue::null());
+                    return Promise::resolve(&JsValue::NULL);
                 };
 
                 let editor_state_lock = self.editor_state_lock.clone();
                 let send_diagnostic = self.client_diagnostic_tx.clone();
+                let send_notification = self.client_notification_tx.clone();
 
                 return future_to_promise(async move {
                     let mut result = match editor_state_lock.try_write() {
@@ -141,25 +151,34 @@ impl LspVscodeBridge {
                     };
 
                     let mut aggregated_diagnostics = vec![];
+                    let mut notification = None;
+
                     if let Ok(ref mut response) = result {
                         aggregated_diagnostics.append(&mut response.aggregated_diagnostics);
+                        notification = response.notification.take();
                     }
 
                     for (location, mut diags) in aggregated_diagnostics.into_iter() {
-                        if let Ok(url) = Url::parse(&location.to_string()) {
+                        if let Ok(uri) = Url::parse(&location.to_string()) {
                             let value = PublishDiagnosticsParams {
-                                uri: url,
+                                uri,
                                 diagnostics: clarity_diagnostics_to_lsp_type(&mut diags),
                                 version: None,
                             };
 
-                            let value = match encode_to_js(&value) {
-                                Ok(value) => value,
-                                Err(_) => return Err(JsValue::from("unable to encode value")),
-                            };
-
-                            let _ = send_diagnostic.call1(&JsValue::null(), &value);
+                            let _ = send_diagnostic.call1(&JsValue::NULL, &encode_to_js(&value)?);
                         }
+                    }
+
+                    if let Some((level, message)) = notification {
+                        let _ = send_notification.call2(
+                            &JsValue::NULL,
+                            &JsValue::from("window/showMessage"),
+                            &encode_to_js(&ShowMessageParams {
+                                message,
+                                typ: level,
+                            })?,
+                        );
                     }
                     Ok(JsValue::TRUE)
                 });
@@ -168,7 +187,8 @@ impl LspVscodeBridge {
                 log!("unexpected notification ({})", method);
             }
         }
-        return Promise::resolve(&JsValue::null());
+
+        return Promise::resolve(&JsValue::NULL);
     }
 
     #[wasm_bindgen(js_name=onRequest)]
