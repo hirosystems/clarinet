@@ -2,7 +2,6 @@
 members = [
     "components/clarinet-cli",
     "components/clarinet-deployments",
-    "components/clarinet-deno",
     "components/clarinet-files",
     "components/clarinet-utils",
     "components/clarity-lsp",

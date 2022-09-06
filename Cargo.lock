@@ -905,72 +905,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "clarinet-deno"
-version = "0.33.0"
-dependencies = [
- "cache_control",
- "data-url",
- "deno_ast",
- "deno_broadcast_channel",
- "deno_console",
- "deno_core",
- "deno_crypto",
- "deno_emit",
- "deno_fetch",
- "deno_ffi",
- "deno_graph",
- "deno_http",
- "deno_net",
- "deno_tls",
- "deno_url",
- "deno_web",
- "deno_webidl",
- "deno_websocket",
- "deno_webstorage",
- "dissimilar",
- "dlopen",
- "dprint-plugin-json",
- "dprint-plugin-markdown",
- "dprint-plugin-typescript",
- "encoding_rs",
- "env_logger",
- "filetime",
- "fs3",
- "futures",
- "http",
- "hyper",
- "import_map",
- "indexmap",
- "jsonc-parser",
- "log",
- "lzzzz",
- "mitata",
- "netif",
- "nix 0.24.2",
- "node_resolver",
- "notify",
- "once_cell",
- "os_pipe",
- "regex",
- "semver-parser 0.10.2",
- "serde",
- "serde_derive",
- "serde_json",
- "signal-hook-registry",
- "sys-info",
- "tempfile",
- "termcolor",
- "text_lines 0.6.0",
- "tokio",
- "tokio-util 0.7.2",
- "twox-hash",
- "typed-arena",
- "uuid",
- "walkdir",
- "zstd",
-]
-
-[[package]]
 name = "clarinet-deployments"
 version = "0.1.0"
 dependencies = [
@@ -1865,12 +1799,6 @@ dependencies = [
  "redox_users 0.4.3",
  "winapi",
 ]
-
-[[package]]
-name = "dissimilar"
-version = "1.0.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "31ad93652f40969dead8d4bf897a41e9462095152eb21c56e5830537e41179dd"
 
 [[package]]
 name = "dlopen"
