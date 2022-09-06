@@ -150,6 +150,7 @@ clarinet_utils = { package = "clarinet-utils", path = "../clarinet-utils" }
 num_cpus = "1.13.1"
 mio = "=0.8.2"
 similar = "2.1.0"
+crossbeam-channel = "0.5.6"
 
 [dependencies.tui]
 version = "0.18.0"
