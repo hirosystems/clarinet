@@ -231,6 +231,10 @@ pub struct StacksChainhookSpecification {
     pub end_block: Option<u64>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub expire_after_occurrence: Option<u64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub capture_all_events: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub decode_clarity_values: Option<bool>,
     pub predicate: StacksHookPredicate,
     pub action: HookAction,
 }

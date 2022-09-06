@@ -10,12 +10,16 @@ use base58::FromBase58;
 use bitcoincore_rpc::bitcoin::blockdata::opcodes;
 use bitcoincore_rpc::bitcoin::blockdata::script::Builder as BitcoinScriptBuilder;
 use bitcoincore_rpc::bitcoin::{Address, PubkeyHash, PublicKey, Script};
-use clarity_repl::clarity::util::hash::{to_hex, Hash160};
+use clarity_repl::clarity::util::hash::{to_hex, hex_bytes, Hash160};
+use std::io::Cursor;
+use clarity_repl::clarity::codec::StacksMessageCodec;
 use orchestra_types::{
     BitcoinChainEvent, BitcoinTransactionData, BlockIdentifier, StacksChainEvent, StacksNetwork,
     StacksTransactionData, StacksTransactionEvent, StacksTransactionKind, TransactionIdentifier,
 };
+use clarity_repl::clarity::types::{SequenceData, Value as ClarityValue, CharType};
 use reqwest::{Client, Method};
+use serde::Serialize;
 use std::collections::HashMap;
 use std::iter::Map;
 use std::slice::Iter;
@@ -28,6 +32,12 @@ pub struct StacksTriggerChainhook<'a> {
     pub chainhook: &'a StacksChainhookSpecification,
     pub apply: Vec<(&'a StacksTransactionData, &'a BlockIdentifier)>,
     pub rollback: Vec<(&'a StacksTransactionData, &'a BlockIdentifier)>,
+}
+
+impl <'a>StacksTriggerChainhook<'a> {
+    pub fn should_decode_clarity_value(&self) -> bool {
+        self.chainhook.decode_clarity_values.unwrap_or(false)
+    }
 }
 
 pub struct BitcoinTriggerChainhook<'a> {
@@ -176,145 +186,143 @@ fn evaluate_stacks_chainhook_on_blocks<'a>(
     let mut occurrences = vec![];
     for block in blocks {
         for tx in block.get_transactions().iter() {
-            // TODO(lgalabru)
-            match (&tx.metadata.kind, &chainhook.predicate) {
-                (
-                    StacksTransactionKind::ContractCall(actual_contract_call),
-                    StacksHookPredicate::ContractCall(expected_contract_call),
-                ) => {
-                    if actual_contract_call.contract_identifier
-                        == expected_contract_call.contract_identifier
-                        && actual_contract_call.method == expected_contract_call.method
-                    {
-                        occurrences.push((tx, block.get_identifier()));
-                        continue;
-                    }
-                }
-                (StacksTransactionKind::ContractCall(_), _)
-                | (StacksTransactionKind::ContractDeployment(_), _) => {
-                    // Look for emitted events
-                    for event in tx.metadata.receipt.events.iter() {
-                        match (event, &chainhook.predicate) {
-                            (
-                                StacksTransactionEvent::NFTMintEvent(actual),
-                                StacksHookPredicate::NftEvent(expected),
-                            ) => {
-                                if actual.asset_class_identifier == expected.asset_identifier
-                                    && expected.actions.contains(&"mint".to_string())
-                                {
-                                    occurrences.push((tx, block.get_identifier()));
-                                    break;
-                                }
-                            }
-                            (
-                                StacksTransactionEvent::NFTTransferEvent(actual),
-                                StacksHookPredicate::NftEvent(expected),
-                            ) => {
-                                if actual.asset_class_identifier == expected.asset_identifier
-                                    && expected.actions.contains(&"transfer".to_string())
-                                {
-                                    occurrences.push((tx, block.get_identifier()));
-                                    break;
-                                }
-                            }
-                            (
-                                StacksTransactionEvent::NFTBurnEvent(actual),
-                                StacksHookPredicate::NftEvent(expected),
-                            ) => {
-                                if actual.asset_class_identifier == expected.asset_identifier
-                                    && expected.actions.contains(&"burn".to_string())
-                                {
-                                    occurrences.push((tx, block.get_identifier()));
-                                    break;
-                                }
-                            }
-                            (
-                                StacksTransactionEvent::FTMintEvent(actual),
-                                StacksHookPredicate::FtEvent(expected),
-                            ) => {
-                                if actual.asset_class_identifier == expected.asset_identifier
-                                    && expected.actions.contains(&"mint".to_string())
-                                {
-                                    occurrences.push((tx, block.get_identifier()));
-                                    break;
-                                }
-                            }
-                            (
-                                StacksTransactionEvent::FTTransferEvent(actual),
-                                StacksHookPredicate::FtEvent(expected),
-                            ) => {
-                                if actual.asset_class_identifier == expected.asset_identifier
-                                    && expected.actions.contains(&"transfer".to_string())
-                                {
-                                    occurrences.push((tx, block.get_identifier()));
-                                    break;
-                                }
-                            }
-                            (
-                                StacksTransactionEvent::FTBurnEvent(actual),
-                                StacksHookPredicate::FtEvent(expected),
-                            ) => {
-                                if actual.asset_class_identifier == expected.asset_identifier
-                                    && expected.actions.contains(&"burn".to_string())
-                                {
-                                    occurrences.push((tx, block.get_identifier()));
-                                    break;
-                                }
-                            }
-                            (
-                                StacksTransactionEvent::STXMintEvent(_),
-                                StacksHookPredicate::StxEvent(expected),
-                            ) => {
-                                if expected.actions.contains(&"mint".to_string()) {
-                                    occurrences.push((tx, block.get_identifier()));
-                                    break;
-                                }
-                            }
-                            (
-                                StacksTransactionEvent::STXTransferEvent(_),
-                                StacksHookPredicate::StxEvent(expected),
-                            ) => {
-                                if expected.actions.contains(&"transfer".to_string()) {
-                                    occurrences.push((tx, block.get_identifier()));
-                                    break;
-                                }
-                            }
-                            (
-                                StacksTransactionEvent::STXLockEvent(_),
-                                StacksHookPredicate::StxEvent(expected),
-                            ) => {
-                                if expected.actions.contains(&"lock".to_string()) {
-                                    occurrences.push((tx, block.get_identifier()));
-                                    break;
-                                }
-                            }
-                            (
-                                StacksTransactionEvent::SmartContractEvent(actual),
-                                StacksHookPredicate::PrintEvent(expected),
-                            ) => {
-                                if actual.contract_identifier == expected.contract_identifier {
-                                    occurrences.push((tx, block.get_identifier()));
-                                    break;
-                                }
-                            }
-                            _ => {}
-                        }
-                    }
-                }
-                (
-                    StacksTransactionKind::NativeTokenTransfer,
-                    StacksHookPredicate::StxEvent(expected_stx_event),
-                ) => {
-                    if expected_stx_event.actions.contains(&"transfer".to_string()) {
-                        occurrences.push((tx, block.get_identifier()));
-                        continue;
-                    }
-                }
-                _ => {}
+            if evaluate_stacks_chainhook_on_transaction(tx, chainhook) {
+                occurrences.push((tx, block.get_identifier()));
+                continue;
             }
         }
     }
     occurrences
+}
+
+pub fn evaluate_stacks_chainhook_on_transaction<'a>(
+    transaction: &'a StacksTransactionData,
+    chainhook: &'a StacksChainhookSpecification,
+) -> bool {
+    match (&transaction.metadata.kind, &chainhook.predicate) {
+        (
+            StacksTransactionKind::ContractCall(actual_contract_call),
+            StacksHookPredicate::ContractCall(expected_contract_call),
+        ) => {
+            if actual_contract_call.contract_identifier
+                == expected_contract_call.contract_identifier
+                && actual_contract_call.method == expected_contract_call.method
+            {
+                return true
+            }
+        }
+        (StacksTransactionKind::ContractCall(_), _)
+        | (StacksTransactionKind::ContractDeployment(_), _) => {
+            // Look for emitted events
+            for event in transaction.metadata.receipt.events.iter() {
+                match (event, &chainhook.predicate) {
+                    (
+                        StacksTransactionEvent::NFTMintEvent(actual),
+                        StacksHookPredicate::NftEvent(expected),
+                    ) => {
+                        if actual.asset_class_identifier == expected.asset_identifier
+                            && expected.actions.contains(&"mint".to_string())
+                        {
+                            return true
+                        }
+                    }
+                    (
+                        StacksTransactionEvent::NFTTransferEvent(actual),
+                        StacksHookPredicate::NftEvent(expected),
+                    ) => {
+                        if actual.asset_class_identifier == expected.asset_identifier
+                            && expected.actions.contains(&"transfer".to_string())
+                        {
+                            return true
+                        }
+                    }
+                    (
+                        StacksTransactionEvent::NFTBurnEvent(actual),
+                        StacksHookPredicate::NftEvent(expected),
+                    ) => {
+                        if actual.asset_class_identifier == expected.asset_identifier
+                            && expected.actions.contains(&"burn".to_string())
+                        {
+                            return true
+                        }
+                    }
+                    (
+                        StacksTransactionEvent::FTMintEvent(actual),
+                        StacksHookPredicate::FtEvent(expected),
+                    ) => {
+                        if actual.asset_class_identifier == expected.asset_identifier
+                            && expected.actions.contains(&"mint".to_string())
+                        {
+                            return true
+                        }
+                    }
+                    (
+                        StacksTransactionEvent::FTTransferEvent(actual),
+                        StacksHookPredicate::FtEvent(expected),
+                    ) => {
+                        if actual.asset_class_identifier == expected.asset_identifier
+                            && expected.actions.contains(&"transfer".to_string())
+                        {
+                            return true
+                        }
+                    }
+                    (
+                        StacksTransactionEvent::FTBurnEvent(actual),
+                        StacksHookPredicate::FtEvent(expected),
+                    ) => {
+                        if actual.asset_class_identifier == expected.asset_identifier
+                            && expected.actions.contains(&"burn".to_string())
+                        {
+                            return true
+                        }
+                    }
+                    (
+                        StacksTransactionEvent::STXMintEvent(_),
+                        StacksHookPredicate::StxEvent(expected),
+                    ) => {
+                        if expected.actions.contains(&"mint".to_string()) {
+                            return true
+                        }
+                    }
+                    (
+                        StacksTransactionEvent::STXTransferEvent(_),
+                        StacksHookPredicate::StxEvent(expected),
+                    ) => {
+                        if expected.actions.contains(&"transfer".to_string()) {
+                            return true
+                        }
+                    }
+                    (
+                        StacksTransactionEvent::STXLockEvent(_),
+                        StacksHookPredicate::StxEvent(expected),
+                    ) => {
+                        if expected.actions.contains(&"lock".to_string()) {
+                            return true
+                        }
+                    }
+                    (
+                        StacksTransactionEvent::SmartContractEvent(actual),
+                        StacksHookPredicate::PrintEvent(expected),
+                    ) => {
+                        if actual.contract_identifier == expected.contract_identifier {
+                            return true
+                        }
+                    }
+                    _ => {}
+                }
+            }
+        }
+        (
+            StacksTransactionKind::NativeTokenTransfer,
+            StacksHookPredicate::StxEvent(expected_stx_event),
+        ) => {
+            if expected_stx_event.actions.contains(&"transfer".to_string()) {
+                return true
+            }
+        }
+        _ => {}
+    }
+    false
 }
 
 pub fn evaluate_bitcoin_chainhooks_on_chain_event<'a>(
@@ -517,10 +525,239 @@ pub fn handle_bitcoin_hook_action<'a>(
     }
 }
 
+fn encode_transaction_including_with_clarity_decoding(transaction: &StacksTransactionData) -> serde_json::Value {
+    json!({
+        "transaction_identifier": transaction.transaction_identifier,
+        "operations": transaction.operations,
+        "metadata": {
+            "success": transaction.metadata.success,
+            "raw_tx": transaction.metadata.raw_tx,
+            "result": serialized_decoded_clarity_value(&transaction.metadata.result),
+            "sender": transaction.metadata.sender,
+            "fee": transaction.metadata.fee,
+            "kind": transaction.metadata.kind,
+            "receipt": {
+                "mutated_contracts_radius": transaction.metadata.receipt.mutated_contracts_radius,
+                "mutated_assets_radius": transaction.metadata.receipt.mutated_assets_radius,
+                "contract_calls_stack": transaction.metadata.receipt.contract_calls_stack,
+                "events": transaction.metadata.receipt.events.iter().map(|event| {
+                    serialized_event_with_decoded_clarity_value(event)
+                }).collect::<Vec<serde_json::Value>>(),
+            },
+            "description": transaction.metadata.description,
+            "sponsor": transaction.metadata.sponsor,
+            "execution_cost": transaction.metadata.execution_cost,
+            "position": transaction.metadata.position,
+        },
+    })
+}
+
+pub fn serialized_event_with_decoded_clarity_value(event: &StacksTransactionEvent) -> serde_json::Value {
+    match event {
+        StacksTransactionEvent::STXTransferEvent(payload) => {
+            json!({
+                "type": "stx_transfer_event",
+                "data": payload
+            })
+        }
+        StacksTransactionEvent::STXMintEvent(payload) => {
+            json!({
+                "type": "stx_mint_event",
+                "data": payload
+            })
+        }
+        StacksTransactionEvent::STXLockEvent(payload) => {
+            json!({
+                "type": "stx_lock_event",
+                "data": payload
+            })
+        }
+        StacksTransactionEvent::STXBurnEvent(payload) => {
+            json!({
+                "type": "stx_burn_event",
+                "data": payload
+            })
+        }
+        StacksTransactionEvent::NFTTransferEvent(payload) => {
+            json!({
+                "type": "nft_transfer_event",
+                "data": {
+                    "asset_class_identifier": payload.asset_class_identifier,
+                    "asset_identifier": serialized_decoded_clarity_value(&payload.hex_asset_identifier),
+                    "sender": payload.sender,
+                    "recipient": payload.recipient,    
+                }
+            })
+        }
+        StacksTransactionEvent::NFTMintEvent(payload) => {        
+            json!({
+                "type": "nft_mint_event",
+                "data": {
+                    "asset_class_identifier": payload.asset_class_identifier,
+                    "asset_identifier": serialized_decoded_clarity_value(&payload.hex_asset_identifier),
+                    "recipient": payload.recipient,
+                }
+            })
+        }
+        StacksTransactionEvent::NFTBurnEvent(payload) => {
+            json!({
+                "type": "stx_burn_event",
+                "data": {
+                    "asset_class_identifier": payload.asset_class_identifier,
+                    "asset_identifier": serialized_decoded_clarity_value(&payload.hex_asset_identifier),
+                    "sender": payload.sender,
+                }
+            })
+        }
+        StacksTransactionEvent::FTTransferEvent(payload) => {
+            json!({
+                "type": "ft_transfer_event",
+                "data": payload
+            })
+        }
+        StacksTransactionEvent::FTMintEvent(payload) => {
+            json!({
+                "type": "ft_mint_event",
+                "data": payload
+            })
+        }
+        StacksTransactionEvent::FTBurnEvent(payload) => {
+            json!({
+                "type": "ft_burn_event",
+                "data": payload
+            })
+        }
+        StacksTransactionEvent::DataVarSetEvent(payload) => {
+            json!({
+                "type": "data_var_set_event",
+                "data": {
+                    "contract_identifier": payload.contract_identifier,
+                    "var": payload.var,
+                    "new_value": serialized_decoded_clarity_value(&payload.hex_new_value),
+                }
+            })
+        }
+        StacksTransactionEvent::DataMapInsertEvent(payload) => {
+            json!({
+                "type": "data_map_insert_event",
+                "data": {
+                    "contract_identifier": payload.contract_identifier,
+                    "map": payload.map,
+                    "inserted_key": serialized_decoded_clarity_value(&payload.hex_inserted_key),
+                    "inserted_value": serialized_decoded_clarity_value(&payload.hex_inserted_value),
+                }
+            })        
+        }
+        StacksTransactionEvent::DataMapUpdateEvent(payload) => {
+            json!({
+                "type": "data_map_update_event",
+                "data": {
+                    "contract_identifier": payload.contract_identifier,
+                    "map": payload.map,
+                    "key": serialized_decoded_clarity_value(&payload.hex_key),
+                    "new_value": serialized_decoded_clarity_value(&payload.hex_new_value),
+                }
+            })        
+        }
+        StacksTransactionEvent::DataMapDeleteEvent(payload) => {
+            json!({
+                "type": "data_map_delete_event",
+                "data": {
+                    "contract_identifier": payload.contract_identifier,
+                    "map": payload.map,
+                    "deleted_key": serialized_decoded_clarity_value(&payload.hex_deleted_key),
+                }
+            })        
+        }
+        StacksTransactionEvent::SmartContractEvent(payload) => {
+            json!({
+                "type": "print_event",
+                "data": {
+                    "contract_identifier": payload.contract_identifier,
+                    "topic": payload.topic,
+                    "value": serialized_decoded_clarity_value(&payload.hex_value),
+                }
+            })
+        }
+    }
+}
+
+pub fn serialized_decoded_clarity_value(hex_value: &str) -> serde_json::Value {
+    let hex_value = match hex_value.strip_prefix("0x") {
+        Some(hex_value) => hex_value,
+        _ => return json!(hex_value.to_string()),
+    };
+    let value_bytes = match hex_bytes(&hex_value) {
+        Ok(bytes) => bytes,
+        _ => return json!(hex_value.to_string()),
+    };
+    let value = match ClarityValue::consensus_deserialize(&mut Cursor::new(&value_bytes)) {
+        Ok(value) => serialize_to_json(&value),
+        Err(e) => {
+            error!("unable to deserialize clarity value {:?}", e);
+            return json!(hex_value.to_string());
+        }
+    };
+    value
+}
+
+pub fn serialize_to_json(value: &ClarityValue) -> serde_json::Value {
+    match value {
+        ClarityValue::Int(int) => json!(int),
+        ClarityValue::UInt(int) => json!(int),
+        ClarityValue::Bool(boolean) => json!(boolean),
+        ClarityValue::Principal(principal_data) => json!(format!("{}", principal_data)),
+        ClarityValue::Sequence(SequenceData::Buffer(vec_bytes)) => json!(format!("0x{}", &vec_bytes)),
+        ClarityValue::Sequence(SequenceData::String(CharType::ASCII(string))) => {
+            json!(String::from_utf8(string.data.clone()).unwrap())
+        }
+        ClarityValue::Sequence(SequenceData::String(CharType::UTF8(string))) => {
+            let mut result = String::new();
+            for c in string.data.iter() {
+                if c.len() > 1 {
+                    result.push_str(&String::from_utf8(c.to_vec()).unwrap());
+                } else {
+                    result.push(c[0] as char)
+                }
+            }
+            json!(result)
+        },
+        ClarityValue::Optional(opt_data) => {
+            match &opt_data.data {
+                None => serde_json::Value::Null,
+                Some(value) => serialize_to_json(&*value)
+            }
+        },
+        ClarityValue::Response(res_data) => {
+            json!({
+                "result": {
+                    "success": res_data.committed,
+                    "value": serialize_to_json(&*res_data.data),
+                }
+            })
+        },
+        ClarityValue::Tuple(data) => {
+            let mut map = serde_json::Map::new();
+            for (name, value) in data.data_map.iter() {
+                map.insert(name.to_string(), serialize_to_json(value));
+            }
+            json!(map)
+        },
+        ClarityValue::Sequence(SequenceData::List(list_data)) => {
+            let mut list = vec![];
+            for value in list_data.data.iter() {
+                list.push(serialize_to_json(value));
+            }
+            json!(list)
+        }
+    }
+}
+
 pub fn handle_stacks_hook_action<'a>(
     trigger: StacksTriggerChainhook<'a>,
     proofs: &HashMap<&'a TransactionIdentifier, String>,
 ) -> Option<StacksChainhookOccurrence> {
+    let decode_clarity_values = trigger.should_decode_clarity_value();
     match &trigger.chainhook.action {
         HookAction::Http(http) => {
             let client = Client::builder().build().unwrap();
@@ -529,7 +766,11 @@ pub fn handle_stacks_hook_action<'a>(
             let payload = json!({
                 "apply": trigger.apply.into_iter().map(|(transaction, block_identifier)| {
                     json!({
-                        "transaction": transaction,
+                        "transaction": if decode_clarity_values {
+                            encode_transaction_including_with_clarity_decoding(transaction)
+                        } else {
+                            json!(transaction)
+                        },
                         "block_identifier": block_identifier,
                         "confirmations": 1, // TODO(lgalabru)
                         "proof": proofs.get(&transaction.transaction_identifier),

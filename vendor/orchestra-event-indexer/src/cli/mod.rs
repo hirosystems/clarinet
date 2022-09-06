@@ -1,17 +1,24 @@
 use super::block;
 use crate::{
     block::DigestingCommand,
-    config::{Config, IndexerConfig, Topology, Bare},
+    config::{Bare, Config, IndexerConfig, Topology},
 };
 use clap::Parser;
 use ctrlc;
-use orchestra_event_observer::{observer::{EventObserverConfig, ObserverEvent, DEFAULT_INGESTION_PORT, DEFAULT_CONTROL_PORT, start_event_observer, ObserverCommand}, utils::nestable_block_on};
-use std::{
-    process,
-    sync::mpsc::channel,
-    thread,
+use orchestra_event_observer::{
+    chainhooks::{
+        evaluate_stacks_chainhook_on_transaction, handle_stacks_hook_action,
+        types::ChainhookSpecification, StacksChainhookOccurrence, StacksTriggerChainhook,
+    },
+    observer::{
+        start_event_observer, EventObserverConfig, ObserverCommand, ObserverEvent,
+        DEFAULT_CONTROL_PORT, DEFAULT_INGESTION_PORT,
+    },
+    utils::nestable_block_on,
 };
+use orchestra_types::{BlockIdentifier, StacksBlockData, StacksTransactionData};
 use std::collections::HashSet;
+use std::{collections::HashMap, process, sync::mpsc::channel, thread};
 
 /// Simple program to greet a person
 #[derive(Parser, Debug)]
@@ -95,6 +102,10 @@ pub fn main() {
         display_logs: false,
     };
 
+    info!(
+        "Listening for chainhooks events on port {}",
+        DEFAULT_CONTROL_PORT
+    );
     let _ = std::thread::spawn(move || {
         let future = start_event_observer(
             event_observer_config,
@@ -104,15 +115,81 @@ pub fn main() {
         );
         let _ = nestable_block_on(future);
     });
-    
+
     loop {
         let event = match observer_event_rx.recv() {
             Ok(cmd) => cmd,
-            Err(_e) => std::process::exit(1)
+            Err(_e) => std::process::exit(1),
         };
         match event {
             ObserverEvent::HookRegistered(chain_hook) => {
-                // Do something
+                // If start block specified, use it.
+                // I no start block specified, depending on the nature the hook, we'd like to retrieve:
+                // - contract-id
+
+                match chain_hook {
+                    ChainhookSpecification::Stacks(stacks_hook) => {
+                        info!("Received chainhook {:?}", stacks_hook);
+
+                        use redis::Commands;
+
+                        let client = redis::Client::open(config.redis_url.clone()).unwrap();
+                        let mut con = client.get_connection().unwrap();
+
+                        // Retrieve highest block height stored
+                        let tip_height: u64 = con
+                            .get(&format!("stx:tip"))
+                            .expect("unable to retrieve tip height");
+
+                        let start_block = stacks_hook.start_block.unwrap_or(2); // TODO(lgalabru): handle STX hooks and genesis block :s
+                        let end_block = stacks_hook.end_block.unwrap_or(tip_height); // TODO(lgalabru): handle STX hooks and genesis block :s
+
+                        // for cursor in 60000..=65000 {
+                        for cursor in start_block..=end_block {
+                            info!("Checking block {}", cursor);
+                            let (block_identifier, transactions) = {
+                                let payload: Vec<String> = con
+                                    .hget(
+                                        &format!("stx:{}", cursor),
+                                        &["block_identifier", "transactions"],
+                                    )
+                                    .expect("unable to retrieve tip height");
+                                if payload.len() != 2 {
+                                    warn!("Chain still being processed, please retry in a few minutes");
+                                    continue;
+                                }
+                                (
+                                    serde_json::from_str::<BlockIdentifier>(&payload[0]).unwrap(),
+                                    serde_json::from_str::<Vec<StacksTransactionData>>(&payload[1])
+                                        .unwrap(),
+                                )
+                            };
+                            let mut apply = vec![];
+                            for tx in transactions.iter() {
+                                if evaluate_stacks_chainhook_on_transaction(&tx, &stacks_hook) {
+                                    info!("Predicate is true for transaction {}", cursor);
+                                    apply.push((tx, &block_identifier));
+                                }
+                            }
+
+                            if apply.len() > 0 {
+                                let trigger = StacksTriggerChainhook {
+                                    chainhook: &stacks_hook,
+                                    apply,
+                                    rollback: vec![],
+                                };
+    
+                                let proofs = HashMap::new();
+                                if let Some(result) = handle_stacks_hook_action(trigger, &proofs) {
+                                    if let StacksChainhookOccurrence::Http(request) = result {
+                                        nestable_block_on(request.send()).unwrap();
+                                    }
+                                }    
+                            }
+                        }
+                    }
+                    ChainhookSpecification::Bitcoin(bitcoin_hook) => {}
+                }
             }
             ObserverEvent::Terminate => {
                 break;
@@ -121,3 +198,4 @@ pub fn main() {
         }
     }
 }
+

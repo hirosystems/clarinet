@@ -25,6 +25,7 @@ pub fn start(command_rx: Receiver<DigestingCommand>, config: &Config) {
     let mut indexer = Indexer::new(config.indexer_config.clone());
 
     let mut con = client.get_connection().unwrap();
+    let mut block_digested = 0;
     loop {
         while let Some(job) = job_queue.pop() {
             match &job.command {
@@ -45,6 +46,10 @@ pub fn start(command_rx: Receiver<DigestingCommand>, config: &Config) {
                             ("metadata", json!(block_data.metadata).to_string()),
                         ],
                     );
+                    if block_digested > 0 && job_queue.is_empty() {
+                        info!("Seeding completed - {} block processed", block_digested + 1);
+                    }
+                    block_digested += 1;
                 }
                 DigestingCommand::GarbageCollect => {
                     let keys_to_prune: Vec<String> = con

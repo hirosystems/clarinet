@@ -92,7 +92,7 @@ pub fn start(
         let mut tip = 0;
 
         while let Ok(Some(record)) = stacks_record_rx.recv() {
-            let (block_identifer, parent_block_identifier) = match &record.kind {
+            let (block_identifier, parent_block_identifier) = match &record.kind {
                 RecordKind::StacksBlockReceived => {
                     indexer::stacks::standardize_stacks_serialized_block_header(&record.raw_log)
                 }
@@ -100,9 +100,9 @@ pub fn start(
             };
 
             let _: Result<(), redis::RedisError> = con.hset_multiple(
-                &format!("stx:{}:{}", block_identifer.index, block_identifer.hash),
+                &format!("stx:{}:{}", block_identifier.index, block_identifier.hash),
                 &[
-                    ("block_identifer", json!(block_identifer).to_string()),
+                    ("block_identifier", json!(block_identifier).to_string()),
                     (
                         "parent_block_identifier",
                         json!(parent_block_identifier).to_string(),
@@ -110,8 +110,8 @@ pub fn start(
                     ("blob", record.raw_log),
                 ],
             );
-            if block_identifer.index > tip {
-                tip = block_identifer.index;
+            if block_identifier.index > tip {
+                tip = block_identifier.index;
                 let _: Result<(), redis::RedisError> = con.set(&format!("stx:tip"), tip);
             }
         }
@@ -130,8 +130,9 @@ pub fn start(
         // Retrieve all the headers stored at this height (SCAN - expensive)
         let mut selected_tip = BlockIdentifier::default();
         for key in chain_tips.into_iter() {
+            info!("HGET block_identifier: {}", key);
             let payload: String = con
-                .hget(&key, "parent_block_identifier")
+                .hget(&key, "block_identifier")
                 .expect("unable to retrieve tip height");
             selected_tip = serde_json::from_str(&payload).unwrap();
             break;
