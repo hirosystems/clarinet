@@ -25,12 +25,8 @@ use clarity_repl::repl::SessionSettings;
 use orchestra_types::StacksNetwork;
 use std::collections::{BTreeMap, HashMap, VecDeque};
 use types::ContractPublishSpecification;
-use types::ContractPublishSpecification;
-use types::DeploymentGenerationArtifacts;
 use types::DeploymentGenerationArtifacts;
 use types::RequirementPublishSpecification;
-use types::RequirementPublishSpecification;
-use types::TransactionSpecification;
 use types::TransactionSpecification;
 
 pub fn setup_session_with_deployment(

@@ -2,7 +2,7 @@ use crate::lsp_types::MessageType;
 use crate::state::{build_state, EditorState, ProtocolState};
 use crate::types::{CompletionItem, CompletionItemKind};
 use clarinet_files::{FileAccessor, FileLocation};
-use clarity_repl::clarity::diagnostic::Diagnostic;
+use clarity::vm::diagnostic::Diagnostic;
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Serialize, Deserialize)]
