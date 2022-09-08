@@ -1,4 +1,4 @@
-use clarity::codec::{write_next, Error as CodecError, StacksMessageCodec};
+use clarity::codec::StacksMessageCodec;
 use clarity::util::hash::{bytes_to_hex, hex_bytes};
 use clarity::vm::types::Value;
 
