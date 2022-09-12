@@ -41,6 +41,7 @@ fn generate_test_config() -> (EventObserverConfig, ChainhookStore) {
         stacks_node_rpc_host: "http://localhost".into(),
         stacks_node_rpc_port: 0,
         operators,
+        display_logs: false,
     };
     let mut entries = HashMap::new();
     entries.insert(ApiKey(None), HookFormation::new());
@@ -221,6 +222,14 @@ fn test_stacks_chainhook_register_deregister() {
         }
         _ => false,
     });
+
+    assert!(match observer_events_rx.recv() {
+        Ok(ObserverEvent::StacksChainhookTriggered(_)) => {
+            true
+        }
+        _ => false,
+    });
+
     // Should propagate block
     assert!(match observer_events_rx.recv() {
         Ok(ObserverEvent::StacksChainEvent(_)) => {
@@ -400,6 +409,14 @@ fn test_stacks_chainhook_auto_deregister() {
         }
         _ => false,
     });
+
+    assert!(match observer_events_rx.recv() {
+        Ok(ObserverEvent::StacksChainhookTriggered(_)) => {
+            true
+        }
+        _ => false,
+    });
+
     // Should propagate block
     assert!(match observer_events_rx.recv() {
         Ok(ObserverEvent::StacksChainEvent(_)) => {
@@ -551,6 +568,14 @@ fn test_bitcoin_chainhook_register_deregister() {
         }
         _ => false,
     });
+
+    assert!(match observer_events_rx.recv() {
+        Ok(ObserverEvent::BitcoinChainhookTriggered(_)) => {
+            true
+        }
+        _ => false,
+    });
+
     // Should propagate block
     assert!(match observer_events_rx.recv() {
         Ok(ObserverEvent::BitcoinChainEvent(_)) => {
@@ -731,6 +756,14 @@ fn test_bitcoin_chainhook_auto_deregister() {
         }
         _ => false,
     });
+
+    assert!(match observer_events_rx.recv() {
+        Ok(ObserverEvent::BitcoinChainhookTriggered(_)) => {
+            true
+        }
+        _ => false,
+    });
+
     // Should propagate block
     assert!(match observer_events_rx.recv() {
         Ok(ObserverEvent::BitcoinChainEvent(_)) => {

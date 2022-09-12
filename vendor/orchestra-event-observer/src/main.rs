@@ -146,6 +146,7 @@ impl EventObserverConfig {
             stacks_node_rpc_host: config_file.stacks_node_rpc_host.clone(),
             stacks_node_rpc_port: config_file.stacks_node_rpc_port.clone(),
             operators,
+            display_logs: true,
         };
         config
     }

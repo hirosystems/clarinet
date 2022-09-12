@@ -62,19 +62,17 @@ pub fn build_transaction_spec(
     }
 
     // Prepare Recipient output
-    let recipient_pub_key_hash = tx_spec
-        .recipient
-        .from_base58()
-        .expect("Unable to get bytes recipient btc address");
+    let address = {
+        use bitcoin::Address;
+        match Address::from_str(&tx_spec.recipient) {
+            Ok(address) => address,
+            Err(e) => panic!("{:?}", e),
+        }
+    };
+
     let txout = TxOut {
         value: tx_spec.sats_amount,
-        script_pubkey: Builder::new()
-            .push_opcode(opcodes::all::OP_DUP)
-            .push_opcode(opcodes::all::OP_HASH160)
-            .push_slice(&recipient_pub_key_hash[1..21])
-            .push_opcode(opcodes::all::OP_EQUALVERIFY)
-            .push_opcode(opcodes::all::OP_CHECKSIG)
-            .into_script(),
+        script_pubkey: address.script_pubkey(),
     };
     transaction.output.push(txout);
 
