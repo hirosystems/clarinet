@@ -382,6 +382,18 @@ struct Test {
         conflicts_with = "use-on-disk-deployment-plan"
     )]
     pub use_computed_deployment_plan: bool,
+    /// Stop after N errors. Defaults to stopping after first failure
+    #[clap(long = "fail-fast")]
+    pub fail_fast: Option<u16>,
+    /// Run tests with this string or pattern in the test name
+    #[clap(long = "filter")]
+    pub filter: Option<String>,
+    /// Load import map file from local file or remote URL
+    #[clap(long = "import-map")]
+    pub import_map: Option<String>,
+    /// Allow network access
+    #[clap(long = "allow-net")]
+    pub allow_net: bool,
 }
 
 #[derive(Parser, PartialEq, Clone, Debug)]
@@ -1017,6 +1029,7 @@ pub fn main() {
             let manifest = load_manifest_or_exit(cmd.manifest_path);
             let deployment_plan_path = cmd.deployment_plan_path.clone();
             let cache = build_deployment_cache_or_exit(&manifest, &deployment_plan_path);
+            let cache_location = manifest.project.cache_location.clone();
 
             let (success, _count) = match run_scripts(
                 cmd.files,
@@ -1028,9 +1041,17 @@ pub fn main() {
                 &manifest,
                 cache,
                 deployment_plan_path,
+                cmd.fail_fast,
+                cmd.filter,
+                cmd.import_map,
+                cmd.allow_net,
+                cache_location,
             ) {
                 Ok(count) => (true, count),
-                Err((_, count)) => (false, count),
+                Err((e, count)) => {
+                    println!("{}: {}", red!("error:"), e);
+                    (false, count)
+                }
             };
             if hints_enabled {
                 display_tests_pro_tips_hint();
@@ -1051,7 +1072,7 @@ pub fn main() {
             let manifest = load_manifest_or_exit(cmd.manifest_path);
 
             let cache = build_deployment_cache_or_exit(&manifest, &cmd.deployment_plan_path);
-
+            let cache_location = manifest.project.cache_location.clone();
             let _ = run_scripts(
                 vec![cmd.script],
                 false,
@@ -1062,6 +1083,11 @@ pub fn main() {
                 &manifest,
                 cache,
                 cmd.deployment_plan_path,
+                None,
+                None,
+                None,
+                false,
+                cache_location,
             );
         }
         Command::Integrate(cmd) => {

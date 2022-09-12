@@ -270,6 +270,7 @@ pub async fn start_event_observer(
         workers: 3,
         address: IpAddr::V4(Ipv4Addr::new(0, 0, 0, 0)),
         keep_alive: 5,
+        temp_dir: std::env::temp_dir().into(),
         log_level: log_level.clone(),
         ..Config::default()
     };
@@ -304,6 +305,7 @@ pub async fn start_event_observer(
         workers: 1,
         address: IpAddr::V4(Ipv4Addr::new(0, 0, 0, 0)),
         keep_alive: 5,
+        temp_dir: std::env::temp_dir().into(),
         log_level,
         ..Config::default()
     };

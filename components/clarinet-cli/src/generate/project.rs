@@ -155,7 +155,7 @@ impl GetChangesForNewProject {
             r#"
 **/settings/Mainnet.toml
 **/settings/Testnet.toml
-.requirements/
+.cache/**
 history.txt
 "#,
         );

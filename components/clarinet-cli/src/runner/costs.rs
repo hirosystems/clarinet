@@ -7,16 +7,6 @@ use clarity_repl::repl::Session;
 use std::collections::HashMap;
 use std::collections::{btree_map::Entry, BTreeMap};
 
-#[derive(Clone)]
-enum Bottleneck {
-    Unknown,
-    Runtime(u64, u64),
-    ReadCount(u64, u64),
-    ReadLength(u64, u64),
-    WriteCount(u64, u64),
-    WriteLength(u64, u64),
-}
-
 pub struct ExecutionCost {
     actual: u64,
     limit: u64,
@@ -29,10 +19,6 @@ impl ExecutionCost {
 
     pub fn actual(&self) -> u64 {
         self.actual
-    }
-
-    pub fn limit(&self) -> u64 {
-        self.limit
     }
 
     pub fn tx_per_block(&self) -> u64 {
@@ -49,10 +35,6 @@ struct FunctionCosts {
     pub write_count: ExecutionCost,
     pub write_length: ExecutionCost,
     pub tx_per_block: u64,
-}
-
-fn safe_div(limit: u64, total: u64) -> u64 {
-    limit.checked_div(total).unwrap_or_else(|| limit)
 }
 
 impl FunctionCosts {
@@ -127,6 +109,7 @@ pub fn display_costs_report(sessions_artifacts: &Vec<SessionArtifacts>) {
     }
 
     println!("\nContract calls cost synthesis");
+    #[allow(unused_variables)]
     let table = Table::new();
     let headers = vec![
         "".to_string(),
