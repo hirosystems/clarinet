@@ -9,6 +9,5 @@ extern crate serde_derive;
 extern crate serde_json;
 
 pub mod rpc_client;
-pub mod transactions;
 
 pub use rpc_client::{PoxInfo, StacksRpc};

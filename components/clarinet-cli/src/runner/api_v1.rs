@@ -3,11 +3,9 @@ use super::DeploymentCache;
 use clarinet_deployments::types::DeploymentSpecification;
 use clarinet_deployments::update_session_with_contracts_executions;
 use clarinet_files::ProjectManifest;
-use clarity_repl::clarity::analysis::contract_interface_builder::{
-    build_contract_interface, ContractInterface,
-};
-use clarity_repl::clarity::coverage::TestCoverageReport;
-use clarity_repl::clarity::types;
+use clarity::vm::analysis::contract_interface_builder::build_contract_interface;
+use clarity::vm::EvaluationResult;
+use clarity_repl::analysis::coverage::TestCoverageReport;
 use clarity_repl::repl::session::CostsReport;
 use clarity_repl::repl::Session;
 use deno::tools::test_runner::TestEvent;
@@ -262,11 +260,11 @@ pub fn load_deployment(state: &mut OpState, args: Value, _: ()) -> Result<String
     for (contract_id, result) in results.into_iter() {
         match result {
             Ok(execution) => {
-                if let Some((_, source, functions, ast, analysis)) = execution.contract {
+                if let EvaluationResult::Contract(contract_result) = execution.result {
                     serialized_contracts.push(json!({
                         "contract_id": contract_id.to_string(),
-                        "contract_interface": build_contract_interface(&analysis),
-                        "source": source,
+                        "contract_interface": build_contract_interface(&contract_result.contract.analysis),
+                        "source": contract_result.contract.code,
                     }))
                 }
             }
@@ -385,8 +383,8 @@ pub fn call_read_only_fn(state: &mut OpState, args: Value, _: ()) -> Result<Stri
             )
             .unwrap(); // TODO(lgalabru)
         let result = match execution.result {
-            Some(output) => format!("{}", output),
-            _ => unreachable!("Value empty"),
+            EvaluationResult::Snippet(result) => format!("{}", result.result),
+            _ => unreachable!("Contract result from snippet"),
         };
         Ok((result, execution.events))
     })?;
@@ -500,8 +498,8 @@ pub fn mine_block(state: &mut OpState, args: Value, _: ()) -> Result<String, Any
                     }
                 };
                 let result = match execution.result {
-                    Some(output) => utils::value_to_string(&output),
-                    _ => unreachable!("Value empty"),
+                    EvaluationResult::Snippet(result) => utils::value_to_string(&result.result),
+                    _ => unreachable!("Contract result from snippet"),
                 };
                 receipts.push((result, execution.events));
             } else {
@@ -518,8 +516,8 @@ pub fn mine_block(state: &mut OpState, args: Value, _: ()) -> Result<String, Any
                         )
                         .unwrap(); // TODO(lgalabru)
                     let result = match execution.result {
-                        Some(output) => format!("{}", output),
-                        _ => unreachable!("Value empty"),
+                        EvaluationResult::Snippet(result) => format!("{}", result.result),
+                        _ => unreachable!("Contract result from snippet"),
                     };
                     receipts.push((result, execution.events));
                 } else if let Some(ref args) = tx.transfer_stx {
@@ -531,8 +529,8 @@ pub fn mine_block(state: &mut OpState, args: Value, _: ()) -> Result<String, Any
                         .interpret(snippet, None, None, false, Some(name.into()), None)
                         .unwrap(); // TODO(lgalabru)
                     let result = match execution.result {
-                        Some(output) => format!("{}", output),
-                        _ => unreachable!("Value empty"),
+                        EvaluationResult::Snippet(result) => format!("{}", result.result),
+                        _ => unreachable!("Contract result from snippet"),
                     };
                     receipts.push((result, execution.events));
                 }

@@ -1,4 +1,4 @@
-use clarity_repl::clarity::util::hash::hex_bytes;
+use clarity::util::hash::hex_bytes;
 use serde::ser::{SerializeSeq, Serializer};
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;

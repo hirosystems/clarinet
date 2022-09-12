@@ -7,6 +7,8 @@ edition = "2021"
 hmac = "0.12.0"
 pbkdf2 = { version = "0.11.0", features = ["simple"], default-features = false }
 sha2 = "0.10.0"
+serde = { version = "1.0", features = ["derive"] }
+clarity = { git = "https://github.com/stacks-network/stacks-blockchain.git", branch = "refactor/clarity-lib-merge" }
 
 [lib]
 name = "clarinet_utils"

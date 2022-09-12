@@ -8,4 +8,10 @@ serde = "1"
 serde_json = "1"
 serde_derive = "1"
 clarity_repl = { package = "clarity-repl", path = "../clarity-repl" }
-reqwest = { version = "0.11", default-features = false, features = ["blocking", "json", "rustls-tls"] }
+clarinet_utils = { package = "clarinet-utils", path = "../clarinet-utils" }
+clarity = { git = "https://github.com/stacks-network/stacks-blockchain.git", branch = "refactor/clarity-lib-merge" }
+reqwest = { version = "0.11", default-features = false, features = [
+    "blocking",
+    "json",
+    "rustls-tls",
+] }

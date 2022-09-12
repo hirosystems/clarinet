@@ -1,6 +1,7 @@
 use crate::FileAccessor;
 
 use super::FileLocation;
+use clarity::types::StacksEpochId;
 use clarity_repl::repl;
 use std::collections::BTreeMap;
 use toml::value::Value;
@@ -138,11 +139,31 @@ impl ProjectManifest {
             authors: project_manifest_file.project.authors.unwrap_or(vec![]),
             telemetry: project_manifest_file.project.telemetry.unwrap_or(false),
             cache_location,
-            boot_contracts: project_manifest_file.project.boot_contracts.unwrap_or(vec![
-                "pox".to_string(),
-                format!("costs-v{}", repl_settings.costs_version),
-                "bns".to_string(),
-            ]),
+            boot_contracts: project_manifest_file.project.boot_contracts.unwrap_or(
+                match repl_settings.epoch {
+                    StacksEpochId::Epoch10 | StacksEpochId::Epoch20 => vec![
+                        "pox".to_string(),
+                        "lockup".to_string(),
+                        "costs".to_string(),
+                        "cost-voting".to_string(),
+                        "bns".to_string(),
+                    ],
+                    StacksEpochId::Epoch2_05 => vec![
+                        "pox".to_string(),
+                        "lockup".to_string(),
+                        "costs-2".to_string(),
+                        "cost-voting".to_string(),
+                        "bns".to_string(),
+                    ],
+                    StacksEpochId::Epoch21 => vec![
+                        "pox-2".to_string(),
+                        "lockup".to_string(),
+                        "costs-2".to_string(),
+                        "cost-voting".to_string(),
+                        "bns".to_string(),
+                    ],
+                },
+            ),
         };
 
         let mut config = ProjectManifest {

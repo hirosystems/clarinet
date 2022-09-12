@@ -16,10 +16,12 @@ use crate::runner::DeploymentCache;
 use clarinet_deployments::setup_session_with_deployment;
 use clarinet_deployments::types::{DeploymentGenerationArtifacts, DeploymentSpecification};
 use clarinet_files::{FileLocation, ProjectManifest, ProjectManifestFile, RequirementConfig};
-use clarity_repl::clarity::analysis::{AnalysisDatabase, ContractAnalysis};
-use clarity_repl::clarity::costs::LimitedCostTracker;
-use clarity_repl::clarity::diagnostic::{Diagnostic, Level};
-use clarity_repl::clarity::types::QualifiedContractIdentifier;
+use clarity::vm::analysis::AnalysisDatabase;
+use clarity::vm::costs::LimitedCostTracker;
+use clarity::vm::diagnostic::{Diagnostic, Level};
+use clarity::vm::types::QualifiedContractIdentifier;
+use clarity_repl::analysis::call_checker::ContractAnalysis;
+use clarity_repl::repl::diagnostic::{output_code, output_diagnostic};
 use clarity_repl::{analysis, repl, Terminal};
 use orchestra_types::Chain;
 use orchestra_types::StacksNetwork;
@@ -918,17 +920,19 @@ pub fn main() {
                 }
             };
             let contract_id = QualifiedContractIdentifier::transient();
-            let (ast, mut diagnostics, mut success) = session.interpreter.build_ast(
-                contract_id.clone(),
-                code.clone(),
-                settings.repl_settings.parser_version,
-            );
+            let (ast, mut diagnostics, mut success) = session
+                .interpreter
+                .build_ast(contract_id.clone(), code.clone());
             let (annotations, mut annotation_diagnostics) =
                 session.interpreter.collect_annotations(&ast, &code);
             diagnostics.append(&mut annotation_diagnostics);
 
-            let mut contract_analysis =
-                ContractAnalysis::new(contract_id, ast.expressions, LimitedCostTracker::new_free());
+            let mut contract_analysis = ContractAnalysis::new(
+                contract_id,
+                ast.expressions,
+                LimitedCostTracker::new_free(),
+                settings.repl_settings.clarity_version,
+            );
             let mut analysis_db = AnalysisDatabase::new(&mut session.interpreter.datastore);
             let mut analysis_diagnostics = match analysis::run_analysis(
                 &mut contract_analysis,
@@ -947,7 +951,7 @@ pub fn main() {
             let lines = code.lines();
             let formatted_lines: Vec<String> = lines.map(|l| l.to_string()).collect();
             for d in diagnostics {
-                for line in d.output(&file, &formatted_lines) {
+                for line in output_diagnostic(&d, &file, &formatted_lines) {
                     println!("{}", line);
                 }
             }
@@ -1631,7 +1635,7 @@ impl DiagnosticsDigest {
                     }
                     Level::Note => {
                         outputs.push(format!("{}: {}", green!("note:"), diagnostic.message));
-                        outputs.append(&mut diagnostic.output_code(&formatted_lines));
+                        outputs.append(&mut output_code(&diagnostic, &formatted_lines));
                         continue;
                     }
                 }
@@ -1649,7 +1653,7 @@ impl DiagnosticsDigest {
                         span.start_column
                     ));
                 }
-                outputs.append(&mut diagnostic.output_code(&formatted_lines));
+                outputs.append(&mut output_code(&diagnostic, &formatted_lines));
 
                 if let Some(ref suggestion) = diagnostic.suggestion {
                     outputs.push(format!("{}", suggestion));

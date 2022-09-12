@@ -8,7 +8,7 @@ use crate::indexer::{self, Indexer, IndexerConfig};
 use crate::utils;
 use bitcoincore_rpc::bitcoin::{BlockHash, Txid};
 use bitcoincore_rpc::{Auth, Client, RpcApi};
-use clarity_repl::clarity::util::hash::bytes_to_hex;
+use clarity::util::hash::bytes_to_hex;
 use orchestra_types::{
     BitcoinChainEvent, StacksChainEvent, StacksNetwork, StacksTransactionData,
     TransactionIdentifier,

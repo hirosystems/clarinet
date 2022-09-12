@@ -2,6 +2,10 @@ use hmac::Hmac;
 use pbkdf2::pbkdf2;
 use sha2::Sha512;
 
+#[macro_use]
+pub mod macros;
+pub mod transactions;
+
 pub fn get_bip39_seed_from_mnemonic(mnemonic: &str, password: &str) -> Result<Vec<u8>, String> {
     const PBKDF2_ROUNDS: u32 = 2048;
     const PBKDF2_BYTES: usize = 64;

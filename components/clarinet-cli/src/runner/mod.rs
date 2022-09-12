@@ -16,12 +16,13 @@ use clarinet_deployments::{
     update_session_with_contracts_executions, update_session_with_genesis_accounts,
 };
 use clarinet_files::ProjectManifest;
-use clarity_repl::clarity::analysis::contract_interface_builder::{
+use clarity::vm::analysis::contract_interface_builder::{
     build_contract_interface, ContractInterface,
 };
-use clarity_repl::clarity::types::QualifiedContractIdentifier;
-use clarity_repl::repl::ast::ContractAST;
-use clarity_repl::repl::{ExecutionResult, Session};
+use clarity::vm::ast::ContractAST;
+use clarity::vm::types::QualifiedContractIdentifier;
+use clarity::vm::EvaluationResult;
+use clarity_repl::repl::Session;
 
 use std::collections::{BTreeMap, HashMap};
 use std::path::PathBuf;
@@ -62,7 +63,7 @@ impl DeploymentCache {
 
         let mut contracts_artifacts = HashMap::new();
         for (contract_id, execution_result) in execution_results.into_iter() {
-            let mut execution_result = match execution_result {
+            let execution_result = match execution_result {
                 Ok(execution_result) => execution_result,
                 Err(diagnostics) => {
                     println!("Error found in contract {}", contract_id);
@@ -72,13 +73,13 @@ impl DeploymentCache {
                     std::process::exit(1);
                 }
             };
-            if let Some((_, source, functions, ast, analysis)) = execution_result.contract.take() {
+            if let EvaluationResult::Contract(contract_result) = execution_result.result {
                 contracts_artifacts.insert(
                     contract_id.clone(),
                     AnalysisArtifacts {
-                        ast,
-                        interface: build_contract_interface(&analysis),
-                        source,
+                        ast: contract_result.contract.ast,
+                        interface: build_contract_interface(&contract_result.contract.analysis),
+                        source: contract_result.contract.code,
                         dependencies: vec![],
                     },
                 );

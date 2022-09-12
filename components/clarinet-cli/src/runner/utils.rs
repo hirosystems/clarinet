@@ -1,9 +1,9 @@
-use clarity_repl::clarity::types;
-use clarity_repl::clarity::util::hash;
+use clarity::util::hash;
+use clarity::vm::Value;
 use std::fmt::Write;
 
-pub fn value_to_string(value: &types::Value) -> String {
-    use clarity_repl::clarity::types::{CharType, SequenceData, Value};
+pub fn value_to_string(value: &Value) -> String {
+    use clarity::vm::types::{CharType, SequenceData};
 
     match value {
         Value::Tuple(tup_data) => {
@@ -59,81 +59,77 @@ pub fn value_to_string(value: &types::Value) -> String {
 
 #[cfg(test)]
 mod tests {
-    use super::types;
     use super::value_to_string;
-    use clarity_repl::clarity::representations::ClarityName;
-    use clarity_repl::clarity::types::{
-        ListTypeData, OptionalData, ResponseData, SequenceData, SequencedValue, TupleData,
+    use clarity::vm::types::{
+        ASCIIData, CharType, ListData, ListTypeData, OptionalData, ResponseData, SequenceData,
+        SequencedValue, TupleData, TypeSignature, UTF8Data, NONE,
     };
+    use clarity::vm::{ClarityName, Value};
 
     #[test]
     fn test_value_to_string() {
-        let mut s = value_to_string(&types::Value::Int(42));
+        let mut s = value_to_string(&Value::Int(42));
         assert_eq!(s, "42");
 
-        s = value_to_string(&types::Value::UInt(12345678909876));
+        s = value_to_string(&Value::UInt(12345678909876));
         assert_eq!(s, "u12345678909876");
 
-        s = value_to_string(&types::Value::Bool(true));
+        s = value_to_string(&Value::Bool(true));
         assert_eq!(s, "true");
 
-        s = value_to_string(&types::Value::buff_from(vec![1, 2, 3]).unwrap());
+        s = value_to_string(&Value::buff_from(vec![1, 2, 3]).unwrap());
         assert_eq!(s, "0x010203");
 
-        s = value_to_string(&types::Value::buff_from(vec![1, 2, 3]).unwrap());
+        s = value_to_string(&Value::buff_from(vec![1, 2, 3]).unwrap());
         assert_eq!(s, "0x010203");
 
-        s = value_to_string(&types::Value::Tuple(
+        s = value_to_string(&Value::Tuple(
             TupleData::from_data(vec![(
                 ClarityName::try_from("foo".to_string()).unwrap(),
-                types::Value::Bool(true),
+                Value::Bool(true),
             )])
             .unwrap(),
         ));
         assert_eq!(s, "{foo: true}");
 
-        s = value_to_string(&types::Value::Optional(OptionalData {
-            data: Some(Box::new(types::Value::UInt(42))),
+        s = value_to_string(&Value::Optional(OptionalData {
+            data: Some(Box::new(Value::UInt(42))),
         }));
         assert_eq!(s, "(some u42)");
 
-        s = value_to_string(&types::NONE);
+        s = value_to_string(&NONE);
         assert_eq!(s, "none");
 
-        s = value_to_string(&types::Value::Response(ResponseData {
+        s = value_to_string(&Value::Response(ResponseData {
             committed: true,
-            data: Box::new(types::Value::Int(-321)),
+            data: Box::new(Value::Int(-321)),
         }));
         assert_eq!(s, "(ok -321)");
 
-        s = value_to_string(&types::Value::Response(ResponseData {
+        s = value_to_string(&Value::Response(ResponseData {
             committed: false,
-            data: Box::new(types::Value::Sequence(types::SequenceData::String(
-                types::CharType::ASCII(types::ASCIIData {
+            data: Box::new(Value::Sequence(SequenceData::String(CharType::ASCII(
+                ASCIIData {
                     data: "'foo'".as_bytes().to_vec(),
-                }),
-            ))),
+                },
+            )))),
         }));
         assert_eq!(s, "(err \"'foo'\")");
 
-        s = value_to_string(&types::Value::Sequence(types::SequenceData::String(
-            types::CharType::ASCII(types::ASCIIData {
+        s = value_to_string(&Value::Sequence(SequenceData::String(CharType::ASCII(
+            ASCIIData {
                 data: "Hello, \"world\"\n".as_bytes().to_vec(),
-            }),
-        )));
+            },
+        ))));
         assert_eq!(s, "\"Hello, \"world\"\n\"");
 
-        s = value_to_string(&types::UTF8Data::to_value(
-            &"Hello, 'world'\n".as_bytes().to_vec(),
-        ));
+        s = value_to_string(&UTF8Data::to_value(&"Hello, 'world'\n".as_bytes().to_vec()));
         assert_eq!(s, "u\"Hello, 'world'\n\"");
 
-        s = value_to_string(&types::Value::Sequence(SequenceData::List(
-            types::ListData {
-                data: vec![types::Value::Int(-321)],
-                type_signature: ListTypeData::new_list(types::TypeSignature::IntType, 2).unwrap(),
-            },
-        )));
+        s = value_to_string(&Value::Sequence(SequenceData::List(ListData {
+            data: vec![Value::Int(-321)],
+            type_signature: ListTypeData::new_list(TypeSignature::IntType, 2).unwrap(),
+        })));
         assert_eq!(s, "[-321]");
     }
 }
