@@ -4,10 +4,10 @@ mod ui;
 
 use bitcoincore_rpc::{Auth, Client};
 
-use clarity::types::chainstate::StacksAddress;
-use clarity::util::secp256k1::{MessageSignature, Secp256k1PrivateKey, Secp256k1PublicKey};
-use clarity::vm::types::StandardPrincipalData;
-use clarity::vm::{ClarityName, EvaluationResult, Value};
+use clarity_repl::clarity::types::chainstate::StacksAddress;
+use clarity_repl::clarity::util::secp256k1::{MessageSignature, Secp256k1PrivateKey, Secp256k1PublicKey};
+use clarity_repl::clarity::vm::types::StandardPrincipalData;
+use clarity_repl::clarity::vm::{ClarityName, EvaluationResult, Value};
 use reqwest::Url;
 pub use ui::start_ui;
 
@@ -26,14 +26,14 @@ use clarinet_utils::transactions::{
     TransactionPayload, TransactionPostConditionMode, TransactionPublicKeyEncoding,
     TransactionSmartContract, TransactionSpendingCondition, TransactionVersion,
 };
-use clarity::codec::StacksMessageCodec;
+use clarity_repl::clarity::codec::StacksMessageCodec;
 
-use clarity::address::{
+use clarity_repl::clarity::address::{
     AddressHashMode, C32_ADDRESS_VERSION_MAINNET_SINGLESIG, C32_ADDRESS_VERSION_TESTNET_SINGLESIG,
 };
-use clarity::vm::types::QualifiedContractIdentifier;
+use clarity_repl::clarity::vm::types::QualifiedContractIdentifier;
 
-use clarity::vm::ContractName;
+use clarity_repl::clarity::vm::ContractName;
 use clarity_repl::repl::Session;
 use clarity_repl::repl::SessionSettings;
 use libsecp256k1::{PublicKey, SecretKey};

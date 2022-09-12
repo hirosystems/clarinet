@@ -1,6 +1,6 @@
 use super::{ClarityBackingStore, ClarityDeserializable};
 use clarity::types::chainstate::StacksBlockId;
-use clarity::util::hash::Sha512Trunc256Sum;
+use clarity_repl::clarity::util::hash::Sha512Trunc256Sum;
 use clarity::vm::errors::InterpreterResult as Result;
 use clarity::vm::types::{QualifiedContractIdentifier, TypeSignature};
 use clarity::vm::Value;

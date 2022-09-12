@@ -5,7 +5,7 @@ use bitcoincore_rpc::bitcoin::hashes::Hash;
 use bitcoincore_rpc::bitcoin::BlockHash;
 use bitcoincore_rpc::{Auth, Client, RpcApi};
 pub use blocks_pool::BitcoinBlockPool;
-use clarity::util::hash::{hex_bytes, to_hex};
+use clarity_repl::clarity::util::hash::{hex_bytes, to_hex};
 use orchestra_types::bitcoin::{OutPoint, TxIn, TxOut};
 use orchestra_types::{
     BitcoinBlockData, BitcoinBlockMetadata, BitcoinTransactionData, BitcoinTransactionMetadata,

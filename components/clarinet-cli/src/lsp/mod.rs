@@ -1,6 +1,6 @@
 mod native_bridge;
 
-use clarity::vm::diagnostic::{Diagnostic as ClarityDiagnostic, Level as ClarityLevel};
+use clarity_repl::clarity::vm::diagnostic::{Diagnostic as ClarityDiagnostic, Level as ClarityLevel};
 use clarity_lsp::utils;
 use native_bridge::LspNativeBridge;
 

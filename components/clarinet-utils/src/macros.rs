@@ -21,13 +21,13 @@ macro_rules! impl_byte_array_newtype {
         impl $thing {
             /// Instantiates from a hex string
             #[allow(dead_code)]
-            pub fn from_hex(hex_str: &str) -> Result<$thing, clarity::util::HexError> {
-                use clarity::util::hash::hex_bytes;
+            pub fn from_hex(hex_str: &str) -> Result<$thing, clarity_repl::clarity::util::HexError> {
+                use clarity_repl::clarity::util::hash::hex_bytes;
                 let _hex_len = $len * 2;
                 match (hex_str.len(), hex_bytes(hex_str)) {
                     (_hex_len, Ok(bytes)) => {
                         if bytes.len() != $len {
-                            return Err(clarity::util::HexError::BadLength(hex_str.len()));
+                            return Err(clarity_repl::clarity::util::HexError::BadLength(hex_str.len()));
                         }
                         let mut ret = [0; $len];
                         ret.copy_from_slice(&bytes);
@@ -90,7 +90,7 @@ macro_rules! impl_byte_array_newtype {
             /// Convert to a hex string
             #[allow(dead_code)]
             pub fn to_hex(&self) -> String {
-                use clarity::util::hash::to_hex;
+                use clarity_repl::clarity::util::hash::to_hex;
                 to_hex(&self.0)
             }
         }

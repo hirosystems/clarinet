@@ -4,19 +4,16 @@ use clarinet_deployments::{
     update_session_with_genesis_accounts,
 };
 use clarinet_files::{FileLocation, ProjectManifest};
-use clarinet_files::ProjectManifest;
-use clarity::vm::analysis::contract_interface_builder::{
+use clarity_repl::clarity::vm::analysis::contract_interface_builder::{
     build_contract_interface, ContractInterface,
 };
-use clarity::vm::ast::ContractAST;
-use clarity::vm::types::QualifiedContractIdentifier;
-use clarity::vm::EvaluationResult;
-use clarity_repl::repl::Session;
-
-use std::collections::{BTreeMap, HashMap};
-use std::path::PathBuf;
-use deno_core::error::AnyError;
+use clarity_repl::clarity::vm::ast::ContractAST;
+use clarity_repl::clarity::vm::types::QualifiedContractIdentifier;
+use clarity_repl::clarity::vm::EvaluationResult;
+use clarity_repl::repl::{Session, session::CostsReport};
+use clarity_repl::analysis::coverage::{TestCoverageReport};
 use std::collections::HashMap;
+use deno_core::error::AnyError;
 
 use clarinet_deployments::types::DeploymentSpecification;
 

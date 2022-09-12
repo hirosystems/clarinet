@@ -21,7 +21,7 @@ use super::vendor::deno_runtime::permissions::Permissions;
 use super::vendor::deno_runtime::tokio_util::run_local;
 use super::{api_v1, costs, DeploymentCache, SessionArtifacts};
 use clarinet_files::{FileLocation, ProjectManifest};
-use clarity_repl::clarity::coverage::CoverageReporter;
+use clarity_repl::analysis::coverage::CoverageReporter;
 use deno_ast::swc::common::comments::CommentKind;
 use deno_ast::MediaType;
 use deno_ast::SourceRangedForSpanned;

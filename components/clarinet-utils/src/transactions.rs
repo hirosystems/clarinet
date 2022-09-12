@@ -5,29 +5,29 @@ use std::ops::Deref;
 use std::ops::DerefMut;
 
 use crate::impl_byte_array_newtype;
-use clarity::address::AddressHashMode;
-use clarity::address::{
+use clarity_repl::clarity::address::AddressHashMode;
+use clarity_repl::clarity::address::{
     C32_ADDRESS_VERSION_MAINNET_MULTISIG, C32_ADDRESS_VERSION_MAINNET_SINGLESIG,
     C32_ADDRESS_VERSION_TESTNET_MULTISIG, C32_ADDRESS_VERSION_TESTNET_SINGLESIG,
 };
-use clarity::codec::MAX_MESSAGE_LEN;
-use clarity::codec::{read_next, write_next, Error as CodecError, StacksMessageCodec};
-use clarity::types::chainstate::{
+use clarity_repl::clarity::codec::MAX_MESSAGE_LEN;
+use clarity_repl::clarity::codec::{read_next, write_next, Error as CodecError, StacksMessageCodec};
+use clarity_repl::clarity::types::chainstate::{
     BlockHeaderHash, BurnchainHeaderHash, ConsensusHash, StacksWorkScore, TrieHash,
 };
-use clarity::types::chainstate::{StacksAddress, StacksPublicKey};
-use clarity::types::PrivateKey;
-use clarity::util::hash::{Hash160, Sha512Trunc256Sum};
-use clarity::util::retry::BoundReader;
-use clarity::util::secp256k1::{
+use clarity_repl::clarity::types::chainstate::{StacksAddress, StacksPublicKey};
+use clarity_repl::clarity::types::PrivateKey;
+use clarity_repl::clarity::util::hash::{Hash160, Sha512Trunc256Sum};
+use clarity_repl::clarity::util::retry::BoundReader;
+use clarity_repl::clarity::util::secp256k1::{
     MessageSignature, Secp256k1PrivateKey, Secp256k1PublicKey, MESSAGE_SIGNATURE_ENCODED_SIZE,
 };
-use clarity::util::vrf::VRFProof;
-use clarity::vm::types::{
+use clarity_repl::clarity::util::vrf::VRFProof;
+use clarity_repl::clarity::vm::types::{
     PrincipalData, QualifiedContractIdentifier, StandardPrincipalData, Value,
 };
-use clarity::vm::{ClarityName, ContractName};
-use clarity::{
+use clarity_repl::clarity::vm::{ClarityName, ContractName};
+use clarity_repl::clarity::{
     impl_array_hexstring_fmt, impl_array_newtype, impl_byte_array_message_codec,
     impl_byte_array_serde,
 };
@@ -39,20 +39,20 @@ pub const MAX_TRANSACTION_LEN: u32 = MAX_BLOCK_LEN;
 #[macro_export]
 macro_rules! impl_byte_array_message_codec {
     ($thing:ident, $len:expr) => {
-        impl clarity::codec::StacksMessageCodec for $thing {
+        impl clarity_repl::clarity::codec::StacksMessageCodec for $thing {
             fn consensus_serialize<W: std::io::Write>(
                 &self,
                 fd: &mut W,
-            ) -> Result<(), clarity::codec::Error> {
+            ) -> Result<(), clarity_repl::clarity::codec::Error> {
                 fd.write_all(self.as_bytes())
-                    .map_err(clarity::codec::Error::WriteError)
+                    .map_err(clarity_repl::clarity::codec::Error::WriteError)
             }
             fn consensus_deserialize<R: std::io::Read>(
                 fd: &mut R,
-            ) -> Result<$thing, clarity::codec::Error> {
+            ) -> Result<$thing, clarity_repl::clarity::codec::Error> {
                 let mut buf = [0u8; ($len as usize)];
                 fd.read_exact(&mut buf)
-                    .map_err(clarity::codec::Error::ReadError)?;
+                    .map_err(clarity_repl::clarity::codec::Error::ReadError)?;
                 let ret = $thing::from_bytes(&buf).expect("BUG: buffer is not the right size");
                 Ok(ret)
             }

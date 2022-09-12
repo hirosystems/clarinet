@@ -25,6 +25,8 @@ mod macros;
 #[cfg(feature = "wasm")]
 use wasm_bindgen::prelude::*;
 
+pub extern crate clarity;
+
 pub mod analysis;
 pub mod repl;
 

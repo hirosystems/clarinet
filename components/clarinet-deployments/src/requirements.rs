@@ -1,5 +1,5 @@
 use clarinet_files::{FileAccessor, FileLocation};
-use clarity::vm::types::QualifiedContractIdentifier;
+use clarity_repl::clarity::vm::types::QualifiedContractIdentifier;
 use reqwest;
 
 pub async fn retrieve_contract(

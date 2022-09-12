@@ -1,10 +1,7 @@
-use super::api_v1::SessionArtifacts;
-use clarinet_deployments::types::DeploymentSpecification;
-use clarity::vm::CostSynthesis;
+use super::SessionArtifacts;
+use clarity_repl::clarity::vm::CostSynthesis;
 use clarity_repl::prettytable::{color, format, Attr, Cell, Row, Table};
 use clarity_repl::repl::session::CostsReport;
-use clarity_repl::repl::Session;
-use std::collections::HashMap;
 use std::collections::{btree_map::Entry, BTreeMap};
 
 pub struct ExecutionCost {

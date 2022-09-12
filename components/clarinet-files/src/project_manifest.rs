@@ -1,7 +1,7 @@
 use crate::FileAccessor;
 
 use super::FileLocation;
-use clarity::types::StacksEpochId;
+use clarity_repl::clarity::types::StacksEpochId;
 use clarity_repl::repl;
 use std::collections::BTreeMap;
 use toml::value::Value;

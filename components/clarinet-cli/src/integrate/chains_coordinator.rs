@@ -10,11 +10,11 @@ use clarinet_deployments::types::DeploymentSpecification;
 use clarinet_files::{self, AccountConfig, DevnetConfig, NetworkManifest, ProjectManifest};
 
 use clarinet_utils::transactions;
-use clarity::address::AddressHashMode;
-use clarity::util::hash::{hex_bytes, Hash160};
-use clarity::vm::types::{BuffData, SequenceData, TupleData};
-use clarity::vm::ClarityName;
-use clarity::vm::Value as ClarityValue;
+use clarity_repl::clarity::address::AddressHashMode;
+use clarity_repl::clarity::util::hash::{hex_bytes, Hash160};
+use clarity_repl::clarity::vm::types::{BuffData, SequenceData, TupleData};
+use clarity_repl::clarity::vm::ClarityName;
+use clarity_repl::clarity::vm::Value as ClarityValue;
 use orchestra_event_observer::observer::{
     start_event_observer, EventObserverConfig, ObserverCommand, ObserverEvent,
     StacksChainMempoolEvent,

@@ -5,7 +5,7 @@ use crate::repl::database::{
     ClarityDatabase, ClarityDeserializable, ClaritySerializable, HeadersDB, NULL_HEADER_DB,
 };
 use clarity::types::chainstate::{BlockHeaderHash, BurnchainHeaderHash, StacksBlockId, VRFSeed};
-use clarity::util::hash::{hex_bytes, to_hex, Sha512Trunc256Sum};
+use clarity_repl::clarity::util::hash::{hex_bytes, to_hex, Sha512Trunc256Sum};
 use clarity::vm::analysis::AnalysisDatabase;
 use clarity::vm::errors::{
     CheckErrors, IncomparableError, InterpreterError, InterpreterResult as Result, RuntimeErrorType,

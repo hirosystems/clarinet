@@ -3,7 +3,7 @@ use std::collections::HashSet;
 use base58::FromBase58;
 use bitcoincore_rpc::bitcoin::blockdata::opcodes;
 use bitcoincore_rpc::bitcoin::blockdata::script::Builder as BitcoinScriptBuilder;
-use clarity::util::hash::to_hex;
+use clarity_repl::clarity::util::hash::to_hex;
 use orchestra_types::bitcoin::TxOut;
 use orchestra_types::{
     BitcoinTransactionData, BitcoinTransactionMetadata, StacksContractCallData,

@@ -1,4 +1,4 @@
-use clarity::util::hash::{bytes_to_hex, Hash160};
+use clarity_repl::clarity::util::hash::{bytes_to_hex, Hash160};
 use mac_address::get_mac_address;
 use segment::{
     message::{Message, Track, User},
