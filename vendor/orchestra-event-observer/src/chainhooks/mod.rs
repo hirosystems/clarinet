@@ -21,6 +21,9 @@ use std::iter::Map;
 use std::slice::Iter;
 use std::str::FromStr;
 
+use reqwest::{Error, RequestBuilder, Response};
+use std::future::Future;
+
 pub struct StacksTriggerChainhook<'a> {
     pub chainhook: &'a StacksChainhookSpecification,
     pub apply: Vec<(&'a StacksTransactionData, &'a BlockIdentifier)>,
@@ -374,13 +377,75 @@ pub fn evaluate_bitcoin_chainhooks_on_chain_event<'a>(
     triggered_chainhooks
 }
 
-use reqwest::{Error, RequestBuilder, Response};
-use std::future::Future;
+#[derive(Clone, Debug)]
+pub struct BitcoinApplyTransactionPayload {
+    pub transaction: BitcoinTransactionData,
+    pub block_identifier: BlockIdentifier,
+    pub confirmations: u8,
+    pub proof: Option<Vec<u8>>,
+}
+
+#[derive(Clone, Debug)]
+pub struct BitcoinRollbackTransactionPayload {
+    pub transaction: BitcoinTransactionData,
+    pub block_identifier: BlockIdentifier,
+    pub confirmations: u8,
+}
+
+#[derive(Clone, Debug)]
+pub struct BitcoinChainhookPayload {
+    pub uuid: String,
+    pub predicate: BitcoinHookPredicate,
+}
+
+#[derive(Clone, Debug)]
+pub struct BitcoinChainhookOccurrencePayload {
+    pub apply: Vec<BitcoinApplyTransactionPayload>,
+    pub rollback: Vec<BitcoinRollbackTransactionPayload>,
+    pub chainhook: BitcoinChainhookPayload,
+}
+
+pub enum BitcoinChainhookOccurrence {
+    Http(RequestBuilder),
+    Data(BitcoinChainhookOccurrencePayload),
+}
+
+#[derive(Clone, Debug)]
+pub struct StacksApplyTransactionPayload {
+    pub transaction: StacksTransactionData,
+    pub block_identifier: BlockIdentifier,
+    pub confirmations: u8,
+    pub proof: Option<Vec<u8>>,
+}
+
+#[derive(Clone, Debug)]
+pub struct StacksRollbackTransactionPayload {
+    pub transaction: StacksTransactionData,
+    pub block_identifier: BlockIdentifier,
+    pub confirmations: u8,
+}
+
+#[derive(Clone, Debug)]
+pub struct StacksChainhookPayload {
+    pub uuid: String,
+    pub predicate: StacksHookPredicate,
+}
+
+#[derive(Clone, Debug)]
+pub struct StacksChainhookOccurrencePayload {
+    pub apply: Vec<StacksApplyTransactionPayload>,
+    pub rollback: Vec<StacksRollbackTransactionPayload>,
+    pub chainhook: StacksChainhookPayload,
+}
+pub enum StacksChainhookOccurrence {
+    Http(RequestBuilder),
+    Data(StacksChainhookOccurrencePayload),
+}
 
 pub fn handle_bitcoin_hook_action<'a>(
     trigger: BitcoinTriggerChainhook<'a>,
     proofs: &HashMap<&'a TransactionIdentifier, String>,
-) -> Option<RequestBuilder> {
+) -> Option<BitcoinChainhookOccurrence> {
     match &trigger.chainhook.action {
         HookAction::Http(http) => {
             let client = Client::builder().build().unwrap();
@@ -408,22 +473,54 @@ pub fn handle_bitcoin_hook_action<'a>(
                 }
             });
             let body = serde_json::to_vec(&payload).unwrap();
-            Some(
+            Some(BitcoinChainhookOccurrence::Http(
                 client
                     .request(method, &host)
                     .header("Content-Type", "application/json")
                     .header("Authorization", http.authorization_header.clone())
                     .body(body),
-            )
+            ))
         }
-        HookAction::Noop => None,
+        HookAction::Noop => Some(BitcoinChainhookOccurrence::Data(
+            BitcoinChainhookOccurrencePayload {
+                apply: trigger
+                    .apply
+                    .into_iter()
+                    .map(|(transaction, block_identifier)| {
+                        BitcoinApplyTransactionPayload {
+                            transaction: transaction.clone(),
+                            block_identifier: block_identifier.clone(),
+                            confirmations: 1, // TODO(lgalabru)
+                            proof: proofs
+                                .get(&transaction.transaction_identifier)
+                                .and_then(|r| Some(r.clone().into_bytes())),
+                        }
+                    })
+                    .collect::<Vec<_>>(),
+                rollback: trigger
+                    .rollback
+                    .into_iter()
+                    .map(|(transaction, block_identifier)| {
+                        BitcoinRollbackTransactionPayload {
+                            transaction: transaction.clone(),
+                            block_identifier: block_identifier.clone(),
+                            confirmations: 1, // TODO(lgalabru)
+                        }
+                    })
+                    .collect::<Vec<_>>(),
+                chainhook: BitcoinChainhookPayload {
+                    uuid: trigger.chainhook.uuid.clone(),
+                    predicate: trigger.chainhook.predicate.clone(),
+                },
+            },
+        )),
     }
 }
 
 pub fn handle_stacks_hook_action<'a>(
     trigger: StacksTriggerChainhook<'a>,
     proofs: &HashMap<&'a TransactionIdentifier, String>,
-) -> Option<RequestBuilder> {
+) -> Option<StacksChainhookOccurrence> {
     match &trigger.chainhook.action {
         HookAction::Http(http) => {
             let client = Client::builder().build().unwrap();
@@ -451,14 +548,46 @@ pub fn handle_stacks_hook_action<'a>(
                 }
             });
             let body = serde_json::to_vec(&payload).unwrap();
-            Some(
+            Some(StacksChainhookOccurrence::Http(
                 client
                     .request(method, &host)
                     .header("Content-Type", "application/json")
                     .body(body),
-            )
+            ))
         }
-        HookAction::Noop => None,
+        HookAction::Noop => Some(StacksChainhookOccurrence::Data(
+            StacksChainhookOccurrencePayload {
+                apply: trigger
+                    .apply
+                    .into_iter()
+                    .map(|(transaction, block_identifier)| {
+                        StacksApplyTransactionPayload {
+                            transaction: transaction.clone(),
+                            block_identifier: block_identifier.clone(),
+                            confirmations: 1, // TODO(lgalabru)
+                            proof: proofs
+                                .get(&transaction.transaction_identifier)
+                                .and_then(|r| Some(r.clone().into_bytes())),
+                        }
+                    })
+                    .collect::<Vec<_>>(),
+                rollback: trigger
+                    .rollback
+                    .into_iter()
+                    .map(|(transaction, block_identifier)| {
+                        StacksRollbackTransactionPayload {
+                            transaction: transaction.clone(),
+                            block_identifier: block_identifier.clone(),
+                            confirmations: 1, // TODO(lgalabru)
+                        }
+                    })
+                    .collect::<Vec<_>>(),
+                chainhook: StacksChainhookPayload {
+                    uuid: trigger.chainhook.uuid.clone(),
+                    predicate: trigger.chainhook.predicate.clone(),
+                },
+            },
+        )),
     }
 }
 

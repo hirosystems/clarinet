@@ -1,7 +1,8 @@
 use crate::chainhooks::types::{ChainhookSpecification, HookFormation};
 use crate::chainhooks::{
     evaluate_bitcoin_chainhooks_on_chain_event, evaluate_stacks_chainhooks_on_chain_event,
-    handle_bitcoin_hook_action, handle_stacks_hook_action,
+    handle_bitcoin_hook_action, handle_stacks_hook_action, BitcoinChainhookOccurrence,
+    BitcoinChainhookOccurrencePayload, StacksChainhookOccurrence, StacksChainhookOccurrencePayload,
 };
 use crate::indexer::{self, Indexer, IndexerConfig};
 use crate::utils;
@@ -118,6 +119,7 @@ pub struct EventObserverConfig {
     pub stacks_node_rpc_host: String,
     pub stacks_node_rpc_port: u16,
     pub operators: HashSet<String>,
+    pub display_logs: bool,
 }
 
 #[derive(Deserialize, Debug)]
@@ -160,6 +162,8 @@ pub enum ObserverEvent {
     NotifyBitcoinTransactionProxied,
     HookRegistered(ChainhookSpecification),
     HookDeregistered(ChainhookSpecification),
+    BitcoinChainhookTriggered(BitcoinChainhookOccurrencePayload),
+    StacksChainhookTriggered(StacksChainhookOccurrencePayload),
     HooksTriggered(usize),
     Terminate,
     StacksChainMempoolEvent(StacksChainMempoolEvent),
@@ -218,10 +222,14 @@ pub async fn start_event_observer(
         bitcoin_node_rpc_password: config.bitcoin_node_password.clone(),
     });
 
-    let log_level = if cfg!(feature = "cli") {
-        LogLevel::Critical
+    let log_level = if config.display_logs {
+        if cfg!(feature = "cli") {
+            LogLevel::Critical
+        } else {
+            LogLevel::Debug
+        }
     } else {
-        LogLevel::Debug
+        LogLevel::Off
     };
 
     let ingestion_port = config.ingestion_port;
@@ -262,7 +270,6 @@ pub async fn start_event_observer(
         workers: 3,
         address: IpAddr::V4(Ipv4Addr::new(0, 0, 0, 0)),
         keep_alive: 5,
-        temp_dir: std::env::temp_dir(),
         log_level: log_level.clone(),
         ..Config::default()
     };
@@ -297,7 +304,6 @@ pub async fn start_event_observer(
         workers: 1,
         address: IpAddr::V4(Ipv4Addr::new(0, 0, 0, 0)),
         keep_alive: 5,
-        temp_dir: std::env::temp_dir(),
         log_level,
         ..Config::default()
     };
@@ -483,10 +489,23 @@ pub async fn start_observer_commands_handler(
                                 ));
                             }
                             for chainhook_to_trigger in chainhooks_to_trigger.into_iter() {
-                                if let Some(request) =
+                                if let Some(result) =
                                     handle_bitcoin_hook_action(chainhook_to_trigger, &proofs)
                                 {
-                                    requests.push(request);
+                                    match result {
+                                        BitcoinChainhookOccurrence::Http(request) => {
+                                            requests.push(request);
+                                        }
+                                        BitcoinChainhookOccurrence::Data(payload) => {
+                                            if let Some(ref tx) = observer_events_tx {
+                                                let _ = tx.send(
+                                                    ObserverEvent::BitcoinChainhookTriggered(
+                                                        payload,
+                                                    ),
+                                                );
+                                            }
+                                        }
+                                    }
                                 }
                             }
                         }
@@ -586,10 +605,23 @@ pub async fn start_observer_commands_handler(
                             }
                             let proofs = HashMap::new();
                             for chainhook_to_trigger in chainhooks_to_trigger.into_iter() {
-                                if let Some(request) =
+                                if let Some(result) =
                                     handle_stacks_hook_action(chainhook_to_trigger, &proofs)
                                 {
-                                    requests.push(request);
+                                    match result {
+                                        StacksChainhookOccurrence::Http(request) => {
+                                            requests.push(request);
+                                        }
+                                        StacksChainhookOccurrence::Data(payload) => {
+                                            if let Some(ref tx) = observer_events_tx {
+                                                let _ = tx.send(
+                                                    ObserverEvent::StacksChainhookTriggered(
+                                                        payload,
+                                                    ),
+                                                );
+                                            }
+                                        }
+                                    }
                                 }
                             }
                         }

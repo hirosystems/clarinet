@@ -13,7 +13,7 @@ stacks_rpc_client = { package = "stacks-rpc-client", path = "../../components/st
 clarity = { git = "https://github.com/stacks-network/stacks-blockchain.git", branch = "refactor/clarity-lib-merge" }
 clarinet_utils = { package = "clarinet-utils", path = "../../components/clarinet-utils" }
 orchestra_types = { package = "orchestra-types", path = "../orchestra-types-rs" }
-rocket = { version = "=0.5.0-rc.1", features = ["json"] }
+rocket = { version = "=0.5.0-rc.2", features = ["json"] }
 bitcoincore-rpc = "0.14.0"
 bitcoincore-rpc-json = "0.14.0"
 base64 = "0.13.0"

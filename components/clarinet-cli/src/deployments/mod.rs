@@ -151,7 +151,6 @@ fn sign_transaction_payload(
     Ok(signed_tx)
 }
 
-#[allow(dead_code)]
 pub fn encode_contract_call(
     contract_id: &QualifiedContractIdentifier,
     function_name: ClarityName,

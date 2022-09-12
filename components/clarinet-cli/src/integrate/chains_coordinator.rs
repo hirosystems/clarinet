@@ -108,6 +108,7 @@ impl DevnetEventObserverConfig {
             stacks_node_rpc_host: "http://localhost".into(),
             stacks_node_rpc_port: devnet_config.stacks_node_rpc_port,
             operators: HashSet::new(),
+            display_logs: true,
         };
 
         DevnetEventObserverConfig {
@@ -391,6 +392,8 @@ pub async fn start_chains_coordinator(
                 }
                 StacksChainMempoolEvent::TransactionDropped(ref _transactions) => {}
             },
+            ObserverEvent::BitcoinChainhookTriggered(_) => {}
+            ObserverEvent::StacksChainhookTriggered(_) => {}
         }
     }
     Ok(())
