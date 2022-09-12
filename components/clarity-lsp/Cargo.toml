@@ -10,7 +10,6 @@ clarity_repl = { package = "clarity-repl", path = "../clarity-repl", default-fea
 clarinet_deployments = { package = "clarinet-deployments", path = "../clarinet-deployments", default-features = false }
 clarinet_files = { package = "clarinet-files", path = "../clarinet-files", default-features = false }
 orchestra_types = { package = "orchestra-types", path = "../../vendor/orchestra-types-rs" }
-clarity = { git = "https://github.com/stacks-network/stacks-blockchain.git", branch = "refactor/clarity-lib-merge" }
 
 # WASM
 console_error_panic_hook = { version = "0.1", optional = true }

@@ -10,8 +10,8 @@ serde = "1"
 serde_json = "1"
 serde_derive = "1"
 stacks_rpc_client = { package = "stacks-rpc-client", path = "../../components/stacks-rpc-client" }
-clarity = { git = "https://github.com/stacks-network/stacks-blockchain.git", branch = "refactor/clarity-lib-merge" }
 clarinet_utils = { package = "clarinet-utils", path = "../../components/clarinet-utils" }
+clarity_repl = { package = "clarity-repl", path = "../../components/clarity-repl" }
 orchestra_types = { package = "orchestra-types", path = "../orchestra-types-rs" }
 rocket = { version = "=0.5.0-rc.2", features = ["json"] }
 bitcoincore-rpc = "0.14.0"
@@ -31,6 +31,7 @@ ctrlc = { version = "3.2.2", optional = true }
 slog = { version = "2.7.0" }
 slog-json = { version = "2.6.1", optional = true }
 slog-scope = { version = "4.4.0", optional = true }
+
 
 [features]
 default = ["cli"]
