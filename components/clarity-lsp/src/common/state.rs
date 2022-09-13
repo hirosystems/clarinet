@@ -147,9 +147,18 @@ impl EditorState {
             for (contract_url, state) in protocol_state.contracts.iter() {
                 let mut diags = vec![];
 
+                let relative_location = state
+                    .location
+                    .get_relative_location_from_manifest(
+                        self.contracts_lookup
+                            .get(contract_url)
+                            .expect("contract not in lookup"),
+                    )
+                    .expect("could not find relative location");
+
                 // Convert and collect errors
                 if !state.errors.is_empty() {
-                    erroring_files.insert(state.location.to_string());
+                    erroring_files.insert(relative_location.clone());
                     for error in state.errors.iter() {
                         diags.push(error.clone());
                     }
@@ -157,7 +166,7 @@ impl EditorState {
 
                 // Convert and collect warnings
                 if !state.warnings.is_empty() {
-                    warning_files.insert(state.location.to_string());
+                    warning_files.insert(relative_location);
                     for warning in state.warnings.iter() {
                         diags.push(warning.clone());
                     }
@@ -173,14 +182,14 @@ impl EditorState {
 
         let tldr = match (erroring_files.len(), warning_files.len()) {
             (0, 0) => None,
-            (0, warnings) if warnings > 0 => Some((
+            (0, _warnings) => Some((
                 MessageType::WARNING,
                 format!(
                     "Warning detected in following contracts: {}",
                     warning_files.into_iter().collect::<Vec<_>>().join(", ")
                 ),
             )),
-            (errors, 0) if errors > 0 => Some((
+            (_errors, 0) => Some((
                 MessageType::ERROR,
                 format!(
                     "Errors detected in following contracts: {}",

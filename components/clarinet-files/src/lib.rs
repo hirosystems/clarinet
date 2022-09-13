@@ -176,35 +176,6 @@ impl FileLocation {
         Ok(())
     }
 
-    pub fn get_project_root_location(&self) -> Result<FileLocation, String> {
-        let mut project_root_location = self.clone();
-        match project_root_location.borrow_mut() {
-            FileLocation::FileSystem { path } => {
-                let mut manifest_found = false;
-                while path.pop() {
-                    path.push("Clarinet.toml");
-                    if FileLocation::fs_exists(path) {
-                        path.pop();
-                        manifest_found = true;
-                        break;
-                    }
-                    path.pop();
-                }
-
-                match manifest_found {
-                    true => Ok(project_root_location),
-                    false => Err(format!(
-                        "unable to find root location from {}",
-                        self.to_string()
-                    )),
-                }
-            }
-            _ => {
-                unimplemented!();
-            }
-        }
-    }
-
     pub async fn get_project_manifest_location(
         &self,
         file_accessor: Option<&Box<dyn FileAccessor>>,
@@ -242,6 +213,59 @@ impl FileLocation {
         }
     }
 
+    pub fn get_project_root_location(&self) -> Result<FileLocation, String> {
+        let mut project_root_location = self.clone();
+        match project_root_location.borrow_mut() {
+            FileLocation::FileSystem { path } => {
+                let mut manifest_found = false;
+                while path.pop() {
+                    path.push("Clarinet.toml");
+                    if FileLocation::fs_exists(path) {
+                        path.pop();
+                        manifest_found = true;
+                        break;
+                    }
+                    path.pop();
+                }
+
+                match manifest_found {
+                    true => Ok(project_root_location),
+                    false => Err(format!(
+                        "unable to find root location from {}",
+                        self.to_string()
+                    )),
+                }
+            }
+            _ => {
+                unimplemented!();
+            }
+        }
+    }
+
+    pub fn get_root_location_from_manifest_location(
+        &self,
+        manifest_location: &FileLocation,
+    ) -> Result<FileLocation, String> {
+        let mut project_root_location = manifest_location.clone();
+
+        match project_root_location.borrow_mut() {
+            FileLocation::FileSystem { path } => {
+                let mut parent = path.clone();
+                parent.pop();
+                parent.pop();
+            }
+            FileLocation::Url { url } => {
+                let mut segments = url
+                    .path_segments_mut()
+                    .map_err(|_| format!("unable to mutate url"))?;
+                segments.pop();
+                segments.pop();
+            }
+        };
+
+        Ok(project_root_location)
+    }
+
     pub fn get_parent_location(&self) -> Result<FileLocation, String> {
         let mut parent_location = self.clone();
         match &mut parent_location {
@@ -275,6 +299,15 @@ impl FileLocation {
             StacksNetwork::Mainnet => "Mainnet.toml",
         })?;
         Ok(network_manifest_location)
+    }
+
+    pub fn get_relative_location_from_manifest(
+        &self,
+        manifest_location: &FileLocation,
+    ) -> Result<String, String> {
+        let base = self.get_root_location_from_manifest_location(manifest_location)?;
+        let file = self.to_string();
+        Ok(file[(base.to_string().len())..].to_string())
     }
 
     pub fn get_relative_location(&self) -> Result<String, String> {
