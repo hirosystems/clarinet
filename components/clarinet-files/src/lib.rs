@@ -307,7 +307,7 @@ impl FileLocation {
     ) -> Result<String, String> {
         let base = self.get_root_location_from_manifest_location(manifest_location)?;
         let file = self.to_string();
-        Ok(file[(base.to_string().len())..].to_string())
+        Ok(file[(base.to_string().len() + 1)..].to_string())
     }
 
     pub fn get_relative_location(&self) -> Result<String, String> {
