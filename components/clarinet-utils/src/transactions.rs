@@ -11,7 +11,9 @@ use clarity_repl::clarity::address::{
     C32_ADDRESS_VERSION_TESTNET_MULTISIG, C32_ADDRESS_VERSION_TESTNET_SINGLESIG,
 };
 use clarity_repl::clarity::codec::MAX_MESSAGE_LEN;
-use clarity_repl::clarity::codec::{read_next, write_next, Error as CodecError, StacksMessageCodec};
+use clarity_repl::clarity::codec::{
+    read_next, write_next, Error as CodecError, StacksMessageCodec,
+};
 use clarity_repl::clarity::types::chainstate::{
     BlockHeaderHash, BurnchainHeaderHash, ConsensusHash, StacksWorkScore, TrieHash,
 };

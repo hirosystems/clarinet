@@ -1,8 +1,8 @@
 use super::bitcoin::{TxIn, TxOut};
 use crate::events::*;
+use schemars::JsonSchema;
 use std::cmp::Ordering;
 use std::collections::HashSet;
-use schemars::JsonSchema;
 use std::fmt::Display;
 use std::hash::{Hash, Hasher};
 

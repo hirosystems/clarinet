@@ -1,8 +1,12 @@
 use super::types::*;
 use clarinet_files::FileLocation;
 use clarity_repl::clarity::vm::analysis::ContractAnalysis;
-use clarity_repl::clarity::vm::diagnostic::{Diagnostic as ClarityDiagnostic, Level as ClarityLevel};
-use clarity_repl::clarity::vm::docs::{make_api_reference, make_define_reference, make_keyword_reference};
+use clarity_repl::clarity::vm::diagnostic::{
+    Diagnostic as ClarityDiagnostic, Level as ClarityLevel,
+};
+use clarity_repl::clarity::vm::docs::{
+    make_api_reference, make_define_reference, make_keyword_reference,
+};
 use clarity_repl::clarity::vm::functions::define::DefineFunctions;
 use clarity_repl::clarity::vm::functions::NativeFunctions;
 use clarity_repl::clarity::vm::types::{BlockInfoProperty, FunctionType};

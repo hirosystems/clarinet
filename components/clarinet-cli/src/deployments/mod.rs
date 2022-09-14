@@ -5,7 +5,9 @@ mod ui;
 use bitcoincore_rpc::{Auth, Client};
 
 use clarity_repl::clarity::types::chainstate::StacksAddress;
-use clarity_repl::clarity::util::secp256k1::{MessageSignature, Secp256k1PrivateKey, Secp256k1PublicKey};
+use clarity_repl::clarity::util::secp256k1::{
+    MessageSignature, Secp256k1PrivateKey, Secp256k1PublicKey,
+};
 use clarity_repl::clarity::vm::types::StandardPrincipalData;
 use clarity_repl::clarity::vm::{ClarityName, EvaluationResult, Value};
 use reqwest::Url;
