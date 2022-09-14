@@ -1,9 +1,11 @@
 use super::utils;
 
 use crate::lsp::{clarity_diagnostics_to_tower_lsp_type, completion_item_type_to_tower_lsp_type};
-use clarity_lsp::backend::{process_notification, LspNotification, LspRequest, LspResponse};
+use clarity_lsp::backend::{
+    process_notification, process_request, LspNotification, LspRequest, LspResponse,
+};
 use clarity_lsp::state::EditorState;
-use crossbeam_channel::{select, Receiver as MultiplexableReceiver, Sender as MultiplexableSender};
+use crossbeam_channel::{Receiver as MultiplexableReceiver, Select, Sender as MultiplexableSender};
 use serde_json::Value;
 use std::sync::mpsc::{Receiver, Sender};
 use std::sync::Arc;
@@ -36,32 +38,35 @@ pub async fn start_language_server(
     response_tx: Sender<LspResponse>,
 ) {
     let mut editor_state = EditorState::new();
-    loop {
-        select! {
-            recv(notification_rx) -> msg => {
-                match msg {
-                    Ok(notification) => {
-                        let result = process_notification(notification, &mut editor_state, None).await;
-                        if let Ok(lsp_response) = result {
-                            let _ = response_tx.send(lsp_response);
-                        }
-                    }
-                    Err(_e) => {
-                        continue;
-                    }
-                };
-            },
-            recv(request_rx) -> msg => {
-                match msg {
-                    Ok(_request) => {
 
-                    }
-                    Err(_e) => {
-                        continue;
+    let mut sel = Select::new();
+    let notifications_oper = sel.recv(&notification_rx);
+    let requests_oper = sel.recv(&request_rx);
+
+    loop {
+        let oper = sel.select();
+        match oper.index() {
+            i if i == notifications_oper => match oper.recv(&notification_rx) {
+                Ok(notification) => {
+                    let result = process_notification(notification, &mut editor_state, None).await;
+                    if let Ok(lsp_response) = result {
+                        let _ = response_tx.send(lsp_response);
                     }
                 }
+                Err(_e) => {
+                    continue;
+                }
             },
-            default => println!("not ready"),
+            i if i == requests_oper => match oper.recv(&request_rx) {
+                Ok(request) => {
+                    let lsp_response = process_request(request, &mut editor_state);
+                    let _ = response_tx.send(lsp_response);
+                }
+                Err(_e) => {
+                    continue;
+                }
+            },
+            _ => unreachable!(),
         }
     }
 }
