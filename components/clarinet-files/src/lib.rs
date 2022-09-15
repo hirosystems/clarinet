@@ -301,13 +301,12 @@ impl FileLocation {
         Ok(network_manifest_location)
     }
 
-    pub fn get_relative_location_from_manifest(
+    pub fn get_relative_path_from_base(
         &self,
-        manifest_location: &FileLocation,
+        base_location: &FileLocation,
     ) -> Result<String, String> {
-        let base = self.get_root_location_from_manifest_location(manifest_location)?;
         let file = self.to_string();
-        Ok(file[(base.to_string().len() + 1)..].to_string())
+        Ok(file[(base_location.to_string().len() + 1)..].to_string())
     }
 
     pub fn get_relative_location(&self) -> Result<String, String> {
