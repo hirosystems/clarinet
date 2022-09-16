@@ -84,17 +84,18 @@ pub async fn process_notification(
             };
         }
         LspNotification::ContractOpened(contract_location) => {
-            // The only reason why we're waiting for this kind of events, is building our initial state
-            // if the system is initialized, move on.
+            // This event can be ignored if the contract is already in the state
+            if editor_state
+                .contracts_lookup
+                .contains_key(&contract_location)
+            {
+                return Ok(LspResponse::default());
+            }
+
             let manifest_location = contract_location
                 .get_project_manifest_location(file_accessor)
                 .await?;
 
-            if editor_state.protocols.contains_key(&manifest_location) {
-                return Ok(LspResponse::default());
-            }
-
-            // With this manifest_location, let's initialize our state.
             let mut protocol_state = ProtocolState::new();
             match build_state(&manifest_location, &mut protocol_state, file_accessor).await {
                 Ok(_) => {
