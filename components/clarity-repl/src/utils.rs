@@ -1,9 +1,9 @@
-use clarity_repl::clarity::util::hash;
-use clarity_repl::clarity::vm::Value;
+use clarity::util::hash;
+use clarity::vm::Value;
 use std::fmt::Write;
 
 pub fn value_to_string(value: &Value) -> String {
-    use clarity_repl::clarity::vm::types::{CharType, SequenceData};
+    use clarity::vm::types::{CharType, SequenceData};
 
     match value {
         Value::Tuple(tup_data) => {
@@ -60,11 +60,12 @@ pub fn value_to_string(value: &Value) -> String {
 #[cfg(test)]
 mod tests {
     use super::value_to_string;
-    use clarity_repl::clarity::vm::types::{
+    use clarity::vm::types::{
         ASCIIData, CharType, ListData, ListTypeData, OptionalData, ResponseData, SequenceData,
         SequencedValue, TupleData, TypeSignature, UTF8Data, NONE,
     };
-    use clarity_repl::clarity::vm::{ClarityName, Value};
+    use clarity::vm::{ClarityName, Value};
+    use std::convert::TryFrom;
 
     #[test]
     fn test_value_to_string() {

@@ -29,6 +29,7 @@ pub extern crate clarity;
 
 pub mod analysis;
 pub mod repl;
+pub mod utils;
 
 struct GlobalContext {
     session: Option<Session>,

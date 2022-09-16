@@ -1,14 +1,25 @@
 use rusqlite::Connection;
 use sha2::{Digest, Sha512_256};
 
+use clarity::types::chainstate::BlockHeaderHash;
+use clarity::types::chainstate::BurnchainHeaderHash;
+use clarity::types::chainstate::ConsensusHash;
+use clarity::types::chainstate::SortitionId;
+use clarity::types::chainstate::StacksAddress;
 use clarity::types::chainstate::StacksBlockId;
+use clarity::types::chainstate::VRFSeed;
+use clarity::types::StacksEpochId;
 use clarity::util::hash::Sha512Trunc256Sum;
 use clarity::vm::analysis::AnalysisDatabase;
+use clarity::vm::database::BurnStateDB;
 use clarity::vm::database::{ClarityBackingStore, ClarityDatabase, HeadersDB, NULL_BURN_STATE_DB};
 use clarity::vm::errors::{
     CheckErrors, IncomparableError, InterpreterError, InterpreterResult as Result, RuntimeErrorType,
 };
 use clarity::vm::types::QualifiedContractIdentifier;
+use clarity::vm::types::TupleData;
+use clarity::vm::EvalHook;
+use clarity::vm::StacksEpoch;
 use std::collections::HashMap;
 use std::hash::Hash;
 
@@ -21,6 +32,26 @@ pub struct Datastore {
     current_chain_tip: StacksBlockId,
     chain_height: u32,
     height_at_chain_tip: HashMap<StacksBlockId, u32>,
+    pub burn_headers_store: Option<BurnHeaderStore>,
+    pub burn_state_store: Option<BurnStateStore>,
+}
+
+#[derive(Clone, Debug)]
+pub struct BurnHeaderStore {}
+
+impl BurnHeaderStore {
+    pub fn new() -> BurnHeaderStore {
+        BurnHeaderStore {}
+    }
+}
+
+#[derive(Clone, Debug)]
+pub struct BurnStateStore {}
+
+impl BurnStateStore {
+    pub fn new() -> BurnStateStore {
+        BurnStateStore {}
+    }
 }
 
 fn height_to_id(height: u32) -> StacksBlockId {
@@ -52,6 +83,8 @@ impl Datastore {
             current_chain_tip: id,
             chain_height: 0,
             height_at_chain_tip: id_height_map,
+            burn_headers_store: Some(BurnHeaderStore::new()),
+            burn_state_store: Some(BurnStateStore::new()),
         }
     }
 
@@ -171,13 +204,140 @@ impl ClarityBackingStore for Datastore {
     }
 }
 
+impl HeadersDB for BurnHeaderStore {
+    fn get_stacks_block_header_hash_for_block(
+        &self,
+        id_bhh: &StacksBlockId,
+    ) -> Option<BlockHeaderHash> {
+        None
+    }
+
+    fn get_burn_header_hash_for_block(
+        &self,
+        id_bhh: &StacksBlockId,
+    ) -> Option<BurnchainHeaderHash> {
+        None
+    }
+
+    fn get_consensus_hash_for_block(&self, id_bhh: &StacksBlockId) -> Option<ConsensusHash> {
+        None
+    }
+    fn get_vrf_seed_for_block(&self, id_bhh: &StacksBlockId) -> Option<VRFSeed> {
+        None
+    }
+    fn get_burn_block_time_for_block(&self, id_bhh: &StacksBlockId) -> Option<u64> {
+        None
+    }
+    fn get_burn_block_height_for_block(&self, id_bhh: &StacksBlockId) -> Option<u32> {
+        None
+    }
+    fn get_miner_address(&self, id_bhh: &StacksBlockId) -> Option<StacksAddress> {
+        None
+    }
+    fn get_burnchain_tokens_spent_for_block(&self, id_bhh: &StacksBlockId) -> Option<u128> {
+        None
+    }
+    fn get_burnchain_tokens_spent_for_winning_block(&self, id_bhh: &StacksBlockId) -> Option<u128> {
+        None
+    }
+    fn get_tokens_earned_for_block(&self, id_bhh: &StacksBlockId) -> Option<u128> {
+        None
+    }
+}
+
+impl BurnStateDB for BurnStateStore {
+    fn get_v1_unlock_height(&self) -> u32 {
+        0
+    }
+
+    /// Returns the *burnchain block height* for the `sortition_id` is associated with.
+    fn get_burn_block_height(&self, sortition_id: &SortitionId) -> Option<u32> {
+        None
+    }
+
+    /// Returns the height of the burnchain when the Stacks chain started running.
+    fn get_burn_start_height(&self) -> u32 {
+        0
+    }
+
+    fn get_pox_prepare_length(&self) -> u32 {
+        0
+    }
+
+    fn get_pox_reward_cycle_length(&self) -> u32 {
+        0
+    }
+
+    fn get_pox_rejection_fraction(&self) -> u64 {
+        0
+    }
+
+    /// Returns the burnchain header hash for the given burn block height, as queried from the given SortitionId.
+    ///
+    /// Returns Some if `self.get_burn_start_height() <= height < self.get_burn_block_height(sorition_id)`, and None otherwise.
+    fn get_burn_header_hash(
+        &self,
+        height: u32,
+        sortition_id: &SortitionId,
+    ) -> Option<BurnchainHeaderHash> {
+        None
+    }
+
+    /// Lookup a `SortitionId` keyed to a `ConsensusHash`.
+    ///
+    /// Returns None if no block found.
+    fn get_sortition_id_from_consensus_hash(
+        &self,
+        consensus_hash: &ConsensusHash,
+    ) -> Option<SortitionId> {
+        None
+    }
+
+    /// The epoch is defined as by a start and end height. This returns
+    /// the epoch enclosing `height`.
+    fn get_stacks_epoch(&self, height: u32) -> Option<StacksEpoch> {
+        None
+    }
+
+    fn get_stacks_epoch_by_epoch_id(&self, epoch_id: &StacksEpochId) -> Option<StacksEpoch> {
+        None
+    }
+
+    /// Get the PoX payout addresses for a given burnchain block
+    fn get_pox_payout_addrs(
+        &self,
+        height: u32,
+        sortition_id: &SortitionId,
+    ) -> Option<(Vec<TupleData>, u128)> {
+        None
+    }
+}
+
 impl Datastore {
     pub fn open(path_str: &str, miner_tip: Option<&StacksBlockId>) -> Result<Datastore> {
         Ok(Datastore::new())
     }
 
-    pub fn as_clarity_db<'a>(&'a mut self, headers_db: &'a dyn HeadersDB) -> ClarityDatabase<'a> {
-        ClarityDatabase::new(self, headers_db, &NULL_BURN_STATE_DB)
+    pub fn with_clarity_db<'a, 'hooks, F, R>(
+        &'a mut self,
+        eval_hooks: Option<Vec<&mut dyn EvalHook>>,
+        to_do: F,
+    ) -> std::result::Result<R, String>
+    where
+        F: FnOnce(
+            ClarityDatabase,
+            Option<Vec<&mut dyn EvalHook>>,
+        ) -> std::result::Result<R, String>,
+    {
+        let burn_headers_store = self.burn_headers_store.take().unwrap();
+        let burn_state_store = self.burn_state_store.take().unwrap();
+        let res = {
+            let database = ClarityDatabase::new(self, &burn_headers_store, &burn_state_store);
+            to_do(database, eval_hooks)
+        };
+        self.burn_headers_store = Some(burn_headers_store);
+        self.burn_state_store = Some(burn_state_store);
+        res
     }
 
     pub fn as_analysis_db<'a>(&'a mut self) -> AnalysisDatabase<'a> {

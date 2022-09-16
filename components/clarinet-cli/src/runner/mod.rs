@@ -20,7 +20,6 @@ use clarinet_deployments::types::DeploymentSpecification;
 mod api_v1;
 mod costs;
 mod deno;
-mod utils;
 mod vendor;
 
 #[derive(Clone)]

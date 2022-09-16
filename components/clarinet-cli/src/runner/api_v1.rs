@@ -1,4 +1,3 @@
-use super::utils;
 use super::vendor::deno_cli::compat;
 use super::vendor::deno_cli::create_main_worker;
 use super::vendor::deno_cli::ops;
@@ -13,6 +12,7 @@ use clarinet_deployments::update_session_with_contracts_executions;
 use clarity_repl::clarity::vm::analysis::contract_interface_builder::build_contract_interface;
 use clarity_repl::clarity::vm::EvaluationResult;
 use clarity_repl::repl::Session;
+use clarity_repl::utils;
 use deno_core::error::AnyError;
 use deno_core::located_script_name;
 use deno_core::serde_json::{json, Value};
@@ -446,7 +446,7 @@ fn call_read_only_fn(state: &mut OpState, args: CallReadOnlyFnArgs) -> Result<St
             )
             .unwrap(); // TODO(lgalabru)
         let result = match execution.result {
-            EvaluationResult::Snippet(result) => format!("{}", result.result),
+            EvaluationResult::Snippet(result) => utils::value_to_string(&result.result),
             _ => unreachable!("Contract result from snippet"),
         };
         Ok((result, execution.events))
