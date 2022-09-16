@@ -13,6 +13,7 @@ use clarity_repl::clarity::types::QualifiedContractIdentifier;
 use clarity_repl::repl::ast::ContractAST;
 use lsp_types::MessageType;
 use orchestra_types::StacksNetwork;
+use std::borrow::BorrowMut;
 use std::collections::{HashMap, HashSet};
 
 #[derive(Debug, Clone, PartialEq)]
@@ -94,9 +95,22 @@ impl EditorState {
     }
 
     pub fn index_protocol(&mut self, manifest_location: FileLocation, protocol: ProtocolState) {
-        let base_location = manifest_location
-            .get_root_location_from_manifest_location(&manifest_location)
-            .expect("could not find root location");
+        let mut base_location = manifest_location.clone();
+
+        match base_location.borrow_mut() {
+            FileLocation::FileSystem { path } => {
+                let mut parent = path.clone();
+                parent.pop();
+                parent.pop();
+            }
+            FileLocation::Url { url } => {
+                let mut segments = url
+                    .path_segments_mut()
+                    .expect("could not find root location");
+                segments.pop();
+                segments.pop();
+            }
+        };
 
         for (contract_uri, _) in protocol.contracts.iter() {
             let relative_path = contract_uri

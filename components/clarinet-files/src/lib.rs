@@ -242,30 +242,6 @@ impl FileLocation {
         }
     }
 
-    pub fn get_root_location_from_manifest_location(
-        &self,
-        manifest_location: &FileLocation,
-    ) -> Result<FileLocation, String> {
-        let mut project_root_location = manifest_location.clone();
-
-        match project_root_location.borrow_mut() {
-            FileLocation::FileSystem { path } => {
-                let mut parent = path.clone();
-                parent.pop();
-                parent.pop();
-            }
-            FileLocation::Url { url } => {
-                let mut segments = url
-                    .path_segments_mut()
-                    .map_err(|_| format!("unable to mutate url"))?;
-                segments.pop();
-                segments.pop();
-            }
-        };
-
-        Ok(project_root_location)
-    }
-
     pub fn get_parent_location(&self) -> Result<FileLocation, String> {
         let mut parent_location = self.clone();
         match &mut parent_location {
