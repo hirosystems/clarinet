@@ -5,6 +5,7 @@ use crate::analysis::annotation::{Annotation, AnnotationKind};
 use crate::analysis::ast_dependency_detector::{ASTDependencyDetector, Dependency};
 use crate::analysis::coverage::TestCoverageReport;
 use crate::analysis::{self, AnalysisPass as REPLAnalysisPass};
+use crate::repl::datastore::BurnDatastore;
 use crate::repl::datastore::Datastore;
 use crate::repl::Settings;
 use crate::utils;
@@ -22,6 +23,7 @@ use clarity::vm::contexts::{CallStack, ContractContext, Environment, GlobalConte
 use clarity::vm::contracts::Contract;
 use clarity::vm::costs::cost_functions::ClarityCostFunction;
 use clarity::vm::costs::{runtime_cost, ExecutionCost, LimitedCostTracker};
+use clarity::vm::database::ClarityDatabase;
 use clarity::vm::database::NULL_HEADER_DB;
 use clarity::vm::diagnostic::{Diagnostic, Level};
 use clarity::vm::errors::Error;
@@ -35,7 +37,8 @@ use clarity::vm::{eval, eval_all, EvaluationResult, SnippetEvaluationResult};
 use clarity::vm::{events::*, ClarityVersion};
 use clarity::vm::{ContractEvaluationResult, EvalHook};
 use clarity::vm::{CostSynthesis, ExecutionResult, ParsedContract};
-use clarity::vm::database::ClarityDatabase;
+
+use super::datastore::StacksConstants;
 
 pub const BLOCK_LIMIT_MAINNET: ExecutionCost = ExecutionCost {
     write_length: 15_000_000,
@@ -48,6 +51,7 @@ pub const BLOCK_LIMIT_MAINNET: ExecutionCost = ExecutionCost {
 #[derive(Clone, Debug)]
 pub struct ClarityInterpreter {
     pub datastore: Datastore,
+    pub burn_datastore: BurnDatastore,
     tx_sender: StandardPrincipalData,
     accounts: BTreeSet<String>,
     tokens: BTreeMap<String, BTreeMap<String, u128>>,
@@ -108,12 +112,20 @@ impl ClarityInterpreter {
         let datastore = Datastore::new();
         let accounts = BTreeSet::new();
         let tokens = BTreeMap::new();
+        let constants = StacksConstants {
+            burn_start_height: 0,
+            pox_prepare_length: 0,
+            pox_reward_cycle_length: 0,
+            pox_rejection_fraction: 0,
+            epoch_21_start_height: 0,
+        };
         ClarityInterpreter {
             datastore,
             tx_sender,
             accounts,
             tokens,
             repl_settings,
+            burn_datastore: BurnDatastore::new(constants),
         }
     }
 
@@ -380,36 +392,38 @@ impl ClarityInterpreter {
                 self.repl_settings.clarity_version,
             );
 
-            self.datastore.with_clarity_db(None, |conn, _| {
-                let cost_tracker = LimitedCostTracker::new_free();
-                let mut global_context = GlobalContext::new(
-                    mainnet,
-                    clarity::consts::CHAIN_ID_TESTNET,
-                    conn,
-                    cost_tracker,
-                    self.repl_settings.epoch,
-                );
-                global_context.begin();
+            let conn = ClarityDatabase::new(
+                &mut self.datastore,
+                &self.burn_datastore,
+                &self.burn_datastore,
+            );
 
-                let _ = global_context.execute(|g| {
-                    eval_all(&contract_ast.expressions, &mut contract_context, g, None)
-                });
+            let cost_tracker = LimitedCostTracker::new_free();
+            let mut global_context = GlobalContext::new(
+                mainnet,
+                clarity::consts::CHAIN_ID_TESTNET,
+                conn,
+                cost_tracker,
+                self.repl_settings.epoch,
+            );
+            global_context.begin();
 
-                global_context
-                    .database
-                    .insert_contract_hash(&contract_identifier, &snippet)
-                    .unwrap();
-                let contract = Contract { contract_context };
-                global_context
-                    .database
-                    .insert_contract(&contract_identifier, contract);
-                global_context
-                    .database
-                    .set_contract_data_size(&contract_identifier, 0)
-                    .unwrap();
-                global_context.commit().unwrap();
-                Ok(())
-            });
+            let _ = global_context
+                .execute(|g| eval_all(&contract_ast.expressions, &mut contract_context, g, None));
+
+            global_context
+                .database
+                .insert_contract_hash(&contract_identifier, &snippet)
+                .unwrap();
+            let contract = Contract { contract_context };
+            global_context
+                .database
+                .insert_contract(&contract_identifier, contract);
+            global_context
+                .database
+                .set_contract_data_size(&contract_identifier, 0)
+                .unwrap();
+            global_context.commit().unwrap();
         };
 
         let mut analysis_db = AnalysisDatabase::new(&mut self.datastore);
@@ -441,294 +455,279 @@ impl ClarityInterpreter {
         );
 
         let (eval_result, eval_hooks) = {
-            let burn_headers_store = self.datastore.burn_headers_store.take().unwrap();
-            let burn_state_store = self.datastore.burn_state_store.take().unwrap();
-            let res = {
-                let conn = ClarityDatabase::new(
-                    &mut self.datastore,
-                    &burn_headers_store,
-                    &burn_state_store,
-                );
-                let tx_sender: PrincipalData = self.tx_sender.clone().into();
-                conn.begin();
-                conn.set_clarity_epoch_version(self.repl_settings.epoch);
-                conn.commit();
-                let cost_tracker = if cost_track {
-                    LimitedCostTracker::new(
-                        false,
-                        CHAIN_ID_TESTNET,
-                        BLOCK_LIMIT_MAINNET.clone(),
-                        &mut conn,
-                        self.repl_settings.epoch,
-                    )
-                    .expect("failed to initialize cost tracker")
-                } else {
-                    LimitedCostTracker::new_free()
-                };
-                let mut global_context = GlobalContext::new(
+            let mut conn = ClarityDatabase::new(
+                &mut self.datastore,
+                &self.burn_datastore,
+                &self.burn_datastore,
+            );
+            let tx_sender: PrincipalData = self.tx_sender.clone().into();
+            conn.begin();
+            conn.set_clarity_epoch_version(self.repl_settings.epoch);
+            conn.commit();
+            let cost_tracker = if cost_track {
+                LimitedCostTracker::new(
                     false,
                     CHAIN_ID_TESTNET,
-                    conn,
-                    cost_tracker,
+                    BLOCK_LIMIT_MAINNET.clone(),
+                    &mut conn,
                     self.repl_settings.epoch,
-                );
+                )
+                .expect("failed to initialize cost tracker")
+            } else {
+                LimitedCostTracker::new_free()
+            };
+            let mut global_context = GlobalContext::new(
+                false,
+                CHAIN_ID_TESTNET,
+                conn,
+                cost_tracker,
+                self.repl_settings.epoch,
+            );
 
-                if let Some(mut in_hooks) = eval_hooks {
-                    let mut hooks: Vec<&mut dyn EvalHook> = Vec::new();
-                    for hook in in_hooks.drain(..) {
-                        hooks.push(hook);
-                    }
-                    global_context.eval_hooks = Some(in_hooks);
+            if let Some(mut in_hooks) = eval_hooks {
+                let mut hooks: Vec<&mut dyn EvalHook> = Vec::new();
+                for hook in in_hooks.drain(..) {
+                    hooks.push(hook);
                 }
-                global_context.begin();
+                global_context.eval_hooks = Some(hooks);
+            }
+            global_context.begin();
 
-                let result = global_context.execute(|g| {
-                    // If we have more than one instruction
-                    if contract_ast.expressions.len() == 1 && !snippet.contains("(define-") {
-                        let context = LocalContext::new();
-                        let mut call_stack = CallStack::new();
-                        let mut env = Environment::new(
-                            g,
-                            &mut contract_context,
-                            &mut call_stack,
-                            Some(tx_sender.clone()),
-                            Some(tx_sender.clone()),
-                            None,
-                        );
+            let result = global_context.execute(|g| {
+                // If we have more than one instruction
+                if contract_ast.expressions.len() == 1 && !snippet.contains("(define-") {
+                    let context = LocalContext::new();
+                    let mut call_stack = CallStack::new();
+                    let mut env = Environment::new(
+                        g,
+                        &mut contract_context,
+                        &mut call_stack,
+                        Some(tx_sender.clone()),
+                        Some(tx_sender.clone()),
+                        None,
+                    );
 
-                        let result = match contract_ast.expressions[0].expr {
-                            List(ref expression) => match expression[0].expr {
-                                Atom(ref name) if name.to_string() == "contract-call?" => {
-                                    let contract_identifier = match expression[1]
-                                        .match_literal_value()
-                                        .unwrap()
-                                        .clone()
-                                        .expect_principal()
-                                    {
-                                        PrincipalData::Contract(contract_identifier) => {
-                                            contract_identifier
-                                        }
-                                        _ => unreachable!(),
-                                    };
-                                    let method = expression[2].match_atom().unwrap().to_string();
-                                    let mut args = vec![];
-                                    for arg in expression[3..].iter() {
-                                        let evaluated_arg = eval(arg, &mut env, &context)?;
-                                        args.push(SymbolicExpression::atom_value(evaluated_arg));
+                    let result = match contract_ast.expressions[0].expr {
+                        List(ref expression) => match expression[0].expr {
+                            Atom(ref name) if name.to_string() == "contract-call?" => {
+                                let contract_identifier = match expression[1]
+                                    .match_literal_value()
+                                    .unwrap()
+                                    .clone()
+                                    .expect_principal()
+                                {
+                                    PrincipalData::Contract(contract_identifier) => {
+                                        contract_identifier
                                     }
-                                    let res = env.execute_contract(
-                                        &contract_identifier,
-                                        &method,
-                                        &args,
-                                        false,
-                                    )?;
-                                    res
+                                    _ => unreachable!(),
+                                };
+                                let method = expression[2].match_atom().unwrap().to_string();
+                                let mut args = vec![];
+                                for arg in expression[3..].iter() {
+                                    let evaluated_arg = eval(arg, &mut env, &context)?;
+                                    args.push(SymbolicExpression::atom_value(evaluated_arg));
                                 }
-                                _ => {
-                                    eval(&contract_ast.expressions[0], &mut env, &context).unwrap()
-                                }
-                            },
-                            _ => eval(&contract_ast.expressions[0], &mut env, &context).unwrap(),
-                        };
-                        Ok(Some(result))
-                    } else {
-                        eval_all(&contract_ast.expressions, &mut contract_context, g, None)
-                    }
-                });
-
-                let value = match result {
-                    Ok(value) => value,
-                    Err(e) => {
-                        let err = format!(
-                            "Runtime error while interpreting {}: {:?}",
-                            contract_identifier, e
-                        );
-                        if let Some(mut eval_hooks) = global_context.eval_hooks.take() {
-                            for hook in eval_hooks.iter_mut() {
-                                hook.did_complete(Err(err.clone()));
+                                let res = env.execute_contract(
+                                    &contract_identifier,
+                                    &method,
+                                    &args,
+                                    false,
+                                )?;
+                                res
                             }
-                            global_context.eval_hooks = Some(eval_hooks);
-                        }
-                        return Err((err, None, None));
-                    }
-                };
-
-                if cost_track {
-                    cost = Some(CostSynthesis::from_cost_tracker(&global_context.cost_track));
-                }
-
-                let mut emitted_events = global_context
-                    .event_batches
-                    .iter()
-                    .flat_map(|b| b.events.clone())
-                    .collect::<Vec<_>>();
-
-                for event in emitted_events.drain(..) {
-                    match event {
-                        StacksTransactionEvent::STXEvent(STXEventType::STXTransferEvent(
-                            ref event_data,
-                        )) => {
-                            accounts_to_debit.push((
-                                event_data.sender.to_string(),
-                                "STX".to_string(),
-                                event_data.amount.clone(),
-                            ));
-                            accounts_to_credit.push((
-                                event_data.recipient.to_string(),
-                                "STX".to_string(),
-                                event_data.amount.clone(),
-                            ));
-                        }
-                        StacksTransactionEvent::STXEvent(STXEventType::STXMintEvent(
-                            ref event_data,
-                        )) => {
-                            accounts_to_credit.push((
-                                event_data.recipient.to_string(),
-                                "STX".to_string(),
-                                event_data.amount.clone(),
-                            ));
-                        }
-                        StacksTransactionEvent::STXEvent(STXEventType::STXBurnEvent(
-                            ref event_data,
-                        )) => {
-                            accounts_to_debit.push((
-                                event_data.sender.to_string(),
-                                "STX".to_string(),
-                                event_data.amount.clone(),
-                            ));
-                        }
-                        StacksTransactionEvent::FTEvent(FTEventType::FTTransferEvent(
-                            ref event_data,
-                        )) => {
-                            accounts_to_credit.push((
-                                event_data.recipient.to_string(),
-                                event_data.asset_identifier.sugared(),
-                                event_data.amount.clone(),
-                            ));
-                            accounts_to_debit.push((
-                                event_data.sender.to_string(),
-                                event_data.asset_identifier.sugared(),
-                                event_data.amount.clone(),
-                            ));
-                        }
-                        StacksTransactionEvent::FTEvent(FTEventType::FTMintEvent(
-                            ref event_data,
-                        )) => {
-                            accounts_to_credit.push((
-                                event_data.recipient.to_string(),
-                                event_data.asset_identifier.sugared(),
-                                event_data.amount.clone(),
-                            ));
-                        }
-                        StacksTransactionEvent::FTEvent(FTEventType::FTBurnEvent(
-                            ref event_data,
-                        )) => {
-                            accounts_to_debit.push((
-                                event_data.sender.to_string(),
-                                event_data.asset_identifier.sugared(),
-                                event_data.amount.clone(),
-                            ));
-                        }
-                        StacksTransactionEvent::NFTEvent(NFTEventType::NFTTransferEvent(
-                            ref event_data,
-                        )) => {
-                            accounts_to_credit.push((
-                                event_data.recipient.to_string(),
-                                event_data.asset_identifier.sugared(),
-                                1,
-                            ));
-                            accounts_to_debit.push((
-                                event_data.sender.to_string(),
-                                event_data.asset_identifier.sugared(),
-                                1,
-                            ));
-                        }
-                        StacksTransactionEvent::NFTEvent(NFTEventType::NFTMintEvent(
-                            ref event_data,
-                        )) => {
-                            accounts_to_credit.push((
-                                event_data.recipient.to_string(),
-                                event_data.asset_identifier.sugared(),
-                                1,
-                            ));
-                        }
-                        StacksTransactionEvent::NFTEvent(NFTEventType::NFTBurnEvent(
-                            ref event_data,
-                        )) => {
-                            accounts_to_debit.push((
-                                event_data.sender.to_string(),
-                                event_data.asset_identifier.sugared(),
-                                1,
-                            ));
-                        }
-                        // StacksTransactionEvent::SmartContractEvent(event_data) => ,
-                        // StacksTransactionEvent::STXEvent(STXEventType::STXLockEvent(event_data)) => ,
-                        _ => {}
+                            _ => eval(&contract_ast.expressions[0], &mut env, &context).unwrap(),
+                        },
+                        _ => eval(&contract_ast.expressions[0], &mut env, &context).unwrap(),
                     };
-
-                    serialized_events.push(serialize_event(&event));
-                }
-
-                contract_saved = contract_context.functions.len() > 0
-                    || contract_context.defined_traits.len() > 0;
-
-                let eval_result = if contract_saved {
-                    let mut functions = BTreeMap::new();
-                    for (name, defined_func) in contract_context.functions.iter() {
-                        if !defined_func.is_public() {
-                            continue;
-                        }
-
-                        let args: Vec<_> = defined_func
-                            .get_arguments()
-                            .iter()
-                            .zip(defined_func.get_arg_types().iter())
-                            .map(|(n, t)| format!("({} {})", n.as_str(), t))
-                            .collect();
-
-                        functions.insert(name.to_string(), args);
-                    }
-                    let parsed_contract = ParsedContract {
-                        contract_identifier: contract_identifier.to_string(),
-                        code: snippet.clone(),
-                        function_args: functions,
-                        ast: contract_ast.clone(),
-                        analysis: contract_analysis.clone(),
-                    };
-
-                    global_context
-                        .database
-                        .insert_contract_hash(&contract_identifier, &snippet)
-                        .unwrap();
-                    let contract = Contract { contract_context };
-                    global_context
-                        .database
-                        .insert_contract(&contract_identifier, contract);
-                    global_context
-                        .database
-                        .set_contract_data_size(&contract_identifier, 0)
-                        .unwrap();
-
-                    EvaluationResult::Contract(ContractEvaluationResult {
-                        result: value,
-                        contract: parsed_contract,
-                    })
+                    Ok(Some(result))
                 } else {
-                    let result = match value {
-                        Some(value) => value,
-                        None => Value::none(),
-                    };
-                    EvaluationResult::Snippet(SnippetEvaluationResult { result })
-                };
-                global_context.commit().unwrap();
-                let eval_hooks = global_context.eval_hooks.take();
-                Ok((eval_result, eval_hooks))
+                    eval_all(&contract_ast.expressions, &mut contract_context, g, None)
+                }
+            });
+
+            let value = match result {
+                Ok(value) => value,
+                Err(e) => {
+                    let err = format!(
+                        "Runtime error while interpreting {}: {:?}",
+                        contract_identifier, e
+                    );
+                    if let Some(mut eval_hooks) = global_context.eval_hooks.take() {
+                        for hook in eval_hooks.iter_mut() {
+                            hook.did_complete(Err(err.clone()));
+                        }
+                        global_context.eval_hooks = Some(eval_hooks);
+                    }
+                    return Err((err, None, None));
+                }
             };
 
-            self.datastore.burn_headers_store = Some(burn_headers_store);
-            self.datastore.burn_state_store = Some(burn_state_store);
-            res?
-        };
+            if cost_track {
+                cost = Some(CostSynthesis::from_cost_tracker(&global_context.cost_track));
+            }
+
+            let mut emitted_events = global_context
+                .event_batches
+                .iter()
+                .flat_map(|b| b.events.clone())
+                .collect::<Vec<_>>();
+
+            for event in emitted_events.drain(..) {
+                match event {
+                    StacksTransactionEvent::STXEvent(STXEventType::STXTransferEvent(
+                        ref event_data,
+                    )) => {
+                        accounts_to_debit.push((
+                            event_data.sender.to_string(),
+                            "STX".to_string(),
+                            event_data.amount.clone(),
+                        ));
+                        accounts_to_credit.push((
+                            event_data.recipient.to_string(),
+                            "STX".to_string(),
+                            event_data.amount.clone(),
+                        ));
+                    }
+                    StacksTransactionEvent::STXEvent(STXEventType::STXMintEvent(
+                        ref event_data,
+                    )) => {
+                        accounts_to_credit.push((
+                            event_data.recipient.to_string(),
+                            "STX".to_string(),
+                            event_data.amount.clone(),
+                        ));
+                    }
+                    StacksTransactionEvent::STXEvent(STXEventType::STXBurnEvent(
+                        ref event_data,
+                    )) => {
+                        accounts_to_debit.push((
+                            event_data.sender.to_string(),
+                            "STX".to_string(),
+                            event_data.amount.clone(),
+                        ));
+                    }
+                    StacksTransactionEvent::FTEvent(FTEventType::FTTransferEvent(
+                        ref event_data,
+                    )) => {
+                        accounts_to_credit.push((
+                            event_data.recipient.to_string(),
+                            event_data.asset_identifier.sugared(),
+                            event_data.amount.clone(),
+                        ));
+                        accounts_to_debit.push((
+                            event_data.sender.to_string(),
+                            event_data.asset_identifier.sugared(),
+                            event_data.amount.clone(),
+                        ));
+                    }
+                    StacksTransactionEvent::FTEvent(FTEventType::FTMintEvent(ref event_data)) => {
+                        accounts_to_credit.push((
+                            event_data.recipient.to_string(),
+                            event_data.asset_identifier.sugared(),
+                            event_data.amount.clone(),
+                        ));
+                    }
+                    StacksTransactionEvent::FTEvent(FTEventType::FTBurnEvent(ref event_data)) => {
+                        accounts_to_debit.push((
+                            event_data.sender.to_string(),
+                            event_data.asset_identifier.sugared(),
+                            event_data.amount.clone(),
+                        ));
+                    }
+                    StacksTransactionEvent::NFTEvent(NFTEventType::NFTTransferEvent(
+                        ref event_data,
+                    )) => {
+                        accounts_to_credit.push((
+                            event_data.recipient.to_string(),
+                            event_data.asset_identifier.sugared(),
+                            1,
+                        ));
+                        accounts_to_debit.push((
+                            event_data.sender.to_string(),
+                            event_data.asset_identifier.sugared(),
+                            1,
+                        ));
+                    }
+                    StacksTransactionEvent::NFTEvent(NFTEventType::NFTMintEvent(
+                        ref event_data,
+                    )) => {
+                        accounts_to_credit.push((
+                            event_data.recipient.to_string(),
+                            event_data.asset_identifier.sugared(),
+                            1,
+                        ));
+                    }
+                    StacksTransactionEvent::NFTEvent(NFTEventType::NFTBurnEvent(
+                        ref event_data,
+                    )) => {
+                        accounts_to_debit.push((
+                            event_data.sender.to_string(),
+                            event_data.asset_identifier.sugared(),
+                            1,
+                        ));
+                    }
+                    // StacksTransactionEvent::SmartContractEvent(event_data) => ,
+                    // StacksTransactionEvent::STXEvent(STXEventType::STXLockEvent(event_data)) => ,
+                    _ => {}
+                };
+
+                serialized_events.push(serialize_event(&event));
+            }
+
+            contract_saved =
+                contract_context.functions.len() > 0 || contract_context.defined_traits.len() > 0;
+
+            let eval_result = if contract_saved {
+                let mut functions = BTreeMap::new();
+                for (name, defined_func) in contract_context.functions.iter() {
+                    if !defined_func.is_public() {
+                        continue;
+                    }
+
+                    let args: Vec<_> = defined_func
+                        .get_arguments()
+                        .iter()
+                        .zip(defined_func.get_arg_types().iter())
+                        .map(|(n, t)| format!("({} {})", n.as_str(), t))
+                        .collect();
+
+                    functions.insert(name.to_string(), args);
+                }
+                let parsed_contract = ParsedContract {
+                    contract_identifier: contract_identifier.to_string(),
+                    code: snippet.clone(),
+                    function_args: functions,
+                    ast: contract_ast.clone(),
+                    analysis: contract_analysis.clone(),
+                };
+
+                global_context
+                    .database
+                    .insert_contract_hash(&contract_identifier, &snippet)
+                    .unwrap();
+                let contract = Contract { contract_context };
+                global_context
+                    .database
+                    .insert_contract(&contract_identifier, contract);
+                global_context
+                    .database
+                    .set_contract_data_size(&contract_identifier, 0)
+                    .unwrap();
+
+                EvaluationResult::Contract(ContractEvaluationResult {
+                    result: value,
+                    contract: parsed_contract,
+                })
+            } else {
+                let result = match value {
+                    Some(value) => value,
+                    None => Value::none(),
+                };
+                EvaluationResult::Snippet(SnippetEvaluationResult { result })
+            };
+            global_context.commit().unwrap();
+            Ok((eval_result, global_context.eval_hooks))
+        }?;
 
         let events = serialized_events;
         let mut execution_result = ExecutionResult {
@@ -768,27 +767,31 @@ impl ClarityInterpreter {
         amount: u64,
     ) -> Result<String, String> {
         let final_balance = {
-            self.datastore.with_clarity_db(None, |conn, _| {
-                let mut global_context = GlobalContext::new(
-                    false,
-                    CHAIN_ID_TESTNET,
-                    conn,
-                    LimitedCostTracker::new_free(),
-                    self.repl_settings.epoch,
-                );
-                global_context.begin();
-                let mut cur_balance = global_context.database.get_stx_balance_snapshot(&recipient);
-                cur_balance.credit(amount as u128);
-                let final_balance = cur_balance.get_available_balance();
-                cur_balance.save();
-                global_context
-                    .database
-                    .increment_ustx_liquid_supply(amount as u128)
-                    .unwrap();
-                global_context.commit().unwrap();
-                Ok(final_balance)
-            })
-        }?;
+            let conn = ClarityDatabase::new(
+                &mut self.datastore,
+                &self.burn_datastore,
+                &self.burn_datastore,
+            );
+
+            let mut global_context = GlobalContext::new(
+                false,
+                CHAIN_ID_TESTNET,
+                conn,
+                LimitedCostTracker::new_free(),
+                self.repl_settings.epoch,
+            );
+            global_context.begin();
+            let mut cur_balance = global_context.database.get_stx_balance_snapshot(&recipient);
+            cur_balance.credit(amount as u128);
+            let final_balance = cur_balance.get_available_balance();
+            cur_balance.save();
+            global_context
+                .database
+                .increment_ustx_liquid_supply(amount as u128)
+                .unwrap();
+            global_context.commit().unwrap();
+            final_balance
+        };
         self.credit_token(recipient.to_string(), "STX".to_string(), amount.into());
         Ok(format!("→ {}: {} µSTX", recipient, final_balance))
     }
@@ -802,6 +805,7 @@ impl ClarityInterpreter {
     }
 
     pub fn advance_chain_tip(&mut self, count: u32) -> u32 {
+        self.burn_datastore.advance_chain_tip(count);
         self.datastore.advance_chain_tip(count)
     }
 

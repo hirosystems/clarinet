@@ -32,26 +32,43 @@ pub struct Datastore {
     current_chain_tip: StacksBlockId,
     chain_height: u32,
     height_at_chain_tip: HashMap<StacksBlockId, u32>,
-    pub burn_headers_store: Option<BurnHeaderStore>,
-    pub burn_state_store: Option<BurnStateStore>,
 }
 
 #[derive(Clone, Debug)]
-pub struct BurnHeaderStore {}
-
-impl BurnHeaderStore {
-    pub fn new() -> BurnHeaderStore {
-        BurnHeaderStore {}
-    }
+pub struct BlockInfo {
+    block_header_hash: BlockHeaderHash,
+    burn_block_header_hash: BurnchainHeaderHash, 
+    consensus_hash: ConsensusHash,
+    vrf_seed: VRFSeed,
+    burn_block_time: u64,
+    burn_block_height: u32,
+    miner: StacksAddress,
+    burnchain_tokens_spent_for_block: u128, 
+    get_burnchain_tokens_spent_for_winning_block: u128,
+    tokens_earned_for_block: u128,
+    pox_payout_addrs: (Vec<TupleData>, u128),
 }
 
 #[derive(Clone, Debug)]
-pub struct BurnStateStore {}
+pub struct StacksConstants {
+    pub burn_start_height: u32,
+    pub pox_prepare_length: u32, 
+    pub pox_reward_cycle_length: u32,
+    pub pox_rejection_fraction: u64,
+    pub epoch_21_start_height: u32,
+}
 
-impl BurnStateStore {
-    pub fn new() -> BurnStateStore {
-        BurnStateStore {}
-    }
+#[derive(Clone, Debug)]
+pub struct BurnDatastore {
+    store: HashMap<StacksBlockId, BlockInfo>,
+    sortition_lookup: HashMap<SortitionId, StacksBlockId>,
+    consensus_hash_lookup: HashMap<ConsensusHash, SortitionId>,
+    block_id_lookup: HashMap<StacksBlockId, StacksBlockId>,
+    open_chain_tip: StacksBlockId,
+    current_chain_tip: StacksBlockId,
+    chain_height: u32,
+    height_at_chain_tip: HashMap<StacksBlockId, u32>,
+    constants: StacksConstants,
 }
 
 fn height_to_id(height: u32) -> StacksBlockId {
@@ -83,8 +100,6 @@ impl Datastore {
             current_chain_tip: id,
             chain_height: 0,
             height_at_chain_tip: id_height_map,
-            burn_headers_store: Some(BurnHeaderStore::new()),
-            burn_state_store: Some(BurnStateStore::new()),
         }
     }
 
@@ -204,48 +219,124 @@ impl ClarityBackingStore for Datastore {
     }
 }
 
-impl HeadersDB for BurnHeaderStore {
+impl BurnDatastore {
+    pub fn new(constants: StacksConstants) -> BurnDatastore {
+        let id = height_to_id(0);
+
+        let genesis_block = BlockInfo {
+            block_header_hash: BlockHeaderHash([0x00; 32]),
+            burn_block_header_hash: BurnchainHeaderHash([0x00; 32]),
+            consensus_hash: ConsensusHash([0x00; 20]),
+            vrf_seed: VRFSeed([0x00; 32]),
+            burn_block_time: 0,
+            burn_block_height: 0,
+            miner: StacksAddress::burn_address(false),
+            burnchain_tokens_spent_for_block: 0,
+            get_burnchain_tokens_spent_for_winning_block: 0,
+            tokens_earned_for_block: 0,
+            pox_payout_addrs: (vec![], 0),
+        };
+
+        let mut store = HashMap::new();
+        store.insert(id, genesis_block);
+
+        let mut block_id_lookup = HashMap::new();
+        block_id_lookup.insert(id, id);
+
+        let mut id_height_map = HashMap::new();
+        id_height_map.insert(id, 0);
+
+        BurnDatastore {
+            store: HashMap::new(),
+            sortition_lookup: HashMap::new(),
+            consensus_hash_lookup: HashMap::new(),
+            block_id_lookup,
+            open_chain_tip: id,
+            current_chain_tip: id,
+            chain_height: 0,
+            height_at_chain_tip: HashMap::new(),
+            constants,        
+        }
+    }
+
+    pub fn advance_chain_tip(&mut self, count: u32) {
+        let cur_height = self.chain_height;
+        let current_lookup_id = self
+            .block_id_lookup
+            .get(&self.open_chain_tip)
+            .expect("Open chain tip missing in block id lookup table")
+            .clone();
+
+        for i in 1..=count {
+            let height = cur_height + i;
+            let id = height_to_id(height);
+
+            self.block_id_lookup.insert(id, current_lookup_id);
+            self.height_at_chain_tip.insert(id, height);
+        }
+
+        self.chain_height = self.chain_height + count;
+        self.open_chain_tip = height_to_id(self.chain_height);
+        self.current_chain_tip = self.open_chain_tip;
+    }
+}
+
+impl HeadersDB for BurnDatastore {
+
+    // fn get(&mut self, key: &str) -> Option<String> {
+    //     let lookup_id = self
+    //         .block_id_lookup
+    //         .get(&self.current_chain_tip)
+    //         .expect("Could not find current chain tip in block_id_lookup map");
+
+    //     if let Some(map) = self.store.get(lookup_id) {
+    //         map.get(key).map(|v| v.clone())
+    //     } else {
+    //         panic!("Block does not exist for current chain tip");
+    //     }
+    // }
+
     fn get_stacks_block_header_hash_for_block(
         &self,
         id_bhh: &StacksBlockId,
     ) -> Option<BlockHeaderHash> {
-        None
+        self.store.get(id_bhh).and_then(|id| Some(id.block_header_hash))
     }
 
     fn get_burn_header_hash_for_block(
         &self,
         id_bhh: &StacksBlockId,
     ) -> Option<BurnchainHeaderHash> {
-        None
+        self.store.get(id_bhh).and_then(|id| Some(id.burn_block_header_hash))
     }
 
     fn get_consensus_hash_for_block(&self, id_bhh: &StacksBlockId) -> Option<ConsensusHash> {
-        None
+        self.store.get(id_bhh).and_then(|id| Some(id.consensus_hash))
     }
     fn get_vrf_seed_for_block(&self, id_bhh: &StacksBlockId) -> Option<VRFSeed> {
-        None
+        self.store.get(id_bhh).and_then(|id| Some(id.vrf_seed))
     }
     fn get_burn_block_time_for_block(&self, id_bhh: &StacksBlockId) -> Option<u64> {
-        None
+        self.store.get(id_bhh).and_then(|id| Some(id.burn_block_time))
     }
     fn get_burn_block_height_for_block(&self, id_bhh: &StacksBlockId) -> Option<u32> {
-        None
+        self.store.get(id_bhh).and_then(|id| Some(id.burn_block_height))
     }
     fn get_miner_address(&self, id_bhh: &StacksBlockId) -> Option<StacksAddress> {
-        None
+        self.store.get(id_bhh).and_then(|id| Some(id.miner))
     }
     fn get_burnchain_tokens_spent_for_block(&self, id_bhh: &StacksBlockId) -> Option<u128> {
-        None
+        self.store.get(id_bhh).and_then(|id| Some(id.burnchain_tokens_spent_for_block))
     }
     fn get_burnchain_tokens_spent_for_winning_block(&self, id_bhh: &StacksBlockId) -> Option<u128> {
-        None
+        self.store.get(id_bhh).and_then(|id| Some(id.get_burnchain_tokens_spent_for_winning_block))
     }
     fn get_tokens_earned_for_block(&self, id_bhh: &StacksBlockId) -> Option<u128> {
-        None
+        self.store.get(id_bhh).and_then(|id| Some(id.tokens_earned_for_block))
     }
 }
 
-impl BurnStateDB for BurnStateStore {
+impl BurnStateDB for BurnDatastore {
     fn get_v1_unlock_height(&self) -> u32 {
         0
     }
@@ -261,15 +352,15 @@ impl BurnStateDB for BurnStateStore {
     }
 
     fn get_pox_prepare_length(&self) -> u32 {
-        0
+        self.constants.pox_prepare_length
     }
 
     fn get_pox_reward_cycle_length(&self) -> u32 {
-        0
+        self.constants.pox_reward_cycle_length
     }
 
     fn get_pox_rejection_fraction(&self) -> u64 {
-        0
+        self.constants.pox_rejection_fraction
     }
 
     /// Returns the burnchain header hash for the given burn block height, as queried from the given SortitionId.
@@ -316,28 +407,6 @@ impl BurnStateDB for BurnStateStore {
 impl Datastore {
     pub fn open(path_str: &str, miner_tip: Option<&StacksBlockId>) -> Result<Datastore> {
         Ok(Datastore::new())
-    }
-
-    pub fn with_clarity_db<'a, 'hooks, F, R>(
-        &'a mut self,
-        eval_hooks: Option<Vec<&mut dyn EvalHook>>,
-        to_do: F,
-    ) -> std::result::Result<R, String>
-    where
-        F: FnOnce(
-            ClarityDatabase,
-            Option<Vec<&mut dyn EvalHook>>,
-        ) -> std::result::Result<R, String>,
-    {
-        let burn_headers_store = self.burn_headers_store.take().unwrap();
-        let burn_state_store = self.burn_state_store.take().unwrap();
-        let res = {
-            let database = ClarityDatabase::new(self, &burn_headers_store, &burn_state_store);
-            to_do(database, eval_hooks)
-        };
-        self.burn_headers_store = Some(burn_headers_store);
-        self.burn_state_store = Some(burn_state_store);
-        res
     }
 
     pub fn as_analysis_db<'a>(&'a mut self) -> AnalysisDatabase<'a> {
@@ -426,79 +495,3 @@ impl Datastore {
         format!("clarity-contract::{}", contract)
     }
 }
-
-// impl ClarityBackingStore for MarfedKV {
-//     fn get_side_store(&mut self) -> &mut SqliteConnection {
-//         &mut self.side_store
-//     }
-
-//     fn set_block_hash(&mut self, bhh: StacksBlockId) -> Result<StacksBlockId> {
-//         self.marf.check_ancestor_block_hash(&bhh).map_err(|e| {
-//             match e {
-//                 MarfError::NotFoundError => RuntimeErrorType::UnknownBlockHeaderHash(BlockHeaderHash(bhh.0)),
-//                 MarfError::NonMatchingForks(_,_) => RuntimeErrorType::UnknownBlockHeaderHash(BlockHeaderHash(bhh.0)),
-//                 _ => panic!("ERROR: Unexpected MARF failure: {}", e)
-//             }
-//         })?;
-
-//         let result = Ok(self.chain_tip);
-//         self.chain_tip = bhh;
-
-//         result
-//     }
-
-//     fn get_current_block_height(&mut self) -> u32 {
-//         self.marf.get_block_height_of(&self.chain_tip, &self.chain_tip)
-//             .expect("Unexpected MARF failure.")
-//             .expect("Failed to obtain current block height.")
-//     }
-
-//     fn get_block_at_height(&mut self, block_height: u32) -> Option<StacksBlockId> {
-//         self.marf.get_bhh_at_height(&self.chain_tip, block_height)
-//             .expect("Unexpected MARF failure.")
-//             .map(|x| StacksBlockId(x.to_bytes()))
-//     }
-
-//     fn get_open_chain_tip(&mut self) -> StacksBlockId {
-//         StacksBlockId(
-//             self.marf.get_open_chain_tip()
-//                 .expect("Attempted to get the open chain tip from an unopened context.")
-//                 .clone()
-//                 .to_bytes())
-//     }
-
-//     fn get_open_chain_tip_height(&mut self) -> u32 {
-//         self.marf.get_open_chain_tip_height()
-//             .expect("Attempted to get the open chain tip from an unopened context.")
-//     }
-
-//     fn get(&mut self, key: &str) -> Option<String> {
-//         self.marf.get(&self.chain_tip, key)
-//             .or_else(|e| {
-//                 match e {
-//                     MarfError::NotFoundError => Ok(None),
-//                     _ => Err(e)
-//                 }
-//             })
-//             .expect("ERROR: Unexpected MARF Failure on GET")
-//             .map(|marf_value| {
-//                 let side_key = marf_value.to_hex();
-//                 self.side_store.get(&side_key)
-//                     .expect(&format!("ERROR: MARF contained value_hash not found in side storage: {}",
-//                                         side_key))
-//             })
-//     }
-
-//     fn put_all(&mut self, mut items: Vec<(String, String)>) {
-//         let mut keys = Vec::new();
-//         let mut values = Vec::new();
-//         for (key, value) in items.drain(..) {
-//             let marf_value = MARFValue::from_value(&value);
-//             self.side_store.put(&marf_value.to_hex(), &value);
-//             keys.push(key);
-//             values.push(marf_value);
-//         }
-//         self.marf.insert_batch(&keys, values)
-//             .expect("ERROR: Unexpected MARF Failure");
-//     }
-// }

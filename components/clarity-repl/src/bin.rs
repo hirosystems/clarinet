@@ -21,6 +21,7 @@ mod macros;
 pub mod analysis;
 pub mod frontend;
 pub mod repl;
+pub mod utils;
 
 use frontend::Terminal;
 use pico_args::Arguments;
