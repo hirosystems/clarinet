@@ -1,0 +1,10 @@
+<p style="color: green"><%= notice %></p>
+
+<%= render @vault %>
+
+<div>
+  <%= link_to "Edit this vault", edit_vault_path(@vault) %> |
+  <%= link_to "Back to vaults", vaults_path %>
+
+  <%= button_to "Destroy this vault", @vault, method: :delete %>
+</div>

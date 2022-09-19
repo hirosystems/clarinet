@@ -1,0 +1,23 @@
+<% content_for(:title) { t("administrate.actions.show_resource", name: page.page_title) } %>
+
+<header class="main-content__header" role="banner">
+  <h1 class="main-content__page-title">
+    <%= content_for(:title) %>
+  </h1>
+</header>
+
+<section class="main-content__body">
+  <dl>
+    <% page.attributes.each do |attribute| %>
+      <dt class="attribute-label" id="<%= attribute.name %>">
+      <%= t(
+        "helpers.label.#{resource_name}.#{attribute.name}",
+        default: page.resource.class.human_attribute_name(attribute.name),
+      ) %>
+      </dt>
+
+      <dd class="attribute-data attribute-data--<%=attribute.html_class%>"
+          ><%= render_field attribute, page: page %></dd>
+    <% end %>
+  </dl>
+</section>

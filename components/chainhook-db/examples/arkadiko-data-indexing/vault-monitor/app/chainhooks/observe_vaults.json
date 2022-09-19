@@ -1,0 +1,23 @@
+{
+  "stacks": {
+    "uuid": "1",
+    "name": "Vault events observer",
+    "network": "mainnet",
+    "version": 1,
+    "decode_clarity_values": true,
+    "predicate": {
+      "type": "print_event",
+      "rule": {
+        "contract_identifier": "SP2C2YFP12AJZB4MABJBAJ55XECVS7E4PMMZ89YZR.arkadiko-freddie-v1-1",
+        "contains": "vault"
+      }
+    },
+    "action": {
+      "http": {
+        "url": "http://localhost:3000/chainhooks/v1/vaults",
+        "method": "POST",
+        "authorization_header": "Bearer cn389ncoiwuencr"
+      }
+    }
+  }
+}

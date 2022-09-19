@@ -19,3 +19,6 @@ components/chainhook-types-js/dist
 *.zip
 *.rdb
 
+components/chainhook-db/examples/arkadiko-data-indexing/vault-monitor/bin
+components/chainhook-db/examples/arkadiko-data-indexing/vault-monitor/tmp
+components/chainhook-db/examples/arkadiko-data-indexing/vault-monitor/vendor
