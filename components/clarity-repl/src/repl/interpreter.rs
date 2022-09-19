@@ -24,7 +24,6 @@ use clarity::vm::contracts::Contract;
 use clarity::vm::costs::cost_functions::ClarityCostFunction;
 use clarity::vm::costs::{runtime_cost, ExecutionCost, LimitedCostTracker};
 use clarity::vm::database::ClarityDatabase;
-use clarity::vm::database::NULL_HEADER_DB;
 use clarity::vm::diagnostic::{Diagnostic, Level};
 use clarity::vm::errors::Error;
 use clarity::vm::representations::SymbolicExpressionType::{Atom, List};

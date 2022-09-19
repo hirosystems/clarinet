@@ -2,7 +2,7 @@ use std::convert::TryInto;
 use std::path::PathBuf;
 
 use crate::repl::database::{
-    ClarityDatabase, ClarityDeserializable, ClaritySerializable, HeadersDB, NULL_HEADER_DB,
+    ClarityDatabase, ClarityDeserializable, ClaritySerializable, HeadersDB,
 };
 use clarity::types::chainstate::{BlockHeaderHash, BurnchainHeaderHash, StacksBlockId, VRFSeed};
 use clarity_repl::clarity::util::hash::{hex_bytes, to_hex, Sha512Trunc256Sum};
@@ -83,60 +83,3 @@ impl ClarityDeserializable<ContractCommitment> for ContractCommitment {
     }
 }
 
-pub struct NullBackingStore {}
-
-impl NullBackingStore {
-    pub fn new() -> Self {
-        NullBackingStore {}
-    }
-
-    pub fn as_clarity_db<'a>(&'a mut self) -> ClarityDatabase<'a> {
-        ClarityDatabase::new(self, &NULL_HEADER_DB)
-    }
-
-    pub fn as_analysis_db<'a>(&'a mut self) -> AnalysisDatabase<'a> {
-        AnalysisDatabase::new(self)
-    }
-}
-
-impl ClarityBackingStore for NullBackingStore {
-    fn set_block_hash(&mut self, _bhh: StacksBlockId) -> Result<StacksBlockId> {
-        panic!("NullBackingStore can't set block hash")
-    }
-
-    fn get(&mut self, _key: &str) -> Option<String> {
-        panic!("NullBackingStore can't retrieve data")
-    }
-
-    fn get_block_at_height(&mut self, _height: u32) -> Option<StacksBlockId> {
-        panic!("NullBackingStore can't get block at height")
-    }
-
-    fn get_open_chain_tip(&mut self) -> StacksBlockId {
-        panic!("NullBackingStore can't open chain tip")
-    }
-
-    fn get_open_chain_tip_height(&mut self) -> u32 {
-        panic!("NullBackingStore can't get open chain tip height")
-    }
-
-    fn get_current_block_height(&mut self) -> u32 {
-        panic!("NullBackingStore can't get current block height")
-    }
-
-    fn put_all(&mut self, mut _items: Vec<(String, String)>) {
-        panic!("NullBackingStore cannot put")
-    }
-
-    fn insert_metadata(&mut self, contract: &QualifiedContractIdentifier, key: &str, value: &str) {
-        panic!("NullBackingStore cannot insert_metadata")
-    }
-
-    fn get_metadata(
-        &mut self,
-        contract: &QualifiedContractIdentifier,
-        key: &str,
-    ) -> Result<Option<String>> {
-        panic!("NullBackingStore cannot get_metadata")
-    }
-}

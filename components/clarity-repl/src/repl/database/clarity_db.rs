@@ -18,6 +18,7 @@ use clarity::vm::contracts::Contract;
 use clarity::vm::costs::CostOverflowingMath;
 use clarity::vm::database::ClarityBackingStore;
 use clarity::vm::database::RollbackWrapper;
+use clarity::vm::database::HeadersDB;
 use clarity::vm::errors::{
     CheckErrors, Error, IncomparableError, InterpreterError, InterpreterResult as Result,
     RuntimeErrorType,
@@ -54,60 +55,6 @@ pub enum StoreType {
 pub struct ClarityDatabase<'a> {
     pub store: RollbackWrapper<'a>,
     headers_db: &'a dyn HeadersDB,
-}
-
-pub trait HeadersDB {
-    fn get_stacks_block_header_hash_for_block(
-        &self,
-        id_bhh: &StacksBlockId,
-    ) -> Option<BlockHeaderHash>;
-    fn get_burn_header_hash_for_block(&self, id_bhh: &StacksBlockId)
-        -> Option<BurnchainHeaderHash>;
-    fn get_vrf_seed_for_block(&self, id_bhh: &StacksBlockId) -> Option<VRFSeed>;
-    fn get_burn_block_time_for_block(&self, id_bhh: &StacksBlockId) -> Option<u64>;
-    fn get_burn_block_height_for_block(&self, id_bhh: &StacksBlockId) -> Option<u32>;
-    fn get_miner_address(&self, id_bhh: &StacksBlockId) -> Option<StacksAddress>;
-    fn get_total_liquid_ustx(&self, id_bhh: &StacksBlockId) -> u128;
-}
-
-pub struct NullHeadersDB {}
-
-pub const NULL_HEADER_DB: NullHeadersDB = NullHeadersDB {};
-
-impl HeadersDB for NullHeadersDB {
-    fn get_burn_header_hash_for_block(&self, bhh: &StacksBlockId) -> Option<BurnchainHeaderHash> {
-        let burn_header_hash = BurnchainHeaderHash(bhh.0.clone());
-        Some(burn_header_hash)
-    }
-
-    fn get_vrf_seed_for_block(&self, bhh: &StacksBlockId) -> Option<VRFSeed> {
-        let mut rng: Pcg64 = Seeder::from(bhh).make_rng();
-        let mut buf = [0u8; 32];
-        rng.fill_bytes(&mut buf);
-        Some(VRFSeed(buf))
-    }
-
-    fn get_stacks_block_header_hash_for_block(
-        &self,
-        id_bhh: &StacksBlockId,
-    ) -> Option<BlockHeaderHash> {
-        let header_hash = BlockHeaderHash(id_bhh.0.clone());
-        Some(header_hash)
-    }
-
-    fn get_burn_block_time_for_block(&self, id_bhh: &StacksBlockId) -> Option<u64> {
-        Some(0)
-    }
-
-    fn get_total_liquid_ustx(&self, _id_bhh: &StacksBlockId) -> u128 {
-        0
-    }
-    fn get_burn_block_height_for_block(&self, _id_bhh: &StacksBlockId) -> Option<u32> {
-        None
-    }
-    fn get_miner_address(&self, _id_bhh: &StacksBlockId) -> Option<StacksAddress> {
-        None
-    }
 }
 
 impl<'a> ClarityDatabase<'a> {
@@ -374,74 +321,6 @@ impl<'a> ClarityDatabase<'a> {
 
     pub fn destroy(self) -> RollbackWrapper<'a> {
         self.store
-    }
-}
-
-// Get block information
-
-impl<'a> ClarityDatabase<'a> {
-    pub fn get_index_block_header_hash(&mut self, block_height: u32) -> StacksBlockId {
-        self.store
-            .get_block_header_hash(block_height)
-            // the caller is responsible for ensuring that the block_height given
-            //  is < current_block_height, so this should _always_ return a value.
-            .expect("Block header hash must return for provided block height")
-    }
-
-    pub fn get_current_block_height(&mut self) -> u32 {
-        self.store.get_current_block_height()
-    }
-
-    pub fn get_current_burnchain_block_height(&mut self) -> u32 {
-        let cur_stacks_height = self.store.get_current_block_height();
-        let cur_id_bhh = self.get_index_block_header_hash(cur_stacks_height);
-        self.get_burnchain_block_height(&cur_id_bhh)
-            .unwrap_or(cur_stacks_height)
-    }
-
-    pub fn get_block_header_hash(&mut self, block_height: u32) -> BlockHeaderHash {
-        let id_bhh = self.get_index_block_header_hash(block_height);
-        self.headers_db
-            .get_stacks_block_header_hash_for_block(&id_bhh)
-            .expect("Failed to get block data.")
-    }
-
-    pub fn get_block_time(&mut self, block_height: u32) -> u64 {
-        block_height as u64 * 600
-    }
-
-    pub fn get_burnchain_block_header_hash(&mut self, block_height: u32) -> BurnchainHeaderHash {
-        let id_bhh = self.get_index_block_header_hash(block_height);
-        self.headers_db
-            .get_burn_header_hash_for_block(&id_bhh)
-            .expect("Failed to get block data.")
-    }
-
-    pub fn get_burnchain_block_height(&mut self, id_bhh: &StacksBlockId) -> Option<u32> {
-        self.headers_db.get_burn_block_height_for_block(id_bhh)
-    }
-
-    pub fn get_block_vrf_seed(&mut self, block_height: u32) -> VRFSeed {
-        let id_bhh = self.get_index_block_header_hash(block_height);
-        self.headers_db
-            .get_vrf_seed_for_block(&id_bhh)
-            .expect("Failed to get block data.")
-    }
-
-    pub fn get_miner_address(&mut self, block_height: u32) -> StandardPrincipalData {
-        StandardPrincipalData::transient()
-    }
-
-    pub fn get_stx_btc_ops_processed(&mut self) -> u64 {
-        self.get("vm_pox::stx_btc_ops::processed_blocks")
-            .unwrap_or(0)
-    }
-
-    pub fn set_stx_btc_ops_processed(&mut self, processed: u64) {
-        // let id_bhh = self.get_index_block_header_hash(block_height);
-        // self.headers_db.get_miner_address(&id_bhh)
-        //     .expect("Failed to get block data.")
-        //     .into()
     }
 }
 

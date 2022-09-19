@@ -12,7 +12,7 @@ use clarity::types::StacksEpochId;
 use clarity::util::hash::Sha512Trunc256Sum;
 use clarity::vm::analysis::AnalysisDatabase;
 use clarity::vm::database::BurnStateDB;
-use clarity::vm::database::{ClarityBackingStore, ClarityDatabase, HeadersDB, NULL_BURN_STATE_DB};
+use clarity::vm::database::{ClarityBackingStore, ClarityDatabase, HeadersDB};
 use clarity::vm::errors::{
     CheckErrors, IncomparableError, InterpreterError, InterpreterResult as Result, RuntimeErrorType,
 };
@@ -37,13 +37,13 @@ pub struct Datastore {
 #[derive(Clone, Debug)]
 pub struct BlockInfo {
     block_header_hash: BlockHeaderHash,
-    burn_block_header_hash: BurnchainHeaderHash, 
+    burn_block_header_hash: BurnchainHeaderHash,
     consensus_hash: ConsensusHash,
     vrf_seed: VRFSeed,
     burn_block_time: u64,
     burn_block_height: u32,
     miner: StacksAddress,
-    burnchain_tokens_spent_for_block: u128, 
+    burnchain_tokens_spent_for_block: u128,
     get_burnchain_tokens_spent_for_winning_block: u128,
     tokens_earned_for_block: u128,
     pox_payout_addrs: (Vec<TupleData>, u128),
@@ -52,7 +52,7 @@ pub struct BlockInfo {
 #[derive(Clone, Debug)]
 pub struct StacksConstants {
     pub burn_start_height: u32,
-    pub pox_prepare_length: u32, 
+    pub pox_prepare_length: u32,
     pub pox_reward_cycle_length: u32,
     pub pox_rejection_fraction: u64,
     pub epoch_21_start_height: u32,
@@ -71,12 +71,62 @@ pub struct BurnDatastore {
     constants: StacksConstants,
 }
 
-fn height_to_id(height: u32) -> StacksBlockId {
+fn height_to_hashed_bytes(height: u32) -> [u8; 32] {
     let input_bytes = height.to_be_bytes();
     let mut hasher = Sha512_256::new();
     hasher.update(input_bytes);
     let hash = Sha512Trunc256Sum::from_hasher(hasher);
-    StacksBlockId(hash.0)
+    hash.0
+}
+
+fn height_to_id(height: u32) -> StacksBlockId {
+    StacksBlockId(height_to_hashed_bytes(height))
+}
+
+fn height_to_block(height: u32) -> BlockInfo {
+    let bytes = height_to_hashed_bytes(height);
+
+    let block_header_hash = {
+        let mut buffer = bytes.clone();
+        buffer[0] = 1;
+        BlockHeaderHash(buffer)
+    };
+    let burn_block_header_hash = {
+        let mut buffer = bytes.clone();
+        buffer[0] = 2;
+        BurnchainHeaderHash(buffer)
+    };
+    let consensus_hash = {
+        let mut buffer = bytes.clone();
+        buffer[0] = 3;
+        ConsensusHash::from_bytes(&buffer[0..20]).unwrap()
+    };
+    let vrf_seed = {
+        let mut buffer = bytes.clone();
+        buffer[0] = 4;
+        VRFSeed(buffer)
+    };
+    let burn_block_time: u64 = (height * 1800).into();
+    let burn_block_height = height;
+    let miner = StacksAddress::burn_address(true);
+    let burnchain_tokens_spent_for_block = 2000;
+    let get_burnchain_tokens_spent_for_winning_block = 2000;
+    let tokens_earned_for_block = 5000;
+    let pox_payout_addrs = (vec![], 0_u128);
+
+    BlockInfo {
+        block_header_hash,
+        burn_block_header_hash,
+        consensus_hash,
+        vrf_seed,
+        burn_block_time,
+        burn_block_height,
+        miner,
+        burnchain_tokens_spent_for_block,
+        get_burnchain_tokens_spent_for_winning_block,
+        tokens_earned_for_block,
+        pox_payout_addrs,
+    }
 }
 
 impl Datastore {
@@ -247,7 +297,7 @@ impl BurnDatastore {
         id_height_map.insert(id, 0);
 
         BurnDatastore {
-            store: HashMap::new(),
+            store,
             sortition_lookup: HashMap::new(),
             consensus_hash_lookup: HashMap::new(),
             block_id_lookup,
@@ -255,7 +305,7 @@ impl BurnDatastore {
             current_chain_tip: id,
             chain_height: 0,
             height_at_chain_tip: HashMap::new(),
-            constants,        
+            constants,
         }
     }
 
@@ -269,10 +319,16 @@ impl BurnDatastore {
 
         for i in 1..=count {
             let height = cur_height + i;
-            let id = height_to_id(height);
-
+            let bytes = height_to_hashed_bytes(height);
+            let id = StacksBlockId(bytes.clone());
+            let sortition_id = SortitionId(bytes.clone());
+            let block_info = height_to_block(height);
             self.block_id_lookup.insert(id, current_lookup_id);
             self.height_at_chain_tip.insert(id, height);
+            self.sortition_lookup.insert(sortition_id, id);
+            self.consensus_hash_lookup
+                .insert(block_info.consensus_hash.clone(), sortition_id);
+            self.store.insert(id, block_info);
         }
 
         self.chain_height = self.chain_height + count;
@@ -282,7 +338,6 @@ impl BurnDatastore {
 }
 
 impl HeadersDB for BurnDatastore {
-
     // fn get(&mut self, key: &str) -> Option<String> {
     //     let lookup_id = self
     //         .block_id_lookup
@@ -300,39 +355,55 @@ impl HeadersDB for BurnDatastore {
         &self,
         id_bhh: &StacksBlockId,
     ) -> Option<BlockHeaderHash> {
-        self.store.get(id_bhh).and_then(|id| Some(id.block_header_hash))
+        self.store
+            .get(id_bhh)
+            .and_then(|id| Some(id.block_header_hash))
     }
 
     fn get_burn_header_hash_for_block(
         &self,
         id_bhh: &StacksBlockId,
     ) -> Option<BurnchainHeaderHash> {
-        self.store.get(id_bhh).and_then(|id| Some(id.burn_block_header_hash))
+        self.store
+            .get(id_bhh)
+            .and_then(|id| Some(id.burn_block_header_hash))
     }
 
     fn get_consensus_hash_for_block(&self, id_bhh: &StacksBlockId) -> Option<ConsensusHash> {
-        self.store.get(id_bhh).and_then(|id| Some(id.consensus_hash))
+        self.store
+            .get(id_bhh)
+            .and_then(|id| Some(id.consensus_hash))
     }
     fn get_vrf_seed_for_block(&self, id_bhh: &StacksBlockId) -> Option<VRFSeed> {
         self.store.get(id_bhh).and_then(|id| Some(id.vrf_seed))
     }
     fn get_burn_block_time_for_block(&self, id_bhh: &StacksBlockId) -> Option<u64> {
-        self.store.get(id_bhh).and_then(|id| Some(id.burn_block_time))
+        self.store
+            .get(id_bhh)
+            .and_then(|id| Some(id.burn_block_time))
     }
     fn get_burn_block_height_for_block(&self, id_bhh: &StacksBlockId) -> Option<u32> {
-        self.store.get(id_bhh).and_then(|id| Some(id.burn_block_height))
+        self.store
+            .get(id_bhh)
+            .and_then(|id| Some(id.burn_block_height))
     }
     fn get_miner_address(&self, id_bhh: &StacksBlockId) -> Option<StacksAddress> {
         self.store.get(id_bhh).and_then(|id| Some(id.miner))
     }
     fn get_burnchain_tokens_spent_for_block(&self, id_bhh: &StacksBlockId) -> Option<u128> {
-        self.store.get(id_bhh).and_then(|id| Some(id.burnchain_tokens_spent_for_block))
+        self.store
+            .get(id_bhh)
+            .and_then(|id| Some(id.burnchain_tokens_spent_for_block))
     }
     fn get_burnchain_tokens_spent_for_winning_block(&self, id_bhh: &StacksBlockId) -> Option<u128> {
-        self.store.get(id_bhh).and_then(|id| Some(id.get_burnchain_tokens_spent_for_winning_block))
+        self.store
+            .get(id_bhh)
+            .and_then(|id| Some(id.get_burnchain_tokens_spent_for_winning_block))
     }
     fn get_tokens_earned_for_block(&self, id_bhh: &StacksBlockId) -> Option<u128> {
-        self.store.get(id_bhh).and_then(|id| Some(id.tokens_earned_for_block))
+        self.store
+            .get(id_bhh)
+            .and_then(|id| Some(id.tokens_earned_for_block))
     }
 }
 
@@ -343,7 +414,10 @@ impl BurnStateDB for BurnDatastore {
 
     /// Returns the *burnchain block height* for the `sortition_id` is associated with.
     fn get_burn_block_height(&self, sortition_id: &SortitionId) -> Option<u32> {
-        None
+        self.sortition_lookup
+            .get(sortition_id)
+            .and_then(|id| self.store.get(id))
+            .and_then(|block_info| Some(block_info.burn_block_height))
     }
 
     /// Returns the height of the burnchain when the Stacks chain started running.
@@ -371,7 +445,10 @@ impl BurnStateDB for BurnDatastore {
         height: u32,
         sortition_id: &SortitionId,
     ) -> Option<BurnchainHeaderHash> {
-        None
+        self.sortition_lookup
+            .get(sortition_id)
+            .and_then(|id| self.store.get(id))
+            .and_then(|block_info| Some(block_info.burn_block_header_hash))
     }
 
     /// Lookup a `SortitionId` keyed to a `ConsensusHash`.
@@ -381,7 +458,9 @@ impl BurnStateDB for BurnDatastore {
         &self,
         consensus_hash: &ConsensusHash,
     ) -> Option<SortitionId> {
-        None
+        self.consensus_hash_lookup
+            .get(consensus_hash)
+            .and_then(|id| Some(id.clone()))
     }
 
     /// The epoch is defined as by a start and end height. This returns
@@ -400,7 +479,10 @@ impl BurnStateDB for BurnDatastore {
         height: u32,
         sortition_id: &SortitionId,
     ) -> Option<(Vec<TupleData>, u128)> {
-        None
+        self.sortition_lookup
+            .get(sortition_id)
+            .and_then(|id| self.store.get(id))
+            .and_then(|block_info| Some(block_info.pox_payout_addrs.clone()))
     }
 }
 
