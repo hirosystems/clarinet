@@ -13,6 +13,7 @@ use clarity_repl::clarity::types::QualifiedContractIdentifier;
 use clarity_repl::repl::ast::ContractAST;
 use lsp_types::MessageType;
 use orchestra_types::StacksNetwork;
+use std::borrow::BorrowMut;
 use std::collections::{HashMap, HashSet};
 
 #[derive(Debug, Clone, PartialEq)]
@@ -70,10 +71,17 @@ impl ContractState {
     }
 }
 
+#[derive(Clone, Debug)]
+pub struct ContractMetadata {
+    pub base_location: FileLocation,
+    pub manifest_location: FileLocation,
+    pub relative_path: String,
+}
+
 #[derive(Clone, Default, Debug)]
 pub struct EditorState {
     pub protocols: HashMap<FileLocation, ProtocolState>,
-    pub contracts_lookup: HashMap<FileLocation, FileLocation>,
+    pub contracts_lookup: HashMap<FileLocation, ContractMetadata>,
     pub native_functions: Vec<CompletionItem>,
 }
 
@@ -87,9 +95,36 @@ impl EditorState {
     }
 
     pub fn index_protocol(&mut self, manifest_location: FileLocation, protocol: ProtocolState) {
+        let mut base_location = manifest_location.clone();
+
+        match base_location.borrow_mut() {
+            FileLocation::FileSystem { path } => {
+                let mut parent = path.clone();
+                parent.pop();
+                parent.pop();
+            }
+            FileLocation::Url { url } => {
+                let mut segments = url
+                    .path_segments_mut()
+                    .expect("could not find root location");
+                segments.pop();
+                segments.pop();
+            }
+        };
+
         for (contract_uri, _) in protocol.contracts.iter() {
-            self.contracts_lookup
-                .insert(contract_uri.clone(), manifest_location.clone());
+            let relative_path = contract_uri
+                .get_relative_path_from_base(&base_location)
+                .expect("could not find relative location");
+
+            self.contracts_lookup.insert(
+                contract_uri.clone(),
+                ContractMetadata {
+                    base_location: base_location.clone(),
+                    manifest_location: manifest_location.clone(),
+                    relative_path,
+                },
+            );
         }
         self.protocols.insert(manifest_location, protocol);
     }
@@ -107,8 +142,8 @@ impl EditorState {
         contract_location: &FileLocation,
     ) -> Option<FileLocation> {
         match self.contracts_lookup.get(&contract_location) {
-            Some(manifest_location) => {
-                let manifest_location = manifest_location.clone();
+            Some(contract_metadata) => {
+                let manifest_location = contract_metadata.manifest_location.clone();
                 self.clear_protocol(&manifest_location);
                 Some(manifest_location)
             }
@@ -125,7 +160,7 @@ impl EditorState {
         let mut user_defined_keywords = self
             .contracts_lookup
             .get(&contract_location)
-            .and_then(|p| self.protocols.get(p))
+            .and_then(|d| self.protocols.get(&d.manifest_location))
             .and_then(|p| Some(p.get_completion_items_for_contract(contract_location)))
             .unwrap_or_default();
 
@@ -147,9 +182,14 @@ impl EditorState {
             for (contract_url, state) in protocol_state.contracts.iter() {
                 let mut diags = vec![];
 
+                let ContractMetadata { relative_path, .. } = self
+                    .contracts_lookup
+                    .get(contract_url)
+                    .expect("contract not in lookup");
+
                 // Convert and collect errors
                 if !state.errors.is_empty() {
-                    erroring_files.insert(state.location.to_string());
+                    erroring_files.insert(relative_path.clone());
                     for error in state.errors.iter() {
                         diags.push(error.clone());
                     }
@@ -157,7 +197,7 @@ impl EditorState {
 
                 // Convert and collect warnings
                 if !state.warnings.is_empty() {
-                    warning_files.insert(state.location.to_string());
+                    warning_files.insert(relative_path.clone());
                     for warning in state.warnings.iter() {
                         diags.push(warning.clone());
                     }
@@ -173,14 +213,14 @@ impl EditorState {
 
         let tldr = match (erroring_files.len(), warning_files.len()) {
             (0, 0) => None,
-            (0, warnings) if warnings > 0 => Some((
+            (0, _warnings) => Some((
                 MessageType::WARNING,
                 format!(
                     "Warning detected in following contracts: {}",
                     warning_files.into_iter().collect::<Vec<_>>().join(", ")
                 ),
             )),
-            (errors, 0) if errors > 0 => Some((
+            (_errors, 0) => Some((
                 MessageType::ERROR,
                 format!(
                     "Errors detected in following contracts: {}",
