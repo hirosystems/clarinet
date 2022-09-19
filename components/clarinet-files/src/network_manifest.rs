@@ -7,7 +7,7 @@ use clarity_repl::clarity::util::secp256k1::Secp256k1PublicKey;
 use clarity_repl::clarity::util::StacksAddress;
 use clarity_repl::clarity::{types::QualifiedContractIdentifier, util::hash::bytes_to_hex};
 use libsecp256k1::{PublicKey, SecretKey};
-use orchestra_types::{BitcoinNetwork, StacksNetwork};
+use chainhook_types::{BitcoinNetwork, StacksNetwork};
 use tiny_hderive::bip32::ExtendedPrivKey;
 use toml::value::Value;
 

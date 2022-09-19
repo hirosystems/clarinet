@@ -11,7 +11,7 @@ use clarinet_files::{
 };
 use clarinet_lib::deployments;
 use clarinet_lib::integrate::{self, DevnetEvent, DevnetOrchestrator};
-use orchestra_types::{
+use chainhook_types::{
     BitcoinChainEvent, BitcoinChainUpdatedWithBlocksData, StacksChainEvent,
     StacksChainUpdatedWithBlocksData, StacksNetwork,
 };

@@ -619,6 +619,70 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "baf1de4339761588bc0619e3cbc0120ee582ebb74b53b4efbf79117bd2da40fd"
 
 [[package]]
+name = "chainhook-db"
+version = "0.1.0"
+dependencies = [
+ "chainhook-event-observer",
+ "chainhook-types",
+ "clap 3.2.12",
+ "clap_generate",
+ "clarity-repl",
+ "criterion",
+ "csv",
+ "ctrlc",
+ "hex",
+ "num_cpus",
+ "redis",
+ "serde",
+ "serde-redis",
+ "serde_derive",
+ "serde_json",
+ "slog",
+ "slog-async",
+ "slog-atomic",
+ "slog-json",
+ "slog-scope",
+ "slog-term",
+ "toml",
+]
+
+[[package]]
+name = "chainhook-event-observer"
+version = "0.33.0"
+dependencies = [
+ "base58 0.2.0",
+ "base64 0.13.0",
+ "bitcoincore-rpc",
+ "bitcoincore-rpc-json",
+ "chainhook-types",
+ "clap 3.2.12",
+ "clap_generate",
+ "clarity-repl",
+ "ctrlc",
+ "reqwest",
+ "rocket",
+ "serde",
+ "serde_derive",
+ "serde_json",
+ "slog",
+ "slog-json",
+ "slog-scope",
+ "stacks-rpc-client",
+ "tokio",
+ "toml",
+]
+
+[[package]]
+name = "chainhook-types"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "serde_derive",
+ "serde_json",
+ "strum",
+]
+
+[[package]]
 name = "chrono"
 version = "0.4.19"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -728,6 +792,8 @@ dependencies = [
  "bitcoincore-rpc-json",
  "block-modes",
  "bollard",
+ "chainhook-event-observer",
+ "chainhook-types",
  "chrono",
  "clap 3.2.12",
  "clap_generate",
@@ -753,8 +819,6 @@ dependencies = [
  "mac_address",
  "mio 0.8.2",
  "num_cpus",
- "orchestra-event-observer",
- "orchestra-types",
  "pbkdf2",
  "percent-encoding",
  "pin-project",
@@ -791,9 +855,9 @@ dependencies = [
 name = "clarinet-deployments"
 version = "0.1.0"
 dependencies = [
+ "chainhook-types",
  "clarinet-files",
  "clarity-repl",
- "orchestra-types",
  "reqwest",
  "serde",
  "serde_derive",
@@ -807,10 +871,10 @@ version = "0.1.0"
 dependencies = [
  "bip39",
  "bitcoin 0.28.1",
+ "chainhook-types",
  "clarinet-utils",
  "clarity-repl",
  "libsecp256k1 0.7.0",
- "orchestra-types",
  "serde",
  "serde_derive",
  "serde_json",
@@ -832,11 +896,11 @@ dependencies = [
 name = "clarity-lsp"
 version = "0.1.0"
 dependencies = [
+ "chainhook-types",
  "clarinet-deployments",
  "clarinet-files",
  "clarity-repl",
  "lsp-types 0.93.0",
- "orchestra-types",
  "wasm-bindgen",
  "wasm-bindgen-futures",
 ]
@@ -3234,70 +3298,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "624a8340c38c1b80fd549087862da4ba43e08858af025b236e509b6649fc13d5"
 
 [[package]]
-name = "orchestra-event-indexer"
-version = "0.1.0"
-dependencies = [
- "clap 3.2.12",
- "clap_generate",
- "clarity-repl",
- "criterion",
- "csv",
- "ctrlc",
- "hex",
- "num_cpus",
- "orchestra-event-observer",
- "orchestra-types",
- "redis",
- "serde",
- "serde-redis",
- "serde_derive",
- "serde_json",
- "slog",
- "slog-async",
- "slog-atomic",
- "slog-json",
- "slog-scope",
- "slog-term",
- "toml",
-]
-
-[[package]]
-name = "orchestra-event-observer"
-version = "0.33.0"
-dependencies = [
- "base58 0.2.0",
- "base64 0.13.0",
- "bitcoincore-rpc",
- "bitcoincore-rpc-json",
- "clap 3.2.12",
- "clap_generate",
- "clarity-repl",
- "ctrlc",
- "orchestra-types",
- "reqwest",
- "rocket",
- "serde",
- "serde_derive",
- "serde_json",
- "slog",
- "slog-json",
- "slog-scope",
- "stacks-rpc-client",
- "tokio",
- "toml",
-]
-
-[[package]]
-name = "orchestra-types"
-version = "0.1.0"
-dependencies = [
- "serde",
- "serde_derive",
- "serde_json",
- "strum",
-]
-
-[[package]]
 name = "os_pipe"
 version = "0.9.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4856,13 +4856,13 @@ dependencies = [
 name = "stacks-devnet-js"
 version = "0.33.0"
 dependencies = [
+ "chainhook-types",
  "clarinet-cli",
  "clarinet-files",
  "clarinet-utils",
  "error-chain",
  "neon",
  "num",
- "orchestra-types",
  "serde",
 ]
 

@@ -13,7 +13,7 @@ pub use network_manifest::{
     compute_addresses, AccountConfig, DevnetConfig, DevnetConfigFile, NetworkManifest,
     NetworkManifestFile, PoxStackingOrder, DEFAULT_DERIVATION_PATH,
 };
-use orchestra_types::StacksNetwork;
+use chainhook_types::StacksNetwork;
 pub use project_manifest::{
     ContractConfig, ProjectManifest, ProjectManifestFile, RequirementConfig,
 };

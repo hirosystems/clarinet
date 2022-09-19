@@ -12,7 +12,7 @@ use clarity_repl::clarity::diagnostic::{Diagnostic as ClarityDiagnostic, Level a
 use clarity_repl::clarity::types::QualifiedContractIdentifier;
 use clarity_repl::repl::ast::ContractAST;
 use lsp_types::MessageType;
-use orchestra_types::StacksNetwork;
+use chainhook_types::StacksNetwork;
 use std::collections::{HashMap, HashSet};
 
 #[derive(Debug, Clone, PartialEq)]

@@ -10,8 +10,8 @@ members = [
     "vendor/deno/cli/",
     "vendor/deno/runtime/",
     "vendor/deno/core/",
-    "vendor/orchestra-types-rs",
-    "vendor/orchestra-event-observer",
-    "vendor/orchestra-event-indexer"
+    "components/chainhook-types-rs",
+    "components/chainhook-event-observer",
+    "components/chainhook-db"
 ]
-default-members = ["components/clarinet-cli", "vendor/orchestra-event-observer"]
+default-members = ["components/clarinet-cli", "components/chainhook-event-observer"]

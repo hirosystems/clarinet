@@ -46,7 +46,7 @@ use clarity_repl::clarity::{
 use clarity_repl::repl::Session;
 use clarity_repl::repl::SessionSettings;
 use libsecp256k1::{PublicKey, SecretKey};
-use orchestra_types::StacksNetwork;
+use chainhook_types::StacksNetwork;
 use serde_yaml;
 use stacks_rpc_client::StacksRpc;
 use std::collections::{BTreeMap, HashSet, VecDeque};

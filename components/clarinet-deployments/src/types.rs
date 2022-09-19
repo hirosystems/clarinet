@@ -5,7 +5,7 @@ use clarity_repl::clarity::types::{
 
 use clarity_repl::clarity::{ClarityName, ContractName};
 
-use orchestra_types::StacksNetwork;
+use chainhook_types::StacksNetwork;
 use serde::{Deserialize, Serialize};
 use serde_yaml;
 use std::collections::BTreeMap;

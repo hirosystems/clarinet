@@ -13,7 +13,7 @@ use bollard::Docker;
 use clarinet_files::{DevnetConfigFile, NetworkManifest, ProjectManifest, DEFAULT_DEVNET_BALANCE};
 use crossterm::terminal::disable_raw_mode;
 use futures::stream::TryStreamExt;
-use orchestra_types::StacksNetwork;
+use chainhook_types::StacksNetwork;
 use std::collections::HashMap;
 use std::fs::{self, File};
 use std::io::Write;

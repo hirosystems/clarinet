@@ -25,7 +25,7 @@ use clarity_repl::clarity::types::{PrincipalData, QualifiedContractIdentifier};
 use clarity_repl::clarity::ContractName;
 use clarity_repl::repl::SessionSettings;
 use clarity_repl::repl::{ExecutionResult, Session};
-use orchestra_types::StacksNetwork;
+use chainhook_types::StacksNetwork;
 use std::collections::{BTreeMap, HashMap, VecDeque};
 
 pub fn setup_session_with_deployment(

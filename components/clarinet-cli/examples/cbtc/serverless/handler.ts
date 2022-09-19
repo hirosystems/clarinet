@@ -1,5 +1,5 @@
 require('dotenv').config();
-import { BitcoinChainEvent, StacksChainEvent, StacksTransactionEventType, StacksFTBurnEventData } from "@hirosystems/orchestra-types";
+import { BitcoinChainEvent, StacksChainEvent, StacksTransactionEventType, StacksFTBurnEventData } from "@hirosystems/chainhook-types";
 import {
   getNonce,
   makeContractCall,

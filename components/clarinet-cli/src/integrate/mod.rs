@@ -5,7 +5,7 @@ mod ui;
 use std::sync::mpsc::{self, channel, Sender};
 
 use chrono::prelude::*;
-use orchestra_event_observer::observer::MempoolAdmissionData;
+use chainhook_event_observer::observer::MempoolAdmissionData;
 use tracing::{self, debug, error, info, warn};
 use tracing_appender;
 
@@ -13,7 +13,7 @@ use crate::types::ChainsCoordinatorCommand;
 use crate::utils;
 use chains_coordinator::start_chains_coordinator;
 use clarinet_deployments::types::DeploymentSpecification;
-use orchestra_types::{BitcoinChainEvent, StacksChainEvent};
+use chainhook_types::{BitcoinChainEvent, StacksChainEvent};
 pub use orchestrator::DevnetOrchestrator;
 
 use self::chains_coordinator::DevnetEventObserverConfig;

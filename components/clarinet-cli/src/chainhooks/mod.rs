@@ -4,9 +4,9 @@ use std::path::PathBuf;
 pub mod types;
 use crate::chainhooks::types::ChainhookSpecificationFile;
 
-use orchestra_event_observer::chainhooks::types::{ChainhookSpecification, HookFormation};
+use chainhook_event_observer::chainhooks::types::{ChainhookSpecification, HookFormation};
 
-use orchestra_types::{BitcoinNetwork, StacksNetwork};
+use chainhook_types::{BitcoinNetwork, StacksNetwork};
 
 use std::fs;
 

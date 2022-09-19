@@ -1,6 +1,6 @@
 use super::util::{StatefulList, TabsState};
 use crate::integrate::{LogData, MempoolAdmissionData, ServiceStatusData};
-use orchestra_types::{StacksBlockData, StacksMicroblockData, StacksTransactionData};
+use chainhook_types::{StacksBlockData, StacksMicroblockData, StacksTransactionData};
 use tui::style::{Color, Style};
 use tui::text::{Span, Spans};
 

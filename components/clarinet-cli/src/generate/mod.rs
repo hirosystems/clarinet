@@ -7,7 +7,7 @@ use chainhook::GetChangesForNewChainhook;
 pub use changes::{Changes, DirectoryCreation, FileCreation, TOMLEdition};
 use clarinet_files::FileLocation;
 use contract::GetChangesForNewContract;
-use orchestra_types::Chain;
+use chainhook_types::Chain;
 use project::GetChangesForNewProject;
 
 use clarinet_files::ProjectManifest;

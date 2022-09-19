@@ -13,8 +13,8 @@ use crossterm::{
     execute,
     terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
 };
-use orchestra_event_observer::observer::ObserverCommand;
-use orchestra_types::StacksChainEvent;
+use chainhook_event_observer::observer::ObserverCommand;
+use chainhook_types::StacksChainEvent;
 use std::sync::mpsc::{Receiver, Sender};
 use std::{
     error::Error,

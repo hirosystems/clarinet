@@ -2,7 +2,7 @@ use crate::deployments::generate_default_deployment;
 use clarinet_deployments::setup_session_with_deployment;
 use clarinet_files::{FileLocation, ProjectManifest};
 use clarity_repl::clarity::debug::dap::DAPDebugger;
-use orchestra_types::StacksNetwork;
+use chainhook_types::StacksNetwork;
 use std::path::PathBuf;
 
 #[cfg(feature = "telemetry")]
