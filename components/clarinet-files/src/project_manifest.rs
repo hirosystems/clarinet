@@ -74,7 +74,7 @@ impl ProjectManifest {
         file_accessor: &Box<dyn FileAccessor>,
     ) -> Result<ProjectManifest, String> {
         let perform_file_access = file_accessor.read_manifest_content(location.clone());
-        let (location, content) = perform_file_access.await?;
+        let content = perform_file_access.await?;
 
         let project_manifest_file: ProjectManifestFile = match toml::from_slice(&content.as_bytes())
         {

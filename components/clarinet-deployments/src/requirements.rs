@@ -16,13 +16,9 @@ pub async fn retrieve_contract(
     let contract_source = match file_accessor {
         None => contract_location.read_content_as_utf8(),
         Some(file_accessor) => {
-            match file_accessor
+            file_accessor
                 .read_contract_content(contract_location.clone())
                 .await
-            {
-                Ok((_, source)) => Ok(source),
-                Err(err) => Err(err),
-            }
         }
     };
 

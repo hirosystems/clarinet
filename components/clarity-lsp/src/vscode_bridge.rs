@@ -6,6 +6,8 @@ use crate::utils::{
 };
 use clarinet_files::{FileAccessor, WASMFileSystemAccessor};
 use js_sys::{Function as JsFunction, Promise};
+use lsp_types::notification::DidChangeTextDocument;
+use lsp_types::DidChangeTextDocumentParams;
 use lsp_types::{
     notification::{DidOpenTextDocument, DidSaveTextDocument, Initialized, Notification},
     request::{Completion, Request},
@@ -129,7 +131,7 @@ impl LspVscodeBridge {
                 log!("> saved: {}", uri);
 
                 let command = if let Some(contract_location) = get_contract_location(uri) {
-                    LspNotification::ContractChanged(contract_location)
+                    LspNotification::ContractChanged(contract_location, None)
                 } else if let Some(manifest_location) = get_manifest_location(uri) {
                     LspNotification::ManifestChanged(manifest_location)
                 } else {
@@ -180,6 +182,60 @@ impl LspVscodeBridge {
                             })?,
                         );
                     }
+                    Ok(JsValue::TRUE)
+                });
+            }
+            DidChangeTextDocument::METHOD => {
+                let params: DidChangeTextDocumentParams = match decode_from_js(js_params) {
+                    Ok(params) => params,
+                    Err(err) => return Promise::reject(&JsValue::from(format!("error: {}", err))),
+                };
+                let uri = &params.text_document.uri;
+                log!("> changed: {}", uri);
+
+                let contract_location = match get_contract_location(uri) {
+                    Some(contract_location) => contract_location,
+                    _ => {
+                        log!("Unsupported file changed");
+                        return Promise::resolve(&JsValue::NULL);
+                    }
+                };
+
+                let command = LspNotification::ContractChanged(
+                    contract_location,
+                    Some(params.content_changes[0].text.clone()),
+                );
+
+                let editor_state_lock = self.editor_state_lock.clone();
+                let send_diagnostic = self.client_diagnostic_tx.clone();
+
+                return future_to_promise(async move {
+                    let mut result = match editor_state_lock.try_write() {
+                        Ok(mut editor_state) => {
+                            process_notification(command, &mut editor_state, Some(&file_accessor))
+                                .await
+                        }
+                        Err(_) => return Err(JsValue::from("unable to lock editor_state")),
+                    };
+
+                    let mut aggregated_diagnostics = vec![];
+
+                    if let Ok(ref mut response) = result {
+                        aggregated_diagnostics.append(&mut response.aggregated_diagnostics);
+                    }
+
+                    for (location, mut diags) in aggregated_diagnostics.into_iter() {
+                        if let Ok(uri) = Url::parse(&location.to_string()) {
+                            let value = PublishDiagnosticsParams {
+                                uri,
+                                diagnostics: clarity_diagnostics_to_lsp_type(&mut diags),
+                                version: None,
+                            };
+
+                            let _ = send_diagnostic.call1(&JsValue::NULL, &encode_to_js(&value)?);
+                        }
+                    }
+
                     Ok(JsValue::TRUE)
                 });
             }

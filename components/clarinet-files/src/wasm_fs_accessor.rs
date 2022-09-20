@@ -65,10 +65,7 @@ impl FileAccessor for WASMFileSystemAccessor {
         })
     }
 
-    fn read_manifest_content(
-        &self,
-        manifest_location: FileLocation,
-    ) -> FileAccessorResult<(FileLocation, String)> {
+    fn read_manifest_content(&self, manifest_location: FileLocation) -> FileAccessorResult<String> {
         log!("reading manifest");
         let read_file_promise = self.get_request_promise(
             "vfs/readFile".into(),
@@ -80,11 +77,8 @@ impl FileAccessor for WASMFileSystemAccessor {
         Box::pin(async move {
             match read_file_promise {
                 Ok(req) => match JsFuture::from(Promise::resolve(&req)).await {
-                    Ok(manifest) => Ok((
-                        manifest_location,
-                        decode_from_js(manifest)
-                            .map_err(|err| format!("decode_from_js error: {:?}", err))?,
-                    )),
+                    Ok(manifest) => Ok(decode_from_js(manifest)
+                        .map_err(|err| format!("decode_from_js error: {:?}", err))?),
                     Err(err) => Err(format!("error: {:?}", &err)),
                 },
                 Err(err) => Err(format!("error: {:?}", &err)),
@@ -92,32 +86,25 @@ impl FileAccessor for WASMFileSystemAccessor {
         })
     }
 
-    fn read_contract_content(
-        &self,
-        contract_location: FileLocation,
-    ) -> FileAccessorResult<(FileLocation, String)> {
+    fn read_contract_content(&self, contract_location: FileLocation) -> FileAccessorResult<String> {
         log!("reading contract");
-        let req = (|| -> Result<(FileLocation, JsValue), String> {
-            let req = self
+        let req = (|| -> Result<JsValue, String> {
+            Ok(self
                 .get_request_promise(
                     "vfs/readFile".into(),
                     &WFSRequest {
                         path: contract_location.to_string(),
                     },
                 )
-                .map_err(|err| format!("failed to read_file {:?}", &err))?;
-
-            Ok((contract_location, req))
+                .map_err(|err| format!("failed to read_file {:?}", &err))?)
         })();
 
         Box::pin(async move {
             match req {
-                Ok((contract_location, req)) => {
-                    match JsFuture::from(Promise::resolve(&req)).await {
-                        Ok(contract) => Ok((contract_location, decode_from_js(contract).unwrap())),
-                        Err(err) => Err(format!("error: {:?}", &err)),
-                    }
-                }
+                Ok(req) => match JsFuture::from(Promise::resolve(&req)).await {
+                    Ok(contract) => Ok(decode_from_js(contract).unwrap()),
+                    Err(err) => Err(format!("error: {:?}", &err)),
+                },
                 Err(err) => Err(format!("error: {}", &err)),
             }
         })

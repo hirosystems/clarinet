@@ -11,6 +11,7 @@ use self::types::{
     TransactionPlanSpecification, TransactionsBatchSpecification, WalletSpecification,
 };
 use clarinet_files::FileAccessor;
+use clarinet_files::FileLocation;
 use clarity_repl::clarity::diagnostic::DiagnosableError;
 use types::ContractPublishSpecification;
 use types::DeploymentGenerationArtifacts;
@@ -160,6 +161,7 @@ pub async fn generate_default_deployment(
     network: &StacksNetwork,
     no_batch: bool,
     file_accessor: Option<&Box<dyn FileAccessor>>,
+    overwrite_contract: Option<(FileLocation, String)>,
 ) -> Result<(DeploymentSpecification, DeploymentGenerationArtifacts), String> {
     let network_manifest = match file_accessor {
         None => NetworkManifest::from_project_manifest_location(
@@ -469,25 +471,32 @@ pub async fn generate_default_deployment(
             }
         };
 
-        let (contract_location, source) = match file_accessor {
+        let mut project_location = manifest.location.clone().get_parent_location()?;
+        let mut source = match file_accessor {
             None => {
-                let mut contract_location = manifest.location.get_project_root_location()?;
-                contract_location.append_path(&contract_config.path)?;
-                let source = contract_location.read_content_as_utf8()?;
-                (contract_location, source)
+                project_location.append_path(&contract_config.path)?;
+                project_location.read_content_as_utf8()?
             }
             Some(file_accessor) => {
-                let mut contract_location = manifest.location.clone().get_parent_location()?;
-                contract_location.append_path(&contract_config.path.to_string())?;
+                project_location.append_path(&contract_config.path.to_string())?;
                 file_accessor
-                    .read_contract_content(contract_location.clone())
+                    .read_contract_content(project_location.clone())
                     .await?
             }
         };
 
+        if let Some((overwrite_location, overwrite_source)) = overwrite_contract.clone() {
+            if project_location == overwrite_location {
+                source = overwrite_source;
+            }
+        }
+
         let contract_id = QualifiedContractIdentifier::new(sender.clone(), contract_name.clone());
 
-        contracts_sources.insert(contract_id.clone(), source.clone());
+        contracts_sources.insert(
+            contract_id.clone(),
+            (project_location.clone(), source.clone()),
+        );
 
         let contract_spec = if network.is_simnet() {
             TransactionSpecification::EmulatedContractPublish(
@@ -495,14 +504,14 @@ pub async fn generate_default_deployment(
                     contract_name,
                     emulated_sender: sender,
                     source,
-                    location: contract_location,
+                    location: project_location,
                 },
             )
         } else {
             TransactionSpecification::ContractPublish(ContractPublishSpecification {
                 contract_name,
                 expected_sender: sender,
-                location: contract_location,
+                location: project_location,
                 cost: deployment_fee_rate
                     .saturating_mul(source.as_bytes().len().try_into().unwrap()),
                 source,
@@ -520,13 +529,21 @@ pub async fn generate_default_deployment(
 
     let mut asts_success = true;
 
-    for (contract_id, source) in contracts_sources.into_iter() {
+    for (contract_id, (location, source)) in contracts_sources.into_iter() {
         let (ast, diags, ast_success) =
             session
                 .interpreter
                 .build_ast(contract_id.clone(), source, parser_version);
+
         contract_asts.insert(contract_id.clone(), ast);
-        contract_diags.insert(contract_id, diags);
+        if let Some((overwrite_location, _)) = overwrite_contract.clone() {
+            if overwrite_location == location {
+                contract_diags.insert(contract_id, diags);
+            }
+        } else {
+            contract_diags.insert(contract_id, diags);
+        }
+
         asts_success = asts_success && ast_success;
     }
 

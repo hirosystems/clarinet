@@ -325,6 +325,7 @@ pub async fn build_state(
     manifest_location: &FileLocation,
     protocol_state: &mut ProtocolState,
     file_accessor: Option<&Box<dyn FileAccessor>>,
+    overwrite_contract: Option<(FileLocation, String)>,
 ) -> Result<(), String> {
     let mut locations = HashMap::new();
     let mut analyses = HashMap::new();
@@ -341,9 +342,14 @@ pub async fn build_state(
         }
     };
 
-    let (deployment, mut artifacts) =
-        generate_default_deployment(&manifest, &StacksNetwork::Simnet, false, file_accessor)
-            .await?;
+    let (deployment, mut artifacts) = generate_default_deployment(
+        &manifest,
+        &StacksNetwork::Simnet,
+        false,
+        file_accessor,
+        overwrite_contract,
+    )
+    .await?;
 
     let mut session = initiate_session_from_deployment(&manifest);
     let results = update_session_with_contracts_executions(

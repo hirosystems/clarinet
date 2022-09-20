@@ -10,7 +10,7 @@ pub enum LspNotification {
     ManifestOpened(FileLocation),
     ManifestChanged(FileLocation),
     ContractOpened(FileLocation),
-    ContractChanged(FileLocation),
+    ContractChanged(FileLocation, Option<String>),
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -67,6 +67,7 @@ pub async fn process_notification(
                 &opened_manifest_location,
                 &mut protocol_state,
                 file_accessor,
+                None,
             )
             .await
             {
@@ -97,7 +98,7 @@ pub async fn process_notification(
                 .await?;
 
             let mut protocol_state = ProtocolState::new();
-            match build_state(&manifest_location, &mut protocol_state, file_accessor).await {
+            match build_state(&manifest_location, &mut protocol_state, file_accessor, None).await {
                 Ok(_) => {
                     editor_state.index_protocol(manifest_location, protocol_state);
                     let (aggregated_diagnostics, notification) =
@@ -116,7 +117,7 @@ pub async fn process_notification(
 
             // We will rebuild the entire state, without to try any optimizations for now
             let mut protocol_state = ProtocolState::new();
-            match build_state(&manifest_location, &mut protocol_state, file_accessor).await {
+            match build_state(&manifest_location, &mut protocol_state, file_accessor, None).await {
                 Ok(_) => {
                     editor_state.index_protocol(manifest_location, protocol_state);
                     let (aggregated_diagnostics, notification) =
@@ -130,7 +131,7 @@ pub async fn process_notification(
                 Err(e) => return Ok(LspResponse::error(&e)),
             };
         }
-        LspNotification::ContractChanged(contract_location) => {
+        LspNotification::ContractChanged(contract_location, overwrite_source) => {
             let manifest_location =
                 match editor_state.clear_protocol_associated_with_contract(&contract_location) {
                     Some(manifest_location) => manifest_location,
@@ -145,7 +146,17 @@ pub async fn process_notification(
             // https://github.com/hirosystems/clarity-lsp/issues/98
             // We will rebuild the entire state, without trying any optimizations for now
             let mut protocol_state = ProtocolState::new();
-            match build_state(&manifest_location, &mut protocol_state, file_accessor).await {
+            match build_state(
+                &manifest_location,
+                &mut protocol_state,
+                file_accessor,
+                match overwrite_source {
+                    Some(overwrite_source) => Some((contract_location, overwrite_source)),
+                    _ => None,
+                },
+            )
+            .await
+            {
                 Ok(_contracts_updates) => {
                     editor_state.index_protocol(manifest_location, protocol_state);
                     let (aggregated_diagnostics, notification) =
