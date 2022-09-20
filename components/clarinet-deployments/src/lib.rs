@@ -491,15 +491,13 @@ pub async fn generate_default_deployment(
             }
         };
 
-        let (contract_location, source) = match file_accessor {
+        let mut contract_location = manifest.location.clone().get_parent_location()?;
+        let source = match file_accessor {
             None => {
-                let mut contract_location = manifest.location.get_project_root_location()?;
                 contract_location.append_path(&contract_config.expect_contract_path_as_str())?;
-                let source = contract_location.read_content_as_utf8()?;
-                (contract_location, source)
+                contract_location.read_content_as_utf8()?
             }
             Some(file_accessor) => {
-                let mut contract_location = manifest.location.clone().get_parent_location()?;
                 contract_location.append_path(&contract_config.expect_contract_path_as_str())?;
                 file_accessor
                     .read_contract_content(contract_location.clone())
