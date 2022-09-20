@@ -532,13 +532,15 @@ impl ClarityInterpreter {
                                     &args,
                                     false,
                                 )?;
-                                res
+                                Ok(Some(res))
                             }
-                            _ => eval(&contract_ast.expressions[0], &mut env, &context).unwrap(),
+                            _ => eval(&contract_ast.expressions[0], &mut env, &context)
+                                .and_then(|r| Ok(Some(r))),
                         },
-                        _ => eval(&contract_ast.expressions[0], &mut env, &context).unwrap(),
+                        _ => eval(&contract_ast.expressions[0], &mut env, &context)
+                            .and_then(|r| Ok(Some(r))),
                     };
-                    Ok(Some(result))
+                    result
                 } else {
                     eval_all(&contract_ast.expressions, &mut contract_context, g, None)
                 }

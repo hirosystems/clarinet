@@ -271,7 +271,9 @@ impl ClarityBackingStore for Datastore {
 
 impl BurnDatastore {
     pub fn new(constants: StacksConstants) -> BurnDatastore {
-        let id = height_to_id(0);
+        let bytes = height_to_hashed_bytes(0);
+        let id = StacksBlockId(bytes.clone());
+        let sortition_id = SortitionId(bytes);
 
         let genesis_block = BlockInfo {
             block_header_hash: BlockHeaderHash([0x00; 32]),
@@ -287,6 +289,15 @@ impl BurnDatastore {
             pox_payout_addrs: (vec![], 0),
         };
 
+        let mut height_at_chain_tip = HashMap::new();
+        height_at_chain_tip.insert(id, 0);
+
+        let mut sortition_lookup = HashMap::new();
+        sortition_lookup.insert(sortition_id, id);
+
+        let mut consensus_hash_lookup = HashMap::new();
+        consensus_hash_lookup.insert(genesis_block.consensus_hash.clone(), sortition_id);
+
         let mut store = HashMap::new();
         store.insert(id, genesis_block);
 
@@ -298,13 +309,13 @@ impl BurnDatastore {
 
         BurnDatastore {
             store,
-            sortition_lookup: HashMap::new(),
-            consensus_hash_lookup: HashMap::new(),
+            sortition_lookup,
+            consensus_hash_lookup,
             block_id_lookup,
             open_chain_tip: id,
             current_chain_tip: id,
             chain_height: 0,
-            height_at_chain_tip: HashMap::new(),
+            height_at_chain_tip,
             constants,
         }
     }

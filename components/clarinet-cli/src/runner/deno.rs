@@ -127,9 +127,15 @@ pub async fn do_run_scripts(
     };
 
     let success = if flags.watch.is_some() {
-        run_tests_with_watch(flags, test_flags, allow_wallets, display_costs_report)
-            .await
-            .map_err(|e| (e, 0))?;
+        run_tests_with_watch(
+            flags,
+            test_flags,
+            allow_wallets,
+            Some(cache),
+            display_costs_report,
+        )
+        .await
+        .map_err(|e| (e, 0))?;
         0
     } else {
         run_tests(
@@ -749,7 +755,7 @@ pub async fn run_tests(
     }
 
     let compat = ps.options.compat();
-    let (failed, artifacts) = test_specifiers(
+    let (success, artifacts) = test_specifiers(
         ps,
         permissions,
         specifiers_with_mode,
@@ -767,7 +773,7 @@ pub async fn run_tests(
     .await
     .map_err(|e| (e, 0))?;
 
-    if failed {
+    if !success {
         return Err((AnyError::msg("Test suite failed"), artifacts.len()));
     }
 
@@ -805,6 +811,7 @@ pub async fn run_tests_with_watch(
     flags: Flags,
     test_flags: TestFlags,
     allow_wallets: bool,
+    deployment_cache: Option<DeploymentCache>,
     display_costs_report: bool,
 ) -> Result<(), AnyError> {
     let ps = ProcState::build(flags).await?;
@@ -936,6 +943,7 @@ pub async fn run_tests_with_watch(
         let ignore = ignore.clone();
         let permissions = permissions.clone();
         let ps = ps.clone();
+        let deployment_cache = deployment_cache.clone();
 
         async move {
             let specifiers_with_mode = fetch_specifiers_with_test_mode(
@@ -969,7 +977,7 @@ pub async fn run_tests_with_watch(
                     trace_ops: test_flags.trace_ops,
                 },
                 allow_wallets,
-                None,
+                deployment_cache,
             )
             .await?;
 
