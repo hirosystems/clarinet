@@ -17,7 +17,7 @@ pub const DEFAULT_STACKS_NODE_IMAGE: &str = "quay.io/hirosystems/stacks-node:dev
 pub const DEFAULT_BITCOIN_EXPLORER_IMAGE: &str = "quay.io/hirosystems/bitcoin-explorer:devnet";
 pub const DEFAULT_STACKS_API_IMAGE: &str = "blockstack/stacks-blockchain-api:latest";
 pub const DEFAULT_STACKS_EXPLORER_IMAGE: &str = "hirosystems/explorer:latest";
-pub const DEFAULT_POSTGRES_IMAGE: &str = "postgres:alpine";
+pub const DEFAULT_POSTGRES_IMAGE: &str = "postgres:14";
 pub const DEFAULT_HYPERCHAIN_NODE_IMAGE: &str = "hirosystems/hyperchains:0.0.4-stretch";
 pub const DEFAULT_HYPERCHAIN_CONTRACT_ID: &str =
     "STXMJXCJDCT4WPF2X1HE42T6ZCCK3TPMBRZ51JEG.hc-alpha";

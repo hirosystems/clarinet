@@ -103,7 +103,7 @@ disable_stacks_api = false
 # stacks_api_image_url = "blockstack/stacks-blockchain-api:latest"
 # stacks_explorer_image_url = "blockstack/explorer:latest"
 # bitcoin_explorer_image_url = "quay.io/hirosystems/bitcoin-explorer:devnet"
-# postgres_image_url = "postgres:alpine"
+# postgres_image_url = "postgres:14"
 
 # Send some stacking orders
 [[devnet.pox_stacking_orders]]
