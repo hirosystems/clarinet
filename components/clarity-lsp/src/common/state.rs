@@ -7,10 +7,13 @@ use clarinet_deployments::{
 use clarinet_files::ProjectManifest;
 use clarinet_files::{FileAccessor, FileLocation};
 use clarity_repl::analysis::ast_dependency_detector::DependencySet;
-use clarity_repl::clarity::analysis::ContractAnalysis;
-use clarity_repl::clarity::diagnostic::{Diagnostic as ClarityDiagnostic, Level as ClarityLevel};
-use clarity_repl::clarity::types::QualifiedContractIdentifier;
-use clarity_repl::repl::ast::ContractAST;
+use clarity_repl::clarity::vm::analysis::ContractAnalysis;
+use clarity_repl::clarity::vm::ast::ContractAST;
+use clarity_repl::clarity::vm::diagnostic::{
+    Diagnostic as ClarityDiagnostic, Level as ClarityLevel,
+};
+use clarity_repl::clarity::vm::types::QualifiedContractIdentifier;
+use clarity_repl::clarity::vm::EvaluationResult;
 use lsp_types::MessageType;
 use orchestra_types::StacksNetwork;
 use std::borrow::BorrowMut;
@@ -359,12 +362,18 @@ pub async fn build_state(
         };
         locations.insert(contract_id.clone(), contract_location.clone());
 
-        let contract_analysis = match result {
-            Ok(ref mut execution_result) => {
+        match result {
+            Ok(mut execution_result) => {
                 if let Some(entry) = artifacts.diags.get_mut(&contract_id) {
                     entry.append(&mut execution_result.diagnostics);
                 }
-                execution_result.contract.take()
+                match execution_result.result {
+                    EvaluationResult::Contract(contract_result) => {
+                        analyses
+                            .insert(contract_id.clone(), Some(contract_result.contract.analysis));
+                    }
+                    _ => (),
+                };
             }
             Err(ref mut diags) => {
                 if let Some(entry) = artifacts.diags.get_mut(&contract_id) {
@@ -373,9 +382,6 @@ pub async fn build_state(
                 continue;
             }
         };
-        if let Some((_, _, _, _, contract_analysis)) = contract_analysis {
-            analyses.insert(contract_id.clone(), Some(contract_analysis));
-        }
     }
 
     protocol_state.consolidate(

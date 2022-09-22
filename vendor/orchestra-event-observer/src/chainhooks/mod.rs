@@ -10,7 +10,7 @@ use base58::FromBase58;
 use bitcoincore_rpc::bitcoin::blockdata::opcodes;
 use bitcoincore_rpc::bitcoin::blockdata::script::Builder as BitcoinScriptBuilder;
 use bitcoincore_rpc::bitcoin::{Address, PubkeyHash, PublicKey, Script};
-use clarity_repl::clarity::util::hash::{to_hex, Hash160};
+use clarity_repl::clarity::util::hash::to_hex;
 use orchestra_types::{
     BitcoinChainEvent, BitcoinTransactionData, BlockIdentifier, StacksChainEvent, StacksNetwork,
     StacksTransactionData, StacksTransactionEvent, StacksTransactionKind, TransactionIdentifier,

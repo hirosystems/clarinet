@@ -1,19 +1,17 @@
 use clarinet_files::FileLocation;
-use clarity_repl::clarity::types::{
+use clarity_repl::clarity::vm::analysis::ContractAnalysis;
+use clarity_repl::clarity::vm::ast::ContractAST;
+use clarity_repl::clarity::vm::diagnostic::Diagnostic;
+use clarity_repl::clarity::vm::types::{
     PrincipalData, QualifiedContractIdentifier, StandardPrincipalData,
 };
-
-use clarity_repl::clarity::{ClarityName, ContractName};
-
+use clarity_repl::clarity::vm::{ClarityName, ContractName};
 use orchestra_types::StacksNetwork;
 use serde::{Deserialize, Serialize};
 use serde_yaml;
 use std::collections::BTreeMap;
 
 use clarity_repl::analysis::ast_dependency_detector::DependencySet;
-use clarity_repl::clarity::analysis::ContractAnalysis;
-use clarity_repl::clarity::ast::ContractAST;
-use clarity_repl::clarity::diagnostic::Diagnostic;
 use clarity_repl::repl::Session;
 use std::collections::HashMap;
 

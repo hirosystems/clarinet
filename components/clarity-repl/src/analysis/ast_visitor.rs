@@ -1,9 +1,9 @@
-use crate::clarity::functions::define::DefineFunctions;
-use crate::clarity::functions::NativeFunctions;
-use crate::clarity::representations::SymbolicExpressionType::*;
-use crate::clarity::representations::{Span, TraitDefinition};
-use crate::clarity::types::{PrincipalData, QualifiedContractIdentifier, TraitIdentifier, Value};
-use crate::clarity::{ClarityName, SymbolicExpression, SymbolicExpressionType};
+use clarity::vm::functions::define::DefineFunctions;
+use clarity::vm::functions::NativeFunctions;
+use clarity::vm::representations::SymbolicExpressionType::*;
+use clarity::vm::representations::{Span, TraitDefinition};
+use clarity::vm::types::{PrincipalData, QualifiedContractIdentifier, TraitIdentifier, Value};
+use clarity::vm::{ClarityName, ClarityVersion, SymbolicExpression, SymbolicExpressionType};
 use std::collections::HashMap;
 
 #[derive(Clone)]
@@ -59,7 +59,7 @@ pub trait ASTVisitor<'a> {
                                     let name = signature[0].match_atom().unwrap_or(&DEFAULT_NAME);
                                     let params = match signature.len() {
                                         1 => None,
-                                        _ => match_pairs(&signature[1..]),
+                                        _ => match_pairs_list(&signature[1..]),
                                     };
                                     self.traverse_define_private(
                                         expr,
@@ -80,7 +80,7 @@ pub trait ASTVisitor<'a> {
                                     let name = signature[0].match_atom().unwrap_or(&DEFAULT_NAME);
                                     let params = match signature.len() {
                                         1 => None,
-                                        _ => match_pairs(&signature[1..]),
+                                        _ => match_pairs_list(&signature[1..]),
                                     };
                                     self.traverse_define_read_only(
                                         expr,
@@ -98,7 +98,7 @@ pub trait ASTVisitor<'a> {
                                     let name = signature[0].match_atom().unwrap_or(&DEFAULT_NAME);
                                     let params = match signature.len() {
                                         1 => None,
-                                        _ => match_pairs(&signature[1..]),
+                                        _ => match_pairs_list(&signature[1..]),
                                     };
                                     self.traverse_define_public(
                                         expr,
@@ -177,9 +177,11 @@ pub trait ASTVisitor<'a> {
                                 }),
                         ),
                     };
-                } else if let Some(native_function) = NativeFunctions::lookup_by_name(function_name)
-                {
-                    use crate::clarity::functions::NativeFunctions::*;
+                } else if let Some(native_function) = NativeFunctions::lookup_by_name_at_version(
+                    function_name,
+                    &ClarityVersion::latest(), // FIXME(brice): this should probably be passed in
+                ) {
+                    use clarity::vm::functions::NativeFunctions::*;
                     rv = match native_function {
                         Add | Subtract | Multiply | Divide | Modulo | Power | Sqrti | Log2 => {
                             self.traverse_arithmetic(expr, native_function, &args)
@@ -205,10 +207,7 @@ pub trait ASTVisitor<'a> {
                             args.get(2).unwrap_or(&DEFAULT_EXPR),
                         ),
                         Let => {
-                            let bindings = args
-                                .get(0)
-                                .unwrap_or(&DEFAULT_EXPR)
-                                .match_pairs()
+                            let bindings = match_pairs(args.get(0).unwrap_or(&DEFAULT_EXPR))
                                 .unwrap_or_default();
                             self.traverse_let(expr, &bindings, &args[1..])
                         }
@@ -286,10 +285,7 @@ pub trait ASTVisitor<'a> {
                                 .unwrap_or(&DEFAULT_EXPR)
                                 .match_atom()
                                 .unwrap_or(&DEFAULT_NAME);
-                            let key = args
-                                .get(1)
-                                .unwrap_or(&DEFAULT_EXPR)
-                                .match_tuple()
+                            let key = match_tuple(args.get(1).unwrap_or(&DEFAULT_EXPR))
                                 .unwrap_or_else(|| {
                                     let mut tuple_map = HashMap::new();
                                     tuple_map.insert(None, args.get(1).unwrap_or(&DEFAULT_EXPR));
@@ -303,19 +299,13 @@ pub trait ASTVisitor<'a> {
                                 .unwrap_or(&DEFAULT_EXPR)
                                 .match_atom()
                                 .unwrap_or(&DEFAULT_NAME);
-                            let key = args
-                                .get(1)
-                                .unwrap_or(&DEFAULT_EXPR)
-                                .match_tuple()
+                            let key = match_tuple(args.get(1).unwrap_or(&DEFAULT_EXPR))
                                 .unwrap_or_else(|| {
                                     let mut tuple_map = HashMap::new();
                                     tuple_map.insert(None, args.get(1).unwrap_or(&DEFAULT_EXPR));
                                     tuple_map
                                 });
-                            let value = args
-                                .get(2)
-                                .unwrap_or(&DEFAULT_EXPR)
-                                .match_tuple()
+                            let value = match_tuple(args.get(2).unwrap_or(&DEFAULT_EXPR))
                                 .unwrap_or_else(|| {
                                     let mut tuple_map = HashMap::new();
                                     tuple_map.insert(None, args.get(2).unwrap_or(&DEFAULT_EXPR));
@@ -329,19 +319,13 @@ pub trait ASTVisitor<'a> {
                                 .unwrap_or(&DEFAULT_EXPR)
                                 .match_atom()
                                 .unwrap_or(&DEFAULT_NAME);
-                            let key = args
-                                .get(1)
-                                .unwrap_or(&DEFAULT_EXPR)
-                                .match_tuple()
+                            let key = match_tuple(args.get(1).unwrap_or(&DEFAULT_EXPR))
                                 .unwrap_or_else(|| {
                                     let mut tuple_map = HashMap::new();
                                     tuple_map.insert(None, args.get(1).unwrap_or(&DEFAULT_EXPR));
                                     tuple_map
                                 });
-                            let value = args
-                                .get(2)
-                                .unwrap_or(&DEFAULT_EXPR)
-                                .match_tuple()
+                            let value = match_tuple(args.get(2).unwrap_or(&DEFAULT_EXPR))
                                 .unwrap_or_else(|| {
                                     let mut tuple_map = HashMap::new();
                                     tuple_map.insert(None, args.get(2).unwrap_or(&DEFAULT_EXPR));
@@ -355,10 +339,7 @@ pub trait ASTVisitor<'a> {
                                 .unwrap_or(&DEFAULT_EXPR)
                                 .match_atom()
                                 .unwrap_or(&DEFAULT_NAME);
-                            let key = args
-                                .get(1)
-                                .unwrap_or(&DEFAULT_EXPR)
-                                .match_tuple()
+                            let key = match_tuple(args.get(1).unwrap_or(&DEFAULT_EXPR))
                                 .unwrap_or_else(|| {
                                     let mut tuple_map = HashMap::new();
                                     tuple_map.insert(None, args.get(1).unwrap_or(&DEFAULT_EXPR));
@@ -367,7 +348,7 @@ pub trait ASTVisitor<'a> {
                             self.traverse_map_delete(expr, name, &key)
                         }
                         TupleCons => {
-                            self.traverse_tuple(expr, &expr.match_tuple().unwrap_or_default())
+                            self.traverse_tuple(expr, &match_tuple(expr).unwrap_or_default())
                         }
                         TupleGet => self.traverse_get(
                             expr,
@@ -526,11 +507,12 @@ pub trait ASTVisitor<'a> {
                             args.get(0).unwrap_or(&DEFAULT_EXPR),
                             args.get(1).unwrap_or(&DEFAULT_EXPR),
                         ),
-                        StxTransfer => self.traverse_stx_transfer(
+                        StxTransfer | StxTransferMemo => self.traverse_stx_transfer(
                             expr,
                             args.get(0).unwrap_or(&DEFAULT_EXPR),
                             args.get(1).unwrap_or(&DEFAULT_EXPR),
                             args.get(2).unwrap_or(&DEFAULT_EXPR),
+                            args.get(3),
                         ),
                         GetStxBalance => self
                             .traverse_stx_get_balance(expr, args.get(0).unwrap_or(&DEFAULT_EXPR)),
@@ -611,6 +593,51 @@ pub trait ASTVisitor<'a> {
                                 .unwrap_or(&DEFAULT_EXPR)
                                 .match_atom()
                                 .unwrap_or(&DEFAULT_NAME),
+                            args.get(1).unwrap_or(&DEFAULT_EXPR),
+                        ),
+                        BuffToIntLe | BuffToUIntLe | BuffToIntBe | BuffToUIntBe => {
+                            self.traverse_buff_cast(expr, args.get(0).unwrap_or(&DEFAULT_EXPR))
+                        }
+                        IsStandard => {
+                            self.traverse_is_standard(expr, args.get(0).unwrap_or(&DEFAULT_EXPR))
+                        }
+                        PrincipalDestruct => self.traverse_principal_destruct(
+                            expr,
+                            args.get(0).unwrap_or(&DEFAULT_EXPR),
+                        ),
+                        PrincipalConstruct => self.traverse_principal_construct(
+                            expr,
+                            args.get(0).unwrap_or(&DEFAULT_EXPR),
+                            args.get(1).unwrap_or(&DEFAULT_EXPR),
+                            args.get(2),
+                        ),
+                        StringToInt | StringToUInt => {
+                            self.traverse_string_to_int(expr, args.get(0).unwrap_or(&DEFAULT_EXPR))
+                        }
+                        IntToAscii | IntToUtf8 => {
+                            self.traverse_int_to_string(expr, args.get(0).unwrap_or(&DEFAULT_EXPR))
+                        }
+                        GetBurnBlockInfo => self.traverse_get_burn_block_info(
+                            expr,
+                            args.get(0)
+                                .unwrap_or(&DEFAULT_EXPR)
+                                .match_atom()
+                                .unwrap_or(&DEFAULT_NAME),
+                            args.get(1).unwrap_or(&DEFAULT_EXPR),
+                        ),
+                        StxGetAccount => self
+                            .traverse_stx_get_account(expr, args.get(0).unwrap_or(&DEFAULT_EXPR)),
+                        Slice => self.traverse_slice(
+                            expr,
+                            args.get(0).unwrap_or(&DEFAULT_EXPR),
+                            args.get(1).unwrap_or(&DEFAULT_EXPR),
+                            args.get(2).unwrap_or(&DEFAULT_EXPR),
+                        ),
+                        ToConsensusBuff => self
+                            .traverse_to_consensus_buff(expr, args.get(0).unwrap_or(&DEFAULT_EXPR)),
+                        FromConsensusBuff => self.traverse_from_consensus_buff(
+                            expr,
+                            args.get(0).unwrap_or(&DEFAULT_EXPR),
                             args.get(1).unwrap_or(&DEFAULT_EXPR),
                         ),
                     };
@@ -1752,11 +1779,13 @@ pub trait ASTVisitor<'a> {
         amount: &'a SymbolicExpression,
         sender: &'a SymbolicExpression,
         recipient: &'a SymbolicExpression,
+        memo: Option<&'a SymbolicExpression>,
     ) -> bool {
         self.traverse_expr(amount)
             && self.traverse_expr(sender)
             && self.traverse_expr(recipient)
-            && self.visit_stx_transfer(expr, amount, sender, recipient)
+            && (memo.is_none() || self.traverse_expr(memo.unwrap()))
+            && self.visit_stx_transfer(expr, amount, sender, recipient, memo)
     }
 
     fn visit_stx_transfer(
@@ -1765,6 +1794,7 @@ pub trait ASTVisitor<'a> {
         amount: &'a SymbolicExpression,
         sender: &'a SymbolicExpression,
         recipient: &'a SymbolicExpression,
+        memo: Option<&'a SymbolicExpression>,
     ) -> bool {
         true
     }
@@ -2203,6 +2233,202 @@ pub trait ASTVisitor<'a> {
     ) -> bool {
         true
     }
+
+    fn traverse_buff_cast(
+        &mut self,
+        expr: &'a SymbolicExpression,
+        input: &'a SymbolicExpression,
+    ) -> bool {
+        self.traverse_expr(input) && self.visit_buff_cast(expr, input)
+    }
+
+    fn visit_buff_cast(
+        &mut self,
+        expr: &'a SymbolicExpression,
+        input: &'a SymbolicExpression,
+    ) -> bool {
+        true
+    }
+
+    fn traverse_is_standard(
+        &mut self,
+        expr: &'a SymbolicExpression,
+        value: &'a SymbolicExpression,
+    ) -> bool {
+        self.traverse_expr(value) && self.visit_is_standard(expr, value)
+    }
+
+    fn visit_is_standard(
+        &mut self,
+        expr: &'a SymbolicExpression,
+        value: &'a SymbolicExpression,
+    ) -> bool {
+        true
+    }
+
+    fn traverse_principal_destruct(
+        &mut self,
+        expr: &'a SymbolicExpression,
+        principal: &'a SymbolicExpression,
+    ) -> bool {
+        self.traverse_expr(principal) && self.visit_principal_destruct(expr, principal)
+    }
+
+    fn visit_principal_destruct(
+        &mut self,
+        expr: &'a SymbolicExpression,
+        principal: &'a SymbolicExpression,
+    ) -> bool {
+        true
+    }
+
+    fn traverse_principal_construct(
+        &mut self,
+        expr: &'a SymbolicExpression,
+        buff1: &'a SymbolicExpression,
+        buff20: &'a SymbolicExpression,
+        contract: Option<&'a SymbolicExpression>,
+    ) -> bool {
+        self.traverse_expr(buff1)
+            && self.traverse_expr(buff20)
+            && (contract.is_none() || self.traverse_expr(contract.unwrap()))
+            && self.visit_principal_construct(expr, buff1, buff20, contract)
+    }
+
+    fn visit_principal_construct(
+        &mut self,
+        expr: &'a SymbolicExpression,
+        buff1: &'a SymbolicExpression,
+        buff20: &'a SymbolicExpression,
+        contract: Option<&'a SymbolicExpression>,
+    ) -> bool {
+        true
+    }
+
+    fn traverse_string_to_int(
+        &mut self,
+        expr: &'a SymbolicExpression,
+        input: &'a SymbolicExpression,
+    ) -> bool {
+        self.traverse_expr(input) && self.visit_string_to_int(expr, input)
+    }
+
+    fn visit_string_to_int(
+        &mut self,
+        expr: &'a SymbolicExpression,
+        input: &'a SymbolicExpression,
+    ) -> bool {
+        true
+    }
+
+    fn traverse_int_to_string(
+        &mut self,
+        expr: &'a SymbolicExpression,
+        input: &'a SymbolicExpression,
+    ) -> bool {
+        self.traverse_expr(input) && self.visit_int_to_string(expr, input)
+    }
+
+    fn visit_int_to_string(
+        &mut self,
+        expr: &'a SymbolicExpression,
+        input: &'a SymbolicExpression,
+    ) -> bool {
+        true
+    }
+
+    fn traverse_stx_get_account(
+        &mut self,
+        expr: &'a SymbolicExpression,
+        owner: &'a SymbolicExpression,
+    ) -> bool {
+        self.traverse_expr(owner) && self.visit_stx_get_account(expr, owner)
+    }
+
+    fn visit_stx_get_account(
+        &mut self,
+        expr: &'a SymbolicExpression,
+        owner: &'a SymbolicExpression,
+    ) -> bool {
+        true
+    }
+
+    fn traverse_slice(
+        &mut self,
+        expr: &'a SymbolicExpression,
+        seq: &'a SymbolicExpression,
+        left: &'a SymbolicExpression,
+        right: &'a SymbolicExpression,
+    ) -> bool {
+        self.traverse_expr(seq)
+            && self.traverse_expr(left)
+            && self.traverse_expr(right)
+            && self.visit_slice(expr, seq, left, right)
+    }
+
+    fn visit_slice(
+        &mut self,
+        expr: &'a SymbolicExpression,
+        seq: &'a SymbolicExpression,
+        left: &'a SymbolicExpression,
+        right: &'a SymbolicExpression,
+    ) -> bool {
+        true
+    }
+
+    fn traverse_get_burn_block_info(
+        &mut self,
+        expr: &'a SymbolicExpression,
+        prop_name: &'a ClarityName,
+        block: &'a SymbolicExpression,
+    ) -> bool {
+        self.traverse_expr(block) && self.visit_get_burn_block_info(expr, prop_name, block)
+    }
+
+    fn visit_get_burn_block_info(
+        &mut self,
+        expr: &'a SymbolicExpression,
+        prop_name: &'a ClarityName,
+        block: &'a SymbolicExpression,
+    ) -> bool {
+        true
+    }
+
+    fn traverse_to_consensus_buff(
+        &mut self,
+        expr: &'a SymbolicExpression,
+        input: &'a SymbolicExpression,
+    ) -> bool {
+        self.traverse_expr(input) && self.visit_to_consensus_buff(expr, input)
+    }
+
+    fn visit_to_consensus_buff(
+        &mut self,
+        expr: &'a SymbolicExpression,
+        input: &'a SymbolicExpression,
+    ) -> bool {
+        true
+    }
+
+    fn traverse_from_consensus_buff(
+        &mut self,
+        expr: &'a SymbolicExpression,
+        type_expr: &'a SymbolicExpression,
+        input: &'a SymbolicExpression,
+    ) -> bool {
+        self.traverse_expr(type_expr)
+            && self.traverse_expr(input)
+            && self.visit_from_consensus_buff(expr, type_expr, input)
+    }
+
+    fn visit_from_consensus_buff(
+        &mut self,
+        expr: &'a SymbolicExpression,
+        type_expr: &'a SymbolicExpression,
+        input: &'a SymbolicExpression,
+    ) -> bool {
+        true
+    }
 }
 
 pub fn traverse<'a>(visitor: &mut impl ASTVisitor<'a>, exprs: &'a [SymbolicExpression]) -> bool {
@@ -2214,42 +2440,44 @@ pub fn traverse<'a>(visitor: &mut impl ASTVisitor<'a>, exprs: &'a [SymbolicExpre
     true
 }
 
-impl<'a> SymbolicExpression {
-    fn match_tuple(&'a self) -> Option<HashMap<Option<&'a ClarityName>, &SymbolicExpression>> {
-        if let Some(list) = self.match_list() {
-            if let Some((function_name, args)) = list.split_first() {
-                if let Some(function_name) = function_name.match_atom() {
-                    if NativeFunctions::lookup_by_name(function_name)
-                        == Some(NativeFunctions::TupleCons)
-                    {
-                        let mut tuple_map = HashMap::new();
-                        for element in args {
-                            let pair = element.match_list().unwrap_or_default();
-                            tuple_map.insert(pair[0].match_atom(), &pair[1]);
-                        }
-                        return Some(tuple_map);
+fn match_tuple(
+    expr: &SymbolicExpression,
+) -> Option<HashMap<Option<&ClarityName>, &SymbolicExpression>> {
+    if let Some(list) = expr.match_list() {
+        if let Some((function_name, args)) = list.split_first() {
+            if let Some(function_name) = function_name.match_atom() {
+                if NativeFunctions::lookup_by_name_at_version(
+                    function_name,
+                    &clarity::vm::ClarityVersion::latest(),
+                ) == Some(NativeFunctions::TupleCons)
+                {
+                    let mut tuple_map = HashMap::new();
+                    for element in args {
+                        let pair = element.match_list().unwrap_or_default();
+                        tuple_map.insert(pair[0].match_atom(), &pair[1]);
                     }
+                    return Some(tuple_map);
                 }
             }
         }
-        None
     }
-
-    fn match_pairs(&'a self) -> Option<HashMap<&'a ClarityName, &SymbolicExpression>> {
-        let list = self.match_list()?;
-        let mut tuple_map = HashMap::new();
-        for pair_list in list {
-            let pair = pair_list.match_list()?;
-            if pair.len() != 2 {
-                return None;
-            }
-            tuple_map.insert(pair[0].match_atom()?, &pair[1]);
-        }
-        return Some(tuple_map);
-    }
+    None
 }
 
-fn match_pairs<'a>(list: &'a [SymbolicExpression]) -> Option<Vec<TypedVar<'a>>> {
+fn match_pairs(expr: &SymbolicExpression) -> Option<HashMap<&ClarityName, &SymbolicExpression>> {
+    let list = expr.match_list()?;
+    let mut tuple_map = HashMap::new();
+    for pair_list in list {
+        let pair = pair_list.match_list()?;
+        if pair.len() != 2 {
+            return None;
+        }
+        tuple_map.insert(pair[0].match_atom()?, &pair[1]);
+    }
+    return Some(tuple_map);
+}
+
+fn match_pairs_list<'a>(list: &'a [SymbolicExpression]) -> Option<Vec<TypedVar<'a>>> {
     let mut vars = Vec::new();
     for pair_list in list {
         let pair = pair_list.match_list()?;

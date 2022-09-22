@@ -3,30 +3,41 @@ use std::collections::{btree_map::Entry, BTreeMap, BTreeSet};
 
 use crate::analysis::annotation::{Annotation, AnnotationKind};
 use crate::analysis::ast_dependency_detector::{ASTDependencyDetector, Dependency};
+use crate::analysis::coverage::TestCoverageReport;
 use crate::analysis::{self, AnalysisPass as REPLAnalysisPass};
-use crate::clarity::analysis::{types::AnalysisPass, ContractAnalysis};
-use crate::clarity::ast::ContractAST;
-use crate::clarity::contexts::{
-    CallStack, ContractContext, Environment, GlobalContext, LocalContext,
-};
-use crate::clarity::contracts::Contract;
-use crate::clarity::costs::{ExecutionCost, LimitedCostTracker};
-use crate::clarity::coverage::TestCoverageReport;
-use crate::clarity::database::{Datastore, NULL_HEADER_DB};
-use crate::clarity::diagnostic::{Diagnostic, Level};
-use crate::clarity::errors::Error;
-use crate::clarity::events::*;
-use crate::clarity::representations::SymbolicExpressionType::{Atom, List};
-use crate::clarity::representations::{Span, SymbolicExpression};
-use crate::clarity::types::{
+use crate::repl::datastore::BurnDatastore;
+use crate::repl::datastore::Datastore;
+use crate::repl::Settings;
+use crate::utils;
+use clarity::consts::CHAIN_ID_TESTNET;
+use clarity::types::chainstate::StacksAddress;
+use clarity::types::StacksEpochId;
+use clarity::vm::analysis::{types::AnalysisPass, ContractAnalysis};
+use clarity::vm::ast::definition_sorter::DefinitionSorter;
+use clarity::vm::ast::expression_identifier::ExpressionIdentifier;
+use clarity::vm::ast::stack_depth_checker::StackDepthChecker;
+use clarity::vm::ast::sugar_expander::SugarExpander;
+use clarity::vm::ast::traits_resolver::TraitsResolver;
+use clarity::vm::ast::{build_ast_with_diagnostics, ContractAST};
+use clarity::vm::contexts::{CallStack, ContractContext, Environment, GlobalContext, LocalContext};
+use clarity::vm::contracts::Contract;
+use clarity::vm::costs::cost_functions::ClarityCostFunction;
+use clarity::vm::costs::{runtime_cost, ExecutionCost, LimitedCostTracker};
+use clarity::vm::database::ClarityDatabase;
+use clarity::vm::diagnostic::{Diagnostic, Level};
+use clarity::vm::errors::Error;
+use clarity::vm::representations::SymbolicExpressionType::{Atom, List};
+use clarity::vm::representations::{Span, SymbolicExpression};
+use clarity::vm::types::{
     self, PrincipalData, QualifiedContractIdentifier, StandardPrincipalData, Value,
 };
-use crate::clarity::util::StacksAddress;
-use crate::clarity::{self, EvalHook};
-use crate::clarity::{analysis::AnalysisDatabase, database::ClarityBackingStore};
-use crate::clarity::{eval, eval_all};
-use crate::repl::ast;
-use crate::repl::{self, CostSynthesis, ExecutionResult};
+use clarity::vm::{analysis::AnalysisDatabase, database::ClarityBackingStore};
+use clarity::vm::{eval, eval_all, EvaluationResult, SnippetEvaluationResult};
+use clarity::vm::{events::*, ClarityVersion};
+use clarity::vm::{ContractEvaluationResult, EvalHook};
+use clarity::vm::{CostSynthesis, ExecutionResult, ParsedContract};
+
+use super::datastore::StacksConstants;
 
 pub const BLOCK_LIMIT_MAINNET: ExecutionCost = ExecutionCost {
     write_length: 15_000_000,
@@ -39,11 +50,15 @@ pub const BLOCK_LIMIT_MAINNET: ExecutionCost = ExecutionCost {
 #[derive(Clone, Debug)]
 pub struct ClarityInterpreter {
     pub datastore: Datastore,
+    pub burn_datastore: BurnDatastore,
     tx_sender: StandardPrincipalData,
     accounts: BTreeSet<String>,
     tokens: BTreeMap<String, BTreeMap<String, u128>>,
-    repl_settings: repl::Settings,
+    repl_settings: Settings,
 }
+
+#[derive(Debug)]
+pub struct Txid(pub [u8; 32]);
 
 trait Equivalent {
     fn equivalent(&self, other: &Self) -> bool;
@@ -51,7 +66,7 @@ trait Equivalent {
 
 impl Equivalent for SymbolicExpression {
     fn equivalent(&self, other: &Self) -> bool {
-        use crate::clarity::representations::SymbolicExpressionType::*;
+        use clarity::vm::representations::SymbolicExpressionType::*;
         match (&self.expr, &other.expr) {
             (AtomValue(a), AtomValue(b)) => a == b,
             (Atom(a), Atom(b)) => a == b,
@@ -92,34 +107,36 @@ impl Equivalent for ContractAST {
 }
 
 impl ClarityInterpreter {
-    pub fn new(
-        tx_sender: StandardPrincipalData,
-        repl_settings: repl::Settings,
-    ) -> ClarityInterpreter {
+    pub fn new(tx_sender: StandardPrincipalData, repl_settings: Settings) -> ClarityInterpreter {
         let datastore = Datastore::new();
         let accounts = BTreeSet::new();
         let tokens = BTreeMap::new();
+        let constants = StacksConstants {
+            burn_start_height: 0,
+            pox_prepare_length: 0,
+            pox_reward_cycle_length: 0,
+            pox_rejection_fraction: 0,
+            epoch_21_start_height: 0,
+        };
         ClarityInterpreter {
             datastore,
             tx_sender,
             accounts,
             tokens,
             repl_settings,
+            burn_datastore: BurnDatastore::new(constants),
         }
     }
 
-    pub fn run(
+    pub fn run<'hooks>(
         &mut self,
         snippet: String,
         contract_identifier: QualifiedContractIdentifier,
         cost_track: bool,
-        eval_hooks: Option<Vec<Box<dyn EvalHook>>>,
+        eval_hooks: Option<Vec<&mut dyn EvalHook>>,
     ) -> Result<ExecutionResult, Vec<Diagnostic>> {
-        let (mut ast, mut diagnostics, success) = self.build_ast(
-            contract_identifier.clone(),
-            snippet.clone(),
-            self.repl_settings.parser_version,
-        );
+        let (mut ast, mut diagnostics, success) =
+            self.build_ast(contract_identifier.clone(), snippet.clone());
         let (annotations, mut annotation_diagnostics) = self.collect_annotations(&ast, &snippet);
         diagnostics.append(&mut annotation_diagnostics);
 
@@ -172,13 +189,13 @@ impl ClarityInterpreter {
         Ok(result)
     }
 
-    pub fn run_ast(
-        &mut self,
+    pub fn run_ast<'a, 'hooks>(
+        &'a mut self,
         mut ast: ContractAST,
         snippet: String,
         contract_identifier: QualifiedContractIdentifier,
         cost_track: bool,
-        eval_hooks: Option<Vec<Box<dyn EvalHook>>>,
+        eval_hooks: Option<Vec<&mut dyn EvalHook>>,
     ) -> Result<ExecutionResult, Vec<Diagnostic>> {
         let (annotations, mut diagnostics) = self.collect_annotations(&ast, &snippet);
 
@@ -230,11 +247,9 @@ impl ClarityInterpreter {
         &mut self,
         contract_id: String,
         snippet: String,
-        parser_version: u32,
     ) -> Result<Vec<Dependency>, String> {
         let contract_id = QualifiedContractIdentifier::parse(&contract_id).unwrap();
-        let (ast, _, success) =
-            self.build_ast(contract_id.clone(), snippet.clone(), parser_version);
+        let (ast, _, success) = self.build_ast(contract_id.clone(), snippet.clone());
         if !success {
             return Err("error parsing source".to_string());
         }
@@ -266,57 +281,14 @@ impl ClarityInterpreter {
         &self,
         contract_identifier: QualifiedContractIdentifier,
         snippet: String,
-        parser_version: u32,
     ) -> (ContractAST, Vec<Diagnostic>, bool) {
-        match parser_version {
-            1 => match clarity::ast::build_ast(&contract_identifier, &snippet, &mut ()) {
-                Ok(res) => (res, vec![], true),
-                Err(error) => (
-                    ContractAST::new(contract_identifier, vec![]),
-                    vec![error.diagnostic],
-                    false,
-                ),
-            },
-            _ => {
-                // While parser v2 is new, we will run both parsers, and check for equivalence.
-                // If they don't match, report a warning and use v1. Once v2 is battle-tested,
-                // this can be removed. If there are errors when parsing, then the ASTs are not
-                // expected to match, and v2 is still used.
-                let (ast, diagnostics, success) =
-                    ast::build_ast(&contract_identifier, &snippet, &mut ());
-
-                #[cfg(not(feature = "wasm"))]
-                {
-                    let (ast_old, mut diagnostics_old, success_old) =
-                        match clarity::ast::build_ast(&contract_identifier, &snippet, &mut ()) {
-                            Ok(res) => (res, vec![], true),
-                            Err(error) => (
-                                ContractAST::new(contract_identifier, vec![]),
-                                vec![error.diagnostic],
-                                false,
-                            ),
-                        };
-                    if (success && !ast.equivalent(&ast_old)) || success != success_old {
-                        diagnostics_old.push(Diagnostic {
-                            level: Level::Warning,
-                            message: r#"conflict between parser versions, reverting to parser v1
-Help improve clarinet by sharing the code that triggered this warning:
-https://github.com/hirosystems/clarinet/issues/new/choose"#
-                                .to_string(),
-                            spans: vec![],
-                            suggestion: None,
-                        });
-                        (ast_old, diagnostics_old, success_old)
-                    } else {
-                        (ast, diagnostics, success)
-                    }
-                }
-
-                // use only v2 in wasm context for performances
-                #[cfg(feature = "wasm")]
-                (ast, diagnostics, success)
-            }
-        }
+        build_ast_with_diagnostics(
+            &contract_identifier,
+            &snippet,
+            &mut (),
+            self.repl_settings.clarity_version,
+            self.repl_settings.epoch,
+        )
     }
 
     pub fn collect_annotations(
@@ -374,12 +346,13 @@ https://github.com/hirosystems/clarinet/issues/new/choose"#
         let mut analysis_db = AnalysisDatabase::new(&mut self.datastore);
 
         // Run standard clarity analyses
-        let mut contract_analysis = match clarity::analysis::run_analysis(
+        let mut contract_analysis = match clarity::vm::analysis::run_analysis(
             &contract_identifier,
             &mut contract_ast.expressions,
             &mut analysis_db,
             false,
             LimitedCostTracker::new_free(),
+            self.repl_settings.clarity_version,
         ) {
             Ok(res) => res,
             Err((error, cost_tracker)) => {
@@ -413,14 +386,29 @@ https://github.com/hirosystems/clarinet/issues/new/choose"#
         mainnet: bool,
     ) {
         {
-            let mut contract_context = ContractContext::new(contract_identifier.clone());
-            let conn = self.datastore.as_clarity_db(&NULL_HEADER_DB);
+            let mut contract_context = ContractContext::new(
+                contract_identifier.clone(),
+                self.repl_settings.clarity_version,
+            );
+
+            let conn = ClarityDatabase::new(
+                &mut self.datastore,
+                &self.burn_datastore,
+                &self.burn_datastore,
+            );
+
             let cost_tracker = LimitedCostTracker::new_free();
-            let mut global_context = GlobalContext::new(mainnet, conn, cost_tracker);
+            let mut global_context = GlobalContext::new(
+                mainnet,
+                clarity::consts::CHAIN_ID_TESTNET,
+                conn,
+                cost_tracker,
+                self.repl_settings.epoch,
+            );
             global_context.begin();
 
             let _ = global_context
-                .execute(|g| eval_all(&contract_ast.expressions, &mut contract_context, g));
+                .execute(|g| eval_all(&contract_ast.expressions, &mut contract_context, g, None));
 
             global_context
                 .database
@@ -446,38 +434,62 @@ https://github.com/hirosystems/clarinet/issues/new/choose"#
     }
 
     #[allow(unused_assignments)]
-    pub fn execute(
-        &mut self,
+    pub fn execute<'a, 'hooks>(
+        &'a mut self,
         contract_identifier: QualifiedContractIdentifier,
         contract_ast: &mut ContractAST,
         snippet: String,
         contract_analysis: ContractAnalysis,
         cost_track: bool,
-        eval_hooks: Option<Vec<Box<dyn EvalHook>>>,
+        eval_hooks: Option<Vec<&mut dyn EvalHook>>,
     ) -> Result<ExecutionResult, (String, Option<Diagnostic>, Option<Error>)> {
-        let mut execution_result = ExecutionResult::default();
+        let mut cost = None;
         let mut contract_saved = false;
         let mut serialized_events = vec![];
         let mut accounts_to_debit = vec![];
         let mut accounts_to_credit = vec![];
-        let mut contract_context = ContractContext::new(contract_identifier.clone());
-        let (value, eval_hooks) = {
-            let tx_sender: PrincipalData = self.tx_sender.clone().into();
+        let mut contract_context = ContractContext::new(
+            contract_identifier.clone(),
+            self.repl_settings.clarity_version,
+        );
 
-            let mut conn = self.datastore.as_clarity_db(&NULL_HEADER_DB);
+        let (eval_result, eval_hooks) = {
+            let mut conn = ClarityDatabase::new(
+                &mut self.datastore,
+                &self.burn_datastore,
+                &self.burn_datastore,
+            );
+            let tx_sender: PrincipalData = self.tx_sender.clone().into();
+            conn.begin();
+            conn.set_clarity_epoch_version(self.repl_settings.epoch);
+            conn.commit();
             let cost_tracker = if cost_track {
                 LimitedCostTracker::new(
                     false,
+                    CHAIN_ID_TESTNET,
                     BLOCK_LIMIT_MAINNET.clone(),
                     &mut conn,
-                    self.repl_settings.costs_version,
+                    self.repl_settings.epoch,
                 )
-                .unwrap()
+                .expect("failed to initialize cost tracker")
             } else {
                 LimitedCostTracker::new_free()
             };
-            let mut global_context = GlobalContext::new(false, conn, cost_tracker);
-            global_context.eval_hooks = eval_hooks;
+            let mut global_context = GlobalContext::new(
+                false,
+                CHAIN_ID_TESTNET,
+                conn,
+                cost_tracker,
+                self.repl_settings.epoch,
+            );
+
+            if let Some(mut in_hooks) = eval_hooks {
+                let mut hooks: Vec<&mut dyn EvalHook> = Vec::new();
+                for hook in in_hooks.drain(..) {
+                    hooks.push(hook);
+                }
+                global_context.eval_hooks = Some(hooks);
+            }
             global_context.begin();
 
             let result = global_context.execute(|g| {
@@ -491,6 +503,7 @@ https://github.com/hirosystems/clarinet/issues/new/choose"#
                         &mut call_stack,
                         Some(tx_sender.clone()),
                         Some(tx_sender.clone()),
+                        None,
                     );
 
                     let result = match contract_ast.expressions[0].expr {
@@ -519,21 +532,22 @@ https://github.com/hirosystems/clarinet/issues/new/choose"#
                                     &args,
                                     false,
                                 )?;
-                                res
+                                Ok(Some(res))
                             }
-                            _ => eval(&contract_ast.expressions[0], &mut env, &context).unwrap(),
+                            _ => eval(&contract_ast.expressions[0], &mut env, &context)
+                                .and_then(|r| Ok(Some(r))),
                         },
-                        _ => eval(&contract_ast.expressions[0], &mut env, &context).unwrap(),
+                        _ => eval(&contract_ast.expressions[0], &mut env, &context)
+                            .and_then(|r| Ok(Some(r))),
                     };
-                    Ok(Some(result))
+                    result
                 } else {
-                    eval_all(&contract_ast.expressions, &mut contract_context, g)
+                    eval_all(&contract_ast.expressions, &mut contract_context, g, None)
                 }
             });
 
             let value = match result {
-                Ok(Some(value)) => value,
-                Ok(None) => Value::none(),
+                Ok(value) => value,
                 Err(e) => {
                     let err = format!(
                         "Runtime error while interpreting {}: {:?}",
@@ -550,8 +564,7 @@ https://github.com/hirosystems/clarinet/issues/new/choose"#
             };
 
             if cost_track {
-                execution_result.cost =
-                    Some(CostSynthesis::from_cost_tracker(&global_context.cost_track));
+                cost = Some(CostSynthesis::from_cost_tracker(&global_context.cost_track));
             }
 
             let mut emitted_events = global_context
@@ -659,13 +672,13 @@ https://github.com/hirosystems/clarinet/issues/new/choose"#
                     _ => {}
                 };
 
-                serialized_events.push(event.json_serialize());
+                serialized_events.push(serialize_event(&event));
             }
 
             contract_saved =
                 contract_context.functions.len() > 0 || contract_context.defined_traits.len() > 0;
 
-            if contract_saved {
+            let eval_result = if contract_saved {
                 let mut functions = BTreeMap::new();
                 for (name, defined_func) in contract_context.functions.iter() {
                     if !defined_func.is_public() {
@@ -673,23 +686,21 @@ https://github.com/hirosystems/clarinet/issues/new/choose"#
                     }
 
                     let args: Vec<_> = defined_func
-                        .arguments
+                        .get_arguments()
                         .iter()
-                        .zip(defined_func.arg_types.iter())
+                        .zip(defined_func.get_arg_types().iter())
                         .map(|(n, t)| format!("({} {})", n.as_str(), t))
                         .collect();
 
                     functions.insert(name.to_string(), args);
                 }
-                execution_result.contract = Some((
-                    contract_identifier.to_string(),
-                    snippet.clone(),
-                    functions,
-                    contract_ast.clone(),
-                    contract_analysis.clone(),
-                ));
-
-                for defined_trait in contract_context.defined_traits.iter() {}
+                let parsed_contract = ParsedContract {
+                    contract_identifier: contract_identifier.to_string(),
+                    code: snippet.clone(),
+                    function_args: functions,
+                    ast: contract_ast.clone(),
+                    analysis: contract_analysis.clone(),
+                };
 
                 global_context
                     .database
@@ -703,13 +714,35 @@ https://github.com/hirosystems/clarinet/issues/new/choose"#
                     .database
                     .set_contract_data_size(&contract_identifier, 0)
                     .unwrap();
-            }
-            global_context.commit().unwrap();
 
-            (value, global_context.eval_hooks)
+                EvaluationResult::Contract(ContractEvaluationResult {
+                    result: value,
+                    contract: parsed_contract,
+                })
+            } else {
+                let result = match value {
+                    Some(value) => value,
+                    None => Value::none(),
+                };
+                EvaluationResult::Snippet(SnippetEvaluationResult { result })
+            };
+            global_context.commit().unwrap();
+            Ok((eval_result, global_context.eval_hooks))
+        }?;
+
+        let events = serialized_events;
+        let mut execution_result = ExecutionResult {
+            result: eval_result,
+            events,
+            cost,
+            diagnostics: Vec::new(),
         };
 
-        execution_result.events = serialized_events;
+        if let Some(mut eval_hooks) = eval_hooks {
+            for hook in eval_hooks.iter_mut() {
+                hook.did_complete(Ok(&mut execution_result));
+            }
+        }
 
         for (account, token, value) in accounts_to_credit.drain(..) {
             self.credit_token(account, token, value);
@@ -719,29 +752,11 @@ https://github.com/hirosystems/clarinet/issues/new/choose"#
             self.debit_token(account, token, value);
         }
 
-        if !contract_saved {
-            execution_result.result = Some(value);
-
-            if let Some(mut eval_hooks) = eval_hooks {
-                for hook in eval_hooks.iter_mut() {
-                    hook.did_complete(Ok(&mut execution_result));
-                }
-            }
-
-            return Ok(execution_result);
-        }
-
-        {
+        if contract_saved {
             let mut analysis_db = AnalysisDatabase::new(&mut self.datastore);
             let _ = analysis_db
                 .execute(|db| db.insert_contract(&contract_identifier, &contract_analysis))
                 .expect("Unable to save data");
-        }
-
-        if let Some(mut eval_hooks) = eval_hooks {
-            for hook in eval_hooks.iter_mut() {
-                hook.did_complete(Ok(&mut execution_result));
-            }
         }
 
         Ok(execution_result)
@@ -753,9 +768,19 @@ https://github.com/hirosystems/clarinet/issues/new/choose"#
         amount: u64,
     ) -> Result<String, String> {
         let final_balance = {
-            let conn = self.datastore.as_clarity_db(&NULL_HEADER_DB);
-            let mut global_context =
-                GlobalContext::new(false, conn, LimitedCostTracker::new_free());
+            let conn = ClarityDatabase::new(
+                &mut self.datastore,
+                &self.burn_datastore,
+                &self.burn_datastore,
+            );
+
+            let mut global_context = GlobalContext::new(
+                false,
+                CHAIN_ID_TESTNET,
+                conn,
+                LimitedCostTracker::new_free(),
+                self.repl_settings.epoch,
+            );
             global_context.begin();
             let mut cur_balance = global_context.database.get_stx_balance_snapshot(&recipient);
             cur_balance.credit(amount as u128);
@@ -781,6 +806,7 @@ https://github.com/hirosystems/clarinet/issues/new/choose"#
     }
 
     pub fn advance_chain_tip(&mut self, count: u32) -> u32 {
+        self.burn_datastore.advance_chain_tip(count);
         self.datastore.advance_chain_tip(count)
     }
 
@@ -844,5 +870,71 @@ https://github.com/hirosystems/clarinet/issues/new/choose"#
             },
             _ => 0,
         }
+    }
+}
+
+pub fn serialize_event(event: &StacksTransactionEvent) -> serde_json::Value {
+    match event {
+        StacksTransactionEvent::SmartContractEvent(event_data) => json!({
+            "type": "contract_event",
+            "contract_event": {
+                "contract_identifier": event_data.key.0.to_string(),
+                "topic": event_data.key.1,
+                "value": utils::value_to_string(&event_data.value),
+            }
+        }),
+        StacksTransactionEvent::STXEvent(STXEventType::STXTransferEvent(event_data)) => json!({
+            "type": "stx_transfer_event",
+            "stx_transfer_event": event_data.json_serialize()
+        }),
+        StacksTransactionEvent::STXEvent(STXEventType::STXMintEvent(event_data)) => json!({
+            "type": "stx_mint_event",
+            "stx_mint_event": event_data.json_serialize()
+        }),
+        StacksTransactionEvent::STXEvent(STXEventType::STXBurnEvent(event_data)) => json!({
+            "type": "stx_burn_event",
+            "stx_burn_event": event_data.json_serialize()
+        }),
+        StacksTransactionEvent::STXEvent(STXEventType::STXLockEvent(event_data)) => json!({
+            "type": "stx_lock_event",
+            "stx_lock_event": event_data.json_serialize()
+        }),
+        StacksTransactionEvent::NFTEvent(NFTEventType::NFTTransferEvent(event_data)) => json!({
+            "type": "nft_transfer_event",
+            "nft_transfer_event": {
+                "asset_identifier": format!("{}", event_data.asset_identifier),
+                "sender": format!("{}", event_data.sender),
+                "recipient": format!("{}", event_data.recipient),
+                "value": utils::value_to_string(&event_data.value),
+            }
+        }),
+        StacksTransactionEvent::NFTEvent(NFTEventType::NFTMintEvent(event_data)) => json!({
+            "type": "nft_mint_event",
+            "nft_mint_event": {
+                "asset_identifier": format!("{}", event_data.asset_identifier),
+                "recipient": format!("{}", event_data.recipient),
+                "value": utils::value_to_string(&event_data.value),
+            }
+        }),
+        StacksTransactionEvent::NFTEvent(NFTEventType::NFTBurnEvent(event_data)) => json!({
+            "type": "nft_burn_event",
+            "nft_burn_event": {
+                "asset_identifier": format!("{}", event_data.asset_identifier),
+                "sender": format!("{}",event_data.sender),
+                "value": utils::value_to_string(&event_data.value),
+            }
+        }),
+        StacksTransactionEvent::FTEvent(FTEventType::FTTransferEvent(event_data)) => json!({
+            "type": "ft_transfer_event",
+            "ft_transfer_event": event_data.json_serialize()
+        }),
+        StacksTransactionEvent::FTEvent(FTEventType::FTMintEvent(event_data)) => json!({
+            "type": "ft_mint_event",
+            "ft_mint_event": event_data.json_serialize()
+        }),
+        StacksTransactionEvent::FTEvent(FTEventType::FTBurnEvent(event_data)) => json!({
+            "type": "ft_burn_event",
+            "ft_burn_event": event_data.json_serialize()
+        }),
     }
 }

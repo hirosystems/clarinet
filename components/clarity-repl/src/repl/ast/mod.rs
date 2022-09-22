@@ -1,22 +1,22 @@
 pub mod parser;
-use crate::clarity::costs::cost_functions::ClarityCostFunction;
-use crate::clarity::costs::{
+use clarity::vm::costs::cost_functions::ClarityCostFunction;
+use clarity::vm::costs::{
     cost_functions, runtime_cost, CostErrors, CostTracker, LimitedCostTracker,
 };
-use crate::clarity::diagnostic::{Diagnostic, Level};
-use crate::clarity::errors::{Error, RuntimeErrorType};
+use clarity::vm::diagnostic::{Diagnostic, Level};
+use clarity::vm::errors::{Error, RuntimeErrorType};
 
-use crate::clarity::representations::SymbolicExpression;
-use crate::clarity::types::QualifiedContractIdentifier;
+use clarity::vm::representations::SymbolicExpression;
+use clarity::vm::types::QualifiedContractIdentifier;
 
-use crate::clarity::ast::definition_sorter::DefinitionSorter;
-use crate::clarity::ast::errors::ParseResult;
-use crate::clarity::ast::expression_identifier::ExpressionIdentifier;
-use crate::clarity::ast::stack_depth_checker::StackDepthChecker;
-use crate::clarity::ast::sugar_expander::SugarExpander;
-use crate::clarity::ast::traits_resolver::TraitsResolver;
-use crate::clarity::ast::types::BuildASTPass;
-pub use crate::clarity::ast::types::ContractAST;
+use clarity::vm::ast::definition_sorter::DefinitionSorter;
+use clarity::vm::ast::errors::ParseResult;
+use clarity::vm::ast::expression_identifier::ExpressionIdentifier;
+use clarity::vm::ast::stack_depth_checker::StackDepthChecker;
+use clarity::vm::ast::sugar_expander::SugarExpander;
+use clarity::vm::ast::traits_resolver::TraitsResolver;
+use clarity::vm::ast::types::BuildASTPass;
+pub use clarity::vm::ast::types::ContractAST;
 
 use self::parser::error::ParserError;
 

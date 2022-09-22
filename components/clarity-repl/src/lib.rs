@@ -25,10 +25,11 @@ mod macros;
 #[cfg(feature = "wasm")]
 use wasm_bindgen::prelude::*;
 
+pub extern crate clarity;
+
 pub mod analysis;
-pub mod clarity;
-pub mod contracts;
 pub mod repl;
+pub mod utils;
 
 struct GlobalContext {
     session: Option<Session>,

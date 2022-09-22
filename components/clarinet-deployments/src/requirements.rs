@@ -1,5 +1,5 @@
 use clarinet_files::{FileAccessor, FileLocation};
-use clarity_repl::clarity::types::QualifiedContractIdentifier;
+use clarity_repl::clarity::vm::types::QualifiedContractIdentifier;
 use reqwest;
 
 pub async fn retrieve_contract(
@@ -11,6 +11,7 @@ pub async fn retrieve_contract(
     let contract_name = contract_id.name.to_string();
 
     let mut contract_location = cache_location.clone();
+    contract_location.append_path("requirements")?;
     contract_location.append_path(&format!("{}.{}.clar", contract_deployer, contract_name))?;
 
     let contract_source = match file_accessor {
