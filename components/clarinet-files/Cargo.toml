@@ -21,7 +21,6 @@ js-sys = { version = "0.3", optional = true }
 serde-wasm-bindgen = { version = "0.4", optional = true }
 wasm-bindgen = { version = "0.2", optional = true }
 wasm-bindgen-futures = { version = "0.4", optional = true }
-web-sys = { version = "0.3", features = ["console"], optional = true }
 
 [features]
 default = ["cli"]
@@ -31,7 +30,6 @@ wasm = [
   "serde-wasm-bindgen",
   "wasm-bindgen",
   "wasm-bindgen-futures",
-  "web-sys",
   "clarity_repl/wasm",
 ]
 
