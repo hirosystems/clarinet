@@ -16,9 +16,10 @@ use self::types::{
     TransactionPlanSpecification, TransactionsBatchSpecification, WalletSpecification,
 };
 use clarinet_files::FileAccessor;
+use clarinet_files::FileLocation;
 use clarinet_files::{NetworkManifest, ProjectManifest};
-
 use clarity_repl::analysis::ast_dependency_detector::{ASTDependencyDetector, DependencySet};
+use clarity_repl::clarity::diagnostic::DiagnosableError;
 use clarity_repl::clarity::vm::ast::ContractAST;
 use clarity_repl::clarity::vm::diagnostic::Diagnostic;
 use clarity_repl::clarity::vm::types::PrincipalData;
@@ -461,6 +462,30 @@ pub async fn generate_default_deployment(
 
     let mut contracts = HashMap::new();
     let mut contracts_sources = HashMap::new();
+
+    let mut n = 0;
+
+    let base_location = manifest.location.clone().get_parent_location()?;
+    let contracts_data: Vec<FileLocation> = manifest
+        .contracts
+        .iter()
+        .map(|(_, contract_config)| -> FileLocation {
+            let mut contract_location = base_location.clone();
+            contract_location
+                .append_path(&contract_config.path)
+                .unwrap();
+            contract_location
+        })
+        .collect();
+
+    let sources: Vec<String> = match file_accessor {
+        None => contracts_data
+            .into_iter()
+            .map(|contract_location| contract_location.read_content_as_utf8().unwrap())
+            .collect(),
+        Some(file_accessor) => file_accessor.read_contracts_content(contracts_data).await?,
+    };
+
     for (name, contract_config) in manifest.contracts.iter() {
         let contract_name = match ContractName::try_from(name.to_string()) {
             Ok(res) => res,
@@ -491,19 +516,10 @@ pub async fn generate_default_deployment(
             }
         };
 
-        let mut contract_location = manifest.location.clone().get_parent_location()?;
-        let source = match file_accessor {
-            None => {
-                contract_location.append_path(&contract_config.expect_contract_path_as_str())?;
-                contract_location.read_content_as_utf8()?
-            }
-            Some(file_accessor) => {
-                contract_location.append_path(&contract_config.expect_contract_path_as_str())?;
-                file_accessor
-                    .read_contract_content(contract_location.clone())
-                    .await?
-            }
-        };
+        let mut contract_location = base_location.clone();
+        contract_location.append_path(&contract_config.expect_contract_path_as_str())?;
+        let source = sources.get(n).unwrap();
+        n += 1;
 
         let contract_id = QualifiedContractIdentifier::new(sender.clone(), contract_name.clone());
 
@@ -523,7 +539,7 @@ pub async fn generate_default_deployment(
                 EmulatedContractPublishSpecification {
                     contract_name,
                     emulated_sender: sender,
-                    source,
+                    source: source.clone(),
                     location: contract_location,
                     clarity_version: contract_config.clarity_version,
                 },
@@ -535,7 +551,7 @@ pub async fn generate_default_deployment(
                 location: contract_location,
                 cost: deployment_fee_rate
                     .saturating_mul(source.as_bytes().len().try_into().unwrap()),
-                source,
+                source: source.clone(),
                 anchor_block_only: true,
                 clarity_version: contract_config.clarity_version,
             })

@@ -17,6 +17,11 @@ struct WFSRequest {
 }
 
 #[derive(Serialize, Deserialize)]
+struct WFSRequestMany {
+    pub paths: Vec<String>,
+}
+
+#[derive(Serialize, Deserialize)]
 struct WFSWriteRequest<'a> {
     pub path: String,
     pub content: &'a [u8],
@@ -99,6 +104,29 @@ impl FileAccessor for WASMFileSystemAccessor {
             match req {
                 Ok(req) => match JsFuture::from(Promise::resolve(&req)).await {
                     Ok(contract) => Ok(decode_from_js(contract)
+                        .map_err(|err| format!("decode_from_js error: {}", err))?),
+                    Err(err) => Err(format!("error: {:?}", &err)),
+                },
+                Err(err) => Err(format!("error: {:?}", &err)),
+            }
+        })
+    }
+
+    fn read_contracts_content(
+        &self,
+        contracts_data: Vec<FileLocation>,
+    ) -> FileAccessorResult<Vec<String>> {
+        let req = self.get_request_promise(
+            "vfs/readFiles".into(),
+            &WFSRequestMany {
+                paths: contracts_data.iter().map(|f| f.to_string()).collect(),
+            },
+        );
+
+        Box::pin(async move {
+            match req {
+                Ok(req) => match JsFuture::from(Promise::resolve(&req)).await {
+                    Ok(contracts) => Ok(decode_from_js(contracts)
                         .map_err(|err| format!("decode_from_js error: {}", err))?),
                     Err(err) => Err(format!("error: {:?}", &err)),
                 },

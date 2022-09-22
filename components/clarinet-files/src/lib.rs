@@ -34,6 +34,10 @@ pub trait FileAccessor {
     fn file_exists(&self, location: FileLocation) -> FileAccessorResult<bool>;
     fn read_manifest_content(&self, manifest_location: FileLocation) -> FileAccessorResult<String>;
     fn read_contract_content(&self, contract_location: FileLocation) -> FileAccessorResult<String>;
+    fn read_contracts_content(
+        &self,
+        contracts_data: Vec<FileLocation>,
+    ) -> FileAccessorResult<Vec<String>>;
     fn write_file(&self, location: FileLocation, content: &[u8]) -> FileAccessorResult<()>;
 }
 
