@@ -1,14 +1,15 @@
-use crate::clarity::errors::Error;
-use crate::clarity::eval;
-use crate::clarity::functions::define::DefineFunctions;
-use crate::clarity::functions::NativeFunctions;
-use crate::clarity::types::PrincipalData;
-use crate::clarity::{
+use crate::repl::interpreter::Txid;
+use crate::repl::tracer::SymbolicExpressionType::List;
+use clarity::vm::errors::Error;
+use clarity::vm::functions::define::DefineFunctions;
+use clarity::vm::functions::NativeFunctions;
+use clarity::vm::types::PrincipalData;
+use clarity::vm::{
     contexts::{Environment, LocalContext},
     types::Value,
     EvalHook, SymbolicExpression, SymbolicExpressionType,
 };
-use crate::repl::tracer::SymbolicExpressionType::List;
+use clarity::vm::{eval, ClarityVersion, EvaluationResult};
 
 pub struct Tracer {
     snippet: String,
@@ -46,8 +47,10 @@ impl EvalHook for Tracer {
             if let Some(function_name) = function_name.match_atom() {
                 if DefineFunctions::lookup_by_name(function_name).is_some() {
                     return;
-                } else if let Some(native_function) = NativeFunctions::lookup_by_name(function_name)
-                {
+                } else if let Some(native_function) = NativeFunctions::lookup_by_name_at_version(
+                    function_name,
+                    &ClarityVersion::latest(),
+                ) {
                     match native_function {
                         NativeFunctions::ContractCall => {
                             let mut call = format!(
@@ -158,7 +161,10 @@ impl EvalHook for Tracer {
                 println!(
                     "{}│ {}",
                     "│   ".repeat(self.stack.len() - self.pending_call_string.len() - 1),
-                    black!(format!("✸ {}", event.json_serialize())),
+                    black!(format!(
+                        "✸ {}",
+                        event.json_serialize(0, &Txid([0u8; 32]), true)
+                    )),
                 )
             }
             self.emitted_events = emitted_events.len();
@@ -200,12 +206,22 @@ impl EvalHook for Tracer {
         }
     }
 
-    fn did_complete(&mut self, result: core::result::Result<&mut super::ExecutionResult, String>) {
+    fn did_complete(
+        &mut self,
+        result: core::result::Result<&mut clarity::vm::ExecutionResult, String>,
+    ) {
         match result {
             Ok(result) => {
-                if let Some(value) = &result.result {
-                    println!("└── {}", blue!(format!("{}", value)));
-                }
+                match &result.result {
+                    EvaluationResult::Contract(contract_result) => {
+                        if let Some(value) = &contract_result.result {
+                            println!("└── {}", blue!(format!("{}", value)));
+                        }
+                    }
+                    EvaluationResult::Snippet(snippet_result) => {
+                        println!("└── {}", blue!(format!("{}", snippet_result.result)));
+                    }
+                };
             }
             Err(e) => println!("{}", e),
         }

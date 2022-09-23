@@ -1,4 +1,4 @@
-use clarity_repl::clarity::util::hash::{hex_bytes, to_hex};
+use clarity_repl::clarity::util::hash::to_hex;
 use orchestra_types::{
     BitcoinBlockData, BitcoinBlockMetadata, BitcoinTransactionData, BitcoinTransactionMetadata,
     BlockIdentifier,

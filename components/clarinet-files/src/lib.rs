@@ -1,3 +1,8 @@
+#[cfg(feature = "wasm")]
+pub use clarity_repl_wasm as clarity_repl;
+#[cfg(not(feature = "wasm"))]
+pub use clarity_repl;
+
 extern crate serde;
 
 #[macro_use]

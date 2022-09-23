@@ -1,15 +1,15 @@
 use crate::analysis::annotation::{Annotation, AnnotationKind, WarningKind};
 use crate::analysis::ast_visitor::{traverse, ASTVisitor, TypedVar};
 use crate::analysis::{self, AnalysisPass, AnalysisResult};
-use crate::clarity::analysis::analysis_db::AnalysisDatabase;
-use crate::clarity::analysis::types::ContractAnalysis;
-use crate::clarity::diagnostic::{DiagnosableError, Diagnostic, Level};
-use crate::clarity::functions::define::DefineFunctions;
-use crate::clarity::functions::NativeFunctions;
-use crate::clarity::representations::SymbolicExpressionType::*;
-use crate::clarity::representations::{Span, TraitDefinition};
-use crate::clarity::types::{TraitIdentifier, Value};
-use crate::clarity::{ClarityName, SymbolicExpression};
+use clarity::vm::analysis::analysis_db::AnalysisDatabase;
+use clarity::vm::analysis::types::ContractAnalysis;
+use clarity::vm::diagnostic::{DiagnosableError, Diagnostic, Level};
+use clarity::vm::functions::define::DefineFunctions;
+use clarity::vm::functions::NativeFunctions;
+use clarity::vm::representations::SymbolicExpressionType::*;
+use clarity::vm::representations::{Span, TraitDefinition};
+use clarity::vm::types::{TraitIdentifier, Value};
+use clarity::vm::{ClarityName, ClarityVersion, SymbolicExpression};
 use std::collections::{HashMap, HashSet};
 use std::convert::TryFrom;
 use std::hash::{Hash, Hasher};
@@ -95,12 +95,6 @@ struct TaintSource<'a> {
 #[derive(Clone, Debug)]
 struct TaintedNode<'a> {
     sources: HashSet<Node<'a>>,
-}
-
-impl Hash for &SymbolicExpression {
-    fn hash<H: Hasher>(&self, state: &mut H) {
-        self.id.hash(state)
-    }
 }
 
 struct FunctionInfo {
@@ -572,9 +566,11 @@ impl<'a> ASTVisitor<'a> for CheckChecker<'a, '_> {
             if let Some(function_name) = function_name.match_atom() {
                 if let Some(define_function) = DefineFunctions::lookup_by_name(function_name) {
                     return true;
-                } else if let Some(native_function) = NativeFunctions::lookup_by_name(function_name)
-                {
-                    use crate::clarity::functions::NativeFunctions::*;
+                } else if let Some(native_function) = NativeFunctions::lookup_by_name_at_version(
+                    function_name,
+                    &ClarityVersion::latest(),
+                ) {
+                    use clarity::vm::functions::NativeFunctions::*;
                     match native_function {
                         Let => return true,
                         Begin => return true,
@@ -605,7 +601,7 @@ impl<'a> ASTVisitor<'a> for CheckChecker<'a, '_> {
     ) -> bool {
         // Input from the sender can be used un-checked to interact with the
         // sender's assets. The sender is protected by post-conditions.
-        if sender.match_tx_sender() && !self.in_as_contract {
+        if match_tx_sender(sender) && !self.in_as_contract {
             return true;
         }
         self.taint_check(amount);
@@ -619,10 +615,11 @@ impl<'a> ASTVisitor<'a> for CheckChecker<'a, '_> {
         amount: &'a SymbolicExpression,
         sender: &'a SymbolicExpression,
         recipient: &'a SymbolicExpression,
+        memo: Option<&'a SymbolicExpression>,
     ) -> bool {
         // Input from the sender can be used un-checked to interact with the
         // sender's assets. The sender is protected by post-conditions.
-        if sender.match_tx_sender() && !self.in_as_contract {
+        if match_tx_sender(sender) && !self.in_as_contract {
             return true;
         }
         self.taint_check(amount);
@@ -640,7 +637,7 @@ impl<'a> ASTVisitor<'a> for CheckChecker<'a, '_> {
     ) -> bool {
         // Input from the sender can be used un-checked to interact with the
         // sender's assets. The sender is protected by post-conditions.
-        if sender.match_tx_sender() && !self.in_as_contract {
+        if match_tx_sender(sender) && !self.in_as_contract {
             return true;
         }
         self.taint_check(amount);
@@ -658,7 +655,7 @@ impl<'a> ASTVisitor<'a> for CheckChecker<'a, '_> {
     ) -> bool {
         // Input from the sender can be used un-checked to interact with the
         // sender's assets. The sender is protected by post-conditions.
-        if sender.match_tx_sender() && !self.in_as_contract {
+        if match_tx_sender(sender) && !self.in_as_contract {
             return true;
         }
         self.taint_check(amount);
@@ -688,7 +685,7 @@ impl<'a> ASTVisitor<'a> for CheckChecker<'a, '_> {
     ) -> bool {
         // Input from the sender can be used un-checked to interact with the
         // sender's assets. The sender is protected by post-conditions.
-        if sender.match_tx_sender() && !self.in_as_contract {
+        if match_tx_sender(sender) && !self.in_as_contract {
             return true;
         }
         self.taint_check(identifier);
@@ -706,7 +703,7 @@ impl<'a> ASTVisitor<'a> for CheckChecker<'a, '_> {
     ) -> bool {
         // Input from the sender can be used un-checked to interact with the
         // sender's assets. The sender is protected by post-conditions.
-        if sender.match_tx_sender() && !self.in_as_contract {
+        if match_tx_sender(sender) && !self.in_as_contract {
             return true;
         }
         self.taint_check(identifier);
@@ -828,14 +825,14 @@ impl<'a> ASTVisitor<'a> for CheckChecker<'a, '_> {
         }
 
         if (self.settings.trusted_sender
-            && ((operands[0].match_tx_sender()
+            && ((match_tx_sender(&operands[0])
                 && !self.tainted_nodes.contains_key(&Node::Expr(operands[1].id)))
-                || (operands[1].match_tx_sender()
+                || (match_tx_sender(&operands[1])
                     && !self.tainted_nodes.contains_key(&Node::Expr(operands[0].id)))))
             || (self.settings.trusted_caller
-                && ((operands[0].match_contract_caller()
+                && ((match_contract_caller(&operands[0])
                     && !self.tainted_nodes.contains_key(&Node::Expr(operands[1].id)))
-                    || (operands[1].match_contract_caller()
+                    || (match_contract_caller(&operands[1])
                         && !self.tainted_nodes.contains_key(&Node::Expr(operands[0].id)))))
         {
             // Save all of the current taint sources before clearing them.
@@ -871,24 +868,22 @@ impl AnalysisPass for CheckChecker<'_, '_> {
     }
 }
 
-impl<'a> SymbolicExpression {
-    fn match_tx_sender(&'a self) -> bool {
-        if let Some(name) = self.match_atom() {
-            if name.as_str() == "tx-sender" {
-                return true;
-            }
+fn match_tx_sender(expr: &SymbolicExpression) -> bool {
+    if let Some(name) = expr.match_atom() {
+        if name.as_str() == "tx-sender" {
+            return true;
         }
-        false
     }
+    false
+}
 
-    fn match_contract_caller(&'a self) -> bool {
-        if let Some(name) = self.match_atom() {
-            if name.as_str() == "contract-caller" {
-                return true;
-            }
+fn match_contract_caller(expr: &SymbolicExpression) -> bool {
+    if let Some(name) = expr.match_atom() {
+        if name.as_str() == "contract-caller" {
+            return true;
         }
-        false
     }
+    false
 }
 
 #[cfg(test)]

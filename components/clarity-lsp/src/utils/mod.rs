@@ -1,8 +1,10 @@
 use super::types::*;
 use clarinet_files::FileLocation;
-use clarity_repl::clarity::analysis::ContractAnalysis;
-use clarity_repl::clarity::diagnostic::{Diagnostic as ClarityDiagnostic, Level as ClarityLevel};
-use clarity_repl::clarity::docs::{
+use clarity_repl::clarity::vm::analysis::ContractAnalysis;
+use clarity_repl::clarity::vm::diagnostic::{
+    Diagnostic as ClarityDiagnostic, Level as ClarityLevel,
+};
+use clarity_repl::clarity::vm::docs::{
     make_api_reference, make_define_reference, make_keyword_reference,
 };
 use clarity_repl::clarity::functions::define::DefineFunctions;
@@ -199,15 +201,18 @@ pub fn build_default_native_keywords_list() -> Vec<CompletionItem> {
 
     let native_variables: Vec<CompletionItem> = NativeVariables::ALL
         .iter()
-        .map(|var| {
-            let api = make_keyword_reference(&var);
-            CompletionItem {
-                label: api.name.to_string(),
-                kind: CompletionItemKind::Field,
-                detail: Some(api.name.to_string()),
-                markdown_documentation: Some(api.description.to_string()),
-                insert_text: Some(api.snippet.to_string()),
-                insert_text_format: InsertTextFormat::PlainText,
+        .filter_map(|var| {
+            if let Some(api) = make_keyword_reference(&var) {
+                Some(CompletionItem {
+                    label: api.name.to_string(),
+                    kind: CompletionItemKind::Field,
+                    detail: Some(api.name.to_string()),
+                    markdown_documentation: Some(api.description.to_string()),
+                    insert_text: Some(api.snippet.to_string()),
+                    insert_text_format: InsertTextFormat::PlainText,
+                })
+            } else {
+                None
             }
         })
         .collect();

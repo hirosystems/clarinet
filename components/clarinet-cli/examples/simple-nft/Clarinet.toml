@@ -1,7 +1,7 @@
 
 [project]
 name = "simple-nft"
-cache_dir = "./.requirements"
+cache_dir = "./.cache"
 
 [contracts.simple-nft]
 path = "contracts/simple-nft.clar"

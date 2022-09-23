@@ -4,8 +4,12 @@ mod ui;
 
 use bitcoincore_rpc::{Auth, Client};
 
+use clarity_repl::clarity::types::chainstate::StacksAddress;
+use clarity_repl::clarity::util::secp256k1::{
+    MessageSignature, Secp256k1PrivateKey, Secp256k1PublicKey,
+};
 use clarity_repl::clarity::types::StandardPrincipalData;
-use clarity_repl::clarity::{ClarityName, Value};
+use clarity_repl::clarity::vm::{ClarityName, EvaluationResult, Value};
 use reqwest::Url;
 pub use ui::start_ui;
 
@@ -18,31 +22,20 @@ use clarinet_deployments::types::{
 use clarinet_files::{AccountConfig, FileLocation, NetworkManifest, ProjectManifest};
 use clarinet_utils::get_bip39_seed_from_mnemonic;
 
-use clarity_repl::clarity::codec::transaction::{
-    StacksTransaction, StacksTransactionSigner, TransactionAnchorMode, TransactionAuth,
-    TransactionContractCall, TransactionPayload, TransactionPostConditionMode,
-    TransactionPublicKeyEncoding, TransactionSmartContract, TransactionSpendingCondition,
+use clarinet_utils::transactions::{
+    SinglesigHashMode, SinglesigSpendingCondition, StacksString, StacksTransaction,
+    StacksTransactionSigner, TransactionAnchorMode, TransactionAuth, TransactionContractCall,
+    TransactionPayload, TransactionPostConditionMode, TransactionPublicKeyEncoding,
+    TransactionSmartContract, TransactionSpendingCondition, TransactionVersion,
 };
 use clarity_repl::clarity::codec::StacksMessageCodec;
 
+use clarity_repl::clarity::address::{
+    AddressHashMode, C32_ADDRESS_VERSION_MAINNET_SINGLESIG, C32_ADDRESS_VERSION_TESTNET_SINGLESIG,
+};
 use clarity_repl::clarity::types::QualifiedContractIdentifier;
-use clarity_repl::clarity::util::{
-    C32_ADDRESS_VERSION_MAINNET_SINGLESIG, C32_ADDRESS_VERSION_TESTNET_SINGLESIG,
-};
-use clarity_repl::clarity::ContractName;
-use clarity_repl::clarity::{
-    codec::{
-        transaction::{
-            RecoverableSignature, SinglesigHashMode, SinglesigSpendingCondition, TransactionVersion,
-        },
-        StacksString,
-    },
-    util::{
-        address::AddressHashMode,
-        secp256k1::{Secp256k1PrivateKey, Secp256k1PublicKey},
-        StacksAddress,
-    },
-};
+
+use clarity_repl::clarity::vm::ContractName;
 use clarity_repl::repl::Session;
 use clarity_repl::repl::SessionSettings;
 use libsecp256k1::{PublicKey, SecretKey};
@@ -129,7 +122,7 @@ fn sign_transaction_payload(
         tx_fee: tx_fee,
         hash_mode: SinglesigHashMode::P2PKH,
         key_encoding: TransactionPublicKeyEncoding::Compressed,
-        signature: RecoverableSignature::empty(),
+        signature: MessageSignature::empty(),
     });
 
     let auth = TransactionAuth::Standard(spending_condition);
@@ -446,7 +439,10 @@ pub fn apply_on_chain_deployment(
                             let execution = session
                                 .interpret(value.to_string(), None, None, false, None, None)
                                 .unwrap();
-                            execution.result.unwrap()
+                            match execution.result {
+                                EvaluationResult::Snippet(result) => result.result,
+                                _ => unreachable!("Contract result from snippet"),
+                            }
                         })
                         .collect::<Vec<_>>();
 

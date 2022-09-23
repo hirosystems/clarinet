@@ -16,10 +16,12 @@ use crate::runner::DeploymentCache;
 use clarinet_deployments::setup_session_with_deployment;
 use clarinet_deployments::types::{DeploymentGenerationArtifacts, DeploymentSpecification};
 use clarinet_files::{FileLocation, ProjectManifest, ProjectManifestFile, RequirementConfig};
-use clarity_repl::clarity::analysis::{AnalysisDatabase, ContractAnalysis};
-use clarity_repl::clarity::costs::LimitedCostTracker;
-use clarity_repl::clarity::diagnostic::{Diagnostic, Level};
+use clarity_repl::analysis::call_checker::ContractAnalysis;
+use clarity_repl::clarity::vm::analysis::AnalysisDatabase;
+use clarity_repl::clarity::vm::costs::LimitedCostTracker;
+use clarity_repl::clarity::vm::diagnostic::{Diagnostic, Level};
 use clarity_repl::clarity::types::QualifiedContractIdentifier;
+use clarity_repl::repl::diagnostic::{output_code, output_diagnostic};
 use clarity_repl::{analysis, repl, Terminal};
 use orchestra_types::Chain;
 use orchestra_types::StacksNetwork;
@@ -380,6 +382,18 @@ struct Test {
         conflicts_with = "use-on-disk-deployment-plan"
     )]
     pub use_computed_deployment_plan: bool,
+    /// Stop after N errors. Defaults to stopping after first failure
+    #[clap(long = "fail-fast")]
+    pub fail_fast: Option<u16>,
+    /// Run tests with this string or pattern in the test name
+    #[clap(long = "filter")]
+    pub filter: Option<String>,
+    /// Load import map file from local file or remote URL
+    #[clap(long = "import-map")]
+    pub import_map: Option<String>,
+    /// Allow network access
+    #[clap(long = "allow-net")]
+    pub allow_net: bool,
 }
 
 #[derive(Parser, PartialEq, Clone, Debug)]
@@ -918,17 +932,19 @@ pub fn main() {
                 }
             };
             let contract_id = QualifiedContractIdentifier::transient();
-            let (ast, mut diagnostics, mut success) = session.interpreter.build_ast(
-                contract_id.clone(),
-                code.clone(),
-                settings.repl_settings.parser_version,
-            );
+            let (ast, mut diagnostics, mut success) = session
+                .interpreter
+                .build_ast(contract_id.clone(), code.clone());
             let (annotations, mut annotation_diagnostics) =
                 session.interpreter.collect_annotations(&ast, &code);
             diagnostics.append(&mut annotation_diagnostics);
 
-            let mut contract_analysis =
-                ContractAnalysis::new(contract_id, ast.expressions, LimitedCostTracker::new_free());
+            let mut contract_analysis = ContractAnalysis::new(
+                contract_id,
+                ast.expressions,
+                LimitedCostTracker::new_free(),
+                settings.repl_settings.clarity_version,
+            );
             let mut analysis_db = AnalysisDatabase::new(&mut session.interpreter.datastore);
             let mut analysis_diagnostics = match analysis::run_analysis(
                 &mut contract_analysis,
@@ -947,7 +963,7 @@ pub fn main() {
             let lines = code.lines();
             let formatted_lines: Vec<String> = lines.map(|l| l.to_string()).collect();
             for d in diagnostics {
-                for line in d.output(&file, &formatted_lines) {
+                for line in output_diagnostic(&d, &file, &formatted_lines) {
                     println!("{}", line);
                 }
             }
@@ -1013,6 +1029,7 @@ pub fn main() {
             let manifest = load_manifest_or_exit(cmd.manifest_path);
             let deployment_plan_path = cmd.deployment_plan_path.clone();
             let cache = build_deployment_cache_or_exit(&manifest, &deployment_plan_path);
+            let cache_location = manifest.project.cache_location.clone();
 
             let (success, _count) = match run_scripts(
                 cmd.files,
@@ -1024,9 +1041,17 @@ pub fn main() {
                 &manifest,
                 cache,
                 deployment_plan_path,
+                cmd.fail_fast,
+                cmd.filter,
+                cmd.import_map,
+                cmd.allow_net,
+                cache_location,
             ) {
                 Ok(count) => (true, count),
-                Err((_, count)) => (false, count),
+                Err((e, count)) => {
+                    println!("{}: {}", red!("error:"), e);
+                    (false, count)
+                }
             };
             if hints_enabled {
                 display_tests_pro_tips_hint();
@@ -1047,7 +1072,7 @@ pub fn main() {
             let manifest = load_manifest_or_exit(cmd.manifest_path);
 
             let cache = build_deployment_cache_or_exit(&manifest, &cmd.deployment_plan_path);
-
+            let cache_location = manifest.project.cache_location.clone();
             let _ = run_scripts(
                 vec![cmd.script],
                 false,
@@ -1058,6 +1083,11 @@ pub fn main() {
                 &manifest,
                 cache,
                 cmd.deployment_plan_path,
+                None,
+                None,
+                None,
+                false,
+                cache_location,
             );
         }
         Command::Integrate(cmd) => {
@@ -1631,7 +1661,7 @@ impl DiagnosticsDigest {
                     }
                     Level::Note => {
                         outputs.push(format!("{}: {}", green!("note:"), diagnostic.message));
-                        outputs.append(&mut diagnostic.output_code(&formatted_lines));
+                        outputs.append(&mut output_code(&diagnostic, &formatted_lines));
                         continue;
                     }
                 }
@@ -1649,7 +1679,7 @@ impl DiagnosticsDigest {
                         span.start_column
                     ));
                 }
-                outputs.append(&mut diagnostic.output_code(&formatted_lines));
+                outputs.append(&mut output_code(&diagnostic, &formatted_lines));
 
                 if let Some(ref suggestion) = diagnostic.suggestion {
                     outputs.push(format!("{}", suggestion));
