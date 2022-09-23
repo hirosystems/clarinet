@@ -463,27 +463,37 @@ pub async fn generate_default_deployment(
     let mut contracts = HashMap::new();
     let mut contracts_sources = HashMap::new();
 
-    let mut n = 0;
-
     let base_location = manifest.location.clone().get_parent_location()?;
-    let contracts_data: Vec<FileLocation> = manifest
-        .contracts
-        .iter()
-        .map(|(_, contract_config)| -> FileLocation {
-            let mut contract_location = base_location.clone();
-            contract_location
-                .append_path(&contract_config.path)
-                .unwrap();
-            contract_location
-        })
-        .collect();
 
-    let sources: Vec<String> = match file_accessor {
-        None => contracts_data
-            .into_iter()
-            .map(|contract_location| contract_location.read_content_as_utf8().unwrap())
-            .collect(),
-        Some(file_accessor) => file_accessor.read_contracts_content(contracts_data).await?,
+    let sources: HashMap<String, String> = match file_accessor {
+        None => {
+            let mut sources = HashMap::new();
+            for (_, contract_config) in manifest.contracts.iter() {
+                let mut contract_location = base_location.clone();
+                contract_location
+                    .append_path(&contract_config.path)
+                    .unwrap();
+                let source = contract_location.read_content_as_utf8().unwrap();
+                sources.insert(contract_location.to_string(), source);
+            }
+            sources
+        }
+        Some(file_accessor) => {
+            let contracts_location = manifest
+                .contracts
+                .iter()
+                .map(|(_, contract_config)| {
+                    let mut contract_location = base_location.clone();
+                    contract_location
+                        .append_path(&contract_config.path)
+                        .unwrap();
+                    contract_location.to_string()
+                })
+                .collect();
+            file_accessor
+                .read_contracts_content(contracts_location)
+                .await?
+        }
     };
 
     for (name, contract_config) in manifest.contracts.iter() {
@@ -518,8 +528,10 @@ pub async fn generate_default_deployment(
 
         let mut contract_location = base_location.clone();
         contract_location.append_path(&contract_config.expect_contract_path_as_str())?;
-        let source = sources.get(n).unwrap();
-        n += 1;
+        let source = sources
+            .get(&contract_location.to_string())
+            .ok_or(format!("source not found for {}", name))?
+            .clone();
 
         let contract_id = QualifiedContractIdentifier::new(sender.clone(), contract_name.clone());
 
@@ -539,7 +551,7 @@ pub async fn generate_default_deployment(
                 EmulatedContractPublishSpecification {
                     contract_name,
                     emulated_sender: sender,
-                    source: source.clone(),
+                    source,
                     location: contract_location,
                     clarity_version: contract_config.clarity_version,
                 },
@@ -551,7 +563,7 @@ pub async fn generate_default_deployment(
                 location: contract_location,
                 cost: deployment_fee_rate
                     .saturating_mul(source.as_bytes().len().try_into().unwrap()),
-                source: source.clone(),
+                source,
                 anchor_block_only: true,
                 clarity_version: contract_config.clarity_version,
             })

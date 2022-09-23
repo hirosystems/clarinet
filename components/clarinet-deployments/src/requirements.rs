@@ -16,7 +16,7 @@ pub async fn retrieve_contract(
 
     let contract_source = match file_accessor {
         None => contract_location.read_content_as_utf8(),
-        Some(file_accessor) => file_accessor.read_file(contract_location.clone()).await,
+        Some(file_accessor) => file_accessor.read_file(contract_location.to_string()).await,
     };
 
     if contract_source.is_ok() {
@@ -42,7 +42,7 @@ pub async fn retrieve_contract(
         None => contract_location.write_content(code.as_bytes()),
         Some(file_accessor) => {
             file_accessor
-                .write_file(contract_location.clone(), code.as_bytes())
+                .write_file(contract_location.to_string(), code.as_bytes())
                 .await
         }
     };

@@ -21,6 +21,7 @@ pub use network_manifest::{
 use orchestra_types::StacksNetwork;
 pub use project_manifest::{ProjectManifest, ProjectManifestFile, RequirementConfig};
 use serde::ser::{Serialize, SerializeMap, Serializer};
+use std::collections::HashMap;
 use std::future::Future;
 use std::pin::Pin;
 use std::{borrow::BorrowMut, path::PathBuf, str::FromStr};
@@ -31,13 +32,13 @@ pub const DEFAULT_DEVNET_BALANCE: u64 = 100_000_000_000_000;
 pub type FileAccessorResult<T> = Pin<Box<dyn Future<Output = Result<T, String>>>>;
 
 pub trait FileAccessor {
-    fn file_exists(&self, location: FileLocation) -> FileAccessorResult<bool>;
-    fn read_file(&self, manifest_location: FileLocation) -> FileAccessorResult<String>;
+    fn file_exists(&self, path: String) -> FileAccessorResult<bool>;
+    fn read_file(&self, path: String) -> FileAccessorResult<String>;
     fn read_contracts_content(
         &self,
-        contracts_data: Vec<FileLocation>,
-    ) -> FileAccessorResult<Vec<String>>;
-    fn write_file(&self, location: FileLocation, content: &[u8]) -> FileAccessorResult<()>;
+        contracts_paths: Vec<String>,
+    ) -> FileAccessorResult<HashMap<String, String>>;
+    fn write_file(&self, path: String, content: &[u8]) -> FileAccessorResult<()>;
 }
 
 #[derive(Deserialize, Debug, Clone, PartialEq, Eq, Hash)]
@@ -188,9 +189,11 @@ impl FileLocation {
                     let mut candidate = parent.clone();
                     candidate.append_path("Clarinet.toml")?;
 
-                    if let Ok(_) = file_accessor.file_exists(candidate.clone()).await {
-                        manifest_location = Some(candidate);
-                        break;
+                    if let Ok(exists) = file_accessor.file_exists(candidate.to_string()).await {
+                        if exists {
+                            manifest_location = Some(candidate);
+                            break;
+                        }
                     }
                     if &parent.get_parent_location().unwrap() == parent {
                         break;

@@ -1,7 +1,8 @@
-use super::{FileAccessor, FileAccessorResult, FileLocation};
+use super::{FileAccessor, FileAccessorResult};
 use js_sys::{Function as JsFunction, Promise};
 use serde::{Deserialize, Serialize};
 use serde_wasm_bindgen::{from_value as decode_from_js, to_value as encode_to_js};
+use std::collections::HashMap;
 use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::JsFuture;
 
@@ -54,24 +55,20 @@ impl WASMFileSystemAccessor {
 }
 
 impl FileAccessor for WASMFileSystemAccessor {
-    fn file_exists(&self, location: FileLocation) -> FileAccessorResult<bool> {
-        let file_exists_request = self.get_request_promise(
-            "vfs/exists".into(),
-            &WFSRequest {
-                path: location.to_string(),
-            },
-        );
+    fn file_exists(&self, path: String) -> FileAccessorResult<bool> {
+        let file_exists_request =
+            self.get_request_promise("vfs/exists".into(), &WFSRequest { path });
 
-        Box::pin(async move { file_exists_request.await.and_then(|r| Ok(r.is_truthy())) })
+        Box::pin(async move {
+            file_exists_request
+                .await
+                .and_then(|r| Ok(decode_from_js(r).map_err(|err| err.to_string())?))
+        })
     }
 
-    fn read_file(&self, file_location: FileLocation) -> FileAccessorResult<String> {
-        let read_file_promise = self.get_request_promise(
-            "vfs/readFile".into(),
-            &WFSRequest {
-                path: file_location.to_string(),
-            },
-        );
+    fn read_file(&self, path: String) -> FileAccessorResult<String> {
+        let read_file_promise =
+            self.get_request_promise("vfs/readFile".into(), &WFSRequest { path });
 
         Box::pin(async move {
             read_file_promise
@@ -82,12 +79,12 @@ impl FileAccessor for WASMFileSystemAccessor {
 
     fn read_contracts_content(
         &self,
-        contracts_data: Vec<FileLocation>,
-    ) -> FileAccessorResult<Vec<String>> {
+        contracts_paths: Vec<String>,
+    ) -> FileAccessorResult<HashMap<String, String>> {
         let read_contract_promise = self.get_request_promise(
             "vfs/readFiles".into(),
             &WFSRequestMany {
-                paths: contracts_data.iter().map(|f| f.to_string()).collect(),
+                paths: contracts_paths,
             },
         );
 
@@ -98,11 +95,11 @@ impl FileAccessor for WASMFileSystemAccessor {
         })
     }
 
-    fn write_file(&self, location: FileLocation, content: &[u8]) -> FileAccessorResult<()> {
+    fn write_file(&self, location: String, content: &[u8]) -> FileAccessorResult<()> {
         let write_file_promise = self.get_request_promise(
             "vfs/writeFile".into(),
             &WFSWriteRequest {
-                path: location.to_string(),
+                path: location,
                 content,
             },
         );

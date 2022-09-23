@@ -238,7 +238,9 @@ impl NetworkManifest {
     ) -> Result<NetworkManifest, String> {
         let mut network_manifest_location = location.get_parent_location()?;
         network_manifest_location.append_path("settings/Devnet.toml")?;
-        let content = file_accessor.read_file(network_manifest_location).await?;
+        let content = file_accessor
+            .read_file(network_manifest_location.to_string())
+            .await?;
 
         let mut network_manifest_file: NetworkManifestFile =
             toml::from_slice(&content.as_bytes()).unwrap();
