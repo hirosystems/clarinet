@@ -3,6 +3,8 @@ use crate::state::{build_state, EditorState, ProtocolState};
 use crate::types::{CompletionItem, CompletionItemKind};
 use clarinet_files::{FileAccessor, FileLocation};
 use clarity_repl::clarity::diagnostic::Diagnostic;
+#[cfg(feature = "wasm")]
+use clarity_repl_wasm as clarity_repl;
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Serialize, Deserialize)]

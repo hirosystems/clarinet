@@ -2,6 +2,8 @@ use clarinet_files::FileLocation;
 use clarity_repl::clarity::types::{
     PrincipalData, QualifiedContractIdentifier, StandardPrincipalData,
 };
+#[cfg(feature = "wasm")]
+use clarity_repl_wasm as clarity_repl;
 
 use clarity_repl::clarity::{ClarityName, ContractName};
 

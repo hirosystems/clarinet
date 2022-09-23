@@ -18,7 +18,6 @@ use types::RequirementPublishSpecification;
 use types::TransactionSpecification;
 
 use clarinet_files::{NetworkManifest, ProjectManifest};
-
 use clarity_repl::analysis::ast_dependency_detector::{ASTDependencyDetector, DependencySet};
 use clarity_repl::clarity::ast::ContractAST;
 use clarity_repl::clarity::diagnostic::Diagnostic;
@@ -26,6 +25,8 @@ use clarity_repl::clarity::types::{PrincipalData, QualifiedContractIdentifier};
 use clarity_repl::clarity::ContractName;
 use clarity_repl::repl::SessionSettings;
 use clarity_repl::repl::{ExecutionResult, Session};
+#[cfg(feature = "wasm")]
+use clarity_repl_wasm as clarity_repl;
 use orchestra_types::StacksNetwork;
 use std::collections::{BTreeMap, HashMap, VecDeque};
 

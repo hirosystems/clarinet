@@ -2,6 +2,8 @@ use crate::FileAccessor;
 
 use super::FileLocation;
 use clarity_repl::repl;
+#[cfg(feature = "wasm")]
+use clarity_repl_wasm as clarity_repl;
 use std::collections::BTreeMap;
 use toml::value::Value;
 

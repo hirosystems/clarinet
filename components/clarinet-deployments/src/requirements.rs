@@ -1,5 +1,7 @@
 use clarinet_files::{FileAccessor, FileLocation};
 use clarity_repl::clarity::types::QualifiedContractIdentifier;
+#[cfg(feature = "wasm")]
+use clarity_repl_wasm as clarity_repl;
 use reqwest;
 
 pub async fn retrieve_contract(

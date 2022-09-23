@@ -734,7 +734,7 @@ dependencies = [
  "clarinet-files",
  "clarinet-utils",
  "clarity-lsp",
- "clarity-repl",
+ "clarity-repl 0.33.0",
  "crossbeam-channel",
  "crossterm 0.22.1",
  "ctrlc",
@@ -792,7 +792,8 @@ name = "clarinet-deployments"
 version = "0.1.0"
 dependencies = [
  "clarinet-files",
- "clarity-repl",
+ "clarity-repl 0.33.0",
+ "clarity-repl 0.33.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "orchestra-types",
  "reqwest",
  "serde",
@@ -808,7 +809,8 @@ dependencies = [
  "bip39",
  "bitcoin 0.28.1",
  "clarinet-utils",
- "clarity-repl",
+ "clarity-repl 0.33.0",
+ "clarity-repl 0.33.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "js-sys",
  "libsecp256k1 0.7.1",
  "orchestra-types",
@@ -838,7 +840,8 @@ version = "0.1.0"
 dependencies = [
  "clarinet-deployments",
  "clarinet-files",
- "clarity-repl",
+ "clarity-repl 0.33.0",
+ "clarity-repl 0.33.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "console_error_panic_hook",
  "js-sys",
  "lsp-types 0.93.1",
@@ -882,6 +885,32 @@ dependencies = [
  "sha3",
  "tokio",
  "tokio-util 0.7.2",
+ "wasm-bindgen",
+ "wasm-bindgen-futures",
+]
+
+[[package]]
+name = "clarity-repl"
+version = "0.33.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0b1b781c5449848251ba41384459924da377d43944dc3d6c8fc4f316b2bca949"
+dependencies = [
+ "ansi_term",
+ "atty",
+ "getrandom 0.2.7",
+ "integer-sqrt",
+ "lazy_static",
+ "libsecp256k1 0.5.0",
+ "rand 0.7.3",
+ "rand_pcg 0.3.1",
+ "rand_seeder",
+ "regex",
+ "ripemd160",
+ "serde",
+ "serde_derive",
+ "serde_json",
+ "sha2 0.9.9",
+ "sha3",
  "wasm-bindgen",
  "wasm-bindgen-futures",
 ]
@@ -3192,7 +3221,7 @@ dependencies = [
  "bitcoincore-rpc-json",
  "clap 3.2.20",
  "clap_generate",
- "clarity-repl",
+ "clarity-repl 0.33.0",
  "ctrlc",
  "orchestra-types",
  "reqwest",
@@ -4675,7 +4704,7 @@ dependencies = [
 name = "stacks-rpc-client"
 version = "0.1.0"
 dependencies = [
- "clarity-repl",
+ "clarity-repl 0.33.0",
  "reqwest",
  "serde",
  "serde_derive",

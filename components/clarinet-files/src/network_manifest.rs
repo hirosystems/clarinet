@@ -5,6 +5,8 @@ use clarity_repl::clarity::types::QualifiedContractIdentifier;
 use clarity_repl::clarity::util::hash::bytes_to_hex;
 use clarity_repl::clarity::util::secp256k1::Secp256k1PublicKey;
 use clarity_repl::clarity::util::StacksAddress;
+#[cfg(feature = "wasm")]
+use clarity_repl_wasm as clarity_repl;
 use libsecp256k1::{PublicKey, SecretKey};
 use orchestra_types::{BitcoinNetwork, StacksNetwork};
 use std::collections::BTreeMap;

@@ -9,6 +9,8 @@ use clarity_repl::clarity::functions::define::DefineFunctions;
 use clarity_repl::clarity::functions::NativeFunctions;
 use clarity_repl::clarity::types::{BlockInfoProperty, FunctionType};
 use clarity_repl::clarity::variables::NativeVariables;
+#[cfg(feature = "wasm")]
+use clarity_repl_wasm as clarity_repl;
 use lsp_types::Diagnostic as LspDiagnostic;
 use lsp_types::Url;
 use lsp_types::{DiagnosticSeverity, Position, Range};
