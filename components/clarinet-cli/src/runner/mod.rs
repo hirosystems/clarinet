@@ -9,7 +9,7 @@ use clarity_repl::clarity::vm::analysis::contract_interface_builder::{
     build_contract_interface, ContractInterface,
 };
 use clarity_repl::clarity::vm::ast::ContractAST;
-use clarity_repl::clarity::types::QualifiedContractIdentifier;
+use clarity_repl::clarity::vm::types::QualifiedContractIdentifier;
 use clarity_repl::clarity::vm::EvaluationResult;
 use clarity_repl::repl::{session::CostsReport, Session};
 use deno_core::error::AnyError;

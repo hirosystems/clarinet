@@ -20,7 +20,7 @@ use clarity_repl::analysis::call_checker::ContractAnalysis;
 use clarity_repl::clarity::vm::analysis::AnalysisDatabase;
 use clarity_repl::clarity::vm::costs::LimitedCostTracker;
 use clarity_repl::clarity::vm::diagnostic::{Diagnostic, Level};
-use clarity_repl::clarity::types::QualifiedContractIdentifier;
+use clarity_repl::clarity::vm::types::QualifiedContractIdentifier;
 use clarity_repl::repl::diagnostic::{output_code, output_diagnostic};
 use clarity_repl::{analysis, repl, Terminal};
 use orchestra_types::Chain;

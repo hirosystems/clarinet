@@ -6,13 +6,14 @@ use clarinet_deployments::{
 };
 use clarinet_files::ProjectManifest;
 use clarinet_files::{FileAccessor, FileLocation};
-#[cfg(feature = "wasm")]
-use clarity_repl_wasm as clarity_repl;
 use clarity_repl::analysis::ast_dependency_detector::DependencySet;
 use clarity_repl::clarity::analysis::ContractAnalysis;
 use clarity_repl::clarity::diagnostic::{Diagnostic as ClarityDiagnostic, Level as ClarityLevel};
-use clarity_repl::clarity::types::QualifiedContractIdentifier;
-use clarity_repl::repl::ast::ContractAST;
+use clarity_repl::clarity::vm::ast::ContractAST;
+use clarity_repl::clarity::vm::types::QualifiedContractIdentifier;
+use clarity_repl::clarity::vm::EvaluationResult;
+#[cfg(feature = "wasm")]
+use clarity_repl_wasm as clarity_repl;
 use lsp_types::MessageType;
 use orchestra_types::StacksNetwork;
 use std::borrow::BorrowMut;

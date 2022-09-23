@@ -16,7 +16,7 @@ use chainhook_types::{
 };
 use clarity_repl::clarity::codec::StacksMessageCodec;
 use clarity_repl::clarity::util::hash::{hex_bytes, to_hex, Hash160};
-use clarity_repl::clarity::types::{CharType, SequenceData, Value as ClarityValue};
+use clarity_repl::clarity::vm::types::{CharType, SequenceData, Value as ClarityValue};
 use reqwest::{Client, Method};
 use serde::Serialize;
 use std::collections::HashMap;

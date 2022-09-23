@@ -1,11 +1,11 @@
 use clarity_repl::clarity::codec::StacksMessageCodec;
 use clarity_repl::clarity::util::hash::{bytes_to_hex, hex_bytes};
-use clarity_repl::clarity::types::Value;
+use clarity_repl::clarity::vm::types::Value;
 
 use reqwest::blocking::Client;
 use std::io::Cursor;
 
-use clarinet_utils::transactions::StacksTransaction;
+use clarity_repl::codec::StacksTransaction;
 
 #[derive(Debug)]
 pub enum RpcError {

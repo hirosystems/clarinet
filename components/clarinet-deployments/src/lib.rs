@@ -16,16 +16,16 @@ use self::types::{
 use clarinet_files::FileAccessor;
 use clarinet_files::{NetworkManifest, ProjectManifest};
 
-use crate::clarity_repl::analysis::ast_dependency_detector::{ASTDependencyDetector, DependencySet};
-use crate::clarity_repl::clarity::vm::ast::ContractAST;
-use crate::clarity_repl::clarity::vm::diagnostic::Diagnostic;
-use crate::clarity_repl::clarity::types::PrincipalData;
-use crate::clarity_repl::clarity::types::QualifiedContractIdentifier;
-use crate::clarity_repl::clarity::vm::ContractName;
-use crate::clarity_repl::clarity::vm::EvaluationResult;
-use crate::clarity_repl::clarity::vm::ExecutionResult;
-use crate::clarity_repl::repl::Session;
-use crate::clarity_repl::repl::SessionSettings;
+use clarity_repl::analysis::ast_dependency_detector::{ASTDependencyDetector, DependencySet};
+use clarity_repl::clarity::vm::ast::ContractAST;
+use clarity_repl::clarity::vm::diagnostic::Diagnostic;
+use clarity_repl::clarity::vm::types::PrincipalData;
+use clarity_repl::clarity::vm::types::QualifiedContractIdentifier;
+use clarity_repl::clarity::vm::ContractName;
+use clarity_repl::clarity::vm::EvaluationResult;
+use clarity_repl::clarity::vm::ExecutionResult;
+use clarity_repl::repl::Session;
+use clarity_repl::repl::SessionSettings;
 use orchestra_types::StacksNetwork;
 use std::collections::{BTreeMap, HashMap, VecDeque};
 use types::ContractPublishSpecification;

@@ -1,7 +1,7 @@
-#[cfg(feature = "wasm")]
-pub use clarity_repl_wasm as clarity_repl;
 #[cfg(not(feature = "wasm"))]
 pub use clarity_repl;
+#[cfg(feature = "wasm")]
+pub use clarity_repl_wasm as clarity_repl;
 
 extern crate serde;
 

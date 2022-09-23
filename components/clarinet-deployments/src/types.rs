@@ -2,7 +2,7 @@ use clarinet_files::FileLocation;
 use clarity_repl::clarity::vm::analysis::ContractAnalysis;
 use clarity_repl::clarity::vm::ast::ContractAST;
 use clarity_repl::clarity::vm::diagnostic::Diagnostic;
-use clarity_repl::clarity::types::{
+use clarity_repl::clarity::vm::types::{
     PrincipalData, QualifiedContractIdentifier, StandardPrincipalData,
 };
 #[cfg(feature = "wasm")]

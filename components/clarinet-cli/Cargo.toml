@@ -63,6 +63,7 @@ deno_broadcast_channel = "0.58.0"
 hyper = { version = "0.14.18", features = ["server", "stream", "http1", "http2", "runtime"] }
 http = "0.2.6"
 ###
+rsa = "=0.7.0-pre"
 deno_fetch = { version = "0.87.0", optional = true }
 deno_crypto = { version = "0.78.0", optional = true }
 import_map = { version = "=0.12.1", optional = true }

@@ -1,8 +1,3 @@
-use std::convert::TryInto;
-use std::fmt;
-use std::io::{Read, Write};
-use std::ops::Deref;
-use std::ops::DerefMut;
 use crate::impl_byte_array_newtype;
 use clarity::address::AddressHashMode;
 use clarity::address::{
@@ -10,10 +5,7 @@ use clarity::address::{
     C32_ADDRESS_VERSION_TESTNET_MULTISIG, C32_ADDRESS_VERSION_TESTNET_SINGLESIG,
 };
 use clarity::codec::MAX_MESSAGE_LEN;
-use clarity::codec::{
-    read_next, write_next, Error as CodecError, StacksMessageCodec,
-};
-use std::convert::TryFrom;
+use clarity::codec::{read_next, write_next, Error as CodecError, StacksMessageCodec};
 use clarity::stacks_common::types::chainstate::{
     BlockHeaderHash, BurnchainHeaderHash, ConsensusHash, StacksWorkScore, TrieHash,
 };
@@ -34,6 +26,12 @@ use clarity::{
     impl_byte_array_serde,
 };
 use serde::{Deserialize, Serialize};
+use std::convert::TryFrom;
+use std::convert::TryInto;
+use std::fmt;
+use std::io::{Read, Write};
+use std::ops::Deref;
+use std::ops::DerefMut;
 
 pub const MAX_BLOCK_LEN: u32 = 2 * 1024 * 1024;
 pub const MAX_TRANSACTION_LEN: u32 = MAX_BLOCK_LEN;

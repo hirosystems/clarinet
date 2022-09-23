@@ -4,11 +4,11 @@ mod ui;
 
 use bitcoincore_rpc::{Auth, Client};
 
-use clarity_repl::clarity::types::chainstate::StacksAddress;
+use clarity_repl::clarity::stacks_common::types::chainstate::StacksAddress;
 use clarity_repl::clarity::util::secp256k1::{
     MessageSignature, Secp256k1PrivateKey, Secp256k1PublicKey,
 };
-use clarity_repl::clarity::types::StandardPrincipalData;
+use clarity_repl::clarity::vm::types::StandardPrincipalData;
 use clarity_repl::clarity::vm::{ClarityName, EvaluationResult, Value};
 use reqwest::Url;
 pub use ui::start_ui;
@@ -22,18 +22,18 @@ use clarinet_deployments::types::{
 use clarinet_files::{AccountConfig, FileLocation, NetworkManifest, ProjectManifest};
 use clarinet_utils::get_bip39_seed_from_mnemonic;
 
-use clarinet_utils::transactions::{
+use clarity_repl::clarity::codec::StacksMessageCodec;
+use clarity_repl::codec::{
     SinglesigHashMode, SinglesigSpendingCondition, StacksString, StacksTransaction,
     StacksTransactionSigner, TransactionAnchorMode, TransactionAuth, TransactionContractCall,
     TransactionPayload, TransactionPostConditionMode, TransactionPublicKeyEncoding,
     TransactionSmartContract, TransactionSpendingCondition, TransactionVersion,
 };
-use clarity_repl::clarity::codec::StacksMessageCodec;
 
 use clarity_repl::clarity::address::{
     AddressHashMode, C32_ADDRESS_VERSION_MAINNET_SINGLESIG, C32_ADDRESS_VERSION_TESTNET_SINGLESIG,
 };
-use clarity_repl::clarity::types::QualifiedContractIdentifier;
+use clarity_repl::clarity::vm::types::QualifiedContractIdentifier;
 
 use clarity_repl::clarity::vm::ContractName;
 use clarity_repl::repl::Session;
