@@ -962,7 +962,7 @@ dependencies = [
 [[package]]
 name = "clarity"
 version = "0.0.1"
-source = "git+https://github.com/stacks-network/stacks-blockchain.git?branch=chore/update-rusqlite#edf24fe41b75803550d4bbd4c9f97d133d4e5109"
+source = "git+https://github.com/stacks-network/stacks-blockchain.git?rev=f00a50167febe6ab603c1acfaa256632aa83339c#f00a50167febe6ab603c1acfaa256632aa83339c"
 dependencies = [
  "integer-sqrt",
  "lazy_static",
@@ -976,7 +976,7 @@ dependencies = [
  "serde_derive",
  "serde_json",
  "serde_stacker",
- "sha2-asm 0.5.5",
+ "sha2-asm",
  "slog",
  "stacks-common",
  "time 0.2.27",
@@ -5288,7 +5288,6 @@ dependencies = [
  "cfg-if",
  "cpufeatures",
  "digest 0.10.5",
- "sha2-asm 0.6.2",
 ]
 
 [[package]]
@@ -5296,15 +5295,6 @@ name = "sha2-asm"
 version = "0.5.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a7c2f225be6502f2134e6bbb35bb5e2957e41ffa0495ed08bce2e2b4ca885da4"
-dependencies = [
- "cc",
-]
-
-[[package]]
-name = "sha2-asm"
-version = "0.6.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "bf27176fb5d15398e3a479c652c20459d9dac830dedd1fa55b42a77dbcdbfcea"
 dependencies = [
  "cc",
 ]
@@ -5535,7 +5525,7 @@ dependencies = [
 [[package]]
 name = "stacks-common"
 version = "0.0.1"
-source = "git+https://github.com/stacks-network/stacks-blockchain.git?branch=chore/update-rusqlite#edf24fe41b75803550d4bbd4c9f97d133d4e5109"
+source = "git+https://github.com/stacks-network/stacks-blockchain.git?rev=f00a50167febe6ab603c1acfaa256632aa83339c#f00a50167febe6ab603c1acfaa256632aa83339c"
 dependencies = [
  "chrono",
  "curve25519-dalek",
