@@ -1,11 +1,11 @@
 use super::{FileAccessor, FileLocation};
 use bip39::{Language, Mnemonic};
 use clarinet_utils::get_bip39_seed_from_mnemonic;
-use clarity_repl::clarity::address::AddressHashMode;
-use clarity_repl::clarity::stacks_common::types::chainstate::StacksAddress;
-use clarity_repl::clarity::util::hash::bytes_to_hex;
-use clarity_repl::clarity::util::secp256k1::Secp256k1PublicKey;
-use clarity_repl::clarity::vm::types::QualifiedContractIdentifier;
+use crate::clarity_repl::clarity::address::AddressHashMode;
+use crate::clarity_repl::clarity::stacks_common::types::chainstate::StacksAddress;
+use crate::clarity_repl::clarity::util::hash::bytes_to_hex;
+use crate::clarity_repl::clarity::util::secp256k1::Secp256k1PublicKey;
+use crate::clarity_repl::clarity::vm::types::QualifiedContractIdentifier;
 use libsecp256k1::{PublicKey, SecretKey};
 use orchestra_types::{BitcoinNetwork, StacksNetwork};
 use std::collections::BTreeMap;
@@ -349,7 +349,7 @@ impl NetworkManifest {
                 _ => DevnetConfigFile::default(),
             };
 
-            let now = clarity_repl::clarity::util::get_epoch_time_secs();
+            let now = crate::clarity_repl::clarity::util::get_epoch_time_secs();
             let mut dir = std::env::temp_dir();
             dir.push(format!("stacks-devnet-{}/", now));
             let default_working_dir = dir.display().to_string();
@@ -588,9 +588,9 @@ pub fn compute_addresses(
     let public_key = PublicKey::from_secret_key(&secret_key);
     let pub_key = Secp256k1PublicKey::from_slice(&public_key.serialize_compressed()).unwrap();
     let version = if networks.1.is_mainnet() {
-        clarity_repl::clarity::address::C32_ADDRESS_VERSION_MAINNET_SINGLESIG
+        crate::clarity_repl::clarity::address::C32_ADDRESS_VERSION_MAINNET_SINGLESIG
     } else {
-        clarity_repl::clarity::address::C32_ADDRESS_VERSION_TESTNET_SINGLESIG
+        crate::clarity_repl::clarity::address::C32_ADDRESS_VERSION_TESTNET_SINGLESIG
     };
 
     let stx_address = StacksAddress::from_public_keys(
