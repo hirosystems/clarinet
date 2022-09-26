@@ -1158,7 +1158,7 @@ impl Session {
             Ok(value) => value,
             Err(e) => return output.push(red!(format!("{}", e))),
         };
-        output.push(green!(format!("{}", value)));
+        output.push(green!(format!("{}", crate::utils::value_to_string(&value))));
     }
 
     pub fn get_costs(&mut self, output: &mut Vec<String>, cmd: &str) {
@@ -1453,14 +1453,14 @@ mod tests {
         assert_eq!(
             output[0],
             format!(
-                "encode:1:7: {}: expected ':' after key in tuple",
+                "{}: Tuple literal construction expects a colon at index 1",
                 red!("error")
             )
         );
 
         session.encode(&mut output, "::encode (foo 1)");
         assert_eq!(
-            output[4],
+            output[2],
             format!(
                 "encode:1:1: {}: use of unresolved function 'foo'",
                 red!("error")
@@ -1497,7 +1497,7 @@ mod tests {
         assert_eq!(output.len(), 1);
         assert_eq!(
             output[0],
-            red!("Failed to decode clarity value: Deserialization error: Bad type prefix")
+            red!("Failed to decode clarity value: DeserializationError(\"Bad type prefix\")")
         );
 
         session.decode(&mut output, "::decode 4g");
