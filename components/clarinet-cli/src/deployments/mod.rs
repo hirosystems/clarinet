@@ -436,9 +436,7 @@ pub fn apply_on_chain_deployment(
                         .parameters
                         .iter()
                         .map(|value| {
-                            let execution = session
-                                .interpret(value.to_string(), None, None, false, None, None)
-                                .unwrap();
+                            let execution = session.eval(value.to_string(), None, false).unwrap();
                             match execution.result {
                                 EvaluationResult::Snippet(result) => result.result,
                                 _ => unreachable!("Contract result from snippet"),

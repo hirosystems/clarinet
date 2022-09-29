@@ -11,7 +11,13 @@ use super::SessionArtifacts;
 use clarinet_deployments::update_session_with_contracts_executions;
 use clarity_repl::clarity::vm::analysis::contract_interface_builder::build_contract_interface;
 use clarity_repl::clarity::vm::EvaluationResult;
+use clarity_repl::clarity::ClarityVersion;
+use clarity_repl::repl::ClarityCodeSource;
+use clarity_repl::repl::ClarityContract;
+use clarity_repl::repl::ContractDeployer;
 use clarity_repl::repl::Session;
+use clarity_repl::repl::DEFAULT_CLARITY_VERSION;
+use clarity_repl::repl::DEFAULT_EPOCH;
 use clarity_repl::utils;
 use deno_core::error::AnyError;
 use deno_core::located_script_name;
@@ -519,6 +525,7 @@ struct ContractCallArgs {
 struct DeployContractArgs {
     name: String,
     code: String,
+    clarity_version: Option<u8>,
 }
 
 #[derive(Deserialize)]
@@ -566,15 +573,20 @@ fn mine_block(state: &mut OpState, args: MineBlockArgs) -> Result<String, AnyErr
             } else {
                 session.set_tx_sender(tx.sender.clone());
                 if let Some(ref args) = tx.deploy_contract {
+                    let contract = ClarityContract {
+                        code_source: ClarityCodeSource::ContractInMemory(args.code.clone()),
+                        name: args.name.clone(),
+                        deployer: ContractDeployer::Address(tx.sender.clone()),
+                        clarity_version: match args.clarity_version {
+                            Some(version) if version == 1 => ClarityVersion::Clarity1,
+                            Some(version) if version == 2 => ClarityVersion::Clarity2,
+                            _ => DEFAULT_CLARITY_VERSION,
+                        },
+                        epoch: DEFAULT_EPOCH,
+                    };
+
                     let execution = session
-                        .interpret(
-                            args.code.clone(),
-                            Some(args.name.clone()),
-                            None,
-                            false,
-                            Some(name.into()),
-                            None,
-                        )
+                        .deploy_contract(&contract, None, false, Some(name.into()), &mut None)
                         .unwrap(); // TODO(lgalabru)
                     let result = match execution.result {
                         EvaluationResult::Snippet(result) => format!("{}", result.result),
@@ -586,9 +598,7 @@ fn mine_block(state: &mut OpState, args: MineBlockArgs) -> Result<String, AnyErr
                         "(stx-transfer? u{} tx-sender '{})",
                         args.amount, args.recipient
                     );
-                    let execution = session
-                        .interpret(snippet, None, None, false, Some(name.into()), None)
-                        .unwrap(); // TODO(lgalabru)
+                    let execution = session.eval(snippet, None, false).unwrap(); // TODO(lgalabru)
                     let result = match execution.result {
                         EvaluationResult::Snippet(result) => format!("{}", result.result),
                         _ => unreachable!("Contract result from snippet"),
