@@ -1,11 +1,7 @@
-use crate::clarity_repl::clarity::stacks_common::types::StacksEpochId;
-use crate::clarity_repl::clarity::ClarityVersion;
-use crate::clarity_repl::repl::{ClarityCodeSource, ClarityContract, ContractDeployer};
-#[cfg(not(feature = "wasm"))]
-pub use clarity_repl;
+use clarity_repl::clarity::stacks_common::types::StacksEpochId;
+use clarity_repl::clarity::ClarityVersion;
 use clarity_repl::repl::DEFAULT_EPOCH;
-#[cfg(feature = "wasm")]
-pub use clarity_repl_wasm as clarity_repl;
+use clarity_repl::repl::{ClarityCodeSource, ClarityContract, ContractDeployer};
 
 extern crate serde;
 
@@ -22,18 +18,16 @@ use self::types::{
 use clarinet_files::FileAccessor;
 use clarinet_files::{NetworkManifest, ProjectManifest};
 
-use crate::clarity_repl::analysis::ast_dependency_detector::{
-    ASTDependencyDetector, DependencySet,
-};
-use crate::clarity_repl::clarity::vm::ast::ContractAST;
-use crate::clarity_repl::clarity::vm::diagnostic::Diagnostic;
-use crate::clarity_repl::clarity::vm::types::PrincipalData;
-use crate::clarity_repl::clarity::vm::types::QualifiedContractIdentifier;
-use crate::clarity_repl::clarity::vm::ContractName;
-use crate::clarity_repl::clarity::vm::EvaluationResult;
-use crate::clarity_repl::clarity::vm::ExecutionResult;
-use crate::clarity_repl::repl::Session;
-use crate::clarity_repl::repl::SessionSettings;
+use clarity_repl::analysis::ast_dependency_detector::{ASTDependencyDetector, DependencySet};
+use clarity_repl::clarity::vm::ast::ContractAST;
+use clarity_repl::clarity::vm::diagnostic::Diagnostic;
+use clarity_repl::clarity::vm::types::PrincipalData;
+use clarity_repl::clarity::vm::types::QualifiedContractIdentifier;
+use clarity_repl::clarity::vm::ContractName;
+use clarity_repl::clarity::vm::EvaluationResult;
+use clarity_repl::clarity::vm::ExecutionResult;
+use clarity_repl::repl::Session;
+use clarity_repl::repl::SessionSettings;
 use orchestra_types::StacksNetwork;
 use std::collections::{BTreeMap, HashMap, VecDeque};
 use types::ContractPublishSpecification;

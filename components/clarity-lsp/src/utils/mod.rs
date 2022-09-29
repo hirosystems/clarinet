@@ -11,8 +11,6 @@ use clarity_repl::clarity::vm::docs::{
     make_api_reference, make_define_reference, make_keyword_reference,
 };
 use clarity_repl::clarity::vm::types::{BlockInfoProperty, FunctionType};
-#[cfg(feature = "wasm")]
-use clarity_repl_wasm as clarity_repl;
 use lsp_types::Diagnostic as LspDiagnostic;
 use lsp_types::Url;
 use lsp_types::{DiagnosticSeverity, Position, Range};

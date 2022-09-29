@@ -64,8 +64,6 @@ pub struct SessionSettings {
 pub struct Settings {
     pub analysis: analysis::Settings,
     pub costs_version: u32,
-    pub clarity_version: ClarityVersion,
-    pub epoch: StacksEpochId,
 }
 
 impl Default for Settings {
@@ -73,8 +71,6 @@ impl Default for Settings {
         Self {
             analysis: analysis::Settings::default(),
             costs_version: DEFAULT_COSTS_VERSION,
-            clarity_version: ClarityVersion::latest(),
-            epoch: StacksEpochId::Epoch2_05, // TODO(brice): Once 2.1 is live, use `::latest()`
         }
     }
 }
@@ -97,8 +93,6 @@ impl From<SettingsFile> for Settings {
         Self {
             analysis,
             costs_version: file.costs_version.unwrap_or(DEFAULT_COSTS_VERSION),
-            clarity_version: file.clarity_version.unwrap_or(ClarityVersion::latest()),
-            epoch: file.epoch.unwrap_or(StacksEpochId::latest()),
         }
     }
 }

@@ -18,7 +18,6 @@ wasm-bindgen = { version = "0.2", optional = true }
 wasm-bindgen-futures = { version = "0.4", optional = true }
 web-sys = { version = "0.3", features = ["console"], optional = true }
 clarity_repl = { package = "clarity-repl", path = "../clarity-repl", default-features = false, optional = true }
-clarity_repl_wasm = { package = "clarity-repl", version = "=0.33.1", default-features = false, optional = true }
 
 [features]
 default = ["cli"]
@@ -36,7 +35,7 @@ wasm = [
   "web-sys",
   "console_error_panic_hook",
   "clarinet_deployments/wasm",
-  "clarity_repl_wasm/wasm",
+  "clarity_repl/wasm",
   "clarinet_files/wasm",
 ]
 

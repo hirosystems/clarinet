@@ -16,7 +16,7 @@ use clarity::util::retry::BoundReader;
 use clarity::util::secp256k1::{
     MessageSignature, Secp256k1PrivateKey, Secp256k1PublicKey, MESSAGE_SIGNATURE_ENCODED_SIZE,
 };
-use clarity::util::vrf::VRFProof;
+// use clarity::util::vrf::VRFProof;
 use clarity::vm::types::{
     PrincipalData, QualifiedContractIdentifier, StandardPrincipalData, Value,
 };
@@ -2152,7 +2152,7 @@ pub struct StacksMicroblock {
 pub struct StacksBlockHeader {
     pub version: u8,
     pub total_work: StacksWorkScore, // NOTE: this is the work done on the chain tip this block builds on (i.e. take this from the parent)
-    pub proof: VRFProof,
+    pub proof: String,
     pub parent_block: BlockHeaderHash, // NOTE: even though this is also present in the burn chain, we need this here for super-light clients that don't even have burn chain headers
     pub parent_microblock: BlockHeaderHash,
     pub parent_microblock_sequence: u16,
@@ -2184,11 +2184,11 @@ impl StacksMessageCodec for StacksMicroblockHeader {
         let signature: MessageSignature = read_next(fd)?;
 
         // signature must be well-formed
-        let _ = signature
-            .to_secp256k1_recoverable()
-            .ok_or(CodecError::DeserializeError(
-                "Failed to parse signature".to_string(),
-            ))?;
+        // let _ = signature
+        //     .to_secp256k1_recoverable()
+        //     .ok_or(CodecError::DeserializeError(
+        //         "Failed to parse signature".to_string(),
+        //     ))?;
 
         Ok(StacksMicroblockHeader {
             version,

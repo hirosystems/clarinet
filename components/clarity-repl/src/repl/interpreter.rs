@@ -38,6 +38,7 @@ use clarity::vm::{ContractEvaluationResult, EvalHook};
 use clarity::vm::{CostSynthesis, ExecutionResult, ParsedContract};
 
 use super::datastore::StacksConstants;
+use super::{ClarityContract, DEFAULT_EPOCH};
 
 pub const BLOCK_LIMIT_MAINNET: ExecutionCost = ExecutionCost {
     write_length: 15_000_000,
@@ -130,18 +131,17 @@ impl ClarityInterpreter {
 
     pub fn run<'hooks>(
         &mut self,
-        snippet: String,
-        contract_identifier: QualifiedContractIdentifier,
+        contract: &ClarityContract,
         cost_track: bool,
         eval_hooks: Option<Vec<&mut dyn EvalHook>>,
     ) -> Result<ExecutionResult, Vec<Diagnostic>> {
-        let (mut ast, mut diagnostics, success) =
-            self.build_ast(contract_identifier.clone(), snippet.clone());
-        let (annotations, mut annotation_diagnostics) = self.collect_annotations(&ast, &snippet);
+        let (mut ast, mut diagnostics, success) = self.build_ast(contract);
+        let contract_id = contract.expect_resolved_contract_identifier(Some(&self.tx_sender));
+        let (annotations, mut annotation_diagnostics) =
+            self.collect_annotations(&ast, contract.expect_in_memory_code_source());
         diagnostics.append(&mut annotation_diagnostics);
-
         let (analysis, mut analysis_diagnostics) =
-            match self.run_analysis(contract_identifier.clone(), &mut ast, &annotations) {
+            match self.run_analysis(&contract, &mut ast, &annotations) {
                 Ok((analysis, diagnostics)) => (analysis, diagnostics),
                 Err((_, Some(diagnostic), _)) => {
                     diagnostics.push(diagnostic);
@@ -156,14 +156,7 @@ impl ClarityInterpreter {
             return Err(diagnostics);
         }
 
-        let mut result = match self.execute(
-            contract_identifier,
-            &mut ast,
-            snippet,
-            analysis,
-            cost_track,
-            eval_hooks,
-        ) {
+        let mut result = match self.execute(&contract, &mut ast, analysis, cost_track, eval_hooks) {
             Ok(result) => result,
             Err((_, Some(diagnostic), _)) => {
                 diagnostics.push(diagnostic);
@@ -191,16 +184,16 @@ impl ClarityInterpreter {
 
     pub fn run_ast<'a, 'hooks>(
         &'a mut self,
-        mut ast: ContractAST,
-        snippet: String,
-        contract_identifier: QualifiedContractIdentifier,
+        contract: &ClarityContract,
+        ast: &mut ContractAST,
         cost_track: bool,
         eval_hooks: Option<Vec<&mut dyn EvalHook>>,
     ) -> Result<ExecutionResult, Vec<Diagnostic>> {
-        let (annotations, mut diagnostics) = self.collect_annotations(&ast, &snippet);
+        let code_source = contract.expect_in_memory_code_source();
+        let (annotations, mut diagnostics) = self.collect_annotations(&ast, &code_source);
 
         let (analysis, mut analysis_diagnostics) =
-            match self.run_analysis(contract_identifier.clone(), &mut ast, &annotations) {
+            match self.run_analysis(contract, ast, &annotations) {
                 Ok((analysis, diagnostics)) => (analysis, diagnostics),
                 Err((_, Some(diagnostic), _)) => {
                     diagnostics.push(diagnostic);
@@ -210,14 +203,7 @@ impl ClarityInterpreter {
             };
         diagnostics.append(&mut analysis_diagnostics);
 
-        let mut result = match self.execute(
-            contract_identifier,
-            &mut ast,
-            snippet,
-            analysis,
-            cost_track,
-            eval_hooks,
-        ) {
+        let mut result = match self.execute(contract, ast, analysis, cost_track, eval_hooks) {
             Ok(result) => result,
             Err((_, Some(diagnostic), _)) => {
                 diagnostics.push(diagnostic);
@@ -245,11 +231,10 @@ impl ClarityInterpreter {
 
     pub fn detect_dependencies(
         &mut self,
-        contract_id: String,
-        snippet: String,
+        contract: &ClarityContract,
     ) -> Result<Vec<Dependency>, String> {
-        let contract_id = QualifiedContractIdentifier::parse(&contract_id).unwrap();
-        let (ast, _, success) = self.build_ast(contract_id.clone(), snippet.clone());
+        let contract_id = contract.expect_resolved_contract_identifier(Some(&self.tx_sender));
+        let (ast, _, success) = self.build_ast(contract);
         if !success {
             return Err("error parsing source".to_string());
         }
@@ -277,28 +262,27 @@ impl ClarityInterpreter {
         Ok(dependencies)
     }
 
-    pub fn build_ast(
-        &self,
-        contract_identifier: QualifiedContractIdentifier,
-        snippet: String,
-    ) -> (ContractAST, Vec<Diagnostic>, bool) {
+    pub fn build_ast(&self, contract: &ClarityContract) -> (ContractAST, Vec<Diagnostic>, bool) {
+        let source_code = contract.expect_in_memory_code_source();
+        let contract_identifier =
+            contract.expect_resolved_contract_identifier(Some(&self.tx_sender));
         build_ast_with_diagnostics(
             &contract_identifier,
-            &snippet,
+            &source_code,
             &mut (),
-            self.repl_settings.clarity_version,
-            self.repl_settings.epoch,
+            contract.clarity_version.clone(),
+            contract.epoch.clone(),
         )
     }
 
     pub fn collect_annotations(
         &self,
         ast: &ContractAST,
-        snippet: &String,
+        code_source: &str,
     ) -> (Vec<Annotation>, Vec<Diagnostic>) {
         let mut annotations = vec![];
         let mut diagnostics = vec![];
-        let lines = snippet.lines();
+        let lines = code_source.lines();
         for (n, line) in lines.enumerate() {
             if let Some(comment) = line.trim().strip_prefix(";;") {
                 if let Some(annotation_string) = comment.trim().strip_prefix("#[") {
@@ -338,7 +322,7 @@ impl ClarityInterpreter {
 
     pub fn run_analysis(
         &mut self,
-        contract_identifier: QualifiedContractIdentifier,
+        contract: &ClarityContract,
         contract_ast: &mut ContractAST,
         annotations: &Vec<Annotation>,
     ) -> Result<(ContractAnalysis, Vec<Diagnostic>), (String, Option<Diagnostic>, Option<Error>)>
@@ -347,12 +331,12 @@ impl ClarityInterpreter {
 
         // Run standard clarity analyses
         let mut contract_analysis = match clarity::vm::analysis::run_analysis(
-            &contract_identifier,
+            &contract.expect_resolved_contract_identifier(Some(&self.tx_sender)),
             &mut contract_ast.expressions,
             &mut analysis_db,
             false,
             LimitedCostTracker::new_free(),
-            self.repl_settings.clarity_version,
+            contract.clarity_version.clone(),
         ) {
             Ok(res) => res,
             Err((error, cost_tracker)) => {
@@ -379,16 +363,16 @@ impl ClarityInterpreter {
     #[allow(unused_assignments)]
     pub fn save_contract(
         &mut self,
-        contract_identifier: QualifiedContractIdentifier,
+        contract: &ClarityContract,
         contract_ast: &mut ContractAST,
-        snippet: String,
         contract_analysis: ContractAnalysis,
         mainnet: bool,
     ) {
+        let contract_id = contract.expect_resolved_contract_identifier(Some(&self.tx_sender));
         {
             let mut contract_context = ContractContext::new(
-                contract_identifier.clone(),
-                self.repl_settings.clarity_version,
+                contract.expect_resolved_contract_identifier(Some(&self.tx_sender)),
+                contract.clarity_version,
             );
 
             let conn = ClarityDatabase::new(
@@ -403,7 +387,7 @@ impl ClarityInterpreter {
                 clarity::consts::CHAIN_ID_TESTNET,
                 conn,
                 cost_tracker,
-                self.repl_settings.epoch,
+                contract.epoch,
             );
             global_context.begin();
 
@@ -412,15 +396,15 @@ impl ClarityInterpreter {
 
             global_context
                 .database
-                .insert_contract_hash(&contract_identifier, &snippet)
+                .insert_contract_hash(&contract_id, contract.expect_in_memory_code_source())
                 .unwrap();
             let contract = Contract { contract_context };
             global_context
                 .database
-                .insert_contract(&contract_identifier, contract);
+                .insert_contract(&contract_id, contract);
             global_context
                 .database
-                .set_contract_data_size(&contract_identifier, 0)
+                .set_contract_data_size(&contract_id, 0)
                 .unwrap();
             global_context.commit().unwrap();
         };
@@ -428,7 +412,7 @@ impl ClarityInterpreter {
         let mut analysis_db = AnalysisDatabase::new(&mut self.datastore);
         analysis_db.begin();
         analysis_db
-            .insert_contract(&contract_identifier, &contract_analysis)
+            .insert_contract(&contract_id, &contract_analysis)
             .unwrap();
         analysis_db.commit();
     }
@@ -436,22 +420,22 @@ impl ClarityInterpreter {
     #[allow(unused_assignments)]
     pub fn execute<'a, 'hooks>(
         &'a mut self,
-        contract_identifier: QualifiedContractIdentifier,
+        contract: &ClarityContract,
         contract_ast: &mut ContractAST,
-        snippet: String,
         contract_analysis: ContractAnalysis,
         cost_track: bool,
         eval_hooks: Option<Vec<&mut dyn EvalHook>>,
     ) -> Result<ExecutionResult, (String, Option<Diagnostic>, Option<Error>)> {
         let mut cost = None;
+        let contract_identifier =
+            contract.expect_resolved_contract_identifier(Some(&self.tx_sender));
+        let snippet = contract.expect_in_memory_code_source();
         let mut contract_saved = false;
         let mut serialized_events = vec![];
         let mut accounts_to_debit = vec![];
         let mut accounts_to_credit = vec![];
-        let mut contract_context = ContractContext::new(
-            contract_identifier.clone(),
-            self.repl_settings.clarity_version,
-        );
+        let mut contract_context =
+            ContractContext::new(contract_identifier.clone(), contract.clarity_version);
 
         let (eval_result, eval_hooks) = {
             let mut conn = ClarityDatabase::new(
@@ -461,7 +445,7 @@ impl ClarityInterpreter {
             );
             let tx_sender: PrincipalData = self.tx_sender.clone().into();
             conn.begin();
-            conn.set_clarity_epoch_version(self.repl_settings.epoch);
+            conn.set_clarity_epoch_version(contract.epoch);
             conn.commit();
             let cost_tracker = if cost_track {
                 LimitedCostTracker::new(
@@ -469,19 +453,14 @@ impl ClarityInterpreter {
                     CHAIN_ID_TESTNET,
                     BLOCK_LIMIT_MAINNET.clone(),
                     &mut conn,
-                    self.repl_settings.epoch,
+                    contract.epoch,
                 )
                 .expect("failed to initialize cost tracker")
             } else {
                 LimitedCostTracker::new_free()
             };
-            let mut global_context = GlobalContext::new(
-                false,
-                CHAIN_ID_TESTNET,
-                conn,
-                cost_tracker,
-                self.repl_settings.epoch,
-            );
+            let mut global_context =
+                GlobalContext::new(false, CHAIN_ID_TESTNET, conn, cost_tracker, contract.epoch);
 
             if let Some(mut in_hooks) = eval_hooks {
                 let mut hooks: Vec<&mut dyn EvalHook> = Vec::new();
@@ -696,7 +675,7 @@ impl ClarityInterpreter {
                 }
                 let parsed_contract = ParsedContract {
                     contract_identifier: contract_identifier.to_string(),
-                    code: snippet.clone(),
+                    code: snippet.to_string(),
                     function_args: functions,
                     ast: contract_ast.clone(),
                     analysis: contract_analysis.clone(),
@@ -779,7 +758,7 @@ impl ClarityInterpreter {
                 CHAIN_ID_TESTNET,
                 conn,
                 LimitedCostTracker::new_free(),
-                self.repl_settings.epoch,
+                DEFAULT_EPOCH,
             );
             global_context.begin();
             let mut cur_balance = global_context.database.get_stx_balance_snapshot(&recipient);

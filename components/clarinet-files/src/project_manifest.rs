@@ -1,12 +1,12 @@
 use crate::FileAccessor;
 
 use super::FileLocation;
-use crate::clarity_repl::clarity::stacks_common::types::StacksEpochId;
-use crate::clarity_repl::repl;
-use crate::clarity_repl::repl::{
+use clarity_repl::clarity::stacks_common::types::StacksEpochId;
+use clarity_repl::clarity::ClarityVersion;
+use clarity_repl::repl;
+use clarity_repl::repl::{
     ClarityCodeSource, ClarityContract, ContractDeployer, DEFAULT_CLARITY_VERSION, DEFAULT_EPOCH,
 };
-use clarity_repl::clarity::ClarityVersion;
 use std::collections::BTreeMap;
 use std::path::PathBuf;
 use std::str::FromStr;

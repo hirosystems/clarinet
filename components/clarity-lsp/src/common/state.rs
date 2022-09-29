@@ -12,8 +12,6 @@ use clarity_repl::clarity::diagnostic::{Diagnostic as ClarityDiagnostic, Level a
 use clarity_repl::clarity::vm::ast::ContractAST;
 use clarity_repl::clarity::vm::types::QualifiedContractIdentifier;
 use clarity_repl::clarity::vm::EvaluationResult;
-#[cfg(feature = "wasm")]
-use clarity_repl_wasm as clarity_repl;
 use lsp_types::MessageType;
 use orchestra_types::StacksNetwork;
 use std::borrow::BorrowMut;

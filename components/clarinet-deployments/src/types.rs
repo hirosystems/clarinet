@@ -5,8 +5,6 @@ use clarity_repl::clarity::vm::diagnostic::Diagnostic;
 use clarity_repl::clarity::vm::types::{
     PrincipalData, QualifiedContractIdentifier, StandardPrincipalData,
 };
-#[cfg(feature = "wasm")]
-use clarity_repl_wasm as clarity_repl;
 
 use clarity_repl::clarity::{ClarityName, ClarityVersion, ContractName};
 
