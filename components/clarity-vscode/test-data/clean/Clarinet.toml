@@ -1,0 +1,27 @@
+[project]
+name = "test-data"
+authors = []
+description = ""
+telemetry = false
+requirements = []
+cache_dir = "/Users/hugo/Sites/hiro/lab/lsp-web/test-data/./.requirements"
+boot_contracts = ["pox", "costs-v2", "bns"]
+
+[contracts.contract]
+path = "contracts/contract.clar"
+
+[contracts.counter]
+path = "contracts/counter.clar"
+
+[repl]
+costs_version = 2
+parser_version = 2
+
+[repl.analysis]
+passes = ["check_checker"]
+
+[repl.analysis.check_checker]
+strict = false
+trusted_sender = false
+trusted_caller = false
+callee_filter = false

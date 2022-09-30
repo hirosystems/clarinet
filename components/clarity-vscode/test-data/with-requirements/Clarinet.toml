@@ -1,0 +1,21 @@
+[project]
+name = "with-requirements"
+authors = []
+description = ""
+telemetry = false
+boot_contracts = ["pox"]
+
+[[project.requirements]]
+contract_id = "SP2PABAF9FTAJYNFZH93XENAJ8FVY99RRM50D2JG9.nft-trait"
+
+[project.cache_location]
+path = ".requirements"
+[contracts.nft-project]
+path = "contracts/nft-project.clar"
+
+[repl]
+costs_version = 2
+parser_version = 2
+
+[repl.analysis]
+passes = []

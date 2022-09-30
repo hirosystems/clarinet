@@ -1,0 +1,11 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "lib": ["ES2022", "WebWorker"],
+    "module": "commonJS",
+    "rootDir": "src",
+    "sourceMap": true
+  },
+  "include": ["src", "tests"],
+  "exclude": ["node_modules", ".vscode-test-web", "tests"]
+}
