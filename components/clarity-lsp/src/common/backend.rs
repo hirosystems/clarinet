@@ -51,27 +51,18 @@ pub async fn process_notification(
     file_accessor: Option<&Box<dyn FileAccessor>>,
 ) -> Result<LspResponse, String> {
     match command {
-        LspNotification::ManifestOpened(opened_manifest_location) => {
+        LspNotification::ManifestOpened(manifest_location) => {
             // The only reason why we're waiting for this kind of events, is building our initial state
             // if the system is initialized, move on.
-            if editor_state
-                .protocols
-                .contains_key(&opened_manifest_location)
-            {
+            if editor_state.protocols.contains_key(&manifest_location) {
                 return Ok(LspResponse::default());
             }
 
             // With this manifest_location, let's initialize our state.
             let mut protocol_state = ProtocolState::new();
-            match build_state(
-                &opened_manifest_location,
-                &mut protocol_state,
-                file_accessor,
-            )
-            .await
-            {
+            match build_state(&manifest_location, &mut protocol_state, file_accessor).await {
                 Ok(_) => {
-                    editor_state.index_protocol(opened_manifest_location, protocol_state);
+                    editor_state.index_protocol(manifest_location, protocol_state);
                     let (aggregated_diagnostics, notification) =
                         editor_state.get_aggregated_diagnostics();
                     return Ok(LspResponse {

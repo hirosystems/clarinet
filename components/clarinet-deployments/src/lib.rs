@@ -17,7 +17,6 @@ use self::types::{
 };
 use clarinet_files::FileAccessor;
 use clarinet_files::{NetworkManifest, ProjectManifest};
-
 use clarity_repl::analysis::ast_dependency_detector::{ASTDependencyDetector, DependencySet};
 use clarity_repl::clarity::vm::ast::ContractAST;
 use clarity_repl::clarity::vm::diagnostic::Diagnostic;
@@ -461,6 +460,40 @@ pub async fn generate_default_deployment(
 
     let mut contracts = HashMap::new();
     let mut contracts_sources = HashMap::new();
+
+    let base_location = manifest.location.clone().get_parent_location()?;
+
+    let mut sources: HashMap<String, String> = match file_accessor {
+        None => {
+            let mut sources = HashMap::new();
+            for (_, contract_config) in manifest.contracts.iter() {
+                let mut contract_location = base_location.clone();
+                contract_location
+                    .append_path(&contract_config.expect_contract_path_as_str())
+                    .unwrap();
+                let source = contract_location.read_content_as_utf8().unwrap();
+                sources.insert(contract_location.to_string(), source);
+            }
+            sources
+        }
+        Some(file_accessor) => {
+            let contracts_location = manifest
+                .contracts
+                .iter()
+                .map(|(_, contract_config)| {
+                    let mut contract_location = base_location.clone();
+                    contract_location
+                        .append_path(&contract_config.expect_contract_path_as_str())
+                        .unwrap();
+                    contract_location.to_string()
+                })
+                .collect();
+            file_accessor
+                .read_contracts_content(contracts_location)
+                .await?
+        }
+    };
+
     for (name, contract_config) in manifest.contracts.iter() {
         let contract_name = match ContractName::try_from(name.to_string()) {
             Ok(res) => res,
@@ -491,21 +524,11 @@ pub async fn generate_default_deployment(
             }
         };
 
-        let (contract_location, source) = match file_accessor {
-            None => {
-                let mut contract_location = manifest.location.get_project_root_location()?;
-                contract_location.append_path(&contract_config.expect_contract_path_as_str())?;
-                let source = contract_location.read_content_as_utf8()?;
-                (contract_location, source)
-            }
-            Some(file_accessor) => {
-                let mut contract_location = manifest.location.clone().get_parent_location()?;
-                contract_location.append_path(&contract_config.expect_contract_path_as_str())?;
-                file_accessor
-                    .read_contract_content(contract_location.clone())
-                    .await?
-            }
-        };
+        let mut contract_location = base_location.clone();
+        contract_location.append_path(&contract_config.expect_contract_path_as_str())?;
+        let source = sources
+            .remove(&contract_location.to_string())
+            .ok_or(format!("source not found for {}", name))?;
 
         let contract_id = QualifiedContractIdentifier::new(sender.clone(), contract_name.clone());
 
