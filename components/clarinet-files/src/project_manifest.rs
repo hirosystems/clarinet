@@ -114,9 +114,6 @@ impl ProjectManifest {
         if let Some(passes) = project_manifest_file.project.analysis {
             repl_settings.analysis.set_passes(passes);
         }
-        if let Some(costs_version) = project_manifest_file.project.costs_version {
-            repl_settings.costs_version = costs_version;
-        }
 
         let project_name = project_manifest_file.project.name;
         let mut project_root_location = manifest_location.get_parent_location()?;
@@ -140,6 +137,8 @@ impl ProjectManifest {
             telemetry: project_manifest_file.project.telemetry.unwrap_or(false),
             cache_location,
             boot_contracts: project_manifest_file.project.boot_contracts.unwrap_or(vec![
+                "costs".to_string(),
+                "pox".to_string(),
                 "pox-2".to_string(),
                 "lockup".to_string(),
                 "costs-2".to_string(),

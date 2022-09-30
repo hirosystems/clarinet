@@ -63,14 +63,12 @@ pub struct SessionSettings {
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct Settings {
     pub analysis: analysis::Settings,
-    pub costs_version: u32,
 }
 
 impl Default for Settings {
     fn default() -> Self {
         Self {
             analysis: analysis::Settings::default(),
-            costs_version: DEFAULT_COSTS_VERSION,
         }
     }
 }
@@ -90,9 +88,6 @@ impl From<SettingsFile> for Settings {
         } else {
             analysis::Settings::default()
         };
-        Self {
-            analysis,
-            costs_version: file.costs_version.unwrap_or(DEFAULT_COSTS_VERSION),
-        }
+        Self { analysis }
     }
 }

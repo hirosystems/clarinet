@@ -487,8 +487,6 @@ name = "my-project"
 [[project.requirements]]
 contract_id = "SP2PABAF9FTAJYNFZH93XENAJ8FVY99RRM50D2JG9.nft-trait"
 
-boot_contracts = ["pox", "costs-v2", "bns"]
-
 [project.cache_location]
 path = ".requirements"
 

@@ -137,14 +137,23 @@ impl Session {
                 .include_boot_contracts
                 .contains(&name.to_string())
             {
-                self.formatted_interpretation(
-                    code.to_string(),
-                    Some(name.to_string()),
-                    false,
-                    None,
-                    None,
-                )
-                .expect(&format!("Unable to deploy {}", name));
+                let (epoch, clarity_version) = if (*name).eq("pox-2") || (*name).eq("cost-3") {
+                    (StacksEpochId::Epoch21, ClarityVersion::Clarity2)
+                } else if (*name).eq("cost-2") {
+                    (StacksEpochId::Epoch2_05, ClarityVersion::Clarity1)
+                } else {
+                    (StacksEpochId::Epoch20, ClarityVersion::Clarity1)
+                };
+
+                let contract = ClarityContract {
+                    code_source: ClarityCodeSource::ContractInMemory(code.to_string()),
+                    name: name.to_string(),
+                    deployer: ContractDeployer::DefaultDeployer,
+                    clarity_version,
+                    epoch,
+                };
+                let _ = self.deploy_contract(&contract, None, false, None, &mut None);
+                // Result ignored, boot contracts are trusted to be valid
             }
         }
     }
@@ -1229,8 +1238,7 @@ mod tests {
     #[test]
     fn evaluate_at_block() {
         let mut settings = SessionSettings::default();
-        settings.include_boot_contracts = vec!["costs-2".into()];
-        settings.repl_settings.costs_version = 2;
+        settings.include_boot_contracts = vec!["costs".into(), "costs-2".into()];
 
         let mut session = Session::new(settings);
         session.start().expect("session could not start");

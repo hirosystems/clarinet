@@ -8,6 +8,7 @@ pub mod settings;
 pub mod tracer;
 
 use std::convert::TryInto;
+use std::fmt::Display;
 use std::path::PathBuf;
 
 use ::clarity::vm::types::{PrincipalData, QualifiedContractIdentifier, StandardPrincipalData};
@@ -29,6 +30,18 @@ pub struct ClarityContract {
     pub deployer: ContractDeployer,
     pub clarity_version: ClarityVersion,
     pub epoch: StacksEpochId,
+}
+
+impl Display for ClarityContract {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "<Contract contract_id={}, clarity_version={}, epoch={}>",
+            self.expect_resolved_contract_identifier(None),
+            self.clarity_version,
+            self.epoch
+        )
+    }
 }
 
 impl ClarityContract {

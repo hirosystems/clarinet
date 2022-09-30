@@ -1,4 +1,5 @@
-use super::{ClarityBackingStore, ClarityDeserializable};
+use super::ClarityDeserializable;
+use clarity::vm::database::ClarityBackingStore;
 use clarity::types::chainstate::StacksBlockId;
 use clarity_repl::clarity::util::hash::Sha512Trunc256Sum;
 use clarity::vm::errors::InterpreterResult as Result;
