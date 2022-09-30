@@ -16,10 +16,8 @@ use self::types::{
     TransactionPlanSpecification, TransactionsBatchSpecification, WalletSpecification,
 };
 use clarinet_files::FileAccessor;
-use clarinet_files::FileLocation;
 use clarinet_files::{NetworkManifest, ProjectManifest};
 use clarity_repl::analysis::ast_dependency_detector::{ASTDependencyDetector, DependencySet};
-use clarity_repl::clarity::diagnostic::DiagnosableError;
 use clarity_repl::clarity::vm::ast::ContractAST;
 use clarity_repl::clarity::vm::diagnostic::Diagnostic;
 use clarity_repl::clarity::vm::types::PrincipalData;
@@ -465,13 +463,13 @@ pub async fn generate_default_deployment(
 
     let base_location = manifest.location.clone().get_parent_location()?;
 
-    let sources: HashMap<String, String> = match file_accessor {
+    let mut sources: HashMap<String, String> = match file_accessor {
         None => {
             let mut sources = HashMap::new();
             for (_, contract_config) in manifest.contracts.iter() {
                 let mut contract_location = base_location.clone();
                 contract_location
-                    .append_path(&contract_config.path)
+                    .append_path(&contract_config.expect_contract_path_as_str())
                     .unwrap();
                 let source = contract_location.read_content_as_utf8().unwrap();
                 sources.insert(contract_location.to_string(), source);
@@ -485,7 +483,7 @@ pub async fn generate_default_deployment(
                 .map(|(_, contract_config)| {
                     let mut contract_location = base_location.clone();
                     contract_location
-                        .append_path(&contract_config.path)
+                        .append_path(&contract_config.expect_contract_path_as_str())
                         .unwrap();
                     contract_location.to_string()
                 })
@@ -529,9 +527,8 @@ pub async fn generate_default_deployment(
         let mut contract_location = base_location.clone();
         contract_location.append_path(&contract_config.expect_contract_path_as_str())?;
         let source = sources
-            .get(&contract_location.to_string())
-            .ok_or(format!("source not found for {}", name))?
-            .clone();
+            .remove(&contract_location.to_string())
+            .ok_or(format!("source not found for {}", name))?;
 
         let contract_id = QualifiedContractIdentifier::new(sender.clone(), contract_name.clone());
 
