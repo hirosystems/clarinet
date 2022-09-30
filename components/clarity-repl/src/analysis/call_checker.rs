@@ -1,14 +1,14 @@
 use crate::analysis::annotation::Annotation;
 use crate::analysis::ast_visitor::{traverse, ASTVisitor, TypedVar};
 use crate::analysis::{AnalysisPass, AnalysisResult, Settings};
-use crate::clarity::analysis::analysis_db::AnalysisDatabase;
-pub use crate::clarity::analysis::types::ContractAnalysis;
-use crate::clarity::ast::ContractAST;
-use crate::clarity::diagnostic::{DiagnosableError, Diagnostic, Level};
-use crate::clarity::representations::SymbolicExpression;
-use crate::clarity::types::{PrincipalData, QualifiedContractIdentifier, Value};
-use crate::clarity::ClarityName;
-use crate::clarity::SymbolicExpressionType::List;
+use clarity::vm::analysis::analysis_db::AnalysisDatabase;
+pub use clarity::vm::analysis::types::ContractAnalysis;
+use clarity::vm::ast::ContractAST;
+use clarity::vm::diagnostic::{DiagnosableError, Diagnostic, Level};
+use clarity::vm::representations::SymbolicExpression;
+use clarity::vm::types::{PrincipalData, QualifiedContractIdentifier, Value};
+use clarity::vm::ClarityName;
+use clarity::vm::SymbolicExpressionType::List;
 use std::collections::{BTreeSet, HashMap};
 
 pub struct CallChecker<'a> {

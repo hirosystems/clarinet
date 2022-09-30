@@ -10,17 +10,17 @@ use base58::FromBase58;
 use bitcoincore_rpc::bitcoin::blockdata::opcodes;
 use bitcoincore_rpc::bitcoin::blockdata::script::Builder as BitcoinScriptBuilder;
 use bitcoincore_rpc::bitcoin::{Address, PubkeyHash, PublicKey, Script};
-use clarity_repl::clarity::util::hash::{to_hex, hex_bytes, Hash160};
-use std::io::Cursor;
-use clarity_repl::clarity::codec::StacksMessageCodec;
 use chainhook_types::{
     BitcoinChainEvent, BitcoinTransactionData, BlockIdentifier, StacksChainEvent, StacksNetwork,
     StacksTransactionData, StacksTransactionEvent, StacksTransactionKind, TransactionIdentifier,
 };
-use clarity_repl::clarity::types::{SequenceData, Value as ClarityValue, CharType};
+use clarity_repl::clarity::codec::StacksMessageCodec;
+use clarity_repl::clarity::util::hash::{hex_bytes, to_hex, Hash160};
+use clarity_repl::clarity::vm::types::{CharType, SequenceData, Value as ClarityValue};
 use reqwest::{Client, Method};
 use serde::Serialize;
 use std::collections::HashMap;
+use std::io::Cursor;
 use std::iter::Map;
 use std::slice::Iter;
 use std::str::FromStr;
@@ -34,7 +34,7 @@ pub struct StacksTriggerChainhook<'a> {
     pub rollback: Vec<(&'a StacksTransactionData, &'a BlockIdentifier)>,
 }
 
-impl <'a>StacksTriggerChainhook<'a> {
+impl<'a> StacksTriggerChainhook<'a> {
     pub fn should_decode_clarity_value(&self) -> bool {
         self.chainhook.decode_clarity_values.unwrap_or(false)
     }
@@ -208,7 +208,7 @@ pub fn evaluate_stacks_chainhook_on_transaction<'a>(
                 == expected_contract_call.contract_identifier
                 && actual_contract_call.method == expected_contract_call.method
             {
-                return true
+                return true;
             }
         }
         (StacksTransactionKind::ContractCall(_), _)
@@ -223,7 +223,7 @@ pub fn evaluate_stacks_chainhook_on_transaction<'a>(
                         if actual.asset_class_identifier == expected.asset_identifier
                             && expected.actions.contains(&"mint".to_string())
                         {
-                            return true
+                            return true;
                         }
                     }
                     (
@@ -233,7 +233,7 @@ pub fn evaluate_stacks_chainhook_on_transaction<'a>(
                         if actual.asset_class_identifier == expected.asset_identifier
                             && expected.actions.contains(&"transfer".to_string())
                         {
-                            return true
+                            return true;
                         }
                     }
                     (
@@ -243,7 +243,7 @@ pub fn evaluate_stacks_chainhook_on_transaction<'a>(
                         if actual.asset_class_identifier == expected.asset_identifier
                             && expected.actions.contains(&"burn".to_string())
                         {
-                            return true
+                            return true;
                         }
                     }
                     (
@@ -253,7 +253,7 @@ pub fn evaluate_stacks_chainhook_on_transaction<'a>(
                         if actual.asset_class_identifier == expected.asset_identifier
                             && expected.actions.contains(&"mint".to_string())
                         {
-                            return true
+                            return true;
                         }
                     }
                     (
@@ -263,7 +263,7 @@ pub fn evaluate_stacks_chainhook_on_transaction<'a>(
                         if actual.asset_class_identifier == expected.asset_identifier
                             && expected.actions.contains(&"transfer".to_string())
                         {
-                            return true
+                            return true;
                         }
                     }
                     (
@@ -273,7 +273,7 @@ pub fn evaluate_stacks_chainhook_on_transaction<'a>(
                         if actual.asset_class_identifier == expected.asset_identifier
                             && expected.actions.contains(&"burn".to_string())
                         {
-                            return true
+                            return true;
                         }
                     }
                     (
@@ -281,7 +281,7 @@ pub fn evaluate_stacks_chainhook_on_transaction<'a>(
                         StacksHookPredicate::StxEvent(expected),
                     ) => {
                         if expected.actions.contains(&"mint".to_string()) {
-                            return true
+                            return true;
                         }
                     }
                     (
@@ -289,7 +289,7 @@ pub fn evaluate_stacks_chainhook_on_transaction<'a>(
                         StacksHookPredicate::StxEvent(expected),
                     ) => {
                         if expected.actions.contains(&"transfer".to_string()) {
-                            return true
+                            return true;
                         }
                     }
                     (
@@ -297,7 +297,7 @@ pub fn evaluate_stacks_chainhook_on_transaction<'a>(
                         StacksHookPredicate::StxEvent(expected),
                     ) => {
                         if expected.actions.contains(&"lock".to_string()) {
-                            return true
+                            return true;
                         }
                     }
                     (
@@ -305,7 +305,7 @@ pub fn evaluate_stacks_chainhook_on_transaction<'a>(
                         StacksHookPredicate::PrintEvent(expected),
                     ) => {
                         if actual.contract_identifier == expected.contract_identifier {
-                            return true
+                            return true;
                         }
                     }
                     _ => {}
@@ -317,7 +317,7 @@ pub fn evaluate_stacks_chainhook_on_transaction<'a>(
             StacksHookPredicate::StxEvent(expected_stx_event),
         ) => {
             if expected_stx_event.actions.contains(&"transfer".to_string()) {
-                return true
+                return true;
             }
         }
         _ => {}
@@ -525,7 +525,9 @@ pub fn handle_bitcoin_hook_action<'a>(
     }
 }
 
-fn encode_transaction_including_with_clarity_decoding(transaction: &StacksTransactionData) -> serde_json::Value {
+fn encode_transaction_including_with_clarity_decoding(
+    transaction: &StacksTransactionData,
+) -> serde_json::Value {
     json!({
         "transaction_identifier": transaction.transaction_identifier,
         "operations": transaction.operations,
@@ -552,7 +554,9 @@ fn encode_transaction_including_with_clarity_decoding(transaction: &StacksTransa
     })
 }
 
-pub fn serialized_event_with_decoded_clarity_value(event: &StacksTransactionEvent) -> serde_json::Value {
+pub fn serialized_event_with_decoded_clarity_value(
+    event: &StacksTransactionEvent,
+) -> serde_json::Value {
     match event {
         StacksTransactionEvent::STXTransferEvent(payload) => {
             json!({
@@ -585,11 +589,11 @@ pub fn serialized_event_with_decoded_clarity_value(event: &StacksTransactionEven
                     "asset_class_identifier": payload.asset_class_identifier,
                     "asset_identifier": serialized_decoded_clarity_value(&payload.hex_asset_identifier),
                     "sender": payload.sender,
-                    "recipient": payload.recipient,    
+                    "recipient": payload.recipient,
                 }
             })
         }
-        StacksTransactionEvent::NFTMintEvent(payload) => {        
+        StacksTransactionEvent::NFTMintEvent(payload) => {
             json!({
                 "type": "nft_mint_event",
                 "data": {
@@ -646,7 +650,7 @@ pub fn serialized_event_with_decoded_clarity_value(event: &StacksTransactionEven
                     "inserted_key": serialized_decoded_clarity_value(&payload.hex_inserted_key),
                     "inserted_value": serialized_decoded_clarity_value(&payload.hex_inserted_value),
                 }
-            })        
+            })
         }
         StacksTransactionEvent::DataMapUpdateEvent(payload) => {
             json!({
@@ -657,7 +661,7 @@ pub fn serialized_event_with_decoded_clarity_value(event: &StacksTransactionEven
                     "key": serialized_decoded_clarity_value(&payload.hex_key),
                     "new_value": serialized_decoded_clarity_value(&payload.hex_new_value),
                 }
-            })        
+            })
         }
         StacksTransactionEvent::DataMapDeleteEvent(payload) => {
             json!({
@@ -667,7 +671,7 @@ pub fn serialized_event_with_decoded_clarity_value(event: &StacksTransactionEven
                     "map": payload.map,
                     "deleted_key": serialized_decoded_clarity_value(&payload.hex_deleted_key),
                 }
-            })        
+            })
         }
         StacksTransactionEvent::SmartContractEvent(payload) => {
             json!({
@@ -707,7 +711,9 @@ pub fn serialize_to_json(value: &ClarityValue) -> serde_json::Value {
         ClarityValue::UInt(int) => json!(int),
         ClarityValue::Bool(boolean) => json!(boolean),
         ClarityValue::Principal(principal_data) => json!(format!("{}", principal_data)),
-        ClarityValue::Sequence(SequenceData::Buffer(vec_bytes)) => json!(format!("0x{}", &vec_bytes)),
+        ClarityValue::Sequence(SequenceData::Buffer(vec_bytes)) => {
+            json!(format!("0x{}", &vec_bytes))
+        }
         ClarityValue::Sequence(SequenceData::String(CharType::ASCII(string))) => {
             json!(String::from_utf8(string.data.clone()).unwrap())
         }
@@ -721,12 +727,10 @@ pub fn serialize_to_json(value: &ClarityValue) -> serde_json::Value {
                 }
             }
             json!(result)
-        },
-        ClarityValue::Optional(opt_data) => {
-            match &opt_data.data {
-                None => serde_json::Value::Null,
-                Some(value) => serialize_to_json(&*value)
-            }
+        }
+        ClarityValue::Optional(opt_data) => match &opt_data.data {
+            None => serde_json::Value::Null,
+            Some(value) => serialize_to_json(&*value),
         },
         ClarityValue::Response(res_data) => {
             json!({
@@ -735,14 +739,14 @@ pub fn serialize_to_json(value: &ClarityValue) -> serde_json::Value {
                     "value": serialize_to_json(&*res_data.data),
                 }
             })
-        },
+        }
         ClarityValue::Tuple(data) => {
             let mut map = serde_json::Map::new();
             for (name, value) in data.data_map.iter() {
                 map.insert(name.to_string(), serialize_to_json(value));
             }
             json!(map)
-        },
+        }
         ClarityValue::Sequence(SequenceData::List(list_data)) => {
             let mut list = vec![];
             for value in list_data.data.iter() {

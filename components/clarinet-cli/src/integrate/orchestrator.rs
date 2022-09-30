@@ -10,10 +10,10 @@ use bollard::image::CreateImageOptions;
 use bollard::models::{HostConfig, PortBinding};
 use bollard::network::{ConnectNetworkOptions, CreateNetworkOptions, PruneNetworksOptions};
 use bollard::Docker;
+use chainhook_types::StacksNetwork;
 use clarinet_files::{DevnetConfigFile, NetworkManifest, ProjectManifest, DEFAULT_DEVNET_BALANCE};
 use crossterm::terminal::disable_raw_mode;
 use futures::stream::TryStreamExt;
-use chainhook_types::StacksNetwork;
 use std::collections::HashMap;
 use std::fs::{self, File};
 use std::io::Write;
@@ -227,16 +227,17 @@ impl DevnetOrchestrator {
         };
 
         let docker_client = match network_config.devnet {
-            Some(devnet) => {
+            Some(ref devnet) => {
                 let docker_client = match &devnet.docker_host {
                     docker_host if docker_host.starts_with("unix://") => {
-                        Docker::connect_with_unix(path, timeout, client_version)
+                        Docker::connect_with_unix(&docker_host, 120, bollard::API_DEFAULT_VERSION)
                     }
                     _ => Docker::connect_with_socket_defaults(),
                 }
                 .map_err(|e| format!("unable to connect to docker: {:?}", e))?;
+                docker_client
             }
-            None => None,
+            None => unreachable!(),
         };
 
         Ok(DevnetOrchestrator {

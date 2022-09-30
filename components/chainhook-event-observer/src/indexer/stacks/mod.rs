@@ -5,11 +5,11 @@ pub use blocks_pool::StacksBlockPool;
 use crate::indexer::AssetClassCache;
 use crate::indexer::{IndexerConfig, StacksChainContext};
 use bitcoincore_rpc::bitcoin::Block;
-use clarity_repl::clarity::codec::transaction::{TransactionAuth, TransactionPayload};
-use clarity_repl::clarity::codec::{StacksMessageCodec, StacksTransaction};
-use clarity_repl::clarity::types::Value as ClarityValue;
-use clarity_repl::clarity::util::hash::hex_bytes;
 use chainhook_types::*;
+use clarity_repl::clarity::codec::StacksMessageCodec;
+use clarity_repl::clarity::util::hash::hex_bytes;
+use clarity_repl::clarity::vm::types::Value as ClarityValue;
+use clarity_repl::codec::{StacksTransaction, TransactionAuth, TransactionPayload};
 use rocket::serde::json::Value as JsonValue;
 use rocket::serde::Deserialize;
 use std::collections::{hash_map::Entry, BTreeMap, BTreeSet, HashMap, HashSet};
@@ -536,7 +536,9 @@ pub fn get_tx_description(
                 StacksTransactionKind::ContractDeployment(data),
             )
         }
-        TransactionPayload::Coinbase(_) => (format!("coinbase"), StacksTransactionKind::Coinbase),
+        TransactionPayload::Coinbase(_, _) => {
+            (format!("coinbase"), StacksTransactionKind::Coinbase)
+        }
         _ => (format!("other"), StacksTransactionKind::Other),
     };
     Ok((description, tx_type, fee, sender, sponsor))
@@ -622,7 +624,7 @@ pub fn get_standardized_non_fungible_currency_from_asset_class_id(
 }
 
 pub fn get_standardized_stacks_operations(
-    txid: &str,
+    _txid: &str,
     events: &Vec<&NewEvent>,
     asset_class_cache: &mut HashMap<String, AssetClassCache>,
     node_url: &str,
@@ -888,8 +890,7 @@ pub fn get_standardized_stacks_operations(
             let value = match data.amount.parse::<u128>() {
                 Ok(value) => value,
                 Err(e) => {
-                    println!("Unable to parse u64 {:?}", data);
-                    panic!();
+                    panic!("unable to parse u64 {:?}: {:?}", data, e);
                 }
             };
 

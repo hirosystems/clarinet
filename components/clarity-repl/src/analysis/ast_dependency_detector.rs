@@ -1,16 +1,16 @@
 use crate::analysis::annotation::Annotation;
 use crate::analysis::ast_visitor::{traverse, ASTVisitor};
 use crate::analysis::{AnalysisPass, AnalysisResult, Settings};
-use crate::clarity::analysis::analysis_db::AnalysisDatabase;
-pub use crate::clarity::analysis::types::ContractAnalysis;
-use crate::clarity::analysis::{CheckErrors, CheckResult};
-use crate::clarity::ast::ContractAST;
-use crate::clarity::representations::{SymbolicExpression, TraitDefinition};
-use crate::clarity::types::{
+use clarity::vm::analysis::analysis_db::AnalysisDatabase;
+pub use clarity::vm::analysis::types::ContractAnalysis;
+use clarity::vm::analysis::{CheckErrors, CheckResult};
+use clarity::vm::ast::ContractAST;
+use clarity::vm::representations::{SymbolicExpression, TraitDefinition};
+use clarity::vm::types::{
     FixedFunction, FunctionSignature, FunctionType, PrincipalData, QualifiedContractIdentifier,
     TraitIdentifier, TypeSignature, Value,
 };
-use crate::clarity::{ClarityName, SymbolicExpressionType};
+use clarity::vm::{ClarityName, SymbolicExpressionType};
 use std::collections::{BTreeMap, HashMap, HashSet};
 use std::convert::TryFrom;
 use std::hash::{Hash, Hasher};
@@ -245,9 +245,9 @@ impl<'a> ASTDependencyDetector<'a> {
             let mut contracts = vec![];
             for index in deps.iter() {
                 let contract = reverse_lookup[*index];
-                contracts.push(contract.name.as_str());
+                contracts.push(contract.name.to_string());
             }
-            return Err(CheckErrors::CircularContractDependency(contracts.join(", ")).into());
+            return Err(CheckErrors::CircularReference(contracts).into());
         }
 
         Ok(sorted_indexes
@@ -831,18 +831,42 @@ impl GraphWalker {
 mod tests {
     use super::*;
     use crate::repl::session::Session;
-    use crate::repl::SessionSettings;
+    use crate::repl::{
+        ClarityCodeSource, ClarityContract, ContractDeployer, SessionSettings,
+        DEFAULT_CLARITY_VERSION, DEFAULT_EPOCH,
+    };
+    use ::clarity::vm::diagnostic::Diagnostic;
+
+    fn build_ast(
+        session: &Session,
+        snippet: &str,
+        name: Option<&str>,
+    ) -> Result<(QualifiedContractIdentifier, ContractAST, Vec<Diagnostic>), String> {
+        let contract = ClarityContract {
+            code_source: ClarityCodeSource::ContractInMemory(snippet.to_string()),
+            name: name.unwrap_or("contract").to_string(),
+            deployer: ContractDeployer::Transient,
+            clarity_version: DEFAULT_CLARITY_VERSION,
+            epoch: DEFAULT_EPOCH,
+        };
+        let (ast, diags, _) = session.interpreter.build_ast(&contract);
+        Ok((
+            contract.expect_resolved_contract_identifier(None),
+            ast,
+            diags,
+        ))
+    }
 
     #[test]
     fn no_deps() {
-        let mut session = Session::new(SessionSettings::default());
+        let session = Session::new(SessionSettings::default());
         let snippet = "
 (define-public (hello)
     (ok (print \"hello\"))
 )
 "
         .to_string();
-        match session.build_ast(&snippet, None) {
+        match build_ast(&session, &snippet, None) {
             Ok((contract_identifier, ast, _)) => {
                 let mut contracts = HashMap::new();
                 contracts.insert(contract_identifier.clone(), ast);
@@ -857,14 +881,14 @@ mod tests {
 
     #[test]
     fn contract_call() {
-        let mut session = Session::new(SessionSettings::default());
+        let session = Session::new(SessionSettings::default());
         let mut contracts = HashMap::new();
         let snippet1 = "
 (define-public (hello (a int))
     (ok u0)
 )"
         .to_string();
-        let foo = match session.build_ast(&snippet1, Some("foo")) {
+        let foo = match build_ast(&session, &snippet1, Some("foo")) {
             Ok((contract_identifier, ast, _)) => {
                 contracts.insert(contract_identifier.clone(), ast);
                 contract_identifier
@@ -878,7 +902,7 @@ mod tests {
 )
 "
         .to_string();
-        let test_identifier = match session.build_ast(&snippet, Some("test")) {
+        let test_identifier = match build_ast(&session, &snippet, Some("test")) {
             Ok((contract_identifier, ast, _)) => {
                 contracts.insert(contract_identifier.clone(), ast);
                 contract_identifier
@@ -897,14 +921,14 @@ mod tests {
     // whether this will be fixed or documented.
     // #[test]
     fn dynamic_contract_call_local_trait() {
-        let mut session = Session::new(SessionSettings::default());
+        let session = Session::new(SessionSettings::default());
         let mut contracts = HashMap::new();
         let snippet1 = "
 (define-public (hello (a int))
     (ok u0)
 )"
         .to_string();
-        let bar = match session.build_ast(&snippet1, Some("bar")) {
+        let bar = match build_ast(&session, &snippet1, Some("bar")) {
             Ok((contract_identifier, ast, _)) => {
                 contracts.insert(contract_identifier.clone(), ast);
                 contract_identifier
@@ -924,7 +948,7 @@ mod tests {
 )
 "
         .to_string();
-        let test_identifier = match session.build_ast(&snippet, Some("test")) {
+        let test_identifier = match build_ast(&session, &snippet, Some("test")) {
             Ok((contract_identifier, ast, _)) => {
                 contracts.insert(contract_identifier.clone(), ast);
                 contract_identifier
@@ -940,7 +964,7 @@ mod tests {
 
     #[test]
     fn dynamic_contract_call_remote_trait() {
-        let mut session = Session::new(SessionSettings::default());
+        let session = Session::new(SessionSettings::default());
         let mut contracts = HashMap::new();
         let snippet1 = "
 (define-trait my-trait
@@ -950,7 +974,7 @@ mod tests {
     (ok u0)
 )"
         .to_string();
-        let bar = match session.build_ast(&snippet1, Some("bar")) {
+        let bar = match build_ast(&session, &snippet1, Some("bar")) {
             Ok((contract_identifier, ast, _)) => {
                 contracts.insert(contract_identifier.clone(), ast);
                 contract_identifier
@@ -968,7 +992,7 @@ mod tests {
 )
 "
         .to_string();
-        let test_identifier = match session.build_ast(&snippet, Some("test")) {
+        let test_identifier = match build_ast(&session, &snippet, Some("test")) {
             Ok((contract_identifier, ast, _)) => {
                 contracts.insert(contract_identifier.clone(), ast);
                 contract_identifier
@@ -985,14 +1009,14 @@ mod tests {
 
     #[test]
     fn pass_contract_local() {
-        let mut session = Session::new(SessionSettings::default());
+        let session = Session::new(SessionSettings::default());
         let mut contracts = HashMap::new();
         let snippet1 = "
 (define-public (hello (a int))
     (ok u0)
 )"
         .to_string();
-        let bar = match session.build_ast(&snippet1, Some("bar")) {
+        let bar = match build_ast(&session, &snippet1, Some("bar")) {
             Ok((contract_identifier, ast, _)) => {
                 contracts.insert(contract_identifier.clone(), ast);
                 contract_identifier
@@ -1005,7 +1029,7 @@ mod tests {
     ((hello (int) (response uint uint)))
 )"
         .to_string();
-        let my_trait = match session.build_ast(&snippet2, Some("my-trait")) {
+        let my_trait = match build_ast(&session, &snippet2, Some("my-trait")) {
             Ok((contract_identifier, ast, _)) => {
                 contracts.insert(contract_identifier.clone(), ast);
                 contract_identifier
@@ -1023,7 +1047,7 @@ mod tests {
 )
 "
         .to_string();
-        let test_identifier = match session.build_ast(&snippet, Some("test")) {
+        let test_identifier = match build_ast(&session, &snippet, Some("test")) {
             Ok((contract_identifier, ast, _)) => {
                 contracts.insert(contract_identifier.clone(), ast);
                 contract_identifier
@@ -1042,14 +1066,14 @@ mod tests {
 
     #[test]
     fn impl_trait() {
-        let mut session = Session::new(SessionSettings::default());
+        let session = Session::new(SessionSettings::default());
         let mut contracts = HashMap::new();
         let snippet1 = "
 (define-trait something
     ((hello (int) (response uint uint)))
 )"
         .to_string();
-        let other = match session.build_ast(&snippet1, Some("other")) {
+        let other = match build_ast(&session, &snippet1, Some("other")) {
             Ok((contract_identifier, ast, _)) => {
                 contracts.insert(contract_identifier.clone(), ast);
                 contract_identifier
@@ -1064,7 +1088,7 @@ mod tests {
 )
 "
         .to_string();
-        let test_identifier = match session.build_ast(&snippet, Some("test")) {
+        let test_identifier = match build_ast(&session, &snippet, Some("test")) {
             Ok((contract_identifier, ast, _)) => {
                 contracts.insert(contract_identifier.clone(), ast);
                 contract_identifier
@@ -1082,14 +1106,14 @@ mod tests {
 
     #[test]
     fn use_trait() {
-        let mut session = Session::new(SessionSettings::default());
+        let session = Session::new(SessionSettings::default());
         let mut contracts = HashMap::new();
         let snippet1 = "
 (define-trait something
     ((hello (int) (response uint uint)))
 )"
         .to_string();
-        let other = match session.build_ast(&snippet1, Some("other")) {
+        let other = match build_ast(&session, &snippet1, Some("other")) {
             Ok((contract_identifier, ast, _)) => {
                 contracts.insert(contract_identifier.clone(), ast);
                 contract_identifier
@@ -1104,7 +1128,7 @@ mod tests {
 (define-public (foo) (ok true))
 "
         .to_string();
-        let test_identifier = match session.build_ast(&snippet, Some("test")) {
+        let test_identifier = match build_ast(&session, &snippet, Some("test")) {
             Ok((contract_identifier, ast, _)) => {
                 contracts.insert(contract_identifier.clone(), ast);
                 contract_identifier
@@ -1122,7 +1146,7 @@ mod tests {
 
     #[test]
     fn unresolved_contract_call() {
-        let mut session = Session::new(SessionSettings::default());
+        let session = Session::new(SessionSettings::default());
         let mut contracts = HashMap::new();
         let snippet = "
 (define-public (call-foo)
@@ -1130,7 +1154,7 @@ mod tests {
 )
 "
         .to_string();
-        let test_identifier = match session.build_ast(&snippet, Some("test")) {
+        let test_identifier = match build_ast(&session, &snippet, Some("test")) {
             Ok((contract_identifier, ast, _)) => {
                 contracts.insert(contract_identifier.clone(), ast);
                 contract_identifier
@@ -1146,7 +1170,7 @@ mod tests {
 
     #[test]
     fn dynamic_contract_call_unresolved_trait() {
-        let mut session = Session::new(SessionSettings::default());
+        let session = Session::new(SessionSettings::default());
         let mut contracts = HashMap::new();
         let snippet = "
 (use-trait my-trait .bar.my-trait)
@@ -1156,7 +1180,7 @@ mod tests {
 )
 "
         .to_string();
-        let test_identifier = match session.build_ast(&snippet, Some("test")) {
+        let test_identifier = match build_ast(&session, &snippet, Some("test")) {
             Ok((contract_identifier, ast, _)) => {
                 contracts.insert(contract_identifier.clone(), ast);
                 contract_identifier
@@ -1172,14 +1196,14 @@ mod tests {
 
     #[test]
     fn contract_call_top_level() {
-        let mut session = Session::new(SessionSettings::default());
+        let session = Session::new(SessionSettings::default());
         let mut contracts = HashMap::new();
         let snippet1 = "
 (define-public (hello (a int))
     (ok u0)
 )"
         .to_string();
-        let foo = match session.build_ast(&snippet1, Some("foo")) {
+        let foo = match build_ast(&session, &snippet1, Some("foo")) {
             Ok((contract_identifier, ast, _)) => {
                 contracts.insert(contract_identifier.clone(), ast);
                 contract_identifier
@@ -1188,7 +1212,7 @@ mod tests {
         };
 
         let snippet = "(contract-call? .foo hello 4)".to_string();
-        let test_identifier = match session.build_ast(&snippet, Some("test")) {
+        let test_identifier = match build_ast(&session, &snippet, Some("test")) {
             Ok((contract_identifier, ast, _)) => {
                 contracts.insert(contract_identifier.clone(), ast);
                 contract_identifier
@@ -1204,14 +1228,14 @@ mod tests {
 
     #[test]
     fn avoid_bad_type() {
-        let mut session = Session::new(SessionSettings::default());
+        let session = Session::new(SessionSettings::default());
         let mut contracts = HashMap::new();
         let snippet1 = "
 (define-public (hello (a (list principal)))
     (ok u0)
 )"
         .to_string();
-        let foo = match session.build_ast(&snippet1, Some("foo")) {
+        let foo = match build_ast(&session, &snippet1, Some("foo")) {
             Ok((contract_identifier, ast, _)) => {
                 contracts.insert(contract_identifier.clone(), ast);
                 contract_identifier
@@ -1220,7 +1244,7 @@ mod tests {
         };
 
         let snippet = "(contract-call? .foo hello 4)".to_string();
-        let test_identifier = match session.build_ast(&snippet, Some("test")) {
+        let test_identifier = match build_ast(&session, &snippet, Some("test")) {
             Ok((contract_identifier, ast, _)) => {
                 contracts.insert(contract_identifier.clone(), ast);
                 contract_identifier

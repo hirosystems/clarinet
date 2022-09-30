@@ -8,11 +8,11 @@ use crate::indexer::{self, Indexer, IndexerConfig};
 use crate::utils;
 use bitcoincore_rpc::bitcoin::{BlockHash, Txid};
 use bitcoincore_rpc::{Auth, Client, RpcApi};
-use clarity_repl::clarity::util::hash::bytes_to_hex;
 use chainhook_types::{
     BitcoinChainEvent, StacksChainEvent, StacksNetwork, StacksTransactionData,
     TransactionIdentifier,
 };
+use clarity_repl::clarity::util::hash::bytes_to_hex;
 use reqwest::Client as HttpClient;
 use rocket::config::{Config, LogLevel};
 use rocket::http::Status;
@@ -34,6 +34,9 @@ use std::str::FromStr;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc::{Receiver, Sender};
 use std::sync::{Arc, Mutex, RwLock};
+
+use rocket_okapi::{openapi, openapi_get_routes, request::OpenApiFromRequest};
+use schemars::JsonSchema;
 
 pub const DEFAULT_INGESTION_PORT: u16 = 20445;
 pub const DEFAULT_CONTROL_PORT: u16 = 20446;
@@ -270,6 +273,7 @@ pub async fn start_event_observer(
         workers: 3,
         address: IpAddr::V4(Ipv4Addr::new(0, 0, 0, 0)),
         keep_alive: 5,
+        temp_dir: std::env::temp_dir().into(),
         log_level: log_level.clone(),
         ..Config::default()
     };
@@ -304,11 +308,12 @@ pub async fn start_event_observer(
         workers: 1,
         address: IpAddr::V4(Ipv4Addr::new(0, 0, 0, 0)),
         keep_alive: 5,
+        temp_dir: std::env::temp_dir().into(),
         log_level,
         ..Config::default()
     };
 
-    let routes = routes![
+    let routes = openapi_get_routes![
         handle_ping,
         handle_get_hooks,
         handle_create_hook,
@@ -766,6 +771,7 @@ pub async fn start_observer_commands_handler(
     Ok(())
 }
 
+#[openapi(skip)]
 #[rocket::get("/ping", format = "application/json")]
 pub fn handle_ping() -> Json<JsonValue> {
     info!("GET /ping");
@@ -775,6 +781,7 @@ pub fn handle_ping() -> Json<JsonValue> {
     }))
 }
 
+#[openapi(skip)]
 #[post("/new_burn_block", format = "json", data = "<marshalled_block>")]
 pub fn handle_new_bitcoin_block(
     indexer_rw_lock: &State<Arc<RwLock<Indexer>>>,
@@ -811,6 +818,7 @@ pub fn handle_new_bitcoin_block(
     }))
 }
 
+#[openapi(skip)]
 #[post("/new_block", format = "application/json", data = "<marshalled_block>")]
 pub fn handle_new_stacks_block(
     indexer_rw_lock: &State<Arc<RwLock<Indexer>>>,
@@ -852,6 +860,7 @@ pub fn handle_new_stacks_block(
     }))
 }
 
+#[openapi(skip)]
 #[post(
     "/new_microblocks",
     format = "application/json",
@@ -895,6 +904,7 @@ pub fn handle_new_microblocks(
     }))
 }
 
+#[openapi(skip)]
 #[post("/new_mempool_tx", format = "application/json", data = "<raw_txs>")]
 pub fn handle_new_mempool_tx(
     raw_txs: Json<Vec<String>>,
@@ -929,6 +939,7 @@ pub fn handle_new_mempool_tx(
     }))
 }
 
+#[openapi(skip)]
 #[post("/drop_mempool_tx", format = "application/json")]
 pub fn handle_drop_mempool_tx() -> Json<JsonValue> {
     info!("POST /drop_mempool_tx");
@@ -948,6 +959,7 @@ pub fn handle_new_attachement() -> Json<JsonValue> {
     }))
 }
 
+#[openapi(skip)]
 #[post("/", format = "application/json", data = "<bitcoin_rpc_call>")]
 pub async fn handle_bitcoin_rpc_call(
     bitcoin_config: &State<BitcoinConfig>,
@@ -996,6 +1008,7 @@ pub async fn handle_bitcoin_rpc_call(
     }
 }
 
+#[openapi(tag = "Chainhooks")]
 #[get("/v1/chainhooks", format = "application/json")]
 pub fn handle_get_hooks(
     chainhook_store: &State<Arc<RwLock<ChainhookStore>>>,
@@ -1023,6 +1036,7 @@ pub fn handle_get_hooks(
     }
 }
 
+#[openapi(tag = "Chainhooks")]
 #[post("/v1/chainhooks", format = "application/json", data = "<hook>")]
 pub fn handle_create_hook(
     hook: Json<ChainhookSpecification>,
@@ -1045,6 +1059,7 @@ pub fn handle_create_hook(
     }))
 }
 
+#[openapi(tag = "Chainhooks")]
 #[delete("/v1/chainhooks/stacks/<hook_uuid>", format = "application/json")]
 pub fn handle_delete_stacks_hook(
     hook_uuid: String,
@@ -1066,6 +1081,7 @@ pub fn handle_delete_stacks_hook(
     }))
 }
 
+#[openapi(tag = "Chainhooks")]
 #[delete("/v1/chainhooks/bitcoin/<hook_uuid>", format = "application/json")]
 pub fn handle_delete_bitcoin_hook(
     hook_uuid: String,
@@ -1087,7 +1103,7 @@ pub fn handle_delete_bitcoin_hook(
     }))
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash, OpenApiFromRequest)]
 pub struct ApiKey(Option<String>);
 
 #[derive(Debug)]

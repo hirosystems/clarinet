@@ -66,7 +66,7 @@ pub fn start(command_rx: Receiver<DigestingCommand>, config: &Config) {
             }
             while let Ok(new_command) = command_rx.try_recv() {
                 job_queue.push(new_job(new_command));
-            };
+            }
         }
         let command = match command_rx.recv() {
             Ok(command) => command,
@@ -85,25 +85,18 @@ fn new_job(command: DigestingCommand) -> Job {
             priority: JOB_DIGEST_BLOCK_SEED_PRIORITY + block_identifier.index,
             command: DigestingCommand::DigestSeedBlock(block_identifier),
         },
-        DigestingCommand::GarbageCollect => {
-            Job {
-                priority: JOB_LOW_PRIORITY,
-                command: DigestingCommand::GarbageCollect,
-            }
-        }
-        DigestingCommand::Terminate => {
-            Job {
-                priority: JOB_TERMINATION_LOW_PRIORITY,
-                command: DigestingCommand::Terminate,
-            }
-        }
-        DigestingCommand::Kill => {
-            Job {
-                priority: JOB_TERMINATION_HIGH_PRIORITY,
-                command: DigestingCommand::Kill,
-            }
-        }
-
+        DigestingCommand::GarbageCollect => Job {
+            priority: JOB_LOW_PRIORITY,
+            command: DigestingCommand::GarbageCollect,
+        },
+        DigestingCommand::Terminate => Job {
+            priority: JOB_TERMINATION_LOW_PRIORITY,
+            command: DigestingCommand::Terminate,
+        },
+        DigestingCommand::Kill => Job {
+            priority: JOB_TERMINATION_HIGH_PRIORITY,
+            command: DigestingCommand::Kill,
+        },
     }
 }
 

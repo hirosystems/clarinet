@@ -1,11 +1,11 @@
 use crate::indexer::{ChainSegment, ChainSegmentIncompatibility};
 use crate::utils::AbstractBlock;
 use bitcoincore_rpc::bitcoin::Block;
-use clarity_repl::clarity::util::hash::to_hex;
 use chainhook_types::{
     BitcoinBlockData, BitcoinChainEvent, BitcoinChainUpdatedWithBlocksData,
     BitcoinChainUpdatedWithReorgData, BitcoinTransactionData, BlockIdentifier, Chain,
 };
+use clarity_repl::clarity::util::hash::to_hex;
 use std::collections::{hash_map::Entry, BTreeMap, BTreeSet, HashMap, HashSet, VecDeque};
 
 pub struct BitcoinBlockPool {

@@ -11,7 +11,7 @@ pub enum DeveloperUsageEvent {
     NewProject(DeveloperUsageDigest),
     PokeExecuted(DeveloperUsageDigest),
     CheckExecuted(DeveloperUsageDigest),
-    TestSuiteExecuted(DeveloperUsageDigest, bool, u32),
+    TestSuiteExecuted(DeveloperUsageDigest, bool, usize),
     DevnetExecuted(DeveloperUsageDigest),
     ProtocolPublished(DeveloperUsageDigest, StacksNetwork),
     DebugStarted(DeveloperUsageDigest, u32),

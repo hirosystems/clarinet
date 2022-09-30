@@ -3,8 +3,6 @@ use crate::{
     block::DigestingCommand,
     config::{Bare, Config, IndexerConfig, Topology},
 };
-use clap::Parser;
-use ctrlc;
 use chainhook_event_observer::{
     chainhooks::{
         evaluate_stacks_chainhook_on_transaction, handle_stacks_hook_action,
@@ -17,6 +15,8 @@ use chainhook_event_observer::{
     utils::nestable_block_on,
 };
 use chainhook_types::{BlockIdentifier, StacksBlockData, StacksTransactionData};
+use clap::Parser;
+use ctrlc;
 use std::collections::HashSet;
 use std::{collections::HashMap, process, sync::mpsc::channel, thread};
 
@@ -82,7 +82,7 @@ pub fn main() {
         block::digestion::start(digestion_rx, &digestion_config);
         let _ = terminate_observer_command_tx.send(ObserverCommand::Terminate);
     });
-    
+
     let event_observer_config = EventObserverConfig {
         normalization_enabled: true,
         grpc_server_enabled: false,
@@ -178,13 +178,13 @@ pub fn main() {
                                     apply,
                                     rollback: vec![],
                                 };
-    
+
                                 let proofs = HashMap::new();
                                 if let Some(result) = handle_stacks_hook_action(trigger, &proofs) {
                                     if let StacksChainhookOccurrence::Http(request) = result {
                                         nestable_block_on(request.send()).unwrap();
                                     }
-                                }    
+                                }
                             }
                         }
                     }
@@ -198,4 +198,3 @@ pub fn main() {
         }
     }
 }
-

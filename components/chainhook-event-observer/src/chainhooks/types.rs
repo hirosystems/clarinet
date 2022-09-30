@@ -8,7 +8,9 @@ use std::path::PathBuf;
 
 use chainhook_types::{BitcoinNetwork, StacksNetwork};
 
-#[derive(Clone, Debug)]
+use schemars::JsonSchema;
+
+#[derive(Clone, Debug, JsonSchema)]
 pub struct HookFormation {
     pub stacks_chainhooks: Vec<StacksChainhookSpecification>,
     pub bitcoin_chainhooks: Vec<BitcoinChainhookSpecification>,
@@ -80,7 +82,7 @@ impl Serialize for HookFormation {
     }
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum ChainhookSpecification {
     Bitcoin(BitcoinChainhookSpecification),
@@ -103,7 +105,7 @@ impl ChainhookSpecification {
     }
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, JsonSchema)]
 pub struct BitcoinChainhookSpecification {
     pub uuid: String,
     pub name: String,
@@ -119,14 +121,14 @@ pub struct BitcoinChainhookSpecification {
     pub action: HookAction,
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum HookAction {
     Http(HttpHook),
     Noop,
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub struct HttpHook {
     pub url: String,
@@ -134,12 +136,12 @@ pub struct HttpHook {
     pub authorization_header: String,
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, JsonSchema)]
 pub struct ScriptTemplate {
     pub instructions: Vec<ScriptInstruction>,
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum ScriptInstruction {
     Opcode(u8),
@@ -178,7 +180,7 @@ impl ScriptTemplate {
     }
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub struct BitcoinHookPredicate {
     pub scope: Scope,
@@ -192,7 +194,7 @@ impl BitcoinHookPredicate {
     }
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 #[serde(tag = "type", content = "rule")]
 pub enum BitcoinPredicateType {
@@ -204,14 +206,14 @@ pub enum BitcoinPredicateType {
     Script(ScriptTemplate),
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum Scope {
     Inputs,
     Outputs,
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum MatchingRule {
     Equals(String),
@@ -219,7 +221,7 @@ pub enum MatchingRule {
     EndsWith(String),
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, JsonSchema)]
 pub struct StacksChainhookSpecification {
     pub uuid: String,
     pub name: String,
@@ -239,7 +241,7 @@ pub struct StacksChainhookSpecification {
     pub action: HookAction,
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 #[serde(tag = "type", content = "rule")]
 pub enum StacksHookPredicate {
@@ -250,35 +252,35 @@ pub enum StacksHookPredicate {
     StxEvent(StacksStxEventBasedPredicate),
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub struct StacksContractCallBasedPredicate {
     pub contract_identifier: String,
     pub method: String,
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub struct StacksPrintEventBasedPredicate {
     pub contract_identifier: String,
     pub contains: String,
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub struct StacksFtEventBasedPredicate {
     pub asset_identifier: String,
     pub actions: Vec<String>,
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub struct StacksNftEventBasedPredicate {
     pub asset_identifier: String,
     pub actions: Vec<String>,
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub struct StacksStxEventBasedPredicate {
     pub actions: Vec<String>,

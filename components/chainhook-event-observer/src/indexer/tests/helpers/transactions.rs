@@ -3,13 +3,13 @@ use std::collections::HashSet;
 use base58::FromBase58;
 use bitcoincore_rpc::bitcoin::blockdata::opcodes;
 use bitcoincore_rpc::bitcoin::blockdata::script::Builder as BitcoinScriptBuilder;
-use clarity_repl::clarity::util::hash::{hex_bytes, to_hex};
 use chainhook_types::bitcoin::TxOut;
 use chainhook_types::{
     BitcoinTransactionData, BitcoinTransactionMetadata, StacksContractCallData,
     StacksTransactionData, StacksTransactionKind, StacksTransactionMetadata,
     StacksTransactionReceipt, TransactionIdentifier,
 };
+use clarity_repl::clarity::util::hash::{hex_bytes, to_hex};
 
 use super::accounts;
 

@@ -9,19 +9,39 @@ pub extern crate url;
 mod network_manifest;
 mod project_manifest;
 
+#[cfg(feature = "wasm")]
+mod wasm_fs_accessor;
+#[cfg(feature = "wasm")]
+pub use wasm_fs_accessor::WASMFileSystemAccessor;
+
+use chainhook_types::StacksNetwork;
 pub use network_manifest::{
     compute_addresses, AccountConfig, DevnetConfig, DevnetConfigFile, NetworkManifest,
     NetworkManifestFile, PoxStackingOrder, DEFAULT_DERIVATION_PATH,
 };
-use chainhook_types::StacksNetwork;
-pub use project_manifest::{
-    ContractConfig, ProjectManifest, ProjectManifestFile, RequirementConfig,
-};
+pub use project_manifest::{ProjectManifest, ProjectManifestFile, RequirementConfig};
 use serde::ser::{Serialize, SerializeMap, Serializer};
+use std::future::Future;
+use std::pin::Pin;
 use std::{borrow::BorrowMut, path::PathBuf, str::FromStr};
 use url::Url;
 
 pub const DEFAULT_DEVNET_BALANCE: u64 = 100_000_000_000_000;
+
+pub type FileAccessorResult<T> = Pin<Box<dyn Future<Output = Result<T, String>>>>;
+
+pub trait FileAccessor {
+    fn file_exists(&self, location: FileLocation) -> FileAccessorResult<bool>;
+    fn read_manifest_content(
+        &self,
+        manifest_location: FileLocation,
+    ) -> FileAccessorResult<(FileLocation, String)>;
+    fn read_contract_content(
+        &self,
+        contract_location: FileLocation,
+    ) -> FileAccessorResult<(FileLocation, String)>;
+    fn write_file(&self, location: FileLocation, content: &[u8]) -> FileAccessorResult<()>;
+}
 
 #[derive(Deserialize, Debug, Clone, PartialEq, Eq, Hash)]
 #[serde(untagged)]
@@ -118,28 +138,6 @@ impl FileLocation {
         Ok(contract_as_utf8)
     }
 
-    pub fn read_content(&self) -> Result<Vec<u8>, String> {
-        let bytes = match &self {
-            FileLocation::FileSystem { path } => FileLocation::fs_read_content(&path),
-            FileLocation::Url { url } => match url.scheme() {
-                #[cfg(not(feature = "wasm"))]
-                "file" => {
-                    let path = url
-                        .to_file_path()
-                        .map_err(|e| format!("unable to convert url {} to path\n{:?}", url, e))?;
-                    FileLocation::fs_read_content(&path)
-                }
-                "http" | "https" => {
-                    unimplemented!()
-                }
-                _ => {
-                    unimplemented!()
-                }
-            },
-        }?;
-        Ok(bytes)
-    }
-
     fn fs_read_content(path: &PathBuf) -> Result<Vec<u8>, String> {
         use std::fs::File;
         use std::io::{BufReader, Read};
@@ -153,26 +151,8 @@ impl FileLocation {
         Ok(file_buffer)
     }
 
-    pub fn exists(&self) -> bool {
-        match self {
-            FileLocation::FileSystem { path } => FileLocation::fs_exists(path),
-            FileLocation::Url { url: _url } => unimplemented!(),
-        }
-    }
-
     fn fs_exists(path: &PathBuf) -> bool {
         path.exists()
-    }
-
-    fn url_exists(_path: &Url) -> bool {
-        unimplemented!()
-    }
-
-    pub fn write_content(&self, content: &[u8]) -> Result<(), String> {
-        match self {
-            FileLocation::FileSystem { path } => FileLocation::fs_write_content(path, content),
-            FileLocation::Url { url: _url } => unimplemented!(),
-        }
     }
 
     fn fs_write_content(file_path: &PathBuf, content: &[u8]) -> Result<(), String> {
@@ -192,6 +172,43 @@ impl FileLocation {
         file.write_all(content)
             .map_err(|e| format!("unable to write file {}\n{}", file_path.display(), e))?;
         Ok(())
+    }
+
+    pub async fn get_project_manifest_location(
+        &self,
+        file_accessor: Option<&Box<dyn FileAccessor>>,
+    ) -> Result<FileLocation, String> {
+        match file_accessor {
+            None => {
+                let mut project_root_location = self.get_project_root_location()?;
+                project_root_location.append_path("Clarinet.toml")?;
+                Ok(project_root_location)
+            }
+            Some(file_accessor) => {
+                let mut manifest_location = None;
+                let mut parent_location = self.get_parent_location();
+                while let Ok(ref parent) = parent_location {
+                    let mut candidate = parent.clone();
+                    candidate.append_path("Clarinet.toml")?;
+
+                    if let Ok(_) = file_accessor.file_exists(candidate.clone()).await {
+                        manifest_location = Some(candidate);
+                        break;
+                    }
+                    if &parent.get_parent_location().unwrap() == parent {
+                        break;
+                    }
+                    parent_location = parent.get_parent_location();
+                }
+                match manifest_location {
+                    Some(manifest_location) => Ok(manifest_location),
+                    None => Err(format!(
+                        "unable to find manifest location from {}",
+                        self.to_string()
+                    )),
+                }
+            }
+        }
     }
 
     pub fn get_project_root_location(&self) -> Result<FileLocation, String> {
@@ -217,50 +234,31 @@ impl FileLocation {
                     )),
                 }
             }
-            FileLocation::Url { url } => {
-                let mut manifest_found = false;
-
-                while url.path() != "/" {
-                    {
-                        let mut segments = url
-                            .path_segments_mut()
-                            .map_err(|_| format!("unable to mutate url"))?;
-                        segments.pop();
-                        segments.push("Clarinet.toml");
-                    }
-                    if FileLocation::url_exists(url) {
-                        {
-                            let mut segments = url
-                                .path_segments_mut()
-                                .map_err(|_| format!("unable to mutate url"))?;
-                            segments.pop();
-                        }
-                        manifest_found = true;
-                        break;
-                    }
-                    {
-                        let mut segments = url
-                            .path_segments_mut()
-                            .map_err(|_| format!("unable to mutate url"))?;
-                        segments.pop();
-                    }
-                }
-
-                match manifest_found {
-                    true => Ok(project_root_location),
-                    false => Err(format!(
-                        "unable to find root location from {}",
-                        self.to_string()
-                    )),
-                }
+            _ => {
+                unimplemented!();
             }
         }
     }
 
-    pub fn get_project_manifest_location(&self) -> Result<FileLocation, String> {
-        let mut project_root_location = self.get_project_root_location()?;
-        project_root_location.append_path("Clarinet.toml")?;
-        Ok(project_root_location)
+    pub fn get_parent_location(&self) -> Result<FileLocation, String> {
+        let mut parent_location = self.clone();
+        match &mut parent_location {
+            FileLocation::FileSystem { path } => {
+                let mut parent = path.clone();
+                parent.pop();
+                if parent.to_str() == path.to_str() {
+                    return Err(String::from("reached root"));
+                }
+                path.pop();
+            }
+            FileLocation::Url { url } => {
+                let mut segments = url
+                    .path_segments_mut()
+                    .map_err(|_| format!("unable to mutate url"))?;
+                segments.pop();
+            }
+        }
+        Ok(parent_location)
     }
 
     pub fn get_network_manifest_location(
@@ -277,6 +275,14 @@ impl FileLocation {
         Ok(network_manifest_location)
     }
 
+    pub fn get_relative_path_from_base(
+        &self,
+        base_location: &FileLocation,
+    ) -> Result<String, String> {
+        let file = self.to_string();
+        Ok(file[(base_location.to_string().len() + 1)..].to_string())
+    }
+
     pub fn get_relative_location(&self) -> Result<String, String> {
         let base = self
             .get_project_root_location()
@@ -284,13 +290,42 @@ impl FileLocation {
         let file = self.to_string();
         Ok(file[(base.len() + 1)..].to_string())
     }
+}
 
-    pub fn to_string(&self) -> String {
+impl FileLocation {
+    pub fn read_content(&self) -> Result<Vec<u8>, String> {
+        let bytes = match &self {
+            FileLocation::FileSystem { path } => FileLocation::fs_read_content(&path),
+            FileLocation::Url { url } => match url.scheme() {
+                #[cfg(not(feature = "wasm"))]
+                "file" => {
+                    let path = url
+                        .to_file_path()
+                        .map_err(|e| format!("unable to convert url {} to path\n{:?}", url, e))?;
+                    FileLocation::fs_read_content(&path)
+                }
+                "http" | "https" => {
+                    unimplemented!()
+                }
+                _ => {
+                    unimplemented!()
+                }
+            },
+        }?;
+        Ok(bytes)
+    }
+
+    pub fn exists(&self) -> bool {
         match self {
-            FileLocation::FileSystem { path } => {
-                format!("{}", path.display())
-            }
-            FileLocation::Url { url } => url.to_string(),
+            FileLocation::FileSystem { path } => FileLocation::fs_exists(path),
+            FileLocation::Url { url: _url } => unimplemented!(),
+        }
+    }
+
+    pub fn write_content(&self, content: &[u8]) -> Result<(), String> {
+        match self {
+            FileLocation::FileSystem { path } => FileLocation::fs_write_content(path, content),
+            FileLocation::Url { url: _url } => unimplemented!(),
         }
     }
 
@@ -306,6 +341,15 @@ impl FileLocation {
             FileLocation::Url { url } => Ok(url.to_string()),
             #[allow(unreachable_patterns)]
             _ => unreachable!(),
+        }
+    }
+
+    pub fn to_string(&self) -> String {
+        match self {
+            FileLocation::FileSystem { path } => {
+                format!("{}", path.display())
+            }
+            FileLocation::Url { url } => url.to_string(),
         }
     }
 }

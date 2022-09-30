@@ -1,8 +1,8 @@
-use clarity_repl::clarity::util::hash::{hex_bytes, to_hex};
 use chainhook_types::{
     BitcoinBlockData, BitcoinBlockMetadata, BitcoinTransactionData, BitcoinTransactionMetadata,
     BlockIdentifier,
 };
+use clarity_repl::clarity::util::hash::{hex_bytes, to_hex};
 
 pub fn generate_test_bitcoin_block(
     fork_id: u8,

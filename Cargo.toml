@@ -7,9 +7,6 @@ members = [
     "components/clarity-lsp",
     "components/stacks-rpc-client",
     "components/stacks-devnet-js",
-    "vendor/deno/cli/",
-    "vendor/deno/runtime/",
-    "vendor/deno/core/",
     "components/chainhook-types-rs",
     "components/chainhook-event-observer",
     "components/chainhook-db"

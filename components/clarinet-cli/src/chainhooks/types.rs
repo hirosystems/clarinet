@@ -174,6 +174,8 @@ impl ChainhookSpecificationFile {
             version: self.version.unwrap_or(1),
             name: self.name.to_string(),
             network: network.clone(),
+            capture_all_events: None,
+            decode_clarity_values: None,
             start_block: network_spec.start_block,
             end_block: network_spec.end_block,
             expire_after_occurrence: network_spec.expire_after_occurrence,

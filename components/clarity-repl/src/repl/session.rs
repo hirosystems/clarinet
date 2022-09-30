@@ -1,23 +1,29 @@
-use super::{ClarityInterpreter, ExecutionResult};
+use super::boot::{STACKS_BOOT_CODE_MAINNET, STACKS_BOOT_CODE_TESTNET};
+use super::diagnostic::output_diagnostic;
+use super::{
+    ClarityCodeSource, ClarityContract, ClarityInterpreter, ContractDeployer, DEFAULT_EPOCH,
+};
 use crate::analysis::ast_dependency_detector::{ASTDependencyDetector, Dependency};
-use crate::clarity::analysis::ContractAnalysis;
-use crate::clarity::ast::ContractAST;
-use crate::clarity::codec::StacksMessageCodec;
-use crate::clarity::coverage::{CoverageReporter, TestCoverageReport};
-use crate::clarity::docs::{make_api_reference, make_define_reference, make_keyword_reference};
-use crate::clarity::errors::Error;
-use crate::clarity::functions::define::DefineFunctions;
-use crate::clarity::functions::NativeFunctions;
-use crate::clarity::types::{
+use crate::analysis::coverage::{self, TestCoverageReport};
+use crate::repl::settings::InitialContract;
+use ansi_term::{Colour, Style};
+use clarity::codec::StacksMessageCodec;
+use clarity::types::chainstate::StacksAddress;
+use clarity::types::StacksEpochId;
+use clarity::vm::analysis::ContractAnalysis;
+use clarity::vm::ast::ContractAST;
+use clarity::vm::diagnostic::Diagnostic;
+use clarity::vm::docs::{make_api_reference, make_define_reference, make_keyword_reference};
+use clarity::vm::errors::Error;
+use clarity::vm::functions::define::DefineFunctions;
+use clarity::vm::functions::NativeFunctions;
+use clarity::vm::types::{
     PrincipalData, QualifiedContractIdentifier, StandardPrincipalData, Value,
 };
-use crate::clarity::util::StacksAddress;
-use crate::clarity::variables::NativeVariables;
-use crate::clarity::{ContractName, EvalHook};
-use crate::contracts::{BNS_CONTRACT, COSTS_V1_CONTRACT, COSTS_V2_CONTRACT, POX_CONTRACT};
-use crate::repl::CostSynthesis;
-use crate::{clarity::diagnostic::Diagnostic, repl::settings::InitialContract};
-use ansi_term::{Colour, Style};
+use clarity::vm::variables::NativeVariables;
+use clarity::vm::{
+    ClarityVersion, ContractName, CostSynthesis, EvalHook, EvaluationResult, ExecutionResult,
+};
 use std::collections::{BTreeMap, BTreeSet, HashMap, VecDeque};
 use std::convert::TryFrom;
 use std::fmt;
@@ -110,275 +116,76 @@ impl Session {
 
         let boot_testnet_deployer = BOOT_TESTNET_PRINCIPAL.clone();
         self.interpreter.set_tx_sender(boot_testnet_deployer);
-        self.include_boot_contracts();
+        self.include_boot_contracts(false);
 
         let boot_mainnet_deployer = BOOT_MAINNET_PRINCIPAL.clone();
         self.interpreter.set_tx_sender(boot_mainnet_deployer);
-        self.include_boot_contracts();
+        self.include_boot_contracts(true);
         self.interpreter.set_tx_sender(default_tx_sender);
     }
 
-    #[cfg(not(feature = "wasm"))]
-    pub fn start(&mut self) -> Result<(String, Vec<(ContractAnalysis, String, String)>), String> {
-        let mut output_err = Vec::<String>::new();
-        let mut output = Vec::<String>::new();
-        let mut contracts = vec![];
-
-        if !self.settings.include_boot_contracts.is_empty() {
-            self.load_boot_contracts();
-        }
-
-        if self.settings.initial_accounts.len() > 0 {
-            let mut initial_accounts = self.settings.initial_accounts.clone();
-            for account in initial_accounts.drain(..) {
-                let recipient = match PrincipalData::parse(&account.address) {
-                    Ok(recipient) => recipient,
-                    _ => {
-                        output_err.push(red!("Unable to parse address to credit"));
-                        continue;
-                    }
-                };
-
-                match self
-                    .interpreter
-                    .mint_stx_balance(recipient, account.balance)
-                {
-                    Ok(_) => {}
-                    Err(err) => output_err.push(red!(err)),
-                };
-            }
-        }
-
-        if !self.settings.lazy_initial_contracts_interpretation {
-            match self.interpret_initial_contracts() {
-                Ok((ref mut res, ref mut initial_contracts)) => {
-                    if self.is_interactive {
-                        // If the session is interactive (clarinet console, usr/bin/clarity-repl)
-                        // we will display the contracts + genesis asset map.
-                        if !self.settings.initial_contracts.is_empty() {
-                            output.push(blue!("Contracts"));
-                            self.get_contracts(&mut output);
-                        }
-
-                        if self.settings.initial_accounts.len() > 0 {
-                            output.push(blue!("Initialized balances"));
-                            self.get_accounts(&mut output);
-                        }
-                    }
-                    output.append(res);
-                    contracts.append(initial_contracts);
-                }
-                Err(ref mut res) => {
-                    output_err.append(res);
-                }
-            };
-        }
-
-        match output_err.len() {
-            0 => Ok((output.join("\n"), contracts)),
-            _ => Err(output_err.join("\n")),
-        }
-    }
-
-    fn handle_initial_contracts(
-        &mut self,
-    ) -> Result<(Vec<String>, Vec<(ContractAnalysis, String, String)>), Vec<String>> {
-        let mut output_err = vec![];
-        let mut output = vec![];
-
-        let mut contracts = vec![];
-        if self.settings.initial_contracts.len() > 0 {
-            let initial_contracts = self.settings.initial_contracts.clone();
-            let mut initial_contracts_map = HashMap::new();
-            let mut contract_asts = HashMap::new();
-            let default_tx_sender = self.interpreter.get_tx_sender();
-
-            // Parse all contracts and save the ASTs
-            for contract in &initial_contracts {
-                let deployer = {
-                    let address = match contract.deployer {
-                        Some(ref entry) => entry.clone(),
-                        None => format!("{}", StacksAddress::burn_address(false)),
-                    };
-                    PrincipalData::parse_standard_principal(&address)
-                        .expect("Unable to parse deployer's address")
-                };
-
-                self.interpreter.set_tx_sender(deployer);
-
-                match self.build_ast(&contract.code, contract.name.as_deref()) {
-                    Ok((contract_identifier, ast, mut contract_output)) => {
-                        contract_asts.insert(contract_identifier.clone(), ast);
-                        initial_contracts_map.insert(contract_identifier, contract);
-                        output.append(&mut contract_output)
-                    }
-                    Err(mut output) => output_err.append(&mut output),
-                }
-            }
-
-            let dependencies =
-                match ASTDependencyDetector::detect_dependencies(&contract_asts, &self.asts) {
-                    Ok(dependencies) => dependencies,
-                    Err((dependencies, unresolved)) => {
-                        for contract_id in unresolved {
-                            output_err.push(format!(
-                                "{}: unresolved dependency: {}",
-                                red!("error"),
-                                contract_id
-                            ));
-                        }
-                        dependencies
-                    }
-                };
-            match ASTDependencyDetector::order_contracts(&dependencies) {
-                Ok(ordered_contracts) => {
-                    // interpret the contract ASTs in order
-                    for contract_identifier in ordered_contracts {
-                        let contract = initial_contracts_map[contract_identifier];
-                        let ast = contract_asts.remove(contract_identifier).unwrap();
-                        match self.formatted_interpretation_ast(
-                            contract.code.to_string(),
-                            ast,
-                            contract_identifier.clone(),
-                            true,
-                            None,
-                            Some("Deployment".into()),
-                        ) {
-                            Ok((ref mut res_output, result)) => {
-                                output.append(res_output);
-                                if result.contract.is_none() {
-                                    continue;
-                                }
-                                let analysis_result = result.contract.unwrap();
-                                contracts.push((
-                                    analysis_result.4.clone(),
-                                    analysis_result.1.clone(),
-                                    contract.path.clone(),
-                                ))
-                            }
-                            Err(ref mut result) => output_err.append(result),
-                        };
-                    }
-                    self.interpreter.set_tx_sender(default_tx_sender);
-                }
-                Err(e) => {
-                    output_err.push(format!("{}: {}", red!("error"), e));
-                }
-            }
-        }
-        if output_err.len() > 0 {
-            return Err(output_err);
-        }
-        Ok((output, contracts))
-    }
-
-    #[cfg(not(feature = "wasm"))]
-    pub fn interpret_initial_contracts(
-        &mut self,
-    ) -> Result<(Vec<String>, Vec<(ContractAnalysis, String, String)>), Vec<String>> {
-        if self.initial_contracts_analysis.is_empty() {
-            let (output, contracts) = self.handle_initial_contracts()?;
-
-            self.initial_contracts_analysis
-                .append(&mut contracts.clone());
-
-            Ok((output, contracts))
+    pub fn include_boot_contracts(&mut self, mainnet: bool) {
+        let boot_code = if mainnet {
+            *STACKS_BOOT_CODE_MAINNET
         } else {
-            Err(vec!["Initial contracts already interpreted".into()])
-        }
-    }
+            *STACKS_BOOT_CODE_TESTNET
+        };
 
-    pub fn include_boot_contracts(&mut self) {
-        if self
-            .settings
-            .include_boot_contracts
-            .contains(&"pox".to_string())
-        {
-            self.formatted_interpretation(
-                POX_CONTRACT.to_string(),
-                Some("pox".to_string()),
-                false,
-                None,
-                None,
-            )
-            .expect("Unable to deploy POX");
-        }
-        if self
-            .settings
-            .include_boot_contracts
-            .contains(&"bns".to_string())
-        {
-            self.formatted_interpretation(
-                BNS_CONTRACT.to_string(),
-                Some("bns".to_string()),
-                false,
-                None,
-                None,
-            )
-            .expect("Unable to deploy BNS");
-        }
-        if self
-            .settings
-            .include_boot_contracts
-            .contains(&"costs-v1".to_string())
-        {
-            self.formatted_interpretation(
-                COSTS_V1_CONTRACT.to_string(),
-                Some("costs-v1".to_string()),
-                false,
-                None,
-                None,
-            )
-            .expect("Unable to deploy COSTS");
-        }
-        if self
-            .settings
-            .include_boot_contracts
-            .contains(&"costs-v2".to_string())
-        {
-            self.formatted_interpretation(
-                COSTS_V2_CONTRACT.to_string(),
-                Some("costs-v2".to_string()),
-                false,
-                None,
-                None,
-            )
-            .expect("Unable to deploy COSTS");
+        for (name, code) in boot_code.iter() {
+            if self
+                .settings
+                .include_boot_contracts
+                .contains(&name.to_string())
+            {
+                let (epoch, clarity_version) = if (*name).eq("pox-2") || (*name).eq("cost-3") {
+                    (StacksEpochId::Epoch21, ClarityVersion::Clarity2)
+                } else if (*name).eq("cost-2") {
+                    (StacksEpochId::Epoch2_05, ClarityVersion::Clarity1)
+                } else {
+                    (StacksEpochId::Epoch20, ClarityVersion::Clarity1)
+                };
+
+                let contract = ClarityContract {
+                    code_source: ClarityCodeSource::ContractInMemory(code.to_string()),
+                    name: name.to_string(),
+                    deployer: ContractDeployer::DefaultDeployer,
+                    clarity_version,
+                    epoch,
+                };
+                let _ = self.deploy_contract(&contract, None, false, None, &mut None);
+                // Result ignored, boot contracts are trusted to be valid
+            }
         }
     }
 
     pub fn get_boot_contracts_asts(&self) -> BTreeMap<QualifiedContractIdentifier, ContractAST> {
         let mut asts = BTreeMap::new();
-        let (pox_ast, _, _) = self.interpreter.build_ast(
-            QualifiedContractIdentifier::transient(),
-            POX_CONTRACT.to_string(),
-            2,
-        );
-        let (bns_ast, _, _) = self.interpreter.build_ast(
-            QualifiedContractIdentifier::transient(),
-            BNS_CONTRACT.to_string(),
-            2,
-        );
-
-        let bns_contract = ContractName::try_from("bns").unwrap();
-        let pox_contract = ContractName::try_from("pox").unwrap();
-
-        asts.insert(
-            QualifiedContractIdentifier::new(BOOT_TESTNET_PRINCIPAL.clone(), bns_contract.clone()),
-            bns_ast.clone(),
-        );
-        asts.insert(
-            QualifiedContractIdentifier::new(BOOT_MAINNET_PRINCIPAL.clone(), bns_contract),
-            bns_ast,
-        );
-        asts.insert(
-            QualifiedContractIdentifier::new(BOOT_TESTNET_PRINCIPAL.clone(), pox_contract.clone()),
-            pox_ast.clone(),
-        );
-        asts.insert(
-            QualifiedContractIdentifier::new(BOOT_MAINNET_PRINCIPAL.clone(), pox_contract),
-            pox_ast,
-        );
+        let deploy: [(&StandardPrincipalData, [(&str, &str); 9]); 2] = [
+            (&*BOOT_TESTNET_PRINCIPAL, *STACKS_BOOT_CODE_TESTNET),
+            (&*BOOT_MAINNET_PRINCIPAL, *STACKS_BOOT_CODE_MAINNET),
+        ];
+        // for (deployer, boot_code) in deploy.iter() {
+        for contract in deploy.iter() {
+            let deployer = contract.0;
+            let boot_code = contract.1;
+            for (name, code) in boot_code.iter() {
+                if self
+                    .settings
+                    .include_boot_contracts
+                    .contains(&name.to_string())
+                {
+                    let boot_contract = ClarityContract {
+                        code_source: ClarityCodeSource::ContractInMemory(code.to_string()),
+                        deployer: ContractDeployer::Address(deployer.to_address()),
+                        name: name.to_string(),
+                        clarity_version: ClarityVersion::Clarity1,
+                        epoch: StacksEpochId::Epoch20,
+                    };
+                    let (ast, _, _) = self.interpreter.build_ast(&boot_contract);
+                    asts.insert(boot_contract.expect_resolved_contract_identifier(None), ast);
+                }
+            }
+        }
         asts
     }
 
@@ -393,13 +200,13 @@ impl Session {
                 PrincipalData::parse_standard_principal(&BOOT_TESTNET_ADDRESS)
                     .expect("Unable to parse deployer's address");
             self.interpreter.set_tx_sender(boot_testnet_deployer);
-            self.include_boot_contracts();
+            self.include_boot_contracts(false);
 
             let boot_mainnet_deployer =
                 PrincipalData::parse_standard_principal(&BOOT_MAINNET_ADDRESS)
                     .expect("Unable to parse deployer's address");
             self.interpreter.set_tx_sender(boot_mainnet_deployer);
-            self.include_boot_contracts();
+            self.include_boot_contracts(true);
 
             self.interpreter.set_tx_sender(default_tx_sender);
         }
@@ -442,8 +249,6 @@ impl Session {
             #[cfg(feature = "cli")]
             cmd if cmd.starts_with("::trace") => self.trace(&mut output, cmd),
             #[cfg(feature = "cli")]
-            cmd if cmd.starts_with("::reload") => self.reload(&mut output),
-            #[cfg(feature = "cli")]
             cmd if cmd.starts_with("::read") => self.read(&mut output, cmd),
 
             snippet => self.run_snippet(&mut output, self.show_costs, snippet),
@@ -462,10 +267,13 @@ impl Session {
             None,
         ) {
             Ok((mut output, result)) => {
-                if let Some((ref contract_name, _, _, _, _)) = result.contract {
-                    let snippet = format!("→ .{} contract successfully stored. Use (contract-call? ...) for invoking the public functions:", contract_name.clone());
-                    output.push(green!(snippet));
-                }
+                match result.result {
+                    EvaluationResult::Contract(contract_result) => {
+                        let snippet = format!("→ .{} contract successfully stored. Use (contract-call? ...) for invoking the public functions:", contract_result.contract.contract_identifier.clone());
+                        output.push(green!(snippet));
+                    }
+                    _ => (),
+                };
                 (output, result.cost.clone())
             }
             Err(output) => (output, None),
@@ -509,24 +317,17 @@ impl Session {
         output.append(&mut result);
     }
 
-    pub fn formatted_interpretation(
-        &mut self,
+    pub fn formatted_interpretation<'a, 'hooks>(
+        &'a mut self,
         snippet: String,
         name: Option<String>,
         cost_track: bool,
-        eval_hooks: Option<Vec<Box<dyn EvalHook>>>,
+        eval_hooks: Option<Vec<&mut dyn EvalHook>>,
         test_name: Option<String>,
     ) -> Result<(Vec<String>, ExecutionResult), Vec<String>> {
         let light_red = Colour::Red.bold();
 
-        let result = self.interpret(
-            snippet.to_string(),
-            name.clone(),
-            eval_hooks,
-            cost_track,
-            test_name,
-            None,
-        );
+        let result = self.eval(snippet.to_string(), eval_hooks, cost_track);
         let mut output = Vec::<String>::new();
         let lines = snippet.lines();
         let formatted_lines: Vec<String> = lines.map(|l| l.to_string()).collect();
@@ -535,7 +336,11 @@ impl Session {
         match result {
             Ok(result) => {
                 for diagnostic in &result.diagnostics {
-                    output.append(&mut diagnostic.output(&contract_name, &formatted_lines));
+                    output.append(&mut output_diagnostic(
+                        diagnostic,
+                        &contract_name,
+                        &formatted_lines,
+                    ));
                 }
                 if result.events.len() > 0 {
                     output.push(black!("Events emitted"));
@@ -543,14 +348,21 @@ impl Session {
                         output.push(black!(format!("{}", event)));
                     }
                 }
-                if let Some(ref result) = result.result {
-                    output.push(green!(format!("{}", result)));
+                match &result.result {
+                    EvaluationResult::Contract(contract_result) => {
+                        if let Some(value) = &contract_result.result {
+                            output.push(green!(format!("{}", value)));
+                        }
+                    }
+                    EvaluationResult::Snippet(snippet_result) => {
+                        output.push(green!(format!("{}", snippet_result.result)))
+                    }
                 }
                 Ok((output, result))
             }
             Err(diagnostics) => {
                 for d in diagnostics {
-                    output.append(&mut d.output(&contract_name, &formatted_lines));
+                    output.append(&mut output_diagnostic(&d, &contract_name, &formatted_lines));
                 }
                 Err(output)
             }
@@ -559,27 +371,30 @@ impl Session {
 
     #[cfg(feature = "cli")]
     pub fn debug(&mut self, output: &mut Vec<String>, cmd: &str) {
-        use crate::clarity::debug::cli::CLIDebugger;
+        use crate::repl::debug::cli::CLIDebugger;
 
         let snippet = match cmd.split_once(" ") {
             Some((_, snippet)) => snippet,
             _ => return output.push(red!("Usage: ::debug <expr>")),
         };
 
-        let debugger = CLIDebugger::new(&QualifiedContractIdentifier::transient(), snippet);
+        let mut debugger = CLIDebugger::new(&QualifiedContractIdentifier::transient(), snippet);
 
         let mut result = match self.formatted_interpretation(
             snippet.to_string(),
             None,
             true,
-            Some(vec![Box::new(debugger)]),
+            Some(vec![&mut debugger]),
             None,
         ) {
             Ok((mut output, result)) => {
-                if let Some((ref contract_name, _, _, _, _)) = result.contract {
-                    let snippet = format!("→ .{} contract successfully stored. Use (contract-call? ...) for invoking the public functions:", contract_name.clone());
-                    output.push(green!(snippet));
-                }
+                match result.result {
+                    EvaluationResult::Contract(contract_result) => {
+                        let snippet = format!("→ .{} contract successfully stored. Use (contract-call? ...) for invoking the public functions:", contract_result.contract.contract_identifier.clone());
+                        output.push(green!(snippet));
+                    }
+                    _ => (),
+                };
                 output
             }
             Err(result) => result,
@@ -596,70 +411,54 @@ impl Session {
             _ => return output.push(red!("Usage: ::trace <expr>")),
         };
 
-        let tracer = Tracer::new(snippet.to_string());
+        let mut tracer = Tracer::new(snippet.to_string());
 
-        match self.interpret(
-            snippet.to_string(),
-            None,
-            Some(vec![Box::new(tracer)]),
-            false,
-            None,
-            None,
-        ) {
+        match self.eval(snippet.to_string(), Some(vec![&mut tracer]), false) {
             Ok(_) => (),
             Err(diagnostics) => {
                 let lines = snippet.lines();
                 let formatted_lines: Vec<String> = lines.map(|l| l.to_string()).collect();
                 for d in diagnostics {
-                    output.append(&mut d.output("<snippet>", &formatted_lines));
+                    output.append(&mut output_diagnostic(&d, "<snippet>", &formatted_lines));
                 }
             }
         };
     }
 
     #[cfg(feature = "cli")]
-    fn reload(&mut self, output: &mut Vec<String>) {
-        self.asts.clear();
-        self.contracts.clear();
-        self.costs_reports.clear();
-        self.coverage_reports.clear();
-        self.initial_contracts_analysis.clear();
-        self.interpreter = ClarityInterpreter::new(
-            self.interpreter.get_tx_sender(),
-            self.settings.repl_settings.clone(),
-        );
-        let contracts = std::mem::take(&mut self.settings.initial_contracts);
+    pub fn start(&mut self) -> Result<(String, Vec<(ContractAnalysis, String, String)>), String> {
+        let mut output_err = Vec::<String>::new();
+        let output = Vec::<String>::new();
+        let contracts = vec![];
 
-        for existing in contracts {
-            let reloaded = match fs::read_to_string(&existing.path) {
-                Ok(code) => code,
-                Err(err) => {
-                    println!(
-                        "{}: Unable to read {}: {}",
-                        red!("error"),
-                        existing.path,
-                        err
-                    );
-                    std::process::exit(1);
-                }
-            };
-
-            self.settings.initial_contracts.push(InitialContract {
-                code: reloaded,
-                path: existing.path,
-                name: existing.name,
-                deployer: existing.deployer,
-            });
+        if !self.settings.include_boot_contracts.is_empty() {
+            self.load_boot_contracts();
         }
 
-        match self.start() {
-            Ok(_) => {
-                self.get_contracts(output);
-                output.push("Ok, contracts reloaded.".to_string());
+        if self.settings.initial_accounts.len() > 0 {
+            let mut initial_accounts = self.settings.initial_accounts.clone();
+            for account in initial_accounts.drain(..) {
+                let recipient = match PrincipalData::parse(&account.address) {
+                    Ok(recipient) => recipient,
+                    _ => {
+                        output_err.push(red!("Unable to parse address to credit"));
+                        continue;
+                    }
+                };
+
+                match self
+                    .interpreter
+                    .mint_stx_balance(recipient, account.balance)
+                {
+                    Ok(_) => {}
+                    Err(err) => output_err.push(red!(err)),
+                };
             }
-            Err(e) => {
-                println!("{}", e);
-            }
+        }
+
+        match output_err.len() {
+            0 => Ok((output.join("\n"), contracts)),
+            _ => Err(output_err.join("\n")),
         }
     }
 
@@ -678,52 +477,59 @@ impl Session {
         self.run_snippet(output, self.show_costs, &snippet.to_string());
     }
 
-    pub fn formatted_interpretation_ast(
+    pub fn deploy_contract(
         &mut self,
-        snippet: String,
-        ast: ContractAST,
-        contract_identifier: QualifiedContractIdentifier,
+        contract: &ClarityContract,
+        eval_hooks: Option<Vec<&mut dyn EvalHook>>,
         cost_track: bool,
-        eval_hooks: Option<Vec<Box<dyn EvalHook>>>,
         test_name: Option<String>,
-    ) -> Result<(Vec<String>, ExecutionResult), Vec<String>> {
-        let light_red = Colour::Red.bold();
+        ast: &mut Option<ContractAST>,
+    ) -> Result<ExecutionResult, Vec<Diagnostic>> {
+        let mut hooks: Vec<&mut dyn EvalHook> = Vec::new();
+        let mut coverage = if let Some(test_name) = test_name {
+            Some(TestCoverageReport::new(test_name.into()))
+        } else {
+            None
+        };
+        if let Some(coverage) = &mut coverage {
+            hooks.push(coverage);
+        };
 
-        let result = self.interpret_ast(
-            &contract_identifier,
-            ast,
-            snippet.to_string(),
-            eval_hooks,
-            cost_track,
-            test_name,
-        );
-        let mut output = Vec::<String>::new();
-        let lines = snippet.lines();
-        let formatted_lines: Vec<String> = lines.map(|l| l.to_string()).collect();
-        let contract_name = contract_identifier.name.to_string();
+        if let Some(mut in_hooks) = eval_hooks {
+            for hook in in_hooks.drain(..) {
+                hooks.push(hook);
+            }
+        }
+
+        let contract_id =
+            contract.expect_resolved_contract_identifier(Some(&self.interpreter.get_tx_sender()));
+
+        let result = if let Some(mut ast) = ast.take() {
+            self.interpreter
+                .run_ast(contract, &mut ast, cost_track, Some(hooks))
+        } else {
+            self.interpreter.run(contract, cost_track, Some(hooks))
+        };
 
         match result {
             Ok(result) => {
-                for diagnostic in &result.diagnostics {
-                    output.append(&mut diagnostic.output(&contract_name, &formatted_lines));
+                if let Some(ref coverage) = coverage {
+                    self.coverage_reports.push(coverage.clone());
                 }
-                if result.events.len() > 0 {
-                    output.push(black!("Events emitted"));
-                    for event in result.events.iter() {
-                        output.push(black!(format!("{}", event)));
+                match &result.result {
+                    EvaluationResult::Contract(contract_result) => {
+                        self.asts
+                            .insert(contract_id.clone(), contract_result.contract.ast.clone());
+                        self.contracts.insert(
+                            contract_id.to_string(),
+                            contract_result.contract.function_args.clone(),
+                        );
                     }
-                }
-                if let Some(ref result) = result.result {
-                    output.push(green!(format!("{}", result)));
-                }
-                Ok((output, result))
+                    _ => (),
+                };
+                Ok(result)
             }
-            Err(diagnostics) => {
-                for d in diagnostics {
-                    output.append(&mut d.output(&contract_name, &formatted_lines));
-                }
-                Err(output)
-            }
+            Err(res) => Err(res),
         }
     }
 
@@ -744,16 +550,37 @@ impl Session {
             format!("{}.{}", initial_tx_sender, contract,)
         };
 
-        let snippet = format!(
+        let mut hooks: Vec<&mut dyn EvalHook> = vec![];
+        let mut coverage = TestCoverageReport::new(test_name.clone());
+        hooks.push(&mut coverage);
+
+        let contract_call = format!(
             "(contract-call? '{} {} {})",
             contract_id,
             method,
             args.join(" ")
         );
+        let contract_call = ClarityContract {
+            code_source: ClarityCodeSource::ContractInMemory(contract_call),
+            name: "contract-call".to_string(),
+            deployer: ContractDeployer::Address(sender.to_string()),
+            epoch: StacksEpochId::Epoch20,
+            clarity_version: ClarityVersion::Clarity1,
+        };
 
         self.set_tx_sender(sender.into());
-        let result = self.interpret(snippet, None, None, true, Some(test_name.clone()), None)?;
-        if let Some(ref cost) = result.cost {
+        let execution = match self.interpreter.run(&contract_call, true, Some(hooks)) {
+            Ok(result) => result,
+            Err(e) => {
+                self.set_tx_sender(initial_tx_sender);
+                return Err(e);
+            }
+        };
+        self.set_tx_sender(initial_tx_sender);
+        // if let Some(coverage) = result.coverage.take() {
+        //     self.coverage_reports.push(coverage);
+        // }
+        if let Some(ref cost) = execution.cost {
             self.costs_reports.push(CostsReport {
                 test_name,
                 contract_id,
@@ -762,151 +589,76 @@ impl Session {
                 cost_result: cost.clone(),
             });
         }
-        self.set_tx_sender(initial_tx_sender);
-        Ok(result)
+        Ok(execution)
     }
 
-    pub fn build_ast(
-        &mut self,
-        snippet: &str,
-        name: Option<&str>,
-    ) -> Result<(QualifiedContractIdentifier, ContractAST, Vec<String>), Vec<String>> {
-        let (contract_name, is_tx) = match name {
-            Some(name) => (name.to_string(), false),
-            None => (format!("contract-{}", self.contracts.len()), true),
-        };
-        let tx_sender = self.interpreter.get_tx_sender().to_address();
-        let id = format!("{}.{}", tx_sender, contract_name);
-        let contract_identifier = QualifiedContractIdentifier::parse(&id).unwrap();
+    // pub fn build_ast(
+    //     &mut self,
+    //     snippet: &str,
+    //     name: Option<&str>,
+    // ) -> Result<(QualifiedContractIdentifier, ContractAST, Vec<String>), Vec<String>> {
+    //     let (contract_name, is_tx) = match name {
+    //         Some(name) => (name.to_string(), false),
+    //         None => (format!("contract-{}", self.contracts.len()), true),
+    //     };
+    //     let tx_sender = self.interpreter.get_tx_sender().to_address();
+    //     let id = format!("{}.{}", tx_sender, contract_name);
+    //     let contract_identifier = QualifiedContractIdentifier::parse(&id).unwrap();
 
-        let (ast, diagnostics, success) = self.interpreter.build_ast(
-            contract_identifier.clone(),
-            snippet.to_string(),
-            self.settings.repl_settings.parser_version,
-        );
+    //     let (ast, diagnostics, success) = self
+    //         .interpreter
+    //         .build_ast(contract_identifier.clone(), snippet.to_string());
 
-        let mut output = Vec::<String>::new();
-        let lines = snippet.lines();
-        let formatted_lines: Vec<String> = lines.map(|l| l.to_string()).collect();
-        for diagnostic in &diagnostics {
-            output.append(&mut diagnostic.output(&contract_name, &formatted_lines));
-        }
-        if success {
-            Ok((contract_identifier, ast, output))
-        } else {
-            Err(output)
-        }
-    }
+    //     let mut output = Vec::<String>::new();
+    //     let lines = snippet.lines();
+    //     let formatted_lines: Vec<String> = lines.map(|l| l.to_string()).collect();
+    //     for diagnostic in &diagnostics {
+    //         output.append(&mut output_diagnostic(
+    //             &diagnostic,
+    //             &contract_name,
+    //             &formatted_lines,
+    //         ));
+    //     }
+    //     if success {
+    //         Ok((contract_identifier, ast, output))
+    //     } else {
+    //         Err(output)
+    //     }
+    // }
 
-    pub fn interpret_ast(
-        &mut self,
-        contract_identifier: &QualifiedContractIdentifier,
-        ast: ContractAST,
+    pub fn eval<'a>(
+        &'a mut self,
         snippet: String,
-        mut eval_hooks: Option<Vec<Box<dyn EvalHook>>>,
+        eval_hooks: Option<Vec<&mut dyn EvalHook>>,
         cost_track: bool,
-        test_name: Option<String>,
     ) -> Result<ExecutionResult, Vec<Diagnostic>> {
-        if let Some(test_name) = test_name {
-            let coverage = TestCoverageReport::new(test_name.into());
-            if let Some(hooks) = &mut eval_hooks {
-                hooks.push(Box::new(coverage));
-            } else {
-                eval_hooks = Some(vec![Box::new(coverage)]);
-            };
-        }
-        match self.interpreter.run_ast(
-            ast,
-            snippet,
-            contract_identifier.clone(),
-            cost_track,
-            eval_hooks,
-        ) {
-            Ok(result) => {
-                if let Some(ref coverage) = result.coverage {
-                    self.coverage_reports.push(coverage.clone());
-                }
-                if let Some((
-                    ref contract_identifier_str,
-                    ref source,
-                    ref contract,
-                    ref ast,
-                    ref analysis,
-                )) = result.contract
-                {
-                    self.asts.insert(contract_identifier.clone(), ast.clone());
-                    self.contracts
-                        .insert(contract_identifier_str.clone(), contract.clone());
-                }
-                Ok(result)
-            }
-            Err(res) => Err(res),
-        }
-    }
-
-    pub fn interpret(
-        &mut self,
-        snippet: String,
-        name: Option<String>,
-        mut eval_hooks: Option<Vec<Box<dyn EvalHook>>>,
-        cost_track: bool,
-        test_name: Option<String>,
-        ast: Option<&ContractAST>,
-    ) -> Result<ExecutionResult, Vec<Diagnostic>> {
-        let (contract_name, is_tx) = match name {
-            Some(name) => (name, false),
-            None => (format!("contract-{}", self.contracts.len()), true),
+        let contract = ClarityContract {
+            code_source: ClarityCodeSource::ContractInMemory(snippet),
+            name: format!("contract-{}", self.contracts.len()),
+            deployer: ContractDeployer::DefaultDeployer,
+            clarity_version: ClarityVersion::default_for_epoch(DEFAULT_EPOCH),
+            epoch: DEFAULT_EPOCH,
         };
-        let first_char = contract_name.chars().next().unwrap();
+        let contract_identifier =
+            contract.expect_resolved_contract_identifier(Some(&self.interpreter.get_tx_sender()));
 
-        if let Some(test_name) = test_name {
-            let coverage = TestCoverageReport::new(test_name.into());
-            if let Some(hooks) = &mut eval_hooks {
-                hooks.push(Box::new(coverage));
-            } else {
-                eval_hooks = Some(vec![Box::new(coverage)]);
-            };
-        }
-
-        // Kludge for handling fully qualified contract_id vs sugared syntax
-        let contract_identifier = if first_char.to_string() == "S" {
-            QualifiedContractIdentifier::parse(&contract_name).unwrap()
-        } else {
-            let tx_sender = self.interpreter.get_tx_sender().to_address();
-            let id = format!("{}.{}", tx_sender, contract_name);
-            QualifiedContractIdentifier::parse(&id).unwrap()
-        };
-
-        let result = if let Some(ast) = ast {
-            self.interpreter.run_ast(
-                ast.clone(),
-                snippet,
-                contract_identifier.clone(),
-                cost_track,
-                eval_hooks,
-            )
-        } else {
-            self.interpreter
-                .run(snippet, contract_identifier.clone(), cost_track, eval_hooks)
-        };
+        let result = self.interpreter.run(&contract, cost_track, Some(vec![]));
 
         match result {
             Ok(result) => {
-                if let Some(ref coverage) = result.coverage {
-                    self.coverage_reports.push(coverage.clone());
-                }
-                if let Some((
-                    ref contract_identifier_str,
-                    ref source,
-                    ref contract,
-                    ref ast,
-                    ref analysis,
-                )) = result.contract
-                {
-                    self.asts.insert(contract_identifier.clone(), ast.clone());
-                    self.contracts
-                        .insert(contract_identifier_str.clone(), contract.clone());
-                }
+                match &result.result {
+                    EvaluationResult::Contract(contract_result) => {
+                        self.asts.insert(
+                            contract_identifier.clone(),
+                            contract_result.contract.ast.clone(),
+                        );
+                        self.contracts.insert(
+                            contract_result.contract.contract_identifier.clone(),
+                            contract_result.contract.function_args.clone(),
+                        );
+                    }
+                    _ => (),
+                };
                 Ok(result)
             }
             Err(res) => Err(res),
@@ -1084,13 +836,19 @@ impl Session {
             _ => return output.push(red!("Usage: ::encode <expr>")),
         };
 
-        let result = self.interpret(snippet.to_string(), None, None, false, None, None);
+        let result = self.eval(snippet.to_string(), None, false);
         let value = match result {
             Ok(result) => {
                 let mut tx_bytes = vec![];
                 let value = match result.result {
-                    Some(value) => value,
-                    None => return output.push("No value".to_string()),
+                    EvaluationResult::Contract(contract_result) => {
+                        if let Some(value) = contract_result.result {
+                            value
+                        } else {
+                            return output.push("No value".to_string());
+                        }
+                    }
+                    EvaluationResult::Snippet(snippet_result) => snippet_result.result,
                 };
                 match value.consensus_serialize(&mut tx_bytes) {
                     Err(e) => return output.push(red!(format!("{}", e))),
@@ -1105,7 +863,7 @@ impl Session {
             Err(diagnostics) => {
                 let lines: Vec<String> = snippet.split('\n').map(|s| s.to_string()).collect();
                 for d in diagnostics {
-                    output.append(&mut d.output(&"encode".to_string(), &lines));
+                    output.append(&mut output_diagnostic(&d, &"encode".to_string(), &lines));
                 }
                 red!("encoding failed")
             }
@@ -1127,7 +885,7 @@ impl Session {
             Ok(value) => value,
             Err(e) => return output.push(red!(format!("{}", e))),
         };
-        output.push(green!(format!("{}", value)));
+        output.push(green!(format!("{}", crate::utils::value_to_string(&value))));
     }
 
     pub fn get_costs(&mut self, output: &mut Vec<String>, cmd: &str) {
@@ -1376,14 +1134,15 @@ fn build_api_reference() -> HashMap<String, String> {
     }
 
     for func in NativeVariables::ALL.iter() {
-        let api = make_keyword_reference(&func);
-        let description = {
-            let mut s = api.description.to_string();
-            s = s.replace("\n", " ");
-            s
-        };
-        let doc = format!("Description\n{}\n\nExamples\n{}", description, api.example);
-        api_reference.insert(api.name.to_string(), doc);
+        if let Some(api) = make_keyword_reference(&func) {
+            let description = {
+                let mut s = api.description.to_string();
+                s = s.replace("\n", " ");
+                s
+            };
+            let doc = format!("Description\n{}\n\nExamples\n{}", description, api.example);
+            api_reference.insert(api.name.to_string(), doc);
+        }
     }
     api_reference
 }
@@ -1421,14 +1180,14 @@ mod tests {
         assert_eq!(
             output[0],
             format!(
-                "encode:1:7: {}: expected ':' after key in tuple",
+                "{}: Tuple literal construction expects a colon at index 1",
                 red!("error")
             )
         );
 
         session.encode(&mut output, "::encode (foo 1)");
         assert_eq!(
-            output[4],
+            output[2],
             format!(
                 "encode:1:1: {}: use of unresolved function 'foo'",
                 red!("error")
@@ -1465,7 +1224,7 @@ mod tests {
         assert_eq!(output.len(), 1);
         assert_eq!(
             output[0],
-            red!("Failed to decode clarity value: Deserialization error: Bad type prefix")
+            red!("Failed to decode clarity value: DeserializationError(\"Bad type prefix\")")
         );
 
         session.decode(&mut output, "::decode 4g");
@@ -1479,45 +1238,52 @@ mod tests {
     #[test]
     fn evaluate_at_block() {
         let mut settings = SessionSettings::default();
-        settings.include_boot_contracts = vec!["costs-v1".into()];
-        settings.repl_settings.costs_version = 1;
+        settings.include_boot_contracts = vec!["costs".into(), "costs-2".into()];
 
         let mut session = Session::new(settings);
         session.start().expect("session could not start");
 
         // setup contract state
-        session.handle_command(
-            "
+        let snippet = "
             (define-data-var x uint u0)
 
             (define-read-only (get-x)
                 (var-get x))
-            
+
             (define-public (incr)
                 (begin
                     (var-set x (+ (var-get x) u1))
-                    (ok (var-get x))))",
-        );
+                    (ok (var-get x))))";
+
+        let contract = ClarityContract {
+            code_source: ClarityCodeSource::ContractInMemory(snippet.to_string()),
+            name: "contract".to_string(),
+            deployer: ContractDeployer::Address("ST000000000000000000002AMW42H".into()),
+            clarity_version: ClarityVersion::Clarity1,
+            epoch: DEFAULT_EPOCH,
+        };
+
+        let _ = session.deploy_contract(&contract, None, false, None, &mut None);
 
         // assert data-var is set to 0
         assert_eq!(
-            session.handle_command("(contract-call? .contract-2 get-x)")[0],
+            session.handle_command("(contract-call? .contract get-x)")[0],
             green!("u0")
         );
 
         // advance chain tip and test at-block
         session.advance_chain_tip(10000);
         assert_eq!(
-            session.handle_command("(contract-call? .contract-2 get-x)")[0],
+            session.handle_command("(contract-call? .contract get-x)")[0],
             green!("u0")
         );
-        session.handle_command("(contract-call? .contract-2 incr)");
+        session.handle_command("(contract-call? .contract incr)");
         assert_eq!(
-            session.handle_command("(contract-call? .contract-2 get-x)")[0],
+            session.handle_command("(contract-call? .contract get-x)")[0],
             green!("u1")
         );
-        assert_eq!(session.handle_command("(at-block (unwrap-panic (get-block-info? id-header-hash u0)) (contract-call? .contract-2 get-x))")[0], green!("u0"));
-        assert_eq!(session.handle_command("(at-block (unwrap-panic (get-block-info? id-header-hash u5000)) (contract-call? .contract-2 get-x))")[0], green!("u0"));
+        assert_eq!(session.handle_command("(at-block (unwrap-panic (get-block-info? id-header-hash u0)) (contract-call? .contract get-x))")[0], green!("u0"));
+        assert_eq!(session.handle_command("(at-block (unwrap-panic (get-block-info? id-header-hash u5000)) (contract-call? .contract get-x))")[0], green!("u0"));
 
         // advance chain tip again and test at-block
         // do this twice to make sure that the lookup table is being updated properly
@@ -1525,14 +1291,14 @@ mod tests {
         session.advance_chain_tip(10);
 
         assert_eq!(
-            session.handle_command("(contract-call? .contract-2 get-x)")[0],
+            session.handle_command("(contract-call? .contract get-x)")[0],
             green!("u1")
         );
-        session.handle_command("(contract-call? .contract-2 incr)");
+        session.handle_command("(contract-call? .contract incr)");
         assert_eq!(
-            session.handle_command("(contract-call? .contract-2 get-x)")[0],
+            session.handle_command("(contract-call? .contract get-x)")[0],
             green!("u2")
         );
-        assert_eq!(session.handle_command("(at-block (unwrap-panic (get-block-info? id-header-hash u10000)) (contract-call? .contract-2 get-x))")[0], green!("u1"));
+        assert_eq!(session.handle_command("(at-block (unwrap-panic (get-block-info? id-header-hash u10000)) (contract-call? .contract get-x))")[0], green!("u1"));
     }
 }

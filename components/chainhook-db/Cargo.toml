@@ -36,25 +36,6 @@ hex = "0.4.3"
 name = "chainhook_db"
 path = "src/lib.rs"
 
-# [[bench]]
-# name = "storage-redis"
-# path = "benches/storage/redis.rs"
-# harness = false
-# html_reports = true
-
-# [[bench]]
-# name = "codec-hex"
-# path = "benches/codec/hex.rs"
-# harness = false
-# html_reports = true
-
-[[bench]]
-name = "codec-clarity"
-path = "benches/codec/clarity.rs"
-harness = false
-html_reports = true
-
-
 [features]
 default = ["cli"]
 cli = ["clap", "clap_generate", "toml", "ctrlc", "slog-json", "slog-scope"]

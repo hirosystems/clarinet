@@ -5,22 +5,35 @@ edition = "2021"
 
 [dependencies]
 serde = "1"
-serde_json = "1"
 serde_derive = "1"
 clarinet_utils = { package = "clarinet-utils", path = "../clarinet-utils" }
 chainhook_types = { package = "chainhook-types", path = "../chainhook-types-rs" }
 bip39 = { version = "1.0.1", default-features = false }
-clarity_repl = { package = "clarity-repl", path = "../clarity-repl", default-features = false }
+clarity_repl = { package = "clarity-repl", path = "../clarity-repl", default-features = false, optional = true }
 libsecp256k1 = "0.7.0"
 toml = { version = "0.5.6", features = ["preserve_order"] }
-url =  { version = "2.2.2", features = ["serde"] }
+url = { version = "2.2.2", features = ["serde"] }
 tiny-hderive = "0.3.0"
 bitcoin = { version = "0.28.1", optional = true }
+
+# wasm
+js-sys = { version = "0.3", optional = true }
+serde-wasm-bindgen = { version = "0.4", optional = true }
+wasm-bindgen = { version = "0.2", optional = true }
+wasm-bindgen-futures = { version = "0.4", optional = true }
+web-sys = { version = "0.3", features = ["console"], optional = true }
 
 [features]
 default = ["cli"]
 cli = ["bitcoin", "clarity_repl/cli"]
-wasm = ["clarity_repl/wasm"]
+wasm = [
+  "js-sys",
+  "serde-wasm-bindgen",
+  "wasm-bindgen",
+  "wasm-bindgen-futures",
+  "web-sys",
+  "clarity_repl/wasm",
+]
 
 [lib]
 name = "clarinet_files"

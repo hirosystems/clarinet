@@ -229,7 +229,7 @@ impl ChainSegment {
         let mut keep = vec![];
         let mut prune = vec![];
 
-        for (index, block_id) in self.block_ids.drain(..).enumerate() {
+        for block_id in self.block_ids.drain(..) {
             if block_id.index >= cut_off.index {
                 keep.push(block_id);
             } else {

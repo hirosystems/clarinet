@@ -19,10 +19,9 @@ extern crate prettytable;
 mod macros;
 
 pub mod analysis;
-pub mod clarity;
-pub mod contracts;
 pub mod frontend;
 pub mod repl;
+pub mod utils;
 
 use frontend::Terminal;
 use pico_args::Arguments;
@@ -35,8 +34,7 @@ fn main() {
     let code = args.subcommand().unwrap();
 
     let mut settings = SessionSettings::default();
-    settings.include_boot_contracts =
-        vec![format!("costs-v{}", settings.repl_settings.costs_version)];
+    settings.include_boot_contracts = vec!["costs".into(), "costs-2".into()];
 
     match code {
         Some(code_str) => {

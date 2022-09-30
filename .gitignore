@@ -11,6 +11,7 @@ npm-debug.log*
 **/settings/Mainnet.toml
 **/settings/Testnet.toml
 **/.requirements
+**/.cache
 **/.build
 components/stacks-devnet-js/dist
 components/stacks-devnet-js/build

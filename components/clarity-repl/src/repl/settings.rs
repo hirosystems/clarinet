@@ -1,11 +1,11 @@
 use std::convert::TryInto;
 
 use crate::analysis;
-use crate::clarity::{
-    coverage::CoverageReporter,
-    types::{PrincipalData, QualifiedContractIdentifier, StandardPrincipalData},
-    util::StacksAddress,
-};
+use crate::analysis::coverage::CoverageReporter;
+use clarity::types::chainstate::StacksAddress;
+use clarity::types::StacksEpochId;
+use clarity::vm::types::{PrincipalData, QualifiedContractIdentifier, StandardPrincipalData};
+use clarity::vm::ClarityVersion;
 
 const DEFAULT_COSTS_VERSION: u32 = 2;
 const DEFAULT_PARSER_VERSION: u32 = 2;
@@ -63,16 +63,12 @@ pub struct SessionSettings {
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct Settings {
     pub analysis: analysis::Settings,
-    pub costs_version: u32,
-    pub parser_version: u32,
 }
 
 impl Default for Settings {
     fn default() -> Self {
         Self {
             analysis: analysis::Settings::default(),
-            costs_version: DEFAULT_COSTS_VERSION,
-            parser_version: DEFAULT_PARSER_VERSION,
         }
     }
 }
@@ -81,7 +77,8 @@ impl Default for Settings {
 pub struct SettingsFile {
     pub analysis: Option<analysis::SettingsFile>,
     pub costs_version: Option<u32>,
-    pub parser_version: Option<u32>,
+    pub clarity_version: Option<ClarityVersion>,
+    pub epoch: Option<StacksEpochId>,
 }
 
 impl From<SettingsFile> for Settings {
@@ -91,10 +88,6 @@ impl From<SettingsFile> for Settings {
         } else {
             analysis::Settings::default()
         };
-        Self {
-            analysis,
-            costs_version: file.costs_version.unwrap_or(DEFAULT_COSTS_VERSION),
-            parser_version: file.parser_version.unwrap_or(DEFAULT_PARSER_VERSION),
-        }
+        Self { analysis }
     }
 }

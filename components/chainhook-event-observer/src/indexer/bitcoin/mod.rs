@@ -5,12 +5,12 @@ use bitcoincore_rpc::bitcoin::hashes::Hash;
 use bitcoincore_rpc::bitcoin::BlockHash;
 use bitcoincore_rpc::{Auth, Client, RpcApi};
 pub use blocks_pool::BitcoinBlockPool;
-use clarity_repl::clarity::util::hash::{hex_bytes, to_hex};
 use chainhook_types::bitcoin::{OutPoint, TxIn, TxOut};
 use chainhook_types::{
     BitcoinBlockData, BitcoinBlockMetadata, BitcoinTransactionData, BitcoinTransactionMetadata,
     BlockIdentifier, TransactionIdentifier,
 };
+use clarity_repl::clarity::util::hash::{hex_bytes, to_hex};
 use rocket::serde::json::Value as JsonValue;
 
 #[derive(Deserialize)]

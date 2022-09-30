@@ -8,17 +8,19 @@ use base58::FromBase58;
 use bitcoincore_rpc::{Auth, Client, RpcApi};
 use clarinet_deployments::types::DeploymentSpecification;
 use clarinet_files::{self, AccountConfig, DevnetConfig, NetworkManifest, ProjectManifest};
-use clarity_repl::clarity::representations::ClarityName;
-use clarity_repl::clarity::types::{BuffData, SequenceData, TupleData, Value as ClarityValue};
-use clarity_repl::clarity::util::address::AddressHashMode;
-use clarity_repl::clarity::util::hash::{hex_bytes, Hash160};
 
 use chainhook_event_observer::observer::{
     start_event_observer, EventObserverConfig, ObserverCommand, ObserverEvent,
     StacksChainMempoolEvent,
 };
 use chainhook_types::{BitcoinChainEvent, BitcoinNetwork, StacksChainEvent, StacksNetwork};
-use stacks_rpc_client::{transactions, PoxInfo, StacksRpc};
+use clarity_repl::clarity::address::AddressHashMode;
+use clarity_repl::clarity::util::hash::{hex_bytes, Hash160};
+use clarity_repl::clarity::vm::types::{BuffData, SequenceData, TupleData};
+use clarity_repl::clarity::vm::ClarityName;
+use clarity_repl::clarity::vm::Value as ClarityValue;
+use clarity_repl::codec;
+use stacks_rpc_client::{PoxInfo, StacksRpc};
 use std::collections::HashSet;
 use std::convert::TryFrom;
 
@@ -514,7 +516,7 @@ pub async fn publish_stacking_orders(
 
                 let addr_bytes = Hash160::from_bytes(&addr_bytes[1..21]).unwrap();
                 let addr_version = AddressHashMode::SerializeP2PKH;
-                let stack_stx_tx = transactions::build_contrat_call_transaction(
+                let stack_stx_tx = codec::build_contrat_call_transaction(
                     pox_contract_id,
                     "stack-stx".into(),
                     vec![
