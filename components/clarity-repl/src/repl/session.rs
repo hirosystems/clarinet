@@ -1244,8 +1244,7 @@ mod tests {
         session.start().expect("session could not start");
 
         // setup contract state
-        session.handle_command(
-            "
+        let snippet = "
             (define-data-var x uint u0)
 
             (define-read-only (get-x)
@@ -1254,28 +1253,37 @@ mod tests {
             (define-public (incr)
                 (begin
                     (var-set x (+ (var-get x) u1))
-                    (ok (var-get x))))",
-        );
+                    (ok (var-get x))))";
+
+        let contract = ClarityContract {
+            code_source: ClarityCodeSource::ContractInMemory(snippet.to_string()),
+            name: "contract".to_string(),
+            deployer: ContractDeployer::Address("ST000000000000000000002AMW42H".into()),
+            clarity_version: ClarityVersion::Clarity1,
+            epoch: DEFAULT_EPOCH,
+        };
+
+        let _ = session.deploy_contract(&contract, None, false, None, &mut None);
 
         // assert data-var is set to 0
         assert_eq!(
-            session.handle_command("(contract-call? .contract-2 get-x)")[0],
+            session.handle_command("(contract-call? .contract get-x)")[0],
             green!("u0")
         );
 
         // advance chain tip and test at-block
         session.advance_chain_tip(10000);
         assert_eq!(
-            session.handle_command("(contract-call? .contract-2 get-x)")[0],
+            session.handle_command("(contract-call? .contract get-x)")[0],
             green!("u0")
         );
-        session.handle_command("(contract-call? .contract-2 incr)");
+        session.handle_command("(contract-call? .contract incr)");
         assert_eq!(
-            session.handle_command("(contract-call? .contract-2 get-x)")[0],
+            session.handle_command("(contract-call? .contract get-x)")[0],
             green!("u1")
         );
-        assert_eq!(session.handle_command("(at-block (unwrap-panic (get-block-info? id-header-hash u0)) (contract-call? .contract-2 get-x))")[0], green!("u0"));
-        assert_eq!(session.handle_command("(at-block (unwrap-panic (get-block-info? id-header-hash u5000)) (contract-call? .contract-2 get-x))")[0], green!("u0"));
+        assert_eq!(session.handle_command("(at-block (unwrap-panic (get-block-info? id-header-hash u0)) (contract-call? .contract get-x))")[0], green!("u0"));
+        assert_eq!(session.handle_command("(at-block (unwrap-panic (get-block-info? id-header-hash u5000)) (contract-call? .contract get-x))")[0], green!("u0"));
 
         // advance chain tip again and test at-block
         // do this twice to make sure that the lookup table is being updated properly
@@ -1283,14 +1291,14 @@ mod tests {
         session.advance_chain_tip(10);
 
         assert_eq!(
-            session.handle_command("(contract-call? .contract-2 get-x)")[0],
+            session.handle_command("(contract-call? .contract get-x)")[0],
             green!("u1")
         );
-        session.handle_command("(contract-call? .contract-2 incr)");
+        session.handle_command("(contract-call? .contract incr)");
         assert_eq!(
-            session.handle_command("(contract-call? .contract-2 get-x)")[0],
+            session.handle_command("(contract-call? .contract get-x)")[0],
             green!("u2")
         );
-        assert_eq!(session.handle_command("(at-block (unwrap-panic (get-block-info? id-header-hash u10000)) (contract-call? .contract-2 get-x))")[0], green!("u1"));
+        assert_eq!(session.handle_command("(at-block (unwrap-panic (get-block-info? id-header-hash u10000)) (contract-call? .contract get-x))")[0], green!("u1"));
     }
 }
