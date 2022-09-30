@@ -1,0 +1,12 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "type": "clarinet",
+      "request": "launch",
+      "name": "Call .counter.increment",
+      "manifest": "${workspaceFolder}/clean/Clarinet.toml",
+      "expression": "(contract-call? .counter increment)"
+    }
+  ]
+}
