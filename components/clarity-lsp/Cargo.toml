@@ -45,10 +45,10 @@ name = "clarity_lsp"
 path = "src/lib.rs"
 
 [package.metadata.wasm-pack.profile.dev]
-wasm-opt = false
+wasm-opt = ['-O1']
 
 [package.metadata.wasm-pack.profile.dev.wasm-bindgen]
-debug-js-glue = false
+debug-js-glue = true
 demangle-name-section = true
 dwarf-debug-info = false
 
@@ -61,12 +61,10 @@ demangle-name-section = true
 dwarf-debug-info = false
 
 [package.metadata.wasm-pack.profile.release]
-# Configuration can be set to an array of strings which are explicit arguments
-# to pass to `wasm-opt`. For example `['-Os']` would optimize for size
-# while `['-O4']` would execute very expensive optimizations passes
-# wasm-opt = ['-Os']
-# TODO(hugocaillard) - benchmark optimizations options
-wasm-opt = false
+# -04  aggressively optimizes for speed
+wasm-opt = ['-O4']
+# -0z aggressively optimizes for size
+# wasm-opt = ['-Oz']
 
 [package.metadata.wasm-pack.profile.release.wasm-bindgen]
 debug-js-glue = false

@@ -6,17 +6,17 @@ use crate::utils::{
 };
 use clarinet_files::{FileAccessor, WASMFileSystemAccessor};
 use js_sys::{Function as JsFunction, Promise};
+use lsp_types::notification::{
+    DidOpenTextDocument, DidSaveTextDocument, Initialized, Notification, ShowMessage,
+};
 use lsp_types::{
-    notification::{DidOpenTextDocument, DidSaveTextDocument, Initialized, Notification},
     request::{Completion, Request},
     CompletionParams, DidOpenTextDocumentParams, DidSaveTextDocumentParams,
     PublishDiagnosticsParams, ShowMessageParams, Url,
 };
 use serde_wasm_bindgen::{from_value as decode_from_js, to_value as encode_to_js};
-use std::{
-    panic,
-    sync::{Arc, RwLock},
-};
+use std::panic;
+use std::sync::{Arc, RwLock};
 use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::future_to_promise;
 
@@ -101,19 +101,19 @@ impl LspVscodeBridge {
                                 version: None,
                             };
 
-                            let _ = send_diagnostic.call1(&JsValue::NULL, &encode_to_js(&value)?);
+                            send_diagnostic.call1(&JsValue::NULL, &encode_to_js(&value)?)?;
                         }
                     }
 
                     if let Some((level, message)) = notification {
-                        let _ = send_notification.call2(
+                        send_notification.call2(
                             &JsValue::NULL,
-                            &JsValue::from("window/showMessage"),
+                            &JsValue::from(ShowMessage::METHOD),
                             &encode_to_js(&ShowMessageParams {
                                 message,
                                 typ: level,
                             })?,
-                        );
+                        )?;
                     }
 
                     Ok(JsValue::TRUE)
@@ -166,19 +166,19 @@ impl LspVscodeBridge {
                                 version: None,
                             };
 
-                            let _ = send_diagnostic.call1(&JsValue::NULL, &encode_to_js(&value)?);
+                            send_diagnostic.call1(&JsValue::NULL, &encode_to_js(&value)?)?;
                         }
                     }
 
                     if let Some((level, message)) = notification {
-                        let _ = send_notification.call2(
+                        send_notification.call2(
                             &JsValue::NULL,
-                            &JsValue::from("window/showMessage"),
+                            &JsValue::from(ShowMessage::METHOD),
                             &encode_to_js(&ShowMessageParams {
                                 message,
                                 typ: level,
                             })?,
-                        );
+                        )?;
                     }
                     Ok(JsValue::TRUE)
                 });
@@ -193,8 +193,6 @@ impl LspVscodeBridge {
 
     #[wasm_bindgen(js_name=onRequest)]
     pub fn request_handler(&self, method: String, js_params: JsValue) -> Result<JsValue, JsValue> {
-        log!("> request method: {}", method);
-
         match method.as_str() {
             Completion::METHOD => {
                 let params: CompletionParams = decode_from_js(js_params)?;
