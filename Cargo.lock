@@ -960,7 +960,7 @@ dependencies = [
 [[package]]
 name = "clarity"
 version = "0.0.1"
-source = "git+https://github.com/stacks-network/stacks-blockchain.git?rev=5d0e4228270fef5cff74a85931d10ec95dcf2951#5d0e4228270fef5cff74a85931d10ec95dcf2951"
+source = "git+https://github.com/stacks-network/stacks-blockchain.git?rev=4ddffa6da4289d14f528a7af8e5369d25290e9e7#4ddffa6da4289d14f528a7af8e5369d25290e9e7"
 dependencies = [
  "integer-sqrt",
  "lazy_static",
@@ -975,7 +975,6 @@ dependencies = [
  "serde_json",
  "serde_stacker",
  "sha2-asm",
- "slog",
  "stacks-common",
  "time 0.2.27",
 ]
@@ -4094,7 +4093,7 @@ dependencies = [
  "csv",
  "encode_unicode",
  "lazy_static",
- "term 0.5.2",
+ "term",
  "unicode-width",
 ]
 
@@ -5403,19 +5402,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "slog-term"
-version = "2.9.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "87d29185c55b7b258b4f120eab00f48557d4d9bc814f41713f449d35b0f8977c"
-dependencies = [
- "atty",
- "slog",
- "term 0.7.0",
- "thread_local",
- "time 0.3.14",
-]
-
-[[package]]
 name = "smallvec"
 version = "1.9.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5494,7 +5480,7 @@ dependencies = [
 [[package]]
 name = "stacks-common"
 version = "0.0.1"
-source = "git+https://github.com/stacks-network/stacks-blockchain.git?rev=5d0e4228270fef5cff74a85931d10ec95dcf2951#5d0e4228270fef5cff74a85931d10ec95dcf2951"
+source = "git+https://github.com/stacks-network/stacks-blockchain.git?rev=4ddffa6da4289d14f528a7af8e5369d25290e9e7#4ddffa6da4289d14f528a7af8e5369d25290e9e7"
 dependencies = [
  "chrono",
  "curve25519-dalek",
@@ -5512,9 +5498,6 @@ dependencies = [
  "serde_json",
  "sha2 0.10.5",
  "sha3 0.10.5",
- "slog",
- "slog-json",
- "slog-term",
  "time 0.2.27",
 ]
 
@@ -6191,17 +6174,6 @@ checksum = "edd106a334b7657c10b7c540a0106114feadeb4dc314513e97df481d5d966f42"
 dependencies = [
  "byteorder",
  "dirs",
- "winapi",
-]
-
-[[package]]
-name = "term"
-version = "0.7.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c59df8ac95d96ff9bede18eb7300b0fda5e5d8d90960e76f8e14ae765eedbf1f"
-dependencies = [
- "dirs-next",
- "rustversion",
  "winapi",
 ]
 
