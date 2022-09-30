@@ -15,9 +15,9 @@ use self::types::{
     DeploymentSpecification, EmulatedContractPublishSpecification, GenesisSpecification,
     TransactionPlanSpecification, TransactionsBatchSpecification, WalletSpecification,
 };
+use chainhook_types::StacksNetwork;
 use clarinet_files::FileAccessor;
 use clarinet_files::{NetworkManifest, ProjectManifest};
-use chainhook_types::StacksNetwork;
 use clarity_repl::analysis::ast_dependency_detector::{ASTDependencyDetector, DependencySet};
 use clarity_repl::clarity::vm::ast::ContractAST;
 use clarity_repl::clarity::vm::diagnostic::Diagnostic;
