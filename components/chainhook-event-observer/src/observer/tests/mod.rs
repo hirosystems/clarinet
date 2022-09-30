@@ -16,7 +16,7 @@ use chainhook_types::{
     BitcoinChainEvent, BitcoinChainUpdatedWithBlocksData, BitcoinNetwork, StacksBlockData,
     StacksBlockUpdate, StacksChainEvent, StacksChainUpdatedWithBlocksData, StacksNetwork,
 };
-use clarity_repl::clarity::types::QualifiedContractIdentifier;
+use clarity_repl::clarity::vm::types::QualifiedContractIdentifier;
 use std::collections::{HashMap, HashSet};
 use std::sync::mpsc::{channel, Receiver, Sender};
 use std::sync::{Arc, RwLock};
