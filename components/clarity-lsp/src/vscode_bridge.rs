@@ -6,18 +6,17 @@ use crate::utils::{
 };
 use clarinet_files::{FileAccessor, WASMFileSystemAccessor};
 use js_sys::{Function as JsFunction, Promise};
-use lsp_types::notification::ShowMessage;
+use lsp_types::notification::{
+    DidOpenTextDocument, DidSaveTextDocument, Initialized, Notification, ShowMessage,
+};
 use lsp_types::{
-    notification::{DidOpenTextDocument, DidSaveTextDocument, Initialized, Notification},
     request::{Completion, Request},
     CompletionParams, DidOpenTextDocumentParams, DidSaveTextDocumentParams,
     PublishDiagnosticsParams, ShowMessageParams, Url,
 };
 use serde_wasm_bindgen::{from_value as decode_from_js, to_value as encode_to_js};
-use std::{
-    panic,
-    sync::{Arc, RwLock},
-};
+use std::panic;
+use std::sync::{Arc, RwLock};
 use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::future_to_promise;
 
