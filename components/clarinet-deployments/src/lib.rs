@@ -1,3 +1,8 @@
+use clarity_repl::clarity::stacks_common::types::StacksEpochId;
+use clarity_repl::clarity::ClarityVersion;
+use clarity_repl::repl::DEFAULT_EPOCH;
+use clarity_repl::repl::{ClarityCodeSource, ClarityContract, ContractDeployer};
+
 extern crate serde;
 
 #[macro_use]
@@ -12,6 +17,7 @@ use self::types::{
 };
 use clarinet_files::FileAccessor;
 use clarinet_files::{NetworkManifest, ProjectManifest};
+
 use clarity_repl::analysis::ast_dependency_detector::{ASTDependencyDetector, DependencySet};
 use clarity_repl::clarity::vm::ast::ContractAST;
 use clarity_repl::clarity::vm::diagnostic::Diagnostic;
@@ -127,17 +133,27 @@ pub fn update_session_with_contracts_executions(
                         tx.emulated_sender.clone(),
                         tx.contract_name.clone(),
                     );
-                    let contract_ast = contracts_asts.as_ref().and_then(|m| m.get(&contract_id));
-                    let result = session.interpret(
-                        tx.source.clone(),
-                        Some(tx.contract_name.to_string()),
+                    let mut contract_ast = contracts_asts
+                        .as_ref()
+                        .and_then(|m| m.get(&contract_id))
+                        .and_then(|c| Some(c.clone()));
+                    let contract = ClarityContract {
+                        code_source: ClarityCodeSource::ContractInMemory(tx.source.clone()),
+                        deployer: ContractDeployer::Address(tx.emulated_sender.to_string()),
+                        name: tx.contract_name.to_string(),
+                        clarity_version: tx.clarity_version,
+                        epoch: DEFAULT_EPOCH,
+                    };
+
+                    let result = session.deploy_contract(
+                        &contract,
                         None,
                         false,
                         match code_coverage_enabled {
                             true => Some("__analysis__".to_string()),
                             false => None,
                         },
-                        contract_ast,
+                        &mut contract_ast,
                     );
                     results.insert(contract_id, result);
                     session.set_tx_sender(default_tx_sender);
@@ -328,6 +344,7 @@ pub async fn generate_default_deployment(
                             emulated_sender: contract_id.issuer.clone(),
                             source: source.clone(),
                             location: contract_location,
+                            clarity_version: ClarityVersion::Clarity1,
                         };
                         emulated_contracts_publish.insert(contract_id.clone(), data);
                     } else if network.either_devnet_or_testnet() {
@@ -360,9 +377,14 @@ pub async fn generate_default_deployment(
                     }
 
                     // Compute the AST
-                    let (ast, _, _) = session
-                        .interpreter
-                        .build_ast(contract_id.clone(), source.to_string());
+                    let contract = ClarityContract {
+                        code_source: ClarityCodeSource::ContractInMemory(source),
+                        name: contract_id.name.to_string(),
+                        deployer: ContractDeployer::ContractIdentifier(contract_id.clone()),
+                        clarity_version: ClarityVersion::Clarity1,
+                        epoch: StacksEpochId::Epoch20,
+                    };
+                    let (ast, _, _) = session.interpreter.build_ast(&contract);
                     ast
                 }
             };
@@ -445,8 +467,9 @@ pub async fn generate_default_deployment(
             Err(_) => return Err(format!("unable to use {} as a valid contract name", name)),
         };
 
-        let deployer = match contract_config.deployer {
-            Some(ref deployer) => {
+        let deployer = match &contract_config.deployer {
+            ContractDeployer::DefaultDeployer => default_deployer,
+            ContractDeployer::LabeledDeployer(deployer) => {
                 let deployer = match network_manifest.accounts.get(deployer) {
                     Some(deployer) => deployer,
                     None => {
@@ -455,7 +478,7 @@ pub async fn generate_default_deployment(
                 };
                 deployer
             }
-            None => default_deployer,
+            _ => unreachable!(),
         };
 
         let sender = match PrincipalData::parse_standard_principal(&deployer.stx_address) {
@@ -471,13 +494,13 @@ pub async fn generate_default_deployment(
         let (contract_location, source) = match file_accessor {
             None => {
                 let mut contract_location = manifest.location.get_project_root_location()?;
-                contract_location.append_path(&contract_config.path)?;
+                contract_location.append_path(&contract_config.expect_contract_path_as_str())?;
                 let source = contract_location.read_content_as_utf8()?;
                 (contract_location, source)
             }
             Some(file_accessor) => {
                 let mut contract_location = manifest.location.clone().get_parent_location()?;
-                contract_location.append_path(&contract_config.path.to_string())?;
+                contract_location.append_path(&contract_config.expect_contract_path_as_str())?;
                 file_accessor
                     .read_contract_content(contract_location.clone())
                     .await?
@@ -486,7 +509,16 @@ pub async fn generate_default_deployment(
 
         let contract_id = QualifiedContractIdentifier::new(sender.clone(), contract_name.clone());
 
-        contracts_sources.insert(contract_id.clone(), source.clone());
+        contracts_sources.insert(
+            contract_id.clone(),
+            ClarityContract {
+                code_source: ClarityCodeSource::ContractInMemory(source.clone()),
+                deployer: ContractDeployer::Address(sender.to_address()),
+                name: contract_name.to_string(),
+                clarity_version: contract_config.clarity_version,
+                epoch: DEFAULT_EPOCH,
+            },
+        );
 
         let contract_spec = if network.is_simnet() {
             TransactionSpecification::EmulatedContractPublish(
@@ -495,6 +527,7 @@ pub async fn generate_default_deployment(
                     emulated_sender: sender,
                     source,
                     location: contract_location,
+                    clarity_version: contract_config.clarity_version,
                 },
             )
         } else {
@@ -506,6 +539,7 @@ pub async fn generate_default_deployment(
                     .saturating_mul(source.as_bytes().len().try_into().unwrap()),
                 source,
                 anchor_block_only: true,
+                clarity_version: contract_config.clarity_version,
             })
         };
 
@@ -519,8 +553,8 @@ pub async fn generate_default_deployment(
 
     let mut asts_success = true;
 
-    for (contract_id, source) in contracts_sources.into_iter() {
-        let (ast, diags, ast_success) = session.interpreter.build_ast(contract_id.clone(), source);
+    for (contract_id, contract) in contracts_sources.into_iter() {
+        let (ast, diags, ast_success) = session.interpreter.build_ast(&contract);
         contract_asts.insert(contract_id.clone(), ast);
         contract_diags.insert(contract_id, diags);
         asts_success = asts_success && ast_success;

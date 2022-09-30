@@ -1,39 +1,37 @@
+use crate::impl_byte_array_newtype;
+use clarity::address::AddressHashMode;
+use clarity::address::{
+    C32_ADDRESS_VERSION_MAINNET_MULTISIG, C32_ADDRESS_VERSION_MAINNET_SINGLESIG,
+    C32_ADDRESS_VERSION_TESTNET_MULTISIG, C32_ADDRESS_VERSION_TESTNET_SINGLESIG,
+};
+use clarity::codec::MAX_MESSAGE_LEN;
+use clarity::codec::{read_next, write_next, Error as CodecError, StacksMessageCodec};
+use clarity::stacks_common::types::chainstate::{
+    BlockHeaderHash, BurnchainHeaderHash, ConsensusHash, StacksWorkScore, TrieHash,
+};
+use clarity::stacks_common::types::chainstate::{StacksAddress, StacksPublicKey};
+use clarity::stacks_common::types::PrivateKey;
+use clarity::util::hash::{Hash160, Sha512Trunc256Sum};
+use clarity::util::retry::BoundReader;
+use clarity::util::secp256k1::{
+    MessageSignature, Secp256k1PrivateKey, Secp256k1PublicKey, MESSAGE_SIGNATURE_ENCODED_SIZE,
+};
+// use clarity::util::vrf::VRFProof;
+use clarity::vm::types::{
+    PrincipalData, QualifiedContractIdentifier, StandardPrincipalData, Value,
+};
+use clarity::vm::{ClarityName, ContractName};
+use clarity::{
+    impl_array_hexstring_fmt, impl_array_newtype, impl_byte_array_message_codec,
+    impl_byte_array_serde,
+};
+use serde::{Deserialize, Serialize};
+use std::convert::TryFrom;
 use std::convert::TryInto;
 use std::fmt;
 use std::io::{Read, Write};
 use std::ops::Deref;
 use std::ops::DerefMut;
-
-use crate::impl_byte_array_newtype;
-use clarity_repl::clarity::address::AddressHashMode;
-use clarity_repl::clarity::address::{
-    C32_ADDRESS_VERSION_MAINNET_MULTISIG, C32_ADDRESS_VERSION_MAINNET_SINGLESIG,
-    C32_ADDRESS_VERSION_TESTNET_MULTISIG, C32_ADDRESS_VERSION_TESTNET_SINGLESIG,
-};
-use clarity_repl::clarity::codec::MAX_MESSAGE_LEN;
-use clarity_repl::clarity::codec::{
-    read_next, write_next, Error as CodecError, StacksMessageCodec,
-};
-use clarity_repl::clarity::types::chainstate::{
-    BlockHeaderHash, BurnchainHeaderHash, ConsensusHash, StacksWorkScore, TrieHash,
-};
-use clarity_repl::clarity::types::chainstate::{StacksAddress, StacksPublicKey};
-use clarity_repl::clarity::types::PrivateKey;
-use clarity_repl::clarity::util::hash::{Hash160, Sha512Trunc256Sum};
-use clarity_repl::clarity::util::retry::BoundReader;
-use clarity_repl::clarity::util::secp256k1::{
-    MessageSignature, Secp256k1PrivateKey, Secp256k1PublicKey, MESSAGE_SIGNATURE_ENCODED_SIZE,
-};
-use clarity_repl::clarity::util::vrf::VRFProof;
-use clarity_repl::clarity::vm::types::{
-    PrincipalData, QualifiedContractIdentifier, StandardPrincipalData, Value,
-};
-use clarity_repl::clarity::vm::{ClarityName, ContractName};
-use clarity_repl::clarity::{
-    impl_array_hexstring_fmt, impl_array_newtype, impl_byte_array_message_codec,
-    impl_byte_array_serde,
-};
-use serde::{Deserialize, Serialize};
 
 pub const MAX_BLOCK_LEN: u32 = 2 * 1024 * 1024;
 pub const MAX_TRANSACTION_LEN: u32 = MAX_BLOCK_LEN;
@@ -41,20 +39,20 @@ pub const MAX_TRANSACTION_LEN: u32 = MAX_BLOCK_LEN;
 #[macro_export]
 macro_rules! impl_byte_array_message_codec {
     ($thing:ident, $len:expr) => {
-        impl clarity_repl::clarity::codec::StacksMessageCodec for $thing {
+        impl clarity::codec::StacksMessageCodec for $thing {
             fn consensus_serialize<W: std::io::Write>(
                 &self,
                 fd: &mut W,
-            ) -> Result<(), clarity_repl::clarity::codec::Error> {
+            ) -> Result<(), clarity::codec::Error> {
                 fd.write_all(self.as_bytes())
-                    .map_err(clarity_repl::clarity::codec::Error::WriteError)
+                    .map_err(clarity::codec::Error::WriteError)
             }
             fn consensus_deserialize<R: std::io::Read>(
                 fd: &mut R,
-            ) -> Result<$thing, clarity_repl::clarity::codec::Error> {
+            ) -> Result<$thing, clarity::codec::Error> {
                 let mut buf = [0u8; ($len as usize)];
                 fd.read_exact(&mut buf)
-                    .map_err(clarity_repl::clarity::codec::Error::ReadError)?;
+                    .map_err(clarity::codec::Error::ReadError)?;
                 let ret = $thing::from_bytes(&buf).expect("BUG: buffer is not the right size");
                 Ok(ret)
             }
@@ -2154,7 +2152,7 @@ pub struct StacksMicroblock {
 pub struct StacksBlockHeader {
     pub version: u8,
     pub total_work: StacksWorkScore, // NOTE: this is the work done on the chain tip this block builds on (i.e. take this from the parent)
-    pub proof: VRFProof,
+    pub proof: String,
     pub parent_block: BlockHeaderHash, // NOTE: even though this is also present in the burn chain, we need this here for super-light clients that don't even have burn chain headers
     pub parent_microblock: BlockHeaderHash,
     pub parent_microblock_sequence: u16,
@@ -2186,11 +2184,11 @@ impl StacksMessageCodec for StacksMicroblockHeader {
         let signature: MessageSignature = read_next(fd)?;
 
         // signature must be well-formed
-        let _ = signature
-            .to_secp256k1_recoverable()
-            .ok_or(CodecError::DeserializeError(
-                "Failed to parse signature".to_string(),
-            ))?;
+        // let _ = signature
+        //     .to_secp256k1_recoverable()
+        //     .ok_or(CodecError::DeserializeError(
+        //         "Failed to parse signature".to_string(),
+        //     ))?;
 
         Ok(StacksMicroblockHeader {
             version,

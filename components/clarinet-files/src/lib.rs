@@ -19,9 +19,7 @@ pub use network_manifest::{
     NetworkManifestFile, PoxStackingOrder, DEFAULT_DERIVATION_PATH,
 };
 use orchestra_types::StacksNetwork;
-pub use project_manifest::{
-    ContractConfig, ProjectManifest, ProjectManifestFile, RequirementConfig,
-};
+pub use project_manifest::{ProjectManifest, ProjectManifestFile, RequirementConfig};
 use serde::ser::{Serialize, SerializeMap, Serializer};
 use std::future::Future;
 use std::pin::Pin;

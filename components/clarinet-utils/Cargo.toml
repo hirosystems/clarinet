@@ -8,7 +8,6 @@ hmac = "0.12.0"
 pbkdf2 = { version = "0.11.0", features = ["simple"], default-features = false }
 sha2 = "0.10.0"
 serde = { version = "1.0", features = ["derive"] }
-clarity_repl = { package = "clarity-repl", path = "../clarity-repl", default-features = false }
 
 [lib]
 name = "clarinet_utils"

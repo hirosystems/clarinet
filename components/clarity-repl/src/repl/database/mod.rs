@@ -10,5 +10,4 @@ pub use self::clarity_db::{
 };
 pub use self::datastore::Datastore;
 pub use self::key_value_wrapper::{RollbackWrapper, RollbackWrapperPersistedLog};
-pub use self::marf::ClarityBackingStore;
 pub use self::structures::{ClarityDeserializable, ClaritySerializable};

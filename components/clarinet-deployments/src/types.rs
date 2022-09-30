@@ -5,14 +5,16 @@ use clarity_repl::clarity::vm::diagnostic::Diagnostic;
 use clarity_repl::clarity::vm::types::{
     PrincipalData, QualifiedContractIdentifier, StandardPrincipalData,
 };
-use clarity_repl::clarity::vm::{ClarityName, ContractName};
+
+use clarity_repl::clarity::{ClarityName, ClarityVersion, ContractName};
+
 use orchestra_types::StacksNetwork;
 use serde::{Deserialize, Serialize};
 use serde_yaml;
 use std::collections::BTreeMap;
 
 use clarity_repl::analysis::ast_dependency_detector::DependencySet;
-use clarity_repl::repl::Session;
+use clarity_repl::repl::{Session, DEFAULT_CLARITY_VERSION};
 use std::collections::HashMap;
 
 pub struct DeploymentGenerationArtifacts {
@@ -103,6 +105,8 @@ pub struct ContractPublishSpecificationFile {
     pub url: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub anchor_block_only: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub clarity_version: Option<u8>,
 }
 
 #[derive(Debug, PartialEq, Serialize, Deserialize)]
@@ -125,6 +129,8 @@ pub struct EmulatedContractPublishSpecificationFile {
     pub path: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub url: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub clarity_version: Option<u8>,
 }
 
 #[derive(Debug, PartialEq, Clone)]
@@ -227,6 +233,7 @@ pub struct ContractPublishSpecification {
     pub expected_sender: StandardPrincipalData,
     pub location: FileLocation,
     pub source: String,
+    pub clarity_version: ClarityVersion,
     pub cost: u64,
     pub anchor_block_only: bool,
 }
@@ -269,6 +276,21 @@ impl ContractPublishSpecification {
 
         let source = location.read_content_as_utf8()?;
 
+        let clarity_version = match specs.clarity_version {
+            Some(clarity_version) => {
+                if clarity_version.eq(&1) {
+                    Ok(ClarityVersion::Clarity1)
+                } else if clarity_version.eq(&2) {
+                    Ok(ClarityVersion::Clarity2)
+                } else {
+                    Err(format!(
+                        "unable to parse clarity_version (can either be '1' or '2'",
+                    ))
+                }
+            }
+            _ => Ok(DEFAULT_CLARITY_VERSION),
+        }?;
+
         Ok(ContractPublishSpecification {
             contract_name,
             expected_sender,
@@ -276,6 +298,7 @@ impl ContractPublishSpecification {
             location: location,
             cost: specs.cost,
             anchor_block_only: specs.anchor_block_only.unwrap_or(true),
+            clarity_version,
         })
     }
 }
@@ -420,6 +443,7 @@ pub struct EmulatedContractPublishSpecification {
     pub contract_name: ContractName,
     pub emulated_sender: StandardPrincipalData,
     pub source: String,
+    pub clarity_version: ClarityVersion,
     pub location: FileLocation,
 }
 
@@ -459,6 +483,21 @@ impl EmulatedContractPublishSpecification {
             "unable to parse file location (can either be 'path' or 'url'",
         ))?;
 
+        let clarity_version = match specs.clarity_version {
+            Some(clarity_version) => {
+                if clarity_version.eq(&1) {
+                    Ok(ClarityVersion::Clarity1)
+                } else if clarity_version.eq(&2) {
+                    Ok(ClarityVersion::Clarity2)
+                } else {
+                    Err(format!(
+                        "unable to parse clarity_version (can either be '1' or '2'",
+                    ))
+                }
+            }
+            _ => Ok(DEFAULT_CLARITY_VERSION),
+        }?;
+
         let source = location.read_content_as_utf8()?;
 
         Ok(EmulatedContractPublishSpecification {
@@ -466,6 +505,7 @@ impl EmulatedContractPublishSpecification {
             emulated_sender,
             source,
             location,
+            clarity_version,
         })
     }
 }
@@ -782,6 +822,10 @@ impl TransactionPlanSpecification {
                                 url: None,
                                 cost: tx.cost,
                                 anchor_block_only: Some(tx.anchor_block_only),
+                                clarity_version: match tx.clarity_version {
+                                    ClarityVersion::Clarity1 => Some(1),
+                                    ClarityVersion::Clarity2 => Some(2),
+                                },
                             },
                         )
                     }
@@ -803,6 +847,10 @@ impl TransactionPlanSpecification {
                                 location: Some(tx.location.clone()),
                                 path: None,
                                 url: None,
+                                clarity_version: match tx.clarity_version {
+                                    ClarityVersion::Clarity1 => Some(1),
+                                    ClarityVersion::Clarity2 => Some(2),
+                                },
                             },
                         )
                     }

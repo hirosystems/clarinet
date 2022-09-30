@@ -63,6 +63,7 @@ deno_broadcast_channel = "0.58.0"
 hyper = { version = "0.14.18", features = ["server", "stream", "http1", "http2", "runtime"] }
 http = "0.2.6"
 ###
+rsa = "=0.7.0-pre"
 deno_fetch = { version = "0.87.0", optional = true }
 deno_crypto = { version = "0.78.0", optional = true }
 import_map = { version = "=0.12.1", optional = true }
@@ -146,7 +147,7 @@ stacks_rpc_client = { package = "stacks-rpc-client", path = "../stacks-rpc-clien
 clarinet_files = { package = "clarinet-files", path = "../clarinet-files", features = ["cli"]  }
 clarity_lsp = { package = "clarity-lsp", path = "../clarity-lsp", features = ["cli"]  }
 clarinet_deployments = { package = "clarinet-deployments", path = "../clarinet-deployments", features = ["cli"]  }
-clarinet_utils = { package = "clarinet-utils", path = "../clarinet-utils" }
+clarinet_utils = { package = "clarinet-utils", path = "../clarinet-utils"  }
 num_cpus = "1.13.1"
 mio = "=0.8.2"
 similar = "2.1.0"

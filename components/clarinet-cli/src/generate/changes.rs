@@ -1,4 +1,5 @@
-use clarinet_files::{ContractConfig, FileLocation, RequirementConfig};
+use clarinet_files::{FileLocation, RequirementConfig};
+use clarity_repl::repl::ClarityContract;
 use std::collections::HashMap;
 
 #[derive(Clone, Debug)]
@@ -20,7 +21,7 @@ pub struct DirectoryCreation {
 pub struct TOMLEdition {
     pub comment: String,
     pub manifest_location: FileLocation,
-    pub contracts_to_add: HashMap<String, ContractConfig>,
+    pub contracts_to_add: HashMap<String, ClarityContract>,
     pub requirements_to_add: Vec<RequirementConfig>,
 }
 

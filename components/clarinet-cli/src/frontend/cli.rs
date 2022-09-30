@@ -21,7 +21,9 @@ use clarity_repl::clarity::vm::analysis::AnalysisDatabase;
 use clarity_repl::clarity::vm::costs::LimitedCostTracker;
 use clarity_repl::clarity::vm::diagnostic::{Diagnostic, Level};
 use clarity_repl::clarity::vm::types::QualifiedContractIdentifier;
+use clarity_repl::clarity::ClarityVersion;
 use clarity_repl::repl::diagnostic::{output_code, output_diagnostic};
+use clarity_repl::repl::{ClarityCodeSource, ClarityContract, ContractDeployer, DEFAULT_EPOCH};
 use clarity_repl::{analysis, repl, Terminal};
 use orchestra_types::Chain;
 use orchestra_types::StacksNetwork;
@@ -924,7 +926,7 @@ pub fn main() {
             settings.repl_settings.analysis.enable_all_passes();
 
             let mut session = repl::Session::new(settings.clone());
-            let code = match fs::read_to_string(&file) {
+            let code_source = match fs::read_to_string(&file) {
                 Ok(code) => code,
                 _ => {
                     println!("{}: unable to read file: '{}'", red!("error"), file);
@@ -932,18 +934,24 @@ pub fn main() {
                 }
             };
             let contract_id = QualifiedContractIdentifier::transient();
-            let (ast, mut diagnostics, mut success) = session
+            let contract = ClarityContract {
+                code_source: ClarityCodeSource::ContractInMemory(code_source),
+                deployer: ContractDeployer::Transient,
+                name: "transient".to_string(),
+                clarity_version: ClarityVersion::Clarity1,
+                epoch: DEFAULT_EPOCH,
+            };
+            let (ast, mut diagnostics, mut success) = session.interpreter.build_ast(&contract);
+            let (annotations, mut annotation_diagnostics) = session
                 .interpreter
-                .build_ast(contract_id.clone(), code.clone());
-            let (annotations, mut annotation_diagnostics) =
-                session.interpreter.collect_annotations(&ast, &code);
+                .collect_annotations(&ast, contract.expect_in_memory_code_source());
             diagnostics.append(&mut annotation_diagnostics);
 
             let mut contract_analysis = ContractAnalysis::new(
                 contract_id,
                 ast.expressions,
                 LimitedCostTracker::new_free(),
-                settings.repl_settings.clarity_version,
+                contract.clarity_version,
             );
             let mut analysis_db = AnalysisDatabase::new(&mut session.interpreter.datastore);
             let mut analysis_diagnostics = match analysis::run_analysis(
@@ -960,7 +968,7 @@ pub fn main() {
             };
             diagnostics.append(&mut analysis_diagnostics);
 
-            let lines = code.lines();
+            let lines = contract.expect_in_memory_code_source().lines();
             let formatted_lines: Vec<String> = lines.map(|l| l.to_string()).collect();
             for d in diagnostics {
                 for line in output_diagnostic(&d, &file, &formatted_lines) {

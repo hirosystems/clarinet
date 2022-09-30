@@ -34,8 +34,7 @@ fn main() {
     let code = args.subcommand().unwrap();
 
     let mut settings = SessionSettings::default();
-    settings.include_boot_contracts =
-        vec![format!("costs-v{}", settings.repl_settings.costs_version)];
+    settings.include_boot_contracts = vec!["costs".into(), "costs-2".into()];
 
     match code {
         Some(code_str) => {

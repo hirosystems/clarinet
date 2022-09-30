@@ -25,11 +25,16 @@ mod macros;
 #[cfg(feature = "wasm")]
 use wasm_bindgen::prelude::*;
 
-pub extern crate clarity;
-
 pub mod analysis;
+pub mod codec;
 pub mod repl;
 pub mod utils;
+
+pub mod clarity {
+    pub use ::clarity::stacks_common::*;
+    pub use ::clarity::vm::*;
+    pub use ::clarity::*;
+}
 
 struct GlobalContext {
     session: Option<Session>,
@@ -53,8 +58,7 @@ pub async fn init_session() -> String {
             Some(session) => (session, "".to_string()),
             None => {
                 let mut settings = SessionSettings::default();
-                settings.include_boot_contracts =
-                    vec![format!("costs-v{}", settings.repl_settings.costs_version)];
+                settings.include_boot_contracts = vec!["costs".into(), "costs-2".into()];
                 let mut session = Session::new(settings);
                 let output = session.start_wasm().await;
                 (session, output)

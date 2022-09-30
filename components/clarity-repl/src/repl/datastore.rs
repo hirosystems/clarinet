@@ -1,4 +1,3 @@
-use rusqlite::Connection;
 use sha2::{Digest, Sha512_256};
 
 use clarity::types::chainstate::BlockHeaderHash;
@@ -261,11 +260,28 @@ impl ClarityBackingStore for Datastore {
     }
 
     fn get_with_proof(&mut self, key: &str) -> Option<(String, Vec<u8>)> {
-        panic!("DataStore cannot get with proof")
+        return None;
     }
 
-    fn get_side_store(&mut self) -> &Connection {
-        panic!("DataStore has no side store")
+    fn get_contract_hash(
+        &mut self,
+        _contract: &QualifiedContractIdentifier,
+    ) -> Result<(StacksBlockId, Sha512Trunc256Sum)> {
+        panic!("Datastore cannot get_contract_hash")
+    }
+
+    fn get_metadata_manual(
+        &mut self,
+        _at_height: u32,
+        _contract: &QualifiedContractIdentifier,
+        _key: &str,
+    ) -> Result<Option<String>> {
+        panic!("Datastore cannot get_metadata_manual")
+    }
+
+    #[cfg(not(feature = "wasm"))]
+    fn get_side_store(&mut self) -> &::clarity::rusqlite::Connection {
+        panic!("Datastore cannot get_side_store")
     }
 }
 
