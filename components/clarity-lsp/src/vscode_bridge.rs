@@ -54,7 +54,9 @@ impl LspVscodeBridge {
         ));
 
         match method.as_str() {
-            Initialized::METHOD => {}
+            Initialized::METHOD => {
+                log!("clarity extension initialized");
+            }
 
             DidOpenTextDocument::METHOD => {
                 let params: DidOpenTextDocumentParams = match decode_from_js(js_params) {
@@ -62,7 +64,6 @@ impl LspVscodeBridge {
                     Err(err) => return Promise::reject(&JsValue::from(format!("error: {}", err))),
                 };
                 let uri = params.text_document.uri;
-                log!("> opened: {}", &uri);
 
                 let command = if let Some(contract_location) = get_contract_location(&uri) {
                     LspNotification::ContractOpened(contract_location)
@@ -126,15 +127,13 @@ impl LspVscodeBridge {
                     Err(err) => return Promise::reject(&JsValue::from(format!("error: {}", err))),
                 };
                 let uri = &params.text_document.uri;
-                log!("> saved: {}", uri);
 
                 let command = if let Some(contract_location) = get_contract_location(uri) {
                     LspNotification::ContractChanged(contract_location)
                 } else if let Some(manifest_location) = get_manifest_location(uri) {
                     LspNotification::ManifestChanged(manifest_location)
                 } else {
-                    log!("Unsupported file opened");
-                    return Promise::resolve(&JsValue::NULL);
+                    return Promise::reject(&JsValue::from_str("Unsupported file opened"));
                 };
 
                 let editor_state_lock = self.editor_state_lock.clone();
@@ -184,6 +183,7 @@ impl LspVscodeBridge {
                 });
             }
             _ => {
+                #[cfg(debug_assertions)]
                 log!("unexpected notification ({})", method);
             }
         }
@@ -208,6 +208,7 @@ impl LspVscodeBridge {
                 return encode_to_js(&lsp_response.completion_items).map_err(|_| JsValue::NULL);
             }
             _ => {
+                #[cfg(debug_assertions)]
                 log!("unexpected request ({})", method);
             }
         }
