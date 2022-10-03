@@ -911,7 +911,6 @@ dependencies = [
  "deno_crypto",
  "deno_emit",
  "deno_fetch",
- "deno_ffi",
  "deno_graph",
  "deno_http",
  "deno_net",
@@ -1720,20 +1719,6 @@ dependencies = [
  "tokio",
  "tokio-stream",
  "tokio-util 0.7.2",
-]
-
-[[package]]
-name = "deno_ffi"
-version = "0.51.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "802d796940328ec03cbcc61c5ee41a21d7638091d495e0f4bd6fd40f2a2a8d8c"
-dependencies = [
- "deno_core",
- "dlopen",
- "libffi",
- "serde",
- "tokio",
- "winapi",
 ]
 
 [[package]]
@@ -3192,25 +3177,6 @@ name = "libc"
 version = "0.2.134"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "329c933548736bc49fd575ee68c89e8be4d260064184389a5b77517cddd99ffb"
-
-[[package]]
-name = "libffi"
-version = "3.0.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1e454b3efb16fba3b17810ae5e41df02b649e564ab3c5a34b3b93ed07ad287e6"
-dependencies = [
- "libc",
- "libffi-sys",
-]
-
-[[package]]
-name = "libffi-sys"
-version = "2.0.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ab4106b7f09d7b87d021334d5618fac1dfcfb824d4c5fe111ff0074dfd242e15"
-dependencies = [
- "cc",
-]
 
 [[package]]
 name = "libloading"
