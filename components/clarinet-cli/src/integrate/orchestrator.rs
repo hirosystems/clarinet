@@ -10,10 +10,10 @@ use bollard::image::CreateImageOptions;
 use bollard::models::{HostConfig, PortBinding};
 use bollard::network::{ConnectNetworkOptions, CreateNetworkOptions, PruneNetworksOptions};
 use bollard::Docker;
+use chainhook_types::StacksNetwork;
 use clarinet_files::{DevnetConfigFile, NetworkManifest, ProjectManifest, DEFAULT_DEVNET_BALANCE};
 use crossterm::terminal::disable_raw_mode;
 use futures::stream::TryStreamExt;
-use orchestra_types::StacksNetwork;
 use std::collections::HashMap;
 use std::fs::{self, File};
 use std::io::Write;
@@ -45,9 +45,6 @@ impl DevnetOrchestrator {
         manifest: ProjectManifest,
         devnet_override: Option<DevnetConfigFile>,
     ) -> Result<DevnetOrchestrator, String> {
-        let docker_client = Docker::connect_with_socket_defaults()
-            .map_err(|e| format!("unable to connect to docker: {:?}", e))?;
-
         let mut network_config = NetworkManifest::from_project_manifest_location(
             &manifest.location,
             &StacksNetwork::Devnet.get_networks(),
@@ -227,6 +224,25 @@ impl DevnetOrchestrator {
                 }
             }
             _ => {}
+        };
+
+        let docker_client = match network_config.devnet {
+            Some(ref _devnet) => {
+                #[cfg(target_os = "unix")]
+                let res = if _devnet.docker_host.starts_with("unix://") {
+                    Docker::connect_with_unix(
+                        &_devnet.docker_host,
+                        120,
+                        bollard::API_DEFAULT_VERSION,
+                    )
+                } else {
+                    Docker::connect_with_socket_defaults()
+                };
+                #[cfg(not(target_os = "unix"))]
+                let res = Docker::connect_with_socket_defaults();
+                res.map_err(|e| format!("unable to connect to docker: {:?}", e))?
+            }
+            None => unreachable!(),
         };
 
         Ok(DevnetOrchestrator {
@@ -2385,7 +2401,7 @@ events_keys = ["*"]
         };
 
         let rpc = Client::new(
-            &format!("http://localhost:{}", devnet_config.bitcoin_node_rpc_port),
+            &format!("http://localhost:{}/", devnet_config.bitcoin_node_rpc_port),
             Auth::UserPass(
                 devnet_config.bitcoin_node_username.to_string(),
                 devnet_config.bitcoin_node_password.to_string(),

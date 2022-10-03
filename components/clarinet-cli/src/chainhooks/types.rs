@@ -1,5 +1,5 @@
-use orchestra_event_observer::chainhooks::types::*;
-use orchestra_types::{BitcoinNetwork, StacksNetwork};
+use chainhook_event_observer::chainhooks::types::*;
+use chainhook_types::{BitcoinNetwork, StacksNetwork};
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 use std::fs::File;
@@ -174,6 +174,8 @@ impl ChainhookSpecificationFile {
             version: self.version.unwrap_or(1),
             name: self.name.to_string(),
             network: network.clone(),
+            capture_all_events: None,
+            decode_clarity_values: None,
             start_block: network_spec.start_block,
             end_block: network_spec.end_block,
             expire_after_occurrence: network_spec.expire_after_occurrence,

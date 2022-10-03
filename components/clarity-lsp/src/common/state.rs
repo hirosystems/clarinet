@@ -1,5 +1,6 @@
 use crate::types::{CompletionItem, CompletionMaps};
 use crate::utils;
+use chainhook_types::StacksNetwork;
 use clarinet_deployments::{
     generate_default_deployment, initiate_session_from_deployment,
     update_session_with_contracts_executions,
@@ -13,7 +14,6 @@ use clarity_repl::clarity::vm::ast::ContractAST;
 use clarity_repl::clarity::vm::types::QualifiedContractIdentifier;
 use clarity_repl::clarity::vm::EvaluationResult;
 use lsp_types::MessageType;
-use orchestra_types::StacksNetwork;
 use std::borrow::BorrowMut;
 use std::collections::{HashMap, HashSet};
 

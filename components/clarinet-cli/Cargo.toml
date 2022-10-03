@@ -34,7 +34,6 @@ deno_webstorage = { version = "0.59.0" }
 deno_webidl = { version = "0.64.0" }
 deno_tls = { version = "0.51.0" }
 deno_http = { version = "0.58.0" }
-deno_ffi = { version = "0.51.0" }
 regex = "=1.5.6"
 serde = { version = "1.0.136", features = ["derive"] }
 lzzzz = '1.0'
@@ -141,8 +140,8 @@ mac_address = { version = "1.1.2", optional = true }
 tower-lsp = { version = "0.14.0", optional = true }
 hex = "0.4.3"
 serde_yaml = "0.8.23"
-orchestra_event_observer = { package = "orchestra-event-observer", default-features = false, path = "../../vendor/orchestra-event-observer" }
-orchestra_types = { package = "orchestra-types", path = "../../vendor/orchestra-types-rs" }
+chainhook_event_observer = { package = "chainhook-event-observer", default-features = false, path = "../chainhook-event-observer" }
+chainhook_types = { package = "chainhook-types", path = "../chainhook-types-rs" }
 stacks_rpc_client = { package = "stacks-rpc-client", path = "../stacks-rpc-client" }
 clarinet_files = { package = "clarinet-files", path = "../clarinet-files", features = ["cli"]  }
 clarity_lsp = { package = "clarity-lsp", path = "../clarity-lsp", features = ["cli"]  }

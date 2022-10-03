@@ -11,8 +11,8 @@ const {
 import {
   BitcoinChainUpdate,
   StacksChainUpdate,
-} from "@hirosystems/orchestra-types";
-export * from "@hirosystems/orchestra-types";
+} from "@hirosystems/chainhook-types";
+export * from "@hirosystems/chainhook-types";
 
 /**
  * Account to include in the genesis accounts

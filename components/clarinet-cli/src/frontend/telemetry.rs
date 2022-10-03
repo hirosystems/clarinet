@@ -5,7 +5,7 @@ use segment::{
     Client, HttpClient,
 };
 
-use orchestra_types::StacksNetwork;
+use chainhook_types::StacksNetwork;
 
 pub enum DeveloperUsageEvent {
     NewProject(DeveloperUsageDigest),

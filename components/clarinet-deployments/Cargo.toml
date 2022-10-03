@@ -8,8 +8,8 @@ serde = "1"
 serde_json = "1"
 serde_derive = "1"
 clarity_repl = { package = "clarity-repl", path = "../clarity-repl", default-features = false, optional = true }
-clarinet_files = { package = "clarinet-files", path = "../clarinet-files", default-features = false }
-orchestra_types = { package = "orchestra-types", path = "../../vendor/orchestra-types-rs" }
+clarinet_files =  { package = "clarinet-files", path = "../clarinet-files", default-features = false }
+chainhook_types = { package = "chainhook-types", path = "../chainhook-types-rs" }
 serde_yaml = "0.8.23"
 
 # CLI

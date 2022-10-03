@@ -1,0 +1,39 @@
+# Read about fixtures at https://api.rubyonrails.org/classes/ActiveRecord/FixtureSet.html
+
+one:
+  id: 1
+  owner: MyString
+  collateral: 1
+  collateral_type: MyString
+  collateral_token: MyString
+  stacked_tokens: 1
+  stacker_name: MyString
+  revoked_stacking: false
+  auto_payoff: false
+  debt: 1
+  created_at_block_height: 1
+  updated_at_block_height: 1
+  stability_fee_accrued: 1
+  stability_fee_last_accrued: 1
+  is_liquidated: false
+  auction_ended: false
+  leftover_collateral: 1
+
+two:
+  id: 1
+  owner: MyString
+  collateral: 1
+  collateral_type: MyString
+  collateral_token: MyString
+  stacked_tokens: 1
+  stacker_name: MyString
+  revoked_stacking: false
+  auto_payoff: false
+  debt: 1
+  created_at_block_height: 1
+  updated_at_block_height: 1
+  stability_fee_accrued: 1
+  stability_fee_last_accrued: 1
+  is_liquidated: false
+  auction_ended: false
+  leftover_collateral: 1

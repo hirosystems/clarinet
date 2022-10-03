@@ -1,0 +1,14 @@
+<p style="color: green"><%= notice %></p>
+
+<h1>Vaults</h1>
+
+<div id="vaults">
+  <% @vaults.each do |vault| %>
+    <%= render vault %>
+    <p>
+      <%= link_to "Show this vault", vault %>
+    </p>
+  <% end %>
+</div>
+
+<%= link_to "New vault", new_vault_path %>

@@ -87,12 +87,6 @@ impl deno_web::TimersPermission for Permissions {
     }
 }
 
-impl deno_ffi::FfiPermissions for Permissions {
-    fn check(&mut self, _path: Option<&Path>) -> Result<(), deno_core::error::AnyError> {
-        unreachable!("snapshotting!")
-    }
-}
-
 impl deno_net::NetPermissions for Permissions {
     fn check_net<T: AsRef<str>>(
         &mut self,
@@ -125,7 +119,6 @@ fn create_runtime_snapshot(snapshot_path: &Path, files: Vec<PathBuf>) {
             deno_broadcast_channel::InMemoryBroadcastChannel::default(),
             false, // No --unstable.
         ),
-        deno_ffi::init::<Permissions>(false),
         deno_net::init::<Permissions>(
             None, false, // No --unstable.
             None,

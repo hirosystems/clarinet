@@ -1,5 +1,8 @@
+use std::collections::BTreeMap;
+
 use super::{FileAccessor, FileLocation};
 use bip39::{Language, Mnemonic};
+use chainhook_types::{BitcoinNetwork, StacksNetwork};
 use clarinet_utils::get_bip39_seed_from_mnemonic;
 use clarity_repl::clarity::address::AddressHashMode;
 use clarity_repl::clarity::stacks_common::types::chainstate::StacksAddress;
@@ -7,8 +10,6 @@ use clarity_repl::clarity::util::hash::bytes_to_hex;
 use clarity_repl::clarity::util::secp256k1::Secp256k1PublicKey;
 use clarity_repl::clarity::vm::types::QualifiedContractIdentifier;
 use libsecp256k1::{PublicKey, SecretKey};
-use orchestra_types::{BitcoinNetwork, StacksNetwork};
-use std::collections::BTreeMap;
 use tiny_hderive::bip32::ExtendedPrivKey;
 use toml::value::Value;
 
@@ -25,6 +26,10 @@ pub const DEFAULT_HYPERCHAIN_CONTRACT_ID: &str =
 pub const DEFAULT_STACKS_MINER_MNEMONIC: &str = "fragile loan twenty basic net assault jazz absorb diet talk art shock innocent float punch travel gadget embrace caught blossom hockey surround initial reduce";
 pub const DEFAULT_FAUCET_MNEMONIC: &str = "shadow private easily thought say logic fault paddle word top book during ignore notable orange flight clock image wealth health outside kitten belt reform";
 pub const DEFAULT_HYPERCHAIN_MNEMONIC: &str = "female adjust gallery certain visit token during great side clown fitness like hurt clip knife warm bench start reunion globe detail dream depend fortune";
+#[cfg(unix)]
+pub const DEFAULT_DOCKER_SOCKET: &str = "unix:///var/run/docker.sock";
+#[cfg(windows)]
+pub const DEFAULT_DOCKER_SOCKET: &str = "npipe:////./pipe/docker_engine";
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct NetworkManifestFile {
@@ -95,6 +100,8 @@ pub struct DevnetConfigFile {
     pub hyperchain_api_port: Option<u16>,
     pub hyperchain_api_events_port: Option<u16>,
     pub disable_hyperchain_api: Option<bool>,
+    pub docker_host: Option<String>,
+    pub components_host: Option<String>,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -199,6 +206,8 @@ pub struct DevnetConfig {
     pub hyperchain_api_port: u16,
     pub hyperchain_api_events_port: u16,
     pub disable_hyperchain_api: bool,
+    pub docker_host: String,
+    pub components_host: String,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -549,6 +558,10 @@ impl NetworkManifest {
                 hyperchain_api_port: devnet_config.hyperchain_api_port.unwrap_or(13999),
                 hyperchain_api_events_port: devnet_config.stacks_api_events_port.unwrap_or(13700),
                 disable_hyperchain_api: devnet_config.disable_hyperchain_api.unwrap_or(true),
+                docker_host: devnet_config
+                    .docker_host
+                    .unwrap_or(DEFAULT_DOCKER_SOCKET.into()),
+                components_host: devnet_config.components_host.unwrap_or("127.0.0.1".into()),
             };
             if !config.disable_stacks_api && config.disable_stacks_api {
                 config.disable_stacks_api = false;

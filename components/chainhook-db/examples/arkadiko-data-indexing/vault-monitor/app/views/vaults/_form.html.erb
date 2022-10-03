@@ -1,0 +1,102 @@
+<%= form_with(model: vault) do |form| %>
+  <% if vault.errors.any? %>
+    <div style="color: red">
+      <h2><%= pluralize(vault.errors.count, "error") %> prohibited this vault from being saved:</h2>
+
+      <ul>
+        <% vault.errors.each do |error| %>
+          <li><%= error.full_message %></li>
+        <% end %>
+      </ul>
+    </div>
+  <% end %>
+
+  <div>
+    <%= form.label :id, style: "display: block" %>
+    <%= form.number_field :id %>
+  </div>
+
+  <div>
+    <%= form.label :owner, style: "display: block" %>
+    <%= form.text_field :owner %>
+  </div>
+
+  <div>
+    <%= form.label :collateral, style: "display: block" %>
+    <%= form.number_field :collateral %>
+  </div>
+
+  <div>
+    <%= form.label :collateral_type, style: "display: block" %>
+    <%= form.text_field :collateral_type %>
+  </div>
+
+  <div>
+    <%= form.label :collateral_token, style: "display: block" %>
+    <%= form.text_field :collateral_token %>
+  </div>
+
+  <div>
+    <%= form.label :stacked_tokens, style: "display: block" %>
+    <%= form.number_field :stacked_tokens %>
+  </div>
+
+  <div>
+    <%= form.label :stacker_name, style: "display: block" %>
+    <%= form.text_field :stacker_name %>
+  </div>
+
+  <div>
+    <%= form.label :revoked_stacking, style: "display: block" %>
+    <%= form.check_box :revoked_stacking %>
+  </div>
+
+  <div>
+    <%= form.label :auto_payoff, style: "display: block" %>
+    <%= form.check_box :auto_payoff %>
+  </div>
+
+  <div>
+    <%= form.label :debt, style: "display: block" %>
+    <%= form.number_field :debt %>
+  </div>
+
+  <div>
+    <%= form.label :created_at_block_height, style: "display: block" %>
+    <%= form.number_field :created_at_block_height %>
+  </div>
+
+  <div>
+    <%= form.label :updated_at_block_height, style: "display: block" %>
+    <%= form.number_field :updated_at_block_height %>
+  </div>
+
+  <div>
+    <%= form.label :stability_fee_accrued, style: "display: block" %>
+    <%= form.number_field :stability_fee_accrued %>
+  </div>
+
+  <div>
+    <%= form.label :stability_fee_last_accrued, style: "display: block" %>
+    <%= form.number_field :stability_fee_last_accrued %>
+  </div>
+
+  <div>
+    <%= form.label :is_liquidated, style: "display: block" %>
+    <%= form.check_box :is_liquidated %>
+  </div>
+
+  <div>
+    <%= form.label :auction_ended, style: "display: block" %>
+    <%= form.check_box :auction_ended %>
+  </div>
+
+  <div>
+    <%= form.label :leftover_collateral, style: "display: block" %>
+    <%= form.number_field :leftover_collateral %>
+  </div>
+
+  <div>
+    <%= form.submit %>
+  </div>
+<% end %>

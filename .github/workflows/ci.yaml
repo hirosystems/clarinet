@@ -101,7 +101,7 @@ jobs:
   #         - name: clarity-repl
   #           working-directory: components/clarity-repl
   #         - name: oreo
-  #           working-directory: vendor/orchestra-event-observer
+  #           working-directory: components/chainhook-event-observer
   #   steps:
   #     - name: Checkout repository
   #       uses: actions/checkout@v3
@@ -533,11 +533,11 @@ jobs:
           echo "PRE_GYP_TARGET_NAME=linux-x64-glibc" >> $GITHUB_ENV
 
       - name: Build - Cargo
-        working-directory: vendor/orchestra-event-observer
+        working-directory: components/chainhook-event-observer
         run: cargo build --release --locked --target x86_64-unknown-linux-gnu
 
       - name: Compress cargo artifact
-        run: tar -C target/x86_64-unknown-linux-gnu/release -zcvf oreo-${{ env.SHORT_TARGET_NAME }}.tar.gz orchestra-event-observer
+        run: tar -C target/x86_64-unknown-linux-gnu/release -zcvf oreo-${{ env.SHORT_TARGET_NAME }}.tar.gz chainhook-event-observer
 
       - name: Upload cargo artifacts
         uses: actions/upload-artifact@v2
@@ -643,9 +643,9 @@ jobs:
             image: ${{ github.repository }}
             artifact: clarinet-linux-x64-glibc
             dockerfile: dockerfiles/ci/clarinet.dockerfile
-          - name: Orchestra Event Observer (Oreo)
+          - name: Chainhook Event Observer (Oreo)
             description: A Stacks event observer.
-            image: ${{ github.repository_owner }}/orchestra-event-observer
+            image: ${{ github.repository_owner }}/chainhook-event-observer
             artifact: oreo-linux-x64-glibc
             dockerfile: dockerfiles/ci/oreo.dockerfile
     steps:

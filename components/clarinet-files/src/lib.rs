@@ -14,11 +14,11 @@ mod wasm_fs_accessor;
 #[cfg(feature = "wasm")]
 pub use wasm_fs_accessor::WASMFileSystemAccessor;
 
+use chainhook_types::StacksNetwork;
 pub use network_manifest::{
     compute_addresses, AccountConfig, DevnetConfig, DevnetConfigFile, NetworkManifest,
     NetworkManifestFile, PoxStackingOrder, DEFAULT_DERIVATION_PATH,
 };
-use orchestra_types::StacksNetwork;
 pub use project_manifest::{ProjectManifest, ProjectManifestFile, RequirementConfig};
 use serde::ser::{Serialize, SerializeMap, Serializer};
 use std::collections::HashMap;
