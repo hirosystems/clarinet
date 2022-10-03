@@ -227,20 +227,19 @@ impl DevnetOrchestrator {
         };
 
         let docker_client = match network_config.devnet {
-            Some(ref devnet) => {
-                let res = if cfg!(target_os = "unix") {
-                    if devnet.docker_host.starts_with("unix://") {
-                        Docker::connect_with_unix(
-                            &devnet.docker_host,
-                            120,
-                            bollard::API_DEFAULT_VERSION,
-                        )
-                    } else {
-                        Docker::connect_with_socket_defaults()
-                    }
+            Some(ref _devnet) => {
+                #[cfg(target_os = "unix")]
+                let res = if _devnet.docker_host.starts_with("unix://") {
+                    Docker::connect_with_unix(
+                        &_devnet.docker_host,
+                        120,
+                        bollard::API_DEFAULT_VERSION,
+                    )
                 } else {
                     Docker::connect_with_socket_defaults()
                 };
+                #[cfg(not(target_os = "unix"))]
+                let res = Docker::connect_with_socket_defaults();
                 res.map_err(|e| format!("unable to connect to docker: {:?}", e))?
             }
             None => unreachable!(),
