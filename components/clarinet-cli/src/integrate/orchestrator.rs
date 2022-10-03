@@ -228,7 +228,7 @@ impl DevnetOrchestrator {
 
         let docker_client = match network_config.devnet {
             Some(ref devnet) => {
-                let res = if cfg!(unix) {
+                let res = if cfg!(target_os = "unix") {
                     if devnet.docker_host.starts_with("unix://") {
                         Docker::connect_with_unix(
                             &devnet.docker_host,
