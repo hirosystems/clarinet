@@ -7,6 +7,7 @@ pub mod session;
 pub mod settings;
 pub mod tracer;
 
+use serde::ser::{Serialize, SerializeMap, Serializer};
 use std::convert::TryInto;
 use std::fmt::Display;
 use std::path::PathBuf;
@@ -23,13 +24,44 @@ use clarity::vm::ClarityVersion;
 pub const DEFAULT_CLARITY_VERSION: ClarityVersion = ClarityVersion::Clarity1;
 pub const DEFAULT_EPOCH: StacksEpochId = StacksEpochId::Epoch20;
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Deserialize, Debug, Clone)]
 pub struct ClarityContract {
     pub code_source: ClarityCodeSource,
     pub name: String,
     pub deployer: ContractDeployer,
     pub clarity_version: ClarityVersion,
     pub epoch: StacksEpochId,
+}
+
+impl Serialize for ClarityContract {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        let mut map = serializer.serialize_map(Some(1))?;
+        match self.code_source {
+            ClarityCodeSource::ContractOnDisk(ref path) => {
+                map.serialize_entry("path", &format!("{}", path.display()))?;
+            }
+            _ => unreachable!(),
+        }
+        match self.deployer {
+            ContractDeployer::LabeledDeployer(ref label) => {
+                map.serialize_entry("deployer_label", &label)?;
+            }
+            ContractDeployer::DefaultDeployer => {}
+            _ => unreachable!(),
+        }
+        match self.clarity_version {
+            ClarityVersion::Clarity1 => {
+                map.serialize_entry("clarity_version", &1)?;
+            }
+            ClarityVersion::Clarity2 => {
+                map.serialize_entry("clarity_version", &2)?;
+            }
+        }
+        map.end()
+    }
 }
 
 impl Display for ClarityContract {

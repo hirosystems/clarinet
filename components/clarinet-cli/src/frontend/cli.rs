@@ -1597,7 +1597,7 @@ fn execute_changes(changes: Vec<Changes>) -> bool {
         let toml_value = match toml::Value::try_from(&project_manifest) {
             Ok(value) => value,
             Err(e) => {
-                println!("{}: Failed to encode config file: {}", red!("error"), e);
+                println!("{}: failed encoding config file ({})", red!("error"), e);
                 return false;
             }
         };
