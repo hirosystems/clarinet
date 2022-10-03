@@ -107,6 +107,7 @@ pub fn run_scripts(
     import_map: Option<String>,
     allow_net: bool,
     cache_location: FileLocation,
+    ts_config: Option<String>,
 ) -> Result<usize, (AnyError, usize)> {
     block_on(deno::do_run_scripts(
         include,
@@ -123,6 +124,7 @@ pub fn run_scripts(
         import_map,
         allow_net,
         cache_location,
+        ts_config,
     ))
 }
 
