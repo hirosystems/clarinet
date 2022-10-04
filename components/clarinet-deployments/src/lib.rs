@@ -463,7 +463,7 @@ pub async fn generate_default_deployment(
 
     let base_location = manifest.location.clone().get_parent_location()?;
 
-    let mut sources: HashMap<String, String> = match file_accessor {
+    let sources: HashMap<String, String> = match file_accessor {
         None => {
             let mut sources = HashMap::new();
             for (_, contract_config) in manifest.contracts.iter() {
@@ -527,8 +527,9 @@ pub async fn generate_default_deployment(
         let mut contract_location = base_location.clone();
         contract_location.append_path(&contract_config.expect_contract_path_as_str())?;
         let source = sources
-            .remove(&contract_location.to_string())
-            .ok_or(format!("source not found for {}", name))?;
+            .get(&contract_location.to_string())
+            .ok_or(format!("source not found for {}", name))?
+            .clone();
 
         let contract_id = QualifiedContractIdentifier::new(sender.clone(), contract_name.clone());
 

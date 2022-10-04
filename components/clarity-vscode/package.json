@@ -5,7 +5,7 @@
   "author": "Hiro Systems",
   "publisher": "hugoclrd",
   "license": "GPL-3.0-only",
-  "version": "0.2.7",
+  "version": "0.2.8",
   "workspaces": [
     "client",
     "server",
