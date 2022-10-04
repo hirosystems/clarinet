@@ -528,7 +528,10 @@ pub async fn generate_default_deployment(
         contract_location.append_path(&contract_config.expect_contract_path_as_str())?;
         let source = sources
             .get(&contract_location.to_string())
-            .ok_or(format!("source not found for {}", name))?
+            .ok_or(format!(
+                "Invalid Clarinet.toml, source file not found for: {}",
+                name
+            ))?
             .clone();
 
         let contract_id = QualifiedContractIdentifier::new(sender.clone(), contract_name.clone());

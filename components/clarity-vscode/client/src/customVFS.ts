@@ -40,10 +40,21 @@ export function initVFS(client: LanguageClient) {
   client.onRequest("vfs/readFiles", async (event: any) => {
     if (!isValidReadManyEvent(event)) throw new Error("invalid read event");
     const files = await Promise.all(
-      event.paths.map((p) => fs.readFile(Uri.parse(p))),
+      event.paths.map(async (p) => {
+        try {
+          const contract = await fs.readFile(Uri.parse(p));
+          return contract;
+        } catch (err) {
+          console.warn(err);
+          return null;
+        }
+      }),
     );
     return Object.fromEntries(
-      files.map((f, i) => [event.paths[i], fileArrayToString(f)]),
+      files.reduce((acc, f, i) => {
+        if (f === null) return acc;
+        return acc.concat([[event.paths[i], fileArrayToString(f)]]);
+      }, [] as [string, string][]),
     );
   });
 
