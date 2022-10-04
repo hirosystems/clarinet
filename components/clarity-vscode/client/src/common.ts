@@ -44,15 +44,10 @@ export async function initClient(
     config = workspace.getConfiguration("obscurity-web-extension");
   });
 
-  // vscode.commands.executeCommand(
-  //   "obscurity-web-extension.clarityInsightsView.focus",
-  // );
-
   /* clariy lsp */
   async function changeSelectionHandler(
     e: vscode.TextEditorSelectionChangeEvent,
   ) {
-    if (!config.panels["insights-panel"]) return;
     if (!e?.textEditor?.document) return;
     const path = e.textEditor.document.uri.toString();
     const { line, character } = e.selections[0].active;
@@ -79,15 +74,17 @@ export async function initClient(
   try {
     await client.start();
 
-    if (window.activeTextEditor) {
-      const { document } = window.activeTextEditor;
-      if (document.languageId !== "clarity") return;
-      insightsViewProvider.fileName = document;
-    }
+    if (config.panels["insights-panel"]) {
+      if (window.activeTextEditor) {
+        const { document } = window.activeTextEditor;
+        if (document.languageId !== "clarity") return;
+        insightsViewProvider.fileName = document;
+      }
 
-    context.subscriptions.push(
-      window.onDidChangeTextEditorSelection(changeSelectionHandler),
-    );
+      context.subscriptions.push(
+        window.onDidChangeTextEditorSelection(changeSelectionHandler),
+      );
+    }
   } catch (err) {
     if (err.message === "worker timeout") {
       vscode.window.showWarningMessage(

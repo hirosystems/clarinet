@@ -6,8 +6,8 @@ import {
 } from "vscode-languageserver";
 import type { ServerCapabilities, Connection } from "vscode-languageserver";
 
-// this type is the same for the browser and node
-import type { LspVscodeBridge } from "./clarity-lsp-node";
+// this type is the same for the browser and node but node isn't alwasy built in dev
+import type { LspVscodeBridge } from "./clarity-lsp-browser";
 
 export function initConnection(
   connection: Connection,
@@ -30,7 +30,11 @@ export function initConnection(
   async function consumeNotification() {
     const notification = notifications[notifications.length - 1];
     if (!notifications) return;
-    await bridge.onNotification(...notification);
+    try {
+      await bridge.onNotification(...notification);
+    } catch (err) {
+      console.warn(err);
+    }
     notifications.pop();
     if (notifications.length > 0) consumeNotification();
   }

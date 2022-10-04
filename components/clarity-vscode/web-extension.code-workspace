@@ -7,6 +7,7 @@
   "settings": {
     "typescript.tsc.autoDetect": "off",
     "rust-analyzer.cargo.features": ["clarity-lsp/wasm", "clarity/wasm"],
-    "rust-analyzer.cargo.noDefaultFeatures": true
+    "rust-analyzer.cargo.noDefaultFeatures": true,
+    "rust-analyzer.debug.openDebugPane": true
   }
 }

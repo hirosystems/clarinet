@@ -5,7 +5,7 @@
   "author": "Hiro Systems",
   "publisher": "hugoclrd",
   "license": "GPL-3.0-only",
-  "version": "0.2.5",
+  "version": "0.2.9",
   "workspaces": [
     "client",
     "server",
@@ -39,9 +39,8 @@
     "vscode": "^1.43.0"
   },
   "activationEvents": [
-    "onDebug",
-    "onLanguage:clarity",
-    "onLanguage:toml"
+    "workspaceContains:Clarinet.toml",
+    "onLanguage:clarity"
   ],
   "main": "./client/dist/clientNode.js",
   "browser": "./client/dist/clientBrowser.js",
@@ -62,11 +61,6 @@
             ],
             "default": "verbose",
             "description": "Traces the communication between VS Code and the web-extension language server."
-          },
-          "obscurity-web-extension.panels.insights-panel": {
-            "type": "boolean",
-            "scope": "window",
-            "default": false
           }
         }
       }
@@ -106,7 +100,8 @@
         {
           "id": "clarityPanel",
           "title": "Clarity",
-          "icon": "assets/images/file-icon/clar-darktheme.svg"
+          "icon": "assets/images/file-icon/clar-darktheme.svg",
+          "when": "config.obscurity-web-extension.panels.insights-panel"
         }
       ]
     },

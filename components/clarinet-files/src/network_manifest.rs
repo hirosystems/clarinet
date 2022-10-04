@@ -30,7 +30,7 @@ pub const DEFAULT_HYPERCHAIN_MNEMONIC: &str = "female adjust gallery certain vis
 pub const DEFAULT_DOCKER_SOCKET: &str = "unix:///var/run/docker.sock";
 #[cfg(windows)]
 pub const DEFAULT_DOCKER_SOCKET: &str = "npipe:////./pipe/docker_engine";
-#[cfg(macos)]
+#[cfg(target_family = "wasm")]
 pub const DEFAULT_DOCKER_SOCKET: &str = "/var/run/docker.sock";
 
 #[derive(Serialize, Deserialize, Debug)]
