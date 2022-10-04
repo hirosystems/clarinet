@@ -47,7 +47,7 @@ impl Serialize for ClarityContract {
         }
         match self.deployer {
             ContractDeployer::LabeledDeployer(ref label) => {
-                map.serialize_entry("deployer_label", &label)?;
+                map.serialize_entry("deployer", &label)?;
             }
             ContractDeployer::DefaultDeployer => {}
             _ => unreachable!(),

@@ -76,9 +76,6 @@ impl Default for Settings {
 #[derive(Debug, Default, Clone, Deserialize, Serialize)]
 pub struct SettingsFile {
     pub analysis: Option<analysis::SettingsFile>,
-    pub costs_version: Option<u32>,
-    pub clarity_version: Option<ClarityVersion>,
-    pub epoch: Option<StacksEpochId>,
 }
 
 impl From<SettingsFile> for Settings {

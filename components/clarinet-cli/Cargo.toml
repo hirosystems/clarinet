@@ -51,14 +51,14 @@ deno_core =  { version = "0.146.0", optional = true }
 deno_ast = { version = "0.17.0", features = ["cjs"], optional = true }
 deno_tls = { version = "0.51.0", optional = true }
 deno_web = { version = "0.95.0", optional = true }
-deno_ops = "0.24.0"
-deno_net = "0.56.0"
-deno_url = "0.64.0"
+deno_ops = { version = "0.24.0", optional = true }
+deno_net = { version = "0.56.0", optional = true }
+deno_url = { version = "0.64.0", optional = true }
 lzzzz = '1.0'
 ### To eliminate
-deno_console = { version = "0.64.0" }
-deno_webstorage = { version = "0.59.0" }
-deno_broadcast_channel = "0.58.0"
+deno_console = { version = "0.64.0", optional = true }
+deno_webstorage = { version = "0.59.0", optional = true }
+deno_broadcast_channel = { version = "0.58.0", optional = true }
 hyper = { version = "0.14.18", features = ["server", "stream", "http1", "http2", "runtime"] }
 http = "0.2.6"
 ###
@@ -71,7 +71,7 @@ walkdir =  { version = "=2.3.2", optional = true }
 node_resolver = { version = "0.1.1", optional = true }
 cache_control = { version = "=0.2.0", optional = true }
 notify = "=5.0.0-pre.7"
-dlopen = "0.1.8"
+dlopen = { version = "0.1.8", optional = true }
 log = { version = "=0.4.17", features = ["serde"] }
 filetime = "0.2.16"
 mitata = '=0.0.7'
@@ -203,6 +203,13 @@ cli = [
     "deno_fetch",
     "deno_web",
     "deno_crypto",
+    "deno_ops",
+    "deno_net",
+    "deno_url",
+    "deno_console",
+    "deno_webstorage",
+    "deno_broadcast_channel",
+    "dlopen",
     "import_map",
     "once_cell",
     "node_resolver",
