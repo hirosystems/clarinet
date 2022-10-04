@@ -481,7 +481,7 @@ name = "my-project"
 contract_id = "SP2PABAF9FTAJYNFZH93XENAJ8FVY99RRM50D2JG9.nft-trait"
 
 [project.cache_location]
-path = ".requirements"
+path = ".cache"
 
 [contracts.bitcoin-whales]
 path = "contracts/bitcoin-whales.clar"
@@ -492,10 +492,6 @@ path = "contracts/conversion.clar"
 
 [contracts.conversion-v2]
 path = "contracts/conversion-v2.clar"
-
-[repl]
-costs_version = 2
-parser_version = 2
 
 [repl.analysis]
 passes = ["check_checker"]

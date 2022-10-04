@@ -31,8 +31,6 @@ pub struct ProjectConfigFile {
     // The fields below have been moved into repl above, but are kept here for
     // backwards compatibility.
     analysis: Option<Vec<clarity_repl::analysis::Pass>>,
-    costs_version: Option<u32>,
-    parser_version: Option<u32>,
     cache_dir: Option<String>,
 }
 

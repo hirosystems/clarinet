@@ -496,7 +496,7 @@ jobs:
           token: ${{ secrets.NPM_TOKEN }}
 
   dist_oreo:
-    name: Build Oreo Distribution
+    name: Build Chainhook event observere Distribution
     runs-on: ubuntu-latest
     needs: pre_run
 

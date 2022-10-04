@@ -1,6 +1,6 @@
 // Copyright 2018-2022 the Deno authors. All rights reserved. MIT license.
 
-use super::vendor::deno_cli::args::TypeCheckMode;
+use super::vendor::deno_cli::args::{ConfigFlag, TypeCheckMode};
 use super::vendor::deno_cli::args::{DenoSubcommand, Flags, TestFlags};
 use super::vendor::deno_cli::file_fetcher::File;
 use super::vendor::deno_cli::file_watcher;
@@ -63,6 +63,7 @@ pub async fn do_run_scripts(
     import_map: Option<String>,
     allow_net: bool,
     cache_location: FileLocation,
+    ts_config: Option<String>,
 ) -> Result<usize, (AnyError, usize)> {
     let project_root = manifest.location.get_project_root_location().unwrap();
     let cwd = PathBuf::from(&project_root.to_string());
@@ -123,6 +124,10 @@ pub async fn do_run_scripts(
         ignore: vec![],                       // todo(lgalabru)
         type_check_mode: TypeCheckMode::None, // todo(lgalabru)
         compat: false,
+        config_flag: match ts_config {
+            Some(ref ts_config) => ConfigFlag::Path(ts_config.clone()),
+            None => ConfigFlag::Discover,
+        },
         ..Default::default()
     };
 

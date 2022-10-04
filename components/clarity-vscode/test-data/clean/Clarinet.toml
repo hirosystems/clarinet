@@ -4,18 +4,13 @@ authors = []
 description = ""
 telemetry = false
 requirements = []
-cache_dir = "/Users/hugo/Sites/hiro/lab/lsp-web/test-data/./.requirements"
-boot_contracts = ["pox", "costs-v2", "bns"]
+cache_dir = "./.cache"
 
 [contracts.contract]
 path = "contracts/contract.clar"
 
 [contracts.counter]
 path = "contracts/counter.clar"
-
-[repl]
-costs_version = 2
-parser_version = 2
 
 [repl.analysis]
 passes = ["check_checker"]

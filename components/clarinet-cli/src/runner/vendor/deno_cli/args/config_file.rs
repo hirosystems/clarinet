@@ -104,7 +104,7 @@ pub const IGNORED_COMPILER_OPTIONS: &[&str] = &[
     "emitBOM",
     "emitDeclarationOnly",
     "esModuleInterop",
-    "experimentalDecorators",
+    // "experimentalDecorators",
     "extendedDiagnostics",
     "forceConsistentCasingInFileNames",
     "generateCpuProfile",

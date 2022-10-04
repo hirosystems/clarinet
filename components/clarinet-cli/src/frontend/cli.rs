@@ -396,6 +396,9 @@ struct Test {
     /// Allow network access
     #[clap(long = "allow-net")]
     pub allow_net: bool,
+    /// Specify optional Typescript config file
+    #[clap(long = "ts-config")]
+    pub ts_config: Option<String>,
 }
 
 #[derive(Parser, PartialEq, Clone, Debug)]
@@ -1054,6 +1057,7 @@ pub fn main() {
                 cmd.import_map,
                 cmd.allow_net,
                 cache_location,
+                cmd.ts_config,
             ) {
                 Ok(count) => (true, count),
                 Err((e, count)) => {
@@ -1096,6 +1100,7 @@ pub fn main() {
                 None,
                 false,
                 cache_location,
+                None,
             );
         }
         Command::Integrate(cmd) => {
@@ -1597,7 +1602,7 @@ fn execute_changes(changes: Vec<Changes>) -> bool {
         let toml_value = match toml::Value::try_from(&project_manifest) {
             Ok(value) => value,
             Err(e) => {
-                println!("{}: Failed to encode config file: {}", red!("error"), e);
+                println!("{}: failed encoding config file ({})", red!("error"), e);
                 return false;
             }
         };

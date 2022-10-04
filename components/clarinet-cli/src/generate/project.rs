@@ -177,7 +177,7 @@ history.txt
 name = "{}"
 authors = []
 telemetry = {}
-cache_dir = "./.requirements"
+cache_dir = "./.cache"
 
 # [contracts.counter]
 # path = "contracts/counter.clar"
