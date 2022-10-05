@@ -3,11 +3,16 @@ import {
   CompletionRequest,
   MarkupKind,
   InsertTextFormat,
+  DidOpenTextDocumentParams,
+  DidCloseTextDocumentNotification,
+  DidOpenTextDocumentNotification,
 } from "vscode-languageserver";
 import type { ServerCapabilities, Connection } from "vscode-languageserver";
 
 // this type is the same for the browser and node but node isn't alwasy built in dev
 import type { LspVscodeBridge } from "./clarity-lsp-browser";
+
+const VALID_PROTOCOLS = ["file", "vscode-vfs", "vscode-test-web"];
 
 export function initConnection(
   connection: Connection,
@@ -40,6 +45,21 @@ export function initConnection(
   }
 
   connection.onNotification((method: string, params: unknown) => {
+    // vscode.dev sends didOpen notification twice
+    // including a notification with a read only github:// url
+    // instead of vscode-vfs://
+    if (method === DidOpenTextDocumentNotification.method) {
+      const [protocol] = (
+        params as DidOpenTextDocumentParams
+      ).textDocument.uri.split("://");
+
+      if (!VALID_PROTOCOLS.includes(protocol)) return;
+    } else if (method === DidCloseTextDocumentNotification.method) {
+      // ignore didClose notifications
+      // it fires twice as well for nothing
+      return;
+    }
+
     notifications.push([method, params]);
     if (notifications.length === 1) consumeNotification();
   });
