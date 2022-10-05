@@ -1,5 +1,5 @@
 import * as vscode from "vscode";
-import { ExtensionContext, Uri } from "vscode";
+import { ExtensionContext } from "vscode";
 import { LanguageClientOptions } from "vscode-languageclient";
 
 import { initVFS } from "./customVFS";
