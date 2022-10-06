@@ -178,7 +178,7 @@ pub async fn start_chains_coordinator(
     let protocol_deployed = Arc::new(AtomicBool::new(false));
 
     let mut deployment_events_rx = Some(deployment_events_rx);
-    let mut hyperchain_initialized = false;
+    let mut subnet_initialized = false;
 
     loop {
         // Did we receive a termination notice?
@@ -370,18 +370,18 @@ pub async fn start_chains_coordinator(
             ObserverEvent::StacksChainMempoolEvent(mempool_event) => match mempool_event {
                 StacksChainMempoolEvent::TransactionsAdmitted(transactions) => {
                     // Temporary UI patch
-                    if config.devnet_config.enable_hyperchain_node && !hyperchain_initialized {
+                    if config.devnet_config.enable_subnet_node && !subnet_initialized {
                         for tx in transactions.iter() {
                             if tx.tx_description.contains("::commit-block") {
                                 let _ = devnet_event_tx.send(DevnetEvent::ServiceStatus(
                                     ServiceStatusData {
                                         order: 5,
                                         status: Status::Green,
-                                        name: "hyperchain-node".into(),
+                                        name: "subnet-node".into(),
                                         comment: format!("⚡️"),
                                     },
                                 ));
-                                hyperchain_initialized = true;
+                                subnet_initialized = true;
                                 break;
                             }
                         }

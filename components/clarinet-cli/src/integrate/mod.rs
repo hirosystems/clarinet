@@ -127,7 +127,7 @@ pub async fn do_run_devnet(
             moved_observer_command_tx,
             orchestrator_terminated_rx,
             &devnet_path,
-            devnet_config.enable_hyperchain_node,
+            devnet_config.enable_subnet_node,
         );
     } else {
         let moved_events_observer_commands_tx = chains_coordinator_commands_tx.clone();
