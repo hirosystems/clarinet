@@ -314,10 +314,14 @@ impl NetworkManifest {
 
                             let mnemonic = match account_settings.get("mnemonic") {
                                 Some(Value::String(words)) => {
-                                    match                                     Mnemonic::parse_in_normalized(Language::English, words) {
+                                    match Mnemonic::parse_in_normalized(Language::English, words) {
                                         Ok(result) => result.to_string(),
                                         Err(e) => {
-                                            println!("Error: mnemonic for wallet '{}' invalid: {}", account_name, e.to_string());
+                                            println!(
+                                                "Error: mnemonic for wallet '{}' invalid: {}",
+                                                account_name,
+                                                e.to_string()
+                                            );
                                             std::process::exit(1);
                                         }
                                     }
