@@ -4,7 +4,7 @@
   "description": "Provides validation, syntax highlighting, code completion, and debugging for Clarity smart contracts",
   "author": "Hiro Systems",
   "publisher": "hirosystems",
-  "icon": "images/stacks.png",
+  "icon": "assets/images/clarity-logo.png",
   "homepage": "https://github.com/hirosystems/clarinet",
   "bugs": "https://github.com/hirosystems/clarinet/issues",
   "license": "GPL-3.0-only",
@@ -27,9 +27,9 @@
     "dev:watch": "webpack -c ./webpack.config.dev.js -w",
     "dev:browser": "vscode-test-web --extensionDevelopmentPath=. ./test-data --open-devtools --browser=chromium",
     "dev": "webpack -c ./webpack.config.dev.js; concurrently \"npm:dev:*\"",
-    "package": "npm run clean; NODE_ENV=production webpack",
-    "vsce:package": "npm run package; vsce package",
-    "vsce:publish": "npm run package; vsce publish"
+    "vscode:prepublish": "npm run clean; NODE_ENV=production webpack",
+    "vsce:package": "vsce package",
+    "vsce:publish": "vsce publish"
   },
   "categories": [
     "Programming Languages",
@@ -63,10 +63,10 @@
     "configuration": [
       {
         "order": 22,
-        "id": "obscurity-web-extension",
+        "id": "clariy-lsp",
         "title": "Clarity",
         "properties": {
-          "obscurity-web-extension.trace.server": {
+          "clariy-lsp.trace.server": {
             "type": "string",
             "scope": "window",
             "enum": [
@@ -116,7 +116,7 @@
           "id": "clarityPanel",
           "title": "Clarity",
           "icon": "assets/images/file-icon/clar-darktheme.svg",
-          "when": "config.obscurity-web-extension.panels.insights-panel"
+          "when": "config.clariy-lsp.panels.insights-panel"
         }
       ]
     },
@@ -124,9 +124,9 @@
       "clarityPanel": [
         {
           "type": "webview",
-          "id": "obscurity-web-extension.clarityInsightsView",
+          "id": "clariy-lsp.clarityInsightsView",
           "name": "Insights",
-          "when": "config.obscurity-web-extension.panels.insights-panel"
+          "when": "config.clariy-lsp.panels.insights-panel"
         }
       ]
     },
