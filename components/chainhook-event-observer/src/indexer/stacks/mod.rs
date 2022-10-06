@@ -114,6 +114,73 @@ pub struct NewEvent {
     pub contract_event: Option<JsonValue>,
 }
 
+impl NewEvent {
+    pub fn into_chainhook_event(&self) -> StacksTransactionEvent {
+        if let Some(ref event_data) = self.stx_mint_event {
+            let data: STXMintEventData =
+                serde_json::from_value(event_data.clone()).expect("Unable to decode event_data");
+            return StacksTransactionEvent::STXMintEvent(data.clone());
+        } else if let Some(ref event_data) = self.stx_lock_event {
+            let data: STXLockEventData =
+                serde_json::from_value(event_data.clone()).expect("Unable to decode event_data");
+            return StacksTransactionEvent::STXLockEvent(data.clone());
+        } else if let Some(ref event_data) = self.stx_burn_event {
+            let data: STXBurnEventData =
+                serde_json::from_value(event_data.clone()).expect("Unable to decode event_data");
+            return StacksTransactionEvent::STXBurnEvent(data.clone());
+        } else if let Some(ref event_data) = self.stx_transfer_event {
+            let data: STXTransferEventData =
+                serde_json::from_value(event_data.clone()).expect("Unable to decode event_data");
+            return StacksTransactionEvent::STXTransferEvent(data.clone());
+        } else if let Some(ref event_data) = self.nft_mint_event {
+            let data: NFTMintEventData =
+                serde_json::from_value(event_data.clone()).expect("Unable to decode event_data");
+            StacksTransactionEvent::NFTMintEvent(data.clone());
+        } else if let Some(ref event_data) = self.nft_burn_event {
+            let data: NFTBurnEventData =
+                serde_json::from_value(event_data.clone()).expect("Unable to decode event_data");
+            return StacksTransactionEvent::NFTBurnEvent(data.clone());
+        } else if let Some(ref event_data) = self.nft_transfer_event {
+            let data: NFTTransferEventData =
+                serde_json::from_value(event_data.clone()).expect("Unable to decode event_data");
+            return StacksTransactionEvent::NFTTransferEvent(data.clone());
+        } else if let Some(ref event_data) = self.ft_mint_event {
+            let data: FTMintEventData =
+                serde_json::from_value(event_data.clone()).expect("Unable to decode event_data");
+            return StacksTransactionEvent::FTMintEvent(data.clone());
+        } else if let Some(ref event_data) = self.ft_burn_event {
+            let data: FTBurnEventData =
+                serde_json::from_value(event_data.clone()).expect("Unable to decode event_data");
+            return StacksTransactionEvent::FTBurnEvent(data.clone());
+        } else if let Some(ref event_data) = self.ft_transfer_event {
+            let data: FTTransferEventData =
+                serde_json::from_value(event_data.clone()).expect("Unable to decode event_data");
+            return StacksTransactionEvent::FTTransferEvent(data.clone());
+        } else if let Some(ref event_data) = self.data_var_set_event {
+            let data: DataVarSetEventData =
+                serde_json::from_value(event_data.clone()).expect("Unable to decode event_data");
+            return StacksTransactionEvent::DataVarSetEvent(data.clone());
+        } else if let Some(ref event_data) = self.data_map_insert_event {
+            let data: DataMapInsertEventData =
+                serde_json::from_value(event_data.clone()).expect("Unable to decode event_data");
+            return StacksTransactionEvent::DataMapInsertEvent(data.clone());
+        } else if let Some(ref event_data) = self.data_map_update_event {
+            let data: DataMapUpdateEventData =
+                serde_json::from_value(event_data.clone()).expect("Unable to decode event_data");
+            return StacksTransactionEvent::DataMapUpdateEvent(data.clone());
+        } else if let Some(ref event_data) = self.data_map_delete_event {
+            let data: DataMapDeleteEventData =
+                serde_json::from_value(event_data.clone()).expect("Unable to decode event_data");
+            return StacksTransactionEvent::DataMapDeleteEvent(data.clone());
+        } else if let Some(ref event_data) = self.contract_event {
+            let data: SmartContractEventData =
+                serde_json::from_value(event_data.clone()).expect("Unable to decode event_data");
+            return StacksTransactionEvent::SmartContractEvent(data.clone());
+        }
+        unreachable!()
+    }
+}
+
 pub fn get_stacks_currency() -> Currency {
     Currency {
         symbol: "STX".into(),
@@ -209,12 +276,13 @@ pub fn standardize_stacks_block(
                         }
                     }
                 };
-
-            let (operations, receipt) = get_standardized_stacks_operations(
+            let events = tx_events.iter().map(|e| e.into_chainhook_event()).collect();
+            let (receipt, operations) = get_standardized_stacks_receipt(
                 &tx.txid,
-                &tx_events,
+                events,
                 &mut ctx.asset_class_map,
                 &indexer_config.stacks_node_rpc_url,
+                true,
             );
 
             StacksTransactionData {
@@ -318,11 +386,13 @@ pub fn standardize_stacks_microblock_trail(
         let (description, tx_type, fee, sender, sponsor) =
             get_tx_description(&tx.raw_tx, &tx_events).expect("unable to parse transaction");
 
-        let (operations, receipt) = get_standardized_stacks_operations(
+        let events = tx_events.iter().map(|e| e.into_chainhook_event()).collect();
+        let (receipt, operations) = get_standardized_stacks_receipt(
             &tx.txid,
-            &tx_events,
+            events,
             &mut ctx.asset_class_map,
             &indexer_config.stacks_node_rpc_url,
+            true,
         );
 
         let microblock_identifier = BlockIdentifier {
@@ -623,418 +693,379 @@ pub fn get_standardized_non_fungible_currency_from_asset_class_id(
     }
 }
 
-pub fn get_standardized_stacks_operations(
+pub fn get_standardized_stacks_receipt(
     _txid: &str,
-    events: &Vec<&NewEvent>,
+    events: Vec<StacksTransactionEvent>,
     asset_class_cache: &mut HashMap<String, AssetClassCache>,
     node_url: &str,
-) -> (Vec<Operation>, StacksTransactionReceipt) {
+    include_operations: bool,
+) -> (StacksTransactionReceipt, Vec<Operation>) {
     let mut mutated_contracts_radius = HashSet::new();
     let mut mutated_assets_radius = HashSet::new();
-    let mut marshalled_events = Vec::new();
-
     let mut operations = vec![];
-    let mut operation_id = 0;
 
-    for event in events.iter() {
-        if let Some(ref event_data) = event.stx_mint_event {
-            let data: STXMintEventData =
-                serde_json::from_value(event_data.clone()).expect("Unable to decode event_data");
-            marshalled_events.push(StacksTransactionEvent::STXMintEvent(data.clone()));
-            operations.push(Operation {
-                operation_identifier: OperationIdentifier {
-                    index: operation_id,
-                    network_index: None,
-                },
-                related_operations: None,
-                type_: OperationType::Credit,
-                status: Some(OperationStatusKind::Success),
-                account: AccountIdentifier {
-                    address: data.recipient,
-                    sub_account: None,
-                },
-                amount: Some(Amount {
-                    value: data.amount.parse::<u128>().expect("Unable to parse u64"),
-                    currency: get_stacks_currency(),
-                }),
-                metadata: None,
-            });
-            operation_id += 1;
-        } else if let Some(ref event_data) = event.stx_lock_event {
-            let data: STXLockEventData =
-                serde_json::from_value(event_data.clone()).expect("Unable to decode event_data");
-            marshalled_events.push(StacksTransactionEvent::STXLockEvent(data.clone()));
-            operations.push(Operation {
-                operation_identifier: OperationIdentifier {
-                    index: operation_id,
-                    network_index: None,
-                },
-                related_operations: None,
-                type_: OperationType::Lock,
-                status: Some(OperationStatusKind::Success),
-                account: AccountIdentifier {
-                    address: data.locked_address,
-                    sub_account: None,
-                },
-                amount: Some(Amount {
-                    value: data
-                        .locked_amount
-                        .parse::<u128>()
-                        .expect("Unable to parse u64"),
-                    currency: get_stacks_currency(),
-                }),
-                metadata: None,
-            });
-            operation_id += 1;
-        } else if let Some(ref event_data) = event.stx_burn_event {
-            let data: STXBurnEventData =
-                serde_json::from_value(event_data.clone()).expect("Unable to decode event_data");
-            marshalled_events.push(StacksTransactionEvent::STXBurnEvent(data.clone()));
-            operations.push(Operation {
-                operation_identifier: OperationIdentifier {
-                    index: operation_id,
-                    network_index: None,
-                },
-                related_operations: None,
-                type_: OperationType::Debit,
-                status: Some(OperationStatusKind::Success),
-                account: AccountIdentifier {
-                    address: data.sender,
-                    sub_account: None,
-                },
-                amount: Some(Amount {
-                    value: data.amount.parse::<u128>().expect("Unable to parse u64"),
-                    currency: get_stacks_currency(),
-                }),
-                metadata: None,
-            });
-            operation_id += 1;
-        } else if let Some(ref event_data) = event.stx_transfer_event {
-            let data: STXTransferEventData =
-                serde_json::from_value(event_data.clone()).expect("Unable to decode event_data");
-            marshalled_events.push(StacksTransactionEvent::STXTransferEvent(data.clone()));
-            operations.push(Operation {
-                operation_identifier: OperationIdentifier {
-                    index: operation_id,
-                    network_index: None,
-                },
-                related_operations: Some(vec![OperationIdentifier {
-                    index: operation_id + 1,
-                    network_index: None,
-                }]),
-                type_: OperationType::Debit,
-                status: Some(OperationStatusKind::Success),
-                account: AccountIdentifier {
-                    address: data.sender,
-                    sub_account: None,
-                },
-                amount: Some(Amount {
-                    value: data.amount.parse::<u128>().expect("Unable to parse u64"),
-                    currency: get_stacks_currency(),
-                }),
-                metadata: None,
-            });
-            operation_id += 1;
-            operations.push(Operation {
-                operation_identifier: OperationIdentifier {
-                    index: operation_id,
-                    network_index: None,
-                },
-                related_operations: Some(vec![OperationIdentifier {
-                    index: operation_id - 1,
-                    network_index: None,
-                }]),
-                type_: OperationType::Credit,
-                status: Some(OperationStatusKind::Success),
-                account: AccountIdentifier {
-                    address: data.recipient,
-                    sub_account: None,
-                },
-                amount: Some(Amount {
-                    value: data.amount.parse::<u128>().expect("Unable to parse u64"),
-                    currency: get_stacks_currency(),
-                }),
-                metadata: None,
-            });
-            operation_id += 1;
-        } else if let Some(ref event_data) = event.nft_mint_event {
-            let data: NFTMintEventData =
-                serde_json::from_value(event_data.clone()).expect("Unable to decode event_data");
-            marshalled_events.push(StacksTransactionEvent::NFTMintEvent(data.clone()));
-            let (asset_class_identifier, contract_identifier) =
-                get_mutated_ids(&data.asset_class_identifier);
-            mutated_assets_radius.insert(asset_class_identifier);
-            mutated_contracts_radius.insert(contract_identifier);
-
-            let currency = get_standardized_non_fungible_currency_from_asset_class_id(
-                &data.asset_class_identifier,
-                &data.hex_asset_identifier,
-                asset_class_cache,
-            );
-            operations.push(Operation {
-                operation_identifier: OperationIdentifier {
-                    index: operation_id,
-                    network_index: None,
-                },
-                related_operations: None,
-                type_: OperationType::Credit,
-                status: Some(OperationStatusKind::Success),
-                account: AccountIdentifier {
-                    address: data.recipient,
-                    sub_account: None,
-                },
-                amount: Some(Amount { value: 1, currency }),
-                metadata: None,
-            });
-            operation_id += 1;
-        } else if let Some(ref event_data) = event.nft_burn_event {
-            let data: NFTBurnEventData =
-                serde_json::from_value(event_data.clone()).expect("Unable to decode event_data");
-            marshalled_events.push(StacksTransactionEvent::NFTBurnEvent(data.clone()));
-            let (asset_class_identifier, contract_identifier) =
-                get_mutated_ids(&data.asset_class_identifier);
-            mutated_assets_radius.insert(asset_class_identifier);
-            mutated_contracts_radius.insert(contract_identifier);
-
-            let currency = get_standardized_non_fungible_currency_from_asset_class_id(
-                &data.asset_class_identifier,
-                &data.hex_asset_identifier,
-                asset_class_cache,
-            );
-            operations.push(Operation {
-                operation_identifier: OperationIdentifier {
-                    index: operation_id,
-                    network_index: None,
-                },
-                related_operations: None,
-                type_: OperationType::Debit,
-                status: Some(OperationStatusKind::Success),
-                account: AccountIdentifier {
-                    address: data.sender,
-                    sub_account: None,
-                },
-                amount: Some(Amount { value: 1, currency }),
-                metadata: None,
-            });
-            operation_id += 1;
-        } else if let Some(ref event_data) = event.nft_transfer_event {
-            let data: NFTTransferEventData =
-                serde_json::from_value(event_data.clone()).expect("Unable to decode event_data");
-            marshalled_events.push(StacksTransactionEvent::NFTTransferEvent(data.clone()));
-            let (asset_class_identifier, contract_identifier) =
-                get_mutated_ids(&data.asset_class_identifier);
-            mutated_assets_radius.insert(asset_class_identifier);
-            mutated_contracts_radius.insert(contract_identifier);
-
-            let currency = get_standardized_non_fungible_currency_from_asset_class_id(
-                &data.asset_class_identifier,
-                &data.hex_asset_identifier,
-                asset_class_cache,
-            );
-            operations.push(Operation {
-                operation_identifier: OperationIdentifier {
-                    index: operation_id,
-                    network_index: None,
-                },
-                related_operations: Some(vec![OperationIdentifier {
-                    index: operation_id + 1,
-                    network_index: None,
-                }]),
-                type_: OperationType::Debit,
-                status: Some(OperationStatusKind::Success),
-                account: AccountIdentifier {
-                    address: data.sender,
-                    sub_account: None,
-                },
-                amount: Some(Amount {
-                    value: 1,
-                    currency: currency.clone(),
-                }),
-                metadata: None,
-            });
-            operation_id += 1;
-            operations.push(Operation {
-                operation_identifier: OperationIdentifier {
-                    index: operation_id,
-                    network_index: None,
-                },
-                related_operations: Some(vec![OperationIdentifier {
-                    index: operation_id - 1,
-                    network_index: None,
-                }]),
-                type_: OperationType::Credit,
-                status: Some(OperationStatusKind::Success),
-                account: AccountIdentifier {
-                    address: data.recipient,
-                    sub_account: None,
-                },
-                amount: Some(Amount { value: 1, currency }),
-                metadata: None,
-            });
-            operation_id += 1;
-        } else if let Some(ref event_data) = event.ft_mint_event {
-            let data: FTMintEventData =
-                serde_json::from_value(event_data.clone()).expect("Unable to decode event_data");
-            marshalled_events.push(StacksTransactionEvent::FTMintEvent(data.clone()));
-            let (asset_class_identifier, contract_identifier) =
-                get_mutated_ids(&data.asset_class_identifier);
-            mutated_assets_radius.insert(asset_class_identifier);
-            mutated_contracts_radius.insert(contract_identifier);
-
-            let currency = get_standardized_fungible_currency_from_asset_class_id(
-                &data.asset_class_identifier,
-                asset_class_cache,
-                node_url,
-            );
-
-            let value = match data.amount.parse::<u128>() {
-                Ok(value) => value,
-                Err(e) => {
-                    panic!("unable to parse u64 {:?}: {:?}", data, e);
+    if include_operations {
+        let mut operation_id = 0;
+        for event in events.iter() {
+            match event {
+                StacksTransactionEvent::STXMintEvent(data) => {
+                    operations.push(Operation {
+                        operation_identifier: OperationIdentifier {
+                            index: operation_id,
+                            network_index: None,
+                        },
+                        related_operations: None,
+                        type_: OperationType::Credit,
+                        status: Some(OperationStatusKind::Success),
+                        account: AccountIdentifier {
+                            address: data.recipient.clone(),
+                            sub_account: None,
+                        },
+                        amount: Some(Amount {
+                            value: data.amount.parse::<u128>().expect("Unable to parse u64"),
+                            currency: get_stacks_currency(),
+                        }),
+                        metadata: None,
+                    });
+                    operation_id += 1;
                 }
-            };
+                StacksTransactionEvent::STXLockEvent(data) => {
+                    operations.push(Operation {
+                        operation_identifier: OperationIdentifier {
+                            index: operation_id,
+                            network_index: None,
+                        },
+                        related_operations: None,
+                        type_: OperationType::Lock,
+                        status: Some(OperationStatusKind::Success),
+                        account: AccountIdentifier {
+                            address: data.locked_address.clone(),
+                            sub_account: None,
+                        },
+                        amount: Some(Amount {
+                            value: data
+                                .locked_amount
+                                .parse::<u128>()
+                                .expect("Unable to parse u64"),
+                            currency: get_stacks_currency(),
+                        }),
+                        metadata: None,
+                    });
+                    operation_id += 1;
+                }
+                StacksTransactionEvent::STXBurnEvent(data) => {
+                    operations.push(Operation {
+                        operation_identifier: OperationIdentifier {
+                            index: operation_id,
+                            network_index: None,
+                        },
+                        related_operations: None,
+                        type_: OperationType::Debit,
+                        status: Some(OperationStatusKind::Success),
+                        account: AccountIdentifier {
+                            address: data.sender.clone(),
+                            sub_account: None,
+                        },
+                        amount: Some(Amount {
+                            value: data.amount.parse::<u128>().expect("Unable to parse u64"),
+                            currency: get_stacks_currency(),
+                        }),
+                        metadata: None,
+                    });
+                    operation_id += 1;
+                }
+                StacksTransactionEvent::STXTransferEvent(data) => {
+                    operations.push(Operation {
+                        operation_identifier: OperationIdentifier {
+                            index: operation_id,
+                            network_index: None,
+                        },
+                        related_operations: Some(vec![OperationIdentifier {
+                            index: operation_id + 1,
+                            network_index: None,
+                        }]),
+                        type_: OperationType::Debit,
+                        status: Some(OperationStatusKind::Success),
+                        account: AccountIdentifier {
+                            address: data.sender.clone(),
+                            sub_account: None,
+                        },
+                        amount: Some(Amount {
+                            value: data.amount.parse::<u128>().expect("Unable to parse u64"),
+                            currency: get_stacks_currency(),
+                        }),
+                        metadata: None,
+                    });
+                    operation_id += 1;
+                    operations.push(Operation {
+                        operation_identifier: OperationIdentifier {
+                            index: operation_id,
+                            network_index: None,
+                        },
+                        related_operations: Some(vec![OperationIdentifier {
+                            index: operation_id - 1,
+                            network_index: None,
+                        }]),
+                        type_: OperationType::Credit,
+                        status: Some(OperationStatusKind::Success),
+                        account: AccountIdentifier {
+                            address: data.recipient.clone(),
+                            sub_account: None,
+                        },
+                        amount: Some(Amount {
+                            value: data.amount.parse::<u128>().expect("Unable to parse u64"),
+                            currency: get_stacks_currency(),
+                        }),
+                        metadata: None,
+                    });
+                    operation_id += 1;
+                }
+                StacksTransactionEvent::NFTMintEvent(data) => {
+                    let (asset_class_identifier, contract_identifier) =
+                        get_mutated_ids(&data.asset_class_identifier);
+                    mutated_assets_radius.insert(asset_class_identifier);
+                    mutated_contracts_radius.insert(contract_identifier);
 
-            operations.push(Operation {
-                operation_identifier: OperationIdentifier {
-                    index: operation_id,
-                    network_index: None,
-                },
-                related_operations: None,
-                type_: OperationType::Credit,
-                status: Some(OperationStatusKind::Success),
-                account: AccountIdentifier {
-                    address: data.recipient,
-                    sub_account: None,
-                },
-                amount: Some(Amount { value, currency }),
-                metadata: None,
-            });
-            operation_id += 1;
-        } else if let Some(ref event_data) = event.ft_burn_event {
-            let data: FTBurnEventData =
-                serde_json::from_value(event_data.clone()).expect("Unable to decode event_data");
-            marshalled_events.push(StacksTransactionEvent::FTBurnEvent(data.clone()));
-            let (asset_class_identifier, contract_identifier) =
-                get_mutated_ids(&data.asset_class_identifier);
-            mutated_assets_radius.insert(asset_class_identifier);
-            mutated_contracts_radius.insert(contract_identifier);
+                    let currency = get_standardized_non_fungible_currency_from_asset_class_id(
+                        &data.asset_class_identifier,
+                        &data.hex_asset_identifier,
+                        asset_class_cache,
+                    );
+                    operations.push(Operation {
+                        operation_identifier: OperationIdentifier {
+                            index: operation_id,
+                            network_index: None,
+                        },
+                        related_operations: None,
+                        type_: OperationType::Credit,
+                        status: Some(OperationStatusKind::Success),
+                        account: AccountIdentifier {
+                            address: data.recipient.clone(),
+                            sub_account: None,
+                        },
+                        amount: Some(Amount { value: 1, currency }),
+                        metadata: None,
+                    });
+                    operation_id += 1;
+                }
+                StacksTransactionEvent::NFTBurnEvent(data) => {
+                    let (asset_class_identifier, contract_identifier) =
+                        get_mutated_ids(&data.asset_class_identifier);
+                    mutated_assets_radius.insert(asset_class_identifier);
+                    mutated_contracts_radius.insert(contract_identifier);
 
-            let currency = get_standardized_fungible_currency_from_asset_class_id(
-                &data.asset_class_identifier,
-                asset_class_cache,
-                node_url,
-            );
-            operations.push(Operation {
-                operation_identifier: OperationIdentifier {
-                    index: operation_id,
-                    network_index: None,
-                },
-                related_operations: None,
-                type_: OperationType::Debit,
-                status: Some(OperationStatusKind::Success),
-                account: AccountIdentifier {
-                    address: data.sender,
-                    sub_account: None,
-                },
-                amount: Some(Amount {
-                    value: data.amount.parse::<u128>().expect("Unable to parse u64"),
-                    currency,
-                }),
-                metadata: None,
-            });
-            operation_id += 1;
-        } else if let Some(ref event_data) = event.ft_transfer_event {
-            let data: FTTransferEventData =
-                serde_json::from_value(event_data.clone()).expect("Unable to decode event_data");
-            marshalled_events.push(StacksTransactionEvent::FTTransferEvent(data.clone()));
-            let (asset_class_identifier, contract_identifier) =
-                get_mutated_ids(&data.asset_class_identifier);
-            mutated_assets_radius.insert(asset_class_identifier);
-            mutated_contracts_radius.insert(contract_identifier);
+                    let currency = get_standardized_non_fungible_currency_from_asset_class_id(
+                        &data.asset_class_identifier,
+                        &data.hex_asset_identifier,
+                        asset_class_cache,
+                    );
+                    operations.push(Operation {
+                        operation_identifier: OperationIdentifier {
+                            index: operation_id,
+                            network_index: None,
+                        },
+                        related_operations: None,
+                        type_: OperationType::Debit,
+                        status: Some(OperationStatusKind::Success),
+                        account: AccountIdentifier {
+                            address: data.sender.clone(),
+                            sub_account: None,
+                        },
+                        amount: Some(Amount { value: 1, currency }),
+                        metadata: None,
+                    });
+                    operation_id += 1;
+                }
+                StacksTransactionEvent::NFTTransferEvent(data) => {
+                    let (asset_class_identifier, contract_identifier) =
+                        get_mutated_ids(&data.asset_class_identifier);
+                    mutated_assets_radius.insert(asset_class_identifier);
+                    mutated_contracts_radius.insert(contract_identifier);
 
-            let currency = get_standardized_fungible_currency_from_asset_class_id(
-                &data.asset_class_identifier,
-                asset_class_cache,
-                node_url,
-            );
-            operations.push(Operation {
-                operation_identifier: OperationIdentifier {
-                    index: operation_id,
-                    network_index: None,
-                },
-                related_operations: Some(vec![OperationIdentifier {
-                    index: operation_id + 1,
-                    network_index: None,
-                }]),
-                type_: OperationType::Debit,
-                status: Some(OperationStatusKind::Success),
-                account: AccountIdentifier {
-                    address: data.sender,
-                    sub_account: None,
-                },
-                amount: Some(Amount {
-                    value: data.amount.parse::<u128>().expect("Unable to parse u64"),
-                    currency: currency.clone(),
-                }),
-                metadata: None,
-            });
-            operation_id += 1;
-            operations.push(Operation {
-                operation_identifier: OperationIdentifier {
-                    index: operation_id,
-                    network_index: None,
-                },
-                related_operations: Some(vec![OperationIdentifier {
-                    index: operation_id - 1,
-                    network_index: None,
-                }]),
-                type_: OperationType::Credit,
-                status: Some(OperationStatusKind::Success),
-                account: AccountIdentifier {
-                    address: data.recipient,
-                    sub_account: None,
-                },
-                amount: Some(Amount {
-                    value: data.amount.parse::<u128>().expect("Unable to parse u64"),
-                    currency,
-                }),
-                metadata: None,
-            });
-            operation_id += 1;
-        } else if let Some(ref event_data) = event.data_var_set_event {
-            let data: DataVarSetEventData =
-                serde_json::from_value(event_data.clone()).expect("Unable to decode event_data");
-            marshalled_events.push(StacksTransactionEvent::DataVarSetEvent(data.clone()));
-            mutated_contracts_radius.insert(data.contract_identifier.clone());
-        } else if let Some(ref event_data) = event.data_map_insert_event {
-            let data: DataMapInsertEventData =
-                serde_json::from_value(event_data.clone()).expect("Unable to decode event_data");
-            marshalled_events.push(StacksTransactionEvent::DataMapInsertEvent(data.clone()));
-            mutated_contracts_radius.insert(data.contract_identifier.clone());
-        } else if let Some(ref event_data) = event.data_map_update_event {
-            let data: DataMapUpdateEventData =
-                serde_json::from_value(event_data.clone()).expect("Unable to decode event_data");
-            marshalled_events.push(StacksTransactionEvent::DataMapUpdateEvent(data.clone()));
-            mutated_contracts_radius.insert(data.contract_identifier.clone());
-        } else if let Some(ref event_data) = event.data_map_delete_event {
-            let data: DataMapDeleteEventData =
-                serde_json::from_value(event_data.clone()).expect("Unable to decode event_data");
-            marshalled_events.push(StacksTransactionEvent::DataMapDeleteEvent(data.clone()));
-            mutated_contracts_radius.insert(data.contract_identifier.clone());
-        } else if let Some(ref event_data) = event.contract_event {
-            let data: SmartContractEventData =
-                serde_json::from_value(event_data.clone()).expect("Unable to decode event_data");
-            marshalled_events.push(StacksTransactionEvent::SmartContractEvent(data.clone()));
-            mutated_contracts_radius.insert(data.contract_identifier.clone());
+                    let currency = get_standardized_non_fungible_currency_from_asset_class_id(
+                        &data.asset_class_identifier,
+                        &data.hex_asset_identifier,
+                        asset_class_cache,
+                    );
+                    operations.push(Operation {
+                        operation_identifier: OperationIdentifier {
+                            index: operation_id,
+                            network_index: None,
+                        },
+                        related_operations: Some(vec![OperationIdentifier {
+                            index: operation_id + 1,
+                            network_index: None,
+                        }]),
+                        type_: OperationType::Debit,
+                        status: Some(OperationStatusKind::Success),
+                        account: AccountIdentifier {
+                            address: data.sender.clone(),
+                            sub_account: None,
+                        },
+                        amount: Some(Amount {
+                            value: 1,
+                            currency: currency.clone(),
+                        }),
+                        metadata: None,
+                    });
+                    operation_id += 1;
+                    operations.push(Operation {
+                        operation_identifier: OperationIdentifier {
+                            index: operation_id,
+                            network_index: None,
+                        },
+                        related_operations: Some(vec![OperationIdentifier {
+                            index: operation_id - 1,
+                            network_index: None,
+                        }]),
+                        type_: OperationType::Credit,
+                        status: Some(OperationStatusKind::Success),
+                        account: AccountIdentifier {
+                            address: data.recipient.clone(),
+                            sub_account: None,
+                        },
+                        amount: Some(Amount { value: 1, currency }),
+                        metadata: None,
+                    });
+                    operation_id += 1;
+                }
+                StacksTransactionEvent::FTMintEvent(data) => {
+                    let (asset_class_identifier, contract_identifier) =
+                        get_mutated_ids(&data.asset_class_identifier);
+                    mutated_assets_radius.insert(asset_class_identifier);
+                    mutated_contracts_radius.insert(contract_identifier);
+
+                    let currency = get_standardized_fungible_currency_from_asset_class_id(
+                        &data.asset_class_identifier,
+                        asset_class_cache,
+                        node_url,
+                    );
+
+                    let value = match data.amount.parse::<u128>() {
+                        Ok(value) => value,
+                        Err(e) => {
+                            panic!("unable to parse u64 {:?}: {:?}", data, e);
+                        }
+                    };
+
+                    operations.push(Operation {
+                        operation_identifier: OperationIdentifier {
+                            index: operation_id,
+                            network_index: None,
+                        },
+                        related_operations: None,
+                        type_: OperationType::Credit,
+                        status: Some(OperationStatusKind::Success),
+                        account: AccountIdentifier {
+                            address: data.recipient.clone(),
+                            sub_account: None,
+                        },
+                        amount: Some(Amount { value, currency }),
+                        metadata: None,
+                    });
+                    operation_id += 1;
+                }
+                StacksTransactionEvent::FTBurnEvent(data) => {
+                    let (asset_class_identifier, contract_identifier) =
+                        get_mutated_ids(&data.asset_class_identifier);
+                    mutated_assets_radius.insert(asset_class_identifier);
+                    mutated_contracts_radius.insert(contract_identifier);
+
+                    let currency = get_standardized_fungible_currency_from_asset_class_id(
+                        &data.asset_class_identifier,
+                        asset_class_cache,
+                        node_url,
+                    );
+                    operations.push(Operation {
+                        operation_identifier: OperationIdentifier {
+                            index: operation_id,
+                            network_index: None,
+                        },
+                        related_operations: None,
+                        type_: OperationType::Debit,
+                        status: Some(OperationStatusKind::Success),
+                        account: AccountIdentifier {
+                            address: data.sender.clone(),
+                            sub_account: None,
+                        },
+                        amount: Some(Amount {
+                            value: data.amount.parse::<u128>().expect("Unable to parse u64"),
+                            currency,
+                        }),
+                        metadata: None,
+                    });
+                    operation_id += 1;
+                }
+                StacksTransactionEvent::FTTransferEvent(data) => {
+                    let (asset_class_identifier, contract_identifier) =
+                        get_mutated_ids(&data.asset_class_identifier);
+                    mutated_assets_radius.insert(asset_class_identifier);
+                    mutated_contracts_radius.insert(contract_identifier);
+
+                    let currency = get_standardized_fungible_currency_from_asset_class_id(
+                        &data.asset_class_identifier,
+                        asset_class_cache,
+                        node_url,
+                    );
+                    operations.push(Operation {
+                        operation_identifier: OperationIdentifier {
+                            index: operation_id,
+                            network_index: None,
+                        },
+                        related_operations: Some(vec![OperationIdentifier {
+                            index: operation_id + 1,
+                            network_index: None,
+                        }]),
+                        type_: OperationType::Debit,
+                        status: Some(OperationStatusKind::Success),
+                        account: AccountIdentifier {
+                            address: data.sender.clone(),
+                            sub_account: None,
+                        },
+                        amount: Some(Amount {
+                            value: data.amount.parse::<u128>().expect("Unable to parse u64"),
+                            currency: currency.clone(),
+                        }),
+                        metadata: None,
+                    });
+                    operation_id += 1;
+                    operations.push(Operation {
+                        operation_identifier: OperationIdentifier {
+                            index: operation_id,
+                            network_index: None,
+                        },
+                        related_operations: Some(vec![OperationIdentifier {
+                            index: operation_id - 1,
+                            network_index: None,
+                        }]),
+                        type_: OperationType::Credit,
+                        status: Some(OperationStatusKind::Success),
+                        account: AccountIdentifier {
+                            address: data.recipient.clone(),
+                            sub_account: None,
+                        },
+                        amount: Some(Amount {
+                            value: data.amount.parse::<u128>().expect("Unable to parse u64"),
+                            currency,
+                        }),
+                        metadata: None,
+                    });
+                    operation_id += 1;
+                }
+                StacksTransactionEvent::DataVarSetEvent(_data) => {}
+                StacksTransactionEvent::DataMapInsertEvent(_data) => {}
+                StacksTransactionEvent::DataMapUpdateEvent(_data) => {}
+                StacksTransactionEvent::DataMapDeleteEvent(_data) => {}
+                StacksTransactionEvent::SmartContractEvent(data) => {
+                    mutated_contracts_radius.insert(data.contract_identifier.clone());
+                }
+            }
         }
     }
 
-    let receipt = StacksTransactionReceipt::new(
-        mutated_contracts_radius,
-        mutated_assets_radius,
-        marshalled_events,
-    );
-    (operations, receipt)
+    let receipt =
+        StacksTransactionReceipt::new(mutated_contracts_radius, mutated_assets_radius, events);
+    (receipt, operations)
 }
 
 fn get_mutated_ids(asset_class_id: &str) -> (String, String) {
