@@ -1,6 +1,6 @@
 [package]
 name = "chainhook-event-observer"
-version = "0.33.0"
+version = "1.0.0"
 edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html

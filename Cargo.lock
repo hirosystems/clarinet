@@ -733,7 +733,7 @@ dependencies = [
 
 [[package]]
 name = "chainhook-event-observer"
-version = "0.33.0"
+version = "1.0.0"
 dependencies = [
  "base58 0.2.0",
  "base64 0.13.0",
@@ -762,7 +762,7 @@ dependencies = [
 
 [[package]]
 name = "chainhook-types"
-version = "0.1.0"
+version = "1.0.0"
 dependencies = [
  "schemars",
  "serde",
@@ -877,7 +877,7 @@ dependencies = [
 
 [[package]]
 name = "clarinet-cli"
-version = "0.33.0"
+version = "1.0.0"
 dependencies = [
  "aes 0.7.5",
  "ansi_term",
@@ -997,7 +997,7 @@ dependencies = [
 
 [[package]]
 name = "clarinet-deployments"
-version = "0.1.0"
+version = "1.0.0"
 dependencies = [
  "chainhook-types",
  "clarinet-files",
@@ -1011,7 +1011,7 @@ dependencies = [
 
 [[package]]
 name = "clarinet-files"
-version = "0.1.0"
+version = "1.0.0"
 dependencies = [
  "bip39",
  "bitcoin 0.28.1",
@@ -1032,7 +1032,7 @@ dependencies = [
 
 [[package]]
 name = "clarinet-utils"
-version = "0.1.0"
+version = "1.0.0"
 dependencies = [
  "hmac 0.12.1",
  "pbkdf2",
@@ -1064,7 +1064,7 @@ dependencies = [
 
 [[package]]
 name = "clarity-lsp"
-version = "0.1.0"
+version = "1.0.0"
 dependencies = [
  "chainhook-types",
  "clarinet-deployments",
@@ -1082,7 +1082,7 @@ dependencies = [
 
 [[package]]
 name = "clarity-repl"
-version = "0.34.0"
+version = "1.0.0"
 dependencies = [
  "ansi_term",
  "atty",
@@ -5724,7 +5724,7 @@ dependencies = [
 
 [[package]]
 name = "stacks-devnet-js"
-version = "0.33.0"
+version = "1.0.0"
 dependencies = [
  "chainhook-types",
  "clarinet-cli",
@@ -5738,7 +5738,7 @@ dependencies = [
 
 [[package]]
 name = "stacks-rpc-client"
-version = "0.1.0"
+version = "1.0.0"
 dependencies = [
  "clarinet-utils",
  "clarity-repl",
