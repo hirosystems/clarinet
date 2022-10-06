@@ -1171,10 +1171,7 @@ events_keys = ["*"]
         Ok(())
     }
 
-    pub fn prepare_subnet_node_config(
-        &self,
-        boot_index: u32,
-    ) -> Result<Config<String>, String> {
+    pub fn prepare_subnet_node_config(&self, boot_index: u32) -> Result<Config<String>, String> {
         let (network_config, devnet_config) = match &self.network_config {
             Some(ref network_config) => match network_config.devnet {
                 Some(ref devnet_config) => (network_config, devnet_config),
@@ -1378,10 +1375,7 @@ events_keys = ["*"]
         Ok(config)
     }
 
-    pub async fn prepare_subnet_node_container(
-        &mut self,
-        boot_index: u32,
-    ) -> Result<(), String> {
+    pub async fn prepare_subnet_node_container(&mut self, boot_index: u32) -> Result<(), String> {
         let (docker, devnet_config) = match (&self.docker_client, &self.network_config) {
             (Some(ref docker), Some(ref network_config)) => match network_config.devnet {
                 Some(ref devnet_config) => (docker, devnet_config),
@@ -1656,10 +1650,7 @@ events_keys = ["*"]
                 format!("PG_PORT=5432"),
                 format!("PG_USER={}", devnet_config.postgres_username),
                 format!("PG_PASSWORD={}", devnet_config.postgres_password),
-                format!(
-                    "PG_DATABASE={}",
-                    devnet_config.subnet_api_postgres_database
-                ),
+                format!("PG_DATABASE={}", devnet_config.subnet_api_postgres_database),
                 format!("STACKS_CHAIN_ID=2147483648"),
                 format!("V2_POX_MIN_AMOUNT_USTX=90000000260"),
                 "NODE_ENV=development".to_string(),

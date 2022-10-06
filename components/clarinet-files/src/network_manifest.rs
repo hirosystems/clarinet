@@ -21,8 +21,7 @@ pub const DEFAULT_STACKS_API_IMAGE: &str = "blockstack/stacks-blockchain-api:lat
 pub const DEFAULT_STACKS_EXPLORER_IMAGE: &str = "hirosystems/explorer:latest";
 pub const DEFAULT_POSTGRES_IMAGE: &str = "postgres:14";
 pub const DEFAULT_SUBNET_NODE_IMAGE: &str = "hirosystems/hyperchains:0.0.4-stretch";
-pub const DEFAULT_SUBNET_CONTRACT_ID: &str =
-    "STXMJXCJDCT4WPF2X1HE42T6ZCCK3TPMBRZ51JEG.hc-alpha";
+pub const DEFAULT_SUBNET_CONTRACT_ID: &str = "STXMJXCJDCT4WPF2X1HE42T6ZCCK3TPMBRZ51JEG.hc-alpha";
 pub const DEFAULT_STACKS_MINER_MNEMONIC: &str = "fragile loan twenty basic net assault jazz absorb diet talk art shock innocent float punch travel gadget embrace caught blossom hockey surround initial reduce";
 pub const DEFAULT_FAUCET_MNEMONIC: &str = "shadow private easily thought say logic fault paddle word top book during ignore notable orange flight clock image wealth health outside kitten belt reform";
 pub const DEFAULT_SUBNET_MNEMONIC: &str = "female adjust gallery certain visit token during great side clown fitness like hurt clip knife warm bench start reunion globe detail dream depend fortune";
@@ -415,9 +414,8 @@ impl NetworkManifest {
             );
 
             let enable_subnet_node = devnet_config.enable_subnet_node.unwrap_or(false);
-            let subnet_events_ingestion_port = devnet_config
-                .subnet_events_ingestion_port
-                .unwrap_or(30445);
+            let subnet_events_ingestion_port =
+                devnet_config.subnet_events_ingestion_port.unwrap_or(30445);
 
             let mut stacks_node_events_observers = devnet_config
                 .stacks_node_events_observers

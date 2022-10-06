@@ -282,16 +282,15 @@ pub async fn generate_default_deployment(
 
     if let Some(ref devnet) = network_manifest.devnet {
         if devnet.enable_subnet_node {
-            let contract_id =
-                match QualifiedContractIdentifier::parse(&devnet.subnet_contract_id) {
-                    Ok(contract_id) => contract_id,
-                    Err(_e) => {
-                        return Err(format!(
-                            "malformatted subnet_contract_id: {}",
-                            devnet.subnet_contract_id
-                        ))
-                    }
-                };
+            let contract_id = match QualifiedContractIdentifier::parse(&devnet.subnet_contract_id) {
+                Ok(contract_id) => contract_id,
+                Err(_e) => {
+                    return Err(format!(
+                        "malformatted subnet_contract_id: {}",
+                        devnet.subnet_contract_id
+                    ))
+                }
+            };
             queue.push_front(contract_id)
         }
     }
