@@ -63,10 +63,10 @@
     "configuration": [
       {
         "order": 22,
-        "id": "obscurity-web-extension",
+        "id": "clariy-lsp",
         "title": "Clarity",
         "properties": {
-          "obscurity-web-extension.trace.server": {
+          "clariy-lsp.trace.server": {
             "type": "string",
             "scope": "window",
             "enum": [
@@ -116,7 +116,7 @@
           "id": "clarityPanel",
           "title": "Clarity",
           "icon": "assets/images/file-icon/clar-darktheme.svg",
-          "when": "config.obscurity-web-extension.panels.insights-panel"
+          "when": "config.clariy-lsp.panels.insights-panel"
         }
       ]
     },
@@ -124,9 +124,9 @@
       "clarityPanel": [
         {
           "type": "webview",
-          "id": "obscurity-web-extension.clarityInsightsView",
+          "id": "clariy-lsp.clarityInsightsView",
           "name": "Insights",
-          "when": "config.obscurity-web-extension.panels.insights-panel"
+          "when": "config.clariy-lsp.panels.insights-panel"
         }
       ]
     },

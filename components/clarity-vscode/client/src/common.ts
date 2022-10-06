@@ -25,7 +25,7 @@ export async function initClient(
   context: ExtensionContext,
   client: LanguageClient,
 ) {
-  let config = workspace.getConfiguration("obscurity-web-extension");
+  let config = workspace.getConfiguration("clarity-lsp");
 
   /* clarity insight webview */
   const insightsViewProvider = new InsightsViewProvider(context.extensionUri);
@@ -38,7 +38,7 @@ export async function initClient(
   );
 
   workspace.onDidChangeConfiguration((e) => {
-    config = workspace.getConfiguration("obscurity-web-extension");
+    config = workspace.getConfiguration("clarity-lsp");
   });
 
   /* clariy lsp */
