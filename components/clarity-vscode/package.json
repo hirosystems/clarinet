@@ -9,7 +9,6 @@
   "bugs": "https://github.com/hirosystems/clarinet/issues",
   "license": "GPL-3.0-only",
   "version": "1.0.0",
-  "releaseTag": "v1.0.0",
   "workspaces": [
     "client",
     "server",
@@ -29,10 +28,12 @@
     "dev": "webpack -c ./webpack.config.dev.js; concurrently \"npm:dev:*\"",
     "vscode:prepublish": "npm run clean; NODE_ENV=production webpack",
     "vsce:package": "vsce package",
-    "vsce:publish": "vsce publish"
+    "vsce:publish": "vsce publish",
+    "vsce:prerelease": "vsce publish --pre-release"
   },
   "categories": [
     "Programming Languages",
+    "Linters",
     "Debuggers"
   ],
   "keywords": [
@@ -51,7 +52,7 @@
   },
   "qna": "https://docs.hiro.so/",
   "engines": {
-    "vscode": "^1.43.0"
+    "vscode": "^1.64.0"
   },
   "activationEvents": [
     "workspaceContains:Clarinet.toml",
