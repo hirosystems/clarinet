@@ -1131,7 +1131,7 @@ impl EvalHook for DAPDebugger {
                 if !result.events.is_empty() {
                     self.log("\nEvents emitted:\n");
                     for event in &result.events {
-                        self.stdout(format!("{}\n", event));
+                        self.stdout(format!("{}\n", crate::utils::serialize_event(event)));
                     }
                 }
 

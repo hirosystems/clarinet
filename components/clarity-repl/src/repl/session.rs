@@ -6,6 +6,7 @@ use super::{
 use crate::analysis::ast_dependency_detector::{ASTDependencyDetector, Dependency};
 use crate::analysis::coverage::{self, TestCoverageReport};
 use crate::repl::settings::InitialContract;
+use crate::utils;
 use ansi_term::{Colour, Style};
 use clarity::codec::StacksMessageCodec;
 use clarity::types::chainstate::StacksAddress;
@@ -345,7 +346,7 @@ impl Session {
                 if result.events.len() > 0 {
                     output.push(black!("Events emitted"));
                     for event in result.events.iter() {
-                        output.push(black!(format!("{}", event)));
+                        output.push(black!(format!("{}", utils::serialize_event(event))));
                     }
                 }
                 match &result.result {

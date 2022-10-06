@@ -1,3 +1,4 @@
+use chainhook_event_observer::chainhooks::types::StacksChainhookSpecification;
 use clarinet_deployments::types::DeploymentGenerationArtifacts;
 use clarinet_deployments::{
     initiate_session_from_deployment, update_session_with_contracts_executions,
@@ -92,6 +93,11 @@ pub struct AnalysisArtifacts {
     pub source: String,
 }
 
+pub enum ChainhookEvent {
+    PerformRequest(reqwest::RequestBuilder),
+    Exit,
+}
+
 pub fn run_scripts(
     include: Vec<String>,
     include_coverage: bool,
@@ -108,6 +114,8 @@ pub fn run_scripts(
     allow_net: bool,
     cache_location: FileLocation,
     ts_config: Option<String>,
+    stacks_chainhooks: Vec<StacksChainhookSpecification>,
+    mine_block_delay: u16,
 ) -> Result<usize, (AnyError, usize)> {
     block_on(deno::do_run_scripts(
         include,
@@ -125,6 +133,8 @@ pub fn run_scripts(
         allow_net,
         cache_location,
         ts_config,
+        stacks_chainhooks,
+        mine_block_delay,
     ))
 }
 

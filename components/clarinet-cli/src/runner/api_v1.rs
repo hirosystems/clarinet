@@ -6,12 +6,29 @@ use super::vendor::deno_cli::tools::test::{TestEventSender, TestMode, TestSpecif
 use super::vendor::deno_runtime::ops::io::Stdio;
 use super::vendor::deno_runtime::ops::io::StdioPipe;
 use super::vendor::deno_runtime::permissions::Permissions;
+use super::ChainhookEvent;
 use super::DeploymentCache;
 use super::SessionArtifacts;
+use crate::runner::api_v1::utils::serialize_event;
+use chainhook_event_observer::chainhooks::evaluate_stacks_chainhook_on_transaction;
+use chainhook_event_observer::chainhooks::handle_stacks_hook_action;
+use chainhook_event_observer::chainhooks::types::StacksChainhookSpecification;
+use chainhook_event_observer::chainhooks::StacksChainhookOccurrence;
+use chainhook_event_observer::chainhooks::StacksTriggerChainhook;
+use chainhook_event_observer::indexer::stacks::get_standardized_stacks_receipt;
+use chainhook_types::BlockIdentifier;
+use chainhook_types::StacksContractCallData;
+use chainhook_types::StacksContractDeploymentData;
+use chainhook_types::StacksTransactionData;
+use chainhook_types::StacksTransactionKind;
+use chainhook_types::StacksTransactionMetadata;
+use chainhook_types::TransactionIdentifier;
 use clarinet_deployments::update_session_with_contracts_executions;
+use clarity_repl::clarity::util::hash::to_hex;
 use clarity_repl::clarity::vm::analysis::contract_interface_builder::build_contract_interface;
 use clarity_repl::clarity::vm::EvaluationResult;
 use clarity_repl::clarity::ClarityVersion;
+use clarity_repl::clarity::ExecutionResult;
 use clarity_repl::repl::ClarityCodeSource;
 use clarity_repl::repl::ClarityContract;
 use clarity_repl::repl::ContractDeployer;
@@ -26,6 +43,8 @@ use deno_core::{op, Extension};
 use deno_core::{ModuleSpecifier, OpState};
 use std::collections::{BTreeMap, HashMap};
 use std::sync::mpsc::{self, Sender};
+use std::thread::sleep;
+use std::time::Duration;
 
 pub enum ClarinetTestEvent {
     SessionTerminated(SessionArtifacts),
@@ -40,6 +59,9 @@ pub async fn run_bridge(
     channel: TestEventSender,
     allow_wallets: bool,
     mut cache: Option<DeploymentCache>,
+    stacks_chainhooks: Vec<StacksChainhookSpecification>,
+    mine_block_delay: u16,
+    chainhook_tx: Option<Sender<ChainhookEvent>>,
 ) -> Result<Vec<SessionArtifacts>, AnyError> {
     let mut custom_extensions = vec![ops::testing::init(channel.clone(), options.filter.clone())];
 
@@ -104,6 +126,23 @@ pub async fn run_bridge(
         deployments.insert(None, cache);
     }
 
+    if !stacks_chainhooks.is_empty() {
+        worker
+            .js_runtime
+            .op_state()
+            .borrow_mut()
+            .put(chainhook_tx.unwrap());
+    }
+    worker
+        .js_runtime
+        .op_state()
+        .borrow_mut()
+        .put(stacks_chainhooks);
+    worker
+        .js_runtime
+        .op_state()
+        .borrow_mut()
+        .put(mine_block_delay);
     worker.js_runtime.op_state().borrow_mut().put(allow_wallets);
     worker.js_runtime.op_state().borrow_mut().put(deployments);
     worker.js_runtime.op_state().borrow_mut().put(sessions);
@@ -442,25 +481,43 @@ struct CallReadOnlyFnArgs {
 #[op]
 fn call_read_only_fn(state: &mut OpState, args: CallReadOnlyFnArgs) -> Result<String, AnyError> {
     let (result, events) = perform_block(state, args.session_id, |_name, session| {
-        let execution = session
-            .invoke_contract_call(
-                &args.contract,
-                &args.method,
-                &args.args,
-                &args.sender,
-                "readonly-calls".into(),
-            )
-            .unwrap(); // TODO(lgalabru)
+        let execution = match session.invoke_contract_call(
+            &args.contract,
+            &args.method,
+            &args.args,
+            &args.sender,
+            "readonly-calls".into(),
+        ) {
+            Ok(res) => res,
+            Err(diagnostics) => {
+                let mut message = format!(
+                    "{}: {}::{}({})",
+                    red!("Readonly Contract call runtime error"),
+                    args.contract,
+                    args.method,
+                    args.args.join(", ")
+                );
+                if let Some(diag) = diagnostics.last() {
+                    message = format!("{} -> {}", message, diag.message);
+                }
+                println!("{}", message);
+                std::process::exit(1);
+            }
+        };
         let result = match execution.result {
             EvaluationResult::Snippet(result) => utils::value_to_string(&result.result),
             _ => unreachable!("Contract result from snippet"),
         };
         Ok((result, execution.events))
     })?;
+    let serialized_events = events
+        .iter()
+        .map(|e| serialize_event(e))
+        .collect::<Vec<serde_json::Value>>();
     Ok(json!({
       "session_id": args.session_id,
       "result": result,
-      "events": events,
+      "events": serialized_events,
     })
     .to_string())
 }
@@ -537,10 +594,10 @@ struct TransferSTXArgs {
 
 #[op]
 fn mine_block(state: &mut OpState, args: MineBlockArgs) -> Result<String, AnyError> {
-    let (block_height, receipts) = perform_block(state, args.session_id, |name, session| {
+    let (block_height, transactions) = perform_block(state, args.session_id, |name, session| {
         let initial_tx_sender = session.get_tx_sender();
-        let mut receipts = vec![];
-        for tx in args.transactions.iter() {
+        let mut transactions = vec![];
+        for (index, tx) in args.transactions.iter().enumerate() {
             if let Some(ref args) = tx.contract_call {
                 let execution = match session.invoke_contract_call(
                     &args.contract,
@@ -551,25 +608,29 @@ fn mine_block(state: &mut OpState, args: MineBlockArgs) -> Result<String, AnyErr
                 ) {
                     Ok(res) => res,
                     Err(diagnostics) => {
-                        if diagnostics.len() > 0 {
-                            // TODO(lgalabru): if CLARINET_BACKTRACE=1
-                            // Retrieve the AST (penultimate entry), and the expression id (last entry)
-                            println!(
-                                "Runtime error: {}::{}({}) -> {}",
-                                args.contract,
-                                args.method,
-                                args.args.join(", "),
-                                diagnostics.last().unwrap().message
-                            );
+                        let mut message = format!(
+                            "{}: {}::{}({})",
+                            red!("Readonly Contract call runtime error"),
+                            args.contract,
+                            args.method,
+                            args.args.join(", ")
+                        );
+                        if let Some(diag) = diagnostics.last() {
+                            message = format!("{} -> {}", message, diag.message);
                         }
+                        println!("{}", message);
                         continue;
                     }
                 };
-                let result = match execution.result {
-                    EvaluationResult::Snippet(result) => utils::value_to_string(&result.result),
-                    _ => unreachable!("Contract result from snippet"),
-                };
-                receipts.push((result, execution.events));
+                let kind = StacksTransactionKind::ContractCall(StacksContractCallData {
+                    contract_identifier: args.contract.clone(),
+                    method: args.method.clone(),
+                    args: args.args.clone(),
+                });
+                transactions.push((
+                    wrap_result_in_simulate_transaction(index, &tx.sender, kind, &execution),
+                    execution.events,
+                ));
             } else {
                 session.set_tx_sender(tx.sender.clone());
                 if let Some(ref args) = tx.deploy_contract {
@@ -584,41 +645,117 @@ fn mine_block(state: &mut OpState, args: MineBlockArgs) -> Result<String, AnyErr
                         },
                         epoch: DEFAULT_EPOCH,
                     };
-
-                    let execution = session
-                        .deploy_contract(&contract, None, false, Some(name.into()), &mut None)
-                        .unwrap(); // TODO(lgalabru)
-                    let result = match execution.result {
-                        EvaluationResult::Snippet(result) => format!("{}", result.result),
-                        _ => unreachable!("Contract result from snippet"),
+                    let execution = match session.deploy_contract(
+                        &contract,
+                        None,
+                        false,
+                        Some(name.into()),
+                        &mut None,
+                    ) {
+                        Ok(res) => res,
+                        Err(diagnostics) => {
+                            let mut message = format!(
+                                "{}: {}.{}",
+                                red!("Contract deployment runtime error"),
+                                tx.sender, args.name
+                            );
+                            if let Some(diag) = diagnostics.last() {
+                                message = format!("{} -> {}", message, diag.message);
+                            }
+                            println!("{}", message);
+                            continue;
+                        }
                     };
-                    receipts.push((result, execution.events));
+                    let kind =
+                        StacksTransactionKind::ContractDeployment(StacksContractDeploymentData {
+                            contract_identifier: contract
+                                .expect_resolved_contract_identifier(None)
+                                .to_string(),
+                            code: contract.expect_in_memory_code_source().to_string(),
+                        });
+                    transactions.push((
+                        wrap_result_in_simulate_transaction(index, &tx.sender, kind, &execution),
+                        execution.events,
+                    ));
                 } else if let Some(ref args) = tx.transfer_stx {
                     let snippet = format!(
                         "(stx-transfer? u{} tx-sender '{})",
                         args.amount, args.recipient
                     );
-                    let execution = session.eval(snippet, None, false).unwrap(); // TODO(lgalabru)
-                    let result = match execution.result {
-                        EvaluationResult::Snippet(result) => format!("{}", result.result),
-                        _ => unreachable!("Contract result from snippet"),
+                    let execution = match session.eval(snippet.clone(), None, false) {
+                        Ok(res) => res,
+                        Err(diagnostics) => {
+                            let mut message = format!("{}: {}", red!("STX transfer runtime error"), snippet);
+                            if let Some(diag) = diagnostics.last() {
+                                message = format!("{} -> {}", message, diag.message);
+                            }
+                            println!("{}", message);
+                            continue;
+                        }
                     };
-                    receipts.push((result, execution.events));
+                    let kind = StacksTransactionKind::NativeTokenTransfer;
+                    transactions.push((
+                        wrap_result_in_simulate_transaction(index, &tx.sender, kind, &execution),
+                        execution.events,
+                    ));
                 }
                 session.set_tx_sender(initial_tx_sender.clone());
             }
         }
         let block_height = session.advance_chain_tip(1);
-        Ok((block_height, receipts))
+        Ok((block_height, transactions))
     })?;
+
+    let chainhooks = match state.try_borrow::<Vec<StacksChainhookSpecification>>() {
+        Some(chainhooks) => chainhooks,
+        None => panic!(),
+    };
+    let mine_block_delay = match state.try_borrow::<u16>() {
+        Some(mine_block_delay) => *mine_block_delay,
+        None => panic!(),
+    };
+    if mine_block_delay > 0 {
+        sleep(Duration::from_secs(mine_block_delay.into()));
+    }
+
+    if !chainhooks.is_empty() {
+        for chainhook in chainhooks.iter() {
+            for (tx, _) in transactions.iter() {
+                if evaluate_stacks_chainhook_on_transaction(tx, chainhook) {
+                    let simulated_block = BlockIdentifier {
+                        index: block_height.into(),
+                        hash: format!("0x{}", to_hex(&block_height.to_be_bytes())),
+                    };
+                    let result = handle_stacks_hook_action(
+                        StacksTriggerChainhook {
+                            chainhook: chainhook,
+                            apply: vec![(tx, &simulated_block)],
+                            rollback: vec![],
+                        },
+                        &HashMap::new(),
+                    );
+                    if let Some(StacksChainhookOccurrence::Http(action)) = result {
+                        let chainhook_tx = match state.try_borrow::<Sender<ChainhookEvent>>() {
+                            Some(chainhook_tx) => chainhook_tx,
+                            None => panic!(),
+                        };
+                        let _ = chainhook_tx.send(ChainhookEvent::PerformRequest(action));
+                    }
+                }
+            }
+        }
+    }
 
     let payload = json!({
       "session_id": args.session_id,
       "block_height": block_height,
-      "receipts":  receipts.iter().map(|r| {
+      "receipts":  transactions.iter().map(|(t, events)| {
         json!({
-          "result": r.0,
-          "events": r.1,
+          "result": t.metadata.result,
+          "events": events
+          .iter()
+          .map(|e| serialize_event(e))
+          .collect::<Vec<serde_json::Value>>()
         })
       }).collect::<Vec<_>>()
     });
@@ -641,5 +778,148 @@ where
             panic!()
         }
         Some((name, ref mut session)) => handler(name.as_str(), session),
+    }
+}
+
+fn wrap_result_in_simulate_transaction(
+    index: usize,
+    sender: &str,
+    kind: StacksTransactionKind,
+    execution: &ExecutionResult,
+) -> StacksTransactionData {
+    let result = match execution.result {
+        EvaluationResult::Snippet(ref result) => utils::value_to_string(&result.result),
+        _ => unreachable!("Contract result from snippet"),
+    };
+    let txid = format!("{}", index);
+    let mut asset_class_cache = HashMap::new();
+    let events = execution
+        .events
+        .iter()
+        .map(|e| convert_clarity_event_to_chainhook_event(e))
+        .collect();
+    let (receipt, operations) =
+        get_standardized_stacks_receipt(&txid, events, &mut asset_class_cache, "", false);
+    let transaction = StacksTransactionData {
+        transaction_identifier: TransactionIdentifier { hash: txid },
+        operations,
+        metadata: StacksTransactionMetadata {
+            success: true,
+            raw_tx: String::new(),
+            result,
+            sender: sender.to_string(),
+            fee: 0,
+            kind,
+            receipt,
+            description: String::new(),
+            sponsor: None,
+            execution_cost: None,
+            position: chainhook_types::StacksTransactionPosition::Index(index),
+        },
+    };
+    transaction
+}
+
+fn convert_clarity_event_to_chainhook_event(
+    source: &clarity_repl::clarity::events::StacksTransactionEvent,
+) -> chainhook_types::StacksTransactionEvent {
+    use chainhook_types::StacksTransactionEvent as DestinationEvent;
+    use chainhook_types::{
+        FTBurnEventData, FTMintEventData, FTTransferEventData, NFTBurnEventData, NFTMintEventData,
+        NFTTransferEventData, STXBurnEventData, STXLockEventData, STXMintEventData,
+        STXTransferEventData, SmartContractEventData,
+    };
+    use clarity_repl::clarity::codec::StacksMessageCodec;
+    use clarity_repl::clarity::events::{
+        FTEventType as SFT, NFTEventType as SNFT, STXEventType as SSTX,
+        StacksTransactionEvent as SourceEvent,
+    };
+
+    match source {
+        SourceEvent::FTEvent(SFT::FTMintEvent(data)) => {
+            DestinationEvent::FTMintEvent(FTMintEventData {
+                asset_class_identifier: data.asset_identifier.to_string(),
+                recipient: data.recipient.to_string(),
+                amount: data.amount.to_string(),
+            })
+        }
+        SourceEvent::FTEvent(SFT::FTBurnEvent(data)) => {
+            DestinationEvent::FTBurnEvent(FTBurnEventData {
+                asset_class_identifier: data.asset_identifier.to_string(),
+                sender: data.sender.to_string(),
+                amount: data.amount.to_string(),
+            })
+        }
+        SourceEvent::FTEvent(SFT::FTTransferEvent(data)) => {
+            DestinationEvent::FTTransferEvent(FTTransferEventData {
+                asset_class_identifier: data.asset_identifier.to_string(),
+                sender: data.sender.to_string(),
+                recipient: data.recipient.to_string(),
+                amount: data.amount.to_string(),
+            })
+        }
+        SourceEvent::NFTEvent(SNFT::NFTMintEvent(data)) => {
+            let mut value = vec![];
+            let _ = data.value.consensus_serialize(&mut value);
+            DestinationEvent::NFTMintEvent(NFTMintEventData {
+                asset_class_identifier: data.asset_identifier.to_string(),
+                hex_asset_identifier: format!("0x{}", to_hex(&value)),
+                recipient: data.recipient.to_string(),
+            })
+        }
+        SourceEvent::NFTEvent(SNFT::NFTBurnEvent(data)) => {
+            let mut value = vec![];
+            let _ = data.value.consensus_serialize(&mut value);
+            DestinationEvent::NFTBurnEvent(NFTBurnEventData {
+                asset_class_identifier: data.asset_identifier.to_string(),
+                hex_asset_identifier: format!("0x{}", to_hex(&value)),
+                sender: data.sender.to_string(),
+            })
+        }
+        SourceEvent::NFTEvent(SNFT::NFTTransferEvent(data)) => {
+            let mut value = vec![];
+            let _ = data.value.consensus_serialize(&mut value);
+            DestinationEvent::NFTTransferEvent(NFTTransferEventData {
+                asset_class_identifier: data.asset_identifier.to_string(),
+                hex_asset_identifier: format!("0x{}", to_hex(&value)),
+                sender: data.sender.to_string(),
+                recipient: data.recipient.to_string(),
+            })
+        }
+        SourceEvent::STXEvent(SSTX::STXTransferEvent(data)) => {
+            DestinationEvent::STXTransferEvent(STXTransferEventData {
+                sender: data.sender.to_string(),
+                recipient: data.recipient.to_string(),
+                amount: data.amount.to_string(),
+            })
+        }
+        SourceEvent::STXEvent(SSTX::STXBurnEvent(data)) => {
+            DestinationEvent::STXBurnEvent(STXBurnEventData {
+                sender: data.sender.to_string(),
+                amount: data.amount.to_string(),
+            })
+        }
+        SourceEvent::STXEvent(SSTX::STXMintEvent(data)) => {
+            DestinationEvent::STXMintEvent(STXMintEventData {
+                recipient: data.recipient.to_string(),
+                amount: data.amount.to_string(),
+            })
+        }
+        SourceEvent::STXEvent(SSTX::STXLockEvent(data)) => {
+            DestinationEvent::STXLockEvent(STXLockEventData {
+                locked_address: data.locked_address.to_string(),
+                locked_amount: data.locked_amount.to_string(),
+                unlock_height: data.unlock_height.to_string(),
+            })
+        }
+        SourceEvent::SmartContractEvent(data) => {
+            let mut value = vec![];
+            let _ = data.value.consensus_serialize(&mut value);
+            DestinationEvent::SmartContractEvent(SmartContractEventData {
+                contract_identifier: data.key.0.to_string(),
+                topic: data.key.1.clone(),
+                hex_value: format!("0x{}", to_hex(&value)),
+            })
+        }
     }
 }
