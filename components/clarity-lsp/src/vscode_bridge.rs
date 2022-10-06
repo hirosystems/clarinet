@@ -7,12 +7,12 @@ use crate::utils::{
 use clarinet_files::{FileAccessor, WASMFileSystemAccessor};
 use js_sys::{Function as JsFunction, Promise};
 use lsp_types::notification::{
-    DidOpenTextDocument, DidSaveTextDocument, Initialized, Notification, ShowMessage,
+    DidOpenTextDocument, DidSaveTextDocument, Initialized, Notification,
 };
 use lsp_types::{
     request::{Completion, Request},
     CompletionParams, DidOpenTextDocumentParams, DidSaveTextDocumentParams,
-    PublishDiagnosticsParams, ShowMessageParams, Url,
+    PublishDiagnosticsParams, Url,
 };
 use serde_wasm_bindgen::{from_value as decode_from_js, to_value as encode_to_js};
 use std::panic;
@@ -24,7 +24,7 @@ use wasm_bindgen_futures::future_to_promise;
 pub struct LspVscodeBridge {
     editor_state_lock: Arc<RwLock<EditorState>>,
     client_diagnostic_tx: JsFunction,
-    client_notification_tx: JsFunction,
+    _client_notification_tx: JsFunction,
     backend_to_client_tx: JsFunction,
 }
 
@@ -33,7 +33,7 @@ impl LspVscodeBridge {
     #[wasm_bindgen(constructor)]
     pub fn new(
         client_diagnostic_tx: JsFunction,
-        client_notification_tx: JsFunction,
+        _client_notification_tx: JsFunction,
         backend_to_client_tx: JsFunction,
     ) -> LspVscodeBridge {
         panic::set_hook(Box::new(console_error_panic_hook::hook));
@@ -42,7 +42,7 @@ impl LspVscodeBridge {
         LspVscodeBridge {
             editor_state_lock,
             client_diagnostic_tx,
-            client_notification_tx,
+            _client_notification_tx,
             backend_to_client_tx,
         }
     }
@@ -75,7 +75,6 @@ impl LspVscodeBridge {
 
                 let editor_state_lock = self.editor_state_lock.clone();
                 let send_diagnostic = self.client_diagnostic_tx.clone();
-                let send_notification = self.client_notification_tx.clone();
 
                 return future_to_promise(async move {
                     let mut result = match editor_state_lock.try_write() {
@@ -87,11 +86,9 @@ impl LspVscodeBridge {
                     };
 
                     let mut aggregated_diagnostics = vec![];
-                    let mut notification = None;
 
                     if let Ok(ref mut response) = result {
                         aggregated_diagnostics.append(&mut response.aggregated_diagnostics);
-                        notification = response.notification.take();
                     }
 
                     for (location, mut diags) in aggregated_diagnostics.into_iter() {
@@ -104,17 +101,6 @@ impl LspVscodeBridge {
 
                             send_diagnostic.call1(&JsValue::NULL, &encode_to_js(&value)?)?;
                         }
-                    }
-
-                    if let Some((level, message)) = notification {
-                        send_notification.call2(
-                            &JsValue::NULL,
-                            &JsValue::from(ShowMessage::METHOD),
-                            &encode_to_js(&ShowMessageParams {
-                                message,
-                                typ: level,
-                            })?,
-                        )?;
                     }
 
                     Ok(JsValue::TRUE)
@@ -138,7 +124,6 @@ impl LspVscodeBridge {
 
                 let editor_state_lock = self.editor_state_lock.clone();
                 let send_diagnostic = self.client_diagnostic_tx.clone();
-                let send_notification = self.client_notification_tx.clone();
 
                 return future_to_promise(async move {
                     let mut result = match editor_state_lock.try_write() {
@@ -150,11 +135,9 @@ impl LspVscodeBridge {
                     };
 
                     let mut aggregated_diagnostics = vec![];
-                    let mut notification = None;
 
                     if let Ok(ref mut response) = result {
                         aggregated_diagnostics.append(&mut response.aggregated_diagnostics);
-                        notification = response.notification.take();
                     }
 
                     for (location, mut diags) in aggregated_diagnostics.into_iter() {
@@ -169,16 +152,6 @@ impl LspVscodeBridge {
                         }
                     }
 
-                    if let Some((level, message)) = notification {
-                        send_notification.call2(
-                            &JsValue::NULL,
-                            &JsValue::from(ShowMessage::METHOD),
-                            &encode_to_js(&ShowMessageParams {
-                                message,
-                                typ: level,
-                            })?,
-                        )?;
-                    }
                     Ok(JsValue::TRUE)
                 });
             }
