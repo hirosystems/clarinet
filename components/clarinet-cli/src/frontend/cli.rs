@@ -1,4 +1,5 @@
 use crate::chainhooks::check_chainhooks;
+use crate::chainhooks::types::ChainhookSpecificationFile;
 use crate::deployments::types::DeploymentSynthesis;
 use crate::deployments::{
     self, apply_on_chain_deployment, check_deployments, generate_default_deployment,
@@ -13,8 +14,9 @@ use crate::integrate::{self, DevnetOrchestrator};
 use crate::lsp::run_lsp;
 use crate::runner::run_scripts;
 use crate::runner::DeploymentCache;
-use chainhook_types::Chain;
+use chainhook_event_observer::chainhooks::types::ChainhookSpecification;
 use chainhook_types::StacksNetwork;
+use chainhook_types::{BitcoinNetwork, Chain};
 use clarinet_deployments::setup_session_with_deployment;
 use clarinet_deployments::types::{DeploymentGenerationArtifacts, DeploymentSpecification};
 use clarinet_files::{FileLocation, ProjectManifest, ProjectManifestFile, RequirementConfig};
@@ -399,6 +401,12 @@ struct Test {
     /// Specify optional Typescript config file
     #[clap(long = "ts-config")]
     pub ts_config: Option<String>,
+    /// Specify relative path of the chainhooks (yaml format) to evaluate
+    #[clap(long = "chainhooks")]
+    pub chainhooks: Vec<String>,
+    /// Add artificial delay (in seconds) when calling `chain.mineBlock(...)`. Useful when testing chainhooks
+    #[clap(long = "mine-block-delay")]
+    pub mine_block_delay: Option<u16>,
 }
 
 #[derive(Parser, PartialEq, Clone, Debug)]
@@ -1041,6 +1049,36 @@ pub fn main() {
             let deployment_plan_path = cmd.deployment_plan_path.clone();
             let cache = build_deployment_cache_or_exit(&manifest, &deployment_plan_path);
             let cache_location = manifest.project.cache_location.clone();
+            let mut stacks_chainhooks = vec![];
+            let mine_block_delay = cmd.mine_block_delay.unwrap_or(0);
+            for chainhook_relative_path in cmd.chainhooks.iter() {
+                let mut chainhook_location = manifest
+                    .location
+                    .get_project_root_location()
+                    .expect("unable to get root location");
+                chainhook_location
+                    .append_path(chainhook_relative_path)
+                    .expect("unable to build path");
+                match ChainhookSpecificationFile::parse(
+                    &chainhook_location.to_string().into(),
+                    &(BitcoinNetwork::Regtest, StacksNetwork::Devnet),
+                ) {
+                    Ok(hook) => match hook {
+                        ChainhookSpecification::Bitcoin(_) => {
+                            println!(
+                                "{}: bitcoin chainhooks not supported in test environments",
+                                red!("error")
+                            );
+                            std::process::exit(1);
+                        }
+                        ChainhookSpecification::Stacks(hook) => stacks_chainhooks.push(hook),
+                    },
+                    Err(msg) => {
+                        println!("{}: unable to load chainhooks ({})", red!("error"), msg);
+                        std::process::exit(1);
+                    }
+                };
+            }
 
             let (success, _count) = match run_scripts(
                 cmd.files,
@@ -1058,6 +1096,8 @@ pub fn main() {
                 cmd.allow_net,
                 cache_location,
                 cmd.ts_config,
+                stacks_chainhooks,
+                mine_block_delay,
             ) {
                 Ok(count) => (true, count),
                 Err((e, count)) => {
@@ -1101,6 +1141,8 @@ pub fn main() {
                 false,
                 cache_location,
                 None,
+                vec![],
+                0,
             );
         }
         Command::Integrate(cmd) => {

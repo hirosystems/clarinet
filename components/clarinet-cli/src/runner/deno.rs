@@ -1,5 +1,7 @@
 // Copyright 2018-2022 the Deno authors. All rights reserved. MIT license.
 
+use crate::utils::nestable_block_on;
+
 use super::vendor::deno_cli::args::{ConfigFlag, TypeCheckMode};
 use super::vendor::deno_cli::args::{DenoSubcommand, Flags, TestFlags};
 use super::vendor::deno_cli::file_fetcher::File;
@@ -19,7 +21,8 @@ use super::vendor::deno_cli::tools::test::{
 
 use super::vendor::deno_runtime::permissions::Permissions;
 use super::vendor::deno_runtime::tokio_util::run_local;
-use super::{api_v1, costs, DeploymentCache, SessionArtifacts};
+use super::{api_v1, costs, ChainhookEvent, DeploymentCache, SessionArtifacts};
+use chainhook_event_observer::chainhooks::types::StacksChainhookSpecification;
 use clarinet_files::{FileLocation, ProjectManifest};
 use clarity_repl::analysis::coverage::CoverageReporter;
 use deno_ast::swc::common::comments::CommentKind;
@@ -44,6 +47,8 @@ use std::collections::HashSet;
 use std::fmt::Write as _;
 use std::num::NonZeroUsize;
 use std::path::PathBuf;
+use std::result::Result::Ok;
+use std::sync::mpsc::{channel, Sender};
 use std::sync::Arc;
 use std::time::Instant;
 use tokio::sync::mpsc::unbounded_channel;
@@ -64,6 +69,8 @@ pub async fn do_run_scripts(
     allow_net: bool,
     cache_location: FileLocation,
     ts_config: Option<String>,
+    stacks_chainhooks: Vec<StacksChainhookSpecification>,
+    mine_block_delay: u16,
 ) -> Result<usize, (AnyError, usize)> {
     let project_root = manifest.location.get_project_root_location().unwrap();
     let cwd = PathBuf::from(&project_root.to_string());
@@ -131,6 +138,45 @@ pub async fn do_run_scripts(
         ..Default::default()
     };
 
+    let chainhook_tx = if !stacks_chainhooks.is_empty() {
+        let (chainhook_tx, chainhook_rx) = channel();
+        std::thread::spawn(move || {
+            while let Ok(msg) = chainhook_rx.recv() {
+                match msg {
+                    ChainhookEvent::PerformRequest(request_builder) => {
+                        match nestable_block_on(request_builder.send()) {
+                            Ok(r) => {
+                                if !r.status().is_success() {
+                                    let body = nestable_block_on(r.text()).unwrap();
+                                    println!(
+                                        "{}: unable to invoke chainhook ({})",
+                                        red!("error"),
+                                        body
+                                    );
+                                    std::process::exit(1);
+                                }
+                            }
+                            Err(e) => {
+                                println!(
+                                    "{}: unable to invoke chainhook ({})",
+                                    red!("error"),
+                                    e.to_string()
+                                );
+                                std::process::exit(1);
+                            }
+                        }
+                    }
+                    ChainhookEvent::Exit => {
+                        break;
+                    }
+                }
+            }
+        });
+        Some(chainhook_tx)
+    } else {
+        None
+    };
+
     let success = if flags.watch.is_some() {
         run_tests_with_watch(
             flags,
@@ -138,6 +184,9 @@ pub async fn do_run_scripts(
             allow_wallets,
             Some(cache),
             display_costs_report,
+            stacks_chainhooks,
+            mine_block_delay,
+            chainhook_tx.clone(),
         )
         .await
         .map_err(|e| (e, 0))?;
@@ -150,9 +199,16 @@ pub async fn do_run_scripts(
             Some(cache),
             display_costs_report,
             generate_coverage,
+            stacks_chainhooks,
+            mine_block_delay,
+            chainhook_tx.clone(),
         )
         .await?
     };
+
+    if let Some(ref chainhook_tx) = chainhook_tx {
+        let _ = chainhook_tx.send(ChainhookEvent::Exit);
+    }
 
     Ok(success)
 }
@@ -419,6 +475,9 @@ async fn test_specifiers(
     options: TestSpecifierOptions,
     allow_wallets: bool,
     deployment_cache: Option<DeploymentCache>,
+    stacks_chainhooks: Vec<StacksChainhookSpecification>,
+    mine_block_delay: u16,
+    chainhook_tx: Option<Sender<ChainhookEvent>>,
 ) -> Result<(bool, Vec<SessionArtifacts>), AnyError> {
     let log_level = ps.options.log_level();
     let specifiers_with_mode = if let Some(seed) = options.shuffle {
@@ -444,6 +503,8 @@ async fn test_specifiers(
         let mut sender = sender.clone();
         let options = options.clone();
         let deployment_cache = deployment_cache.clone();
+        let stacks_chainhooks = stacks_chainhooks.clone();
+        let chainhook_tx = chainhook_tx.clone();
 
         tokio::task::spawn_blocking(move || {
             let origin = specifier.to_string();
@@ -457,6 +518,9 @@ async fn test_specifiers(
                 channel,
                 allow_wallets,
                 deployment_cache,
+                stacks_chainhooks,
+                mine_block_delay,
+                chainhook_tx,
             ));
 
             match file_result {
@@ -735,6 +799,9 @@ pub async fn run_tests(
     deployment_cache: Option<DeploymentCache>,
     display_costs_report: bool,
     generate_coverage: bool,
+    stacks_chainhooks: Vec<StacksChainhookSpecification>,
+    mine_block_delay: u16,
+    chainhook_tx: Option<Sender<ChainhookEvent>>,
 ) -> Result<usize, (AnyError, usize)> {
     let ps = ProcState::build(flags).await.map_err(|e| (e, 0))?;
     let permissions = Permissions::from_options(&ps.options.permissions_options());
@@ -774,6 +841,9 @@ pub async fn run_tests(
         },
         allow_wallets,
         deployment_cache.clone(),
+        stacks_chainhooks,
+        mine_block_delay,
+        chainhook_tx,
     )
     .await
     .map_err(|e| (e, 0))?;
@@ -818,6 +888,9 @@ pub async fn run_tests_with_watch(
     allow_wallets: bool,
     deployment_cache: Option<DeploymentCache>,
     display_costs_report: bool,
+    stacks_chainhooks: Vec<StacksChainhookSpecification>,
+    mine_block_delay: u16,
+    chainhook_tx: Option<Sender<ChainhookEvent>>,
 ) -> Result<(), AnyError> {
     let ps = ProcState::build(flags).await?;
     let permissions = Permissions::from_options(&ps.options.permissions_options());
@@ -949,7 +1022,8 @@ pub async fn run_tests_with_watch(
         let permissions = permissions.clone();
         let ps = ps.clone();
         let deployment_cache = deployment_cache.clone();
-
+        let stacks_chainhooks = stacks_chainhooks.clone();
+        let chainhook_tx = chainhook_tx.clone();
         async move {
             let specifiers_with_mode = fetch_specifiers_with_test_mode(
                 &ps,
@@ -983,6 +1057,9 @@ pub async fn run_tests_with_watch(
                 },
                 allow_wallets,
                 deployment_cache,
+                stacks_chainhooks,
+                mine_block_delay,
+                chainhook_tx,
             )
             .await?;
 
