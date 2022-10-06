@@ -1,5 +1,5 @@
 import * as vscode from "vscode";
-import { ExtensionContext, Uri } from "vscode";
+import { ExtensionContext } from "vscode";
 import { LanguageClientOptions } from "vscode-languageclient";
 
 import { initVFS } from "./customVFS";
@@ -14,9 +14,6 @@ function isValidInsight(data: InsightsData): data is InsightsData {
 
 export const clientOpts: LanguageClientOptions = {
   documentSelector: [{ language: "clarity" }, { language: "toml" }],
-  synchronize: {
-    fileEvents: workspace.createFileSystemWatcher("**/*.clar"),
-  },
   diagnosticCollectionName: "Clarity LSP",
   progressOnInitialization: false,
   traceOutputChannel: vscode.window.createOutputChannel(
