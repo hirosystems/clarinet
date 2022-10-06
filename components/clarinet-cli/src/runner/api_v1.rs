@@ -491,7 +491,8 @@ fn call_read_only_fn(state: &mut OpState, args: CallReadOnlyFnArgs) -> Result<St
             Ok(res) => res,
             Err(diagnostics) => {
                 let mut message = format!(
-                    "Readonly Contract call runtime error: {}::{}({})",
+                    "{}: {}::{}({})",
+                    red!("Readonly Contract call runtime error"),
                     args.contract,
                     args.method,
                     args.args.join(", ")
@@ -608,7 +609,8 @@ fn mine_block(state: &mut OpState, args: MineBlockArgs) -> Result<String, AnyErr
                     Ok(res) => res,
                     Err(diagnostics) => {
                         let mut message = format!(
-                            "Contract call runtime error: {}::{}({})",
+                            "{}: {}::{}({})",
+                            red!("Readonly Contract call runtime error"),
                             args.contract,
                             args.method,
                             args.args.join(", ")
@@ -653,7 +655,8 @@ fn mine_block(state: &mut OpState, args: MineBlockArgs) -> Result<String, AnyErr
                         Ok(res) => res,
                         Err(diagnostics) => {
                             let mut message = format!(
-                                "Contract deployment runtime error: {}.{}",
+                                "{}: {}.{}",
+                                red!("Contract deployment runtime error"),
                                 tx.sender, args.name
                             );
                             if let Some(diag) = diagnostics.last() {
@@ -682,7 +685,7 @@ fn mine_block(state: &mut OpState, args: MineBlockArgs) -> Result<String, AnyErr
                     let execution = match session.eval(snippet.clone(), None, false) {
                         Ok(res) => res,
                         Err(diagnostics) => {
-                            let mut message = format!("Stacks transfer runtime error: {}", snippet);
+                            let mut message = format!("{}: {}", red!("STX transfer runtime error"), snippet);
                             if let Some(diag) = diagnostics.last() {
                                 message = format!("{} -> {}", message, diag.message);
                             }
