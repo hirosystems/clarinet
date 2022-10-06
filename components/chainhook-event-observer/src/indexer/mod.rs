@@ -197,7 +197,7 @@ impl ChainSegment {
             Some(tip) => tip,
             None => return Ok(()),
         };
-        println!("Comparing {} with {}", tip, block.get_identifier());
+        info!("Comparing {} with {}", tip, block.get_identifier());
         if tip.index == block.get_parent_identifier().index {
             match tip.hash == block.get_parent_identifier().hash {
                 true => return Ok(()),
@@ -214,7 +214,7 @@ impl ChainSegment {
     }
 
     fn get_block_id(&self, block_id: &BlockIdentifier) -> Option<&BlockIdentifier> {
-        println!("=> {}", self.get_relative_index(block_id));
+        info!("=> {}", self.get_relative_index(block_id));
         match self.block_ids.get(self.get_relative_index(block_id)) {
             Some(res) => Some(res),
             None => None,
@@ -312,14 +312,14 @@ impl ChainSegment {
     fn try_append_block(&mut self, block: &dyn AbstractBlock) -> (bool, Option<ChainSegment>) {
         let mut block_appended = false;
         let mut fork = None;
-        println!("Trying to append {} to {}", block.get_identifier(), self);
+        info!("Trying to append {} to {}", block.get_identifier(), self);
         match self.can_append_block(block) {
             Ok(()) => {
                 self.append_block_identifier(&block.get_identifier());
                 block_appended = true;
             }
             Err(incompatibility) => {
-                println!("Will have to fork: {:?}", incompatibility);
+                info!("Will have to fork: {:?}", incompatibility);
                 match incompatibility {
                     ChainSegmentIncompatibility::BlockCollision => {
                         let mut new_fork = self.clone();
@@ -328,7 +328,7 @@ impl ChainSegment {
                                 &block.get_parent_identifier(),
                             );
                         if parent_found {
-                            println!("Success");
+                            info!("Success");
                             new_fork.append_block_identifier(&block.get_identifier());
                             fork = Some(new_fork);
                             block_appended = true;
