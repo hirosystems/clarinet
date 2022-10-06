@@ -657,7 +657,8 @@ fn mine_block(state: &mut OpState, args: MineBlockArgs) -> Result<String, AnyErr
                             let mut message = format!(
                                 "{}: {}.{}",
                                 red!("Contract deployment runtime error"),
-                                tx.sender, args.name
+                                tx.sender,
+                                args.name
                             );
                             if let Some(diag) = diagnostics.last() {
                                 message = format!("{} -> {}", message, diag.message);
@@ -685,7 +686,8 @@ fn mine_block(state: &mut OpState, args: MineBlockArgs) -> Result<String, AnyErr
                     let execution = match session.eval(snippet.clone(), None, false) {
                         Ok(res) => res,
                         Err(diagnostics) => {
-                            let mut message = format!("{}: {}", red!("STX transfer runtime error"), snippet);
+                            let mut message =
+                                format!("{}: {}", red!("STX transfer runtime error"), snippet);
                             if let Some(diag) = diagnostics.last() {
                                 message = format!("{} -> {}", message, diag.message);
                             }
