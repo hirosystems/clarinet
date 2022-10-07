@@ -1,5 +1,5 @@
 use crate::integrate::{LogLevel, Status};
-use orchestra_types::{StacksBlockData, StacksMicroblockData, StacksTransactionData};
+use chainhook_types::{StacksBlockData, StacksMicroblockData, StacksTransactionData};
 
 use super::{app::BlockData, App};
 use tui::{
@@ -30,7 +30,7 @@ pub fn draw<B: Backend>(f: &mut Frame<B>, app: &mut App) {
         .constraints([Constraint::Min(0), Constraint::Length(78)].as_ref())
         .split(page_components[1]);
 
-    let service_len = match app.hyperchain_enabled {
+    let service_len = match app.subnet_enabled {
         false => 7,
         true => 9,
     };

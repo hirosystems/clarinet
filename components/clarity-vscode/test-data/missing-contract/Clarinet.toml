@@ -1,0 +1,25 @@
+[project]
+name = "missing-contract"
+authors = []
+description = ""
+telemetry = false
+requirements = []
+boot_contracts = ["pox", "costs-v2", "bns"]
+
+[project.cache_location]
+path = "./.requirements"
+[contracts.counter]
+path = "contracts/counter.clar"
+
+[repl]
+costs_version = 2
+parser_version = 2
+
+[repl.analysis]
+passes = ["check_checker"]
+
+[repl.analysis.check_checker]
+strict = false
+trusted_sender = false
+trusted_caller = false
+callee_filter = false

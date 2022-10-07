@@ -1,20 +1,24 @@
 [package]
 name = "clarity-repl"
-version = "0.33.0"
+version = "1.0.0"
 description = "Clarity REPL"
-authors = ["Ludo Galabru <ludo@hiro.so>", "Brice Dobry <brice@hiro.so>", "Reed Rosenbluth <reed@hiro.so>"]
+authors = [
+    "Ludo Galabru <ludo@hiro.so>",
+    "Brice Dobry <brice@hiro.so>",
+    "Reed Rosenbluth <reed@hiro.so>",
+]
 readme = "README.md"
 edition = "2018"
 license = "GPL-3.0-only"
 keywords = ["blockstack", "blockchain", "clarity", "smart-contract", "repl"]
-exclude = [
-    "vs-client/**",
-    ".husky",
-    ".git*"
-    ]
+exclude = ["vs-client/**", ".husky", ".git*"]
 homepage = "https://hirosystems.github.io/clarity-repl/"
 repository = "https://github.com/hirosystems/clarity-repl"
-categories = ["command-line-utilities", "development-tools", "development-tools::build-utils"]
+categories = [
+    "command-line-utilities",
+    "development-tools",
+    "development-tools::build-utils",
+]
 
 [dependencies]
 ansi_term = "0.12.1"
@@ -22,18 +26,19 @@ lazy_static = "1.4.0"
 regex = "1.5.5"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = { version = "1.0.47", features = ["unbounded_depth"] }
-sha2 = "0.9.3"
+sha2 = "0.10"
 sha3 = "0.9.1"
 serde_derive = "1.0"
 ripemd160 = "0.9.1"
 integer-sqrt = "0.1.3"
 libsecp256k1 = "0.5.0"
-serde_stacker = "0.1"
 rand = "=0.7.3"
 getrandom = { version = "0.2.3", features = ["js"] }
 rand_pcg = "0.3.1"
 rand_seeder = "0.2.2"
 atty = "0.2.14"
+clarity = { git = "https://github.com/stacks-network/stacks-blockchain.git", rev = "e7482540e17099698ab79aa428c9d9bf2e4ac281", default-features = false, optional = true }
+# clarity = { package = "clarity", path = "../../../stacks-blockchain/clarity", default-features = false, optional = true }
 
 # DAP Debugger
 tokio = { version = "=1.17.0", features = ["full"], optional = true }
@@ -59,7 +64,6 @@ name = "clarity_repl"
 path = "src/lib.rs"
 # Default type
 # crate-type = ["lib"]
-
 # Use this instead for WASM builds
 crate-type = ["cdylib", "rlib"]
 
@@ -69,7 +73,7 @@ path = "src/bin.rs"
 
 [features]
 default = ["cli", "dap"]
-cli = ["pico-args", "rustyline", "prettytable-rs"]
+cli = ["pico-args", "rustyline", "prettytable-rs", "clarity/canonical", "clarity/developer-mode"]
 dap = [
     "tokio",
     "tokio-util",
@@ -80,9 +84,9 @@ dap = [
     "memchr",
     "log",
 ]
-wasm = ["wasm-bindgen", "wasm-bindgen-futures"]
+wasm = ["wasm-bindgen", "wasm-bindgen-futures", "clarity/wasm"]
 
 [package.metadata.wasm-pack.profile.release.wasm-bindgen]
 debug-js-glue = false
-demangle-name-section = true
+demangle-name-section = false
 dwarf-debug-info = false

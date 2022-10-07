@@ -1,6 +1,6 @@
 use super::changes::{Changes, DirectoryCreation, FileCreation};
+use chainhook_types::Chain;
 use clarinet_files::ProjectManifest;
-use orchestra_types::Chain;
 
 pub struct GetChangesForNewChainhook<'a> {
     manifest: &'a ProjectManifest,

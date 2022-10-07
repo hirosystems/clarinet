@@ -83,7 +83,7 @@ jobs:
         run: cargo install cargo-audit
 
       - name: Run audit
-        run: cargo audit --ignore RUSTSEC-2021-0076 --ignore RUSTSEC-2021-0119 --ignore RUSTSEC-2022-0028 --ignore RUSTSEC-2020-0071 --ignore RUSTSEC-2021-0124
+        run: cargo audit --ignore RUSTSEC-2021-0076 --ignore RUSTSEC-2021-0119 --ignore RUSTSEC-2022-0028 --ignore RUSTSEC-2020-0071 --ignore RUSTSEC-2021-0124 --ignore RUSTSEC-2022-0040
 
       - name: Run rustfmt
         run: cargo fmt --all -- --check
@@ -101,7 +101,7 @@ jobs:
   #         - name: clarity-repl
   #           working-directory: components/clarity-repl
   #         - name: oreo
-  #           working-directory: vendor/orchestra-event-observer
+  #           working-directory: components/chainhook-event-observer
   #   steps:
   #     - name: Checkout repository
   #       uses: actions/checkout@v3
@@ -365,11 +365,6 @@ jobs:
             target: x86_64-unknown-linux-gnu
             architecture: x64
             libc: glibc
-          - os: ubuntu-latest
-            platform: linux
-            target: x86_64-unknown-linux-musl
-            architecture: x64
-            libc: musl
           - os: windows-latest
             platform: windows
             target: x86_64-pc-windows-msvc
@@ -382,6 +377,11 @@ jobs:
             platform: darwin
             target: aarch64-apple-darwin
             architecture: arm64
+          # - os: ubuntu-latest
+          #   platform: linux
+          #   target: x86_64-unknown-linux-musl
+          #   architecture: x64
+          #   libc: musl
 
     steps:
       - name: Configure git to use LF (Windows)
@@ -496,7 +496,7 @@ jobs:
           token: ${{ secrets.NPM_TOKEN }}
 
   dist_oreo:
-    name: Build Oreo Distribution
+    name: Build Chainhook event observere Distribution
     runs-on: ubuntu-latest
     needs: pre_run
 
@@ -533,11 +533,11 @@ jobs:
           echo "PRE_GYP_TARGET_NAME=linux-x64-glibc" >> $GITHUB_ENV
 
       - name: Build - Cargo
-        working-directory: vendor/orchestra-event-observer
+        working-directory: components/chainhook-event-observer
         run: cargo build --release --locked --target x86_64-unknown-linux-gnu
 
       - name: Compress cargo artifact
-        run: tar -C target/x86_64-unknown-linux-gnu/release -zcvf oreo-${{ env.SHORT_TARGET_NAME }}.tar.gz orchestra-event-observer
+        run: tar -C target/x86_64-unknown-linux-gnu/release -zcvf oreo-${{ env.SHORT_TARGET_NAME }}.tar.gz chainhook-event-observer
 
       - name: Upload cargo artifacts
         uses: actions/upload-artifact@v2
@@ -593,16 +593,16 @@ jobs:
       - name: Build - Cargo
         run: cargo build --release --locked --target x86_64-unknown-linux-gnu
 
-      - name: Build - WASM
-        run: wasm-pack build --target web --release -- --no-default-features --features wasm
+      # - name: Build - WASM
+      #   run: wasm-pack build --target web --release -- --no-default-features --features wasm
 
       - name: Compress cargo artifact
         working-directory: "."
         run: tar -C target/x86_64-unknown-linux-gnu/release -zcvf clarity-repl-${{ env.SHORT_TARGET_NAME }}.tar.gz clarity-repl
 
-      - name: Compress wasm artifact
-        working-directory: "."
-        run: tar -C target/wasm32-unknown-unknown/release -zcvf clarity-repl-wasm.tar.gz clarity_repl.wasm
+      # - name: Compress wasm artifact
+      #   working-directory: "."
+      #   run: tar -C target/wasm32-unknown-unknown/release -zcvf clarity-repl-wasm.tar.gz clarity_repl.wasm
 
       - name: Upload cargo artifact
         uses: actions/upload-artifact@v2
@@ -610,11 +610,11 @@ jobs:
           name: clarity-repl-${{ env.SHORT_TARGET_NAME }}
           path: clarity-repl-${{ env.SHORT_TARGET_NAME }}.tar.gz
 
-      - name: Upload wasm artifact
-        uses: actions/upload-artifact@v2
-        with:
-          name: clarity-repl-wasm
-          path: clarity-repl-wasm.tar.gz
+      # - name: Upload wasm artifact
+      #   uses: actions/upload-artifact@v2
+      #   with:
+      #     name: clarity-repl-wasm
+      #     path: clarity-repl-wasm.tar.gz
 
       - name: Unit Tests - Cargo
         run: cargo test --release --locked --target x86_64-unknown-linux-gnu
@@ -643,9 +643,9 @@ jobs:
             image: ${{ github.repository }}
             artifact: clarinet-linux-x64-glibc
             dockerfile: dockerfiles/ci/clarinet.dockerfile
-          - name: Orchestra Event Observer (Oreo)
+          - name: Chainhook Event Observer (Oreo)
             description: A Stacks event observer.
-            image: ${{ github.repository_owner }}/orchestra-event-observer
+            image: ${{ github.repository_owner }}/chainhook-event-observer
             artifact: oreo-linux-x64-glibc
             dockerfile: dockerfiles/ci/oreo.dockerfile
     steps:

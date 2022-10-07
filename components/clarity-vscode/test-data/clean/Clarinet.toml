@@ -1,0 +1,22 @@
+[project]
+name = "test-data"
+authors = []
+description = ""
+telemetry = false
+requirements = []
+cache_dir = "./.cache"
+
+[contracts.contract]
+path = "contracts/contract.clar"
+
+[contracts.counter]
+path = "contracts/counter.clar"
+
+[repl.analysis]
+passes = ["check_checker"]
+
+[repl.analysis.check_checker]
+strict = false
+trusted_sender = false
+trusted_caller = false
+callee_filter = false

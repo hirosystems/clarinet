@@ -485,8 +485,8 @@ dependencies = [
  "libsecp256k1 0.7.1",
  "mio 0.8.2",
  "num_cpus",
- "orchestra-event-observer",
- "orchestra-types",
+ "chainhook-event-observer",
+ "chainhook-types",
  "pbkdf2",
  "percent-encoding",
  "pin-project",
@@ -521,7 +521,7 @@ version = "0.1.0"
 dependencies = [
  "clarinet-files",
  "clarity-repl 0.28.2",
- "orchestra-types",
+ "chainhook-types",
  "reqwest",
  "serde",
  "serde_derive",
@@ -538,7 +538,7 @@ dependencies = [
  "clarinet-utils",
  "clarity-repl 0.28.2",
  "libsecp256k1 0.7.1",
- "orchestra-types",
+ "chainhook-types",
  "serde",
  "serde_derive",
  "serde_json",
@@ -564,7 +564,7 @@ dependencies = [
  "clarinet-files",
  "clarity-repl 0.28.2",
  "lsp-types",
- "orchestra-types",
+ "chainhook-types",
 ]
 
 [[package]]
@@ -2033,7 +2033,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "624a8340c38c1b80fd549087862da4ba43e08858af025b236e509b6649fc13d5"
 
 [[package]]
-name = "orchestra-event-observer"
+name = "chainhook-event-observer"
 version = "0.1.0"
 dependencies = [
  "base58 0.2.0",
@@ -2041,7 +2041,7 @@ dependencies = [
  "bitcoincore-rpc",
  "bitcoincore-rpc-json",
  "clarity-repl 0.28.2 (registry+https://github.com/rust-lang/crates.io-index)",
- "orchestra-types",
+ "chainhook-types",
  "reqwest",
  "rocket",
  "serde",
@@ -2053,7 +2053,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "orchestra-types"
+name = "chainhook-types"
 version = "0.1.0"
 dependencies = [
  "serde",
@@ -3057,7 +3057,7 @@ dependencies = [
  "error-chain",
  "neon",
  "num",
- "orchestra-types",
+ "chainhook-types",
  "serde",
 ]
 

@@ -1,0 +1,2 @@
+module VaultsHelper
+end

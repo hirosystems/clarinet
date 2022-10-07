@@ -1,18 +1,17 @@
-use clarinet_utils::get_bip39_seed_from_mnemonic;
 use std::collections::BTreeMap;
 
-use super::FileLocation;
+use super::{FileAccessor, FileLocation};
 use bip39::{Language, Mnemonic};
+use chainhook_types::{BitcoinNetwork, StacksNetwork};
+use clarinet_utils::get_bip39_seed_from_mnemonic;
+use clarity_repl::clarity::address::AddressHashMode;
+use clarity_repl::clarity::stacks_common::types::chainstate::StacksAddress;
+use clarity_repl::clarity::util::hash::bytes_to_hex;
 use clarity_repl::clarity::util::secp256k1::Secp256k1PublicKey;
-use clarity_repl::clarity::util::StacksAddress;
-use clarity_repl::clarity::{types::QualifiedContractIdentifier, util::hash::bytes_to_hex};
+use clarity_repl::clarity::vm::types::QualifiedContractIdentifier;
 use libsecp256k1::{PublicKey, SecretKey};
-use orchestra_types::{BitcoinNetwork, StacksNetwork};
 use tiny_hderive::bip32::ExtendedPrivKey;
 use toml::value::Value;
-
-#[cfg(feature = "cli")]
-use bitcoin;
 
 pub const DEFAULT_DERIVATION_PATH: &str = "m/44'/5757'/0'/0/0";
 pub const DEFAULT_BITCOIN_NODE_IMAGE: &str = "quay.io/hirosystems/bitcoind:devnet-v2";
@@ -20,13 +19,18 @@ pub const DEFAULT_STACKS_NODE_IMAGE: &str = "quay.io/hirosystems/stacks-node:dev
 pub const DEFAULT_BITCOIN_EXPLORER_IMAGE: &str = "quay.io/hirosystems/bitcoin-explorer:devnet";
 pub const DEFAULT_STACKS_API_IMAGE: &str = "blockstack/stacks-blockchain-api:latest";
 pub const DEFAULT_STACKS_EXPLORER_IMAGE: &str = "hirosystems/explorer:latest";
-pub const DEFAULT_POSTGRES_IMAGE: &str = "postgres:alpine";
-pub const DEFAULT_HYPERCHAIN_NODE_IMAGE: &str = "hirosystems/hyperchains:0.0.4-stretch";
-pub const DEFAULT_HYPERCHAIN_CONTRACT_ID: &str =
-    "STXMJXCJDCT4WPF2X1HE42T6ZCCK3TPMBRZ51JEG.hc-alpha";
+pub const DEFAULT_POSTGRES_IMAGE: &str = "postgres:14";
+pub const DEFAULT_SUBNET_NODE_IMAGE: &str = "hirosystems/hyperchains:0.0.4-stretch";
+pub const DEFAULT_SUBNET_CONTRACT_ID: &str = "STXMJXCJDCT4WPF2X1HE42T6ZCCK3TPMBRZ51JEG.hc-alpha";
 pub const DEFAULT_STACKS_MINER_MNEMONIC: &str = "fragile loan twenty basic net assault jazz absorb diet talk art shock innocent float punch travel gadget embrace caught blossom hockey surround initial reduce";
 pub const DEFAULT_FAUCET_MNEMONIC: &str = "shadow private easily thought say logic fault paddle word top book during ignore notable orange flight clock image wealth health outside kitten belt reform";
-pub const DEFAULT_HYPERCHAIN_MNEMONIC: &str = "female adjust gallery certain visit token during great side clown fitness like hurt clip knife warm bench start reunion globe detail dream depend fortune";
+pub const DEFAULT_SUBNET_MNEMONIC: &str = "female adjust gallery certain visit token during great side clown fitness like hurt clip knife warm bench start reunion globe detail dream depend fortune";
+#[cfg(unix)]
+pub const DEFAULT_DOCKER_SOCKET: &str = "unix:///var/run/docker.sock";
+#[cfg(windows)]
+pub const DEFAULT_DOCKER_SOCKET: &str = "npipe:////./pipe/docker_engine";
+#[cfg(target_family = "wasm")]
+pub const DEFAULT_DOCKER_SOCKET: &str = "/var/run/docker.sock";
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct NetworkManifestFile {
@@ -71,7 +75,7 @@ pub struct DevnetConfigFile {
     pub postgres_username: Option<String>,
     pub postgres_password: Option<String>,
     pub stacks_api_postgres_database: Option<String>,
-    pub hyperchain_api_postgres_database: Option<String>,
+    pub subnet_api_postgres_database: Option<String>,
     pub pox_stacking_orders: Option<Vec<PoxStackingOrder>>,
     pub execute_script: Option<Vec<ExecuteScript>>,
     pub bitcoin_node_image_url: Option<String>,
@@ -84,19 +88,21 @@ pub struct DevnetConfigFile {
     pub disable_stacks_explorer: Option<bool>,
     pub disable_stacks_api: Option<bool>,
     pub bind_containers_volumes: Option<bool>,
-    pub enable_hyperchain_node: Option<bool>,
-    pub hyperchain_node_image_url: Option<String>,
-    pub hyperchain_leader_mnemonic: Option<String>,
-    pub hyperchain_leader_derivation_path: Option<String>,
-    pub hyperchain_node_p2p_port: Option<u16>,
-    pub hyperchain_node_rpc_port: Option<u16>,
-    pub hyperchain_events_ingestion_port: Option<u16>,
-    pub hyperchain_node_events_observers: Option<Vec<String>>,
-    pub hyperchain_contract_id: Option<String>,
-    pub hyperchain_api_image_url: Option<String>,
-    pub hyperchain_api_port: Option<u16>,
-    pub hyperchain_api_events_port: Option<u16>,
-    pub disable_hyperchain_api: Option<bool>,
+    pub enable_subnet_node: Option<bool>,
+    pub subnet_node_image_url: Option<String>,
+    pub subnet_leader_mnemonic: Option<String>,
+    pub subnet_leader_derivation_path: Option<String>,
+    pub subnet_node_p2p_port: Option<u16>,
+    pub subnet_node_rpc_port: Option<u16>,
+    pub subnet_events_ingestion_port: Option<u16>,
+    pub subnet_node_events_observers: Option<Vec<String>>,
+    pub subnet_contract_id: Option<String>,
+    pub subnet_api_image_url: Option<String>,
+    pub subnet_api_port: Option<u16>,
+    pub subnet_api_events_port: Option<u16>,
+    pub disable_subnet_api: Option<bool>,
+    pub docker_host: Option<String>,
+    pub components_host: Option<String>,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -171,7 +177,7 @@ pub struct DevnetConfig {
     pub postgres_username: String,
     pub postgres_password: String,
     pub stacks_api_postgres_database: String,
-    pub hyperchain_api_postgres_database: String,
+    pub subnet_api_postgres_database: String,
     pub pox_stacking_orders: Vec<PoxStackingOrder>,
     pub execute_script: Vec<ExecuteScript>,
     pub bitcoin_node_image_url: String,
@@ -184,23 +190,25 @@ pub struct DevnetConfig {
     pub disable_stacks_explorer: bool,
     pub disable_stacks_api: bool,
     pub bind_containers_volumes: bool,
-    pub enable_hyperchain_node: bool,
-    pub hyperchain_node_image_url: String,
-    pub hyperchain_leader_stx_address: String,
-    pub hyperchain_leader_secret_key_hex: String,
-    pub hyperchain_leader_btc_address: String,
-    pub hyperchain_leader_mnemonic: String,
-    pub hyperchain_leader_derivation_path: String,
-    pub hyperchain_node_p2p_port: u16,
-    pub hyperchain_node_rpc_port: u16,
-    pub hyperchain_events_ingestion_port: u16,
-    pub hyperchain_node_events_observers: Vec<String>,
-    pub hyperchain_contract_id: String,
-    pub remapped_hyperchain_contract_id: String,
-    pub hyperchain_api_image_url: String,
-    pub hyperchain_api_port: u16,
-    pub hyperchain_api_events_port: u16,
-    pub disable_hyperchain_api: bool,
+    pub enable_subnet_node: bool,
+    pub subnet_node_image_url: String,
+    pub subnet_leader_stx_address: String,
+    pub subnet_leader_secret_key_hex: String,
+    pub subnet_leader_btc_address: String,
+    pub subnet_leader_mnemonic: String,
+    pub subnet_leader_derivation_path: String,
+    pub subnet_node_p2p_port: u16,
+    pub subnet_node_rpc_port: u16,
+    pub subnet_events_ingestion_port: u16,
+    pub subnet_node_events_observers: Vec<String>,
+    pub subnet_contract_id: String,
+    pub remapped_subnet_contract_id: String,
+    pub subnet_api_image_url: String,
+    pub subnet_api_port: u16,
+    pub subnet_api_events_port: u16,
+    pub disable_subnet_api: bool,
+    pub docker_host: String,
+    pub components_host: String,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -231,6 +239,25 @@ impl NetworkManifest {
         let network_manifest_location =
             project_manifest_location.get_network_manifest_location(&networks.1)?;
         NetworkManifest::from_location(&network_manifest_location, networks)
+    }
+
+    pub async fn from_project_manifest_location_using_file_accessor(
+        location: &FileLocation,
+        networks: &(BitcoinNetwork, StacksNetwork),
+        file_accessor: &Box<dyn FileAccessor>,
+    ) -> Result<NetworkManifest, String> {
+        let mut network_manifest_location = location.get_parent_location()?;
+        network_manifest_location.append_path("settings/Devnet.toml")?;
+        let content = file_accessor
+            .read_file(network_manifest_location.to_string())
+            .await?;
+
+        let mut network_manifest_file: NetworkManifestFile =
+            toml::from_slice(&content.as_bytes()).unwrap();
+        Ok(NetworkManifest::from_network_manifest_file(
+            &mut network_manifest_file,
+            networks,
+        ))
     }
 
     pub fn from_location(
@@ -286,9 +313,17 @@ impl NetworkManifest {
 
                             let mnemonic = match account_settings.get("mnemonic") {
                                 Some(Value::String(words)) => {
-                                    Mnemonic::parse_in_normalized(Language::English, words)
-                                        .unwrap()
-                                        .to_string()
+                                    match Mnemonic::parse_in_normalized(Language::English, words) {
+                                        Ok(result) => result.to_string(),
+                                        Err(e) => {
+                                            println!(
+                                                "Error: mnemonic for wallet '{}' invalid: {}",
+                                                account_name,
+                                                e.to_string()
+                                            );
+                                            std::process::exit(1);
+                                        }
+                                    }
                                 }
                                 _ => {
                                     let entropy = &[
@@ -360,63 +395,62 @@ impl NetworkManifest {
             let (faucet_stx_address, faucet_btc_address, faucet_secret_key_hex) =
                 compute_addresses(&faucet_mnemonic, &faucet_derivation_path, networks);
 
-            let hyperchain_leader_mnemonic = devnet_config
-                .hyperchain_leader_mnemonic
+            let subnet_leader_mnemonic = devnet_config
+                .subnet_leader_mnemonic
                 .take()
-                .unwrap_or(DEFAULT_HYPERCHAIN_MNEMONIC.to_string());
-            let hyperchain_leader_derivation_path = devnet_config
-                .hyperchain_leader_derivation_path
+                .unwrap_or(DEFAULT_SUBNET_MNEMONIC.to_string());
+            let subnet_leader_derivation_path = devnet_config
+                .subnet_leader_derivation_path
                 .take()
                 .unwrap_or(DEFAULT_DERIVATION_PATH.to_string());
             let (
-                hyperchain_leader_stx_address,
-                hyperchain_leader_btc_address,
-                hyperchain_leader_secret_key_hex,
+                subnet_leader_stx_address,
+                subnet_leader_btc_address,
+                subnet_leader_secret_key_hex,
             ) = compute_addresses(
-                &hyperchain_leader_mnemonic,
-                &hyperchain_leader_derivation_path,
+                &subnet_leader_mnemonic,
+                &subnet_leader_derivation_path,
                 networks,
             );
 
-            let enable_hyperchain_node = devnet_config.enable_hyperchain_node.unwrap_or(false);
-            let hyperchain_events_ingestion_port = devnet_config
-                .hyperchain_events_ingestion_port
-                .unwrap_or(30445);
+            let enable_subnet_node = devnet_config.enable_subnet_node.unwrap_or(false);
+            let subnet_events_ingestion_port =
+                devnet_config.subnet_events_ingestion_port.unwrap_or(30445);
 
             let mut stacks_node_events_observers = devnet_config
                 .stacks_node_events_observers
                 .take()
                 .unwrap_or(vec![]);
 
-            if enable_hyperchain_node {
-                // add hyperchain node to stacks-node observers
-                let label = "hyperchain-leader";
+            if enable_subnet_node {
+                // add subnet node to stacks-node observers
+                let label = "subnet-leader";
                 stacks_node_events_observers.push(format!(
                     "host.docker.internal:{}",
-                    hyperchain_events_ingestion_port
+                    subnet_events_ingestion_port
                 ));
                 accounts.insert(
                     label.to_string(),
                     AccountConfig {
                         label: label.to_string(),
-                        mnemonic: hyperchain_leader_mnemonic.clone(),
-                        derivation: hyperchain_leader_derivation_path.clone(),
+                        mnemonic: subnet_leader_mnemonic.clone(),
+                        derivation: subnet_leader_derivation_path.clone(),
                         balance: super::DEFAULT_DEVNET_BALANCE,
-                        stx_address: hyperchain_leader_stx_address.clone(),
-                        btc_address: hyperchain_leader_btc_address.clone(),
+                        stx_address: subnet_leader_stx_address.clone(),
+                        btc_address: subnet_leader_btc_address.clone(),
                         is_mainnet,
                     },
                 );
             }
-            let hyperchain_contract_id = devnet_config
-                .hyperchain_contract_id
-                .unwrap_or(DEFAULT_HYPERCHAIN_CONTRACT_ID.to_string());
-            let contract_id = QualifiedContractIdentifier::parse(&hyperchain_contract_id)
-                .expect("hyperchain contract_id invalid");
+            let subnet_contract_id = devnet_config
+                .subnet_contract_id
+                .unwrap_or(DEFAULT_SUBNET_CONTRACT_ID.to_string());
+            let contract_id = QualifiedContractIdentifier::parse(&subnet_contract_id)
+                .expect("subnet contract_id invalid");
             let default_deployer = accounts
                 .get("deployer")
                 .expect("default deployer account unavailable");
-            let remapped_hyperchain_contract_id =
+            let remapped_subnet_contract_id =
                 format!("{}.{}", default_deployer.stx_address, contract_id.name);
 
             let mut config = DevnetConfig {
@@ -472,10 +506,10 @@ impl NetworkManifest {
                     .stacks_api_postgres_database
                     .take()
                     .unwrap_or("stacks_api".to_string()),
-                hyperchain_api_postgres_database: devnet_config
-                    .hyperchain_api_postgres_database
+                subnet_api_postgres_database: devnet_config
+                    .subnet_api_postgres_database
                     .take()
-                    .unwrap_or("hyperchain_api".to_string()),
+                    .unwrap_or("subnet_api".to_string()),
                 execute_script: devnet_config.execute_script.take().unwrap_or(vec![]),
                 bitcoin_node_image_url: devnet_config
                     .bitcoin_node_image_url
@@ -506,32 +540,36 @@ impl NetworkManifest {
                 disable_stacks_api: devnet_config.disable_stacks_api.unwrap_or(false),
                 disable_stacks_explorer: devnet_config.disable_stacks_explorer.unwrap_or(false),
                 bind_containers_volumes: devnet_config.bind_containers_volumes.unwrap_or(false),
-                enable_hyperchain_node,
-                hyperchain_node_image_url: devnet_config
-                    .hyperchain_node_image_url
+                enable_subnet_node,
+                subnet_node_image_url: devnet_config
+                    .subnet_node_image_url
                     .take()
-                    .unwrap_or(DEFAULT_HYPERCHAIN_NODE_IMAGE.to_string()),
-                hyperchain_leader_btc_address,
-                hyperchain_leader_stx_address,
-                hyperchain_leader_mnemonic,
-                hyperchain_leader_secret_key_hex,
-                hyperchain_leader_derivation_path,
-                hyperchain_node_p2p_port: devnet_config.stacks_node_p2p_port.unwrap_or(30444),
-                hyperchain_node_rpc_port: devnet_config.stacks_node_rpc_port.unwrap_or(30443),
-                hyperchain_events_ingestion_port,
-                hyperchain_node_events_observers: devnet_config
-                    .hyperchain_node_events_observers
+                    .unwrap_or(DEFAULT_SUBNET_NODE_IMAGE.to_string()),
+                subnet_leader_btc_address,
+                subnet_leader_stx_address,
+                subnet_leader_mnemonic,
+                subnet_leader_secret_key_hex,
+                subnet_leader_derivation_path,
+                subnet_node_p2p_port: devnet_config.stacks_node_p2p_port.unwrap_or(30444),
+                subnet_node_rpc_port: devnet_config.stacks_node_rpc_port.unwrap_or(30443),
+                subnet_events_ingestion_port,
+                subnet_node_events_observers: devnet_config
+                    .subnet_node_events_observers
                     .take()
                     .unwrap_or(vec![]),
-                hyperchain_contract_id,
-                remapped_hyperchain_contract_id,
-                hyperchain_api_image_url: devnet_config
-                    .hyperchain_api_image_url
+                subnet_contract_id,
+                remapped_subnet_contract_id,
+                subnet_api_image_url: devnet_config
+                    .subnet_api_image_url
                     .take()
                     .unwrap_or(DEFAULT_STACKS_API_IMAGE.to_string()),
-                hyperchain_api_port: devnet_config.hyperchain_api_port.unwrap_or(13999),
-                hyperchain_api_events_port: devnet_config.stacks_api_events_port.unwrap_or(13700),
-                disable_hyperchain_api: devnet_config.disable_hyperchain_api.unwrap_or(true),
+                subnet_api_port: devnet_config.subnet_api_port.unwrap_or(13999),
+                subnet_api_events_port: devnet_config.stacks_api_events_port.unwrap_or(13700),
+                disable_subnet_api: devnet_config.disable_subnet_api.unwrap_or(true),
+                docker_host: devnet_config
+                    .docker_host
+                    .unwrap_or(DEFAULT_DOCKER_SOCKET.into()),
+                components_host: devnet_config.components_host.unwrap_or("127.0.0.1".into()),
             };
             if !config.disable_stacks_api && config.disable_stacks_api {
                 config.disable_stacks_api = false;
@@ -572,19 +610,28 @@ pub fn compute_addresses(
     let public_key = PublicKey::from_secret_key(&secret_key);
     let pub_key = Secp256k1PublicKey::from_slice(&public_key.serialize_compressed()).unwrap();
     let version = if networks.1.is_mainnet() {
-        clarity_repl::clarity::util::C32_ADDRESS_VERSION_MAINNET_SINGLESIG
+        clarity_repl::clarity::address::C32_ADDRESS_VERSION_MAINNET_SINGLESIG
     } else {
-        clarity_repl::clarity::util::C32_ADDRESS_VERSION_TESTNET_SINGLESIG
+        clarity_repl::clarity::address::C32_ADDRESS_VERSION_TESTNET_SINGLESIG
     };
 
-    let stx_address = StacksAddress::from_public_key(version, pub_key).unwrap();
+    let stx_address = StacksAddress::from_public_keys(
+        version,
+        &AddressHashMode::SerializeP2PKH,
+        1,
+        &vec![pub_key],
+    )
+    .unwrap();
 
     let btc_address = compute_btc_address(&public_key, &networks.0);
 
     (stx_address.to_string(), btc_address, miner_secret_key_hex)
 }
 
-#[cfg(feature = "cli")]
+#[cfg(not(feature = "wasm"))]
+use bitcoin;
+
+#[cfg(not(feature = "wasm"))]
 fn compute_btc_address(public_key: &PublicKey, network: &BitcoinNetwork) -> String {
     let public_key = bitcoin::PublicKey::from_slice(&public_key.serialize_compressed())
         .expect("Unable to recreate public key");

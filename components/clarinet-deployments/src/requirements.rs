@@ -1,19 +1,26 @@
-use clarinet_files::FileLocation;
-use clarity_repl::clarity::types::QualifiedContractIdentifier;
+use clarinet_files::{FileAccessor, FileLocation};
+use clarity_repl::clarity::vm::types::QualifiedContractIdentifier;
 use reqwest;
 
 pub async fn retrieve_contract(
     contract_id: &QualifiedContractIdentifier,
     cache_location: &FileLocation,
+    file_accessor: &Option<&Box<dyn FileAccessor>>,
 ) -> Result<(String, FileLocation), String> {
     let contract_deployer = contract_id.issuer.to_address();
     let contract_name = contract_id.name.to_string();
 
     let mut contract_location = cache_location.clone();
+    contract_location.append_path("requirements")?;
     contract_location.append_path(&format!("{}.{}.clar", contract_deployer, contract_name))?;
 
-    if let Ok(contract_source) = contract_location.read_content_as_utf8() {
-        return Ok((contract_source, contract_location));
+    let contract_source = match file_accessor {
+        None => contract_location.read_content_as_utf8(),
+        Some(file_accessor) => file_accessor.read_file(contract_location.to_string()).await,
+    };
+
+    if contract_source.is_ok() {
+        return Ok((contract_source.unwrap(), contract_location));
     }
 
     let stacks_node_addr = if contract_deployer.starts_with("SP") {
@@ -29,11 +36,21 @@ pub async fn retrieve_contract(
         name = contract_name
     );
 
-    let response = fetch_contract(request_url).await?;
-    let code = response.source.to_string();
-    contract_location.write_content(code.as_bytes())?;
+    let code = fetch_contract(request_url).await?.source;
 
-    Ok((code, contract_location))
+    let result = match file_accessor {
+        None => contract_location.write_content(code.as_bytes()),
+        Some(file_accessor) => {
+            file_accessor
+                .write_file(contract_location.to_string(), code.as_bytes())
+                .await
+        }
+    };
+
+    match result {
+        Ok(_) => Ok((code, contract_location)),
+        Err(err) => Err(err),
+    }
 }
 
 #[allow(dead_code)]

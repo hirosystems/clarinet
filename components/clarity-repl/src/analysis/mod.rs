@@ -3,14 +3,15 @@ pub mod ast_dependency_detector;
 pub mod ast_visitor;
 pub mod call_checker;
 pub mod check_checker;
+pub mod coverage;
 
 use serde::de::Deserialize;
 use serde::Serialize;
 
 use crate::analysis::annotation::Annotation;
-use crate::clarity::analysis::analysis_db::AnalysisDatabase;
-use crate::clarity::analysis::types::ContractAnalysis;
-use crate::clarity::diagnostic::Diagnostic;
+use clarity::vm::analysis::analysis_db::AnalysisDatabase;
+use clarity::vm::analysis::types::ContractAnalysis;
+use clarity::vm::diagnostic::Diagnostic;
 
 use self::ast_dependency_detector::ASTDependencyDetector;
 use self::call_checker::CallChecker;

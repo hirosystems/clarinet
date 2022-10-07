@@ -1,37 +1,27 @@
-#![allow(unused_imports)]
-#![allow(unused_variables)]
-#![allow(dead_code)]
-#![allow(non_camel_case_types)]
-#![allow(non_snake_case)]
-#![allow(non_upper_case_globals)]
-#![allow(unused_must_use)]
-
-use crate::deployments::{
-    apply_on_chain_deployment, check_deployments, get_absolute_deployment_path,
-    get_default_deployment_path, load_deployment, write_deployment,
-};
+use chainhook_event_observer::chainhooks::types::StacksChainhookSpecification;
 use clarinet_deployments::types::DeploymentGenerationArtifacts;
 use clarinet_deployments::{
-    generate_default_deployment, initiate_session_from_deployment, setup_session_with_deployment,
-    update_session_with_contracts_executions, update_session_with_genesis_accounts,
+    initiate_session_from_deployment, update_session_with_contracts_executions,
+    update_session_with_genesis_accounts,
 };
-use clarinet_files::ProjectManifest;
-use clarity_repl::clarity::analysis::contract_interface_builder::{
+use clarinet_files::{FileLocation, ProjectManifest};
+use clarity_repl::analysis::coverage::TestCoverageReport;
+use clarity_repl::clarity::vm::analysis::contract_interface_builder::{
     build_contract_interface, ContractInterface,
 };
-use clarity_repl::clarity::types::QualifiedContractIdentifier;
-use clarity_repl::repl::ast::ContractAST;
-use clarity_repl::repl::{ExecutionResult, Session};
-
-use std::collections::{BTreeMap, HashMap};
-use std::path::PathBuf;
+use clarity_repl::clarity::vm::ast::ContractAST;
+use clarity_repl::clarity::vm::types::QualifiedContractIdentifier;
+use clarity_repl::clarity::vm::EvaluationResult;
+use clarity_repl::repl::{session::CostsReport, Session};
+use deno_core::error::AnyError;
+use std::collections::HashMap;
 
 use clarinet_deployments::types::DeploymentSpecification;
 
-pub mod api_v1;
+mod api_v1;
 mod costs;
-pub mod deno;
-mod utils;
+mod deno;
+mod vendor;
 
 #[derive(Clone)]
 pub struct DeploymentCache {
@@ -62,7 +52,7 @@ impl DeploymentCache {
 
         let mut contracts_artifacts = HashMap::new();
         for (contract_id, execution_result) in execution_results.into_iter() {
-            let mut execution_result = match execution_result {
+            let execution_result = match execution_result {
                 Ok(execution_result) => execution_result,
                 Err(diagnostics) => {
                     println!("Error found in contract {}", contract_id);
@@ -72,13 +62,13 @@ impl DeploymentCache {
                     std::process::exit(1);
                 }
             };
-            if let Some((_, source, functions, ast, analysis)) = execution_result.contract.take() {
+            if let EvaluationResult::Contract(contract_result) = execution_result.result {
                 contracts_artifacts.insert(
                     contract_id.clone(),
                     AnalysisArtifacts {
-                        ast,
-                        interface: build_contract_interface(&analysis),
-                        source,
+                        ast: contract_result.contract.ast,
+                        interface: build_contract_interface(&contract_result.contract.analysis),
+                        source: contract_result.contract.code,
                         dependencies: vec![],
                     },
                 );
@@ -103,8 +93,13 @@ pub struct AnalysisArtifacts {
     pub source: String,
 }
 
+pub enum ChainhookEvent {
+    PerformRequest(reqwest::RequestBuilder),
+    Exit,
+}
+
 pub fn run_scripts(
-    files: Vec<String>,
+    include: Vec<String>,
     include_coverage: bool,
     include_costs_report: bool,
     watch: bool,
@@ -113,9 +108,17 @@ pub fn run_scripts(
     manifest: &ProjectManifest,
     cache: DeploymentCache,
     deployment_plan_path: Option<String>,
-) -> Result<u32, (String, u32)> {
-    match block_on(deno::do_run_scripts(
-        files,
+    fail_fast: Option<u16>,
+    filter: Option<String>,
+    import_map: Option<String>,
+    allow_net: bool,
+    cache_location: FileLocation,
+    ts_config: Option<String>,
+    stacks_chainhooks: Vec<StacksChainhookSpecification>,
+    mine_block_delay: u16,
+) -> Result<usize, (AnyError, usize)> {
+    block_on(deno::do_run_scripts(
+        include,
         include_coverage,
         include_costs_report,
         watch,
@@ -124,10 +127,15 @@ pub fn run_scripts(
         manifest,
         cache,
         deployment_plan_path,
-    )) {
-        Err(e) => Err((format!("{:?}", e), 0)),
-        Ok(res) => Ok(res),
-    }
+        fail_fast,
+        filter,
+        import_map,
+        allow_net,
+        cache_location,
+        ts_config,
+        stacks_chainhooks,
+        mine_block_delay,
+    ))
 }
 
 pub fn block_on<F, R>(future: F) -> R
@@ -136,4 +144,8 @@ where
 {
     let rt = crate::utils::create_basic_runtime();
     rt.block_on(future)
+}
+pub struct SessionArtifacts {
+    pub coverage_reports: Vec<TestCoverageReport>,
+    pub costs_reports: Vec<CostsReport>,
 }

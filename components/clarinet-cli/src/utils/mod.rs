@@ -1,5 +1,5 @@
 use std::future::Future;
-
+use std::thread::Builder;
 use tokio;
 
 pub fn create_basic_runtime() -> tokio::runtime::Runtime {
@@ -21,4 +21,8 @@ pub fn nestable_block_on<F: Future>(future: F) -> F::Output {
     };
     let response = handle.block_on(async { future.await });
     response
+}
+
+pub fn thread_named(name: &str) -> Builder {
+    Builder::new().name(name.to_string())
 }

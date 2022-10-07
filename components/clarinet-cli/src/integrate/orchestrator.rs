@@ -10,10 +10,10 @@ use bollard::image::CreateImageOptions;
 use bollard::models::{HostConfig, PortBinding};
 use bollard::network::{ConnectNetworkOptions, CreateNetworkOptions, PruneNetworksOptions};
 use bollard::Docker;
+use chainhook_types::StacksNetwork;
 use clarinet_files::{DevnetConfigFile, NetworkManifest, ProjectManifest, DEFAULT_DEVNET_BALANCE};
 use crossterm::terminal::disable_raw_mode;
 use futures::stream::TryStreamExt;
-use orchestra_types::StacksNetwork;
 use std::collections::HashMap;
 use std::fs::{self, File};
 use std::io::Write;
@@ -35,8 +35,8 @@ pub struct DevnetOrchestrator {
     bitcoin_node_container_id: Option<String>,
     bitcoin_explorer_container_id: Option<String>,
     postgres_container_id: Option<String>,
-    hyperchain_node_container_id: Option<String>,
-    hyperchain_api_container_id: Option<String>,
+    subnet_node_container_id: Option<String>,
+    subnet_api_container_id: Option<String>,
     docker_client: Option<Docker>,
 }
 
@@ -45,9 +45,6 @@ impl DevnetOrchestrator {
         manifest: ProjectManifest,
         devnet_override: Option<DevnetConfigFile>,
     ) -> Result<DevnetOrchestrator, String> {
-        let docker_client = Docker::connect_with_socket_defaults()
-            .map_err(|e| format!("unable to connect to docker: {:?}", e))?;
-
         let mut network_config = NetworkManifest::from_project_manifest_location(
             &manifest.location,
             &StacksNetwork::Devnet.get_networks(),
@@ -138,8 +135,8 @@ impl DevnetOrchestrator {
                     devnet_config.stacks_api_postgres_database = val.clone();
                 }
 
-                if let Some(ref val) = devnet_override.hyperchain_api_postgres_database {
-                    devnet_config.hyperchain_api_postgres_database = val.clone();
+                if let Some(ref val) = devnet_override.subnet_api_postgres_database {
+                    devnet_config.subnet_api_postgres_database = val.clone();
                 }
 
                 if let Some(ref val) = devnet_override.pox_stacking_orders {
@@ -190,43 +187,62 @@ impl DevnetOrchestrator {
                     devnet_config.bitcoin_controller_automining_disabled = val;
                 }
 
-                if let Some(val) = devnet_override.enable_hyperchain_node {
-                    devnet_config.enable_hyperchain_node = val;
+                if let Some(val) = devnet_override.enable_subnet_node {
+                    devnet_config.enable_subnet_node = val;
                 }
 
-                if let Some(val) = devnet_override.hyperchain_node_p2p_port {
-                    devnet_config.hyperchain_node_p2p_port = val;
+                if let Some(val) = devnet_override.subnet_node_p2p_port {
+                    devnet_config.subnet_node_p2p_port = val;
                 }
 
-                if let Some(val) = devnet_override.hyperchain_node_rpc_port {
-                    devnet_config.hyperchain_node_rpc_port = val;
+                if let Some(val) = devnet_override.subnet_node_rpc_port {
+                    devnet_config.subnet_node_rpc_port = val;
                 }
 
-                if let Some(val) = devnet_override.hyperchain_events_ingestion_port {
-                    devnet_config.hyperchain_events_ingestion_port = val;
+                if let Some(val) = devnet_override.subnet_events_ingestion_port {
+                    devnet_config.subnet_events_ingestion_port = val;
                 }
 
-                if let Some(ref val) = devnet_override.hyperchain_node_events_observers {
-                    devnet_config.hyperchain_node_events_observers = val.clone();
+                if let Some(ref val) = devnet_override.subnet_node_events_observers {
+                    devnet_config.subnet_node_events_observers = val.clone();
                 }
 
-                if let Some(ref val) = devnet_override.hyperchain_node_image_url {
-                    devnet_config.hyperchain_node_image_url = val.clone();
+                if let Some(ref val) = devnet_override.subnet_node_image_url {
+                    devnet_config.subnet_node_image_url = val.clone();
                 }
 
-                if let Some(ref val) = devnet_override.hyperchain_leader_derivation_path {
-                    devnet_config.hyperchain_leader_derivation_path = val.clone();
+                if let Some(ref val) = devnet_override.subnet_leader_derivation_path {
+                    devnet_config.subnet_leader_derivation_path = val.clone();
                 }
 
-                if let Some(ref val) = devnet_override.hyperchain_leader_mnemonic {
-                    devnet_config.hyperchain_leader_mnemonic = val.clone();
+                if let Some(ref val) = devnet_override.subnet_leader_mnemonic {
+                    devnet_config.subnet_leader_mnemonic = val.clone();
                 }
 
-                if let Some(ref val) = devnet_override.hyperchain_leader_mnemonic {
-                    devnet_config.hyperchain_leader_mnemonic = val.clone();
+                if let Some(ref val) = devnet_override.subnet_leader_mnemonic {
+                    devnet_config.subnet_leader_mnemonic = val.clone();
                 }
             }
             _ => {}
+        };
+
+        let docker_client = match network_config.devnet {
+            Some(ref _devnet) => {
+                #[cfg(target_os = "unix")]
+                let res = if _devnet.docker_host.starts_with("unix://") {
+                    Docker::connect_with_unix(
+                        &_devnet.docker_host,
+                        120,
+                        bollard::API_DEFAULT_VERSION,
+                    )
+                } else {
+                    Docker::connect_with_socket_defaults()
+                };
+                #[cfg(not(target_os = "unix"))]
+                let res = Docker::connect_with_socket_defaults();
+                res.map_err(|e| format!("unable to connect to docker: {:?}", e))?
+            }
+            None => unreachable!(),
         };
 
         Ok(DevnetOrchestrator {
@@ -243,8 +259,8 @@ impl DevnetOrchestrator {
             bitcoin_node_container_id: None,
             bitcoin_explorer_container_id: None,
             postgres_container_id: None,
-            hyperchain_node_container_id: None,
-            hyperchain_api_container_id: None,
+            subnet_node_container_id: None,
+            subnet_api_container_id: None,
         })
     }
 
@@ -288,8 +304,8 @@ impl DevnetOrchestrator {
         let disable_stacks_api = devnet_config.disable_stacks_api;
         let disable_stacks_explorer = devnet_config.disable_stacks_explorer;
         let disable_bitcoin_explorer = devnet_config.disable_bitcoin_explorer;
-        let enable_hyperchain_node = devnet_config.enable_hyperchain_node;
-        let disable_hyperchain_api = devnet_config.disable_hyperchain_api;
+        let enable_subnet_node = devnet_config.enable_subnet_node;
+        let disable_subnet_api = devnet_config.disable_subnet_api;
 
         let _ = fs::create_dir(format!("{}", devnet_config.working_dir));
         let _ = fs::create_dir(format!("{}/conf", devnet_config.working_dir));
@@ -298,7 +314,7 @@ impl DevnetOrchestrator {
         let bitcoin_explorer_port = devnet_config.bitcoin_explorer_port;
         let stacks_explorer_port = devnet_config.stacks_explorer_port;
         let stacks_api_port = devnet_config.stacks_api_port;
-        let hyperchain_api_port = devnet_config.hyperchain_api_port;
+        let subnet_api_port = devnet_config.subnet_api_port;
 
         let _ = event_tx.send(DevnetEvent::ServiceStatus(ServiceStatusData {
             order: 0,
@@ -347,19 +363,19 @@ impl DevnetOrchestrator {
             },
         }));
 
-        if enable_hyperchain_node {
+        if enable_subnet_node {
             let _ = event_tx.send(DevnetEvent::ServiceStatus(ServiceStatusData {
                 order: 5,
                 status: Status::Red,
-                name: "hyperchain-node".into(),
+                name: "subnet-node".into(),
                 comment: "initializing".into(),
             }));
 
             let _ = event_tx.send(DevnetEvent::ServiceStatus(ServiceStatusData {
                 order: 6,
                 status: Status::Red,
-                name: "hyperchain-api".into(),
-                comment: if disable_hyperchain_api {
+                name: "subnet-api".into(),
+                comment: if disable_subnet_api {
                     "disabled".into()
                 } else {
                     "initializing".into()
@@ -476,9 +492,9 @@ impl DevnetOrchestrator {
         }
 
         // Start Hyperchain node
-        if enable_hyperchain_node {
-            let _ = event_tx.send(DevnetEvent::info(format!("Starting hyperchain-node")));
-            match self.prepare_hyperchain_node_container(boot_index).await {
+        if enable_subnet_node {
+            let _ = event_tx.send(DevnetEvent::info(format!("Starting subnet-node")));
+            match self.prepare_subnet_node_container(boot_index).await {
                 Ok(_) => {}
                 Err(message) => {
                     let _ = event_tx.send(DevnetEvent::FatalError(message.clone()));
@@ -489,10 +505,10 @@ impl DevnetOrchestrator {
             let _ = event_tx.send(DevnetEvent::ServiceStatus(ServiceStatusData {
                 order: 5,
                 status: Status::Yellow,
-                name: "hyperchain-node".into(),
+                name: "subnet-node".into(),
                 comment: "booting".into(),
             }));
-            match self.boot_hyperchain_node_container().await {
+            match self.boot_subnet_node_container().await {
                 Ok(_) => {}
                 Err(message) => {
                     let _ = event_tx.send(DevnetEvent::FatalError(message.clone()));
@@ -501,9 +517,9 @@ impl DevnetOrchestrator {
                 }
             };
 
-            if !disable_hyperchain_api {
-                let _ = event_tx.send(DevnetEvent::info(format!("Starting hyperchain-api")));
-                match self.prepare_hyperchain_api_container().await {
+            if !disable_subnet_api {
+                let _ = event_tx.send(DevnetEvent::info(format!("Starting subnet-api")));
+                match self.prepare_subnet_api_container().await {
                     Ok(_) => {}
                     Err(message) => {
                         let _ = event_tx.send(DevnetEvent::FatalError(message.clone()));
@@ -514,10 +530,10 @@ impl DevnetOrchestrator {
                 let _ = event_tx.send(DevnetEvent::ServiceStatus(ServiceStatusData {
                     order: 6,
                     status: Status::Green,
-                    name: "hyperchain-api".into(),
-                    comment: format!("http://localhost:{}/doc", hyperchain_api_port),
+                    name: "subnet-api".into(),
+                    comment: format!("http://localhost:{}/doc", subnet_api_port),
                 }));
-                match self.boot_hyperchain_api_container().await {
+                match self.boot_subnet_api_container().await {
                     Ok(_) => {}
                     Err(message) => {
                         let _ = event_tx.send(DevnetEvent::FatalError(message.clone()));
@@ -1155,10 +1171,7 @@ events_keys = ["*"]
         Ok(())
     }
 
-    pub fn prepare_hyperchain_node_config(
-        &self,
-        boot_index: u32,
-    ) -> Result<Config<String>, String> {
+    pub fn prepare_subnet_node_config(&self, boot_index: u32) -> Result<Config<String>, String> {
         let (network_config, devnet_config) = match &self.network_config {
             Some(ref network_config) => match network_config.devnet {
                 Some(ref devnet_config) => (network_config, devnet_config),
@@ -1169,40 +1182,40 @@ events_keys = ["*"]
 
         let mut port_bindings = HashMap::new();
         port_bindings.insert(
-            format!("{}/tcp", devnet_config.hyperchain_node_p2p_port),
+            format!("{}/tcp", devnet_config.subnet_node_p2p_port),
             Some(vec![PortBinding {
                 host_ip: Some(String::from("0.0.0.0")),
-                host_port: Some(format!("{}/tcp", devnet_config.hyperchain_node_p2p_port)),
+                host_port: Some(format!("{}/tcp", devnet_config.subnet_node_p2p_port)),
             }]),
         );
         port_bindings.insert(
-            format!("{}/tcp", devnet_config.hyperchain_node_rpc_port),
+            format!("{}/tcp", devnet_config.subnet_node_rpc_port),
             Some(vec![PortBinding {
                 host_ip: Some(String::from("0.0.0.0")),
-                host_port: Some(format!("{}/tcp", devnet_config.hyperchain_node_rpc_port)),
+                host_port: Some(format!("{}/tcp", devnet_config.subnet_node_rpc_port)),
             }]),
         );
         port_bindings.insert(
-            format!("{}/tcp", devnet_config.hyperchain_events_ingestion_port),
+            format!("{}/tcp", devnet_config.subnet_events_ingestion_port),
             Some(vec![PortBinding {
                 host_ip: Some(String::from("0.0.0.0")),
                 host_port: Some(format!(
                     "{}/tcp",
-                    devnet_config.hyperchain_events_ingestion_port
+                    devnet_config.subnet_events_ingestion_port
                 )),
             }]),
         );
 
-        let mut hyperchain_conf = format!(
+        let mut subnet_conf = format!(
             r#"
 [node]
 working_dir = "/devnet"
-rpc_bind = "0.0.0.0:{hyperchain_node_rpc_port}"
-p2p_bind = "0.0.0.0:{hyperchain_node_p2p_port}"
+rpc_bind = "0.0.0.0:{subnet_node_rpc_port}"
+p2p_bind = "0.0.0.0:{subnet_node_p2p_port}"
 miner = true
-seed = "{hyperchain_leader_secret_key_hex}"
-mining_key = "{hyperchain_leader_secret_key_hex}"
-local_peer_seed = "{hyperchain_leader_secret_key_hex}"
+seed = "{subnet_leader_secret_key_hex}"
+mining_key = "{subnet_leader_secret_key_hex}"
+local_peer_seed = "{subnet_leader_secret_key_hex}"
 wait_time_for_microblocks = 3_000
 wait_before_first_anchored_block = 0
 
@@ -1213,13 +1226,13 @@ subsequent_attempt_time_ms = 5_000
 
 [burnchain]
 chain = "stacks_layer_1"
-mode = "hyperchain"
+mode = "subnet"
 first_burn_header_height = {first_burn_header_height}
 peer_host = "host.docker.internal"
 rpc_port = {stacks_node_rpc_port}
 peer_port = {stacks_node_p2p_port}
-contract_identifier = "{hyperchain_contract_id}"
-observer_port = {hyperchain_events_ingestion_port}
+contract_identifier = "{subnet_contract_id}"
+observer_port = {subnet_events_ingestion_port}
 
 # Add orchestrator (docker-host) as an event observer
 # [[events_observer]]
@@ -1228,29 +1241,29 @@ observer_port = {hyperchain_events_ingestion_port}
 # include_data_events = true
 # events_keys = ["*"]
 "#,
-            hyperchain_node_rpc_port = devnet_config.hyperchain_node_rpc_port,
-            hyperchain_node_p2p_port = devnet_config.hyperchain_node_p2p_port,
-            hyperchain_leader_secret_key_hex = devnet_config.hyperchain_leader_secret_key_hex,
+            subnet_node_rpc_port = devnet_config.subnet_node_rpc_port,
+            subnet_node_p2p_port = devnet_config.subnet_node_p2p_port,
+            subnet_leader_secret_key_hex = devnet_config.subnet_leader_secret_key_hex,
             stacks_node_rpc_port = devnet_config.stacks_node_rpc_port,
             stacks_node_p2p_port = devnet_config.stacks_node_p2p_port,
             orchestrator_port = devnet_config.orchestrator_ingestion_port,
-            hyperchain_events_ingestion_port = devnet_config.hyperchain_events_ingestion_port,
+            subnet_events_ingestion_port = devnet_config.subnet_events_ingestion_port,
             first_burn_header_height = 0,
-            hyperchain_contract_id = devnet_config.remapped_hyperchain_contract_id,
+            subnet_contract_id = devnet_config.remapped_subnet_contract_id,
         );
 
-        hyperchain_conf.push_str(&format!(
+        subnet_conf.push_str(&format!(
             r#"
 [[ustx_balance]]
-address = "{hyperchain_leader_stx_address}"
+address = "{subnet_leader_stx_address}"
 amount = {default_balance}
 "#,
-            hyperchain_leader_stx_address = devnet_config.hyperchain_leader_stx_address,
+            subnet_leader_stx_address = devnet_config.subnet_leader_stx_address,
             default_balance = DEFAULT_DEVNET_BALANCE
         ));
 
         for (_, account) in network_config.accounts.iter() {
-            hyperchain_conf.push_str(&format!(
+            subnet_conf.push_str(&format!(
                 r#"
 [[ustx_balance]]
 address = "{}"
@@ -1260,8 +1273,8 @@ amount = {}
             ));
         }
 
-        for events_observer in devnet_config.hyperchain_node_events_observers.iter() {
-            hyperchain_conf.push_str(&format!(
+        for events_observer in devnet_config.subnet_node_events_observers.iter() {
+            subnet_conf.push_str(&format!(
                 r#"
 [[events_observer]]
 endpoint = "{}"
@@ -1272,10 +1285,10 @@ events_keys = ["*"]
             ));
         }
 
-        if !devnet_config.disable_hyperchain_api {
-            hyperchain_conf.push_str(&format!(
+        if !devnet_config.disable_subnet_api {
+            subnet_conf.push_str(&format!(
                 r#"
-# Add hyperchain-api as an event observer
+# Add subnet-api as an event observer
 [[events_observer]]
 endpoint = "{}"
 retry_count = 255
@@ -1283,38 +1296,38 @@ include_data_events = false
 events_keys = ["*"]
 "#,
                 format!(
-                    "hyperchain-api.{}:{}",
-                    self.network_name, devnet_config.hyperchain_api_events_port
+                    "subnet-api.{}:{}",
+                    self.network_name, devnet_config.subnet_api_events_port
                 ),
             ));
         }
 
-        let mut hyperchain_conf_path = PathBuf::from(&devnet_config.working_dir);
-        hyperchain_conf_path.push("conf/Hyperchain.toml");
-        let mut file = File::create(hyperchain_conf_path)
-            .map_err(|e| format!("unable to create Hyperchain.toml: {:?}", e))?;
-        file.write_all(hyperchain_conf.as_bytes())
-            .map_err(|e| format!("unable to write Hyperchain.toml: {:?}", e))?;
+        let mut subnet_conf_path = PathBuf::from(&devnet_config.working_dir);
+        subnet_conf_path.push("conf/Subnet.toml");
+        let mut file = File::create(subnet_conf_path)
+            .map_err(|e| format!("unable to create Subnet.toml: {:?}", e))?;
+        file.write_all(subnet_conf.as_bytes())
+            .map_err(|e| format!("unable to write Subnet.toml: {:?}", e))?;
 
         let mut stacks_node_data_path = PathBuf::from(&devnet_config.working_dir);
         stacks_node_data_path.push("data");
         stacks_node_data_path.push(format!("{}", boot_index));
         let _ = fs::create_dir(stacks_node_data_path.clone());
-        stacks_node_data_path.push("hyperchain");
+        stacks_node_data_path.push("subnet");
         fs::create_dir(stacks_node_data_path)
             .map_err(|e| format!("to create working dir: {:?}", e))?;
 
         let mut exposed_ports = HashMap::new();
         exposed_ports.insert(
-            format!("{}/tcp", devnet_config.hyperchain_node_rpc_port),
+            format!("{}/tcp", devnet_config.subnet_node_rpc_port),
             HashMap::new(),
         );
         exposed_ports.insert(
-            format!("{}/tcp", devnet_config.hyperchain_node_p2p_port),
+            format!("{}/tcp", devnet_config.subnet_node_p2p_port),
             HashMap::new(),
         );
         exposed_ports.insert(
-            format!("{}/tcp", devnet_config.hyperchain_events_ingestion_port),
+            format!("{}/tcp", devnet_config.subnet_events_ingestion_port),
             HashMap::new(),
         );
 
@@ -1323,27 +1336,27 @@ events_keys = ["*"]
         labels.insert("reset".to_string(), "true".to_string());
 
         let mut binds = vec![format!(
-            "{}/conf:/src/hyperchain-node/",
+            "{}/conf:/src/subnet-node/",
             devnet_config.working_dir
         )];
 
         if devnet_config.bind_containers_volumes {
             binds.push(format!(
-                "{}/data/{}/hyperchain:/devnet/",
+                "{}/data/{}/subnet:/devnet/",
                 devnet_config.working_dir, boot_index
             ))
         }
 
         let config = Config {
             labels: Some(labels),
-            image: Some(devnet_config.hyperchain_node_image_url.clone()),
+            image: Some(devnet_config.subnet_node_image_url.clone()),
             domainname: Some(self.network_name.to_string()),
             tty: None,
             exposed_ports: Some(exposed_ports),
             entrypoint: Some(vec![
                 "hyperchain-node".into(),
                 "start".into(),
-                "--config=/src/hyperchain-node/Hyperchain.toml".into(),
+                "--config=/src/subnet-node/Subnet.toml".into(),
             ]),
             env: Some(vec![
                 "STACKS_LOG_PP=1".to_string(),
@@ -1362,10 +1375,7 @@ events_keys = ["*"]
         Ok(config)
     }
 
-    pub async fn prepare_hyperchain_node_container(
-        &mut self,
-        boot_index: u32,
-    ) -> Result<(), String> {
+    pub async fn prepare_subnet_node_container(&mut self, boot_index: u32) -> Result<(), String> {
         let (docker, devnet_config) = match (&self.docker_client, &self.network_config) {
             (Some(ref docker), Some(ref network_config)) => match network_config.devnet {
                 Some(ref devnet_config) => (docker, devnet_config),
@@ -1377,7 +1387,7 @@ events_keys = ["*"]
         let _info = docker
             .create_image(
                 Some(CreateImageOptions {
-                    from_image: devnet_config.hyperchain_node_image_url.clone(),
+                    from_image: devnet_config.subnet_node_image_url.clone(),
                     ..Default::default()
                 }),
                 None,
@@ -1387,10 +1397,10 @@ events_keys = ["*"]
             .await
             .map_err(|e| format!("unable to create image: {}", e))?;
 
-        let config = self.prepare_hyperchain_node_config(boot_index)?;
+        let config = self.prepare_subnet_node_config(boot_index)?;
 
         let options = CreateContainerOptions {
-            name: format!("hyperchain-node.{}", self.network_name),
+            name: format!("subnet-node.{}", self.network_name),
         };
 
         let container = docker
@@ -1399,14 +1409,14 @@ events_keys = ["*"]
             .map_err(|e| format!("unable to create container: {}", e))?
             .id;
 
-        info!("Created container hyperchain-node: {}", container);
-        self.hyperchain_node_container_id = Some(container.clone());
+        info!("Created container subnet-node: {}", container);
+        self.subnet_node_container_id = Some(container.clone());
 
         Ok(())
     }
 
-    pub async fn boot_hyperchain_node_container(&self) -> Result<(), String> {
-        let container = match &self.hyperchain_node_container_id {
+    pub async fn boot_subnet_node_container(&self) -> Result<(), String> {
+        let container = match &self.subnet_node_container_id {
             Some(container) => container.clone(),
             _ => return Err(format!("unable to boot container")),
         };
@@ -1572,7 +1582,7 @@ events_keys = ["*"]
         Ok(())
     }
 
-    pub async fn prepare_hyperchain_api_container(&mut self) -> Result<(), String> {
+    pub async fn prepare_subnet_api_container(&mut self) -> Result<(), String> {
         let (docker, _, devnet_config) = match (&self.docker_client, &self.network_config) {
             (Some(ref docker), Some(ref network_config)) => match network_config.devnet {
                 Some(ref devnet_config) => (docker, network_config, devnet_config),
@@ -1584,7 +1594,7 @@ events_keys = ["*"]
         let _info = docker
             .create_image(
                 Some(CreateImageOptions {
-                    from_image: devnet_config.hyperchain_api_image_url.clone(),
+                    from_image: devnet_config.subnet_api_image_url.clone(),
                     ..Default::default()
                 }),
                 None,
@@ -1596,16 +1606,16 @@ events_keys = ["*"]
 
         let mut port_bindings = HashMap::new();
         port_bindings.insert(
-            format!("{}/tcp", devnet_config.hyperchain_api_port),
+            format!("{}/tcp", devnet_config.subnet_api_port),
             Some(vec![PortBinding {
                 host_ip: Some(String::from("0.0.0.0")),
-                host_port: Some(format!("{}/tcp", devnet_config.hyperchain_api_port)),
+                host_port: Some(format!("{}/tcp", devnet_config.subnet_api_port)),
             }]),
         );
 
         let mut exposed_ports = HashMap::new();
         exposed_ports.insert(
-            format!("{}/tcp", devnet_config.hyperchain_api_port),
+            format!("{}/tcp", devnet_config.subnet_api_port),
             HashMap::new(),
         );
 
@@ -1614,25 +1624,25 @@ events_keys = ["*"]
 
         let config = Config {
             labels: Some(labels),
-            image: Some(devnet_config.hyperchain_api_image_url.clone()),
+            image: Some(devnet_config.subnet_api_image_url.clone()),
             domainname: Some(self.network_name.to_string()),
             tty: None,
             exposed_ports: Some(exposed_ports),
             env: Some(vec![
-                format!("STACKS_CORE_RPC_HOST=hyperchain-node.{}", self.network_name),
+                format!("STACKS_CORE_RPC_HOST=subnet-node.{}", self.network_name),
                 format!("STACKS_BLOCKCHAIN_API_DB=pg"),
                 format!(
                     "STACKS_CORE_RPC_PORT={}",
-                    devnet_config.hyperchain_node_rpc_port
+                    devnet_config.subnet_node_rpc_port
                 ),
                 format!(
                     "STACKS_BLOCKCHAIN_API_PORT={}",
-                    devnet_config.hyperchain_api_port
+                    devnet_config.subnet_api_port
                 ),
                 format!("STACKS_BLOCKCHAIN_API_HOST=0.0.0.0"),
                 format!(
                     "STACKS_CORE_EVENT_PORT={}",
-                    devnet_config.hyperchain_api_events_port
+                    devnet_config.subnet_api_events_port
                 ),
                 format!("STACKS_CORE_EVENT_HOST=0.0.0.0"),
                 format!("STACKS_API_ENABLE_FT_METADATA=1"),
@@ -1640,10 +1650,7 @@ events_keys = ["*"]
                 format!("PG_PORT=5432"),
                 format!("PG_USER={}", devnet_config.postgres_username),
                 format!("PG_PASSWORD={}", devnet_config.postgres_password),
-                format!(
-                    "PG_DATABASE={}",
-                    devnet_config.hyperchain_api_postgres_database
-                ),
+                format!("PG_DATABASE={}", devnet_config.subnet_api_postgres_database),
                 format!("STACKS_CHAIN_ID=2147483648"),
                 format!("V2_POX_MIN_AMOUNT_USTX=90000000260"),
                 "NODE_ENV=development".to_string(),
@@ -1657,7 +1664,7 @@ events_keys = ["*"]
         };
 
         let options = CreateContainerOptions {
-            name: format!("hyperchain-api.{}", self.network_name),
+            name: format!("subnet-api.{}", self.network_name),
         };
 
         let container = docker
@@ -1666,14 +1673,14 @@ events_keys = ["*"]
             .map_err(|e| format!("unable to create container: {}", e))?
             .id;
 
-        info!("Created container hyperchain-api: {}", container);
-        self.hyperchain_api_container_id = Some(container);
+        info!("Created container subnet-api: {}", container);
+        self.subnet_api_container_id = Some(container);
 
         Ok(())
     }
 
-    pub async fn boot_hyperchain_api_container(&self) -> Result<(), String> {
-        // Before booting the hyperchain-api, we need to create an additional DB in the postgres container.
+    pub async fn boot_subnet_api_container(&self) -> Result<(), String> {
+        // Before booting the subnet-api, we need to create an additional DB in the postgres container.
         let (docker, _, devnet_config) = match (&self.docker_client, &self.network_config) {
             (Some(ref docker), Some(ref network_config)) => match network_config.devnet {
                 Some(ref devnet_config) => (docker, network_config, devnet_config),
@@ -1689,7 +1696,7 @@ events_keys = ["*"]
 
         let psql_command = format!(
             "CREATE DATABASE {};",
-            devnet_config.hyperchain_api_postgres_database
+            devnet_config.subnet_api_postgres_database
         );
 
         let config = CreateExecOptions {
@@ -1709,7 +1716,7 @@ events_keys = ["*"]
             .await
             .map_err(|e| formatted_docker_error("unable to start exec command", e))?;
 
-        let container = match &self.hyperchain_api_container_id {
+        let container = match &self.subnet_api_container_id {
             Some(container) => container.clone(),
             _ => return Err(format!("unable to boot container")),
         };
@@ -2313,20 +2320,20 @@ events_keys = ["*"]
             let _ = docker.remove_container(stacks_node_container_id, None);
         }
 
-        if let Some(ref hyperchain_node_container_id) = self.hyperchain_node_container_id {
+        if let Some(ref subnet_node_container_id) = self.subnet_node_container_id {
             let _ = docker
-                .kill_container(hyperchain_node_container_id, options.clone())
+                .kill_container(subnet_node_container_id, options.clone())
                 .await;
-            println!("Terminating hyperchain-node...");
-            let _ = docker.remove_container(hyperchain_node_container_id, None);
+            println!("Terminating subnet-node...");
+            let _ = docker.remove_container(subnet_node_container_id, None);
         }
 
-        if let Some(ref hyperchain_api_container_id) = self.hyperchain_api_container_id {
+        if let Some(ref subnet_api_container_id) = self.subnet_api_container_id {
             let _ = docker
-                .kill_container(hyperchain_api_container_id, options)
+                .kill_container(subnet_api_container_id, options)
                 .await;
-            println!("Terminating hyperchain-api...");
-            let _ = docker.remove_container(hyperchain_api_container_id, None);
+            println!("Terminating subnet-api...");
+            let _ = docker.remove_container(subnet_api_container_id, None);
         }
 
         // Prune network
@@ -2385,7 +2392,7 @@ events_keys = ["*"]
         };
 
         let rpc = Client::new(
-            &format!("http://localhost:{}", devnet_config.bitcoin_node_rpc_port),
+            &format!("http://localhost:{}/", devnet_config.bitcoin_node_rpc_port),
             Auth::UserPass(
                 devnet_config.bitcoin_node_username.to_string(),
                 devnet_config.bitcoin_node_password.to_string(),

@@ -1,8 +1,8 @@
 use crate::deployments::generate_default_deployment;
+use chainhook_types::StacksNetwork;
 use clarinet_deployments::setup_session_with_deployment;
 use clarinet_files::{FileLocation, ProjectManifest};
-use clarity_repl::clarity::debug::dap::DAPDebugger;
-use orchestra_types::StacksNetwork;
+use clarity_repl::repl::debug::dap::DAPDebugger;
 use std::path::PathBuf;
 
 #[cfg(feature = "telemetry")]
@@ -41,14 +41,7 @@ pub fn run_dap() -> Result<(), String> {
             }
 
             // Begin execution of the expression in debug mode
-            match session.interpret(
-                expression.clone(),
-                None,
-                Some(vec![Box::new(dap)]),
-                false,
-                None,
-                None,
-            ) {
+            match session.eval(expression.clone(), Some(vec![&mut dap]), false) {
                 Ok(_result) => Ok(()),
                 Err(_diagnostics) => Err("unable to interpret expression".to_string()),
             }

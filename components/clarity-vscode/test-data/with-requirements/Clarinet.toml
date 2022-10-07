@@ -1,0 +1,22 @@
+[project]
+name = "with-requirements"
+authors = []
+description = ""
+telemetry = false
+
+[[project.requirements]]
+contract_id = "SP2PABAF9FTAJYNFZH93XENAJ8FVY99RRM50D2JG9.nft-trait"
+[[project.requirements]]
+contract_id = "SP3FBR2AGK5H9QBDH3EEN6DF8EK8JY7RX8QJ5SVTE.sip-010-trait-ft-standard"
+
+[project.cache_location]
+path = ".cache"
+
+[contracts.ft-project]
+path = "contracts/ft-project.clar"
+
+[contracts.nft-project]
+path = "contracts/nft-project.clar"
+
+[repl.analysis]
+passes = []

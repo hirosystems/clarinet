@@ -1,5 +1,5 @@
-use crate::clarity::representations::Span;
-use crate::clarity::ClarityName;
+use clarity::vm::representations::Span;
+use clarity::vm::ClarityName;
 use regex::Regex;
 use std::convert::TryFrom;
 

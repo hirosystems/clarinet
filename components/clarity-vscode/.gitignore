@@ -1,0 +1,7 @@
+dist
+server/src/clarity-lsp-*
+node_modules
+.vscode-test-web
+.DS_Store
+
+*.vsix

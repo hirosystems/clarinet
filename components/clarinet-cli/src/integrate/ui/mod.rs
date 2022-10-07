@@ -8,13 +8,13 @@ mod util;
 use super::DevnetEvent;
 use crate::types::ChainsCoordinatorCommand;
 use app::App;
+use chainhook_event_observer::observer::ObserverCommand;
+use chainhook_types::StacksChainEvent;
 use crossterm::{
     event::{self, Event, KeyCode, KeyModifiers},
     execute,
     terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
 };
-use orchestra_event_observer::observer::ObserverCommand;
-use orchestra_types::StacksChainEvent;
 use std::sync::mpsc::{Receiver, Sender};
 use std::{
     error::Error,
@@ -31,7 +31,7 @@ pub fn start_ui(
     observer_command_tx: Sender<ObserverCommand>,
     orchestrator_terminated_rx: Receiver<bool>,
     devnet_path: &str,
-    hyperchain_enabled: bool,
+    subnet_enabled: bool,
 ) -> Result<(), Box<dyn Error>> {
     enable_raw_mode()?;
 
@@ -65,7 +65,7 @@ pub fn start_ui(
         }
     });
 
-    let mut app = App::new("Clarinet", devnet_path, hyperchain_enabled);
+    let mut app = App::new("Clarinet", devnet_path, subnet_enabled);
 
     terminal.clear()?;
 

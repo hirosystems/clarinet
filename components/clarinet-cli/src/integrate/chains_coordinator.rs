@@ -8,17 +8,19 @@ use base58::FromBase58;
 use bitcoincore_rpc::{Auth, Client, RpcApi};
 use clarinet_deployments::types::DeploymentSpecification;
 use clarinet_files::{self, AccountConfig, DevnetConfig, NetworkManifest, ProjectManifest};
-use clarity_repl::clarity::representations::ClarityName;
-use clarity_repl::clarity::types::{BuffData, SequenceData, TupleData, Value as ClarityValue};
-use clarity_repl::clarity::util::address::AddressHashMode;
-use clarity_repl::clarity::util::hash::{hex_bytes, Hash160};
 
-use orchestra_event_observer::observer::{
+use chainhook_event_observer::observer::{
     start_event_observer, EventObserverConfig, ObserverCommand, ObserverEvent,
     StacksChainMempoolEvent,
 };
-use orchestra_types::{BitcoinChainEvent, BitcoinNetwork, StacksChainEvent, StacksNetwork};
-use stacks_rpc_client::{transactions, PoxInfo, StacksRpc};
+use chainhook_types::{BitcoinChainEvent, BitcoinNetwork, StacksChainEvent, StacksNetwork};
+use clarity_repl::clarity::address::AddressHashMode;
+use clarity_repl::clarity::util::hash::{hex_bytes, Hash160};
+use clarity_repl::clarity::vm::types::{BuffData, SequenceData, TupleData};
+use clarity_repl::clarity::vm::ClarityName;
+use clarity_repl::clarity::vm::Value as ClarityValue;
+use clarity_repl::codec;
+use stacks_rpc_client::{PoxInfo, StacksRpc};
 use std::collections::HashSet;
 use std::convert::TryFrom;
 
@@ -106,6 +108,7 @@ impl DevnetEventObserverConfig {
             stacks_node_rpc_host: "http://localhost".into(),
             stacks_node_rpc_port: devnet_config.stacks_node_rpc_port,
             operators: HashSet::new(),
+            display_logs: true,
         };
 
         DevnetEventObserverConfig {
@@ -152,7 +155,7 @@ pub async fn start_chains_coordinator(
     let event_observer_config = config.event_observer_config.clone();
     let observer_event_tx_moved = observer_event_tx.clone();
     let observer_command_tx_moved = observer_command_tx.clone();
-    let _ = std::thread::spawn(move || {
+    let _ = utils::thread_named("Event observer").spawn(move || {
         let future = start_event_observer(
             event_observer_config,
             observer_command_tx_moved,
@@ -165,7 +168,7 @@ pub async fn start_chains_coordinator(
     // Spawn bitcoin miner controller
     let (mining_command_tx, mining_command_rx) = channel();
     let devnet_config = config.devnet_config.clone();
-    std::thread::spawn(move || {
+    let _ = utils::thread_named("Bitcoin mining").spawn(move || {
         handle_bitcoin_mining(mining_command_rx, &devnet_config);
     });
 
@@ -175,7 +178,7 @@ pub async fn start_chains_coordinator(
     let protocol_deployed = Arc::new(AtomicBool::new(false));
 
     let mut deployment_events_rx = Some(deployment_events_rx);
-    let mut hyperchain_initialized = false;
+    let mut subnet_initialized = false;
 
     loop {
         // Did we receive a termination notice?
@@ -261,7 +264,7 @@ pub async fn start_chains_coordinator(
                         )
                     }
 
-                    std::thread::spawn(move || loop {
+                    let _ = utils::thread_named("Deployment monitoring").spawn(move || loop {
                         match deployment_progress_rx.recv() {
                             Ok(DeploymentEvent::ProtocolDeployed) => {
                                 protocol_deployed_moved.store(true, Ordering::SeqCst);
@@ -269,8 +272,10 @@ pub async fn start_chains_coordinator(
                                     let _ =
                                         mining_command_tx_moved.send(BitcoinMiningCommand::Start);
                                 }
+                                break;
                             }
-                            _ => continue,
+                            Ok(_) => continue,
+                            _ => break,
                         }
                     });
                 }
@@ -367,18 +372,18 @@ pub async fn start_chains_coordinator(
             ObserverEvent::StacksChainMempoolEvent(mempool_event) => match mempool_event {
                 StacksChainMempoolEvent::TransactionsAdmitted(transactions) => {
                     // Temporary UI patch
-                    if config.devnet_config.enable_hyperchain_node && !hyperchain_initialized {
+                    if config.devnet_config.enable_subnet_node && !subnet_initialized {
                         for tx in transactions.iter() {
                             if tx.tx_description.contains("::commit-block") {
                                 let _ = devnet_event_tx.send(DevnetEvent::ServiceStatus(
                                     ServiceStatusData {
                                         order: 5,
                                         status: Status::Green,
-                                        name: "hyperchain-node".into(),
+                                        name: "subnet-node".into(),
                                         comment: format!("⚡️"),
                                     },
                                 ));
-                                hyperchain_initialized = true;
+                                subnet_initialized = true;
                                 break;
                             }
                         }
@@ -389,6 +394,8 @@ pub async fn start_chains_coordinator(
                 }
                 StacksChainMempoolEvent::TransactionDropped(ref _transactions) => {}
             },
+            ObserverEvent::BitcoinChainhookTriggered(_) => {}
+            ObserverEvent::StacksChainhookTriggered(_) => {}
         }
     }
     Ok(())
@@ -403,7 +410,7 @@ pub fn prepare_protocol_deployment(
     let manifest = manifest.clone();
     let deployment = deployment.clone();
 
-    std::thread::spawn(move || {
+    let _ = utils::thread_named("Deployment preheat").spawn(move || {
         apply_on_chain_deployment(
             &manifest,
             deployment,
@@ -426,7 +433,7 @@ pub fn perform_protocol_deployment(
 
     let _ = deployment_commands_tx.send(DeploymentCommand::Start);
 
-    std::thread::spawn(move || {
+    let _ = utils::thread_named("Deployment perform").spawn(move || {
         loop {
             let event = match deployment_events_rx.recv() {
                 Ok(event) => event,
@@ -496,7 +503,7 @@ pub async fn publish_stacking_orders(
             let node_url = stacks_node_rpc_url.clone();
             let pox_contract_id = pox_info.contract_id.clone();
 
-            std::thread::spawn(move || {
+            let _ = utils::thread_named("Stacking orders handler").spawn(move || {
                 let default_fee = fee_rate * 1000;
                 let stacks_rpc = StacksRpc::new(&node_url);
                 let nonce = stacks_rpc
@@ -511,7 +518,7 @@ pub async fn publish_stacking_orders(
 
                 let addr_bytes = Hash160::from_bytes(&addr_bytes[1..21]).unwrap();
                 let addr_version = AddressHashMode::SerializeP2PKH;
-                let stack_stx_tx = transactions::build_contrat_call_transaction(
+                let stack_stx_tx = codec::build_contrat_call_transaction(
                     pox_contract_id,
                     "stack-stx".into(),
                     vec![
@@ -609,7 +616,7 @@ fn handle_bitcoin_mining(
                 stop_miner.store(false, Ordering::SeqCst);
                 let stop_miner_reader = stop_miner.clone();
                 let devnet_config = devnet_config.clone();
-                std::thread::spawn(move || loop {
+                let _ = utils::thread_named("Bitcoin mining runloop").spawn(move || loop {
                     std::thread::sleep(std::time::Duration::from_millis(
                         devnet_config.bitcoin_controller_block_time.into(),
                     ));

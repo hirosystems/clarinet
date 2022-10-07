@@ -1,0 +1,215 @@
+{
+  "name": "clarity-lsp",
+  "displayName": "Clarity",
+  "description": "Provides validation, syntax highlighting, code completion, and debugging for Clarity smart contracts",
+  "author": "Hiro Systems",
+  "publisher": "hirosystems",
+  "icon": "assets/images/clarity-logo.png",
+  "homepage": "https://github.com/hirosystems/clarinet",
+  "bugs": "https://github.com/hirosystems/clarinet/issues",
+  "license": "GPL-3.0-only",
+  "version": "1.0.0",
+  "workspaces": [
+    "client",
+    "server",
+    "debug"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/hirosystems/clarinet/"
+  },
+  "scripts": {
+    "clean": "rimraf .vscode-test-web ./debug/dist ./client/dist ./server/dist ./server/src/clarity-lsp-*",
+    "pretest": "NODE_ENV=test concurrently \"webpack\" \"swc --config-file .runTests.swcrc ./client/tests/runTests.ts -o ./client/dist/tests/runTests.js\"",
+    "test": "node client/dist/tests/runTests.js",
+    "lint": "eslint ./client/src ./server/src --ext .ts,.tsx",
+    "dev:watch": "webpack -c ./webpack.config.dev.js -w",
+    "dev:browser": "vscode-test-web --extensionDevelopmentPath=. ./test-data --open-devtools --browser=chromium",
+    "dev": "webpack -c ./webpack.config.dev.js; concurrently \"npm:dev:*\"",
+    "vscode:prepublish": "npm run clean; NODE_ENV=production webpack",
+    "vsce:package": "vsce package",
+    "vsce:publish": "vsce publish",
+    "vsce:prerelease": "vsce publish --pre-release"
+  },
+  "categories": [
+    "Programming Languages",
+    "Linters",
+    "Debuggers"
+  ],
+  "keywords": [
+    "blockchain",
+    "clarity",
+    "bitcoin",
+    "stacks",
+    "smart contract",
+    "lsp",
+    "stx",
+    "btc"
+  ],
+  "galleryBanner": {
+    "color": "#242424",
+    "theme": "dark"
+  },
+  "qna": "https://docs.hiro.so/",
+  "engines": {
+    "vscode": "^1.64.0"
+  },
+  "activationEvents": [
+    "workspaceContains:Clarinet.toml",
+    "onLanguage:clarity"
+  ],
+  "main": "./client/dist/clientNode.js",
+  "browser": "./client/dist/clientBrowser.js",
+  "contributes": {
+    "configuration": [
+      {
+        "order": 22,
+        "id": "clariy-lsp",
+        "title": "Clarity",
+        "properties": {
+          "clariy-lsp.trace.server": {
+            "type": "string",
+            "scope": "window",
+            "enum": [
+              "off",
+              "messages",
+              "verbose"
+            ],
+            "default": "verbose",
+            "description": "Traces the communication between VS Code and the web-extension language server."
+          }
+        }
+      }
+    ],
+    "languages": [
+      {
+        "id": "clarity",
+        "aliases": [
+          "Clarity",
+          "clarity"
+        ],
+        "extensions": [
+          ".clar"
+        ],
+        "icon": {
+          "light": "./assets/images/file-icon/clar-light-theme.svg",
+          "dark": "./assets/images/file-icon/clar-dark-theme.svg"
+        },
+        "configuration": "./language-configuration.json"
+      },
+      {
+        "id": "toml",
+        "extensions": [
+          ".toml"
+        ]
+      }
+    ],
+    "grammars": [
+      {
+        "language": "clarity",
+        "scopeName": "source.clar",
+        "path": "./syntaxes/clarity.tmLanguage.json"
+      }
+    ],
+    "viewsContainers": {
+      "panel": [
+        {
+          "id": "clarityPanel",
+          "title": "Clarity",
+          "icon": "assets/images/file-icon/clar-darktheme.svg",
+          "when": "config.clariy-lsp.panels.insights-panel"
+        }
+      ]
+    },
+    "views": {
+      "clarityPanel": [
+        {
+          "type": "webview",
+          "id": "clariy-lsp.clarityInsightsView",
+          "name": "Insights",
+          "when": "config.clariy-lsp.panels.insights-panel"
+        }
+      ]
+    },
+    "breakpoints": [
+      {
+        "language": "clarity"
+      }
+    ],
+    "debuggers": [
+      {
+        "type": "clarinet",
+        "label": "Clarinet Debug",
+        "program": "./debug/dist/debug.js",
+        "runtime": "node",
+        "languages": [
+          "clarity"
+        ],
+        "configurationAttributes": {
+          "launch": {
+            "required": [
+              "manifest",
+              "expression"
+            ],
+            "properties": {
+              "manifest": {
+                "type": "string",
+                "description": "Path to Clarinet.toml."
+              },
+              "expression": {
+                "type": "string",
+                "description": "Expression to debug."
+              }
+            }
+          }
+        },
+        "initialConfigurations": [
+          {
+            "type": "clarinet",
+            "request": "launch",
+            "name": "Call .foo.bar",
+            "manifest": "${workspaceFolder}/Clarinet.toml",
+            "expression": "(contract-call? .foo bar 42)"
+          }
+        ],
+        "configurationSnippets": [
+          {
+            "label": "Clarinet Debugger",
+            "description": "A new configuration for debugging a smart contract.",
+            "body": {
+              "type": "clarinet",
+              "request": "launch",
+              "name": "Call .foo.bar",
+              "manifest": "${workspaceFolder}/Clarinet.toml",
+              "expression": "(contract-call? .foo bar 42)"
+            }
+          }
+        ]
+      }
+    ]
+  },
+  "devDependencies": {
+    "@swc/cli": "^0.1.57",
+    "@swc/core": "^1.2.218",
+    "@types/chai": "^4.3.1",
+    "@types/mocha": "^10.0.0",
+    "@types/webpack-env": "^1.17.0",
+    "@typescript-eslint/eslint-plugin": "^5.19.0",
+    "@typescript-eslint/parser": "^5.19.0",
+    "@vscode/test-web": "^0.0.30",
+    "@wasm-tool/wasm-pack-plugin": "^1.6.0",
+    "chai": "^4.3.6",
+    "concurrently": "^7.2.2",
+    "copy-webpack-plugin": "^11.0.0",
+    "eslint": "^8.13.0",
+    "mocha": "^10.0.0",
+    "path-browserify": "^1.0.1",
+    "regenerator-runtime": "^0.13.9",
+    "rimraf": "^3.0.2",
+    "swc-loader": "^0.2.3",
+    "typescript": "^4.7.2",
+    "vsce": "^2.9.1",
+    "webpack": "^5.74.0",
+    "webpack-cli": "^4.10.0"
+  }
+}

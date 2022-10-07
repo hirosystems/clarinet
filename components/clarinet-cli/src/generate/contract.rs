@@ -1,6 +1,9 @@
 use super::changes::{Changes, FileCreation, TOMLEdition};
-use clarinet_files::{ContractConfig, FileLocation};
-use std::collections::HashMap;
+use clarinet_files::FileLocation;
+use clarity_repl::repl::{
+    ClarityCodeSource, ClarityContract, ContractDeployer, DEFAULT_CLARITY_VERSION, DEFAULT_EPOCH,
+};
+use std::{collections::HashMap, path::PathBuf, str::FromStr};
 
 pub struct GetChangesForNewContract {
     manifest_location: FileLocation,
@@ -76,7 +79,7 @@ impl GetChangesForNewContract {
     fn create_template_test(&mut self) -> Result<(), String> {
         let content = format!(
             r#"
-import {{ Clarinet, Tx, Chain, Account, types }} from 'https://deno.land/x/clarinet@v0.31.0/index.ts';
+import {{ Clarinet, Tx, Chain, Account, types }} from 'https://deno.land/x/clarinet@v{}/index.ts';
 import {{ assertEquals }} from 'https://deno.land/std@0.90.0/testing/asserts.ts';
 
 Clarinet.test({{
@@ -101,7 +104,8 @@ Clarinet.test({{
         assertEquals(block.height, 3);
     }},
 }});
-"#
+"#,
+            env!("CARGO_PKG_VERSION")
         );
 
         let name = format!("{}_test.ts", self.contract_name);
@@ -124,10 +128,16 @@ Clarinet.test({{
     fn index_contract_in_clarinet_toml(&mut self) {
         let contract_file_name = format!("{}.clar", self.contract_name);
         let manifest_location = self.manifest_location.clone();
-
-        let contract_config = ContractConfig {
-            path: format!("contracts/{}", contract_file_name),
-            deployer: None,
+        let contract_path = {
+            let path = format!("contracts/{}", contract_file_name);
+            PathBuf::from_str(&path).unwrap()
+        };
+        let contract_config = ClarityContract {
+            code_source: ClarityCodeSource::ContractOnDisk(contract_path),
+            deployer: ContractDeployer::DefaultDeployer,
+            name: self.contract_name.clone(),
+            clarity_version: DEFAULT_CLARITY_VERSION,
+            epoch: DEFAULT_EPOCH,
         };
         let mut contracts_to_add = HashMap::new();
         contracts_to_add.insert(self.contract_name.clone(), contract_config);

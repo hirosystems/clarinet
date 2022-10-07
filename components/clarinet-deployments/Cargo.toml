@@ -1,15 +1,15 @@
 [package]
 name = "clarinet-deployments"
-version = "0.1.0"
+version = "1.0.0"
 edition = "2021"
 
 [dependencies]
 serde = "1"
 serde_json = "1"
 serde_derive = "1"
-clarity_repl = { package = "clarity-repl", path = "../clarity-repl", default-features = false }
+clarity_repl = { package = "clarity-repl", path = "../clarity-repl", default-features = false, optional = true }
 clarinet_files =  { package = "clarinet-files", path = "../clarinet-files", default-features = false }
-orchestra_types = { package = "orchestra-types", path = "../../vendor/orchestra-types-rs" }
+chainhook_types = { package = "chainhook-types", path = "../chainhook-types-rs" }
 serde_yaml = "0.8.23"
 
 # CLI

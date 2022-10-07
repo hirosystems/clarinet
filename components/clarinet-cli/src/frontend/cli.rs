@@ -1,4 +1,5 @@
 use crate::chainhooks::check_chainhooks;
+use crate::chainhooks::types::ChainhookSpecificationFile;
 use crate::deployments::types::DeploymentSynthesis;
 use crate::deployments::{
     self, apply_on_chain_deployment, check_deployments, generate_default_deployment,
@@ -13,16 +14,21 @@ use crate::integrate::{self, DevnetOrchestrator};
 use crate::lsp::run_lsp;
 use crate::runner::run_scripts;
 use crate::runner::DeploymentCache;
+use chainhook_event_observer::chainhooks::types::ChainhookSpecification;
+use chainhook_types::StacksNetwork;
+use chainhook_types::{BitcoinNetwork, Chain};
 use clarinet_deployments::setup_session_with_deployment;
 use clarinet_deployments::types::{DeploymentGenerationArtifacts, DeploymentSpecification};
 use clarinet_files::{FileLocation, ProjectManifest, ProjectManifestFile, RequirementConfig};
-use clarity_repl::clarity::analysis::{AnalysisDatabase, ContractAnalysis};
-use clarity_repl::clarity::costs::LimitedCostTracker;
-use clarity_repl::clarity::diagnostic::{Diagnostic, Level};
-use clarity_repl::clarity::types::QualifiedContractIdentifier;
+use clarity_repl::analysis::call_checker::ContractAnalysis;
+use clarity_repl::clarity::vm::analysis::AnalysisDatabase;
+use clarity_repl::clarity::vm::costs::LimitedCostTracker;
+use clarity_repl::clarity::vm::diagnostic::{Diagnostic, Level};
+use clarity_repl::clarity::vm::types::QualifiedContractIdentifier;
+use clarity_repl::clarity::ClarityVersion;
+use clarity_repl::repl::diagnostic::{output_code, output_diagnostic};
+use clarity_repl::repl::{ClarityCodeSource, ClarityContract, ContractDeployer, DEFAULT_EPOCH};
 use clarity_repl::{analysis, repl, Terminal};
-use orchestra_types::Chain;
-use orchestra_types::StacksNetwork;
 use std::collections::HashMap;
 use std::fs::{self, File};
 use std::io::prelude::*;
@@ -380,6 +386,27 @@ struct Test {
         conflicts_with = "use-on-disk-deployment-plan"
     )]
     pub use_computed_deployment_plan: bool,
+    /// Stop after N errors. Defaults to stopping after first failure
+    #[clap(long = "fail-fast")]
+    pub fail_fast: Option<u16>,
+    /// Run tests with this string or pattern in the test name
+    #[clap(long = "filter")]
+    pub filter: Option<String>,
+    /// Load import map file from local file or remote URL
+    #[clap(long = "import-map")]
+    pub import_map: Option<String>,
+    /// Allow network access
+    #[clap(long = "allow-net")]
+    pub allow_net: bool,
+    /// Specify optional Typescript config file
+    #[clap(long = "ts-config")]
+    pub ts_config: Option<String>,
+    /// Specify relative path of the chainhooks (yaml format) to evaluate
+    #[clap(long = "chainhooks")]
+    pub chainhooks: Vec<String>,
+    /// Add artificial delay (in seconds) when calling `chain.mineBlock(...)`. Useful when testing chainhooks
+    #[clap(long = "mine-block-delay")]
+    pub mine_block_delay: Option<u16>,
 }
 
 #[derive(Parser, PartialEq, Clone, Debug)]
@@ -910,7 +937,7 @@ pub fn main() {
             settings.repl_settings.analysis.enable_all_passes();
 
             let mut session = repl::Session::new(settings.clone());
-            let code = match fs::read_to_string(&file) {
+            let code_source = match fs::read_to_string(&file) {
                 Ok(code) => code,
                 _ => {
                     println!("{}: unable to read file: '{}'", red!("error"), file);
@@ -918,17 +945,25 @@ pub fn main() {
                 }
             };
             let contract_id = QualifiedContractIdentifier::transient();
-            let (ast, mut diagnostics, mut success) = session.interpreter.build_ast(
-                contract_id.clone(),
-                code.clone(),
-                settings.repl_settings.parser_version,
-            );
-            let (annotations, mut annotation_diagnostics) =
-                session.interpreter.collect_annotations(&ast, &code);
+            let contract = ClarityContract {
+                code_source: ClarityCodeSource::ContractInMemory(code_source),
+                deployer: ContractDeployer::Transient,
+                name: "transient".to_string(),
+                clarity_version: ClarityVersion::Clarity1,
+                epoch: DEFAULT_EPOCH,
+            };
+            let (ast, mut diagnostics, mut success) = session.interpreter.build_ast(&contract);
+            let (annotations, mut annotation_diagnostics) = session
+                .interpreter
+                .collect_annotations(&ast, contract.expect_in_memory_code_source());
             diagnostics.append(&mut annotation_diagnostics);
 
-            let mut contract_analysis =
-                ContractAnalysis::new(contract_id, ast.expressions, LimitedCostTracker::new_free());
+            let mut contract_analysis = ContractAnalysis::new(
+                contract_id,
+                ast.expressions,
+                LimitedCostTracker::new_free(),
+                contract.clarity_version,
+            );
             let mut analysis_db = AnalysisDatabase::new(&mut session.interpreter.datastore);
             let mut analysis_diagnostics = match analysis::run_analysis(
                 &mut contract_analysis,
@@ -944,10 +979,10 @@ pub fn main() {
             };
             diagnostics.append(&mut analysis_diagnostics);
 
-            let lines = code.lines();
+            let lines = contract.expect_in_memory_code_source().lines();
             let formatted_lines: Vec<String> = lines.map(|l| l.to_string()).collect();
             for d in diagnostics {
-                for line in d.output(&file, &formatted_lines) {
+                for line in output_diagnostic(&d, &file, &formatted_lines) {
                     println!("{}", line);
                 }
             }
@@ -1013,6 +1048,37 @@ pub fn main() {
             let manifest = load_manifest_or_exit(cmd.manifest_path);
             let deployment_plan_path = cmd.deployment_plan_path.clone();
             let cache = build_deployment_cache_or_exit(&manifest, &deployment_plan_path);
+            let cache_location = manifest.project.cache_location.clone();
+            let mut stacks_chainhooks = vec![];
+            let mine_block_delay = cmd.mine_block_delay.unwrap_or(0);
+            for chainhook_relative_path in cmd.chainhooks.iter() {
+                let mut chainhook_location = manifest
+                    .location
+                    .get_project_root_location()
+                    .expect("unable to get root location");
+                chainhook_location
+                    .append_path(chainhook_relative_path)
+                    .expect("unable to build path");
+                match ChainhookSpecificationFile::parse(
+                    &chainhook_location.to_string().into(),
+                    &(BitcoinNetwork::Regtest, StacksNetwork::Devnet),
+                ) {
+                    Ok(hook) => match hook {
+                        ChainhookSpecification::Bitcoin(_) => {
+                            println!(
+                                "{}: bitcoin chainhooks not supported in test environments",
+                                red!("error")
+                            );
+                            std::process::exit(1);
+                        }
+                        ChainhookSpecification::Stacks(hook) => stacks_chainhooks.push(hook),
+                    },
+                    Err(msg) => {
+                        println!("{}: unable to load chainhooks ({})", red!("error"), msg);
+                        std::process::exit(1);
+                    }
+                };
+            }
 
             let (success, _count) = match run_scripts(
                 cmd.files,
@@ -1024,9 +1090,20 @@ pub fn main() {
                 &manifest,
                 cache,
                 deployment_plan_path,
+                cmd.fail_fast,
+                cmd.filter,
+                cmd.import_map,
+                cmd.allow_net,
+                cache_location,
+                cmd.ts_config,
+                stacks_chainhooks,
+                mine_block_delay,
             ) {
                 Ok(count) => (true, count),
-                Err((_, count)) => (false, count),
+                Err((e, count)) => {
+                    println!("{}: {}", red!("error:"), e);
+                    (false, count)
+                }
             };
             if hints_enabled {
                 display_tests_pro_tips_hint();
@@ -1047,7 +1124,7 @@ pub fn main() {
             let manifest = load_manifest_or_exit(cmd.manifest_path);
 
             let cache = build_deployment_cache_or_exit(&manifest, &cmd.deployment_plan_path);
-
+            let cache_location = manifest.project.cache_location.clone();
             let _ = run_scripts(
                 vec![cmd.script],
                 false,
@@ -1058,6 +1135,14 @@ pub fn main() {
                 &manifest,
                 cache,
                 cmd.deployment_plan_path,
+                None,
+                None,
+                None,
+                false,
+                cache_location,
+                None,
+                vec![],
+                0,
             );
         }
         Command::Integrate(cmd) => {
@@ -1559,13 +1644,23 @@ fn execute_changes(changes: Vec<Changes>) -> bool {
         let toml_value = match toml::Value::try_from(&project_manifest) {
             Ok(value) => value,
             Err(e) => {
-                println!("{}: Failed to encode config file: {}", red!("error"), e);
+                println!("{}: failed encoding config file ({})", red!("error"), e);
                 return false;
             }
         };
-        let toml = format!("{}", toml_value);
 
-        if let Err(message) = project_manifest.location.write_content(toml.as_bytes()) {
+        let pretty_toml = match toml::ser::to_string_pretty(&toml_value) {
+            Ok(value) => value,
+            Err(e) => {
+                println!("{}: failed formatting config file ({})", red!("error"), e);
+                return false;
+            }
+        };
+
+        if let Err(message) = project_manifest
+            .location
+            .write_content(pretty_toml.as_bytes())
+        {
             println!(
                 "{}: Unable to update manifest file - {}",
                 red!("error"),
@@ -1631,7 +1726,7 @@ impl DiagnosticsDigest {
                     }
                     Level::Note => {
                         outputs.push(format!("{}: {}", green!("note:"), diagnostic.message));
-                        outputs.append(&mut diagnostic.output_code(&formatted_lines));
+                        outputs.append(&mut output_code(&diagnostic, &formatted_lines));
                         continue;
                     }
                 }
@@ -1649,7 +1744,7 @@ impl DiagnosticsDigest {
                         span.start_column
                     ));
                 }
-                outputs.append(&mut diagnostic.output_code(&formatted_lines));
+                outputs.append(&mut output_code(&diagnostic, &formatted_lines));
 
                 if let Some(ref suggestion) = diagnostic.suggestion {
                     outputs.push(format!("{}", suggestion));
