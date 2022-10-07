@@ -175,6 +175,7 @@ history.txt
             r#"
 [project]
 name = "{}"
+description = ""
 authors = []
 telemetry = {}
 cache_dir = "./.cache"
@@ -375,15 +376,15 @@ disable_stacks_api = false
 # stacks_explorer_image_url = "hirosystems/explorer:latest"
 # bitcoin_explorer_image_url = "quay.io/hirosystems/bitcoin-explorer:devnet"
 # postgres_image_url = "postgres:14"
-# enable_hyperchain_node = true
-# hyperchain_node_image_url = "hirosystems/hyperchains:0.0.4-stretch"
-# hyperchain_leader_mnemonic = "female adjust gallery certain visit token during great side clown fitness like hurt clip knife warm bench start reunion globe detail dream depend fortune"
-# hyperchain_leader_derivation_path = "m/44'/5757'/0'/0/0"
-# hyperchain_contract_id = "STXMJXCJDCT4WPF2X1HE42T6ZCCK3TPMBRZ51JEG.hc-alpha"
-# hyperchain_node_rpc_port = 30443
-# hyperchain_node_p2p_port = 30444
-# hyperchain_events_ingestion_port = 30445
-# hyperchain_node_events_observers = ["host.docker.internal:8002"]
+# enable_subnet_node = true
+# subnet_node_image_url = "hirosystems/hyperchains:0.0.4-stretch"
+# subnet_leader_mnemonic = "female adjust gallery certain visit token during great side clown fitness like hurt clip knife warm bench start reunion globe detail dream depend fortune"
+# subnet_leader_derivation_path = "m/44'/5757'/0'/0/0"
+# subnet_contract_id = "STXMJXCJDCT4WPF2X1HE42T6ZCCK3TPMBRZ51JEG.hc-alpha"
+# subnet_node_rpc_port = 30443
+# subnet_node_p2p_port = 30444
+# subnet_events_ingestion_port = 30445
+# subnet_node_events_observers = ["host.docker.internal:8002"]
 
 
 # Send some stacking orders

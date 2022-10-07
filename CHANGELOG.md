@@ -1,3 +1,55 @@
+#### 1.0.0 (2022-10-06)
+
+##### New Features
+
+*  Introducing our brand new re-architected VSCode extension ([README](https://github.com/hirosystems/clarinet/tree/develop/components/clarity-vscode))
+*  All of our tools (REPL, LSP, Clarinet) are now directly derived from the canonical Clarity VM ([#512](https://github.com/hirosystems/clarinet/pull/512), [#535](https://github.com/hirosystems/clarinet/pull/535), [#544](https://github.com/hirosystems/clarinet/pull/544))
+*  Ability to trigger chainhooks from unit tests ([#564](https://github.com/hirosystems/clarinet/pull/564))
+*  Deno integration upgraded and revisited ([#511](https://github.com/hirosystems/clarinet/pull/511))
+*  Ability to specify Deno import maps ([#511](https://github.com/hirosystems/clarinet/pull/511))
+*  Ability to specify TS config files ([#555](https://github.com/hirosystems/clarinet/pull/555/commits/083b498ef4210b50de74a70bc20e4a4e5a64db94))
+*  Ability to cache Deno libraries locally ([a2c2ded3](https://github.com/hirosystems/clarinet/commit/a2c2ded391e3110c640d0d3e6b41d3cd0d1b56e5))
+*  Bitcoin deployment plans now supports transfers to P2WPKH addresses ([c50a4c27](https://github.com/hirosystems/clarinet/commit/c50a4c27857a41d178393306f97e464bffea9b80))
+*  Ability to detect outdated deployment plans and display diffs ([#365](https://github.com/hirosystems/clarinet/issues/365))
+
+##### Bug Fixes
+
+A myriad of issues were addressed in this new version, the most notable being:
+
+*  Cannot make http request from within clarinet test ([#566](https://github.com/hirosystems/clarinet/issues/566))
+*  Clarinet CPU usage spiking to 100% when using clarinet integrate ([#545](https://github.com/hirosystems/clarinet/issues/545))
+*  Clarinet console crashes when it errors ([#541](https://github.com/hirosystems/clarinet/issues/541))
+*  Unhandled Division By Zero exception ([#525](https://github.com/hirosystems/clarinet/issues/525))
+*  Handle errors from callReadOnlyFn in tests ([#407](https://github.com/hirosystems/clarinet/issues/407))
+*  Arithmetic underflow crashes clarity-repl instead of displaying error ([#471](https://github.com/hirosystems/clarinet/issues/471))
+*  Improve debugability of chain.mine_block() ([#91](https://github.com/hirosystems/clarinet/issues/91))
+
+
+##### Documentation
+
+*  Added new example - How to use Chainhooks for indexing data ([cdeca648](https://github.com/hirosystems/clarinet/commit/cdeca64837e51dd64292ba2f4ddfcdfc3ef77da1))
+*  Added OpenAPI spec for Chainhooks ([01e8979c](https://github.com/hirosystems/clarinet/commit/01e8979c815cff701496d25e07dbf6777ff0afd5))
+
+##### Compatibility Issue
+
+clarinet v1.0.0 is not backward compatible with older versions of the clarinet deno library. If you're updating to clarinet v1.0.0, you will need to import
+
+```ts
+import { … } from 'https://deno.land/x/clarinet@1.0.0/index.ts';
+```
+
+in your test files.
+This v1.0.0 library is not compatible with clarinet's versions <= 0.33.0, and the prior versions of the library won't be compatible with versions >= 1.0.0 of Clarinet - the layer in charge of the communication between typescript and rust was upgraded. 
+If you're using clarinet in a **Github Action** and using the tag `latest` (now pointing to v1.0.0), then the tests will end up failing if the import upgrade is not done. If you don't want to upgrade, this is possible, you just need to specify the docker tag `v0.33.0`, instead of `latest`.
+
+Clarinet v1.0.0 is not currently backwards-compatible with older versions of the Clarinet deno library. If you are upgrading Clarinet to Clarinet `v1.0.0`, you will need to enter the following import command in your test files to perform this update.
+```ts
+import { … } from 'https://deno.land/x/clarinet@1.0.0/index.ts';
+```
+
+*Note* The `v1.0.0` library is not compatible with Clarinet versions <= `0.33.0`. Prior versions of the library also will not be compatible with versions >= `1.0.0` of Clarinet because the layer in charge of the communication between Typescript and Rust was upgraded.
+If you are using Clarinet in a *Github Action*, and using the tag `latest` (now pointing to `v1.0.0`), the tests will fail if the import upgrade task is not performed. If you do not want to upgrade, this is possible; however, you will need to specify the docker tag `v0.33.0`, instead of `latest`.
+
 #### 0.33.0 (2022-07-20)
 
 ##### Chores

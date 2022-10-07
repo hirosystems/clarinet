@@ -716,22 +716,22 @@ This trace shows all function calls, both internal calls to private functions, a
 ### Deploy with Hyperchains on Devnet
 
 Clarinet can be used for facilitating experimentations with [Hyperchains](https://www.youtube.com/watch?v=PFPwuVCGGuI).
-To get started with hyperchains, in your `Devnet.toml`, enable the flag
+To get started with subnets, in your `Devnet.toml`, enable the flag
 
 ```toml
 [devnet]
 # ...
-enable_hyperchain_node = true
+enable_subnet_node = true
 ```
 
-This same file can be used for customizing the hyperchain-node (miner, etc).
+This same file can be used for customizing the subnet-node (miner, etc).
 When running the command:
 
 ```bash
 $ clarinet integrate
 ```
 
-Clarinet will spin-up a hyperchain node. More documentation on how to use and interact with this incoming L2 can be found on the [Hyperchain repository](https://github.com/hirosystems/stacks-hyperchains).
+Clarinet will spin-up a subnet node. More documentation on how to use and interact with this incoming L2 can be found on the [Hyperchain repository](https://github.com/hirosystems/stacks-subnets).
 
 ## Contributing
 

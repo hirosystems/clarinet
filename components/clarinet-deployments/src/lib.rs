@@ -281,17 +281,16 @@ pub async fn generate_default_deployment(
     let mut queue = VecDeque::new();
 
     if let Some(ref devnet) = network_manifest.devnet {
-        if devnet.enable_hyperchain_node {
-            let contract_id =
-                match QualifiedContractIdentifier::parse(&devnet.hyperchain_contract_id) {
-                    Ok(contract_id) => contract_id,
-                    Err(_e) => {
-                        return Err(format!(
-                            "malformatted hyperchain_contract_id: {}",
-                            devnet.hyperchain_contract_id
-                        ))
-                    }
-                };
+        if devnet.enable_subnet_node {
+            let contract_id = match QualifiedContractIdentifier::parse(&devnet.subnet_contract_id) {
+                Ok(contract_id) => contract_id,
+                Err(_e) => {
+                    return Err(format!(
+                        "malformatted subnet_contract_id: {}",
+                        devnet.subnet_contract_id
+                    ))
+                }
+            };
             queue.push_front(contract_id)
         }
     }
@@ -352,12 +351,12 @@ pub async fn generate_default_deployment(
                             .insert(contract_id.issuer.clone(), default_deployer_address.clone());
                         match network_manifest.devnet {
                             Some(ref devnet)
-                                if devnet.hyperchain_contract_id == contract_id.to_string() =>
+                                if devnet.subnet_contract_id == contract_id.to_string() =>
                             {
                                 remap_principals.insert(
                                     contract_id.issuer.clone(),
                                     PrincipalData::parse_standard_principal(
-                                        &devnet.hyperchain_leader_stx_address,
+                                        &devnet.subnet_leader_stx_address,
                                     )
                                     .unwrap(),
                                 );

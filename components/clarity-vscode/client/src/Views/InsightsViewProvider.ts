@@ -3,8 +3,7 @@ import { emptyBody, insightsBody, head, getNonce } from "../utils/html";
 import type { InsightsData } from "../types";
 
 export class InsightsViewProvider implements vscode.WebviewViewProvider {
-  public static readonly viewType =
-    "obscurity-web-extension.clarityInsightsView";
+  public static readonly viewType = "clarity-lsp.clarityInsightsView";
 
   private _view?: vscode.WebviewView;
   private _fileName?: string;

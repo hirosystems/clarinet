@@ -7,6 +7,8 @@ use clarity_repl::repl;
 use clarity_repl::repl::{
     ClarityCodeSource, ClarityContract, ContractDeployer, DEFAULT_CLARITY_VERSION, DEFAULT_EPOCH,
 };
+use serde::ser::SerializeMap;
+use serde::{Serialize, Serializer};
 use std::collections::BTreeMap;
 use std::path::PathBuf;
 use std::str::FromStr;
@@ -45,7 +47,7 @@ pub struct ProjectManifest {
     pub location: FileLocation,
 }
 
-#[derive(Serialize, Debug, Clone)]
+#[derive(Debug, Clone)]
 pub struct ProjectConfig {
     pub name: String,
     pub authors: Vec<String>,
@@ -56,15 +58,33 @@ pub struct ProjectConfig {
     pub boot_contracts: Vec<String>,
 }
 
+impl Serialize for ProjectConfig {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        let mut map = serializer.serialize_map(Some(1))?;
+        map.serialize_entry("name", &self.name)?;
+        map.serialize_entry("description", &self.description)?;
+        map.serialize_entry("authors", &self.authors)?;
+        map.serialize_entry("telemetry", &self.telemetry)?;
+        map.serialize_entry(
+            "cache_dir",
+            &self
+                .cache_location
+                .get_relative_location()
+                .expect("invalida cache_dir property"),
+        )?;
+        if self.requirements.is_some() {
+            map.serialize_entry("requirements", &self.requirements)?;
+        }
+        map.end()
+    }
+}
+
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Default)]
 pub struct RequirementConfig {
     pub contract_id: String,
-}
-
-#[derive(Serialize, Deserialize, Debug)]
-pub struct NotebookConfig {
-    pub name: String,
-    pub path: String,
 }
 
 impl ProjectManifest {
@@ -133,7 +153,7 @@ impl ProjectManifest {
             authors: project_manifest_file.project.authors.unwrap_or(vec![]),
             telemetry: project_manifest_file.project.telemetry.unwrap_or(false),
             cache_location,
-            boot_contracts: project_manifest_file.project.boot_contracts.unwrap_or(vec![
+            boot_contracts: vec![
                 "costs".to_string(),
                 "pox".to_string(),
                 "pox-2".to_string(),
@@ -141,7 +161,7 @@ impl ProjectManifest {
                 "costs-2".to_string(),
                 "cost-voting".to_string(),
                 "bns".to_string(),
-            ]),
+            ],
         };
 
         let mut config = ProjectManifest {
