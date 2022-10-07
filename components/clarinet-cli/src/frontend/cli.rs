@@ -1648,9 +1648,19 @@ fn execute_changes(changes: Vec<Changes>) -> bool {
                 return false;
             }
         };
-        let toml = format!("{}", toml_value);
 
-        if let Err(message) = project_manifest.location.write_content(toml.as_bytes()) {
+        let pretty_toml = match toml::ser::to_string_pretty(&toml_value) {
+            Ok(value) => value,
+            Err(e) => {
+                println!("{}: failed formatting config file ({})", red!("error"), e);
+                return false;
+            }
+        };
+
+        if let Err(message) = project_manifest
+            .location
+            .write_content(pretty_toml.as_bytes())
+        {
             println!(
                 "{}: Unable to update manifest file - {}",
                 red!("error"),

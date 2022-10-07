@@ -175,6 +175,7 @@ history.txt
             r#"
 [project]
 name = "{}"
+description = ""
 authors = []
 telemetry = {}
 cache_dir = "./.cache"
