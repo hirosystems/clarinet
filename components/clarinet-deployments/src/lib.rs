@@ -26,6 +26,7 @@ use clarity_repl::clarity::vm::types::QualifiedContractIdentifier;
 use clarity_repl::clarity::vm::ContractName;
 use clarity_repl::clarity::vm::EvaluationResult;
 use clarity_repl::clarity::vm::ExecutionResult;
+use clarity_repl::repl::session::BOOT_CONTRACTS_ASTS;
 use clarity_repl::repl::Session;
 use clarity_repl::repl::SessionSettings;
 use std::collections::{BTreeMap, HashMap, VecDeque};
@@ -271,7 +272,7 @@ pub async fn generate_default_deployment(
     settings.repl_settings = manifest.repl_settings.clone();
 
     let session = Session::new(settings.clone());
-    let mut boot_contracts_asts = session.get_boot_contracts_asts();
+    let mut boot_contracts_asts = BOOT_CONTRACTS_ASTS.clone();
     let boot_contracts_ids = boot_contracts_asts
         .iter()
         .map(|(k, _)| k.clone())

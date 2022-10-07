@@ -6,6 +6,7 @@ use super::{
 use crate::analysis::ast_dependency_detector::{ASTDependencyDetector, Dependency};
 use crate::analysis::coverage::{self, TestCoverageReport};
 use crate::repl::settings::InitialContract;
+use crate::repl::Settings;
 use crate::utils;
 use ansi_term::{Colour, Style};
 use clarity::codec::StacksMessageCodec;
@@ -47,6 +48,35 @@ lazy_static! {
         PrincipalData::parse_standard_principal(&BOOT_TESTNET_ADDRESS).unwrap();
     static ref BOOT_MAINNET_PRINCIPAL: StandardPrincipalData =
         PrincipalData::parse_standard_principal(&BOOT_MAINNET_ADDRESS).unwrap();
+}
+
+lazy_static! {
+    pub static ref BOOT_CONTRACTS_ASTS: BTreeMap<QualifiedContractIdentifier, ContractAST> = {
+        let mut asts = BTreeMap::new();
+        let deploy: [(&StandardPrincipalData, [(&str, &str); 9]); 2] = [
+            (&*BOOT_TESTNET_PRINCIPAL, *STACKS_BOOT_CODE_TESTNET),
+            (&*BOOT_MAINNET_PRINCIPAL, *STACKS_BOOT_CODE_MAINNET),
+        ];
+
+        let interpreter =
+            ClarityInterpreter::new(StandardPrincipalData::transient(), Settings::default());
+        for contract in deploy.iter() {
+            let deployer = contract.0;
+            let boot_code = contract.1;
+            for (name, code) in boot_code.iter() {
+                let boot_contract = ClarityContract {
+                    code_source: ClarityCodeSource::ContractInMemory(code.to_string()),
+                    deployer: ContractDeployer::Address(deployer.to_address()),
+                    name: name.to_string(),
+                    clarity_version: ClarityVersion::Clarity1,
+                    epoch: StacksEpochId::Epoch20,
+                };
+                let (ast, _, _) = interpreter.build_ast(&boot_contract);
+                asts.insert(boot_contract.expect_resolved_contract_identifier(None), ast);
+            }
+        }
+        asts
+    };
 }
 
 enum Command {
@@ -157,37 +187,6 @@ impl Session {
                 // Result ignored, boot contracts are trusted to be valid
             }
         }
-    }
-
-    pub fn get_boot_contracts_asts(&self) -> BTreeMap<QualifiedContractIdentifier, ContractAST> {
-        let mut asts = BTreeMap::new();
-        let deploy: [(&StandardPrincipalData, [(&str, &str); 9]); 2] = [
-            (&*BOOT_TESTNET_PRINCIPAL, *STACKS_BOOT_CODE_TESTNET),
-            (&*BOOT_MAINNET_PRINCIPAL, *STACKS_BOOT_CODE_MAINNET),
-        ];
-        // for (deployer, boot_code) in deploy.iter() {
-        for contract in deploy.iter() {
-            let deployer = contract.0;
-            let boot_code = contract.1;
-            for (name, code) in boot_code.iter() {
-                if self
-                    .settings
-                    .include_boot_contracts
-                    .contains(&name.to_string())
-                {
-                    let boot_contract = ClarityContract {
-                        code_source: ClarityCodeSource::ContractInMemory(code.to_string()),
-                        deployer: ContractDeployer::Address(deployer.to_address()),
-                        name: name.to_string(),
-                        clarity_version: ClarityVersion::Clarity1,
-                        epoch: StacksEpochId::Epoch20,
-                    };
-                    let (ast, _, _) = self.interpreter.build_ast(&boot_contract);
-                    asts.insert(boot_contract.expect_resolved_contract_identifier(None), ast);
-                }
-            }
-        }
-        asts
     }
 
     #[cfg(feature = "wasm")]
