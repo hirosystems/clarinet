@@ -6,6 +6,7 @@ import {
   DidOpenTextDocumentParams,
   DidCloseTextDocumentNotification,
   DidOpenTextDocumentNotification,
+  CompletionItemKind,
 } from "vscode-languageserver";
 import type { ServerCapabilities, Connection } from "vscode-languageserver";
 
@@ -69,20 +70,28 @@ export function initConnection(
   });
 
   connection.onCompletion(async (params: unknown) => {
+    // notifications and requests are competing to get access to the editor_state_lock
+    // in the (occasional) event of a completion request happening while the server has
+    // notifications to handle, let's ignore the completion request
+    if (notifications.length > 0) return null;
     const res = await bridge.onRequest(CompletionRequest.method, params);
     if (!res) return null;
-    return res.map((item: Record<string, any>) => ({
-      ...item,
-      insertText: item.insert_text,
-      insertTextFormat:
-        item.insert_text_format === "PlainText"
-          ? InsertTextFormat.PlainText
-          : InsertTextFormat.Snippet,
-      documentation: {
-        kind: MarkupKind.Markdown,
-        value: item.markdown_documentation,
-      },
-    }));
+    return res.map((item: Record<string, any>) => {
+      return {
+        ...item,
+        insertText: item.insert_text,
+        insertTextFormat:
+          item.insert_text_format === "PlainText"
+            ? InsertTextFormat.PlainText
+            : InsertTextFormat.Snippet,
+        // @ts-ignore
+        kind: CompletionItemKind[item.kind],
+        documentation: {
+          kind: MarkupKind.Markdown,
+          value: item.markdown_documentation,
+        },
+      };
+    });
   });
 
   connection.listen();
