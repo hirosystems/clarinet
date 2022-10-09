@@ -27,7 +27,7 @@ When a contract is opened or saved, the extension will notify you if errors are 
 
 ### VS Code for the Web Support
 
-Visual Studio Code is natively supported, but this extension provides additional support for [vscode.dev](https://vscode.dev/), [github.dev](https://github.dev/github/dev) and similar tools.
+This extension works in VS Code on Desktop along with support for [vscode.dev](https://vscode.dev/), [github.dev](https://github.dev/github/dev)
 
 For more information, please see the [Clarinet GitHub VS Code documentation page](https://github.com/hirosystems/clarinet/blob/develop/components/clarity-vscode/README.md)
 
