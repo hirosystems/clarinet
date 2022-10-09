@@ -601,7 +601,7 @@ Clarinet can easily be extended by community members: open source contributions 
 
 | Name                      | wallet access | disk write | disk read | Deployment                                                            | Description                                                                                                                                       |
 | ------------------------- | ------------- | ---------- | --------- | --------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
-| stacksjs-helper-generator | no            | yes        | no        | https://deno.land/x/clarinet@v0.34.0/ext/stacksjs-helper-generator.ts | Facilitates contract integration by generating some typescript constants that can be used with stacks.js. Never hard code a stacks address again! |
+| stacksjs-helper-generator | no            | yes        | no        | https://deno.land/x/clarinet@v1.0.2/ext/stacksjs-helper-generator.ts | Facilitates contract integration by generating some typescript constants that can be used with stacks.js. Never hard code a stacks address again! |
 |                           |               |            |           |                                                                       |
 
 #### How to use extensions
