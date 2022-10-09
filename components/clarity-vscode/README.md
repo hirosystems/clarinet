@@ -7,59 +7,56 @@ Clarity is a **decidable** smart contract language that optimizes for predictabi
 ## Clarity for Visual Studio Installation
 
 You can install the latest release of the extension directly from VS Code or from the [marketplace](https://marketplace.visualstudio.com/items?itemName=hirosystems.clarity-lsp).
+
 ## Features
 
 The features described below are available when you install the Clarity for Visual Studio plugin.
 
-### Auto Complete Native Functions
+### Auto Complete Functions
 
 This feature enables you to start typing a function name, and then have the editor automatically suggest auto-completion with the documentation related to the suggestion.
 
-For instance, when you select a function, the extension adds the necessary parentheses around it and puts placeholders in the arguments of the function.
+When you select a function, the extension adds the necessary parentheses around it and puts placeholders in the arguments of the function.
 
 ![autocomplete gif](images/autocomplete.gif)
 
-### Check Contract on Save and Display Errors
+### Check Contract on Save and Display Errors Inline
 
 When a contract is opened or saved, the extension will notify you if errors are found (syntax, unknown keyword, etc), or warnings (such as unsafe code). This helps you to ensure that you write safe and clean code.
 
 ![display errors gif](images/errors.gif)
 
+### Debugger
+
+The debugging feature allows you to run Clarity code, line-by-line, so you can better understand what will happen when run.
+
+**Note: This feature currently only runs on the desktop and requires a local installation of Clarinet.**
+
+For more information on how debugging works, and how you can debug smart contracts, please see the [How to Debug Your Smart Contracts With Clarinet](https://www.hiro.so/blog/how-to-debug-your-smart-contracts-with-clarinet) blog post.
+
 ### VS Code for the Web Support
 
 This extension works in VS Code on Desktop along with support for [vscode.dev](https://vscode.dev/), [github.dev](https://github.dev/github/dev)
-
-For more information, please see the [Clarinet GitHub VS Code documentation page](https://github.com/hirosystems/clarinet/blob/develop/components/clarity-vscode/README.md)
-
-### Auto Complete User-Defined Functions
-
-This feature is similar to the auto-complete feature, but does not provide documentation for functions when writing a contract.
-
-### Resolve Contract-Call Targeting Local Contracts
-
-This feature is similar to the auto-complete feature, but enables auto-completion over multiple files.
 
 ### Support for Multiple Errors
 
 Although not considered a native feature for the Visual Studio Code extension, support for multiple errors is now supported in this version.
 
 ![multiple error support](images/multicontract.gif)
+
 ### Support for Traits
 
-When a contract implements a trait (such as the NFT of FT trait – SIPs 009 and 010), the extensions will detect errors if the trait implementation is not satisfied (for example, if the trait expects a function which is not implemented, or if the function signature does not match the trait definition).
+When a contract implements a trait (such as the NFT of FT trait – SIPs 009 and 010), the extensions will show and errors if the trait implementation is not satisfied (for example, if the trait expects a function which is not implemented, or if the function signature does not match the trait definition).
 
 ### Documentation
 
 This feature extends the capabilities of the native auto-complete function by providing documentation for a function when writing a smart contract.
 
-### Debugger
-
-The debugging feature allows you to run Clarity code, line-by-line, so you can better understand what will happen when run.
-
-For more information on how debugging works, and how you can debug smart contracts, please see the [How to Debug Your Smart Contracts With Clarinet](https://www.hiro.so/blog/how-to-debug-your-smart-contracts-with-clarinet) blog post.
-
 ### Handle Requirements
 
-If your Clarity project relies on specific requirements for [interacting with contracts on mainnet](https://github.com/hirosystems/clarinet#interacting-with-contracts-deployed-on-mainnet),this extension will automatically detect the requirement 
-on download, and then cache the required contracts. In some cases, you may need to require contracts to have
+If your Clarity project relies on specific requirements for [interacting with contracts on mainnet](https://github.com/hirosystems/clarinet#interacting-with-contracts-deployed-on-mainnet),this extension will automatically detect the requirement on download, and then cache the required contracts. In some cases, you may need to require contracts to have
 defining traits (such as SIPs 009 and 010); however, this may only concern contracts deployed on mainnet.
+
+## Contributing To This Extension
+
+Hiro welcomes feedback, comments and suggestions to improve this extension over time. Simply open up an issue or Pull Request in this repository with your proposed changes.
