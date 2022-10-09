@@ -2,12 +2,6 @@
 
 Clarity is a **decidable** smart contract language that optimizes for predictability and security. Developed by Hiro, Clarity enables smart contract developers to encode essential business logic on a blockchain.
 
-A programming language is referred to as **decidable** if you can know with certainty, from the code itself, what the program will do. Clarity is was designed to be intentionally Turing incomplete, thereby avoiding the problem of `Turing complexity` (the number of steps it takes for a turing machine to run an algorithm on a given input size). This allows for complete static analysis of the entire call graph of a given smart contract, while Hiro's support for types and type checkers can eliminate whole classes of bugs like unintended casts, reentrancy bugs, and reads of uninitialized values.
-
-The Language Server Protocol (LSP) defines the protocol used between an editor or IDE, and a language server that provides language features such as auto-complete, go-to-definition, find-all-references, and others.
-
-This Clarity-LSP project aims at leveraging the decidability quality of Clarity and the LSP to provide insights about your code, without publishing your smart contracts to a blockchain, while also enabling you to run the Clarity for Visual Studio Code extenstion in-browser.
-
 ![screenshot](images/screenshot.png)
 
 ## Clarity for Visual Studio Installation
