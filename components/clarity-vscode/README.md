@@ -46,7 +46,7 @@ Although not considered a native feature for the Visual Studio Code extension, s
 ![multiple error support](images/multicontract.gif)
 ### Support for Traits
 
-When a contract implements a trait (such as the NFT of FT trait – SIPs 009 and 010), the extensions will show and errors if the trait implementation is not satisfied (for example, if the trait expects a function which is not implemented, or if the function signature does not match the trait definition).
+When a contract implements a trait (such as the NFT of FT trait – SIPs 009 and 010), the extensions will detect errors if the trait implementation is not satisfied (for example, if the trait expects a function which is not implemented, or if the function signature does not match the trait definition).
 
 ### Documentation
 
