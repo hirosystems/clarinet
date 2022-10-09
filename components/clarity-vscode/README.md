@@ -34,6 +34,7 @@ For more information, please see the [Clarinet GitHub VS Code documentation page
 ### Auto Complete User-Defined Functions
 
 This feature is similar to the auto-complete feature, but does not provide documentation for functions when writing a contract.
+
 ### Resolve Contract-Call Targeting Local Contracts
 
 This feature is similar to the auto-complete feature, but enables auto-completion over multiple files.
