@@ -19,7 +19,7 @@ When you select a function, the extension adds the necessary parentheses around 
 
 ![autocomplete gif](images/autocomplete.gif)
 
-### Check Contract on Save and Display Errors Inline
+### Check Contract on Save and Display Errors
 
 When a contract is opened or saved, the extension will notify you if errors are found (syntax, unknown keyword, etc), or warnings (such as unsafe code). This helps you to ensure that you write safe and clean code.
 
