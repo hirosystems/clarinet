@@ -15,7 +15,7 @@ The features described below are available when you install the Clarity for Visu
 
 This feature enables you to start typing a function name, and then have the editor automatically suggest auto-completion with the documentation related to the suggestion.
 
-When you select a function, the extension adds the necessary parentheses around it and puts placeholders in the arguments of the function.
+For instance, when you select a function, the extension adds the necessary parentheses around it and puts placeholders in the arguments of the function.
 
 ![autocomplete gif](images/autocomplete.gif)
 
