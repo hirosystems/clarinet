@@ -6,7 +6,7 @@ Clarity is a **decidable** smart contract language that optimizes for predictabi
 
 ## Clarity for Visual Studio Installation
 
-You can install the latest release of the plugin from the [marketplace](https://marketplace.visualstudio.com/items?itemName=hirosystems.clarity-lsp).
+You can install the latest release of the extension directly from VS Code or from the [marketplace](https://marketplace.visualstudio.com/items?itemName=hirosystems.clarity-lsp).
 ## Features
 
 The features described below are available when you install the Clarity for Visual Studio plugin.
