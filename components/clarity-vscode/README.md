@@ -17,6 +17,12 @@ When you select a function, the extension adds the necessary parentheses around 
 
 ![autocomplete gif](https://raw.githubusercontent.com/hirosystems/clarinet/develop/components/clarity-vscode/docs/images/autocomplete.gif)
 
+### Resolve contract-call targeting local contracts
+
+The extension auto-completes local contract calls as well.
+
+![multiple error support](images/multicontract.gif)
+
 ### Check Contract on Save and Display Errors Inline
 
 When a contract is opened or saved, the extension will notify you if errors are found (syntax, unknown keyword, etc), or warnings (such as unsafe code). This helps you to ensure that you write safe and clean code.
@@ -34,12 +40,6 @@ For more information on how debugging works, and how you can debug smart contrac
 ### Support VS Code for the Web
 
 This extension works in VS Code on Desktop along with support for [vscode.dev](https://vscode.dev/) and [github.dev](https://github.dev/github/dev).
-
-### Resolve contract-call targeting local contracts
-
-Jusrt like auto-completion on works with native or custom functions, the extension will auto-complete local contract calls.
-
-![multiple error support](images/multicontract.gif)
 
 ### Support for Traits
 
