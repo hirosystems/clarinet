@@ -6,7 +6,7 @@ class ChainhooksController < ApplicationController
     payload = JSON.parse request.body.read
     payload["apply"].each do |apply|
       apply["transaction"]["metadata"]["receipt"]["events"].each do |event|
-        next if event["type"] != "print_event"
+        next if event["type"] != "SmartContractEvent"
         event_data = event["data"]["value"] 
         next if event_data.nil? || event_data["type"] != "vault"
         vault_event_data = event_data["data"]

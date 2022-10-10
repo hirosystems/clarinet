@@ -560,31 +560,31 @@ pub fn serialized_event_with_decoded_clarity_value(
     match event {
         StacksTransactionEvent::STXTransferEvent(payload) => {
             json!({
-                "type": "stx_transfer_event",
+                "type": "STXTransferEvent",
                 "data": payload
             })
         }
         StacksTransactionEvent::STXMintEvent(payload) => {
             json!({
-                "type": "stx_mint_event",
+                "type": "STXMintEvent",
                 "data": payload
             })
         }
         StacksTransactionEvent::STXLockEvent(payload) => {
             json!({
-                "type": "stx_lock_event",
+                "type": "STXLockEvent",
                 "data": payload
             })
         }
         StacksTransactionEvent::STXBurnEvent(payload) => {
             json!({
-                "type": "stx_burn_event",
+                "type": "STXBurnEvent",
                 "data": payload
             })
         }
         StacksTransactionEvent::NFTTransferEvent(payload) => {
             json!({
-                "type": "nft_transfer_event",
+                "type": "NFTTransferEvent",
                 "data": {
                     "asset_class_identifier": payload.asset_class_identifier,
                     "asset_identifier": serialized_decoded_clarity_value(&payload.hex_asset_identifier),
@@ -595,7 +595,7 @@ pub fn serialized_event_with_decoded_clarity_value(
         }
         StacksTransactionEvent::NFTMintEvent(payload) => {
             json!({
-                "type": "nft_mint_event",
+                "type": "NFTMintEvent",
                 "data": {
                     "asset_class_identifier": payload.asset_class_identifier,
                     "asset_identifier": serialized_decoded_clarity_value(&payload.hex_asset_identifier),
@@ -605,7 +605,7 @@ pub fn serialized_event_with_decoded_clarity_value(
         }
         StacksTransactionEvent::NFTBurnEvent(payload) => {
             json!({
-                "type": "stx_burn_event",
+                "type": "NFTBurnEvent",
                 "data": {
                     "asset_class_identifier": payload.asset_class_identifier,
                     "asset_identifier": serialized_decoded_clarity_value(&payload.hex_asset_identifier),
@@ -615,25 +615,25 @@ pub fn serialized_event_with_decoded_clarity_value(
         }
         StacksTransactionEvent::FTTransferEvent(payload) => {
             json!({
-                "type": "ft_transfer_event",
+                "type": "FTTransferEvent",
                 "data": payload
             })
         }
         StacksTransactionEvent::FTMintEvent(payload) => {
             json!({
-                "type": "ft_mint_event",
+                "type": "FTMintEvent",
                 "data": payload
             })
         }
         StacksTransactionEvent::FTBurnEvent(payload) => {
             json!({
-                "type": "ft_burn_event",
+                "type": "FTBurnEvent",
                 "data": payload
             })
         }
         StacksTransactionEvent::DataVarSetEvent(payload) => {
             json!({
-                "type": "data_var_set_event",
+                "type": "DataVarSetEvent",
                 "data": {
                     "contract_identifier": payload.contract_identifier,
                     "var": payload.var,
@@ -643,7 +643,7 @@ pub fn serialized_event_with_decoded_clarity_value(
         }
         StacksTransactionEvent::DataMapInsertEvent(payload) => {
             json!({
-                "type": "data_map_insert_event",
+                "type": "DataMapInsertEvent",
                 "data": {
                     "contract_identifier": payload.contract_identifier,
                     "map": payload.map,
@@ -654,7 +654,7 @@ pub fn serialized_event_with_decoded_clarity_value(
         }
         StacksTransactionEvent::DataMapUpdateEvent(payload) => {
             json!({
-                "type": "data_map_update_event",
+                "type": "DataMapUpdateEvent",
                 "data": {
                     "contract_identifier": payload.contract_identifier,
                     "map": payload.map,
@@ -665,7 +665,7 @@ pub fn serialized_event_with_decoded_clarity_value(
         }
         StacksTransactionEvent::DataMapDeleteEvent(payload) => {
             json!({
-                "type": "data_map_delete_event",
+                "type": "DataMapDeleteEvent",
                 "data": {
                     "contract_identifier": payload.contract_identifier,
                     "map": payload.map,
@@ -675,7 +675,7 @@ pub fn serialized_event_with_decoded_clarity_value(
         }
         StacksTransactionEvent::SmartContractEvent(payload) => {
             json!({
-                "type": "print_event",
+                "type": "SmartContractEvent",
                 "data": {
                     "contract_identifier": payload.contract_identifier,
                     "topic": payload.topic,
