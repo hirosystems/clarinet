@@ -1,23 +1,59 @@
-# Clarity for VSCode
+# Clarity for Visual Studio Code
 
-Clarity is a decidable smart contract language that optimizes for predictability and security. Smart contracts allow developers to encode essential business logic on a blockchain.
+Clarity is a **decidable** Smart Contract language that optimizes for predictability and security. This VS Code extension brings essential features to write safe and clean Clarity code: auto-completion, linting, safety checks, debugger and more.
 
-This extension aims to help developer write safe and clean Clarity code, it includes syntax highlighting, auto-completion, linting, debugging and [safety checks](https://www.hiro.so/blog/new-safety-checks-in-clarinet),.
+![screenshot](https://raw.githubusercontent.com/hirosystems/clarinet/develop/components/clarity-vscode/docs/images/screenshot.png)
 
-## Support for [vscode.dev](https://vscode.dev)
+## Clarity for Visual Studio Installation
 
-The Clarity extension runs in the browser so it can be used with [vscode.dev](https://vscode.dev) and [github.dev](https://github.dev), the same way it runs in VSCode for Desktop.
+You can install the latest release of the extension directly from VS Code or from the [marketplace](https://marketplace.visualstudio.com/items?itemName=hirosystems.clarity-lsp).
 
-The Debugger is not implemented yet on the browser.
+## Features
 
-## Debugging
+### Auto Complete Functions
 
-The debugger included in this extension allows to run Clarity code line by line which is a powerful tool to understand what precisely happens. Read this [blog post](https://www.hiro.so/blog/how-to-debug-your-smart-contracts-with-clarinet) to know more about Clarity debugging.
+This feature enables you to start typing a function name, and then have the editor automatically suggest auto-completion with the documentation related to the suggestion.  
+When you select a function, the extension adds the necessary parentheses around it and puts placeholders in the arguments of the function.
 
-In order to use the Debugger (DAP), this extension relies on a local installation of Clarinet. To install Clarinet, please follow the instructions [here](https://github.com/hirosystems/clarinet#installation).
+![autocomplete gif](https://raw.githubusercontent.com/hirosystems/clarinet/develop/components/clarity-vscode/docs/images/autocomplete.gif)
+
+### Resolve contract-call targeting local contracts
+
+The extension auto-completes local contract calls as well.
+
+![multiple error support](images/multicontract.gif)
+
+### Check Contract on Save and Display Errors Inline
+
+When a contract is opened or saved, the extension will notify you if errors are found (syntax, unknown keyword, etc), or warnings (such as unsafe code). This helps you to ensure that you write safe and clean code.
+
+![display errors gif](https://raw.githubusercontent.com/hirosystems/clarinet/develop/components/clarity-vscode/docs/images/errors.gif)
+
+### Debugger
+
+The debugging feature allows you to run Clarity code, line-by-line, so you can better understand what happens when it runs.
+
+**Note: This feature currently only runs on the desktop and requires a local [installation of Clarinet](https://github.com/hirosystems/clarinet#installation).**
+
+For more information on how debugging works, and how you can debug smart contracts, please see the [How to Debug Your Smart Contracts With Clarinet](https://www.hiro.so/blog/how-to-debug-your-smart-contracts-with-clarinet) blog post.
+
+### Support VS Code for the Web
+
+This extension works in VS Code on Desktop along with support for [vscode.dev](https://vscode.dev/) and [github.dev](https://github.dev/).
+
+### Support for Traits
+
+When a contract implements a trait (such as the NFT of FT trait – SIPs 009 and 010), the extensions will show and errors if the trait implementation is incomplete (for example, if the trait expects a function which is not implemented, or if the function signature does not match the trait definition).
+
+### Handle Requirements
+
+If your Clarity project relies on specific requirements (eg: SIPs 009 or 010) for [interacting with contracts on mainnet](https://github.com/hirosystems/clarinet#interacting-with-contracts-deployed-on-mainnet), the extension will automatically detect and cached the required contracts.
 
 ---
-## Contributes
+
+## Contributing to this Extension
+
+Hiro welcomes feedback, comments and suggestions to improve this extension over time. 
 
 ### Run the extension locally
 
@@ -28,11 +64,11 @@ From the `./components/clarity-vscode`, run `npm install` to install the depende
 ### Structure
 
 The LSP has two main parts: the client and the server.
-This two part will run differents environments:
-- VSCode Web: in a WebWorkers
-- VSCode Desktop: in a Node.js environments
+These two parts will run in different environments:
+- VSCode Web (Web Worker)
+- VSCode Desktop (Node.js)
 
-The LSP (`./components/clarity-lsp`), written in Rust, is built with wasm-pack for both these environments and will be load accordingly, with `fetch()` in the browser and `fs.readFileSync()` in Node.js.
+The LSP (`./components/clarity-lsp`), written in Rust, is built with wasm-pack for both these environments and will be loaded accordingly, with `fetch()` in the browser and `fs.readFileSync()` in Node.js.
 
 ```
 ./components/clarity-vscode
