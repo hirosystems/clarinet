@@ -1082,7 +1082,7 @@ dependencies = [
 
 [[package]]
 name = "clarity-repl"
-version = "1.0.0"
+version = "1.0.2"
 dependencies = [
  "ansi_term",
  "atty",
@@ -5724,7 +5724,7 @@ dependencies = [
 
 [[package]]
 name = "stacks-devnet-js"
-version = "1.0.0"
+version = "1.0.2"
 dependencies = [
  "chainhook-types",
  "clarinet-cli",
