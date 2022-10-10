@@ -10,9 +10,11 @@ use clarinet_files::{FileAccessor, FileLocation};
 use clarity_repl::analysis::ast_dependency_detector::DependencySet;
 use clarity_repl::clarity::analysis::ContractAnalysis;
 use clarity_repl::clarity::diagnostic::{Diagnostic as ClarityDiagnostic, Level as ClarityLevel};
+use clarity_repl::clarity::stacks_common::types::StacksEpochId;
 use clarity_repl::clarity::vm::ast::ContractAST;
 use clarity_repl::clarity::vm::types::QualifiedContractIdentifier;
 use clarity_repl::clarity::vm::EvaluationResult;
+use clarity_repl::clarity::ClarityVersion;
 use lsp_types::MessageType;
 use std::borrow::BorrowMut;
 use std::collections::{HashMap, HashSet};
@@ -342,9 +344,14 @@ pub async fn build_state(
         }
     };
 
-    let (deployment, mut artifacts) =
-        generate_default_deployment(&manifest, &StacksNetwork::Simnet, false, file_accessor)
-            .await?;
+    let (deployment, mut artifacts) = generate_default_deployment(
+        &manifest,
+        &StacksNetwork::Simnet,
+        false,
+        file_accessor,
+        Some((StacksEpochId::Epoch21, ClarityVersion::Clarity2)),
+    )
+    .await?;
 
     let mut session = initiate_session_from_deployment(&manifest);
     let results = update_session_with_contracts_executions(
