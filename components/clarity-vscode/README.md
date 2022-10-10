@@ -66,9 +66,8 @@ From the `./components/clarity-vscode`, run `npm install` to install the depende
 
 The LSP has two main parts: the client and the server.
 This two part will run different environments:
-- VSCode Web:  for Web Workers' environment
-- VSCode Desktop: for Node.js environment```
-- VSCode Desktop: in a Node.js environments
+- VSCode Web (Web Worker)
+- VSCode Desktop (Node.js)
 
 The LSP (`./components/clarity-lsp`), written in Rust, is built with wasm-pack for both these environments and will be loaded accordingly, with `fetch()` in the browser and `fs.readFileSync()` in Node.js.
 
