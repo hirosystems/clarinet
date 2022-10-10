@@ -32,19 +32,9 @@ A myriad of issues were addressed in this new version, the most notable being:
 
 ##### Compatibility Issue
 
-clarinet v1.0.0 is not backward compatible with older versions of the clarinet deno library. If you're updating to clarinet v1.0.0, you will need to import
-
-```ts
-import { … } from 'https://deno.land/x/clarinet@1.0.0/index.ts';
-```
-
-in your test files.
-This v1.0.0 library is not compatible with clarinet's versions <= 0.33.0, and the prior versions of the library won't be compatible with versions >= 1.0.0 of Clarinet - the layer in charge of the communication between typescript and rust was upgraded. 
-If you're using clarinet in a **Github Action** and using the tag `latest` (now pointing to v1.0.0), then the tests will end up failing if the import upgrade is not done. If you don't want to upgrade, this is possible, you just need to specify the docker tag `v0.33.0`, instead of `latest`.
-
 Clarinet v1.0.0 is not currently backwards-compatible with older versions of the Clarinet deno library. If you are upgrading Clarinet to Clarinet `v1.0.0`, you will need to enter the following import command in your test files to perform this update.
 ```ts
-import { … } from 'https://deno.land/x/clarinet@1.0.0/index.ts';
+import { … } from 'https://deno.land/x/clarinet@v1.0.2/index.ts';
 ```
 
 *Note* The `v1.0.0` library is not compatible with Clarinet versions <= `0.33.0`. Prior versions of the library also will not be compatible with versions >= `1.0.0` of Clarinet because the layer in charge of the communication between Typescript and Rust was upgraded.
