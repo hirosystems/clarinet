@@ -65,7 +65,7 @@ From the `./components/clarity-vscode`, run `npm install` to install the depende
 ### Structure
 
 The LSP has two main parts: the client and the server.
-This two part will run differents environments:
+This two part will run different environments:
 - VSCode Web: in a WebWorkers
 - VSCode Desktop: in a Node.js environments
 
