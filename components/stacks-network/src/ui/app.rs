@@ -1,5 +1,5 @@
 use super::util::{StatefulList, TabsState};
-use crate::integrate::{LogData, MempoolAdmissionData, ServiceStatusData};
+use crate::{LogData, MempoolAdmissionData, ServiceStatusData};
 use chainhook_types::{StacksBlockData, StacksMicroblockData, StacksTransactionData};
 use tui::style::{Color, Style};
 use tui::text::{Span, Spans};
@@ -84,7 +84,7 @@ impl<'a> App<'a> {
     }
 
     pub fn display_log(&mut self, log: LogData) {
-        use crate::integrate::LogLevel;
+        use crate::LogLevel;
         use tracing::{debug, error, info, warn};
         match &log.level {
             LogLevel::Error => error!("{}", log.message),

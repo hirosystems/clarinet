@@ -2,21 +2,24 @@ use crate::chainhooks::check_chainhooks;
 use crate::chainhooks::types::ChainhookSpecificationFile;
 use crate::deployments::types::DeploymentSynthesis;
 use crate::deployments::{
-    self, apply_on_chain_deployment, check_deployments, generate_default_deployment,
-    get_absolute_deployment_path, get_default_deployment_path, get_initial_transactions_trackers,
-    load_deployment, write_deployment, DeploymentCommand, DeploymentEvent,
+    self, check_deployments, generate_default_deployment, get_absolute_deployment_path,
+    get_default_deployment_path, load_deployment, write_deployment,
 };
 use crate::generate::{
     self,
     changes::{Changes, TOMLEdition},
 };
-use crate::integrate::{self, DevnetOrchestrator};
+use crate::integrate;
 use crate::lsp::run_lsp;
 use crate::runner::run_scripts;
 use crate::runner::DeploymentCache;
 use chainhook_event_observer::chainhooks::types::ChainhookSpecification;
 use chainhook_types::StacksNetwork;
 use chainhook_types::{BitcoinNetwork, Chain};
+use clarinet_deployments::onchain::{
+    apply_on_chain_deployment, get_initial_transactions_trackers, DeploymentCommand,
+    DeploymentEvent,
+};
 use clarinet_deployments::setup_session_with_deployment;
 use clarinet_deployments::types::{DeploymentGenerationArtifacts, DeploymentSpecification};
 use clarinet_files::{FileLocation, ProjectManifest, ProjectManifestFile, RequirementConfig};
@@ -29,6 +32,7 @@ use clarity_repl::clarity::ClarityVersion;
 use clarity_repl::repl::diagnostic::{output_code, output_diagnostic};
 use clarity_repl::repl::{ClarityCodeSource, ClarityContract, ContractDeployer, DEFAULT_EPOCH};
 use clarity_repl::{analysis, repl, Terminal};
+use stacks_network::{self, DevnetOrchestrator};
 use std::collections::HashMap;
 use std::fs::{self, File};
 use std::io::prelude::*;

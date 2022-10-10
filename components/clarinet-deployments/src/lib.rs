@@ -10,6 +10,8 @@ extern crate serde_derive;
 
 pub mod requirements;
 pub mod types;
+#[cfg(feature = "onchain")]
+pub mod onchain;
 
 use self::types::{
     DeploymentSpecification, EmulatedContractPublishSpecification, GenesisSpecification,

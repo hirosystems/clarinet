@@ -1,4 +1,4 @@
-use crate::integrate::{LogLevel, Status};
+use crate::{LogLevel, Status};
 use chainhook_types::{StacksBlockData, StacksMicroblockData, StacksTransactionData};
 
 use super::{app::BlockData, App};

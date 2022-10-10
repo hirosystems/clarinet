@@ -716,6 +716,7 @@ dependencies = [
  "csv",
  "ctrlc",
  "hex",
+ "hiro-system-kit",
  "num_cpus",
  "redis",
  "serde",
@@ -745,6 +746,7 @@ dependencies = [
  "clarinet-utils",
  "clarity-repl",
  "ctrlc",
+ "hiro-system-kit",
  "reqwest",
  "rocket",
  "rocket_okapi",
@@ -885,10 +887,7 @@ dependencies = [
  "base58 0.2.0",
  "base64 0.13.0",
  "bitcoin 0.28.1",
- "bitcoincore-rpc",
- "bitcoincore-rpc-json",
  "block-modes 0.8.1",
- "bollard",
  "cache_control",
  "chainhook-event-observer",
  "chainhook-types",
@@ -932,6 +931,7 @@ dependencies = [
  "futures",
  "fwdansi",
  "hex",
+ "hiro-system-kit",
  "hmac 0.12.1",
  "http",
  "hyper",
@@ -970,21 +970,17 @@ dependencies = [
  "shell-escape",
  "signal-hook-registry",
  "similar",
- "stacks-rpc-client",
+ "stacks-network",
  "strum",
  "sys-info",
  "tempfile",
  "termcolor",
  "text-size",
  "text_lines 0.6.0",
- "tiny-hderive",
  "tokio",
  "tokio-util 0.7.2",
  "toml",
  "tower-lsp",
- "tracing",
- "tracing-appender",
- "tracing-subscriber",
  "tui",
  "twox-hash",
  "typed-arena",
@@ -999,14 +995,22 @@ dependencies = [
 name = "clarinet-deployments"
 version = "1.0.0"
 dependencies = [
+ "base58 0.2.0",
+ "bitcoin 0.28.1",
+ "bitcoincore-rpc",
+ "bitcoincore-rpc-json",
  "chainhook-types",
  "clarinet-files",
+ "clarinet-utils",
  "clarity-repl",
+ "libsecp256k1 0.7.1",
  "reqwest",
  "serde",
  "serde_derive",
  "serde_json",
  "serde_yaml",
+ "stacks-rpc-client",
+ "tiny-hderive",
 ]
 
 [[package]]
@@ -2701,6 +2705,14 @@ name = "hex"
 version = "0.4.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7f24254aa9a54b5c858eaee2f5bccdb46aaf0e486a595ed5fd8f86ba55232a70"
+
+[[package]]
+name = "hiro-system-kit"
+version = "0.1.0"
+dependencies = [
+ "futures",
+ "tokio",
+]
 
 [[package]]
 name = "hkdf"
@@ -5734,6 +5746,36 @@ dependencies = [
  "neon",
  "num",
  "serde",
+]
+
+[[package]]
+name = "stacks-network"
+version = "0.1.0"
+dependencies = [
+ "base58 0.2.0",
+ "bitcoin 0.28.1",
+ "bitcoincore-rpc",
+ "bollard",
+ "chainhook-event-observer",
+ "chainhook-types",
+ "chrono",
+ "clarinet-deployments",
+ "clarinet-files",
+ "clarinet-utils",
+ "clarity-repl",
+ "crossterm 0.22.1",
+ "ctrlc",
+ "futures",
+ "hiro-system-kit",
+ "reqwest",
+ "serde",
+ "serde_derive",
+ "serde_json",
+ "stacks-rpc-client",
+ "tracing",
+ "tracing-appender",
+ "tracing-subscriber",
+ "tui",
 ]
 
 [[package]]

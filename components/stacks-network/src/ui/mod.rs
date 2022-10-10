@@ -6,7 +6,7 @@ mod ui;
 mod util;
 
 use super::DevnetEvent;
-use crate::types::ChainsCoordinatorCommand;
+use crate::ChainsCoordinatorCommand;
 use app::App;
 use chainhook_event_observer::observer::ObserverCommand;
 use chainhook_types::StacksChainEvent;

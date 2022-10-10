@@ -3,8 +3,8 @@ mod app;
 #[allow(dead_code)]
 mod ui;
 
-use super::{DeploymentEvent, TransactionTracker};
 use app::App;
+use clarinet_deployments::onchain::{DeploymentEvent, TransactionTracker};
 use crossterm::{
     execute,
     terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},

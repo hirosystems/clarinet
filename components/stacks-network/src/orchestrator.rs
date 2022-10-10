@@ -1,5 +1,5 @@
 use super::DevnetEvent;
-use crate::integrate::{ServiceStatusData, Status};
+use crate::{ServiceStatusData, Status};
 use bollard::container::{
     Config, CreateContainerOptions, KillContainerOptions, ListContainersOptions,
     PruneContainersOptions, WaitContainerOptions,

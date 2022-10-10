@@ -5,7 +5,6 @@ use crate::chainhooks::{
     BitcoinChainhookOccurrencePayload, StacksChainhookOccurrence, StacksChainhookOccurrencePayload,
 };
 use crate::indexer::{self, Indexer, IndexerConfig};
-use crate::utils;
 use bitcoincore_rpc::bitcoin::{BlockHash, Txid};
 use bitcoincore_rpc::{Auth, Client, RpcApi};
 use chainhook_types::{
@@ -13,6 +12,7 @@ use chainhook_types::{
     TransactionIdentifier,
 };
 use clarity_repl::clarity::util::hash::bytes_to_hex;
+use hiro_system_kit;
 use reqwest::Client as HttpClient;
 use rocket::config::{Config, LogLevel};
 use rocket::http::Status;
@@ -300,7 +300,7 @@ pub async fn start_event_observer(
             .mount("/", routes)
             .launch();
 
-        let _ = utils::nestable_block_on(future);
+        let _ = hiro_system_kit::nestable_block_on(future);
     });
 
     let control_config = Config {
@@ -331,7 +331,7 @@ pub async fn start_event_observer(
             .mount("/", routes)
             .launch();
 
-        let _ = utils::nestable_block_on(future);
+        let _ = hiro_system_kit::nestable_block_on(future);
     });
 
     // This loop is used for handling background jobs, emitted by HTTP calls.

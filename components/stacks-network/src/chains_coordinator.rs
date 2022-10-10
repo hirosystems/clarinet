@@ -1,19 +1,21 @@
+use super::ChainsCoordinatorCommand;
 use super::DevnetEvent;
-use crate::chainhooks::load_chainhooks;
-use crate::deployments::{apply_on_chain_deployment, DeploymentCommand, DeploymentEvent};
-use crate::integrate::{ServiceStatusData, Status};
-use crate::types::ChainsCoordinatorCommand;
-use crate::utils;
+use crate::{ServiceStatusData, Status};
 use base58::FromBase58;
 use bitcoincore_rpc::{Auth, Client, RpcApi};
+use chainhook_event_observer::chainhooks::types::HookFormation;
+use clarinet_deployments::onchain::{
+    apply_on_chain_deployment, DeploymentCommand, DeploymentEvent,
+};
 use clarinet_deployments::types::DeploymentSpecification;
 use clarinet_files::{self, AccountConfig, DevnetConfig, NetworkManifest, ProjectManifest};
+use hiro_system_kit;
 
 use chainhook_event_observer::observer::{
     start_event_observer, EventObserverConfig, ObserverCommand, ObserverEvent,
     StacksChainMempoolEvent,
 };
-use chainhook_types::{BitcoinChainEvent, BitcoinNetwork, StacksChainEvent, StacksNetwork};
+use chainhook_types::{BitcoinChainEvent, StacksChainEvent, StacksNetwork};
 use clarity_repl::clarity::address::AddressHashMode;
 use clarity_repl::clarity::util::hash::{hex_bytes, Hash160};
 use clarity_repl::clarity::vm::types::{BuffData, SequenceData, TupleData};
@@ -72,6 +74,7 @@ impl DevnetEventObserverConfig {
         devnet_config: DevnetConfig,
         manifest: ProjectManifest,
         deployment: DeploymentSpecification,
+        chainhooks: HookFormation,
     ) -> Self {
         info!("Checking contracts...");
         let network_manifest = NetworkManifest::from_project_manifest_location(
@@ -80,25 +83,13 @@ impl DevnetEventObserverConfig {
         )
         .expect("unable to load network manifest");
 
-        info!("Checking hooks...");
-        let hooks = match load_chainhooks(
-            &manifest.location,
-            &(BitcoinNetwork::Regtest, StacksNetwork::Devnet),
-        ) {
-            Ok(hooks) => hooks,
-            Err(e) => {
-                println!("{}", e);
-                std::process::exit(1);
-            }
-        };
-
         let event_observer_config = EventObserverConfig {
             normalization_enabled: true,
             grpc_server_enabled: false,
             hooks_enabled: true,
             bitcoin_rpc_proxy_enabled: true,
             event_handlers: vec![],
-            initial_hook_formation: Some(hooks),
+            initial_hook_formation: Some(chainhooks),
             ingestion_port: devnet_config.orchestrator_ingestion_port,
             control_port: devnet_config.orchestrator_control_port,
             bitcoin_node_username: devnet_config.bitcoin_node_username.clone(),
@@ -155,20 +146,20 @@ pub async fn start_chains_coordinator(
     let event_observer_config = config.event_observer_config.clone();
     let observer_event_tx_moved = observer_event_tx.clone();
     let observer_command_tx_moved = observer_command_tx.clone();
-    let _ = utils::thread_named("Event observer").spawn(move || {
+    let _ = hiro_system_kit::thread_named("Event observer").spawn(move || {
         let future = start_event_observer(
             event_observer_config,
             observer_command_tx_moved,
             observer_command_rx,
             Some(observer_event_tx_moved),
         );
-        let _ = utils::nestable_block_on(future);
+        let _ = hiro_system_kit::nestable_block_on(future);
     });
 
     // Spawn bitcoin miner controller
     let (mining_command_tx, mining_command_rx) = channel();
     let devnet_config = config.devnet_config.clone();
-    let _ = utils::thread_named("Bitcoin mining").spawn(move || {
+    let _ = hiro_system_kit::thread_named("Bitcoin mining").spawn(move || {
         handle_bitcoin_mining(mining_command_rx, &devnet_config);
     });
 
@@ -264,20 +255,22 @@ pub async fn start_chains_coordinator(
                         )
                     }
 
-                    let _ = utils::thread_named("Deployment monitoring").spawn(move || loop {
-                        match deployment_progress_rx.recv() {
-                            Ok(DeploymentEvent::ProtocolDeployed) => {
-                                protocol_deployed_moved.store(true, Ordering::SeqCst);
-                                if !automining_disabled {
-                                    let _ =
-                                        mining_command_tx_moved.send(BitcoinMiningCommand::Start);
+                    let _ = hiro_system_kit::thread_named("Deployment monitoring").spawn(
+                        move || loop {
+                            match deployment_progress_rx.recv() {
+                                Ok(DeploymentEvent::ProtocolDeployed) => {
+                                    protocol_deployed_moved.store(true, Ordering::SeqCst);
+                                    if !automining_disabled {
+                                        let _ = mining_command_tx_moved
+                                            .send(BitcoinMiningCommand::Start);
+                                    }
+                                    break;
                                 }
-                                break;
+                                Ok(_) => continue,
+                                _ => break,
                             }
-                            Ok(_) => continue,
-                            _ => break,
-                        }
-                    });
+                        },
+                    );
                 }
 
                 let known_tip = match &chain_event {
@@ -410,7 +403,7 @@ pub fn prepare_protocol_deployment(
     let manifest = manifest.clone();
     let deployment = deployment.clone();
 
-    let _ = utils::thread_named("Deployment preheat").spawn(move || {
+    let _ = hiro_system_kit::thread_named("Deployment preheat").spawn(move || {
         apply_on_chain_deployment(
             &manifest,
             deployment,
@@ -433,7 +426,7 @@ pub fn perform_protocol_deployment(
 
     let _ = deployment_commands_tx.send(DeploymentCommand::Start);
 
-    let _ = utils::thread_named("Deployment perform").spawn(move || {
+    let _ = hiro_system_kit::thread_named("Deployment perform").spawn(move || {
         loop {
             let event = match deployment_events_rx.recv() {
                 Ok(event) => event,
@@ -503,7 +496,7 @@ pub async fn publish_stacking_orders(
             let node_url = stacks_node_rpc_url.clone();
             let pox_contract_id = pox_info.contract_id.clone();
 
-            let _ = utils::thread_named("Stacking orders handler").spawn(move || {
+            let _ = hiro_system_kit::thread_named("Stacking orders handler").spawn(move || {
                 let default_fee = fee_rate * 1000;
                 let stacks_rpc = StacksRpc::new(&node_url);
                 let nonce = stacks_rpc
@@ -616,20 +609,21 @@ fn handle_bitcoin_mining(
                 stop_miner.store(false, Ordering::SeqCst);
                 let stop_miner_reader = stop_miner.clone();
                 let devnet_config = devnet_config.clone();
-                let _ = utils::thread_named("Bitcoin mining runloop").spawn(move || loop {
-                    std::thread::sleep(std::time::Duration::from_millis(
-                        devnet_config.bitcoin_controller_block_time.into(),
-                    ));
-                    mine_bitcoin_block(
-                        devnet_config.bitcoin_node_rpc_port,
-                        &devnet_config.bitcoin_node_username,
-                        &devnet_config.bitcoin_node_password,
-                        &devnet_config.miner_btc_address,
-                    );
-                    if stop_miner_reader.load(Ordering::SeqCst) {
-                        break;
-                    }
-                });
+                let _ =
+                    hiro_system_kit::thread_named("Bitcoin mining runloop").spawn(move || loop {
+                        std::thread::sleep(std::time::Duration::from_millis(
+                            devnet_config.bitcoin_controller_block_time.into(),
+                        ));
+                        mine_bitcoin_block(
+                            devnet_config.bitcoin_node_rpc_port,
+                            &devnet_config.bitcoin_node_username,
+                            &devnet_config.bitcoin_node_password,
+                            &devnet_config.miner_btc_address,
+                        );
+                        if stop_miner_reader.load(Ordering::SeqCst) {
+                            break;
+                        }
+                    });
             }
             BitcoinMiningCommand::Pause => {
                 stop_miner.store(true, Ordering::SeqCst);

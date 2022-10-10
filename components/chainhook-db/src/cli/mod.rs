@@ -12,11 +12,11 @@ use chainhook_event_observer::{
         start_event_observer, EventObserverConfig, ObserverCommand, ObserverEvent,
         DEFAULT_CONTROL_PORT, DEFAULT_INGESTION_PORT,
     },
-    utils::nestable_block_on,
 };
 use chainhook_types::{BlockIdentifier, StacksBlockData, StacksTransactionData};
 use clap::Parser;
 use ctrlc;
+use hiro_system_kit;
 use std::collections::HashSet;
 use std::{collections::HashMap, process, sync::mpsc::channel, thread};
 
@@ -113,7 +113,7 @@ pub fn main() {
             observer_command_rx,
             Some(observer_event_tx),
         );
-        let _ = nestable_block_on(future);
+        let _ = hiro_system_kit::nestable_block_on(future);
     });
 
     loop {
@@ -182,7 +182,7 @@ pub fn main() {
                                 let proofs = HashMap::new();
                                 if let Some(result) = handle_stacks_hook_action(trigger, &proofs) {
                                     if let StacksChainhookOccurrence::Http(request) = result {
-                                        nestable_block_on(request.send()).unwrap();
+                                        hiro_system_kit::nestable_block_on(request.send()).unwrap();
                                     }
                                 }
                             }
