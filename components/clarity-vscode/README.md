@@ -39,7 +39,7 @@ For more information on how debugging works, and how you can debug smart contrac
 
 ### Support VS Code for the Web
 
-This extension works in VS Code on Desktop along with support for [vscode.dev](https://vscode.dev/) and [github.dev](https://github.dev/github/dev).
+This extension works in VS Code on Desktop along with support for [vscode.dev](https://vscode.dev/) and [github.dev](https://github.dev/).
 
 ### Support for Traits
 
@@ -47,8 +47,7 @@ When a contract implements a trait (such as the NFT of FT trait – SIPs 009 and
 
 ### Handle Requirements
 
-If your Clarity project relies on specific requirements for [interacting with contracts on mainnet](https://github.com/hirosystems/clarinet#interacting-with-contracts-deployed-on-mainnet),this extension will automatically detect the requirement on download, and then cache the required contracts. In some cases, you may need to require contracts to have
-defining traits (such as SIPs 009 and 010); however, this may only concern contracts deployed on mainnet.
+If your Clarity project relies on specific requirements (eg: SIPs 009 or 010) for [interacting with contracts on mainnet](https://github.com/hirosystems/clarinet#interacting-with-contracts-deployed-on-mainnet), the extension will automatically detect and cached the required contracts.
 
 ---
 
