@@ -21,7 +21,7 @@ When you select a function, the extension adds the necessary parentheses around 
 
 The extension auto-completes local contract calls as well.
 
-![multiple error support](images/multicontract.gif)
+![multiple error support](https://raw.githubusercontent.com/hirosystems/clarinet/develop/components/clarity-vscode/docs/images/multicontract.gif)
 
 ### Check Contract on Save and Display Errors Inline
 
