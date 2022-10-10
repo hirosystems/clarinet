@@ -43,7 +43,7 @@ This extension works in VS Code on Desktop along with support for [vscode.dev](h
 
 ### Support for Traits
 
-When a contract implements a trait (such as the NFT of FT trait – SIPs 009 and 010), the extensions will show and errors if the trait implementation is not satisfied (for example, if the trait expects a function which is not implemented, or if the function signature does not match the trait definition).
+When a contract implements a trait (such as the NFT of FT trait – SIPs 009 and 010), the extensions will show and errors if the trait implementation is incomplete (for example, if the trait expects a function which is not implemented, or if the function signature does not match the trait definition).
 
 ### Handle Requirements
 
