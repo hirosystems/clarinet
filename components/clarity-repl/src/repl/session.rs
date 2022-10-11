@@ -642,7 +642,7 @@ impl Session {
         let contract_identifier =
             contract.expect_resolved_contract_identifier(Some(&self.interpreter.get_tx_sender()));
 
-        let result = self.interpreter.run(&contract, cost_track, Some(vec![]));
+        let result = self.interpreter.run(&contract, cost_track, eval_hooks);
 
         match result {
             Ok(result) => {
