@@ -540,7 +540,7 @@ impl Session {
         args: &Vec<String>,
         sender: &str,
         test_name: String,
-    ) -> Result<ExecutionResult, Vec<Diagnostic>> {
+    ) -> Result<(ExecutionResult, QualifiedContractIdentifier), Vec<Diagnostic>> {
         let initial_tx_sender = self.get_tx_sender();
         // Kludge for handling fully qualified contract_id vs sugared syntax
         let first_char = contract.chars().next().unwrap();
@@ -580,6 +580,9 @@ impl Session {
         // if let Some(coverage) = result.coverage.take() {
         //     self.coverage_reports.push(coverage);
         // }
+
+        let contract_identifier = QualifiedContractIdentifier::parse(&contract_id).unwrap();
+
         if let Some(ref cost) = execution.cost {
             self.costs_reports.push(CostsReport {
                 test_name,
@@ -589,7 +592,8 @@ impl Session {
                 cost_result: cost.clone(),
             });
         }
-        Ok(execution)
+
+        Ok((execution, contract_identifier))
     }
 
     // pub fn build_ast(

@@ -488,7 +488,7 @@ struct CallReadOnlyFnArgs {
 #[op]
 fn call_read_only_fn(state: &mut OpState, args: CallReadOnlyFnArgs) -> Result<String, AnyError> {
     let (result, events) = perform_block(state, args.session_id, |_name, session| {
-        let execution = match session.invoke_contract_call(
+        let (execution, _contract_id) = match session.invoke_contract_call(
             &args.contract,
             &args.method,
             &args.args,
@@ -606,7 +606,7 @@ fn mine_block(state: &mut OpState, args: MineBlockArgs) -> Result<String, AnyErr
         let mut transactions = vec![];
         for (index, tx) in args.transactions.iter().enumerate() {
             if let Some(ref args) = tx.contract_call {
-                let execution = match session.invoke_contract_call(
+                let (execution, contract_id) = match session.invoke_contract_call(
                     &args.contract,
                     &args.method,
                     &args.args,
@@ -629,8 +629,9 @@ fn mine_block(state: &mut OpState, args: MineBlockArgs) -> Result<String, AnyErr
                         continue;
                     }
                 };
+
                 let kind = StacksTransactionKind::ContractCall(StacksContractCallData {
-                    contract_identifier: args.contract.clone(),
+                    contract_identifier: contract_id.to_string(),
                     method: args.method.clone(),
                     args: args.args.clone(),
                 });
