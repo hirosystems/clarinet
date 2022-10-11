@@ -472,8 +472,19 @@ pub async fn generate_default_deployment(
                 let mut contract_location = base_location.clone();
                 contract_location
                     .append_path(&contract_config.expect_contract_path_as_str())
-                    .unwrap();
-                let source = contract_location.read_content_as_utf8().unwrap();
+                    .map_err(|_| {
+                        format!(
+                            "unable to build path for contract {}",
+                            contract_config.expect_contract_path_as_str()
+                        )
+                    })?;
+
+                let source = contract_location.read_content_as_utf8().map_err(|_| {
+                    format!(
+                        "unable to find contract at path {}",
+                        contract_config.expect_contract_path_as_str()
+                    )
+                })?;
                 sources.insert(contract_location.to_string(), source);
             }
             sources
