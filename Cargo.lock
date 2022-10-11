@@ -967,6 +967,7 @@ dependencies = [
  "serde_derive",
  "serde_json",
  "serde_yaml",
+ "sha2 0.10.6",
  "shell-escape",
  "signal-hook-registry",
  "similar",

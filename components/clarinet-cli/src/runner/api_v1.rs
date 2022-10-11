@@ -23,8 +23,12 @@ use chainhook_types::StacksTransactionData;
 use chainhook_types::StacksTransactionKind;
 use chainhook_types::StacksTransactionMetadata;
 use chainhook_types::TransactionIdentifier;
+use chrono::{DateTime, NaiveDateTime, Utc};
 use clarinet_deployments::update_session_with_contracts_executions;
+use clarity_repl::clarity::stacks_common::util::hash::MerkleTree;
+use clarity_repl::clarity::util::hash::hex_bytes;
 use clarity_repl::clarity::util::hash::to_hex;
+use clarity_repl::clarity::util::hash::Sha512Trunc256Sum;
 use clarity_repl::clarity::vm::analysis::contract_interface_builder::build_contract_interface;
 use clarity_repl::clarity::vm::EvaluationResult;
 use clarity_repl::clarity::ClarityVersion;
@@ -41,6 +45,7 @@ use deno_core::located_script_name;
 use deno_core::serde_json::{json, Value};
 use deno_core::{op, Extension};
 use deno_core::{ModuleSpecifier, OpState};
+use sha2::{Digest, Sha256};
 use std::collections::{BTreeMap, HashMap};
 use std::sync::mpsc::{self, Sender};
 use std::thread::sleep;
@@ -628,7 +633,7 @@ fn mine_block(state: &mut OpState, args: MineBlockArgs) -> Result<String, AnyErr
                     args: args.args.clone(),
                 });
                 transactions.push((
-                    wrap_result_in_simulate_transaction(index, &tx.sender, kind, &execution),
+                    wrap_result_in_simulated_transaction(index, &tx.sender, kind, &execution),
                     execution.events,
                 ));
             } else {
@@ -675,7 +680,7 @@ fn mine_block(state: &mut OpState, args: MineBlockArgs) -> Result<String, AnyErr
                             code: contract.expect_in_memory_code_source().to_string(),
                         });
                     transactions.push((
-                        wrap_result_in_simulate_transaction(index, &tx.sender, kind, &execution),
+                        wrap_result_in_simulated_transaction(index, &tx.sender, kind, &execution),
                         execution.events,
                     ));
                 } else if let Some(ref args) = tx.transfer_stx {
@@ -697,7 +702,7 @@ fn mine_block(state: &mut OpState, args: MineBlockArgs) -> Result<String, AnyErr
                     };
                     let kind = StacksTransactionKind::NativeTokenTransfer;
                     transactions.push((
-                        wrap_result_in_simulate_transaction(index, &tx.sender, kind, &execution),
+                        wrap_result_in_simulated_transaction(index, &tx.sender, kind, &execution),
                         execution.events,
                     ));
                 }
@@ -721,12 +726,18 @@ fn mine_block(state: &mut OpState, args: MineBlockArgs) -> Result<String, AnyErr
     }
 
     if !chainhooks.is_empty() {
+        let txids = transactions
+            .iter()
+            .map(|t| hex_bytes(&t.0.transaction_identifier.hash[2..]).unwrap())
+            .collect::<Vec<Vec<u8>>>();
+        let merkle_tree = MerkleTree::<Sha512Trunc256Sum>::new(&txids);
+
         for chainhook in chainhooks.iter() {
             for (tx, _) in transactions.iter() {
                 if evaluate_stacks_chainhook_on_transaction(tx, chainhook) {
                     let simulated_block = BlockIdentifier {
                         index: block_height.into(),
-                        hash: format!("0x{}", to_hex(&block_height.to_be_bytes())),
+                        hash: format!("0x{}", merkle_tree.root().to_hex()),
                     };
                     let result = handle_stacks_hook_action(
                         StacksTriggerChainhook {
@@ -783,7 +794,7 @@ where
     }
 }
 
-fn wrap_result_in_simulate_transaction(
+fn wrap_result_in_simulated_transaction(
     index: usize,
     sender: &str,
     kind: StacksTransactionKind,
@@ -793,7 +804,11 @@ fn wrap_result_in_simulate_transaction(
         EvaluationResult::Snippet(ref result) => utils::value_to_string(&result.result),
         _ => unreachable!("Contract result from snippet"),
     };
-    let txid = format!("{}", index);
+    let (txid, _timestamp) = {
+        let timestamp = DateTime::<Utc>::from_utc(NaiveDateTime::from_timestamp(61, 0), Utc);
+        let bytes = Sha256::digest(timestamp.timestamp_micros().to_be_bytes()).to_vec();
+        (format!("0x{}", to_hex(&bytes)), timestamp)
+    };
     let mut asset_class_cache = HashMap::new();
     let events = execution
         .events
