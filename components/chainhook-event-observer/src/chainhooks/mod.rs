@@ -19,6 +19,7 @@ use clarity_repl::clarity::util::hash::{hex_bytes, to_hex, Hash160};
 use clarity_repl::clarity::vm::types::{CharType, SequenceData, Value as ClarityValue};
 use reqwest::{Client, Method};
 use serde::Serialize;
+use serde_json::Value as JsonValue;
 use std::collections::HashMap;
 use std::io::Cursor;
 use std::iter::Map;
@@ -415,6 +416,7 @@ pub struct BitcoinChainhookOccurrencePayload {
 
 pub enum BitcoinChainhookOccurrence {
     Http(RequestBuilder),
+    File(String, Vec<u8>),
     Data(BitcoinChainhookOccurrencePayload),
 }
 
@@ -447,7 +449,35 @@ pub struct StacksChainhookOccurrencePayload {
 }
 pub enum StacksChainhookOccurrence {
     Http(RequestBuilder),
+    File(String, Vec<u8>),
     Data(StacksChainhookOccurrencePayload),
+}
+
+pub fn serialize_bitcoin_payload_to_json<'a>(
+    trigger: BitcoinTriggerChainhook<'a>,
+    proofs: &HashMap<&'a TransactionIdentifier, String>,
+) -> JsonValue {
+    json!({
+        "apply": trigger.apply.into_iter().map(|(transaction, block_identifier)| {
+            json!({
+                "transaction": transaction,
+                "block_identifier": block_identifier,
+                "confirmations": 1, // TODO(lgalabru)
+                "proof": proofs.get(&transaction.transaction_identifier),
+            })
+        }).collect::<Vec<_>>(),
+        "rollback": trigger.rollback.into_iter().map(|(transaction, block_identifier)| {
+            json!({
+                "transaction": transaction,
+                "block_identifier": block_identifier,
+                "confirmations": 1, // TODO(lgalabru)
+            })
+        }).collect::<Vec<_>>(),
+        "chainhook": {
+            "uuid": trigger.chainhook.uuid,
+            "predicate": trigger.chainhook.predicate,
+        }
+    })
 }
 
 pub fn handle_bitcoin_hook_action<'a>(
@@ -459,34 +489,22 @@ pub fn handle_bitcoin_hook_action<'a>(
             let client = Client::builder().build().unwrap();
             let host = format!("{}", http.url);
             let method = Method::from_bytes(http.method.as_bytes()).unwrap();
-            let payload = json!({
-                "apply": trigger.apply.into_iter().map(|(transaction, block_identifier)| {
-                    json!({
-                        "transaction": transaction,
-                        "block_identifier": block_identifier,
-                        "confirmations": 1, // TODO(lgalabru)
-                        "proof": proofs.get(&transaction.transaction_identifier),
-                    })
-                }).collect::<Vec<_>>(),
-                "rollback": trigger.rollback.into_iter().map(|(transaction, block_identifier)| {
-                    json!({
-                        "transaction": transaction,
-                        "block_identifier": block_identifier,
-                        "confirmations": 1, // TODO(lgalabru)
-                    })
-                }).collect::<Vec<_>>(),
-                "chainhook": {
-                    "uuid": trigger.chainhook.uuid,
-                    "predicate": trigger.chainhook.predicate,
-                }
-            });
-            let body = serde_json::to_vec(&payload).unwrap();
+            let body =
+                serde_json::to_vec(&serialize_bitcoin_payload_to_json(trigger, proofs)).unwrap();
             Some(BitcoinChainhookOccurrence::Http(
                 client
                     .request(method, &host)
                     .header("Content-Type", "application/json")
                     .header("Authorization", http.authorization_header.clone())
                     .body(body),
+            ))
+        }
+        HookAction::File(disk) => {
+            let bytes =
+                serde_json::to_vec(&serialize_bitcoin_payload_to_json(trigger, proofs)).unwrap();
+            Some(BitcoinChainhookOccurrence::File(
+                disk.path.to_string(),
+                bytes,
             ))
         }
         HookAction::Noop => Some(BitcoinChainhookOccurrence::Data(
@@ -757,47 +775,62 @@ pub fn serialize_to_json(value: &ClarityValue) -> serde_json::Value {
     }
 }
 
+pub fn serialize_stacks_payload_to_json<'a>(
+    trigger: StacksTriggerChainhook<'a>,
+    proofs: &HashMap<&'a TransactionIdentifier, String>,
+) -> JsonValue {
+    let decode_clarity_values = trigger.should_decode_clarity_value();
+    json!({
+        "apply": trigger.apply.into_iter().map(|(transaction, block_identifier)| {
+            json!({
+                "transaction": if decode_clarity_values {
+                    encode_transaction_including_with_clarity_decoding(transaction)
+                } else {
+                    json!(transaction)
+                },
+                "block_identifier": block_identifier,
+                "confirmations": 1, // TODO(lgalabru)
+                "proof": proofs.get(&transaction.transaction_identifier),
+            })
+        }).collect::<Vec<_>>(),
+        "rollback": trigger.rollback.into_iter().map(|(transaction, block_identifier)| {
+            json!({
+                "transaction": transaction,
+                "block_identifier": block_identifier,
+                "confirmations": 1, // TODO(lgalabru)
+            })
+        }).collect::<Vec<_>>(),
+        "chainhook": {
+            "uuid": trigger.chainhook.uuid,
+            "predicate": trigger.chainhook.predicate,
+        }
+    })
+}
+
 pub fn handle_stacks_hook_action<'a>(
     trigger: StacksTriggerChainhook<'a>,
     proofs: &HashMap<&'a TransactionIdentifier, String>,
 ) -> Option<StacksChainhookOccurrence> {
-    let decode_clarity_values = trigger.should_decode_clarity_value();
     match &trigger.chainhook.action {
         HookAction::Http(http) => {
             let client = Client::builder().build().unwrap();
             let host = format!("{}", http.url);
             let method = Method::from_bytes(http.method.as_bytes()).unwrap();
-            let payload = json!({
-                "apply": trigger.apply.into_iter().map(|(transaction, block_identifier)| {
-                    json!({
-                        "transaction": if decode_clarity_values {
-                            encode_transaction_including_with_clarity_decoding(transaction)
-                        } else {
-                            json!(transaction)
-                        },
-                        "block_identifier": block_identifier,
-                        "confirmations": 1, // TODO(lgalabru)
-                        "proof": proofs.get(&transaction.transaction_identifier),
-                    })
-                }).collect::<Vec<_>>(),
-                "rollback": trigger.rollback.into_iter().map(|(transaction, block_identifier)| {
-                    json!({
-                        "transaction": transaction,
-                        "block_identifier": block_identifier,
-                        "confirmations": 1, // TODO(lgalabru)
-                    })
-                }).collect::<Vec<_>>(),
-                "chainhook": {
-                    "uuid": trigger.chainhook.uuid,
-                    "predicate": trigger.chainhook.predicate,
-                }
-            });
-            let body = serde_json::to_vec(&payload).unwrap();
+            let body =
+                serde_json::to_vec(&serialize_stacks_payload_to_json(trigger, proofs)).unwrap();
             Some(StacksChainhookOccurrence::Http(
                 client
                     .request(method, &host)
                     .header("Content-Type", "application/json")
                     .body(body),
+            ))
+        }
+        HookAction::File(disk) => {
+            let bytes =
+                serde_json::to_vec(&serialize_stacks_payload_to_json(trigger, proofs)).unwrap();
+            Some(StacksChainhookOccurrence::File(
+                disk.path.to_string(),
+                bytes,
             ))
         }
         HookAction::Noop => Some(StacksChainhookOccurrence::Data(

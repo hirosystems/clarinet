@@ -21,6 +21,8 @@ use rocket::request::{self, FromRequest, Outcome, Request};
 use rocket::serde::json::{json, Json, Value as JsonValue};
 use rocket::serde::Deserialize;
 use rocket::State;
+use rocket_okapi::{openapi, openapi_get_routes, request::OpenApiFromRequest};
+use schemars::JsonSchema;
 use serde_json::error;
 use stacks_rpc_client::{PoxInfo, StacksRpc};
 use std::collections::{HashMap, HashSet, VecDeque};
@@ -34,9 +36,6 @@ use std::str::FromStr;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc::{Receiver, Sender};
 use std::sync::{Arc, Mutex, RwLock};
-
-use rocket_okapi::{openapi, openapi_get_routes, request::OpenApiFromRequest};
-use schemars::JsonSchema;
 
 pub const DEFAULT_INGESTION_PORT: u16 = 20445;
 pub const DEFAULT_CONTROL_PORT: u16 = 20446;
@@ -501,6 +500,9 @@ pub async fn start_observer_commands_handler(
                                         BitcoinChainhookOccurrence::Http(request) => {
                                             requests.push(request);
                                         }
+                                        BitcoinChainhookOccurrence::File(_path, _bytes) => {
+                                            info!("Writing to disk not supported in server mode")
+                                        }
                                         BitcoinChainhookOccurrence::Data(payload) => {
                                             if let Some(ref tx) = observer_events_tx {
                                                 let _ = tx.send(
@@ -616,6 +618,9 @@ pub async fn start_observer_commands_handler(
                                     match result {
                                         StacksChainhookOccurrence::Http(request) => {
                                             requests.push(request);
+                                        }
+                                        StacksChainhookOccurrence::File(_path, _bytes) => {
+                                            info!("Writing to disk not supported in server mode")
                                         }
                                         StacksChainhookOccurrence::Data(payload) => {
                                             if let Some(ref tx) = observer_events_tx {
@@ -980,11 +985,18 @@ pub async fn handle_bitcoin_rpc_call(
         "{}:{}",
         bitcoin_config.username, bitcoin_config.password
     ));
+
+    let path = if method == "listunspent" {
+        "wallet/stacks-mining"
+    } else {
+        ""
+    };
+
     let client = Client::new();
     let builder = client
         .post(format!(
-            "{}:{}/",
-            bitcoin_config.rpc_host, bitcoin_config.rpc_port
+            "{}:{}/{}",
+            bitcoin_config.rpc_host, bitcoin_config.rpc_port, path
         ))
         .header("Content-Type", "application/json")
         .timeout(std::time::Duration::from_secs(5))

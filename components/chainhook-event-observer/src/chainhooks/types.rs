@@ -125,6 +125,7 @@ pub struct BitcoinChainhookSpecification {
 #[serde(rename_all = "snake_case")]
 pub enum HookAction {
     Http(HttpHook),
+    File(FileHook),
     Noop,
 }
 
@@ -134,6 +135,12 @@ pub struct HttpHook {
     pub url: String,
     pub method: String,
     pub authorization_header: String,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub struct FileHook {
+    pub path: String,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, JsonSchema)]

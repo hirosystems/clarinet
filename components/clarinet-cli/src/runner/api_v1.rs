@@ -47,6 +47,8 @@ use deno_core::{op, Extension};
 use deno_core::{ModuleSpecifier, OpState};
 use sha2::{Digest, Sha256};
 use std::collections::{BTreeMap, HashMap};
+use std::fs::OpenOptions;
+use std::io::Write;
 use std::sync::mpsc::{self, Sender};
 use std::thread::sleep;
 use std::time::Duration;
@@ -747,12 +749,38 @@ fn mine_block(state: &mut OpState, args: MineBlockArgs) -> Result<String, AnyErr
                         },
                         &HashMap::new(),
                     );
-                    if let Some(StacksChainhookOccurrence::Http(action)) = result {
-                        let chainhook_tx = match state.try_borrow::<Sender<ChainhookEvent>>() {
-                            Some(chainhook_tx) => chainhook_tx,
-                            None => panic!(),
-                        };
-                        let _ = chainhook_tx.send(ChainhookEvent::PerformRequest(action));
+                    match result {
+                        Some(StacksChainhookOccurrence::Http(action)) => {
+                            let chainhook_tx = match state.try_borrow::<Sender<ChainhookEvent>>() {
+                                Some(chainhook_tx) => chainhook_tx,
+                                None => panic!(),
+                            };
+                            let _ = chainhook_tx.send(ChainhookEvent::PerformRequest(action));
+                        }
+                        Some(StacksChainhookOccurrence::File(path, bytes)) => {
+                            let mut file_path = std::env::current_dir().unwrap();
+                            file_path.push(path);
+                            if !file_path.exists() {
+                                match std::fs::File::open(&file_path) {
+                                    Ok(ref mut file) => {
+                                        let _ = file.write_all(&bytes);
+                                    }
+                                    Err(e) => println!("unable to create file {:?}", e),
+                                }
+                            }
+                            let mut file = OpenOptions::new()
+                                .create(false)
+                                .write(true)
+                                .append(true)
+                                .open(file_path)
+                                .unwrap();
+
+                            if let Err(e) = writeln!(file, "{}", String::from_utf8(bytes).unwrap())
+                            {
+                                eprintln!("Couldn't write to file: {}", e);
+                            }
+                        }
+                        _ => {}
                     }
                 }
             }
