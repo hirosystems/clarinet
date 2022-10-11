@@ -1,5 +1,5 @@
-use crate::chainhooks::check_chainhooks;
 use crate::chainhooks::types::ChainhookSpecificationFile;
+use crate::chainhooks::{check_chainhooks, load_chainhooks};
 use crate::deployments::types::DeploymentSynthesis;
 use crate::deployments::{
     self, check_deployments, generate_default_deployment, get_absolute_deployment_path,
@@ -1057,33 +1057,48 @@ pub fn main() {
             let cache_location = manifest.project.cache_location.clone();
             let mut stacks_chainhooks = vec![];
             let mine_block_delay = cmd.mine_block_delay.unwrap_or(0);
-            for chainhook_relative_path in cmd.chainhooks.iter() {
-                let mut chainhook_location = manifest
-                    .location
-                    .get_project_root_location()
-                    .expect("unable to get root location");
-                chainhook_location
-                    .append_path(chainhook_relative_path)
-                    .expect("unable to build path");
-                match ChainhookSpecificationFile::parse(
-                    &chainhook_location.to_string().into(),
+
+            if cmd.chainhooks.contains(&"*".to_string()) {
+                match load_chainhooks(
+                    &manifest.location,
                     &(BitcoinNetwork::Regtest, StacksNetwork::Devnet),
                 ) {
-                    Ok(hook) => match hook {
-                        ChainhookSpecification::Bitcoin(_) => {
-                            println!(
-                                "{}: bitcoin chainhooks not supported in test environments",
-                                red!("error")
-                            );
-                            std::process::exit(1);
-                        }
-                        ChainhookSpecification::Stacks(hook) => stacks_chainhooks.push(hook),
-                    },
-                    Err(msg) => {
-                        println!("{}: unable to load chainhooks ({})", red!("error"), msg);
-                        std::process::exit(1);
+                    Ok(ref mut formation) => {
+                        stacks_chainhooks.append(&mut formation.stacks_chainhooks);
+                    }
+                    Err(e) => {
+                        println!("{}: unable to load chainhooks - {}", red!("error"), e);
                     }
                 };
+            } else {
+                for chainhook_relative_path in cmd.chainhooks.iter() {
+                    let mut chainhook_location = manifest
+                        .location
+                        .get_project_root_location()
+                        .expect("unable to get root location");
+                    chainhook_location
+                        .append_path(chainhook_relative_path)
+                        .expect("unable to build path");
+                    match ChainhookSpecificationFile::parse(
+                        &chainhook_location.to_string().into(),
+                        &(BitcoinNetwork::Regtest, StacksNetwork::Devnet),
+                    ) {
+                        Ok(hook) => match hook {
+                            ChainhookSpecification::Bitcoin(_) => {
+                                println!(
+                                    "{}: bitcoin chainhooks not supported in test environments",
+                                    red!("error")
+                                );
+                                std::process::exit(1);
+                            }
+                            ChainhookSpecification::Stacks(hook) => stacks_chainhooks.push(hook),
+                        },
+                        Err(msg) => {
+                            println!("{}: unable to load chainhooks ({})", red!("error"), msg);
+                            std::process::exit(1);
+                        }
+                    };
+                }
             }
 
             let (success, _count) = match run_scripts(
