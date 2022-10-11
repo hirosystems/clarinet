@@ -14,7 +14,6 @@ use clarity_repl::clarity::stacks_common::types::StacksEpochId;
 use clarity_repl::clarity::vm::ast::ContractAST;
 use clarity_repl::clarity::vm::types::QualifiedContractIdentifier;
 use clarity_repl::clarity::vm::EvaluationResult;
-use clarity_repl::clarity::ClarityVersion;
 use lsp_types::MessageType;
 use std::borrow::BorrowMut;
 use std::collections::{HashMap, HashSet};
@@ -349,7 +348,7 @@ pub async fn build_state(
         &StacksNetwork::Simnet,
         false,
         file_accessor,
-        Some((StacksEpochId::Epoch21, ClarityVersion::Clarity2)),
+        Some(StacksEpochId::Epoch21),
     )
     .await?;
 

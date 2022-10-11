@@ -179,7 +179,7 @@ pub async fn generate_default_deployment(
     network: &StacksNetwork,
     no_batch: bool,
     file_accessor: Option<&Box<dyn FileAccessor>>,
-    forced_versions: Option<(StacksEpochId, ClarityVersion)>,
+    forced_epoch: Option<StacksEpochId>,
 ) -> Result<(DeploymentSpecification, DeploymentGenerationArtifacts), String> {
     let network_manifest = match file_accessor {
         None => NetworkManifest::from_project_manifest_location(
@@ -376,9 +376,9 @@ pub async fn generate_default_deployment(
                         requirements_publish.insert(contract_id.clone(), data);
                     }
 
-                    let (epoch, clarity_version) = match forced_versions {
-                        Some((epoch_id, stacks_version)) => (epoch_id, stacks_version),
-                        None => (StacksEpochId::Epoch20, ClarityVersion::Clarity1),
+                    let epoch = match forced_epoch {
+                        Some(epoch_id) => epoch_id,
+                        None => StacksEpochId::Epoch20,
                     };
 
                     // Compute the AST
@@ -386,8 +386,8 @@ pub async fn generate_default_deployment(
                         code_source: ClarityCodeSource::ContractInMemory(source),
                         name: contract_id.name.to_string(),
                         deployer: ContractDeployer::ContractIdentifier(contract_id.clone()),
+                        clarity_version: ClarityVersion::Clarity1,
                         epoch,
-                        clarity_version,
                     };
 
                     let (ast, _, _) = session.interpreter.build_ast(&contract);
