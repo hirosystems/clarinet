@@ -3,7 +3,7 @@ use crate::chainhooks::types::ChainhookSpecificationFile;
 use crate::deployments::types::DeploymentSynthesis;
 use crate::deployments::{
     self, check_deployments, generate_default_deployment, get_absolute_deployment_path,
-    get_default_deployment_path, load_deployment, write_deployment,
+    write_deployment,
 };
 use crate::generate::{
     self,
@@ -20,8 +20,10 @@ use clarinet_deployments::onchain::{
     apply_on_chain_deployment, get_initial_transactions_trackers, DeploymentCommand,
     DeploymentEvent,
 };
-use clarinet_deployments::setup_session_with_deployment;
 use clarinet_deployments::types::{DeploymentGenerationArtifacts, DeploymentSpecification};
+use clarinet_deployments::{
+    get_default_deployment_path, load_deployment, setup_session_with_deployment,
+};
 use clarinet_files::{FileLocation, ProjectManifest, ProjectManifestFile, RequirementConfig};
 use clarity_repl::analysis::call_checker::ContractAnalysis;
 use clarity_repl::clarity::vm::analysis::AnalysisDatabase;

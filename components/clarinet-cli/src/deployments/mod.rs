@@ -1,39 +1,21 @@
 pub mod types;
 mod ui;
 
-
-
-
-
-
 pub use ui::start_ui;
 
 use hiro_system_kit;
 
-use clarinet_deployments::types::{
-    DeploymentGenerationArtifacts, DeploymentSpecification,
-};
+use clarinet_deployments::types::{DeploymentGenerationArtifacts, DeploymentSpecification};
 
 use clarinet_files::{FileLocation, ProjectManifest};
 
-
-
-
-
-
-
-
-
 use chainhook_types::StacksNetwork;
-
-
 
 use serde_yaml;
 
 use std::fs::{self};
 
 use std::path::PathBuf;
-
 
 #[derive(Deserialize, Debug)]
 pub struct Balance {
@@ -52,21 +34,6 @@ pub fn get_absolute_deployment_path(
     Ok(deployment_path)
 }
 
-pub fn get_default_deployment_path(
-    manifest: &ProjectManifest,
-    network: &StacksNetwork,
-) -> Result<FileLocation, String> {
-    let mut deployment_path = manifest.location.get_project_root_location()?;
-    deployment_path.append_path("deployments")?;
-    deployment_path.append_path(match network {
-        StacksNetwork::Simnet => "default.simnet-plan.yaml",
-        StacksNetwork::Devnet => "default.devnet-plan.yaml",
-        StacksNetwork::Testnet => "default.testnet-plan.yaml",
-        StacksNetwork::Mainnet => "default.mainnet-plan.yaml",
-    })?;
-    Ok(deployment_path)
-}
-
 pub fn generate_default_deployment(
     manifest: &ProjectManifest,
     network: &StacksNetwork,
@@ -74,30 +41,6 @@ pub fn generate_default_deployment(
 ) -> Result<(DeploymentSpecification, DeploymentGenerationArtifacts), String> {
     let future = clarinet_deployments::generate_default_deployment(manifest, network, false, None);
     hiro_system_kit::nestable_block_on(future)
-}
-
-#[allow(dead_code)]
-pub fn read_deployment_or_generate_default(
-    manifest: &ProjectManifest,
-    network: &StacksNetwork,
-) -> Result<
-    (
-        DeploymentSpecification,
-        Option<DeploymentGenerationArtifacts>,
-    ),
-    String,
-> {
-    let default_deployment_file_path = get_default_deployment_path(&manifest, network)?;
-    let (deployment, artifacts) = if default_deployment_file_path.exists() {
-        (
-            load_deployment(manifest, &default_deployment_file_path)?,
-            None,
-        )
-    } else {
-        let (deployment, artifacts) = generate_default_deployment(manifest, network, false)?;
-        (deployment, Some(artifacts))
-    };
-    Ok((deployment, artifacts))
 }
 
 pub fn check_deployments(manifest: &ProjectManifest) -> Result<(), String> {
@@ -117,28 +60,6 @@ pub fn check_deployments(manifest: &ProjectManifest) -> Result<(), String> {
         println!("{} {} succesfully checked", green!("✔"), relative_path);
     }
     Ok(())
-}
-
-pub fn load_deployment(
-    manifest: &ProjectManifest,
-    deployment_plan_location: &FileLocation,
-) -> Result<DeploymentSpecification, String> {
-    let project_root_location = manifest.location.get_project_root_location()?;
-    let spec = match DeploymentSpecification::from_config_file(
-        &deployment_plan_location,
-        &project_root_location,
-    ) {
-        Ok(spec) => spec,
-        Err(msg) => {
-            return Err(format!(
-                "{} {} syntax incorrect\n{}",
-                red!("x"),
-                deployment_plan_location.to_string(),
-                msg
-            ));
-        }
-    };
-    Ok(spec)
 }
 
 fn get_deployments_files(

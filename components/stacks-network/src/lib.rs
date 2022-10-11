@@ -40,7 +40,7 @@ where
 pub async fn do_run_devnet(
     mut devnet: DevnetOrchestrator,
     deployment: DeploymentSpecification,
-    chainhooks: HookFormation,
+    chainhooks: &mut Option<HookFormation>,
     log_tx: Option<Sender<LogData>>,
     display_dashboard: bool,
 ) -> Result<
@@ -74,12 +74,16 @@ pub async fn do_run_devnet(
 
     // The event observer should be able to send some events to the UI thread,
     // and should be able to be terminated
+    let hooks = match chainhooks.take() {
+        Some(hooks) => hooks,
+        _ => HookFormation::new(),
+    };
     let devnet_path = devnet_config.working_dir.clone();
     let config = DevnetEventObserverConfig::new(
         devnet_config.clone(),
         devnet.manifest.clone(),
         deployment,
-        chainhooks,
+        hooks,
     );
     let chains_coordinator_tx = devnet_events_tx.clone();
     let (chains_coordinator_commands_tx, chains_coordinator_commands_rx) = channel();

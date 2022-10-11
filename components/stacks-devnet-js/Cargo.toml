@@ -14,11 +14,9 @@ error-chain = "0.12"
 chainhook_types = { package = "chainhook-types", path = "../chainhook-types-rs" }
 clarinet_files = { package = "clarinet-files", path = "../clarinet-files" }
 clarinet_utils = { package = "clarinet-utils", path = "../clarinet-utils" }
-
-[dependencies.clarinet_lib]
-package = "clarinet-cli"
-path = "../clarinet-cli"
-default-features = false
+clarinet_deployments = { package = "clarinet-deployments", path = "../clarinet-deployments" }
+stacks_network = { package = "stacks-network", path = "../stacks-network" }
+hiro_system_kit = { package = "hiro-system-kit", path = "../hiro-system-kit" }
 
 [dependencies.neon]
 version = "0.9.1"

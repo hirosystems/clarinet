@@ -3,7 +3,9 @@ use std::sync::mpsc::{self, Sender};
 use crate::chainhooks::load_chainhooks;
 use chainhook_types::{BitcoinNetwork, StacksNetwork};
 use clarinet_deployments::types::DeploymentSpecification;
-use stacks_network::{do_run_devnet, DevnetOrchestrator, LogData, DevnetEvent, ChainsCoordinatorCommand};
+use stacks_network::{
+    do_run_devnet, ChainsCoordinatorCommand, DevnetEvent, DevnetOrchestrator, LogData,
+};
 
 pub fn run_devnet(
     devnet: DevnetOrchestrator,
@@ -32,7 +34,7 @@ pub fn run_devnet(
     match hiro_system_kit::nestable_block_on(do_run_devnet(
         devnet,
         deployment,
-        hooks,
+        &mut Some(hooks),
         log_tx,
         display_dashboard,
     )) {

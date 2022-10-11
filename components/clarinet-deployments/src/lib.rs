@@ -8,17 +8,17 @@ extern crate serde;
 #[macro_use]
 extern crate serde_derive;
 
-pub mod requirements;
-pub mod types;
 #[cfg(feature = "onchain")]
 pub mod onchain;
+pub mod requirements;
+pub mod types;
 
 use self::types::{
     DeploymentSpecification, EmulatedContractPublishSpecification, GenesisSpecification,
     TransactionPlanSpecification, TransactionsBatchSpecification, WalletSpecification,
 };
 use chainhook_types::StacksNetwork;
-use clarinet_files::FileAccessor;
+use clarinet_files::{FileAccessor, FileLocation};
 use clarinet_files::{NetworkManifest, ProjectManifest};
 use clarity_repl::analysis::ast_dependency_detector::{ASTDependencyDetector, DependencySet};
 use clarity_repl::clarity::vm::ast::ContractAST;
@@ -705,4 +705,40 @@ pub async fn generate_default_deployment(
     };
 
     Ok((deployment, artifacts))
+}
+
+pub fn get_default_deployment_path(
+    manifest: &ProjectManifest,
+    network: &StacksNetwork,
+) -> Result<FileLocation, String> {
+    let mut deployment_path = manifest.location.get_project_root_location()?;
+    deployment_path.append_path("deployments")?;
+    deployment_path.append_path(match network {
+        StacksNetwork::Simnet => "default.simnet-plan.yaml",
+        StacksNetwork::Devnet => "default.devnet-plan.yaml",
+        StacksNetwork::Testnet => "default.testnet-plan.yaml",
+        StacksNetwork::Mainnet => "default.mainnet-plan.yaml",
+    })?;
+    Ok(deployment_path)
+}
+
+pub fn load_deployment(
+    manifest: &ProjectManifest,
+    deployment_plan_location: &FileLocation,
+) -> Result<DeploymentSpecification, String> {
+    let project_root_location = manifest.location.get_project_root_location()?;
+    let spec = match DeploymentSpecification::from_config_file(
+        &deployment_plan_location,
+        &project_root_location,
+    ) {
+        Ok(spec) => spec,
+        Err(msg) => {
+            return Err(format!(
+                "error: {} syntax incorrect\n{}",
+                deployment_plan_location.to_string(),
+                msg
+            ));
+        }
+    };
+    Ok(spec)
 }

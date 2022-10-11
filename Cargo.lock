@@ -5739,13 +5739,15 @@ name = "stacks-devnet-js"
 version = "1.0.2"
 dependencies = [
  "chainhook-types",
- "clarinet-cli",
+ "clarinet-deployments",
  "clarinet-files",
  "clarinet-utils",
  "error-chain",
+ "hiro-system-kit",
  "neon",
  "num",
  "serde",
+ "stacks-network",
 ]
 
 [[package]]

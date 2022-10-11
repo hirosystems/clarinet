@@ -8,13 +8,14 @@ use chainhook_types::{
     BitcoinChainEvent, BitcoinChainUpdatedWithBlocksData, StacksChainEvent,
     StacksChainUpdatedWithBlocksData, StacksNetwork,
 };
+use clarinet_deployments::{get_default_deployment_path, load_deployment};
 use clarinet_files::bip39::{Language, Mnemonic};
 use clarinet_files::{
     compute_addresses, AccountConfig, DevnetConfigFile, FileLocation, PoxStackingOrder,
     ProjectManifest, DEFAULT_DERIVATION_PATH,
 };
-use clarinet_lib::deployments;
-use clarinet_lib::integrate::{self, DevnetEvent, DevnetOrchestrator};
+// use ::deployments;
+use stacks_network::{self, DevnetEvent, DevnetOrchestrator};
 
 use core::panic;
 use neon::prelude::*;
@@ -25,6 +26,62 @@ use std::thread;
 use std::{env, process};
 
 type DevnetCallback = Box<dyn FnOnce(&Channel) + Send>;
+
+use std::sync::mpsc::Sender;
+
+use clarinet_deployments::types::{DeploymentGenerationArtifacts, DeploymentSpecification};
+use stacks_network::{do_run_devnet, ChainsCoordinatorCommand, LogData};
+
+pub fn run_devnet(
+    devnet: DevnetOrchestrator,
+    deployment: DeploymentSpecification,
+    log_tx: Option<Sender<LogData>>,
+    display_dashboard: bool,
+) -> Result<
+    (
+        Option<mpsc::Receiver<DevnetEvent>>,
+        Option<mpsc::Sender<bool>>,
+        Option<mpsc::Sender<ChainsCoordinatorCommand>>,
+    ),
+    String,
+> {
+    match hiro_system_kit::nestable_block_on(do_run_devnet(
+        devnet,
+        deployment,
+        &mut None,
+        log_tx,
+        display_dashboard,
+    )) {
+        Err(_e) => std::process::exit(1),
+        Ok(res) => Ok(res),
+    }
+}
+
+pub fn read_deployment_or_generate_default(
+    manifest: &ProjectManifest,
+    network: &StacksNetwork,
+) -> Result<
+    (
+        DeploymentSpecification,
+        Option<DeploymentGenerationArtifacts>,
+    ),
+    String,
+> {
+    let default_deployment_file_path = get_default_deployment_path(&manifest, network)?;
+    let (deployment, artifacts) = if default_deployment_file_path.exists() {
+        (
+            load_deployment(manifest, &default_deployment_file_path)?,
+            None,
+        )
+    } else {
+        let future =
+            clarinet_deployments::generate_default_deployment(manifest, network, false, None);
+
+        let (deployment, artifacts) = hiro_system_kit::nestable_block_on(future)?;
+        (deployment, Some(artifacts))
+    };
+    Ok((deployment, artifacts))
+}
 
 struct StacksDevnet {
     tx: mpsc::Sender<DevnetCommand>,
@@ -63,7 +120,7 @@ impl StacksDevnet {
         let manifest = ProjectManifest::from_location(&manifest_location)
             .expect("Syntax error in Clarinet.toml.");
         let (deployment, _) =
-            deployments::read_deployment_or_generate_default(&manifest, &StacksNetwork::Devnet)
+            read_deployment_or_generate_default(&manifest, &StacksNetwork::Devnet)
                 .expect("Unable to generate deployment");
         let devnet = match DevnetOrchestrator::new(manifest, Some(devnet_overrides)) {
             Ok(devnet) => devnet,
@@ -79,7 +136,7 @@ impl StacksDevnet {
             if let Ok(DevnetCommand::Start(callback)) = rx.recv() {
                 // Start devnet
                 let (devnet_events_rx, terminator_tx) =
-                    match integrate::run_devnet(devnet, deployment, Some(log_tx), false) {
+                    match run_devnet(devnet, deployment, Some(log_tx), false) {
                         Ok((Some(devnet_events_rx), Some(terminator_tx), _)) => {
                             (devnet_events_rx, terminator_tx)
                         }
