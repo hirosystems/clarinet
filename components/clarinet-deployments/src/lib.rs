@@ -42,8 +42,13 @@ pub fn setup_session_with_deployment(
 ) -> DeploymentGenerationArtifacts {
     let mut session = initiate_session_from_deployment(&manifest);
     update_session_with_genesis_accounts(&mut session, deployment);
-    let results =
-        update_session_with_contracts_executions(&mut session, deployment, contracts_asts, false);
+    let results = update_session_with_contracts_executions(
+        &mut session,
+        deployment,
+        contracts_asts,
+        false,
+        None,
+    );
 
     let deps = HashMap::new();
     let mut diags = HashMap::new();
@@ -114,6 +119,7 @@ pub fn update_session_with_contracts_executions(
     deployment: &DeploymentSpecification,
     contracts_asts: Option<&HashMap<QualifiedContractIdentifier, ContractAST>>,
     code_coverage_enabled: bool,
+    forced_epoch: Option<StacksEpochId>,
 ) -> BTreeMap<QualifiedContractIdentifier, Result<ExecutionResult, Vec<Diagnostic>>> {
     let mut results = BTreeMap::new();
     for batch in deployment.plan.batches.iter() {
@@ -142,7 +148,7 @@ pub fn update_session_with_contracts_executions(
                         deployer: ContractDeployer::Address(tx.emulated_sender.to_string()),
                         name: tx.contract_name.to_string(),
                         clarity_version: tx.clarity_version,
-                        epoch: DEFAULT_EPOCH,
+                        epoch: forced_epoch.unwrap_or(DEFAULT_EPOCH),
                     };
 
                     let result = session.deploy_contract(
@@ -376,20 +382,14 @@ pub async fn generate_default_deployment(
                         requirements_publish.insert(contract_id.clone(), data);
                     }
 
-                    let epoch = match forced_epoch {
-                        Some(epoch_id) => epoch_id,
-                        None => StacksEpochId::Epoch20,
-                    };
-
                     // Compute the AST
                     let contract = ClarityContract {
                         code_source: ClarityCodeSource::ContractInMemory(source),
                         name: contract_id.name.to_string(),
                         deployer: ContractDeployer::ContractIdentifier(contract_id.clone()),
                         clarity_version: ClarityVersion::Clarity1,
-                        epoch,
+                        epoch: forced_epoch.unwrap_or(DEFAULT_EPOCH),
                     };
-
                     let (ast, _, _) = session.interpreter.build_ast(&contract);
                     ast
                 }
@@ -550,7 +550,7 @@ pub async fn generate_default_deployment(
                 deployer: ContractDeployer::Address(sender.to_address()),
                 name: contract_name.to_string(),
                 clarity_version: contract_config.clarity_version,
-                epoch: StacksEpochId::Epoch21,
+                epoch: forced_epoch.unwrap_or(DEFAULT_EPOCH),
             },
         );
 
@@ -587,12 +587,14 @@ pub async fn generate_default_deployment(
 
     let mut asts_success = true;
 
+    web_sys::console::time_with_label("compute contracts asts");
     for (contract_id, contract) in contracts_sources.into_iter() {
         let (ast, diags, ast_success) = session.interpreter.build_ast(&contract);
         contract_asts.insert(contract_id.clone(), ast);
         contract_diags.insert(contract_id, diags);
         asts_success = asts_success && ast_success;
     }
+    web_sys::console::time_end_with_label("compute contracts asts");
 
     let dependencies =
         ASTDependencyDetector::detect_dependencies(&contract_asts, &requirements_asts);

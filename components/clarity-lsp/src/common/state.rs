@@ -343,6 +343,7 @@ pub async fn build_state(
         }
     };
 
+    web_sys::console::time_with_label("generate default deploy");
     let (deployment, mut artifacts) = generate_default_deployment(
         &manifest,
         &StacksNetwork::Simnet,
@@ -351,14 +352,18 @@ pub async fn build_state(
         Some(StacksEpochId::Epoch21),
     )
     .await?;
+    web_sys::console::time_end_with_label("generate default deploy");
 
     let mut session = initiate_session_from_deployment(&manifest);
+    web_sys::console::time_with_label("update session");
     let results = update_session_with_contracts_executions(
         &mut session,
         &deployment,
         Some(&artifacts.asts),
         false,
+        Some(StacksEpochId::Epoch21),
     );
+    web_sys::console::time_end_with_label("update session");
     for (contract_id, mut result) in results.into_iter() {
         let (_, contract_location) = match deployment.contracts.get(&contract_id) {
             Some(entry) => entry,
