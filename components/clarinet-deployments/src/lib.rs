@@ -587,14 +587,12 @@ pub async fn generate_default_deployment(
 
     let mut asts_success = true;
 
-    web_sys::console::time_with_label("compute contracts asts");
     for (contract_id, contract) in contracts_sources.into_iter() {
         let (ast, diags, ast_success) = session.interpreter.build_ast(&contract);
         contract_asts.insert(contract_id.clone(), ast);
         contract_diags.insert(contract_id, diags);
         asts_success = asts_success && ast_success;
     }
-    web_sys::console::time_end_with_label("compute contracts asts");
 
     let dependencies =
         ASTDependencyDetector::detect_dependencies(&contract_asts, &requirements_asts);

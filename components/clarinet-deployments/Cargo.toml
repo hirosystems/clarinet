@@ -11,8 +11,6 @@ clarity_repl = { package = "clarity-repl", path = "../clarity-repl", default-fea
 clarinet_files = { package = "clarinet-files", path = "../clarinet-files", default-features = false }
 chainhook_types = { package = "chainhook-types", path = "../chainhook-types-rs" }
 serde_yaml = "0.8.23"
-web-sys = { version = "0.3", features = ["console"], optional = true }
-
 
 # CLI
 reqwest = { version = "0.11", default-features = false, features = [
@@ -23,7 +21,7 @@ reqwest = { version = "0.11", default-features = false, features = [
 [features]
 default = ["cli"]
 cli = ["clarity_repl/cli", "clarinet_files/cli"]
-wasm = ["clarity_repl/wasm", "clarinet_files/wasm", "web-sys"]
+wasm = ["clarity_repl/wasm", "clarinet_files/wasm"]
 
 [lib]
 name = "clarinet_deployments"
