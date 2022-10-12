@@ -26,7 +26,7 @@ use clarity_repl::clarity::vm::types::QualifiedContractIdentifier;
 use clarity_repl::clarity::vm::ContractName;
 use clarity_repl::clarity::vm::EvaluationResult;
 use clarity_repl::clarity::vm::ExecutionResult;
-use clarity_repl::repl::session::BOOT_CONTRACTS_ASTS;
+use clarity_repl::repl::session::BOOT_CONTRACTS_DATA;
 use clarity_repl::repl::Session;
 use clarity_repl::repl::SessionSettings;
 use std::collections::{BTreeMap, HashMap, VecDeque};
@@ -87,9 +87,6 @@ pub fn setup_session_with_deployment(
 
 pub fn initiate_session_from_deployment(manifest: &ProjectManifest) -> Session {
     let mut settings = SessionSettings::default();
-    settings
-        .include_boot_contracts
-        .append(&mut manifest.project.boot_contracts.clone());
     settings.repl_settings = manifest.repl_settings.clone();
     settings.disk_cache_enabled = true;
     let session = Session::new(settings);
@@ -121,6 +118,14 @@ pub fn update_session_with_contracts_executions(
     code_coverage_enabled: bool,
     forced_epoch: Option<StacksEpochId>,
 ) -> BTreeMap<QualifiedContractIdentifier, Result<ExecutionResult, Vec<Diagnostic>>> {
+    let boot_contracts_data = BOOT_CONTRACTS_DATA.clone();
+    for (_, (boot_contract, mut ast)) in boot_contracts_data {
+        session
+            .interpreter
+            .run_ast(&boot_contract, &mut ast, false, None)
+            .expect("failed to interprete boot contract");
+    }
+
     let mut results = BTreeMap::new();
     for batch in deployment.plan.batches.iter() {
         for transaction in batch.transactions.iter() {
@@ -275,15 +280,17 @@ pub async fn generate_default_deployment(
     let mut requirements_deps = HashMap::new();
 
     let mut settings = SessionSettings::default();
-    settings.include_boot_contracts = manifest.project.boot_contracts.clone();
     settings.repl_settings = manifest.repl_settings.clone();
 
     let session = Session::new(settings.clone());
-    let mut boot_contracts_asts = BOOT_CONTRACTS_ASTS.clone();
-    let boot_contracts_ids = boot_contracts_asts
-        .iter()
-        .map(|(k, _)| k.clone())
-        .collect::<Vec<QualifiedContractIdentifier>>();
+
+    let boot_contracts_data = BOOT_CONTRACTS_DATA.clone();
+    let mut boot_contracts_ids = Vec::new();
+    let mut boot_contracts_asts = BTreeMap::new();
+    for (id, (_, ast)) in boot_contracts_data {
+        boot_contracts_ids.push(id.clone());
+        boot_contracts_asts.insert(id, ast);
+    }
     requirements_asts.append(&mut boot_contracts_asts);
 
     let mut queue = VecDeque::new();

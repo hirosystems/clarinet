@@ -12,3 +12,7 @@
     (ok (var-get counter))
   )
 )
+
+(define-public (call-bns)
+  (contract-call? 'SP000000000000000000002Q6VF78.bns can-namespace-be-registered 0x627463)
+)
