@@ -704,35 +704,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "baf1de4339761588bc0619e3cbc0120ee582ebb74b53b4efbf79117bd2da40fd"
 
 [[package]]
-name = "chainhook-db"
-version = "0.1.0"
-dependencies = [
- "chainhook-event-observer",
- "chainhook-types",
- "clap 3.2.22",
- "clap_generate",
- "clarity-repl",
- "criterion",
- "csv",
- "ctrlc",
- "hex",
- "hiro-system-kit",
- "num_cpus",
- "redis",
- "serde",
- "serde-redis",
- "serde_derive",
- "serde_json",
- "slog",
- "slog-async",
- "slog-atomic",
- "slog-json",
- "slog-scope",
- "slog-term",
- "toml",
-]
-
-[[package]]
 name = "chainhook-event-observer"
 version = "1.0.0"
 dependencies = [
@@ -759,6 +730,35 @@ dependencies = [
  "slog-scope",
  "stacks-rpc-client",
  "tokio",
+ "toml",
+]
+
+[[package]]
+name = "chainhook-node"
+version = "0.1.0"
+dependencies = [
+ "chainhook-event-observer",
+ "chainhook-types",
+ "clap 3.2.22",
+ "clap_generate",
+ "clarity-repl",
+ "criterion",
+ "csv",
+ "ctrlc",
+ "hex",
+ "hiro-system-kit",
+ "num_cpus",
+ "redis",
+ "serde",
+ "serde-redis",
+ "serde_derive",
+ "serde_json",
+ "slog",
+ "slog-async",
+ "slog-atomic",
+ "slog-json",
+ "slog-scope",
+ "slog-term",
  "toml",
 ]
 

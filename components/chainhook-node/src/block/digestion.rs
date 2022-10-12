@@ -21,8 +21,9 @@ struct Job {
 pub fn start(command_rx: Receiver<DigestingCommand>, config: &Config) {
     // let mut bit_vector
     let mut job_queue: BinaryHeap<Job> = BinaryHeap::new();
-    let client = redis::Client::open(config.redis_url.clone()).unwrap();
-    let mut indexer = Indexer::new(config.indexer_config.clone());
+    let redis_config = config.expected_redis_config();
+    let client = redis::Client::open(redis_config.uri.clone()).unwrap();
+    let mut indexer = Indexer::new(config.indexer.clone());
 
     let mut con = client.get_connection().unwrap();
     let mut block_digested = 0;

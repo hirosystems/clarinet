@@ -1,8 +1,8 @@
 use super::block;
-use crate::{
-    block::DigestingCommand,
-    config::{Bare, Config, IndexerConfig, Topology},
-};
+use crate::block::DigestingCommand;
+use crate::config::{Config, ConfigFile};
+
+use chainhook_db::config::{StorageConfig, StorageDriver};
 use chainhook_event_observer::{
     chainhooks::{
         evaluate_stacks_chainhook_on_transaction, handle_stacks_hook_action,
@@ -44,21 +44,7 @@ pub fn main() {
     })
     .expect("Error setting Ctrl-C handler");
 
-    let config = Config {
-        redis_url: "redis://127.0.0.1/".into(),
-        events_dump_url: "https://storage.googleapis.com/blockstack-publish/archiver-main/api/stacks-node-events-latest.tar.gz".into(),
-        seed_tsv_path: args.events_logs_csv_path.clone(),
-        topology: Topology::Bare(Bare {
-            stacks_node_pool: vec!["http://0.0.0.0:20443".into()],
-            bitcoin_node_pool: vec!["http://0.0.0.0:18443".into()],
-        }),
-        indexer_config: IndexerConfig {
-            stacks_node_rpc_url: "http://0.0.0.0:20443".into(),
-            bitcoin_node_rpc_url: "http://0.0.0.0:18443".into(),
-            bitcoin_node_rpc_username: "devnet".into(),
-            bitcoin_node_rpc_password: "devnet".into(),
-        },
-    };
+    let config = Config::default();
 
     let ingestion_config = config.clone();
     let seed_digestion_tx = digestion_tx.clone();
@@ -132,8 +118,8 @@ pub fn main() {
                         info!("Received chainhook {:?}", stacks_hook);
 
                         use redis::Commands;
-
-                        let client = redis::Client::open(config.redis_url.clone()).unwrap();
+                        let redis_config = config.expected_redis_config();
+                        let client = redis::Client::open(redis_config.uri.clone()).unwrap();
                         let mut con = client.get_connection().unwrap();
 
                         // Retrieve highest block height stored

@@ -40,7 +40,7 @@ pub fn start(
     let (stacks_record_tx, stacks_record_rx) = channel();
     let (bitcoin_record_tx, bitcoin_record_rx) = channel();
 
-    let seed_tsv_path = config.seed_tsv_path.clone();
+    let seed_tsv_path = config.expected_local_tsv_file().clone();
     let parsing_handle = thread::spawn(move || {
         let mut reader_builder = csv::ReaderBuilder::default()
             .has_headers(false)
@@ -84,9 +84,11 @@ pub fn start(
     let stacks_thread_config = config.clone();
 
     let stacks_processing_handle = thread::spawn(move || {
-        let client = redis::Client::open(stacks_thread_config.redis_url.clone()).unwrap();
+        let redis_config = stacks_thread_config.expected_redis_config();
+
+        let client = redis::Client::open(redis_config.uri.clone()).unwrap();
         let mut con = client.get_connection().unwrap();
-        let mut indexer = Indexer::new(stacks_thread_config.indexer_config.clone());
+        let mut indexer = Indexer::new(stacks_thread_config.indexer.clone());
         let mut tip = 0;
 
         while let Ok(Some(record)) = stacks_record_rx.recv() {
@@ -158,7 +160,9 @@ pub fn start(
     let bitcoin_indexer_config = config.clone();
 
     let bitcoin_processing_handle = thread::spawn(move || {
-        let client = redis::Client::open(bitcoin_indexer_config.redis_url.clone()).unwrap();
+        let redis_config = bitcoin_indexer_config.expected_redis_config();
+
+        let client = redis::Client::open(redis_config.uri.clone()).unwrap();
         let mut con = client.get_connection().unwrap();
         while let Ok(Some(record)) = bitcoin_record_rx.recv() {
             let _: () = match con.set(&format!("btc:{}", record.id), record.raw_log.as_str()) {
