@@ -135,7 +135,7 @@ impl NewEvent {
         } else if let Some(ref event_data) = self.nft_mint_event {
             let data: NFTMintEventData =
                 serde_json::from_value(event_data.clone()).expect("Unable to decode event_data");
-            StacksTransactionEvent::NFTMintEvent(data.clone());
+            return StacksTransactionEvent::NFTMintEvent(data.clone());
         } else if let Some(ref event_data) = self.nft_burn_event {
             let data: NFTBurnEventData =
                 serde_json::from_value(event_data.clone()).expect("Unable to decode event_data");
