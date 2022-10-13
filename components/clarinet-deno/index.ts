@@ -1,4 +1,4 @@
-// deno-lint-ignore-file prefer-const ban-ts-comment no-explicit-any no-namespace
+// deno-lint-ignore-file ban-ts-comment no-namespace
 
 import {
   ExpectFungibleTokenBurnEvent,
@@ -26,7 +26,7 @@ export class Tx {
   }
 
   static transferSTX(amount: number, recipient: string, sender: string) {
-    let tx = new Tx(1, sender);
+    const tx = new Tx(1, sender);
     tx.transferStx = {
       recipient,
       amount,
@@ -40,7 +40,7 @@ export class Tx {
     args: Array<string>,
     sender: string
   ) {
-    let tx = new Tx(2, sender);
+    const tx = new Tx(2, sender);
     tx.contractCall = {
       contract,
       method,
@@ -50,7 +50,7 @@ export class Tx {
   }
 
   static deployContract(name: string, code: string, sender: string) {
-    let tx = new Tx(3, sender);
+    const tx = new Tx(3, sender);
     tx.deployContract = {
       name,
       code,
@@ -77,7 +77,7 @@ export interface TxTransfer {
 
 export interface TxReceipt {
   result: string;
-  events: Array<any>;
+  events: Array<unknown>;
 }
 
 export interface Block {
@@ -98,7 +98,7 @@ export interface Chain {
 export interface ReadOnlyFn {
   session_id: number;
   result: string;
-  events: Array<any>;
+  events: Array<unknown>;
 }
 
 export interface EmptyBlock {
@@ -124,7 +124,7 @@ export class Chain {
   }
 
   mineBlock(transactions: Array<Tx>): Block {
-    let result = JSON.parse(
+    const result = JSON.parse(
       // @ts-ignore
       Deno.core.opSync("api/v1/mine_block", {
         sessionId: this.sessionId,
@@ -132,7 +132,7 @@ export class Chain {
       })
     );
     this.blockHeight = result.block_height;
-    let block: Block = {
+    const block: Block = {
       height: result.block_height,
       receipts: result.receipts,
     };
@@ -140,7 +140,7 @@ export class Chain {
   }
 
   mineEmptyBlock(count: number): EmptyBlock {
-    let result = JSON.parse(
+    const result = JSON.parse(
       // @ts-ignore
       Deno.core.opSync("api/v1/mine_empty_blocks", {
         sessionId: this.sessionId,
@@ -148,7 +148,7 @@ export class Chain {
       })
     );
     this.blockHeight = result.block_height;
-    let emptyBlock: EmptyBlock = {
+    const emptyBlock: EmptyBlock = {
       session_id: result.session_id,
       block_height: result.block_height,
     };
@@ -156,7 +156,7 @@ export class Chain {
   }
 
   mineEmptyBlockUntil(targetBlockHeight: number): EmptyBlock {
-    let count = targetBlockHeight - this.blockHeight;
+    const count = targetBlockHeight - this.blockHeight;
     if (count < 0) {
       throw new Error(
         `Chain tip cannot be moved from ${this.blockHeight} to ${targetBlockHeight}`
@@ -168,10 +168,10 @@ export class Chain {
   callReadOnlyFn(
     contract: string,
     method: string,
-    args: Array<any>,
+    args: Array<unknown>,
     sender: string
   ): ReadOnlyFn {
-    let result = JSON.parse(
+    const result = JSON.parse(
       // @ts-ignore
       Deno.core.opSync("api/v1/call_read_only_fn", {
         sessionId: this.sessionId,
@@ -181,7 +181,7 @@ export class Chain {
         sender: sender,
       })
     );
-    let readOnlyFn: ReadOnlyFn = {
+    const readOnlyFn: ReadOnlyFn = {
       session_id: result.session_id,
       result: result.result,
       events: result.events,
@@ -190,13 +190,13 @@ export class Chain {
   }
 
   getAssetsMaps(): AssetsMaps {
-    let result = JSON.parse(
+    const result = JSON.parse(
       // @ts-ignore
       Deno.core.opSync("api/v1/get_assets_maps", {
         sessionId: this.sessionId,
       })
     );
-    let assetsMaps: AssetsMaps = {
+    const assetsMaps: AssetsMaps = {
       session_id: result.session_id,
       assets: result.assets,
     };
@@ -227,7 +227,7 @@ interface UnitTestOptions {
 export interface Contract {
   contract_id: string;
   source: string;
-  contract_interface: any;
+  contract_interface: unknown;
 }
 
 export interface StacksNode {
@@ -252,7 +252,7 @@ export class Clarinet {
       only: options.only,
       ignore: options.ignore,
       async fn() {
-        let hasPreDeploymentSteps = options.preDeployment !== undefined;
+        const hasPreDeploymentSteps = options.preDeployment !== undefined;
 
         let result = JSON.parse(
           // @ts-ignore
@@ -264,9 +264,9 @@ export class Clarinet {
         );
 
         if (options.preDeployment) {
-          let chain = new Chain(result["session_id"]);
-          let accounts: Map<string, Account> = new Map();
-          for (let account of result["accounts"]) {
+          const chain = new Chain(result.session_id);
+          const accounts: Map<string, Account> = new Map();
+          for (const account of result.accounts) {
             accounts.set(account.name, account);
           }
           await options.preDeployment(chain, accounts);
@@ -280,13 +280,13 @@ export class Clarinet {
           );
         }
 
-        let chain = new Chain(result["session_id"]);
-        let accounts: Map<string, Account> = new Map();
-        for (let account of result["accounts"]) {
+        const chain = new Chain(result.session_id);
+        const accounts: Map<string, Account> = new Map();
+        for (const account of result.accounts) {
           accounts.set(account.name, account);
         }
-        let contracts: Map<string, Contract> = new Map();
-        for (let contract of result["contracts"]) {
+        const contracts: Map<string, Contract> = new Map();
+        for (const contract of result.contracts) {
           contracts.set(contract.contract_id, contract);
         }
         await options.fn(chain, accounts, contracts);
@@ -306,7 +306,7 @@ export class Clarinet {
     Deno.test({
       name: "running script",
       async fn() {
-        let result = JSON.parse(
+        const result = JSON.parse(
           // @ts-ignore
           Deno.core.opSync("api/v1/new_session", {
             name: "running script",
@@ -314,16 +314,16 @@ export class Clarinet {
             deploymentPath: undefined,
           })
         );
-        let accounts: Map<string, Account> = new Map();
-        for (let account of result["accounts"]) {
+        const accounts: Map<string, Account> = new Map();
+        for (const account of result.accounts) {
           accounts.set(account.name, account);
         }
-        let contracts: Map<string, Contract> = new Map();
-        for (let contract of result["contracts"]) {
+        const contracts: Map<string, Contract> = new Map();
+        for (const contract of result.contracts) {
           contracts.set(contract.contract_id, contract);
         }
-        let stacks_node: StacksNode = {
-          url: result["stacks_node_url"],
+        const stacks_node: StacksNode = {
+          url: result.stacks_node_url,
         };
         await options.fn(accounts, contracts, stacks_node);
       },
@@ -332,15 +332,15 @@ export class Clarinet {
 }
 
 export namespace types {
-  const byteToHex: any[] = [];
+  const byteToHex: string[] = [];
   for (let n = 0; n <= 0xff; ++n) {
     const hexOctet = n.toString(16).padStart(2, "0");
     byteToHex.push(hexOctet);
   }
 
   function serializeTuple(input: Record<string, unknown>) {
-    let items: Array<string> = [];
-    for (let [key, value] of Object.entries(input)) {
+    const items: Array<string> = [];
+    for (const [key, value] of Object.entries(input)) {
       if (Array.isArray(value)) {
         throw new Error("Tuple value can't be an array");
       } else if (!!value && typeof value === "object") {
@@ -405,7 +405,7 @@ export namespace types {
     return `0x${hexOctets.join("")}`;
   }
 
-  export function list(val: Array<any>) {
+  export function list(val: Array<unknown>) {
     return `(list ${val.join(" ")})`;
   }
 
@@ -413,25 +413,25 @@ export namespace types {
     return `'${val}`;
   }
 
-  export function tuple(val: Record<string, any>) {
+  export function tuple(val: Record<string, unknown>) {
     return `{ ${serializeTuple(val)} }`;
   }
 }
 
 declare global {
   interface String {
-    expectOk(): String;
-    expectErr(): String;
-    expectSome(): String;
+    expectOk(): string;
+    expectErr(): string;
+    expectSome(): string;
     expectNone(): void;
     expectBool(value: boolean): boolean;
     expectUint(value: number | bigint): bigint;
     expectInt(value: number | bigint): bigint;
     expectBuff(value: ArrayBuffer): ArrayBuffer;
-    expectAscii(value: String): String;
-    expectUtf8(value: String): String;
-    expectPrincipal(value: String): String;
-    expectList(): Array<String>;
+    expectAscii(value: string): string;
+    expectUtf8(value: string): string;
+    expectPrincipal(value: string): string;
+    expectList(): Array<string>;
     expectTuple(): Record<string, string>;
   }
 
@@ -503,7 +503,7 @@ function consume(src: String, expectation: string, wrapped: boolean) {
   if (wrapped) {
     dst = dst.substring(1, dst.length - 1);
   }
-  let res = dst.slice(0, expectation.length);
+  const res = dst.slice(0, expectation.length);
   if (res !== expectation) {
     throw new Error(
       `Expected ${green(expectation.toString())}, got ${red(src.toString())}`
@@ -513,7 +513,7 @@ function consume(src: String, expectation: string, wrapped: boolean) {
   if (dst.charAt(expectation.length) === " ") {
     leftPad = 1;
   }
-  let remainder = dst.substring(expectation.length + leftPad);
+  const remainder = dst.substring(expectation.length + leftPad);
   return remainder;
 }
 
@@ -561,7 +561,7 @@ String.prototype.expectInt = function (value: number | bigint): bigint {
 };
 
 String.prototype.expectBuff = function (value: ArrayBuffer) {
-  let buffer = types.buff(value);
+  const buffer = types.buff(value);
   if (this !== buffer) {
     throw new Error(`Expected ${green(buffer)}, got ${red(this.toString())}`);
   }
@@ -602,8 +602,8 @@ String.prototype.expectList = function () {
     );
   }
 
-  let stack = [];
-  let elements = [];
+  const stack = [];
+  const elements = [];
   let start = 1;
   for (let i = 0; i < this.length; i++) {
     if (this.charAt(i) === "," && stack.length == 1) {
@@ -623,7 +623,7 @@ String.prototype.expectList = function () {
       stack.pop();
     }
   }
-  let remainder = this.substring(start, this.length - 1);
+  const remainder = this.substring(start, this.length - 1);
   if (remainder.length > 0) {
     elements.push(remainder);
   }
@@ -638,8 +638,8 @@ String.prototype.expectTuple = function () {
   }
 
   let start = 1;
-  let stack = [];
-  let elements = [];
+  const stack = [];
+  const elements = [];
   for (let i = 0; i < this.length; i++) {
     if (this.charAt(i) === "," && stack.length == 1) {
       elements.push(this.substring(start, i));
@@ -658,17 +658,17 @@ String.prototype.expectTuple = function () {
       stack.pop();
     }
   }
-  let remainder = this.substring(start, this.length - 1);
+  const remainder = this.substring(start, this.length - 1);
   if (remainder.length > 0) {
     elements.push(remainder);
   }
 
-  let tuple: Record<string, string> = {};
-  for (let element of elements) {
+  const tuple: Record<string, string> = {};
+  for (const element of elements) {
     for (let i = 0; i < element.length; i++) {
       if (element.charAt(i) === ":") {
-        let key: string = element.substring(0, i);
-        let value: string = element.substring(i + 2, element.length);
+        const key = element.substring(0, i);
+        const value = element.substring(i + 2, element.length);
         tuple[key] = value;
         break;
       }
@@ -679,7 +679,7 @@ String.prototype.expectTuple = function () {
 };
 
 Array.prototype.expectSTXTransferEvent = function (amount, sender, recipient) {
-  for (let { stx_transfer_event } of this) {
+  for (const { stx_transfer_event } of this) {
     try {
       return {
         amount: stx_transfer_event.amount.expectInt(amount),
@@ -699,7 +699,7 @@ Array.prototype.expectFungibleTokenTransferEvent = function (
   recipient,
   assetId
 ) {
-  for (let { ft_transfer_event } of this) {
+  for (const { ft_transfer_event } of this) {
     try {
       if (!ft_transfer_event.asset_identifier.endsWith(assetId)) continue;
 
@@ -725,7 +725,7 @@ Array.prototype.expectFungibleTokenMintEvent = function (
   recipient,
   assetId
 ) {
-  for (let { ft_mint_event } of this) {
+  for (const { ft_mint_event } of this) {
     try {
       if (!ft_mint_event.asset_identifier.endsWith(assetId)) continue;
 
@@ -746,7 +746,7 @@ Array.prototype.expectFungibleTokenBurnEvent = function (
   sender,
   assetId
 ) {
-  for (let { ft_burn_event } of this) {
+  for (const { ft_burn_event } of this) {
     try {
       if (!ft_burn_event.asset_identifier.endsWith(assetId)) continue;
 
@@ -763,7 +763,7 @@ Array.prototype.expectFungibleTokenBurnEvent = function (
 };
 
 Array.prototype.expectPrintEvent = function (contractIdentifier, value) {
-  for (let { contract_event } of this) {
+  for (const { contract_event } of this) {
     try {
       if (!contract_event.topic.endsWith("print")) continue;
       if (!contract_event.value.endsWith(value)) continue;
@@ -791,7 +791,7 @@ Array.prototype.expectNonFungibleTokenTransferEvent = function (
   assetAddress,
   assetId
 ) {
-  for (let { nft_transfer_event } of this) {
+  for (const { nft_transfer_event } of this) {
     try {
       if (nft_transfer_event.value !== tokenId) continue;
       if (nft_transfer_event.asset_identifier !== `${assetAddress}::${assetId}`)
@@ -816,7 +816,7 @@ Array.prototype.expectNonFungibleTokenMintEvent = function (
   assetAddress,
   assetId
 ) {
-  for (let { nft_mint_event } of this) {
+  for (const { nft_mint_event } of this) {
     try {
       if (nft_mint_event.value !== tokenId) continue;
       if (nft_mint_event.asset_identifier !== `${assetAddress}::${assetId}`)
@@ -840,7 +840,7 @@ Array.prototype.expectNonFungibleTokenBurnEvent = function (
   assetAddress,
   assetId
 ) {
-  for (let event of this) {
+  for (const event of this) {
     try {
       if (event.nft_burn_event.value !== tokenId) continue;
       if (
