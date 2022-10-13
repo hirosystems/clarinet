@@ -1,3 +1,5 @@
+// deno-lint-ignore-file prefer-const ban-ts-comment no-explicit-any no-namespace
+
 export class Tx {
   type: number;
   sender: string;
@@ -23,7 +25,7 @@ export class Tx {
     contract: string,
     method: string,
     args: Array<string>,
-    sender: string,
+    sender: string
   ) {
     let tx = new Tx(2, sender);
     tx.contractCall = {
@@ -102,18 +104,20 @@ export interface AssetsMaps {
 
 export class Chain {
   sessionId: number;
-  blockHeight: number = 1;
+  blockHeight = 1;
 
   constructor(sessionId: number) {
     this.sessionId = sessionId;
   }
 
   mineBlock(transactions: Array<Tx>): Block {
-    // @ts-ignore
-    let result = JSON.parse(Deno.core.opSync("api/v1/mine_block", {
-      sessionId: this.sessionId,
-      transactions: transactions,
-    }));
+    let result = JSON.parse(
+      // @ts-ignore
+      Deno.core.opSync("api/v1/mine_block", {
+        sessionId: this.sessionId,
+        transactions: transactions,
+      })
+    );
     this.blockHeight = result.block_height;
     let block: Block = {
       height: result.block_height,
@@ -128,7 +132,7 @@ export class Chain {
       Deno.core.opSync("api/v1/mine_empty_blocks", {
         sessionId: this.sessionId,
         count: count,
-      }),
+      })
     );
     this.blockHeight = result.block_height;
     let emptyBlock: EmptyBlock = {
@@ -142,7 +146,7 @@ export class Chain {
     let count = targetBlockHeight - this.blockHeight;
     if (count < 0) {
       throw new Error(
-        `Chain tip cannot be moved from ${this.blockHeight} to ${targetBlockHeight}`,
+        `Chain tip cannot be moved from ${this.blockHeight} to ${targetBlockHeight}`
       );
     }
     return this.mineEmptyBlock(count);
@@ -152,7 +156,7 @@ export class Chain {
     contract: string,
     method: string,
     args: Array<any>,
-    sender: string,
+    sender: string
   ): ReadOnlyFn {
     let result = JSON.parse(
       // @ts-ignore
@@ -162,7 +166,7 @@ export class Chain {
         method: method,
         args: args,
         sender: sender,
-      }),
+      })
     );
     let readOnlyFn: ReadOnlyFn = {
       session_id: result.session_id,
@@ -177,7 +181,7 @@ export class Chain {
       // @ts-ignore
       Deno.core.opSync("api/v1/get_assets_maps", {
         sessionId: this.sessionId,
-      }),
+      })
     );
     let assetsMaps: AssetsMaps = {
       session_id: result.session_id,
@@ -189,15 +193,14 @@ export class Chain {
 
 type PreDeploymentFunction = (
   chain: Chain,
-  accounts: Map<string, Account>,
+  accounts: Map<string, Account>
 ) => void | Promise<void>;
 
 type TestFunction = (
   chain: Chain,
   accounts: Map<string, Account>,
-  contracts: Map<string, Contract>,
+  contracts: Map<string, Contract>
 ) => void | Promise<void>;
-type PreSetupFunction = () => Array<Tx>;
 
 interface UnitTestOptions {
   name: string;
@@ -221,7 +224,7 @@ export interface StacksNode {
 type ScriptFunction = (
   accounts: Map<string, Account>,
   contracts: Map<string, Contract>,
-  node: StacksNode,
+  node: StacksNode
 ) => void | Promise<void>;
 
 interface ScriptOptions {
@@ -244,7 +247,7 @@ export class Clarinet {
             name: options.name,
             loadDeployment: !hasPreDeploymentSteps,
             deploymentPath: options.deploymentPath,
-          }),
+          })
         );
 
         if (options.preDeployment) {
@@ -260,7 +263,7 @@ export class Clarinet {
             Deno.core.opSync("api/v1/load_deployment", {
               sessionId: chain.sessionId,
               deploymentPath: options.deploymentPath,
-            }),
+            })
           );
         }
 
@@ -275,10 +278,12 @@ export class Clarinet {
         }
         await options.fn(chain, accounts, contracts);
 
-        // @ts-ignore
-        JSON.parse(Deno.core.opSync("api/v1/terminate_session", {
-          sessionId: chain.sessionId,
-        }));
+        JSON.parse(
+          // @ts-ignore
+          Deno.core.opSync("api/v1/terminate_session", {
+            sessionId: chain.sessionId,
+          })
+        );
       },
     });
   }
@@ -294,7 +299,7 @@ export class Clarinet {
             name: "running script",
             loadDeployment: true,
             deploymentPath: undefined,
-          }),
+          })
         );
         let accounts: Map<string, Account> = new Map();
         for (let account of result["accounts"]) {
@@ -314,28 +319,26 @@ export class Clarinet {
 }
 
 export namespace types {
-  const byteToHex: any = [];
+  const byteToHex: any[] = [];
   for (let n = 0; n <= 0xff; ++n) {
     const hexOctet = n.toString(16).padStart(2, "0");
     byteToHex.push(hexOctet);
   }
 
-  function serializeTuple(input: Object) {
+  function serializeTuple(input: Record<string, unknown>) {
     let items: Array<string> = [];
-    for (var [key, value] of Object.entries(input)) {
-      if (typeof value === "object") {
-        items.push(`${key}: { ${serializeTuple(value)} }`);
-      } else if (Array.isArray(value)) {
-        // todo(ludo): not supported, should panic
+    for (let [key, value] of Object.entries(input)) {
+      if (Array.isArray(value)) {
+        throw new Error("Tuple value can't be an array");
+      } else if (!!value && typeof value === "object") {
+        items.push(
+          `${key}: { ${serializeTuple(value as Record<string, unknown>)} }`
+        );
       } else {
         items.push(`${key}: ${value}`);
       }
     }
     return items.join(", ");
-  }
-
-  function isObject(obj: any) {
-    return typeof obj === "object" && !Array.isArray(obj);
   }
 
   export function ok(val: string) {
@@ -375,9 +378,10 @@ export namespace types {
   }
 
   export function buff(val: ArrayBuffer | string) {
-    const buff = typeof val == "string"
-      ? new TextEncoder().encode(val)
-      : new Uint8Array(val);
+    const buff =
+      typeof val == "string"
+        ? new TextEncoder().encode(val)
+        : new Uint8Array(val);
 
     const hexOctets = new Array(buff.length);
 
@@ -396,7 +400,7 @@ export namespace types {
     return `'${val}`;
   }
 
-  export function tuple(val: Object) {
+  export function tuple(val: Record<string, any>) {
     return `{ ${serializeTuple(val)} }`;
   }
 }
@@ -420,59 +424,59 @@ declare global {
 
   interface Array<T> {
     expectSTXTransferEvent(
-      amount: Number | bigint,
-      sender: String,
-      recipient: String,
-    ): Object;
+      amount: number | bigint,
+      sender: string,
+      recipient: string
+    ): Record<string, unknown>;
     expectFungibleTokenTransferEvent(
-      amount: Number | bigint,
-      sender: String,
-      recipient: String,
-      assetId: String,
-    ): Object;
+      amount: number | bigint,
+      sender: string,
+      recipient: string,
+      assetId: string
+    ): Record<string, unknown>;
     expectFungibleTokenMintEvent(
-      amount: Number | bigint,
-      recipient: String,
-      assetId: String,
-    ): Object;
+      amount: number | bigint,
+      recipient: string,
+      assetId: string
+    ): Record<string, unknown>;
     expectFungibleTokenBurnEvent(
-      amount: Number | bigint,
-      sender: String,
-      assetId: String,
-    ): Object;
+      amount: number | bigint,
+      sender: string,
+      assetId: string
+    ): Record<string, unknown>;
     expectPrintEvent(
       contract_identifier: string,
-      value: string,
-    ): Object;
+      value: string
+    ): Record<string, unknown>;
     expectNonFungibleTokenTransferEvent(
-      tokenId: String,
-      sender: String,
-      recipient: String,
-      assetAddress: String,
-      assetId: String,
-    ): Object;
+      tokenId: string,
+      sender: string,
+      recipient: string,
+      assetAddress: string,
+      assetId: string
+    ): Record<string, unknown>;
     expectNonFungibleTokenMintEvent(
-      tokenId: String,
-      recipient: String,
-      assetAddress: String,
-      assetId: String,
-    ): Object;
+      tokenId: string,
+      recipient: string,
+      assetAddress: string,
+      assetId: string
+    ): Record<string, unknown>;
     expectNonFungibleTokenBurnEvent(
-      tokenId: String,
-      sender: String,
-      assetAddress: String,
-      assetId: String,
-    ): Object;
-    // expectEvent(sel: (e: Object) => Object): Object;
+      tokenId: string,
+      sender: string,
+      assetAddress: string,
+      assetId: string
+    ): Record<string, unknown>;
   }
 }
 
-function consume(src: String, expectation: String, wrapped: boolean) {
+// deno-lint-ignore ban-types
+function consume(src: String, expectation: string, wrapped: boolean) {
   let dst = (" " + src).slice(1);
   let size = expectation.length;
   if (!wrapped && src !== expectation) {
     throw new Error(
-      `Expected ${green(expectation.toString())}, got ${red(src.toString())}`,
+      `Expected ${green(expectation.toString())}, got ${red(src.toString())}`
     );
   }
   if (wrapped) {
@@ -480,7 +484,7 @@ function consume(src: String, expectation: String, wrapped: boolean) {
   }
   if (dst.length < size) {
     throw new Error(
-      `Expected ${green(expectation.toString())}, got ${red(src.toString())}`,
+      `Expected ${green(expectation.toString())}, got ${red(src.toString())}`
     );
   }
   if (wrapped) {
@@ -489,7 +493,7 @@ function consume(src: String, expectation: String, wrapped: boolean) {
   let res = dst.slice(0, expectation.length);
   if (res !== expectation) {
     throw new Error(
-      `Expected ${green(expectation.toString())}, got ${red(src.toString())}`,
+      `Expected ${green(expectation.toString())}, got ${red(src.toString())}`
     );
   }
   let leftPad = 0;
@@ -581,14 +585,14 @@ String.prototype.expectPrincipal = function (value: string) {
 String.prototype.expectList = function () {
   if (this.charAt(0) !== "[" || this.charAt(this.length - 1) !== "]") {
     throw new Error(
-      `Expected ${green("(list ...)")}, got ${red(this.toString())}`,
+      `Expected ${green("(list ...)")}, got ${red(this.toString())}`
     );
   }
 
   let stack = [];
   let elements = [];
   let start = 1;
-  for (var i = 0; i < this.length; i++) {
+  for (let i = 0; i < this.length; i++) {
     if (this.charAt(i) === "," && stack.length == 1) {
       elements.push(this.substring(start, i));
       start = i + 2;
@@ -616,14 +620,14 @@ String.prototype.expectList = function () {
 String.prototype.expectTuple = function () {
   if (this.charAt(0) !== "{" || this.charAt(this.length - 1) !== "}") {
     throw new Error(
-      `Expected ${green("(tuple ...)")}, got ${red(this.toString())}`,
+      `Expected ${green("(tuple ...)")}, got ${red(this.toString())}`
     );
   }
 
   let start = 1;
   let stack = [];
   let elements = [];
-  for (var i = 0; i < this.length; i++) {
+  for (let i = 0; i < this.length; i++) {
     if (this.charAt(i) === "," && stack.length == 1) {
       elements.push(this.substring(start, i));
       start = i + 2;
@@ -648,7 +652,7 @@ String.prototype.expectTuple = function () {
 
   let tuple: Record<string, string> = {};
   for (let element of elements) {
-    for (var i = 0; i < element.length; i++) {
+    for (let i = 0; i < element.length; i++) {
       if (element.charAt(i) === ":") {
         let key: string = element.substring(0, i);
         let value: string = element.substring(i + 2, element.length);
@@ -662,20 +666,19 @@ String.prototype.expectTuple = function () {
 };
 
 Array.prototype.expectSTXTransferEvent = function (
-  amount: Number | bigint,
-  sender: String,
-  recipient: String,
+  amount: number | bigint,
+  sender: string,
+  recipient: string
 ) {
   for (let event of this) {
     try {
       let e: any = {};
-      e["amount"] = event.stx_transfer_event.amount.expectInt(amount);
-      e["sender"] = event.stx_transfer_event.sender.expectPrincipal(sender);
-      e["recipient"] = event.stx_transfer_event.recipient.expectPrincipal(
-        recipient,
-      );
+      e.amount = event.stx_transfer_event.amount.expectInt(amount);
+      e.sender = event.stx_transfer_event.sender.expectPrincipal(sender);
+      e.recipient =
+        event.stx_transfer_event.recipient.expectPrincipal(recipient);
       return e;
-    } catch (error) {
+    } catch (_error) {
       continue;
     }
   }
@@ -683,53 +686,52 @@ Array.prototype.expectSTXTransferEvent = function (
 };
 
 Array.prototype.expectFungibleTokenTransferEvent = function (
-  amount: Number,
-  sender: String,
-  recipient: String,
-  assetId: String,
+  amount: number,
+  sender: string,
+  recipient: string,
+  assetId: string
 ) {
   for (let event of this) {
     try {
       let e: any = {};
-      e["amount"] = event.ft_transfer_event.amount.expectInt(amount);
-      e["sender"] = event.ft_transfer_event.sender.expectPrincipal(sender);
-      e["recipient"] = event.ft_transfer_event.recipient.expectPrincipal(
-        recipient,
-      );
+      e.amount = event.ft_transfer_event.amount.expectInt(amount);
+      e.sender = event.ft_transfer_event.sender.expectPrincipal(sender);
+      e.recipient =
+        event.ft_transfer_event.recipient.expectPrincipal(recipient);
       if (event.ft_transfer_event.asset_identifier.endsWith(assetId)) {
-        e["assetId"] = event.ft_transfer_event.asset_identifier;
+        e.assetId = event.ft_transfer_event.asset_identifier;
       } else {
         continue;
       }
       return e;
-    } catch (error) {
+    } catch (_error) {
       continue;
     }
   }
   throw new Error(
-    `Unable to retrieve expected FungibleTokenTransferEvent(${amount}, ${sender}, ${recipient}, ${assetId})\n${
-      JSON.stringify(this)
-    }`,
+    `Unable to retrieve expected FungibleTokenTransferEvent(${amount}, ${sender}, ${recipient}, ${assetId})\n${JSON.stringify(
+      this
+    )}`
   );
 };
 
 Array.prototype.expectFungibleTokenMintEvent = function (
-  amount: Number | bigint,
-  recipient: String,
-  assetId: String,
+  amount: number | bigint,
+  recipient: string,
+  assetId: string
 ) {
   for (let event of this) {
     try {
       let e: any = {};
-      e["amount"] = event.ft_mint_event.amount.expectInt(amount);
-      e["recipient"] = event.ft_mint_event.recipient.expectPrincipal(recipient);
+      e.amount = event.ft_mint_event.amount.expectInt(amount);
+      e.recipient = event.ft_mint_event.recipient.expectPrincipal(recipient);
       if (event.ft_mint_event.asset_identifier.endsWith(assetId)) {
-        e["assetId"] = event.ft_mint_event.asset_identifier;
+        e.assetId = event.ft_mint_event.asset_identifier;
       } else {
         continue;
       }
       return e;
-    } catch (error) {
+    } catch (_error) {
       continue;
     }
   }
@@ -737,22 +739,22 @@ Array.prototype.expectFungibleTokenMintEvent = function (
 };
 
 Array.prototype.expectFungibleTokenBurnEvent = function (
-  amount: Number | bigint,
-  sender: String,
-  assetId: String,
+  amount: number | bigint,
+  sender: string,
+  assetId: string
 ) {
   for (let event of this) {
     try {
       let e: any = {};
-      e["amount"] = event.ft_burn_event.amount.expectInt(amount);
-      e["sender"] = event.ft_burn_event.sender.expectPrincipal(sender);
+      e.amount = event.ft_burn_event.amount.expectInt(amount);
+      e.sender = event.ft_burn_event.sender.expectPrincipal(sender);
       if (event.ft_burn_event.asset_identifier.endsWith(assetId)) {
-        e["assetId"] = event.ft_burn_event.asset_identifier;
+        e.assetId = event.ft_burn_event.asset_identifier;
       } else {
         continue;
       }
       return e;
-    } catch (error) {
+    } catch (_error) {
       continue;
     }
   }
@@ -761,51 +763,42 @@ Array.prototype.expectFungibleTokenBurnEvent = function (
 
 Array.prototype.expectPrintEvent = function (
   contract_identifier: string,
-  value: string,
+  value: string
 ) {
   for (let event of this) {
     try {
       let e: any = {};
-      e["contract_identifier"] = event.contract_event.contract_identifier
-        .expectPrincipal(
-          contract_identifier,
+      e.contract_identifier =
+        event.contract_event.contract_identifier.expectPrincipal(
+          contract_identifier
         );
 
       if (event.contract_event.topic.endsWith("print")) {
-        e["topic"] = event.contract_event.topic;
+        e.topic = event.contract_event.topic;
       } else {
         continue;
       }
 
       if (event.contract_event.value.endsWith(value)) {
-        e["value"] = event.contract_event.value;
+        e.value = event.contract_event.value;
       } else {
         continue;
       }
       return e;
     } catch (error) {
+      console.warn(error);
       continue;
     }
   }
   throw new Error(`Unable to retrieve expected PrintEvent`);
 };
-// Array.prototype.expectEvent = function(sel: (e: Object) => Object) {
-//     for (let event of this) {
-//         try {
-//             sel(event);
-//             return event as Object;
-//         } catch (error) {
-//             continue;
-//         }
-//     }
-//     throw new Error(`Unable to retrieve expected PrintEvent`);
-// }
+
 Array.prototype.expectNonFungibleTokenTransferEvent = function (
-  tokenId: String,
-  sender: String,
-  recipient: String,
-  assetAddress: String,
-  assetId: String,
+  tokenId: string,
+  sender: string,
+  recipient: string,
+  assetAddress: string,
+  assetId: string
 ) {
   for (let event of this) {
     try {
@@ -816,19 +809,18 @@ Array.prototype.expectNonFungibleTokenTransferEvent = function (
         continue;
       }
       e["sender"] = event.nft_transfer_event.sender.expectPrincipal(sender);
-      e["recipient"] = event.nft_transfer_event.recipient.expectPrincipal(
-        recipient,
-      );
+      e["recipient"] =
+        event.nft_transfer_event.recipient.expectPrincipal(recipient);
       if (
         event.nft_transfer_event.asset_identifier ===
-          `${assetAddress}::${assetId}`
+        `${assetAddress}::${assetId}`
       ) {
         e["assetId"] = event.nft_transfer_event.asset_identifier;
       } else {
         continue;
       }
       return e;
-    } catch (error) {
+    } catch (_error) {
       continue;
     }
   }
@@ -836,31 +828,29 @@ Array.prototype.expectNonFungibleTokenTransferEvent = function (
 };
 
 Array.prototype.expectNonFungibleTokenMintEvent = function (
-  tokenId: String,
-  recipient: String,
-  assetAddress: String,
-  assetId: String,
+  tokenId: string,
+  recipient: string,
+  assetAddress: string,
+  assetId: string
 ) {
   for (let event of this) {
     try {
       let e: any = {};
       if (event.nft_mint_event.value === tokenId) {
-        e["tokenId"] = event.nft_mint_event.value;
+        e.tokenId = event.nft_mint_event.value;
       } else {
         continue;
       }
-      e["recipient"] = event.nft_mint_event.recipient.expectPrincipal(
-        recipient,
-      );
+      e.recipient = event.nft_mint_event.recipient.expectPrincipal(recipient);
       if (
         event.nft_mint_event.asset_identifier === `${assetAddress}::${assetId}`
       ) {
-        e["assetId"] = event.nft_mint_event.asset_identifier;
+        e.assetId = event.nft_mint_event.asset_identifier;
       } else {
         continue;
       }
       return e;
-    } catch (error) {
+    } catch (_error) {
       continue;
     }
   }
@@ -868,44 +858,43 @@ Array.prototype.expectNonFungibleTokenMintEvent = function (
 };
 
 Array.prototype.expectNonFungibleTokenBurnEvent = function (
-  tokenId: String,
-  sender: String,
-  assetAddress: String,
-  assetId: String,
+  tokenId: string,
+  sender: string,
+  assetAddress: string,
+  assetId: string
 ) {
   for (let event of this) {
     try {
       let e: any = {};
       if (event.nft_burn_event.value === tokenId) {
-        e["tokenId"] = event.nft_burn_event.value;
+        e.tokenId = event.nft_burn_event.value;
       } else {
         continue;
       }
-      e["sender"] = event.nft_burn_event.sender.expectPrincipal(sender);
+      e.sender = event.nft_burn_event.sender.expectPrincipal(sender);
       if (
         event.nft_burn_event.asset_identifier === `${assetAddress}::${assetId}`
       ) {
-        e["assetId"] = event.nft_burn_event.asset_identifier;
+        e.assetId = event.nft_burn_event.asset_identifier;
       } else {
         continue;
       }
       return e;
-    } catch (error) {
+    } catch (_error) {
       continue;
     }
   }
   throw new Error(`Unable to retrieve expected NonFungibleTokenBurnEvent`);
 };
 
-const noColor = globalThis.Deno?.noColor ?? true;
+const noColor = Deno.noColor ?? true;
+const enabled = !noColor;
 
 interface Code {
   open: string;
   close: string;
   regexp: RegExp;
 }
-
-let enabled = !noColor;
 
 function code(open: number[], close: number): Code {
   return {

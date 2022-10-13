@@ -24,7 +24,7 @@
     "test": "node client/dist/tests/runTests.js",
     "lint": "eslint ./client/src ./server/src --ext .ts,.tsx",
     "dev:watch": "webpack -c ./webpack.config.dev.js -w",
-    "dev:browser": "vscode-test-web --extensionDevelopmentPath=. ./test-data --open-devtools --browser=chromium",
+    "dev:browser": "vscode-test-web --extensionDevelopmentPath=. ../../../../citycoins/protocol --open-devtools --browser=chromium",
     "dev": "webpack -c ./webpack.config.dev.js; concurrently \"npm:dev:*\"",
     "vscode:prepublish": "npm run clean; NODE_ENV=production webpack",
     "vsce:package": "vsce package",
