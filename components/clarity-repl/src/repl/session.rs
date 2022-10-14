@@ -586,9 +586,7 @@ impl Session {
             }
         };
         self.set_tx_sender(initial_tx_sender);
-        // if let Some(coverage) = result.coverage.take() {
-        //     self.coverage_reports.push(coverage);
-        // }
+        self.coverage_reports.push(coverage);
         if let Some(ref cost) = execution.cost {
             self.costs_reports.push(CostsReport {
                 test_name,
