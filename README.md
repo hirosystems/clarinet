@@ -89,7 +89,8 @@ cd clarinet
 cargo clarinet-install
 ```
 
-By default, you will be in Hiro's development branch, `develop`, with code that has not been released yet. If you plan on submitting any changes to the code, then this is the right branch for you. If you simply want the latest stable version, switch to the main branch by entering the following command:
+By default, you will be in Hiro's development branch, `develop`, with code that has not been released yet. If you plan on submitting any changes to the code, then this is the right branch for you.
+If you want the latest stable version, switch to the main branch by entering the following command:
 
 ```bash
 git checkout main
