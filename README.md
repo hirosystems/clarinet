@@ -1,9 +1,9 @@
 # Clarinet
 
 Clarinet is a Clarity runtime packaged as a command line tool, designed to facilitate smart contract understanding,
-development, testing and deployment. Clarinet consists of a Clarity Read-Evaluate-Print-Loop (REPL) environment and a testing harness. When used together, Clarity and the REPL environment enables you to rapidly develop and test a Clarity smart contract, requiring you to deploy the contract to a local devnet or testnet.
+development, testing and deployment. Clarinet consists of a Clarity Read-Evaluate-Print-Loop (REPL) environment and a testing harness. When used together, Clarity and the REPL environment enables you to rapidly develop and test a Clarity smart contract, allowing you to deploy the contract to a local devnet or testnet.
 
-Clarity is a **decidable** smart contract language that optimizes for predictability and security, meaning you can know with certainty, from the code itself, what the program will do. Smart contracts allow developers to encode essential business logic on a blockchain.
+Clarity is a **decidable** smart contract language that optimizes for predictability and security, meaning you can know with certainty, from the code itself, what the program will do. Smart contracts allow you to encode essential business logic on a blockchain.
 
 For a video description of Clarinet, please refer to the [What Is Clarinet?](https://www.youtube.com/watch?v=mitOkTZqMHc&list=PL5Ujm489LoJaAz9kUJm8lYUWdGJ2AnQTb&index=1) YouTube video.
 
@@ -13,8 +13,8 @@ For a video description of Clarinet, please refer to the [What Is Clarinet?](htt
 
 Hiro has created an introductory video tutorial series that guides you through some of the fundamentals of of Clarinet, and how it can help develop, test, and deploy Clarity smart contracts.
 
-Check out the YouTube playlist on [Hiro's Youtube](https://www.youtube.com/c/HiroSystems):
-[<img src="docs/images/clarinet101.png">](https://youtube.com/playlist?list=PL5Ujm489LoJaAz9kUJm8lYUWdGJ2AnQTb) channel.
+Please revew and watch the YouTube playlist on [Hiro's Youtube](https://www.youtube.com/c/HiroSystems):
+[<img src="docs/images/clarinet101.png">](https://youtube.com/playlist?list=PL5Ujm489LoJaAz9kUJm8lYUWdGJ2AnQTb) channel for information on how to use Clarinet for smart contracts.
 
 ## Installation
 
@@ -26,19 +26,19 @@ To install Clarinet on macOS, run the following command:
 brew install clarinet
 ```
 
-For a video description on the Windows installation process, please see the [Setting Up Your Clarity Development Environment (Windows)](https://www.youtube.com/watch?v=r5LY1J5oACs&list=PL5Ujm489LoJaAz9kUJm8lYUWdGJ2AnQTb&index=3) YouTube video.
+For a video description of this installation process, please see the [Setting Up Your Clarity Development Environment (Mac)](https://www.youtube.com/watch?v=dpPopuvYU90&list=PL5Ujm489LoJaAz9kUJm8lYUWdGJ2AnQTb&index=2) YouTube video.
 
 ### Install on Windows
 
-If you would like to install Clarinet on Windows, the easiest way to install Clarinet on Windows is to use the MSI installer. You can downloaded the executable from the [releases page](https://github.com/hirosystems/clarinet/releases).
+If you would like to install Clarinet on Windows, the easiest way to install Clarinet on Windows is to use the MSI installer. You can download the executable from the [releases page](https://github.com/hirosystems/clarinet/releases).
 
-Clarinet is also available on Winget, the package manager that Microsoft started including in the latest Windows updates:
+Clarinet is also available on Winget; the package manager that Microsoft began including in the latest Windows updates:
 
 ```powershell
 winget install clarinet
 ```
 
-For a video description of this installation process, please see the [Setting Up Your Clarity Development Environment (Mac)](https://www.youtube.com/watch?v=dpPopuvYU90&list=PL5Ujm489LoJaAz9kUJm8lYUWdGJ2AnQTb&index=2) YouTube video.
+For a video description on the Windows installation process, please see the [Setting Up Your Clarity Development Environment (Windows)](https://www.youtube.com/watch?v=r5LY1J5oACs&list=PL5Ujm489LoJaAz9kUJm8lYUWdGJ2AnQTb&index=3) YouTube video.
 
 ### Install from a pre-built binary
 
@@ -185,7 +185,7 @@ This command uses the `Clarinet.toml` file to locate and analyze all of the cont
 ✔ 2 contracts checked
 ```
 
-The checker may also report warnings that indicate that the code is valid; however, you should be aware of a specific condition that might arise. For example, the check-checker analysis discussed below will generate warnings. If there are errors in the code, the output of the command will indicate the kind and location of the errors.
+The checker may also report warnings that indicate the code is valid; however, you should be aware of a specific condition that might arise. For example, the check-checker analysis discussed below will generate warnings. If there are errors in the code, the output of the command will indicate the kind and location of the errors.
 
 You may also perform syntax-check on a single file by using the following command.
 
@@ -199,13 +199,13 @@ If there are no syntax errors, the output of the command will be a success messa
 ✔ Syntax of contract successfully checked
 ```
 
-Any syntactical errors in the Clarity code will be reported, but type-checking and other semantic checks will not be performed because Clarinet will only look at this one contract, since it does not have the full context to perform a complete check.
+**Note** Any syntactical errors in the Clarity code will be reported, but type-checking and other semantic checks will not be performed because Clarinet will only look at this one contract, since it does not have the full context to perform a complete check.
 
 ### Static Analysis
 
 #### Check-Checker
 
-The check-checker is a static analysis pass that you can use to help find potential vulnerabilities in your contracts. To enable this pass, add the following to your Clarinet.toml file:
+The check-checker is a static analysis pass you can use to help find potential vulnerabilities in your contracts. To enable this pass, add the following lines to your `Clarinet.toml` file:
 
 ```toml
 [repl.analysis]
@@ -233,12 +233,12 @@ The check-checker pass analyzes your contract to identify places where untrusted
   - Variables:
     - var-set
 
-In addition to those operations, the check-checker is also a bit opinionated and prefers that untrusted data be checked near the source, making the code more readable and maintainable. For this reason, it also requires that arguments passed into private functions must be checked and return values must be checked.
+In addition to those operations, the check-checker is also a bit opinionated and prefers that untrusted data be checked near the source, making the code more readable and maintainable. For this reason, the check-checker also requires that arguments passed into private functions and return values must be checked.
 
 - Calls to private functions
 - Return values
 
-Finally, another opportunity for exploits shows up when contracts call functions from traits. Those traits are untrusted, just like other parameters to public functions, so they are also required to be checked.
+Finally, another opportunity for exploits appears when contracts call functions from traits. Those traits are untrusted, just like other parameters to public functions, so they are also required to be checked.
 
 - Dynamic contract calls (through traits)
 
@@ -258,7 +258,7 @@ For a more detailed description on how to use the Check-Checker, please see the 
 
 ##### Options
 
-The check-checker provides some options that can be specified in Clarinet.toml to handle common usage scenarios that may reduce false positives from the analysis:
+The check-checker provides some options that can be specified in `Clarinet.toml` to handle common usage scenarios that may reduce false positives from the analysis:
 
 ```toml
 [repl.analysis.check_checker]
@@ -284,7 +284,7 @@ In the example below, the `asserts!` on line 3 is verifying the `tx-sender`. Bec
 )
 ```
 
-The `callee_filter` option loosens the restriction on passing untrusted data to private functions, and instead, allows checks in a called function to propagate up to the caller. This is helpful, because it allows developers to define input checks in a function that can be reused.
+The `callee_filter` option loosens the restriction on passing untrusted data to private functions, and instead, allows checks in a called function to propagate up to the caller. This is helpful, because it allows you to define input checks in a function that can be reused.
 
 In the example below, the private function `validate` checks its parameter. The public function `save` calls `validate`, and when the `callee_filter` option is enabled, that call to `validate` will count as a check for the untrusted input, `amount`, resulting in no warnings from the check-checker.
 
@@ -338,7 +338,7 @@ This annotation tells the check-checker that the following expression is allowed
 
 This annotation tells the check-checker to consider the specified variables to be checked by the following expression. This is useful for the case where your contract does some indirect check that validates that an input is safe, but there is no way for the analysis to recognize this. In place of the list of variable names in the annotation, an `*` may be used to filter all inputs.
 
-_This is the safest and preferred way to silence warnings that you consider false positives._
+**Note** The command below is the safest and preferred way to silence warnings that you consider false positives.
 
 ```clarity
 (define-public (filter_one (amount uint))
@@ -352,13 +352,15 @@ _This is the safest and preferred way to silence warnings that you consider fals
 
 ### Execute a test suite
 
-Clarinet provides a testing harness based on Deno that can allow you to create automated unit tests or pseudo-integration tests using Typescript.
+Clarinet provides a testing harness based on Deno that can enable you to create automated unit tests or pseudo-integration tests using Typescript.
 
 ```bash
 $ clarinet test
 ```
 
-When you use `clarinet contract new foo` to create a new contract, clarinet will automatically create a unit test file for this new contract, _tests/foo_test.ts_. Other files under the _tests/_ directory following the Deno test naming convention will also be included:
+For more information on how to create unit tests using Typescript, see the [Writing Unit Tests Using Typescript](https://www.youtube.com/watch?v=Z4YEHUxHWuE&list=PL5Ujm489LoJaAz9kUJm8lYUWdGJ2AnQTb&index=7) YouTube video.
+
+When you use the `clarinet contract new foo` command to create a new contract, Clarinet will automatically create a unit test file for this new contract, `tests/foo_test.ts`. Other files under the `tests/_ directory` following the Deno test naming convention will also be included:
 
 - named test.{ts, tsx, mts, js, mjs, jsx, cjs, cts},
 - or ending with .test.{ts, tsx, mts, js, mjs, jsx, cjs, cts},
@@ -429,11 +431,11 @@ evaluation on a blockchain by using the following command:
 $ clarinet integrate
 ```
 
-**Note**Make sure you have a working installation of Docker running locally.
+**Note** Make sure you have a working installation of Docker running locally.
 
 ### Interacting with contracts deployed on Mainnet
 
-Composition and interactions between protocols and contracts are one of the key innovations in blockchains. Clarinet was designed to handle this sort of interactions.
+Composition and interactions between protocols and contracts are one of the key innovations in blockchains. Clarinet was designed to handle these types of interactions.
 
 Before referring to contracts deployed on Mainnet, these contracts should be explicitly be listed as a `requirement` in the manifest `Clarinet.toml`, either manually:
 
@@ -451,13 +453,13 @@ or with the command:
 clarinet requirements add SP2KAF9RF86PVX3NEE27DFV1CQX0T4WGR41X3S45C.bitcoin-whales
 ```
 
-Clarinet will be able to resolve the `contract-call?` statements invoking requirements present in your local contracts by downloading and caching a copy of these contracts and using them during the execution of your testsuites. All of the different features are available in `clarinet`.
+Clarinet will be able to resolve the `contract-call?` statements invoking requirements present in your local contracts by downloading and caching a copy of these contracts and using them during the execution of your test suites. All of the different features are available in `clarinet`.
 
 When deploying your protocol to Devnet / Testnet, for the contracts involving requirements, the setting `remap_requirements` in your deployment plans must be set.
 
 As a step-by-step example, we use here the following contract, [**bitcoin-whales**](https://explorer.stacks.co/txid/SP2KAF9RF86PVX3NEE27DFV1CQX0T4WGR41X3S45C.bitcoin-whales?chain=mainnet)
 
-If you examine this contract, you will see that  there are 3 different dependencies: two from the **same**
+If you examine this contract, you will see that there are 3 different dependencies: two from the **same**
 project (included in the same Clarinet.toml file), and one referring to a contract deployed outside of the current project.
 
 ### Same Project
@@ -601,11 +603,11 @@ jobs:
 
 You may also add the steps above in your existing workflows. The generated code coverage output can then be used as is with GitHub Apps like https://codecov.io.
 
-For more information on how you use GitHub Actions with Clarinet, please see the A Simple CI With Clarinet and GitHub(https://www.youtube.com/watch?v=cEv6Mi4EcKQ&list=PL5Ujm489LoJaAz9kUJm8lYUWdGJ2AnQTb&index=8) YouTube video
+For more information on how you can use GitHub Actions with Clarinet, please see the [A Simple CI With Clarinet and GitHub](https://www.youtube.com/watch?v=cEv6Mi4EcKQ&list=PL5Ujm489LoJaAz9kUJm8lYUWdGJ2AnQTb&index=8) YouTube video
 
 ### Extensions
 
-Clarinet can easily be extended by community members: open source contributions to clarinet are welcome, but you may also write your own Clarinet extensions if you want to integrate Clarity contracts with your own tooling and workflow.
+Clarinet can easily be extended by community members: open source contributions to Clarinet are welcome, but you may also write your own Clarinet extensions if you want to integrate Clarity contracts with your own tooling and workflow.
 
 | Name                      | wallet access | disk write | disk read | Deployment                                                            | Description                                                                                                                                       |
 | ------------------------- | ------------- | ---------- | --------- | --------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -702,7 +704,7 @@ Inside of the console (`clarinet console`), there is a debugger for stepping thr
   - **Continue**: Continue execution until hitting a breakpoint or completing execution (`continue` or `c` command)
 - Evaluate and print the result of any expression (`print` or `p` command)
 
-To initiate a debug sessionm, first enter the REPL console using the following command:
+To initiate a debug session, first enter the REPL console using the following command:
 
 ```
 clarinet console
@@ -729,7 +731,7 @@ This trace shows all function calls, both internal calls to private functions, a
 ### Deploy with Hyperchains on Devnet
 
 Clarinet can be used for facilitating experimentations with [Hyperchains](https://www.youtube.com/watch?v=PFPwuVCGGuI).
-To get started with subnets, in your `Devnet.toml`, enable the flag
+To begin working with subnets, in your `Devnet.toml`, enable the following flag:
 
 ```toml
 [devnet]
@@ -737,7 +739,8 @@ To get started with subnets, in your `Devnet.toml`, enable the flag
 enable_subnet_node = true
 ```
 
-This same file can be used for customizing the subnet-node (miner, etc).
+This same file may also be used for customizing the subnet-node (miner, etc).
+
 When running the command:
 
 ```bash
@@ -748,7 +751,7 @@ Clarinet will spin-up a subnet node. More documentation on how to use and intera
 
 ## Contributing to Clarinet
 
-We welcome contributions to Clarinet! The following sections provide information on how you can contribute to the Clarinet project.
+Contribtions are welcome and appreciated. The following sections provide information on how you can contribute to Clarinet.
 
 ### Prerequisites
 
