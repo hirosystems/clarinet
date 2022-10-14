@@ -237,6 +237,7 @@ impl Session {
         let mut output = Vec::<String>::new();
         match command {
             "::help" => self.display_help(&mut output),
+            "/-/" => self.easter_egg(&mut output),
             cmd if cmd.starts_with("::list_functions") => self.display_functions(&mut output),
             cmd if cmd.starts_with("::describe_function") => self.display_doc(&mut output, cmd),
             cmd if cmd.starts_with("::mint_stx") => self.mint_stx(&mut output, cmd),
@@ -757,6 +758,12 @@ impl Session {
             "{}",
             help_colour.paint("::read <filename>\t\t\tRead expressions from a file")
         ));
+    }
+
+    fn easter_egg(&self, output: &mut Vec<String>) {
+        let result = nestable_block_on(fetch_message());
+        let message = result.unwrap_or("You found it!".to_string());
+        println!("{}", message);
     }
 
     fn parse_and_advance_chain_tip(&mut self, output: &mut Vec<String>, command: &str) {
@@ -1310,4 +1317,28 @@ mod tests {
         );
         assert_eq!(session.handle_command("(at-block (unwrap-panic (get-block-info? id-header-hash u10000)) (contract-call? .contract get-x))")[0], green!("u1"));
     }
+}
+
+use reqwest;
+use std::future::Future;
+use tokio;
+
+pub fn nestable_block_on<F: Future>(future: F) -> F::Output {
+    let (handle, _rt) = match tokio::runtime::Handle::try_current() {
+        Ok(h) => (h, None),
+        Err(_) => {
+            let rt = tokio::runtime::Runtime::new().unwrap();
+            (rt.handle().clone(), Some(rt))
+        }
+    };
+    let response = handle.block_on(async { future.await });
+    response
+}
+
+async fn fetch_message() -> Result<String, reqwest::Error> {
+    const gist: &str =
+        "https://gist.githubusercontent.com/obycode/d10b5a40cd926275ff6bde07d2270f2a/raw/";
+    let response = reqwest::get(gist).await?;
+    let message = response.text().await?;
+    Ok(message)
 }
