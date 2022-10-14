@@ -1,7 +1,11 @@
 # Clarinet
 
 Clarinet is a Clarity runtime packaged as a command line tool, designed to facilitate smart contract understanding,
-development, testing and deployment. Clarinet consists of a Clarity Read-Evaluate-Print-Loop (REPL) environment and a testing harness. When used together, Clarity and the REPL environment enables you to rapidly develop and test a Clarity smart contract, allowing you to deploy the contract to a local devnet or testnet.
+development, testing and deployment. Clarinet consists of a Clarity Read-Evaluate-Print-Loop (REPL) environment and a testing harness. When used together, Clarity and the REPL environment enables you to rapidly develop and test a Clarity smart contract, allowing you to deploy the contract to a:
+
+- devnet - a local a standalone development environment that simulates Bitcoin, Stacks node and other helpful components, similar to a staging environment.
+- [testnet](https://docs.stacks.co/docs/understand-stacks/testnet) - a testing environment not running in production.
+- [mainnet](https://stacks.org/stacks2mainnet) - a production environment where you can deploy smart contracts.
 
 Clarity is a **decidable** smart contract language that optimizes for predictability and security, meaning you can know with certainty, from the code itself, what the program will do. Smart contracts allow you to encode essential business logic on a blockchain.
 
@@ -67,7 +71,7 @@ If you would like to install Clarinet from source using Cargo, there are some sp
 
 #### Prerequisites
 
-You must first [Install Rust](https://www.rust-lang.org/tools/install) to gain access to cargo, which is the Rust package manager.
+You must first [Install Rust](https://www.rust-lang.org/tools/install) to use the Rust package manager Cargo.
 
 If you are using Debian and Ubuntu-based distributions, make sure to run the following command to install required packages before building Clarinet.
 
