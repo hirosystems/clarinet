@@ -1,6 +1,6 @@
 // Copyright 2018-2022 the Deno authors. All rights reserved. MIT license.
 
-use crate::utils::nestable_block_on;
+use hiro_system_kit::nestable_block_on;
 
 use super::vendor::deno_cli::args::{ConfigFlag, TypeCheckMode};
 use super::vendor::deno_cli::args::{DenoSubcommand, Flags, TestFlags};

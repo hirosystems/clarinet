@@ -11,12 +11,12 @@ use crate::observer::{
     self, start_observer_commands_handler, ApiKey, ChainhookStore, EventHandler,
     EventObserverConfig, ObserverCommand,
 };
-use crate::utils;
 use chainhook_types::{
     BitcoinChainEvent, BitcoinChainUpdatedWithBlocksData, BitcoinNetwork, StacksBlockData,
     StacksBlockUpdate, StacksChainEvent, StacksChainUpdatedWithBlocksData, StacksNetwork,
 };
 use clarity_repl::clarity::vm::types::QualifiedContractIdentifier;
+use hiro_system_kit;
 use std::collections::{HashMap, HashSet};
 use std::sync::mpsc::{channel, Receiver, Sender};
 use std::sync::{Arc, RwLock};
@@ -153,7 +153,7 @@ fn test_stacks_chainhook_register_deregister() {
 
     let handle = std::thread::spawn(move || {
         let (config, chainhook_store) = generate_test_config();
-        let _ = crate::utils::nestable_block_on(start_observer_commands_handler(
+        let _ = hiro_system_kit::nestable_block_on(start_observer_commands_handler(
             config,
             Arc::new(RwLock::new(chainhook_store)),
             observer_commands_rx,
@@ -329,7 +329,7 @@ fn test_stacks_chainhook_auto_deregister() {
 
     let handle = std::thread::spawn(move || {
         let (config, chainhook_store) = generate_test_config();
-        let _ = crate::utils::nestable_block_on(start_observer_commands_handler(
+        let _ = hiro_system_kit::nestable_block_on(start_observer_commands_handler(
             config,
             Arc::new(RwLock::new(chainhook_store)),
             observer_commands_rx,
@@ -485,7 +485,7 @@ fn test_bitcoin_chainhook_register_deregister() {
 
     let handle = std::thread::spawn(move || {
         let (config, chainhook_store) = generate_test_config();
-        let _ = crate::utils::nestable_block_on(start_observer_commands_handler(
+        let _ = hiro_system_kit::nestable_block_on(start_observer_commands_handler(
             config,
             Arc::new(RwLock::new(chainhook_store)),
             observer_commands_rx,
@@ -681,7 +681,7 @@ fn test_bitcoin_chainhook_auto_deregister() {
 
     let handle = std::thread::spawn(move || {
         let (config, chainhook_store) = generate_test_config();
-        let _ = crate::utils::nestable_block_on(start_observer_commands_handler(
+        let _ = hiro_system_kit::nestable_block_on(start_observer_commands_handler(
             config,
             Arc::new(RwLock::new(chainhook_store)),
             observer_commands_rx,

@@ -235,10 +235,11 @@ impl NetworkManifest {
     pub fn from_project_manifest_location(
         project_manifest_location: &FileLocation,
         networks: &(BitcoinNetwork, StacksNetwork),
+        cache_location: Option<&FileLocation>,
     ) -> Result<NetworkManifest, String> {
         let network_manifest_location =
             project_manifest_location.get_network_manifest_location(&networks.1)?;
-        NetworkManifest::from_location(&network_manifest_location, networks)
+        NetworkManifest::from_location(&network_manifest_location, networks, cache_location)
     }
 
     pub async fn from_project_manifest_location_using_file_accessor(
@@ -257,12 +258,14 @@ impl NetworkManifest {
         Ok(NetworkManifest::from_network_manifest_file(
             &mut network_manifest_file,
             networks,
+            None,
         ))
     }
 
     pub fn from_location(
         location: &FileLocation,
         networks: &(BitcoinNetwork, StacksNetwork),
+        cache_location: Option<&FileLocation>,
     ) -> Result<NetworkManifest, String> {
         let network_manifest_file_content = location.read_content()?;
         let mut network_manifest_file: NetworkManifestFile =
@@ -270,12 +273,14 @@ impl NetworkManifest {
         Ok(NetworkManifest::from_network_manifest_file(
             &mut network_manifest_file,
             networks,
+            cache_location,
         ))
     }
 
     pub fn from_network_manifest_file(
         network_manifest_file: &mut NetworkManifestFile,
         networks: &(BitcoinNetwork, StacksNetwork),
+        cache_location: Option<&FileLocation>,
     ) -> NetworkManifest {
         let stacks_node_rpc_address = match (
             &network_manifest_file.network.node_rpc_address,
@@ -369,9 +374,19 @@ impl NetworkManifest {
             };
 
             let now = clarity_repl::clarity::util::get_epoch_time_secs();
-            let mut dir = std::env::temp_dir();
-            dir.push(format!("stacks-devnet-{}/", now));
-            let default_working_dir = dir.display().to_string();
+            let devnet_dir = format!("stacks-devnet-{}/", now);
+            let default_working_dir = match cache_location {
+                Some(cache_location) => {
+                    let mut devnet_location = cache_location.clone();
+                    let _ = devnet_location.append_path(&devnet_dir);
+                    devnet_location.to_string()
+                }
+                None => {
+                    let mut dir = std::env::temp_dir();
+                    dir.push(devnet_dir);
+                    dir.display().to_string()
+                }
+            };
 
             let miner_mnemonic = devnet_config
                 .miner_mnemonic

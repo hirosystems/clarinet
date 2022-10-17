@@ -25,7 +25,7 @@ pub fn block_on<F, R>(future: F) -> R
 where
     F: std::future::Future<Output = R>,
 {
-    let rt = crate::utils::create_basic_runtime();
+    let rt = hiro_system_kit::create_basic_runtime();
     rt.block_on(future)
 }
 
@@ -37,7 +37,7 @@ async fn do_run_lsp() -> Result<(), String> {
     let (request_tx, request_rx) = unbounded();
     let (response_tx, response_rx) = mpsc::channel();
     std::thread::spawn(move || {
-        crate::utils::nestable_block_on(native_bridge::start_language_server(
+        hiro_system_kit::nestable_block_on(native_bridge::start_language_server(
             notification_rx,
             request_rx,
             response_tx,
@@ -178,7 +178,7 @@ fn test_opening_counter_contract_should_return_fresh_analysis() {
     let (_request_tx, request_rx) = unbounded();
     let (response_tx, response_rx) = channel();
     std::thread::spawn(move || {
-        crate::utils::nestable_block_on(native_bridge::start_language_server(
+        hiro_system_kit::nestable_block_on(native_bridge::start_language_server(
             notification_rx,
             request_rx,
             response_tx,
@@ -219,7 +219,7 @@ fn test_opening_counter_manifest_should_return_fresh_analysis() {
     let (_request_tx, request_rx) = unbounded();
     let (response_tx, response_rx) = channel();
     std::thread::spawn(move || {
-        crate::utils::nestable_block_on(native_bridge::start_language_server(
+        hiro_system_kit::nestable_block_on(native_bridge::start_language_server(
             notification_rx,
             request_rx,
             response_tx,
@@ -259,7 +259,7 @@ fn test_opening_simple_nft_manifest_should_return_fresh_analysis() {
     let (_request_tx, request_rx) = unbounded();
     let (response_tx, response_rx) = channel();
     std::thread::spawn(move || {
-        crate::utils::nestable_block_on(native_bridge::start_language_server(
+        hiro_system_kit::nestable_block_on(native_bridge::start_language_server(
             notification_rx,
             request_rx,
             response_tx,

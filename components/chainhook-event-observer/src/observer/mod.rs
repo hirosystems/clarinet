@@ -5,7 +5,6 @@ use crate::chainhooks::{
     BitcoinChainhookOccurrencePayload, StacksChainhookOccurrence, StacksChainhookOccurrencePayload,
 };
 use crate::indexer::{self, Indexer, IndexerConfig};
-use crate::utils;
 use bitcoincore_rpc::bitcoin::{BlockHash, Txid};
 use bitcoincore_rpc::{Auth, Client, RpcApi};
 use chainhook_types::{
@@ -13,14 +12,18 @@ use chainhook_types::{
     TransactionIdentifier,
 };
 use clarity_repl::clarity::util::hash::bytes_to_hex;
+use hiro_system_kit;
 use reqwest::Client as HttpClient;
 use rocket::config::{Config, LogLevel};
+use rocket::data::{Limits, ToByteUnit};
 use rocket::http::Status;
 use rocket::outcome::IntoOutcome;
 use rocket::request::{self, FromRequest, Outcome, Request};
 use rocket::serde::json::{json, Json, Value as JsonValue};
 use rocket::serde::Deserialize;
 use rocket::State;
+use rocket_okapi::{openapi, openapi_get_routes, request::OpenApiFromRequest};
+use schemars::JsonSchema;
 use serde_json::error;
 use stacks_rpc_client::{PoxInfo, StacksRpc};
 use std::collections::{HashMap, HashSet, VecDeque};
@@ -34,9 +37,6 @@ use std::str::FromStr;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc::{Receiver, Sender};
 use std::sync::{Arc, Mutex, RwLock};
-
-use rocket_okapi::{openapi, openapi_get_routes, request::OpenApiFromRequest};
-use schemars::JsonSchema;
 
 pub const DEFAULT_INGESTION_PORT: u16 = 20445;
 pub const DEFAULT_CONTROL_PORT: u16 = 20446;
@@ -268,6 +268,7 @@ pub async fn start_event_observer(
 
     let background_job_tx_mutex = Arc::new(Mutex::new(observer_commands_tx.clone()));
 
+    let limits = Limits::default().limit("json", 4.megabytes());
     let ingestion_config = Config {
         port: ingestion_port,
         workers: 3,
@@ -275,6 +276,7 @@ pub async fn start_event_observer(
         keep_alive: 5,
         temp_dir: std::env::temp_dir().into(),
         log_level: log_level.clone(),
+        limits,
         ..Config::default()
     };
 
@@ -300,7 +302,7 @@ pub async fn start_event_observer(
             .mount("/", routes)
             .launch();
 
-        let _ = utils::nestable_block_on(future);
+        let _ = hiro_system_kit::nestable_block_on(future);
     });
 
     let control_config = Config {
@@ -331,7 +333,7 @@ pub async fn start_event_observer(
             .mount("/", routes)
             .launch();
 
-        let _ = utils::nestable_block_on(future);
+        let _ = hiro_system_kit::nestable_block_on(future);
     });
 
     // This loop is used for handling background jobs, emitted by HTTP calls.
@@ -501,6 +503,9 @@ pub async fn start_observer_commands_handler(
                                         BitcoinChainhookOccurrence::Http(request) => {
                                             requests.push(request);
                                         }
+                                        BitcoinChainhookOccurrence::File(_path, _bytes) => {
+                                            info!("Writing to disk not supported in server mode")
+                                        }
                                         BitcoinChainhookOccurrence::Data(payload) => {
                                             if let Some(ref tx) = observer_events_tx {
                                                 let _ = tx.send(
@@ -616,6 +621,9 @@ pub async fn start_observer_commands_handler(
                                     match result {
                                         StacksChainhookOccurrence::Http(request) => {
                                             requests.push(request);
+                                        }
+                                        StacksChainhookOccurrence::File(_path, _bytes) => {
+                                            info!("Writing to disk not supported in server mode")
                                         }
                                         StacksChainhookOccurrence::Data(payload) => {
                                             if let Some(ref tx) = observer_events_tx {
@@ -980,10 +988,11 @@ pub async fn handle_bitcoin_rpc_call(
         "{}:{}",
         bitcoin_config.username, bitcoin_config.password
     ));
+
     let client = Client::new();
     let builder = client
         .post(format!(
-            "{}:{}/",
+            "{}:{}",
             bitcoin_config.rpc_host, bitcoin_config.rpc_port
         ))
         .header("Content-Type", "application/json")
