@@ -53,6 +53,7 @@ pub fn standardize_bitcoin_block(
     let block = rpc.get_block(&block_hash).unwrap();
 
     for mut tx in block.txdata.into_iter() {
+        let txid = tx.txid().to_string();
         let mut inputs = vec![];
         for input in tx.input.drain(..) {
             inputs.push(TxIn {
@@ -76,7 +77,7 @@ pub fn standardize_bitcoin_block(
 
         let tx = BitcoinTransactionData {
             transaction_identifier: TransactionIdentifier {
-                hash: format!("0x{}", tx.txid().to_string()),
+                hash: format!("0x{}", txid),
             },
             operations: vec![],
             metadata: BitcoinTransactionMetadata { inputs, outputs },
