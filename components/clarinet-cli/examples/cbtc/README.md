@@ -19,7 +19,9 @@ $ clarinet integrate
 In another console, change the directory to `./serverless/`. After running
 
 ```bash
+$ cd serverless
 $ yarn global add serverless    # Install serverless globally
+$ yarn add --dev serverless-plugin-typescript@latest
 $ yarn                          # Install dependencies
 ```
 
