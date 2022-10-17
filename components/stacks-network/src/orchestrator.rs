@@ -48,6 +48,7 @@ impl DevnetOrchestrator {
         let mut network_config = NetworkManifest::from_project_manifest_location(
             &manifest.location,
             &StacksNetwork::Devnet.get_networks(),
+            Some(&manifest.project.cache_location),
         )?;
 
         let name = manifest.project.name.clone();

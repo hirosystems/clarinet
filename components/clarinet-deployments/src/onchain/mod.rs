@@ -222,6 +222,7 @@ pub fn apply_on_chain_deployment(
     let network_manifest = NetworkManifest::from_project_manifest_location(
         &manifest.location,
         &deployment.network.get_networks(),
+        None,
     )
     .expect("unable to load network manifest");
     let delay_between_checks: u64 = 10;
