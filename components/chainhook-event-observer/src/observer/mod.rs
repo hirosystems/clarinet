@@ -986,17 +986,11 @@ pub async fn handle_bitcoin_rpc_call(
         bitcoin_config.username, bitcoin_config.password
     ));
 
-    let path = if method == "listunspent" {
-        "wallet/stacks-mining"
-    } else {
-        ""
-    };
-
     let client = Client::new();
     let builder = client
         .post(format!(
-            "{}:{}/{}",
-            bitcoin_config.rpc_host, bitcoin_config.rpc_port, path
+            "{}:{}",
+            bitcoin_config.rpc_host, bitcoin_config.rpc_port
         ))
         .header("Content-Type", "application/json")
         .timeout(std::time::Duration::from_secs(5))
