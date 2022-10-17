@@ -14,6 +14,10 @@ COPY ./components/stacks-rpc-client /src/components/stacks-rpc-client
 
 COPY ./components/clarity-repl /src/components/clarity-repl
 
+COPY ./components/clarinet-utils /src/components/clarinet-utils
+
+COPY ./components/hiro-system-kit /src/components/hiro-system-kit
+
 WORKDIR /src/components/chainhook-event-observer
 
 RUN mkdir /out
