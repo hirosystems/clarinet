@@ -48,6 +48,7 @@ impl DeploymentCache {
             &deployment,
             Some(&artifacts.asts),
             true,
+            None,
         );
 
         let mut contracts_artifacts = HashMap::new();
