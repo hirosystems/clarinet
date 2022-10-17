@@ -413,7 +413,7 @@ impl DevnetOrchestrator {
             Ok(_) => {}
             Err(message) => {
                 let _ = event_tx.send(DevnetEvent::FatalError(message.clone()));
-                self.kill().await;
+                self.kill(Some(&message)).await;
                 return Err(message);
             }
         };
@@ -429,7 +429,7 @@ impl DevnetOrchestrator {
             }
             Err(message) => {
                 let _ = event_tx.send(DevnetEvent::FatalError(message.clone()));
-                self.kill().await;
+                self.kill(Some(&message)).await;
                 return Err(message);
             }
         };
@@ -448,7 +448,7 @@ impl DevnetOrchestrator {
                 Ok(_) => {}
                 Err(message) => {
                     let _ = event_tx.send(DevnetEvent::FatalError(message.clone()));
-                    self.kill().await;
+                    self.kill(Some(&message)).await;
                     return Err(message);
                 }
             };
@@ -456,7 +456,7 @@ impl DevnetOrchestrator {
                 Ok(_) => {}
                 Err(message) => {
                     let _ = event_tx.send(DevnetEvent::FatalError(message.clone()));
-                    self.kill().await;
+                    self.kill(Some(&message)).await;
                     return Err(message);
                 }
             };
@@ -472,7 +472,7 @@ impl DevnetOrchestrator {
                 Ok(_) => {}
                 Err(message) => {
                     let _ = event_tx.send(DevnetEvent::FatalError(message.clone()));
-                    self.kill().await;
+                    self.kill(Some(&message)).await;
                     return Err(message);
                 }
             };
@@ -486,7 +486,7 @@ impl DevnetOrchestrator {
                 Ok(_) => {}
                 Err(message) => {
                     let _ = event_tx.send(DevnetEvent::FatalError(message.clone()));
-                    self.kill().await;
+                    self.kill(Some(&message)).await;
                     return Err(message);
                 }
             };
@@ -499,7 +499,7 @@ impl DevnetOrchestrator {
                 Ok(_) => {}
                 Err(message) => {
                     let _ = event_tx.send(DevnetEvent::FatalError(message.clone()));
-                    self.kill().await;
+                    self.kill(Some(&message)).await;
                     return Err(message);
                 }
             };
@@ -513,7 +513,7 @@ impl DevnetOrchestrator {
                 Ok(_) => {}
                 Err(message) => {
                     let _ = event_tx.send(DevnetEvent::FatalError(message.clone()));
-                    self.kill().await;
+                    self.kill(Some(&message)).await;
                     return Err(message);
                 }
             };
@@ -524,7 +524,7 @@ impl DevnetOrchestrator {
                     Ok(_) => {}
                     Err(message) => {
                         let _ = event_tx.send(DevnetEvent::FatalError(message.clone()));
-                        self.kill().await;
+                        self.kill(Some(&message)).await;
                         return Err(message);
                     }
                 };
@@ -538,7 +538,7 @@ impl DevnetOrchestrator {
                     Ok(_) => {}
                     Err(message) => {
                         let _ = event_tx.send(DevnetEvent::FatalError(message.clone()));
-                        self.kill().await;
+                        self.kill(Some(&message)).await;
                         return Err(message);
                     }
                 };
@@ -557,7 +557,7 @@ impl DevnetOrchestrator {
             Ok(_) => {}
             Err(message) => {
                 let _ = event_tx.send(DevnetEvent::FatalError(message.clone()));
-                self.kill().await;
+                self.kill(Some(&message)).await;
                 return Err(message);
             }
         };
@@ -571,7 +571,7 @@ impl DevnetOrchestrator {
             Ok(_) => {}
             Err(message) => {
                 let _ = event_tx.send(DevnetEvent::FatalError(message.clone()));
-                self.kill().await;
+                self.kill(Some(&message)).await;
                 return Err(message);
             }
         };
@@ -588,7 +588,7 @@ impl DevnetOrchestrator {
                 Ok(_) => {}
                 Err(message) => {
                     let _ = event_tx.send(DevnetEvent::FatalError(message.clone()));
-                    self.kill().await;
+                    self.kill(Some(&message)).await;
                     return Err(message);
                 }
             };
@@ -597,7 +597,7 @@ impl DevnetOrchestrator {
                 Ok(_) => {}
                 Err(message) => {
                     let _ = event_tx.send(DevnetEvent::FatalError(message.clone()));
-                    self.kill().await;
+                    self.kill(Some(&message)).await;
                     return Err(message);
                 }
             };
@@ -621,7 +621,7 @@ impl DevnetOrchestrator {
                 Ok(_) => {}
                 Err(message) => {
                     let _ = event_tx.send(DevnetEvent::FatalError(message.clone()));
-                    self.kill().await;
+                    self.kill(Some(&message)).await;
                     return Err(message);
                 }
             };
@@ -630,7 +630,7 @@ impl DevnetOrchestrator {
                 Ok(_) => {}
                 Err(message) => {
                     let _ = event_tx.send(DevnetEvent::FatalError(message.clone()));
-                    self.kill().await;
+                    self.kill(Some(&message)).await;
                     return Err(message);
                 }
             };
@@ -646,7 +646,7 @@ impl DevnetOrchestrator {
             boot_index += 1;
             match terminator_rx.recv() {
                 Ok(true) => {
-                    self.kill().await;
+                    self.kill(None).await;
                     break;
                 }
                 Ok(false) => {
@@ -2262,7 +2262,7 @@ events_keys = ["*"]
         Ok((bitcoin_node_c_id, stacks_node_c_id))
     }
 
-    pub async fn kill(&self) {
+    pub async fn kill(&self, fatal_message: Option<&str>) {
         let (docker, devnet_config) = match (&self.docker_client, &self.network_config) {
             (Some(ref docker), Some(ref network_config)) => match network_config.devnet {
                 Some(ref devnet_config) => (docker, devnet_config),
@@ -2348,9 +2348,11 @@ events_keys = ["*"]
             "Artifacts (logs, conf, chainstates) available here: {}",
             devnet_config.working_dir
         );
-        println!("✌️");
-        if self.can_exit {
-            std::process::exit(0);
+
+        if let Some(message) = fatal_message {
+            println!("⚠️  fatal error - {}", message);
+        } else {
+            println!("✌️");
         }
     }
 
