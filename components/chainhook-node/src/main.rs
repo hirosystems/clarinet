@@ -11,6 +11,7 @@ extern crate slog;
 use slog_async;
 use slog_term;
 
+pub mod archive;
 pub mod block;
 mod cli;
 pub mod config;
@@ -28,7 +29,7 @@ fn main() {
     // Get a root logger that will log into a given drain.
     //
     // Note `o!` macro for more natural `OwnedKeyValue` sequence building.
-    let root = Logger::root(drain.fuse(), o!("version" => env!("CARGO_PKG_VERSION")));
+    let root = Logger::root(drain.fuse(), o!());
 
     // slog_stdlog uses the logger from slog_scope, so set a logger there
     let _guard = slog_scope::set_global_logger(root);

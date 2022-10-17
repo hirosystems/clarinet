@@ -22,3 +22,4 @@ components/chainhook-types-js/dist
 components/chainhook-db/examples/arkadiko-data-indexing/vault-monitor/bin
 components/chainhook-db/examples/arkadiko-data-indexing/vault-monitor/tmp
 components/chainhook-db/examples/arkadiko-data-indexing/vault-monitor/vendor
+components/chainhook-node/cache

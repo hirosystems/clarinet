@@ -26,6 +26,12 @@ slog-scope = { version = "4.4.0", optional = true }
 slog-term = "2.9.0"
 slog-async = "2.7.0"
 slog-atomic = "3.1.0"
+reqwest = { version = "0.11", features = ["stream", "json"] }
+tokio = { version = "=1.17.0", features = ["full"] }
+futures-util = "0.3.24"
+flate2 = "1.0.24"
+tar = "0.4.38"
+flume = "0.10.14"
 
 [dev-dependencies]
 criterion = "0.3"

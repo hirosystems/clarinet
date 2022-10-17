@@ -59,6 +59,10 @@ pub fn start(command_rx: Receiver<DigestingCommand>, config: &Config) {
                         .into_iter()
                         .collect();
                     let _: Result<(), redis::RedisError> = con.del(&keys_to_prune);
+                    info!(
+                        "{} Stacks orphaned blocks removed from storage",
+                        keys_to_prune.len()
+                    );
                 }
                 DigestingCommand::Terminate | DigestingCommand::Kill => {
                     info!("Terminating");

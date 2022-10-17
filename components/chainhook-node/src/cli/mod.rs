@@ -1,4 +1,5 @@
 use super::block;
+use crate::archive;
 use crate::block::DigestingCommand;
 use crate::config::{Config, ConfigFile};
 
@@ -18,6 +19,8 @@ use clap::Parser;
 use ctrlc;
 use hiro_system_kit;
 use std::collections::HashSet;
+use std::fs::File;
+use std::io;
 use std::{collections::HashMap, process, sync::mpsc::channel, thread};
 
 /// Simple program to greet a person
@@ -44,7 +47,28 @@ pub fn main() {
     })
     .expect("Error setting Ctrl-C handler");
 
-    let config = Config::default();
+    let mut config = Config::default();
+
+    // Download default tsv.
+    if config.rely_on_remote_tsv() && config.should_download_remote_tsv() {
+        let url = config.expected_remote_tsv_url();
+        let mut destination_path = config.expected_cache_path();
+        destination_path.push("stacks-node-events.tsv");
+        // Download archive if not already present in cache
+        if !destination_path.exists() {
+            info!("Downloading {}...", url);
+            match hiro_system_kit::nestable_block_on(archive::download_tsv_file(&config)) {
+                Ok(_) => {}
+                Err(e) => {
+                    error!("{}", e);
+                    process::exit(1);
+                }
+            }
+            let mut destination_path = config.expected_cache_path();
+            destination_path.push("stacks-node-events.tsv");
+        }
+        config.add_local_tsv_source(&destination_path);
+    }
 
     let ingestion_config = config.clone();
     let seed_digestion_tx = digestion_tx.clone();
@@ -57,9 +81,6 @@ pub fn main() {
                 process::exit(1);
             }
         };
-        seed_digestion_tx
-            .send(DigestingCommand::Terminate)
-            .expect("Unable to terminate service");
     });
 
     let digestion_config = config.clone();
@@ -78,8 +99,8 @@ pub fn main() {
         initial_hook_formation: None,
         ingestion_port: DEFAULT_INGESTION_PORT,
         control_port: DEFAULT_CONTROL_PORT,
-        bitcoin_node_username: "devnet".into(),
-        bitcoin_node_password: "devnet".into(),
+        bitcoin_node_username: config.indexer.bitcoin_node_rpc_username.clone(),
+        bitcoin_node_password: config.indexer.bitcoin_node_rpc_password.clone(),
         bitcoin_node_rpc_host: "http://localhost".into(),
         bitcoin_node_rpc_port: 18443,
         stacks_node_rpc_host: "http://localhost".into(),
@@ -89,7 +110,7 @@ pub fn main() {
     };
 
     info!(
-        "Listening for chainhooks events on port {}",
+        "Listen for chainhooks events on port {}",
         DEFAULT_CONTROL_PORT
     );
     let _ = std::thread::spawn(move || {

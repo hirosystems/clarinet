@@ -41,6 +41,7 @@ pub fn start(
     let (bitcoin_record_tx, bitcoin_record_rx) = channel();
 
     let seed_tsv_path = config.expected_local_tsv_file().clone();
+    info!("Initialize storage with events {}", seed_tsv_path.display());
     let parsing_handle = thread::spawn(move || {
         let mut reader_builder = csv::ReaderBuilder::default()
             .has_headers(false)
@@ -126,11 +127,13 @@ pub fn start(
             .into_iter()
             .collect();
 
-        info!("Retrieve chain tip");
+        info!(
+            "Start processing canonical Stacks blocks from chain tip #{}",
+            tip_height
+        );
         // Retrieve all the headers stored at this height (SCAN - expensive)
         let mut selected_tip = BlockIdentifier::default();
         for key in chain_tips.into_iter() {
-            info!("HGET block_identifier: {}", key);
             let payload: String = con
                 .hget(&key, "block_identifier")
                 .expect("unable to retrieve tip height");
@@ -138,7 +141,6 @@ pub fn start(
             break;
         }
 
-        info!("Reverse traversal");
         let mut cursor = selected_tip.clone();
         while cursor.index > 0 {
             let key = format!("stx:{}:{}", cursor.index, cursor.hash);
@@ -152,6 +154,7 @@ pub fn start(
             let _ = digestion_tx.send(DigestingCommand::DigestSeedBlock(cursor.clone()));
             cursor = parent_block_identifier.clone();
         }
+        info!("{} Stacks blocks queued for processing", tip_height);
 
         let _ = digestion_tx.send(DigestingCommand::GarbageCollect);
         Ok(selected_tip)

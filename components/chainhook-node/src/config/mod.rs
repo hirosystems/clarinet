@@ -4,6 +4,9 @@ pub use chainhook_event_observer::indexer::IndexerConfig;
 pub use file::ConfigFile;
 use std::path::PathBuf;
 
+const DEFAULT_MAINNET_TSV_ARCHIVE: &str = "https://storage.googleapis.com/blockstack-publish/mainnet/api/mainnet-blockchain-api-5.0.0-latest.tar.gz";
+const DEFAULT_TESTNET_TSV_ARCHIVE: &str = "https://storage.googleapis.com/blockstack-publish/testnet/api/testnet-blockchain-api-5.0.0-latest.tar.gz";
+
 #[derive(Clone, Debug)]
 pub struct Config {
     pub storage: StorageConfig,
@@ -80,19 +83,55 @@ impl Config {
         panic!("expected local-tsv source")
     }
 
+    pub fn expected_cache_path(&self) -> PathBuf {
+        let mut destination_path = std::env::current_dir().expect("unable to get current dir");
+        destination_path.push(&self.storage.cache_path);
+        destination_path
+    }
+
+    pub fn expected_remote_tsv_url(&self) -> &String {
+        for source in self.event_sources.iter() {
+            if let EventSourceConfig::TsvUrl(config) = source {
+                return &config.file_url;
+            }
+        }
+        panic!("expected remote-tsv source")
+    }
+
+    pub fn rely_on_remote_tsv(&self) -> bool {
+        for source in self.event_sources.iter() {
+            if let EventSourceConfig::TsvUrl(_config) = source {
+                return true;
+            }
+        }
+        false
+    }
+
+    pub fn should_download_remote_tsv(&self) -> bool {
+        let mut rely_on_remote_tsv = false;
+        let mut remote_tsv_present_locally = false;
+        for source in self.event_sources.iter() {
+            if let EventSourceConfig::TsvUrl(_config) = source {
+                rely_on_remote_tsv = true;
+            }
+            if let EventSourceConfig::TsvPath(_config) = source {
+                remote_tsv_present_locally = true;
+            }
+        }
+        rely_on_remote_tsv == true && remote_tsv_present_locally == false
+    }
+
     pub fn default() -> Config {
         Config {
             storage: StorageConfig {
                 driver: StorageDriver::Redis(RedisConfig {
-                    uri: "redis://127.0.0.1/".into() 
+                    uri: "redis://127.0.0.1/".into(),
                 }),
-                cache_path: "./.cache".into(),
+                cache_path: "cache".into(),
             },
-            event_sources: vec![
-                EventSourceConfig::TsvUrl(TsvUrlConfig {
-                    file_url: "https://storage.googleapis.com/blockstack-publish/archiver-main/api/stacks-node-events-latest.tar.gz".into() 
-                })
-            ],
+            event_sources: vec![EventSourceConfig::TsvUrl(TsvUrlConfig {
+                file_url: DEFAULT_TESTNET_TSV_ARCHIVE.into(),
+            })],
             chainhooks: ChainhooksConfig {
                 max_stacks_registrations: 10,
                 max_bitcoin_registrations: 10,
