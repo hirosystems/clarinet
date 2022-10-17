@@ -75,7 +75,7 @@ pub fn read_deployment_or_generate_default(
         )
     } else {
         let future =
-            clarinet_deployments::generate_default_deployment(manifest, network, false, None);
+            clarinet_deployments::generate_default_deployment(manifest, network, false, None, None);
 
         let (deployment, artifacts) = hiro_system_kit::nestable_block_on(future)?;
         (deployment, Some(artifacts))
