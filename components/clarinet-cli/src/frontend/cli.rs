@@ -1328,8 +1328,8 @@ fn get_manifest_location_or_warn(path: Option<String>) -> Option<FileLocation> {
         Some(manifest_location) => Some(manifest_location),
         None => {
             println!(
-                "{}: no manifest found. Continuing with default.",
-                green!("note")
+                "{}: no manifest found, starting with default settings.",
+                yellow!("note")
             );
             None
         }

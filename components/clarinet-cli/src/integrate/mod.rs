@@ -31,14 +31,11 @@ pub fn run_devnet(
         }
     };
 
-    match hiro_system_kit::nestable_block_on(do_run_devnet(
+    hiro_system_kit::nestable_block_on(do_run_devnet(
         devnet,
         deployment,
         &mut Some(hooks),
         log_tx,
         display_dashboard,
-    )) {
-        Err(_e) => std::process::exit(1),
-        Ok(res) => Ok(res),
-    }
+    ))
 }
