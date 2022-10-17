@@ -15,6 +15,7 @@ use clarity_repl::clarity::util::hash::bytes_to_hex;
 use hiro_system_kit;
 use reqwest::Client as HttpClient;
 use rocket::config::{Config, LogLevel};
+use rocket::data::{Limits, ToByteUnit};
 use rocket::http::Status;
 use rocket::outcome::IntoOutcome;
 use rocket::request::{self, FromRequest, Outcome, Request};
@@ -267,6 +268,7 @@ pub async fn start_event_observer(
 
     let background_job_tx_mutex = Arc::new(Mutex::new(observer_commands_tx.clone()));
 
+    let limits = Limits::default().limit("json", 4.megabytes());
     let ingestion_config = Config {
         port: ingestion_port,
         workers: 3,
@@ -274,6 +276,7 @@ pub async fn start_event_observer(
         keep_alive: 5,
         temp_dir: std::env::temp_dir().into(),
         log_level: log_level.clone(),
+        limits,
         ..Config::default()
     };
 
