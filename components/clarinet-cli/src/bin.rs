@@ -13,11 +13,9 @@ mod chainhooks;
 mod deployments;
 mod frontend;
 mod generate;
-mod integrate;
+pub mod integrate;
 mod lsp;
 mod runner;
-mod types;
-mod utils;
 
 use frontend::cli;
 

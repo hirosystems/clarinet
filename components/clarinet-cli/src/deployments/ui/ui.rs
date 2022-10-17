@@ -1,4 +1,4 @@
-use crate::deployments::TransactionStatus;
+use clarinet_deployments::onchain::TransactionStatus;
 
 use super::App;
 use tui::{

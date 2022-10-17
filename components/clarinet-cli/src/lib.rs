@@ -17,8 +17,6 @@ pub mod chainhooks;
 pub mod deployments;
 pub mod generate;
 pub mod integrate;
-pub mod types;
-pub mod utils;
 
 #[cfg(feature = "cli")]
 pub mod frontend;

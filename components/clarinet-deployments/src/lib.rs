@@ -8,6 +8,8 @@ extern crate serde;
 #[macro_use]
 extern crate serde_derive;
 
+#[cfg(feature = "onchain")]
+pub mod onchain;
 pub mod requirements;
 pub mod types;
 
@@ -16,7 +18,7 @@ use self::types::{
     TransactionPlanSpecification, TransactionsBatchSpecification, WalletSpecification,
 };
 use chainhook_types::StacksNetwork;
-use clarinet_files::FileAccessor;
+use clarinet_files::{FileAccessor, FileLocation};
 use clarinet_files::{NetworkManifest, ProjectManifest};
 use clarity_repl::analysis::ast_dependency_detector::{ASTDependencyDetector, DependencySet};
 use clarity_repl::clarity::vm::ast::ContractAST;
@@ -26,7 +28,7 @@ use clarity_repl::clarity::vm::types::QualifiedContractIdentifier;
 use clarity_repl::clarity::vm::ContractName;
 use clarity_repl::clarity::vm::EvaluationResult;
 use clarity_repl::clarity::vm::ExecutionResult;
-use clarity_repl::repl::session::BOOT_CONTRACTS_ASTS;
+use clarity_repl::repl::session::BOOT_CONTRACTS_DATA;
 use clarity_repl::repl::Session;
 use clarity_repl::repl::SessionSettings;
 use std::collections::{BTreeMap, HashMap, VecDeque};
@@ -42,8 +44,13 @@ pub fn setup_session_with_deployment(
 ) -> DeploymentGenerationArtifacts {
     let mut session = initiate_session_from_deployment(&manifest);
     update_session_with_genesis_accounts(&mut session, deployment);
-    let results =
-        update_session_with_contracts_executions(&mut session, deployment, contracts_asts, false);
+    let results = update_session_with_contracts_executions(
+        &mut session,
+        deployment,
+        contracts_asts,
+        false,
+        None,
+    );
 
     let deps = HashMap::new();
     let mut diags = HashMap::new();
@@ -82,9 +89,6 @@ pub fn setup_session_with_deployment(
 
 pub fn initiate_session_from_deployment(manifest: &ProjectManifest) -> Session {
     let mut settings = SessionSettings::default();
-    settings
-        .include_boot_contracts
-        .append(&mut manifest.project.boot_contracts.clone());
     settings.repl_settings = manifest.repl_settings.clone();
     settings.disk_cache_enabled = true;
     let session = Session::new(settings);
@@ -114,7 +118,16 @@ pub fn update_session_with_contracts_executions(
     deployment: &DeploymentSpecification,
     contracts_asts: Option<&HashMap<QualifiedContractIdentifier, ContractAST>>,
     code_coverage_enabled: bool,
+    forced_epoch: Option<StacksEpochId>,
 ) -> BTreeMap<QualifiedContractIdentifier, Result<ExecutionResult, Vec<Diagnostic>>> {
+    let boot_contracts_data = BOOT_CONTRACTS_DATA.clone();
+    for (_, (boot_contract, mut ast)) in boot_contracts_data {
+        session
+            .interpreter
+            .run_ast(&boot_contract, &mut ast, false, None)
+            .expect("failed to interprete boot contract");
+    }
+
     let mut results = BTreeMap::new();
     for batch in deployment.plan.batches.iter() {
         for transaction in batch.transactions.iter() {
@@ -142,7 +155,7 @@ pub fn update_session_with_contracts_executions(
                         deployer: ContractDeployer::Address(tx.emulated_sender.to_string()),
                         name: tx.contract_name.to_string(),
                         clarity_version: tx.clarity_version,
-                        epoch: DEFAULT_EPOCH,
+                        epoch: forced_epoch.unwrap_or(DEFAULT_EPOCH),
                     };
 
                     let result = session.deploy_contract(
@@ -179,11 +192,13 @@ pub async fn generate_default_deployment(
     network: &StacksNetwork,
     no_batch: bool,
     file_accessor: Option<&Box<dyn FileAccessor>>,
+    forced_epoch: Option<StacksEpochId>,
 ) -> Result<(DeploymentSpecification, DeploymentGenerationArtifacts), String> {
     let network_manifest = match file_accessor {
         None => NetworkManifest::from_project_manifest_location(
             &manifest.location,
             &network.get_networks(),
+            Some(&manifest.project.cache_location),
         )?,
         Some(file_accessor) => {
             NetworkManifest::from_project_manifest_location_using_file_accessor(
@@ -268,15 +283,17 @@ pub async fn generate_default_deployment(
     let mut requirements_deps = HashMap::new();
 
     let mut settings = SessionSettings::default();
-    settings.include_boot_contracts = manifest.project.boot_contracts.clone();
     settings.repl_settings = manifest.repl_settings.clone();
 
     let session = Session::new(settings.clone());
-    let mut boot_contracts_asts = BOOT_CONTRACTS_ASTS.clone();
-    let boot_contracts_ids = boot_contracts_asts
-        .iter()
-        .map(|(k, _)| k.clone())
-        .collect::<Vec<QualifiedContractIdentifier>>();
+
+    let boot_contracts_data = BOOT_CONTRACTS_DATA.clone();
+    let mut boot_contracts_ids = Vec::new();
+    let mut boot_contracts_asts = BTreeMap::new();
+    for (id, (_, ast)) in boot_contracts_data {
+        boot_contracts_ids.push(id.clone());
+        boot_contracts_asts.insert(id, ast);
+    }
     requirements_asts.append(&mut boot_contracts_asts);
 
     let mut queue = VecDeque::new();
@@ -381,7 +398,7 @@ pub async fn generate_default_deployment(
                         name: contract_id.name.to_string(),
                         deployer: ContractDeployer::ContractIdentifier(contract_id.clone()),
                         clarity_version: ClarityVersion::Clarity1,
-                        epoch: StacksEpochId::Epoch20,
+                        epoch: forced_epoch.unwrap_or(DEFAULT_EPOCH),
                     };
                     let (ast, _, _) = session.interpreter.build_ast(&contract);
                     ast
@@ -470,8 +487,19 @@ pub async fn generate_default_deployment(
                 let mut contract_location = base_location.clone();
                 contract_location
                     .append_path(&contract_config.expect_contract_path_as_str())
-                    .unwrap();
-                let source = contract_location.read_content_as_utf8().unwrap();
+                    .map_err(|_| {
+                        format!(
+                            "unable to build path for contract {}",
+                            contract_config.expect_contract_path_as_str()
+                        )
+                    })?;
+
+                let source = contract_location.read_content_as_utf8().map_err(|_| {
+                    format!(
+                        "unable to find contract at path {}",
+                        contract_config.expect_contract_path_as_str()
+                    )
+                })?;
                 sources.insert(contract_location.to_string(), source);
             }
             sources
@@ -543,7 +571,7 @@ pub async fn generate_default_deployment(
                 deployer: ContractDeployer::Address(sender.to_address()),
                 name: contract_name.to_string(),
                 clarity_version: contract_config.clarity_version,
-                epoch: DEFAULT_EPOCH,
+                epoch: forced_epoch.unwrap_or(DEFAULT_EPOCH),
             },
         );
 
@@ -703,4 +731,40 @@ pub async fn generate_default_deployment(
     };
 
     Ok((deployment, artifacts))
+}
+
+pub fn get_default_deployment_path(
+    manifest: &ProjectManifest,
+    network: &StacksNetwork,
+) -> Result<FileLocation, String> {
+    let mut deployment_path = manifest.location.get_project_root_location()?;
+    deployment_path.append_path("deployments")?;
+    deployment_path.append_path(match network {
+        StacksNetwork::Simnet => "default.simnet-plan.yaml",
+        StacksNetwork::Devnet => "default.devnet-plan.yaml",
+        StacksNetwork::Testnet => "default.testnet-plan.yaml",
+        StacksNetwork::Mainnet => "default.mainnet-plan.yaml",
+    })?;
+    Ok(deployment_path)
+}
+
+pub fn load_deployment(
+    manifest: &ProjectManifest,
+    deployment_plan_location: &FileLocation,
+) -> Result<DeploymentSpecification, String> {
+    let project_root_location = manifest.location.get_project_root_location()?;
+    let spec = match DeploymentSpecification::from_config_file(
+        &deployment_plan_location,
+        &project_root_location,
+    ) {
+        Ok(spec) => spec,
+        Err(msg) => {
+            return Err(format!(
+                "error: {} syntax incorrect\n{}",
+                deployment_plan_location.to_string(),
+                msg
+            ));
+        }
+    };
+    Ok(spec)
 }

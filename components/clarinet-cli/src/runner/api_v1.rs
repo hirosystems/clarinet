@@ -23,8 +23,12 @@ use chainhook_types::StacksTransactionData;
 use chainhook_types::StacksTransactionKind;
 use chainhook_types::StacksTransactionMetadata;
 use chainhook_types::TransactionIdentifier;
+use chrono::{DateTime, NaiveDateTime, Utc};
 use clarinet_deployments::update_session_with_contracts_executions;
+use clarity_repl::clarity::stacks_common::util::hash::MerkleTree;
+use clarity_repl::clarity::util::hash::hex_bytes;
 use clarity_repl::clarity::util::hash::to_hex;
+use clarity_repl::clarity::util::hash::Sha512Trunc256Sum;
 use clarity_repl::clarity::vm::analysis::contract_interface_builder::build_contract_interface;
 use clarity_repl::clarity::vm::EvaluationResult;
 use clarity_repl::clarity::ClarityVersion;
@@ -41,7 +45,10 @@ use deno_core::located_script_name;
 use deno_core::serde_json::{json, Value};
 use deno_core::{op, Extension};
 use deno_core::{ModuleSpecifier, OpState};
+use sha2::{Digest, Sha256};
 use std::collections::{BTreeMap, HashMap};
+use std::fs::OpenOptions;
+use std::io::Write;
 use std::sync::mpsc::{self, Sender};
 use std::thread::sleep;
 use std::time::Duration;
@@ -367,7 +374,7 @@ fn load_deployment(state: &mut OpState, args: LoadDeploymentArgs) -> Result<Stri
         .expect("unable to retrieve session");
 
     // Execute deployment on session
-    let results = update_session_with_contracts_executions(session, &deployment, None, true);
+    let results = update_session_with_contracts_executions(session, &deployment, None, true, None);
     let mut serialized_contracts = vec![];
     for (contract_id, result) in results.into_iter() {
         match result {
@@ -481,7 +488,7 @@ struct CallReadOnlyFnArgs {
 #[op]
 fn call_read_only_fn(state: &mut OpState, args: CallReadOnlyFnArgs) -> Result<String, AnyError> {
     let (result, events) = perform_block(state, args.session_id, |_name, session| {
-        let execution = match session.invoke_contract_call(
+        let (execution, _contract_id) = match session.invoke_contract_call(
             &args.contract,
             &args.method,
             &args.args,
@@ -599,7 +606,7 @@ fn mine_block(state: &mut OpState, args: MineBlockArgs) -> Result<String, AnyErr
         let mut transactions = vec![];
         for (index, tx) in args.transactions.iter().enumerate() {
             if let Some(ref args) = tx.contract_call {
-                let execution = match session.invoke_contract_call(
+                let (execution, contract_id) = match session.invoke_contract_call(
                     &args.contract,
                     &args.method,
                     &args.args,
@@ -622,13 +629,14 @@ fn mine_block(state: &mut OpState, args: MineBlockArgs) -> Result<String, AnyErr
                         continue;
                     }
                 };
+
                 let kind = StacksTransactionKind::ContractCall(StacksContractCallData {
-                    contract_identifier: args.contract.clone(),
+                    contract_identifier: contract_id.to_string(),
                     method: args.method.clone(),
                     args: args.args.clone(),
                 });
                 transactions.push((
-                    wrap_result_in_simulate_transaction(index, &tx.sender, kind, &execution),
+                    wrap_result_in_simulated_transaction(index, &tx.sender, kind, &execution),
                     execution.events,
                 ));
             } else {
@@ -675,7 +683,7 @@ fn mine_block(state: &mut OpState, args: MineBlockArgs) -> Result<String, AnyErr
                             code: contract.expect_in_memory_code_source().to_string(),
                         });
                     transactions.push((
-                        wrap_result_in_simulate_transaction(index, &tx.sender, kind, &execution),
+                        wrap_result_in_simulated_transaction(index, &tx.sender, kind, &execution),
                         execution.events,
                     ));
                 } else if let Some(ref args) = tx.transfer_stx {
@@ -697,7 +705,7 @@ fn mine_block(state: &mut OpState, args: MineBlockArgs) -> Result<String, AnyErr
                     };
                     let kind = StacksTransactionKind::NativeTokenTransfer;
                     transactions.push((
-                        wrap_result_in_simulate_transaction(index, &tx.sender, kind, &execution),
+                        wrap_result_in_simulated_transaction(index, &tx.sender, kind, &execution),
                         execution.events,
                     ));
                 }
@@ -721,12 +729,18 @@ fn mine_block(state: &mut OpState, args: MineBlockArgs) -> Result<String, AnyErr
     }
 
     if !chainhooks.is_empty() {
+        let txids = transactions
+            .iter()
+            .map(|t| hex_bytes(&t.0.transaction_identifier.hash[2..]).unwrap())
+            .collect::<Vec<Vec<u8>>>();
+        let merkle_tree = MerkleTree::<Sha512Trunc256Sum>::new(&txids);
+
         for chainhook in chainhooks.iter() {
             for (tx, _) in transactions.iter() {
                 if evaluate_stacks_chainhook_on_transaction(tx, chainhook) {
                     let simulated_block = BlockIdentifier {
                         index: block_height.into(),
-                        hash: format!("0x{}", to_hex(&block_height.to_be_bytes())),
+                        hash: format!("0x{}", merkle_tree.root().to_hex()),
                     };
                     let result = handle_stacks_hook_action(
                         StacksTriggerChainhook {
@@ -736,12 +750,38 @@ fn mine_block(state: &mut OpState, args: MineBlockArgs) -> Result<String, AnyErr
                         },
                         &HashMap::new(),
                     );
-                    if let Some(StacksChainhookOccurrence::Http(action)) = result {
-                        let chainhook_tx = match state.try_borrow::<Sender<ChainhookEvent>>() {
-                            Some(chainhook_tx) => chainhook_tx,
-                            None => panic!(),
-                        };
-                        let _ = chainhook_tx.send(ChainhookEvent::PerformRequest(action));
+                    match result {
+                        Some(StacksChainhookOccurrence::Http(action)) => {
+                            let chainhook_tx = match state.try_borrow::<Sender<ChainhookEvent>>() {
+                                Some(chainhook_tx) => chainhook_tx,
+                                None => panic!(),
+                            };
+                            let _ = chainhook_tx.send(ChainhookEvent::PerformRequest(action));
+                        }
+                        Some(StacksChainhookOccurrence::File(path, bytes)) => {
+                            let mut file_path = std::env::current_dir().unwrap();
+                            file_path.push(path);
+                            if !file_path.exists() {
+                                match std::fs::File::open(&file_path) {
+                                    Ok(ref mut file) => {
+                                        let _ = file.write_all(&bytes);
+                                    }
+                                    Err(e) => println!("unable to create file {:?}", e),
+                                }
+                            }
+                            let mut file = OpenOptions::new()
+                                .create(false)
+                                .write(true)
+                                .append(true)
+                                .open(file_path)
+                                .unwrap();
+
+                            if let Err(e) = writeln!(file, "{}", String::from_utf8(bytes).unwrap())
+                            {
+                                eprintln!("Couldn't write to file: {}", e);
+                            }
+                        }
+                        _ => {}
                     }
                 }
             }
@@ -783,7 +823,7 @@ where
     }
 }
 
-fn wrap_result_in_simulate_transaction(
+fn wrap_result_in_simulated_transaction(
     index: usize,
     sender: &str,
     kind: StacksTransactionKind,
@@ -793,7 +833,11 @@ fn wrap_result_in_simulate_transaction(
         EvaluationResult::Snippet(ref result) => utils::value_to_string(&result.result),
         _ => unreachable!("Contract result from snippet"),
     };
-    let txid = format!("{}", index);
+    let (txid, _timestamp) = {
+        let timestamp = DateTime::<Utc>::from_utc(NaiveDateTime::from_timestamp(61, 0), Utc);
+        let bytes = Sha256::digest(timestamp.timestamp_micros().to_be_bytes()).to_vec();
+        (format!("0x{}", to_hex(&bytes)), timestamp)
+    };
     let mut asset_class_cache = HashMap::new();
     let events = execution
         .events

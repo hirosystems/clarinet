@@ -19,7 +19,7 @@ export async function activate(context: ExtensionContext) {
     serverWorkerReady = resolve;
     workerTimeout = setTimeout(() => {
       reject(new Error("worker timeout"));
-    }, 5000);
+    }, 10000);
   });
 
   worker.addEventListener(

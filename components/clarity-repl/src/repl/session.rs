@@ -43,6 +43,8 @@ use super::SessionSettings;
 static BOOT_TESTNET_ADDRESS: &str = "ST000000000000000000002AMW42H";
 static BOOT_MAINNET_ADDRESS: &str = "SP000000000000000000002Q6VF78";
 
+static V2_BOOT_CONTRACTS: &[&str] = &["pox-2"];
+
 lazy_static! {
     static ref BOOT_TESTNET_PRINCIPAL: StandardPrincipalData =
         PrincipalData::parse_standard_principal(&BOOT_TESTNET_ADDRESS).unwrap();
@@ -51,8 +53,8 @@ lazy_static! {
 }
 
 lazy_static! {
-    pub static ref BOOT_CONTRACTS_ASTS: BTreeMap<QualifiedContractIdentifier, ContractAST> = {
-        let mut asts = BTreeMap::new();
+    pub static ref BOOT_CONTRACTS_DATA: BTreeMap<QualifiedContractIdentifier, (ClarityContract, ContractAST)> = {
+        let mut result = BTreeMap::new();
         let deploy: [(&StandardPrincipalData, [(&str, &str); 9]); 2] = [
             (&*BOOT_TESTNET_PRINCIPAL, *STACKS_BOOT_CODE_TESTNET),
             (&*BOOT_MAINNET_PRINCIPAL, *STACKS_BOOT_CODE_MAINNET),
@@ -60,22 +62,29 @@ lazy_static! {
 
         let interpreter =
             ClarityInterpreter::new(StandardPrincipalData::transient(), Settings::default());
-        for contract in deploy.iter() {
-            let deployer = contract.0;
-            let boot_code = contract.1;
+        for (deployer, boot_code) in deploy.iter() {
             for (name, code) in boot_code.iter() {
+                let clarity_version = if V2_BOOT_CONTRACTS.contains(name) {
+                    ClarityVersion::Clarity2
+                } else {
+                    ClarityVersion::Clarity1
+                };
+
                 let boot_contract = ClarityContract {
                     code_source: ClarityCodeSource::ContractInMemory(code.to_string()),
                     deployer: ContractDeployer::Address(deployer.to_address()),
                     name: name.to_string(),
-                    clarity_version: ClarityVersion::Clarity1,
                     epoch: StacksEpochId::Epoch20,
+                    clarity_version,
                 };
                 let (ast, _, _) = interpreter.build_ast(&boot_contract);
-                asts.insert(boot_contract.expect_resolved_contract_identifier(None), ast);
+                result.insert(
+                    boot_contract.expect_resolved_contract_identifier(None),
+                    (boot_contract, ast),
+                );
             }
         }
-        asts
+        result
     };
 }
 
@@ -540,7 +549,7 @@ impl Session {
         args: &Vec<String>,
         sender: &str,
         test_name: String,
-    ) -> Result<ExecutionResult, Vec<Diagnostic>> {
+    ) -> Result<(ExecutionResult, QualifiedContractIdentifier), Vec<Diagnostic>> {
         let initial_tx_sender = self.get_tx_sender();
         // Kludge for handling fully qualified contract_id vs sugared syntax
         let first_char = contract.chars().next().unwrap();
@@ -577,9 +586,9 @@ impl Session {
             }
         };
         self.set_tx_sender(initial_tx_sender);
-        // if let Some(coverage) = result.coverage.take() {
-        //     self.coverage_reports.push(coverage);
-        // }
+        self.coverage_reports.push(coverage);
+
+        let contract_identifier = QualifiedContractIdentifier::parse(&contract_id).unwrap();
         if let Some(ref cost) = execution.cost {
             self.costs_reports.push(CostsReport {
                 test_name,
@@ -589,7 +598,8 @@ impl Session {
                 cost_result: cost.clone(),
             });
         }
-        Ok(execution)
+
+        Ok((execution, contract_identifier))
     }
 
     // pub fn build_ast(

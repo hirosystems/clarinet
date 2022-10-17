@@ -1,24 +1,29 @@
-use crate::chainhooks::check_chainhooks;
 use crate::chainhooks::types::ChainhookSpecificationFile;
+use crate::chainhooks::{check_chainhooks, load_chainhooks};
 use crate::deployments::types::DeploymentSynthesis;
 use crate::deployments::{
-    self, apply_on_chain_deployment, check_deployments, generate_default_deployment,
-    get_absolute_deployment_path, get_default_deployment_path, get_initial_transactions_trackers,
-    load_deployment, write_deployment, DeploymentCommand, DeploymentEvent,
+    self, check_deployments, generate_default_deployment, get_absolute_deployment_path,
+    write_deployment,
 };
 use crate::generate::{
     self,
     changes::{Changes, TOMLEdition},
 };
-use crate::integrate::{self, DevnetOrchestrator};
+use crate::integrate;
 use crate::lsp::run_lsp;
 use crate::runner::run_scripts;
 use crate::runner::DeploymentCache;
 use chainhook_event_observer::chainhooks::types::ChainhookSpecification;
 use chainhook_types::StacksNetwork;
 use chainhook_types::{BitcoinNetwork, Chain};
-use clarinet_deployments::setup_session_with_deployment;
+use clarinet_deployments::onchain::{
+    apply_on_chain_deployment, get_initial_transactions_trackers, DeploymentCommand,
+    DeploymentEvent,
+};
 use clarinet_deployments::types::{DeploymentGenerationArtifacts, DeploymentSpecification};
+use clarinet_deployments::{
+    get_default_deployment_path, load_deployment, setup_session_with_deployment,
+};
 use clarinet_files::{FileLocation, ProjectManifest, ProjectManifestFile, RequirementConfig};
 use clarity_repl::analysis::call_checker::ContractAnalysis;
 use clarity_repl::clarity::vm::analysis::AnalysisDatabase;
@@ -29,6 +34,7 @@ use clarity_repl::clarity::ClarityVersion;
 use clarity_repl::repl::diagnostic::{output_code, output_diagnostic};
 use clarity_repl::repl::{ClarityCodeSource, ClarityContract, ContractDeployer, DEFAULT_EPOCH};
 use clarity_repl::{analysis, repl, Terminal};
+use stacks_network::{self, DevnetOrchestrator};
 use std::collections::HashMap;
 use std::fs::{self, File};
 use std::io::prelude::*;
@@ -1051,33 +1057,48 @@ pub fn main() {
             let cache_location = manifest.project.cache_location.clone();
             let mut stacks_chainhooks = vec![];
             let mine_block_delay = cmd.mine_block_delay.unwrap_or(0);
-            for chainhook_relative_path in cmd.chainhooks.iter() {
-                let mut chainhook_location = manifest
-                    .location
-                    .get_project_root_location()
-                    .expect("unable to get root location");
-                chainhook_location
-                    .append_path(chainhook_relative_path)
-                    .expect("unable to build path");
-                match ChainhookSpecificationFile::parse(
-                    &chainhook_location.to_string().into(),
+
+            if cmd.chainhooks.contains(&"*".to_string()) {
+                match load_chainhooks(
+                    &manifest.location,
                     &(BitcoinNetwork::Regtest, StacksNetwork::Devnet),
                 ) {
-                    Ok(hook) => match hook {
-                        ChainhookSpecification::Bitcoin(_) => {
-                            println!(
-                                "{}: bitcoin chainhooks not supported in test environments",
-                                red!("error")
-                            );
-                            std::process::exit(1);
-                        }
-                        ChainhookSpecification::Stacks(hook) => stacks_chainhooks.push(hook),
-                    },
-                    Err(msg) => {
-                        println!("{}: unable to load chainhooks ({})", red!("error"), msg);
-                        std::process::exit(1);
+                    Ok(ref mut formation) => {
+                        stacks_chainhooks.append(&mut formation.stacks_chainhooks);
+                    }
+                    Err(e) => {
+                        println!("{}: unable to load chainhooks - {}", red!("error"), e);
                     }
                 };
+            } else {
+                for chainhook_relative_path in cmd.chainhooks.iter() {
+                    let mut chainhook_location = manifest
+                        .location
+                        .get_project_root_location()
+                        .expect("unable to get root location");
+                    chainhook_location
+                        .append_path(chainhook_relative_path)
+                        .expect("unable to build path");
+                    match ChainhookSpecificationFile::parse(
+                        &chainhook_location.to_string().into(),
+                        &(BitcoinNetwork::Regtest, StacksNetwork::Devnet),
+                    ) {
+                        Ok(hook) => match hook {
+                            ChainhookSpecification::Bitcoin(_) => {
+                                println!(
+                                    "{}: bitcoin chainhooks not supported in test environments",
+                                    red!("error")
+                                );
+                                std::process::exit(1);
+                            }
+                            ChainhookSpecification::Stacks(hook) => stacks_chainhooks.push(hook),
+                        },
+                        Err(msg) => {
+                            println!("{}: unable to load chainhooks ({})", red!("error"), msg);
+                            std::process::exit(1);
+                        }
+                    };
+                }
             }
 
             let (success, _count) = match run_scripts(
@@ -1307,8 +1328,8 @@ fn get_manifest_location_or_warn(path: Option<String>) -> Option<FileLocation> {
         Some(manifest_location) => Some(manifest_location),
         None => {
             println!(
-                "{}: no manifest found. Continuing with default.",
-                green!("note")
+                "{}: no manifest found, starting with default settings.",
+                yellow!("note")
             );
             None
         }

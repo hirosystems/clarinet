@@ -1,3 +1,22 @@
+#### 1.0.4 (2022-10-17)
+
+##### New Features
+
+*  Devnet chainstate now lives in `cache` directory specified in Clarinet.toml ([a6fb383f](https://github.com/hirosystems/clarinet/commit/a6fb383fecb936d27386f3f914f98dda89a67dda))
+*  Ability to pass wildcards for chainhook testing ([08f75a2a](https://github.com/hirosystems/clarinet/commit/08f75a2a2abcf1cbc1b2c60115cc7d939d090fbd))
+*  Ability to use write-to-file as action (chainhooks) ([fb19e392](https://github.com/hirosystems/clarinet/commit/fb19e392836430d029aa8374a625a49451b38ad9))
+*  Introduce stacks-network component ([ace64116](https://github.com/hirosystems/clarinet/commit/ace641164465d7a253375365a2f805a650981d09))
+
+##### Bug Fixes
+
+*  Bump ingestion limits to 5 mb ([e4d539da](https://github.com/hirosystems/clarinet/commit/e4d539da703371d6046a64088e18fb23d0452575))
+*  Fix invalid bitcoin txid ([03783a41](https://github.com/hirosystems/clarinet/commit/03783a414837afc78c7688741d42ab4309389abb))
+*  Fix coverage tracking ([1a4836d1](https://github.com/hirosystems/clarinet/commit/1a4836d1d6e35e835a76465caf0b3be01a5b2aee))
+*  Fix crash occuring on NFTMintEvent ([d5dc3fc0](https://github.com/hirosystems/clarinet/commit/d5dc3fc0454a51a5a9708a66b63cb5ccf58c3b24))
+*  Resolve boot contract in LSP ([ad34037c](https://github.com/hirosystems/clarinet/commit/ad34037cbd4d6f30360a08817e497a8c9a9ef2de))
+*  Better error ([d42f7ed6](https://github.com/hirosystems/clarinet/commit/d42f7ed680097e672611ab1a581f55f32208dd11))
+*  Performance optimisation with parser v2 ([c1712489](https://github.com/hirosystems/clarinet/commit/c171248997a357d8e6a1bc074b79a0452de6235f))
+
 #### 1.0.0 (2022-10-06)
 
 ##### New Features

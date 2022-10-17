@@ -262,10 +262,10 @@
     "@hapi/bourne" "2.x.x"
     "@hapi/hoek" "9.x.x"
 
-"@hirosystems/orchestra-types@^1.0.1-beta.1":
-  version "1.0.1-beta.1"
-  resolved "https://registry.npmjs.org/@hirosystems/orchestra-types/-/orchestra-types-1.0.1-beta.1.tgz"
-  integrity sha512-IjzKR8jkH2IYQj3F2PI2hry7u5i8axa5LzmE9BiIHjdSErUkQph8as8hso/lmda/nd/MqYgT+7WmZqXjWq25dQ==
+"@hirosystems/chainhook-types@^1.0.1-beta.1":
+  version "1.0.0"
+  resolved "https://registry.yarnpkg.com/@hirosystems/chainhook-types/-/chainhook-types-1.0.0.tgz#2d0c381fad26067711fa048f5f8e5c5bfa3da52f"
+  integrity sha512-V2LvM21HZjdiHC4jKHdCRkDArNgc/udecOhNjBfXDXQgZXpIYz4EdxjdNaHz5rruY/hWOeEHpCqfLFDzt4cZBg==
 
 "@noble/hashes@^1.0.0":
   version "1.0.0"

@@ -74,6 +74,7 @@ pub struct StxEventPredicateFile {
 #[serde(rename_all = "kebab-case")]
 pub struct HookActionFile {
     http: Option<BTreeMap<String, String>>,
+    file: Option<BTreeMap<String, String>>,
 }
 
 impl ChainhookSpecificationFile {
@@ -200,14 +201,19 @@ impl HookActionFile {
                 Some(authorization_header) => Ok(authorization_header.to_string()),
                 None => Err(format!("authorization-header missing for http")),
             }?;
-
             Ok(HookAction::Http(HttpHook {
                 url,
                 method,
                 authorization_header,
             }))
+        } else if let Some(ref specs) = self.file {
+            let path = match specs.get("path") {
+                Some(path) => Ok(path.to_string()),
+                None => Err(format!("path missing for file")),
+            }?;
+            Ok(HookAction::File(FileHook { path }))
         } else {
-            Err(format!("action not supported (http)"))
+            Err(format!("action not supported (http, file)"))
         }
     }
 }
