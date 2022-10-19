@@ -687,15 +687,11 @@ fn mine_block(state: &mut OpState, args: MineBlockArgs) -> Result<String, AnyErr
                         execution.events,
                     ));
                 } else if let Some(ref args) = tx.transfer_stx {
-                    let snippet = format!(
-                        "(stx-transfer? u{} tx-sender '{})",
-                        args.amount, args.recipient
-                    );
-                    let execution = match session.eval(snippet.clone(), None, false) {
+                    let execution = match session.stx_transfer(args.amount, &args.recipient) {
                         Ok(res) => res,
                         Err(diagnostics) => {
                             let mut message =
-                                format!("{}: {}", red!("STX transfer runtime error"), snippet);
+                                format!("{}: {}", red!("STX transfer runtime error"), tx.sender);
                             if let Some(diag) = diagnostics.last() {
                                 message = format!("{} -> {}", message, diag.message);
                             }

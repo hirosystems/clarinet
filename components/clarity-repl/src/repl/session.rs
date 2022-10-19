@@ -486,6 +486,15 @@ impl Session {
         self.run_snippet(output, self.show_costs, &snippet.to_string());
     }
 
+    pub fn stx_transfer(
+        &mut self,
+        amount: u64,
+        recipient: &str,
+    ) -> Result<ExecutionResult, Vec<Diagnostic>> {
+        let snippet = format!("(stx-transfer? u{} tx-sender '{})", amount, recipient);
+        self.eval(snippet.clone(), None, false)
+    }
+
     pub fn deploy_contract(
         &mut self,
         contract: &ClarityContract,

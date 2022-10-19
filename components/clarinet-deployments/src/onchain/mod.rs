@@ -7,14 +7,16 @@ use clarity_repl::clarity::stacks_common::types::chainstate::StacksAddress;
 use clarity_repl::clarity::util::secp256k1::{
     MessageSignature, Secp256k1PrivateKey, Secp256k1PublicKey,
 };
-use clarity_repl::clarity::vm::types::{QualifiedContractIdentifier, StandardPrincipalData};
+use clarity_repl::clarity::vm::types::{
+    PrincipalData, QualifiedContractIdentifier, StandardPrincipalData,
+};
 use clarity_repl::clarity::vm::{ClarityName, Value};
 use clarity_repl::clarity::{ContractName, EvaluationResult};
 use clarity_repl::codec::{
     SinglesigHashMode, SinglesigSpendingCondition, StacksString, StacksTransactionSigner,
-    TransactionAuth, TransactionContractCall, TransactionPayload, TransactionPostConditionMode,
-    TransactionPublicKeyEncoding, TransactionSmartContract, TransactionSpendingCondition,
-    TransactionVersion,
+    TokenTransferMemo, TransactionAuth, TransactionContractCall, TransactionPayload,
+    TransactionPostConditionMode, TransactionPublicKeyEncoding, TransactionSmartContract,
+    TransactionSpendingCondition, TransactionVersion,
 };
 use clarity_repl::codec::{StacksTransaction, TransactionAnchorMode};
 use clarity_repl::repl::{Session, SessionSettings};
@@ -155,6 +157,20 @@ pub fn encode_contract_call(
     )
 }
 
+pub fn encode_stx_transfer(
+    recipient: PrincipalData,
+    amount: u64,
+    memo: [u8; 34],
+    account: &AccountConfig,
+    nonce: u64,
+    tx_fee: u64,
+    anchor_mode: TransactionAnchorMode,
+    network: &StacksNetwork,
+) -> Result<StacksTransaction, String> {
+    let payload = TransactionPayload::TokenTransfer(recipient, amount, TokenTransferMemo(memo));
+    sign_transaction_payload(account, payload, nonce, tx_fee, anchor_mode, network)
+}
+
 pub fn encode_contract_publish(
     contract_name: &ContractName,
     source: &str,
@@ -196,6 +212,7 @@ pub struct TransactionTracker {
 
 #[derive(Clone, Debug)]
 pub enum TransactionCheck {
+    StxTransfer(StandardPrincipalData, u64),
     ContractCall(StandardPrincipalData, u64),
     ContractPublish(StandardPrincipalData, ContractName),
     // TODO(lgalabru): Handle Bitcoin checks
@@ -267,6 +284,54 @@ pub fn apply_on_chain_deployment(
         let mut batch = Vec::new();
         for transaction in batch_spec.transactions.iter() {
             let tracker = match transaction {
+                TransactionSpecification::StxTransfer(tx) => {
+                    let issuer_address = tx.expected_sender.to_address();
+                    let nonce = match accounts_cached_nonces.get(&issuer_address) {
+                        Some(cached_nonce) => cached_nonce.clone(),
+                        None => stacks_rpc
+                            .get_nonce(&issuer_address)
+                            .expect("Unable to retrieve account"),
+                    };
+                    let account = stx_accounts_lookup.get(&issuer_address).unwrap();
+
+                    let anchor_mode = match tx.anchor_block_only {
+                        true => TransactionAnchorMode::OnChainOnly,
+                        false => TransactionAnchorMode::Any,
+                    };
+
+                    let transaction = match encode_stx_transfer(
+                        tx.recipient.clone(),
+                        tx.mstx_amount,
+                        tx.memo,
+                        *account,
+                        nonce,
+                        tx.cost,
+                        anchor_mode,
+                        &network,
+                    ) {
+                        Ok(res) => res,
+                        Err(e) => {
+                            let _ = deployment_event_tx.send(DeploymentEvent::Interrupted(
+                                format!("unable to encode stx_transfer ({})", e),
+                            ));
+                            return;
+                        }
+                    };
+
+                    accounts_cached_nonces.insert(issuer_address.clone(), nonce + 1);
+                    let name = format!(
+                        "STX transfer ({}µSTX from {} to {})",
+                        tx.mstx_amount,
+                        issuer_address,
+                        tx.recipient.to_string(),
+                    );
+                    let check = TransactionCheck::StxTransfer(tx.expected_sender.clone(), nonce);
+                    TransactionTracker {
+                        index,
+                        name: name.clone(),
+                        status: TransactionStatus::Encoded(transaction, check),
+                    }
+                }
                 TransactionSpecification::BtcTransfer(tx) => {
                     let url = Url::parse(&bitcoin_node_url).expect("Url malformatted");
                     let auth = match url.password() {
@@ -327,7 +392,13 @@ pub fn apply_on_chain_deployment(
                     ) {
                         Ok(res) => res,
                         Err(e) => {
-                            let _ = deployment_event_tx.send(DeploymentEvent::Interrupted(e));
+                            let _ =
+                                deployment_event_tx.send(DeploymentEvent::Interrupted(format!(
+                                    "unable to encode contract_call {}::{} ({})",
+                                    tx.contract_id.to_string(),
+                                    tx.method,
+                                    e
+                                )));
                             return;
                         }
                     };
@@ -393,7 +464,11 @@ pub fn apply_on_chain_deployment(
                     ) {
                         Ok(res) => res,
                         Err(e) => {
-                            let _ = deployment_event_tx.send(DeploymentEvent::Interrupted(e));
+                            let _ =
+                                deployment_event_tx.send(DeploymentEvent::Interrupted(format!(
+                                    "unable to encode contract_publish {} ({})",
+                                    tx.contract_name, e
+                                )));
                             return;
                         }
                     };
@@ -526,7 +601,7 @@ pub fn apply_on_chain_deployment(
                     ongoing_batch.insert(res.txid, tracker);
                 }
                 Err(e) => {
-                    let message = format!("{:?}", e);
+                    let message = format!("unable to post transaction ({:?})", e);
                     tracker.status = TransactionStatus::Error(message.clone());
 
                     let _ = deployment_event_tx
@@ -642,8 +717,18 @@ pub fn get_initial_transactions_trackers(
                 TransactionSpecification::BtcTransfer(tx) => TransactionTracker {
                     index,
                     name: format!(
-                        "BTC transfer {} send {} to {}",
+                        "BTC transfer {} send {} satoshis to {}",
                         tx.expected_sender, tx.sats_amount, tx.recipient
+                    ),
+                    status: TransactionStatus::Queued,
+                },
+                TransactionSpecification::StxTransfer(tx) => TransactionTracker {
+                    index,
+                    name: format!(
+                        "STX transfer {} send {} µSTC to {}",
+                        tx.expected_sender.to_address(),
+                        tx.mstx_amount,
+                        tx.recipient.to_string()
                     ),
                     status: TransactionStatus::Queued,
                 },
