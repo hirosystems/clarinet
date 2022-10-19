@@ -1,11 +1,11 @@
 use clarity_repl::clarity::codec::StacksMessageCodec;
-use clarity_repl::clarity::util::hash::{bytes_to_hex, hex_bytes};
+use clarity_repl::clarity::util::hash::{bytes_to_hex, hex_bytes, to_hex};
 use clarity_repl::clarity::vm::types::Value;
 
 use reqwest::blocking::Client;
 use std::io::Cursor;
 
-use clarity_repl::codec::StacksTransaction;
+use clarity_repl::codec::{StacksTransaction, TransactionPayload};
 
 #[derive(Debug)]
 pub enum RpcError {
@@ -100,12 +100,42 @@ pub struct Contract {
     pub publish_height: u64,
 }
 
+#[derive(Deserialize, Debug)]
+pub struct FeeEstimationReport {
+    pub estimations: Vec<FeeEstimation>,
+}
+
+#[derive(Deserialize, Debug)]
+pub struct FeeEstimation {
+    pub fee: u64,
+}
+
 impl StacksRpc {
     pub fn new(url: &str) -> Self {
         Self {
             url: url.into(),
             client: Client::builder().build().unwrap(),
         }
+    }
+
+    pub fn estimate_transaction_fee(
+        &self,
+        transaction_payload: &TransactionPayload,
+        priority: usize,
+    ) -> Result<u64, RpcError> {
+        let tx = transaction_payload.serialize_to_vec();
+        let payload = json!({ "transaction_payload": to_hex(&tx) });
+        let path = format!("{}/v2/fees/transaction", self.url);
+        let res: FeeEstimationReport = self
+            .client
+            .post(&path)
+            .json(&payload)
+            .send()
+            .map_err(|e| RpcError::Message(e.to_string()))?
+            .json()
+            .map_err(|e| RpcError::Message(e.to_string()))?;
+
+        Ok(res.estimations[priority].fee)
     }
 
     pub fn post_transaction(

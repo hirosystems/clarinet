@@ -228,6 +228,95 @@ pub enum DeploymentCommand {
     Start,
 }
 
+pub fn update_deployment_costs(
+    deployment: &mut DeploymentSpecification,
+    priority: usize,
+) -> Result<(), String> {
+    let stacks_node_url = deployment
+        .stacks_node
+        .as_ref()
+        .expect("unable to get stacks node rcp address");
+    let stacks_rpc = StacksRpc::new(&stacks_node_url);
+    let mut session = Session::new(SessionSettings::default());
+
+    for batch_spec in deployment.plan.batches.iter_mut() {
+        for transaction in batch_spec.transactions.iter_mut() {
+            match transaction {
+                TransactionSpecification::StxTransfer(tx) => {
+                    let transaction_payload = TransactionPayload::TokenTransfer(
+                        tx.recipient.clone(),
+                        tx.mstx_amount,
+                        TokenTransferMemo(tx.memo.clone()),
+                    );
+
+                    match stacks_rpc.estimate_transaction_fee(&transaction_payload, priority) {
+                        Ok(fee) => {
+                            tx.cost = fee;
+                        }
+                        Err(e) => {
+                            println!("unable to estimate fee for transaction");
+                            continue;
+                        }
+                    };
+                }
+                TransactionSpecification::ContractCall(tx) => {
+                    let function_args = tx
+                        .parameters
+                        .iter()
+                        .map(|value| {
+                            let execution = session.eval(value.to_string(), None, false).unwrap();
+                            match execution.result {
+                                EvaluationResult::Snippet(result) => result.result,
+                                _ => unreachable!("Contract result from snippet"),
+                            }
+                        })
+                        .collect::<Vec<_>>();
+
+                    let transaction_payload =
+                        TransactionPayload::ContractCall(TransactionContractCall {
+                            contract_name: tx.contract_id.name.clone(),
+                            address: StacksAddress::from(tx.contract_id.issuer.clone()),
+                            function_name: tx.method.clone(),
+                            function_args: function_args,
+                        });
+
+                    match stacks_rpc.estimate_transaction_fee(&transaction_payload, priority) {
+                        Ok(fee) => {
+                            tx.cost = fee;
+                        }
+                        Err(e) => {
+                            println!("unable to estimate fee for transaction");
+                            continue;
+                        }
+                    };
+                }
+                TransactionSpecification::ContractPublish(tx) => {
+                    let transaction_payload =
+                        TransactionPayload::SmartContract(TransactionSmartContract {
+                            name: tx.contract_name.clone(),
+                            code_body: StacksString::from_str(&tx.source).unwrap(),
+                        });
+
+                    match stacks_rpc.estimate_transaction_fee(&transaction_payload, priority) {
+                        Ok(fee) => {
+                            tx.cost = fee;
+                        }
+                        Err(e) => {
+                            println!("unable to estimate fee for transaction: {}", e.to_string());
+                            continue;
+                        }
+                    };
+                }
+                TransactionSpecification::RequirementPublish(_)
+                | TransactionSpecification::BtcTransfer(_)
+                | TransactionSpecification::EmulatedContractPublish(_)
+                | TransactionSpecification::EmulatedContractCall(_) => continue,
+            };
+        }
+    }
+    Ok(())
+}
+
 pub fn apply_on_chain_deployment(
     manifest: &ProjectManifest,
     deployment: DeploymentSpecification,

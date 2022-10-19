@@ -17,8 +17,8 @@ use chainhook_event_observer::chainhooks::types::ChainhookSpecification;
 use chainhook_types::StacksNetwork;
 use chainhook_types::{BitcoinNetwork, Chain};
 use clarinet_deployments::onchain::{
-    apply_on_chain_deployment, get_initial_transactions_trackers, DeploymentCommand,
-    DeploymentEvent,
+    apply_on_chain_deployment, get_initial_transactions_trackers, update_deployment_costs,
+    DeploymentCommand, DeploymentEvent,
 };
 use clarinet_deployments::types::{DeploymentGenerationArtifacts, DeploymentSpecification};
 use clarinet_deployments::{
@@ -231,6 +231,38 @@ struct GenerateDeployment {
         conflicts_with = "mainnet"
     )]
     pub no_batch: bool,
+    /// Compute and set cost, using low priority (network connection required)
+    #[clap(
+        long = "low-cost",
+        conflicts_with = "medium-cost",
+        conflicts_with = "high-cost",
+        conflicts_with = "manual-cost"
+    )]
+    pub low_cost: bool,
+    /// Compute and set cost, using medium priority (network connection required)
+    #[clap(
+        conflicts_with = "low-cost",
+        long = "medium-cost",
+        conflicts_with = "high-cost",
+        conflicts_with = "manual-cost"
+    )]
+    pub medium_cost: bool,
+    /// Compute and set cost, using high priority (network connection required)
+    #[clap(
+        conflicts_with = "low-cost",
+        conflicts_with = "medium-cost",
+        long = "high-cost",
+        conflicts_with = "manual-cost"
+    )]
+    pub high_cost: bool,
+    /// Leave cost estimation manual
+    #[clap(
+        conflicts_with = "low-cost",
+        conflicts_with = "medium-cost",
+        conflicts_with = "high-cost",
+        long = "manual-cost"
+    )]
+    pub manual_cost: bool,
 }
 
 #[derive(Parser, PartialEq, Clone, Debug)]
@@ -608,7 +640,7 @@ pub fn main() {
 
                 let default_deployment_path =
                     get_default_deployment_path(&manifest, &network).unwrap();
-                let (deployment, _) =
+                let (mut deployment, _) =
                     match generate_default_deployment(&manifest, &network, cmd.no_batch) {
                         Ok(deployment) => deployment,
                         Err(message) => {
@@ -616,6 +648,29 @@ pub fn main() {
                             std::process::exit(1);
                         }
                     };
+
+                if !cmd.manual_cost && network.either_testnet_or_mainnet() {
+                    let priority = match (cmd.low_cost, cmd.medium_cost, cmd.high_cost) {
+                        (_, _, true) => 2,
+                        (_, true, _) => 1,
+                        (true, _, _) => 0,
+                        (false, false, false) => {
+                            println!("{}: cost strategy not specified (--low-cost, --medium-cost, --high-cost, --manual-cost)", red!("error"));
+                            std::process::exit(1);
+                        }
+                    };
+                    match update_deployment_costs(&mut deployment, priority) {
+                        Ok(_) => {}
+                        Err(message) => {
+                            println!(
+                                "{}: unable to update costs\n{}",
+                                yellow!("warning"),
+                                message
+                            );
+                        }
+                    };
+                }
+
                 let res = write_deployment(&deployment, &default_deployment_path, true);
                 if let Err(message) = res {
                     println!("{}: {}", red!("error"), message);
