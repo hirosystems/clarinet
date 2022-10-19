@@ -92,7 +92,7 @@ Deno.test("expectTuple", () => {
   assertObjectMatch("{id: u0}".expectTuple(), { id: "u0" });
 });
 
-Deno.test("expect", () => {
+Deno.test("expectPrintEvent", () => {
   const id = "ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM.color-vote";
   const events = [
     {
