@@ -15,7 +15,7 @@ chainhook_types = { package = "chainhook-types", path = "../chainhook-types-rs" 
 stacks_rpc_client = { package = "stacks-rpc-client", path = "../stacks-rpc-client", optional = true }
 
 # CLI
-reqwest = { version = "0.11", default-features = false, optional = true, features = [
+reqwest = { version = "0.11", default-features = false, features = [
     "json",
     "rustls-tls",
 ] }
@@ -30,10 +30,9 @@ clarinet_utils = { package = "clarinet-utils", path = "../clarinet-utils", optio
 [features]
 default = ["cli"]
 cli = ["clarity_repl/cli", "clarinet_files/cli", "onchain"]
-wasm = ["clarity_repl/wasm", "clarinet_files/wasm", "reqwest"]
+wasm = ["clarity_repl/wasm", "clarinet_files/wasm"]
 onchain = [
     "stacks_rpc_client",
-    "reqwest",
     "bitcoin",
     "bitcoincore-rpc",
     "bitcoincore-rpc-json",
