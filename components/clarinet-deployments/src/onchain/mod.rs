@@ -601,7 +601,7 @@ pub fn apply_on_chain_deployment(
                     ongoing_batch.insert(res.txid, tracker);
                 }
                 Err(e) => {
-                    let message = format!("unable to post transaction ({:?})", e);
+                    let message = format!("unable to post transaction\n{:?}", e);
                     tracker.status = TransactionStatus::Error(message.clone());
 
                     let _ = deployment_event_tx

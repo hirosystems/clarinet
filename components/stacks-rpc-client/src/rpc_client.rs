@@ -10,6 +10,18 @@ use clarity_repl::codec::StacksTransaction;
 #[derive(Debug)]
 pub enum RpcError {
     Generic,
+    StatusCode(u16),
+    Message(String),
+}
+
+impl RpcError {
+    pub fn to_string(&self) -> String {
+        match &self {
+            RpcError::Message(e) => e.clone(),
+            RpcError::StatusCode(e) => format!("error status code {}", e),
+            RpcError::Generic => "unknown error".into(),
+        }
+    }
 }
 
 pub struct StacksRpc {
@@ -108,11 +120,14 @@ impl StacksRpc {
             .header("Content-Type", "application/octet-stream")
             .body(tx)
             .send()
-            .unwrap();
+            .map_err(|e| RpcError::Message(e.to_string()))?;
 
         if !res.status().is_success() {
-            println!("{}", res.text().unwrap());
-            return Err(RpcError::Generic);
+            let err = match res.text() {
+                Ok(message) => RpcError::Message(message),
+                Err(e) => RpcError::Message(e.to_string()),
+            };
+            return Err(err);
         }
 
         let txid: String = res.json().unwrap();
@@ -127,9 +142,9 @@ impl StacksRpc {
             .client
             .get(&request_url)
             .send()
-            .expect("Unable to retrieve account")
+            .map_err(|e| RpcError::Message(e.to_string()))?
             .json()
-            .expect("Unable to parse contract");
+            .map_err(|e| RpcError::Message(e.to_string()))?;
         let nonce = res.nonce;
         Ok(nonce)
     }
@@ -141,9 +156,9 @@ impl StacksRpc {
             .client
             .get(&request_url)
             .send()
-            .expect("Unable to retrieve account")
+            .map_err(|e| RpcError::Message(e.to_string()))?
             .json()
-            .expect("Unable to parse contract");
+            .map_err(|e| RpcError::Message(e.to_string()))?;
         Ok(res)
     }
 
@@ -154,9 +169,9 @@ impl StacksRpc {
             .client
             .get(&request_url)
             .send()
-            .expect("Unable to retrieve account")
+            .map_err(|e| RpcError::Message(e.to_string()))?
             .json()
-            .expect("Unable to parse contract");
+            .map_err(|e| RpcError::Message(e.to_string()))?;
         Ok(res)
     }
 
@@ -175,9 +190,9 @@ impl StacksRpc {
         match res {
             Ok(response) => match response.json() {
                 Ok(value) => Ok(value),
-                _ => Err(RpcError::Generic),
+                Err(e) => Err(RpcError::Message(format!("{}", e.to_string()))),
             },
-            _ => Err(RpcError::Generic),
+            Err(e) => Err(RpcError::Message(format!("{}", e.to_string()))),
         }
     }
 
