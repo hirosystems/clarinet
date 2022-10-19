@@ -160,6 +160,14 @@ Clarinet.run({
 
       code.push([`}`, ``]);
     }
+
+    try {
+      Deno.statSync("./artifacts");
+    } catch (_) {
+      Deno.mkdirSync("./artifacts");
+    }
+
+    Deno.writeTextFileSync("./artifacts/contracts.ts", code.flat().join("\n"));
   },
 });
 
