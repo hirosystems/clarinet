@@ -6,7 +6,7 @@ use crate::config::{Config, ConfigFile};
 use chainhook_db::config::{StorageConfig, StorageDriver};
 use chainhook_event_observer::{
     chainhooks::{
-        evaluate_stacks_chainhook_on_transaction, handle_stacks_hook_action,
+        evaluate_stacks_transaction_predicate_on_transaction, handle_stacks_hook_action,
         types::ChainhookSpecification, StacksChainhookOccurrence, StacksTriggerChainhook,
     },
     observer::{
@@ -173,7 +173,10 @@ pub fn main() {
                             };
                             let mut apply = vec![];
                             for tx in transactions.iter() {
-                                if evaluate_stacks_chainhook_on_transaction(&tx, &stacks_hook) {
+                                if evaluate_stacks_transaction_predicate_on_transaction(
+                                    &tx,
+                                    &stacks_hook,
+                                ) {
                                     info!("Predicate is true for transaction {}", cursor);
                                     apply.push((tx, &block_identifier));
                                 }

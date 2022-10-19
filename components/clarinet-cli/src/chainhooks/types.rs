@@ -180,7 +180,8 @@ impl ChainhookSpecificationFile {
             start_block: network_spec.start_block,
             end_block: network_spec.end_block,
             expire_after_occurrence: network_spec.expire_after_occurrence,
-            predicate: network_spec.predicate.to_stacks_predicate()?,
+            block_predicate: None,
+            transaction_predicate: network_spec.predicate.to_stacks_predicate()?,
             action: network_spec.action.to_specifications()?,
         })
     }
@@ -219,31 +220,31 @@ impl HookActionFile {
 }
 
 impl ChainhookPredicateFile {
-    pub fn to_bitcoin_predicate(&self) -> Result<BitcoinHookPredicate, String> {
+    pub fn to_bitcoin_predicate(&self) -> Result<BitcoinTransactionFilterPredicate, String> {
         if let Some(ref specs) = self.hex {
             let rule = BitcoinPredicateType::Hex(self.extract_matching_rule(specs)?);
             let scope = self.extract_scope()?;
-            return Ok(BitcoinHookPredicate::new(scope, rule));
+            return Ok(BitcoinTransactionFilterPredicate::new(scope, rule));
         } else if let Some(ref specs) = self.p2pkh {
             let rule = BitcoinPredicateType::P2pkh(self.extract_matching_rule(specs)?);
             let scope = self.extract_scope()?;
-            return Ok(BitcoinHookPredicate::new(scope, rule));
+            return Ok(BitcoinTransactionFilterPredicate::new(scope, rule));
         } else if let Some(ref specs) = self.p2sh {
             let rule = BitcoinPredicateType::P2sh(self.extract_matching_rule(specs)?);
             let scope = self.extract_scope()?;
-            return Ok(BitcoinHookPredicate::new(scope, rule));
+            return Ok(BitcoinTransactionFilterPredicate::new(scope, rule));
         } else if let Some(ref specs) = self.p2wpkh {
             let rule = BitcoinPredicateType::P2wpkh(self.extract_matching_rule(specs)?);
             let scope = self.extract_scope()?;
-            return Ok(BitcoinHookPredicate::new(scope, rule));
+            return Ok(BitcoinTransactionFilterPredicate::new(scope, rule));
         } else if let Some(ref specs) = self.p2wsh {
             let rule = BitcoinPredicateType::P2wsh(self.extract_matching_rule(specs)?);
             let scope = self.extract_scope()?;
-            return Ok(BitcoinHookPredicate::new(scope, rule));
+            return Ok(BitcoinTransactionFilterPredicate::new(scope, rule));
         } else if let Some(ref _specs) = self.script {
             // let rule = BitcoinPredicateType::Script(self.ex(specs)?);
             // let scope = self.extract_scope()?;
-            // return Ok(BitcoinHookPredicate::new(scope, rule));
+            // return Ok(BitcoinTransactionFilterPredicate::new(scope, rule));
             return Err(format!("trigger script unimplemented"));
         }
         return Err(format!(
@@ -284,22 +285,22 @@ impl ChainhookPredicateFile {
         return Err(format!("predicate scope not specified (inputs, outputs)"));
     }
 
-    pub fn to_stacks_predicate(&self) -> Result<StacksHookPredicate, String> {
+    pub fn to_stacks_predicate(&self) -> Result<StacksTransactionFilterPredicate, String> {
         if let Some(ref specs) = self.contract_call {
             let predicate = self.extract_contract_call_predicate(specs)?;
-            return Ok(StacksHookPredicate::ContractCall(predicate));
+            return Ok(StacksTransactionFilterPredicate::ContractCall(predicate));
         } else if let Some(ref specs) = self.print_event {
             let predicate = self.extract_print_event_predicate(specs)?;
-            return Ok(StacksHookPredicate::PrintEvent(predicate));
+            return Ok(StacksTransactionFilterPredicate::PrintEvent(predicate));
         } else if let Some(ref specs) = self.ft_event {
             let predicate = self.extract_ft_event_predicate(specs)?;
-            return Ok(StacksHookPredicate::FtEvent(predicate));
+            return Ok(StacksTransactionFilterPredicate::FtEvent(predicate));
         } else if let Some(ref specs) = self.nft_event {
             let predicate = self.extract_nft_event_predicate(specs)?;
-            return Ok(StacksHookPredicate::NftEvent(predicate));
+            return Ok(StacksTransactionFilterPredicate::NftEvent(predicate));
         } else if let Some(ref specs) = self.stx_event {
             let predicate = self.extract_stx_event_predicate(specs)?;
-            return Ok(StacksHookPredicate::StxEvent(predicate));
+            return Ok(StacksTransactionFilterPredicate::StxEvent(predicate));
         }
         return Err(format!("trigger not specified (contract-call, event)"));
     }
