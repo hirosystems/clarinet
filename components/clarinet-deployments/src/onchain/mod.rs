@@ -212,8 +212,7 @@ pub struct TransactionTracker {
 
 #[derive(Clone, Debug)]
 pub enum TransactionCheck {
-    StxTransfer(StandardPrincipalData, u64),
-    ContractCall(StandardPrincipalData, u64),
+    NonceCheck(StandardPrincipalData, u64),
     ContractPublish(StandardPrincipalData, ContractName),
     // TODO(lgalabru): Handle Bitcoin checks
     // BtcTransfer(),
@@ -325,7 +324,7 @@ pub fn apply_on_chain_deployment(
                         issuer_address,
                         tx.recipient.to_string(),
                     );
-                    let check = TransactionCheck::StxTransfer(tx.expected_sender.clone(), nonce);
+                    let check = TransactionCheck::NonceCheck(tx.expected_sender.clone(), nonce);
                     TransactionTracker {
                         index,
                         name: name.clone(),
@@ -410,7 +409,7 @@ pub fn apply_on_chain_deployment(
                         tx.method,
                         tx.parameters.join(" ")
                     );
-                    let check = TransactionCheck::ContractCall(tx.expected_sender.clone(), nonce);
+                    let check = TransactionCheck::NonceCheck(tx.expected_sender.clone(), nonce);
                     TransactionTracker {
                         index,
                         name: name.clone(),
@@ -649,14 +648,14 @@ pub fn apply_on_chain_deployment(
                             break;
                         }
                     }
-                    TransactionStatus::Broadcasted(TransactionCheck::ContractCall(
+                    TransactionStatus::Broadcasted(TransactionCheck::NonceCheck(
                         tx_sender,
                         expected_nonce,
                     )) => {
                         let tx_sender_address = tx_sender.to_address();
                         let res = stacks_rpc.get_nonce(&tx_sender_address);
                         if let Ok(current_nonce) = res {
-                            if current_nonce > *expected_nonce {
+                            if current_nonce.gt(expected_nonce) {
                                 tracker.status = TransactionStatus::Confirmed;
                                 let _ = deployment_event_tx
                                     .send(DeploymentEvent::TransactionUpdate(tracker.clone()));
