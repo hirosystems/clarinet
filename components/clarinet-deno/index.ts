@@ -667,8 +667,8 @@ String.prototype.expectTuple = function () {
   for (const element of elements) {
     for (let i = 0; i < element.length; i++) {
       if (element.charAt(i) === ":") {
-        const key = element.substring(0, i);
-        const value = element.substring(i + 2, element.length);
+        const key = element.substring(0, i).trim();
+        const value = element.substring(i + 2).trim();
         tuple[key] = value;
         break;
       }
