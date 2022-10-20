@@ -17,8 +17,8 @@ use chainhook_event_observer::chainhooks::types::ChainhookSpecification;
 use chainhook_types::StacksNetwork;
 use chainhook_types::{BitcoinNetwork, Chain};
 use clarinet_deployments::onchain::{
-    apply_on_chain_deployment, get_initial_transactions_trackers, DeploymentCommand,
-    DeploymentEvent,
+    apply_on_chain_deployment, get_initial_transactions_trackers, update_deployment_costs,
+    DeploymentCommand, DeploymentEvent,
 };
 use clarinet_deployments::types::{DeploymentGenerationArtifacts, DeploymentSpecification};
 use clarinet_deployments::{
@@ -231,6 +231,38 @@ struct GenerateDeployment {
         conflicts_with = "mainnet"
     )]
     pub no_batch: bool,
+    /// Compute and set cost, using low priority (network connection required)
+    #[clap(
+        long = "low-cost",
+        conflicts_with = "medium-cost",
+        conflicts_with = "high-cost",
+        conflicts_with = "manual-cost"
+    )]
+    pub low_cost: bool,
+    /// Compute and set cost, using medium priority (network connection required)
+    #[clap(
+        conflicts_with = "low-cost",
+        long = "medium-cost",
+        conflicts_with = "high-cost",
+        conflicts_with = "manual-cost"
+    )]
+    pub medium_cost: bool,
+    /// Compute and set cost, using high priority (network connection required)
+    #[clap(
+        conflicts_with = "low-cost",
+        conflicts_with = "medium-cost",
+        long = "high-cost",
+        conflicts_with = "manual-cost"
+    )]
+    pub high_cost: bool,
+    /// Leave cost estimation manual
+    #[clap(
+        conflicts_with = "low-cost",
+        conflicts_with = "medium-cost",
+        conflicts_with = "high-cost",
+        long = "manual-cost"
+    )]
+    pub manual_cost: bool,
 }
 
 #[derive(Parser, PartialEq, Clone, Debug)]
@@ -608,7 +640,7 @@ pub fn main() {
 
                 let default_deployment_path =
                     get_default_deployment_path(&manifest, &network).unwrap();
-                let (deployment, _) =
+                let (mut deployment, _) =
                     match generate_default_deployment(&manifest, &network, cmd.no_batch) {
                         Ok(deployment) => deployment,
                         Err(message) => {
@@ -616,17 +648,61 @@ pub fn main() {
                             std::process::exit(1);
                         }
                     };
-                let res = write_deployment(&deployment, &default_deployment_path, true);
-                if let Err(message) = res {
-                    println!("{}: {}", red!("error"), message);
-                    process::exit(1);
+
+                if !cmd.manual_cost && network.either_testnet_or_mainnet() {
+                    let priority = match (cmd.low_cost, cmd.medium_cost, cmd.high_cost) {
+                        (_, _, true) => 2,
+                        (_, true, _) => 1,
+                        (true, _, _) => 0,
+                        (false, false, false) => {
+                            println!("{}: cost strategy not specified (--low-cost, --medium-cost, --high-cost, --manual-cost)", red!("error"));
+                            std::process::exit(1);
+                        }
+                    };
+                    match update_deployment_costs(&mut deployment, priority) {
+                        Ok(_) => {}
+                        Err(message) => {
+                            println!(
+                                "{}: unable to update costs\n{}",
+                                yellow!("warning"),
+                                message
+                            );
+                        }
+                    };
                 }
 
-                println!(
-                    "{} {}",
-                    green!("Generated file"),
-                    default_deployment_path.get_relative_location().unwrap()
-                );
+                let write_plan = if default_deployment_path.exists() {
+                    let existing_deployment =
+                        match load_deployment(&manifest, &default_deployment_path) {
+                            Ok(deployment) => deployment,
+                            Err(message) => {
+                                println!(
+                                    "{}: unable to load {}\n{}",
+                                    red!("error"),
+                                    default_deployment_path.to_string(),
+                                    message
+                                );
+                                process::exit(1);
+                            }
+                        };
+                    should_existing_plan_be_replaced(&existing_deployment, &deployment)
+                } else {
+                    true
+                };
+
+                if write_plan {
+                    let res = write_deployment(&deployment, &default_deployment_path, true);
+                    if let Err(message) = res {
+                        println!("{}: {}", red!("error"), message);
+                        process::exit(1);
+                    }
+
+                    println!(
+                        "{} {}",
+                        green!("Generated file"),
+                        default_deployment_path.get_relative_location().unwrap()
+                    );
+                }
             }
             Deployments::ApplyDeployment(cmd) => {
                 let manifest = load_manifest_or_exit(cmd.manifest_path);
@@ -1444,6 +1520,48 @@ fn load_deployment_and_artifacts_or_exit(
             println!("{}: {}", red!("error"), e);
             process::exit(1);
         }
+    }
+}
+
+pub fn should_existing_plan_be_replaced(
+    existing_plan: &DeploymentSpecification,
+    new_plan: &DeploymentSpecification,
+) -> bool {
+    use similar::{ChangeTag, TextDiff};
+
+    let existing_file = serde_yaml::to_string(&existing_plan.to_specification_file()).unwrap();
+
+    let new_file = serde_yaml::to_string(&new_plan.to_specification_file()).unwrap();
+
+    if existing_file == new_file {
+        return false;
+    }
+
+    println!("{}", blue!("A new deployment plan was computed and differs from the default deployment plan currently saved on disk:"));
+
+    let diffs = TextDiff::from_lines(&existing_file, &new_file);
+
+    for change in diffs.iter_all_changes() {
+        let formatted_change = match change.tag() {
+            ChangeTag::Delete => {
+                format!("{} {}", red!("-"), red!(format!("{}", change)))
+            }
+            ChangeTag::Insert => {
+                format!("{} {}", green!("+"), green!(format!("{}", change)))
+            }
+            ChangeTag::Equal => format!("  {}", change),
+        };
+        print!("{}", formatted_change);
+    }
+
+    println!("{}", yellow!("Overwrite? [Y/n]"));
+    let mut buffer = String::new();
+    std::io::stdin().read_line(&mut buffer).unwrap();
+
+    if buffer.starts_with("n") {
+        return false;
+    } else {
+        return true;
     }
 }
 
