@@ -3,8 +3,9 @@ pub mod types;
 use crate::utils::AbstractStacksBlock;
 
 use self::types::{
-    BitcoinChainhookSpecification, BitcoinHookPredicate, ChainhookSpecification, HookAction,
-    HookFormation, MatchingRule, StacksChainhookSpecification, StacksHookPredicate,
+    BitcoinChainhookSpecification, BitcoinTransactionFilterPredicate, ChainhookSpecification,
+    HookAction, HookFormation, MatchingRule, StacksChainhookSpecification,
+    StacksContractDeploymentPredicate, StacksTransactionFilterPredicate,
 };
 use base58::FromBase58;
 use bitcoincore_rpc::bitcoin::blockdata::opcodes;
@@ -187,7 +188,7 @@ fn evaluate_stacks_chainhook_on_blocks<'a>(
     let mut occurrences = vec![];
     for block in blocks {
         for tx in block.get_transactions().iter() {
-            if evaluate_stacks_chainhook_on_transaction(tx, chainhook) {
+            if evaluate_stacks_transaction_predicate_on_transaction(tx, chainhook) {
                 occurrences.push((tx, block.get_identifier()));
                 continue;
             }
@@ -196,134 +197,103 @@ fn evaluate_stacks_chainhook_on_blocks<'a>(
     occurrences
 }
 
-pub fn evaluate_stacks_chainhook_on_transaction<'a>(
+pub fn evaluate_stacks_transaction_predicate_on_transaction<'a>(
     transaction: &'a StacksTransactionData,
     chainhook: &'a StacksChainhookSpecification,
 ) -> bool {
-    match (&transaction.metadata.kind, &chainhook.predicate) {
-        (
-            StacksTransactionKind::ContractCall(actual_contract_call),
-            StacksHookPredicate::ContractCall(expected_contract_call),
-        ) => {
-            if actual_contract_call.contract_identifier
-                == expected_contract_call.contract_identifier
-                && actual_contract_call.method == expected_contract_call.method
-            {
-                return true;
+    match &chainhook.transaction_predicate {
+        StacksTransactionFilterPredicate::ContractDeployment(
+            StacksContractDeploymentPredicate::Principal(expected_deployer),
+        ) => match &transaction.metadata.kind {
+            StacksTransactionKind::ContractDeployment(actual_deployment) => actual_deployment
+                .contract_identifier
+                .starts_with(expected_deployer),
+            _ => false,
+        },
+        StacksTransactionFilterPredicate::ContractDeployment(
+            StacksContractDeploymentPredicate::Trait(_expected_trait),
+        ) => match &transaction.metadata.kind {
+            StacksTransactionKind::ContractDeployment(_actual_deployment) => {
+                warn!("StacksContractDeploymentPredicate::Trait uninmplemented");
+                false
+            }
+            _ => false,
+        },
+        StacksTransactionFilterPredicate::ContractCall(expected_contract_call) => {
+            match &transaction.metadata.kind {
+                StacksTransactionKind::ContractCall(actual_contract_call) => {
+                    actual_contract_call
+                        .contract_identifier
+                        .eq(&expected_contract_call.contract_identifier)
+                        && actual_contract_call
+                            .method
+                            .eq(&expected_contract_call.method)
+                }
+                _ => false,
             }
         }
-        (StacksTransactionKind::ContractCall(_), _)
-        | (StacksTransactionKind::ContractDeployment(_), _) => {
-            // Look for emitted events
+        StacksTransactionFilterPredicate::FtEvent(expected_event) => {
+            let expecting_mint = expected_event.actions.contains(&"mint".to_string());
+            let expecting_transfer = expected_event.actions.contains(&"transfer".to_string());
+            let expecting_burn = expected_event.actions.contains(&"burn".to_string());
+
             for event in transaction.metadata.receipt.events.iter() {
-                match (event, &chainhook.predicate) {
-                    (
-                        StacksTransactionEvent::NFTMintEvent(actual),
-                        StacksHookPredicate::NftEvent(expected),
-                    ) => {
-                        if actual.asset_class_identifier == expected.asset_identifier
-                            && expected.actions.contains(&"mint".to_string())
-                        {
-                            return true;
-                        }
-                    }
-                    (
-                        StacksTransactionEvent::NFTTransferEvent(actual),
-                        StacksHookPredicate::NftEvent(expected),
-                    ) => {
-                        if actual.asset_class_identifier == expected.asset_identifier
-                            && expected.actions.contains(&"transfer".to_string())
-                        {
-                            return true;
-                        }
-                    }
-                    (
-                        StacksTransactionEvent::NFTBurnEvent(actual),
-                        StacksHookPredicate::NftEvent(expected),
-                    ) => {
-                        if actual.asset_class_identifier == expected.asset_identifier
-                            && expected.actions.contains(&"burn".to_string())
-                        {
-                            return true;
-                        }
-                    }
-                    (
-                        StacksTransactionEvent::FTMintEvent(actual),
-                        StacksHookPredicate::FtEvent(expected),
-                    ) => {
-                        if actual.asset_class_identifier == expected.asset_identifier
-                            && expected.actions.contains(&"mint".to_string())
-                        {
-                            return true;
-                        }
-                    }
-                    (
-                        StacksTransactionEvent::FTTransferEvent(actual),
-                        StacksHookPredicate::FtEvent(expected),
-                    ) => {
-                        if actual.asset_class_identifier == expected.asset_identifier
-                            && expected.actions.contains(&"transfer".to_string())
-                        {
-                            return true;
-                        }
-                    }
-                    (
-                        StacksTransactionEvent::FTBurnEvent(actual),
-                        StacksHookPredicate::FtEvent(expected),
-                    ) => {
-                        if actual.asset_class_identifier == expected.asset_identifier
-                            && expected.actions.contains(&"burn".to_string())
-                        {
-                            return true;
-                        }
-                    }
-                    (
-                        StacksTransactionEvent::STXMintEvent(_),
-                        StacksHookPredicate::StxEvent(expected),
-                    ) => {
-                        if expected.actions.contains(&"mint".to_string()) {
-                            return true;
-                        }
-                    }
-                    (
-                        StacksTransactionEvent::STXTransferEvent(_),
-                        StacksHookPredicate::StxEvent(expected),
-                    ) => {
-                        if expected.actions.contains(&"transfer".to_string()) {
-                            return true;
-                        }
-                    }
-                    (
-                        StacksTransactionEvent::STXLockEvent(_),
-                        StacksHookPredicate::StxEvent(expected),
-                    ) => {
-                        if expected.actions.contains(&"lock".to_string()) {
-                            return true;
-                        }
-                    }
-                    (
-                        StacksTransactionEvent::SmartContractEvent(actual),
-                        StacksHookPredicate::PrintEvent(expected),
-                    ) => {
-                        if actual.contract_identifier == expected.contract_identifier {
+                match (event, expecting_mint, expecting_transfer, expecting_burn) {
+                    (StacksTransactionEvent::FTMintEvent(_), true, _, _) => return true,
+                    (StacksTransactionEvent::FTTransferEvent(_), _, true, _) => return true,
+                    (StacksTransactionEvent::FTBurnEvent(_), _, _, true) => return true,
+                    _ => continue,
+                }
+            }
+            false
+        }
+        StacksTransactionFilterPredicate::NftEvent(expected_event) => {
+            let expecting_mint = expected_event.actions.contains(&"mint".to_string());
+            let expecting_transfer = expected_event.actions.contains(&"transfer".to_string());
+            let expecting_burn = expected_event.actions.contains(&"burn".to_string());
+
+            for event in transaction.metadata.receipt.events.iter() {
+                match (event, expecting_mint, expecting_transfer, expecting_burn) {
+                    (StacksTransactionEvent::NFTMintEvent(_), true, _, _) => return true,
+                    (StacksTransactionEvent::NFTTransferEvent(_), _, true, _) => return true,
+                    (StacksTransactionEvent::NFTBurnEvent(_), _, _, true) => return true,
+                    _ => continue,
+                }
+            }
+            false
+        }
+        StacksTransactionFilterPredicate::StxEvent(expected_event) => {
+            let expecting_mint = expected_event.actions.contains(&"mint".to_string());
+            let expecting_transfer = expected_event.actions.contains(&"transfer".to_string());
+            let expecting_lock = expected_event.actions.contains(&"lock".to_string());
+
+            for event in transaction.metadata.receipt.events.iter() {
+                match (event, expecting_mint, expecting_transfer, expecting_lock) {
+                    (StacksTransactionEvent::STXMintEvent(_), true, _, _) => return true,
+                    (StacksTransactionEvent::STXTransferEvent(_), _, true, _) => return true,
+                    (StacksTransactionEvent::STXLockEvent(_), _, _, true) => return true,
+                    _ => continue,
+                }
+            }
+            false
+        }
+        StacksTransactionFilterPredicate::PrintEvent(expected_event) => {
+            for event in transaction.metadata.receipt.events.iter() {
+                match event {
+                    StacksTransactionEvent::SmartContractEvent(actual) => {
+                        if actual.contract_identifier == expected_event.contract_identifier {
                             return true;
                         }
                     }
                     _ => {}
                 }
             }
+            false
         }
-        (
-            StacksTransactionKind::NativeTokenTransfer,
-            StacksHookPredicate::StxEvent(expected_stx_event),
-        ) => {
-            if expected_stx_event.actions.contains(&"transfer".to_string()) {
-                return true;
-            }
+        StacksTransactionFilterPredicate::TransactionIdentifierHash(txid) => {
+            txid.eq(&transaction.transaction_identifier.hash)
         }
-        _ => {}
     }
-    false
 }
 
 pub fn evaluate_bitcoin_chainhooks_on_chain_event<'a>(
@@ -339,7 +309,7 @@ pub fn evaluate_bitcoin_chainhooks_on_chain_event<'a>(
 
                 for block in event.new_blocks.iter() {
                     for tx in block.transactions.iter() {
-                        if chainhook.evaluate_predicate(&tx) {
+                        if chainhook.evaluate_transaction_predicate(&tx) {
                             apply.push((tx, &block.block_identifier))
                         }
                     }
@@ -361,14 +331,14 @@ pub fn evaluate_bitcoin_chainhooks_on_chain_event<'a>(
 
                 for block in event.blocks_to_apply.iter() {
                     for tx in block.transactions.iter() {
-                        if chainhook.evaluate_predicate(&tx) {
+                        if chainhook.evaluate_transaction_predicate(&tx) {
                             apply.push((tx, &block.block_identifier))
                         }
                     }
                 }
                 for block in event.blocks_to_rollback.iter() {
                     for tx in block.transactions.iter() {
-                        if chainhook.evaluate_predicate(&tx) {
+                        if chainhook.evaluate_transaction_predicate(&tx) {
                             rollback.push((tx, &block.block_identifier))
                         }
                     }
@@ -404,7 +374,6 @@ pub struct BitcoinRollbackTransactionPayload {
 #[derive(Clone, Debug)]
 pub struct BitcoinChainhookPayload {
     pub uuid: String,
-    pub predicate: BitcoinHookPredicate,
 }
 
 #[derive(Clone, Debug)]
@@ -438,7 +407,6 @@ pub struct StacksRollbackTransactionPayload {
 #[derive(Clone, Debug)]
 pub struct StacksChainhookPayload {
     pub uuid: String,
-    pub predicate: StacksHookPredicate,
 }
 
 #[derive(Clone, Debug)]
@@ -536,7 +504,6 @@ pub fn handle_bitcoin_hook_action<'a>(
                     .collect::<Vec<_>>(),
                 chainhook: BitcoinChainhookPayload {
                     uuid: trigger.chainhook.uuid.clone(),
-                    predicate: trigger.chainhook.predicate.clone(),
                 },
             },
         )),
@@ -802,7 +769,8 @@ pub fn serialize_stacks_payload_to_json<'a>(
         }).collect::<Vec<_>>(),
         "chainhook": {
             "uuid": trigger.chainhook.uuid,
-            "predicate": trigger.chainhook.predicate,
+            "transaction_predicate": trigger.chainhook.transaction_predicate,
+            "block_predicate": trigger.chainhook.transaction_predicate,
         }
     })
 }
@@ -862,7 +830,6 @@ pub fn handle_stacks_hook_action<'a>(
                     .collect::<Vec<_>>(),
                 chainhook: StacksChainhookPayload {
                     uuid: trigger.chainhook.uuid.clone(),
-                    predicate: trigger.chainhook.predicate.clone(),
                 },
             },
         )),
@@ -870,12 +837,36 @@ pub fn handle_stacks_hook_action<'a>(
 }
 
 impl BitcoinChainhookSpecification {
-    pub fn evaluate_predicate(&self, tx: &BitcoinTransactionData) -> bool {
+    pub fn evaluate_transaction_predicate(&self, tx: &BitcoinTransactionData) -> bool {
         // TODO(lgalabru): follow-up on this implementation
         match &self.predicate.kind {
-            types::BitcoinPredicateType::Hex(MatchingRule::Equals(_address)) => false,
-            types::BitcoinPredicateType::Hex(MatchingRule::StartsWith(_address)) => false,
-            types::BitcoinPredicateType::Hex(MatchingRule::EndsWith(_address)) => false,
+            types::BitcoinPredicateType::TransactionIdentifierHash(txid) => {
+                tx.transaction_identifier.hash.eq(txid)
+            }
+            types::BitcoinPredicateType::Hex(MatchingRule::Equals(hex_bytes)) => {
+                for output in tx.metadata.outputs.iter() {
+                    if output.script_pubkey.eq(hex_bytes) {
+                        return true;
+                    }
+                }
+                false
+            }
+            types::BitcoinPredicateType::Hex(MatchingRule::StartsWith(hex_bytes)) => {
+                for output in tx.metadata.outputs.iter() {
+                    if output.script_pubkey.starts_with(hex_bytes) {
+                        return true;
+                    }
+                }
+                false
+            }
+            types::BitcoinPredicateType::Hex(MatchingRule::EndsWith(hex_bytes)) => {
+                for output in tx.metadata.outputs.iter() {
+                    if output.script_pubkey.ends_with(hex_bytes) {
+                        return true;
+                    }
+                }
+                false
+            }
             types::BitcoinPredicateType::P2pkh(MatchingRule::Equals(address)) => {
                 let pubkey_hash = address
                     .from_base58()
@@ -897,7 +888,23 @@ impl BitcoinChainhookSpecification {
             }
             types::BitcoinPredicateType::P2pkh(MatchingRule::StartsWith(_address)) => false,
             types::BitcoinPredicateType::P2pkh(MatchingRule::EndsWith(_address)) => false,
-            types::BitcoinPredicateType::P2sh(MatchingRule::Equals(_address)) => false,
+            types::BitcoinPredicateType::P2sh(MatchingRule::Equals(address)) => {
+                let script_hash = address
+                    .from_base58()
+                    .expect("Unable to get bytes from btc address");
+                let script = BitcoinScriptBuilder::new()
+                    .push_opcode(opcodes::all::OP_HASH160)
+                    .push_slice(&script_hash[1..21])
+                    .push_opcode(opcodes::all::OP_EQUAL)
+                    .into_script();
+
+                for output in tx.metadata.outputs.iter() {
+                    if output.script_pubkey == to_hex(script.as_bytes()) {
+                        return true;
+                    }
+                }
+                false
+            }
             types::BitcoinPredicateType::P2sh(MatchingRule::StartsWith(_address)) => false,
             types::BitcoinPredicateType::P2sh(MatchingRule::EndsWith(_address)) => false,
             types::BitcoinPredicateType::P2wpkh(MatchingRule::Equals(_address)) => false,

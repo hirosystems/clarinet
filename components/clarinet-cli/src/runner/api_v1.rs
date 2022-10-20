@@ -10,7 +10,7 @@ use super::ChainhookEvent;
 use super::DeploymentCache;
 use super::SessionArtifacts;
 use crate::runner::api_v1::utils::serialize_event;
-use chainhook_event_observer::chainhooks::evaluate_stacks_chainhook_on_transaction;
+use chainhook_event_observer::chainhooks::evaluate_stacks_transaction_predicate_on_transaction;
 use chainhook_event_observer::chainhooks::handle_stacks_hook_action;
 use chainhook_event_observer::chainhooks::types::StacksChainhookSpecification;
 use chainhook_event_observer::chainhooks::StacksChainhookOccurrence;
@@ -733,7 +733,7 @@ fn mine_block(state: &mut OpState, args: MineBlockArgs) -> Result<String, AnyErr
 
         for chainhook in chainhooks.iter() {
             for (tx, _) in transactions.iter() {
-                if evaluate_stacks_chainhook_on_transaction(tx, chainhook) {
+                if evaluate_stacks_transaction_predicate_on_transaction(tx, chainhook) {
                     let simulated_block = BlockIdentifier {
                         index: block_height.into(),
                         hash: format!("0x{}", merkle_tree.root().to_hex()),
