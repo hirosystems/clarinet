@@ -254,7 +254,7 @@ pub fn update_deployment_costs(
                             tx.cost = fee;
                         }
                         Err(e) => {
-                            println!("unable to estimate fee for transaction");
+                            println!("unable to estimate fee for transaction: {}", e.to_string());
                             continue;
                         }
                     };
@@ -285,7 +285,7 @@ pub fn update_deployment_costs(
                             tx.cost = fee;
                         }
                         Err(e) => {
-                            println!("unable to estimate fee for transaction");
+                            println!("unable to estimate fee for transaction: {}", e.to_string());
                             continue;
                         }
                     };

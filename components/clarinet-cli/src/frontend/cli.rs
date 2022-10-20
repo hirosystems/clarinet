@@ -671,17 +671,38 @@ pub fn main() {
                     };
                 }
 
-                let res = write_deployment(&deployment, &default_deployment_path, true);
-                if let Err(message) = res {
-                    println!("{}: {}", red!("error"), message);
-                    process::exit(1);
-                }
+                let write_plan = if default_deployment_path.exists() {
+                    let existing_deployment =
+                        match load_deployment(&manifest, &default_deployment_path) {
+                            Ok(deployment) => deployment,
+                            Err(message) => {
+                                println!(
+                                    "{}: unable to load {}\n{}",
+                                    red!("error"),
+                                    default_deployment_path.to_string(),
+                                    message
+                                );
+                                process::exit(1);
+                            }
+                        };
+                    should_existing_plan_be_replaced(&existing_deployment, &deployment)
+                } else {
+                    true
+                };
 
-                println!(
-                    "{} {}",
-                    green!("Generated file"),
-                    default_deployment_path.get_relative_location().unwrap()
-                );
+                if write_plan {
+                    let res = write_deployment(&deployment, &default_deployment_path, true);
+                    if let Err(message) = res {
+                        println!("{}: {}", red!("error"), message);
+                        process::exit(1);
+                    }
+
+                    println!(
+                        "{} {}",
+                        green!("Generated file"),
+                        default_deployment_path.get_relative_location().unwrap()
+                    );
+                }
             }
             Deployments::ApplyDeployment(cmd) => {
                 let manifest = load_manifest_or_exit(cmd.manifest_path);
@@ -1499,6 +1520,48 @@ fn load_deployment_and_artifacts_or_exit(
             println!("{}: {}", red!("error"), e);
             process::exit(1);
         }
+    }
+}
+
+pub fn should_existing_plan_be_replaced(
+    existing_plan: &DeploymentSpecification,
+    new_plan: &DeploymentSpecification,
+) -> bool {
+    use similar::{ChangeTag, TextDiff};
+
+    let existing_file = serde_yaml::to_string(&existing_plan.to_specification_file()).unwrap();
+
+    let new_file = serde_yaml::to_string(&new_plan.to_specification_file()).unwrap();
+
+    if existing_file == new_file {
+        return false;
+    }
+
+    println!("{}", blue!("A new deployment plan was computed and differs from the default deployment plan currently saved on disk:"));
+
+    let diffs = TextDiff::from_lines(&existing_file, &new_file);
+
+    for change in diffs.iter_all_changes() {
+        let formatted_change = match change.tag() {
+            ChangeTag::Delete => {
+                format!("{} {}", red!("-"), red!(format!("{}", change)))
+            }
+            ChangeTag::Insert => {
+                format!("{} {}", green!("+"), green!(format!("{}", change)))
+            }
+            ChangeTag::Equal => format!("  {}", change),
+        };
+        print!("{}", formatted_change);
+    }
+
+    println!("{}", yellow!("Overwrite? [Y/n]"));
+    let mut buffer = String::new();
+    std::io::stdin().read_line(&mut buffer).unwrap();
+
+    if buffer.starts_with("n") {
+        return false;
+    } else {
+        return true;
     }
 }
 
