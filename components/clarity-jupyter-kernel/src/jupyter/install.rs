@@ -24,11 +24,7 @@ pub fn install() -> Result<(), Error> {
     Ok(())
 }
 
-pub fn install_resource(
-    dir: &PathBuf,
-    filename: &str,
-    bytes: &'static [u8],
-) -> Result<(), Error> {
+pub fn install_resource(dir: &PathBuf, filename: &str, bytes: &'static [u8]) -> Result<(), Error> {
     let res_path = dir.join(filename);
     println!("Writing {}", res_path.to_string_lossy());
     let mut file = fs::File::create(res_path)?;

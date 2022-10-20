@@ -6,6 +6,7 @@ use super::jupyter_message::JupyterMessage;
 use super::CommandContext;
 
 use colored::*;
+use failure::Error;
 use json;
 use json::JsonValue;
 use std;
@@ -14,7 +15,6 @@ use std::sync::{mpsc, Arc, Mutex};
 use std::thread;
 use std::time;
 use zmq;
-use failure::Error;
 
 #[derive(Clone)]
 pub struct Server {
@@ -155,15 +155,17 @@ impl Server {
                 .send(&mut *self.iopub.lock().unwrap())?;
             let mut has_error = false;
             for code in split_code_and_command(src) {
-
-                match self.session.formatted_interpretation(code.to_string(), None, false, None, None) {
+                match self.session.formatted_interpretation(
+                    code.to_string(),
+                    None,
+                    false,
+                    None,
+                    None,
+                ) {
                     Ok((result, _)) => {
                         let res = result.join("\n");
                         let mut data: HashMap<String, JsonValue> = HashMap::new();
-                        data.insert(
-                            "text/plain".into(),
-                            json::from(res),
-                        );
+                        data.insert("text/plain".into(), json::from(res));
                         message
                             .new_message("execute_result")
                             .with_content(object! {
@@ -293,11 +295,7 @@ impl Server {
         });
     }
 
-    fn emit_errors(
-        &self,
-        errors: &Error,
-        parent_message: &JupyterMessage,
-    ) -> Result<(), Error> {
+    fn emit_errors(&self, errors: &Error, parent_message: &JupyterMessage) -> Result<(), Error> {
         Ok(())
     }
 }

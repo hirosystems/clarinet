@@ -4,12 +4,12 @@ pub mod core;
 pub mod install;
 pub mod jupyter_message;
 
+use failure::Error;
 use std;
 use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
 use std::sync::mpsc;
 use std::time::{Duration, Instant};
-use failure::Error;
 
 pub struct EvalContextOutputs {
     pub stdout: mpsc::Receiver<String>,
@@ -22,12 +22,10 @@ pub struct EvalOutputs {
     pub timing: Option<Duration>,
 }
 
-pub struct CommandContext {
-}
+pub struct CommandContext {}
 
 impl CommandContext {
     pub fn new() -> Result<(CommandContext, EvalContextOutputs), Error> {
-
         let (stdout_sender, stdout_receiver) = mpsc::channel();
         let (stderr_sender, stderr_receiver) = mpsc::channel();
         let outputs = EvalContextOutputs {
