@@ -138,6 +138,12 @@ pub fn update_session_with_contracts_executions(
                 | TransactionSpecification::ContractPublish(_) => {
                     panic!("emulated-contract-call and emulated-contract-publish are the only operations admitted in simnet deployments")
                 }
+                TransactionSpecification::StxTransfer(tx) => {
+                    let default_tx_sender = session.get_tx_sender();
+                    session.set_tx_sender(tx.expected_sender.to_string());
+                    let _ = session.stx_transfer(tx.mstx_amount, &tx.recipient.to_string());
+                    session.set_tx_sender(default_tx_sender);
+                }
                 TransactionSpecification::EmulatedContractPublish(tx) => {
                     let default_tx_sender = session.get_tx_sender();
                     session.set_tx_sender(tx.emulated_sender.to_string());
