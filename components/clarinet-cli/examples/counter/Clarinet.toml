@@ -3,7 +3,6 @@ name = "counter"
 authors = []
 description = ""
 telemetry = false
-cache_dir = "./.requirements"
 
 [contracts.counter]
 path = "contracts/counter.clar"
