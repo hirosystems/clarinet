@@ -14,6 +14,8 @@ extern crate lazy_static;
 extern crate serde_derive;
 #[macro_use]
 extern crate prettytable;
+#[macro_use]
+extern crate hiro_system_kit;
 
 #[macro_use]
 mod macros;

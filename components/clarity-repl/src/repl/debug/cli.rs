@@ -212,7 +212,7 @@ impl CLIDebugger {
 
     fn break_command(&mut self, args: &str, env: &mut Environment) {
         if args.is_empty() {
-            println!("{}: invalid break command", red!("error"));
+            println!("{}", format_err!("invalid break command"));
             print_help_breakpoint();
             return;
         }
@@ -236,7 +236,7 @@ impl CLIDebugger {
                     let id = match arg_list[1].parse::<usize>() {
                         Ok(id) => id,
                         Err(_) => {
-                            println!("{}: unable to parse breakpoint identifier", red!("error"));
+                            println!("{}", format_err!("unable to parse breakpoint identifier"));
                             return;
                         }
                     };
@@ -253,7 +253,7 @@ impl CLIDebugger {
             }
             _ => {
                 if arg_list.len() != 1 {
-                    println!("{}: invalid break command", red!("error"));
+                    println!("{}", format_err!("invalid break command"));
                     print_help_breakpoint();
                     return;
                 }
@@ -265,7 +265,7 @@ impl CLIDebugger {
                     // - :line
                     let parts: Vec<&str> = args.split(':').collect();
                     if parts.len() < 2 || parts.len() > 3 {
-                        println!("{}: invalid breakpoint format", red!("error"));
+                        println!("{}", format_err!("invalid breakpoint format"));
                         print_help_breakpoint();
                         return;
                     }
@@ -275,7 +275,7 @@ impl CLIDebugger {
                     } else {
                         let contract_parts: Vec<&str> = parts[0].split('.').collect();
                         if contract_parts.len() != 2 {
-                            println!("{}: invalid breakpoint format", red!("error"));
+                            println!("{}", format_err!("invalid breakpoint format"));
                             print_help_breakpoint();
                             return;
                         }
@@ -303,7 +303,7 @@ impl CLIDebugger {
                     let line = match parts[1].parse::<u32>() {
                         Ok(line) => line,
                         Err(e) => {
-                            println!("{}: invalid breakpoint format", red!("error"),);
+                            println!("{}", format_err!("invalid breakpoint format"),);
                             print_help_breakpoint();
                             return;
                         }
@@ -313,7 +313,7 @@ impl CLIDebugger {
                         match parts[2].parse::<u32>() {
                             Ok(column) => column,
                             Err(e) => {
-                                println!("{}: invalid breakpoint format", red!("error"),);
+                                println!("{}", format_err!("invalid breakpoint format"),);
                                 print_help_breakpoint();
                                 return;
                             }
@@ -370,7 +370,7 @@ impl CLIDebugger {
                             (contract_id, parts[2])
                         }
                         _ => {
-                            println!("{}: invalid breakpoint format", red!("error"),);
+                            println!("{}", format_err!("invalid breakpoint format"),);
                             print_help_breakpoint();
                             return;
                         }
@@ -379,13 +379,13 @@ impl CLIDebugger {
                     let contract = match env.global_context.database.get_contract(&contract_id) {
                         Ok(contract) => contract,
                         Err(e) => {
-                            println!("{}: {}", red!("error"), e);
+                            println!("{}", format_err!(e));
                             return;
                         }
                     };
                     let function = match contract.contract_context.lookup_function(function_name) {
                         None => {
-                            println!("{}: no such function", red!("error"));
+                            println!("{}", format_err!("no such function"));
                             return;
                         }
                         Some(function) => function,
@@ -407,7 +407,7 @@ impl CLIDebugger {
 
     fn watch_command(&mut self, args: &str, env: &mut Environment, access_type: AccessType) {
         if args.is_empty() {
-            println!("{}: invalid watch command", red!("error"));
+            println!("{}", format_err!("invalid watch command"));
             print_help_watchpoint();
             return;
         }
@@ -431,7 +431,7 @@ impl CLIDebugger {
                     let id = match arg_list[1].parse::<usize>() {
                         Ok(id) => id,
                         Err(_) => {
-                            println!("{}: unable to parse watchpoint identifier", red!("error"));
+                            println!("{}", format_err!("unable to parse watchpoint identifier"));
                             return;
                         }
                     };
@@ -448,7 +448,7 @@ impl CLIDebugger {
             }
             _ => {
                 if arg_list.len() != 1 {
-                    println!("{}: invalid watch command", red!("error"));
+                    println!("{}", format_err!("invalid watch command"));
                     print_help_watchpoint();
                     return;
                 }
@@ -460,7 +460,7 @@ impl CLIDebugger {
                         access_type,
                     ),
                     Err(e) => {
-                        println!("{}: {}", red!("error"), e);
+                        println!("{}", format_err!(e));
                         print_help_watchpoint();
                         return;
                     }
@@ -511,7 +511,7 @@ impl EvalHook for CLIDebugger {
                     green!("Return value"),
                     black!(format!("{}", value))
                 ),
-                Err(e) => println!("{}: {}", red!("error"), e),
+                Err(e) => println!("{}", format_err!(e)),
             }
         }
     }

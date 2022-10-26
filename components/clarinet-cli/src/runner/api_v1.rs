@@ -286,7 +286,7 @@ fn new_session(state: &mut OpState, args: NewSessionArgs) -> Result<String, AnyE
                     if entry.is_none() {
                         // TODO(lgalabru): Ability to specify a deployment plan in tests
                         // https://github.com/hirosystems/clarinet/issues/357
-                        println!("{}: feature identified, but is not supported yet. Please comment in https://github.com/hirosystems/clarinet/issues/357", red!("Error"));
+                        println!("{}", format_err!("feature identified, but is not supported yet. Please comment in https://github.com/hirosystems/clarinet/issues/357"));
                         std::process::exit(1);
                     }
                 }
@@ -390,7 +390,7 @@ fn load_deployment(state: &mut OpState, args: LoadDeploymentArgs) -> Result<Stri
             Err(_e) => {
                 println!(
                     "{}: unable to load deployment {:?} in test {}",
-                    red!("Error"),
+                    red!("error"),
                     args.deployment_path,
                     label
                 );

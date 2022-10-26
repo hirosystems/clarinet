@@ -1,3 +1,5 @@
+mod macros;
+
 use std::future::Future;
 use std::thread::Builder;
 use tokio;

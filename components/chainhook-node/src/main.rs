@@ -4,6 +4,9 @@ extern crate serde_json;
 #[macro_use]
 extern crate slog_scope;
 
+#[macro_use]
+extern crate hiro_system_kit;
+
 extern crate serde;
 extern crate serde_derive;
 extern crate slog;

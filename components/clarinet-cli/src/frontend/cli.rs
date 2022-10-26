@@ -550,7 +550,7 @@ pub fn main() {
                 let current_dir = match env::current_dir() {
                     Ok(dir) => dir,
                     Err(e) => {
-                        println!("{}: Unable to get current directory: {}", red!("error"), e);
+                        println!("{}{}", format_err!("unable to get current directory"), e);
                         std::process::exit(1);
                     }
                 };
@@ -595,7 +595,7 @@ pub fn main() {
             ) {
                 Ok(changes) => changes,
                 Err(message) => {
-                    println!("{}: {}", red!("error"), message);
+                    println!("{}", format_err!(message));
                     std::process::exit(1);
                 }
             };
@@ -621,7 +621,7 @@ pub fn main() {
                 println!("Checking deployments");
                 let res = check_deployments(&manifest);
                 if let Err(message) = res {
-                    println!("{}: {}", red!("error"), message);
+                    println!("{}", format_err!(message));
                     process::exit(1);
                 }
             }
@@ -644,7 +644,7 @@ pub fn main() {
                     match generate_default_deployment(&manifest, &network, cmd.no_batch) {
                         Ok(deployment) => deployment,
                         Err(message) => {
-                            println!("{}: {}", red!("error"), message);
+                            println!("{}", format_err!(message));
                             std::process::exit(1);
                         }
                     };
@@ -655,7 +655,7 @@ pub fn main() {
                         (_, true, _) => 1,
                         (true, _, _) => 0,
                         (false, false, false) => {
-                            println!("{}: cost strategy not specified (--low-cost, --medium-cost, --high-cost, --manual-cost)", red!("error"));
+                            println!("{}", format_err!("cost strategy not specified (--low-cost, --medium-cost, --high-cost, --manual-cost)"));
                             std::process::exit(1);
                         }
                     };
@@ -677,10 +677,12 @@ pub fn main() {
                             Ok(deployment) => deployment,
                             Err(message) => {
                                 println!(
-                                    "{}: unable to load {}\n{}",
-                                    red!("error"),
-                                    default_deployment_path.to_string(),
-                                    message
+                                    "{}",
+                                    format_err!(format!(
+                                        "unable to load {}\n{}",
+                                        default_deployment_path.to_string(),
+                                        message
+                                    ))
                                 );
                                 process::exit(1);
                             }
@@ -693,7 +695,7 @@ pub fn main() {
                 if write_plan {
                     let res = write_deployment(&deployment, &default_deployment_path, true);
                     if let Err(message) = res {
-                        println!("{}: {}", red!("error"), message);
+                        println!("{}", format_err!(message));
                         process::exit(1);
                     }
 
@@ -863,8 +865,8 @@ pub fn main() {
                     (false, true) => Chain::Stacks,
                     (_, _) => {
                         println!(
-                            "{}: either --bitcoin or --stacks must be passed",
-                            red!("error")
+                            "{}",
+                            format_err!("either --bitcoin or --stacks must be passed")
                         );
                         process::exit(1);
                     }
@@ -874,7 +876,7 @@ pub fn main() {
                     match generate::get_changes_for_new_chainhook(&manifest, cmd.name, chain) {
                         Ok(changes) => changes,
                         Err(message) => {
-                            println!("{}: {}", red!("error"), message);
+                            println!("{}", format_err!(message));
                             std::process::exit(1);
                         }
                     };
@@ -909,7 +911,7 @@ pub fn main() {
                 ) {
                     Ok(changes) => changes,
                     Err(message) => {
-                        println!("{}: {}", red!("error"), message);
+                        println!("{}", format_err!(message));
                         std::process::exit(1);
                     }
                 };
@@ -1162,8 +1164,10 @@ pub fn main() {
                         Ok(hook) => match hook {
                             ChainhookSpecification::Bitcoin(_) => {
                                 println!(
-                                    "{}: bitcoin chainhooks not supported in test environments",
-                                    red!("error")
+                                    "{}",
+                                    format_err!(
+                                        "bitcoin chainhooks not supported in test environments"
+                                    )
                                 );
                                 std::process::exit(1);
                             }
@@ -1304,7 +1308,7 @@ pub fn main() {
             let deployment = match result {
                 Ok(deployment) => deployment,
                 Err(e) => {
-                    println!("{}", e);
+                    println!("{}", format_err!(e));
                     std::process::exit(1);
                 }
             };
@@ -1312,7 +1316,7 @@ pub fn main() {
             let orchestrator = match DevnetOrchestrator::new(manifest, None) {
                 Ok(orchestrator) => orchestrator,
                 Err(e) => {
-                    println!("{}: {}", red!("error"), e);
+                    println!("{}", format_err!(e));
                     process::exit(1);
                 }
             };
@@ -1328,7 +1332,7 @@ pub fn main() {
             }
             if let Err(e) = integrate::run_devnet(orchestrator, deployment, None, !cmd.no_dashboard)
             {
-                println!("{}: {}", red!("error"), e);
+                println!("{}", format_err!(e));
                 process::exit(1);
             }
             if hints_enabled {
@@ -1339,7 +1343,7 @@ pub fn main() {
         Command::DAP => match super::dap::run_dap() {
             Ok(_) => (),
             Err(e) => {
-                println!("{}: {}", red!("error"), e);
+                println!("{}", red!(e));
                 process::exit(1);
             }
         },
@@ -1517,7 +1521,7 @@ fn load_deployment_and_artifacts_or_exit(
     match result {
         Ok(deployment) => deployment,
         Err(e) => {
-            println!("{}: {}", red!("error"), e);
+            println!("{}", format_err!(e));
             process::exit(1);
         }
     }
@@ -1728,7 +1732,7 @@ fn execute_changes(changes: Vec<Changes>) -> bool {
                         let project_manifest_content = match manifest_location.read_content() {
                             Ok(content) => content,
                             Err(message) => {
-                                println!("{}: {}", red!("error"), message);
+                                println!("{}", format_err!(message));
                                 return false;
                             }
                         };
@@ -1751,7 +1755,7 @@ fn execute_changes(changes: Vec<Changes>) -> bool {
                         ) {
                             Ok(content) => content,
                             Err(message) => {
-                                println!("{}: {}", red!("error"), message);
+                                println!("{}", format_err!(message));
                                 return false;
                             }
                         }
@@ -1857,7 +1861,7 @@ impl DiagnosticsDigest {
                 match diagnostic.level {
                     Level::Error => {
                         errors += 1;
-                        outputs.push(format!("{}: {}", red!("error"), diagnostic.message));
+                        outputs.push(format_err!(diagnostic.message));
                     }
                     Level::Warning => {
                         warnings += 1;
