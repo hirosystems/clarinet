@@ -117,7 +117,7 @@ pub struct BitcoinChainhookSpecification {
     pub end_block: Option<u64>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub expire_after_occurrence: Option<u64>,
-    pub predicate: BitcoinHookPredicate,
+    pub predicate: BitcoinTransactionFilterPredicate,
     pub action: HookAction,
 }
 
@@ -189,15 +189,15 @@ impl ScriptTemplate {
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, JsonSchema)]
 #[serde(rename_all = "snake_case")]
-pub struct BitcoinHookPredicate {
+pub struct BitcoinTransactionFilterPredicate {
     pub scope: Scope,
     #[serde(flatten)]
     pub kind: BitcoinPredicateType,
 }
 
-impl BitcoinHookPredicate {
-    pub fn new(scope: Scope, kind: BitcoinPredicateType) -> BitcoinHookPredicate {
-        BitcoinHookPredicate { scope, kind }
+impl BitcoinTransactionFilterPredicate {
+    pub fn new(scope: Scope, kind: BitcoinPredicateType) -> BitcoinTransactionFilterPredicate {
+        BitcoinTransactionFilterPredicate { scope, kind }
     }
 }
 
@@ -211,6 +211,16 @@ pub enum BitcoinPredicateType {
     P2wpkh(MatchingRule),
     P2wsh(MatchingRule),
     Script(ScriptTemplate),
+    TransactionIdentifierHash(String),
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum BlockIdentifierIndexRule {
+    Equals(u64),
+    HigherThan(u64),
+    LowerThan(u64),
+    Between(u64, u64),
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, JsonSchema)]
@@ -229,6 +239,13 @@ pub enum MatchingRule {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum BlockIdentifierHashRule {
+    Equals(String),
+    BuildsOff(String),
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, JsonSchema)]
 pub struct StacksChainhookSpecification {
     pub uuid: String,
     pub name: String,
@@ -244,19 +261,33 @@ pub struct StacksChainhookSpecification {
     pub capture_all_events: Option<bool>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub decode_clarity_values: Option<bool>,
-    pub predicate: StacksHookPredicate,
+    #[serde(rename = "predicate")]
+    pub transaction_predicate: StacksTransactionFilterPredicate,
+    pub block_predicate: Option<StacksBlockFilterPredicate>,
     pub action: HookAction,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 #[serde(tag = "type", content = "rule")]
-pub enum StacksHookPredicate {
+pub enum StacksBlockFilterPredicate {
+    BlockIdentifierHash(BlockIdentifierHashRule),
+    BlockIdentifierIndex(BlockIdentifierIndexRule),
+    BitcoinBlockIdentifierHash(BlockIdentifierHashRule),
+    BitcoinBlockIdentifierIndex(BlockIdentifierHashRule),
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, JsonSchema)]
+#[serde(rename_all = "snake_case")]
+#[serde(tag = "type", content = "rule")]
+pub enum StacksTransactionFilterPredicate {
+    ContractDeployment(StacksContractDeploymentPredicate),
     ContractCall(StacksContractCallBasedPredicate),
     PrintEvent(StacksPrintEventBasedPredicate),
     FtEvent(StacksFtEventBasedPredicate),
     NftEvent(StacksNftEventBasedPredicate),
     StxEvent(StacksStxEventBasedPredicate),
+    TransactionIdentifierHash(String),
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, JsonSchema)]
@@ -264,6 +295,14 @@ pub enum StacksHookPredicate {
 pub struct StacksContractCallBasedPredicate {
     pub contract_identifier: String,
     pub method: String,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, JsonSchema)]
+#[serde(rename_all = "snake_case")]
+#[serde(tag = "type", content = "rule")]
+pub enum StacksContractDeploymentPredicate {
+    Principal(String),
+    Trait(String),
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, JsonSchema)]
