@@ -556,7 +556,18 @@ pub async fn start_observer_commands_handler(
                 for request in requests.into_iter() {
                     // todo(lgalabru): collect responses for reporting
                     info!("Dispatching request from bitcoin chainhook {:?}", request);
-                    let _ = request.send().await;
+                    match request.send().await {
+                        Ok(res) => {
+                            if !res.status().is_success() {
+                                info!("Trigger {} successuful", res.url());
+                            } else {
+                                warn!("Trigger {} failed with status {}", res.url(), res.status());
+                            }
+                        }
+                        Err(e) => {
+                            warn!("Unable to build and send request {:?}", e);
+                        }
+                    }
                 }
 
                 if let Some(ref tx) = observer_events_tx {
@@ -670,7 +681,19 @@ pub async fn start_observer_commands_handler(
 
                 for request in requests.into_iter() {
                     // todo(lgalabru): collect responses for reporting
-                    let _ = request.send().await;
+                    info!("Dispatching request from stacks chainhook {:?}", request);
+                    match request.send().await {
+                        Ok(res) => {
+                            if !res.status().is_success() {
+                                info!("Trigger {} successuful", res.url());
+                            } else {
+                                warn!("Trigger {} failed with status {}", res.url(), res.status());
+                            }
+                        }
+                        Err(e) => {
+                            warn!("Unable to build and send request {:?}", e);
+                        }
+                    }
                 }
 
                 if let Some(ref tx) = observer_events_tx {

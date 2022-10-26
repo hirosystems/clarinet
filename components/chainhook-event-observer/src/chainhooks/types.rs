@@ -1,3 +1,4 @@
+use clarity_repl::clarity::types::Address;
 use clarity_repl::clarity::util::hash::hex_bytes;
 use serde::ser::{SerializeSeq, Serializer};
 use serde::{Deserialize, Serialize};
@@ -205,13 +206,128 @@ impl BitcoinTransactionFilterPredicate {
 #[serde(rename_all = "snake_case")]
 #[serde(tag = "type", content = "rule")]
 pub enum BitcoinPredicateType {
-    Hex(MatchingRule),
-    P2pkh(MatchingRule),
-    P2sh(MatchingRule),
-    P2wpkh(MatchingRule),
-    P2wsh(MatchingRule),
-    Script(ScriptTemplate),
-    TransactionIdentifierHash(String),
+    TransactionIdentifierHash(ExactMatchingRule),
+    OpReturn(MatchingRule),
+    P2pkh(ExactMatchingRule),
+    P2sh(ExactMatchingRule),
+    P2wpkh(ExactMatchingRule),
+    P2wsh(ExactMatchingRule),
+    Pox(PoxPredicate),
+    Pob(PobPredicate),
+    KeyRegistration(KeyRegistrationPredicate),
+    TransferSTX(TransferSTXPredicate),
+    LockSTX(LockSTXPredicate),
+}
+
+pub fn get_canonical_magic_bytes(network: &BitcoinNetwork) -> [u8; 2] {
+    match network {
+        BitcoinNetwork::Mainnet => ['X' as u8, '2' as u8],
+        BitcoinNetwork::Testnet => ['T' as u8, '2' as u8],
+        BitcoinNetwork::Regtest => ['i' as u8, 'd' as u8],
+    }
+}
+
+pub struct PoxConfig {
+    pub genesis_block_height: u64,
+    pub prepare_phase_len: u64,
+    pub reward_phase_len: u64,
+    pub rewarded_addresses_per_block: usize,
+}
+
+impl PoxConfig {
+    pub fn is_consensus_rewarding_participants_at_block_height(&self, block_height: u64) -> bool {
+        (block_height.saturating_div(self.genesis_block_height) % self.get_pox_cycle_len())
+            >= self.prepare_phase_len
+    }
+
+    pub fn get_pox_cycle_len(&self) -> u64 {
+        self.prepare_phase_len + self.reward_phase_len
+    }
+}
+
+const pox_config_mainnet: PoxConfig = PoxConfig {
+    genesis_block_height: 666050,
+    prepare_phase_len: 2100,
+    reward_phase_len: 100,
+    rewarded_addresses_per_block: 2,
+};
+
+const pox_config_testnet: PoxConfig = PoxConfig {
+    genesis_block_height: 2000000,
+    prepare_phase_len: 1050,
+    reward_phase_len: 50,
+    rewarded_addresses_per_block: 2,
+};
+
+const pox_config_devnet: PoxConfig = PoxConfig {
+    genesis_block_height: 100,
+    prepare_phase_len: 10,
+    reward_phase_len: 5,
+    rewarded_addresses_per_block: 2,
+};
+
+pub fn get_canonical_pox_config(network: &BitcoinNetwork) -> PoxConfig {
+    match network {
+        BitcoinNetwork::Mainnet => pox_config_mainnet,
+        BitcoinNetwork::Testnet => pox_config_testnet,
+        BitcoinNetwork::Regtest => pox_config_devnet,
+    }
+}
+
+#[derive(Debug, Clone, PartialEq)]
+#[repr(u8)]
+pub enum StacksOpcodes {
+    BlockCommit = '[' as u8,
+    KeyRegister = '^' as u8,
+    StackStx = 'x' as u8,
+    PreStx = 'p' as u8,
+    TransferStx = '$' as u8,
+}
+
+impl TryFrom<u8> for StacksOpcodes {
+    type Error = ();
+
+    fn try_from(v: u8) -> Result<Self, Self::Error> {
+        match v {
+            x if x == StacksOpcodes::BlockCommit as u8 => Ok(StacksOpcodes::BlockCommit),
+            x if x == StacksOpcodes::KeyRegister as u8 => Ok(StacksOpcodes::KeyRegister),
+            x if x == StacksOpcodes::StackStx as u8 => Ok(StacksOpcodes::StackStx),
+            x if x == StacksOpcodes::PreStx as u8 => Ok(StacksOpcodes::PreStx),
+            x if x == StacksOpcodes::TransferStx as u8 => Ok(StacksOpcodes::TransferStx),
+            _ => Err(()),
+        }
+    }
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum KeyRegistrationPredicate {
+    Any,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum TransferSTXPredicate {
+    Any,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum LockSTXPredicate {
+    Any,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum PoxPredicate {
+    Any,
+    Recipient(MatchingRule),
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum PobPredicate {
+    Any,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, JsonSchema)]
@@ -236,6 +352,12 @@ pub enum MatchingRule {
     Equals(String),
     StartsWith(String),
     EndsWith(String),
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum ExactMatchingRule {
+    Equals(String),
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, JsonSchema)]
