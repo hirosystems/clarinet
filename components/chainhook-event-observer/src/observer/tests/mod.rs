@@ -1,6 +1,6 @@
 use crate::chainhooks::types::{
     BitcoinChainhookSpecification, BitcoinPredicateType, BitcoinTransactionFilterPredicate,
-    ChainhookSpecification, HookAction, HookFormation, MatchingRule, Scope,
+    ChainhookSpecification, ExactMatchingRule, HookAction, HookFormation, MatchingRule, Scope,
     StacksBlockFilterPredicate, StacksChainhookSpecification, StacksContractCallBasedPredicate,
     StacksTransactionFilterPredicate,
 };
@@ -92,7 +92,7 @@ fn bitcoin_chainhook_p2pkh(
         expire_after_occurrence,
         predicate: BitcoinTransactionFilterPredicate {
             scope: Scope::Outputs,
-            kind: BitcoinPredicateType::P2pkh(MatchingRule::Equals(address.to_string())),
+            kind: BitcoinPredicateType::P2pkh(ExactMatchingRule::Equals(address.to_string())),
         },
         action: HookAction::Noop,
     };

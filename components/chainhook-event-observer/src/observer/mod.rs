@@ -8,7 +8,7 @@ use crate::indexer::{self, Indexer, IndexerConfig};
 use bitcoincore_rpc::bitcoin::{BlockHash, Txid};
 use bitcoincore_rpc::{Auth, Client, RpcApi};
 use chainhook_types::{
-    BitcoinChainEvent, StacksChainEvent, StacksNetwork, StacksTransactionData,
+    BitcoinChainEvent, BitcoinNetwork, StacksChainEvent, StacksNetwork, StacksTransactionData,
     TransactionIdentifier,
 };
 use clarity_repl::clarity::util::hash::bytes_to_hex;
@@ -223,6 +223,8 @@ pub async fn start_event_observer(
         ),
         bitcoin_node_rpc_username: config.bitcoin_node_username.clone(),
         bitcoin_node_rpc_password: config.bitcoin_node_password.clone(),
+        stacks_network: StacksNetwork::Devnet,
+        bitcoin_network: BitcoinNetwork::Regtest,
     });
 
     let log_level = if config.display_logs {

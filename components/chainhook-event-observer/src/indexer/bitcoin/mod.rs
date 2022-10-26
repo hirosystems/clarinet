@@ -48,7 +48,6 @@ pub fn standardize_bitcoin_block(
     let rpc = Client::new(&indexer_config.bitcoin_node_rpc_url, auth).unwrap();
 
     let partial_block: NewBitcoinBlock = serde_json::from_value(marshalled_block).unwrap();
-    let block_height = partial_block.burn_block_height;
     let block_hash = {
         let block_hash_str = partial_block.burn_block_hash.strip_prefix("0x").unwrap();
         let mut block_hash_bytes = hex_bytes(&block_hash_str).unwrap();
@@ -136,40 +135,40 @@ fn try_parse_stacks_operation(
 
     // Safely parsing the first 2 bytes (following OP_RETURN + PUSH_DATA)
     let op_return_output = outputs[0].script_pubkey.as_bytes();
-    if op_return_output.len() < 6 {
+    if op_return_output.len() < 7 {
         return None;
     }
-    if op_return_output[2] != expected_magic_bytes[0]
-        || op_return_output[3] != expected_magic_bytes[1]
+    if op_return_output[3] != expected_magic_bytes[0]
+        || op_return_output[4] != expected_magic_bytes[1]
     {
         return None;
     }
     // Safely classifying the Stacks operation;
-    let op_type: StacksOpcodes = match op_return_output[4].try_into() {
+    let op_type: StacksOpcodes = match op_return_output[5].try_into() {
         Ok(op) => op,
         Err(_) => {
             debug!(
                 "Stacks operation parsing - opcode unknown {}",
-                op_return_output[4]
+                op_return_output[5]
             );
             return None;
         }
     };
     let op = match op_type {
         StacksOpcodes::KeyRegister => {
-            let res = try_parse_key_register_op(&op_return_output[5..])?;
+            let res = try_parse_key_register_op(&op_return_output[6..])?;
             StacksBaseChainOperation::KeyRegistration(res)
         }
         StacksOpcodes::PreStx => {
-            let res = try_parse_pre_stx_op(&op_return_output[5..])?;
+            let res = try_parse_pre_stx_op(&op_return_output[6..])?;
             return None;
         }
         StacksOpcodes::TransferStx => {
-            let res = try_parse_transfer_stx_op(&op_return_output[5..])?;
+            let res = try_parse_transfer_stx_op(&op_return_output[6..])?;
             StacksBaseChainOperation::TransferSTX(res)
         }
         StacksOpcodes::StackStx => {
-            let res = try_parse_stacks_stx_op(&op_return_output[5..])?;
+            let res = try_parse_stacks_stx_op(&op_return_output[6..])?;
             StacksBaseChainOperation::LockSTX(res)
         }
         StacksOpcodes::BlockCommit => {

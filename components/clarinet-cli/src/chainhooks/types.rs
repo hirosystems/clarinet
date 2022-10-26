@@ -34,7 +34,7 @@ pub struct ChainhookPredicateFile {
     nft_event: Option<NftEventPredicateFile>,
     stx_event: Option<StxEventPredicateFile>,
     contract_call: Option<BTreeMap<String, String>>,
-    hex: Option<BTreeMap<String, String>>,
+    op_return: Option<BTreeMap<String, String>>,
     p2pkh: Option<BTreeMap<String, String>>,
     p2sh: Option<BTreeMap<String, String>>,
     p2wpkh: Option<BTreeMap<String, String>>,
@@ -221,34 +221,29 @@ impl HookActionFile {
 
 impl ChainhookPredicateFile {
     pub fn to_bitcoin_predicate(&self) -> Result<BitcoinTransactionFilterPredicate, String> {
-        if let Some(ref specs) = self.hex {
-            let rule = BitcoinPredicateType::Hex(self.extract_matching_rule(specs)?);
+        if let Some(ref specs) = self.op_return {
+            let rule = BitcoinPredicateType::OpReturn(self.extract_matching_rule(specs)?);
             let scope = self.extract_scope()?;
             return Ok(BitcoinTransactionFilterPredicate::new(scope, rule));
         } else if let Some(ref specs) = self.p2pkh {
-            let rule = BitcoinPredicateType::P2pkh(self.extract_matching_rule(specs)?);
+            let rule = BitcoinPredicateType::P2pkh(self.extract_exact_matching_rule(specs)?);
             let scope = self.extract_scope()?;
             return Ok(BitcoinTransactionFilterPredicate::new(scope, rule));
         } else if let Some(ref specs) = self.p2sh {
-            let rule = BitcoinPredicateType::P2sh(self.extract_matching_rule(specs)?);
+            let rule = BitcoinPredicateType::P2sh(self.extract_exact_matching_rule(specs)?);
             let scope = self.extract_scope()?;
             return Ok(BitcoinTransactionFilterPredicate::new(scope, rule));
         } else if let Some(ref specs) = self.p2wpkh {
-            let rule = BitcoinPredicateType::P2wpkh(self.extract_matching_rule(specs)?);
+            let rule = BitcoinPredicateType::P2wpkh(self.extract_exact_matching_rule(specs)?);
             let scope = self.extract_scope()?;
             return Ok(BitcoinTransactionFilterPredicate::new(scope, rule));
         } else if let Some(ref specs) = self.p2wsh {
-            let rule = BitcoinPredicateType::P2wsh(self.extract_matching_rule(specs)?);
+            let rule = BitcoinPredicateType::P2wsh(self.extract_exact_matching_rule(specs)?);
             let scope = self.extract_scope()?;
             return Ok(BitcoinTransactionFilterPredicate::new(scope, rule));
-        } else if let Some(ref _specs) = self.script {
-            // let rule = BitcoinPredicateType::Script(self.ex(specs)?);
-            // let scope = self.extract_scope()?;
-            // return Ok(BitcoinTransactionFilterPredicate::new(scope, rule));
-            return Err(format!("trigger script unimplemented"));
         }
         return Err(format!(
-            "trigger not specified (hex, p2pkh, p2sh, p2wpkh, p2wsh, script)"
+            "trigger not specified (op_return, p2pkh, p2sh, p2wpkh, p2wsh, script)"
         ));
     }
 
@@ -271,6 +266,17 @@ impl ChainhookPredicateFile {
         return Err(format!(
             "predicate rule not specified (starts-with, ends-with, equals)"
         ));
+    }
+
+    pub fn extract_exact_matching_rule(
+        &self,
+        specs: &BTreeMap<String, String>,
+    ) -> Result<ExactMatchingRule, String> {
+        if let Some(rule) = specs.get("equals") {
+            return Ok(ExactMatchingRule::Equals(rule.to_string()));
+        };
+
+        return Err(format!("predicate rule not specified (equals)"));
     }
 
     pub fn extract_scope(&self) -> Result<Scope, String> {

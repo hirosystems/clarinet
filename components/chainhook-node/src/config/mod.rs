@@ -1,6 +1,7 @@
 pub mod file;
 
 pub use chainhook_event_observer::indexer::IndexerConfig;
+use chainhook_types::{BitcoinNetwork, StacksNetwork};
 pub use file::ConfigFile;
 use std::path::PathBuf;
 
@@ -141,6 +142,8 @@ impl Config {
                 bitcoin_node_rpc_url: "http://0.0.0.0:18443".into(),
                 bitcoin_node_rpc_username: "devnet".into(),
                 bitcoin_node_rpc_password: "devnet".into(),
+                stacks_network: StacksNetwork::Devnet,
+                bitcoin_network: BitcoinNetwork::Regtest,
             },
         }
     }
