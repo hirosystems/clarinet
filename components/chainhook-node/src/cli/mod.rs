@@ -198,8 +198,6 @@ pub fn start_node(network: &StacksNetwork) {
 
                 match chain_hook {
                     ChainhookSpecification::Stacks(stacks_hook) => {
-                        info!("Received chainhook {:?}", stacks_hook);
-
                         use redis::Commands;
                         let redis_config = config.expected_redis_config();
                         let client = redis::Client::open(redis_config.uri.clone()).unwrap();
@@ -213,9 +211,16 @@ pub fn start_node(network: &StacksNetwork) {
                         let start_block = stacks_hook.start_block.unwrap_or(2); // TODO(lgalabru): handle STX hooks and genesis block :s
                         let end_block = stacks_hook.end_block.unwrap_or(tip_height); // TODO(lgalabru): handle STX hooks and genesis block :s
 
-                        // for cursor in 60000..=65000 {
+                        info!(
+                            "Processing Stacks chainhook {}, will scan blocks [{}; {}]...",
+                            stacks_hook.uuid, start_block, end_block
+                        );
+                        let mut hits = 0;
                         for cursor in start_block..=end_block {
-                            debug!("Evaluating block {} for predicate hits", cursor);
+                            debug!(
+                                "Evaluating predicate #{} on block #{}",
+                                stacks_hook.uuid, cursor
+                            );
                             let (block_identifier, transactions) = {
                                 let payload: Vec<String> = con
                                     .hget(
@@ -239,8 +244,12 @@ pub fn start_node(network: &StacksNetwork) {
                                     &tx,
                                     &stacks_hook,
                                 ) {
-                                    info!("Detected predicate hit in block #{} (transaction {})", cursor, tx.transaction_identifier.hash);
+                                    debug!(
+                                        "Action #{} triggered by transaction {} (block #{})",
+                                        stacks_hook.uuid, tx.transaction_identifier.hash, cursor
+                                    );
                                     apply.push((tx, &block_identifier));
+                                    hits += 1;
                                 }
                             }
 
@@ -259,6 +268,7 @@ pub fn start_node(network: &StacksNetwork) {
                                 }
                             }
                         }
+                        info!("Stacks chainhook {} scan completed: action triggered by {} transactions", stacks_hook.uuid, hits);
                     }
                     ChainhookSpecification::Bitcoin(bitcoin_hook) => {}
                 }

@@ -68,6 +68,7 @@ pub fn start(command_rx: Receiver<DigestingCommand>, config: &Config) -> Result<
                         "{} Stacks orphaned blocks removed from storage",
                         keys_to_prune.len()
                     );
+                    info!("Initial ingestion succesfully performed")
                 }
                 DigestingCommand::Terminate | DigestingCommand::Kill => {
                     info!("Terminating");

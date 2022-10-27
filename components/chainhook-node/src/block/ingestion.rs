@@ -95,6 +95,10 @@ pub fn start(
             }
         };
         let indexer = Indexer::new(stacks_thread_config.indexer.clone());
+
+        // Retrieve the former highest block height stored
+        let former_tip_height: u64 = con.get(&format!("stx:tip")).unwrap_or(0);
+
         let mut tip = 0;
 
         while let Ok(Some(record)) = stacks_record_rx.recv() {
@@ -126,6 +130,23 @@ pub fn start(
         let tip_height: u64 = con
             .get(&format!("stx:tip"))
             .expect("unable to retrieve tip height");
+
+        if former_tip_height == tip_height {
+            // No new block to ingest, we will make sure that we have all the blocks,
+            // and succesfully terminate this routine.
+            let _ = digestion_tx.send(DigestingCommand::GarbageCollect);
+            // Retrieve block identifier
+            let key = format!("stx:{}", tip_height);
+            let block_identifier: BlockIdentifier = {
+                let payload: String = con
+                    .hget(&key, "block_identifier")
+                    .expect("unable to retrieve tip height");
+                serde_json::from_str(&payload).unwrap()
+            };
+            info!("Local storage seeded, no new block to process");
+            return Ok(block_identifier);
+        }
+
         let chain_tips: Vec<String> = con
             .scan_match(&format!("stx:{}:*", tip_height))
             .expect("unable to retrieve tip height")
@@ -159,7 +180,7 @@ pub fn start(
             let _ = digestion_tx.send(DigestingCommand::DigestSeedBlock(cursor.clone()));
             cursor = parent_block_identifier.clone();
         }
-        info!("{} Stacks blocks queued for processing", tip_height);
+        info!("{} Stacks blocks queued for processing...", tip_height);
 
         let _ = digestion_tx.send(DigestingCommand::GarbageCollect);
         Ok(selected_tip)

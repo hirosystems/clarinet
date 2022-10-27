@@ -48,4 +48,4 @@ path = "src/lib.rs"
 [features]
 default = ["cli"]
 cli = ["clap", "clap_generate", "toml", "ctrlc", "slog-json", "slog-scope"]
-debug = ["slog/max_level_trace", "slog/release_max_level_warn"]
+debug = ["slog/max_level_trace", "slog/release_max_level_debug"]
