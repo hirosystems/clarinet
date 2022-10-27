@@ -5,8 +5,8 @@ use chainhook_types::{BitcoinNetwork, StacksNetwork};
 pub use file::ConfigFile;
 use std::path::PathBuf;
 
-const DEFAULT_MAINNET_TSV_ARCHIVE: &str = "https://storage.googleapis.com/blockstack-publish/mainnet/api/mainnet-blockchain-api-5.0.0-latest.tar.gz";
-const DEFAULT_TESTNET_TSV_ARCHIVE: &str = "https://storage.googleapis.com/blockstack-publish/testnet/api/testnet-blockchain-api-5.0.0-latest.tar.gz";
+const DEFAULT_MAINNET_TSV_ARCHIVE: &str = "https://storage.googleapis.com/hirosystems-archive/mainnet/api/mainnet-blockchain-api-5.0.0-latest.tar.gz";
+const DEFAULT_TESTNET_TSV_ARCHIVE: &str = "https://storage.googleapis.com/hirosystems-archive/testnet/api/testnet-blockchain-api-5.0.0-latest.tar.gz";
 
 #[derive(Clone, Debug)]
 pub struct Config {
@@ -122,7 +122,7 @@ impl Config {
         rely_on_remote_tsv == true && remote_tsv_present_locally == false
     }
 
-    pub fn default() -> Config {
+    pub fn devnet_default() -> Config {
         Config {
             storage: StorageConfig {
                 driver: StorageDriver::Redis(RedisConfig {
@@ -144,6 +144,58 @@ impl Config {
                 bitcoin_node_rpc_password: "devnet".into(),
                 stacks_network: StacksNetwork::Devnet,
                 bitcoin_network: BitcoinNetwork::Regtest,
+            },
+        }
+    }
+
+    pub fn testnet_default() -> Config {
+        Config {
+            storage: StorageConfig {
+                driver: StorageDriver::Redis(RedisConfig {
+                    uri: "redis://127.0.0.1/".into(),
+                }),
+                cache_path: "cache".into(),
+            },
+            event_sources: vec![EventSourceConfig::TsvUrl(TsvUrlConfig {
+                file_url: DEFAULT_TESTNET_TSV_ARCHIVE.into(),
+            })],
+            chainhooks: ChainhooksConfig {
+                max_stacks_registrations: 10,
+                max_bitcoin_registrations: 10,
+            },
+            indexer: IndexerConfig {
+                stacks_node_rpc_url: "http://0.0.0.0:20443".into(),
+                bitcoin_node_rpc_url: "http://0.0.0.0:18443".into(),
+                bitcoin_node_rpc_username: "devnet".into(),
+                bitcoin_node_rpc_password: "devnet".into(),
+                stacks_network: StacksNetwork::Testnet,
+                bitcoin_network: BitcoinNetwork::Testnet,
+            },
+        }
+    }
+
+    pub fn mainnet_default() -> Config {
+        Config {
+            storage: StorageConfig {
+                driver: StorageDriver::Redis(RedisConfig {
+                    uri: "redis://127.0.0.1/".into(),
+                }),
+                cache_path: "cache".into(),
+            },
+            event_sources: vec![EventSourceConfig::TsvUrl(TsvUrlConfig {
+                file_url: DEFAULT_MAINNET_TSV_ARCHIVE.into(),
+            })],
+            chainhooks: ChainhooksConfig {
+                max_stacks_registrations: 10,
+                max_bitcoin_registrations: 10,
+            },
+            indexer: IndexerConfig {
+                stacks_node_rpc_url: "http://0.0.0.0:20443".into(),
+                bitcoin_node_rpc_url: "http://0.0.0.0:18443".into(),
+                bitcoin_node_rpc_username: "devnet".into(),
+                bitcoin_node_rpc_password: "devnet".into(),
+                stacks_network: StacksNetwork::Mainnet,
+                bitcoin_network: BitcoinNetwork::Mainnet,
             },
         }
     }

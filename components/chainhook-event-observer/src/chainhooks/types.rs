@@ -244,21 +244,21 @@ impl PoxConfig {
     }
 }
 
-const pox_config_mainnet: PoxConfig = PoxConfig {
+const POX_CONFIG_MAINNET: PoxConfig = PoxConfig {
     genesis_block_height: 666050,
     prepare_phase_len: 2100,
     reward_phase_len: 100,
     rewarded_addresses_per_block: 2,
 };
 
-const pox_config_testnet: PoxConfig = PoxConfig {
+const POX_CONFIG_TESTNET: PoxConfig = PoxConfig {
     genesis_block_height: 2000000,
     prepare_phase_len: 1050,
     reward_phase_len: 50,
     rewarded_addresses_per_block: 2,
 };
 
-const pox_config_devnet: PoxConfig = PoxConfig {
+const POX_CONFIG_DEVNET: PoxConfig = PoxConfig {
     genesis_block_height: 100,
     prepare_phase_len: 10,
     reward_phase_len: 5,
@@ -267,9 +267,9 @@ const pox_config_devnet: PoxConfig = PoxConfig {
 
 pub fn get_canonical_pox_config(network: &BitcoinNetwork) -> PoxConfig {
     match network {
-        BitcoinNetwork::Mainnet => pox_config_mainnet,
-        BitcoinNetwork::Testnet => pox_config_testnet,
-        BitcoinNetwork::Regtest => pox_config_devnet,
+        BitcoinNetwork::Mainnet => POX_CONFIG_MAINNET,
+        BitcoinNetwork::Testnet => POX_CONFIG_TESTNET,
+        BitcoinNetwork::Regtest => POX_CONFIG_DEVNET,
     }
 }
 

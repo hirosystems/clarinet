@@ -88,8 +88,13 @@ pub fn start(
         let redis_config = stacks_thread_config.expected_redis_config();
 
         let client = redis::Client::open(redis_config.uri.clone()).unwrap();
-        let mut con = client.get_connection().unwrap();
-        let mut indexer = Indexer::new(stacks_thread_config.indexer.clone());
+        let mut con = match client.get_connection() {
+            Ok(con) => con,
+            Err(message) => {
+                return Err(format!("Redis: {}", message.to_string()));
+            }
+        };
+        let indexer = Indexer::new(stacks_thread_config.indexer.clone());
         let mut tip = 0;
 
         while let Ok(Some(record)) = stacks_record_rx.recv() {
@@ -97,7 +102,7 @@ pub fn start(
                 RecordKind::StacksBlockReceived => {
                     indexer::stacks::standardize_stacks_serialized_block_header(&record.raw_log)
                 }
-                _ => return Err(()),
+                _ => unreachable!(),
             };
 
             let _: Result<(), redis::RedisError> = con.hset_multiple(
@@ -166,25 +171,24 @@ pub fn start(
         let redis_config = bitcoin_indexer_config.expected_redis_config();
 
         let client = redis::Client::open(redis_config.uri.clone()).unwrap();
-        let mut con = client.get_connection().unwrap();
+        let mut con = match client.get_connection() {
+            Ok(con) => con,
+            Err(message) => {
+                return Err(format!("Redis: {}", message.to_string()));
+            }
+        };
         while let Ok(Some(record)) = bitcoin_record_rx.recv() {
             let _: () = match con.set(&format!("btc:{}", record.id), record.raw_log.as_str()) {
                 Ok(()) => (),
-                Err(_) => return Err(()),
+                Err(e) => return Err(e.to_string()),
             };
         }
         Ok(BlockIdentifier::default())
     });
 
     let _ = parsing_handle.join();
-    let stacks_chain_tip = match stacks_processing_handle.join().unwrap() {
-        Ok(chain_tip) => chain_tip,
-        Err(e) => panic!(),
-    };
-    let bitcoin_chain_tip = match bitcoin_processing_handle.join().unwrap() {
-        Ok(chain_tip) => chain_tip,
-        Err(e) => panic!(),
-    };
+    let stacks_chain_tip = stacks_processing_handle.join().unwrap()?;
+    let bitcoin_chain_tip = bitcoin_processing_handle.join().unwrap()?;
 
     Ok((stacks_chain_tip, bitcoin_chain_tip))
 }

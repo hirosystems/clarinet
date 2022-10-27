@@ -1,9 +1,8 @@
 use super::block;
 use crate::archive;
 use crate::block::DigestingCommand;
-use crate::config::{Config, ConfigFile};
+use crate::config::Config;
 
-use chainhook_db::config::{StorageConfig, StorageDriver};
 use chainhook_event_observer::{
     chainhooks::{
         evaluate_stacks_transaction_predicate_on_transaction, handle_stacks_hook_action,
@@ -14,26 +13,81 @@ use chainhook_event_observer::{
         DEFAULT_CONTROL_PORT, DEFAULT_INGESTION_PORT,
     },
 };
-use chainhook_types::{BlockIdentifier, StacksBlockData, StacksTransactionData};
-use clap::Parser;
+use chainhook_types::{BlockIdentifier, StacksNetwork, StacksTransactionData};
+use clap::{Parser, Subcommand};
 use ctrlc;
 use hiro_system_kit;
 use std::collections::HashSet;
-use std::fs::File;
-use std::io;
 use std::{collections::HashMap, process, sync::mpsc::channel, thread};
 
-/// Simple program to greet a person
 #[derive(Parser, Debug)]
 #[clap(author, version, about, long_about = None)]
-struct Args {
-    /// Name of the person to greet
-    #[clap(short, long, value_parser)]
-    events_logs_csv_path: String,
+struct Opts {
+    #[clap(subcommand)]
+    command: Command,
+}
+
+#[derive(Subcommand, PartialEq, Clone, Debug)]
+enum Command {
+    /// Start chainhook-node
+    #[clap(name = "start", bin_name = "start")]
+    Start(StartNode),
+}
+
+#[derive(Parser, PartialEq, Clone, Debug)]
+struct StartNode {
+    /// Target Devnet network
+    #[clap(
+        long = "devnet",
+        conflicts_with = "testnet",
+        conflicts_with = "mainnet"
+    )]
+    pub devnet: bool,
+    /// Target Testnet network
+    #[clap(
+        long = "testnet",
+        conflicts_with = "devnet",
+        conflicts_with = "mainnet"
+    )]
+    pub testnet: bool,
+    /// Target Mainnet network
+    #[clap(
+        long = "mainnet",
+        conflicts_with = "testnet",
+        conflicts_with = "devnet"
+    )]
+    pub mainnet: bool,
 }
 
 pub fn main() {
-    let args = Args::parse();
+    let opts: Opts = match Opts::try_parse() {
+        Ok(opts) => opts,
+        Err(e) => {
+            println!("{}", e);
+            process::exit(1);
+        }
+    };
+
+    match opts.command {
+        Command::Start(cmd) => {
+            let network = match (cmd.devnet, cmd.testnet, cmd.mainnet) {
+                (true, false, false) => StacksNetwork::Devnet,
+                (false, true, false) => StacksNetwork::Testnet,
+                (false, false, true) => StacksNetwork::Mainnet,
+                _ => {
+                    println!(
+                        "{}",
+                        format_err!("network flag required (devnet, testnet, mainnet)")
+                    );
+                    process::exit(1);
+                }
+            };
+            start_node(&network);
+        }
+    }
+}
+
+pub fn start_node(network: &StacksNetwork) {
     let (digestion_tx, digestion_rx) = channel();
     let (observer_event_tx, observer_event_rx) = channel();
     let (observer_command_tx, observer_command_rx) = channel();
@@ -47,7 +101,12 @@ pub fn main() {
     })
     .expect("Error setting Ctrl-C handler");
 
-    let mut config = Config::default();
+    let mut config = match network {
+        StacksNetwork::Devnet => Config::devnet_default(),
+        StacksNetwork::Testnet => Config::testnet_default(),
+        StacksNetwork::Mainnet => Config::mainnet_default(),
+        _ => unreachable!(),
+    };
 
     // Download default tsv.
     if config.rely_on_remote_tsv() && config.should_download_remote_tsv() {
@@ -86,7 +145,10 @@ pub fn main() {
     let digestion_config = config.clone();
     let terminate_observer_command_tx = observer_command_tx.clone();
     thread::spawn(move || {
-        block::digestion::start(digestion_rx, &digestion_config);
+        let res = block::digestion::start(digestion_rx, &digestion_config);
+        if let Err(e) = res {
+            error!("{}", e);
+        }
         let _ = terminate_observer_command_tx.send(ObserverCommand::Terminate);
     });
 
@@ -153,7 +215,7 @@ pub fn main() {
 
                         // for cursor in 60000..=65000 {
                         for cursor in start_block..=end_block {
-                            info!("Checking block {}", cursor);
+                            debug!("Evaluating block {} for predicate hits", cursor);
                             let (block_identifier, transactions) = {
                                 let payload: Vec<String> = con
                                     .hget(
@@ -177,7 +239,7 @@ pub fn main() {
                                     &tx,
                                     &stacks_hook,
                                 ) {
-                                    info!("Predicate is true for transaction {}", cursor);
+                                    info!("Detected predicate hit in block #{} (transaction {})", cursor, tx.transaction_identifier.hash);
                                     apply.push((tx, &block_identifier));
                                 }
                             }
