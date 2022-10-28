@@ -34,6 +34,8 @@ pub struct ChainhookPredicateFile {
     nft_event: Option<NftEventPredicateFile>,
     stx_event: Option<StxEventPredicateFile>,
     contract_call: Option<BTreeMap<String, String>>,
+    contract_deploy: Option<ContractDeploymentPredicateFile>,
+    txid: Option<String>,
     op_return: Option<BTreeMap<String, String>>,
     p2pkh: Option<BTreeMap<String, String>>,
     p2sh: Option<BTreeMap<String, String>>,
@@ -48,6 +50,12 @@ pub struct ChainhookPredicateFile {
 pub struct PrintEventPredicateFile {
     contract_identifier: String,
     contains: String,
+}
+
+#[derive(Debug, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub struct ContractDeploymentPredicateFile {
+    deployer: Option<String>,
 }
 
 #[derive(Debug, PartialEq, Serialize, Deserialize)]
@@ -243,7 +251,7 @@ impl ChainhookPredicateFile {
             return Ok(BitcoinTransactionFilterPredicate::new(scope, rule));
         }
         return Err(format!(
-            "trigger not specified (op_return, p2pkh, p2sh, p2wpkh, p2wsh, script)"
+            "trigger not specified (op-return, p2pkh, p2sh, p2wpkh, p2wsh)"
         ));
     }
 
@@ -307,8 +315,13 @@ impl ChainhookPredicateFile {
         } else if let Some(ref specs) = self.stx_event {
             let predicate = self.extract_stx_event_predicate(specs)?;
             return Ok(StacksTransactionFilterPredicate::StxEvent(predicate));
+        } else if let Some(ref specs) = self.txid {
+            return Ok(StacksTransactionFilterPredicate::TransactionIdentifierHash(specs.clone()));
+        } else if let Some(ref specs) = self.contract_deploy {
+            let predicate = self.extract_contract_deploy_predicate(specs)?;
+            return Ok(StacksTransactionFilterPredicate::ContractDeployment(predicate));
         }
-        return Err(format!("trigger not specified (contract-call, event)"));
+        return Err(format!("trigger not specified (print-event, ft-event, nft-event, stx-event, contract-deploy, txid)"));
     }
 
     pub fn extract_contract_call_predicate(
@@ -331,6 +344,16 @@ impl ChainhookPredicateFile {
         })
     }
 
+    pub fn extract_contract_deploy_predicate(
+        &self,
+        specs: &ContractDeploymentPredicateFile,
+    ) -> Result<StacksContractDeploymentPredicate, String> {
+        if let Some(ref deployer) = specs.deployer {
+            return Ok(StacksContractDeploymentPredicate::Principal(deployer.clone()));
+        }
+        return Err(format!("deployer not specified ('any', 'ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM', etc)"));
+    }
+
     pub fn extract_print_event_predicate(
         &self,
         specs: &PrintEventPredicateFile,
@@ -345,6 +368,12 @@ impl ChainhookPredicateFile {
         &self,
         specs: &FtEventPredicateFile,
     ) -> Result<StacksFtEventBasedPredicate, String> {
+        let available_actions = vec!["burn", "mint", "transfer"];
+        for action in specs.actions.iter() {
+            if !available_actions.contains(&action.as_str()) {
+                return Err(format!("action not supported ({})", available_actions.join(", ")));
+            }
+        }
         Ok(StacksFtEventBasedPredicate {
             asset_identifier: specs.asset_identifier.clone(),
             actions: specs.actions.clone(),
@@ -355,6 +384,12 @@ impl ChainhookPredicateFile {
         &self,
         specs: &NftEventPredicateFile,
     ) -> Result<StacksNftEventBasedPredicate, String> {
+        let available_actions = vec!["burn", "mint", "transfer"];
+        for action in specs.actions.iter() {
+            if !available_actions.contains(&action.as_str()) {
+                return Err(format!("action not supported ({})", available_actions.join(", ")));
+            }
+        }
         Ok(StacksNftEventBasedPredicate {
             asset_identifier: specs.asset_identifier.clone(),
             actions: specs.actions.clone(),
@@ -365,6 +400,12 @@ impl ChainhookPredicateFile {
         &self,
         specs: &StxEventPredicateFile,
     ) -> Result<StacksStxEventBasedPredicate, String> {
+        let available_actions = vec!["lock", "mint", "transfer"];
+        for action in specs.actions.iter() {
+            if !available_actions.contains(&action.as_str()) {
+                return Err(format!("action not supported ({})", available_actions.join(", ")));
+            }
+        }
         Ok(StacksStxEventBasedPredicate {
             actions: specs.actions.clone(),
         })
