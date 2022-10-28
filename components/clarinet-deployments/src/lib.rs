@@ -577,7 +577,7 @@ pub async fn generate_default_deployment(
                 deployer: ContractDeployer::Address(sender.to_address()),
                 name: contract_name.to_string(),
                 clarity_version: contract_config.clarity_version,
-                epoch: forced_epoch.unwrap_or(DEFAULT_EPOCH),
+                epoch: forced_epoch.unwrap_or(contract_config.epoch),
             },
         );
 
