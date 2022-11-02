@@ -78,12 +78,12 @@ function typeToCVType(argType: any) {
 }
 
 Clarinet.run({
-  async fn(
-    accounts: Map<string, Account>,
+  fn(
+    _accounts: Map<string, Account>,
     contracts: Map<string, Contract>,
-    node: StacksNode,
+    _node: StacksNode
   ) {
-    let code = [];
+    const code = [];
     code.push([
       `// Code generated with the stacksjs-helper-generator extension`,
       `// Manual edits will be overwritten`,
@@ -92,8 +92,8 @@ Clarinet.run({
       ``,
     ]);
 
-    for (let [contractId, contract] of contracts) {
-      let [address, name] = contractId.split(".");
+    for (const [contractId, contract] of contracts) {
+      const [address, name] = contractId.split(".");
       code.push([
         `export namespace ${kebabToCamel(capitalize(name))}Contract {`,
         `    export const address = "${address}";`,
@@ -101,9 +101,9 @@ Clarinet.run({
         ``,
       ]);
 
-      let functions = [];
+      const functions = [];
 
-      for (let func of contract.contract_interface.functions) {
+      for (const func of contract.contract_interface.functions) {
         if (func.access === "public") {
           functions.push(func);
         } else if (func.access === "read_only") {
@@ -112,11 +112,8 @@ Clarinet.run({
       }
 
       if (functions.length > 0) {
-        code.push([
-          `    // Functions`,
-          `    export namespace Functions {`,
-        ]);
-        for (let f of functions) {
+        code.push([`    // Functions`, `    export namespace Functions {`]);
+        for (const f of functions) {
           code.push([
             `        // ${f.name}`,
             `        export namespace ${kebabToCamel(capitalize(f.name))} {`,
@@ -127,62 +124,50 @@ Clarinet.run({
           if (f.args.length > 0) {
             // Generate code for interface
             code.push([
-              `            export interface ${
-                kebabToCamel(capitalize(f.name))
-              }Args {`,
+              `            export interface ${kebabToCamel(
+                capitalize(f.name)
+              )}Args {`,
             ]);
-            for (let arg of f.args) {
+            for (const arg of f.args) {
               code.push([
-                `                ${kebabToCamel(arg.name)}: ${
-                  typeToCVType(arg.type)
-                },`,
+                `                ${kebabToCamel(arg.name)}: ${typeToCVType(
+                  arg.type
+                )},`,
               ]);
             }
-            code.push([
-              `            }`,
-              ``,
-            ]);
+            code.push([`            }`, ``]);
 
             // Generate code for helper function
             code.push([
-              `            export function args(args: ${
-                kebabToCamel(capitalize(f.name))
-              }Args): ClarityValue[] {`,
+              `            export function args(args: ${kebabToCamel(
+                capitalize(f.name)
+              )}Args): ClarityValue[] {`,
               `                return [`,
             ]);
-            for (let arg of f.args) {
+            for (const arg of f.args) {
               code.push([
                 `                    args.${kebabToCamel(arg.name)},`,
               ]);
             }
-            code.push([
-              `                ];`,
-              `            }`,
-              ``,
-            ]);
+            code.push([`                ];`, `            }`, ``]);
           }
 
-          code.push([
-            `        }`,
-            ``,
-          ]);
+          code.push([`        }`, ``]);
         }
 
-        code.push([
-          `    }`,
-        ]);
+        code.push([`    }`]);
       }
 
-      code.push([
-        `}`,
-        ``,
-      ]);
+      code.push([`}`, ``]);
     }
 
-    const write = await Deno.writeTextFile(
-      "./artifacts/contracts.ts",
-      code.flat().join("\n"),
-    );
+    try {
+      Deno.statSync("./artifacts");
+    } catch (_) {
+      Deno.mkdirSync("./artifacts");
+    }
+
+    Deno.writeTextFileSync("./artifacts/contracts.ts", code.flat().join("\n"));
   },
 });
 

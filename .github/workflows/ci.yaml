@@ -17,6 +17,7 @@ jobs:
         uses: styfle/cancel-workflow-action@ad6cb1b847ffb509a69b745b6ee2f1d14dfe14b8
         with:
           access_token: ${{ github.token }}
+          persist-credentials: false
 
   get_release_info:
     name: Get Release Info
