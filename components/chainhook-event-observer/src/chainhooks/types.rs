@@ -1,4 +1,5 @@
 use clarity_repl::clarity::util::hash::hex_bytes;
+use reqwest::Url;
 use serde::ser::{SerializeSeq, Serializer};
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
@@ -22,6 +23,30 @@ impl HookFormation {
             stacks_chainhooks: vec![],
             bitcoin_chainhooks: vec![],
         }
+    }
+
+    pub fn serialized_stacks_predicates(
+        &self,
+    ) -> Vec<(&String, &StacksNetwork, &StacksTransactionFilterPredicate)> {
+        let mut stacks = vec![];
+        for chainhook in self.stacks_chainhooks.iter() {
+            stacks.push((
+                &chainhook.uuid,
+                &chainhook.network,
+                &chainhook.transaction_predicate,
+            ));
+        }
+        stacks
+    }
+
+    pub fn serialized_bitcoin_predicates(
+        &self,
+    ) -> Vec<(&String, &BitcoinNetwork, &BitcoinTransactionFilterPredicate)> {
+        let mut bitcoin = vec![];
+        for chainhook in self.bitcoin_chainhooks.iter() {
+            bitcoin.push((&chainhook.uuid, &chainhook.network, &chainhook.predicate));
+        }
+        bitcoin
     }
 
     pub fn register_hook(&mut self, hook: ChainhookSpecification) {
@@ -103,6 +128,18 @@ impl ChainhookSpecification {
             Self::Stacks(data) => &data.uuid,
         }
     }
+
+    pub fn validate(&self) -> Result<(), String> {
+        match &self {
+            Self::Bitcoin(data) => {
+                let _ = data.action.validate()?;
+            }
+            Self::Stacks(data) => {
+                let _ = data.action.validate()?;
+            }
+        }
+        Ok(())
+    }
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, JsonSchema)]
@@ -127,6 +164,20 @@ pub enum HookAction {
     Http(HttpHook),
     File(FileHook),
     Noop,
+}
+
+impl HookAction {
+    pub fn validate(&self) -> Result<(), String> {
+        match &self {
+            HookAction::Http(spec) => {
+                let _ = Url::parse(&spec.url)
+                    .map_err(|e| format!("hook action url invalid ({})", e.to_string()))?;
+            }
+            HookAction::File(spec) => {}
+            HookAction::Noop => {}
+        }
+        Ok(())
+    }
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, JsonSchema)]

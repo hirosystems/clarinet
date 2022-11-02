@@ -1057,10 +1057,40 @@ pub fn handle_get_hooks(
                     "status": 404,
                 }))
             }
-            Some(hooks) => Json(json!({
-                "status": 200,
-                "result": hooks,
-            })),
+            Some(hooks) => {
+                let mut predicates = vec![];
+                let mut stacks_predicates = hooks
+                    .serialized_stacks_predicates()
+                    .iter()
+                    .map(|(uuid, network, predicate)| {
+                        json!({
+                            "chain": "stacks",
+                            "uuid": uuid,
+                            "network": network,
+                            "predicate": predicate,
+                        })
+                    })
+                    .collect::<Vec<_>>();
+                predicates.append(&mut stacks_predicates);
+                let mut bitcoin_predicates = hooks
+                    .serialized_bitcoin_predicates()
+                    .iter()
+                    .map(|(uuid, network, predicate)| {
+                        json!({
+                            "chain": "bitcoin",
+                            "uuid": uuid,
+                            "network": network,
+                            "predicate": predicate,
+                        })
+                    })
+                    .collect::<Vec<_>>();
+                predicates.append(&mut bitcoin_predicates);
+
+                Json(json!({
+                    "status": 200,
+                    "result": predicates
+                }))
+            }
         }
     } else {
         Json(json!({
@@ -1079,6 +1109,13 @@ pub fn handle_create_hook(
 ) -> Json<JsonValue> {
     info!("POST /v1/chainhooks");
     let hook = hook.into_inner();
+    if let Err(e) = hook.validate() {
+        return Json(json!({
+            "status": 422,
+            "error": e,
+        }));
+    }
+
     let background_job_tx = background_job_tx.inner();
     match background_job_tx.lock() {
         Ok(tx) => {
