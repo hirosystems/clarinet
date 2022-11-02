@@ -10,15 +10,21 @@ use chainhook_event_observer::{
     },
     observer::{
         start_event_observer, EventObserverConfig, ObserverCommand, ObserverEvent,
-        DEFAULT_CONTROL_PORT, DEFAULT_INGESTION_PORT,
     },
 };
-use chainhook_types::{BlockIdentifier, StacksNetwork, StacksTransactionData};
+use chainhook_types::{
+    BlockIdentifier, StacksBlockData, StacksChainEvent, StacksNetwork,
+    StacksTransactionData,
+};
 use clap::{Parser, Subcommand};
 use ctrlc;
 use hiro_system_kit;
+use redis::{Commands, Connection};
 use std::collections::HashSet;
 use std::{collections::HashMap, process, sync::mpsc::channel, thread};
+
+pub const DEFAULT_INGESTION_PORT: u16 = 20455;
+pub const DEFAULT_CONTROL_PORT: u16 = 20456;
 
 #[derive(Parser, Debug)]
 #[clap(author, version, about, long_about = None)]
@@ -108,39 +114,43 @@ pub fn start_node(network: &StacksNetwork) {
         _ => unreachable!(),
     };
 
-    // Download default tsv.
-    if config.rely_on_remote_tsv() && config.should_download_remote_tsv() {
-        let url = config.expected_remote_tsv_url();
-        let mut destination_path = config.expected_cache_path();
-        destination_path.push("stacks-node-events.tsv");
-        // Download archive if not already present in cache
-        if !destination_path.exists() {
-            info!("Downloading {}...", url);
-            match hiro_system_kit::nestable_block_on(archive::download_tsv_file(&config)) {
-                Ok(_) => {}
-                Err(e) => {
-                    error!("{}", e);
-                    process::exit(1);
-                }
-            }
+    if config.is_initial_ingestion_required() {
+        // Download default tsv.
+        if config.rely_on_remote_tsv() && config.should_download_remote_tsv() {
+            let url = config.expected_remote_tsv_url();
             let mut destination_path = config.expected_cache_path();
             destination_path.push("stacks-node-events.tsv");
-        }
-        config.add_local_tsv_source(&destination_path);
-    }
-
-    let ingestion_config = config.clone();
-    let seed_digestion_tx = digestion_tx.clone();
-    thread::spawn(move || {
-        let res = block::ingestion::start(seed_digestion_tx.clone(), &ingestion_config);
-        let (_stacks_chain_tip, _bitcoin_chain_tip) = match res {
-            Ok(chain_tips) => chain_tips,
-            Err(e) => {
-                error!("{}", e);
-                process::exit(1);
+            // Download archive if not already present in cache
+            if !destination_path.exists() {
+                info!("Downloading {}...", url);
+                match hiro_system_kit::nestable_block_on(archive::download_tsv_file(&config)) {
+                    Ok(_) => {}
+                    Err(e) => {
+                        error!("{}", e);
+                        process::exit(1);
+                    }
+                }
+                let mut destination_path = config.expected_cache_path();
+                destination_path.push("stacks-node-events.tsv");
             }
-        };
-    });
+            config.add_local_tsv_source(&destination_path);
+
+            let ingestion_config = config.clone();
+            let seed_digestion_tx = digestion_tx.clone();
+            thread::spawn(move || {
+                let res = block::ingestion::start(seed_digestion_tx.clone(), &ingestion_config);
+                let (_stacks_chain_tip, _bitcoin_chain_tip) = match res {
+                    Ok(chain_tips) => chain_tips,
+                    Err(e) => {
+                        error!("{}", e);
+                        process::exit(1);
+                    }
+                };
+            });
+        }
+    } else {
+        info!("Streaming blocks from stacks-node {}...", config.expected_stacks_node_event_source());
+    }
 
     let digestion_config = config.clone();
     let terminate_observer_command_tx = observer_command_tx.clone();
@@ -170,9 +180,12 @@ pub fn start_node(network: &StacksNetwork) {
         operators: HashSet::new(),
         display_logs: false,
     };
-
     info!(
-        "Listen for chainhooks events on port {}",
+        "Listening for new blockchain events on port {}",
+        DEFAULT_INGESTION_PORT
+    );
+    info!(
+        "Listening for chainhook predicate registrations on port {}",
         DEFAULT_CONTROL_PORT
     );
     let _ = std::thread::spawn(move || {
@@ -185,10 +198,23 @@ pub fn start_node(network: &StacksNetwork) {
         let _ = hiro_system_kit::nestable_block_on(future);
     });
 
+    let redis_config = config.expected_redis_config();
+    let client = redis::Client::open(redis_config.uri.clone()).unwrap();
+    let mut redis_con = match client.get_connection() {
+        Ok(con) => con,
+        Err(message) => {
+            error!("Redis: {}", message.to_string());
+            panic!();
+        }
+    };
+
     loop {
         let event = match observer_event_rx.recv() {
             Ok(cmd) => cmd,
-            Err(_e) => std::process::exit(1),
+            Err(e) => {
+                error!("Error: broken channel {}", e.to_string());
+                break;
+            }
         };
         match event {
             ObserverEvent::HookRegistered(chain_hook) => {
@@ -198,13 +224,8 @@ pub fn start_node(network: &StacksNetwork) {
 
                 match chain_hook {
                     ChainhookSpecification::Stacks(stacks_hook) => {
-                        use redis::Commands;
-                        let redis_config = config.expected_redis_config();
-                        let client = redis::Client::open(redis_config.uri.clone()).unwrap();
-                        let mut con = client.get_connection().unwrap();
-
                         // Retrieve highest block height stored
-                        let tip_height: u64 = con
+                        let tip_height: u64 = redis_con
                             .get(&format!("stx:tip"))
                             .expect("unable to retrieve tip height");
 
@@ -222,7 +243,7 @@ pub fn start_node(network: &StacksNetwork) {
                                 stacks_hook.uuid, cursor
                             );
                             let (block_identifier, transactions) = {
-                                let payload: Vec<String> = con
+                                let payload: Vec<String> = redis_con
                                     .hget(
                                         &format!("stx:{}", cursor),
                                         &["block_identifier", "transactions"],
@@ -270,13 +291,84 @@ pub fn start_node(network: &StacksNetwork) {
                         }
                         info!("Stacks chainhook {} scan completed: action triggered by {} transactions", stacks_hook.uuid, hits);
                     }
-                    ChainhookSpecification::Bitcoin(bitcoin_hook) => {}
+                    ChainhookSpecification::Bitcoin(_bitcoin_hook) => {
+                        warn!("Bitcoin chainhook evaluation unavailable for historical data");
+                    }
                 }
+            }
+            ObserverEvent::BitcoinChainEvent(_chain_update) => {
+                debug!("Bitcoin update not stored");
+            }
+            ObserverEvent::StacksChainEvent(chain_event) => {
+                match &chain_event {
+                    StacksChainEvent::ChainUpdatedWithBlocks(data) => {
+                        update_storage_with_confirmed_stacks_blocks(
+                            &mut redis_con,
+                            &data.confirmed_blocks,
+                        );
+                    }
+                    StacksChainEvent::ChainUpdatedWithReorg(data) => {
+                        update_storage_with_confirmed_stacks_blocks(
+                            &mut redis_con,
+                            &data.confirmed_blocks,
+                        );
+                    }
+                    StacksChainEvent::ChainUpdatedWithMicroblocks(_)
+                    | StacksChainEvent::ChainUpdatedWithMicroblocksReorg(_) => {}
+                };
             }
             ObserverEvent::Terminate => {
                 break;
             }
             _ => {}
         }
+    };
+}
+
+fn update_storage_with_confirmed_stacks_blocks(
+    redis_con: &mut Connection,
+    blocks: &Vec<StacksBlockData>,
+) {
+    let current_tip_height: u64 = redis_con
+        .get(&format!("stx:tip"))
+        .unwrap_or(0);
+
+    let mut new_tip = None;
+
+    for block in blocks.iter() {
+        let res: Result<(), redis::RedisError> = redis_con.hset_multiple(
+            &format!("stx:{}", block.block_identifier.index),
+            &[
+                (
+                    "block_identifier",
+                    json!(block.block_identifier).to_string(),
+                ),
+                (
+                    "parent_block_identifier",
+                    json!(block.parent_block_identifier).to_string(),
+                ),
+                ("transactions", json!(block.transactions).to_string()),
+                ("metadata", json!(block.metadata).to_string()),
+            ],
+        );
+        if let Err(error) = res {
+            error!(
+                "unable to archive block {}: {}",
+                block.block_identifier,
+                error.to_string()
+            );
+        }
+        if block.block_identifier.index >= current_tip_height {
+            new_tip = Some(block);
+        }
+    }
+
+    if let Some(block) = new_tip {
+        info!(
+            "Archiving confirmed Stacks chain block {}",
+            block.block_identifier
+        );
+        let _: Result<(), redis::RedisError> =
+            redis_con.set(&format!("stx:tip"), block.block_identifier.index);
     }
 }

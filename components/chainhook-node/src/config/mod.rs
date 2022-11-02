@@ -61,6 +61,16 @@ pub struct ChainhooksConfig {
 }
 
 impl Config {
+    pub fn is_initial_ingestion_required(&self) -> bool {
+        for source in self.event_sources.iter() {
+            match source {
+                EventSourceConfig::TsvUrl(_) | EventSourceConfig::TsvPath(_) => return true,
+                EventSourceConfig::StacksNode(_) => {}
+            }
+        }
+        return false;
+    }
+
     pub fn add_local_tsv_source(&mut self, file_path: &PathBuf) {
         self.event_sources
             .push(EventSourceConfig::TsvPath(TsvPathConfig {
@@ -88,6 +98,15 @@ impl Config {
         let mut destination_path = std::env::current_dir().expect("unable to get current dir");
         destination_path.push(&self.storage.cache_path);
         destination_path
+    }
+
+    pub fn expected_stacks_node_event_source(&self) -> &String {
+        for source in self.event_sources.iter() {
+            if let EventSourceConfig::StacksNode(config) = source {
+                return &config.host;
+            }
+        }
+        panic!("expected remote-tsv source")
     }
 
     pub fn expected_remote_tsv_url(&self) -> &String {
@@ -130,12 +149,12 @@ impl Config {
                 }),
                 cache_path: "cache".into(),
             },
-            event_sources: vec![EventSourceConfig::TsvUrl(TsvUrlConfig {
-                file_url: DEFAULT_TESTNET_TSV_ARCHIVE.into(),
+            event_sources: vec![EventSourceConfig::StacksNode(StacksNodeConfig {
+                host: "http://0.0.0.0:20443".into(),
             })],
             chainhooks: ChainhooksConfig {
-                max_stacks_registrations: 10,
-                max_bitcoin_registrations: 10,
+                max_stacks_registrations: 50,
+                max_bitcoin_registrations: 50,
             },
             indexer: IndexerConfig {
                 stacks_node_rpc_url: "http://0.0.0.0:20443".into(),

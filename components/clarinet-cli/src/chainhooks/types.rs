@@ -316,10 +316,14 @@ impl ChainhookPredicateFile {
             let predicate = self.extract_stx_event_predicate(specs)?;
             return Ok(StacksTransactionFilterPredicate::StxEvent(predicate));
         } else if let Some(ref specs) = self.txid {
-            return Ok(StacksTransactionFilterPredicate::TransactionIdentifierHash(specs.clone()));
+            return Ok(StacksTransactionFilterPredicate::TransactionIdentifierHash(
+                specs.clone(),
+            ));
         } else if let Some(ref specs) = self.contract_deploy {
             let predicate = self.extract_contract_deploy_predicate(specs)?;
-            return Ok(StacksTransactionFilterPredicate::ContractDeployment(predicate));
+            return Ok(StacksTransactionFilterPredicate::ContractDeployment(
+                predicate,
+            ));
         }
         return Err(format!("trigger not specified (print-event, ft-event, nft-event, stx-event, contract-deploy, txid)"));
     }
@@ -349,9 +353,13 @@ impl ChainhookPredicateFile {
         specs: &ContractDeploymentPredicateFile,
     ) -> Result<StacksContractDeploymentPredicate, String> {
         if let Some(ref deployer) = specs.deployer {
-            return Ok(StacksContractDeploymentPredicate::Principal(deployer.clone()));
+            return Ok(StacksContractDeploymentPredicate::Principal(
+                deployer.clone(),
+            ));
         }
-        return Err(format!("deployer not specified ('any', 'ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM', etc)"));
+        return Err(format!(
+            "deployer not specified ('any', 'ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM', etc)"
+        ));
     }
 
     pub fn extract_print_event_predicate(
@@ -371,7 +379,10 @@ impl ChainhookPredicateFile {
         let available_actions = vec!["burn", "mint", "transfer"];
         for action in specs.actions.iter() {
             if !available_actions.contains(&action.as_str()) {
-                return Err(format!("action not supported ({})", available_actions.join(", ")));
+                return Err(format!(
+                    "action not supported ({})",
+                    available_actions.join(", ")
+                ));
             }
         }
         Ok(StacksFtEventBasedPredicate {
@@ -387,7 +398,10 @@ impl ChainhookPredicateFile {
         let available_actions = vec!["burn", "mint", "transfer"];
         for action in specs.actions.iter() {
             if !available_actions.contains(&action.as_str()) {
-                return Err(format!("action not supported ({})", available_actions.join(", ")));
+                return Err(format!(
+                    "action not supported ({})",
+                    available_actions.join(", ")
+                ));
             }
         }
         Ok(StacksNftEventBasedPredicate {
@@ -403,7 +417,10 @@ impl ChainhookPredicateFile {
         let available_actions = vec!["lock", "mint", "transfer"];
         for action in specs.actions.iter() {
             if !available_actions.contains(&action.as_str()) {
-                return Err(format!("action not supported ({})", available_actions.join(", ")));
+                return Err(format!(
+                    "action not supported ({})",
+                    available_actions.join(", ")
+                ));
             }
         }
         Ok(StacksStxEventBasedPredicate {
