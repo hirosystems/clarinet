@@ -8,13 +8,10 @@ use chainhook_event_observer::{
         evaluate_stacks_transaction_predicate_on_transaction, handle_stacks_hook_action,
         types::ChainhookSpecification, StacksChainhookOccurrence, StacksTriggerChainhook,
     },
-    observer::{
-        start_event_observer, EventObserverConfig, ObserverCommand, ObserverEvent,
-    },
+    observer::{start_event_observer, EventObserverConfig, ObserverCommand, ObserverEvent},
 };
 use chainhook_types::{
-    BlockIdentifier, StacksBlockData, StacksChainEvent, StacksNetwork,
-    StacksTransactionData,
+    BlockIdentifier, StacksBlockData, StacksChainEvent, StacksNetwork, StacksTransactionData,
 };
 use clap::{Parser, Subcommand};
 use ctrlc;
@@ -149,7 +146,10 @@ pub fn start_node(network: &StacksNetwork) {
             });
         }
     } else {
-        info!("Streaming blocks from stacks-node {}...", config.expected_stacks_node_event_source());
+        info!(
+            "Streaming blocks from stacks-node {}...",
+            config.expected_stacks_node_event_source()
+        );
     }
 
     let digestion_config = config.clone();
@@ -322,16 +322,14 @@ pub fn start_node(network: &StacksNetwork) {
             }
             _ => {}
         }
-    };
+    }
 }
 
 fn update_storage_with_confirmed_stacks_blocks(
     redis_con: &mut Connection,
     blocks: &Vec<StacksBlockData>,
 ) {
-    let current_tip_height: u64 = redis_con
-        .get(&format!("stx:tip"))
-        .unwrap_or(0);
+    let current_tip_height: u64 = redis_con.get(&format!("stx:tip")).unwrap_or(0);
 
     let mut new_tip = None;
 
