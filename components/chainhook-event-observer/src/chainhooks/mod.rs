@@ -284,7 +284,11 @@ pub fn evaluate_stacks_transaction_predicate_on_transaction<'a>(
                 match event {
                     StacksTransactionEvent::SmartContractEvent(actual) => {
                         if actual.contract_identifier == expected_event.contract_identifier {
-                            return true;
+                            let value =
+                                format!("{}", expect_decoded_clarity_value(&actual.hex_value));
+                            if value.contains(&expected_event.contains) {
+                                return true;
+                            }
                         }
                     }
                     _ => {}
@@ -671,6 +675,16 @@ pub fn serialized_event_with_decoded_clarity_value(
             })
         }
     }
+}
+
+pub fn expect_decoded_clarity_value(hex_value: &str) -> ClarityValue {
+    let hex_value = hex_value
+        .strip_prefix("0x")
+        .expect("unable to decode clarity value emitted by stacks-node");
+    let value_bytes =
+        hex_bytes(&hex_value).expect("unable to decode clarity value emitted by stacks-node");
+    ClarityValue::consensus_deserialize(&mut Cursor::new(&value_bytes))
+        .expect("unable to decode clarity value emitted by stacks-node")
 }
 
 pub fn serialized_decoded_clarity_value(hex_value: &str) -> serde_json::Value {
