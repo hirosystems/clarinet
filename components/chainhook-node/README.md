@@ -14,8 +14,11 @@ Start a Mainnet node
 $ chainhook-node start --mainnet
 ```
 
-Start a Devnet node will come soon. In the meantime `clarinet integrate` can be used.
+Start a Devnet node 
 
+```bash
+$ chainhook-node start --devnet
+```
 
 ## Predicates available
 
@@ -62,14 +65,14 @@ predicate:
 
 # Get any transaction including a Stacks Proof of Transfer commitment
 # `recipients` mandatory argument admits:
-#  - string "any"
+#  - string "*"
 #  - array of strings type. example: ["mr1iPkD9N3RJZZxXRk7xF9d36gffa6exNC", "muYdXKmX9bByAueDe6KFfHd5Ff1gdN9ErG"]
 #  - array of hex encoded bytes type. example: ["76a914000000000000000000000000000000000000000088ac", "0x76a914ee9369fb719c0ba43ddf4d94638a970b84775f4788ac"]
 predicate:
     scope: outputs
     stacks-op:
         type: pox-commit
-        recipients: any
+        recipients: *
 
 # Get any transaction including a key registration operation 
 predicate:
@@ -159,23 +162,18 @@ predicate:
             - lock
 
 # Get any transaction emitting given print events predicate
-# `actions` mandatory argument admits:
+# `contract-identifier` mandatory argument admits:
+#  - string type, fully qualifying the contract to observe. example: `ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM.monkey-sip09`
+# `contains` mandatory argument admits:
 #  - string type, used for matching event
 predicate:
     print-event:
+        contract-identifier: 'ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM.monkey-sip09'
         contains: "vault"
 
 # Get any transaction including a contract deployment
 # `deployer` mandatory argument admits:
-#  - string "any"
-#  - string encoding a valid STX address. example: "ST2CY5V39NHDPWSXMW9QDT3HC3GD6Q6XX4CFRK9AG"
-predicate:
-    contract-deploy:
-        deployer: "ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM"
-
-# Get any transaction including a contract deployment
-# `deployer` mandatory argument admits:
-#  - string "any"
+#  - string "*"
 #  - string encoding a valid STX address. example: "ST2CY5V39NHDPWSXMW9QDT3HC3GD6Q6XX4CFRK9AG"
 predicate:
     contract-deploy:
