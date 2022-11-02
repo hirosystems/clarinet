@@ -244,8 +244,8 @@ impl CLIDebugger {
                         println!("breakpoint deleted");
                     } else {
                         println!(
-                            "{}: '{}' is not a currently valid breakpoint id",
-                            red!("error"),
+                            "{} '{}' is not a currently valid breakpoint id",
+                            red!("error:"),
                             id
                         );
                     }
@@ -289,8 +289,8 @@ impl CLIDebugger {
                                 Ok(contract_identifier) => contract_identifier,
                                 Err(e) => {
                                     println!(
-                                        "{}: unable to parse breakpoint contract identifier: {}",
-                                        red!("error"),
+                                        "{} unable to parse breakpoint contract identifier: {}",
+                                        red!("error:"),
                                         e
                                     );
                                     print_help_breakpoint();
@@ -358,8 +358,8 @@ impl CLIDebugger {
                                     Ok(contract_identifier) => contract_identifier,
                                     Err(e) => {
                                         println!(
-                                            "{}: unable to parse breakpoint contract identifier: {}",
-                                            red!("error"),
+                                            "{} unable to parse breakpoint contract identifier: {}",
+                                            red!("error:"),
                                             e
                                         );
                                         print_help_breakpoint();
@@ -439,8 +439,8 @@ impl CLIDebugger {
                         println!("watchpoint deleted");
                     } else {
                         println!(
-                            "{}: '{}' is not a currently valid watchpoint id",
-                            red!("error"),
+                            "{} '{}' is not a currently valid watchpoint id",
+                            red!("error:"),
                             id
                         );
                     }

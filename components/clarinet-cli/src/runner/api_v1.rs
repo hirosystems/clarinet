@@ -247,7 +247,7 @@ pub async fn run_bridge(
 
 #[op]
 pub fn deprecation_notice(_state: &mut OpState, _args: Value, _: ()) -> Result<(), AnyError> {
-    println!("{}: clarinet v{} is incompatible with the version of the library being imported in the test files.", red!("error"), option_env!("CARGO_PKG_VERSION").expect("Unable to detect version"));
+    println!("{} clarinet v{} is incompatible with the version of the library being imported in the test files.", red!("error:"), option_env!("CARGO_PKG_VERSION").expect("Unable to detect version"));
     println!("The test files should import the latest version.");
     std::process::exit(1);
 }
@@ -389,8 +389,8 @@ fn load_deployment(state: &mut OpState, args: LoadDeploymentArgs) -> Result<Stri
             }
             Err(_e) => {
                 println!(
-                    "{}: unable to load deployment {:?} in test {}",
-                    red!("error"),
+                    "{} unable to load deployment {:?} in test {}",
+                    red!("error:"),
                     args.deployment_path,
                     label
                 );

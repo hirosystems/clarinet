@@ -1204,7 +1204,10 @@ mod tests {
         session.encode(&mut output, "::encode (foo 1)");
         assert_eq!(
             output[2],
-            format_err!("encode:1:1: {}: use of unresolved function 'foo'",)
+            format!(
+                "encode:1:1: {} use of unresolved function 'foo'",
+                red!("error:")
+            )
         );
     }
 
