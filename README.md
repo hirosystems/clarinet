@@ -9,8 +9,6 @@ development, testing and deployment. Clarinet consists of a Clarity Read-Evaluat
 
 Clarity is a **decidable** smart contract language that optimizes for predictability and security, meaning you can know with certainty, from the code itself, what the program will do. Smart contracts allow you to encode essential business logic on a blockchain.
 
-For a video description of Clarinet, please refer to the [What Is Clarinet?](https://www.youtube.com/watch?v=mitOkTZqMHc&list=PL5Ujm489LoJaAz9kUJm8lYUWdGJ2AnQTb&index=1) YouTube video.
-
 ![screenshot](docs/images/demo.gif)
 
 ### Clarinet 101
@@ -30,8 +28,6 @@ To install Clarinet on macOS, run the following command:
 brew install clarinet
 ```
 
-For a video description of this installation process, please see the [Setting Up Your Clarity Development Environment (Mac)](https://www.youtube.com/watch?v=dpPopuvYU90&list=PL5Ujm489LoJaAz9kUJm8lYUWdGJ2AnQTb&index=2) YouTube video.
-
 ### Install on Windows
 
 If you would like to install Clarinet on Windows, the easiest way to install Clarinet on Windows is to use the MSI installer. You can download the executable from the [releases page](https://github.com/hirosystems/clarinet/releases).
@@ -41,8 +37,6 @@ Clarinet is also available on Winget; the package manager that Microsoft began i
 ```powershell
 winget install clarinet
 ```
-
-For a video description on the Windows installation process, please see the [Setting Up Your Clarity Development Environment (Windows)](https://www.youtube.com/watch?v=r5LY1J5oACs&list=PL5Ujm489LoJaAz9kUJm8lYUWdGJ2AnQTb&index=3) YouTube video.
 
 ### Install from a pre-built binary
 
@@ -823,4 +817,3 @@ To start contributing:
       done
       ```
 6. Submit a pull request against the `develop` branch for review.
-
