@@ -25,7 +25,7 @@ impl HookFormation {
         }
     }
 
-    pub fn serialized_stacks_predicates(
+    pub fn get_serialized_stacks_predicates(
         &self,
     ) -> Vec<(&String, &StacksNetwork, &StacksTransactionFilterPredicate)> {
         let mut stacks = vec![];

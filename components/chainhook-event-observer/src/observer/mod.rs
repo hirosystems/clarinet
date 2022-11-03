@@ -560,8 +560,8 @@ pub async fn start_observer_commands_handler(
                     info!("Dispatching request from bitcoin chainhook {:?}", request);
                     match request.send().await {
                         Ok(res) => {
-                            if !res.status().is_success() {
-                                info!("Trigger {} successuful", res.url());
+                            if res.status().is_success() {
+                                info!("Trigger {} successful", res.url());
                             } else {
                                 warn!("Trigger {} failed with status {}", res.url(), res.status());
                             }
@@ -686,8 +686,8 @@ pub async fn start_observer_commands_handler(
                     info!("Dispatching request from stacks chainhook {:?}", request);
                     match request.send().await {
                         Ok(res) => {
-                            if !res.status().is_success() {
-                                info!("Trigger {} successuful", res.url());
+                            if res.status().is_success() {
+                                info!("Trigger {} successful", res.url());
                             } else {
                                 warn!("Trigger {} failed with status {}", res.url(), res.status());
                             }
@@ -1060,7 +1060,7 @@ pub fn handle_get_hooks(
             Some(hooks) => {
                 let mut predicates = vec![];
                 let mut stacks_predicates = hooks
-                    .serialized_stacks_predicates()
+                    .get_serialized_stacks_predicates()
                     .iter()
                     .map(|(uuid, network, predicate)| {
                         json!({
