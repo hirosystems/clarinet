@@ -256,7 +256,7 @@ impl StacksRpc {
         if !res.status().is_success() {
             let error = match res.text() {
                 Ok(message) => RpcError::Message(message),
-                _ => RpcError::Generic
+                _ => RpcError::Generic,
             };
             return Err(error);
         }
