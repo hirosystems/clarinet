@@ -230,7 +230,66 @@ fn test_stacks_chainhook_register_deregister() {
     });
 
     assert!(match observer_events_rx.recv() {
-        Ok(ObserverEvent::StacksChainhookTriggered(_)) => {
+        Ok(ObserverEvent::StacksChainhookTriggered(payload)) => {
+            assert_eq!(payload.apply.len(), 1);
+            assert_eq!(payload.apply[0].transactions.len(), 1);
+            true
+        }
+        _ => false,
+    });
+
+    // Should propagate block
+    assert!(match observer_events_rx.recv() {
+        Ok(ObserverEvent::StacksChainEvent(_)) => {
+            true
+        }
+        _ => false,
+    });
+
+    // Simulate a block that does include 2 trigger
+    let transactions = vec![
+        generate_test_tx_stacks_contract_call(
+            1,
+            &accounts::wallet_1_stx_address(),
+            "counter",
+            "increment",
+            vec!["u1"],
+        ),
+        generate_test_tx_stacks_contract_call(
+            2,
+            &accounts::wallet_2_stx_address(),
+            "counter",
+            "increment",
+            vec!["u2"],
+        ),
+        generate_test_tx_stacks_contract_call(
+            3,
+            &accounts::wallet_3_stx_address(),
+            "counter",
+            "decrement",
+            vec!["u2"],
+        ),
+    ];
+    let chain_event = StacksChainEvent::ChainUpdatedWithBlocks(StacksChainUpdatedWithBlocksData {
+        new_blocks: vec![StacksBlockUpdate::new(
+            stacks_blocks::generate_test_stacks_block(0, 2, transactions, None).expect_block(),
+        )],
+        confirmed_blocks: vec![],
+    });
+    let _ = observer_commands_tx.send(ObserverCommand::PropagateStacksChainEvent(chain_event));
+    // Should signal that no hook were triggered
+    assert!(match observer_events_rx.recv() {
+        Ok(ObserverEvent::HooksTriggered(len)) => {
+            assert_eq!(len, 1);
+            true
+        }
+        _ => false,
+    });
+
+    assert!(match observer_events_rx.recv() {
+        Ok(ObserverEvent::StacksChainhookTriggered(payload)) => {
+            assert_eq!(payload.apply.len(), 1);
+            assert_eq!(payload.apply[0].transactions.len(), 2);
             true
         }
         _ => false,
@@ -576,7 +635,67 @@ fn test_bitcoin_chainhook_register_deregister() {
     });
 
     assert!(match observer_events_rx.recv() {
-        Ok(ObserverEvent::BitcoinChainhookTriggered(_)) => {
+        Ok(ObserverEvent::BitcoinChainhookTriggered(payload)) => {
+            assert_eq!(payload.apply.len(), 1);
+            assert_eq!(payload.apply[0].block.transactions.len(), 1);
+            true
+        }
+        _ => false,
+    });
+
+    // Should propagate block
+    assert!(match observer_events_rx.recv() {
+        Ok(ObserverEvent::BitcoinChainEvent(_)) => {
+            true
+        }
+        _ => false,
+    });
+
+    // Simulate a block that does include a trigger (wallet_1 to wallet_2)
+    let transactions = vec![
+        generate_test_tx_bitcoin_p2pkh_transfer(
+            0,
+            &accounts::wallet_1_btc_address(),
+            &accounts::wallet_2_btc_address(),
+            3,
+        ),
+        generate_test_tx_bitcoin_p2pkh_transfer(
+            1,
+            &accounts::wallet_3_btc_address(),
+            &accounts::wallet_2_btc_address(),
+            5,
+        ),
+        generate_test_tx_bitcoin_p2pkh_transfer(
+            1,
+            &accounts::wallet_3_btc_address(),
+            &accounts::wallet_1_btc_address(),
+            5,
+        ),
+    ];
+    let chain_event =
+        BitcoinChainEvent::ChainUpdatedWithBlocks(BitcoinChainUpdatedWithBlocksData {
+            new_blocks: vec![bitcoin_blocks::generate_test_bitcoin_block(
+                0,
+                2,
+                transactions,
+                None,
+            )],
+            confirmed_blocks: vec![],
+        });
+    let _ = observer_commands_tx.send(ObserverCommand::PropagateBitcoinChainEvent(chain_event));
+    // Should signal that no hook were triggered
+    assert!(match observer_events_rx.recv() {
+        Ok(ObserverEvent::HooksTriggered(len)) => {
+            assert_eq!(len, 1);
+            true
+        }
+        _ => false,
+    });
+
+    assert!(match observer_events_rx.recv() {
+        Ok(ObserverEvent::BitcoinChainhookTriggered(payload)) => {
+            assert_eq!(payload.apply.len(), 1);
+            assert_eq!(payload.apply[0].block.transactions.len(), 2);
             true
         }
         _ => false,
