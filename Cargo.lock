@@ -896,7 +896,7 @@ dependencies = [
 
 [[package]]
 name = "clarinet-cli"
-version = "1.0.4"
+version = "1.0.5"
 dependencies = [
  "aes 0.7.5",
  "ansi_term",
@@ -1125,7 +1125,7 @@ dependencies = [
 
 [[package]]
 name = "clarity-repl"
-version = "1.0.4"
+version = "1.0.5"
 dependencies = [
  "ansi_term",
  "atty",
@@ -6108,7 +6108,7 @@ dependencies = [
 
 [[package]]
 name = "stacks-devnet-js"
-version = "1.0.4"
+version = "1.0.5"
 dependencies = [
  "chainhook-types",
  "clarinet-deployments",
