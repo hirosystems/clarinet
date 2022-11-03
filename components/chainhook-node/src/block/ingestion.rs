@@ -88,8 +88,17 @@ pub fn start(
         let redis_config = stacks_thread_config.expected_redis_config();
 
         let client = redis::Client::open(redis_config.uri.clone()).unwrap();
-        let mut con = client.get_connection().unwrap();
-        let mut indexer = Indexer::new(stacks_thread_config.indexer.clone());
+        let mut con = match client.get_connection() {
+            Ok(con) => con,
+            Err(message) => {
+                return Err(format!("Redis: {}", message.to_string()));
+            }
+        };
+        let indexer = Indexer::new(stacks_thread_config.indexer.clone());
+
+        // Retrieve the former highest block height stored
+        let former_tip_height: u64 = con.get(&format!("stx:tip")).unwrap_or(0);
+
         let mut tip = 0;
 
         while let Ok(Some(record)) = stacks_record_rx.recv() {
@@ -97,7 +106,7 @@ pub fn start(
                 RecordKind::StacksBlockReceived => {
                     indexer::stacks::standardize_stacks_serialized_block_header(&record.raw_log)
                 }
-                _ => return Err(()),
+                _ => unreachable!(),
             };
 
             let _: Result<(), redis::RedisError> = con.hset_multiple(
@@ -121,6 +130,23 @@ pub fn start(
         let tip_height: u64 = con
             .get(&format!("stx:tip"))
             .expect("unable to retrieve tip height");
+
+        if former_tip_height == tip_height {
+            // No new block to ingest, we will make sure that we have all the blocks,
+            // and succesfully terminate this routine.
+            let _ = digestion_tx.send(DigestingCommand::GarbageCollect);
+            // Retrieve block identifier
+            let key = format!("stx:{}", tip_height);
+            let block_identifier: BlockIdentifier = {
+                let payload: String = con
+                    .hget(&key, "block_identifier")
+                    .expect("unable to retrieve tip height");
+                serde_json::from_str(&payload).unwrap()
+            };
+            info!("Local storage seeded, no new block to process");
+            return Ok(block_identifier);
+        }
+
         let chain_tips: Vec<String> = con
             .scan_match(&format!("stx:{}:*", tip_height))
             .expect("unable to retrieve tip height")
@@ -154,7 +180,7 @@ pub fn start(
             let _ = digestion_tx.send(DigestingCommand::DigestSeedBlock(cursor.clone()));
             cursor = parent_block_identifier.clone();
         }
-        info!("{} Stacks blocks queued for processing", tip_height);
+        info!("{} Stacks blocks queued for processing...", tip_height);
 
         let _ = digestion_tx.send(DigestingCommand::GarbageCollect);
         Ok(selected_tip)
@@ -166,25 +192,24 @@ pub fn start(
         let redis_config = bitcoin_indexer_config.expected_redis_config();
 
         let client = redis::Client::open(redis_config.uri.clone()).unwrap();
-        let mut con = client.get_connection().unwrap();
+        let mut con = match client.get_connection() {
+            Ok(con) => con,
+            Err(message) => {
+                return Err(format!("Redis: {}", message.to_string()));
+            }
+        };
         while let Ok(Some(record)) = bitcoin_record_rx.recv() {
             let _: () = match con.set(&format!("btc:{}", record.id), record.raw_log.as_str()) {
                 Ok(()) => (),
-                Err(_) => return Err(()),
+                Err(e) => return Err(e.to_string()),
             };
         }
         Ok(BlockIdentifier::default())
     });
 
     let _ = parsing_handle.join();
-    let stacks_chain_tip = match stacks_processing_handle.join().unwrap() {
-        Ok(chain_tip) => chain_tip,
-        Err(e) => panic!(),
-    };
-    let bitcoin_chain_tip = match bitcoin_processing_handle.join().unwrap() {
-        Ok(chain_tip) => chain_tip,
-        Err(e) => panic!(),
-    };
+    let stacks_chain_tip = stacks_processing_handle.join().unwrap()?;
+    let bitcoin_chain_tip = bitcoin_processing_handle.join().unwrap()?;
 
     Ok((stacks_chain_tip, bitcoin_chain_tip))
 }

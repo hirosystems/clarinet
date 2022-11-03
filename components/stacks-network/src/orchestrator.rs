@@ -237,10 +237,29 @@ impl DevnetOrchestrator {
                         bollard::API_DEFAULT_VERSION,
                     )
                 } else {
-                    Docker::connect_with_socket_defaults()
+                    // By default, when docker is being setup, the installer creates the following symlink
+                    // sudo ln -s /Users/<username>/.docker/run/docker.sock /var/run/docker.sock
+                    // However it looks like users can opt out from this. As such, we try to fallback on
+                    // the home location.
+                    let res = match Docker::connect_with_socket_defaults() {
+                        Ok(client) => Ok(client),
+                        Err(_) => {
+                            let mut user_space_docker_socket =
+                                dirs::home_dir().expect("unable to retrieve homedir");
+                            user_space_docker_socket.push(".docker");
+                            user_space_docker_socket.push("run");
+                            user_space_docker_socket.push("docker.sock");
+                            Docker::connect_with_unix(
+                                &user_space_docker_socket.to_str().unwrap(),
+                                120,
+                                bollard::API_DEFAULT_VERSION,
+                            )
+                        }
+                    };
                 };
                 #[cfg(not(target_os = "unix"))]
                 let res = Docker::connect_with_socket_defaults();
+
                 res.map_err(|e| format!("unable to connect to docker: {:?}", e))?
             }
             None => unreachable!(),

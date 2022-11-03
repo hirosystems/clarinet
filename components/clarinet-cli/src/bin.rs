@@ -7,7 +7,7 @@ extern crate serde_derive;
 extern crate serde_json;
 
 #[macro_use]
-mod macros;
+extern crate hiro_system_kit;
 
 mod chainhooks;
 mod deployments;

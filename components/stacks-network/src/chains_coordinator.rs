@@ -134,12 +134,15 @@ pub async fn start_chains_coordinator(
     );
 
     if let Some(ref hooks) = config.event_observer_config.initial_hook_formation {
-        devnet_event_tx
-            .send(DevnetEvent::info(format!(
-                "{} hooks registered",
-                hooks.bitcoin_chainhooks.len() + hooks.stacks_chainhooks.len()
-            )))
-            .expect("Unable to terminate event observer");
+        let chainhooks_count = hooks.bitcoin_chainhooks.len() + hooks.stacks_chainhooks.len();
+        if chainhooks_count > 0 {
+            devnet_event_tx
+                .send(DevnetEvent::info(format!(
+                    "{} chainhooks registered",
+                    hooks.bitcoin_chainhooks.len() + hooks.stacks_chainhooks.len()
+                )))
+                .expect("Unable to terminate event observer");
+        }
     }
 
     // Spawn event observer
@@ -177,6 +180,7 @@ pub async fn start_chains_coordinator(
         if let Ok(ChainsCoordinatorCommand::Terminate) = chains_coordinator_commands_rx.try_recv() {
             let _ = chains_coordinator_terminator_tx.send(true);
             let _ = observer_command_tx.send(ObserverCommand::Terminate);
+            let _ = mining_command_tx.send(BitcoinMiningCommand::Pause);
             break;
         }
         let command = match observer_event_rx.recv() {

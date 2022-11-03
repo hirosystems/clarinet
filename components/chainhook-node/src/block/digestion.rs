@@ -18,14 +18,19 @@ struct Job {
     pub priority: u64,
 }
 
-pub fn start(command_rx: Receiver<DigestingCommand>, config: &Config) {
+pub fn start(command_rx: Receiver<DigestingCommand>, config: &Config) -> Result<(), String> {
     // let mut bit_vector
     let mut job_queue: BinaryHeap<Job> = BinaryHeap::new();
     let redis_config = config.expected_redis_config();
     let client = redis::Client::open(redis_config.uri.clone()).unwrap();
     let mut indexer = Indexer::new(config.indexer.clone());
 
-    let mut con = client.get_connection().unwrap();
+    let mut con = match client.get_connection() {
+        Ok(con) => con,
+        Err(message) => {
+            return Err(format!("Redis: {}", message.to_string()));
+        }
+    };
     let mut block_digested = 0;
     loop {
         while let Some(job) = job_queue.pop() {
@@ -59,14 +64,15 @@ pub fn start(command_rx: Receiver<DigestingCommand>, config: &Config) {
                         .into_iter()
                         .collect();
                     let _: Result<(), redis::RedisError> = con.del(&keys_to_prune);
-                    info!(
+                    debug!(
                         "{} Stacks orphaned blocks removed from storage",
                         keys_to_prune.len()
                     );
+                    info!("Initial ingestion succesfully performed")
                 }
                 DigestingCommand::Terminate | DigestingCommand::Kill => {
                     info!("Terminating");
-                    return;
+                    return Ok(());
                 }
             }
             while let Ok(new_command) = command_rx.try_recv() {

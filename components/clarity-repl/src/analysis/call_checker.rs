@@ -233,8 +233,10 @@ mod tests {
                 assert_eq!(
                     output[0],
                     format!(
-                        "checker:7:9: {}: incorrect number of arguments in call to 'foo' (expected 1 got 2)",
-                        red!("error")
+                        "checker:7:9: {}",
+                        format_err!(
+                            "incorrect number of arguments in call to 'foo' (expected 1 got 2)"
+                        )
                     )
                 );
                 assert_eq!(output[1], "    (ok (foo u1 u2))");
@@ -269,8 +271,10 @@ mod tests {
                 assert_eq!(
                     output[0],
                     format!(
-                        "checker:7:9: {}: incorrect number of arguments in call to 'foo' (expected 1 got 0)",
-                        red!("error")
+                        "checker:7:9: {}",
+                        format_err!(
+                            "incorrect number of arguments in call to 'foo' (expected 1 got 0)"
+                        )
                     )
                 );
                 assert_eq!(output[1], "    (ok (foo))");
@@ -305,8 +309,10 @@ mod tests {
                 assert_eq!(
                     output[0],
                     format!(
-                        "checker:7:9: {}: incorrect number of arguments in call to 'foo' (expected 1 got 2)",
-                        red!("error")
+                        "checker:7:9: {}",
+                        format_err!(
+                            "incorrect number of arguments in call to 'foo' (expected 1 got 2)"
+                        )
                     )
                 );
                 assert_eq!(output[1], "    (ok (foo u1 u2))");
@@ -359,7 +365,15 @@ mod tests {
             None,
             None,
         ) {
-            assert_eq!(err_output[0], format!("checker:5:5: {}: incorrect number of arguments in call to 'map-set' (expected 3 got 4)", red!("error")));
+            assert_eq!(
+                err_output[0],
+                format!(
+                    "checker:5:5: {}",
+                    format_err!(
+                        "incorrect number of arguments in call to 'map-set' (expected 3 got 4)"
+                    )
+                )
+            );
         } else {
             panic!("expected error")
         }
@@ -377,7 +391,15 @@ mod tests {
             None,
             None,
         ) {
-            assert_eq!(err_output[0], format!("checker:5:5: {}: incorrect number of arguments in call to 'map-insert' (expected 3 got 4)", red!("error")));
+            assert_eq!(
+                err_output[0],
+                format!(
+                    "checker:5:5: {}",
+                    format_err!(
+                        "incorrect number of arguments in call to 'map-insert' (expected 3 got 4)"
+                    )
+                )
+            );
         } else {
             panic!("expected error")
         }
@@ -395,7 +417,15 @@ mod tests {
             None,
             None,
         ) {
-            assert_eq!(err_output[0], format!("checker:5:5: {}: incorrect number of arguments in call to 'map-delete' (expected 2 got 3)", red!("error")));
+            assert_eq!(
+                err_output[0],
+                format!(
+                    "checker:5:5: {}",
+                    format_err!(
+                        "incorrect number of arguments in call to 'map-delete' (expected 2 got 3)"
+                    )
+                )
+            );
         } else {
             panic!("expected error")
         }

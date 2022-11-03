@@ -550,7 +550,7 @@ pub fn main() {
                 let current_dir = match env::current_dir() {
                     Ok(dir) => dir,
                     Err(e) => {
-                        println!("{}: Unable to get current directory: {}", red!("error"), e);
+                        println!("{}{}", format_err!("unable to get current directory"), e);
                         std::process::exit(1);
                     }
                 };
@@ -595,7 +595,7 @@ pub fn main() {
             ) {
                 Ok(changes) => changes,
                 Err(message) => {
-                    println!("{}: {}", red!("error"), message);
+                    println!("{}", format_err!(message));
                     std::process::exit(1);
                 }
             };
@@ -621,7 +621,7 @@ pub fn main() {
                 println!("Checking deployments");
                 let res = check_deployments(&manifest);
                 if let Err(message) = res {
-                    println!("{}: {}", red!("error"), message);
+                    println!("{}", format_err!(message));
                     process::exit(1);
                 }
             }
@@ -644,7 +644,7 @@ pub fn main() {
                     match generate_default_deployment(&manifest, &network, cmd.no_batch) {
                         Ok(deployment) => deployment,
                         Err(message) => {
-                            println!("{}: {}", red!("error"), message);
+                            println!("{}", format_err!(message));
                             std::process::exit(1);
                         }
                     };
@@ -655,7 +655,7 @@ pub fn main() {
                         (_, true, _) => 1,
                         (true, _, _) => 0,
                         (false, false, false) => {
-                            println!("{}: cost strategy not specified (--low-cost, --medium-cost, --high-cost, --manual-cost)", red!("error"));
+                            println!("{}", format_err!("cost strategy not specified (--low-cost, --medium-cost, --high-cost, --manual-cost)"));
                             std::process::exit(1);
                         }
                     };
@@ -663,8 +663,8 @@ pub fn main() {
                         Ok(_) => {}
                         Err(message) => {
                             println!(
-                                "{}: unable to update costs\n{}",
-                                yellow!("warning"),
+                                "{} unable to update costs\n{}",
+                                yellow!("warning:"),
                                 message
                             );
                         }
@@ -677,10 +677,12 @@ pub fn main() {
                             Ok(deployment) => deployment,
                             Err(message) => {
                                 println!(
-                                    "{}: unable to load {}\n{}",
-                                    red!("error"),
-                                    default_deployment_path.to_string(),
-                                    message
+                                    "{}",
+                                    format_err!(format!(
+                                        "unable to load {}\n{}",
+                                        default_deployment_path.to_string(),
+                                        message
+                                    ))
                                 );
                                 process::exit(1);
                             }
@@ -693,7 +695,7 @@ pub fn main() {
                 if write_plan {
                     let res = write_deployment(&deployment, &default_deployment_path, true);
                     if let Err(message) = res {
-                        println!("{}: {}", red!("error"), message);
+                        println!("{}", format_err!(message));
                         process::exit(1);
                     }
 
@@ -726,8 +728,8 @@ pub fn main() {
                         match res {
                             Some(Ok(deployment)) => {
                                 println!(
-                                    "{}: using existing deployments/default.{}-plan.yaml",
-                                    yellow!("note"),
+                                    "{} using existing deployments/default.{}-plan.yaml",
+                                    yellow!("note:"),
                                     format!("{:?}", network).to_lowercase(),
                                 );
                                 Ok(deployment)
@@ -863,8 +865,8 @@ pub fn main() {
                     (false, true) => Chain::Stacks,
                     (_, _) => {
                         println!(
-                            "{}: either --bitcoin or --stacks must be passed",
-                            red!("error")
+                            "{}",
+                            format_err!("either --bitcoin or --stacks must be passed")
                         );
                         process::exit(1);
                     }
@@ -874,7 +876,7 @@ pub fn main() {
                     match generate::get_changes_for_new_chainhook(&manifest, cmd.name, chain) {
                         Ok(changes) => changes,
                         Err(message) => {
-                            println!("{}: {}", red!("error"), message);
+                            println!("{}", format_err!(message));
                             std::process::exit(1);
                         }
                     };
@@ -909,7 +911,7 @@ pub fn main() {
                 ) {
                     Ok(changes) => changes,
                     Err(message) => {
-                        println!("{}: {}", red!("error"), message);
+                        println!("{}", format_err!(message));
                         std::process::exit(1);
                     }
                 };
@@ -1022,7 +1024,7 @@ pub fn main() {
             let code_source = match fs::read_to_string(&file) {
                 Ok(code) => code,
                 _ => {
-                    println!("{}: unable to read file: '{}'", red!("error"), file);
+                    println!("{} unable to read file: '{}'", red!("error:"), file);
                     std::process::exit(1);
                 }
             };
@@ -1143,7 +1145,7 @@ pub fn main() {
                         stacks_chainhooks.append(&mut formation.stacks_chainhooks);
                     }
                     Err(e) => {
-                        println!("{}: unable to load chainhooks - {}", red!("error"), e);
+                        println!("{} unable to load chainhooks - {}", red!("error:"), e);
                     }
                 };
             } else {
@@ -1162,15 +1164,17 @@ pub fn main() {
                         Ok(hook) => match hook {
                             ChainhookSpecification::Bitcoin(_) => {
                                 println!(
-                                    "{}: bitcoin chainhooks not supported in test environments",
-                                    red!("error")
+                                    "{}",
+                                    format_err!(
+                                        "bitcoin chainhooks not supported in test environments"
+                                    )
                                 );
                                 std::process::exit(1);
                             }
                             ChainhookSpecification::Stacks(hook) => stacks_chainhooks.push(hook),
                         },
                         Err(msg) => {
-                            println!("{}: unable to load chainhooks ({})", red!("error"), msg);
+                            println!("{} unable to load chainhooks ({})", red!("error:"), msg);
                             std::process::exit(1);
                         }
                     };
@@ -1198,7 +1202,7 @@ pub fn main() {
             ) {
                 Ok(count) => (true, count),
                 Err((e, count)) => {
-                    println!("{}: {}", red!("error:"), e);
+                    println!("{} {}", red!("error:"), e);
                     (false, count)
                 }
             };
@@ -1256,8 +1260,8 @@ pub fn main() {
                     match res {
                         Some(Ok(deployment)) => {
                             println!(
-                                "{}: using existing deployments/default.devnet-plan.yaml",
-                                yellow!("note")
+                                "{} using existing deployments/default.devnet-plan.yaml",
+                                yellow!("note:")
                             );
                             // TODO(lgalabru): Think more about the desired DX.
                             // Compute the latest version, display differences and propose overwrite?
@@ -1304,7 +1308,7 @@ pub fn main() {
             let deployment = match result {
                 Ok(deployment) => deployment,
                 Err(e) => {
-                    println!("{}", e);
+                    println!("{}", format_err!(e));
                     std::process::exit(1);
                 }
             };
@@ -1312,7 +1316,7 @@ pub fn main() {
             let orchestrator = match DevnetOrchestrator::new(manifest, None) {
                 Ok(orchestrator) => orchestrator,
                 Err(e) => {
-                    println!("{}: {}", red!("error"), e);
+                    println!("{}", format_err!(e));
                     process::exit(1);
                 }
             };
@@ -1328,7 +1332,7 @@ pub fn main() {
             }
             if let Err(e) = integrate::run_devnet(orchestrator, deployment, None, !cmd.no_dashboard)
             {
-                println!("{}: {}", red!("error"), e);
+                println!("{}", format_err!(e));
                 process::exit(1);
             }
             if hints_enabled {
@@ -1339,7 +1343,7 @@ pub fn main() {
         Command::DAP => match super::dap::run_dap() {
             Ok(_) => (),
             Err(e) => {
-                println!("{}: {}", red!("error"), e);
+                println!("{}", red!(e));
                 process::exit(1);
             }
         },
@@ -1350,8 +1354,8 @@ pub fn main() {
                 Ok(file) => file,
                 Err(e) => {
                     println!(
-                        "{}: Unable to create file {}: {}",
-                        red!("error"),
+                        "{} Unable to create file {}: {}",
+                        red!("error:"),
                         file_name,
                         e
                     );
@@ -1404,8 +1408,8 @@ fn get_manifest_location_or_warn(path: Option<String>) -> Option<FileLocation> {
         Some(manifest_location) => Some(manifest_location),
         None => {
             println!(
-                "{}: no manifest found, starting with default settings.",
-                yellow!("note")
+                "{} no manifest found, starting with default settings.",
+                yellow!("note:")
             );
             None
         }
@@ -1418,8 +1422,8 @@ fn load_manifest_or_exit(path: Option<String>) -> ProjectManifest {
         Ok(manifest) => manifest,
         Err(message) => {
             println!(
-                "{}: Syntax errors in Clarinet.toml\n{}",
-                red!("error"),
+                "{} syntax errors in Clarinet.toml\n{}",
+                red!("error:"),
                 message,
             );
             process::exit(1);
@@ -1435,8 +1439,8 @@ fn load_manifest_or_warn(path: Option<String>) -> Option<ProjectManifest> {
             Ok(manifest) => manifest,
             Err(message) => {
                 println!(
-                    "{}: Syntax errors in Clarinet.toml\n{}",
-                    red!("error"),
+                    "{} syntax errors in Clarinet.toml\n{}",
+                    red!("error:"),
                     message,
                 );
                 process::exit(1);
@@ -1469,8 +1473,8 @@ fn load_deployment_and_artifacts_or_exit(
             match res {
                 Some(Ok(deployment)) => {
                     println!(
-                        "{}: using deployments/default.simnet-plan.yaml",
-                        yellow!("note")
+                        "{} using deployments/default.simnet-plan.yaml",
+                        yellow!("note:")
                     );
                     let artifacts = setup_session_with_deployment(&manifest, &deployment, None);
                     Ok((deployment, None, artifacts))
@@ -1517,7 +1521,7 @@ fn load_deployment_and_artifacts_or_exit(
     match result {
         Ok(deployment) => deployment,
         Err(e) => {
-            println!("{}: {}", red!("error"), e);
+            println!("{}", format_err!(e));
             process::exit(1);
         }
     }
@@ -1639,8 +1643,8 @@ pub fn load_deployment_if_exists(
             }
             Err(message) => {
                 println!(
-                    "{}: unable to compute an updated plan\n{}",
-                    red!("error"),
+                    "{} unable to compute an updated plan\n{}",
+                    red!("error:"),
                     message
                 );
                 Some(load_deployment(manifest, &default_deployment_location))
@@ -1672,8 +1676,8 @@ fn execute_changes(changes: Vec<Changes>) -> bool {
                 if let Ok(entry) = fs::metadata(&options.path) {
                     if entry.is_file() {
                         println!(
-                            "{}: file already exists at path {}",
-                            yellow!("warning"),
+                            "{} file already exists at path {}",
+                            yellow!("warning:"),
                             options.path
                         );
                         continue;
@@ -1683,8 +1687,8 @@ fn execute_changes(changes: Vec<Changes>) -> bool {
                     Ok(file) => file,
                     Err(e) => {
                         println!(
-                            "{}: Unable to create file {}: {}",
-                            red!("error"),
+                            "{} Unable to create file {}: {}",
+                            red!("error:"),
                             options.path,
                             e
                         );
@@ -1695,8 +1699,8 @@ fn execute_changes(changes: Vec<Changes>) -> bool {
                     Ok(_) => (),
                     Err(e) => {
                         println!(
-                            "{}: Unable to write file {}: {}",
-                            red!("error"),
+                            "{} Unable to write file {}: {}",
+                            red!("error:"),
                             options.path,
                             e
                         );
@@ -1710,8 +1714,8 @@ fn execute_changes(changes: Vec<Changes>) -> bool {
                     Ok(_) => (),
                     Err(e) => {
                         println!(
-                            "{}: Unable to create directory {}: {}",
-                            red!("error"),
+                            "{} Unable to create directory {}: {}",
+                            red!("error:"),
                             options.path,
                             e
                         );
@@ -1728,7 +1732,7 @@ fn execute_changes(changes: Vec<Changes>) -> bool {
                         let project_manifest_content = match manifest_location.read_content() {
                             Ok(content) => content,
                             Err(message) => {
-                                println!("{}: {}", red!("error"), message);
+                                println!("{}", format_err!(message));
                                 return false;
                             }
                         };
@@ -1738,8 +1742,8 @@ fn execute_changes(changes: Vec<Changes>) -> bool {
                                 Ok(manifest) => manifest,
                                 Err(message) => {
                                     println!(
-                                        "{}: Failed to process manifest file: {}",
-                                        red!("error"),
+                                        "{} Failed to process manifest file: {}",
+                                        red!("error:"),
                                         message
                                     );
                                     return false;
@@ -1751,7 +1755,7 @@ fn execute_changes(changes: Vec<Changes>) -> bool {
                         ) {
                             Ok(content) => content,
                             Err(message) => {
-                                println!("{}: {}", red!("error"), message);
+                                println!("{}", format_err!(message));
                                 return false;
                             }
                         }
@@ -1783,7 +1787,7 @@ fn execute_changes(changes: Vec<Changes>) -> bool {
         let toml_value = match toml::Value::try_from(&project_manifest) {
             Ok(value) => value,
             Err(e) => {
-                println!("{}: failed encoding config file ({})", red!("error"), e);
+                println!("{} failed encoding config file ({})", red!("error:"), e);
                 return false;
             }
         };
@@ -1791,7 +1795,7 @@ fn execute_changes(changes: Vec<Changes>) -> bool {
         let pretty_toml = match toml::ser::to_string_pretty(&toml_value) {
             Ok(value) => value,
             Err(e) => {
-                println!("{}: failed formatting config file ({})", red!("error"), e);
+                println!("{} failed formatting config file ({})", red!("error:"), e);
                 return false;
             }
         };
@@ -1801,8 +1805,8 @@ fn execute_changes(changes: Vec<Changes>) -> bool {
             .write_content(pretty_toml.as_bytes())
         {
             println!(
-                "{}: Unable to update manifest file - {}",
-                red!("error"),
+                "{} Unable to update manifest file - {}",
+                red!("error:"),
                 message
             );
             return false;
@@ -1857,11 +1861,11 @@ impl DiagnosticsDigest {
                 match diagnostic.level {
                     Level::Error => {
                         errors += 1;
-                        outputs.push(format!("{}: {}", red!("error"), diagnostic.message));
+                        outputs.push(format_err!(diagnostic.message));
                     }
                     Level::Warning => {
                         warnings += 1;
-                        outputs.push(format!("{}: {}", yellow!("warning"), diagnostic.message));
+                        outputs.push(format!("{} {}", yellow!("warning:"), diagnostic.message));
                     }
                     Level::Note => {
                         outputs.push(format!("{}: {}", green!("note:"), diagnostic.message));

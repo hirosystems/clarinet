@@ -3,9 +3,9 @@ pub mod stacks;
 
 use crate::utils::AbstractBlock;
 use chainhook_types::{
-    BitcoinChainEvent, BlockIdentifier, StacksBlockData, StacksChainEvent,
+    BitcoinChainEvent, BitcoinNetwork, BlockIdentifier, StacksBlockData, StacksChainEvent,
     StacksChainUpdatedWithBlocksData, StacksChainUpdatedWithMicroblocksData,
-    StacksMicroblocksTrail,
+    StacksMicroblocksTrail, StacksNetwork,
 };
 use rocket::serde::json::Value as JsonValue;
 use stacks::StacksBlockPool;
@@ -36,6 +36,8 @@ impl StacksChainContext {
 
 #[derive(Debug, Clone)]
 pub struct IndexerConfig {
+    pub bitcoin_network: BitcoinNetwork,
+    pub stacks_network: StacksNetwork,
     pub stacks_node_rpc_url: String,
     pub bitcoin_node_rpc_url: String,
     pub bitcoin_node_rpc_username: String,

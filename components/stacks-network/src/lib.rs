@@ -7,7 +7,14 @@ pub mod chains_coordinator;
 mod orchestrator;
 mod ui;
 
-use std::sync::mpsc::{self, channel, Sender};
+use std::{
+    sync::{
+        mpsc::{self, channel, Sender},
+        Arc,
+    },
+    thread::sleep,
+    time::Duration,
+};
 
 use chainhook_event_observer::{chainhooks::types::HookFormation, observer::MempoolAdmissionData};
 use chrono::prelude::*;
@@ -19,6 +26,7 @@ use chains_coordinator::start_chains_coordinator;
 use clarinet_deployments::types::DeploymentSpecification;
 use hiro_system_kit;
 pub use orchestrator::DevnetOrchestrator;
+use std::sync::atomic::{AtomicBool, Ordering};
 
 use self::chains_coordinator::DevnetEventObserverConfig;
 
@@ -134,12 +142,31 @@ pub async fn do_run_devnet(
             &devnet_path,
             devnet_config.enable_subnet_node,
         );
+
+        if let Err(e) = chains_coordinator_handle.join() {
+            if let Ok(message) = e.downcast::<String>() {
+                return Err(*message);
+            }
+        }
+
+        if let Err(e) = orchestrator_handle.join() {
+            if let Ok(message) = e.downcast::<String>() {
+                return Err(*message);
+            }
+        }
     } else {
+        let termination_reader = Arc::new(AtomicBool::new(false));
+        let termination_writer = termination_reader.clone();
+        let moved_orchestrator_terminator_tx = orchestrator_terminator_tx.clone();
         let moved_events_observer_commands_tx = chains_coordinator_commands_tx.clone();
         ctrlc::set_handler(move || {
             moved_events_observer_commands_tx
                 .send(ChainsCoordinatorCommand::Terminate)
                 .expect("Unable to terminate devnet");
+            moved_orchestrator_terminator_tx
+                .send(true)
+                .expect("Unable to terminate devnet");
+            termination_writer.store(true, Ordering::SeqCst);
         })
         .expect("Error setting Ctrl-C handler");
 
@@ -161,6 +188,10 @@ pub async fn do_run_devnet(
                     }
                     _ => {}
                 }
+                if termination_reader.load(Ordering::SeqCst) {
+                    sleep(Duration::from_secs(3));
+                    std::process::exit(0);
+                }
             }
         } else {
             return Ok((
@@ -168,18 +199,6 @@ pub async fn do_run_devnet(
                 Some(orchestrator_terminator_tx),
                 Some(chains_coordinator_commands_tx),
             ));
-        }
-    }
-
-    if let Err(e) = chains_coordinator_handle.join() {
-        if let Ok(message) = e.downcast::<String>() {
-            return Err(*message);
-        }
-    }
-
-    if let Err(e) = orchestrator_handle.join() {
-        if let Ok(message) = e.downcast::<String>() {
-            return Err(*message);
         }
     }
 

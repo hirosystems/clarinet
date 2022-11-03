@@ -254,8 +254,11 @@ impl StacksRpc {
             .unwrap();
 
         if !res.status().is_success() {
-            println!("{}", res.text().unwrap());
-            return Err(RpcError::Generic);
+            let error = match res.text() {
+                Ok(message) => RpcError::Message(message),
+                _ => RpcError::Generic,
+            };
+            return Err(error);
         }
 
         #[derive(Deserialize, Debug)]

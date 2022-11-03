@@ -3,17 +3,19 @@ pub mod types;
 use crate::utils::AbstractStacksBlock;
 
 use self::types::{
-    BitcoinChainhookSpecification, BitcoinTransactionFilterPredicate, ChainhookSpecification,
-    HookAction, HookFormation, MatchingRule, StacksChainhookSpecification,
-    StacksContractDeploymentPredicate, StacksTransactionFilterPredicate,
+    BitcoinChainhookSpecification, BitcoinPredicateType, BitcoinTransactionFilterPredicate,
+    ChainhookSpecification, ExactMatchingRule, HookAction, HookFormation, KeyRegistrationPredicate,
+    LockSTXPredicate, MatchingRule, PobPredicate, PoxPredicate, StacksChainhookSpecification,
+    StacksContractDeploymentPredicate, StacksTransactionFilterPredicate, TransferSTXPredicate,
 };
 use base58::FromBase58;
 use bitcoincore_rpc::bitcoin::blockdata::opcodes;
 use bitcoincore_rpc::bitcoin::blockdata::script::Builder as BitcoinScriptBuilder;
 use bitcoincore_rpc::bitcoin::{Address, PubkeyHash, PublicKey, Script};
 use chainhook_types::{
-    BitcoinChainEvent, BitcoinTransactionData, BlockIdentifier, StacksChainEvent, StacksNetwork,
-    StacksTransactionData, StacksTransactionEvent, StacksTransactionKind, TransactionIdentifier,
+    BitcoinChainEvent, BitcoinTransactionData, BlockIdentifier, StacksBaseChainOperation,
+    StacksChainEvent, StacksNetwork, StacksTransactionData, StacksTransactionEvent,
+    StacksTransactionKind, TransactionIdentifier,
 };
 use clarity_repl::clarity::codec::StacksMessageCodec;
 use clarity_repl::clarity::util::hash::{hex_bytes, to_hex, Hash160};
@@ -282,7 +284,11 @@ pub fn evaluate_stacks_transaction_predicate_on_transaction<'a>(
                 match event {
                     StacksTransactionEvent::SmartContractEvent(actual) => {
                         if actual.contract_identifier == expected_event.contract_identifier {
-                            return true;
+                            let value =
+                                format!("{}", expect_decoded_clarity_value(&actual.hex_value));
+                            if value.contains(&expected_event.contains) {
+                                return true;
+                            }
                         }
                     }
                     _ => {}
@@ -671,6 +677,16 @@ pub fn serialized_event_with_decoded_clarity_value(
     }
 }
 
+pub fn expect_decoded_clarity_value(hex_value: &str) -> ClarityValue {
+    let hex_value = hex_value
+        .strip_prefix("0x")
+        .expect("unable to decode clarity value emitted by stacks-node");
+    let value_bytes =
+        hex_bytes(&hex_value).expect("unable to decode clarity value emitted by stacks-node");
+    ClarityValue::consensus_deserialize(&mut Cursor::new(&value_bytes))
+        .expect("unable to decode clarity value emitted by stacks-node")
+}
+
 pub fn serialized_decoded_clarity_value(hex_value: &str) -> serde_json::Value {
     let hex_value = match hex_value.strip_prefix("0x") {
         Some(hex_value) => hex_value,
@@ -840,10 +856,10 @@ impl BitcoinChainhookSpecification {
     pub fn evaluate_transaction_predicate(&self, tx: &BitcoinTransactionData) -> bool {
         // TODO(lgalabru): follow-up on this implementation
         match &self.predicate.kind {
-            types::BitcoinPredicateType::TransactionIdentifierHash(txid) => {
+            BitcoinPredicateType::TransactionIdentifierHash(ExactMatchingRule::Equals(txid)) => {
                 tx.transaction_identifier.hash.eq(txid)
             }
-            types::BitcoinPredicateType::Hex(MatchingRule::Equals(hex_bytes)) => {
+            BitcoinPredicateType::OpReturn(MatchingRule::Equals(hex_bytes)) => {
                 for output in tx.metadata.outputs.iter() {
                     if output.script_pubkey.eq(hex_bytes) {
                         return true;
@@ -851,7 +867,7 @@ impl BitcoinChainhookSpecification {
                 }
                 false
             }
-            types::BitcoinPredicateType::Hex(MatchingRule::StartsWith(hex_bytes)) => {
+            BitcoinPredicateType::OpReturn(MatchingRule::StartsWith(hex_bytes)) => {
                 for output in tx.metadata.outputs.iter() {
                     if output.script_pubkey.starts_with(hex_bytes) {
                         return true;
@@ -859,7 +875,7 @@ impl BitcoinChainhookSpecification {
                 }
                 false
             }
-            types::BitcoinPredicateType::Hex(MatchingRule::EndsWith(hex_bytes)) => {
+            BitcoinPredicateType::OpReturn(MatchingRule::EndsWith(hex_bytes)) => {
                 for output in tx.metadata.outputs.iter() {
                     if output.script_pubkey.ends_with(hex_bytes) {
                         return true;
@@ -867,7 +883,7 @@ impl BitcoinChainhookSpecification {
                 }
                 false
             }
-            types::BitcoinPredicateType::P2pkh(MatchingRule::Equals(address)) => {
+            BitcoinPredicateType::P2pkh(ExactMatchingRule::Equals(address)) => {
                 let pubkey_hash = address
                     .from_base58()
                     .expect("Unable to get bytes from btc address");
@@ -886,9 +902,7 @@ impl BitcoinChainhookSpecification {
                 }
                 false
             }
-            types::BitcoinPredicateType::P2pkh(MatchingRule::StartsWith(_address)) => false,
-            types::BitcoinPredicateType::P2pkh(MatchingRule::EndsWith(_address)) => false,
-            types::BitcoinPredicateType::P2sh(MatchingRule::Equals(address)) => {
+            BitcoinPredicateType::P2sh(ExactMatchingRule::Equals(address)) => {
                 let script_hash = address
                     .from_base58()
                     .expect("Unable to get bytes from btc address");
@@ -905,15 +919,86 @@ impl BitcoinChainhookSpecification {
                 }
                 false
             }
-            types::BitcoinPredicateType::P2sh(MatchingRule::StartsWith(_address)) => false,
-            types::BitcoinPredicateType::P2sh(MatchingRule::EndsWith(_address)) => false,
-            types::BitcoinPredicateType::P2wpkh(MatchingRule::Equals(_address)) => false,
-            types::BitcoinPredicateType::P2wpkh(MatchingRule::StartsWith(_address)) => false,
-            types::BitcoinPredicateType::P2wpkh(MatchingRule::EndsWith(_address)) => false,
-            types::BitcoinPredicateType::P2wsh(MatchingRule::Equals(_address)) => false,
-            types::BitcoinPredicateType::P2wsh(MatchingRule::StartsWith(_address)) => false,
-            types::BitcoinPredicateType::P2wsh(MatchingRule::EndsWith(_address)) => false,
-            types::BitcoinPredicateType::Script(_template) => false,
+            BitcoinPredicateType::P2wpkh(ExactMatchingRule::Equals(_address)) => false,
+            BitcoinPredicateType::P2wsh(ExactMatchingRule::Equals(_address)) => false,
+            BitcoinPredicateType::Pob(PobPredicate::Any) => {
+                for op in tx.metadata.stacks_operations.iter() {
+                    if let StacksBaseChainOperation::PobBlockCommitment(_) = op {
+                        return true;
+                    }
+                }
+                false
+            }
+            BitcoinPredicateType::Pox(PoxPredicate::Any) => {
+                for op in tx.metadata.stacks_operations.iter() {
+                    if let StacksBaseChainOperation::PoxBlockCommitment(_) = op {
+                        return true;
+                    }
+                }
+                false
+            }
+            BitcoinPredicateType::Pox(PoxPredicate::Recipient(MatchingRule::Equals(address))) => {
+                for op in tx.metadata.stacks_operations.iter() {
+                    if let StacksBaseChainOperation::PoxBlockCommitment(commitment) = op {
+                        for reward in commitment.rewards.iter() {
+                            if reward.recipient.eq(address) {
+                                return true;
+                            }
+                        }
+                    }
+                }
+                false
+            }
+            BitcoinPredicateType::Pox(PoxPredicate::Recipient(MatchingRule::StartsWith(
+                prefix,
+            ))) => {
+                for op in tx.metadata.stacks_operations.iter() {
+                    if let StacksBaseChainOperation::PoxBlockCommitment(commitment) = op {
+                        for reward in commitment.rewards.iter() {
+                            if reward.recipient.starts_with(prefix) {
+                                return true;
+                            }
+                        }
+                    }
+                }
+                false
+            }
+            BitcoinPredicateType::Pox(PoxPredicate::Recipient(MatchingRule::EndsWith(suffix))) => {
+                for op in tx.metadata.stacks_operations.iter() {
+                    if let StacksBaseChainOperation::PoxBlockCommitment(commitment) = op {
+                        for reward in commitment.rewards.iter() {
+                            if reward.recipient.ends_with(suffix) {
+                                return true;
+                            }
+                        }
+                    }
+                }
+                false
+            }
+            BitcoinPredicateType::KeyRegistration(KeyRegistrationPredicate::Any) => {
+                for op in tx.metadata.stacks_operations.iter() {
+                    if let StacksBaseChainOperation::KeyRegistration(_) = op {
+                        return true;
+                    }
+                }
+                false
+            }
+            BitcoinPredicateType::TransferSTX(TransferSTXPredicate::Any) => {
+                for op in tx.metadata.stacks_operations.iter() {
+                    if let StacksBaseChainOperation::TransferSTX(_) = op {
+                        return true;
+                    }
+                }
+                false
+            }
+            BitcoinPredicateType::LockSTX(LockSTXPredicate::Any) => {
+                for op in tx.metadata.stacks_operations.iter() {
+                    if let StacksBaseChainOperation::LockSTX(_) = op {
+                        return true;
+                    }
+                }
+                false
+            }
         }
     }
 }

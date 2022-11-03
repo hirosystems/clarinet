@@ -238,6 +238,58 @@ pub struct BitcoinTransactionData {
 pub struct BitcoinTransactionMetadata {
     pub inputs: Vec<TxIn>,
     pub outputs: Vec<TxOut>,
+    pub stacks_operations: Vec<StacksBaseChainOperation>,
+}
+
+#[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
+pub enum StacksBaseChainOperation {
+    PoxBlockCommitment(PoxBlockCommitmentData),
+    PobBlockCommitment(PobBlockCommitmentData),
+    KeyRegistration(KeyRegistrationData),
+    TransferSTX(TransferSTXData),
+    LockSTX(LockSTXData),
+}
+
+#[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
+pub struct PoxBlockCommitmentData {
+    pub signers: Vec<String>,
+    pub stacks_block_hash: String,
+    pub rewards: Vec<PoxReward>,
+}
+
+#[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
+pub struct PoxReward {
+    pub recipient: String,
+    pub amount: u64,
+}
+
+#[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
+pub struct KeyRegistrationData;
+
+#[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
+pub struct PobBlockCommitmentData {
+    pub signers: Vec<String>,
+    pub stacks_block_hash: String,
+    pub amount: u64,
+}
+
+#[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
+pub struct BlockCommitmentData {
+    pub stacks_block_hash: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
+pub struct TransferSTXData {
+    pub sender: String,
+    pub recipient: String,
+    pub amount: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
+pub struct LockSTXData {
+    pub sender: String,
+    pub amount: String,
+    pub duration: u64,
 }
 
 /// The transaction_identifier uniquely identifies a transaction in a particular

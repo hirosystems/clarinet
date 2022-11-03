@@ -8,7 +8,7 @@ use crate::indexer::{self, Indexer, IndexerConfig};
 use bitcoincore_rpc::bitcoin::{BlockHash, Txid};
 use bitcoincore_rpc::{Auth, Client, RpcApi};
 use chainhook_types::{
-    BitcoinChainEvent, StacksChainEvent, StacksNetwork, StacksTransactionData,
+    BitcoinChainEvent, BitcoinNetwork, StacksChainEvent, StacksNetwork, StacksTransactionData,
     TransactionIdentifier,
 };
 use clarity_repl::clarity::util::hash::bytes_to_hex;
@@ -223,6 +223,8 @@ pub async fn start_event_observer(
         ),
         bitcoin_node_rpc_username: config.bitcoin_node_username.clone(),
         bitcoin_node_rpc_password: config.bitcoin_node_password.clone(),
+        stacks_network: StacksNetwork::Devnet,
+        bitcoin_network: BitcoinNetwork::Regtest,
     });
 
     let log_level = if config.display_logs {
@@ -556,7 +558,18 @@ pub async fn start_observer_commands_handler(
                 for request in requests.into_iter() {
                     // todo(lgalabru): collect responses for reporting
                     info!("Dispatching request from bitcoin chainhook {:?}", request);
-                    let _ = request.send().await;
+                    match request.send().await {
+                        Ok(res) => {
+                            if res.status().is_success() {
+                                info!("Trigger {} successful", res.url());
+                            } else {
+                                warn!("Trigger {} failed with status {}", res.url(), res.status());
+                            }
+                        }
+                        Err(e) => {
+                            warn!("Unable to build and send request {:?}", e);
+                        }
+                    }
                 }
 
                 if let Some(ref tx) = observer_events_tx {
@@ -670,7 +683,19 @@ pub async fn start_observer_commands_handler(
 
                 for request in requests.into_iter() {
                     // todo(lgalabru): collect responses for reporting
-                    let _ = request.send().await;
+                    info!("Dispatching request from stacks chainhook {:?}", request);
+                    match request.send().await {
+                        Ok(res) => {
+                            if res.status().is_success() {
+                                info!("Trigger {} successful", res.url());
+                            } else {
+                                warn!("Trigger {} failed with status {}", res.url(), res.status());
+                            }
+                        }
+                        Err(e) => {
+                            warn!("Unable to build and send request {:?}", e);
+                        }
+                    }
                 }
 
                 if let Some(ref tx) = observer_events_tx {
@@ -1032,10 +1057,40 @@ pub fn handle_get_hooks(
                     "status": 404,
                 }))
             }
-            Some(hooks) => Json(json!({
-                "status": 200,
-                "result": hooks,
-            })),
+            Some(hooks) => {
+                let mut predicates = vec![];
+                let mut stacks_predicates = hooks
+                    .get_serialized_stacks_predicates()
+                    .iter()
+                    .map(|(uuid, network, predicate)| {
+                        json!({
+                            "chain": "stacks",
+                            "uuid": uuid,
+                            "network": network,
+                            "predicate": predicate,
+                        })
+                    })
+                    .collect::<Vec<_>>();
+                predicates.append(&mut stacks_predicates);
+                let mut bitcoin_predicates = hooks
+                    .get_serialized_bitcoin_predicates()
+                    .iter()
+                    .map(|(uuid, network, predicate)| {
+                        json!({
+                            "chain": "bitcoin",
+                            "uuid": uuid,
+                            "network": network,
+                            "predicate": predicate,
+                        })
+                    })
+                    .collect::<Vec<_>>();
+                predicates.append(&mut bitcoin_predicates);
+
+                Json(json!({
+                    "status": 200,
+                    "result": predicates
+                }))
+            }
         }
     } else {
         Json(json!({
@@ -1054,6 +1109,13 @@ pub fn handle_create_hook(
 ) -> Json<JsonValue> {
     info!("POST /v1/chainhooks");
     let hook = hook.into_inner();
+    if let Err(e) = hook.validate() {
+        return Json(json!({
+            "status": 422,
+            "error": e,
+        }));
+    }
+
     let background_job_tx = background_job_tx.inner();
     match background_job_tx.lock() {
         Ok(tx) => {

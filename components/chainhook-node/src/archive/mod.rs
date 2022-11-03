@@ -1,10 +1,8 @@
 use crate::config::Config;
 use flate2::read::GzDecoder;
 use futures_util::StreamExt;
-use std::cmp::min;
 use std::io::Read;
 use std::io::{self, Cursor};
-use std::{fs::File, io::Write};
 use tar::Archive;
 
 pub async fn download_tsv_file(config: &Config) -> Result<(), String> {
