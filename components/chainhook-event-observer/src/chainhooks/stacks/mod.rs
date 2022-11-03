@@ -12,8 +12,8 @@ use bitcoincore_rpc::bitcoin::blockdata::script::Builder as BitcoinScriptBuilder
 use bitcoincore_rpc::bitcoin::{Address, PubkeyHash, PublicKey, Script};
 use chainhook_types::{
     BitcoinChainEvent, BitcoinTransactionData, BlockIdentifier, StacksBaseChainOperation,
-    StacksChainEvent, StacksNetwork, StacksTransactionData, StacksTransactionEvent,
-    StacksTransactionKind, TransactionIdentifier,
+    StacksBlockData, StacksChainEvent, StacksNetwork, StacksTransactionData,
+    StacksTransactionEvent, StacksTransactionKind, TransactionIdentifier,
 };
 use clarity_repl::clarity::codec::StacksMessageCodec;
 use clarity_repl::clarity::util::hash::{hex_bytes, to_hex, Hash160};
@@ -32,23 +32,20 @@ use std::future::Future;
 
 pub struct StacksTriggerChainhook<'a> {
     pub chainhook: &'a StacksChainhookSpecification,
-    pub apply: Vec<(&'a StacksTransactionData, &'a BlockIdentifier)>,
-    pub rollback: Vec<(&'a StacksTransactionData, &'a BlockIdentifier)>,
+    pub apply: Vec<(Vec<&'a StacksTransactionData>, &'a dyn AbstractStacksBlock)>,
+    pub rollback: Vec<(Vec<&'a StacksTransactionData>, &'a dyn AbstractStacksBlock)>,
 }
 
 #[derive(Clone, Debug)]
 pub struct StacksApplyTransactionPayload {
-    pub transaction: StacksTransactionData,
     pub block_identifier: BlockIdentifier,
-    pub confirmations: u8,
-    pub proof: Option<Vec<u8>>,
+    pub transactions: Vec<StacksTransactionData>,
 }
 
 #[derive(Clone, Debug)]
 pub struct StacksRollbackTransactionPayload {
-    pub transaction: StacksTransactionData,
     pub block_identifier: BlockIdentifier,
-    pub confirmations: u8,
+    pub transactions: Vec<StacksTransactionData>,
 }
 
 #[derive(Clone, Debug)]
@@ -210,14 +207,17 @@ pub fn evaluate_stacks_chainhooks_on_chain_event<'a>(
 fn evaluate_stacks_chainhook_on_blocks<'a>(
     blocks: Vec<&'a dyn AbstractStacksBlock>,
     chainhook: &'a StacksChainhookSpecification,
-) -> Vec<(&'a StacksTransactionData, &'a BlockIdentifier)> {
+) -> Vec<(Vec<&'a StacksTransactionData>, &'a dyn AbstractStacksBlock)> {
     let mut occurrences = vec![];
     for block in blocks {
+        let mut hits = vec![];
         for tx in block.get_transactions().iter() {
             if evaluate_stacks_transaction_predicate_on_transaction(tx, chainhook) {
-                occurrences.push((tx, block.get_identifier()));
-                continue;
+                hits.push(tx);
             }
+        }
+        if hits.len() > 0 {
+            occurrences.push((hits, block));
         }
     }
     occurrences
@@ -574,23 +574,36 @@ pub fn serialize_stacks_payload_to_json<'a>(
 ) -> JsonValue {
     let decode_clarity_values = trigger.should_decode_clarity_value();
     json!({
-        "apply": trigger.apply.into_iter().map(|(transaction, block_identifier)| {
+        "apply": trigger.apply.into_iter().map(|(transactions, block)| {
             json!({
-                "transaction": if decode_clarity_values {
-                    encode_transaction_including_with_clarity_decoding(transaction)
-                } else {
-                    json!(transaction)
-                },
-                "block_identifier": block_identifier,
-                "confirmations": 1, // TODO(lgalabru)
-                "proof": proofs.get(&transaction.transaction_identifier),
+                "block_identifier": block.get_identifier(),
+                "parent_block_identifier": block.get_parent_identifier(),
+                "timestamp": block.get_timestamp(),
+                "transactions": transactions.iter().map(|transaction| {
+                    if decode_clarity_values {
+                        encode_transaction_including_with_clarity_decoding(transaction)
+                    } else {
+                        json!(transaction)
+                    }
+                }).collect::<Vec<_>>(),
+                "metadata": block.get_serialized_metadata(),
+                // "proof": proofs.get(&transaction.transaction_identifier),
             })
         }).collect::<Vec<_>>(),
-        "rollback": trigger.rollback.into_iter().map(|(transaction, block_identifier)| {
+        "rollback": trigger.rollback.into_iter().map(|(transactions, block)| {
             json!({
-                "transaction": transaction,
-                "block_identifier": block_identifier,
-                "confirmations": 1, // TODO(lgalabru)
+                "block_identifier": block.get_identifier(),
+                "parent_block_identifier": block.get_parent_identifier(),
+                "timestamp": block.get_timestamp(),
+                "transactions": transactions.iter().map(|transaction| {
+                    if decode_clarity_values {
+                        encode_transaction_including_with_clarity_decoding(transaction)
+                    } else {
+                        json!(transaction)
+                    }
+                }).collect::<Vec<_>>(),
+                "metadata": block.get_serialized_metadata(),
+                // "proof": proofs.get(&transaction.transaction_identifier),
             })
         }).collect::<Vec<_>>(),
         "chainhook": {
@@ -632,25 +645,28 @@ pub fn handle_stacks_hook_action<'a>(
                 apply: trigger
                     .apply
                     .into_iter()
-                    .map(|(transaction, block_identifier)| {
+                    .map(|(transactions, block)| {
+                        let transactions = transactions
+                            .into_iter()
+                            .map(|t| t.clone())
+                            .collect::<Vec<_>>();
                         StacksApplyTransactionPayload {
-                            transaction: transaction.clone(),
-                            block_identifier: block_identifier.clone(),
-                            confirmations: 1, // TODO(lgalabru)
-                            proof: proofs
-                                .get(&transaction.transaction_identifier)
-                                .and_then(|r| Some(r.clone().into_bytes())),
+                            block_identifier: block.get_identifier().clone(),
+                            transactions,
                         }
                     })
                     .collect::<Vec<_>>(),
                 rollback: trigger
                     .rollback
                     .into_iter()
-                    .map(|(transaction, block_identifier)| {
+                    .map(|(transactions, block)| {
+                        let transactions = transactions
+                            .into_iter()
+                            .map(|t| t.clone())
+                            .collect::<Vec<_>>();
                         StacksRollbackTransactionPayload {
-                            transaction: transaction.clone(),
-                            block_identifier: block_identifier.clone(),
-                            confirmations: 1, // TODO(lgalabru)
+                            block_identifier: block.get_identifier().clone(),
+                            transactions,
                         }
                     })
                     .collect::<Vec<_>>(),

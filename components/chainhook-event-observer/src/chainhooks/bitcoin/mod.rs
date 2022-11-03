@@ -11,9 +11,9 @@ use bitcoincore_rpc::bitcoin::blockdata::opcodes;
 use bitcoincore_rpc::bitcoin::blockdata::script::Builder as BitcoinScriptBuilder;
 use bitcoincore_rpc::bitcoin::{Address, PubkeyHash, PublicKey, Script};
 use chainhook_types::{
-    BitcoinChainEvent, BitcoinTransactionData, BlockIdentifier, StacksBaseChainOperation,
-    StacksChainEvent, StacksNetwork, StacksTransactionData, StacksTransactionEvent,
-    StacksTransactionKind, TransactionIdentifier,
+    BitcoinBlockData, BitcoinChainEvent, BitcoinTransactionData, BlockIdentifier,
+    StacksBaseChainOperation, StacksChainEvent, StacksNetwork, StacksTransactionData,
+    StacksTransactionEvent, StacksTransactionKind, TransactionIdentifier,
 };
 use clarity_repl::clarity::codec::StacksMessageCodec;
 use clarity_repl::clarity::util::hash::{hex_bytes, to_hex, Hash160};
@@ -32,23 +32,18 @@ use std::future::Future;
 
 pub struct BitcoinTriggerChainhook<'a> {
     pub chainhook: &'a BitcoinChainhookSpecification,
-    pub apply: Vec<(&'a BitcoinTransactionData, &'a BlockIdentifier)>,
-    pub rollback: Vec<(&'a BitcoinTransactionData, &'a BlockIdentifier)>,
+    pub apply: Vec<(Vec<&'a BitcoinTransactionData>, &'a BitcoinBlockData)>,
+    pub rollback: Vec<(Vec<&'a BitcoinTransactionData>, &'a BitcoinBlockData)>,
 }
 
 #[derive(Clone, Debug)]
 pub struct BitcoinApplyTransactionPayload {
-    pub transaction: BitcoinTransactionData,
-    pub block_identifier: BlockIdentifier,
-    pub confirmations: u8,
-    pub proof: Option<Vec<u8>>,
+    pub block: BitcoinBlockData,
 }
 
 #[derive(Clone, Debug)]
 pub struct BitcoinRollbackTransactionPayload {
-    pub transaction: BitcoinTransactionData,
-    pub block_identifier: BlockIdentifier,
-    pub confirmations: u8,
+    pub block: BitcoinBlockData,
 }
 
 #[derive(Clone, Debug)]
@@ -81,10 +76,14 @@ pub fn evaluate_bitcoin_chainhooks_on_chain_event<'a>(
                 let rollback = vec![];
 
                 for block in event.new_blocks.iter() {
+                    let mut hits = vec![];
                     for tx in block.transactions.iter() {
                         if chainhook.evaluate_transaction_predicate(&tx) {
-                            apply.push((tx, &block.block_identifier))
+                            hits.push(tx);
                         }
+                    }
+                    if hits.len() > 0 {
+                        apply.push((hits, block));
                     }
                 }
 
@@ -103,17 +102,25 @@ pub fn evaluate_bitcoin_chainhooks_on_chain_event<'a>(
                 let mut rollback = vec![];
 
                 for block in event.blocks_to_apply.iter() {
+                    let mut hits = vec![];
                     for tx in block.transactions.iter() {
                         if chainhook.evaluate_transaction_predicate(&tx) {
-                            apply.push((tx, &block.block_identifier))
+                            hits.push(tx);
                         }
+                    }
+                    if hits.len() > 0 {
+                        apply.push((hits, block));
                     }
                 }
                 for block in event.blocks_to_rollback.iter() {
+                    let mut hits = vec![];
                     for tx in block.transactions.iter() {
                         if chainhook.evaluate_transaction_predicate(&tx) {
-                            rollback.push((tx, &block.block_identifier))
+                            hits.push(tx);
                         }
+                    }
+                    if hits.len() > 0 {
+                        rollback.push((hits, block));
                     }
                 }
                 if !apply.is_empty() || !rollback.is_empty() {
@@ -134,19 +141,23 @@ pub fn serialize_bitcoin_payload_to_json<'a>(
     proofs: &HashMap<&'a TransactionIdentifier, String>,
 ) -> JsonValue {
     json!({
-        "apply": trigger.apply.into_iter().map(|(transaction, block_identifier)| {
+        "apply": trigger.apply.into_iter().map(|(transactions, block)| {
             json!({
-                "transaction": transaction,
-                "block_identifier": block_identifier,
-                "confirmations": 1, // TODO(lgalabru)
-                "proof": proofs.get(&transaction.transaction_identifier),
+                "block_identifier": block.block_identifier,
+                "parent_block_identifier": block.parent_block_identifier,
+                "timestamp": block.timestamp,
+                "transactions": transactions,
+                "metadata": block.metadata,
+                // "proof": proofs.get(&transaction.transaction_identifier), // todo(lgalabru)
             })
         }).collect::<Vec<_>>(),
-        "rollback": trigger.rollback.into_iter().map(|(transaction, block_identifier)| {
+        "rollback": trigger.rollback.into_iter().map(|(transactions, block)| {
             json!({
-                "transaction": transaction,
-                "block_identifier": block_identifier,
-                "confirmations": 1, // TODO(lgalabru)
+                "block_identifier": block.block_identifier,
+                "parent_block_identifier": block.parent_block_identifier,
+                "timestamp": block.timestamp,
+                "transactions": transactions,
+                "metadata": block.metadata,
             })
         }).collect::<Vec<_>>(),
         "chainhook": {
@@ -188,26 +199,25 @@ pub fn handle_bitcoin_hook_action<'a>(
                 apply: trigger
                     .apply
                     .into_iter()
-                    .map(|(transaction, block_identifier)| {
-                        BitcoinApplyTransactionPayload {
-                            transaction: transaction.clone(),
-                            block_identifier: block_identifier.clone(),
-                            confirmations: 1, // TODO(lgalabru)
-                            proof: proofs
-                                .get(&transaction.transaction_identifier)
-                                .and_then(|r| Some(r.clone().into_bytes())),
-                        }
+                    .map(|(transactions, block)| {
+                        let mut block = block.clone();
+                        block.transactions = transactions
+                            .into_iter()
+                            .map(|t| t.clone())
+                            .collect::<Vec<_>>();
+                        BitcoinApplyTransactionPayload { block }
                     })
                     .collect::<Vec<_>>(),
                 rollback: trigger
                     .rollback
                     .into_iter()
-                    .map(|(transaction, block_identifier)| {
-                        BitcoinRollbackTransactionPayload {
-                            transaction: transaction.clone(),
-                            block_identifier: block_identifier.clone(),
-                            confirmations: 1, // TODO(lgalabru)
-                        }
+                    .map(|(transactions, block)| {
+                        let mut block = block.clone();
+                        block.transactions = transactions
+                            .into_iter()
+                            .map(|t| t.clone())
+                            .collect::<Vec<_>>();
+                        BitcoinRollbackTransactionPayload { block }
                     })
                     .collect::<Vec<_>>(),
                 chainhook: BitcoinChainhookPayload {

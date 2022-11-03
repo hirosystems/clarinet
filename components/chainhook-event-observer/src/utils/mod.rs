@@ -1,11 +1,14 @@
 use chainhook_types::{
     BitcoinBlockData, BlockIdentifier, StacksBlockData, StacksMicroblockData, StacksTransactionData,
 };
+use serde_json::Value as JsonValue;
 
 pub trait AbstractStacksBlock {
     fn get_identifier(&self) -> &BlockIdentifier;
     fn get_parent_identifier(&self) -> &BlockIdentifier;
     fn get_transactions(&self) -> &Vec<StacksTransactionData>;
+    fn get_timestamp(&self) -> i64;
+    fn get_serialized_metadata(&self) -> JsonValue;
 }
 
 impl AbstractStacksBlock for StacksBlockData {
@@ -20,6 +23,14 @@ impl AbstractStacksBlock for StacksBlockData {
     fn get_transactions(&self) -> &Vec<StacksTransactionData> {
         &self.transactions
     }
+
+    fn get_timestamp(&self) -> i64 {
+        self.timestamp
+    }
+
+    fn get_serialized_metadata(&self) -> JsonValue {
+        json!(self.metadata)
+    }
 }
 
 impl AbstractStacksBlock for StacksMicroblockData {
@@ -33,6 +44,14 @@ impl AbstractStacksBlock for StacksMicroblockData {
 
     fn get_transactions(&self) -> &Vec<StacksTransactionData> {
         &self.transactions
+    }
+
+    fn get_timestamp(&self) -> i64 {
+        self.timestamp
+    }
+
+    fn get_serialized_metadata(&self) -> JsonValue {
+        json!(self.metadata)
     }
 }
 
