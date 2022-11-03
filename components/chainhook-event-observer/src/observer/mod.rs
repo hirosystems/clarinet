@@ -1073,7 +1073,7 @@ pub fn handle_get_hooks(
                     .collect::<Vec<_>>();
                 predicates.append(&mut stacks_predicates);
                 let mut bitcoin_predicates = hooks
-                    .serialized_bitcoin_predicates()
+                    .get_serialized_bitcoin_predicates()
                     .iter()
                     .map(|(uuid, network, predicate)| {
                         json!({

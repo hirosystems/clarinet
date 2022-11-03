@@ -39,7 +39,7 @@ impl HookFormation {
         stacks
     }
 
-    pub fn serialized_bitcoin_predicates(
+    pub fn get_serialized_bitcoin_predicates(
         &self,
     ) -> Vec<(&String, &BitcoinNetwork, &BitcoinTransactionFilterPredicate)> {
         let mut bitcoin = vec![];
