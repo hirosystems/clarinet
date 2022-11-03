@@ -534,11 +534,11 @@ jobs:
           echo "PRE_GYP_TARGET_NAME=linux-x64-glibc" >> $GITHUB_ENV
 
       - name: Build - Cargo
-        working-directory: components/chainhook-event-observer
+        working-directory: components/chainhook-node
         run: cargo build --release --locked --target x86_64-unknown-linux-gnu
 
       - name: Compress cargo artifact
-        run: tar -C target/x86_64-unknown-linux-gnu/release -zcvf chainhook-node-${{ env.SHORT_TARGET_NAME }}.tar.gz chainhook-event-observer
+        run: tar -C target/x86_64-unknown-linux-gnu/release -zcvf chainhook-node-${{ env.SHORT_TARGET_NAME }}.tar.gz chainhook-node
 
       - name: Upload cargo artifacts
         uses: actions/upload-artifact@v2
