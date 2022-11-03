@@ -3,13 +3,17 @@ use crate::archive;
 use crate::block::DigestingCommand;
 use crate::config::Config;
 
-use chainhook_event_observer::{
-    chainhooks::{
-        evaluate_stacks_transaction_predicate_on_transaction, handle_stacks_hook_action,
-        types::ChainhookSpecification, StacksChainhookOccurrence, StacksTriggerChainhook,
-    },
-    observer::{start_event_observer, EventObserverConfig, ObserverCommand, ObserverEvent},
+use chainhook_event_observer::observer::{
+    start_event_observer, EventObserverConfig, ObserverCommand, ObserverEvent,
 };
+use chainhook_event_observer::{
+    chainhooks::stacks::{
+        evaluate_stacks_transaction_predicate_on_transaction, handle_stacks_hook_action,
+        StacksChainhookOccurrence, StacksTriggerChainhook,
+    },
+    chainhooks::types::ChainhookSpecification,
+};
+
 use chainhook_types::{
     BlockIdentifier, StacksBlockData, StacksChainEvent, StacksNetwork, StacksTransactionData,
 };

@@ -1,9 +1,12 @@
-use crate::chainhooks::types::{ChainhookSpecification, HookFormation};
-use crate::chainhooks::{
-    evaluate_bitcoin_chainhooks_on_chain_event, evaluate_stacks_chainhooks_on_chain_event,
-    handle_bitcoin_hook_action, handle_stacks_hook_action, BitcoinChainhookOccurrence,
-    BitcoinChainhookOccurrencePayload, StacksChainhookOccurrence, StacksChainhookOccurrencePayload,
+use crate::chainhooks::bitcoin::{
+    evaluate_bitcoin_chainhooks_on_chain_event, handle_bitcoin_hook_action,
+    BitcoinChainhookOccurrence, BitcoinChainhookOccurrencePayload,
 };
+use crate::chainhooks::stacks::{
+    evaluate_stacks_chainhooks_on_chain_event, handle_stacks_hook_action,
+    StacksChainhookOccurrence, StacksChainhookOccurrencePayload,
+};
+use crate::chainhooks::types::{ChainhookSpecification, HookFormation};
 use crate::indexer::{self, Indexer, IndexerConfig};
 use bitcoincore_rpc::bitcoin::{BlockHash, Txid};
 use bitcoincore_rpc::{Auth, Client, RpcApi};
