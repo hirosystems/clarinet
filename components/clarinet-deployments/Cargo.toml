@@ -12,26 +12,35 @@ serde_yaml = "0.8.23"
 clarity_repl = { package = "clarity-repl", path = "../clarity-repl", default-features = false, optional = true }
 clarinet_files = { package = "clarinet-files", path = "../clarinet-files", default-features = false }
 chainhook_types = { package = "chainhook-types", path = "../chainhook-types-rs" }
-stacks_rpc_client = { package = "stacks-rpc-client", path = "../stacks-rpc-client", optional = true  }
+stacks_rpc_client = { package = "stacks-rpc-client", path = "../stacks-rpc-client", optional = true }
 
 # CLI
-reqwest = { version = "0.11", default-features = false, optional = true, features = [
+reqwest = { version = "0.11", default-features = false, features = [
     "json",
     "rustls-tls",
 ] }
-bitcoin = { version = "0.28.1", optional = true  }
-bitcoincore-rpc = { version = "0.14.0", optional = true  }
-bitcoincore-rpc-json = { version = "0.14.0", optional = true  }
-base58 = { version = "0.2.0", optional = true  }
-tiny-hderive = { version = "0.3.0", optional = true  }
-libsecp256k1 = { version = "0.7.0", optional = true  }
-clarinet_utils = { package = "clarinet-utils", path = "../clarinet-utils", optional = true  }
+bitcoin = { version = "0.28.1", optional = true }
+bitcoincore-rpc = { version = "0.14.0", optional = true }
+bitcoincore-rpc-json = { version = "0.14.0", optional = true }
+base58 = { version = "0.2.0", optional = true }
+tiny-hderive = { version = "0.3.0", optional = true }
+libsecp256k1 = { version = "0.7.0", optional = true }
+clarinet_utils = { package = "clarinet-utils", path = "../clarinet-utils", optional = true }
 
 [features]
 default = ["cli"]
 cli = ["clarity_repl/cli", "clarinet_files/cli", "onchain"]
 wasm = ["clarity_repl/wasm", "clarinet_files/wasm"]
-onchain = ["stacks_rpc_client", "reqwest", "bitcoin", "bitcoincore-rpc", "bitcoincore-rpc-json", "base58", "tiny-hderive", "libsecp256k1", "clarinet_utils"]
+onchain = [
+    "stacks_rpc_client",
+    "bitcoin",
+    "bitcoincore-rpc",
+    "bitcoincore-rpc-json",
+    "base58",
+    "tiny-hderive",
+    "libsecp256k1",
+    "clarinet_utils",
+]
 
 [lib]
 name = "clarinet_deployments"

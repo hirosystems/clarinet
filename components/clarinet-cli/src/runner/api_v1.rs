@@ -10,13 +10,15 @@ use super::ChainhookEvent;
 use super::DeploymentCache;
 use super::SessionArtifacts;
 use crate::runner::api_v1::utils::serialize_event;
-use chainhook_event_observer::chainhooks::evaluate_stacks_chainhook_on_transaction;
-use chainhook_event_observer::chainhooks::handle_stacks_hook_action;
+use chainhook_event_observer::chainhooks::stacks::evaluate_stacks_transaction_predicate_on_transaction;
+use chainhook_event_observer::chainhooks::stacks::handle_stacks_hook_action;
+use chainhook_event_observer::chainhooks::stacks::StacksChainhookOccurrence;
+use chainhook_event_observer::chainhooks::stacks::StacksTriggerChainhook;
 use chainhook_event_observer::chainhooks::types::StacksChainhookSpecification;
-use chainhook_event_observer::chainhooks::StacksChainhookOccurrence;
-use chainhook_event_observer::chainhooks::StacksTriggerChainhook;
 use chainhook_event_observer::indexer::stacks::get_standardized_stacks_receipt;
 use chainhook_types::BlockIdentifier;
+use chainhook_types::StacksBlockData;
+use chainhook_types::StacksBlockMetadata;
 use chainhook_types::StacksContractCallData;
 use chainhook_types::StacksContractDeploymentData;
 use chainhook_types::StacksTransactionData;
@@ -247,7 +249,7 @@ pub async fn run_bridge(
 
 #[op]
 pub fn deprecation_notice(_state: &mut OpState, _args: Value, _: ()) -> Result<(), AnyError> {
-    println!("{}: clarinet v{} is incompatible with the version of the library being imported in the test files.", red!("error"), option_env!("CARGO_PKG_VERSION").expect("Unable to detect version"));
+    println!("{} clarinet v{} is incompatible with the version of the library being imported in the test files.", red!("error:"), option_env!("CARGO_PKG_VERSION").expect("Unable to detect version"));
     println!("The test files should import the latest version.");
     std::process::exit(1);
 }
@@ -286,7 +288,7 @@ fn new_session(state: &mut OpState, args: NewSessionArgs) -> Result<String, AnyE
                     if entry.is_none() {
                         // TODO(lgalabru): Ability to specify a deployment plan in tests
                         // https://github.com/hirosystems/clarinet/issues/357
-                        println!("{}: feature identified, but is not supported yet. Please comment in https://github.com/hirosystems/clarinet/issues/357", red!("Error"));
+                        println!("{}", format_err!("feature identified, but is not supported yet. Please comment in https://github.com/hirosystems/clarinet/issues/357"));
                         std::process::exit(1);
                     }
                 }
@@ -389,8 +391,8 @@ fn load_deployment(state: &mut OpState, args: LoadDeploymentArgs) -> Result<Stri
             }
             Err(_e) => {
                 println!(
-                    "{}: unable to load deployment {:?} in test {}",
-                    red!("Error"),
+                    "{} unable to load deployment {:?} in test {}",
+                    red!("error:"),
                     args.deployment_path,
                     label
                 );
@@ -687,15 +689,11 @@ fn mine_block(state: &mut OpState, args: MineBlockArgs) -> Result<String, AnyErr
                         execution.events,
                     ));
                 } else if let Some(ref args) = tx.transfer_stx {
-                    let snippet = format!(
-                        "(stx-transfer? u{} tx-sender '{})",
-                        args.amount, args.recipient
-                    );
-                    let execution = match session.eval(snippet.clone(), None, false) {
+                    let execution = match session.stx_transfer(args.amount, &args.recipient) {
                         Ok(res) => res,
                         Err(diagnostics) => {
                             let mut message =
-                                format!("{}: {}", red!("STX transfer runtime error"), snippet);
+                                format!("{}: {}", red!("STX transfer runtime error"), tx.sender);
                             if let Some(diag) = diagnostics.last() {
                                 message = format!("{} -> {}", message, diag.message);
                             }
@@ -736,53 +734,74 @@ fn mine_block(state: &mut OpState, args: MineBlockArgs) -> Result<String, AnyErr
         let merkle_tree = MerkleTree::<Sha512Trunc256Sum>::new(&txids);
 
         for chainhook in chainhooks.iter() {
+            let mut hits = vec![];
             for (tx, _) in transactions.iter() {
-                if evaluate_stacks_chainhook_on_transaction(tx, chainhook) {
-                    let simulated_block = BlockIdentifier {
+                if evaluate_stacks_transaction_predicate_on_transaction(tx, chainhook) {
+                    hits.push(tx);
+                }
+            }
+            if hits.len() > 0 {
+                let simulated_block = StacksBlockData {
+                    block_identifier: BlockIdentifier {
                         index: block_height.into(),
                         hash: format!("0x{}", merkle_tree.root().to_hex()),
-                    };
-                    let result = handle_stacks_hook_action(
-                        StacksTriggerChainhook {
-                            chainhook: chainhook,
-                            apply: vec![(tx, &simulated_block)],
-                            rollback: vec![],
+                    },
+                    parent_block_identifier: BlockIdentifier {
+                        index: block_height.saturating_sub(1).into(),
+                        hash: format!("0x{}", merkle_tree.root().to_hex()),
+                    },
+                    timestamp: block_height.into(),
+                    transactions: vec![],
+                    metadata: StacksBlockMetadata {
+                        bitcoin_anchor_block_identifier: BlockIdentifier {
+                            index: block_height.saturating_sub(1).into(),
+                            hash: format!("0x{}", merkle_tree.root().to_hex()),
                         },
-                        &HashMap::new(),
-                    );
-                    match result {
-                        Some(StacksChainhookOccurrence::Http(action)) => {
-                            let chainhook_tx = match state.try_borrow::<Sender<ChainhookEvent>>() {
-                                Some(chainhook_tx) => chainhook_tx,
-                                None => panic!(),
-                            };
-                            let _ = chainhook_tx.send(ChainhookEvent::PerformRequest(action));
-                        }
-                        Some(StacksChainhookOccurrence::File(path, bytes)) => {
-                            let mut file_path = std::env::current_dir().unwrap();
-                            file_path.push(path);
-                            if !file_path.exists() {
-                                match std::fs::File::open(&file_path) {
-                                    Ok(ref mut file) => {
-                                        let _ = file.write_all(&bytes);
-                                    }
-                                    Err(e) => println!("unable to create file {:?}", e),
-                                }
-                            }
-                            let mut file = OpenOptions::new()
-                                .create(false)
-                                .write(true)
-                                .append(true)
-                                .open(file_path)
-                                .unwrap();
-
-                            if let Err(e) = writeln!(file, "{}", String::from_utf8(bytes).unwrap())
-                            {
-                                eprintln!("Couldn't write to file: {}", e);
-                            }
-                        }
-                        _ => {}
+                        pox_cycle_index: 0,
+                        pox_cycle_position: 0,
+                        pox_cycle_length: 0,
+                        confirm_microblock_identifier: None,
+                    },
+                };
+                let result = handle_stacks_hook_action(
+                    StacksTriggerChainhook {
+                        chainhook: chainhook,
+                        apply: vec![(hits, &simulated_block)],
+                        rollback: vec![],
+                    },
+                    &HashMap::new(),
+                );
+                match result {
+                    Some(StacksChainhookOccurrence::Http(action)) => {
+                        let chainhook_tx = match state.try_borrow::<Sender<ChainhookEvent>>() {
+                            Some(chainhook_tx) => chainhook_tx,
+                            None => panic!(),
+                        };
+                        let _ = chainhook_tx.send(ChainhookEvent::PerformRequest(action));
                     }
+                    Some(StacksChainhookOccurrence::File(path, bytes)) => {
+                        let mut file_path = std::env::current_dir().unwrap();
+                        file_path.push(path);
+                        if !file_path.exists() {
+                            match std::fs::File::open(&file_path) {
+                                Ok(ref mut file) => {
+                                    let _ = file.write_all(&bytes);
+                                }
+                                Err(e) => println!("unable to create file {:?}", e),
+                            }
+                        }
+                        let mut file = OpenOptions::new()
+                            .create(false)
+                            .write(true)
+                            .append(true)
+                            .open(file_path)
+                            .unwrap();
+
+                        if let Err(e) = writeln!(file, "{}", String::from_utf8(bytes).unwrap()) {
+                            eprintln!("Couldn't write to file: {}", e);
+                        }
+                    }
+                    _ => {}
                 }
             }
         }
@@ -861,6 +880,7 @@ fn wrap_result_in_simulated_transaction(
             sponsor: None,
             execution_cost: None,
             position: chainhook_types::StacksTransactionPosition::Index(index),
+            proof: None,
         },
     };
     transaction

@@ -166,7 +166,7 @@ impl DAPDebugger {
             Ok(_) => (),
             Err(e) => {
                 // If we can't send, there's not really anything else we can do.
-                println!("{}: send_response: {}", red!("error"), e);
+                println!("{} send_response: {}", red!("error:"), e);
             }
         };
 
@@ -184,7 +184,7 @@ impl DAPDebugger {
             Ok(_) => (),
             Err(e) => {
                 // If we can't send, there's not really anything else we can do.
-                println!("{}: send_event: {}", red!("error"), e);
+                println!("{} send_event: {}", red!("error:"), e);
             }
         };
 

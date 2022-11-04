@@ -255,11 +255,7 @@ impl NetworkManifest {
 
         let mut network_manifest_file: NetworkManifestFile =
             toml::from_slice(&content.as_bytes()).unwrap();
-        Ok(NetworkManifest::from_network_manifest_file(
-            &mut network_manifest_file,
-            networks,
-            None,
-        ))
+        NetworkManifest::from_network_manifest_file(&mut network_manifest_file, networks, None)
     }
 
     pub fn from_location(
@@ -270,18 +266,18 @@ impl NetworkManifest {
         let network_manifest_file_content = location.read_content()?;
         let mut network_manifest_file: NetworkManifestFile =
             toml::from_slice(&network_manifest_file_content[..]).unwrap();
-        Ok(NetworkManifest::from_network_manifest_file(
+        NetworkManifest::from_network_manifest_file(
             &mut network_manifest_file,
             networks,
             cache_location,
-        ))
+        )
     }
 
     pub fn from_network_manifest_file(
         network_manifest_file: &mut NetworkManifestFile,
         networks: &(BitcoinNetwork, StacksNetwork),
         cache_location: Option<&FileLocation>,
-    ) -> NetworkManifest {
+    ) -> Result<NetworkManifest, String> {
         let stacks_node_rpc_address = match (
             &network_manifest_file.network.node_rpc_address,
             &network_manifest_file.network.stacks_node_rpc_address,
@@ -321,12 +317,11 @@ impl NetworkManifest {
                                     match Mnemonic::parse_in_normalized(Language::English, words) {
                                         Ok(result) => result.to_string(),
                                         Err(e) => {
-                                            println!(
-                                                "Error: mnemonic for wallet '{}' invalid: {}",
+                                            return Err(format!(
+                                                "mnemonic for wallet '{}' invalid: {}",
                                                 account_name,
                                                 e.to_string()
-                                            );
-                                            std::process::exit(1);
+                                            ));
                                         }
                                     }
                                 }
@@ -599,7 +594,7 @@ impl NetworkManifest {
             devnet,
         };
 
-        config
+        Ok(config)
     }
 }
 

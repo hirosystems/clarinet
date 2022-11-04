@@ -63,6 +63,7 @@ pub fn generate_test_tx_stacks_contract_call(
             description: format!("contract call {}::{}", contract_identifier, method),
             sponsor: None,
             position: chainhook_types::StacksTransactionPosition::Index(0),
+            proof: None,
         },
     }
 }
@@ -102,6 +103,8 @@ pub fn generate_test_tx_bitcoin_p2pkh_transfer(
         metadata: BitcoinTransactionMetadata {
             inputs: vec![],
             outputs,
+            stacks_operations: vec![],
+            proof: None,
         },
     }
 }

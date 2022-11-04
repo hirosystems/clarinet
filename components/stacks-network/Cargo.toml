@@ -38,6 +38,7 @@ clarinet_deployments = { package = "clarinet-deployments", path = "../clarinet-d
 clarinet_utils = { package = "clarinet-utils", path = "../clarinet-utils"  }
 hiro_system_kit = { package = "hiro-system-kit", path = "../hiro-system-kit" }
 clarity_repl = { package = "clarity-repl", path = "../clarity-repl", features = ["cli"] }
+dirs = { version = "4.0.0" }
 
 [features]
 default = ["crossterm"]

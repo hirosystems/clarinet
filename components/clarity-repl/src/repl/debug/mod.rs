@@ -355,7 +355,7 @@ impl DebugState {
 
         match eval(&ast.expressions[0], env, &context) {
             Ok(value) => Ok(value),
-            Err(e) => Err(vec![format!("{}: {}", red!("error"), e)]),
+            Err(e) => Err(vec![format_err!(e)]),
         }
     }
 

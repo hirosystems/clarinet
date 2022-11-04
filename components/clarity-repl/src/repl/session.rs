@@ -486,6 +486,15 @@ impl Session {
         self.run_snippet(output, self.show_costs, &snippet.to_string());
     }
 
+    pub fn stx_transfer(
+        &mut self,
+        amount: u64,
+        recipient: &str,
+    ) -> Result<ExecutionResult, Vec<Diagnostic>> {
+        let snippet = format!("(stx-transfer? u{} tx-sender '{})", amount, recipient);
+        self.eval(snippet.clone(), None, false)
+    }
+
     pub fn deploy_contract(
         &mut self,
         contract: &ClarityContract,
@@ -1189,18 +1198,15 @@ mod tests {
         session.encode(&mut output, "::encode { foo false }");
         assert_eq!(
             output[0],
-            format!(
-                "{}: Tuple literal construction expects a colon at index 1",
-                red!("error")
-            )
+            format_err!("Tuple literal construction expects a colon at index 1")
         );
 
         session.encode(&mut output, "::encode (foo 1)");
         assert_eq!(
             output[2],
             format!(
-                "encode:1:1: {}: use of unresolved function 'foo'",
-                red!("error")
+                "encode:1:1: {} use of unresolved function 'foo'",
+                red!("error:")
             )
         );
     }
