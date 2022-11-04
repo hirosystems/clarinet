@@ -81,7 +81,6 @@ impl Config {
     pub fn expected_redis_config(&self) -> &RedisConfig {
         match self.storage.driver {
             StorageDriver::Redis(ref conf) => conf,
-            _ => panic!("expected redis configuration"),
         }
     }
 

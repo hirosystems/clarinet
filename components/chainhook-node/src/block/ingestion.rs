@@ -94,7 +94,7 @@ pub fn start(
                 return Err(format!("Redis: {}", message.to_string()));
             }
         };
-        let indexer = Indexer::new(stacks_thread_config.indexer.clone());
+        let _indexer = Indexer::new(stacks_thread_config.indexer.clone());
 
         // Retrieve the former highest block height stored
         let former_tip_height: u64 = con.get(&format!("stx:tip")).unwrap_or(0);
