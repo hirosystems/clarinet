@@ -179,6 +179,7 @@ pub struct StacksTransactionMetadata {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub execution_cost: Option<StacksTransactionExecutionCost>,
     pub position: StacksTransactionPosition,
+    pub proof: Option<String>,
 }
 
 /// TODO
@@ -239,6 +240,7 @@ pub struct BitcoinTransactionMetadata {
     pub inputs: Vec<TxIn>,
     pub outputs: Vec<TxOut>,
     pub stacks_operations: Vec<StacksBaseChainOperation>,
+    pub proof: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]

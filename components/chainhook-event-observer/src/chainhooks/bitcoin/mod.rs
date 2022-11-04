@@ -147,9 +147,19 @@ pub fn serialize_bitcoin_payload_to_json<'a>(
                 "block_identifier": block.block_identifier,
                 "parent_block_identifier": block.parent_block_identifier,
                 "timestamp": block.timestamp,
-                "transactions": transactions,
+                "transactions": transactions.into_iter().map(|transaction| {
+                    json!({
+                        "transaction_identifier": transaction.transaction_identifier,
+                        "operations": transaction.operations,
+                        "metadata": json!({
+                            "inputs": transaction.metadata.inputs,
+                            "outputs": transaction.metadata.inputs,
+                            "stacks_operations": transaction.metadata.stacks_operations,
+                            "proof": proofs.get(&transaction.transaction_identifier),
+                        }),
+                    })
+                }).collect::<Vec<_>>(),
                 "metadata": block.metadata,
-                // "proof": proofs.get(&transaction.transaction_identifier), // todo(lgalabru)
             })
         }).collect::<Vec<_>>(),
         "rollback": trigger.rollback.into_iter().map(|(transactions, block)| {

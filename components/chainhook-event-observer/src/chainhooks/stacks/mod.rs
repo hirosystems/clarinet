@@ -570,7 +570,7 @@ pub fn serialize_to_json(value: &ClarityValue) -> serde_json::Value {
 
 pub fn serialize_stacks_payload_to_json<'a>(
     trigger: StacksTriggerChainhook<'a>,
-    proofs: &HashMap<&'a TransactionIdentifier, String>,
+    _proofs: &HashMap<&'a TransactionIdentifier, String>,
 ) -> JsonValue {
     let decode_clarity_values = trigger.should_decode_clarity_value();
     json!({
@@ -587,7 +587,6 @@ pub fn serialize_stacks_payload_to_json<'a>(
                     }
                 }).collect::<Vec<_>>(),
                 "metadata": block.get_serialized_metadata(),
-                // "proof": proofs.get(&transaction.transaction_identifier),
             })
         }).collect::<Vec<_>>(),
         "rollback": trigger.rollback.into_iter().map(|(transactions, block)| {

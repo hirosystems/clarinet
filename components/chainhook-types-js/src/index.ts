@@ -318,6 +318,11 @@ export interface StacksTransactionMetadata {
    * @memberof StacksTransactionMetadata
    */
   position: number | any;
+  /**
+   * @type {string}
+   * @memberof StacksTransactionMetadata
+   */
+  proof?: string;
 }
 
 export interface StacksTransactionReceipt {
@@ -525,6 +530,11 @@ export interface StacksSmartContractEventData {
 export interface BitcoinTransactionMetadata {
   inputs: Input[];
   outputs: Output[];
+  /**
+   * @type {string}
+   * @memberof StacksTransactionMetadata
+   */
+  proof?: string;
 }
 
 export interface Input {

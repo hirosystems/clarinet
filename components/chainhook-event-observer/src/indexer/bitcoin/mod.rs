@@ -99,6 +99,7 @@ pub fn standardize_bitcoin_block(
                 inputs,
                 outputs,
                 stacks_operations,
+                proof: None,
             },
         };
         transactions.push(tx);

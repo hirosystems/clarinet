@@ -880,6 +880,7 @@ fn wrap_result_in_simulated_transaction(
             sponsor: None,
             execution_cost: None,
             position: chainhook_types::StacksTransactionPosition::Index(index),
+            proof: None,
         },
     };
     transaction
