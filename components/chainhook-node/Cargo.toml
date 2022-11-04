@@ -16,7 +16,7 @@ serde-redis = "0.12.0"
 chainhook_event_observer = { package = "chainhook-event-observer", default-features = false, path = "../chainhook-event-observer" }
 chainhook_types = { package = "chainhook-types", path = "../chainhook-types-rs" }
 hiro_system_kit = { package = "hiro-system-kit", path = "../hiro-system-kit" }
-clap = { version = "3.2.8", features = ["derive"], optional = true }
+clap = { version = "3.2.23", features = ["derive"], optional = true }
 clap_generate = { version = "3.0.3", optional = true }
 toml = { version = "0.5.6", features = ["preserve_order"], optional = true  }
 ctrlc = { version = "3.2.2", optional = true }
