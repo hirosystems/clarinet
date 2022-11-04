@@ -145,7 +145,7 @@ impl Config {
         Config {
             storage: StorageConfig {
                 driver: StorageDriver::Redis(RedisConfig {
-                    uri: "redis://127.0.0.1/".into(),
+                    uri: "redis://localhost:6379/".into(),
                 }),
                 cache_path: "cache".into(),
             },
@@ -171,7 +171,7 @@ impl Config {
         Config {
             storage: StorageConfig {
                 driver: StorageDriver::Redis(RedisConfig {
-                    uri: "redis://127.0.0.1/".into(),
+                    uri: "redis://localhost:6379/".into(),
                 }),
                 cache_path: "cache".into(),
             },
@@ -197,7 +197,7 @@ impl Config {
         Config {
             storage: StorageConfig {
                 driver: StorageDriver::Redis(RedisConfig {
-                    uri: "redis://127.0.0.1/".into(),
+                    uri: "redis://localhost:6379/".into(),
                 }),
                 cache_path: "cache".into(),
             },

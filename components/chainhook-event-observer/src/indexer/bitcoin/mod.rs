@@ -99,6 +99,7 @@ pub fn standardize_bitcoin_block(
                 inputs,
                 outputs,
                 stacks_operations,
+                proof: None,
             },
         };
         transactions.push(tx);
@@ -160,7 +161,7 @@ fn try_parse_stacks_operation(
             StacksBaseChainOperation::KeyRegistration(res)
         }
         StacksOpcodes::PreStx => {
-            let res = try_parse_pre_stx_op(&op_return_output[6..])?;
+            let _ = try_parse_pre_stx_op(&op_return_output[6..])?;
             return None;
         }
         StacksOpcodes::TransferStx => {
@@ -217,11 +218,11 @@ fn try_parse_block_commit_op(bytes: &[u8]) -> Option<BlockCommitmentData> {
     })
 }
 
-fn try_parse_key_register_op(bytes: &[u8]) -> Option<KeyRegistrationData> {
+fn try_parse_key_register_op(_bytes: &[u8]) -> Option<KeyRegistrationData> {
     Some(KeyRegistrationData {})
 }
 
-fn try_parse_pre_stx_op(bytes: &[u8]) -> Option<()> {
+fn try_parse_pre_stx_op(_bytes: &[u8]) -> Option<()> {
     None
 }
 

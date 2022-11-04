@@ -272,6 +272,7 @@ pub fn standardize_stacks_block(
                                 receipt: StacksTransactionReceipt::default(),
                                 description: "Unparsable transaction".into(),
                                 position: StacksTransactionPosition::Index(0),
+                                proof: None,
                             },
                         }
                     }
@@ -302,6 +303,7 @@ pub fn standardize_stacks_block(
                     receipt,
                     description,
                     position: StacksTransactionPosition::Index(tx.tx_index),
+                    proof: None,
                 },
             }
         })
@@ -429,6 +431,7 @@ pub fn standardize_stacks_microblock_trail(
                     microblock_identifier.clone(),
                     tx.tx_index,
                 ),
+                proof: None,
             },
         };
 

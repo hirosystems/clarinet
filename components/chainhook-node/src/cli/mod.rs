@@ -3,15 +3,20 @@ use crate::archive;
 use crate::block::DigestingCommand;
 use crate::config::Config;
 
-use chainhook_event_observer::{
-    chainhooks::{
-        evaluate_stacks_transaction_predicate_on_transaction, handle_stacks_hook_action,
-        types::ChainhookSpecification, StacksChainhookOccurrence, StacksTriggerChainhook,
-    },
-    observer::{start_event_observer, EventObserverConfig, ObserverCommand, ObserverEvent},
+use chainhook_event_observer::observer::{
+    start_event_observer, EventObserverConfig, ObserverCommand, ObserverEvent,
 };
+use chainhook_event_observer::{
+    chainhooks::stacks::{
+        evaluate_stacks_transaction_predicate_on_transaction, handle_stacks_hook_action,
+        StacksChainhookOccurrence, StacksTriggerChainhook,
+    },
+    chainhooks::types::ChainhookSpecification,
+};
+
 use chainhook_types::{
-    BlockIdentifier, StacksBlockData, StacksChainEvent, StacksNetwork, StacksTransactionData,
+    BlockIdentifier, StacksBlockData, StacksBlockMetadata, StacksChainEvent, StacksNetwork,
+    StacksTransactionData,
 };
 use clap::{Parser, Subcommand};
 use ctrlc;
@@ -236,30 +241,46 @@ pub fn start_node(network: &StacksNetwork) {
                             "Processing Stacks chainhook {}, will scan blocks [{}; {}]...",
                             stacks_hook.uuid, start_block, end_block
                         );
-                        let mut hits = 0;
+                        let mut total_hits = 0;
                         for cursor in start_block..=end_block {
                             debug!(
                                 "Evaluating predicate #{} on block #{}",
                                 stacks_hook.uuid, cursor
                             );
-                            let (block_identifier, transactions) = {
+                            let (
+                                block_identifier,
+                                parent_block_identifier,
+                                timestamp,
+                                transactions,
+                                metadata,
+                            ) = {
                                 let payload: Vec<String> = redis_con
                                     .hget(
                                         &format!("stx:{}", cursor),
-                                        &["block_identifier", "transactions"],
+                                        &[
+                                            "block_identifier",
+                                            "parent_block_identifier",
+                                            "timestamp",
+                                            "transactions",
+                                            "metadata",
+                                        ],
                                     )
                                     .expect("unable to retrieve tip height");
-                                if payload.len() != 2 {
+                                if payload.len() != 5 {
                                     warn!("Chain still being processed, please retry in a few minutes");
                                     continue;
                                 }
                                 (
                                     serde_json::from_str::<BlockIdentifier>(&payload[0]).unwrap(),
-                                    serde_json::from_str::<Vec<StacksTransactionData>>(&payload[1])
+                                    serde_json::from_str::<BlockIdentifier>(&payload[1]).unwrap(),
+                                    serde_json::from_str::<i64>(&payload[2]).unwrap(),
+                                    serde_json::from_str::<Vec<StacksTransactionData>>(&payload[3])
+                                        .unwrap(),
+                                    serde_json::from_str::<StacksBlockMetadata>(&payload[4])
                                         .unwrap(),
                                 )
                             };
-                            let mut apply = vec![];
+                            let mut hits = vec![];
                             for tx in transactions.iter() {
                                 if evaluate_stacks_transaction_predicate_on_transaction(
                                     &tx,
@@ -269,15 +290,22 @@ pub fn start_node(network: &StacksNetwork) {
                                         "Action #{} triggered by transaction {} (block #{})",
                                         stacks_hook.uuid, tx.transaction_identifier.hash, cursor
                                     );
-                                    apply.push((tx, &block_identifier));
-                                    hits += 1;
+                                    hits.push(tx);
+                                    total_hits += 1;
                                 }
                             }
 
-                            if apply.len() > 0 {
+                            if hits.len() > 0 {
+                                let block = StacksBlockData {
+                                    block_identifier,
+                                    parent_block_identifier,
+                                    timestamp,
+                                    transactions: vec![],
+                                    metadata,
+                                };
                                 let trigger = StacksTriggerChainhook {
                                     chainhook: &stacks_hook,
-                                    apply,
+                                    apply: vec![(hits, &block)],
                                     rollback: vec![],
                                 };
 
@@ -289,7 +317,7 @@ pub fn start_node(network: &StacksNetwork) {
                                 }
                             }
                         }
-                        info!("Stacks chainhook {} scan completed: action triggered by {} transactions", stacks_hook.uuid, hits);
+                        info!("Stacks chainhook {} scan completed: action triggered by {} transactions", stacks_hook.uuid, total_hits);
                     }
                     ChainhookSpecification::Bitcoin(_bitcoin_hook) => {
                         warn!("Bitcoin chainhook evaluation unavailable for historical data");

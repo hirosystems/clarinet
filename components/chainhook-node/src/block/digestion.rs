@@ -50,6 +50,7 @@ pub fn start(command_rx: Receiver<DigestingCommand>, config: &Config) -> Result<
                         &[
                             ("transactions", json!(block_data.transactions).to_string()),
                             ("metadata", json!(block_data.metadata).to_string()),
+                            ("timestamp", json!(block_data.timestamp).to_string()),
                         ],
                     );
                     if block_digested > 0 && job_queue.is_empty() {

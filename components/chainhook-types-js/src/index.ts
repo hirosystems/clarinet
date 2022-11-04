@@ -58,8 +58,8 @@ export interface StacksBlockUpdate {
 }
 
 export interface BitcoinChainEvent {
-  apply: BitcoinApply[];
-  rollback: BitcoinRollback[];
+  apply: Block[];
+  rollback: Block[];
   chainhook: {
     uuid: string;
     predicate: BitcoinPredicate;
@@ -67,36 +67,12 @@ export interface BitcoinChainEvent {
 }
 
 export interface StacksChainEvent {
-  apply: StacksApply[];
-  rollback: StacksRollback[];
+  apply: Block[];
+  rollback: Block[];
   chainhook: {
     uuid: string;
     predicate: StacksPredicate;
   };
-}
-
-export interface BitcoinApply {
-  transaction: BitcoinTransaction;
-  proof: string;
-  block_identifier: BlockIdentifier;
-  confirmations: number;
-}
-
-export interface BitcoinRollback {
-  transaction: BitcoinTransaction;
-  block_identifier: BlockIdentifier;
-}
-
-export interface StacksApply {
-  transaction: StacksTransaction;
-  proof: string;
-  block_identifier: BlockIdentifier;
-  confirmations: number;
-}
-
-export interface StacksRollback {
-  transaction: BitcoinTransaction;
-  block_identifier: BlockIdentifier;
 }
 
 export interface StacksChainhook {
@@ -342,6 +318,11 @@ export interface StacksTransactionMetadata {
    * @memberof StacksTransactionMetadata
    */
   position: number | any;
+  /**
+   * @type {string}
+   * @memberof StacksTransactionMetadata
+   */
+  proof?: string;
 }
 
 export interface StacksTransactionReceipt {
@@ -549,6 +530,11 @@ export interface StacksSmartContractEventData {
 export interface BitcoinTransactionMetadata {
   inputs: Input[];
   outputs: Output[];
+  /**
+   * @type {string}
+   * @memberof StacksTransactionMetadata
+   */
+  proof?: string;
 }
 
 export interface Input {

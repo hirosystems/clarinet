@@ -721,7 +721,7 @@ dependencies = [
  "bitcoincore-rpc",
  "bitcoincore-rpc-json",
  "chainhook-types",
- "clap 3.2.22",
+ "clap 3.2.23",
  "clap_generate",
  "clarinet-utils",
  "clarity-repl",
@@ -750,7 +750,7 @@ dependencies = [
  "atty",
  "chainhook-event-observer",
  "chainhook-types",
- "clap 3.2.22",
+ "clap 3.2.23",
  "clap_generate",
  "clarity-repl",
  "criterion",
@@ -838,9 +838,9 @@ dependencies = [
 
 [[package]]
 name = "clap"
-version = "3.2.22"
+version = "3.2.23"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "86447ad904c7fb335a790c9d7fe3d0d971dc523b8ccd1561a520de9a85302750"
+checksum = "71655c45cb9845d3270c9d6df84ebe72b4dad3c2ba3f7023ad47c144e4e473a5"
 dependencies = [
  "atty",
  "bitflags",
@@ -850,7 +850,7 @@ dependencies = [
  "once_cell",
  "strsim",
  "termcolor",
- "textwrap 0.15.1",
+ "textwrap 0.16.0",
 ]
 
 [[package]]
@@ -859,7 +859,7 @@ version = "3.2.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3f7a2e0a962c45ce25afce14220bc24f9dade0a1787f185cecf96bfba7847cd8"
 dependencies = [
- "clap 3.2.22",
+ "clap 3.2.23",
 ]
 
 [[package]]
@@ -881,7 +881,7 @@ version = "3.0.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8e1b28c4a802ac3628604fd267cac62aaea74dc61af3410db6b1c44c03b42599"
 dependencies = [
- "clap 3.2.22",
+ "clap 3.2.23",
  "clap_complete",
 ]
 
@@ -896,7 +896,7 @@ dependencies = [
 
 [[package]]
 name = "clarinet-cli"
-version = "1.0.4"
+version = "1.0.5"
 dependencies = [
  "aes 0.7.5",
  "ansi_term",
@@ -909,7 +909,7 @@ dependencies = [
  "chainhook-event-observer",
  "chainhook-types",
  "chrono",
- "clap 3.2.22",
+ "clap 3.2.23",
  "clap_generate",
  "clarinet-deployments",
  "clarinet-files",
@@ -1125,7 +1125,7 @@ dependencies = [
 
 [[package]]
 name = "clarity-repl"
-version = "1.0.4"
+version = "1.0.5"
 dependencies = [
  "ansi_term",
  "atty",
@@ -3696,7 +3696,7 @@ version = "0.0.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "21fd49a3bd69c5be5d2c21899e2995ed99193b48e2c9f3ac09596a0d69f7fa79"
 dependencies = [
- "clap 3.2.22",
+ "clap 3.2.23",
 ]
 
 [[package]]
@@ -6108,7 +6108,7 @@ dependencies = [
 
 [[package]]
 name = "stacks-devnet-js"
-version = "1.0.4"
+version = "1.0.5"
 dependencies = [
  "chainhook-types",
  "clarinet-deployments",
@@ -6884,9 +6884,9 @@ dependencies = [
 
 [[package]]
 name = "textwrap"
-version = "0.15.1"
+version = "0.16.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "949517c0cf1bf4ee812e2e07e08ab448e3ae0d23472aee8a06c985f0c8815b16"
+checksum = "222a222a5bfe1bba4a77b45ec488a741b3cb8872e5e499451fd7d0129c9c7c3d"
 
 [[package]]
 name = "thiserror"

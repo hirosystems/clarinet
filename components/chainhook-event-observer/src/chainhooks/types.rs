@@ -173,7 +173,7 @@ impl HookAction {
                 let _ = Url::parse(&spec.url)
                     .map_err(|e| format!("hook action url invalid ({})", e.to_string()))?;
             }
-            HookAction::File(spec) => {}
+            HookAction::File(_) => {}
             HookAction::Noop => {}
         }
         Ok(())

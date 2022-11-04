@@ -1,3 +1,24 @@
+#### 1.0.5 (2022-11-03)
+
+##### New Features
+
+*  Many chainhooks enhancements: event payload augmented, new predicates (segwit, etc) implemented. Documentation coming soon!
+*  Introducing clarity-jupyter-kernel ([1c118513](https://github.com/hirosystems/clarinet/commit/1c1185136a1c52248a1b20ba43b5887fbaa4ef4d))
+*  Ability to use low/medium/high cost dynamic presets in deployment plans ([86219c4e](https://github.com/hirosystems/clarinet/commit/86219c4e52997d8aad059e871c96f96a5834c616))
+*  Ability to send STX in deployment plans ([c9e3bac4](https://github.com/hirosystems/clarinet/commit/c9e3bac44c2fe97f2f6b5f6578cc309f2cc2e38f))
+
+##### Bug Fixes
+
+*  Termination in `clarinet integrate --no-dashboard` mode fixed ([2cdb09a6](https://github.com/hirosystems/clarinet/commit/2cdb09a6aeed631236971f4d4206ff97b742683e))
+*  Check print predicate for contained value ([0f5956dc](https://github.com/hirosystems/clarinet/commit/0f5956dc1019f25d14c4204d7cece8923d74ae7b))
+*  Improved keyword recognition in VSCode grammar file ([e690b371](https://github.com/hirosystems/clarinet/commit/e690b371331ed8ec4d27cbc609581c9f07e04888), [119dce57](https://github.com/hirosystems/clarinet/commit/119dce577dd654e471a3054c206c593bdf78bb1b))
+*  Fixed stacks-js-helper generator ([11562ae7](https://github.com/hirosystems/clarinet/commit/11562ae739170a799620f4a62462219304dafc19))
+
+##### Chores
+
+*  Types improvements clarinet deno library ([3bc5c51c](https://github.com/hirosystems/clarinet/commit/3bc5c51cda35bdc52c8867fe222341680e0e3880))
+*  Add tests to the clarinet deno library ([d5b7555d](https://github.com/hirosystems/clarinet/commit/d5b7555d5a3acf4d5d53e32f06e6b80520b93c4e), [062a7144](https://github.com/hirosystems/clarinet/commit/062a7144f25e019dbacd62f8874e2d0a783fd20f))
+
 #### 1.0.4 (2022-10-17)
 
 ##### New Features
