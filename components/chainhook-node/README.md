@@ -100,7 +100,7 @@ predicate:
     stacks-op:
         type: stx-lock
 
-# Get any transaction including a p2pkh ouput paying a given recipient
+# Get any transaction including a p2pkh output paying a given recipient
 # `p2pkh` construct admits:
 #  - string type. example: "mr1iPkD9N3RJZZxXRk7xF9d36gffa6exNC"
 #  - hex encoded bytes type. example: "0x76a914ee9369fb719c0ba43ddf4d94638a970b84775f4788ac" 
@@ -108,7 +108,7 @@ predicate:
     scope: outputs
     p2pkh: mr1iPkD9N3RJZZxXRk7xF9d36gffa6exNC
 
-# Get any transaction including a p2sh ouput paying a given recipient
+# Get any transaction including a p2sh output paying a given recipient
 # `p2sh` construct admits:
 #  - string type. example: "2MxDJ723HBJtEMa2a9vcsns4qztxBuC8Zb2"
 #  - hex encoded bytes type. example: "0x76a914ee9369fb719c0ba43ddf4d94638a970b84775f4788ac" 
@@ -116,7 +116,21 @@ predicate:
     scope: outputs
     p2sh: 2MxDJ723HBJtEMa2a9vcsns4qztxBuC8Zb2
 
-# Additional predicates including p2wpkh, p2wsh and support for taproot coming soon
+# Get any transaction including a p2wpkh output paying a given recipient
+# `p2wpkh` construct admits:
+#  - string type. example: "bcrt1qnxknq3wqtphv7sfwy07m7e4sr6ut9yt6ed99jg"
+predicate:
+    scope: outputs
+    p2wpkh: bcrt1qnxknq3wqtphv7sfwy07m7e4sr6ut9yt6ed99jg
+
+# Get any transaction including a p2wsh output paying a given recipient
+# `p2wsh` construct admits:
+#  - string type. example: "bc1qklpmx03a8qkv263gy8te36w0z9yafxplc5kwzc"
+predicate:
+    scope: outputs
+    p2wsh: bc1qklpmx03a8qkv263gy8te36w0z9yafxplc5kwzc
+
+# Additional predicates including support for taproot coming soon
 ```
 
 ### Stacks

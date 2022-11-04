@@ -9,6 +9,7 @@ use super::types::{
 use base58::FromBase58;
 use bitcoincore_rpc::bitcoin::blockdata::opcodes;
 use bitcoincore_rpc::bitcoin::blockdata::script::Builder as BitcoinScriptBuilder;
+use bitcoincore_rpc::bitcoin::util::address::Payload;
 use bitcoincore_rpc::bitcoin::{Address, PubkeyHash, PublicKey, Script};
 use chainhook_types::{
     BitcoinBlockData, BitcoinChainEvent, BitcoinTransactionData, BlockIdentifier,
@@ -295,8 +296,26 @@ impl BitcoinChainhookSpecification {
                 }
                 false
             }
-            BitcoinPredicateType::P2wpkh(ExactMatchingRule::Equals(_address)) => false,
-            BitcoinPredicateType::P2wsh(ExactMatchingRule::Equals(_address)) => false,
+            BitcoinPredicateType::P2wpkh(ExactMatchingRule::Equals(encoded_address))
+            | BitcoinPredicateType::P2wsh(ExactMatchingRule::Equals(encoded_address)) => {
+                let address = match Address::from_str(encoded_address) {
+                    Ok(address) => match address.payload {
+                        Payload::WitnessProgram {
+                            version: _,
+                            program: _,
+                        } => address,
+                        _ => return false,
+                    },
+                    Err(_) => return false,
+                };
+                let script_bytes = to_hex(address.script_pubkey().as_bytes());
+                for output in tx.metadata.outputs.iter() {
+                    if output.script_pubkey == script_bytes {
+                        return true;
+                    }
+                }
+                false
+            }
             BitcoinPredicateType::Pob(PobPredicate::Any) => {
                 for op in tx.metadata.stacks_operations.iter() {
                     if let StacksBaseChainOperation::PobBlockCommitment(_) = op {
