@@ -875,7 +875,8 @@ pub fn handle_new_stacks_block(
             let chain_event = indexer.handle_stacks_marshalled_block(marshalled_block.into_inner());
             (pox_info, chain_event)
         }
-        _ => {
+        Err(e) => {
+            warn!("unable to acquire indexer_rw_lock: {}", e.to_string());
             return Json(json!({
                 "status": 500,
                 "result": "Unable to acquire lock",
@@ -889,7 +890,13 @@ pub fn handle_new_stacks_block(
             Ok(tx) => {
                 let _ = tx.send(ObserverCommand::PropagateStacksChainEvent(chain_event));
             }
-            _ => {}
+            Err(e) => {
+                warn!("unable to acquire background_job_tx: {}", e.to_string());
+                return Json(json!({
+                    "status": 500,
+                    "result": "Unable to acquire lock",
+                }))    
+            }
         };
     }
 
