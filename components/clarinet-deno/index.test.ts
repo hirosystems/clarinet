@@ -185,3 +185,60 @@ Deno.test("types.tuple", () => {
   assertStrictEquals(types.tuple({ id: 1 }), "{ id: 1 }");
   assertObjectMatch(types.tuple({ id: 1 }).expectTuple(), { id: "1" });
 });
+
+Deno.test("expectPrintEvent", () => {
+  const events = [
+    {
+      type: "contract_event",
+      contract_event: {
+        contract_identifier:
+          "ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM.my-contract",
+        topic: "print",
+        value: '"hello"',
+      },
+    },
+    {
+      type: "stx_transfer_event",
+      stx_transfer_event: {
+        sender: "ST1SJ3DTE5DN7X54YDH5D64R3BCB6A2AG2ZQ8YPD5",
+        recipient: "ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM",
+        amount: "1000",
+        memo: "",
+      },
+    },
+  ];
+
+  events.expectPrintEvent(
+    "ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM.my-contract",
+    '"hello"'
+  );
+});
+
+Deno.test("expectSTXTransferEvent", () => {
+  const events = [
+    {
+      type: "contract_event",
+      contract_event: {
+        contract_identifier:
+          "ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM.my-contract",
+        topic: "print",
+        value: '"hello"',
+      },
+    },
+    {
+      type: "stx_transfer_event",
+      stx_transfer_event: {
+        sender: "ST1SJ3DTE5DN7X54YDH5D64R3BCB6A2AG2ZQ8YPD5",
+        recipient: "ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM",
+        amount: "1000",
+        memo: "",
+      },
+    },
+  ];
+
+  events.expectSTXTransferEvent(
+    1000,
+    "ST1SJ3DTE5DN7X54YDH5D64R3BCB6A2AG2ZQ8YPD5",
+    "ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM"
+  );
+});
