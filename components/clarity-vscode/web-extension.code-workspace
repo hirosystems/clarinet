@@ -8,6 +8,17 @@
     }
   ],
   "settings": {
+    "files.watcherExclude": {
+      "**/.git/objects/**": true,
+      "**/.git/subtree-cache/**": true,
+      "**/node_modules/*/**": true,
+      "**/.hg/store/**": true,
+      "**/components/chainhook-event-observer": true,
+      "**/components/chainhook-node": true,
+      "**/components/chainhook-types-rs": true,
+      "**/components/clarinet-cli": true,
+      "**/components/clarity-jupyer-kernel": true
+    },
     "rust-analyzer.cargo.noDefaultFeatures": true,
     "rust-analyzer.cargo.features": ["clarity-lsp/wasm"],
     "rust-analyzer.checkOnSave.overrideCommand": [
@@ -17,6 +28,13 @@
       "--package=clarity-lsp",
       "--features=wasm",
       "--message-format=json"
+    ],
+    "rust-analyzer.files.excludeDirs": [
+      "components/chainhook-event-observer",
+      "components/chainhook-node",
+      "components/chainhook-types-rs",
+      "components/clarinet-cli",
+      "components/clarity-jupyer-kernel"
     ]
   }
 }

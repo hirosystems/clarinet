@@ -1,3 +1,6 @@
+#[macro_use]
+extern crate lazy_static;
+
 mod common;
 pub mod types;
 pub mod utils;

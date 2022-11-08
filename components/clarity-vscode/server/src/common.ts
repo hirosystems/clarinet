@@ -11,7 +11,7 @@ import {
 import type { ServerCapabilities, Connection } from "vscode-languageserver";
 
 // this type is the same for the browser and node but node isn't alwasy built in dev
-import type { LspVscodeBridge } from "./clarity-lsp-browser";
+import type { LspVscodeBridge } from "./clarity-lsp-browser/lsp-browser";
 
 const VALID_PROTOCOLS = ["file", "vscode-vfs", "vscode-test-web"];
 
@@ -22,12 +22,13 @@ export function initConnection(
   connection.onInitialize(() => {
     const capabilities: ServerCapabilities = {
       textDocumentSync: {
-        change: TextDocumentSyncKind.None,
+        change: TextDocumentSyncKind.Full,
         willSave: false,
         openClose: true,
         save: { includeText: false },
       },
       completionProvider: {},
+      hoverProvider: {},
     };
     return { capabilities };
   });

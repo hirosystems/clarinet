@@ -22,7 +22,6 @@ pub enum LspRequest {
 pub struct LspResponse {
     pub aggregated_diagnostics: Vec<(FileLocation, Vec<Diagnostic>)>,
     pub notification: Option<(MessageType, String)>,
-    pub completion_items: Vec<CompletionItem>,
 }
 
 impl LspResponse {
@@ -30,7 +29,6 @@ impl LspResponse {
         LspResponse {
             aggregated_diagnostics: vec![],
             notification: None,
-            completion_items: vec![],
         }
     }
 }
@@ -39,7 +37,6 @@ impl LspResponse {
     pub fn error(message: &str) -> LspResponse {
         LspResponse {
             aggregated_diagnostics: vec![],
-            completion_items: vec![],
             notification: Some((MessageType::ERROR, format!("Internal error: {}", message))),
         }
     }
@@ -68,7 +65,6 @@ pub async fn process_notification(
                     return Ok(LspResponse {
                         aggregated_diagnostics,
                         notification,
-                        completion_items: vec![],
                     });
                 }
                 Err(e) => return Ok(LspResponse::error(&e)),
@@ -96,7 +92,6 @@ pub async fn process_notification(
                     return Ok(LspResponse {
                         aggregated_diagnostics,
                         notification,
-                        completion_items: vec![],
                     });
                 }
                 Err(e) => return Ok(LspResponse::error(&e)),
@@ -115,7 +110,6 @@ pub async fn process_notification(
                     return Ok(LspResponse {
                         aggregated_diagnostics,
                         notification,
-                        completion_items: vec![],
                     });
                 }
                 Err(e) => return Ok(LspResponse::error(&e)),
@@ -144,7 +138,6 @@ pub async fn process_notification(
                     return Ok(LspResponse {
                         aggregated_diagnostics,
                         notification,
-                        completion_items: vec![],
                     });
                 }
                 Err(e) => return Ok(LspResponse::error(&e)),
@@ -153,45 +146,39 @@ pub async fn process_notification(
     }
 }
 
-pub fn process_request(command: LspRequest, editor_state: &EditorState) -> LspResponse {
-    match command {
-        LspRequest::GetIntellisense(contract_location) => {
-            let mut completion_items_src =
-                editor_state.get_completion_items_for_contract(&contract_location);
-            let mut completion_items = vec![];
-            // Little big detail: should we wrap the inserted_text with braces?
-            let should_wrap = {
-                // let line = params.text_document_position.position.line;
-                // let char = params.text_document_position.position.character;
-                // let doc = params.text_document_position.text_document.uri;
-                //
-                // TODO(lgalabru): from there, we'd need to get the prior char
-                // and see if a parenthesis was opened. If not, we need to wrap.
-                // The LSP would need to update its local document cache, via
-                // the did_change method.
-                true
-            };
-            if should_wrap {
-                for mut item in completion_items_src.drain(..) {
-                    match item.kind {
-                        CompletionItemKind::Event
-                        | CompletionItemKind::Function
-                        | CompletionItemKind::Module
-                        | CompletionItemKind::Class => {
-                            item.insert_text =
-                                Some(format!("({})", item.insert_text.take().unwrap()));
-                        }
-                        _ => {}
-                    }
-                    completion_items.push(item);
+pub fn get_intellisense(
+    editor_state: &EditorState,
+    contract_location: &FileLocation,
+) -> Vec<CompletionItem> {
+    let mut completion_items_src =
+        editor_state.get_completion_items_for_contract(contract_location);
+    let mut completion_items = vec![];
+    // Little big detail: should we wrap the inserted_text with braces?
+    let should_wrap = {
+        // let line = params.text_document_position.position.line;
+        // let char = params.text_document_position.position.character;
+        // let doc = params.text_document_position.text_document.uri;
+        //
+        // TODO(lgalabru): from there, we'd need to get the prior char
+        // and see if a parenthesis was opened. If not, we need to wrap.
+        // The LSP would need to update its local document cache, via
+        // the did_change method.
+        true
+    };
+    if should_wrap {
+        for mut item in completion_items_src.drain(..) {
+            match item.kind {
+                CompletionItemKind::Event
+                | CompletionItemKind::Function
+                | CompletionItemKind::Module
+                | CompletionItemKind::Class => {
+                    item.insert_text = Some(format!("({})", item.insert_text.take().unwrap()));
                 }
+                _ => {}
             }
-
-            LspResponse {
-                aggregated_diagnostics: vec![],
-                notification: None,
-                completion_items,
-            }
+            completion_items.push(item);
         }
     }
+
+    completion_items
 }
