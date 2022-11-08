@@ -880,7 +880,7 @@ pub fn handle_new_stacks_block(
             return Json(json!({
                 "status": 500,
                 "result": "Unable to acquire lock",
-            }))
+            }));
         }
     };
 
@@ -895,7 +895,7 @@ pub fn handle_new_stacks_block(
                 return Json(json!({
                     "status": 500,
                     "result": "Unable to acquire lock",
-                }))    
+                }));
             }
         };
     }

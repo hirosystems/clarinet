@@ -7,7 +7,7 @@ use bitcoincore_rpc::bitcoin::hashes::Hash;
 use bitcoincore_rpc::bitcoin::{Block, BlockHash};
 use bitcoincore_rpc::{Auth, Client, RpcApi};
 pub use blocks_pool::BitcoinBlockPool;
-use chainhook_types::bitcoin::{OutPoint, TxIn, TxOut};
+use chainhook_types::bitcoin::{OutPoint, TxIn, TxOut, Witness};
 use chainhook_types::{
     BitcoinBlockData, BitcoinBlockMetadata, BitcoinTransactionData, BitcoinTransactionMetadata,
     BlockCommitmentData, BlockIdentifier, KeyRegistrationData, LockSTXData, PobBlockCommitmentData,
@@ -38,8 +38,6 @@ pub fn standardize_bitcoin_block(
     indexer_config: &IndexerConfig,
     marshalled_block: JsonValue,
 ) -> BitcoinBlockData {
-    let mut transactions = vec![];
-
     let auth = Auth::UserPass(
         indexer_config.bitcoin_node_rpc_username.clone(),
         indexer_config.bitcoin_node_rpc_password.clone(),
@@ -56,6 +54,16 @@ pub fn standardize_bitcoin_block(
     };
     let block = rpc.get_block(&block_hash).unwrap();
     let block_height = partial_block.burn_block_height;
+    build_block(block, block_height, indexer_config)
+}
+
+pub fn build_block(
+    block: Block,
+    block_height: u64,
+    indexer_config: &IndexerConfig,
+) -> BitcoinBlockData {
+    let mut transactions = vec![];
+
     let expected_magic_bytes = get_canonical_magic_bytes(&indexer_config.bitcoin_network);
     let pox_config = get_canonical_pox_config(&indexer_config.bitcoin_network);
 
@@ -69,8 +77,8 @@ pub fn standardize_bitcoin_block(
                     vout: input.previous_output.vout,
                 },
                 script_sig: to_hex(input.script_sig.as_bytes()),
-                sequence: input.sequence,
-                witness: input.witness,
+                sequence: input.sequence.0,
+                witness: input.witness.to_vec(),
             })
         }
 
