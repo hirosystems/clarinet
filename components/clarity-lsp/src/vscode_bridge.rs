@@ -22,7 +22,6 @@ use std::panic;
 use std::sync::{Arc, RwLock};
 use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::future_to_promise;
-use web_sys::console;
 
 #[wasm_bindgen]
 pub struct LspVscodeBridge {
@@ -70,7 +69,6 @@ impl LspVscodeBridge {
                     Err(err) => return Promise::reject(&JsValue::from(format!("error: {}", err))),
                 };
                 let uri = params.text_document.uri;
-                log!("> opened uri: {:}", &uri.path());
 
                 let command = if let Some(contract_location) = get_contract_location(&uri) {
                     LspNotification::ContractOpened(contract_location.clone())
@@ -116,7 +114,6 @@ impl LspVscodeBridge {
                     Err(err) => return Promise::reject(&JsValue::from(format!("error: {}", err))),
                 };
                 let uri = &params.text_document.uri;
-                log!("> saved uri: {:}", &uri.path());
 
                 let command = if let Some(contract_location) = get_contract_location(uri) {
                     LspNotification::ContractSaved(contract_location)
@@ -158,13 +155,11 @@ impl LspVscodeBridge {
             }
 
             DidChangeTextDocument::METHOD => {
-                console::time_with_label("handle_did_change");
                 let params: DidChangeTextDocumentParams = match decode_from_js(js_params) {
                     Ok(params) => params,
                     Err(err) => return Promise::reject(&JsValue::from(format!("error: {}", err))),
                 };
                 let uri = &params.text_document.uri;
-                log!("> changed uri: {:}", &uri.path());
 
                 let command = if let Some(contract_location) = get_contract_location(uri) {
                     LspNotification::ContractChanged(
@@ -172,7 +167,7 @@ impl LspVscodeBridge {
                         params.content_changes[0].text.to_string(),
                     )
                 } else {
-                    return Promise::resolve(&JsValue::NULL);
+                    return Promise::resolve(&JsValue::FALSE);
                 };
 
                 let mut editor_state = self.editor_state.clone();
@@ -196,7 +191,6 @@ impl LspVscodeBridge {
                         }
                     }
 
-                    console::time_end_with_label("handle_did_change");
                     Ok(JsValue::TRUE)
                 });
             }
@@ -207,12 +201,11 @@ impl LspVscodeBridge {
                     Err(err) => return Promise::reject(&JsValue::from(format!("error: {}", err))),
                 };
                 let uri = &params.text_document.uri;
-                log!("> closed uri: {:}", &uri.path());
 
                 let command = if let Some(contract_location) = get_contract_location(uri) {
                     LspNotification::ContractClosed(contract_location)
                 } else {
-                    return Promise::resolve(&JsValue::NULL);
+                    return Promise::resolve(&JsValue::FALSE);
                 };
 
                 let mut editor_state = self.editor_state.clone();

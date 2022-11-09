@@ -1,5 +1,6 @@
 mod native_bridge;
 
+use self::native_bridge::LspNativeBridge;
 use clarity_lsp::utils;
 use clarity_repl::clarity::vm::diagnostic::{
     Diagnostic as ClarityDiagnostic, Level as ClarityLevel,
@@ -11,8 +12,6 @@ use tower_lsp::lsp_types::{
     Diagnostic, DiagnosticSeverity, Documentation, MarkupContent, MarkupKind, Position, Range,
 };
 use tower_lsp::{LspService, Server};
-
-use self::native_bridge::LspNativeBridge;
 
 pub fn run_lsp() {
     match block_on(do_run_lsp()) {

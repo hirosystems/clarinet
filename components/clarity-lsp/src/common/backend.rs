@@ -1,5 +1,3 @@
-use std::sync::{Arc, RwLock};
-
 use crate::lsp_types::MessageType;
 use crate::state::{build_state, EditorState, ProtocolState};
 use crate::types::{CompletionItem, CompletionItemKind};
@@ -7,6 +5,7 @@ use clarinet_files::{FileAccessor, FileLocation};
 use clarity_repl::clarity::diagnostic::Diagnostic;
 use clarity_repl::repl::DEFAULT_CLARITY_VERSION;
 use serde::{Deserialize, Serialize};
+use std::sync::{Arc, RwLock};
 
 #[derive(Debug, Clone)]
 pub struct EditorStateInput {
@@ -93,11 +92,9 @@ pub async fn process_notification(
 ) -> Result<LspNotificationResponse, String> {
     match command {
         LspNotification::ManifestOpened(manifest_location) => {
-            {
-                // Only build the initial state if it does not exist
-                if editor_state.try_read(|es| es.protocols.contains_key(&manifest_location))? {
-                    return Ok(LspNotificationResponse::default());
-                }
+            // Only build the initial state if it does not exist
+            if editor_state.try_read(|es| es.protocols.contains_key(&manifest_location))? {
+                return Ok(LspNotificationResponse::default());
             }
 
             // With this manifest_location, let's initialize our state.
@@ -136,6 +133,7 @@ pub async fn process_notification(
         }
 
         LspNotification::ContractOpened(contract_location) => {
+            // store the file in the active_contracts map
             if !editor_state.try_read(|es| es.active_contracts.contains_key(&contract_location))? {
                 let contract_source = match file_accessor {
                     None => contract_location.read_content_as_utf8(),
