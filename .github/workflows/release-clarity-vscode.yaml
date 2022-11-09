@@ -1,0 +1,98 @@
+name: Build Release for Clarity VSCode
+on:
+  pull_request:
+  push:
+    tags:
+      - 'v*'
+    paths-ignore:
+      - '**/CHANGELOG.md'
+      - '**/package.json'
+      - '**/package-lock.json'
+    branches:
+      - main
+      - develop
+  workflow_dispatch:
+
+jobs:
+  pre_run:
+    name: Cancel previous runs
+    runs-on: ubuntu-latest
+    steps:
+      - name: Cancel Previous Runs
+        uses: styfle/cancel-workflow-action
+        with:
+          access_token: ${{ github.token }}
+
+  typescript:
+    name: TypeScript
+    runs-on: ubuntu-latest
+    needs: pre_run
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v2
+
+      - name: Install Nodejs
+        uses: actions/setup-node@v1
+        with:
+          node-version: 14.x
+
+      - name: Install dependencies
+        run: npm ci
+        working-directory: ./components/clarity-vscode/
+
+      - name: Audit
+        run: npm audit --audit-level high
+        working-directory: ./components/clarity-vscode/
+
+      - name: Lint
+        run: npm run lint
+        working-directory: ./components/clarity-vscode/
+
+      - name: Build extension
+        run: npm run package --scripts-prepend-node-path
+        working-directory: ./components/clarity-vscode/
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v2
+        with:
+          name: clarity-lsp.vsix
+          path: ./components/clarity-vscode/clarity-lsp.vsix
+
+      - name: Upload artifact to GH release
+        uses: svenstaro/upload-release-action@v2
+        if: startsWith(github.ref, 'refs/tags/v')
+        with:
+          repo_token: ${{ secrets.GITHUB_TOKEN }}
+          file: clarity-lsp.vsix
+          asset_name: clarity-lsp.vsix
+          tag: ${{ github.ref }}
+
+      - name: Publish extension
+        if: startsWith(github.ref, 'refs/tags/v') && !contains(github.ref, 'develop')
+        working-directory: ./components/clarity-vscode/
+        run: npx vsce publish --pat ${{ secrets.MARKETPLACE_TOKEN }} --packagePath clarity-lsp.vsix
+
+  release:
+    name: Release
+    runs-on: ubuntu-latest
+    if: contains(github.ref, 'main')
+    needs:
+      - typescript
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+        with:
+          # Necessary for Semantic Release
+          token: ${{ secrets.GH_TOKEN || secrets.GITHUB_TOKEN }}
+
+      - name: Semantic Release
+        uses: cycjimmy/semantic-release-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
+          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+          SEMANTIC_RELEASE_PACKAGE: ${{ github.event.repository.name }}
+        with:
+          extra_plugins: |
+            @semantic-release/changelog
+            @semantic-release/exec
+            @semantic-release/git
