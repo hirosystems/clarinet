@@ -371,9 +371,8 @@ impl<'a> ASTVisitor<'a> for CheckChecker<'a, '_> {
         // Upon entering a public function, all parameters are tainted
         if let Some(params) = parameters {
             for param in params {
-                match TypeSignature::parse_type_repr(param.type_expr, &mut ()) {
-                    Ok(TypeSignature::BoolType) => (),
-                    _ => self.add_taint_source(Node::Symbol(param.name), param.decl_span)
+                if !is_param_type_excluded_from_checked_requirement(&param) {
+                    self.add_taint_source(Node::Symbol(param.name), param.decl_span);
                 }
             }
         }
@@ -415,7 +414,9 @@ impl<'a> ASTVisitor<'a> for CheckChecker<'a, '_> {
             for (i, param) in params.iter().enumerate() {
                 unchecked_params[i] = allow;
                 if allow || self.settings.callee_filter {
-                    self.add_taint_source(Node::Symbol(param.name), param.decl_span.clone());
+                    if !is_param_type_excluded_from_checked_requirement(param) {
+                        self.add_taint_source(Node::Symbol(param.name), param.decl_span.clone());
+                    }
                 }
             }
             info.unchecked_params = unchecked_params;
@@ -851,6 +852,13 @@ impl<'a> ASTVisitor<'a> for CheckChecker<'a, '_> {
     }
 }
 
+fn is_param_type_excluded_from_checked_requirement(param :&TypedVar) -> bool {
+    match TypeSignature::parse_type_repr(param.type_expr, &mut ()) {
+        Ok(TypeSignature::BoolType) => true,
+        _ => false
+    }
+}
+
 fn is_tx_sender(expr: &SymbolicExpression) -> bool {
     if let Some(name) = expr.match_atom() {
         name.as_str() == "tx_sender"
@@ -896,6 +904,7 @@ mod tests {
     use crate::repl::session::Session;
     use crate::repl::SessionSettings;
 
+    #[test]
     fn allow_unchecked_bool_in_private_function_with_unchecked_params_annotation() {
         let mut settings = SessionSettings::default();
         settings.repl_settings.analysis.passes = vec![Pass::CheckChecker];
