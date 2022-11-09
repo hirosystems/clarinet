@@ -2,7 +2,8 @@ use super::utils;
 
 use crate::lsp::{clarity_diagnostics_to_tower_lsp_type, completion_item_type_to_tower_lsp_type};
 use clarity_lsp::backend::{
-    process_notification, process_request, LspNotification, LspNotificationResponse, LspRequest,
+    process_notification, process_request, EditorStateInput, LspNotification,
+    LspNotificationResponse, LspRequest, LspRequestResponse,
 };
 use clarity_lsp::state::EditorState;
 use crossbeam_channel::{Receiver as MultiplexableReceiver, Select, Sender as MultiplexableSender};
@@ -21,23 +22,17 @@ use tower_lsp::lsp_types::{
 };
 use tower_lsp::{async_trait, Client, LanguageServer};
 
-// The LSP is being initialized when clarity files are being detected in the project.
-// We want the LSP to be notified when 2 kind of edits happened:
-// - .clar file opened:
-//      - if the state is empty
-//      - if the state is ready
-// - Clarinet.toml file saved
-// - .clar files saved
-//      - if indexed in `Clarinet.toml`:
-//      - if not indexed:
-// - Clarinet.toml file saved
+pub enum LspResponse {
+    Notification(LspNotificationResponse),
+    Request(LspRequestResponse),
+}
 
 pub async fn start_language_server(
     notification_rx: MultiplexableReceiver<LspNotification>,
     request_rx: MultiplexableReceiver<LspRequest>,
-    response_tx: Sender<LspNotificationResponse>,
+    response_tx: Sender<LspResponse>,
 ) {
-    let mut editor_state = EditorState::new();
+    let mut editor_state = EditorStateInput::new(Some(EditorState::new()), None);
 
     let mut sel = Select::new();
     let notifications_oper = sel.recv(&notification_rx);
@@ -49,8 +44,8 @@ pub async fn start_language_server(
             i if i == notifications_oper => match oper.recv(&notification_rx) {
                 Ok(notification) => {
                     let result = process_notification(notification, &mut editor_state, None).await;
-                    if let Ok(lsp_response) = result {
-                        let _ = response_tx.send(lsp_response);
+                    if let Ok(response) = result {
+                        let _ = response_tx.send(LspResponse::Notification(response));
                     }
                 }
                 Err(_e) => {
@@ -59,8 +54,8 @@ pub async fn start_language_server(
             },
             i if i == requests_oper => match oper.recv(&request_rx) {
                 Ok(request) => {
-                    let lsp_response = process_request(request, &mut editor_state);
-                    let _ = response_tx.send(lsp_response);
+                    let request_response = process_request(request, &mut editor_state);
+                    let _ = response_tx.send(LspResponse::Request(request_response));
                 }
                 Err(_e) => {
                     continue;
@@ -74,22 +69,22 @@ pub async fn start_language_server(
 #[derive(Debug)]
 pub struct LspNativeBridge {
     client: Client,
-    request_tx: Arc<Mutex<MultiplexableSender<LspRequest>>>,
     notification_tx: Arc<Mutex<MultiplexableSender<LspNotification>>>,
-    response_rx: Arc<Mutex<Receiver<LspNotificationResponse>>>,
+    request_tx: Arc<Mutex<MultiplexableSender<LspRequest>>>,
+    response_rx: Arc<Mutex<Receiver<LspResponse>>>,
 }
 
 impl LspNativeBridge {
     pub fn new(
         client: Client,
-        request_tx: MultiplexableSender<LspRequest>,
         notification_tx: MultiplexableSender<LspNotification>,
-        response_rx: Receiver<LspNotificationResponse>,
+        request_tx: MultiplexableSender<LspRequest>,
+        response_rx: Receiver<LspResponse>,
     ) -> Self {
         Self {
             client,
-            request_tx: Arc::new(Mutex::new(request_tx)),
             notification_tx: Arc::new(Mutex::new(notification_tx)),
+            request_tx: Arc::new(Mutex::new(request_tx)),
             response_rx: Arc::new(Mutex::new(response_rx)),
         }
     }
@@ -151,7 +146,9 @@ impl LanguageServer for LspNativeBridge {
         let mut keywords = vec![];
         if let Ok(response_rx) = self.response_rx.lock() {
             if let Ok(ref mut response) = response_rx.recv() {
-                keywords.append(&mut response.completion_items);
+                if let LspResponse::Request(request_response) = response {
+                    keywords.append(&mut request_response.completion_items);
+                }
             }
         }
 
@@ -193,8 +190,11 @@ impl LanguageServer for LspNativeBridge {
         let mut notification = None;
         if let Ok(response_rx) = self.response_rx.lock() {
             if let Ok(ref mut response) = response_rx.recv() {
-                aggregated_diagnostics.append(&mut response.aggregated_diagnostics);
-                notification = response.notification.take();
+                if let LspResponse::Notification(notification_response) = response {
+                    aggregated_diagnostics
+                        .append(&mut notification_response.aggregated_diagnostics);
+                    notification = notification_response.notification.take();
+                }
             }
         }
         for (location, mut diags) in aggregated_diagnostics.drain(..) {
@@ -236,8 +236,11 @@ impl LanguageServer for LspNativeBridge {
         let mut notification = None;
         if let Ok(response_rx) = self.response_rx.lock() {
             if let Ok(ref mut response) = response_rx.recv() {
-                aggregated_diagnostics.append(&mut response.aggregated_diagnostics);
-                notification = response.notification.take();
+                if let LspResponse::Notification(notification_response) = response {
+                    aggregated_diagnostics
+                        .append(&mut notification_response.aggregated_diagnostics);
+                    notification = notification_response.notification.take();
+                }
             }
         }
 

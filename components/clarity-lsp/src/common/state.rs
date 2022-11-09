@@ -21,13 +21,13 @@ use std::borrow::BorrowMut;
 use std::collections::{HashMap, HashSet};
 
 #[derive(Debug, Clone, PartialEq)]
-pub struct ActiveContractState {
+pub struct ActiveContractData {
     pub clarity_version: ClarityVersion,
     pub expressions: Option<Vec<SymbolicExpression>>,
     pub diagnostic: Option<ClarityDiagnostic>,
 }
 
-impl ActiveContractState {
+impl ActiveContractData {
     pub fn new(clarity_version: ClarityVersion, source: &str) -> Self {
         match build_ast(
             &QualifiedContractIdentifier::transient(),
@@ -36,12 +36,12 @@ impl ActiveContractState {
             clarity_version,
             StacksEpochId::Epoch21,
         ) {
-            Ok(ast) => ActiveContractState {
+            Ok(ast) => ActiveContractData {
                 clarity_version,
                 expressions: Some(ast.expressions),
                 diagnostic: None,
             },
-            Err(err) => ActiveContractState {
+            Err(err) => ActiveContractData {
                 clarity_version,
                 expressions: None,
                 diagnostic: Some(err.diagnostic),
@@ -135,7 +135,7 @@ pub struct ContractMetadata {
 pub struct EditorState {
     pub protocols: HashMap<FileLocation, ProtocolState>,
     pub contracts_lookup: HashMap<FileLocation, ContractMetadata>,
-    pub active_contracts: HashMap<FileLocation, ActiveContractState>,
+    pub active_contracts: HashMap<FileLocation, ActiveContractData>,
     pub native_functions: Vec<CompletionItem>,
 }
 
@@ -300,7 +300,7 @@ impl EditorState {
         clarity_version: ClarityVersion,
         source: &str,
     ) {
-        let contract = ActiveContractState::new(clarity_version, source);
+        let contract = ActiveContractData::new(clarity_version, source);
         self.active_contracts.insert(contract_location, contract);
     }
 
@@ -308,7 +308,7 @@ impl EditorState {
         &mut self,
         contract_location: &FileLocation,
         source: &str,
-    ) -> Result<ActiveContractState, String> {
+    ) -> Result<ActiveContractData, String> {
         let contract_state = self
             .active_contracts
             .get_mut(contract_location)

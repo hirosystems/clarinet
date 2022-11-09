@@ -80,12 +80,13 @@ impl LspVscodeBridge {
                     return Promise::reject(&JsValue::from_str("Unsupported file opened"));
                 };
 
-                let editor_state = self.editor_state.clone();
+                let mut editor_state = self.editor_state.clone();
                 let send_diagnostic = self.client_diagnostic_tx.clone();
 
                 return future_to_promise(async move {
                     let mut result =
-                        process_notification(command, &editor_state, Some(&file_accessor)).await;
+                        process_notification(command, &mut editor_state, Some(&file_accessor))
+                            .await;
 
                     let mut aggregated_diagnostics = vec![];
 
@@ -125,12 +126,13 @@ impl LspVscodeBridge {
                     return Promise::reject(&JsValue::from_str("Unsupported file opened"));
                 };
 
-                let editor_state = self.editor_state.clone();
+                let mut editor_state = self.editor_state.clone();
                 let send_diagnostic = self.client_diagnostic_tx.clone();
 
                 return future_to_promise(async move {
                     let mut result =
-                        process_notification(command, &editor_state, Some(&file_accessor)).await;
+                        process_notification(command, &mut editor_state, Some(&file_accessor))
+                            .await;
 
                     let mut aggregated_diagnostics = vec![];
 
@@ -173,12 +175,13 @@ impl LspVscodeBridge {
                     return Promise::resolve(&JsValue::NULL);
                 };
 
-                let editor_state = self.editor_state.clone();
+                let mut editor_state = self.editor_state.clone();
                 let send_diagnostic = self.client_diagnostic_tx.clone();
 
                 return future_to_promise(async move {
                     let result =
-                        process_notification(command, &editor_state, Some(&file_accessor)).await?;
+                        process_notification(command, &mut editor_state, Some(&file_accessor))
+                            .await?;
 
                     if let Some((location, diagnostic)) = result.aggregated_diagnostics.get(0) {
                         if let Ok(uri) = Url::parse(&location.to_string()) {
@@ -212,10 +215,10 @@ impl LspVscodeBridge {
                     return Promise::resolve(&JsValue::NULL);
                 };
 
-                let editor_state = self.editor_state.clone();
+                let mut editor_state = self.editor_state.clone();
 
                 return future_to_promise(async move {
-                    process_notification(command, &editor_state, Some(&file_accessor)).await?;
+                    process_notification(command, &mut editor_state, Some(&file_accessor)).await?;
                     Ok(JsValue::TRUE)
                 });
             }

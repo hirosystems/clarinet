@@ -4,8 +4,6 @@ use clarity_lsp::utils;
 use clarity_repl::clarity::vm::diagnostic::{
     Diagnostic as ClarityDiagnostic, Level as ClarityLevel,
 };
-use native_bridge::LspNativeBridge;
-
 use crossbeam_channel::unbounded;
 use std::sync::mpsc;
 use tokio;
@@ -13,6 +11,8 @@ use tower_lsp::lsp_types::{
     Diagnostic, DiagnosticSeverity, Documentation, MarkupContent, MarkupKind, Position, Range,
 };
 use tower_lsp::{LspService, Server};
+
+use self::native_bridge::LspNativeBridge;
 
 pub fn run_lsp() {
     match block_on(do_run_lsp()) {
@@ -45,7 +45,7 @@ async fn do_run_lsp() -> Result<(), String> {
     });
 
     let (service, messages) = LspService::new(|client| {
-        LspNativeBridge::new(client, request_tx, notification_tx, response_rx)
+        LspNativeBridge::new(client, notification_tx, request_tx, response_rx)
     });
     Server::new(stdin, stdout)
         .interleave(messages)
@@ -169,6 +169,7 @@ pub fn clarity_diagnostic_to_tower_lsp_type(
 
 #[test]
 fn test_opening_counter_contract_should_return_fresh_analysis() {
+    use crate::lsp::native_bridge::LspResponse;
     use clarinet_files::FileLocation;
     use clarity_lsp::backend::{LspNotification, LspNotificationResponse};
     use crossbeam_channel::unbounded;
@@ -196,6 +197,11 @@ fn test_opening_counter_contract_should_return_fresh_analysis() {
 
     let _ = notification_tx.send(LspNotification::ContractOpened(contract_location.clone()));
     let response = response_rx.recv().expect("Unable to get response");
+    let response = if let LspResponse::Notification(response) = response {
+        response
+    } else {
+        panic!("Unable to get response")
+    };
 
     // the counter project should emit 2 warnings and 2 notes coming from counter.clar
     assert_eq!(response.aggregated_diagnostics.len(), 1);
@@ -205,11 +211,18 @@ fn test_opening_counter_contract_should_return_fresh_analysis() {
     // re-opening this contract should not trigger a full analysis
     let _ = notification_tx.send(LspNotification::ContractOpened(contract_location));
     let response = response_rx.recv().expect("Unable to get response");
+    let response = if let LspResponse::Notification(response) = response {
+        response
+    } else {
+        panic!("Unable to get response")
+    };
+
     assert_eq!(response, LspNotificationResponse::default());
 }
 
 #[test]
 fn test_opening_counter_manifest_should_return_fresh_analysis() {
+    use crate::lsp::native_bridge::LspResponse;
     use clarinet_files::FileLocation;
     use clarity_lsp::backend::{LspNotification, LspNotificationResponse};
     use crossbeam_channel::unbounded;
@@ -236,6 +249,11 @@ fn test_opening_counter_manifest_should_return_fresh_analysis() {
 
     let _ = notification_tx.send(LspNotification::ManifestOpened(manifest_location.clone()));
     let response = response_rx.recv().expect("Unable to get response");
+    let response = if let LspResponse::Notification(response) = response {
+        response
+    } else {
+        panic!("Unable to get response")
+    };
 
     // the counter project should emit 2 warnings and 2 notes coming from counter.clar
     assert_eq!(response.aggregated_diagnostics.len(), 1);
@@ -245,11 +263,17 @@ fn test_opening_counter_manifest_should_return_fresh_analysis() {
     // re-opening this manifest should not trigger a full analysis
     let _ = notification_tx.send(LspNotification::ManifestOpened(manifest_location));
     let response = response_rx.recv().expect("Unable to get response");
+    let response = if let LspResponse::Notification(response) = response {
+        response
+    } else {
+        panic!("Unable to get response")
+    };
     assert_eq!(response, LspNotificationResponse::default());
 }
 
 #[test]
 fn test_opening_simple_nft_manifest_should_return_fresh_analysis() {
+    use crate::lsp::native_bridge::LspResponse;
     use clarinet_files::FileLocation;
     use clarity_lsp::backend::LspNotification;
     use crossbeam_channel::unbounded;
@@ -275,6 +299,11 @@ fn test_opening_simple_nft_manifest_should_return_fresh_analysis() {
         manifest_location,
     )));
     let response = response_rx.recv().expect("Unable to get response");
+    let response = if let LspResponse::Notification(response) = response {
+        response
+    } else {
+        panic!("Unable to get response")
+    };
 
     // the counter project should emit 2 warnings and 2 notes coming from counter.clar
     assert_eq!(response.aggregated_diagnostics.len(), 2);
