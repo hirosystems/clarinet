@@ -8,7 +8,7 @@ use clarity::vm::functions::define::DefineFunctions;
 use clarity::vm::functions::NativeFunctions;
 use clarity::vm::representations::SymbolicExpressionType::*;
 use clarity::vm::representations::{Span, TraitDefinition};
-use clarity::vm::types::{TraitIdentifier, Value};
+use clarity::vm::types::{TraitIdentifier, Value, TypeSignature};
 use clarity::vm::{ClarityName, ClarityVersion, SymbolicExpression};
 use std::collections::{HashMap, HashSet};
 use std::convert::TryFrom;
@@ -371,7 +371,10 @@ impl<'a> ASTVisitor<'a> for CheckChecker<'a, '_> {
         // Upon entering a public function, all parameters are tainted
         if let Some(params) = parameters {
             for param in params {
-                self.add_taint_source(Node::Symbol(param.name), param.decl_span);
+                match TypeSignature::parse_type_repr(param.type_expr, &mut ()) {
+                    Ok(TypeSignature::BoolType) => (),
+                    _ => self.add_taint_source(Node::Symbol(param.name), param.decl_span)
+                }
             }
         }
         self.traverse_expr(body)
@@ -892,6 +895,83 @@ mod tests {
     use crate::analysis::Pass;
     use crate::repl::session::Session;
     use crate::repl::SessionSettings;
+
+    fn allow_unchecked_bool_in_private_function_with_unchecked_params_annotation() {
+        let mut settings = SessionSettings::default();
+        settings.repl_settings.analysis.passes = vec![Pass::CheckChecker];
+        let mut session = Session::new(settings);
+        let snippet = "
+(define-data-var p1 principal tx-sender)
+(define-data-var b1 bool false)
+;; #[allow(unchecked_params)]
+(define-private (my-func-p (p principal) (b bool))
+    (begin
+        (var-set p1 p)
+        (var-set b1 b)
+    )
+)"
+        .to_string();
+        match session.formatted_interpretation(
+            snippet,
+            Some("checker".to_string()),
+            false,
+            None,
+            None,
+        ) {
+            Ok((output, result)) => {
+                assert_eq!(result.diagnostics.len(), 2);
+                assert_eq!(output.len(), 6);
+                assert_eq!(
+                    output[0],
+                    format!(
+                        "checker:7:21: {} use of potentially unchecked data",
+                        yellow!("warning:")
+                    )
+                );
+                assert_eq!(output[1], "        (var-set p1 p)");
+                assert_eq!(output[2], "                    ^");
+                assert_eq!(
+                    output[3],
+                    format!(
+                        "checker:5:29: {} source of untrusted input here",
+                        blue!("note:")
+                    )
+                );
+                assert_eq!(
+                    output[4],
+                    "(define-private (my-func-p (p principal) (b bool))"
+                );
+                assert_eq!(output[5], "                            ^");
+            }
+            _ => panic!("Expected successful interpretation"),
+        };
+    }
+
+    #[test]
+    fn allow_unchecked_bool_in_public_function() {
+        let mut settings = SessionSettings::default();
+        settings.repl_settings.analysis.passes = vec![Pass::CheckChecker];
+        let mut session = Session::new(settings);
+        let snippet = "
+(define-data-var myvar bool false)
+(define-public (tainted-var-set (b bool))
+    (ok (var-set myvar b))
+)
+"
+        .to_string();
+        match session.formatted_interpretation(
+            snippet,
+            Some("checker".to_string()),
+            false,
+            None,
+            None,
+        ) {
+            Ok((_, result)) => {
+                assert_eq!(result.diagnostics.len(), 0);
+            }
+            _ => panic!("Expected successful interpretation"),
+        };
+    }
 
     #[test]
     fn define_public() {
