@@ -484,7 +484,7 @@ pub async fn start_observer_commands_handler(
                                             ) {
                                                 Ok(proof) => {
                                                     proofs.insert(
-                                                        transaction.transaction_identifier,
+                                                        &transaction.transaction_identifier,
                                                         proof,
                                                     );
                                                 }
