@@ -3,6 +3,7 @@ use crate::archive;
 use crate::block::DigestingCommand;
 use crate::config::Config;
 
+use chainhook_db::config::ConfigFile;
 use chainhook_event_observer::chainhooks::bitcoin::{
     handle_bitcoin_hook_action, BitcoinChainhookOccurrence, BitcoinTriggerChainhook,
 };
@@ -74,6 +75,14 @@ struct StartNode {
         conflicts_with = "devnet"
     )]
     pub mainnet: bool,
+    /// Load config file path
+    #[clap(
+        long = "config-path",
+        conflicts_with = "mainnet",
+        conflicts_with = "testnet",
+        conflicts_with = "devnet"
+    )]
+    pub config_path: Option<String>,
 }
 
 #[derive(Parser, PartialEq, Clone, Debug)]
@@ -117,19 +126,26 @@ pub fn main() {
 
     match opts.command {
         Command::Start(cmd) => {
-            let network = match (cmd.devnet, cmd.testnet, cmd.mainnet) {
-                (true, false, false) => StacksNetwork::Devnet,
-                (false, true, false) => StacksNetwork::Testnet,
-                (false, false, true) => StacksNetwork::Mainnet,
+            let config = match (cmd.devnet, cmd.testnet, cmd.mainnet, cmd.config_path) {
+                (true, false, false, _) => Config::devnet_default(),
+                (false, true, false, _) => Config::testnet_default(),
+                (false, false, true, _) => Config::mainnet_default(),
+                (false, false, false, Some(config_path)) => {
+                    match Config::from_file_path(&config_path) {
+                        Ok(config) => config,
+                        Err(e) => {
+                            println!("{e}");
+                            process::exit(1);
+                        }
+                    }
+                }
                 _ => {
-                    println!(
-                        "{}",
-                        format_err!("network flag required (devnet, testnet, mainnet)")
-                    );
+                    println!("network flag required (devnet, testnet, mainnet)");
                     process::exit(1);
                 }
             };
-            start_node(&network);
+            println!("{:?}", config);
+            start_node(config);
         }
         Command::Replay(cmd) => {
             let network = match (cmd.devnet, cmd.testnet, cmd.mainnet) {
@@ -191,9 +207,9 @@ pub fn start_replay_flow(network: &StacksNetwork, bitcoind_rpc_url: Url, apply: 
     let bitcoin_port = bitcoind_rpc_url
         .port()
         .expect("unable to retrieve port from bitcoin_url");
-    config.indexer.bitcoin_node_rpc_url = format!("http://{}:{}", bitcoin_host, bitcoin_port);
-    config.indexer.bitcoin_node_rpc_username = bitcoind_rpc_url.username().to_string();
-    config.indexer.bitcoin_node_rpc_password = bitcoind_rpc_url
+    config.network.bitcoin_node_rpc_url = format!("http://{}:{}", bitcoin_host, bitcoin_port);
+    config.network.bitcoin_node_rpc_username = bitcoind_rpc_url.username().to_string();
+    config.network.bitcoin_node_rpc_password = bitcoind_rpc_url
         .password()
         .expect("unable to retrieve password from bitcoin_url")
         .to_string();
@@ -258,9 +274,9 @@ pub fn start_replay_flow(network: &StacksNetwork, bitcoind_rpc_url: Url, apply: 
         initial_hook_formation: None,
         ingestion_port: DEFAULT_INGESTION_PORT,
         control_port: DEFAULT_CONTROL_PORT,
-        bitcoin_node_username: config.indexer.bitcoin_node_rpc_username.clone(),
-        bitcoin_node_password: config.indexer.bitcoin_node_rpc_password.clone(),
-        bitcoin_node_rpc_host: config.indexer.bitcoin_node_rpc_url.clone(),
+        bitcoin_node_username: config.network.bitcoin_node_rpc_username.clone(),
+        bitcoin_node_password: config.network.bitcoin_node_rpc_password.clone(),
+        bitcoin_node_rpc_host: config.network.bitcoin_node_rpc_url.clone(),
         bitcoin_node_rpc_port: bitcoin_port,
         stacks_node_rpc_host: "http://localhost".into(),
         stacks_node_rpc_port: 20443,
@@ -296,10 +312,10 @@ pub fn start_replay_flow(network: &StacksNetwork, bitcoind_rpc_url: Url, apply: 
     };
 
     let auth = Auth::UserPass(
-        config.indexer.bitcoin_node_rpc_username.clone(),
-        config.indexer.bitcoin_node_rpc_password.clone(),
+        config.network.bitcoin_node_rpc_username.clone(),
+        config.network.bitcoin_node_rpc_password.clone(),
     );
-    let bitcoin_rpc = Client::new(&config.indexer.bitcoin_node_rpc_url, auth).unwrap();
+    let bitcoin_rpc = Client::new(&config.network.bitcoin_node_rpc_url, auth).unwrap();
 
     loop {
         let event = match observer_event_rx.recv() {
@@ -504,7 +520,7 @@ pub fn start_replay_flow(network: &StacksNetwork, bitcoind_rpc_url: Url, apply: 
                                     };
 
                                     let block = match bitcoin_rpc.get_block(&block_hash) {
-                                        Ok(block) => build_block(block, cursor, &config.indexer),
+                                        Ok(block) => build_block(block, cursor, &config.network),
                                         Err(e) => {
                                             error!("unable to retrieve block hash {}", cursor);
                                             continue;
@@ -611,7 +627,7 @@ pub fn start_replay_flow(network: &StacksNetwork, bitcoind_rpc_url: Url, apply: 
     }
 }
 
-pub fn start_node(network: &StacksNetwork) {
+pub fn start_node(mut config: Config) {
     let (digestion_tx, digestion_rx) = channel();
     let (observer_event_tx, observer_event_rx) = channel();
     let (observer_command_tx, observer_command_rx) = channel();
@@ -624,13 +640,6 @@ pub fn start_node(network: &StacksNetwork) {
             .expect("Unable to terminate service");
     })
     .expect("Error setting Ctrl-C handler");
-
-    let mut config = match network {
-        StacksNetwork::Devnet => Config::devnet_default(),
-        StacksNetwork::Testnet => Config::testnet_default(),
-        StacksNetwork::Mainnet => Config::mainnet_default(),
-        _ => unreachable!(),
-    };
 
     if config.is_initial_ingestion_required() {
         // Download default tsv.
@@ -692,8 +701,8 @@ pub fn start_node(network: &StacksNetwork) {
         initial_hook_formation: None,
         ingestion_port: DEFAULT_INGESTION_PORT,
         control_port: DEFAULT_CONTROL_PORT,
-        bitcoin_node_username: config.indexer.bitcoin_node_rpc_username.clone(),
-        bitcoin_node_password: config.indexer.bitcoin_node_rpc_password.clone(),
+        bitcoin_node_username: config.network.bitcoin_node_rpc_username.clone(),
+        bitcoin_node_password: config.network.bitcoin_node_rpc_password.clone(),
         bitcoin_node_rpc_host: "http://localhost".into(),
         bitcoin_node_rpc_port: 18443,
         stacks_node_rpc_host: "http://localhost".into(),
