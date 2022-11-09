@@ -206,7 +206,7 @@ pub fn start_replay_flow(network: &StacksNetwork, bitcoind_rpc_url: Url, apply: 
             destination_path.push("stacks-node-events.tsv");
             // Download archive if not already present in cache
             if !destination_path.exists() {
-                info!("Downloading {}...", url);
+                info!("Downloading {}", url);
                 match hiro_system_kit::nestable_block_on(archive::download_tsv_file(&config)) {
                     Ok(_) => {}
                     Err(e) => {
@@ -234,7 +234,7 @@ pub fn start_replay_flow(network: &StacksNetwork, bitcoind_rpc_url: Url, apply: 
         }
     } else {
         info!(
-            "Streaming blocks from stacks-node {}...",
+            "Streaming blocks from stacks-node {}",
             config.expected_stacks_node_event_source()
         );
     }
@@ -326,8 +326,8 @@ pub fn start_replay_flow(network: &StacksNetwork, bitcoind_rpc_url: Url, apply: 
                         let end_block = stacks_hook.end_block.unwrap_or(tip_height); // TODO(lgalabru): handle STX hooks and genesis block :s
 
                         info!(
-                            "Processing Stacks chainhook {}, will scan blocks [{}; {}]...",
-                            stacks_hook.uuid, start_block, end_block
+                            "Processing Stacks chainhook {}, will scan blocks [{}; {}]  (apply = {})",
+                            stacks_hook.uuid, start_block, end_block, apply
                         );
                         let mut total_hits = vec![];
                         for cursor in start_block..=end_block {
@@ -431,8 +431,8 @@ pub fn start_replay_flow(network: &StacksNetwork, bitcoind_rpc_url: Url, apply: 
                         let end_block = bitcoin_hook.end_block.unwrap_or(tip_height);
 
                         info!(
-                            "Processing Bitcoin chainhook {}, will scan blocks [{}; {}]...",
-                            bitcoin_hook.uuid, start_block, end_block
+                            "Processing Bitcoin chainhook {}, will scan blocks [{}; {}] (apply = {})",
+                            bitcoin_hook.uuid, start_block, end_block, apply
                         );
 
                         let mut total_hits = vec![];
@@ -640,7 +640,7 @@ pub fn start_node(network: &StacksNetwork) {
             destination_path.push("stacks-node-events.tsv");
             // Download archive if not already present in cache
             if !destination_path.exists() {
-                info!("Downloading {}...", url);
+                info!("Downloading {}", url);
                 match hiro_system_kit::nestable_block_on(archive::download_tsv_file(&config)) {
                     Ok(_) => {}
                     Err(e) => {
@@ -668,7 +668,7 @@ pub fn start_node(network: &StacksNetwork) {
         }
     } else {
         info!(
-            "Streaming blocks from stacks-node {}...",
+            "Streaming blocks from stacks-node {}",
             config.expected_stacks_node_event_source()
         );
     }
@@ -754,7 +754,7 @@ pub fn start_node(network: &StacksNetwork) {
                         let end_block = stacks_hook.end_block.unwrap_or(tip_height); // TODO(lgalabru): handle STX hooks and genesis block :s
 
                         info!(
-                            "Processing Stacks chainhook {}, will scan blocks [{}; {}]...",
+                            "Processing Stacks chainhook {}, will scan blocks [{}; {}]",
                             stacks_hook.uuid, start_block, end_block
                         );
                         let mut total_hits = 0;

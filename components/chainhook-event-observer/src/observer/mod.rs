@@ -11,8 +11,8 @@ use crate::indexer::{self, Indexer, IndexerConfig};
 use bitcoincore_rpc::bitcoin::{BlockHash, Txid};
 use bitcoincore_rpc::{Auth, Client, RpcApi};
 use chainhook_types::{
-    BitcoinChainEvent, BitcoinNetwork, StacksChainEvent, StacksNetwork, StacksTransactionData,
-    TransactionIdentifier,
+    BitcoinChainEvent, BitcoinNetwork, BlockIdentifier, StacksChainEvent, StacksNetwork,
+    StacksTransactionData, TransactionIdentifier,
 };
 use clarity_repl::clarity::util::hash::bytes_to_hex;
 use hiro_system_kit;
@@ -351,6 +351,26 @@ pub async fn start_event_observer(
     .await
 }
 
+pub fn get_bitcoin_proof(
+    bitcoin_client_rpc: &Client,
+    transaction_identifier: &TransactionIdentifier,
+    block_identifier: &BlockIdentifier,
+) -> Result<String, String> {
+    let txid = Txid::from_str(&transaction_identifier.hash[2..]).expect("unable to build txid");
+    let block_hash =
+        BlockHash::from_str(&block_identifier.hash[2..]).expect("unable to build block_hash");
+
+    let res = bitcoin_client_rpc.get_tx_out_proof(&vec![txid], Some(&block_hash));
+    match res {
+        Ok(proof) => Ok(format!("0x{}", bytes_to_hex(&proof))),
+        Err(e) => Err(format!(
+            "failed collecting proof for transaction {}: {}",
+            transaction_identifier.hash,
+            e.to_string()
+        )),
+    }
+}
+
 pub async fn start_observer_commands_handler(
     config: EventObserverConfig,
     chainhook_store: Arc<RwLock<ChainhookStore>>,
@@ -435,6 +455,18 @@ pub async fn start_observer_commands_handler(
                                 }
                             }
 
+                            let bitcoin_client_rpc = Client::new(
+                                &format!(
+                                    "{}:{}",
+                                    config.bitcoin_node_rpc_host, config.bitcoin_node_rpc_port
+                                ),
+                                Auth::UserPass(
+                                    config.bitcoin_node_username.to_string(),
+                                    config.bitcoin_node_password.to_string(),
+                                ),
+                            )
+                            .expect("unable to build http client");
+
                             let mut proofs = HashMap::new();
                             for hook_to_trigger in chainhooks_to_trigger.iter() {
                                 for (transactions, block) in hook_to_trigger.apply.iter() {
@@ -445,49 +477,20 @@ pub async fn start_observer_commands_handler(
                                                 "collecting proof for transaction {}",
                                                 transaction.transaction_identifier.hash
                                             );
-
-                                            let rpc = Client::new(
-                                                &format!(
-                                                    "{}:{}",
-                                                    config.bitcoin_node_rpc_host,
-                                                    config.bitcoin_node_rpc_port
-                                                ),
-                                                Auth::UserPass(
-                                                    config.bitcoin_node_username.to_string(),
-                                                    config.bitcoin_node_password.to_string(),
-                                                ),
-                                            )
-                                            .expect("unable to build http client");
-                                            let txid = Txid::from_str(
-                                                &transaction.transaction_identifier.hash[2..],
-                                            )
-                                            .expect("unable to build txid");
-                                            let block_hash = BlockHash::from_str(
-                                                &block.block_identifier.hash[2..],
-                                            )
-                                            .expect("unable to build block_hash");
-
-                                            info!(
-                                                "collecting proof for transaction {} / {}",
-                                                txid, block_hash
-                                            );
-
-                                            let res = rpc
-                                                .get_tx_out_proof(&vec![txid], Some(&block_hash));
-                                            if let Ok(proof) = res {
-                                                info!(
-                                                    "succeeded collecting proof for transaction {}",
-                                                    transaction.transaction_identifier.hash
-                                                );
-                                                proofs.insert(
-                                                    &transaction.transaction_identifier,
-                                                    bytes_to_hex(&proof),
-                                                );
-                                            } else {
-                                                info!(
-                                                    "failed collecting proof for transaction {}",
-                                                    transaction.transaction_identifier.hash
-                                                );
+                                            match get_bitcoin_proof(
+                                                &bitcoin_client_rpc,
+                                                &transaction.transaction_identifier,
+                                                &block.block_identifier,
+                                            ) {
+                                                Ok(proof) => {
+                                                    proofs.insert(
+                                                        transaction.transaction_identifier,
+                                                        proof,
+                                                    );
+                                                }
+                                                Err(e) => {
+                                                    error!("{e}");
+                                                }
                                             }
                                         }
                                     }

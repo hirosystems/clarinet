@@ -180,7 +180,7 @@ pub fn start(
             let _ = digestion_tx.send(DigestingCommand::DigestSeedBlock(cursor.clone()));
             cursor = parent_block_identifier.clone();
         }
-        info!("{} Stacks blocks queued for processing...", tip_height);
+        info!("{} Stacks blocks queued for processing", tip_height);
 
         let _ = digestion_tx.send(DigestingCommand::GarbageCollect);
         Ok(selected_tip)

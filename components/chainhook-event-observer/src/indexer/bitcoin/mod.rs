@@ -78,7 +78,12 @@ pub fn build_block(
                 },
                 script_sig: to_hex(input.script_sig.as_bytes()),
                 sequence: input.sequence.0,
-                witness: input.witness.to_vec(),
+                witness: input
+                    .witness
+                    .to_vec()
+                    .iter()
+                    .map(|w| format!("0x{}", to_hex(w)))
+                    .collect::<Vec<_>>(),
             })
         }
 

@@ -5,8 +5,8 @@ use chainhook_types::{BitcoinNetwork, StacksNetwork};
 pub use file::ConfigFile;
 use std::path::PathBuf;
 
-const DEFAULT_MAINNET_TSV_ARCHIVE: &str = "https://storage.googleapis.com/hirosystems-archive/mainnet/api/mainnet-blockchain-api-5.0.0-latest.tar.gz";
-const DEFAULT_TESTNET_TSV_ARCHIVE: &str = "https://storage.googleapis.com/hirosystems-archive/testnet/api/testnet-blockchain-api-5.0.0-latest.tar.gz";
+const DEFAULT_MAINNET_TSV_ARCHIVE: &str = "https://storage.googleapis.com/hirosystems-archive/mainnet/api/mainnet-blockchain-api-5.0.3-latest.tar.gz";
+const DEFAULT_TESTNET_TSV_ARCHIVE: &str = "https://storage.googleapis.com/hirosystems-archive/testnet/api/testnet-blockchain-api-5.0.3-latest.tar.gz";
 
 #[derive(Clone, Debug)]
 pub struct Config {
