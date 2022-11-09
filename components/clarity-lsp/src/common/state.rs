@@ -9,14 +9,65 @@ use clarinet_files::ProjectManifest;
 use clarinet_files::{FileAccessor, FileLocation};
 use clarity_repl::analysis::ast_dependency_detector::DependencySet;
 use clarity_repl::clarity::analysis::ContractAnalysis;
+use clarity_repl::clarity::ast::build_ast;
 use clarity_repl::clarity::diagnostic::{Diagnostic as ClarityDiagnostic, Level as ClarityLevel};
 use clarity_repl::clarity::stacks_common::types::StacksEpochId;
 use clarity_repl::clarity::vm::ast::ContractAST;
 use clarity_repl::clarity::vm::types::QualifiedContractIdentifier;
 use clarity_repl::clarity::vm::EvaluationResult;
+use clarity_repl::clarity::{ClarityVersion, SymbolicExpression};
 use lsp_types::MessageType;
 use std::borrow::BorrowMut;
 use std::collections::{HashMap, HashSet};
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct ActiveContractState {
+    pub clarity_version: ClarityVersion,
+    pub expressions: Option<Vec<SymbolicExpression>>,
+    pub diagnostic: Option<ClarityDiagnostic>,
+}
+
+impl ActiveContractState {
+    pub fn new(clarity_version: ClarityVersion, source: &str) -> Self {
+        match build_ast(
+            &QualifiedContractIdentifier::transient(),
+            source,
+            &mut (),
+            clarity_version,
+            StacksEpochId::Epoch21,
+        ) {
+            Ok(ast) => ActiveContractState {
+                clarity_version,
+                expressions: Some(ast.expressions),
+                diagnostic: None,
+            },
+            Err(err) => ActiveContractState {
+                clarity_version,
+                expressions: None,
+                diagnostic: Some(err.diagnostic),
+            },
+        }
+    }
+
+    pub fn update(&mut self, source: &str) {
+        match build_ast(
+            &QualifiedContractIdentifier::transient(),
+            source,
+            &mut (),
+            self.clarity_version,
+            StacksEpochId::Epoch21,
+        ) {
+            Ok(ast) => {
+                self.expressions = Some(ast.expressions);
+                self.diagnostic = None;
+            }
+            Err(err) => {
+                self.expressions = None;
+                self.diagnostic = Some(err.diagnostic);
+            }
+        };
+    }
+}
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct ContractState {
@@ -84,6 +135,7 @@ pub struct ContractMetadata {
 pub struct EditorState {
     pub protocols: HashMap<FileLocation, ProtocolState>,
     pub contracts_lookup: HashMap<FileLocation, ContractMetadata>,
+    pub active_contracts: HashMap<FileLocation, ActiveContractState>,
     pub native_functions: Vec<CompletionItem>,
 }
 
@@ -92,6 +144,7 @@ impl EditorState {
         EditorState {
             protocols: HashMap::new(),
             contracts_lookup: HashMap::new(),
+            active_contracts: HashMap::new(),
             native_functions: utils::build_default_native_keywords_list(),
         }
     }
@@ -239,6 +292,30 @@ impl EditorState {
         };
 
         (contracts, tldr)
+    }
+
+    pub fn insert_active_contract(
+        &mut self,
+        contract_location: FileLocation,
+        clarity_version: ClarityVersion,
+        source: &str,
+    ) {
+        let contract = ActiveContractState::new(clarity_version, source);
+        self.active_contracts.insert(contract_location, contract);
+    }
+
+    pub fn update_contract(
+        &mut self,
+        contract_location: &FileLocation,
+        source: &str,
+    ) -> Result<ActiveContractState, String> {
+        let contract_state = self
+            .active_contracts
+            .get_mut(contract_location)
+            .ok_or("contract not in active_contracts")?;
+
+        contract_state.update(source);
+        Ok(contract_state.to_owned())
     }
 }
 

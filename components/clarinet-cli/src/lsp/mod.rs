@@ -170,7 +170,7 @@ pub fn clarity_diagnostic_to_tower_lsp_type(
 #[test]
 fn test_opening_counter_contract_should_return_fresh_analysis() {
     use clarinet_files::FileLocation;
-    use clarity_lsp::backend::{LspNotification, LspResponse};
+    use clarity_lsp::backend::{LspNotification, LspNotificationResponse};
     use crossbeam_channel::unbounded;
     use std::sync::mpsc::channel;
 
@@ -205,13 +205,13 @@ fn test_opening_counter_contract_should_return_fresh_analysis() {
     // re-opening this contract should not trigger a full analysis
     let _ = notification_tx.send(LspNotification::ContractOpened(contract_location));
     let response = response_rx.recv().expect("Unable to get response");
-    assert_eq!(response, LspResponse::default());
+    assert_eq!(response, LspNotificationResponse::default());
 }
 
 #[test]
 fn test_opening_counter_manifest_should_return_fresh_analysis() {
     use clarinet_files::FileLocation;
-    use clarity_lsp::backend::{LspNotification, LspResponse};
+    use clarity_lsp::backend::{LspNotification, LspNotificationResponse};
     use crossbeam_channel::unbounded;
     use std::sync::mpsc::channel;
 
@@ -245,7 +245,7 @@ fn test_opening_counter_manifest_should_return_fresh_analysis() {
     // re-opening this manifest should not trigger a full analysis
     let _ = notification_tx.send(LspNotification::ManifestOpened(manifest_location));
     let response = response_rx.recv().expect("Unable to get response");
-    assert_eq!(response, LspResponse::default());
+    assert_eq!(response, LspNotificationResponse::default());
 }
 
 #[test]

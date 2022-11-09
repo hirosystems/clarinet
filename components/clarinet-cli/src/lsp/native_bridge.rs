@@ -2,7 +2,7 @@ use super::utils;
 
 use crate::lsp::{clarity_diagnostics_to_tower_lsp_type, completion_item_type_to_tower_lsp_type};
 use clarity_lsp::backend::{
-    process_notification, process_request, LspNotification, LspRequest, LspResponse,
+    process_notification, process_request, LspNotification, LspNotificationResponse, LspRequest,
 };
 use clarity_lsp::state::EditorState;
 use crossbeam_channel::{Receiver as MultiplexableReceiver, Select, Sender as MultiplexableSender};
@@ -35,7 +35,7 @@ use tower_lsp::{async_trait, Client, LanguageServer};
 pub async fn start_language_server(
     notification_rx: MultiplexableReceiver<LspNotification>,
     request_rx: MultiplexableReceiver<LspRequest>,
-    response_tx: Sender<LspResponse>,
+    response_tx: Sender<LspNotificationResponse>,
 ) {
     let mut editor_state = EditorState::new();
 
@@ -76,7 +76,7 @@ pub struct LspNativeBridge {
     client: Client,
     request_tx: Arc<Mutex<MultiplexableSender<LspRequest>>>,
     notification_tx: Arc<Mutex<MultiplexableSender<LspNotification>>>,
-    response_rx: Arc<Mutex<Receiver<LspResponse>>>,
+    response_rx: Arc<Mutex<Receiver<LspNotificationResponse>>>,
 }
 
 impl LspNativeBridge {
@@ -84,7 +84,7 @@ impl LspNativeBridge {
         client: Client,
         request_tx: MultiplexableSender<LspRequest>,
         notification_tx: MultiplexableSender<LspNotification>,
-        response_rx: Receiver<LspResponse>,
+        response_rx: Receiver<LspNotificationResponse>,
     ) -> Self {
         Self {
             client,
@@ -218,14 +218,14 @@ impl LanguageServer for LspNativeBridge {
     async fn did_save(&self, params: DidSaveTextDocumentParams) {
         if let Some(contract_location) = utils::get_contract_location(&params.text_document.uri) {
             let _ = match self.notification_tx.lock() {
-                Ok(tx) => tx.send(LspNotification::ContractChanged(contract_location)),
+                Ok(tx) => tx.send(LspNotification::ContractSaved(contract_location)),
                 Err(_) => return,
             };
         } else if let Some(manifest_location) =
             utils::get_manifest_location(&params.text_document.uri)
         {
             let _ = match self.notification_tx.lock() {
-                Ok(tx) => tx.send(LspNotification::ManifestChanged(manifest_location)),
+                Ok(tx) => tx.send(LspNotification::ManifestSaved(manifest_location)),
                 Err(_) => return,
             };
         } else {

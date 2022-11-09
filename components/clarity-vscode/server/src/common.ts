@@ -22,7 +22,7 @@ export function initConnection(
   connection.onInitialize(() => {
     const capabilities: ServerCapabilities = {
       textDocumentSync: {
-        change: TextDocumentSyncKind.None,
+        change: TextDocumentSyncKind.Full,
         willSave: false,
         openClose: true,
         save: { includeText: false },
