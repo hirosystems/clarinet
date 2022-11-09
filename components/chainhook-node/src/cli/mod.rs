@@ -144,7 +144,6 @@ pub fn main() {
                     process::exit(1);
                 }
             };
-            println!("{:?}", config);
             start_node(config);
         }
         Command::Replay(cmd) => {
