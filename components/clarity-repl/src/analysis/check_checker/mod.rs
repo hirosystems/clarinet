@@ -8,7 +8,7 @@ use clarity::vm::functions::define::DefineFunctions;
 use clarity::vm::functions::NativeFunctions;
 use clarity::vm::representations::SymbolicExpressionType::*;
 use clarity::vm::representations::{Span, TraitDefinition};
-use clarity::vm::types::{TraitIdentifier, Value, TypeSignature};
+use clarity::vm::types::{TraitIdentifier, TypeSignature, Value};
 use clarity::vm::{ClarityName, ClarityVersion, SymbolicExpression};
 use std::collections::{HashMap, HashSet};
 use std::convert::TryFrom;
@@ -852,10 +852,10 @@ impl<'a> ASTVisitor<'a> for CheckChecker<'a, '_> {
     }
 }
 
-fn is_param_type_excluded_from_checked_requirement(param :&TypedVar) -> bool {
+fn is_param_type_excluded_from_checked_requirement(param: &TypedVar) -> bool {
     match TypeSignature::parse_type_repr(param.type_expr, &mut ()) {
         Ok(TypeSignature::BoolType) => true,
-        _ => false
+        _ => false,
     }
 }
 
