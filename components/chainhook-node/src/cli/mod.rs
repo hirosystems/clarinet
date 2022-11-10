@@ -102,8 +102,8 @@ struct ReplayConfig {
     )]
     pub mainnet: bool,
     /// Apply chainhook action (false by default)
-    #[clap(long = "apply")]
-    pub apply: bool,
+    #[clap(long = "apply-trigger")]
+    pub apply_trigger: bool,
     /// Bitcoind node url
     #[clap(long = "bitcoind-rpc-url")]
     pub bitcoind_rpc_url: String,
@@ -167,7 +167,7 @@ pub fn main() {
                     }
                 }
             };
-            start_replay_flow(&network, bitcoind_rpc_url, cmd.apply);
+            start_replay_flow(&network, bitcoind_rpc_url, cmd.apply_trigger);
         }
     }
 }
