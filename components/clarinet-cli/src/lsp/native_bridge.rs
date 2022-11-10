@@ -100,7 +100,7 @@ impl LanguageServer for LspNativeBridge {
                     TextDocumentSyncOptions {
                         open_close: Some(true),
                         change: Some(TextDocumentSyncKind::Full),
-                        will_save: Some(true),
+                        will_save: Some(false),
                         will_save_wait_until: Some(false),
                         save: Some(TextDocumentSyncSaveOptions::Supported(true)),
                     },
@@ -262,9 +262,24 @@ impl LanguageServer for LspNativeBridge {
         }
     }
 
-    async fn did_change(&self, _changes: DidChangeTextDocumentParams) {}
+    async fn did_change(&self, params: DidChangeTextDocumentParams) {
+        if let Some(contract_location) = utils::get_contract_location(&params.text_document.uri) {
+            if let Ok(tx) = self.notification_tx.lock() {
+                let _ = tx.send(LspNotification::ContractChanged(
+                    contract_location,
+                    params.content_changes[0].text.to_string(),
+                ));
+            };
+        }
+    }
 
-    async fn did_close(&self, _: DidCloseTextDocumentParams) {}
+    async fn did_close(&self, params: DidCloseTextDocumentParams) {
+        if let Some(contract_location) = utils::get_contract_location(&params.text_document.uri) {
+            if let Ok(tx) = self.notification_tx.lock() {
+                let _ = tx.send(LspNotification::ContractClosed(contract_location));
+            };
+        }
+    }
 }
 
 pub fn message_level_type_to_tower_lsp_type(
