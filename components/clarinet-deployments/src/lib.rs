@@ -31,7 +31,7 @@ use clarity_repl::clarity::vm::ExecutionResult;
 use clarity_repl::repl::session::BOOT_CONTRACTS_DATA;
 use clarity_repl::repl::Session;
 use clarity_repl::repl::SessionSettings;
-use std::collections::{BTreeMap, HashMap, VecDeque, BTreeSet};
+use std::collections::{BTreeMap, BTreeSet, HashMap, VecDeque};
 use types::ContractPublishSpecification;
 use types::DeploymentGenerationArtifacts;
 use types::RequirementPublishSpecification;
@@ -462,9 +462,7 @@ pub async fn generate_default_deployment(
                 };
 
             // Filter out boot contracts from requirement dependencies
-            ordered_contracts_ids.retain(|contract_id| {
-                !boot_contracts_ids.contains(contract_id)
-            });
+            ordered_contracts_ids.retain(|contract_id| !boot_contracts_ids.contains(contract_id));
 
             if network.is_simnet() {
                 for contract_id in ordered_contracts_ids.iter() {
