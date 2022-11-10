@@ -2,7 +2,6 @@ use super::DigestingCommand;
 use crate::config::Config;
 use chainhook_event_observer::indexer;
 use chainhook_event_observer::indexer::Indexer;
-use redis;
 use redis::Commands;
 use std::cmp::Ordering;
 use std::{collections::BinaryHeap, process, sync::mpsc::Receiver};
@@ -23,7 +22,7 @@ pub fn start(command_rx: Receiver<DigestingCommand>, config: &Config) -> Result<
     let mut job_queue: BinaryHeap<Job> = BinaryHeap::new();
     let redis_config = config.expected_redis_config();
     let client = redis::Client::open(redis_config.uri.clone()).unwrap();
-    let mut indexer = Indexer::new(config.indexer.clone());
+    let mut indexer = Indexer::new(config.network.clone());
 
     let mut con = match client.get_connection() {
         Ok(con) => con,

@@ -679,8 +679,9 @@ String.prototype.expectTuple = function () {
 };
 
 Array.prototype.expectSTXTransferEvent = function (amount, sender, recipient) {
-  for (const { stx_transfer_event } of this) {
+  for (const event of this) {
     try {
+      const { stx_transfer_event } = event;
       return {
         amount: stx_transfer_event.amount.expectInt(amount),
         sender: stx_transfer_event.sender.expectPrincipal(sender),
@@ -699,8 +700,9 @@ Array.prototype.expectFungibleTokenTransferEvent = function (
   recipient,
   assetId
 ) {
-  for (const { ft_transfer_event } of this) {
+  for (const event of this) {
     try {
+      const { ft_transfer_event } = event;
       if (!ft_transfer_event.asset_identifier.endsWith(assetId)) continue;
 
       return {
@@ -725,8 +727,9 @@ Array.prototype.expectFungibleTokenMintEvent = function (
   recipient,
   assetId
 ) {
-  for (const { ft_mint_event } of this) {
+  for (const event of this) {
     try {
+      const { ft_mint_event } = event;
       if (!ft_mint_event.asset_identifier.endsWith(assetId)) continue;
 
       return {
@@ -746,8 +749,9 @@ Array.prototype.expectFungibleTokenBurnEvent = function (
   sender,
   assetId
 ) {
-  for (const { ft_burn_event } of this) {
+  for (const event of this) {
     try {
+      const { ft_burn_event } = event;
       if (!ft_burn_event.asset_identifier.endsWith(assetId)) continue;
 
       return {
@@ -763,8 +767,9 @@ Array.prototype.expectFungibleTokenBurnEvent = function (
 };
 
 Array.prototype.expectPrintEvent = function (contractIdentifier, value) {
-  for (const { contract_event } of this) {
+  for (const event of this) {
     try {
+      const { contract_event } = event;
       if (!contract_event.topic.endsWith("print")) continue;
       if (!contract_event.value.endsWith(value)) continue;
 
@@ -791,8 +796,9 @@ Array.prototype.expectNonFungibleTokenTransferEvent = function (
   assetAddress,
   assetId
 ) {
-  for (const { nft_transfer_event } of this) {
+  for (const event of this) {
     try {
+      const { nft_transfer_event } = event;
       if (nft_transfer_event.value !== tokenId) continue;
       if (nft_transfer_event.asset_identifier !== `${assetAddress}::${assetId}`)
         continue;
@@ -816,8 +822,9 @@ Array.prototype.expectNonFungibleTokenMintEvent = function (
   assetAddress,
   assetId
 ) {
-  for (const { nft_mint_event } of this) {
+  for (const event of this) {
     try {
+      const { nft_mint_event } = event;
       if (nft_mint_event.value !== tokenId) continue;
       if (nft_mint_event.asset_identifier !== `${assetAddress}::${assetId}`)
         continue;
