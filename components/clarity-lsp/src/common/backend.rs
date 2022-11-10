@@ -188,8 +188,7 @@ pub async fn process_notification(
                 }
             };
 
-            // TODO(lgalabru): introduce partial analysis
-            // https://github.com/hirosystems/clarity-lsp/issues/98
+            // TODO(lgalabru): introduce partial analysis #604
             // We will rebuild the entire state, without trying any optimizations for now
             let mut protocol_state = ProtocolState::new();
             match build_state(&manifest_location, &mut protocol_state, file_accessor).await {
@@ -212,15 +211,12 @@ pub async fn process_notification(
             match editor_state
                 .try_write(|es| es.update_contract(&contract_location, &contract_source))?
             {
-                Ok(result) => {
-                    let aggregated_diagnostics = match result.diagnostic {
-                        Some(diagnostic) => vec![(contract_location, vec![diagnostic])],
-                        None => vec![],
-                    };
-                    return Ok(LspNotificationResponse {
-                        aggregated_diagnostics,
-                        notification: None,
-                    });
+                Ok(_result) => {
+                    // In case the source can not be parsed, the diagnostic could be sent but it would
+                    // remove the other diagnostic errors (types, check-checker, etc).
+                    // Let's address it as part of #604
+                    // let aggregated_diagnostics = vec![(contract_location, vec![diagnostic.unwrap()])],
+                    return Ok(LspNotificationResponse::default());
                 }
                 Err(err) => Ok(LspNotificationResponse::error(&err)),
             }

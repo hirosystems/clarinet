@@ -44,7 +44,7 @@ impl LspVscodeBridge {
         LspVscodeBridge {
             client_diagnostic_tx,
             _client_notification_tx,
-            backend_to_client_tx,
+            backend_to_client_tx: backend_to_client_tx.clone(),
             editor_state: EditorStateInput::new(
                 None,
                 Some(Arc::new(RwLock::new(EditorState::new()))),
@@ -54,13 +54,10 @@ impl LspVscodeBridge {
 
     #[wasm_bindgen(js_name=onNotification)]
     pub fn notification_handler(&self, method: String, js_params: JsValue) -> Promise {
-        let file_accessor: Box<dyn FileAccessor> = Box::new(WASMFileSystemAccessor::new(
-            self.backend_to_client_tx.clone(),
-        ));
-
-        match method.as_str() {
+        let command = match method.as_str() {
             Initialized::METHOD => {
                 log!("clarity extension initialized");
+                return Promise::resolve(&JsValue::FALSE);
             }
 
             DidOpenTextDocument::METHOD => {
@@ -70,42 +67,13 @@ impl LspVscodeBridge {
                 };
                 let uri = params.text_document.uri;
 
-                let command = if let Some(contract_location) = get_contract_location(&uri) {
+                if let Some(contract_location) = get_contract_location(&uri) {
                     LspNotification::ContractOpened(contract_location.clone())
                 } else if let Some(manifest_location) = get_manifest_location(&uri) {
                     LspNotification::ManifestOpened(manifest_location)
                 } else {
                     return Promise::reject(&JsValue::from_str("Unsupported file opened"));
-                };
-
-                let mut editor_state = self.editor_state.clone();
-                let send_diagnostic = self.client_diagnostic_tx.clone();
-
-                return future_to_promise(async move {
-                    let mut result =
-                        process_notification(command, &mut editor_state, Some(&file_accessor))
-                            .await;
-
-                    let mut aggregated_diagnostics = vec![];
-
-                    if let Ok(ref mut response) = result {
-                        aggregated_diagnostics.append(&mut response.aggregated_diagnostics);
-                    }
-
-                    for (location, mut diags) in aggregated_diagnostics.into_iter() {
-                        if let Ok(uri) = Url::parse(&location.to_string()) {
-                            let value = PublishDiagnosticsParams {
-                                uri,
-                                diagnostics: clarity_diagnostics_to_lsp_type(&mut diags),
-                                version: None,
-                            };
-
-                            send_diagnostic.call1(&JsValue::NULL, &encode_to_js(&value)?)?;
-                        }
-                    }
-
-                    Ok(JsValue::TRUE)
-                });
+                }
             }
 
             DidSaveTextDocument::METHOD => {
@@ -115,43 +83,13 @@ impl LspVscodeBridge {
                 };
                 let uri = &params.text_document.uri;
 
-                let command = if let Some(contract_location) = get_contract_location(uri) {
+                if let Some(contract_location) = get_contract_location(uri) {
                     LspNotification::ContractSaved(contract_location)
                 } else if let Some(manifest_location) = get_manifest_location(uri) {
                     LspNotification::ManifestSaved(manifest_location)
                 } else {
                     return Promise::reject(&JsValue::from_str("Unsupported file opened"));
-                };
-
-                let mut editor_state = self.editor_state.clone();
-                let send_diagnostic = self.client_diagnostic_tx.clone();
-
-                return future_to_promise(async move {
-                    let mut result =
-                        process_notification(command, &mut editor_state, Some(&file_accessor))
-                            .await;
-
-                    let mut aggregated_diagnostics = vec![];
-
-                    if let Ok(ref mut response) = result {
-                        aggregated_diagnostics.append(&mut response.aggregated_diagnostics);
-                    }
-
-                    for (location, mut diags) in aggregated_diagnostics.into_iter() {
-                        if let Ok(uri) = Url::parse(&location.to_string()) {
-                            send_diagnostic.call1(
-                                &JsValue::NULL,
-                                &encode_to_js(&PublishDiagnosticsParams {
-                                    uri,
-                                    diagnostics: clarity_diagnostics_to_lsp_type(&mut diags),
-                                    version: None,
-                                })?,
-                            )?;
-                        }
-                    }
-
-                    Ok(JsValue::TRUE)
-                });
+                }
             }
 
             DidChangeTextDocument::METHOD => {
@@ -161,38 +99,14 @@ impl LspVscodeBridge {
                 };
                 let uri = &params.text_document.uri;
 
-                let command = if let Some(contract_location) = get_contract_location(uri) {
+                if let Some(contract_location) = get_contract_location(uri) {
                     LspNotification::ContractChanged(
                         contract_location,
                         params.content_changes[0].text.to_string(),
                     )
                 } else {
                     return Promise::resolve(&JsValue::FALSE);
-                };
-
-                let mut editor_state = self.editor_state.clone();
-                let send_diagnostic = self.client_diagnostic_tx.clone();
-
-                return future_to_promise(async move {
-                    let result =
-                        process_notification(command, &mut editor_state, Some(&file_accessor))
-                            .await?;
-
-                    if let Some((location, diagnostic)) = result.aggregated_diagnostics.get(0) {
-                        if let Ok(uri) = Url::parse(&location.to_string()) {
-                            send_diagnostic.call1(
-                                &JsValue::NULL,
-                                &encode_to_js(&PublishDiagnosticsParams {
-                                    uri,
-                                    diagnostics: clarity_diagnostics_to_lsp_type(diagnostic),
-                                    version: None,
-                                })?,
-                            )?;
-                        }
-                    }
-
-                    Ok(JsValue::TRUE)
-                });
+                }
             }
 
             DidCloseTextDocument::METHOD => {
@@ -202,27 +116,50 @@ impl LspVscodeBridge {
                 };
                 let uri = &params.text_document.uri;
 
-                let command = if let Some(contract_location) = get_contract_location(uri) {
+                if let Some(contract_location) = get_contract_location(uri) {
                     LspNotification::ContractClosed(contract_location)
                 } else {
                     return Promise::resolve(&JsValue::FALSE);
-                };
-
-                let mut editor_state = self.editor_state.clone();
-
-                return future_to_promise(async move {
-                    process_notification(command, &mut editor_state, Some(&file_accessor)).await?;
-                    Ok(JsValue::TRUE)
-                });
+                }
             }
 
             _ => {
                 #[cfg(debug_assertions)]
                 log!("unexpected notification ({})", method);
+                return Promise::resolve(&JsValue::FALSE);
             }
-        }
+        };
 
-        return Promise::resolve(&JsValue::NULL);
+        let mut editor_state = self.editor_state.clone();
+        let send_diagnostic = self.client_diagnostic_tx.clone();
+        let file_accessor: Box<dyn FileAccessor> = Box::new(WASMFileSystemAccessor::new(
+            self.backend_to_client_tx.clone(),
+        ));
+
+        future_to_promise(async move {
+            let mut result =
+                process_notification(command, &mut editor_state, Some(&file_accessor)).await;
+
+            let mut aggregated_diagnostics = vec![];
+            if let Ok(ref mut response) = result {
+                aggregated_diagnostics.append(&mut response.aggregated_diagnostics);
+            }
+
+            for (location, mut diags) in aggregated_diagnostics.into_iter() {
+                if let Ok(uri) = Url::parse(&location.to_string()) {
+                    send_diagnostic.call1(
+                        &JsValue::NULL,
+                        &encode_to_js(&PublishDiagnosticsParams {
+                            uri,
+                            diagnostics: clarity_diagnostics_to_lsp_type(&mut diags),
+                            version: None,
+                        })?,
+                    )?;
+                }
+            }
+
+            Ok(JsValue::TRUE)
+        })
     }
 
     #[wasm_bindgen(js_name=onRequest)]
