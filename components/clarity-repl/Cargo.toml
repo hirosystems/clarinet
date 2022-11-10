@@ -1,6 +1,6 @@
 [package]
 name = "clarity-repl"
-version = "1.0.5"
+version = "1.0.6"
 description = "Clarity REPL"
 authors = [
     "Ludo Galabru <ludo@hiro.so>",
@@ -74,7 +74,13 @@ path = "src/bin.rs"
 
 [features]
 default = ["cli", "dap"]
-cli = ["pico-args", "rustyline", "prettytable-rs", "clarity/canonical", "clarity/developer-mode"]
+cli = [
+    "pico-args",
+    "rustyline",
+    "prettytable-rs",
+    "clarity/canonical",
+    "clarity/developer-mode",
+]
 dap = [
     "tokio",
     "tokio-util",
