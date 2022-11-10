@@ -38,7 +38,7 @@ where
     });
 
     let t = Table::new(rows)
-        .block(Block::default().title(format!("Broadcasting transactions to {}...", app.node_url)))
+        .block(Block::default().title(format!("Broadcasting transactions to {}", app.node_url)))
         .style(Style::default().fg(Color::White))
         .widths(&[
             Constraint::Length(3),

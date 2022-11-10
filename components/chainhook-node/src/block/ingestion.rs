@@ -1,7 +1,6 @@
 use crate::config::Config;
 use chainhook_event_observer::indexer::{self, Indexer};
 use chainhook_types::BlockIdentifier;
-use redis;
 use redis::Commands;
 use serde::Deserialize;
 use std::sync::mpsc::Sender;
@@ -94,7 +93,7 @@ pub fn start(
                 return Err(format!("Redis: {}", message.to_string()));
             }
         };
-        let _indexer = Indexer::new(stacks_thread_config.indexer.clone());
+        let _indexer = Indexer::new(stacks_thread_config.network.clone());
 
         // Retrieve the former highest block height stored
         let former_tip_height: u64 = con.get(&format!("stx:tip")).unwrap_or(0);
@@ -180,7 +179,7 @@ pub fn start(
             let _ = digestion_tx.send(DigestingCommand::DigestSeedBlock(cursor.clone()));
             cursor = parent_block_identifier.clone();
         }
-        info!("{} Stacks blocks queued for processing...", tip_height);
+        info!("{} Stacks blocks queued for processing", tip_height);
 
         let _ = digestion_tx.send(DigestingCommand::GarbageCollect);
         Ok(selected_tip)

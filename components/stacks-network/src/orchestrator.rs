@@ -682,10 +682,10 @@ impl DevnetOrchestrator {
                         comment: "restarting".into(),
                     }));
 
-                    let _ = event_tx.send(DevnetEvent::debug("Killing containers...".into()));
+                    let _ = event_tx.send(DevnetEvent::debug("Killing containers".into()));
                     let _ = self.stop_containers().await;
 
-                    let _ = event_tx.send(DevnetEvent::debug("Restarting containers...".into()));
+                    let _ = event_tx.send(DevnetEvent::debug("Restarting containers".into()));
                     let (bitcoin_node_c_id, stacks_node_c_id) = self
                         .start_containers(boot_index)
                         .await
@@ -2296,7 +2296,7 @@ events_keys = ["*"]
             let _ = docker
                 .kill_container(bitcoin_explorer_container_id, options.clone())
                 .await;
-            println!("Terminating bitcoin-explorer...");
+            println!("Terminating bitcoin-explorer");
             let _ = docker.remove_container(bitcoin_explorer_container_id, None);
         }
 
@@ -2304,7 +2304,7 @@ events_keys = ["*"]
             let _ = docker
                 .kill_container(stacks_explorer_container_id, options.clone())
                 .await;
-            println!("Terminating stacks-explorer...");
+            println!("Terminating stacks-explorer");
             let _ = docker.remove_container(stacks_explorer_container_id, None);
         }
 
@@ -2312,7 +2312,7 @@ events_keys = ["*"]
             let _ = docker
                 .kill_container(bitcoin_node_container_id, options.clone())
                 .await;
-            println!("Terminating bitcoin-node...");
+            println!("Terminating bitcoin-node");
             let _ = docker.remove_container(bitcoin_node_container_id, None);
         }
 
@@ -2320,7 +2320,7 @@ events_keys = ["*"]
             let _ = docker
                 .kill_container(stacks_api_container_id, options.clone())
                 .await;
-            println!("Terminating stacks-api...");
+            println!("Terminating stacks-api");
             let _ = docker.remove_container(stacks_api_container_id, None);
         }
 
@@ -2328,7 +2328,7 @@ events_keys = ["*"]
             let _ = docker
                 .kill_container(postgres_container_id, options.clone())
                 .await;
-            println!("Terminating postgres...");
+            println!("Terminating postgres");
             let _ = docker.remove_container(postgres_container_id, None);
         }
 
@@ -2336,7 +2336,7 @@ events_keys = ["*"]
             let _ = docker
                 .kill_container(stacks_node_container_id, options.clone())
                 .await;
-            println!("Terminating stacks-node...");
+            println!("Terminating stacks-node");
             let _ = docker.remove_container(stacks_node_container_id, None);
         }
 
@@ -2344,7 +2344,7 @@ events_keys = ["*"]
             let _ = docker
                 .kill_container(subnet_node_container_id, options.clone())
                 .await;
-            println!("Terminating subnet-node...");
+            println!("Terminating subnet-node");
             let _ = docker.remove_container(subnet_node_container_id, None);
         }
 
@@ -2352,12 +2352,12 @@ events_keys = ["*"]
             let _ = docker
                 .kill_container(subnet_api_container_id, options)
                 .await;
-            println!("Terminating subnet-api...");
+            println!("Terminating subnet-api");
             let _ = docker.remove_container(subnet_api_container_id, None);
         }
 
         // Prune network
-        println!("Pruning network and containers...");
+        println!("Pruning network and containers");
         self.prune().await;
         if let Some(ref tx) = self.termination_success_tx {
             let _ = tx.send(true);
