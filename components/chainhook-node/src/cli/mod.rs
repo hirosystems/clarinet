@@ -3,7 +3,6 @@ use crate::archive;
 use crate::block::DigestingCommand;
 use crate::config::Config;
 
-use chainhook_db::config::ConfigFile;
 use chainhook_event_observer::chainhooks::bitcoin::{
     handle_bitcoin_hook_action, BitcoinChainhookOccurrence, BitcoinTriggerChainhook,
 };
@@ -87,12 +86,6 @@ struct StartNode {
 
 #[derive(Parser, PartialEq, Clone, Debug)]
 struct ReplayConfig {
-    /// Target Devnet network
-    #[clap(
-        long = "devnet",
-        conflicts_with = "testnet",
-        conflicts_with = "mainnet"
-    )]
     pub devnet: bool,
     /// Target Testnet network
     #[clap(
@@ -108,11 +101,12 @@ struct ReplayConfig {
         conflicts_with = "devnet"
     )]
     pub mainnet: bool,
+    /// Apply chainhook action (false by default)
+    #[clap(long = "apply")]
+    pub apply: bool,
     /// Bitcoind node url
     #[clap(long = "bitcoind-rpc-url")]
     pub bitcoind_rpc_url: String,
-    /// Apply chainhook action (false by default)
-    pub apply: bool,
 }
 
 pub fn main() {
@@ -147,14 +141,13 @@ pub fn main() {
             start_node(config);
         }
         Command::Replay(cmd) => {
-            let network = match (cmd.devnet, cmd.testnet, cmd.mainnet) {
-                (true, false, false) => StacksNetwork::Devnet,
-                (false, true, false) => StacksNetwork::Testnet,
-                (false, false, true) => StacksNetwork::Mainnet,
+            let network = match (cmd.testnet, cmd.mainnet) {
+                (true, false) => StacksNetwork::Testnet,
+                (false, true) => StacksNetwork::Mainnet,
                 _ => {
                     println!(
                         "{}",
-                        format_err!("network flag required (devnet, testnet, mainnet)")
+                        format_err!("network flag required (support --testnet, --mainnet)")
                     );
                     process::exit(1);
                 }
@@ -513,7 +506,11 @@ pub fn start_replay_flow(network: &StacksNetwork, bitcoind_rpc_url: Url, apply: 
                                     let block_hash = match bitcoin_rpc.get_block_hash(cursor) {
                                         Ok(block_hash) => block_hash,
                                         Err(e) => {
-                                            error!("unable to retrieve block hash {}", cursor);
+                                            error!(
+                                                "unable to retrieve block hash {}: {}",
+                                                cursor,
+                                                e.to_string()
+                                            );
                                             continue;
                                         }
                                     };
@@ -521,7 +518,11 @@ pub fn start_replay_flow(network: &StacksNetwork, bitcoind_rpc_url: Url, apply: 
                                     let block = match bitcoin_rpc.get_block(&block_hash) {
                                         Ok(block) => build_block(block, cursor, &config.network),
                                         Err(e) => {
-                                            error!("unable to retrieve block hash {}", cursor);
+                                            error!(
+                                                "unable to retrieve block {}: {}",
+                                                cursor,
+                                                e.to_string()
+                                            );
                                             continue;
                                         }
                                     };
