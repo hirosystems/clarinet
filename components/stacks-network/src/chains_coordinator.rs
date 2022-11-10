@@ -76,7 +76,7 @@ impl DevnetEventObserverConfig {
         deployment: DeploymentSpecification,
         chainhooks: HookFormation,
     ) -> Self {
-        info!("Checking contracts...");
+        info!("Checking contracts");
         let network_manifest = NetworkManifest::from_project_manifest_location(
             &manifest.location,
             &StacksNetwork::Devnet.get_networks(),

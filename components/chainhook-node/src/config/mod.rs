@@ -3,17 +3,19 @@ pub mod file;
 pub use chainhook_event_observer::indexer::IndexerConfig;
 use chainhook_types::{BitcoinNetwork, StacksNetwork};
 pub use file::ConfigFile;
+use std::fs::File;
+use std::io::{BufReader, Read};
 use std::path::PathBuf;
 
-const DEFAULT_MAINNET_TSV_ARCHIVE: &str = "https://storage.googleapis.com/hirosystems-archive/mainnet/api/mainnet-blockchain-api-5.0.0-latest.tar.gz";
-const DEFAULT_TESTNET_TSV_ARCHIVE: &str = "https://storage.googleapis.com/hirosystems-archive/testnet/api/testnet-blockchain-api-5.0.0-latest.tar.gz";
+const DEFAULT_MAINNET_TSV_ARCHIVE: &str = "https://storage.googleapis.com/hirosystems-archive/mainnet/api/mainnet-blockchain-api-latest.tar.gz";
+const DEFAULT_TESTNET_TSV_ARCHIVE: &str = "https://storage.googleapis.com/hirosystems-archive/testnet/api/testnet-blockchain-api-latest.tar.gz";
 
 #[derive(Clone, Debug)]
 pub struct Config {
     pub storage: StorageConfig,
     pub event_sources: Vec<EventSourceConfig>,
     pub chainhooks: ChainhooksConfig,
-    pub indexer: IndexerConfig,
+    pub network: IndexerConfig,
 }
 
 #[derive(Clone, Debug)]
@@ -61,6 +63,70 @@ pub struct ChainhooksConfig {
 }
 
 impl Config {
+    pub fn from_file_path(file_path: &str) -> Result<Config, String> {
+        let file = File::open(file_path)
+            .map_err(|e| format!("unable to read file {}\n{:?}", file_path, e))?;
+        let mut file_reader = BufReader::new(file);
+        let mut file_buffer = vec![];
+        file_reader
+            .read_to_end(&mut file_buffer)
+            .map_err(|e| format!("unable to read file {}\n{:?}", file_path, e))?;
+
+        let config_file: ConfigFile = match toml::from_slice(&file_buffer) {
+            Ok(s) => s,
+            Err(e) => {
+                return Err(format!("Config file malformatted {}", e.to_string()));
+            }
+        };
+        Config::from_config_file(config_file)
+    }
+
+    pub fn from_config_file(config_file: ConfigFile) -> Result<Config, String> {
+        let (stacks_network, bitcoin_network) = match config_file.network.mode.as_str() {
+            "devnet" => (StacksNetwork::Devnet, BitcoinNetwork::Regtest),
+            "testnet" => (StacksNetwork::Testnet, BitcoinNetwork::Testnet),
+            "mainnet" => (StacksNetwork::Mainnet, BitcoinNetwork::Mainnet),
+            _ => return Err("network.mode not supported".to_string()),
+        };
+
+        let config = Config {
+            storage: StorageConfig {
+                driver: StorageDriver::Redis(RedisConfig {
+                    uri: config_file.storage.redis_uri.to_string(),
+                }),
+                cache_path: "cache".into(),
+            },
+            event_sources: vec![EventSourceConfig::StacksNode(StacksNodeConfig {
+                host: config_file.network.stacks_node_rpc_url.to_string(),
+            })],
+            chainhooks: ChainhooksConfig {
+                max_stacks_registrations: config_file
+                    .chainhooks
+                    .max_stacks_registrations
+                    .unwrap_or(100),
+                max_bitcoin_registrations: config_file
+                    .chainhooks
+                    .max_bitcoin_registrations
+                    .unwrap_or(100),
+            },
+            network: IndexerConfig {
+                stacks_node_rpc_url: config_file.network.stacks_node_rpc_url.to_string(),
+                bitcoin_node_rpc_url: config_file.network.bitcoin_node_rpc_url.to_string(),
+                bitcoin_node_rpc_username: config_file
+                    .network
+                    .bitcoin_node_rpc_username
+                    .to_string(),
+                bitcoin_node_rpc_password: config_file
+                    .network
+                    .bitcoin_node_rpc_password
+                    .to_string(),
+                stacks_network,
+                bitcoin_network,
+            },
+        };
+        Ok(config)
+    }
+
     pub fn is_initial_ingestion_required(&self) -> bool {
         for source in self.event_sources.iter() {
             match source {
@@ -155,7 +221,7 @@ impl Config {
                 max_stacks_registrations: 50,
                 max_bitcoin_registrations: 50,
             },
-            indexer: IndexerConfig {
+            network: IndexerConfig {
                 stacks_node_rpc_url: "http://0.0.0.0:20443".into(),
                 bitcoin_node_rpc_url: "http://0.0.0.0:18443".into(),
                 bitcoin_node_rpc_username: "devnet".into(),
@@ -181,7 +247,7 @@ impl Config {
                 max_stacks_registrations: 10,
                 max_bitcoin_registrations: 10,
             },
-            indexer: IndexerConfig {
+            network: IndexerConfig {
                 stacks_node_rpc_url: "http://0.0.0.0:20443".into(),
                 bitcoin_node_rpc_url: "http://0.0.0.0:18443".into(),
                 bitcoin_node_rpc_username: "devnet".into(),
@@ -207,7 +273,7 @@ impl Config {
                 max_stacks_registrations: 10,
                 max_bitcoin_registrations: 10,
             },
-            indexer: IndexerConfig {
+            network: IndexerConfig {
                 stacks_node_rpc_url: "http://0.0.0.0:20443".into(),
                 bitcoin_node_rpc_url: "http://0.0.0.0:18443".into(),
                 bitcoin_node_rpc_username: "devnet".into(),

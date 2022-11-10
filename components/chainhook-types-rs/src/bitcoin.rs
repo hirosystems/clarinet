@@ -16,7 +16,7 @@ pub struct TxIn {
     /// Encodable/Decodable, as it is (de)serialized at the end of the full
     /// Transaction. It *is* (de)serialized with the rest of the TxIn in other
     /// (de)serialization routines.
-    pub witness: Vec<Vec<u8>>,
+    pub witness: Vec<String>,
 }
 
 /// A transaction output, which defines new coins to be created from old ones.

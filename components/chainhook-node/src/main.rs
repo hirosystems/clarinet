@@ -7,8 +7,10 @@ extern crate slog_scope;
 #[macro_use]
 extern crate hiro_system_kit;
 
-extern crate serde;
+#[macro_use]
 extern crate serde_derive;
+
+extern crate serde;
 extern crate slog;
 
 use slog_async;

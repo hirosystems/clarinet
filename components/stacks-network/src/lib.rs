@@ -131,7 +131,7 @@ pub async fn do_run_devnet(
         .expect("unable to retrieve join handle");
 
     if display_dashboard {
-        info!("Starting Devnet...");
+        info!("Starting Devnet");
         let moved_chains_coordinator_commands_tx = chains_coordinator_commands_tx.clone();
         let _ = ui::start_ui(
             devnet_events_tx,

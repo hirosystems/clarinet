@@ -153,7 +153,7 @@ pub fn serialize_bitcoin_payload_to_json<'a>(
                         "operations": transaction.operations,
                         "metadata": json!({
                             "inputs": transaction.metadata.inputs,
-                            "outputs": transaction.metadata.inputs,
+                            "outputs": transaction.metadata.outputs,
                             "stacks_operations": transaction.metadata.stacks_operations,
                             "proof": proofs.get(&transaction.transaction_identifier),
                         }),

@@ -16,8 +16,8 @@ hiro_system_kit = { package = "hiro-system-kit", path = "../../components/hiro-s
 
 chainhook_types = { package = "chainhook-types", path = "../chainhook-types-rs" }
 rocket = { version = "=0.5.0-rc.2", features = ["json"] }
-bitcoincore-rpc = "0.14.0"
-bitcoincore-rpc-json = "0.14.0"
+bitcoincore-rpc = "0.16.0"
+bitcoincore-rpc-json = "0.16.0"
 base64 = "0.13.0"
 reqwest = { version = "0.11", default-features = false, features = [
     "blocking",
