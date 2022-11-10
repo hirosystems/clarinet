@@ -693,7 +693,7 @@ pub fn main() {
                 };
 
                 if write_plan {
-                    let res = write_deployment(&deployment, &default_deployment_path, true);
+                    let res = write_deployment(&deployment, &default_deployment_path, false);
                     if let Err(message) = res {
                         println!("{}", format_err!(message));
                         process::exit(1);
