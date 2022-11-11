@@ -4,6 +4,7 @@ members = [
     "components/clarinet-deployments",
     "components/clarinet-files",
     "components/clarinet-utils",
+    "components/clarity-fmt",
     "components/clarity-lsp",
     "components/clarity-jupyter-kernel",
     "components/stacks-rpc-client",
