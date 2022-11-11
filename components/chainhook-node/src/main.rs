@@ -26,18 +26,21 @@ use slog_atomic::*;
 use std::sync::Mutex;
 
 fn main() {
-    let decorator = slog_term::TermDecorator::new().build();
-    let drain = Mutex::new(slog_term::FullFormat::new(decorator).build()).fuse();
-    let drain = slog_async::Async::new(drain).build().fuse();
-    let drain = AtomicSwitch::new(drain);
-
-    // Get a root logger that will log into a given drain.
-    //
-    // Note `o!` macro for more natural `OwnedKeyValue` sequence building.
-    let root = Logger::root(drain.fuse(), o!());
+    let logger = if cfg!(feature = "release") {
+        slog::Logger::root(
+            Mutex::new(slog_json::Json::default(std::io::stderr())).map(slog::Fuse),
+            slog::o!("version" => env!("CARGO_PKG_VERSION")),
+        )
+    } else {
+        let decorator = slog_term::TermDecorator::new().build();
+        let drain = Mutex::new(slog_term::FullFormat::new(decorator).build()).fuse();
+        let drain = slog_async::Async::new(drain).build().fuse();
+        let drain = AtomicSwitch::new(drain);
+        Logger::root(drain.fuse(), o!())
+    };
 
     // slog_stdlog uses the logger from slog_scope, so set a logger there
-    let _guard = slog_scope::set_global_logger(root);
+    let _guard = slog_scope::set_global_logger(logger);
 
     cli::main();
 }
