@@ -350,7 +350,7 @@ impl StacksBlockPool {
     pub fn process_microblocks(
         &mut self,
         microblocks: Vec<StacksMicroblockData>,
-    ) -> Option<StacksChainEvent> {
+    ) -> Result<Option<StacksChainEvent>, String> {
         info!("Start processing {} microblocks", microblocks.len());
 
         let mut previous_canonical_micro_fork = None;
@@ -501,7 +501,7 @@ impl StacksBlockPool {
 
         if micro_forks_updated.is_empty() {
             info!("Unable to process microblocks - inboxed for later");
-            return None;
+            return Ok(None);
         } else {
             info!("Microblocks successfully appended");
         }
@@ -509,9 +509,8 @@ impl StacksBlockPool {
         let anchor_block_updated = match anchor_block_updated {
             Some(anchor_block_updated) => anchor_block_updated,
             None => {
-                // Microblock was received before its anchorblock
-
-                return None;
+                info!("Microblock was received before its anchorblock");
+                return Ok(None);
             }
         };
 
@@ -552,7 +551,7 @@ impl StacksBlockPool {
             &previous_canonical_micro_fork,
         );
 
-        chain_event
+        Ok(chain_event)
     }
 
     // We got the confirmed canonical microblock trail,

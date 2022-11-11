@@ -67,7 +67,7 @@ pub struct NewMicroblockTrail {
     pub events: Vec<NewEvent>,
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Debug)]
 pub struct NewTransaction {
     pub txid: String,
     pub tx_index: usize,
@@ -115,69 +115,69 @@ pub struct NewEvent {
 }
 
 impl NewEvent {
-    pub fn into_chainhook_event(&self) -> StacksTransactionEvent {
+    pub fn into_chainhook_event(&self) -> Result<StacksTransactionEvent, String> {
         if let Some(ref event_data) = self.stx_mint_event {
             let data: STXMintEventData =
                 serde_json::from_value(event_data.clone()).expect("Unable to decode event_data");
-            return StacksTransactionEvent::STXMintEvent(data.clone());
+            return Ok(StacksTransactionEvent::STXMintEvent(data.clone()));
         } else if let Some(ref event_data) = self.stx_lock_event {
             let data: STXLockEventData =
                 serde_json::from_value(event_data.clone()).expect("Unable to decode event_data");
-            return StacksTransactionEvent::STXLockEvent(data.clone());
+            return Ok(StacksTransactionEvent::STXLockEvent(data.clone()));
         } else if let Some(ref event_data) = self.stx_burn_event {
             let data: STXBurnEventData =
                 serde_json::from_value(event_data.clone()).expect("Unable to decode event_data");
-            return StacksTransactionEvent::STXBurnEvent(data.clone());
+            return Ok(StacksTransactionEvent::STXBurnEvent(data.clone()));
         } else if let Some(ref event_data) = self.stx_transfer_event {
             let data: STXTransferEventData =
                 serde_json::from_value(event_data.clone()).expect("Unable to decode event_data");
-            return StacksTransactionEvent::STXTransferEvent(data.clone());
+            return Ok(StacksTransactionEvent::STXTransferEvent(data.clone()));
         } else if let Some(ref event_data) = self.nft_mint_event {
             let data: NFTMintEventData =
                 serde_json::from_value(event_data.clone()).expect("Unable to decode event_data");
-            return StacksTransactionEvent::NFTMintEvent(data.clone());
+            return Ok(StacksTransactionEvent::NFTMintEvent(data.clone()));
         } else if let Some(ref event_data) = self.nft_burn_event {
             let data: NFTBurnEventData =
                 serde_json::from_value(event_data.clone()).expect("Unable to decode event_data");
-            return StacksTransactionEvent::NFTBurnEvent(data.clone());
+            return Ok(StacksTransactionEvent::NFTBurnEvent(data.clone()));
         } else if let Some(ref event_data) = self.nft_transfer_event {
             let data: NFTTransferEventData =
                 serde_json::from_value(event_data.clone()).expect("Unable to decode event_data");
-            return StacksTransactionEvent::NFTTransferEvent(data.clone());
+            return Ok(StacksTransactionEvent::NFTTransferEvent(data.clone()));
         } else if let Some(ref event_data) = self.ft_mint_event {
             let data: FTMintEventData =
                 serde_json::from_value(event_data.clone()).expect("Unable to decode event_data");
-            return StacksTransactionEvent::FTMintEvent(data.clone());
+            return Ok(StacksTransactionEvent::FTMintEvent(data.clone()));
         } else if let Some(ref event_data) = self.ft_burn_event {
             let data: FTBurnEventData =
                 serde_json::from_value(event_data.clone()).expect("Unable to decode event_data");
-            return StacksTransactionEvent::FTBurnEvent(data.clone());
+            return Ok(StacksTransactionEvent::FTBurnEvent(data.clone()));
         } else if let Some(ref event_data) = self.ft_transfer_event {
             let data: FTTransferEventData =
                 serde_json::from_value(event_data.clone()).expect("Unable to decode event_data");
-            return StacksTransactionEvent::FTTransferEvent(data.clone());
+            return Ok(StacksTransactionEvent::FTTransferEvent(data.clone()));
         } else if let Some(ref event_data) = self.data_var_set_event {
             let data: DataVarSetEventData =
                 serde_json::from_value(event_data.clone()).expect("Unable to decode event_data");
-            return StacksTransactionEvent::DataVarSetEvent(data.clone());
+            return Ok(StacksTransactionEvent::DataVarSetEvent(data.clone()));
         } else if let Some(ref event_data) = self.data_map_insert_event {
             let data: DataMapInsertEventData =
                 serde_json::from_value(event_data.clone()).expect("Unable to decode event_data");
-            return StacksTransactionEvent::DataMapInsertEvent(data.clone());
+            return Ok(StacksTransactionEvent::DataMapInsertEvent(data.clone()));
         } else if let Some(ref event_data) = self.data_map_update_event {
             let data: DataMapUpdateEventData =
                 serde_json::from_value(event_data.clone()).expect("Unable to decode event_data");
-            return StacksTransactionEvent::DataMapUpdateEvent(data.clone());
+            return Ok(StacksTransactionEvent::DataMapUpdateEvent(data.clone()));
         } else if let Some(ref event_data) = self.data_map_delete_event {
             let data: DataMapDeleteEventData =
                 serde_json::from_value(event_data.clone()).expect("Unable to decode event_data");
-            return StacksTransactionEvent::DataMapDeleteEvent(data.clone());
+            return Ok(StacksTransactionEvent::DataMapDeleteEvent(data.clone()));
         } else if let Some(ref event_data) = self.contract_event {
             let data: SmartContractEventData =
                 serde_json::from_value(event_data.clone()).expect("Unable to decode event_data");
-            return StacksTransactionEvent::SmartContractEvent(data.clone());
+            return Ok(StacksTransactionEvent::SmartContractEvent(data.clone()));
         }
-        unreachable!()
+        return Err(format!("unable to support event type"));
     }
 }
 
@@ -197,25 +197,35 @@ pub struct ContractReadonlyCall {
 
 pub fn standardize_stacks_serialized_block_header(
     serialized_block: &str,
-) -> (BlockIdentifier, BlockIdentifier) {
-    let mut block_header: NewBlockHeader = serde_json::from_str(serialized_block).unwrap();
+) -> Result<(BlockIdentifier, BlockIdentifier), String> {
+    let mut block_header: NewBlockHeader = serde_json::from_str(serialized_block)
+        .map_err(|e| format!("unable to parse stacks block_header {}", e.to_string()))?;
+    let hash = block_header
+        .index_block_hash
+        .take()
+        .ok_or(format!("unable to retrieve index_block_hash"))?;
     let block_identifier = BlockIdentifier {
-        hash: block_header.index_block_hash.take().unwrap(),
+        hash,
         index: block_header.block_height,
     };
+    let parent_hash = block_header
+        .parent_index_block_hash
+        .take()
+        .ok_or(format!("unable to retrieve parent_index_block_hash"))?;
     let parent_block_identifier = BlockIdentifier {
-        hash: block_header.parent_index_block_hash.take().unwrap(),
+        hash: parent_hash,
         index: block_identifier.index - 1,
     };
-    (block_identifier, parent_block_identifier)
+    Ok((block_identifier, parent_block_identifier))
 }
 
 pub fn standardize_stacks_serialized_block(
     indexer_config: &IndexerConfig,
     serialized_block: &str,
     ctx: &mut StacksChainContext,
-) -> StacksBlockData {
-    let mut block: NewBlock = serde_json::from_str(serialized_block).unwrap();
+) -> Result<StacksBlockData, String> {
+    let mut block: NewBlock = serde_json::from_str(serialized_block)
+        .map_err(|e| format!("unable to parse stacks block_header {}", e.to_string()))?;
     standardize_stacks_block(indexer_config, &mut block, ctx)
 }
 
@@ -223,8 +233,9 @@ pub fn standardize_stacks_marshalled_block(
     indexer_config: &IndexerConfig,
     marshalled_block: JsonValue,
     ctx: &mut StacksChainContext,
-) -> StacksBlockData {
-    let mut block: NewBlock = serde_json::from_value(marshalled_block).unwrap();
+) -> Result<StacksBlockData, String> {
+    let mut block: NewBlock = serde_json::from_value(marshalled_block)
+        .map_err(|e| format!("unable to parse stacks block {}", e.to_string()))?;
     standardize_stacks_block(indexer_config, &mut block, ctx)
 }
 
@@ -232,7 +243,7 @@ pub fn standardize_stacks_block(
     indexer_config: &IndexerConfig,
     block: &mut NewBlock,
     ctx: &mut StacksChainContext,
-) -> StacksBlockData {
+) -> Result<StacksBlockData, String> {
     let pox_cycle_length: u64 =
         (ctx.pox_info.prepare_phase_block_length + ctx.pox_info.reward_phase_block_length).into();
     let current_len = block.burn_block_height - ctx.pox_info.first_burnchain_block_height;
@@ -246,68 +257,49 @@ pub fn standardize_stacks_block(
             .or_insert(vec![&event]);
     }
 
-    let transactions = block
-        .transactions
-        .iter()
-        .map(|tx| {
-            let tx_events = events.remove(&tx.txid).unwrap_or(vec![]);
-            let (description, tx_type, fee, sender, sponsor) =
-                match get_tx_description(&tx.raw_tx, &tx_events) {
-                    Ok(desc) => desc,
-                    Err(_) => {
-                        return StacksTransactionData {
-                            transaction_identifier: TransactionIdentifier {
-                                hash: "0x00".into(),
-                            },
-                            operations: vec![],
-                            metadata: StacksTransactionMetadata {
-                                success: true,
-                                result: "0x00".into(),
-                                raw_tx: "0x00".into(),
-                                sender: "0x00".into(),
-                                fee: 0,
-                                sponsor: None,
-                                kind: StacksTransactionKind::Other,
-                                execution_cost: None,
-                                receipt: StacksTransactionReceipt::default(),
-                                description: "Unparsable transaction".into(),
-                                position: StacksTransactionPosition::Index(0),
-                                proof: None,
-                            },
-                        }
-                    }
-                };
-            let events = tx_events.iter().map(|e| e.into_chainhook_event()).collect();
-            let (receipt, operations) = get_standardized_stacks_receipt(
-                &tx.txid,
-                events,
-                &mut ctx.asset_class_map,
-                &indexer_config.stacks_node_rpc_url,
-                true,
-            );
+    let mut transactions = vec![];
+    for tx in block.transactions.iter() {
+        let tx_events = events.remove(&tx.txid).unwrap_or(vec![]);
+        let (description, tx_type, fee, sender, sponsor) =
+            match get_tx_description(&tx.raw_tx, &tx_events) {
+                Ok(desc) => desc,
+                Err(_) => {
+                    return Err(format!("unable to standardize block ({:?})", tx));
+                }
+            };
+        let events = tx_events
+            .iter()
+            .map(|e| e.into_chainhook_event())
+            .collect::<Result<Vec<StacksTransactionEvent>, String>>()?;
+        let (receipt, operations) = get_standardized_stacks_receipt(
+            &tx.txid,
+            events,
+            &mut ctx.asset_class_map,
+            &indexer_config.stacks_node_rpc_url,
+            true,
+        );
 
-            StacksTransactionData {
-                transaction_identifier: TransactionIdentifier {
-                    hash: tx.txid.clone(),
-                },
-                operations,
-                metadata: StacksTransactionMetadata {
-                    success: tx.status == "success",
-                    result: get_value_description(&tx.raw_result),
-                    raw_tx: tx.raw_tx.clone(),
-                    sender,
-                    fee,
-                    sponsor,
-                    kind: tx_type,
-                    execution_cost: tx.execution_cost.clone(),
-                    receipt,
-                    description,
-                    position: StacksTransactionPosition::Index(tx.tx_index),
-                    proof: None,
-                },
-            }
-        })
-        .collect();
+        transactions.push(StacksTransactionData {
+            transaction_identifier: TransactionIdentifier {
+                hash: tx.txid.clone(),
+            },
+            operations,
+            metadata: StacksTransactionMetadata {
+                success: tx.status == "success",
+                result: get_value_description(&tx.raw_result),
+                raw_tx: tx.raw_tx.clone(),
+                sender,
+                fee,
+                sponsor,
+                kind: tx_type,
+                execution_cost: tx.execution_cost.clone(),
+                receipt,
+                description,
+                position: StacksTransactionPosition::Index(tx.tx_index),
+                proof: None,
+            },
+        });
+    }
 
     let confirm_microblock_identifier = if block.parent_microblock
         == "0x0000000000000000000000000000000000000000000000000000000000000000"
@@ -323,7 +315,7 @@ pub fn standardize_stacks_block(
         })
     };
 
-    StacksBlockData {
+    let block = StacksBlockData {
         block_identifier: BlockIdentifier {
             hash: block.index_block_hash.clone(),
             index: block.block_height,
@@ -344,16 +336,18 @@ pub fn standardize_stacks_block(
             confirm_microblock_identifier,
         },
         transactions,
-    }
+    };
+    Ok(block)
 }
 
 pub fn standardize_stacks_serialized_microblock_trail(
     indexer_config: &IndexerConfig,
     serialized_microblock_trail: &str,
     ctx: &mut StacksChainContext,
-) -> Vec<StacksMicroblockData> {
+) -> Result<Vec<StacksMicroblockData>, String> {
     let mut microblock_trail: NewMicroblockTrail =
-        serde_json::from_str(serialized_microblock_trail).unwrap();
+        serde_json::from_str(serialized_microblock_trail)
+            .map_err(|e| format!("unable to parse microblock trail {}", e.to_string()))?;
     standardize_stacks_microblock_trail(indexer_config, &mut microblock_trail, ctx)
 }
 
@@ -361,9 +355,10 @@ pub fn standardize_stacks_marshalled_microblock_trail(
     indexer_config: &IndexerConfig,
     marshalled_microblock_trail: JsonValue,
     ctx: &mut StacksChainContext,
-) -> Vec<StacksMicroblockData> {
+) -> Result<Vec<StacksMicroblockData>, String> {
     let mut microblock_trail: NewMicroblockTrail =
-        serde_json::from_value(marshalled_microblock_trail).unwrap();
+        serde_json::from_value(marshalled_microblock_trail)
+            .map_err(|e| format!("unable to parse microblock trail {}", e.to_string()))?;
     standardize_stacks_microblock_trail(indexer_config, &mut microblock_trail, ctx)
 }
 
@@ -371,7 +366,7 @@ pub fn standardize_stacks_microblock_trail(
     indexer_config: &IndexerConfig,
     microblock_trail: &mut NewMicroblockTrail,
     ctx: &mut StacksChainContext,
-) -> Vec<StacksMicroblockData> {
+) -> Result<Vec<StacksMicroblockData>, String> {
     let mut events: HashMap<&String, Vec<&NewEvent>> = HashMap::new();
     for event in microblock_trail.events.iter() {
         events
@@ -388,7 +383,10 @@ pub fn standardize_stacks_microblock_trail(
         let (description, tx_type, fee, sender, sponsor) =
             get_tx_description(&tx.raw_tx, &tx_events).expect("unable to parse transaction");
 
-        let events = tx_events.iter().map(|e| e.into_chainhook_event()).collect();
+        let events = tx_events
+            .iter()
+            .map(|e| e.into_chainhook_event())
+            .collect::<Result<Vec<StacksTransactionEvent>, String>>()?;
         let (receipt, operations) = get_standardized_stacks_receipt(
             &tx.txid,
             events,
@@ -458,7 +456,7 @@ pub fn standardize_stacks_microblock_trail(
     }
     microblocks.sort_by(|a, b| a.block_identifier.cmp(&b.block_identifier));
 
-    microblocks
+    Ok(microblocks)
 }
 
 pub fn get_value_description(raw_value: &str) -> String {
@@ -492,15 +490,15 @@ pub fn get_tx_description(
         String, // Sender's address
         Option<String>, // Sponsor's address (optional)
     ),
-    (),
+    String,
 > {
     let raw_tx = match raw_tx.strip_prefix("0x") {
         Some(raw_tx) => raw_tx,
-        _ => return Err(()),
+        _ => return Err("unable to read txid".into()),
     };
     let tx_bytes = match hex_bytes(&raw_tx) {
         Ok(bytes) => bytes,
-        _ => return Err(()),
+        Err(e) => return Err(format!("unable to read txid {}", e.to_string())),
     };
 
     // Handle Stacks transitions operated through Bitcoin transactions
@@ -508,13 +506,14 @@ pub fn get_tx_description(
         let event = match tx_events.first() {
             Some(event) => event,
             None => {
-                debug!("Received block with transaction '0x00' and no events");
-                return Err(());
+                return Err(format!(
+                    "received block with transaction '0x00' and no events"
+                ));
             }
         };
         if let Some(ref event_data) = event.stx_transfer_event {
-            let data: STXTransferEventData =
-                serde_json::from_value(event_data.clone()).expect("Unable to decode event_data");
+            let data: STXTransferEventData = serde_json::from_value(event_data.clone())
+                .map_err(|e| format!("unable to decode event_data {}", e.to_string()))?;
             let description = format!(
                 "transfered: {} µSTX from {} to {} through Bitcoin transaction",
                 data.amount, data.sender, data.recipient
@@ -522,8 +521,8 @@ pub fn get_tx_description(
             let tx_type = StacksTransactionKind::NativeTokenTransfer;
             return Ok((description, tx_type, 0, data.sender, None));
         } else if let Some(ref event_data) = event.stx_lock_event {
-            let data: STXLockEventData =
-                serde_json::from_value(event_data.clone()).expect("Unable to decode event_data");
+            let data: STXLockEventData = serde_json::from_value(event_data.clone())
+                .map_err(|e| format!("unable to decode event_data {}", e.to_string()))?;
             let description = format!(
                 "stacked: {} µSTX by {} through Bitcoin transaction",
                 data.locked_amount, data.locked_address,
@@ -531,13 +530,11 @@ pub fn get_tx_description(
             let tx_type = StacksTransactionKind::Other;
             return Ok((description, tx_type, 0, data.locked_address, None));
         }
-        unreachable!()
+        return Err(format!("unable to parse transaction {raw_tx}"));
     }
 
-    let tx = match StacksTransaction::consensus_deserialize(&mut Cursor::new(&tx_bytes)) {
-        Ok(bytes) => bytes,
-        _ => return Err(()),
-    };
+    let tx = StacksTransaction::consensus_deserialize(&mut Cursor::new(&tx_bytes))
+        .map_err(|e| format!("unable to consensus decode transaction {}", e.to_string()))?;
 
     let (fee, sender, sponsor) = match tx.auth {
         TransactionAuth::Standard(ref conditions) => (

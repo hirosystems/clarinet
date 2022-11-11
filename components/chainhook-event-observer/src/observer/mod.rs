@@ -945,28 +945,43 @@ pub fn handle_new_microblocks(
     info!("POST /new_microblocks");
     // Standardize the structure of the microblock, and identify the
     // kind of update that this new microblock would imply
-    let mut chain_event = match indexer_rw_lock.inner().write() {
+    let chain_event = match indexer_rw_lock.inner().write() {
         Ok(mut indexer) => {
             let chain_event = indexer
                 .handle_stacks_marshalled_microblock_trail(marshalled_microblock.into_inner());
             chain_event
         }
-        _ => {
+        Err(e) => {
+            warn!("unable to acquire background_job_tx: {}", e.to_string());
             return Json(json!({
                 "status": 500,
                 "result": "Unable to acquire lock",
-            }))
+            }));
         }
     };
 
-    if let Some(chain_event) = chain_event.take() {
-        let background_job_tx = background_job_tx.inner();
-        match background_job_tx.lock() {
-            Ok(tx) => {
-                let _ = tx.send(ObserverCommand::PropagateStacksChainEvent(chain_event));
-            }
-            _ => {}
-        };
+    match chain_event {
+        Ok(Some(chain_event)) => {
+            let background_job_tx = background_job_tx.inner();
+            match background_job_tx.lock() {
+                Ok(tx) => {
+                    let _ = tx.send(ObserverCommand::PropagateStacksChainEvent(chain_event));
+                }
+                Err(e) => {
+                    warn!("unable to acquire background_job_tx: {}", e.to_string());
+                    return Json(json!({
+                        "status": 500,
+                        "result": "Unable to acquire lock",
+                    }));
+                }
+            };
+        }
+        Ok(None) => {
+            info!("unable to infer chain progress");
+        }
+        Err(e) => {
+            error!("unable to handle stacks microblock: {}", e);
+        }
     }
 
     Json(json!({

@@ -81,7 +81,7 @@ impl Indexer {
             &self.config,
             serialized_block,
             &mut self.stacks_context,
-        );
+        )?;
         self.stacks_blocks_pool.process_block(block)
     }
 
@@ -93,31 +93,31 @@ impl Indexer {
             &self.config,
             marshalled_block,
             &mut self.stacks_context,
-        );
+        )?;
         self.stacks_blocks_pool.process_block(block)
     }
 
     pub fn handle_stacks_serialized_microblock_trail(
         &mut self,
         serialized_microblock_trail: &str,
-    ) -> Option<StacksChainEvent> {
+    ) -> Result<Option<StacksChainEvent>, String> {
         let microblocks = stacks::standardize_stacks_serialized_microblock_trail(
             &self.config,
             serialized_microblock_trail,
             &mut self.stacks_context,
-        );
+        )?;
         self.stacks_blocks_pool.process_microblocks(microblocks)
     }
 
     pub fn handle_stacks_marshalled_microblock_trail(
         &mut self,
         marshalled_microblock_trail: JsonValue,
-    ) -> Option<StacksChainEvent> {
+    ) -> Result<Option<StacksChainEvent>, String> {
         let microblocks = stacks::standardize_stacks_marshalled_microblock_trail(
             &self.config,
             marshalled_microblock_trail,
             &mut self.stacks_context,
-        );
+        )?;
         self.stacks_blocks_pool.process_microblocks(microblocks)
     }
 

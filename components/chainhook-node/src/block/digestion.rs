@@ -39,11 +39,17 @@ pub fn start(command_rx: Receiver<DigestingCommand>, config: &Config) -> Result<
                     let payload: String = con
                         .hget(&key, "blob")
                         .expect("unable to retrieve tip height");
-                    let block_data = indexer::stacks::standardize_stacks_serialized_block(
+                    let block_data = match indexer::stacks::standardize_stacks_serialized_block(
                         &indexer.config,
                         &payload,
                         &mut indexer.stacks_context,
-                    );
+                    ) {
+                        Ok(block) => block,
+                        Err(e) => {
+                            error!("unable to handle stacks block: {e}");
+                            continue;
+                        }
+                    };
                     let _: Result<(), redis::RedisError> = con.hset_multiple(
                         &key,
                         &[
