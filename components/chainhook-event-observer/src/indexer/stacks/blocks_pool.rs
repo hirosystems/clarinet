@@ -40,7 +40,7 @@ impl StacksBlockPool {
     pub fn process_block(
         &mut self,
         block: StacksBlockData,
-    ) -> Result<Option<StacksChainEvent>, ()> {
+    ) -> Result<Option<StacksChainEvent>, String> {
         info!("Start processing Stacks {}", block.block_identifier);
 
         // Keep block data in memory
@@ -62,7 +62,10 @@ impl StacksBlockPool {
         let previous_canonical_fork_id = self.canonical_fork_id;
         let previous_canonical_fork = match self.forks.get(&previous_canonical_fork_id) {
             Some(fork) => fork.clone(),
-            None => return Err(()),
+            None => {
+                error!("unable to retrieve previous stacks fork");
+                return Ok(None);
+            }
         };
 
         let mut fork_updated = None;

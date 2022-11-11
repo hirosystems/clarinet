@@ -67,15 +67,16 @@ impl Indexer {
     pub fn handle_bitcoin_block(
         &mut self,
         marshalled_block: JsonValue,
-    ) -> Result<Option<BitcoinChainEvent>, ()> {
-        let block = bitcoin::standardize_bitcoin_block(&self.config, marshalled_block);
-        self.bitcoin_blocks_pool.process_block(block)
+    ) -> Result<Option<BitcoinChainEvent>, String> {
+        let block = bitcoin::standardize_bitcoin_block(&self.config, marshalled_block)?;
+        let event = self.bitcoin_blocks_pool.process_block(block);
+        event
     }
 
     pub fn handle_stacks_serialized_block(
         &mut self,
         serialized_block: &str,
-    ) -> Result<Option<StacksChainEvent>, ()> {
+    ) -> Result<Option<StacksChainEvent>, String> {
         let block = stacks::standardize_stacks_serialized_block(
             &self.config,
             serialized_block,
@@ -87,7 +88,7 @@ impl Indexer {
     pub fn handle_stacks_marshalled_block(
         &mut self,
         marshalled_block: JsonValue,
-    ) -> Result<Option<StacksChainEvent>, ()> {
+    ) -> Result<Option<StacksChainEvent>, String> {
         let block = stacks::standardize_stacks_marshalled_block(
             &self.config,
             marshalled_block,

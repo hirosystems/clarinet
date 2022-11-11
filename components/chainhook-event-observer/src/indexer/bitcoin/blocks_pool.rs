@@ -30,7 +30,7 @@ impl BitcoinBlockPool {
     pub fn process_block(
         &mut self,
         block: BitcoinBlockData,
-    ) -> Result<Option<BitcoinChainEvent>, ()> {
+    ) -> Result<Option<BitcoinChainEvent>, String> {
         info!("Start processing Bitcoin {}", block.block_identifier);
 
         // Keep block data in memory
@@ -52,7 +52,10 @@ impl BitcoinBlockPool {
         let previous_canonical_fork_id = self.canonical_fork_id;
         let previous_canonical_fork = match self.forks.get(&previous_canonical_fork_id) {
             Some(fork) => fork.clone(),
-            None => return Err(()),
+            None => {
+                error!("unable to retrieve previous bitcoin fork");
+                return Ok(None);
+            }
         };
 
         let mut fork_updated = None;

@@ -37,24 +37,30 @@ pub struct RewardParticipant {
 pub fn standardize_bitcoin_block(
     indexer_config: &IndexerConfig,
     marshalled_block: JsonValue,
-) -> BitcoinBlockData {
+) -> Result<BitcoinBlockData, String> {
     let auth = Auth::UserPass(
         indexer_config.bitcoin_node_rpc_username.clone(),
         indexer_config.bitcoin_node_rpc_password.clone(),
     );
-
-    let rpc = Client::new(&indexer_config.bitcoin_node_rpc_url, auth).unwrap();
-
-    let partial_block: NewBitcoinBlock = serde_json::from_value(marshalled_block).unwrap();
+    let rpc = Client::new(&indexer_config.bitcoin_node_rpc_url, auth).map_err(|e| {
+        format!(
+            "unable for bitcoin rpc initialize client: {}",
+            e.to_string()
+        )
+    })?;
+    let partial_block: NewBitcoinBlock = serde_json::from_value(marshalled_block)
+        .map_err(|e| format!("unable for parse bitcoin block: {}", e.to_string()))?;
     let block_hash = {
         let block_hash_str = partial_block.burn_block_hash.strip_prefix("0x").unwrap();
         let mut block_hash_bytes = hex_bytes(&block_hash_str).unwrap();
         block_hash_bytes.reverse();
         BlockHash::from_slice(&block_hash_bytes).unwrap()
     };
-    let block = rpc.get_block(&block_hash).unwrap();
+    let block = rpc
+        .get_block(&block_hash)
+        .map_err(|e| format!("unable for invoke rpc get_block: {}", e.to_string()))?;
     let block_height = partial_block.burn_block_height;
-    build_block(block, block_height, indexer_config)
+    Ok(build_block(block, block_height, indexer_config))
 }
 
 pub fn build_block(

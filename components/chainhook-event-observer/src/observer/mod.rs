@@ -836,22 +836,36 @@ pub fn handle_new_bitcoin_block(
     // into account the last 7 blocks.
     let chain_update = match indexer_rw_lock.inner().write() {
         Ok(mut indexer) => indexer.handle_bitcoin_block(marshalled_block.into_inner()),
-        _ => {
+        Err(e) => {
+            warn!("unable to acquire indexer_rw_lock: {}", e.to_string());
             return Json(json!({
                 "status": 500,
                 "result": "Unable to acquire lock",
-            }))
+            }));
         }
     };
 
-    if let Ok(Some(chain_event)) = chain_update {
-        let background_job_tx = background_job_tx.inner();
-        match background_job_tx.lock() {
-            Ok(tx) => {
-                let _ = tx.send(ObserverCommand::PropagateBitcoinChainEvent(chain_event));
-            }
-            _ => {}
-        };
+    match chain_update {
+        Ok(Some(chain_event)) => {
+            match background_job_tx.lock() {
+                Ok(tx) => {
+                    let _ = tx.send(ObserverCommand::PropagateBitcoinChainEvent(chain_event));
+                }
+                Err(e) => {
+                    warn!("unable to acquire background_job_tx: {}", e.to_string());
+                    return Json(json!({
+                        "status": 500,
+                        "result": "Unable to acquire lock",
+                    }));
+                }
+            };
+        }
+        Ok(None) => {
+            info!("unable to infer chain progress");
+        }
+        Err(e) => {
+            error!("unable to handle bitcoin block: {}", e)
+        }
     }
 
     Json(json!({
@@ -887,20 +901,28 @@ pub fn handle_new_stacks_block(
         }
     };
 
-    if let Ok(Some(chain_event)) = chain_event {
-        let background_job_tx = background_job_tx.inner();
-        match background_job_tx.lock() {
-            Ok(tx) => {
-                let _ = tx.send(ObserverCommand::PropagateStacksChainEvent(chain_event));
-            }
-            Err(e) => {
-                warn!("unable to acquire background_job_tx: {}", e.to_string());
-                return Json(json!({
-                    "status": 500,
-                    "result": "Unable to acquire lock",
-                }));
-            }
-        };
+    match chain_event {
+        Ok(Some(chain_event)) => {
+            let background_job_tx = background_job_tx.inner();
+            match background_job_tx.lock() {
+                Ok(tx) => {
+                    let _ = tx.send(ObserverCommand::PropagateStacksChainEvent(chain_event));
+                }
+                Err(e) => {
+                    warn!("unable to acquire background_job_tx: {}", e.to_string());
+                    return Json(json!({
+                        "status": 500,
+                        "result": "Unable to acquire lock",
+                    }));
+                }
+            };
+        }
+        Ok(None) => {
+            info!("unable to infer chain progress");
+        }
+        Err(e) => {
+            error!("unable to handle stacks block: {}", e)
+        }
     }
 
     Json(json!({
