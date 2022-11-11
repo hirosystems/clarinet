@@ -1,6 +1,6 @@
 [package]
 name = "clarinet-cli"
-version = "1.0.5"
+version = "1.0.6"
 authors = ["Ludo Galabru <ludo@hiro.so>", "Brice Dobry <brice@hiro.so>"]
 edition = "2021"
 description = "Clarinet is a simple, modern and opinionated runtime for testing, integrating and deploying Clarity smart contracts."
@@ -47,7 +47,7 @@ serde_json = { version = "1.0.79", features = ["preserve_order"] }
 serde_derive = "1"
 deno_emit = { version = "0.4.0", optional = true }
 deno_graph = { version = "0.29.0", optional = true }
-deno_core =  { version = "0.146.0", optional = true }
+deno_core = { version = "0.146.0", optional = true }
 deno_ast = { version = "0.17.0", features = ["cjs"], optional = true }
 deno_tls = { version = "0.51.0", optional = true }
 deno_web = { version = "0.95.0", optional = true }
@@ -59,7 +59,13 @@ lzzzz = '1.0'
 deno_console = { version = "0.64.0", optional = true }
 deno_webstorage = { version = "0.59.0", optional = true }
 deno_broadcast_channel = { version = "0.58.0", optional = true }
-hyper = { version = "0.14.18", features = ["server", "stream", "http1", "http2", "runtime"] }
+hyper = { version = "0.14.18", features = [
+    "server",
+    "stream",
+    "http1",
+    "http2",
+    "runtime",
+] }
 http = "0.2.6"
 ###
 rsa = "=0.7.0-pre"
@@ -67,7 +73,7 @@ deno_fetch = { version = "0.87.0", optional = true }
 deno_crypto = { version = "0.78.0", optional = true }
 import_map = { version = "=0.12.1", optional = true }
 once_cell = { version = "1.13.0", optional = true }
-walkdir =  { version = "=2.3.2", optional = true }
+walkdir = { version = "=2.3.2", optional = true }
 node_resolver = { version = "0.1.1", optional = true }
 cache_control = { version = "=0.2.0", optional = true }
 notify = "=5.0.0-pre.7"
@@ -93,7 +99,9 @@ twox-hash = "1.6.3"
 data-url = "=0.1.1"
 os_pipe = "1.0.1"
 tokio-util = { version = "0.7.1", features = ["io"], optional = true }
-clarity_repl = { package = "clarity-repl", path = "../clarity-repl", features = ["cli"] }
+clarity_repl = { package = "clarity-repl", path = "../clarity-repl", features = [
+    "cli",
+] }
 aes = "0.7.5"
 base64 = "0.13.0"
 block-modes = "0.8.1"
@@ -133,9 +141,15 @@ hex = "0.4.3"
 serde_yaml = "0.8.23"
 chainhook_event_observer = { package = "chainhook-event-observer", default-features = false, path = "../chainhook-event-observer" }
 chainhook_types = { package = "chainhook-types", path = "../chainhook-types-rs" }
-clarinet_files = { package = "clarinet-files", path = "../clarinet-files", features = ["cli"] }
-clarity_lsp = { package = "clarity-lsp", path = "../clarity-lsp", features = ["cli"] }
-clarinet_deployments = { package = "clarinet-deployments", path = "../clarinet-deployments", features = ["cli"] }
+clarinet_files = { package = "clarinet-files", path = "../clarinet-files", features = [
+    "cli",
+] }
+clarity_lsp = { package = "clarity-lsp", path = "../clarity-lsp", features = [
+    "cli",
+] }
+clarinet_deployments = { package = "clarinet-deployments", path = "../clarinet-deployments", features = [
+    "cli",
+] }
 hiro_system_kit = { package = "hiro-system-kit", path = "../hiro-system-kit" }
 clarinet_utils = { package = "clarinet-utils", path = "../clarinet-utils" }
 stacks_network = { package = "stacks-network", path = "../stacks-network" }
@@ -169,7 +183,7 @@ winapi = { version = "0.3.9", features = [
     "std",
     "handleapi",
     "ws2ipdef",
-    "ws2tcpip"
+    "ws2tcpip",
 ] }
 
 [package.metadata.winres]

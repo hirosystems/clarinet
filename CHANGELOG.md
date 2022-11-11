@@ -1,3 +1,21 @@
+#### 1.0.6 (2022-11-10)
+
+##### New Features
+
+*  Ability for chainhook-node to start with custom config ([473c86ba](https://github.com/hirosystems/clarinet/commit/473c86babe41f0c16ea9c370890d440a698dfa08))
+*  Draft bitcoin replay implementation ([8580092e](https://github.com/hirosystems/clarinet/commit/8580092e2e8661c3d6e653be2c3f687774e560fa))
+
+##### Bug Fixes
+
+*  Filter out boot contracts from requirement dependencies ([34fbcf96](https://github.com/hirosystems/clarinet/commit/34fbcf9686a9bdcdf2e11715abbcb9fa301e4dfb))
+*  Deno expect events ([8bdcd392](https://github.com/hirosystems/clarinet/commit/8bdcd39254c8fb269245005f30b2f930df8dd7ea))
+*  Fix issue with check-checker requiring checking on bools ([ef738fe3](https://github.com/hirosystems/clarinet/commit/ef738fe3f98cbdb87dd8e510d5ed0857817350eb))
+
+##### Refactors
+
+*  Add serverless dependency in cbtc example and upgrade dependencies ([f065f2b](https://github.com/hirosystems/clarinet/pull/660/commits/f065f2b3d5268689b7d2b77bba668f352bb53ca2))
+*  Get_bitcoin_proof ([5a3a8ee9](https://github.com/hirosystems/clarinet/commit/5a3a8ee97a4b6db895c048ba9d67ac3423abe5de))
+
 #### 1.0.5 (2022-11-03)
 
 ##### New Features
