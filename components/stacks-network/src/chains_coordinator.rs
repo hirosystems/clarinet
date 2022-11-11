@@ -95,10 +95,11 @@ impl DevnetEventObserverConfig {
             control_port: devnet_config.orchestrator_control_port,
             bitcoin_node_username: devnet_config.bitcoin_node_username.clone(),
             bitcoin_node_password: devnet_config.bitcoin_node_password.clone(),
-            bitcoin_node_rpc_host: "http://localhost".into(),
-            bitcoin_node_rpc_port: devnet_config.bitcoin_node_rpc_port,
-            stacks_node_rpc_host: "http://localhost".into(),
-            stacks_node_rpc_port: devnet_config.stacks_node_rpc_port,
+            bitcoin_node_rpc_url: format!(
+                "http://localhost:{}",
+                devnet_config.bitcoin_node_rpc_port
+            ),
+            stacks_node_rpc_url: format!("http://localhost:{}", devnet_config.stacks_node_rpc_port),
             operators: HashSet::new(),
             display_logs: true,
         };

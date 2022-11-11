@@ -249,7 +249,7 @@ impl Config {
             },
             network: IndexerConfig {
                 stacks_node_rpc_url: "http://0.0.0.0:20443".into(),
-                bitcoin_node_rpc_url: "http://0.0.0.0:18443".into(),
+                bitcoin_node_rpc_url: "http://0.0.0.0:18332".into(),
                 bitcoin_node_rpc_username: "devnet".into(),
                 bitcoin_node_rpc_password: "devnet".into(),
                 stacks_network: StacksNetwork::Testnet,
@@ -275,7 +275,7 @@ impl Config {
             },
             network: IndexerConfig {
                 stacks_node_rpc_url: "http://0.0.0.0:20443".into(),
-                bitcoin_node_rpc_url: "http://0.0.0.0:18443".into(),
+                bitcoin_node_rpc_url: "http://0.0.0.0:8332".into(),
                 bitcoin_node_rpc_username: "devnet".into(),
                 bitcoin_node_rpc_password: "devnet".into(),
                 stacks_network: StacksNetwork::Mainnet,

@@ -80,10 +80,8 @@ pub struct EventObserverConfigFile {
     pub control_port: Option<u16>,
     pub bitcoin_node_username: String,
     pub bitcoin_node_password: String,
-    pub bitcoin_node_rpc_host: String,
-    pub bitcoin_node_rpc_port: u16,
-    pub stacks_node_rpc_host: String,
-    pub stacks_node_rpc_port: u16,
+    pub bitcoin_node_rpc_url: String,
+    pub stacks_node_rpc_url: String,
     pub operators: Option<Vec<String>>,
 }
 
@@ -141,10 +139,8 @@ impl EventObserverConfig {
                 .unwrap_or(observer::DEFAULT_CONTROL_PORT),
             bitcoin_node_username: config_file.bitcoin_node_username.clone(),
             bitcoin_node_password: config_file.bitcoin_node_password.clone(),
-            bitcoin_node_rpc_host: config_file.bitcoin_node_rpc_host.clone(),
-            bitcoin_node_rpc_port: config_file.bitcoin_node_rpc_port.clone(),
-            stacks_node_rpc_host: config_file.stacks_node_rpc_host.clone(),
-            stacks_node_rpc_port: config_file.stacks_node_rpc_port.clone(),
+            bitcoin_node_rpc_url: config_file.bitcoin_node_rpc_url.clone(),
+            stacks_node_rpc_url: config_file.stacks_node_rpc_url.clone(),
             operators,
             display_logs: true,
         };

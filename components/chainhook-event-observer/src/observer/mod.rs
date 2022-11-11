@@ -120,10 +120,8 @@ pub struct EventObserverConfig {
     pub control_port: u16,
     pub bitcoin_node_username: String,
     pub bitcoin_node_password: String,
-    pub bitcoin_node_rpc_host: String,
-    pub bitcoin_node_rpc_port: u16,
-    pub stacks_node_rpc_host: String,
-    pub stacks_node_rpc_port: u16,
+    pub bitcoin_node_rpc_url: String,
+    pub stacks_node_rpc_url: String,
     pub operators: HashSet<String>,
     pub display_logs: bool,
 }
@@ -192,8 +190,7 @@ pub struct BitcoinRPCRequest {
 pub struct BitcoinConfig {
     pub username: String,
     pub password: String,
-    pub rpc_host: String,
-    pub rpc_port: u16,
+    pub rpc_url: String,
 }
 
 #[derive(Debug, Clone)]
@@ -216,14 +213,8 @@ pub async fn start_event_observer(
     info!("Event observer starting with config {:?}", config);
 
     let indexer = Indexer::new(IndexerConfig {
-        stacks_node_rpc_url: format!(
-            "{}:{}",
-            config.stacks_node_rpc_host, config.stacks_node_rpc_port
-        ),
-        bitcoin_node_rpc_url: format!(
-            "{}:{}",
-            config.bitcoin_node_rpc_host, config.bitcoin_node_rpc_port
-        ),
+        stacks_node_rpc_url: config.stacks_node_rpc_url.clone(),
+        bitcoin_node_rpc_url: config.bitcoin_node_rpc_url.clone(),
         bitcoin_node_rpc_username: config.bitcoin_node_username.clone(),
         bitcoin_node_rpc_password: config.bitcoin_node_password.clone(),
         stacks_network: StacksNetwork::Devnet,
@@ -246,8 +237,7 @@ pub async fn start_event_observer(
     let bitcoin_config = BitcoinConfig {
         username: config.bitcoin_node_username.clone(),
         password: config.bitcoin_node_password.clone(),
-        rpc_host: config.bitcoin_node_rpc_host.clone(),
-        rpc_port: config.bitcoin_node_rpc_port,
+        rpc_url: config.bitcoin_node_rpc_url.clone(),
     };
 
     let mut entries = HashMap::new();
@@ -456,10 +446,7 @@ pub async fn start_observer_commands_handler(
                             }
 
                             let bitcoin_client_rpc = Client::new(
-                                &format!(
-                                    "{}:{}",
-                                    config.bitcoin_node_rpc_host, config.bitcoin_node_rpc_port
-                                ),
+                                &config.bitcoin_node_rpc_url,
                                 Auth::UserPass(
                                     config.bitcoin_node_username.to_string(),
                                     config.bitcoin_node_password.to_string(),
@@ -1069,10 +1056,7 @@ pub async fn handle_bitcoin_rpc_call(
 
     let client = Client::new();
     let builder = client
-        .post(format!(
-            "{}:{}",
-            bitcoin_config.rpc_host, bitcoin_config.rpc_port
-        ))
+        .post(&bitcoin_config.rpc_url)
         .header("Content-Type", "application/json")
         .timeout(std::time::Duration::from_secs(5))
         .header("Authorization", format!("Basic {}", token));

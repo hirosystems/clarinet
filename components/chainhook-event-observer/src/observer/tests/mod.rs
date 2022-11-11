@@ -37,10 +37,8 @@ fn generate_test_config() -> (EventObserverConfig, ChainhookStore) {
         control_port: 0,
         bitcoin_node_username: "user".into(),
         bitcoin_node_password: "user".into(),
-        bitcoin_node_rpc_host: "http://localhost".into(),
-        bitcoin_node_rpc_port: 0,
-        stacks_node_rpc_host: "http://localhost".into(),
-        stacks_node_rpc_port: 0,
+        bitcoin_node_rpc_url: "http://localhost:20443".into(),
+        stacks_node_rpc_url: "http://localhost:18443".into(),
         operators,
         display_logs: false,
     };
