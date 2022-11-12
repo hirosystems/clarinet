@@ -9,7 +9,7 @@ use clarity_repl::repl::{
 };
 use serde::ser::SerializeMap;
 use serde::{Serialize, Serializer};
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashMap};
 use std::path::PathBuf;
 use std::str::FromStr;
 use toml::value::Value;
@@ -45,6 +45,8 @@ pub struct ProjectManifest {
     pub repl_settings: repl::Settings,
     #[serde(skip_serializing)]
     pub location: FileLocation,
+    #[serde(skip_serializing)]
+    pub contracts_settings: HashMap<FileLocation, ClarityContract>,
 }
 
 #[derive(Debug, Clone)]
@@ -139,7 +141,7 @@ impl ProjectManifest {
                 .ok_or(format!("unable to parse path {}", path))?,
             None => {
                 project_root_location.append_path(".cache")?;
-                project_root_location
+                project_root_location.clone()
             }
         };
 
@@ -169,8 +171,10 @@ impl ProjectManifest {
             contracts: BTreeMap::new(),
             repl_settings,
             location: manifest_location.clone(),
+            contracts_settings: HashMap::new(),
         };
         let mut config_contracts = BTreeMap::new();
+        let mut contracts_settings = HashMap::new();
         let mut config_requirements: Vec<RequirementConfig> = Vec::new();
 
         match project_manifest_file.project.requirements {
@@ -195,17 +199,18 @@ impl ProjectManifest {
                 for (contract_name, contract_settings) in contracts.iter() {
                     match contract_settings {
                         Value::Table(contract_settings) => {
-                            let code_source = match contract_settings.get("path") {
-                                Some(Value::String(path)) => match PathBuf::from_str(path) {
-                                    Ok(path) => ClarityCodeSource::ContractOnDisk(path),
-                                    Err(e) => {
-                                        return Err(format!(
-                                            "unable to parse path {} ({})",
-                                            path, e
-                                        ))
-                                    }
-                                },
+                            let contract_path = match contract_settings.get("path") {
+                                Some(Value::String(path)) => path,
                                 _ => continue,
+                            };
+                            let code_source = match PathBuf::from_str(contract_path) {
+                                Ok(path) => ClarityCodeSource::ContractOnDisk(path),
+                                Err(e) => {
+                                    return Err(format!(
+                                        "unable to parse path {} ({})",
+                                        contract_path, e
+                                    ))
+                                }
                             };
                             let deployer = match contract_settings.get("deployer") {
                                 Some(Value::String(path)) => {
@@ -243,16 +248,18 @@ impl ProjectManifest {
                                 }
                                 _ => DEFAULT_EPOCH,
                             };
-                            config_contracts.insert(
-                                contract_name.to_string(),
-                                ClarityContract {
-                                    name: contract_name.clone(),
-                                    code_source,
-                                    deployer,
-                                    clarity_version,
-                                    epoch,
-                                },
-                            );
+                            let clarity_contract = ClarityContract {
+                                name: contract_name.clone(),
+                                code_source,
+                                deployer,
+                                clarity_version,
+                                epoch,
+                            };
+                            config_contracts
+                                .insert(contract_name.clone(), clarity_contract.clone());
+                            let mut contract_location = project_root_location.clone();
+                            contract_location.append_path(contract_path)?;
+                            contracts_settings.insert(contract_location, clarity_contract);
                         }
                         _ => {}
                     }
@@ -261,6 +268,7 @@ impl ProjectManifest {
             _ => {}
         };
         config.contracts = config_contracts;
+        config.contracts_settings = contracts_settings;
         config.project.requirements = Some(config_requirements);
         Ok(config)
     }

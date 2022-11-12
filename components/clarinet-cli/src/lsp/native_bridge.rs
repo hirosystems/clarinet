@@ -1,6 +1,5 @@
 use super::utils;
-
-use crate::lsp::{clarity_diagnostics_to_tower_lsp_type, completion_item_type_to_tower_lsp_type};
+use crate::lsp::clarity_diagnostics_to_tower_lsp_type;
 use clarity_lsp::backend::{
     process_notification, process_request, EditorStateInput, LspNotification,
     LspNotificationResponse, LspRequest, LspRequestResponse,
@@ -11,14 +10,11 @@ use serde_json::Value;
 use std::sync::mpsc::{Receiver, Sender};
 use std::sync::Arc;
 use std::sync::Mutex;
-use tower_lsp::jsonrpc::Result;
+use tower_lsp::jsonrpc::{Error, ErrorCode, Result};
 use tower_lsp::lsp_types::{
-    CompletionOptions, CompletionParams, CompletionResponse, DeclarationCapability,
-    DidChangeTextDocumentParams, DidCloseTextDocumentParams, DidOpenTextDocumentParams,
-    DidSaveTextDocumentParams, ExecuteCommandParams, HoverProviderCapability, InitializeParams,
-    InitializeResult, InitializedParams, MessageType, ServerCapabilities,
-    TextDocumentSyncCapability, TextDocumentSyncKind, TextDocumentSyncOptions,
-    TextDocumentSyncSaveOptions, Url,
+    CompletionParams, CompletionResponse, DidChangeTextDocumentParams, DidCloseTextDocumentParams,
+    DidOpenTextDocumentParams, DidSaveTextDocumentParams, ExecuteCommandParams, InitializeParams,
+    InitializeResult, InitializedParams, MessageType, Url,
 };
 use tower_lsp::{async_trait, Client, LanguageServer};
 
@@ -32,7 +28,7 @@ pub async fn start_language_server(
     request_rx: MultiplexableReceiver<LspRequest>,
     response_tx: Sender<LspResponse>,
 ) {
-    let mut editor_state = EditorStateInput::new(Some(EditorState::new()), None);
+    let mut editor_state = EditorStateInput::Owned(EditorState::new());
 
     let mut sel = Select::new();
     let notifications_oper = sel.recv(&notification_rx);
@@ -54,7 +50,7 @@ pub async fn start_language_server(
             },
             i if i == requests_oper => match oper.recv(&request_rx) {
                 Ok(request) => {
-                    let request_response = process_request(request, &mut editor_state);
+                    let request_response = process_request(request, &editor_state);
                     let _ = response_tx.send(LspResponse::Request(request_response));
                 }
                 Err(_e) => {
@@ -92,31 +88,22 @@ impl LspNativeBridge {
 
 #[async_trait]
 impl LanguageServer for LspNativeBridge {
-    async fn initialize(&self, _params: InitializeParams) -> Result<InitializeResult> {
-        Ok(InitializeResult {
-            server_info: None,
-            capabilities: ServerCapabilities {
-                text_document_sync: Some(TextDocumentSyncCapability::Options(
-                    TextDocumentSyncOptions {
-                        open_close: Some(true),
-                        change: Some(TextDocumentSyncKind::Full),
-                        will_save: Some(false),
-                        will_save_wait_until: Some(false),
-                        save: Some(TextDocumentSyncSaveOptions::Supported(true)),
-                    },
-                )),
-                completion_provider: Some(CompletionOptions {
-                    resolve_provider: Some(false),
-                    trigger_characters: None,
-                    all_commit_characters: None,
-                    work_done_progress_options: Default::default(),
-                }),
-                type_definition_provider: None,
-                hover_provider: Some(HoverProviderCapability::Simple(false)),
-                declaration_provider: Some(DeclarationCapability::Simple(false)),
-                ..ServerCapabilities::default()
-            },
-        })
+    async fn initialize(&self, params: InitializeParams) -> Result<InitializeResult> {
+        let _ = match self.request_tx.lock() {
+            Ok(tx) => tx.send(LspRequest::Initialize(params)),
+            Err(_) => return Err(Error::new(ErrorCode::InternalError)),
+        };
+
+        if let Ok(response_rx) = self.response_rx.lock() {
+            if let Ok(response) = response_rx.recv() {
+                if let LspResponse::Request(request_response) = response {
+                    if let LspRequestResponse::Initialize(initialize) = request_response {
+                        return Ok(initialize);
+                    }
+                }
+            }
+        }
+        return Err(Error::new(ErrorCode::InternalError));
     }
 
     async fn initialized(&self, _params: InitializedParams) {}
@@ -130,31 +117,20 @@ impl LanguageServer for LspNativeBridge {
     }
 
     async fn completion(&self, params: CompletionParams) -> Result<Option<CompletionResponse>> {
-        // We receive notifications for toml and clar files, but only want to achieve this capability
-        // for clar files.
-        let file_url = params.text_document_position.text_document.uri;
-        let contract_location = match utils::get_contract_location(&file_url) {
-            Some(location) => location,
-            _ => return Ok(None),
-        };
-
         let _ = match self.request_tx.lock() {
-            Ok(tx) => tx.send(LspRequest::GetIntellisense(contract_location)),
+            Ok(tx) => tx.send(LspRequest::Completion(params)),
             Err(_) => return Ok(None),
         };
 
-        let mut keywords = vec![];
+        let mut completion_items = vec![];
         if let Ok(response_rx) = self.response_rx.lock() {
             if let Ok(ref mut response) = response_rx.recv() {
                 if let LspResponse::Request(request_response) = response {
-                    keywords.append(&mut request_response.completion_items);
+                    if let LspRequestResponse::CompletionItems(items) = request_response {
+                        completion_items.append(items);
+                    }
                 }
             }
-        }
-
-        let mut completion_items = vec![];
-        for mut item in keywords.drain(..) {
-            completion_items.push(completion_item_type_to_tower_lsp_type(&mut item));
         }
 
         Ok(Some(CompletionResponse::from(completion_items)))
@@ -175,14 +151,14 @@ impl LanguageServer for LspNativeBridge {
             };
         } else {
             self.client
-                .log_message(MessageType::Warning, "Unsupported file opened")
+                .log_message(MessageType::WARNING, "Unsupported file opened")
                 .await;
             return;
         };
 
         self.client
             .log_message(
-                MessageType::Warning,
+                MessageType::WARNING,
                 "Command submitted to background thread",
             )
             .await;
@@ -286,9 +262,9 @@ pub fn message_level_type_to_tower_lsp_type(
     level: &clarity_lsp::lsp_types::MessageType,
 ) -> tower_lsp::lsp_types::MessageType {
     match level {
-        &clarity_lsp::lsp_types::MessageType::ERROR => tower_lsp::lsp_types::MessageType::Error,
-        &clarity_lsp::lsp_types::MessageType::WARNING => tower_lsp::lsp_types::MessageType::Warning,
-        &clarity_lsp::lsp_types::MessageType::INFO => tower_lsp::lsp_types::MessageType::Info,
-        _ => tower_lsp::lsp_types::MessageType::Log,
+        &clarity_lsp::lsp_types::MessageType::ERROR => tower_lsp::lsp_types::MessageType::ERROR,
+        &clarity_lsp::lsp_types::MessageType::WARNING => tower_lsp::lsp_types::MessageType::WARNING,
+        &clarity_lsp::lsp_types::MessageType::INFO => tower_lsp::lsp_types::MessageType::INFO,
+        _ => tower_lsp::lsp_types::MessageType::LOG,
     }
 }

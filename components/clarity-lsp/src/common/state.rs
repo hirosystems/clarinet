@@ -23,26 +23,29 @@ use std::collections::{HashMap, HashSet};
 #[derive(Debug, Clone, PartialEq)]
 pub struct ActiveContractData {
     pub clarity_version: ClarityVersion,
+    pub epoch: StacksEpochId,
     pub expressions: Option<Vec<SymbolicExpression>>,
     pub diagnostic: Option<ClarityDiagnostic>,
 }
 
 impl ActiveContractData {
-    pub fn new(clarity_version: ClarityVersion, source: &str) -> Self {
+    pub fn new(clarity_version: ClarityVersion, epoch: StacksEpochId, source: &str) -> Self {
         match build_ast(
             &QualifiedContractIdentifier::transient(),
             source,
             &mut (),
             clarity_version,
-            StacksEpochId::Epoch21,
+            epoch,
         ) {
             Ok(ast) => ActiveContractData {
                 clarity_version,
+                epoch,
                 expressions: Some(ast.expressions),
                 diagnostic: None,
             },
             Err(err) => ActiveContractData {
                 clarity_version,
+                epoch,
                 expressions: None,
                 diagnostic: Some(err.diagnostic),
             },
@@ -55,7 +58,7 @@ impl ActiveContractData {
             source,
             &mut (),
             self.clarity_version,
-            StacksEpochId::Epoch21,
+            self.epoch,
         ) {
             Ok(ast) => {
                 self.expressions = Some(ast.expressions);
@@ -298,9 +301,10 @@ impl EditorState {
         &mut self,
         contract_location: FileLocation,
         clarity_version: ClarityVersion,
+        epoch: StacksEpochId,
         source: &str,
     ) {
-        let contract = ActiveContractData::new(clarity_version, source);
+        let contract = ActiveContractData::new(clarity_version, epoch, source);
         self.active_contracts.insert(contract_location, contract);
     }
 

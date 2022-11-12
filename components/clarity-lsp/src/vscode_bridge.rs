@@ -1,6 +1,7 @@
 extern crate console_error_panic_hook;
 use crate::backend::{
     process_notification, process_request, EditorStateInput, LspNotification, LspRequest,
+    LspRequestResponse,
 };
 use crate::state::EditorState;
 use crate::utils::{
@@ -12,10 +13,10 @@ use lsp_types::notification::{
     DidChangeTextDocument, DidCloseTextDocument, DidOpenTextDocument, DidSaveTextDocument,
     Initialized, Notification,
 };
+use lsp_types::request::{Completion, Initialize, Request};
 use lsp_types::{
-    request::{Completion, Request},
-    CompletionParams, DidChangeTextDocumentParams, DidCloseTextDocumentParams,
-    DidOpenTextDocumentParams, DidSaveTextDocumentParams, PublishDiagnosticsParams, Url,
+    DidChangeTextDocumentParams, DidCloseTextDocumentParams, DidOpenTextDocumentParams,
+    DidSaveTextDocumentParams, PublishDiagnosticsParams, Url,
 };
 use serde_wasm_bindgen::{from_value as decode_from_js, to_value as encode_to_js};
 use std::panic;
@@ -28,7 +29,7 @@ pub struct LspVscodeBridge {
     client_diagnostic_tx: JsFunction,
     _client_notification_tx: JsFunction,
     backend_to_client_tx: JsFunction,
-    editor_state: EditorStateInput,
+    editor_state_lock: Arc<RwLock<EditorState>>,
 }
 
 #[wasm_bindgen]
@@ -45,10 +46,7 @@ impl LspVscodeBridge {
             client_diagnostic_tx,
             _client_notification_tx,
             backend_to_client_tx: backend_to_client_tx.clone(),
-            editor_state: EditorStateInput::new(
-                None,
-                Some(Arc::new(RwLock::new(EditorState::new()))),
-            ),
+            editor_state_lock: Arc::new(RwLock::new(EditorState::new())),
         }
     }
 
@@ -65,11 +63,11 @@ impl LspVscodeBridge {
                     Ok(params) => params,
                     Err(err) => return Promise::reject(&JsValue::from(format!("error: {}", err))),
                 };
-                let uri = params.text_document.uri;
+                let uri = &params.text_document.uri;
 
-                if let Some(contract_location) = get_contract_location(&uri) {
+                if let Some(contract_location) = get_contract_location(uri) {
                     LspNotification::ContractOpened(contract_location.clone())
-                } else if let Some(manifest_location) = get_manifest_location(&uri) {
+                } else if let Some(manifest_location) = get_manifest_location(uri) {
                     LspNotification::ManifestOpened(manifest_location)
                 } else {
                     return Promise::reject(&JsValue::from_str("Unsupported file opened"));
@@ -130,7 +128,7 @@ impl LspVscodeBridge {
             }
         };
 
-        let mut editor_state = self.editor_state.clone();
+        let mut editor_state_lock = EditorStateInput::RwLock(self.editor_state_lock.clone());
         let send_diagnostic = self.client_diagnostic_tx.clone();
         let file_accessor: Box<dyn FileAccessor> = Box::new(WASMFileSystemAccessor::new(
             self.backend_to_client_tx.clone(),
@@ -138,7 +136,7 @@ impl LspVscodeBridge {
 
         future_to_promise(async move {
             let mut result =
-                process_notification(command, &mut editor_state, Some(&file_accessor)).await;
+                process_notification(command, &mut editor_state_lock, Some(&file_accessor)).await;
 
             let mut aggregated_diagnostics = vec![];
             if let Ok(ref mut response) = result {
@@ -165,14 +163,24 @@ impl LspVscodeBridge {
     #[wasm_bindgen(js_name=onRequest)]
     pub fn request_handler(&self, method: String, js_params: JsValue) -> Result<JsValue, JsValue> {
         match method.as_str() {
-            Completion::METHOD => {
-                let params: CompletionParams = decode_from_js(js_params)?;
-                let file_url = params.text_document_position.text_document.uri;
-                let location = get_contract_location(&file_url).ok_or(JsValue::NULL)?;
-                let command = LspRequest::GetIntellisense(location);
-                let lsp_response = process_request(command, &self.editor_state);
+            Initialize::METHOD => {
+                let lsp_response = process_request(
+                    LspRequest::Initialize(decode_from_js(js_params)?),
+                    &EditorStateInput::RwLock(self.editor_state_lock.clone()),
+                );
+                if let LspRequestResponse::Initialize(response) = lsp_response {
+                    return encode_to_js(&response).map_err(|_| JsValue::NULL);
+                }
+            }
 
-                return encode_to_js(&lsp_response.completion_items).map_err(|_| JsValue::NULL);
+            Completion::METHOD => {
+                let lsp_response = process_request(
+                    LspRequest::Completion(decode_from_js(js_params)?),
+                    &EditorStateInput::RwLock(self.editor_state_lock.clone()),
+                );
+                if let LspRequestResponse::CompletionItems(response) = lsp_response {
+                    return encode_to_js(&response).map_err(|_| JsValue::NULL);
+                }
             }
 
             _ => {
