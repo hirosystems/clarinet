@@ -252,7 +252,7 @@ pub fn start_replay_flow(network: &StacksNetwork, bitcoind_rpc_url: Url, apply: 
     thread::spawn(move || {
         let res = block::digestion::start(digestion_rx, &digestion_config);
         if let Err(e) = res {
-            error!("{}", e);
+            crit!("{}", e);
         }
         let _ = terminate_observer_command_tx.send(ObserverCommand::Terminate);
     });
@@ -296,7 +296,7 @@ pub fn start_replay_flow(network: &StacksNetwork, bitcoind_rpc_url: Url, apply: 
     let mut redis_con = match client.get_connection() {
         Ok(con) => con,
         Err(message) => {
-            error!("Redis: {}", message.to_string());
+            crit!("Redis: {}", message.to_string());
             panic!();
         }
     };
@@ -311,7 +311,7 @@ pub fn start_replay_flow(network: &StacksNetwork, bitcoind_rpc_url: Url, apply: 
         let event = match observer_event_rx.recv() {
             Ok(cmd) => cmd,
             Err(e) => {
-                error!("Error: broken channel {}", e.to_string());
+                crit!("Error: broken channel {}", e.to_string());
                 break;
             }
         };
@@ -423,14 +423,14 @@ pub fn start_replay_flow(network: &StacksNetwork, bitcoind_rpc_url: Url, apply: 
                         let start_block = match bitcoin_hook.start_block {
                             Some(start_block) => start_block,
                             None => {
-                                error!("Bitcoin chainhook specification must include a field start_block in replay mode");
+                                warn!("Bitcoin chainhook specification must include a field start_block in replay mode");
                                 continue;
                             }
                         };
                         let tip_height = match bitcoin_rpc.get_blockchain_info() {
                             Ok(result) => result.blocks,
                             Err(e) => {
-                                error!("unable to retrieve Bitcoin chain tip ({})", e.to_string());
+                                warn!("unable to retrieve Bitcoin chain tip ({})", e.to_string());
                                 continue;
                             }
                         };
@@ -898,7 +898,7 @@ fn update_storage_with_confirmed_stacks_blocks(
             ],
         );
         if let Err(error) = res {
-            error!(
+            crit!(
                 "unable to archive block {}: {}",
                 block.block_identifier,
                 error.to_string()
