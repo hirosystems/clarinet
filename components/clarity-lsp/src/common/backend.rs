@@ -5,9 +5,9 @@ use crate::utils::get_contract_location;
 use clarinet_files::{FileAccessor, FileLocation, ProjectManifest};
 use clarity_repl::clarity::diagnostic::Diagnostic;
 use lsp_types::{
-    CompletionItem, CompletionOptions, CompletionParams, Documentation, HoverProviderCapability,
-    InitializeParams, InitializeResult, MarkupContent, MarkupKind, ServerCapabilities,
-    TextDocumentSyncCapability, TextDocumentSyncKind, TextDocumentSyncOptions,
+    CompletionItem, CompletionOptions, CompletionParams, Documentation, Hover, HoverParams,
+    HoverProviderCapability, InitializeParams, InitializeResult, MarkupContent, MarkupKind,
+    ServerCapabilities, TextDocumentSyncCapability, TextDocumentSyncKind, TextDocumentSyncOptions,
     TextDocumentSyncSaveOptions,
 };
 use serde::{Deserialize, Serialize};
@@ -255,12 +255,14 @@ pub async fn process_notification(
 pub enum LspRequest {
     Initialize(InitializeParams),
     Completion(CompletionParams),
+    Hover(HoverParams),
 }
 
 #[derive(Debug, PartialEq, Deserialize, Serialize)]
 pub enum LspRequestResponse {
     Initialize(InitializeResult),
     CompletionItems(Vec<CompletionItem>),
+    Hover(Option<Hover>),
 }
 
 pub fn process_request(command: LspRequest, editor_state: &EditorStateInput) -> LspRequestResponse {
@@ -283,10 +285,26 @@ pub fn process_request(command: LspRequest, editor_state: &EditorStateInput) -> 
                     all_commit_characters: None,
                     work_done_progress_options: Default::default(),
                 }),
-                hover_provider: Some(HoverProviderCapability::Simple(false)),
+                hover_provider: Some(HoverProviderCapability::Simple(true)),
                 ..ServerCapabilities::default()
             },
         }),
+
+        LspRequest::Hover(params) => {
+            let file_url = params.text_document_position_params.text_document.uri;
+            let contract_location = match get_contract_location(&file_url) {
+                Some(contract_location) => contract_location,
+                None => return LspRequestResponse::Hover(None),
+            };
+            let position = params.text_document_position_params.position;
+            let hover_data = match try_read(editor_state, |es| {
+                es.get_hover_data(&contract_location, &position)
+            }) {
+                Ok(result) => result,
+                Err(_) => return LspRequestResponse::Hover(None),
+            };
+            LspRequestResponse::Hover(hover_data)
+        }
 
         LspRequest::Completion(params) => {
             let file_url = params.text_document_position.text_document.uri;
