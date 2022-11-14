@@ -724,22 +724,21 @@ pub fn start_node(mut config: Config) {
         let _ = hiro_system_kit::nestable_block_on(future);
     });
 
-    let redis_config = config.expected_redis_config();
-    let client = redis::Client::open(redis_config.uri.clone()).unwrap();
-    let mut redis_con = match client.get_connection() {
-        Ok(con) => con,
-        Err(message) => {
-            error!("Redis: {}", message.to_string());
-            panic!();
-        }
-    };
-
     loop {
         let event = match observer_event_rx.recv() {
             Ok(cmd) => cmd,
             Err(e) => {
                 error!("Error: broken channel {}", e.to_string());
                 break;
+            }
+        };
+        let redis_config = config.expected_redis_config();
+        let client = redis::Client::open(redis_config.uri.clone()).unwrap();
+        let mut redis_con = match client.get_connection() {
+            Ok(con) => con,
+            Err(message) => {
+                error!("Redis: {}", message.to_string());
+                panic!();
             }
         };
         match event {
