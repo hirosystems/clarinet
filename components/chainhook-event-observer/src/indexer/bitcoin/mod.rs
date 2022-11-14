@@ -7,14 +7,13 @@ use bitcoincore_rpc::bitcoin::hashes::Hash;
 use bitcoincore_rpc::bitcoin::{Block, BlockHash};
 use bitcoincore_rpc::{Auth, Client, RpcApi};
 pub use blocks_pool::BitcoinBlockPool;
-use chainhook_types::bitcoin::{OutPoint, TxIn, TxOut, Witness};
+use chainhook_types::bitcoin::{OutPoint, TxIn, TxOut};
 use chainhook_types::{
     BitcoinBlockData, BitcoinBlockMetadata, BitcoinTransactionData, BitcoinTransactionMetadata,
     BlockCommitmentData, BlockIdentifier, KeyRegistrationData, LockSTXData, PobBlockCommitmentData,
     PoxBlockCommitmentData, PoxReward, StacksBaseChainOperation, TransactionIdentifier,
     TransferSTXData,
 };
-use clarity_repl::clarity::deps_common::bitcoin::blockdata::script::Script;
 use clarity_repl::clarity::util::hash::{hex_bytes, to_hex};
 use rocket::serde::json::Value as JsonValue;
 

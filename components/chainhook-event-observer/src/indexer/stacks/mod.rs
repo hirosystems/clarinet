@@ -4,7 +4,6 @@ pub use blocks_pool::StacksBlockPool;
 
 use crate::indexer::AssetClassCache;
 use crate::indexer::{IndexerConfig, StacksChainContext};
-use bitcoincore_rpc::bitcoin::Block;
 use chainhook_types::*;
 use clarity_repl::clarity::codec::StacksMessageCodec;
 use clarity_repl::clarity::util::hash::hex_bytes;
@@ -12,7 +11,7 @@ use clarity_repl::clarity::vm::types::Value as ClarityValue;
 use clarity_repl::codec::{StacksTransaction, TransactionAuth, TransactionPayload};
 use rocket::serde::json::Value as JsonValue;
 use rocket::serde::Deserialize;
-use std::collections::{hash_map::Entry, BTreeMap, BTreeSet, HashMap, HashSet};
+use std::collections::{BTreeMap, HashMap, HashSet};
 use std::convert::TryInto;
 use std::io::Cursor;
 use std::str;

@@ -3,9 +3,7 @@ pub mod stacks;
 
 use crate::utils::AbstractBlock;
 use chainhook_types::{
-    BitcoinChainEvent, BitcoinNetwork, BlockIdentifier, StacksBlockData, StacksChainEvent,
-    StacksChainUpdatedWithBlocksData, StacksChainUpdatedWithMicroblocksData,
-    StacksMicroblocksTrail, StacksNetwork,
+    BitcoinChainEvent, BitcoinNetwork, BlockIdentifier, StacksChainEvent, StacksNetwork,
 };
 use rocket::serde::json::Value as JsonValue;
 use stacks::StacksBlockPool;

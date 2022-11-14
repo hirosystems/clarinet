@@ -1,7 +1,7 @@
 use crate::chainhooks::types::{
     BitcoinChainhookSpecification, BitcoinPredicateType, BitcoinTransactionFilterPredicate,
-    ChainhookSpecification, ExactMatchingRule, HookAction, HookFormation, MatchingRule, Scope,
-    StacksBlockFilterPredicate, StacksChainhookSpecification, StacksContractCallBasedPredicate,
+    ChainhookSpecification, ExactMatchingRule, HookAction, HookFormation, Scope,
+    StacksChainhookSpecification, StacksContractCallBasedPredicate,
     StacksTransactionFilterPredicate,
 };
 use crate::indexer::tests::helpers::transactions::generate_test_tx_bitcoin_p2pkh_transfer;
@@ -9,14 +9,12 @@ use crate::indexer::tests::helpers::{
     accounts, bitcoin_blocks, stacks_blocks, transactions::generate_test_tx_stacks_contract_call,
 };
 use crate::observer::{
-    self, start_observer_commands_handler, ApiKey, ChainhookStore, EventHandler,
-    EventObserverConfig, ObserverCommand,
+    start_observer_commands_handler, ApiKey, ChainhookStore, EventObserverConfig, ObserverCommand,
 };
 use chainhook_types::{
-    BitcoinChainEvent, BitcoinChainUpdatedWithBlocksData, BitcoinNetwork, StacksBlockData,
-    StacksBlockUpdate, StacksChainEvent, StacksChainUpdatedWithBlocksData, StacksNetwork,
+    BitcoinChainEvent, BitcoinChainUpdatedWithBlocksData, BitcoinNetwork, StacksBlockUpdate,
+    StacksChainEvent, StacksChainUpdatedWithBlocksData, StacksNetwork,
 };
-use clarity_repl::clarity::vm::types::QualifiedContractIdentifier;
 use hiro_system_kit;
 use std::collections::{HashMap, HashSet};
 use std::sync::mpsc::{channel, Receiver, Sender};

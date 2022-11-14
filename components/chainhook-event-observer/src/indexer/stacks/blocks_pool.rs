@@ -1,14 +1,11 @@
 use crate::indexer::{ChainSegment, ChainSegmentIncompatibility};
-use crate::utils::AbstractBlock;
-use bitcoincore_rpc::bitcoin::Block;
 use chainhook_types::{
-    BitcoinChainEvent, BlockIdentifier, Chain, StacksBlockData, StacksBlockUpdate,
-    StacksChainEvent, StacksChainUpdatedWithBlocksData, StacksChainUpdatedWithMicroblocksData,
+    BlockIdentifier, StacksBlockData, StacksBlockUpdate, StacksChainEvent,
+    StacksChainUpdatedWithBlocksData, StacksChainUpdatedWithMicroblocksData,
     StacksChainUpdatedWithMicroblocksReorgData, StacksChainUpdatedWithReorgData,
-    StacksMicroblockData, StacksMicroblocksTrail, StacksTransactionData,
+    StacksMicroblockData,
 };
-use clarity_repl::clarity::util::hash::to_hex;
-use std::collections::{hash_map::Entry, BTreeMap, BTreeSet, HashMap, HashSet, VecDeque};
+use std::collections::{hash_map::Entry, BTreeMap, BTreeSet, HashMap, HashSet};
 
 pub struct StacksBlockPool {
     canonical_fork_id: usize,

@@ -12,7 +12,7 @@ use bitcoincore_rpc::bitcoin::{BlockHash, Txid};
 use bitcoincore_rpc::{Auth, Client, RpcApi};
 use chainhook_types::{
     BitcoinChainEvent, BitcoinNetwork, BlockIdentifier, StacksChainEvent, StacksNetwork,
-    StacksTransactionData, TransactionIdentifier,
+    TransactionIdentifier,
 };
 use clarity_repl::clarity::util::hash::bytes_to_hex;
 use hiro_system_kit;
@@ -20,24 +20,16 @@ use reqwest::Client as HttpClient;
 use rocket::config::{Config, LogLevel};
 use rocket::data::{Limits, ToByteUnit};
 use rocket::http::Status;
-use rocket::outcome::IntoOutcome;
 use rocket::request::{self, FromRequest, Outcome, Request};
 use rocket::serde::json::{json, Json, Value as JsonValue};
 use rocket::serde::Deserialize;
 use rocket::State;
 use rocket_okapi::{openapi, openapi_get_routes, request::OpenApiFromRequest};
-use schemars::JsonSchema;
-use serde_json::error;
-use stacks_rpc_client::{PoxInfo, StacksRpc};
-use std::collections::{HashMap, HashSet, VecDeque};
-use std::convert::TryFrom;
+use std::collections::{HashMap, HashSet};
 use std::error::Error;
-use std::iter::FromIterator;
 use std::net::{IpAddr, Ipv4Addr};
-use std::path::PathBuf;
 use std::str;
 use std::str::FromStr;
-use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc::{Receiver, Sender};
 use std::sync::{Arc, Mutex, RwLock};
 

@@ -1,7 +1,7 @@
 pub mod helpers;
 use self::helpers::BlockEvent;
 use super::{BitcoinBlockPool, StacksBlockPool};
-use chainhook_types::{BitcoinBlockData, BitcoinChainEvent, StacksBlockData, StacksChainEvent};
+use chainhook_types::{BitcoinBlockData, BitcoinChainEvent, StacksChainEvent};
 
 pub type StacksChainEventExpectation = Box<dyn Fn(Option<StacksChainEvent>) -> ()>;
 
