@@ -135,13 +135,14 @@ impl ProjectManifest {
         }
 
         let project_name = project_manifest_file.project.name;
-        let mut project_root_location = manifest_location.get_parent_location()?;
+        let project_root_location = manifest_location.get_parent_location()?;
         let cache_location = match project_manifest_file.project.cache_dir {
             Some(ref path) => FileLocation::try_parse(path, Some(&project_root_location))
                 .ok_or(format!("unable to parse path {}", path))?,
             None => {
-                project_root_location.append_path(".cache")?;
-                project_root_location.clone()
+                let mut cache_location = project_root_location.clone();
+                cache_location.append_path(".cache")?;
+                cache_location
             }
         };
 
@@ -257,6 +258,7 @@ impl ProjectManifest {
                             };
                             config_contracts
                                 .insert(contract_name.clone(), clarity_contract.clone());
+
                             let mut contract_location = project_root_location.clone();
                             contract_location.append_path(contract_path)?;
                             contracts_settings.insert(contract_location, clarity_contract);

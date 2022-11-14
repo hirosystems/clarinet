@@ -84,7 +84,7 @@ pub async fn process_notification(
 ) -> Result<LspNotificationResponse, String> {
     match command {
         LspNotification::ManifestOpened(manifest_location) => {
-            // Only build the initial state if it does not exist
+            // Only build the initial protocal state if it does not exist
             if try_read(&editor_state, |es| {
                 es.protocols.contains_key(&manifest_location)
             })? {
@@ -133,7 +133,7 @@ pub async fn process_notification(
                 .get_project_manifest_location(file_accessor)
                 .await?;
 
-            // store the file in the active_contracts map
+            // store the contract in the active_contracts map
             if !try_read(&editor_state, |es| {
                 es.active_contracts.contains_key(&contract_location)
             })? {
@@ -144,30 +144,46 @@ pub async fn process_notification(
                     }
                 }?;
 
-                let manifest = match file_accessor {
-                    None => ProjectManifest::from_location(&manifest_location),
-                    Some(file_accessor) => {
-                        ProjectManifest::from_file_accessor(&manifest_location, file_accessor).await
+                let lookup_clarity_version = try_read(editor_state, |es| {
+                    match es.contracts_lookup.get(&contract_location) {
+                        Some(metadata) => Some(metadata.clarity_version),
+                        None => None,
                     }
-                }?;
+                })?;
 
-                let contract_settings = manifest
-                    .contracts_settings
-                    .get(&contract_location)
-                    .ok_or("contract not found in manifest")?;
+                let clarity_version = match lookup_clarity_version {
+                    Some(clarity_version) => clarity_version,
+                    None => {
+                        // if the contract isn't in loopkup yet, get version directly from manifest
+                        match file_accessor {
+                            None => ProjectManifest::from_location(&manifest_location),
+                            Some(file_accessor) => {
+                                ProjectManifest::from_file_accessor(
+                                    &manifest_location,
+                                    file_accessor,
+                                )
+                                .await
+                            }
+                        }?
+                        .contracts_settings
+                        .get(&contract_location)
+                        .ok_or("contract not found in manifest")?
+                        .clarity_version
+                    }
+                };
 
                 try_write(editor_state, |es| {
                     es.insert_active_contract(
                         contract_location.clone(),
-                        contract_settings.clarity_version,
-                        contract_settings.epoch,
+                        clarity_version,
                         contract_source.as_str(),
                     )
                 })?;
             }
 
+            // Only build the initial protocal state if it does not exist
             if try_read(&editor_state, |es| {
-                es.contracts_lookup.contains_key(&contract_location)
+                es.protocols.contains_key(&manifest_location)
             })? {
                 return Ok(LspNotificationResponse::default());
             }
@@ -223,7 +239,7 @@ pub async fn process_notification(
 
         LspNotification::ContractChanged(contract_location, contract_source) => {
             match try_write(editor_state, |es| {
-                es.update_contract(&contract_location, &contract_source)
+                es.update_active_contract(&contract_location, &contract_source)
             })? {
                 Ok(_result) => {
                     // In case the source can not be parsed, the diagnostic could be sent but it would

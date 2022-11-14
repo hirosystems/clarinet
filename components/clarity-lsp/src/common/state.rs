@@ -1,5 +1,5 @@
 use crate::types::{CompletionItem, CompletionMaps};
-use crate::utils;
+use crate::utils::{self};
 use chainhook_types::StacksNetwork;
 use clarinet_deployments::{
     generate_default_deployment, initiate_session_from_deployment,
@@ -16,6 +16,7 @@ use clarity_repl::clarity::vm::ast::ContractAST;
 use clarity_repl::clarity::vm::types::QualifiedContractIdentifier;
 use clarity_repl::clarity::vm::EvaluationResult;
 use clarity_repl::clarity::{ClarityVersion, SymbolicExpression};
+use clarity_repl::repl::DEFAULT_CLARITY_VERSION;
 use lsp_types::MessageType;
 use std::borrow::BorrowMut;
 use std::collections::{HashMap, HashSet};
@@ -26,6 +27,7 @@ pub struct ActiveContractData {
     pub epoch: StacksEpochId,
     pub expressions: Option<Vec<SymbolicExpression>>,
     pub diagnostic: Option<ClarityDiagnostic>,
+    source: String,
 }
 
 impl ActiveContractData {
@@ -42,17 +44,20 @@ impl ActiveContractData {
                 epoch,
                 expressions: Some(ast.expressions),
                 diagnostic: None,
+                source: source.to_string(),
             },
             Err(err) => ActiveContractData {
                 clarity_version,
                 epoch,
                 expressions: None,
                 diagnostic: Some(err.diagnostic),
+                source: source.to_string(),
             },
         }
     }
 
     pub fn update(&mut self, source: &str) {
+        self.source = source.to_string();
         match build_ast(
             &QualifiedContractIdentifier::transient(),
             source,
@@ -70,6 +75,11 @@ impl ActiveContractData {
             }
         };
     }
+
+    pub fn update_clarity_version(&mut self, clarity_version: ClarityVersion) {
+        self.clarity_version = clarity_version;
+        self.update(&self.source.clone());
+    }
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -81,6 +91,7 @@ pub struct ContractState {
     contract_id: QualifiedContractIdentifier,
     analysis: Option<ContractAnalysis>,
     location: FileLocation,
+    clarity_version: ClarityVersion,
 }
 
 impl ContractState {
@@ -91,6 +102,7 @@ impl ContractState {
         mut diags: Vec<ClarityDiagnostic>,
         analysis: Option<ContractAnalysis>,
         location: FileLocation,
+        clarity_version: ClarityVersion,
     ) -> ContractState {
         let mut errors = vec![];
         let mut warnings = vec![];
@@ -123,6 +135,7 @@ impl ContractState {
             notes,
             analysis,
             location,
+            clarity_version,
         }
     }
 }
@@ -132,6 +145,7 @@ pub struct ContractMetadata {
     pub base_location: FileLocation,
     pub manifest_location: FileLocation,
     pub relative_path: String,
+    pub clarity_version: ClarityVersion,
 }
 
 #[derive(Clone, Default, Debug)]
@@ -170,19 +184,26 @@ impl EditorState {
             }
         };
 
-        for (contract_uri, _) in protocol.contracts.iter() {
-            let relative_path = contract_uri
+        for (contract_location, contract_state) in protocol.contracts.iter() {
+            let relative_path = contract_location
                 .get_relative_path_from_base(&base_location)
                 .expect("could not find relative location");
 
             self.contracts_lookup.insert(
-                contract_uri.clone(),
+                contract_location.clone(),
                 ContractMetadata {
                     base_location: base_location.clone(),
                     manifest_location: manifest_location.clone(),
                     relative_path,
+                    clarity_version: contract_state.clarity_version,
                 },
             );
+
+            if let Some(active_contract) = self.active_contracts.get_mut(contract_location) {
+                if active_contract.clarity_version != contract_state.clarity_version {
+                    active_contract.update_clarity_version(contract_state.clarity_version)
+                }
+            }
         }
         self.protocols.insert(manifest_location, protocol);
     }
@@ -301,14 +322,14 @@ impl EditorState {
         &mut self,
         contract_location: FileLocation,
         clarity_version: ClarityVersion,
-        epoch: StacksEpochId,
         source: &str,
     ) {
+        let epoch = StacksEpochId::Epoch21;
         let contract = ActiveContractData::new(clarity_version, epoch, source);
         self.active_contracts.insert(contract_location, contract);
     }
 
-    pub fn update_contract(
+    pub fn update_active_contract(
         &mut self,
         contract_location: &FileLocation,
         source: &str,
@@ -317,7 +338,6 @@ impl EditorState {
             .active_contracts
             .get_mut(contract_location)
             .ok_or("contract not in active_contracts")?;
-
         contract_state.update(source);
         Ok(contract_state.to_owned())
     }
@@ -364,6 +384,10 @@ impl ProtocolState {
                 Some(analysis) => analysis,
                 None => None,
             };
+            let clarity_version = match &analysis {
+                Some(analysis) => analysis.clarity_version,
+                None => DEFAULT_CLARITY_VERSION,
+            };
 
             let contract_state = ContractState::new(
                 contract_id,
@@ -372,6 +396,7 @@ impl ProtocolState {
                 diags,
                 analysis,
                 contract_location.clone(),
+                clarity_version,
             );
             self.contracts
                 .insert(contract_location.clone(), contract_state);
