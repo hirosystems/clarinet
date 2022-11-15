@@ -490,11 +490,11 @@ pub async fn generate_default_deployment(
     let sources: HashMap<String, String> = match file_accessor {
         None => {
             let mut sources = HashMap::new();
-            for (contract_location, contract_config) in manifest.contracts_settings.iter() {
+            for (contract_location, _) in manifest.contracts_settings.iter() {
                 let source = contract_location.read_content_as_utf8().map_err(|_| {
                     format!(
-                        "unable to find contract at path {}",
-                        contract_config.expect_contract_path_as_str()
+                        "unable to find contract at {}",
+                        contract_location.to_string()
                     )
                 })?;
                 sources.insert(contract_location.to_string(), source);

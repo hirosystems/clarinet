@@ -14,6 +14,14 @@ use std::path::PathBuf;
 use std::str::FromStr;
 use toml::value::Value;
 
+#[derive(Deserialize, Debug, Clone)]
+pub struct ClarityContractMetadata {
+    pub name: String,
+    pub deployer: ContractDeployer,
+    pub clarity_version: ClarityVersion,
+    pub epoch: StacksEpochId,
+}
+
 #[derive(Serialize, Deserialize, Debug)]
 pub struct ProjectManifestFile {
     project: ProjectConfigFile,
@@ -46,7 +54,7 @@ pub struct ProjectManifest {
     #[serde(skip_serializing)]
     pub location: FileLocation,
     #[serde(skip_serializing)]
-    pub contracts_settings: HashMap<FileLocation, ClarityContract>,
+    pub contracts_settings: HashMap<FileLocation, ClarityContractMetadata>,
 }
 
 #[derive(Debug, Clone)]
@@ -249,19 +257,29 @@ impl ProjectManifest {
                                 }
                                 _ => DEFAULT_EPOCH,
                             };
-                            let clarity_contract = ClarityContract {
-                                name: contract_name.clone(),
-                                code_source,
-                                deployer,
-                                clarity_version,
-                                epoch,
-                            };
-                            config_contracts
-                                .insert(contract_name.clone(), clarity_contract.clone());
+
+                            config_contracts.insert(
+                                contract_name.to_string(),
+                                ClarityContract {
+                                    name: contract_name.to_string(),
+                                    deployer: deployer.clone(),
+                                    code_source,
+                                    clarity_version,
+                                    epoch,
+                                },
+                            );
 
                             let mut contract_location = project_root_location.clone();
                             contract_location.append_path(contract_path)?;
-                            contracts_settings.insert(contract_location, clarity_contract);
+                            contracts_settings.insert(
+                                contract_location,
+                                ClarityContractMetadata {
+                                    name: contract_name.to_string(),
+                                    deployer,
+                                    clarity_version,
+                                    epoch,
+                                },
+                            );
                         }
                         _ => {}
                     }
