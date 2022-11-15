@@ -19,29 +19,31 @@ pub enum EditorStateInput {
     RwLock(Arc<RwLock<EditorState>>),
 }
 
-fn try_read<F, R>(editor_state_input: &EditorStateInput, closure: F) -> Result<R, String>
-where
-    F: FnOnce(&EditorState) -> R,
-{
-    match editor_state_input {
-        EditorStateInput::Owned(editor_state) => Ok(closure(&editor_state)),
-        EditorStateInput::RwLock(editor_state_lock) => match editor_state_lock.try_read() {
-            Ok(editor_state) => Ok(closure(&editor_state)),
-            Err(_) => Err("failed to read editor_state".to_string()),
-        },
+impl EditorStateInput {
+    pub fn try_read<F, R>(&self, closure: F) -> Result<R, String>
+    where
+        F: FnOnce(&EditorState) -> R,
+    {
+        match self {
+            EditorStateInput::Owned(editor_state) => Ok(closure(&editor_state)),
+            EditorStateInput::RwLock(editor_state_lock) => match editor_state_lock.try_read() {
+                Ok(editor_state) => Ok(closure(&editor_state)),
+                Err(_) => Err("failed to read editor_state".to_string()),
+            },
+        }
     }
-}
 
-fn try_write<F, R>(editor_state_input: &mut EditorStateInput, closure: F) -> Result<R, String>
-where
-    F: FnOnce(&mut EditorState) -> R,
-{
-    match editor_state_input {
-        EditorStateInput::Owned(editor_state) => Ok(closure(editor_state)),
-        EditorStateInput::RwLock(editor_state_lock) => match editor_state_lock.try_write() {
-            Ok(mut editor_state) => Ok(closure(&mut editor_state)),
-            Err(_) => Err("failed to write editor_state".to_string()),
-        },
+    pub fn try_write<F, R>(&mut self, closure: F) -> Result<R, String>
+    where
+        F: FnOnce(&mut EditorState) -> R,
+    {
+        match self {
+            EditorStateInput::Owned(editor_state) => Ok(closure(editor_state)),
+            EditorStateInput::RwLock(editor_state_lock) => match editor_state_lock.try_write() {
+                Ok(mut editor_state) => Ok(closure(&mut editor_state)),
+                Err(_) => Err("failed to write editor_state".to_string()),
+            },
+        }
     }
 }
 
@@ -85,9 +87,7 @@ pub async fn process_notification(
     match command {
         LspNotification::ManifestOpened(manifest_location) => {
             // Only build the initial protocal state if it does not exist
-            if try_read(&editor_state, |es| {
-                es.protocols.contains_key(&manifest_location)
-            })? {
+            if editor_state.try_read(|es| es.protocols.contains_key(&manifest_location))? {
                 return Ok(LspNotificationResponse::default());
             }
 
@@ -95,11 +95,10 @@ pub async fn process_notification(
             let mut protocol_state = ProtocolState::new();
             match build_state(&manifest_location, &mut protocol_state, file_accessor).await {
                 Ok(_) => {
-                    try_write(editor_state, |es| {
-                        es.index_protocol(manifest_location, protocol_state)
-                    })?;
+                    editor_state
+                        .try_write(|es| es.index_protocol(manifest_location, protocol_state))?;
                     let (aggregated_diagnostics, notification) =
-                        try_read(&editor_state, |es| es.get_aggregated_diagnostics())?;
+                        editor_state.try_read(|es| es.get_aggregated_diagnostics())?;
                     return Ok(LspNotificationResponse {
                         aggregated_diagnostics,
                         notification,
@@ -114,11 +113,10 @@ pub async fn process_notification(
             let mut protocol_state = ProtocolState::new();
             match build_state(&manifest_location, &mut protocol_state, file_accessor).await {
                 Ok(_) => {
-                    try_write(editor_state, |es| {
-                        es.index_protocol(manifest_location, protocol_state)
-                    })?;
+                    editor_state
+                        .try_write(|es| es.index_protocol(manifest_location, protocol_state))?;
                     let (aggregated_diagnostics, notification) =
-                        try_read(&editor_state, |es| es.get_aggregated_diagnostics())?;
+                        editor_state.try_read(|es| es.get_aggregated_diagnostics())?;
                     return Ok(LspNotificationResponse {
                         aggregated_diagnostics,
                         notification,
@@ -134,9 +132,7 @@ pub async fn process_notification(
                 .await?;
 
             // store the contract in the active_contracts map
-            if !try_read(&editor_state, |es| {
-                es.active_contracts.contains_key(&contract_location)
-            })? {
+            if !editor_state.try_read(|es| es.active_contracts.contains_key(&contract_location))? {
                 let contract_source = match file_accessor {
                     None => contract_location.read_content_as_utf8(),
                     Some(file_accessor) => {
@@ -144,7 +140,7 @@ pub async fn process_notification(
                     }
                 }?;
 
-                let lookup_clarity_version = try_read(editor_state, |es| {
+                let lookup_clarity_version = editor_state.try_read(|es| {
                     match es.contracts_lookup.get(&contract_location) {
                         Some(metadata) => Some(metadata.clarity_version),
                         None => None,
@@ -172,7 +168,7 @@ pub async fn process_notification(
                     }
                 };
 
-                try_write(editor_state, |es| {
+                editor_state.try_write(|es| {
                     es.insert_active_contract(
                         contract_location.clone(),
                         clarity_version,
@@ -182,20 +178,17 @@ pub async fn process_notification(
             }
 
             // Only build the initial protocal state if it does not exist
-            if try_read(&editor_state, |es| {
-                es.protocols.contains_key(&manifest_location)
-            })? {
+            if editor_state.try_read(|es| es.protocols.contains_key(&manifest_location))? {
                 return Ok(LspNotificationResponse::default());
             }
 
             let mut protocol_state = ProtocolState::new();
             match build_state(&manifest_location, &mut protocol_state, file_accessor).await {
                 Ok(_) => {
-                    try_write(editor_state, |es| {
-                        es.index_protocol(manifest_location, protocol_state)
-                    })?;
+                    editor_state
+                        .try_write(|es| es.index_protocol(manifest_location, protocol_state))?;
                     let (aggregated_diagnostics, notification) =
-                        try_read(&editor_state, |es| es.get_aggregated_diagnostics())?;
+                        editor_state.try_read(|es| es.get_aggregated_diagnostics())?;
                     return Ok(LspNotificationResponse {
                         aggregated_diagnostics,
                         notification,
@@ -206,9 +199,9 @@ pub async fn process_notification(
         }
 
         LspNotification::ContractSaved(contract_location) => {
-            let manifest_location = match try_write(editor_state, |es| {
-                es.clear_protocol_associated_with_contract(&contract_location)
-            })? {
+            let manifest_location = match editor_state
+                .try_write(|es| es.clear_protocol_associated_with_contract(&contract_location))?
+            {
                 Some(manifest_location) => manifest_location,
                 None => {
                     contract_location
@@ -222,12 +215,11 @@ pub async fn process_notification(
             let mut protocol_state = ProtocolState::new();
             match build_state(&manifest_location, &mut protocol_state, file_accessor).await {
                 Ok(_contracts_updates) => {
-                    try_write(editor_state, |es| {
-                        es.index_protocol(manifest_location, protocol_state)
-                    })?;
+                    editor_state
+                        .try_write(|es| es.index_protocol(manifest_location, protocol_state))?;
 
                     let (aggregated_diagnostics, notification) =
-                        try_read(&editor_state, |es| es.get_aggregated_diagnostics())?;
+                        editor_state.try_read(|es| es.get_aggregated_diagnostics())?;
                     return Ok(LspNotificationResponse {
                         aggregated_diagnostics,
                         notification,
@@ -238,9 +230,9 @@ pub async fn process_notification(
         }
 
         LspNotification::ContractChanged(contract_location, contract_source) => {
-            match try_write(editor_state, |es| {
-                es.update_active_contract(&contract_location, &contract_source)
-            })? {
+            match editor_state
+                .try_write(|es| es.update_active_contract(&contract_location, &contract_source))?
+            {
                 Ok(_result) => {
                     // In case the source can not be parsed, the diagnostic could be sent but it would
                     // remove the other diagnostic errors (types, check-checker, etc).
@@ -253,9 +245,7 @@ pub async fn process_notification(
         }
 
         LspNotification::ContractClosed(contract_location) => {
-            try_write(editor_state, |es| {
-                es.active_contracts.remove_entry(&contract_location)
-            })?;
+            editor_state.try_write(|es| es.active_contracts.remove_entry(&contract_location))?;
             Ok(LspNotificationResponse::default())
         }
     }
@@ -304,9 +294,9 @@ pub fn process_request(command: LspRequest, editor_state: &EditorStateInput) -> 
                 Some(contract_location) => contract_location,
                 None => return LspRequestResponse::CompletionItems(vec![]),
             };
-            let mut completion_items_src = match try_read(editor_state, |es| {
-                es.get_completion_items_for_contract(&contract_location)
-            }) {
+            let mut completion_items_src = match editor_state
+                .try_read(|es| es.get_completion_items_for_contract(&contract_location))
+            {
                 Ok(result) => result,
                 Err(_) => return LspRequestResponse::CompletionItems(vec![]),
             };
