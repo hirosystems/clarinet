@@ -297,9 +297,9 @@ pub fn process_request(command: LspRequest, editor_state: &EditorStateInput) -> 
                 None => return LspRequestResponse::Hover(None),
             };
             let position = params.text_document_position_params.position;
-            let hover_data = match try_read(editor_state, |es| {
-                es.get_hover_data(&contract_location, &position)
-            }) {
+            let hover_data = match editor_state
+                .try_read(|es| es.get_hover_data(&contract_location, &position))
+            {
                 Ok(result) => result,
                 Err(_) => return LspRequestResponse::Hover(None),
             };

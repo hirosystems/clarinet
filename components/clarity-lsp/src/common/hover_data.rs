@@ -14,16 +14,17 @@ fn code(code: &str) -> String {
 lazy_static! {
     static ref API_REF: HashMap<(String, String), String> = {
         let mut api_references = HashMap::new();
+        let separator = "- - -"; // "---" can produce h2 if placed under text
         for define_function in DefineFunctions::ALL {
             let reference = make_define_reference(define_function);
             api_references.insert(
                 (reference.version.to_string(), define_function.to_string()),
                 Vec::from([
                     &code(&reference.signature),
-                    "---",
+                    separator,
                     "**Description**",
                     &reference.description,
-                    "---",
+                    separator,
                     "**Example**",
                     &code(&reference.example),
                 ])
@@ -37,13 +38,13 @@ lazy_static! {
                 (reference.version.to_string(), native_function.to_string()),
                 Vec::from([
                     &code(&reference.signature),
-                    "---",
+                    separator,
                     "**Description**",
                     &reference.description,
-                    "---",
+                    separator,
                     "**Example**",
                     &code(&reference.example),
-                    "---",
+                    separator,
                     &format!("**Introduced in:** {}", &reference.version),
                 ])
                 .join("\n"),
@@ -57,9 +58,10 @@ lazy_static! {
                 vec![
                     "**Description**",
                     &reference.description,
-                    "---",
+                    separator,
                     "**Example**",
                     &code(&reference.example),
+                    separator,
                     &format!("**Introduced in:** {}", &reference.version),
                 ]
                 .join("\n"),
