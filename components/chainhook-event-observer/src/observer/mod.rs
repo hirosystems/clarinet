@@ -263,6 +263,7 @@ pub async fn start_event_observer(
         keep_alive: 5,
         temp_dir: std::env::temp_dir().into(),
         log_level: log_level.clone(),
+        cli_colors: false,
         limits,
         ..Config::default()
     };
@@ -301,6 +302,7 @@ pub async fn start_event_observer(
         keep_alive: 5,
         temp_dir: std::env::temp_dir().into(),
         log_level,
+        cli_colors: false,
         ..Config::default()
     };
 

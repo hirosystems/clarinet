@@ -585,16 +585,35 @@ pub fn mine_bitcoin_block(
 ) {
     use bitcoincore_rpc::bitcoin::Address;
     use std::str::FromStr;
-    let rpc = Client::new(
+    let rpc = match Client::new(
         &format!("http://localhost:{}", bitcoin_node_rpc_port),
         Auth::UserPass(
             bitcoin_node_username.to_string(),
             bitcoin_node_password.to_string(),
         ),
-    )
-    .unwrap();
+    ) {
+        Ok(rpc) => rpc,
+        Err(e) => {
+            println!(
+                "{}: {}",
+                "unable to initialize bitcoin rpc client",
+                e.to_string()
+            );
+            std::process::exit(1);
+        }
+    };
     let miner_address = Address::from_str(miner_btc_address).unwrap();
-    let _ = rpc.generate_to_address(1, &miner_address);
+    match rpc.generate_to_address(1, &miner_address) {
+        Ok(rpc) => rpc,
+        Err(e) => {
+            println!(
+                "{}: {}",
+                "unable to generate new bitcoin block",
+                e.to_string()
+            );
+            std::process::exit(1);
+        }
+    };
 }
 
 fn handle_bitcoin_mining(

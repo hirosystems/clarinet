@@ -969,6 +969,7 @@ miner = true
 seed = "{miner_secret_key_hex}"
 local_peer_seed = "{miner_secret_key_hex}"
 wait_time_for_microblocks = 5000
+wait_time_for_blocks = 0
 pox_sync_sample_secs = 10
 microblock_frequency = 15000
 

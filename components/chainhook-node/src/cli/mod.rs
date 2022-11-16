@@ -305,7 +305,14 @@ pub fn start_replay_flow(network: &StacksNetwork, bitcoind_rpc_url: Url, apply: 
         config.network.bitcoin_node_rpc_username.clone(),
         config.network.bitcoin_node_rpc_password.clone(),
     );
-    let bitcoin_rpc = Client::new(&config.network.bitcoin_node_rpc_url, auth).unwrap();
+
+    let bitcoin_rpc = match Client::new(&config.network.bitcoin_node_rpc_url, auth) {
+        Ok(con) => con,
+        Err(message) => {
+            crit!("Bitcoin RPC: {}", message.to_string());
+            panic!();
+        }
+    };
 
     loop {
         let event = match observer_event_rx.recv() {
