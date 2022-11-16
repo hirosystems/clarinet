@@ -14,6 +14,9 @@ use std::path::PathBuf;
 use std::str::FromStr;
 use toml::value::Value;
 
+const INVALID_CLARITY_VERSION: &str = "clarity_version field invalid (value supported: 1, 2)";
+const INVALID_EPOCH: &str = "epoch field invalid (value supported: 2.0, 2.05, 2.1)";
+
 #[derive(Deserialize, Debug, Clone)]
 pub struct ClarityContractMetadata {
     pub name: String,
@@ -229,21 +232,22 @@ impl ProjectManifest {
                             };
 
                             let clarity_version = match contract_settings.get("clarity_version") {
+                                None => DEFAULT_CLARITY_VERSION,
                                 Some(Value::Integer(version)) => {
                                     if version.eq(&1) {
                                         ClarityVersion::Clarity1
                                     } else if version.eq(&2) {
                                         ClarityVersion::Clarity2
                                     } else {
-                                        return Err(
-                                            "clarity_version field invalid (value supported: 1, 2)"
-                                                .to_string(),
-                                        );
+                                        return Err(INVALID_CLARITY_VERSION.into());
                                     }
                                 }
-                                _ => DEFAULT_CLARITY_VERSION,
+                                _ => {
+                                    return Err(INVALID_CLARITY_VERSION.into());
+                                }
                             };
                             let epoch = match contract_settings.get("epoch") {
+                                None => DEFAULT_EPOCH,
                                 Some(Value::String(epoch)) => {
                                     if epoch.eq("2.0") {
                                         StacksEpochId::Epoch20
@@ -252,10 +256,23 @@ impl ProjectManifest {
                                     } else if epoch.eq("2.1") {
                                         StacksEpochId::Epoch21
                                     } else {
-                                        return Err("epoch field invalid (value supported: '2.0', '2.05', '2.1')".to_string());
+                                        return Err(INVALID_EPOCH.into());
                                     }
                                 }
-                                _ => DEFAULT_EPOCH,
+                                Some(Value::Float(epoch)) => {
+                                    if epoch.eq(&2.0) {
+                                        StacksEpochId::Epoch20
+                                    } else if epoch.eq(&2.05) {
+                                        StacksEpochId::Epoch2_05
+                                    } else if epoch.eq(&2.1) {
+                                        StacksEpochId::Epoch21
+                                    } else {
+                                        return Err(INVALID_EPOCH.into());
+                                    }
+                                }
+                                _ => {
+                                    return Err(INVALID_EPOCH.into());
+                                }
                             };
 
                             config_contracts.insert(
