@@ -12,14 +12,16 @@ fn code(code: &str) -> String {
 }
 
 lazy_static! {
-    static ref API_REF: HashMap<(String, String), String> = {
-        let mut api_references = HashMap::new();
-        let separator = "- - -"; // "---" can produce h2 if placed under text
+    static ref API_REF: HashMap<String, (ClarityVersion, String)> = {
+        let mut api_references: HashMap<String, (ClarityVersion, String)> = HashMap::new();
+         // "---" can produce h2 if placed under text
+        let separator = "- - -";
+
         for define_function in DefineFunctions::ALL {
             let reference = make_define_reference(define_function);
             api_references.insert(
-                (reference.version.to_string(), define_function.to_string()),
-                Vec::from([
+                define_function.to_string(),
+                (reference.version, Vec::from([
                     &code(&reference.signature),
                     separator,
                     "**Description**",
@@ -28,15 +30,15 @@ lazy_static! {
                     "**Example**",
                     &code(&reference.example),
                 ])
-                .join("\n"),
+                .join("\n")),
             );
         }
 
         for native_function in NativeFunctions::ALL {
             let reference = make_api_reference(native_function);
             api_references.insert(
-                (reference.version.to_string(), native_function.to_string()),
-                Vec::from([
+                native_function.to_string(),
+                (reference.version, Vec::from([
                     &code(&reference.signature),
                     separator,
                     "**Description**",
@@ -47,15 +49,15 @@ lazy_static! {
                     separator,
                     &format!("**Introduced in:** {}", &reference.version),
                 ])
-                .join("\n"),
+                .join("\n")),
             );
         }
 
         for native_keyword in NativeVariables::ALL {
             let reference = make_keyword_reference(native_keyword).unwrap();
             api_references.insert(
-                (reference.version.to_string(), native_keyword.to_string()),
-                vec![
+                native_keyword.to_string(),
+                (reference.version, Vec::from([
                     "**Description**",
                     &reference.description,
                     separator,
@@ -63,8 +65,8 @@ lazy_static! {
                     &code(&reference.example),
                     separator,
                     &format!("**Introduced in:** {}", &reference.version),
-                ]
-                .join("\n"),
+                ])
+                .join("\n")),
             );
         }
 
@@ -108,8 +110,13 @@ pub fn get_expression_documentation(
 ) -> Option<String> {
     let expression_name = get_expression_name_at_position(line, column, expressions)?;
 
-    match API_REF.get(&(clarity_version.to_string(), expression_name)) {
-        Some(documentation) => Some(documentation.to_owned()),
+    match API_REF.get(&expression_name.clone()) {
+        Some((version, documentation)) => {
+            if version <= &clarity_version {
+                return Some(documentation.to_owned());
+            }
+            None
+        }
         None => None,
     }
 }
