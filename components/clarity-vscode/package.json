@@ -8,7 +8,7 @@
   "homepage": "https://github.com/hirosystems/clarinet",
   "bugs": "https://github.com/hirosystems/clarinet/issues",
   "license": "GPL-3.0-only",
-  "version": "1.0.5",
+  "version": "1.0.8",
   "workspaces": [
     "client",
     "server",
@@ -24,7 +24,7 @@
     "test": "node client/dist/tests/runTests.js",
     "lint": "eslint ./client/src ./server/src --ext .ts,.tsx",
     "dev:watch": "webpack -c ./webpack.config.dev.js -w",
-    "dev:browser": "vscode-test-web --extensionDevelopmentPath=. ./test-data --open-devtools --browser=chromium",
+    "dev:browser": "vscode-test-web --extensionDevelopmentPath=. ./test-data --open-devtools",
     "dev": "webpack -c ./webpack.config.dev.js; concurrently \"npm:dev:*\"",
     "vscode:prepublish": "npm run clean; NODE_ENV=production webpack",
     "vsce:package": "vsce package",

@@ -8,9 +8,15 @@
     }
   ],
   "settings": {
-    "typescript.tsc.autoDetect": "off",
-    "rust-analyzer.cargo.features": ["clarity-lsp/wasm", "clarity/wasm"],
     "rust-analyzer.cargo.noDefaultFeatures": true,
-    "rust-analyzer.debug.openDebugPane": true
+    "rust-analyzer.cargo.features": ["clarity-lsp/wasm"],
+    "rust-analyzer.checkOnSave.overrideCommand": [
+      "cargo",
+      "check",
+      "--no-default-features",
+      "--package=clarity-lsp",
+      "--features=wasm",
+      "--message-format=json"
+    ]
   }
 }
