@@ -4,7 +4,6 @@ version: 1
 chain: stacks
 networks:
   devnet:
-    oreo-url: 'http://localhost:20446/'
     predicate:
       ft-event:
         asset-identifier: 'ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM.cbtc-token::cbtc'
