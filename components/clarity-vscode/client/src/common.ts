@@ -21,10 +21,22 @@ export const clientOpts: LanguageClientOptions = {
   ),
 };
 
+declare const __DEV_MODE__: boolean | undefined;
+
 export async function initClient(
   context: ExtensionContext,
   client: LanguageClient,
 ) {
+  if (__DEV_MODE__) {
+    // update vscode default config in dev
+    if (workspace.getConfiguration("files").autoSave !== "off") {
+      vscode.commands.executeCommand("workbench.action.toggleAutoSave");
+    }
+    if (window.activeColorTheme.kind !== 2) {
+      vscode.commands.executeCommand("workbench.action.toggleLightDarkThemes");
+    }
+  }
+
   let config = workspace.getConfiguration("clarity-lsp");
 
   /* clarity insight webview */

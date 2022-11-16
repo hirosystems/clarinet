@@ -9,10 +9,21 @@ use clarity_repl::repl::{
 };
 use serde::ser::SerializeMap;
 use serde::{Serialize, Serializer};
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashMap};
 use std::path::PathBuf;
 use std::str::FromStr;
 use toml::value::Value;
+
+const INVALID_CLARITY_VERSION: &str = "clarity_version field invalid (value supported: 1, 2)";
+const INVALID_EPOCH: &str = "epoch field invalid (value supported: 2.0, 2.05, 2.1)";
+
+#[derive(Deserialize, Debug, Clone)]
+pub struct ClarityContractMetadata {
+    pub name: String,
+    pub deployer: ContractDeployer,
+    pub clarity_version: ClarityVersion,
+    pub epoch: StacksEpochId,
+}
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct ProjectManifestFile {
@@ -45,6 +56,8 @@ pub struct ProjectManifest {
     pub repl_settings: repl::Settings,
     #[serde(skip_serializing)]
     pub location: FileLocation,
+    #[serde(skip_serializing)]
+    pub contracts_settings: HashMap<FileLocation, ClarityContractMetadata>,
 }
 
 #[derive(Debug, Clone)]
@@ -133,13 +146,14 @@ impl ProjectManifest {
         }
 
         let project_name = project_manifest_file.project.name;
-        let mut project_root_location = manifest_location.get_parent_location()?;
+        let project_root_location = manifest_location.get_parent_location()?;
         let cache_location = match project_manifest_file.project.cache_dir {
             Some(ref path) => FileLocation::try_parse(path, Some(&project_root_location))
                 .ok_or(format!("unable to parse path {}", path))?,
             None => {
-                project_root_location.append_path(".cache")?;
-                project_root_location
+                let mut cache_location = project_root_location.clone();
+                cache_location.append_path(".cache")?;
+                cache_location
             }
         };
 
@@ -169,8 +183,10 @@ impl ProjectManifest {
             contracts: BTreeMap::new(),
             repl_settings,
             location: manifest_location.clone(),
+            contracts_settings: HashMap::new(),
         };
         let mut config_contracts = BTreeMap::new();
+        let mut contracts_settings = HashMap::new();
         let mut config_requirements: Vec<RequirementConfig> = Vec::new();
 
         match project_manifest_file.project.requirements {
@@ -195,17 +211,18 @@ impl ProjectManifest {
                 for (contract_name, contract_settings) in contracts.iter() {
                     match contract_settings {
                         Value::Table(contract_settings) => {
-                            let code_source = match contract_settings.get("path") {
-                                Some(Value::String(path)) => match PathBuf::from_str(path) {
-                                    Ok(path) => ClarityCodeSource::ContractOnDisk(path),
-                                    Err(e) => {
-                                        return Err(format!(
-                                            "unable to parse path {} ({})",
-                                            path, e
-                                        ))
-                                    }
-                                },
+                            let contract_path = match contract_settings.get("path") {
+                                Some(Value::String(path)) => path,
                                 _ => continue,
+                            };
+                            let code_source = match PathBuf::from_str(contract_path) {
+                                Ok(path) => ClarityCodeSource::ContractOnDisk(path),
+                                Err(e) => {
+                                    return Err(format!(
+                                        "unable to parse path {} ({})",
+                                        contract_path, e
+                                    ))
+                                }
                             };
                             let deployer = match contract_settings.get("deployer") {
                                 Some(Value::String(path)) => {
@@ -215,21 +232,22 @@ impl ProjectManifest {
                             };
 
                             let clarity_version = match contract_settings.get("clarity_version") {
+                                None => DEFAULT_CLARITY_VERSION,
                                 Some(Value::Integer(version)) => {
                                     if version.eq(&1) {
                                         ClarityVersion::Clarity1
                                     } else if version.eq(&2) {
                                         ClarityVersion::Clarity2
                                     } else {
-                                        return Err(
-                                            "clarity_version field invalid (value supported: 1, 2)"
-                                                .to_string(),
-                                        );
+                                        return Err(INVALID_CLARITY_VERSION.into());
                                     }
                                 }
-                                _ => DEFAULT_CLARITY_VERSION,
+                                _ => {
+                                    return Err(INVALID_CLARITY_VERSION.into());
+                                }
                             };
                             let epoch = match contract_settings.get("epoch") {
+                                None => DEFAULT_EPOCH,
                                 Some(Value::String(epoch)) => {
                                     if epoch.eq("2.0") {
                                         StacksEpochId::Epoch20
@@ -238,16 +256,42 @@ impl ProjectManifest {
                                     } else if epoch.eq("2.1") {
                                         StacksEpochId::Epoch21
                                     } else {
-                                        return Err("epoch field invalid (value supported: '2.0', '2.05', '2.1')".to_string());
+                                        return Err(INVALID_EPOCH.into());
                                     }
                                 }
-                                _ => DEFAULT_EPOCH,
+                                Some(Value::Float(epoch)) => {
+                                    if epoch.eq(&2.0) {
+                                        StacksEpochId::Epoch20
+                                    } else if epoch.eq(&2.05) {
+                                        StacksEpochId::Epoch2_05
+                                    } else if epoch.eq(&2.1) {
+                                        StacksEpochId::Epoch21
+                                    } else {
+                                        return Err(INVALID_EPOCH.into());
+                                    }
+                                }
+                                _ => {
+                                    return Err(INVALID_EPOCH.into());
+                                }
                             };
+
                             config_contracts.insert(
                                 contract_name.to_string(),
                                 ClarityContract {
-                                    name: contract_name.clone(),
+                                    name: contract_name.to_string(),
+                                    deployer: deployer.clone(),
                                     code_source,
+                                    clarity_version,
+                                    epoch,
+                                },
+                            );
+
+                            let mut contract_location = project_root_location.clone();
+                            contract_location.append_path(contract_path)?;
+                            contracts_settings.insert(
+                                contract_location,
+                                ClarityContractMetadata {
+                                    name: contract_name.to_string(),
                                     deployer,
                                     clarity_version,
                                     epoch,
@@ -261,6 +305,7 @@ impl ProjectManifest {
             _ => {}
         };
         config.contracts = config_contracts;
+        config.contracts_settings = contracts_settings;
         config.project.requirements = Some(config_requirements);
         Ok(config)
     }

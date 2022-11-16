@@ -13,6 +13,12 @@ const [clientBrowserConfig, serverBrowserConfig] = configs;
 
 const extensionURL = "http://localhost:3000/static/devextensions/";
 
+clientBrowserConfig.plugins = [
+  new webpack.DefinePlugin({
+    __DEV_MODE__: JSON.stringify(true),
+  }),
+];
+
 serverBrowserConfig.plugins = [
   new webpack.DefinePlugin({
     __EXTENSION_URL__: JSON.stringify(extensionURL),
