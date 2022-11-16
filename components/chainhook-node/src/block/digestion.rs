@@ -46,7 +46,7 @@ pub fn start(command_rx: Receiver<DigestingCommand>, config: &Config) -> Result<
                     ) {
                         Ok(block) => block,
                         Err(e) => {
-                            error!("unable to handle stacks block: {e}");
+                            error!("{e}");
                             continue;
                         }
                     };

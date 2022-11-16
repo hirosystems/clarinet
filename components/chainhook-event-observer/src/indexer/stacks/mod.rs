@@ -262,8 +262,8 @@ pub fn standardize_stacks_block(
         let (description, tx_type, fee, sender, sponsor) =
             match get_tx_description(&tx.raw_tx, &tx_events) {
                 Ok(desc) => desc,
-                Err(_) => {
-                    return Err(format!("unable to standardize block ({:?})", tx));
+                Err(e) => {
+                    return Err(format!("unable to standardize block ({})", e.to_string()));
                 }
             };
         let events = tx_events
@@ -594,7 +594,7 @@ pub fn get_tx_description(
                 }),
             )
         }
-        TransactionPayload::SmartContract(ref smart_contract) => {
+        TransactionPayload::SmartContract(ref smart_contract, ref _clarity_version) => {
             let contract_identifier = format!("{}.{}", tx.origin_address(), smart_contract.name);
             let data = StacksContractDeploymentData {
                 contract_identifier: contract_identifier.clone(),

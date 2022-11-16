@@ -186,7 +186,7 @@ pub fn encode_contract_publish(
     };
     sign_transaction_payload(
         account,
-        TransactionPayload::SmartContract(payload),
+        TransactionPayload::SmartContract(payload, None),
         nonce,
         tx_fee,
         anchor_mode,
@@ -291,11 +291,13 @@ pub fn update_deployment_costs(
                     };
                 }
                 TransactionSpecification::ContractPublish(tx) => {
-                    let transaction_payload =
-                        TransactionPayload::SmartContract(TransactionSmartContract {
+                    let transaction_payload = TransactionPayload::SmartContract(
+                        TransactionSmartContract {
                             name: tx.contract_name.clone(),
                             code_body: StacksString::from_str(&tx.source).unwrap(),
-                        });
+                        },
+                        None,
+                    );
 
                     match stacks_rpc.estimate_transaction_fee(&transaction_payload, priority) {
                         Ok(fee) => {

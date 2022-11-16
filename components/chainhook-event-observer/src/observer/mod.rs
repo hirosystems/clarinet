@@ -275,6 +275,8 @@ pub async fn start_event_observer(
         handle_new_mempool_tx,
         handle_drop_mempool_tx,
         handle_new_attachement,
+        handle_mined_block,
+        handle_mined_microblock,
     ];
 
     if bitcoin_rpc_proxy_enabled {
@@ -900,7 +902,7 @@ pub fn handle_new_stacks_block(
             info!("unable to infer chain progress");
         }
         Err(e) => {
-            error!("unable to handle stacks block: {}", e)
+            error!("{}", e)
         }
     }
 
@@ -1018,6 +1020,26 @@ pub fn handle_drop_mempool_tx() -> Json<JsonValue> {
 #[post("/attachments/new", format = "application/json")]
 pub fn handle_new_attachement() -> Json<JsonValue> {
     info!("POST /attachments/new");
+    Json(json!({
+        "status": 200,
+        "result": "Ok",
+    }))
+}
+
+#[openapi(skip)]
+#[post("/mined_block", format = "application/json", data = "<payload>")]
+pub fn handle_mined_block(payload: Json<JsonValue>) -> Json<JsonValue> {
+    info!("POST /mined_block {:?}", payload);
+    Json(json!({
+        "status": 200,
+        "result": "Ok",
+    }))
+}
+
+#[openapi(skip)]
+#[post("/mined_microblock", format = "application/json", data = "<payload>")]
+pub fn handle_mined_microblock(payload: Json<JsonValue>) -> Json<JsonValue> {
+    info!("POST /mined_microblock {:?}", payload);
     Json(json!({
         "status": 200,
         "result": "Ok",

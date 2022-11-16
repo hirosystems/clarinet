@@ -108,7 +108,7 @@ pub fn start(
                     ) {
                         Ok(data) => data,
                         Err(e) => {
-                            error!("unable to handle stacks block: {e}");
+                            error!("{e}");
                             continue;
                         }
                     }
