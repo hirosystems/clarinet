@@ -104,6 +104,8 @@ pub struct RequirementPublishSpecificationFile {
     pub path: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub url: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub clarity_version: Option<u8>,
 }
 
 #[derive(Debug, PartialEq, Serialize, Deserialize)]
@@ -387,6 +389,7 @@ pub struct RequirementPublishSpecification {
     pub remap_sender: StandardPrincipalData,
     pub remap_principals: BTreeMap<StandardPrincipalData, StandardPrincipalData>,
     pub source: String,
+    pub clarity_version: ClarityVersion,
     pub cost: u64,
     pub location: FileLocation,
 }
@@ -453,11 +456,27 @@ impl RequirementPublishSpecification {
 
         let source = location.read_content_as_utf8()?;
 
+        let clarity_version = match specs.clarity_version {
+            Some(clarity_version) => {
+                if clarity_version.eq(&1) {
+                    Ok(ClarityVersion::Clarity1)
+                } else if clarity_version.eq(&2) {
+                    Ok(ClarityVersion::Clarity2)
+                } else {
+                    Err(format!(
+                        "unable to parse clarity_version (can either be '1' or '2'",
+                    ))
+                }
+            }
+            _ => Ok(DEFAULT_CLARITY_VERSION),
+        }?;
+
         Ok(RequirementPublishSpecification {
             contract_id,
             remap_sender,
             remap_principals,
             source,
+            clarity_version,
             location: location,
             cost: specs.cost,
         })
@@ -954,6 +973,10 @@ impl TransactionPlanSpecification {
                                 path: None,
                                 url: None,
                                 cost: tx.cost,
+                                clarity_version: match tx.clarity_version {
+                                    ClarityVersion::Clarity1 => Some(1),
+                                    ClarityVersion::Clarity2 => Some(2),
+                                },
                             },
                         )
                     }

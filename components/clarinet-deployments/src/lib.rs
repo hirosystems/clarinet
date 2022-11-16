@@ -352,12 +352,13 @@ pub async fn generate_default_deployment(
                 Some(ast) => ast,
                 None => {
                     // Download the code
-                    let (source, contract_location) = requirements::retrieve_contract(
-                        &contract_id,
-                        &cache_location,
-                        &file_accessor,
-                    )
-                    .await?;
+                    let (source, clarity_version, contract_location) =
+                        requirements::retrieve_contract(
+                            &contract_id,
+                            &cache_location,
+                            &file_accessor,
+                        )
+                        .await?;
 
                     // Build the struct representing the requirement in the deployment
                     if network.is_simnet() {
@@ -394,6 +395,7 @@ pub async fn generate_default_deployment(
                             location: contract_location,
                             cost: deployment_fee_rate * source.len() as u64,
                             remap_principals,
+                            clarity_version,
                         };
                         requirements_publish.insert(contract_id.clone(), data);
                     }

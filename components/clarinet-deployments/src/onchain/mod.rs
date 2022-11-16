@@ -11,7 +11,7 @@ use clarity_repl::clarity::vm::types::{
     PrincipalData, QualifiedContractIdentifier, StandardPrincipalData,
 };
 use clarity_repl::clarity::vm::{ClarityName, Value};
-use clarity_repl::clarity::{ContractName, EvaluationResult};
+use clarity_repl::clarity::{ClarityVersion, ContractName, EvaluationResult};
 use clarity_repl::codec::{
     SinglesigHashMode, SinglesigSpendingCondition, StacksString, StacksTransactionSigner,
     TokenTransferMemo, TransactionAuth, TransactionContractCall, TransactionPayload,
@@ -174,6 +174,7 @@ pub fn encode_stx_transfer(
 pub fn encode_contract_publish(
     contract_name: &ContractName,
     source: &str,
+    clarity_version: &ClarityVersion,
     account: &AccountConfig,
     nonce: u64,
     tx_fee: u64,
@@ -186,7 +187,7 @@ pub fn encode_contract_publish(
     };
     sign_transaction_payload(
         account,
-        TransactionPayload::SmartContract(payload, None),
+        TransactionPayload::SmartContract(payload, Some(clarity_version.clone())),
         nonce,
         tx_fee,
         anchor_mode,
@@ -546,6 +547,7 @@ pub fn apply_on_chain_deployment(
                     let transaction = match encode_contract_publish(
                         &tx.contract_name,
                         &source,
+                        &tx.clarity_version,
                         *account,
                         nonce,
                         tx.cost,
@@ -621,6 +623,7 @@ pub fn apply_on_chain_deployment(
                     let transaction = match encode_contract_publish(
                         &tx.contract_id.name,
                         &source,
+                        &tx.clarity_version,
                         *account,
                         nonce,
                         tx.cost,
