@@ -1144,6 +1144,7 @@ dependencies = [
  "clarity-repl",
  "console_error_panic_hook",
  "js-sys",
+ "lazy_static",
  "lsp-types",
  "serde",
  "serde-wasm-bindgen",

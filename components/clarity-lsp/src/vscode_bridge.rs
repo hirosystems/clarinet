@@ -13,7 +13,7 @@ use lsp_types::notification::{
     DidChangeTextDocument, DidCloseTextDocument, DidOpenTextDocument, DidSaveTextDocument,
     Initialized, Notification,
 };
-use lsp_types::request::{Completion, Initialize, Request};
+use lsp_types::request::{Completion, HoverRequest, Initialize, Request};
 use lsp_types::{
     DidChangeTextDocumentParams, DidCloseTextDocumentParams, DidOpenTextDocumentParams,
     DidSaveTextDocumentParams, PublishDiagnosticsParams, Url,
@@ -169,6 +169,16 @@ impl LspVscodeBridge {
                     &EditorStateInput::RwLock(self.editor_state_lock.clone()),
                 );
                 if let LspRequestResponse::Initialize(response) = lsp_response {
+                    return encode_to_js(&response).map_err(|_| JsValue::NULL);
+                }
+            }
+
+            HoverRequest::METHOD => {
+                let lsp_response = process_request(
+                    LspRequest::Hover(decode_from_js(js_params)?),
+                    &EditorStateInput::RwLock(self.editor_state_lock.clone()),
+                );
+                if let LspRequestResponse::Hover(response) = lsp_response {
                     return encode_to_js(&response).map_err(|_| JsValue::NULL);
                 }
             }

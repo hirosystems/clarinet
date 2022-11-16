@@ -13,8 +13,8 @@ use std::sync::Mutex;
 use tower_lsp::jsonrpc::{Error, ErrorCode, Result};
 use tower_lsp::lsp_types::{
     CompletionParams, CompletionResponse, DidChangeTextDocumentParams, DidCloseTextDocumentParams,
-    DidOpenTextDocumentParams, DidSaveTextDocumentParams, ExecuteCommandParams, InitializeParams,
-    InitializeResult, InitializedParams, MessageType, Url,
+    DidOpenTextDocumentParams, DidSaveTextDocumentParams, ExecuteCommandParams, Hover, HoverParams,
+    InitializeParams, InitializeResult, InitializedParams, MessageType, Url,
 };
 use tower_lsp::{async_trait, Client, LanguageServer};
 
@@ -94,16 +94,14 @@ impl LanguageServer for LspNativeBridge {
             Err(_) => return Err(Error::new(ErrorCode::InternalError)),
         };
 
-        if let Ok(response_rx) = self.response_rx.lock() {
-            if let Ok(response) = response_rx.recv() {
-                if let LspResponse::Request(request_response) = response {
-                    if let LspRequestResponse::Initialize(initialize) = request_response {
-                        return Ok(initialize);
-                    }
-                }
+        let response_rx = self.response_rx.lock().expect("failed to lock response_rx");
+        let ref response = response_rx.recv().expect("failed to get value from recv");
+        if let LspResponse::Request(request_response) = response {
+            if let LspRequestResponse::Initialize(initialize) = request_response {
+                return Ok(initialize.to_owned());
             }
         }
-        return Err(Error::new(ErrorCode::InternalError));
+        Err(Error::new(ErrorCode::InternalError))
     }
 
     async fn initialized(&self, _params: InitializedParams) {}
@@ -122,18 +120,32 @@ impl LanguageServer for LspNativeBridge {
             Err(_) => return Ok(None),
         };
 
-        let mut completion_items = vec![];
-        if let Ok(response_rx) = self.response_rx.lock() {
-            if let Ok(ref mut response) = response_rx.recv() {
-                if let LspResponse::Request(request_response) = response {
-                    if let LspRequestResponse::CompletionItems(items) = request_response {
-                        completion_items.append(items);
-                    }
-                }
+        let response_rx = self.response_rx.lock().expect("failed to lock response_rx");
+        let ref response = response_rx.recv().expect("failed to get value from recv");
+        if let LspResponse::Request(request_response) = response {
+            if let LspRequestResponse::CompletionItems(items) = request_response {
+                return Ok(Some(CompletionResponse::from(items.to_vec())));
             }
         }
 
-        Ok(Some(CompletionResponse::from(completion_items)))
+        Ok(None)
+    }
+
+    async fn hover(&self, params: HoverParams) -> Result<Option<Hover>> {
+        let _ = match self.request_tx.lock() {
+            Ok(tx) => tx.send(LspRequest::Hover(params)),
+            Err(_) => return Ok(None),
+        };
+
+        let response_rx = self.response_rx.lock().expect("failed to lock response_rx");
+        let ref response = response_rx.recv().expect("failed to get value from recv");
+        if let LspResponse::Request(request_response) = response {
+            if let LspRequestResponse::Hover(data) = request_response {
+                return Ok(data.to_owned());
+            }
+        }
+
+        Ok(None)
     }
 
     async fn did_open(&self, params: DidOpenTextDocumentParams) {

@@ -17,9 +17,11 @@ use clarity_repl::clarity::vm::types::QualifiedContractIdentifier;
 use clarity_repl::clarity::vm::EvaluationResult;
 use clarity_repl::clarity::{ClarityVersion, SymbolicExpression};
 use clarity_repl::repl::DEFAULT_CLARITY_VERSION;
-use lsp_types::MessageType;
+use lsp_types::{Hover, MessageType};
 use std::borrow::BorrowMut;
 use std::collections::{HashMap, HashSet};
+
+use super::hover_data::get_expression_documentation;
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct ActiveContractData {
@@ -245,6 +247,28 @@ impl EditorState {
 
         keywords.append(&mut user_defined_keywords);
         keywords
+    }
+
+    pub fn get_hover_data(
+        &self,
+        contract_location: &FileLocation,
+        position: &lsp_types::Position,
+    ) -> Option<Hover> {
+        let contract = self.active_contracts.get(&contract_location)?;
+        let documentation = get_expression_documentation(
+            position.line + 1,
+            position.character + 1,
+            contract.clarity_version,
+            contract.expressions.as_ref()?,
+        )?;
+
+        Some(Hover {
+            contents: lsp_types::HoverContents::Markup(lsp_types::MarkupContent {
+                kind: lsp_types::MarkupKind::Markdown,
+                value: documentation.to_string(),
+            }),
+            range: None,
+        })
     }
 
     pub fn get_aggregated_diagnostics(
