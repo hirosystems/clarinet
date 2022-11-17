@@ -1,7 +1,7 @@
 pub mod helpers;
 use self::helpers::BlockEvent;
 use super::{BitcoinBlockPool, StacksBlockPool};
-use chainhook_types::{BitcoinBlockData, BitcoinChainEvent, StacksBlockData, StacksChainEvent};
+use chainhook_types::{BitcoinBlockData, BitcoinChainEvent, StacksChainEvent};
 
 pub type StacksChainEventExpectation = Box<dyn Fn(Option<StacksChainEvent>) -> ()>;
 
@@ -16,7 +16,9 @@ pub fn process_stacks_blocks_and_check_expectations(
                 check_chain_event_expectations(chain_event);
             }
             BlockEvent::Microblock(microblock) => {
-                let chain_event = blocks_processor.process_microblocks(vec![microblock]);
+                let chain_event = blocks_processor
+                    .process_microblocks(vec![microblock])
+                    .unwrap();
                 check_chain_event_expectations(chain_event);
             }
         }

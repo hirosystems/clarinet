@@ -1,7 +1,7 @@
 use crate::chainhooks::types::{
     BitcoinChainhookSpecification, BitcoinPredicateType, BitcoinTransactionFilterPredicate,
-    ChainhookSpecification, ExactMatchingRule, HookAction, HookFormation, MatchingRule, Scope,
-    StacksBlockFilterPredicate, StacksChainhookSpecification, StacksContractCallBasedPredicate,
+    ChainhookSpecification, ExactMatchingRule, HookAction, HookFormation, Scope,
+    StacksChainhookSpecification, StacksContractCallBasedPredicate,
     StacksTransactionFilterPredicate,
 };
 use crate::indexer::tests::helpers::transactions::generate_test_tx_bitcoin_p2pkh_transfer;
@@ -9,14 +9,12 @@ use crate::indexer::tests::helpers::{
     accounts, bitcoin_blocks, stacks_blocks, transactions::generate_test_tx_stacks_contract_call,
 };
 use crate::observer::{
-    self, start_observer_commands_handler, ApiKey, ChainhookStore, EventHandler,
-    EventObserverConfig, ObserverCommand,
+    start_observer_commands_handler, ApiKey, ChainhookStore, EventObserverConfig, ObserverCommand,
 };
 use chainhook_types::{
-    BitcoinChainEvent, BitcoinChainUpdatedWithBlocksData, BitcoinNetwork, StacksBlockData,
-    StacksBlockUpdate, StacksChainEvent, StacksChainUpdatedWithBlocksData, StacksNetwork,
+    BitcoinChainEvent, BitcoinChainUpdatedWithBlocksData, BitcoinNetwork, StacksBlockUpdate,
+    StacksChainEvent, StacksChainUpdatedWithBlocksData, StacksNetwork,
 };
-use clarity_repl::clarity::vm::types::QualifiedContractIdentifier;
 use hiro_system_kit;
 use std::collections::{HashMap, HashSet};
 use std::sync::mpsc::{channel, Receiver, Sender};
@@ -37,10 +35,8 @@ fn generate_test_config() -> (EventObserverConfig, ChainhookStore) {
         control_port: 0,
         bitcoin_node_username: "user".into(),
         bitcoin_node_password: "user".into(),
-        bitcoin_node_rpc_host: "http://localhost".into(),
-        bitcoin_node_rpc_port: 0,
-        stacks_node_rpc_host: "http://localhost".into(),
-        stacks_node_rpc_port: 0,
+        bitcoin_node_rpc_url: "http://localhost:20443".into(),
+        stacks_node_rpc_url: "http://localhost:18443".into(),
         operators,
         display_logs: false,
     };

@@ -2,10 +2,6 @@ use clarity_repl::clarity::util::hash::hex_bytes;
 use reqwest::Url;
 use serde::ser::{SerializeSeq, Serializer};
 use serde::{Deserialize, Serialize};
-use std::collections::BTreeMap;
-use std::fs::File;
-use std::io::{BufReader, Read};
-use std::path::PathBuf;
 
 use chainhook_types::{BitcoinNetwork, StacksNetwork};
 

@@ -1,13 +1,5 @@
-#![allow(unused_imports)]
-
 #[macro_use]
 extern crate rocket;
-
-#[macro_use]
-extern crate slog_scope;
-
-#[macro_use]
-extern crate serde;
 
 #[macro_use]
 extern crate serde_derive;
@@ -15,24 +7,25 @@ extern crate serde_derive;
 #[macro_use]
 extern crate serde_json;
 
+#[macro_use]
+extern crate hiro_system_kit;
+
 pub mod chainhooks;
 pub mod indexer;
 pub mod observer;
 pub mod utils;
 
-use slog::Drain;
-use std::sync::Mutex;
+use hiro_system_kit::log::setup_global_logger;
 
 use crate::chainhooks::types::HookFormation;
 use clap::Parser;
 use ctrlc;
 use observer::{EventHandler, EventObserverConfig, ObserverCommand};
-use std::collections::{HashMap, HashSet};
+use std::collections::HashSet;
 use std::fs::File;
 use std::io::{BufReader, Read};
 use std::path::PathBuf;
-use std::sync::mpsc::{channel, Receiver, Sender};
-use toml::value::Value;
+use std::sync::mpsc::channel;
 
 /// Simple program to greet a person
 #[derive(Parser, Debug)]
@@ -45,13 +38,8 @@ struct Args {
 
 #[rocket::main]
 async fn main() {
-    let logger = slog::Logger::root(
-        Mutex::new(slog_json::Json::default(std::io::stderr())).map(slog::Fuse),
-        slog::o!("version" => env!("CARGO_PKG_VERSION")),
-    );
-
     // slog_stdlog uses the logger from slog_scope, so set a logger there
-    let _guard = slog_scope::set_global_logger(logger);
+    let _guard = setup_global_logger();
 
     let args = Args::parse();
     let config_path = get_config_path_or_exit(&args.config_path);
@@ -80,10 +68,8 @@ pub struct EventObserverConfigFile {
     pub control_port: Option<u16>,
     pub bitcoin_node_username: String,
     pub bitcoin_node_password: String,
-    pub bitcoin_node_rpc_host: String,
-    pub bitcoin_node_rpc_port: u16,
-    pub stacks_node_rpc_host: String,
-    pub stacks_node_rpc_port: u16,
+    pub bitcoin_node_rpc_url: String,
+    pub stacks_node_rpc_url: String,
     pub operators: Option<Vec<String>>,
 }
 
@@ -141,10 +127,8 @@ impl EventObserverConfig {
                 .unwrap_or(observer::DEFAULT_CONTROL_PORT),
             bitcoin_node_username: config_file.bitcoin_node_username.clone(),
             bitcoin_node_password: config_file.bitcoin_node_password.clone(),
-            bitcoin_node_rpc_host: config_file.bitcoin_node_rpc_host.clone(),
-            bitcoin_node_rpc_port: config_file.bitcoin_node_rpc_port.clone(),
-            stacks_node_rpc_host: config_file.stacks_node_rpc_host.clone(),
-            stacks_node_rpc_port: config_file.stacks_node_rpc_port.clone(),
+            bitcoin_node_rpc_url: config_file.bitcoin_node_rpc_url.clone(),
+            stacks_node_rpc_url: config_file.stacks_node_rpc_url.clone(),
             operators,
             display_logs: true,
         };

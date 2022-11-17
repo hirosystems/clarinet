@@ -1,7 +1,4 @@
-use super::super::tests::{
-    helpers, process_stacks_blocks_and_check_expectations, StacksChainEventExpectation,
-};
-use super::StacksBlockPool;
+use super::super::tests::{helpers, process_stacks_blocks_and_check_expectations};
 
 #[test]
 fn test_stacks_vector_001() {

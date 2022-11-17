@@ -252,7 +252,7 @@ pub fn start_replay_flow(network: &StacksNetwork, bitcoind_rpc_url: Url, apply: 
     thread::spawn(move || {
         let res = block::digestion::start(digestion_rx, &digestion_config);
         if let Err(e) = res {
-            error!("{}", e);
+            crit!("{}", e);
         }
         let _ = terminate_observer_command_tx.send(ObserverCommand::Terminate);
     });
@@ -268,10 +268,8 @@ pub fn start_replay_flow(network: &StacksNetwork, bitcoind_rpc_url: Url, apply: 
         control_port: DEFAULT_CONTROL_PORT,
         bitcoin_node_username: config.network.bitcoin_node_rpc_username.clone(),
         bitcoin_node_password: config.network.bitcoin_node_rpc_password.clone(),
-        bitcoin_node_rpc_host: config.network.bitcoin_node_rpc_url.clone(),
-        bitcoin_node_rpc_port: bitcoin_port,
-        stacks_node_rpc_host: "http://localhost".into(),
-        stacks_node_rpc_port: 20443,
+        bitcoin_node_rpc_url: config.network.bitcoin_node_rpc_url.clone(),
+        stacks_node_rpc_url: config.network.stacks_node_rpc_url.clone(),
         operators: HashSet::new(),
         display_logs: false,
     };
@@ -298,7 +296,7 @@ pub fn start_replay_flow(network: &StacksNetwork, bitcoind_rpc_url: Url, apply: 
     let mut redis_con = match client.get_connection() {
         Ok(con) => con,
         Err(message) => {
-            error!("Redis: {}", message.to_string());
+            crit!("Redis: {}", message.to_string());
             panic!();
         }
     };
@@ -307,13 +305,20 @@ pub fn start_replay_flow(network: &StacksNetwork, bitcoind_rpc_url: Url, apply: 
         config.network.bitcoin_node_rpc_username.clone(),
         config.network.bitcoin_node_rpc_password.clone(),
     );
-    let bitcoin_rpc = Client::new(&config.network.bitcoin_node_rpc_url, auth).unwrap();
+
+    let bitcoin_rpc = match Client::new(&config.network.bitcoin_node_rpc_url, auth) {
+        Ok(con) => con,
+        Err(message) => {
+            crit!("Bitcoin RPC: {}", message.to_string());
+            panic!();
+        }
+    };
 
     loop {
         let event = match observer_event_rx.recv() {
             Ok(cmd) => cmd,
             Err(e) => {
-                error!("Error: broken channel {}", e.to_string());
+                crit!("Error: broken channel {}", e.to_string());
                 break;
             }
         };
@@ -425,14 +430,14 @@ pub fn start_replay_flow(network: &StacksNetwork, bitcoind_rpc_url: Url, apply: 
                         let start_block = match bitcoin_hook.start_block {
                             Some(start_block) => start_block,
                             None => {
-                                error!("Bitcoin chainhook specification must include a field start_block in replay mode");
+                                warn!("Bitcoin chainhook specification must include a field start_block in replay mode");
                                 continue;
                             }
                         };
                         let tip_height = match bitcoin_rpc.get_blockchain_info() {
                             Ok(result) => result.blocks,
                             Err(e) => {
-                                error!("unable to retrieve Bitcoin chain tip ({})", e.to_string());
+                                warn!("unable to retrieve Bitcoin chain tip ({})", e.to_string());
                                 continue;
                             }
                         };
@@ -703,10 +708,8 @@ pub fn start_node(mut config: Config) {
         control_port: DEFAULT_CONTROL_PORT,
         bitcoin_node_username: config.network.bitcoin_node_rpc_username.clone(),
         bitcoin_node_password: config.network.bitcoin_node_rpc_password.clone(),
-        bitcoin_node_rpc_host: "http://localhost".into(),
-        bitcoin_node_rpc_port: 18443,
-        stacks_node_rpc_host: "http://localhost".into(),
-        stacks_node_rpc_port: 20443,
+        bitcoin_node_rpc_url: config.network.bitcoin_node_rpc_url.clone(),
+        stacks_node_rpc_url: config.network.stacks_node_rpc_url.clone(),
         operators: HashSet::new(),
         display_logs: false,
     };
@@ -728,22 +731,21 @@ pub fn start_node(mut config: Config) {
         let _ = hiro_system_kit::nestable_block_on(future);
     });
 
-    let redis_config = config.expected_redis_config();
-    let client = redis::Client::open(redis_config.uri.clone()).unwrap();
-    let mut redis_con = match client.get_connection() {
-        Ok(con) => con,
-        Err(message) => {
-            error!("Redis: {}", message.to_string());
-            panic!();
-        }
-    };
-
     loop {
         let event = match observer_event_rx.recv() {
             Ok(cmd) => cmd,
             Err(e) => {
                 error!("Error: broken channel {}", e.to_string());
                 break;
+            }
+        };
+        let redis_config = config.expected_redis_config();
+        let client = redis::Client::open(redis_config.uri.clone()).unwrap();
+        let mut redis_con = match client.get_connection() {
+            Ok(con) => con,
+            Err(message) => {
+                error!("Redis: {}", message.to_string());
+                panic!();
             }
         };
         match event {
@@ -903,7 +905,7 @@ fn update_storage_with_confirmed_stacks_blocks(
             ],
         );
         if let Err(error) = res {
-            error!(
+            crit!(
                 "unable to archive block {}: {}",
                 block.block_identifier,
                 error.to_string()

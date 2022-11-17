@@ -95,10 +95,11 @@ impl DevnetEventObserverConfig {
             control_port: devnet_config.orchestrator_control_port,
             bitcoin_node_username: devnet_config.bitcoin_node_username.clone(),
             bitcoin_node_password: devnet_config.bitcoin_node_password.clone(),
-            bitcoin_node_rpc_host: "http://localhost".into(),
-            bitcoin_node_rpc_port: devnet_config.bitcoin_node_rpc_port,
-            stacks_node_rpc_host: "http://localhost".into(),
-            stacks_node_rpc_port: devnet_config.stacks_node_rpc_port,
+            bitcoin_node_rpc_url: format!(
+                "http://localhost:{}",
+                devnet_config.bitcoin_node_rpc_port
+            ),
+            stacks_node_rpc_url: format!("http://localhost:{}", devnet_config.stacks_node_rpc_port),
             operators: HashSet::new(),
             display_logs: true,
         };
@@ -584,16 +585,35 @@ pub fn mine_bitcoin_block(
 ) {
     use bitcoincore_rpc::bitcoin::Address;
     use std::str::FromStr;
-    let rpc = Client::new(
+    let rpc = match Client::new(
         &format!("http://localhost:{}", bitcoin_node_rpc_port),
         Auth::UserPass(
             bitcoin_node_username.to_string(),
             bitcoin_node_password.to_string(),
         ),
-    )
-    .unwrap();
+    ) {
+        Ok(rpc) => rpc,
+        Err(e) => {
+            println!(
+                "{}: {}",
+                "unable to initialize bitcoin rpc client",
+                e.to_string()
+            );
+            std::process::exit(1);
+        }
+    };
     let miner_address = Address::from_str(miner_btc_address).unwrap();
-    let _ = rpc.generate_to_address(1, &miner_address);
+    match rpc.generate_to_address(1, &miner_address) {
+        Ok(rpc) => rpc,
+        Err(e) => {
+            println!(
+                "{}: {}",
+                "unable to generate new bitcoin block",
+                e.to_string()
+            );
+            std::process::exit(1);
+        }
+    };
 }
 
 fn handle_bitcoin_mining(

@@ -12,7 +12,7 @@ use bitcoincore_rpc::bitcoin::{BlockHash, Txid};
 use bitcoincore_rpc::{Auth, Client, RpcApi};
 use chainhook_types::{
     BitcoinChainEvent, BitcoinNetwork, BlockIdentifier, StacksChainEvent, StacksNetwork,
-    StacksTransactionData, TransactionIdentifier,
+    TransactionIdentifier,
 };
 use clarity_repl::clarity::util::hash::bytes_to_hex;
 use hiro_system_kit;
@@ -20,24 +20,16 @@ use reqwest::Client as HttpClient;
 use rocket::config::{Config, LogLevel};
 use rocket::data::{Limits, ToByteUnit};
 use rocket::http::Status;
-use rocket::outcome::IntoOutcome;
 use rocket::request::{self, FromRequest, Outcome, Request};
 use rocket::serde::json::{json, Json, Value as JsonValue};
 use rocket::serde::Deserialize;
 use rocket::State;
 use rocket_okapi::{openapi, openapi_get_routes, request::OpenApiFromRequest};
-use schemars::JsonSchema;
-use serde_json::error;
-use stacks_rpc_client::{PoxInfo, StacksRpc};
-use std::collections::{HashMap, HashSet, VecDeque};
-use std::convert::TryFrom;
+use std::collections::{HashMap, HashSet};
 use std::error::Error;
-use std::iter::FromIterator;
 use std::net::{IpAddr, Ipv4Addr};
-use std::path::PathBuf;
 use std::str;
 use std::str::FromStr;
-use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc::{Receiver, Sender};
 use std::sync::{Arc, Mutex, RwLock};
 
@@ -120,10 +112,8 @@ pub struct EventObserverConfig {
     pub control_port: u16,
     pub bitcoin_node_username: String,
     pub bitcoin_node_password: String,
-    pub bitcoin_node_rpc_host: String,
-    pub bitcoin_node_rpc_port: u16,
-    pub stacks_node_rpc_host: String,
-    pub stacks_node_rpc_port: u16,
+    pub bitcoin_node_rpc_url: String,
+    pub stacks_node_rpc_url: String,
     pub operators: HashSet<String>,
     pub display_logs: bool,
 }
@@ -192,8 +182,7 @@ pub struct BitcoinRPCRequest {
 pub struct BitcoinConfig {
     pub username: String,
     pub password: String,
-    pub rpc_host: String,
-    pub rpc_port: u16,
+    pub rpc_url: String,
 }
 
 #[derive(Debug, Clone)]
@@ -216,14 +205,8 @@ pub async fn start_event_observer(
     info!("Event observer starting with config {:?}", config);
 
     let indexer = Indexer::new(IndexerConfig {
-        stacks_node_rpc_url: format!(
-            "{}:{}",
-            config.stacks_node_rpc_host, config.stacks_node_rpc_port
-        ),
-        bitcoin_node_rpc_url: format!(
-            "{}:{}",
-            config.bitcoin_node_rpc_host, config.bitcoin_node_rpc_port
-        ),
+        stacks_node_rpc_url: config.stacks_node_rpc_url.clone(),
+        bitcoin_node_rpc_url: config.bitcoin_node_rpc_url.clone(),
         bitcoin_node_rpc_username: config.bitcoin_node_username.clone(),
         bitcoin_node_rpc_password: config.bitcoin_node_password.clone(),
         stacks_network: StacksNetwork::Devnet,
@@ -246,8 +229,7 @@ pub async fn start_event_observer(
     let bitcoin_config = BitcoinConfig {
         username: config.bitcoin_node_username.clone(),
         password: config.bitcoin_node_password.clone(),
-        rpc_host: config.bitcoin_node_rpc_host.clone(),
-        rpc_port: config.bitcoin_node_rpc_port,
+        rpc_url: config.bitcoin_node_rpc_url.clone(),
     };
 
     let mut entries = HashMap::new();
@@ -281,6 +263,7 @@ pub async fn start_event_observer(
         keep_alive: 5,
         temp_dir: std::env::temp_dir().into(),
         log_level: log_level.clone(),
+        cli_colors: false,
         limits,
         ..Config::default()
     };
@@ -293,6 +276,8 @@ pub async fn start_event_observer(
         handle_new_mempool_tx,
         handle_drop_mempool_tx,
         handle_new_attachement,
+        handle_mined_block,
+        handle_mined_microblock,
     ];
 
     if bitcoin_rpc_proxy_enabled {
@@ -317,6 +302,7 @@ pub async fn start_event_observer(
         keep_alive: 5,
         temp_dir: std::env::temp_dir().into(),
         log_level,
+        cli_colors: false,
         ..Config::default()
     };
 
@@ -456,10 +442,7 @@ pub async fn start_observer_commands_handler(
                             }
 
                             let bitcoin_client_rpc = Client::new(
-                                &format!(
-                                    "{}:{}",
-                                    config.bitcoin_node_rpc_host, config.bitcoin_node_rpc_port
-                                ),
+                                &config.bitcoin_node_rpc_url,
                                 Auth::UserPass(
                                     config.bitcoin_node_username.to_string(),
                                     config.bitcoin_node_password.to_string(),
@@ -836,22 +819,36 @@ pub fn handle_new_bitcoin_block(
     // into account the last 7 blocks.
     let chain_update = match indexer_rw_lock.inner().write() {
         Ok(mut indexer) => indexer.handle_bitcoin_block(marshalled_block.into_inner()),
-        _ => {
+        Err(e) => {
+            warn!("unable to acquire indexer_rw_lock: {}", e.to_string());
             return Json(json!({
                 "status": 500,
                 "result": "Unable to acquire lock",
-            }))
+            }));
         }
     };
 
-    if let Ok(Some(chain_event)) = chain_update {
-        let background_job_tx = background_job_tx.inner();
-        match background_job_tx.lock() {
-            Ok(tx) => {
-                let _ = tx.send(ObserverCommand::PropagateBitcoinChainEvent(chain_event));
-            }
-            _ => {}
-        };
+    match chain_update {
+        Ok(Some(chain_event)) => {
+            match background_job_tx.lock() {
+                Ok(tx) => {
+                    let _ = tx.send(ObserverCommand::PropagateBitcoinChainEvent(chain_event));
+                }
+                Err(e) => {
+                    warn!("unable to acquire background_job_tx: {}", e.to_string());
+                    return Json(json!({
+                        "status": 500,
+                        "result": "Unable to acquire lock",
+                    }));
+                }
+            };
+        }
+        Ok(None) => {
+            info!("unable to infer chain progress");
+        }
+        Err(e) => {
+            error!("unable to handle bitcoin block: {}", e)
+        }
     }
 
     Json(json!({
@@ -887,20 +884,28 @@ pub fn handle_new_stacks_block(
         }
     };
 
-    if let Ok(Some(chain_event)) = chain_event {
-        let background_job_tx = background_job_tx.inner();
-        match background_job_tx.lock() {
-            Ok(tx) => {
-                let _ = tx.send(ObserverCommand::PropagateStacksChainEvent(chain_event));
-            }
-            Err(e) => {
-                warn!("unable to acquire background_job_tx: {}", e.to_string());
-                return Json(json!({
-                    "status": 500,
-                    "result": "Unable to acquire lock",
-                }));
-            }
-        };
+    match chain_event {
+        Ok(Some(chain_event)) => {
+            let background_job_tx = background_job_tx.inner();
+            match background_job_tx.lock() {
+                Ok(tx) => {
+                    let _ = tx.send(ObserverCommand::PropagateStacksChainEvent(chain_event));
+                }
+                Err(e) => {
+                    warn!("unable to acquire background_job_tx: {}", e.to_string());
+                    return Json(json!({
+                        "status": 500,
+                        "result": "Unable to acquire lock",
+                    }));
+                }
+            };
+        }
+        Ok(None) => {
+            info!("unable to infer chain progress");
+        }
+        Err(e) => {
+            error!("{}", e)
+        }
     }
 
     Json(json!({
@@ -923,28 +928,43 @@ pub fn handle_new_microblocks(
     info!("POST /new_microblocks");
     // Standardize the structure of the microblock, and identify the
     // kind of update that this new microblock would imply
-    let mut chain_event = match indexer_rw_lock.inner().write() {
+    let chain_event = match indexer_rw_lock.inner().write() {
         Ok(mut indexer) => {
             let chain_event = indexer
                 .handle_stacks_marshalled_microblock_trail(marshalled_microblock.into_inner());
             chain_event
         }
-        _ => {
+        Err(e) => {
+            warn!("unable to acquire background_job_tx: {}", e.to_string());
             return Json(json!({
                 "status": 500,
                 "result": "Unable to acquire lock",
-            }))
+            }));
         }
     };
 
-    if let Some(chain_event) = chain_event.take() {
-        let background_job_tx = background_job_tx.inner();
-        match background_job_tx.lock() {
-            Ok(tx) => {
-                let _ = tx.send(ObserverCommand::PropagateStacksChainEvent(chain_event));
-            }
-            _ => {}
-        };
+    match chain_event {
+        Ok(Some(chain_event)) => {
+            let background_job_tx = background_job_tx.inner();
+            match background_job_tx.lock() {
+                Ok(tx) => {
+                    let _ = tx.send(ObserverCommand::PropagateStacksChainEvent(chain_event));
+                }
+                Err(e) => {
+                    warn!("unable to acquire background_job_tx: {}", e.to_string());
+                    return Json(json!({
+                        "status": 500,
+                        "result": "Unable to acquire lock",
+                    }));
+                }
+            };
+        }
+        Ok(None) => {
+            info!("unable to infer chain progress");
+        }
+        Err(e) => {
+            error!("unable to handle stacks microblock: {}", e);
+        }
     }
 
     Json(json!({
@@ -1009,6 +1029,26 @@ pub fn handle_new_attachement() -> Json<JsonValue> {
 }
 
 #[openapi(skip)]
+#[post("/mined_block", format = "application/json", data = "<payload>")]
+pub fn handle_mined_block(payload: Json<JsonValue>) -> Json<JsonValue> {
+    info!("POST /mined_block {:?}", payload);
+    Json(json!({
+        "status": 200,
+        "result": "Ok",
+    }))
+}
+
+#[openapi(skip)]
+#[post("/mined_microblock", format = "application/json", data = "<payload>")]
+pub fn handle_mined_microblock(payload: Json<JsonValue>) -> Json<JsonValue> {
+    info!("POST /mined_microblock {:?}", payload);
+    Json(json!({
+        "status": 200,
+        "result": "Ok",
+    }))
+}
+
+#[openapi(skip)]
 #[post("/", format = "application/json", data = "<bitcoin_rpc_call>")]
 pub async fn handle_bitcoin_rpc_call(
     bitcoin_config: &State<BitcoinConfig>,
@@ -1032,10 +1072,7 @@ pub async fn handle_bitcoin_rpc_call(
 
     let client = Client::new();
     let builder = client
-        .post(format!(
-            "{}:{}",
-            bitcoin_config.rpc_host, bitcoin_config.rpc_port
-        ))
+        .post(&bitcoin_config.rpc_url)
         .header("Content-Type", "application/json")
         .timeout(std::time::Duration::from_secs(5))
         .header("Authorization", format!("Basic {}", token));
