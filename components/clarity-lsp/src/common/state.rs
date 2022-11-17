@@ -17,11 +17,13 @@ use clarity_repl::clarity::vm::types::QualifiedContractIdentifier;
 use clarity_repl::clarity::vm::EvaluationResult;
 use clarity_repl::clarity::{ClarityVersion, SymbolicExpression};
 use clarity_repl::repl::DEFAULT_CLARITY_VERSION;
-use lsp_types::{Hover, MessageType};
+use lsp_types::{DocumentSymbol, Hover, MessageType};
 use std::borrow::BorrowMut;
 use std::collections::{HashMap, HashSet};
+use std::vec;
 
-use super::hover_data::get_expression_documentation;
+use super::requests::document_symbols::ASTSymbols;
+use super::requests::hover::get_expression_documentation;
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct ActiveContractData {
@@ -240,13 +242,43 @@ impl EditorState {
 
         let mut user_defined_keywords = self
             .contracts_lookup
-            .get(&contract_location)
+            .get(contract_location)
             .and_then(|d| self.protocols.get(&d.manifest_location))
             .and_then(|p| Some(p.get_completion_items_for_contract(contract_location)))
             .unwrap_or_default();
 
         keywords.append(&mut user_defined_keywords);
         keywords
+    }
+
+    pub fn get_document_symbols_for_contract(
+        &self,
+        contract_location: &FileLocation,
+    ) -> Vec<DocumentSymbol> {
+        let active_contract = self.active_contracts.get(contract_location);
+
+        let expressions = match active_contract {
+            Some(active_contract) => match &active_contract.expressions {
+                Some(expressions) => expressions,
+                None => return vec![],
+            },
+            None => {
+                let analysis = self
+                    .contracts_lookup
+                    .get(contract_location)
+                    .and_then(|c| self.protocols.get(&c.manifest_location))
+                    .and_then(|p| p.contracts.get(contract_location))
+                    .and_then(|c| c.analysis.as_ref());
+
+                match analysis {
+                    Some(analysis) => &analysis.expressions,
+                    None => return vec![],
+                }
+            }
+        };
+
+        let ast_symbols = ASTSymbols::new();
+        ast_symbols.get_symbols(&expressions)
     }
 
     pub fn get_hover_data(

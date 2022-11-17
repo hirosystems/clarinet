@@ -2454,6 +2454,9 @@ fn match_tuple(
                     let mut tuple_map = HashMap::new();
                     for element in args {
                         let pair = element.match_list().unwrap_or_default();
+                        if pair.len() != 2 {
+                            return None;
+                        }
                         tuple_map.insert(pair[0].match_atom(), &pair[1]);
                     }
                     return Some(tuple_map);
