@@ -7,14 +7,13 @@ use bitcoincore_rpc::bitcoin::hashes::Hash;
 use bitcoincore_rpc::bitcoin::{Block, BlockHash};
 use bitcoincore_rpc::{Auth, Client, RpcApi};
 pub use blocks_pool::BitcoinBlockPool;
-use chainhook_types::bitcoin::{OutPoint, TxIn, TxOut, Witness};
+use chainhook_types::bitcoin::{OutPoint, TxIn, TxOut};
 use chainhook_types::{
     BitcoinBlockData, BitcoinBlockMetadata, BitcoinTransactionData, BitcoinTransactionMetadata,
     BlockCommitmentData, BlockIdentifier, KeyRegistrationData, LockSTXData, PobBlockCommitmentData,
     PoxBlockCommitmentData, PoxReward, StacksBaseChainOperation, TransactionIdentifier,
     TransferSTXData,
 };
-use clarity_repl::clarity::deps_common::bitcoin::blockdata::script::Script;
 use clarity_repl::clarity::util::hash::{hex_bytes, to_hex};
 use rocket::serde::json::Value as JsonValue;
 
@@ -37,24 +36,30 @@ pub struct RewardParticipant {
 pub fn standardize_bitcoin_block(
     indexer_config: &IndexerConfig,
     marshalled_block: JsonValue,
-) -> BitcoinBlockData {
+) -> Result<BitcoinBlockData, String> {
     let auth = Auth::UserPass(
         indexer_config.bitcoin_node_rpc_username.clone(),
         indexer_config.bitcoin_node_rpc_password.clone(),
     );
-
-    let rpc = Client::new(&indexer_config.bitcoin_node_rpc_url, auth).unwrap();
-
-    let partial_block: NewBitcoinBlock = serde_json::from_value(marshalled_block).unwrap();
+    let rpc = Client::new(&indexer_config.bitcoin_node_rpc_url, auth).map_err(|e| {
+        format!(
+            "unable for bitcoin rpc initialize client: {}",
+            e.to_string()
+        )
+    })?;
+    let partial_block: NewBitcoinBlock = serde_json::from_value(marshalled_block)
+        .map_err(|e| format!("unable for parse bitcoin block: {}", e.to_string()))?;
     let block_hash = {
         let block_hash_str = partial_block.burn_block_hash.strip_prefix("0x").unwrap();
         let mut block_hash_bytes = hex_bytes(&block_hash_str).unwrap();
         block_hash_bytes.reverse();
         BlockHash::from_slice(&block_hash_bytes).unwrap()
     };
-    let block = rpc.get_block(&block_hash).unwrap();
+    let block = rpc
+        .get_block(&block_hash)
+        .map_err(|e| format!("unable for invoke rpc get_block: {}", e.to_string()))?;
     let block_height = partial_block.burn_block_height;
-    build_block(block, block_height, indexer_config)
+    Ok(build_block(block, block_height, indexer_config))
 }
 
 pub fn build_block(

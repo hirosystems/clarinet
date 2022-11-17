@@ -1,7 +1,6 @@
 use super::{super::StacksChainEventExpectation, BlockEvent};
 use super::{microblocks, stacks_blocks};
-use bitcoincore_rpc::bitcoin::Block;
-use chainhook_types::{StacksBlockData, StacksChainEvent, StacksMicroblockData};
+use chainhook_types::StacksChainEvent;
 
 pub fn expect_no_chain_update() -> StacksChainEventExpectation {
     Box::new(move |chain_event_to_check: Option<StacksChainEvent>| {

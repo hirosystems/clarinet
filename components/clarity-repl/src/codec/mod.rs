@@ -16,6 +16,7 @@ use clarity::util::retry::BoundReader;
 use clarity::util::secp256k1::{
     MessageSignature, Secp256k1PrivateKey, Secp256k1PublicKey, MESSAGE_SIGNATURE_ENCODED_SIZE,
 };
+use clarity::vm::ClarityVersion;
 // use clarity::util::vrf::VRFProof;
 use clarity::vm::types::{
     PrincipalData, QualifiedContractIdentifier, StandardPrincipalData, Value,
@@ -1350,7 +1351,7 @@ impl_byte_array_serde!(TokenTransferMemo);
 pub enum TransactionPayload {
     TokenTransfer(PrincipalData, u64, TokenTransferMemo),
     ContractCall(TransactionContractCall),
-    SmartContract(TransactionSmartContract),
+    SmartContract(TransactionSmartContract, Option<ClarityVersion>),
     PoisonMicroblock(StacksMicroblockHeader, StacksMicroblockHeader), // the previous epoch leader sent two microblocks with the same sequence, and this is proof
     Coinbase(CoinbasePayload, Option<PrincipalData>),
 }
@@ -1376,6 +1377,7 @@ pub enum TransactionPayloadID {
     PoisonMicroblock = 3,
     Coinbase = 4,
     CoinbaseToAltRecipient = 5,
+    VersionedSmartContract = 6,
 }
 
 /// Encoding of an asset type identifier
@@ -2380,6 +2382,29 @@ impl StacksMessageCodec for TransactionSmartContract {
     }
 }
 
+fn ClarityVersion_consensus_serialize<W: Write>(
+    version: &ClarityVersion,
+    fd: &mut W,
+) -> Result<(), CodecError> {
+    match *version {
+        ClarityVersion::Clarity1 => write_next(fd, &1u8)?,
+        ClarityVersion::Clarity2 => write_next(fd, &2u8)?,
+    }
+    Ok(())
+}
+
+fn ClarityVersion_consensus_deserialize<R: Read>(fd: &mut R) -> Result<ClarityVersion, CodecError> {
+    let version_byte: u8 = read_next(fd)?;
+    match version_byte {
+        1u8 => Ok(ClarityVersion::Clarity1),
+        2u8 => Ok(ClarityVersion::Clarity2),
+        _ => Err(CodecError::DeserializeError(format!(
+            "Unrecognized ClarityVersion byte {}",
+            &version_byte
+        ))),
+    }
+}
+
 impl StacksMessageCodec for TransactionPayload {
     fn consensus_serialize<W: Write>(&self, fd: &mut W) -> Result<(), CodecError> {
         match *self {
@@ -2393,9 +2418,17 @@ impl StacksMessageCodec for TransactionPayload {
                 write_next(fd, &(TransactionPayloadID::ContractCall as u8))?;
                 cc.consensus_serialize(fd)?;
             }
-            TransactionPayload::SmartContract(ref sc) => {
-                write_next(fd, &(TransactionPayloadID::SmartContract as u8))?;
-                sc.consensus_serialize(fd)?;
+            TransactionPayload::SmartContract(ref sc, ref version_opt) => {
+                if let Some(version) = version_opt {
+                    // caller requests a specific Clarity version
+                    write_next(fd, &(TransactionPayloadID::VersionedSmartContract as u8))?;
+                    ClarityVersion_consensus_serialize(&version, fd)?;
+                    sc.consensus_serialize(fd)?;
+                } else {
+                    // caller requests to use whatever the current clarity version is
+                    write_next(fd, &(TransactionPayloadID::SmartContract as u8))?;
+                    sc.consensus_serialize(fd)?;
+                }
             }
             _ => {
                 unreachable!()
@@ -2419,7 +2452,12 @@ impl StacksMessageCodec for TransactionPayload {
             }
             x if x == TransactionPayloadID::SmartContract as u8 => {
                 let payload: TransactionSmartContract = read_next(fd)?;
-                TransactionPayload::SmartContract(payload)
+                TransactionPayload::SmartContract(payload, None)
+            }
+            x if x == TransactionPayloadID::VersionedSmartContract as u8 => {
+                let version = ClarityVersion_consensus_deserialize(fd)?;
+                let payload: TransactionSmartContract = read_next(fd)?;
+                TransactionPayload::SmartContract(payload, Some(version))
             }
             x if x == TransactionPayloadID::PoisonMicroblock as u8 => {
                 let micrblock1: StacksMicroblockHeader = read_next(fd)?;
@@ -2429,6 +2467,18 @@ impl StacksMessageCodec for TransactionPayload {
             x if x == TransactionPayloadID::Coinbase as u8 => {
                 let payload: CoinbasePayload = read_next(fd)?;
                 TransactionPayload::Coinbase(payload, None)
+            }
+            x if x == TransactionPayloadID::CoinbaseToAltRecipient as u8 => {
+                let payload: CoinbasePayload = read_next(fd)?;
+                let principal_value: Value = read_next(fd)?;
+                let recipient = match principal_value {
+                    Value::Principal(recipient_principal) => recipient_principal,
+                    _ => {
+                        return Err(CodecError::DeserializeError("Failed to parse coinbase transaction -- did not receive a recipient principal value".to_string()));
+                    }
+                };
+
+                TransactionPayload::Coinbase(payload, Some(recipient))
             }
             _ => {
                 return Err(CodecError::DeserializeError(format!(

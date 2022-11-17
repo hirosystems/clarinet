@@ -1,35 +1,24 @@
-use crate::utils::AbstractStacksBlock;
-
 use super::types::{
-    BitcoinChainhookSpecification, BitcoinPredicateType, BitcoinTransactionFilterPredicate,
-    ChainhookSpecification, ExactMatchingRule, HookAction, HookFormation, KeyRegistrationPredicate,
-    LockSTXPredicate, MatchingRule, PobPredicate, PoxPredicate, StacksChainhookSpecification,
-    StacksContractDeploymentPredicate, StacksTransactionFilterPredicate, TransferSTXPredicate,
+    BitcoinChainhookSpecification, BitcoinPredicateType, ExactMatchingRule, HookAction,
+    KeyRegistrationPredicate, LockSTXPredicate, MatchingRule, PobPredicate, PoxPredicate,
+    TransferSTXPredicate,
 };
 use base58::FromBase58;
 use bitcoincore_rpc::bitcoin::blockdata::opcodes;
 use bitcoincore_rpc::bitcoin::blockdata::script::Builder as BitcoinScriptBuilder;
 use bitcoincore_rpc::bitcoin::util::address::Payload;
-use bitcoincore_rpc::bitcoin::{Address, PubkeyHash, PublicKey, Script};
+use bitcoincore_rpc::bitcoin::Address;
 use chainhook_types::{
-    BitcoinBlockData, BitcoinChainEvent, BitcoinTransactionData, BlockIdentifier,
-    StacksBaseChainOperation, StacksChainEvent, StacksNetwork, StacksTransactionData,
-    StacksTransactionEvent, StacksTransactionKind, TransactionIdentifier,
+    BitcoinBlockData, BitcoinChainEvent, BitcoinTransactionData, StacksBaseChainOperation,
+    TransactionIdentifier,
 };
-use clarity_repl::clarity::codec::StacksMessageCodec;
-use clarity_repl::clarity::util::hash::{hex_bytes, to_hex, Hash160};
-use clarity_repl::clarity::vm::types::{CharType, SequenceData, Value as ClarityValue};
+use clarity_repl::clarity::util::hash::to_hex;
 use reqwest::{Client, Method};
-use serde::Serialize;
 use serde_json::Value as JsonValue;
 use std::collections::HashMap;
-use std::io::Cursor;
-use std::iter::Map;
-use std::slice::Iter;
 use std::str::FromStr;
 
-use reqwest::{Error, RequestBuilder, Response};
-use std::future::Future;
+use reqwest::RequestBuilder;
 
 pub struct BitcoinTriggerChainhook<'a> {
     pub chainhook: &'a BitcoinChainhookSpecification,

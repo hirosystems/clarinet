@@ -103,7 +103,15 @@ pub fn start(
         while let Ok(Some(record)) = stacks_record_rx.recv() {
             let (block_identifier, parent_block_identifier) = match &record.kind {
                 RecordKind::StacksBlockReceived => {
-                    indexer::stacks::standardize_stacks_serialized_block_header(&record.raw_log)
+                    match indexer::stacks::standardize_stacks_serialized_block_header(
+                        &record.raw_log,
+                    ) {
+                        Ok(data) => data,
+                        Err(e) => {
+                            error!("{e}");
+                            continue;
+                        }
+                    }
                 }
                 _ => unreachable!(),
             };

@@ -352,12 +352,13 @@ pub async fn generate_default_deployment(
                 Some(ast) => ast,
                 None => {
                     // Download the code
-                    let (source, contract_location) = requirements::retrieve_contract(
-                        &contract_id,
-                        &cache_location,
-                        &file_accessor,
-                    )
-                    .await?;
+                    let (source, clarity_version, contract_location) =
+                        requirements::retrieve_contract(
+                            &contract_id,
+                            &cache_location,
+                            &file_accessor,
+                        )
+                        .await?;
 
                     // Build the struct representing the requirement in the deployment
                     if network.is_simnet() {
@@ -394,6 +395,7 @@ pub async fn generate_default_deployment(
                             location: contract_location,
                             cost: deployment_fee_rate * source.len() as u64,
                             remap_principals,
+                            clarity_version,
                         };
                         requirements_publish.insert(contract_id.clone(), data);
                     }
@@ -487,26 +489,14 @@ pub async fn generate_default_deployment(
     let mut contracts = HashMap::new();
     let mut contracts_sources = HashMap::new();
 
-    let base_location = manifest.location.clone().get_parent_location()?;
-
     let sources: HashMap<String, String> = match file_accessor {
         None => {
             let mut sources = HashMap::new();
-            for (_, contract_config) in manifest.contracts.iter() {
-                let mut contract_location = base_location.clone();
-                contract_location
-                    .append_path(&contract_config.expect_contract_path_as_str())
-                    .map_err(|_| {
-                        format!(
-                            "unable to build path for contract {}",
-                            contract_config.expect_contract_path_as_str()
-                        )
-                    })?;
-
+            for (contract_location, _) in manifest.contracts_settings.iter() {
                 let source = contract_location.read_content_as_utf8().map_err(|_| {
                     format!(
-                        "unable to find contract at path {}",
-                        contract_config.expect_contract_path_as_str()
+                        "unable to find contract at {}",
+                        contract_location.to_string()
                     )
                 })?;
                 sources.insert(contract_location.to_string(), source);
@@ -515,15 +505,9 @@ pub async fn generate_default_deployment(
         }
         Some(file_accessor) => {
             let contracts_location = manifest
-                .contracts
+                .contracts_settings
                 .iter()
-                .map(|(_, contract_config)| {
-                    let mut contract_location = base_location.clone();
-                    contract_location
-                        .append_path(&contract_config.expect_contract_path_as_str())
-                        .unwrap();
-                    contract_location.to_string()
-                })
+                .map(|(contract_location, _)| contract_location.to_string())
                 .collect();
             file_accessor
                 .read_contracts_content(contracts_location)
@@ -531,10 +515,15 @@ pub async fn generate_default_deployment(
         }
     };
 
-    for (name, contract_config) in manifest.contracts.iter() {
-        let contract_name = match ContractName::try_from(name.to_string()) {
+    for (contract_location, contract_config) in manifest.contracts_settings.iter() {
+        let contract_name = match ContractName::try_from(contract_config.name.to_string()) {
             Ok(res) => res,
-            Err(_) => return Err(format!("unable to use {} as a valid contract name", name)),
+            Err(_) => {
+                return Err(format!(
+                    "unable to use {} as a valid contract name",
+                    contract_config.name
+                ))
+            }
         };
 
         let deployer = match &contract_config.deployer {
@@ -561,13 +550,11 @@ pub async fn generate_default_deployment(
             }
         };
 
-        let mut contract_location = base_location.clone();
-        contract_location.append_path(&contract_config.expect_contract_path_as_str())?;
         let source = sources
             .get(&contract_location.to_string())
             .ok_or(format!(
                 "Invalid Clarinet.toml, source file not found for: {}",
-                name
+                &contract_config.name
             ))?
             .clone();
 
@@ -590,7 +577,7 @@ pub async fn generate_default_deployment(
                     contract_name,
                     emulated_sender: sender,
                     source,
-                    location: contract_location,
+                    location: contract_location.clone(),
                     clarity_version: contract_config.clarity_version,
                 },
             )
@@ -598,7 +585,7 @@ pub async fn generate_default_deployment(
             TransactionSpecification::ContractPublish(ContractPublishSpecification {
                 contract_name,
                 expected_sender: sender,
-                location: contract_location,
+                location: contract_location.clone(),
                 cost: deployment_fee_rate
                     .saturating_mul(source.as_bytes().len().try_into().unwrap()),
                 source,

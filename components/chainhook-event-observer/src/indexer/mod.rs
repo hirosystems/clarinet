@@ -3,9 +3,7 @@ pub mod stacks;
 
 use crate::utils::AbstractBlock;
 use chainhook_types::{
-    BitcoinChainEvent, BitcoinNetwork, BlockIdentifier, StacksBlockData, StacksChainEvent,
-    StacksChainUpdatedWithBlocksData, StacksChainUpdatedWithMicroblocksData,
-    StacksMicroblocksTrail, StacksNetwork,
+    BitcoinChainEvent, BitcoinNetwork, BlockIdentifier, StacksChainEvent, StacksNetwork,
 };
 use rocket::serde::json::Value as JsonValue;
 use stacks::StacksBlockPool;
@@ -67,56 +65,57 @@ impl Indexer {
     pub fn handle_bitcoin_block(
         &mut self,
         marshalled_block: JsonValue,
-    ) -> Result<Option<BitcoinChainEvent>, ()> {
-        let block = bitcoin::standardize_bitcoin_block(&self.config, marshalled_block);
-        self.bitcoin_blocks_pool.process_block(block)
+    ) -> Result<Option<BitcoinChainEvent>, String> {
+        let block = bitcoin::standardize_bitcoin_block(&self.config, marshalled_block)?;
+        let event = self.bitcoin_blocks_pool.process_block(block);
+        event
     }
 
     pub fn handle_stacks_serialized_block(
         &mut self,
         serialized_block: &str,
-    ) -> Result<Option<StacksChainEvent>, ()> {
+    ) -> Result<Option<StacksChainEvent>, String> {
         let block = stacks::standardize_stacks_serialized_block(
             &self.config,
             serialized_block,
             &mut self.stacks_context,
-        );
+        )?;
         self.stacks_blocks_pool.process_block(block)
     }
 
     pub fn handle_stacks_marshalled_block(
         &mut self,
         marshalled_block: JsonValue,
-    ) -> Result<Option<StacksChainEvent>, ()> {
+    ) -> Result<Option<StacksChainEvent>, String> {
         let block = stacks::standardize_stacks_marshalled_block(
             &self.config,
             marshalled_block,
             &mut self.stacks_context,
-        );
+        )?;
         self.stacks_blocks_pool.process_block(block)
     }
 
     pub fn handle_stacks_serialized_microblock_trail(
         &mut self,
         serialized_microblock_trail: &str,
-    ) -> Option<StacksChainEvent> {
+    ) -> Result<Option<StacksChainEvent>, String> {
         let microblocks = stacks::standardize_stacks_serialized_microblock_trail(
             &self.config,
             serialized_microblock_trail,
             &mut self.stacks_context,
-        );
+        )?;
         self.stacks_blocks_pool.process_microblocks(microblocks)
     }
 
     pub fn handle_stacks_marshalled_microblock_trail(
         &mut self,
         marshalled_microblock_trail: JsonValue,
-    ) -> Option<StacksChainEvent> {
+    ) -> Result<Option<StacksChainEvent>, String> {
         let microblocks = stacks::standardize_stacks_marshalled_microblock_trail(
             &self.config,
             marshalled_microblock_trail,
             &mut self.stacks_context,
-        );
+        )?;
         self.stacks_blocks_pool.process_microblocks(microblocks)
     }
 

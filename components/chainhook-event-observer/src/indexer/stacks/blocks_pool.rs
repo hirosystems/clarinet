@@ -1,14 +1,11 @@
 use crate::indexer::{ChainSegment, ChainSegmentIncompatibility};
-use crate::utils::AbstractBlock;
-use bitcoincore_rpc::bitcoin::Block;
 use chainhook_types::{
-    BitcoinChainEvent, BlockIdentifier, Chain, StacksBlockData, StacksBlockUpdate,
-    StacksChainEvent, StacksChainUpdatedWithBlocksData, StacksChainUpdatedWithMicroblocksData,
+    BlockIdentifier, StacksBlockData, StacksBlockUpdate, StacksChainEvent,
+    StacksChainUpdatedWithBlocksData, StacksChainUpdatedWithMicroblocksData,
     StacksChainUpdatedWithMicroblocksReorgData, StacksChainUpdatedWithReorgData,
-    StacksMicroblockData, StacksMicroblocksTrail, StacksTransactionData,
+    StacksMicroblockData,
 };
-use clarity_repl::clarity::util::hash::to_hex;
-use std::collections::{hash_map::Entry, BTreeMap, BTreeSet, HashMap, HashSet, VecDeque};
+use std::collections::{hash_map::Entry, BTreeMap, BTreeSet, HashMap, HashSet};
 
 pub struct StacksBlockPool {
     canonical_fork_id: usize,
@@ -40,7 +37,7 @@ impl StacksBlockPool {
     pub fn process_block(
         &mut self,
         block: StacksBlockData,
-    ) -> Result<Option<StacksChainEvent>, ()> {
+    ) -> Result<Option<StacksChainEvent>, String> {
         info!("Start processing Stacks {}", block.block_identifier);
 
         // Keep block data in memory
@@ -62,7 +59,10 @@ impl StacksBlockPool {
         let previous_canonical_fork_id = self.canonical_fork_id;
         let previous_canonical_fork = match self.forks.get(&previous_canonical_fork_id) {
             Some(fork) => fork.clone(),
-            None => return Err(()),
+            None => {
+                error!("unable to retrieve previous stacks fork");
+                return Ok(None);
+            }
         };
 
         let mut fork_updated = None;
@@ -347,7 +347,7 @@ impl StacksBlockPool {
     pub fn process_microblocks(
         &mut self,
         microblocks: Vec<StacksMicroblockData>,
-    ) -> Option<StacksChainEvent> {
+    ) -> Result<Option<StacksChainEvent>, String> {
         info!("Start processing {} microblocks", microblocks.len());
 
         let mut previous_canonical_micro_fork = None;
@@ -498,7 +498,7 @@ impl StacksBlockPool {
 
         if micro_forks_updated.is_empty() {
             info!("Unable to process microblocks - inboxed for later");
-            return None;
+            return Ok(None);
         } else {
             info!("Microblocks successfully appended");
         }
@@ -506,9 +506,8 @@ impl StacksBlockPool {
         let anchor_block_updated = match anchor_block_updated {
             Some(anchor_block_updated) => anchor_block_updated,
             None => {
-                // Microblock was received before its anchorblock
-
-                return None;
+                info!("Microblock was received before its anchorblock");
+                return Ok(None);
             }
         };
 
@@ -549,7 +548,7 @@ impl StacksBlockPool {
             &previous_canonical_micro_fork,
         );
 
-        chain_event
+        Ok(chain_event)
     }
 
     // We got the confirmed canonical microblock trail,

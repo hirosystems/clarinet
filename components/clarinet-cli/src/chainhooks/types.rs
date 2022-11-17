@@ -23,7 +23,6 @@ pub struct ChainhookNetworkSpecificationFile {
     expire_after_occurrence: Option<u64>,
     predicate: ChainhookPredicateFile,
     action: HookActionFile,
-    oreo_url: String,
 }
 
 #[derive(Debug, PartialEq, Serialize, Deserialize)]

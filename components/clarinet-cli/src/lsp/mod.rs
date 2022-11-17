@@ -1,17 +1,14 @@
 mod native_bridge;
 
+use self::native_bridge::LspNativeBridge;
 use clarity_lsp::utils;
 use clarity_repl::clarity::vm::diagnostic::{
     Diagnostic as ClarityDiagnostic, Level as ClarityLevel,
 };
-use native_bridge::LspNativeBridge;
-
 use crossbeam_channel::unbounded;
 use std::sync::mpsc;
 use tokio;
-use tower_lsp::lsp_types::{
-    Diagnostic, DiagnosticSeverity, Documentation, MarkupContent, MarkupKind, Position, Range,
-};
+use tower_lsp::lsp_types::{Diagnostic, DiagnosticSeverity, Position, Range};
 use tower_lsp::{LspService, Server};
 
 pub fn run_lsp() {
@@ -44,83 +41,11 @@ async fn do_run_lsp() -> Result<(), String> {
         ));
     });
 
-    let (service, messages) = LspService::new(|client| {
-        LspNativeBridge::new(client, request_tx, notification_tx, response_rx)
+    let (service, socket) = LspService::new(|client| {
+        LspNativeBridge::new(client, notification_tx, request_tx, response_rx)
     });
-    Server::new(stdin, stdout)
-        .interleave(messages)
-        .serve(service)
-        .await;
+    Server::new(stdin, stdout, socket).serve(service).await;
     Ok(())
-}
-
-pub fn completion_item_type_to_tower_lsp_type(
-    item: &mut clarity_lsp::types::CompletionItem,
-) -> tower_lsp::lsp_types::CompletionItem {
-    tower_lsp::lsp_types::CompletionItem {
-        label: item.label.clone(),
-        kind: Some(completion_item_kind_lsp_type_to_tower_lsp_type(&item.kind)),
-        detail: item.detail.take(),
-        documentation: item.markdown_documentation.take().and_then(|doc| {
-            Some(Documentation::MarkupContent(MarkupContent {
-                kind: MarkupKind::Markdown,
-                value: doc,
-            }))
-        }),
-        deprecated: None,
-        preselect: None,
-        sort_text: None,
-        filter_text: None,
-        insert_text: item.insert_text.take(),
-        insert_text_format: Some(insert_text_format_lsp_type_to_tower_lsp_type(
-            &item.insert_text_format,
-        )),
-        insert_text_mode: None,
-        text_edit: None,
-        additional_text_edits: None,
-        command: None,
-        commit_characters: None,
-        data: None,
-        tags: None,
-    }
-}
-
-pub fn completion_item_kind_lsp_type_to_tower_lsp_type(
-    kind: &clarity_lsp::types::CompletionItemKind,
-) -> tower_lsp::lsp_types::CompletionItemKind {
-    match kind {
-        clarity_lsp::types::CompletionItemKind::Class => {
-            tower_lsp::lsp_types::CompletionItemKind::Class
-        }
-        clarity_lsp::types::CompletionItemKind::Event => {
-            tower_lsp::lsp_types::CompletionItemKind::Event
-        }
-        clarity_lsp::types::CompletionItemKind::Field => {
-            tower_lsp::lsp_types::CompletionItemKind::Field
-        }
-        clarity_lsp::types::CompletionItemKind::Function => {
-            tower_lsp::lsp_types::CompletionItemKind::Function
-        }
-        clarity_lsp::types::CompletionItemKind::Module => {
-            tower_lsp::lsp_types::CompletionItemKind::Module
-        }
-        clarity_lsp::types::CompletionItemKind::TypeParameter => {
-            tower_lsp::lsp_types::CompletionItemKind::TypeParameter
-        }
-    }
-}
-
-pub fn insert_text_format_lsp_type_to_tower_lsp_type(
-    kind: &clarity_lsp::types::InsertTextFormat,
-) -> tower_lsp::lsp_types::InsertTextFormat {
-    match kind {
-        clarity_lsp::types::InsertTextFormat::PlainText => {
-            tower_lsp::lsp_types::InsertTextFormat::PlainText
-        }
-        clarity_lsp::types::InsertTextFormat::Snippet => {
-            tower_lsp::lsp_types::InsertTextFormat::Snippet
-        }
-    }
 }
 
 pub fn clarity_diagnostics_to_tower_lsp_type(
@@ -153,9 +78,9 @@ pub fn clarity_diagnostic_to_tower_lsp_type(
     Diagnostic {
         range,
         severity: match diagnostic.level {
-            ClarityLevel::Error => Some(DiagnosticSeverity::Error),
-            ClarityLevel::Warning => Some(DiagnosticSeverity::Warning),
-            ClarityLevel::Note => Some(DiagnosticSeverity::Information),
+            ClarityLevel::Error => Some(DiagnosticSeverity::ERROR),
+            ClarityLevel::Warning => Some(DiagnosticSeverity::WARNING),
+            ClarityLevel::Note => Some(DiagnosticSeverity::INFORMATION),
         },
         code: None,
         code_description: None,
@@ -169,8 +94,9 @@ pub fn clarity_diagnostic_to_tower_lsp_type(
 
 #[test]
 fn test_opening_counter_contract_should_return_fresh_analysis() {
+    use crate::lsp::native_bridge::LspResponse;
     use clarinet_files::FileLocation;
-    use clarity_lsp::backend::{LspNotification, LspResponse};
+    use clarity_lsp::backend::{LspNotification, LspNotificationResponse};
     use crossbeam_channel::unbounded;
     use std::sync::mpsc::channel;
 
@@ -196,6 +122,11 @@ fn test_opening_counter_contract_should_return_fresh_analysis() {
 
     let _ = notification_tx.send(LspNotification::ContractOpened(contract_location.clone()));
     let response = response_rx.recv().expect("Unable to get response");
+    let response = if let LspResponse::Notification(response) = response {
+        response
+    } else {
+        panic!("Unable to get response")
+    };
 
     // the counter project should emit 2 warnings and 2 notes coming from counter.clar
     assert_eq!(response.aggregated_diagnostics.len(), 1);
@@ -205,13 +136,20 @@ fn test_opening_counter_contract_should_return_fresh_analysis() {
     // re-opening this contract should not trigger a full analysis
     let _ = notification_tx.send(LspNotification::ContractOpened(contract_location));
     let response = response_rx.recv().expect("Unable to get response");
-    assert_eq!(response, LspResponse::default());
+    let response = if let LspResponse::Notification(response) = response {
+        response
+    } else {
+        panic!("Unable to get response")
+    };
+
+    assert_eq!(response, LspNotificationResponse::default());
 }
 
 #[test]
 fn test_opening_counter_manifest_should_return_fresh_analysis() {
+    use crate::lsp::native_bridge::LspResponse;
     use clarinet_files::FileLocation;
-    use clarity_lsp::backend::{LspNotification, LspResponse};
+    use clarity_lsp::backend::{LspNotification, LspNotificationResponse};
     use crossbeam_channel::unbounded;
     use std::sync::mpsc::channel;
 
@@ -236,6 +174,11 @@ fn test_opening_counter_manifest_should_return_fresh_analysis() {
 
     let _ = notification_tx.send(LspNotification::ManifestOpened(manifest_location.clone()));
     let response = response_rx.recv().expect("Unable to get response");
+    let response = if let LspResponse::Notification(response) = response {
+        response
+    } else {
+        panic!("Unable to get response")
+    };
 
     // the counter project should emit 2 warnings and 2 notes coming from counter.clar
     assert_eq!(response.aggregated_diagnostics.len(), 1);
@@ -245,11 +188,17 @@ fn test_opening_counter_manifest_should_return_fresh_analysis() {
     // re-opening this manifest should not trigger a full analysis
     let _ = notification_tx.send(LspNotification::ManifestOpened(manifest_location));
     let response = response_rx.recv().expect("Unable to get response");
-    assert_eq!(response, LspResponse::default());
+    let response = if let LspResponse::Notification(response) = response {
+        response
+    } else {
+        panic!("Unable to get response")
+    };
+    assert_eq!(response, LspNotificationResponse::default());
 }
 
 #[test]
 fn test_opening_simple_nft_manifest_should_return_fresh_analysis() {
+    use crate::lsp::native_bridge::LspResponse;
     use clarinet_files::FileLocation;
     use clarity_lsp::backend::LspNotification;
     use crossbeam_channel::unbounded;
@@ -275,6 +224,11 @@ fn test_opening_simple_nft_manifest_should_return_fresh_analysis() {
         manifest_location,
     )));
     let response = response_rx.recv().expect("Unable to get response");
+    let response = if let LspResponse::Notification(response) = response {
+        response
+    } else {
+        panic!("Unable to get response")
+    };
 
     // the counter project should emit 2 warnings and 2 notes coming from counter.clar
     assert_eq!(response.aggregated_diagnostics.len(), 2);

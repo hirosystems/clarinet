@@ -969,18 +969,9 @@ miner = true
 seed = "{miner_secret_key_hex}"
 local_peer_seed = "{miner_secret_key_hex}"
 wait_time_for_microblocks = 5000
+wait_time_for_blocks = 0
 pox_sync_sample_secs = 10
 microblock_frequency = 15000
-
-[burnchain]
-chain = "bitcoin"
-mode = "krypton"
-poll_time_secs = 1
-peer_host = "host.docker.internal"
-username = "{bitcoin_node_username}"
-password = "{bitcoin_node_password}"
-rpc_port = {orchestrator_ingestion_port}
-peer_port = {bitcoin_node_p2p_port}
 
 [miner]
 first_attempt_time_ms = 10000
@@ -990,10 +981,6 @@ subsequent_attempt_time_ms = 10000
             stacks_node_rpc_port = devnet_config.stacks_node_rpc_port,
             stacks_node_p2p_port = devnet_config.stacks_node_p2p_port,
             miner_secret_key_hex = devnet_config.miner_secret_key_hex,
-            bitcoin_node_username = devnet_config.bitcoin_node_username,
-            bitcoin_node_password = devnet_config.bitcoin_node_password,
-            bitcoin_node_p2p_port = devnet_config.bitcoin_node_p2p_port,
-            orchestrator_ingestion_port = devnet_config.orchestrator_ingestion_port,
         );
 
         for (_, account) in network_config.accounts.iter() {
@@ -1048,6 +1035,50 @@ events_keys = ["*"]
             ));
         }
 
+        stacks_conf.push_str(&format!(
+            r#"
+[burnchain]
+chain = "bitcoin"
+mode = "krypton"
+poll_time_secs = 1
+peer_host = "host.docker.internal"
+username = "{bitcoin_node_username}"
+password = "{bitcoin_node_password}"
+rpc_port = {orchestrator_ingestion_port}
+peer_port = {bitcoin_node_p2p_port}
+"#,
+            bitcoin_node_username = devnet_config.bitcoin_node_username,
+            bitcoin_node_password = devnet_config.bitcoin_node_password,
+            bitcoin_node_p2p_port = devnet_config.bitcoin_node_p2p_port,
+            orchestrator_ingestion_port = devnet_config.orchestrator_ingestion_port,
+        ));
+
+        if devnet_config.enable_next_features {
+            stacks_conf.push_str(&format!(
+                r#"pox_2_activation = {epoch_2_1}
+
+[[burnchain.epochs]]
+epoch_name = "1.0"
+start_height = 0
+
+[[burnchain.epochs]]
+epoch_name = "2.0"
+start_height = {epoch_2_0}
+
+[[burnchain.epochs]]
+epoch_name = "2.05"
+start_height = {epoch_2_05}
+
+[[burnchain.epochs]]
+epoch_name = "2.1"
+start_height = {epoch_2_1}
+                    "#,
+                epoch_2_0 = devnet_config.epoch_2_0,
+                epoch_2_05 = devnet_config.epoch_2_05,
+                epoch_2_1 = devnet_config.epoch_2_1,
+            ));
+        }
+
         let mut stacks_conf_path = PathBuf::from(&devnet_config.working_dir);
         stacks_conf_path.push("conf/Stacks.toml");
         let mut file = File::create(stacks_conf_path)
@@ -1088,6 +1119,12 @@ events_keys = ["*"]
             ))
         }
 
+        let mut env = vec![
+            "STACKS_LOG_PP=1".to_string(),
+            "BLOCKSTACK_USE_TEST_GENESIS_CHAINSTATE=1".to_string(),
+        ];
+        env.append(&mut devnet_config.stacks_node_env_vars.clone());
+
         let config = Config {
             labels: Some(labels),
             image: Some(devnet_config.stacks_node_image_url.clone()),
@@ -1099,11 +1136,7 @@ events_keys = ["*"]
                 "start".into(),
                 "--config=/src/stacks-node/Stacks.toml".into(),
             ]),
-            env: Some(vec![
-                "STACKS_LOG_PP=1".to_string(),
-                // "STACKS_LOG_DEBUG=1".to_string(),
-                "BLOCKSTACK_USE_TEST_GENESIS_CHAINSTATE=1".to_string(),
-            ]),
+            env: Some(env),
             host_config: Some(HostConfig {
                 port_bindings: Some(port_bindings),
                 binds: Some(binds),
@@ -1510,39 +1543,42 @@ events_keys = ["*"]
         let mut labels = HashMap::new();
         labels.insert("project".to_string(), self.network_name.to_string());
 
+        let mut env = vec![
+            format!("STACKS_CORE_RPC_HOST=stacks-node.{}", self.network_name),
+            format!("STACKS_BLOCKCHAIN_API_DB=pg"),
+            format!(
+                "STACKS_CORE_RPC_PORT={}",
+                devnet_config.stacks_node_rpc_port
+            ),
+            format!(
+                "STACKS_BLOCKCHAIN_API_PORT={}",
+                devnet_config.stacks_api_port
+            ),
+            format!("STACKS_BLOCKCHAIN_API_HOST=0.0.0.0"),
+            format!(
+                "STACKS_CORE_EVENT_PORT={}",
+                devnet_config.stacks_api_events_port
+            ),
+            format!("STACKS_CORE_EVENT_HOST=0.0.0.0"),
+            format!("STACKS_API_ENABLE_FT_METADATA=1"),
+            format!("PG_HOST=postgres.{}", self.network_name),
+            format!("PG_PORT=5432"),
+            format!("PG_USER={}", devnet_config.postgres_username),
+            format!("PG_PASSWORD={}", devnet_config.postgres_password),
+            format!("PG_DATABASE={}", devnet_config.stacks_api_postgres_database),
+            format!("STACKS_CHAIN_ID=2147483648"),
+            format!("V2_POX_MIN_AMOUNT_USTX=90000000260"),
+            "NODE_ENV=development".to_string(),
+        ];
+        env.append(&mut devnet_config.stacks_api_env_vars.clone());
+
         let config = Config {
             labels: Some(labels),
             image: Some(devnet_config.stacks_api_image_url.clone()),
             domainname: Some(self.network_name.to_string()),
             tty: None,
             exposed_ports: Some(exposed_ports),
-            env: Some(vec![
-                format!("STACKS_CORE_RPC_HOST=stacks-node.{}", self.network_name),
-                format!("STACKS_BLOCKCHAIN_API_DB=pg"),
-                format!(
-                    "STACKS_CORE_RPC_PORT={}",
-                    devnet_config.stacks_node_rpc_port
-                ),
-                format!(
-                    "STACKS_BLOCKCHAIN_API_PORT={}",
-                    devnet_config.stacks_api_port
-                ),
-                format!("STACKS_BLOCKCHAIN_API_HOST=0.0.0.0"),
-                format!(
-                    "STACKS_CORE_EVENT_PORT={}",
-                    devnet_config.stacks_api_events_port
-                ),
-                format!("STACKS_CORE_EVENT_HOST=0.0.0.0"),
-                format!("STACKS_API_ENABLE_FT_METADATA=1"),
-                format!("PG_HOST=postgres.{}", self.network_name),
-                format!("PG_PORT=5432"),
-                format!("PG_USER={}", devnet_config.postgres_username),
-                format!("PG_PASSWORD={}", devnet_config.postgres_password),
-                format!("PG_DATABASE={}", devnet_config.stacks_api_postgres_database),
-                format!("STACKS_CHAIN_ID=2147483648"),
-                format!("V2_POX_MIN_AMOUNT_USTX=90000000260"),
-                "NODE_ENV=development".to_string(),
-            ]),
+            env: Some(env),
             host_config: Some(HostConfig {
                 port_bindings: Some(port_bindings),
                 extra_hosts: Some(vec!["host.docker.internal:host-gateway".into()]),
@@ -1912,28 +1948,31 @@ events_keys = ["*"]
         let mut labels = HashMap::new();
         labels.insert("project".to_string(), self.network_name.to_string());
 
+        let mut env = vec![
+            format!(
+                "NEXT_PUBLIC_REGTEST_API_SERVER=http://localhost:{}",
+                devnet_config.stacks_api_port
+            ),
+            format!(
+                "NEXT_PUBLIC_TESTNET_API_SERVER=http://localhost:{}",
+                devnet_config.stacks_api_port
+            ),
+            format!(
+                "NEXT_PUBLIC_MAINNET_API_SERVER=http://localhost:{}",
+                devnet_config.stacks_api_port
+            ),
+            format!("NEXT_PUBLIC_DEFAULT_POLLING_INTERVAL={}", 5000),
+            "NODE_ENV=development".to_string(),
+        ];
+        env.append(&mut devnet_config.stacks_node_env_vars.clone());
+
         let config = Config {
             labels: Some(labels),
             image: Some(devnet_config.stacks_explorer_image_url.clone()),
             domainname: Some(self.network_name.to_string()),
             tty: None,
             exposed_ports: Some(exposed_ports),
-            env: Some(vec![
-                format!(
-                    "NEXT_PUBLIC_REGTEST_API_SERVER=http://localhost:{}",
-                    devnet_config.stacks_api_port
-                ),
-                format!(
-                    "NEXT_PUBLIC_TESTNET_API_SERVER=http://localhost:{}",
-                    devnet_config.stacks_api_port
-                ),
-                format!(
-                    "NEXT_PUBLIC_MAINNET_API_SERVER=http://localhost:{}",
-                    devnet_config.stacks_api_port
-                ),
-                format!("NEXT_PUBLIC_DEFAULT_POLLING_INTERVAL={}", 5000),
-                "NODE_ENV=development".to_string(),
-            ]),
+            env: Some(env),
             host_config: Some(HostConfig {
                 port_bindings: Some(port_bindings),
                 extra_hosts: Some(vec!["host.docker.internal:host-gateway".into()]),

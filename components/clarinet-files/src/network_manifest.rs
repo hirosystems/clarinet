@@ -16,6 +16,7 @@ use toml::value::Value;
 pub const DEFAULT_DERIVATION_PATH: &str = "m/44'/5757'/0'/0/0";
 pub const DEFAULT_BITCOIN_NODE_IMAGE: &str = "quay.io/hirosystems/bitcoind:devnet-v2";
 pub const DEFAULT_STACKS_NODE_IMAGE: &str = "quay.io/hirosystems/stacks-node:devnet-v2";
+pub const DEFAULT_STACKS_NODE_NEXT_IMAGE: &str = "quay.io/hirosystems/stacks-node:devnet-v3";
 pub const DEFAULT_BITCOIN_EXPLORER_IMAGE: &str = "quay.io/hirosystems/bitcoin-explorer:devnet";
 pub const DEFAULT_STACKS_API_IMAGE: &str = "blockstack/stacks-blockchain-api:latest";
 pub const DEFAULT_STACKS_EXPLORER_IMAGE: &str = "hirosystems/explorer:latest";
@@ -31,6 +32,10 @@ pub const DEFAULT_DOCKER_SOCKET: &str = "unix:///var/run/docker.sock";
 pub const DEFAULT_DOCKER_SOCKET: &str = "npipe:////./pipe/docker_engine";
 #[cfg(target_family = "wasm")]
 pub const DEFAULT_DOCKER_SOCKET: &str = "/var/run/docker.sock";
+
+pub const DEFAULT_EPOCH_2_0: u64 = 100;
+pub const DEFAULT_EPOCH_2_05: u64 = 107;
+pub const DEFAULT_EPOCH_2_1: u64 = 114;
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct NetworkManifestFile {
@@ -58,6 +63,9 @@ pub struct DevnetConfigFile {
     pub stacks_node_p2p_port: Option<u16>,
     pub stacks_node_rpc_port: Option<u16>,
     pub stacks_node_events_observers: Option<Vec<String>>,
+    pub stacks_node_env_vars: Option<Vec<String>>,
+    pub stacks_api_env_vars: Option<Vec<String>>,
+    pub stacks_explorer_env_vars: Option<Vec<String>>,
     pub stacks_api_port: Option<u16>,
     pub stacks_api_events_port: Option<u16>,
     pub bitcoin_explorer_port: Option<u16>,
@@ -103,6 +111,10 @@ pub struct DevnetConfigFile {
     pub disable_subnet_api: Option<bool>,
     pub docker_host: Option<String>,
     pub components_host: Option<String>,
+    pub enable_next_features: Option<bool>,
+    pub epoch_2_0: Option<u64>,
+    pub epoch_2_05: Option<u64>,
+    pub epoch_2_1: Option<u64>,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -156,9 +168,12 @@ pub struct DevnetConfig {
     pub stacks_node_p2p_port: u16,
     pub stacks_node_rpc_port: u16,
     pub stacks_node_events_observers: Vec<String>,
+    pub stacks_node_env_vars: Vec<String>,
     pub stacks_api_port: u16,
     pub stacks_api_events_port: u16,
+    pub stacks_api_env_vars: Vec<String>,
     pub stacks_explorer_port: u16,
+    pub stacks_explorer_env_vars: Vec<String>,
     pub bitcoin_explorer_port: u16,
     pub bitcoin_controller_block_time: u32,
     pub bitcoin_controller_automining_disabled: bool,
@@ -209,6 +224,10 @@ pub struct DevnetConfig {
     pub disable_subnet_api: bool,
     pub docker_host: String,
     pub components_host: String,
+    pub enable_next_features: bool,
+    pub epoch_2_0: u64,
+    pub epoch_2_05: u64,
+    pub epoch_2_1: u64,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -462,6 +481,7 @@ impl NetworkManifest {
                 .expect("default deployer account unavailable");
             let remapped_subnet_contract_id =
                 format!("{}.{}", default_deployer.stx_address, contract_id.name);
+            let enable_next_features = devnet_config.enable_next_features.unwrap_or(false);
 
             let mut config = DevnetConfig {
                 orchestrator_ingestion_port: devnet_config.orchestrator_port.unwrap_or(20445),
@@ -525,10 +545,13 @@ impl NetworkManifest {
                     .bitcoin_node_image_url
                     .take()
                     .unwrap_or(DEFAULT_BITCOIN_NODE_IMAGE.to_string()),
-                stacks_node_image_url: devnet_config
-                    .stacks_node_image_url
-                    .take()
-                    .unwrap_or(DEFAULT_STACKS_NODE_IMAGE.to_string()),
+                stacks_node_image_url: devnet_config.stacks_node_image_url.take().unwrap_or(
+                    match enable_next_features {
+                        true => DEFAULT_STACKS_NODE_NEXT_IMAGE,
+                        false => DEFAULT_STACKS_NODE_IMAGE,
+                    }
+                    .to_string(),
+                ),
                 stacks_api_image_url: devnet_config
                     .stacks_api_image_url
                     .take()
@@ -580,6 +603,16 @@ impl NetworkManifest {
                     .docker_host
                     .unwrap_or(DEFAULT_DOCKER_SOCKET.into()),
                 components_host: devnet_config.components_host.unwrap_or("127.0.0.1".into()),
+                epoch_2_0: devnet_config.epoch_2_0.unwrap_or(DEFAULT_EPOCH_2_0),
+                epoch_2_05: devnet_config.epoch_2_05.unwrap_or(DEFAULT_EPOCH_2_05),
+                epoch_2_1: devnet_config.epoch_2_1.unwrap_or(DEFAULT_EPOCH_2_1),
+                stacks_node_env_vars: devnet_config.stacks_node_env_vars.take().unwrap_or(vec![]),
+                stacks_api_env_vars: devnet_config.stacks_api_env_vars.take().unwrap_or(vec![]),
+                stacks_explorer_env_vars: devnet_config
+                    .stacks_explorer_env_vars
+                    .take()
+                    .unwrap_or(vec![]),
+                enable_next_features,
             };
             if !config.disable_stacks_api && config.disable_stacks_api {
                 config.disable_stacks_api = false;
