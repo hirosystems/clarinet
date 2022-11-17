@@ -89,7 +89,7 @@ impl Terminal {
         Terminal { session }
     }
 
-    pub fn start(&mut self) {
+    pub fn start(&mut self) -> bool {
         println!("{}", green!(format!("clarity-repl v{}", VERSION.unwrap())));
         println!("{}", black!("Enter \"::help\" for usage hints."));
         println!("{}", black!("Connected to a transient in-memory database."));
@@ -110,7 +110,7 @@ impl Terminal {
         editor
             .load_history(HISTORY_FILE.unwrap_or("history.txt"))
             .ok();
-        loop {
+        let reload = loop {
             let readline = editor.readline(prompt.as_str());
             match readline {
                 Ok(command) => {
@@ -119,7 +119,7 @@ impl Terminal {
                     let input = input_buffer.join(" ");
                     match complete_input(&input) {
                         Ok(Input::Complete(forms)) => {
-                            let output = self.session.handle_command(&input);
+                            let (reload, output) = self.session.handle_command(&input);
                             for line in output {
                                 println!("{}", line);
                             }
@@ -127,6 +127,9 @@ impl Terminal {
                             self.session.executed.push(input.to_string());
                             editor.add_history_entry(input);
                             input_buffer.clear();
+                            if reload {
+                                break true;
+                            }
                         }
                         Ok(Input::Incomplete(str)) => {
                             prompt = format!("{}.. ", str);
@@ -141,23 +144,24 @@ impl Terminal {
                 Err(ReadlineError::Interrupted) => {
                     ctrl_c_acc += 1;
                     if ctrl_c_acc == 2 {
-                        break;
+                        break false;
                     } else {
                         println!("{}", yellow!("Hit CTRL-C a second time to quit."));
                     }
                 }
                 Err(ReadlineError::Eof) => {
                     println!("CTRL-D");
-                    break;
+                    break false;
                 }
                 Err(err) => {
                     println!("Error: {:?}", err);
-                    break;
+                    break false;
                 }
             }
-        }
+        };
         editor
             .save_history(HISTORY_FILE.unwrap_or("history.txt"))
             .unwrap();
+        reload
     }
 }

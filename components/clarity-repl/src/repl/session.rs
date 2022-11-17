@@ -233,8 +233,9 @@ impl Session {
         output.join("\n")
     }
 
-    pub fn handle_command(&mut self, command: &str) -> Vec<String> {
+    pub fn handle_command(&mut self, command: &str) -> (bool, Vec<String>) {
         let mut output = Vec::<String>::new();
+        let mut reload = false;
         match command {
             "::help" => self.display_help(&mut output),
             cmd if cmd.starts_with("::list_functions") => self.display_functions(&mut output),
@@ -258,12 +259,14 @@ impl Session {
             #[cfg(feature = "cli")]
             cmd if cmd.starts_with("::trace") => self.trace(&mut output, cmd),
             #[cfg(feature = "cli")]
+            cmd if cmd.starts_with("::reload") => reload = true,
+            #[cfg(feature = "cli")]
             cmd if cmd.starts_with("::read") => self.read(&mut output, cmd),
 
             snippet => self.run_snippet(&mut output, self.show_costs, snippet),
         }
 
-        output
+        (reload, output)
     }
 
     #[cfg(feature = "cli")]
