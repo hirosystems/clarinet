@@ -306,7 +306,14 @@ pub async fn start_chains_coordinator(
                 let _ = devnet_event_tx.send(DevnetEvent::ServiceStatus(ServiceStatusData {
                     order: 1,
                     status: Status::Green,
-                    name: "stacks-node".into(),
+                    name: format!(
+                        "stacks-node {}",
+                        if config.devnet_config.enable_next_features {
+                            "🚧"
+                        } else {
+                            ""
+                        }
+                    ),
                     comment: format!(
                         "mining blocks (chaintip = #{})",
                         known_tip.block.block_identifier.index
