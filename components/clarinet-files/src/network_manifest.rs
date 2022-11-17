@@ -34,8 +34,8 @@ pub const DEFAULT_DOCKER_SOCKET: &str = "npipe:////./pipe/docker_engine";
 pub const DEFAULT_DOCKER_SOCKET: &str = "/var/run/docker.sock";
 
 pub const DEFAULT_EPOCH_2_0: u64 = 100;
-pub const DEFAULT_EPOCH_2_05: u64 = 115;
-pub const DEFAULT_EPOCH_2_1: u64 = 130;
+pub const DEFAULT_EPOCH_2_05: u64 = 107;
+pub const DEFAULT_EPOCH_2_1: u64 = 114;
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct NetworkManifestFile {

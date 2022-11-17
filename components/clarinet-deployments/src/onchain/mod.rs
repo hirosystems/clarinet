@@ -174,7 +174,7 @@ pub fn encode_stx_transfer(
 pub fn encode_contract_publish(
     contract_name: &ContractName,
     source: &str,
-    clarity_version: &ClarityVersion,
+    clarity_version: Option<ClarityVersion>,
     account: &AccountConfig,
     nonce: u64,
     tx_fee: u64,
@@ -187,7 +187,7 @@ pub fn encode_contract_publish(
     };
     sign_transaction_payload(
         account,
-        TransactionPayload::SmartContract(payload, Some(clarity_version.clone())),
+        TransactionPayload::SmartContract(payload, clarity_version.clone()),
         nonce,
         tx_fee,
         anchor_mode,
@@ -342,12 +342,15 @@ pub fn apply_on_chain_deployment(
     let mut accounts_cached_nonces: BTreeMap<String, u64> = BTreeMap::new();
     let mut stx_accounts_lookup: BTreeMap<String, &AccountConfig> = BTreeMap::new();
     let mut btc_accounts_lookup: BTreeMap<String, &AccountConfig> = BTreeMap::new();
-
+    let mut clarity_version_available = false;
     if !fetch_initial_nonces {
         if network == StacksNetwork::Devnet {
             for (_, account) in network_manifest.accounts.iter() {
                 accounts_cached_nonces.insert(account.stx_address.clone(), 0);
             }
+            if let Some(ref devnet) = network_manifest.devnet {
+                clarity_version_available = devnet.enable_next_features;
+            };
         }
     }
 
@@ -544,10 +547,16 @@ pub fn apply_on_chain_deployment(
                         false => TransactionAnchorMode::Any,
                     };
 
+                    let clarity_version = if clarity_version_available {
+                        Some(tx.clarity_version.clone())
+                    } else {
+                        None
+                    };
+
                     let transaction = match encode_contract_publish(
                         &tx.contract_name,
                         &source,
-                        &tx.clarity_version,
+                        clarity_version,
                         *account,
                         nonce,
                         tx.cost,
@@ -623,7 +632,7 @@ pub fn apply_on_chain_deployment(
                     let transaction = match encode_contract_publish(
                         &tx.contract_id.name,
                         &source,
-                        &tx.clarity_version,
+                        None,
                         *account,
                         nonce,
                         tx.cost,

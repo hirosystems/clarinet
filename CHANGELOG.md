@@ -1,3 +1,14 @@
+#### 1.1.0 (2022-11-17)
+
+##### New Features
+
+*  Support for Stacks 2.1 ([790c14bf](https://github.com/hirosystems/clarinet/commit/790c14bf8fd4a30d1f50c2c4a55873aecac1a076))
+*  Display clarity documentation on hover in VSCode ([e605acb4](https://github.com/hirosystems/clarinet/commit/e605acb49f0892cb75b7a16edf37807f29133a20))
+
+##### Chores
+
+*  Better error management in chainhook-node ([353ceb61](https://github.com/hirosystems/clarinet/commit/353ceb617b8a5b710331fe3387b07f6ad48e3f48))
+
 #### 1.0.6 (2022-11-10)
 
 ##### New Features
