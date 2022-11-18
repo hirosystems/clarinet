@@ -233,8 +233,9 @@ impl Session {
         output.join("\n")
     }
 
-    pub fn handle_command(&mut self, command: &str) -> Vec<String> {
+    pub fn handle_command(&mut self, command: &str) -> (bool, Vec<String>) {
         let mut output = Vec::<String>::new();
+        let mut reload = false;
         match command {
             "::help" => self.display_help(&mut output),
             cmd if cmd.starts_with("::list_functions") => self.display_functions(&mut output),
@@ -258,12 +259,14 @@ impl Session {
             #[cfg(feature = "cli")]
             cmd if cmd.starts_with("::trace") => self.trace(&mut output, cmd),
             #[cfg(feature = "cli")]
+            cmd if cmd.starts_with("::reload") => reload = true,
+            #[cfg(feature = "cli")]
             cmd if cmd.starts_with("::read") => self.read(&mut output, cmd),
 
             snippet => self.run_snippet(&mut output, self.show_costs, snippet),
         }
 
-        output
+        (reload, output)
     }
 
     #[cfg(feature = "cli")]
@@ -1283,23 +1286,23 @@ mod tests {
 
         // assert data-var is set to 0
         assert_eq!(
-            session.handle_command("(contract-call? .contract get-x)")[0],
+            session.handle_command("(contract-call? .contract get-x)").1[0],
             green!("u0")
         );
 
         // advance chain tip and test at-block
         session.advance_chain_tip(10000);
         assert_eq!(
-            session.handle_command("(contract-call? .contract get-x)")[0],
+            session.handle_command("(contract-call? .contract get-x)").1[0],
             green!("u0")
         );
         session.handle_command("(contract-call? .contract incr)");
         assert_eq!(
-            session.handle_command("(contract-call? .contract get-x)")[0],
+            session.handle_command("(contract-call? .contract get-x)").1[0],
             green!("u1")
         );
-        assert_eq!(session.handle_command("(at-block (unwrap-panic (get-block-info? id-header-hash u0)) (contract-call? .contract get-x))")[0], green!("u0"));
-        assert_eq!(session.handle_command("(at-block (unwrap-panic (get-block-info? id-header-hash u5000)) (contract-call? .contract get-x))")[0], green!("u0"));
+        assert_eq!(session.handle_command("(at-block (unwrap-panic (get-block-info? id-header-hash u0)) (contract-call? .contract get-x))").1[0], green!("u0"));
+        assert_eq!(session.handle_command("(at-block (unwrap-panic (get-block-info? id-header-hash u5000)) (contract-call? .contract get-x))").1[0], green!("u0"));
 
         // advance chain tip again and test at-block
         // do this twice to make sure that the lookup table is being updated properly
@@ -1307,14 +1310,14 @@ mod tests {
         session.advance_chain_tip(10);
 
         assert_eq!(
-            session.handle_command("(contract-call? .contract get-x)")[0],
+            session.handle_command("(contract-call? .contract get-x)").1[0],
             green!("u1")
         );
         session.handle_command("(contract-call? .contract incr)");
         assert_eq!(
-            session.handle_command("(contract-call? .contract get-x)")[0],
+            session.handle_command("(contract-call? .contract get-x)").1[0],
             green!("u2")
         );
-        assert_eq!(session.handle_command("(at-block (unwrap-panic (get-block-info? id-header-hash u10000)) (contract-call? .contract get-x))")[0], green!("u1"));
+        assert_eq!(session.handle_command("(at-block (unwrap-panic (get-block-info? id-header-hash u10000)) (contract-call? .contract get-x))").1[0], green!("u1"));
     }
 }

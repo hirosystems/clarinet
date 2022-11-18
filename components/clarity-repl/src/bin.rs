@@ -49,14 +49,16 @@ fn main() {
                 }
             };
 
-            let output = session.handle_command(&code_str);
+            let (_, output) = session.handle_command(&code_str);
             for line in output {
                 println!("{}", line);
             }
         }
-        None => {
-            let mut terminal = Terminal::new(settings);
-            terminal.start();
-        }
+        None => loop {
+            let mut terminal = Terminal::new(settings.clone());
+            if !terminal.start() {
+                break;
+            }
+        },
     }
 }
