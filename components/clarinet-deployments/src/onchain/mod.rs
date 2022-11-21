@@ -187,7 +187,7 @@ pub fn encode_contract_publish(
     };
     sign_transaction_payload(
         account,
-        TransactionPayload::SmartContract(payload, clarity_version.clone()),
+        TransactionPayload::SmartContract(payload, clarity_version),
         nonce,
         tx_fee,
         anchor_mode,
@@ -703,7 +703,7 @@ pub fn apply_on_chain_deployment(
                     ongoing_batch.insert(res.txid, tracker);
                 }
                 Err(e) => {
-                    let message = format!("unable to post transaction\n{:?}", e);
+                    let message = format!("unable to post transaction\n{}", e.to_string());
                     tracker.status = TransactionStatus::Error(message.clone());
 
                     let _ = deployment_event_tx
@@ -742,13 +742,16 @@ pub fn apply_on_chain_deployment(
                     )) => {
                         let deployer_address = deployer.to_address();
                         let res = stacks_rpc.get_contract_source(&deployer_address, &contract_name);
-                        if let Ok(_contract) = res {
-                            tracker.status = TransactionStatus::Confirmed;
-                            let _ = deployment_event_tx
-                                .send(DeploymentEvent::TransactionUpdate(tracker.clone()));
-                        } else {
-                            keep_looping = true;
-                            break;
+                        match res {
+                            Ok(_contract) => {
+                                tracker.status = TransactionStatus::Confirmed;
+                                let _ = deployment_event_tx
+                                    .send(DeploymentEvent::TransactionUpdate(tracker.clone()));    
+                            }
+                            Err(e) => {
+                                keep_looping = true;
+                                break;    
+                            }
                         }
                     }
                     TransactionStatus::Broadcasted(TransactionCheck::NonceCheck(

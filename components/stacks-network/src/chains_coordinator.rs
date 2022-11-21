@@ -333,7 +333,7 @@ pub async fn start_chains_coordinator(
                 let should_submit_pox_orders = known_tip.block.metadata.pox_cycle_position
                     == (known_tip.block.metadata.pox_cycle_length - 2);
                 if should_submit_pox_orders {
-                    let bitcoin_block_height = known_tip.block.block_identifier.index;
+                    let bitcoin_block_height = known_tip.block.metadata.bitcoin_anchor_block_identifier.index;
                     let res = publish_stacking_orders(
                         &config.devnet_config,
                         &config.accounts,
@@ -484,7 +484,7 @@ pub async fn publish_stacking_orders(
         .expect("Unable to parse contract");
 
     for pox_stacking_order in devnet_config.pox_stacking_orders.iter() {
-        if pox_stacking_order.start_at_cycle == (pox_info.reward_cycle_id + 1) {
+        if pox_stacking_order.start_at_cycle - 1 == pox_info.reward_cycle_id {
             let mut account = None;
             let mut accounts_iter = accounts.iter();
             while let Some(e) = accounts_iter.next() {
