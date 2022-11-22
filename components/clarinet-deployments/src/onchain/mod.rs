@@ -746,11 +746,11 @@ pub fn apply_on_chain_deployment(
                             Ok(_contract) => {
                                 tracker.status = TransactionStatus::Confirmed;
                                 let _ = deployment_event_tx
-                                    .send(DeploymentEvent::TransactionUpdate(tracker.clone()));    
+                                    .send(DeploymentEvent::TransactionUpdate(tracker.clone()));
                             }
-                            Err(e) => {
+                            Err(_e) => {
                                 keep_looping = true;
-                                break;    
+                                break;
                             }
                         }
                     }

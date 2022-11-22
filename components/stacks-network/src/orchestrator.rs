@@ -54,6 +54,32 @@ impl DevnetOrchestrator {
         let name = manifest.project.name.clone();
         let network_name = format!("{}.devnet", name);
 
+        if let Some(ref mut devnet) = network_config.devnet {
+            let working_dir = PathBuf::from(&devnet.working_dir);
+            let devnet_path = if working_dir.is_absolute() {
+                working_dir.canonicalize().map_err(|e| {
+                    format!(
+                        "unable to canonicalize x working_dir {} ({})",
+                        working_dir.display(),
+                        e.to_string()
+                    )
+                })?
+            } else {
+                let mut cwd = std::env::current_dir()
+                    .map_err(|e| format!("unable to retrieve current dir ({})", e.to_string()))?;
+                cwd.push(&working_dir);
+                let _ = fs::create_dir(&cwd);
+                cwd.canonicalize().map_err(|e| {
+                    format!(
+                        "unable to canonicalize working_dir {} ({})",
+                        working_dir.display(),
+                        e.to_string()
+                    )
+                })?
+            };
+            devnet.working_dir = format!("{}", devnet_path.display());
+        }
+
         match (&mut network_config.devnet, devnet_override) {
             (Some(ref mut devnet_config), Some(ref devnet_override)) => {
                 if let Some(val) = devnet_override.orchestrator_port {
@@ -223,6 +249,22 @@ impl DevnetOrchestrator {
                 if let Some(ref val) = devnet_override.subnet_leader_mnemonic {
                     devnet_config.subnet_leader_mnemonic = val.clone();
                 }
+
+                if let Some(ref val) = devnet_override.enable_next_features {
+                    devnet_config.enable_next_features = val.clone();
+                }
+
+                if let Some(ref val) = devnet_override.epoch_2_0 {
+                    devnet_config.epoch_2_0 = val.clone();
+                }
+
+                if let Some(ref val) = devnet_override.epoch_2_05 {
+                    devnet_config.epoch_2_05 = val.clone();
+                }
+
+                if let Some(ref val) = devnet_override.epoch_2_1 {
+                    devnet_config.epoch_2_1 = val.clone();
+                }
             }
             _ => {}
         };
@@ -317,7 +359,6 @@ impl DevnetOrchestrator {
             "Initiating Devnet boot sequence (working_dir: {})",
             devnet_config.working_dir
         )));
-
         let mut devnet_path = PathBuf::from(&devnet_config.working_dir);
         devnet_path.push("data");
 

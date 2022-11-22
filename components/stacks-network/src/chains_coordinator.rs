@@ -333,7 +333,11 @@ pub async fn start_chains_coordinator(
                 let should_submit_pox_orders = known_tip.block.metadata.pox_cycle_position
                     == (known_tip.block.metadata.pox_cycle_length - 2);
                 if should_submit_pox_orders {
-                    let bitcoin_block_height = known_tip.block.metadata.bitcoin_anchor_block_identifier.index;
+                    let bitcoin_block_height = known_tip
+                        .block
+                        .metadata
+                        .bitcoin_anchor_block_identifier
+                        .index;
                     let res = publish_stacking_orders(
                         &config.devnet_config,
                         &config.accounts,
