@@ -478,6 +478,34 @@ impl StacksDevnet {
             overrides.bind_containers_volumes = Some(false);
         }
 
+        if let Ok(res) = devnet_settings
+            .get(&mut cx, "enable_next_features")?
+            .downcast::<JsBoolean, _>(&mut cx)
+        {
+            overrides.enable_next_features = Some(res.value(&mut cx));
+        }
+
+        if let Ok(res) = devnet_settings
+            .get(&mut cx, "epoch_2_0")?
+            .downcast::<JsNumber, _>(&mut cx)
+        {
+            overrides.epoch_2_0 = Some(res.value(&mut cx) as u64);
+        }
+
+        if let Ok(res) = devnet_settings
+            .get(&mut cx, "epoch_2_05")?
+            .downcast::<JsNumber, _>(&mut cx)
+        {
+            overrides.epoch_2_05 = Some(res.value(&mut cx) as u64);
+        }
+
+        if let Ok(res) = devnet_settings
+            .get(&mut cx, "epoch_2_1")?
+            .downcast::<JsNumber, _>(&mut cx)
+        {
+            overrides.epoch_2_1 = Some(res.value(&mut cx) as u64);
+        }
+
         // Disable scripts
         overrides.execute_script = Some(vec![]);
 

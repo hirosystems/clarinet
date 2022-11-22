@@ -276,6 +276,10 @@ export interface DevnetConfig {
    * @memberof DevnetConfig
    */
   disable_stacks_api?: boolean;
+  enable_next_features?: boolean;
+  epoch_2_0?: number;
+  epoch_2_05?: number;
+  epoch_2_1?: number;
 }
 
 /**
