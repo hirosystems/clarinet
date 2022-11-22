@@ -18,6 +18,20 @@ use clarity_repl::analysis::ast_dependency_detector::DependencySet;
 use clarity_repl::repl::{Session, DEFAULT_CLARITY_VERSION};
 use std::collections::HashMap;
 
+#[derive(Serialize, Deserialize, PartialEq, Debug, Clone, Copy, Eq, PartialOrd, Ord)]
+pub enum EpochSpec {
+    #[serde(rename = "2.05")]
+    Epoch2_05,
+    #[serde(rename = "2.1")]
+    Epoch2_1,
+}
+
+impl Default for EpochSpec {
+    fn default() -> Self {
+        Self::Epoch2_1
+    }
+}
+
 pub struct DeploymentGenerationArtifacts {
     pub asts: HashMap<QualifiedContractIdentifier, ContractAST>,
     pub deps: HashMap<QualifiedContractIdentifier, DependencySet>,
@@ -43,6 +57,8 @@ pub struct TransactionPlanSpecificationFile {
 pub struct TransactionsBatchSpecificationFile {
     pub id: usize,
     pub transactions: Vec<TransactionSpecificationFile>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub epoch: Option<EpochSpec>,
 }
 
 #[derive(Debug, PartialEq, Serialize, Deserialize)]
@@ -154,6 +170,7 @@ pub struct EmulatedContractPublishSpecificationFile {
 pub struct TransactionsBatchSpecification {
     pub id: usize,
     pub transactions: Vec<TransactionSpecification>,
+    pub epoch: Option<EpochSpec>,
 }
 
 #[derive(Debug, PartialEq, Clone)]
@@ -692,6 +709,7 @@ impl DeploymentSpecification {
                         batches.push(TransactionsBatchSpecification {
                             id: batch.id,
                             transactions,
+                            epoch: batch.epoch,
                         });
                     }
                 }
@@ -741,6 +759,7 @@ impl DeploymentSpecification {
                         batches.push(TransactionsBatchSpecification {
                             id: batch.id,
                             transactions,
+                            epoch: batch.epoch,
                         });
                     }
                 }
@@ -1009,6 +1028,7 @@ impl TransactionPlanSpecification {
             batches.push(TransactionsBatchSpecificationFile {
                 id: batch.id,
                 transactions,
+                epoch: batch.epoch,
             });
         }
 
