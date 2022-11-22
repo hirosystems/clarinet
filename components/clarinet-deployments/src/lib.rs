@@ -686,6 +686,7 @@ pub async fn generate_default_deployment(
         batches.push(TransactionsBatchSpecification {
             id: id,
             transactions: transactions.to_vec(),
+            epoch: None,
         })
     }
 
