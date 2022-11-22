@@ -41,10 +41,10 @@ export interface StacksChainUpdate {
  */
 export interface StacksBlockUpdate {
   /**
-   * @type {Array<Block>}
+   * @type {Block}
    * @memberof StacksBlockUpdate
    */
-  new_blocks: Array<Block>;
+  block: Block;
   /**
    * @type {Array<Block>}
    * @memberof StacksBlockUpdate
