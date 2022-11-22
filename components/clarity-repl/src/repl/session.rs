@@ -235,6 +235,7 @@ impl Session {
 
     pub fn handle_command(&mut self, command: &str) -> (bool, Vec<String>) {
         let mut output = Vec::<String>::new();
+        #[allow(unused_mut)]
         let mut reload = false;
         match command {
             "::help" => self.display_help(&mut output),
