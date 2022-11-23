@@ -25,7 +25,7 @@ export interface Account {
    * @type {string}
    * @memberof Account
    */
-  id: string;
+  label: string;
   /**
    * The mnemonic to use for generating the keypair
    * @type {string}
@@ -38,6 +38,8 @@ export interface Account {
    * @memberof Account
    */
   balance: number;
+  derivation?: string;
+  is_mainnet?: boolean;
 }
 
 /**

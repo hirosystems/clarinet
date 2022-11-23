@@ -236,11 +236,6 @@ impl StacksDevnet {
                 .downcast_or_throw::<JsString, _>(&mut cx)?
                 .value(&mut cx);
 
-            let id = account_settings
-                .get(&mut cx, "id")?
-                .downcast_or_throw::<JsString, _>(&mut cx)?
-                .value(&mut cx);
-
             let words = account_settings
                 .get(&mut cx, "mnemonic")?
                 .downcast_or_throw::<JsString, _>(&mut cx)?
@@ -281,7 +276,7 @@ impl StacksDevnet {
             );
 
             let account = AccountConfig {
-                label,
+                label: label.clone(),
                 mnemonic: mnemonic.to_string(),
                 stx_address,
                 btc_address,
@@ -289,7 +284,7 @@ impl StacksDevnet {
                 is_mainnet,
                 balance: balance as u64,
             };
-            genesis_accounts.insert(id, account);
+            genesis_accounts.insert(label, account);
         }
 
         let mut overrides = DevnetConfigFile::default();
