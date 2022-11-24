@@ -1,0 +1,706 @@
+use std::collections::HashMap;
+
+use super::helpers::{get_atom_start_at_position, span_to_range};
+use clarinet_files::FileLocation;
+use clarity_repl::analysis::ast_visitor::{traverse, ASTVisitor, TypedVar};
+use clarity_repl::clarity::{ClarityName, SymbolicExpression};
+use lsp_types::{Location, Position, Range, Url};
+
+#[cfg(feature = "wasm")]
+#[allow(unused_imports)]
+use crate::utils::log;
+
+#[derive(Clone, Debug)]
+pub struct Definitions {
+    pub tokens: HashMap<(u32, u32), Range>,
+    global: HashMap<ClarityName, Range>,
+    local: HashMap<u64, HashMap<ClarityName, Range>>,
+}
+
+impl<'a> Definitions {
+    pub fn new() -> Self {
+        Self {
+            tokens: HashMap::new(),
+            global: HashMap::new(),
+            local: HashMap::new(),
+        }
+    }
+
+    pub fn run(&mut self, expressions: &'a Vec<SymbolicExpression>) {
+        traverse(self, &expressions);
+    }
+
+    fn set_function_paramaters_scope(&mut self, expr: &SymbolicExpression) -> Option<()> {
+        let mut local_scope = HashMap::new();
+        let (_, binding_exprs) = expr.match_list()?.get(1)?.match_list()?.split_first()?;
+        for binding in binding_exprs {
+            let (name, _) = binding.match_list()?.split_first()?;
+            local_scope.insert(name.match_atom()?.to_owned(), span_to_range(&binding.span));
+        }
+
+        self.local.insert(expr.id, local_scope);
+        Some(())
+    }
+
+    fn get_definition_for_arg_at_index(
+        &mut self,
+        expr: &SymbolicExpression,
+        token: &ClarityName,
+        index: usize,
+    ) -> Option<()> {
+        let range = self.global.get(token)?;
+        let keyword = expr.match_list()?.get(index)?;
+        self.tokens
+            .insert((keyword.span.start_line, keyword.span.start_column), *range);
+        Some(())
+    }
+}
+
+impl<'a> ASTVisitor<'a> for Definitions {
+    fn traverse_expr(&mut self, expr: &'a SymbolicExpression) -> bool {
+        use clarity_repl::clarity::vm::representations::SymbolicExpressionType::*;
+        match &expr.expr {
+            AtomValue(value) => self.visit_atom_value(expr, value),
+            Atom(name) => self.visit_atom(expr, name),
+            List(exprs) => {
+                let result = self.traverse_list(expr, &exprs);
+                self.local.remove(&expr.id);
+                result
+            }
+            LiteralValue(value) => self.visit_literal_value(expr, value),
+            Field(field) => self.visit_field(expr, field),
+            TraitReference(name, trait_def) => self.visit_trait_reference(expr, name, trait_def),
+        }
+    }
+
+    fn visit_atom(&mut self, expr: &'a SymbolicExpression, atom: &'a ClarityName) -> bool {
+        for scope in self.local.values() {
+            if let Some(range) = scope.get(atom) {
+                self.tokens
+                    .insert((expr.span.start_line, expr.span.start_column), *range);
+                return true;
+            }
+        }
+
+        if let Some(range) = self.global.get(atom) {
+            self.tokens
+                .insert((expr.span.start_line, expr.span.start_column), *range);
+        }
+        true
+    }
+
+    fn visit_var_set(
+        &mut self,
+        expr: &'a SymbolicExpression,
+        name: &'a ClarityName,
+        _value: &'a SymbolicExpression,
+    ) -> bool {
+        self.get_definition_for_arg_at_index(expr, name, 1);
+        true
+    }
+
+    fn visit_var_get(&mut self, expr: &'a SymbolicExpression, name: &'a ClarityName) -> bool {
+        self.get_definition_for_arg_at_index(expr, name, 1);
+        true
+    }
+
+    fn visit_map_insert(
+        &mut self,
+        expr: &'a SymbolicExpression,
+        name: &'a ClarityName,
+        _key: &HashMap<Option<&'a ClarityName>, &'a SymbolicExpression>,
+        _value: &HashMap<Option<&'a ClarityName>, &'a SymbolicExpression>,
+    ) -> bool {
+        self.get_definition_for_arg_at_index(expr, name, 1);
+        true
+    }
+
+    fn visit_map_get(
+        &mut self,
+        expr: &'a SymbolicExpression,
+        name: &'a ClarityName,
+        _key: &HashMap<Option<&'a ClarityName>, &'a SymbolicExpression>,
+    ) -> bool {
+        self.get_definition_for_arg_at_index(expr, name, 1);
+        true
+    }
+
+    fn visit_map_set(
+        &mut self,
+        expr: &'a SymbolicExpression,
+        name: &'a ClarityName,
+        _key: &HashMap<Option<&'a ClarityName>, &'a SymbolicExpression>,
+        _value: &HashMap<Option<&'a ClarityName>, &'a SymbolicExpression>,
+    ) -> bool {
+        self.get_definition_for_arg_at_index(expr, name, 1);
+        true
+    }
+
+    fn visit_map_delete(
+        &mut self,
+        expr: &'a SymbolicExpression,
+        name: &'a ClarityName,
+        _key: &HashMap<Option<&'a ClarityName>, &'a SymbolicExpression>,
+    ) -> bool {
+        self.get_definition_for_arg_at_index(expr, name, 1);
+        true
+    }
+
+    fn visit_call_user_defined(
+        &mut self,
+        expr: &'a SymbolicExpression,
+        name: &'a ClarityName,
+        _args: &'a [SymbolicExpression],
+    ) -> bool {
+        if let Some(range) = self.global.get(name) {
+            self.tokens
+                .insert((expr.span.start_line, expr.span.start_column + 1), *range);
+        }
+        true
+    }
+
+    fn visit_ft_mint(
+        &mut self,
+        expr: &'a SymbolicExpression,
+        token: &'a ClarityName,
+        _amount: &'a SymbolicExpression,
+        _recipient: &'a SymbolicExpression,
+    ) -> bool {
+        self.get_definition_for_arg_at_index(expr, token, 1);
+        true
+    }
+
+    fn visit_ft_burn(
+        &mut self,
+        expr: &'a SymbolicExpression,
+        token: &'a ClarityName,
+        _amount: &'a SymbolicExpression,
+        _sender: &'a SymbolicExpression,
+    ) -> bool {
+        self.get_definition_for_arg_at_index(expr, token, 1);
+        true
+    }
+
+    fn visit_ft_get_balance(
+        &mut self,
+        expr: &'a SymbolicExpression,
+        token: &'a ClarityName,
+        _owner: &'a SymbolicExpression,
+    ) -> bool {
+        self.get_definition_for_arg_at_index(expr, token, 1);
+        true
+    }
+
+    fn visit_ft_get_supply(
+        &mut self,
+        expr: &'a SymbolicExpression,
+        token: &'a ClarityName,
+    ) -> bool {
+        self.get_definition_for_arg_at_index(expr, token, 1);
+        true
+    }
+
+    fn visit_ft_transfer(
+        &mut self,
+        expr: &'a SymbolicExpression,
+        token: &'a ClarityName,
+        _amount: &'a SymbolicExpression,
+        _sender: &'a SymbolicExpression,
+        _recipient: &'a SymbolicExpression,
+    ) -> bool {
+        self.get_definition_for_arg_at_index(expr, token, 1);
+        true
+    }
+
+    fn visit_nft_burn(
+        &mut self,
+        expr: &'a SymbolicExpression,
+        token: &'a ClarityName,
+        _identifier: &'a SymbolicExpression,
+        _sender: &'a SymbolicExpression,
+    ) -> bool {
+        self.get_definition_for_arg_at_index(expr, token, 1);
+        true
+    }
+
+    fn visit_nft_get_owner(
+        &mut self,
+        expr: &'a SymbolicExpression,
+        token: &'a ClarityName,
+        _identifier: &'a SymbolicExpression,
+    ) -> bool {
+        self.get_definition_for_arg_at_index(expr, token, 1);
+        true
+    }
+
+    fn visit_nft_mint(
+        &mut self,
+        expr: &'a SymbolicExpression,
+        token: &'a ClarityName,
+        _identifier: &'a SymbolicExpression,
+        _recipient: &'a SymbolicExpression,
+    ) -> bool {
+        self.get_definition_for_arg_at_index(expr, token, 1);
+        true
+    }
+
+    fn visit_nft_transfer(
+        &mut self,
+        expr: &'a SymbolicExpression,
+        token: &'a ClarityName,
+        _identifier: &'a SymbolicExpression,
+        _sender: &'a SymbolicExpression,
+        _recipient: &'a SymbolicExpression,
+    ) -> bool {
+        self.get_definition_for_arg_at_index(expr, token, 1);
+        true
+    }
+
+    fn traverse_define_private(
+        &mut self,
+        expr: &'a SymbolicExpression,
+        name: &'a ClarityName,
+        parameters: Option<Vec<TypedVar<'a>>>,
+        body: &'a SymbolicExpression,
+    ) -> bool {
+        self.set_function_paramaters_scope(expr);
+        self.traverse_expr(body) && self.visit_define_private(expr, name, parameters, body)
+    }
+
+    fn visit_define_private(
+        &mut self,
+        expr: &'a SymbolicExpression,
+        name: &'a ClarityName,
+        _parameters: Option<Vec<clarity_repl::analysis::ast_visitor::TypedVar<'a>>>,
+        _body: &'a SymbolicExpression,
+    ) -> bool {
+        self.global.insert(name.clone(), span_to_range(&expr.span));
+        true
+    }
+
+    fn traverse_define_read_only(
+        &mut self,
+        expr: &'a SymbolicExpression,
+        name: &'a ClarityName,
+        parameters: Option<Vec<TypedVar<'a>>>,
+        body: &'a SymbolicExpression,
+    ) -> bool {
+        self.set_function_paramaters_scope(expr);
+        self.traverse_expr(body) && self.visit_define_read_only(expr, name, parameters, body)
+    }
+
+    fn visit_define_read_only(
+        &mut self,
+        expr: &'a SymbolicExpression,
+        name: &'a ClarityName,
+        _parameters: Option<Vec<clarity_repl::analysis::ast_visitor::TypedVar<'a>>>,
+        _body: &'a SymbolicExpression,
+    ) -> bool {
+        self.global.insert(name.clone(), span_to_range(&expr.span));
+        true
+    }
+
+    fn traverse_define_public(
+        &mut self,
+        expr: &'a SymbolicExpression,
+        name: &'a ClarityName,
+        parameters: Option<Vec<TypedVar<'a>>>,
+        body: &'a SymbolicExpression,
+    ) -> bool {
+        self.set_function_paramaters_scope(expr);
+        self.traverse_expr(body) && self.visit_define_public(expr, name, parameters, body)
+    }
+
+    fn visit_define_public(
+        &mut self,
+        expr: &'a SymbolicExpression,
+        name: &'a ClarityName,
+        _parameters: Option<Vec<clarity_repl::analysis::ast_visitor::TypedVar<'a>>>,
+        _body: &'a SymbolicExpression,
+    ) -> bool {
+        self.global.insert(name.clone(), span_to_range(&expr.span));
+        true
+    }
+
+    fn visit_define_constant(
+        &mut self,
+        expr: &'a SymbolicExpression,
+        name: &'a ClarityName,
+        _value: &'a SymbolicExpression,
+    ) -> bool {
+        self.global.insert(name.clone(), span_to_range(&expr.span));
+        true
+    }
+
+    fn visit_define_data_var(
+        &mut self,
+        expr: &'a SymbolicExpression,
+        name: &'a ClarityName,
+        _data_type: &'a SymbolicExpression,
+        _initial: &'a SymbolicExpression,
+    ) -> bool {
+        self.global.insert(name.clone(), span_to_range(&expr.span));
+        true
+    }
+
+    fn visit_define_map(
+        &mut self,
+        expr: &'a SymbolicExpression,
+        name: &'a ClarityName,
+        _key_type: &'a SymbolicExpression,
+        _value_type: &'a SymbolicExpression,
+    ) -> bool {
+        self.global.insert(name.clone(), span_to_range(&expr.span));
+        true
+    }
+
+    fn visit_define_ft(
+        &mut self,
+        expr: &'a SymbolicExpression,
+        name: &'a ClarityName,
+        _supply: Option<&'a SymbolicExpression>,
+    ) -> bool {
+        self.global.insert(name.clone(), span_to_range(&expr.span));
+        true
+    }
+
+    fn visit_define_nft(
+        &mut self,
+        expr: &'a SymbolicExpression,
+        name: &'a ClarityName,
+        _nft_type: &'a SymbolicExpression,
+    ) -> bool {
+        self.global.insert(name.clone(), span_to_range(&expr.span));
+        true
+    }
+
+    fn traverse_let(
+        &mut self,
+        expr: &'a SymbolicExpression,
+        bindings: &HashMap<&'a ClarityName, &'a SymbolicExpression>,
+        body: &'a [SymbolicExpression],
+    ) -> bool {
+        let local_scope = || -> Option<HashMap<ClarityName, Range>> {
+            let mut result = HashMap::new();
+            let binding_exprs = expr.match_list()?.get(1)?.match_list()?;
+            for binding in binding_exprs {
+                let (name, _) = binding.match_list()?.split_first()?;
+                result.insert(name.match_atom()?.to_owned(), span_to_range(&binding.span));
+            }
+            Some(result)
+        };
+        if let Some(local_scope) = local_scope() {
+            self.local.insert(expr.id, local_scope);
+        }
+
+        for (_, val) in bindings {
+            if !self.traverse_expr(val) {
+                return false;
+            }
+        }
+
+        for expr in body {
+            if !self.traverse_expr(expr) {
+                return false;
+            }
+        }
+        self.visit_let(expr, bindings, body)
+    }
+
+    fn traverse_match_option(
+        &mut self,
+        expr: &'a SymbolicExpression,
+        input: &'a SymbolicExpression,
+        some_name: &'a ClarityName,
+        some_branch: &'a SymbolicExpression,
+        none_branch: &'a SymbolicExpression,
+    ) -> bool {
+        self.local.insert(
+            expr.id,
+            HashMap::from([(some_name.clone(), span_to_range(&input.span))]),
+        );
+        self.traverse_expr(input)
+            && self.traverse_expr(some_branch)
+            && self.traverse_expr(none_branch)
+            && self.visit_match_option(expr, input, some_name, some_branch, none_branch)
+    }
+
+    fn traverse_match_response(
+        &mut self,
+        expr: &'a SymbolicExpression,
+        input: &'a SymbolicExpression,
+        ok_name: &'a ClarityName,
+        ok_branch: &'a SymbolicExpression,
+        err_name: &'a ClarityName,
+        err_branch: &'a SymbolicExpression,
+    ) -> bool {
+        self.local.insert(
+            expr.id,
+            HashMap::from([
+                (ok_name.clone(), span_to_range(&input.span)),
+                (err_name.clone(), span_to_range(&input.span)),
+            ]),
+        );
+        self.traverse_expr(input)
+            && self.traverse_expr(ok_branch)
+            && self.traverse_expr(err_branch)
+            && self.visit_match_response(expr, input, ok_name, ok_branch, err_name, err_branch)
+    }
+}
+
+#[cfg(test)]
+mod definitions_visitor_tests {
+    use std::collections::HashMap;
+
+    use clarity_repl::clarity::stacks_common::types::StacksEpochId;
+    use clarity_repl::clarity::{
+        ast::build_ast, vm::types::QualifiedContractIdentifier, ClarityVersion, SymbolicExpression,
+    };
+    use lsp_types::{Position, Range};
+
+    use super::Definitions;
+
+    fn get_ast(source: &str) -> Vec<SymbolicExpression> {
+        let contract_ast = build_ast(
+            &QualifiedContractIdentifier::transient(),
+            source,
+            &mut (),
+            ClarityVersion::Clarity1,
+            StacksEpochId::Epoch21,
+        )
+        .unwrap();
+        return contract_ast.expressions;
+    }
+
+    fn get_tokens(sources: &str) -> HashMap<(u32, u32), Range> {
+        let ast = get_ast(sources);
+        let mut definitions_visitor = Definitions::new();
+        definitions_visitor.run(&ast);
+        definitions_visitor.tokens
+    }
+
+    fn new_range(start_line: u32, start_column: u32, end_line: u32, end_column: u32) -> Range {
+        Range::new(
+            Position::new(start_line, start_column),
+            Position::new(end_line, end_column),
+        )
+    }
+
+    #[test]
+    fn find_define_private_bindings() {
+        let tokens = get_tokens("(define-private (func (arg1 int)) (ok arg1))");
+        assert_eq!(tokens.keys().len(), 1);
+        assert_eq!(tokens.keys().next(), Some(&(1, 39)));
+        assert_eq!(tokens.values().next(), Some(&new_range(0, 22, 0, 32)));
+    }
+
+    #[test]
+    fn find_define_read_only_bindings() {
+        let tokens = get_tokens("(define-read-only (func (arg1 int)) (ok arg1))");
+        assert_eq!(tokens.keys().len(), 1);
+        assert_eq!(tokens.keys().next(), Some(&(1, 41)));
+        assert_eq!(tokens.values().next(), Some(&new_range(0, 24, 0, 34)));
+    }
+
+    #[test]
+    fn find_define_public_bindings() {
+        let tokens = get_tokens("(define-public (func (arg1 int)) (ok arg1))");
+        assert_eq!(tokens.keys().len(), 1);
+        assert_eq!(tokens.keys().next(), Some(&(1, 38)));
+        assert_eq!(tokens.values().next(), Some(&new_range(0, 21, 0, 31)));
+    }
+
+    #[test]
+    fn find_let_bindings() {
+        let tokens = get_tokens("(let ((val1 u1)) (ok val1))");
+        assert_eq!(tokens.len(), 1);
+        assert_eq!(tokens.keys().next(), Some(&(1, 22)));
+        assert_eq!(tokens.values().next(), Some(&new_range(0, 6, 0, 15)));
+    }
+
+    #[test]
+    fn find_data_var_definition() {
+        let tokens = get_tokens(
+            vec![
+                "(define-data-var var1 int 1)",
+                "(var-get var1)",
+                "(var-set var1 2)",
+            ]
+            .join("\n")
+            .as_str(),
+        );
+
+        let expected_range = new_range(0, 0, 0, 28);
+        assert_eq!(tokens.len(), 2);
+        assert_eq!(tokens.get(&(2, 10)), Some(&expected_range));
+        assert_eq!(tokens.get(&(3, 10)), Some(&expected_range));
+    }
+
+    #[test]
+    fn find_map_definition() {
+        let tokens = get_tokens(
+            vec![
+                "(define-map owners int principal)",
+                "(map-insert owners 1 tx-sender)",
+                "(map-get? owners 1)",
+                "(map-set owners 1 tx-sender)",
+                "(map-delete owners 1)",
+            ]
+            .join("\n")
+            .as_str(),
+        );
+
+        let expected_range = new_range(0, 0, 0, 33);
+        assert_eq!(tokens.len(), 4);
+        assert_eq!(tokens.get(&(2, 13)), Some(&expected_range));
+        assert_eq!(tokens.get(&(3, 11)), Some(&expected_range));
+        assert_eq!(tokens.get(&(4, 10)), Some(&expected_range));
+        assert_eq!(tokens.get(&(5, 13)), Some(&expected_range));
+    }
+
+    #[test]
+    fn find_ft_definition() {
+        let tokens = get_tokens(
+            vec![
+                "(define-fungible-token ft u1)",
+                "(ft-mint? ft u1 tx-sender)",
+                "(ft-burn? ft u1 tx-sender)",
+                "(ft-get-balance ft tx-sender)",
+                "(ft-get-supply ft)",
+                "(ft-transfer? ft u1 tx-sender tx-sender)",
+            ]
+            .join("\n")
+            .as_str(),
+        );
+
+        let expected_range = new_range(0, 0, 0, 29);
+        assert_eq!(tokens.len(), 5);
+        assert_eq!(tokens.get(&(2, 11)), Some(&expected_range));
+        assert_eq!(tokens.get(&(3, 11)), Some(&expected_range));
+        assert_eq!(tokens.get(&(4, 17)), Some(&expected_range));
+        assert_eq!(tokens.get(&(5, 16)), Some(&expected_range));
+        assert_eq!(tokens.get(&(6, 15)), Some(&expected_range));
+    }
+
+    #[test]
+    fn find_definition_in_tuple() {
+        let tokens = get_tokens("(define-public (ok-tuple (arg1 int)) (ok { value: arg1 }))");
+
+        assert_eq!(tokens.len(), 1);
+        assert_eq!(tokens.get(&(1, 51)), Some(&new_range(0, 25, 0, 35)));
+    }
+}
+
+pub fn find_definition(
+    location: &FileLocation,
+    position: &Position,
+    expressions: &Vec<SymbolicExpression>,
+) -> Option<Location> {
+    #[cfg(feature = "wasm")]
+    web_sys::console::time_with_label("compute ast definitions");
+
+    let position_hash = get_atom_start_at_position(position, expressions)?;
+    let mut definitions_visitor = Definitions::new();
+    definitions_visitor.run(expressions);
+
+    #[cfg(feature = "wasm")]
+    web_sys::console::time_end_with_label("compute ast definitions");
+
+    let range = definitions_visitor.tokens.get(&position_hash)?;
+    let uri = Url::parse(&location.to_string()).ok()?;
+    return Some(Location {
+        uri,
+        range: range.clone(),
+    });
+}
+
+#[cfg(test)]
+mod find_definition_tests {
+    use clarinet_files::FileLocation;
+    use clarity_repl::clarity::stacks_common::types::StacksEpochId;
+
+    use clarity_repl::clarity::{
+        ast::build_ast, vm::types::QualifiedContractIdentifier, ClarityVersion, SymbolicExpression,
+    };
+    use lsp_types::{Location, Position, Range, Url};
+
+    use super::find_definition;
+
+    fn get_ast(source: &str) -> Vec<SymbolicExpression> {
+        let contract_ast = build_ast(
+            &QualifiedContractIdentifier::transient(),
+            source,
+            &mut (),
+            ClarityVersion::Clarity1,
+            StacksEpochId::Epoch21,
+        )
+        .unwrap();
+        return contract_ast.expressions;
+    }
+
+    #[test]
+    fn find_let_binding_tests() {
+        let sources = vec!["(define-public (a-func)", "  (let ((arg1 u1)) (ok arg1)))"].join("\n");
+        let ast = get_ast(sources.as_str());
+        let url = Url::parse("https://example.com/contract.clar").unwrap();
+
+        let result = find_definition(
+            &FileLocation::Url { url: url.clone() },
+            &Position {
+                line: 2,
+                character: 25,
+            },
+            &ast,
+        );
+
+        assert_eq!(
+            result,
+            Some(Location {
+                uri: url,
+                range: Range {
+                    start: Position {
+                        line: 1,
+                        character: 8
+                    },
+                    end: Position {
+                        line: 1,
+                        character: 17
+                    }
+                }
+            })
+        )
+    }
+
+    #[test]
+    fn arg_in_tuple_tests() {
+        let sources = "(define-public (ok-tuple (arg1 int)) (ok { value: arg1 }))";
+        let ast = get_ast(sources);
+        let url = Url::parse("https://example.com/contract.clar").unwrap();
+
+        let result = find_definition(
+            &FileLocation::Url { url: url.clone() },
+            &Position {
+                line: 1,
+                character: 52,
+            },
+            &ast,
+        );
+
+        assert_eq!(
+            result,
+            Some(Location {
+                uri: url,
+                range: Range {
+                    start: Position {
+                        line: 1,
+                        character: 8
+                    },
+                    end: Position {
+                        line: 1,
+                        character: 17
+                    }
+                }
+            })
+        )
+    }
+}

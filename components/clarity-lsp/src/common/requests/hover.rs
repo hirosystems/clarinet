@@ -5,7 +5,10 @@ use clarity_repl::clarity::{
     ClarityVersion, SymbolicExpression,
 };
 use lazy_static::lazy_static;
+use lsp_types::Position;
 use std::collections::HashMap;
+
+use super::helpers::get_expression_name_at_position;
 
 fn code(code: &str) -> String {
     vec!["```clarity", code.trim(), "```"].join("\n")
@@ -74,43 +77,14 @@ lazy_static! {
     };
 }
 
-fn get_expression_name_at_position(
-    line: u32,
-    column: u32,
-    expressions: &Vec<SymbolicExpression>,
-) -> Option<String> {
-    for expr in expressions {
-        let SymbolicExpression { span, .. } = expr;
-
-        if span.start_line <= line && span.end_line >= line {
-            if span.end_line > span.start_line {
-                if let Some(expressions) = expr.match_list() {
-                    return get_expression_name_at_position(line, column, &expressions.to_vec());
-                }
-                return None;
-            }
-            if span.start_column <= column && span.end_column >= column {
-                if let Some(function_name) = expr.match_atom() {
-                    return Some(function_name.to_string());
-                } else if let Some(expressions) = expr.match_list() {
-                    return get_expression_name_at_position(line, column, &expressions.to_vec());
-                }
-                return None;
-            }
-        }
-    }
-    None
-}
-
 pub fn get_expression_documentation(
-    line: u32,
-    column: u32,
+    position: &Position,
     clarity_version: ClarityVersion,
     expressions: &Vec<SymbolicExpression>,
 ) -> Option<String> {
-    let expression_name = get_expression_name_at_position(line, column, expressions)?;
+    let expression_name = get_expression_name_at_position(position, expressions)?;
 
-    match API_REF.get(&expression_name.clone()) {
+    match API_REF.get(&expression_name.to_string()) {
         Some((version, documentation)) => {
             if version <= &clarity_version {
                 return Some(documentation.to_owned());
@@ -120,3 +94,16 @@ pub fn get_expression_documentation(
         None => None,
     }
 }
+
+// fn search_external_func() {
+//     let metadata = self.contracts_lookup.get(contract_location)?;
+//     let analysis = self
+//         .protocols
+//         .get(&metadata.manifest_location)?
+//         .contracts
+//         .get(contract_location)?
+//         .analysis
+//         .as_ref()?;
+
+//     let _private_func = analysis.public_function_types.get(&expr)?;
+// }

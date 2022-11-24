@@ -4,16 +4,22 @@
   (ok (var-get counter))
 )
 
+(define-private (set-counter (n int))
+  (var-set counter n)
+)
+
+
 (define-public (increment)
-  (begin
-    (var-set counter (+ (var-get counter) 1))
+  (let ((new-value (+ (var-get counter) 1)))
+    (set-counter new-value)
     (ok (var-get counter))
   )
 )
 
+
 (define-public (decrement)
   (begin
-    (var-set counter (- (var-get counter) 1))
+    (set-counter (- (var-get counter) 1))
     (ok (var-get counter))
   )
 )

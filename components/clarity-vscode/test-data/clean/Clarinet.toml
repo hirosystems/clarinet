@@ -12,6 +12,12 @@ path = "contracts/contract.clar"
 [contracts.counter]
 path = "contracts/counter.clar"
 
+[contracts.test-cases]
+path = "contracts/test-cases.clar"
+
+[contracts.bns]
+path = "contracts/bns.clar"
+
 [repl.analysis]
 passes = ["check_checker"]
 

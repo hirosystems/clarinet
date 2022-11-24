@@ -6,9 +6,10 @@ use clarinet_files::{FileAccessor, FileLocation, ProjectManifest};
 use clarity_repl::clarity::diagnostic::Diagnostic;
 use lsp_types::{
     CompletionItem, CompletionOptions, CompletionParams, DocumentSymbol, DocumentSymbolParams,
-    Documentation, Hover, HoverParams, HoverProviderCapability, InitializeParams, InitializeResult,
-    MarkupContent, MarkupKind, ServerCapabilities, TextDocumentSyncCapability,
-    TextDocumentSyncKind, TextDocumentSyncOptions, TextDocumentSyncSaveOptions,
+    Documentation, GotoDefinitionParams, Hover, HoverParams, HoverProviderCapability,
+    InitializeParams, InitializeResult, Location, MarkupContent, MarkupKind, ServerCapabilities,
+    TextDocumentSyncCapability, TextDocumentSyncKind, TextDocumentSyncOptions,
+    TextDocumentSyncSaveOptions,
 };
 use serde::{Deserialize, Serialize};
 use std::sync::{Arc, RwLock};
@@ -255,6 +256,7 @@ pub async fn process_notification(
 pub enum LspRequest {
     Initialize(InitializeParams),
     Completion(CompletionParams),
+    Definition(GotoDefinitionParams),
     Hover(HoverParams),
     DocumentSymbol(DocumentSymbolParams),
 }
@@ -263,6 +265,7 @@ pub enum LspRequest {
 pub enum LspRequestResponse {
     Initialize(InitializeResult),
     CompletionItems(Vec<CompletionItem>),
+    Definition(Option<Location>),
     DocumentSymbol(Vec<DocumentSymbol>),
     Hover(Option<Hover>),
 }
@@ -289,6 +292,7 @@ pub fn process_request(command: LspRequest, editor_state: &EditorStateInput) -> 
                 }),
                 hover_provider: Some(HoverProviderCapability::Simple(true)),
                 document_symbol_provider: Some(lsp_types::OneOf::Left(true)),
+                definition_provider: Some(lsp_types::OneOf::Left(true)),
                 ..ServerCapabilities::default()
             },
         }),
@@ -378,6 +382,29 @@ pub fn process_request(command: LspRequest, editor_state: &EditorStateInput) -> 
             }
 
             LspRequestResponse::CompletionItems(completion_items)
+        }
+
+        LspRequest::Definition(params) => {
+            LspRequestResponse::Definition(None);
+            let file_url = params.text_document_position_params.text_document.uri;
+            let contract_location = match get_contract_location(&file_url) {
+                Some(contract_location) => contract_location,
+                None => return LspRequestResponse::Definition(None),
+            };
+            let position = params.text_document_position_params.position;
+
+            #[cfg(feature = "wasm")]
+            web_sys::console::time_with_label("search def");
+            let location = match editor_state
+                .try_read(|es| es.get_definition_location(&contract_location, &position))
+            {
+                Ok(location) => location,
+                Err(_) => None,
+            };
+            #[cfg(feature = "wasm")]
+            web_sys::console::time_end_with_label("search def");
+
+            LspRequestResponse::Definition(location)
         }
 
         LspRequest::DocumentSymbol(params) => {

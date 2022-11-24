@@ -17,11 +17,12 @@ use clarity_repl::clarity::vm::types::QualifiedContractIdentifier;
 use clarity_repl::clarity::vm::EvaluationResult;
 use clarity_repl::clarity::{ClarityVersion, SymbolicExpression};
 use clarity_repl::repl::DEFAULT_CLARITY_VERSION;
-use lsp_types::{DocumentSymbol, Hover, MessageType};
+use lsp_types::{DocumentSymbol, Hover, MessageType, Position};
 use std::borrow::BorrowMut;
 use std::collections::{HashMap, HashSet};
 use std::vec;
 
+use super::requests::definitions::find_definition;
 use super::requests::document_symbols::ASTSymbols;
 use super::requests::hover::get_expression_documentation;
 
@@ -283,15 +284,31 @@ impl EditorState {
         ast_symbols.get_symbols(&expressions)
     }
 
+    pub fn get_definition_location(
+        &self,
+        contract_location: &FileLocation,
+        position: &Position,
+    ) -> Option<lsp_types::Location> {
+        let contract = self.active_contracts.get(&contract_location)?;
+        let position = Position {
+            line: position.line + 1,
+            character: position.character + 1,
+        };
+        find_definition(contract_location, &position, contract.expressions.as_ref()?)
+    }
+
     pub fn get_hover_data(
         &self,
         contract_location: &FileLocation,
         position: &lsp_types::Position,
     ) -> Option<Hover> {
         let contract = self.active_contracts.get(&contract_location)?;
+        let position = Position {
+            line: position.line + 1,
+            character: position.character + 1,
+        };
         let documentation = get_expression_documentation(
-            position.line + 1,
-            position.character + 1,
+            &position,
             contract.clarity_version,
             contract.expressions.as_ref()?,
         )?;

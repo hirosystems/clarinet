@@ -63,7 +63,7 @@ dwarf-debug-info = false
 
 [package.metadata.wasm-pack.profile.release]
 # -04  aggressively optimizes for speed
-wasm-opt = ['-O4']
+wasm-opt = ['-O2']
 # -0z aggressively optimizes for size
 # wasm-opt = ['-Oz']
 
