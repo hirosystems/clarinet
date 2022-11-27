@@ -16,7 +16,9 @@ use std::{
     time::Duration,
 };
 
-use chainhook_event_observer::{chainhooks::types::HookFormation, observer::MempoolAdmissionData};
+use chainhook_event_observer::{
+    chainhooks::types::HookFormation, observer::MempoolAdmissionData, utils::Context,
+};
 use chrono::prelude::*;
 use tracing::{self, debug, error, info, warn};
 use tracing_appender;
@@ -51,6 +53,7 @@ pub async fn do_run_devnet(
     chainhooks: &mut Option<HookFormation>,
     log_tx: Option<Sender<LogData>>,
     display_dashboard: bool,
+    ctx: Context,
 ) -> Result<
     (
         Option<mpsc::Receiver<DevnetEvent>>,
@@ -111,6 +114,7 @@ pub async fn do_run_devnet(
                 moved_orchestrator_terminator_tx,
                 observer_command_tx,
                 observer_command_rx,
+                ctx,
             );
             let rt = hiro_system_kit::create_basic_runtime();
             rt.block_on(future)

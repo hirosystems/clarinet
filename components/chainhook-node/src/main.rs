@@ -15,6 +15,5 @@ mod cli;
 pub mod config;
 
 fn main() {
-    let _guard = hiro_system_kit::log::setup_global_logger();
     cli::main();
 }

@@ -11,6 +11,7 @@ use crate::indexer::tests::helpers::{
 use crate::observer::{
     start_observer_commands_handler, ApiKey, ChainhookStore, EventObserverConfig, ObserverCommand,
 };
+use crate::utils::Context;
 use chainhook_types::{
     BitcoinChainEvent, BitcoinChainUpdatedWithBlocksData, BitcoinNetwork, StacksBlockUpdate,
     StacksChainEvent, StacksChainUpdatedWithBlocksData, StacksNetwork,
@@ -158,6 +159,7 @@ fn test_stacks_chainhook_register_deregister() {
             Arc::new(RwLock::new(chainhook_store)),
             observer_commands_rx,
             Some(observer_events_tx),
+            Context::empty(),
         ));
     });
 
@@ -393,6 +395,7 @@ fn test_stacks_chainhook_auto_deregister() {
             Arc::new(RwLock::new(chainhook_store)),
             observer_commands_rx,
             Some(observer_events_tx),
+            Context::empty(),
         ));
     });
 
@@ -549,6 +552,7 @@ fn test_bitcoin_chainhook_register_deregister() {
             Arc::new(RwLock::new(chainhook_store)),
             observer_commands_rx,
             Some(observer_events_tx),
+            Context::empty(),
         ));
     });
 
@@ -805,6 +809,7 @@ fn test_bitcoin_chainhook_auto_deregister() {
             Arc::new(RwLock::new(chainhook_store)),
             observer_commands_rx,
             Some(observer_events_tx),
+            Context::empty(),
         ));
     });
 

@@ -16,6 +16,7 @@ use chainhook_event_observer::chainhooks::stacks::StacksChainhookOccurrence;
 use chainhook_event_observer::chainhooks::stacks::StacksTriggerChainhook;
 use chainhook_event_observer::chainhooks::types::StacksChainhookSpecification;
 use chainhook_event_observer::indexer::stacks::get_standardized_stacks_receipt;
+use chainhook_event_observer::utils::Context;
 use chainhook_types::BlockIdentifier;
 use chainhook_types::StacksBlockData;
 use chainhook_types::StacksBlockMetadata;
@@ -736,7 +737,11 @@ fn mine_block(state: &mut OpState, args: MineBlockArgs) -> Result<String, AnyErr
         for chainhook in chainhooks.iter() {
             let mut hits = vec![];
             for (tx, _) in transactions.iter() {
-                if evaluate_stacks_transaction_predicate_on_transaction(tx, chainhook) {
+                if evaluate_stacks_transaction_predicate_on_transaction(
+                    tx,
+                    chainhook,
+                    &Context::empty(),
+                ) {
                     hits.push(tx);
                 }
             }
@@ -770,6 +775,7 @@ fn mine_block(state: &mut OpState, args: MineBlockArgs) -> Result<String, AnyErr
                         rollback: vec![],
                     },
                     &HashMap::new(),
+                    &Context::empty(),
                 );
                 match result {
                     Some(StacksChainhookOccurrence::Http(action)) => {

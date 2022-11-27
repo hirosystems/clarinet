@@ -10,6 +10,7 @@ use chainhook_event_observer::indexer::bitcoin::build_block;
 use chainhook_event_observer::observer::{
     start_event_observer, EventObserverConfig, ObserverCommand, ObserverEvent,
 };
+use chainhook_event_observer::utils::Context;
 use chainhook_event_observer::{
     chainhooks::stacks::{
         evaluate_stacks_transaction_predicate_on_transaction, handle_stacks_hook_action,
@@ -110,6 +111,13 @@ struct ReplayConfig {
 }
 
 pub fn main() {
+    let logger = hiro_system_kit::log::setup_logger();
+    let _guard = hiro_system_kit::log::setup_global_logger(logger.clone());
+    let ctx = Context {
+        logger: Some(logger),
+        tracer: false,
+    };
+
     let opts: Opts = match Opts::try_parse() {
         Ok(opts) => opts,
         Err(e) => {
@@ -138,7 +146,7 @@ pub fn main() {
                     process::exit(1);
                 }
             };
-            start_node(config);
+            start_node(config, ctx);
         }
         Command::Replay(cmd) => {
             let network = match (cmd.testnet, cmd.mainnet) {
@@ -167,19 +175,28 @@ pub fn main() {
                     }
                 }
             };
-            start_replay_flow(&network, bitcoind_rpc_url, cmd.apply_trigger);
+            start_replay_flow(&network, bitcoind_rpc_url, cmd.apply_trigger, ctx);
         }
     }
 }
 
-pub fn start_replay_flow(network: &StacksNetwork, bitcoind_rpc_url: Url, apply: bool) {
+pub fn start_replay_flow(
+    network: &StacksNetwork,
+    bitcoind_rpc_url: Url,
+    apply: bool,
+    ctx: Context,
+) {
     let (digestion_tx, digestion_rx) = channel();
     let (observer_event_tx, observer_event_rx) = channel();
     let (observer_command_tx, observer_command_rx) = channel();
 
     let terminate_digestion_tx = digestion_tx.clone();
+    let context_cloned = ctx.clone();
     ctrlc::set_handler(move || {
-        warn!("Manual interruption signal received");
+        warn!(
+            &context_cloned.expect_logger(),
+            "Manual interruption signal received"
+        );
         terminate_digestion_tx
             .send(DigestingCommand::Kill)
             .expect("Unable to terminate service");
@@ -214,11 +231,11 @@ pub fn start_replay_flow(network: &StacksNetwork, bitcoind_rpc_url: Url, apply: 
             destination_path.push("stacks-node-events.tsv");
             // Download archive if not already present in cache
             if !destination_path.exists() {
-                info!("Downloading {}", url);
+                info!(ctx.expect_logger(), "Downloading {}", url);
                 match hiro_system_kit::nestable_block_on(archive::download_tsv_file(&config)) {
                     Ok(_) => {}
                     Err(e) => {
-                        error!("{}", e);
+                        error!(ctx.expect_logger(), "{}", e);
                         process::exit(1);
                     }
                 }
@@ -229,12 +246,18 @@ pub fn start_replay_flow(network: &StacksNetwork, bitcoind_rpc_url: Url, apply: 
 
             let ingestion_config = config.clone();
             let seed_digestion_tx = digestion_tx.clone();
+            let context_cloned = ctx.clone();
+
             thread::spawn(move || {
-                let res = block::ingestion::start(seed_digestion_tx.clone(), &ingestion_config);
+                let res = block::ingestion::start(
+                    seed_digestion_tx.clone(),
+                    &ingestion_config,
+                    context_cloned.clone(),
+                );
                 let (_stacks_chain_tip, _bitcoin_chain_tip) = match res {
                     Ok(chain_tips) => chain_tips,
                     Err(e) => {
-                        error!("{}", e);
+                        error!(&context_cloned.expect_logger(), "{}", e);
                         process::exit(1);
                     }
                 };
@@ -242,6 +265,7 @@ pub fn start_replay_flow(network: &StacksNetwork, bitcoind_rpc_url: Url, apply: 
         }
     } else {
         info!(
+            ctx.expect_logger(),
             "Streaming blocks from stacks-node {}",
             config.expected_stacks_node_event_source()
         );
@@ -249,10 +273,12 @@ pub fn start_replay_flow(network: &StacksNetwork, bitcoind_rpc_url: Url, apply: 
 
     let digestion_config = config.clone();
     let terminate_observer_command_tx = observer_command_tx.clone();
+    let context_cloned = ctx.clone();
+
     thread::spawn(move || {
-        let res = block::digestion::start(digestion_rx, &digestion_config);
+        let res = block::digestion::start(digestion_rx, &digestion_config, &context_cloned);
         if let Err(e) = res {
-            crit!("{}", e);
+            crit!(&context_cloned.expect_logger(), "{}", e);
         }
         let _ = terminate_observer_command_tx.send(ObserverCommand::Terminate);
     });
@@ -274,19 +300,22 @@ pub fn start_replay_flow(network: &StacksNetwork, bitcoind_rpc_url: Url, apply: 
         display_logs: false,
     };
     info!(
-        "Listening for new blockchain events on port {}",
-        DEFAULT_INGESTION_PORT
+        ctx.expect_logger(),
+        "Listening for new blockchain events on port {}", DEFAULT_INGESTION_PORT
     );
     info!(
-        "Listening for chainhook predicate registrations on port {}",
-        DEFAULT_CONTROL_PORT
+        ctx.expect_logger(),
+        "Listening for chainhook predicate registrations on port {}", DEFAULT_CONTROL_PORT
     );
+    let context_cloned = ctx.clone();
+
     let _ = std::thread::spawn(move || {
         let future = start_event_observer(
             event_observer_config,
             observer_command_tx,
             observer_command_rx,
             Some(observer_event_tx),
+            context_cloned,
         );
         let _ = hiro_system_kit::nestable_block_on(future);
     });
@@ -296,7 +325,7 @@ pub fn start_replay_flow(network: &StacksNetwork, bitcoind_rpc_url: Url, apply: 
     let mut redis_con = match client.get_connection() {
         Ok(con) => con,
         Err(message) => {
-            crit!("Redis: {}", message.to_string());
+            crit!(ctx.expect_logger(), "Redis: {}", message.to_string());
             panic!();
         }
     };
@@ -309,7 +338,7 @@ pub fn start_replay_flow(network: &StacksNetwork, bitcoind_rpc_url: Url, apply: 
     let bitcoin_rpc = match Client::new(&config.network.bitcoin_node_rpc_url, auth) {
         Ok(con) => con,
         Err(message) => {
-            crit!("Bitcoin RPC: {}", message.to_string());
+            crit!(ctx.expect_logger(), "Bitcoin RPC: {}", message.to_string());
             panic!();
         }
     };
@@ -318,7 +347,11 @@ pub fn start_replay_flow(network: &StacksNetwork, bitcoind_rpc_url: Url, apply: 
         let event = match observer_event_rx.recv() {
             Ok(cmd) => cmd,
             Err(e) => {
-                crit!("Error: broken channel {}", e.to_string());
+                crit!(
+                    ctx.expect_logger(),
+                    "Error: broken channel {}",
+                    e.to_string()
+                );
                 break;
             }
         };
@@ -339,14 +372,14 @@ pub fn start_replay_flow(network: &StacksNetwork, bitcoind_rpc_url: Url, apply: 
                         let end_block = stacks_hook.end_block.unwrap_or(tip_height); // TODO(lgalabru): handle STX hooks and genesis block :s
 
                         info!(
-                            "Processing Stacks chainhook {}, will scan blocks [{}; {}]  (apply = {})",
+                            ctx.expect_logger(), "Processing Stacks chainhook {}, will scan blocks [{}; {}]  (apply = {})",
                             stacks_hook.uuid, start_block, end_block, apply
                         );
                         let mut total_hits = vec![];
                         for cursor in start_block..=end_block {
                             debug!(
-                                "Evaluating predicate #{} on block #{}",
-                                stacks_hook.uuid, cursor
+                                ctx.expect_logger(),
+                                "Evaluating predicate #{} on block #{}", stacks_hook.uuid, cursor
                             );
                             let (
                                 block_identifier,
@@ -368,7 +401,7 @@ pub fn start_replay_flow(network: &StacksNetwork, bitcoind_rpc_url: Url, apply: 
                                     )
                                     .expect("unable to retrieve tip height");
                                 if payload.len() != 5 {
-                                    warn!("Chain still being processed, please retry in a few minutes");
+                                    warn!(ctx.expect_logger(), "Chain still being processed, please retry in a few minutes");
                                     continue;
                                 }
                                 (
@@ -386,10 +419,14 @@ pub fn start_replay_flow(network: &StacksNetwork, bitcoind_rpc_url: Url, apply: 
                                 if evaluate_stacks_transaction_predicate_on_transaction(
                                     &tx,
                                     &stacks_hook,
+                                    &ctx,
                                 ) {
                                     debug!(
+                                        ctx.expect_logger(),
                                         "Action #{} triggered by transaction {} (block #{})",
-                                        stacks_hook.uuid, tx.transaction_identifier.hash, cursor
+                                        stacks_hook.uuid,
+                                        tx.transaction_identifier.hash,
+                                        cursor
                                     );
                                     hits.push(tx);
                                     total_hits.push(tx.transaction_identifier.hash.to_string());
@@ -413,7 +450,7 @@ pub fn start_replay_flow(network: &StacksNetwork, bitcoind_rpc_url: Url, apply: 
                                 let proofs = HashMap::new();
                                 if apply {
                                     if let Some(result) =
-                                        handle_stacks_hook_action(trigger, &proofs)
+                                        handle_stacks_hook_action(trigger, &proofs, &ctx)
                                     {
                                         if let StacksChainhookOccurrence::Http(request) = result {
                                             hiro_system_kit::nestable_block_on(request.send())
@@ -424,35 +461,39 @@ pub fn start_replay_flow(network: &StacksNetwork, bitcoind_rpc_url: Url, apply: 
                             }
                         }
 
-                        info!("Stacks chainhook {} scan completed and triggered by {} transactions {}", stacks_hook.uuid, total_hits.len(), total_hits.join(","))
+                        info!(ctx.expect_logger(), "Stacks chainhook {} scan completed and triggered by {} transactions {}", stacks_hook.uuid, total_hits.len(), total_hits.join(","))
                     }
                     ChainhookSpecification::Bitcoin(bitcoin_hook) => {
                         let start_block = match bitcoin_hook.start_block {
                             Some(start_block) => start_block,
                             None => {
-                                warn!("Bitcoin chainhook specification must include a field start_block in replay mode");
+                                warn!(ctx.expect_logger(), "Bitcoin chainhook specification must include a field start_block in replay mode");
                                 continue;
                             }
                         };
                         let tip_height = match bitcoin_rpc.get_blockchain_info() {
                             Ok(result) => result.blocks,
                             Err(e) => {
-                                warn!("unable to retrieve Bitcoin chain tip ({})", e.to_string());
+                                warn!(
+                                    ctx.expect_logger(),
+                                    "unable to retrieve Bitcoin chain tip ({})",
+                                    e.to_string()
+                                );
                                 continue;
                             }
                         };
                         let end_block = bitcoin_hook.end_block.unwrap_or(tip_height);
 
                         info!(
-                            "Processing Bitcoin chainhook {}, will scan blocks [{}; {}] (apply = {})",
+                            ctx.expect_logger(), "Processing Bitcoin chainhook {}, will scan blocks [{}; {}] (apply = {})",
                             bitcoin_hook.uuid, start_block, end_block, apply
                         );
 
                         let mut total_hits = vec![];
                         for cursor in start_block..=end_block {
                             debug!(
-                                "Evaluating predicate #{} on block #{}",
-                                bitcoin_hook.uuid, cursor
+                                ctx.expect_logger(),
+                                "Evaluating predicate #{} on block #{}", bitcoin_hook.uuid, cursor
                             );
 
                             // Try to retrieve block from cache
@@ -498,6 +539,7 @@ pub fn start_replay_flow(network: &StacksNetwork, bitcoind_rpc_url: Url, apply: 
                                         .unwrap(),
                                     };
                                     debug!(
+                                        ctx.expect_logger(),
                                         "Bitcoin block #{} retrieved from cache",
                                         block.block_identifier.index
                                     );
@@ -512,6 +554,7 @@ pub fn start_replay_flow(network: &StacksNetwork, bitcoind_rpc_url: Url, apply: 
                                         Ok(block_hash) => block_hash,
                                         Err(e) => {
                                             error!(
+                                                ctx.expect_logger(),
                                                 "unable to retrieve block hash {}: {}",
                                                 cursor,
                                                 e.to_string()
@@ -521,9 +564,12 @@ pub fn start_replay_flow(network: &StacksNetwork, bitcoind_rpc_url: Url, apply: 
                                     };
 
                                     let block = match bitcoin_rpc.get_block(&block_hash) {
-                                        Ok(block) => build_block(block, cursor, &config.network),
+                                        Ok(block) => {
+                                            build_block(block, cursor, &config.network, &ctx)
+                                        }
                                         Err(e) => {
                                             error!(
+                                                ctx.expect_logger(),
                                                 "unable to retrieve block {}: {}",
                                                 cursor,
                                                 e.to_string()
@@ -551,12 +597,14 @@ pub fn start_replay_flow(network: &StacksNetwork, bitcoind_rpc_url: Url, apply: 
                                     ) {
                                         Ok(()) => {
                                             debug!(
+                                                ctx.expect_logger(),
                                                 "Bitcoin block #{} saved to cache",
                                                 block.block_identifier.index
                                             );
                                         }
                                         Err(e) => {
                                             warn!(
+                                                ctx.expect_logger(),
                                                 "unable to keep block {key} in cache: {}",
                                                 e.to_string()
                                             );
@@ -571,8 +619,11 @@ pub fn start_replay_flow(network: &StacksNetwork, bitcoind_rpc_url: Url, apply: 
                             for tx in block.transactions.iter() {
                                 if bitcoin_hook.evaluate_transaction_predicate(&tx) {
                                     debug!(
+                                        ctx.expect_logger(),
                                         "Action #{} triggered by transaction {} (block #{})",
-                                        bitcoin_hook.uuid, tx.transaction_identifier.hash, cursor
+                                        bitcoin_hook.uuid,
+                                        tx.transaction_identifier.hash,
+                                        cursor
                                     );
                                     hits.push(tx);
                                     total_hits.push(tx.transaction_identifier.hash.to_string());
@@ -599,12 +650,12 @@ pub fn start_replay_flow(network: &StacksNetwork, bitcoind_rpc_url: Url, apply: 
                                 }
                             }
                         }
-                        info!("Bitcoin chainhook {} scan completed and triggered by {} transactions {}", bitcoin_hook.uuid, total_hits.len(), total_hits.join(","))
+                        info!(ctx.expect_logger(), "Bitcoin chainhook {} scan completed and triggered by {} transactions {}", bitcoin_hook.uuid, total_hits.len(), total_hits.join(","))
                     }
                 }
             }
             ObserverEvent::BitcoinChainEvent(_chain_update) => {
-                debug!("Bitcoin update not stored");
+                debug!(ctx.expect_logger(), "Bitcoin update not stored");
             }
             ObserverEvent::StacksChainEvent(chain_event) => {
                 match &chain_event {
@@ -612,12 +663,14 @@ pub fn start_replay_flow(network: &StacksNetwork, bitcoind_rpc_url: Url, apply: 
                         update_storage_with_confirmed_stacks_blocks(
                             &mut redis_con,
                             &data.confirmed_blocks,
+                            &ctx,
                         );
                     }
                     StacksChainEvent::ChainUpdatedWithReorg(data) => {
                         update_storage_with_confirmed_stacks_blocks(
                             &mut redis_con,
                             &data.confirmed_blocks,
+                            &ctx,
                         );
                     }
                     StacksChainEvent::ChainUpdatedWithMicroblocks(_)
@@ -632,14 +685,18 @@ pub fn start_replay_flow(network: &StacksNetwork, bitcoind_rpc_url: Url, apply: 
     }
 }
 
-pub fn start_node(mut config: Config) {
+pub fn start_node(mut config: Config, ctx: Context) {
     let (digestion_tx, digestion_rx) = channel();
     let (observer_event_tx, observer_event_rx) = channel();
     let (observer_command_tx, observer_command_rx) = channel();
 
     let terminate_digestion_tx = digestion_tx.clone();
+    let context_cloned = ctx.clone();
     ctrlc::set_handler(move || {
-        warn!("Manual interruption signal received");
+        warn!(
+            &context_cloned.expect_logger(),
+            "Manual interruption signal received"
+        );
         terminate_digestion_tx
             .send(DigestingCommand::Kill)
             .expect("Unable to terminate service");
@@ -654,11 +711,11 @@ pub fn start_node(mut config: Config) {
             destination_path.push("stacks-node-events.tsv");
             // Download archive if not already present in cache
             if !destination_path.exists() {
-                info!("Downloading {}", url);
+                info!(ctx.expect_logger(), "Downloading {}", url);
                 match hiro_system_kit::nestable_block_on(archive::download_tsv_file(&config)) {
                     Ok(_) => {}
                     Err(e) => {
-                        error!("{}", e);
+                        error!(ctx.expect_logger(), "{}", e);
                         process::exit(1);
                     }
                 }
@@ -669,12 +726,18 @@ pub fn start_node(mut config: Config) {
 
             let ingestion_config = config.clone();
             let seed_digestion_tx = digestion_tx.clone();
+            let context_cloned = ctx.clone();
+
             thread::spawn(move || {
-                let res = block::ingestion::start(seed_digestion_tx.clone(), &ingestion_config);
+                let res = block::ingestion::start(
+                    seed_digestion_tx.clone(),
+                    &ingestion_config,
+                    context_cloned.clone(),
+                );
                 let (_stacks_chain_tip, _bitcoin_chain_tip) = match res {
                     Ok(chain_tips) => chain_tips,
                     Err(e) => {
-                        error!("{}", e);
+                        error!(&context_cloned.expect_logger(), "{}", e);
                         process::exit(1);
                     }
                 };
@@ -682,6 +745,7 @@ pub fn start_node(mut config: Config) {
         }
     } else {
         info!(
+            ctx.expect_logger(),
             "Streaming blocks from stacks-node {}",
             config.expected_stacks_node_event_source()
         );
@@ -689,10 +753,12 @@ pub fn start_node(mut config: Config) {
 
     let digestion_config = config.clone();
     let terminate_observer_command_tx = observer_command_tx.clone();
+    let context_cloned = ctx.clone();
+
     thread::spawn(move || {
-        let res = block::digestion::start(digestion_rx, &digestion_config);
+        let res = block::digestion::start(digestion_rx, &digestion_config, &context_cloned);
         if let Err(e) = res {
-            error!("{}", e);
+            error!(&context_cloned.expect_logger(), "{}", e);
         }
         let _ = terminate_observer_command_tx.send(ObserverCommand::Terminate);
     });
@@ -714,19 +780,21 @@ pub fn start_node(mut config: Config) {
         display_logs: false,
     };
     info!(
-        "Listening for new blockchain events on port {}",
-        DEFAULT_INGESTION_PORT
+        ctx.expect_logger(),
+        "Listening for new blockchain events on port {}", DEFAULT_INGESTION_PORT
     );
     info!(
-        "Listening for chainhook predicate registrations on port {}",
-        DEFAULT_CONTROL_PORT
+        ctx.expect_logger(),
+        "Listening for chainhook predicate registrations on port {}", DEFAULT_CONTROL_PORT
     );
+    let context_cloned = ctx.clone();
     let _ = std::thread::spawn(move || {
         let future = start_event_observer(
             event_observer_config,
             observer_command_tx,
             observer_command_rx,
             Some(observer_event_tx),
+            context_cloned,
         );
         let _ = hiro_system_kit::nestable_block_on(future);
     });
@@ -735,7 +803,11 @@ pub fn start_node(mut config: Config) {
         let event = match observer_event_rx.recv() {
             Ok(cmd) => cmd,
             Err(e) => {
-                error!("Error: broken channel {}", e.to_string());
+                error!(
+                    ctx.expect_logger(),
+                    "Error: broken channel {}",
+                    e.to_string()
+                );
                 break;
             }
         };
@@ -744,7 +816,7 @@ pub fn start_node(mut config: Config) {
         let mut redis_con = match client.get_connection() {
             Ok(con) => con,
             Err(message) => {
-                error!("Redis: {}", message.to_string());
+                error!(ctx.expect_logger(), "Redis: {}", message.to_string());
                 panic!();
             }
         };
@@ -765,14 +837,17 @@ pub fn start_node(mut config: Config) {
                         let end_block = stacks_hook.end_block.unwrap_or(tip_height); // TODO(lgalabru): handle STX hooks and genesis block :s
 
                         info!(
+                            ctx.expect_logger(),
                             "Processing Stacks chainhook {}, will scan blocks [{}; {}]",
-                            stacks_hook.uuid, start_block, end_block
+                            stacks_hook.uuid,
+                            start_block,
+                            end_block
                         );
                         let mut total_hits = 0;
                         for cursor in start_block..=end_block {
                             debug!(
-                                "Evaluating predicate #{} on block #{}",
-                                stacks_hook.uuid, cursor
+                                ctx.expect_logger(),
+                                "Evaluating predicate #{} on block #{}", stacks_hook.uuid, cursor
                             );
                             let (
                                 block_identifier,
@@ -794,7 +869,7 @@ pub fn start_node(mut config: Config) {
                                     )
                                     .expect("unable to retrieve tip height");
                                 if payload.len() != 5 {
-                                    warn!("Chain still being processed, please retry in a few minutes");
+                                    warn!(ctx.expect_logger(), "Chain still being processed, please retry in a few minutes");
                                     continue;
                                 }
                                 (
@@ -812,10 +887,14 @@ pub fn start_node(mut config: Config) {
                                 if evaluate_stacks_transaction_predicate_on_transaction(
                                     &tx,
                                     &stacks_hook,
+                                    &ctx,
                                 ) {
                                     debug!(
+                                        ctx.expect_logger(),
                                         "Action #{} triggered by transaction {} (block #{})",
-                                        stacks_hook.uuid, tx.transaction_identifier.hash, cursor
+                                        stacks_hook.uuid,
+                                        tx.transaction_identifier.hash,
+                                        cursor
                                     );
                                     hits.push(tx);
                                     total_hits += 1;
@@ -837,22 +916,27 @@ pub fn start_node(mut config: Config) {
                                 };
 
                                 let proofs = HashMap::new();
-                                if let Some(result) = handle_stacks_hook_action(trigger, &proofs) {
+                                if let Some(result) =
+                                    handle_stacks_hook_action(trigger, &proofs, &ctx)
+                                {
                                     if let StacksChainhookOccurrence::Http(request) = result {
                                         hiro_system_kit::nestable_block_on(request.send()).unwrap();
                                     }
                                 }
                             }
                         }
-                        info!("Stacks chainhook {} scan completed: action triggered by {} transactions", stacks_hook.uuid, total_hits);
+                        info!(ctx.expect_logger(), "Stacks chainhook {} scan completed: action triggered by {} transactions", stacks_hook.uuid, total_hits);
                     }
                     ChainhookSpecification::Bitcoin(_bitcoin_hook) => {
-                        warn!("Bitcoin chainhook evaluation unavailable for historical data");
+                        warn!(
+                            ctx.expect_logger(),
+                            "Bitcoin chainhook evaluation unavailable for historical data"
+                        );
                     }
                 }
             }
             ObserverEvent::BitcoinChainEvent(_chain_update) => {
-                debug!("Bitcoin update not stored");
+                debug!(ctx.expect_logger(), "Bitcoin update not stored");
             }
             ObserverEvent::StacksChainEvent(chain_event) => {
                 match &chain_event {
@@ -860,12 +944,14 @@ pub fn start_node(mut config: Config) {
                         update_storage_with_confirmed_stacks_blocks(
                             &mut redis_con,
                             &data.confirmed_blocks,
+                            &ctx,
                         );
                     }
                     StacksChainEvent::ChainUpdatedWithReorg(data) => {
                         update_storage_with_confirmed_stacks_blocks(
                             &mut redis_con,
                             &data.confirmed_blocks,
+                            &ctx,
                         );
                     }
                     StacksChainEvent::ChainUpdatedWithMicroblocks(_)
@@ -883,6 +969,7 @@ pub fn start_node(mut config: Config) {
 fn update_storage_with_confirmed_stacks_blocks(
     redis_con: &mut Connection,
     blocks: &Vec<StacksBlockData>,
+    ctx: &Context,
 ) {
     let current_tip_height: u64 = redis_con.get(&format!("stx:tip")).unwrap_or(0);
 
@@ -906,6 +993,7 @@ fn update_storage_with_confirmed_stacks_blocks(
         );
         if let Err(error) = res {
             crit!(
+                ctx.expect_logger(),
                 "unable to archive block {}: {}",
                 block.block_identifier,
                 error.to_string()
@@ -918,8 +1006,8 @@ fn update_storage_with_confirmed_stacks_blocks(
 
     if let Some(block) = new_tip {
         info!(
-            "Archiving confirmed Stacks chain block {}",
-            block.block_identifier
+            ctx.expect_logger(),
+            "Archiving confirmed Stacks chain block {}", block.block_identifier
         );
         let _: Result<(), redis::RedisError> =
             redis_con.set(&format!("stx:tip"), block.block_identifier.index);

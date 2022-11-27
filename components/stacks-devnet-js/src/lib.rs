@@ -51,6 +51,7 @@ pub fn run_devnet(
         &mut None,
         log_tx,
         display_dashboard,
+        None,
     )) {
         Err(_e) => std::process::exit(1),
         Ok(res) => Ok(res),

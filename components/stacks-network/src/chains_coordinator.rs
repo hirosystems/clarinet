@@ -4,6 +4,7 @@ use crate::{ServiceStatusData, Status};
 use base58::FromBase58;
 use bitcoincore_rpc::{Auth, Client, RpcApi};
 use chainhook_event_observer::chainhooks::types::HookFormation;
+use chainhook_event_observer::utils::Context;
 use clarinet_deployments::onchain::{
     apply_on_chain_deployment, DeploymentCommand, DeploymentEvent,
 };
@@ -123,6 +124,7 @@ pub async fn start_chains_coordinator(
     chains_coordinator_terminator_tx: Sender<bool>,
     observer_command_tx: Sender<ObserverCommand>,
     observer_command_rx: Receiver<ObserverCommand>,
+    ctx: Context,
 ) -> Result<(), String> {
     let (deployment_events_tx, deployment_events_rx) = channel();
     let (deployment_commands_tx, deployments_command_rx) = channel();
@@ -157,6 +159,7 @@ pub async fn start_chains_coordinator(
             observer_command_tx_moved,
             observer_command_rx,
             Some(observer_event_tx_moved),
+            ctx,
         );
         let _ = hiro_system_kit::nestable_block_on(future);
     });

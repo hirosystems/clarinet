@@ -434,6 +434,7 @@ export interface StacksSTXTransferEventData {
   sender: string;
   recipient: string;
   amount: string;
+  memo?: string;
 }
 
 export interface StacksSTXMintEventData {
