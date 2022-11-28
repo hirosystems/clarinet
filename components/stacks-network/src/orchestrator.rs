@@ -57,13 +57,7 @@ impl DevnetOrchestrator {
         if let Some(ref mut devnet) = network_config.devnet {
             let working_dir = PathBuf::from(&devnet.working_dir);
             let devnet_path = if working_dir.is_absolute() {
-                working_dir.canonicalize().map_err(|e| {
-                    format!(
-                        "unable to canonicalize x working_dir {} ({})",
-                        working_dir.display(),
-                        e.to_string()
-                    )
-                })?
+                working_dir
             } else {
                 let mut cwd = std::env::current_dir()
                     .map_err(|e| format!("unable to retrieve current dir ({})", e.to_string()))?;
