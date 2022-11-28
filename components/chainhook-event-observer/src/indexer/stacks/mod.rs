@@ -31,7 +31,7 @@ pub struct NewBlock {
     pub parent_microblock_sequence: u64,
     pub parent_burn_block_hash: String,
     pub parent_burn_block_height: u64,
-    pub parent_burn_block_timestamp: u64,
+    pub parent_burn_block_timestamp: i64,
     pub transactions: Vec<NewTransaction>,
     pub events: Vec<NewEvent>,
     pub matured_miner_rewards: Vec<MaturedMinerReward>,
@@ -63,7 +63,7 @@ pub struct NewMicroblockTrail {
     pub parent_index_block_hash: String,
     pub burn_block_hash: String,
     pub burn_block_height: u64,
-    pub burn_block_timestamp: u64,
+    pub burn_block_timestamp: i64,
     pub transactions: Vec<NewMicroblockTransaction>,
     pub events: Vec<NewEvent>,
 }
@@ -329,7 +329,7 @@ pub fn standardize_stacks_block(
             hash: block.parent_index_block_hash.clone(),
             index: block.block_height - 1,
         },
-        timestamp: 0,
+        timestamp: block.parent_burn_block_timestamp,
         metadata: StacksBlockMetadata {
             bitcoin_anchor_block_identifier: BlockIdentifier {
                 hash: block.burn_block_hash.clone(),
@@ -452,7 +452,7 @@ pub fn standardize_stacks_microblock_trail(
         microblocks.push(StacksMicroblockData {
             block_identifier,
             parent_block_identifier,
-            timestamp: 0,
+            timestamp: microblock_trail.burn_block_timestamp,
             transactions,
             metadata: StacksMicroblockMetadata {
                 anchor_block_identifier: BlockIdentifier {
