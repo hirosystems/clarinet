@@ -222,7 +222,7 @@ pub enum TransactionCheck {
 pub enum DeploymentEvent {
     TransactionUpdate(TransactionTracker),
     Interrupted(String),
-    ProtocolDeployed,
+    DeploymentCompleted,
 }
 
 pub enum DeploymentCommand {
@@ -781,7 +781,7 @@ pub fn apply_on_chain_deployment(
         }
     }
 
-    let _ = deployment_event_tx.send(DeploymentEvent::ProtocolDeployed);
+    let _ = deployment_event_tx.send(DeploymentEvent::DeploymentCompleted);
 }
 
 pub fn get_initial_transactions_trackers(

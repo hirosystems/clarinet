@@ -164,8 +164,8 @@ pub fn start_ui(
                     orchestrator_terminated_rx);
                 break;
             },
-            DevnetEvent::ProtocolDeployed => {
-                app.display_log(DevnetEvent::log_success("Protocol successfully deployed".into()));
+            DevnetEvent::BootCompleted(_) => {
+                app.display_log(DevnetEvent::log_success("Local Devnet network ready".into()));
             }
             // DevnetEvent::Terminate => {
 

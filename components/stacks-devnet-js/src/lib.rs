@@ -14,7 +14,7 @@ use clarinet_files::{
     compute_addresses, AccountConfig, DevnetConfigFile, FileLocation, PoxStackingOrder,
     ProjectManifest, DEFAULT_DERIVATION_PATH,
 };
-// use ::deployments;
+use stacks_network::chains_coordinator::BitcoinMiningCommand;
 use stacks_network::{self, DevnetEvent, DevnetOrchestrator};
 
 use core::panic;
@@ -85,6 +85,7 @@ pub fn read_deployment_or_generate_default(
 
 struct StacksDevnet {
     tx: mpsc::Sender<DevnetCommand>,
+    mining_tx: mpsc::Sender<BitcoinMiningCommand>,
     bitcoin_block_rx: mpsc::Receiver<BitcoinChainUpdatedWithBlocksData>,
     stacks_block_rx: mpsc::Receiver<StacksChainUpdatedWithBlocksData>,
     node_url: String,
@@ -109,7 +110,11 @@ impl StacksDevnet {
         C: Context<'a>,
     {
         let (tx, rx) = mpsc::channel::<DevnetCommand>();
-        let (meta_tx, meta_rx) = mpsc::channel();
+        let (meta_devnet_command_tx, meta_devnet_command_rx) = mpsc::channel();
+
+        let (relaying_mining_tx, relaying_mining_rx) = mpsc::channel::<BitcoinMiningCommand>();
+        let (meta_mining_command_tx, meta_mining_command_rx) = mpsc::channel();
+        
         let (log_tx, _log_rx) = mpsc::channel();
         let (bitcoin_block_tx, bitcoin_block_rx) = mpsc::channel();
         let (stacks_block_tx, stacks_block_rx) = mpsc::channel();
@@ -142,7 +147,7 @@ impl StacksDevnet {
                         }
                         _ => std::process::exit(1),
                     };
-                meta_tx
+                meta_devnet_command_tx
                     .send(devnet_events_rx)
                     .expect("Unable to transmit event receiver");
 
@@ -169,7 +174,7 @@ impl StacksDevnet {
         });
 
         thread::spawn(move || {
-            if let Ok(ref devnet_rx) = meta_rx.recv() {
+            if let Ok(ref devnet_rx) = meta_devnet_command_rx.recv() {
                 while let Ok(event) = devnet_rx.recv() {
                     match event {
                         DevnetEvent::BitcoinChainEvent(
@@ -191,14 +196,45 @@ impl StacksDevnet {
                                 println!("{:?}", log);
                             }
                         }
+                        DevnetEvent::BootCompleted(mining_tx) => {
+                            // println!("Mining tx received from devnet event");
+                            let _ = meta_mining_command_tx.send(mining_tx);
+                        }
                         _ => {}
                     }
                 }
             }
         });
 
+        // thread::spawn(move || {
+        //     if let Ok(ref mining_tx) = meta_mining_command_rx.recv() {
+        //         println!("Mining tx injected in relayer thread");
+        //         while let Ok(command) = relaying_mining_rx.recv() {
+        //             println!("Relaying mining command {:?}", command);
+        //             let _ = mining_tx.send(command);
+        //         }
+        //     }
+        // });
+
+        thread::spawn(move || {
+            let mut relayer_tx = None;
+            while let Ok(command) = relaying_mining_rx.recv() {
+                if relayer_tx.is_none() {
+                    if let Ok(mining_tx) = meta_mining_command_rx.recv() {
+                        relayer_tx = Some(mining_tx);
+                        // println!("Mining tx injected in relayer thread");
+                    }
+                }
+                if let Some(ref tx) = relayer_tx {
+                    // println!("Relaying mining command {:?}", command);
+                    let _ = tx.send(command);
+                }
+            }
+        });
+
         Self {
             tx,
+            mining_tx: relaying_mining_tx,
             bitcoin_block_rx,
             stacks_block_rx,
             node_url,
@@ -553,6 +589,16 @@ impl StacksDevnet {
             overrides.disable_stacks_api = Some(true);
         }
 
+        // Disable bitcoin automining default:
+        if let Ok(res) = devnet_settings
+            .get(&mut cx, "bitcoin_controller_automining_disabled")?
+            .downcast::<JsBoolean, _>(&mut cx)
+        {
+            overrides.bitcoin_controller_automining_disabled = Some(res.value(&mut cx));
+        } else {
+            overrides.bitcoin_controller_automining_disabled = Some(true);
+        }
+
         // Retrieve stacks_node_events_observers
         if let Ok(res) = devnet_settings
             .get(&mut cx, "stacks_node_events_observers")?
@@ -655,10 +701,14 @@ impl StacksDevnet {
             .this()
             .downcast_or_throw::<JsBox<StacksDevnet>, _>(&mut cx)?;
 
+        // println!("Trigger BitcoinMiningCommand::Mine command from js_on_stacks_block");
+        // let _ = devnet.mining_tx.send(BitcoinMiningCommand::Mine);
+
         let blocks = match devnet.stacks_block_rx.recv() {
             Ok(obj) => obj,
             Err(_) => return Ok(cx.undefined().as_value(&mut cx)),
         };
+        // println!("StacksChainUpdate received");
 
         let js_blocks = serde::to_value(&mut cx, &blocks).expect("Unable to serialize block");
 
@@ -670,10 +720,14 @@ impl StacksDevnet {
             .this()
             .downcast_or_throw::<JsBox<StacksDevnet>, _>(&mut cx)?;
 
+        // println!("Trigger BitcoinMiningCommand::Mine command from js_on_bitcoin_block");
+        // let _ = devnet.mining_tx.send(BitcoinMiningCommand::Mine);
+
         let block = match devnet.bitcoin_block_rx.recv() {
             Ok(obj) => obj,
             Err(err) => panic!("{:?}", err),
         };
+        // println!("BitcoinChainUpdate received");
 
         let js_block = serde::to_value(&mut cx, &block).expect("Unable to serialize block");
 
