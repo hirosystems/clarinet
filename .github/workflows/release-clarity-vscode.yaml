@@ -3,12 +3,17 @@ on:
   pull_request:
   push:
     tags:
-      - 'v*'
-    paths:
-      - components/clarity-vscode
+     - 'v*'
+    paths-ignore:
+     - '**/CHANGELOG.md'
+     - '**/package.json'
+     - '**/package-lock.json'
     branches:
-      - main
-      - develop
+     - main
+     - develop
+    paths:
+     - components/clarity-vscode
+
   workflow_dispatch:
 
 jobs:
