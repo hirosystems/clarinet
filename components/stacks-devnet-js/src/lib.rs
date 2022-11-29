@@ -290,10 +290,24 @@ impl StacksDevnet {
         let mut overrides = DevnetConfigFile::default();
 
         if let Ok(res) = devnet_settings
+            .get(&mut cx, "network_id")?
+            .downcast::<JsNumber, _>(&mut cx)
+        {
+            overrides.network_id = Some(res.value(&mut cx) as u16);
+        }
+
+        if let Ok(res) = devnet_settings
             .get(&mut cx, "orchestrator_port")?
             .downcast::<JsNumber, _>(&mut cx)
         {
             overrides.orchestrator_port = Some(res.value(&mut cx) as u16);
+        }
+
+        if let Ok(res) = devnet_settings
+            .get(&mut cx, "orchestrator_control_port")?
+            .downcast::<JsNumber, _>(&mut cx)
+        {
+            overrides.orchestrator_control_port = Some(res.value(&mut cx) as u16);
         }
 
         if let Ok(res) = devnet_settings
@@ -636,7 +650,7 @@ impl StacksDevnet {
 
         let blocks = match devnet.stacks_block_rx.recv() {
             Ok(obj) => obj,
-            Err(err) => panic!("{:?}", err),
+            Err(_) => return Ok(cx.undefined().as_value(&mut cx)),
         };
 
         let js_blocks = serde::to_value(&mut cx, &blocks).expect("Unable to serialize block");

@@ -87,11 +87,23 @@ export interface PoxStackingOrder {
  */
 export interface DevnetConfig {
   /**
+   * Optional network id
+   * @type {number}
+   * @memberof DevnetConfig
+   */
+  network_id?: number;
+  /**
    * The port that should be used by the orchestrator
    * @type {number}
    * @memberof DevnetConfig
    */
   orchestrator_port?: number;
+  /**
+   * The port that should be used by the orchestrator's control plan
+   * @type {number}
+   * @memberof DevnetConfig
+   */
+  orchestrator_control_port?: number;
   /**
    * The port that should be used by bitcoind's data plane
    * @type {number}

@@ -205,6 +205,7 @@ pub async fn generate_default_deployment(
             &manifest.location,
             &network.get_networks(),
             Some(&manifest.project.cache_location),
+            None,
         )?,
         Some(file_accessor) => {
             NetworkManifest::from_project_manifest_location_using_file_accessor(

@@ -81,6 +81,7 @@ impl DevnetEventObserverConfig {
             &manifest.location,
             &StacksNetwork::Devnet.get_networks(),
             Some(&manifest.project.cache_location),
+            None,
         )
         .expect("unable to load network manifest");
 
