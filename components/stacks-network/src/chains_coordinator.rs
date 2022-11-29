@@ -175,7 +175,6 @@ pub async fn start_chains_coordinator(
     let mut should_deploy_protocol = protocol_deployment_enabled;
     let boot_completed = Arc::new(AtomicBool::new(false));
 
-    
     let mut deployment_events_rx = Some(deployment_events_rx);
     let mut subnet_initialized = false;
 
@@ -282,10 +281,10 @@ pub async fn start_chains_coordinator(
                     );
                 } else if !protocol_deployment_enabled && !boot_completed.load(Ordering::SeqCst) {
                     boot_completed.store(true, Ordering::SeqCst);
-                    let _ = devnet_event_tx.send(DevnetEvent::BootCompleted(mining_command_tx.clone()));
+                    let _ =
+                        devnet_event_tx.send(DevnetEvent::BootCompleted(mining_command_tx.clone()));
                     if !config.devnet_config.bitcoin_controller_automining_disabled {
-                        let _ = mining_command_tx
-                            .send(BitcoinMiningCommand::Start);
+                        let _ = mining_command_tx.send(BitcoinMiningCommand::Start);
                     }
                 }
 

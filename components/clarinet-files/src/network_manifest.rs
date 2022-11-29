@@ -839,7 +839,9 @@ impl NetworkManifest {
                 epoch_2_0: devnet_config.epoch_2_0.unwrap_or(DEFAULT_EPOCH_2_0),
                 epoch_2_05: devnet_config.epoch_2_05.unwrap_or(DEFAULT_EPOCH_2_05),
                 epoch_2_1: devnet_config.epoch_2_1.unwrap_or(DEFAULT_EPOCH_2_1),
-                pox_2_activation: devnet_config.pox_2_activation.unwrap_or(DEFAULT_POX2_ACTIVATION),
+                pox_2_activation: devnet_config
+                    .pox_2_activation
+                    .unwrap_or(DEFAULT_POX2_ACTIVATION),
                 stacks_node_env_vars: devnet_config.stacks_node_env_vars.take().unwrap_or(vec![]),
                 stacks_api_env_vars: devnet_config.stacks_api_env_vars.take().unwrap_or(vec![]),
                 stacks_explorer_env_vars: devnet_config

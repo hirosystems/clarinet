@@ -114,7 +114,7 @@ impl StacksDevnet {
 
         let (relaying_mining_tx, relaying_mining_rx) = mpsc::channel::<BitcoinMiningCommand>();
         let (meta_mining_command_tx, meta_mining_command_rx) = mpsc::channel();
-        
+
         let (log_tx, _log_rx) = mpsc::channel();
         let (bitcoin_block_tx, bitcoin_block_rx) = mpsc::channel();
         let (stacks_block_tx, stacks_block_rx) = mpsc::channel();
