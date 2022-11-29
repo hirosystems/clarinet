@@ -4,10 +4,8 @@ on:
   push:
     tags:
       - 'v*'
-    paths-ignore:
-      - '**/CHANGELOG.md'
-      - '**/package.json'
-      - '**/package-lock.json'
+    paths:
+      - components/clarity-vscode
     branches:
       - main
       - develop
