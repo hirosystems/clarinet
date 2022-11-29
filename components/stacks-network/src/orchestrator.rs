@@ -821,14 +821,14 @@ p2p_bind = "0.0.0.0:{stacks_node_p2p_port}"
 miner = true
 seed = "{miner_secret_key_hex}"
 local_peer_seed = "{miner_secret_key_hex}"
-wait_time_for_microblocks = 5000
+wait_time_for_microblocks = 1000
 wait_time_for_blocks = 0
 pox_sync_sample_secs = 10
-microblock_frequency = 15000
+microblock_frequency = 8000
 
 [miner]
-first_attempt_time_ms = 10000
-subsequent_attempt_time_ms = 10000
+first_attempt_time_ms = 5000
+subsequent_attempt_time_ms = 2000
 # microblock_attempt_time_ms = 15000
 "#,
             stacks_node_rpc_port = devnet_config.stacks_node_rpc_port,
