@@ -16,7 +16,7 @@ use toml::value::Value;
 pub const DEFAULT_DERIVATION_PATH: &str = "m/44'/5757'/0'/0/0";
 pub const DEFAULT_BITCOIN_NODE_IMAGE: &str = "quay.io/hirosystems/bitcoind:devnet-v2";
 pub const DEFAULT_STACKS_NODE_IMAGE: &str = "quay.io/hirosystems/stacks-node:devnet-v2";
-pub const DEFAULT_STACKS_NODE_NEXT_IMAGE: &str = "quay.io/hirosystems/stacks-node:devnet-v4";
+pub const DEFAULT_STACKS_NODE_NEXT_IMAGE: &str = "quay.io/hirosystems/stacks-node:devnet-v3-beta1";
 pub const DEFAULT_BITCOIN_EXPLORER_IMAGE: &str = "quay.io/hirosystems/bitcoin-explorer:devnet";
 pub const DEFAULT_STACKS_API_IMAGE: &str = "hirosystems/stacks-blockchain-api:latest";
 pub const DEFAULT_STACKS_API_NEXT_IMAGE: &str = "hirosystems/stacks-blockchain-api:stacks-2.1";
@@ -36,8 +36,9 @@ pub const DEFAULT_DOCKER_SOCKET: &str = "npipe:////./pipe/docker_engine";
 pub const DEFAULT_DOCKER_SOCKET: &str = "/var/run/docker.sock";
 
 pub const DEFAULT_EPOCH_2_0: u64 = 100;
-pub const DEFAULT_EPOCH_2_05: u64 = 107;
-pub const DEFAULT_EPOCH_2_1: u64 = 114;
+pub const DEFAULT_EPOCH_2_05: u64 = 102;
+pub const DEFAULT_EPOCH_2_1: u64 = 106;
+pub const DEFAULT_POX2_ACTIVATION: u64 = 108;
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct NetworkManifestFile {
@@ -118,6 +119,7 @@ pub struct DevnetConfigFile {
     pub epoch_2_0: Option<u64>,
     pub epoch_2_05: Option<u64>,
     pub epoch_2_1: Option<u64>,
+    pub pox_2_activation: Option<u64>,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -232,6 +234,7 @@ pub struct DevnetConfig {
     pub epoch_2_0: u64,
     pub epoch_2_05: u64,
     pub epoch_2_1: u64,
+    pub pox_2_activation: u64,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -594,6 +597,10 @@ impl NetworkManifest {
                     devnet_config.epoch_2_1 = Some(val.clone());
                 }
 
+                if let Some(ref val) = devnet_override.pox_2_activation {
+                    devnet_config.pox_2_activation = Some(val.clone());
+                }
+
                 if let Some(val) = devnet_override.network_id {
                     devnet_config.network_id = Some(val);
                 }
@@ -832,6 +839,7 @@ impl NetworkManifest {
                 epoch_2_0: devnet_config.epoch_2_0.unwrap_or(DEFAULT_EPOCH_2_0),
                 epoch_2_05: devnet_config.epoch_2_05.unwrap_or(DEFAULT_EPOCH_2_05),
                 epoch_2_1: devnet_config.epoch_2_1.unwrap_or(DEFAULT_EPOCH_2_1),
+                pox_2_activation: devnet_config.pox_2_activation.unwrap_or(DEFAULT_POX2_ACTIVATION),
                 stacks_node_env_vars: devnet_config.stacks_node_env_vars.take().unwrap_or(vec![]),
                 stacks_api_env_vars: devnet_config.stacks_api_env_vars.take().unwrap_or(vec![]),
                 stacks_explorer_env_vars: devnet_config

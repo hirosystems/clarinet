@@ -908,7 +908,7 @@ peer_port = {bitcoin_node_p2p_port}
 
         if devnet_config.enable_next_features {
             stacks_conf.push_str(&format!(
-                r#"pox_2_activation = {epoch_2_1}
+                r#"pox_2_activation = {pox_2_activation}
 
 [[burnchain.epochs]]
 epoch_name = "1.0"
@@ -929,6 +929,7 @@ start_height = {epoch_2_1}
                 epoch_2_0 = devnet_config.epoch_2_0,
                 epoch_2_05 = devnet_config.epoch_2_05,
                 epoch_2_1 = devnet_config.epoch_2_1,
+                pox_2_activation = devnet_config.pox_2_activation,
             ));
         }
 

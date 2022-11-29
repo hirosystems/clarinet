@@ -294,6 +294,7 @@ export interface DevnetConfig {
   epoch_2_0?: number;
   epoch_2_05?: number;
   epoch_2_1?: number;
+  pox_2_activation?: number;
 }
 
 /**
