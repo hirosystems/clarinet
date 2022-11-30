@@ -27,7 +27,7 @@
     "version": "npm run build-release"
   },
   "dependencies": {
-    "@hirosystems/chainhook-types": "^1.1.1-rc.1",
+    "@hirosystems/chainhook-types": "^1.1.1-rc.2",
     "@mapbox/node-pre-gyp": "^1.0.8",
     "neon-cli": "^0.9.1",
     "node-pre-gyp-github": "^1.4.3",

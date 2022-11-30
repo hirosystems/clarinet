@@ -258,7 +258,7 @@ pub fn standardize_stacks_block(
     let mut transactions = vec![];
     for tx in block.transactions.iter() {
         let tx_events = events.remove(&tx.txid).unwrap_or(vec![]);
-        let (description, tx_type, fee, sender, sponsor) =
+        let (description, tx_type, fee, nonce, sender, sponsor) =
             match get_tx_description(&tx.raw_tx, &tx_events) {
                 Ok(desc) => desc,
                 Err(e) => {
@@ -287,6 +287,7 @@ pub fn standardize_stacks_block(
                 result: get_value_description(&tx.raw_result),
                 raw_tx: tx.raw_tx.clone(),
                 sender,
+                nonce,
                 fee,
                 sponsor,
                 kind: tx_type,
@@ -378,7 +379,7 @@ pub fn standardize_stacks_microblock_trail(
     > = BTreeMap::new();
     for tx in microblock_trail.transactions.iter() {
         let tx_events = events.remove(&tx.txid).unwrap_or(vec![]);
-        let (description, tx_type, fee, sender, sponsor) =
+        let (description, tx_type, fee, nonce, sender, sponsor) =
             get_tx_description(&tx.raw_tx, &tx_events).expect("unable to parse transaction");
 
         let events = tx_events
@@ -418,6 +419,7 @@ pub fn standardize_stacks_microblock_trail(
                 raw_tx: tx.raw_tx.clone(),
                 sender,
                 fee,
+                nonce,
                 sponsor,
                 kind: tx_type,
                 execution_cost: tx.execution_cost.clone(),
@@ -482,11 +484,12 @@ pub fn get_tx_description(
     tx_events: &Vec<&NewEvent>,
 ) -> Result<
     (
-        String, // Human readable transaction's description (contract-call, publish, ...)
-        StacksTransactionKind, //
-        u64,    // Transaction fee
-        String, // Sender's address
-        Option<String>, // Sponsor's address (optional)
+        String,                 // Human readable transaction's description (contract-call, publish, ...)
+        StacksTransactionKind,  // Transaction kind
+        u64,                    // Transaction fee
+        u64,                    // Transaction nonce
+        String,                 // Sender's address
+        Option<String>,         // Sponsor's address (optional)
     ),
     String,
 > {
@@ -517,7 +520,7 @@ pub fn get_tx_description(
                 data.amount, data.sender, data.recipient
             );
             let tx_type = StacksTransactionKind::NativeTokenTransfer;
-            return Ok((description, tx_type, 0, data.sender, None));
+            return Ok((description, tx_type, 0, 0, data.sender, None));
         } else if let Some(ref event_data) = event.stx_lock_event {
             let data: STXLockEventData = serde_json::from_value(event_data.clone())
                 .map_err(|e| format!("unable to decode event_data {}", e.to_string()))?;
@@ -526,7 +529,7 @@ pub fn get_tx_description(
                 data.locked_amount, data.locked_address,
             );
             let tx_type = StacksTransactionKind::Other;
-            return Ok((description, tx_type, 0, data.locked_address, None));
+            return Ok((description, tx_type, 0, 0, data.locked_address, None));
         }
         return Err(format!("unable to parse transaction {raw_tx}"));
     }
@@ -534,9 +537,10 @@ pub fn get_tx_description(
     let tx = StacksTransaction::consensus_deserialize(&mut Cursor::new(&tx_bytes))
         .map_err(|e| format!("unable to consensus decode transaction {}", e.to_string()))?;
 
-    let (fee, sender, sponsor) = match tx.auth {
+    let (fee, nonce, sender, sponsor) = match tx.auth {
         TransactionAuth::Standard(ref conditions) => (
             conditions.tx_fee(),
+            conditions.nonce(),
             if tx.is_mainnet() {
                 conditions.address_mainnet().to_string()
             } else {
@@ -546,6 +550,7 @@ pub fn get_tx_description(
         ),
         TransactionAuth::Sponsored(ref sender_conditions, ref sponsor_conditions) => (
             sponsor_conditions.tx_fee(),
+            sender_conditions.nonce(),
             if tx.is_mainnet() {
                 sender_conditions.address_mainnet().to_string()
             } else {
@@ -609,7 +614,7 @@ pub fn get_tx_description(
         }
         _ => (format!("other"), StacksTransactionKind::Other),
     };
-    Ok((description, tx_type, fee, sender, sponsor))
+    Ok((description, tx_type, fee, nonce, sender, sponsor))
 }
 
 pub fn get_standardized_fungible_currency_from_asset_class_id(

@@ -299,6 +299,11 @@ export interface StacksTransactionMetadata {
    */
   fee: number;
   /**
+   * @type {number}
+   * @memberof StacksTransactionMetadata
+   */
+  nonce: number;
+  /**
    * @type {StacksTransactionKind}
    * @memberof StacksTransactionMetadata
    */

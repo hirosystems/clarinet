@@ -170,6 +170,7 @@ pub struct StacksTransactionMetadata {
     pub raw_tx: String,
     pub result: String,
     pub sender: String,
+    pub nonce: u64,
     pub fee: u64,
     pub kind: StacksTransactionKind,
     pub receipt: StacksTransactionReceipt,
