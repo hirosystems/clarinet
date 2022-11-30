@@ -880,6 +880,7 @@ fn wrap_result_in_simulated_transaction(
             result,
             sender: sender.to_string(),
             fee: 0,
+            nonce: 0,
             kind,
             receipt,
             description: String::new(),

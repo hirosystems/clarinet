@@ -1,11 +1,13 @@
 use crate::analysis::annotation::Annotation;
 use crate::analysis::ast_visitor::{traverse, ASTVisitor};
 use crate::analysis::{AnalysisPass, AnalysisResult, Settings};
+use crate::repl::DEFAULT_CLARITY_VERSION;
 use clarity::vm::analysis::analysis_db::AnalysisDatabase;
 pub use clarity::vm::analysis::types::ContractAnalysis;
 use clarity::vm::analysis::{CheckErrors, CheckResult};
 use clarity::vm::ast::ContractAST;
 use clarity::vm::representations::{SymbolicExpression, TraitDefinition};
+use clarity::vm::types::signatures::CallableSubtype;
 use clarity::vm::types::{
     FixedFunction, FunctionSignature, FunctionType, PrincipalData, QualifiedContractIdentifier,
     TraitIdentifier, TypeSignature, Value,
@@ -357,7 +359,7 @@ impl<'a> ASTDependencyDetector<'a> {
     ) -> Vec<QualifiedContractIdentifier> {
         let mut dependencies = Vec::new();
         for (i, arg) in arg_types.iter().enumerate() {
-            if matches!(arg, TypeSignature::TraitReferenceType(_)) {
+            if matches!(arg, TypeSignature::CallableType(CallableSubtype::Trait(_))) {
                 if args.len() > i {
                     if let Some(Value::Principal(PrincipalData::Contract(contract))) =
                         args[i].match_literal_value()
@@ -534,7 +536,9 @@ impl<'a> ASTVisitor<'a> for ASTDependencyDetector<'a> {
         name: &'a ClarityName,
         functions: &'a [SymbolicExpression],
     ) -> bool {
-        if let Ok(trait_definition) = TypeSignature::parse_trait_type_repr(functions, &mut ()) {
+        if let Ok(trait_definition) =
+            TypeSignature::parse_trait_type_repr(functions, &mut (), DEFAULT_CLARITY_VERSION)
+        {
             self.add_defined_trait(self.current_contract.unwrap(), name, trait_definition);
         }
         true
@@ -612,7 +616,7 @@ impl<'a> ASTVisitor<'a> for ASTDependencyDetector<'a> {
             .get(&(&self.current_contract.unwrap(), name))
         {
             for (i, arg) in arg_types.iter().enumerate() {
-                if matches!(arg, TypeSignature::TraitReferenceType(_)) {
+                if matches!(arg, TypeSignature::CallableType(CallableSubtype::Trait(_))) {
                     if args.len() > i {
                         if let Some(Value::Principal(PrincipalData::Contract(contract))) =
                             args[i].match_literal_value()
@@ -715,7 +719,9 @@ impl<'a, 'b> ASTVisitor<'a> for PreloadedVisitor<'a, 'b> {
         name: &'a ClarityName,
         functions: &'a [SymbolicExpression],
     ) -> bool {
-        if let Ok(trait_definition) = TypeSignature::parse_trait_type_repr(functions, &mut ()) {
+        if let Ok(trait_definition) =
+            TypeSignature::parse_trait_type_repr(functions, &mut (), DEFAULT_CLARITY_VERSION)
+        {
             self.detector
                 .add_defined_trait(self.current_contract.unwrap(), name, trait_definition);
         }

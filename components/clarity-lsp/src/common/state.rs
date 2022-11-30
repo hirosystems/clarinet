@@ -9,7 +9,7 @@ use clarinet_files::ProjectManifest;
 use clarinet_files::{FileAccessor, FileLocation};
 use clarity_repl::analysis::ast_dependency_detector::DependencySet;
 use clarity_repl::clarity::analysis::ContractAnalysis;
-use clarity_repl::clarity::ast::build_ast;
+use clarity_repl::clarity::ast::{build_ast_with_rules, ASTRules};
 use clarity_repl::clarity::diagnostic::{Diagnostic as ClarityDiagnostic, Level as ClarityLevel};
 use clarity_repl::clarity::stacks_common::types::StacksEpochId;
 use clarity_repl::clarity::vm::ast::ContractAST;
@@ -36,12 +36,13 @@ pub struct ActiveContractData {
 
 impl ActiveContractData {
     pub fn new(clarity_version: ClarityVersion, epoch: StacksEpochId, source: &str) -> Self {
-        match build_ast(
+        match build_ast_with_rules(
             &QualifiedContractIdentifier::transient(),
             source,
             &mut (),
             clarity_version,
             epoch,
+            ASTRules::PrecheckSize,
         ) {
             Ok(ast) => ActiveContractData {
                 clarity_version,
@@ -62,12 +63,13 @@ impl ActiveContractData {
 
     pub fn update(&mut self, source: &str) {
         self.source = source.to_string();
-        match build_ast(
+        match build_ast_with_rules(
             &QualifiedContractIdentifier::transient(),
             source,
             &mut (),
             self.clarity_version,
             self.epoch,
+            ASTRules::PrecheckSize,
         ) {
             Ok(ast) => {
                 self.expressions = Some(ast.expressions);

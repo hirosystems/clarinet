@@ -25,7 +25,7 @@ export interface Account {
    * @type {string}
    * @memberof Account
    */
-  id: string;
+  label: string;
   /**
    * The mnemonic to use for generating the keypair
    * @type {string}
@@ -38,6 +38,18 @@ export interface Account {
    * @memberof Account
    */
   balance: number;
+  /**
+   * The derivation path to use
+   * @type {number}
+   * @memberof Account
+   */
+  derivation?: string;
+  /**
+   * Should a mainnet/testnet address be constructed
+   * @type {number}
+   * @memberof Account
+   */
+  is_mainnet?: boolean;
 }
 
 /**
@@ -85,11 +97,23 @@ export interface PoxStackingOrder {
  */
 export interface DevnetConfig {
   /**
+   * Optional network id
+   * @type {number}
+   * @memberof DevnetConfig
+   */
+  network_id?: number;
+  /**
    * The port that should be used by the orchestrator
    * @type {number}
    * @memberof DevnetConfig
    */
   orchestrator_port?: number;
+  /**
+   * The port that should be used by the orchestrator's control plan
+   * @type {number}
+   * @memberof DevnetConfig
+   */
+  orchestrator_control_port?: number;
   /**
    * The port that should be used by bitcoind's data plane
    * @type {number}
@@ -276,6 +300,36 @@ export interface DevnetConfig {
    * @memberof DevnetConfig
    */
   disable_stacks_api?: boolean;
+  /**
+   * Enable support for Stacks 2.1 (false by default)
+   * @type {boolean}
+   * @memberof DevnetConfig
+   */
+  enable_next_features?: boolean;
+  /**
+   * Bitcoin block height starting the epoch 2.0
+   * @type {number}
+   * @memberof DevnetConfig
+   */
+  epoch_2_0?: number;
+  /**
+   * Bitcoin block height starting the epoch 2.05
+   * @type {number}
+   * @memberof DevnetConfig
+   */
+  epoch_2_05?: number;
+  /**
+   * Bitcoin block height starting the epoch 2.1
+   * @type {number}
+   * @memberof DevnetConfig
+   */
+  epoch_2_1?: number;
+  /**
+   * Bitcoin block height activating switch to POX 2.0
+   * @type {number}
+   * @memberof DevnetConfig
+   */
+  pox_2_activation?: number;
 }
 
 /**

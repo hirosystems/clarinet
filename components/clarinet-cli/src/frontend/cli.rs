@@ -831,7 +831,7 @@ pub fn main() {
                             DeploymentEvent::TransactionUpdate(update) => {
                                 println!("{} {:?} {}", blue!("➡"), update.status, update.name);
                             }
-                            DeploymentEvent::ProtocolDeployed => {
+                            DeploymentEvent::DeploymentCompleted => {
                                 println!(
                                     "{} Transactions successfully confirmed on {:?}",
                                     green!("✔"),
