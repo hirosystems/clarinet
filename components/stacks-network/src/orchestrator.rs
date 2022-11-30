@@ -49,183 +49,37 @@ impl DevnetOrchestrator {
             &manifest.location,
             &StacksNetwork::Devnet.get_networks(),
             Some(&manifest.project.cache_location),
+            devnet_override,
         )?;
 
-        let name = manifest.project.name.clone();
-        let network_name = format!("{}.devnet", name);
+        if let Some(ref mut devnet) = network_config.devnet {
+            let working_dir = PathBuf::from(&devnet.working_dir);
+            let devnet_path = if working_dir.is_absolute() {
+                working_dir
+            } else {
+                let mut cwd = std::env::current_dir()
+                    .map_err(|e| format!("unable to retrieve current dir ({})", e.to_string()))?;
+                cwd.push(&working_dir);
+                let _ = fs::create_dir(&cwd);
+                cwd.canonicalize().map_err(|e| {
+                    format!(
+                        "unable to canonicalize working_dir {} ({})",
+                        working_dir.display(),
+                        e.to_string()
+                    )
+                })?
+            };
+            devnet.working_dir = format!("{}", devnet_path.display());
+        }
 
-        match (&mut network_config.devnet, devnet_override) {
-            (Some(ref mut devnet_config), Some(ref devnet_override)) => {
-                if let Some(val) = devnet_override.orchestrator_port {
-                    devnet_config.orchestrator_ingestion_port = val;
-                }
-
-                if let Some(val) = devnet_override.bitcoin_node_p2p_port {
-                    devnet_config.bitcoin_node_p2p_port = val;
-                }
-
-                if let Some(val) = devnet_override.bitcoin_node_rpc_port {
-                    devnet_config.bitcoin_node_rpc_port = val;
-                }
-
-                if let Some(val) = devnet_override.stacks_node_p2p_port {
-                    devnet_config.stacks_node_p2p_port = val;
-                }
-
-                if let Some(val) = devnet_override.stacks_node_rpc_port {
-                    devnet_config.stacks_node_rpc_port = val;
-                }
-
-                if let Some(ref val) = devnet_override.stacks_node_events_observers {
-                    devnet_config.stacks_node_events_observers = val.clone();
-                }
-
-                if let Some(val) = devnet_override.stacks_api_port {
-                    devnet_config.stacks_api_port = val;
-                }
-
-                if let Some(val) = devnet_override.stacks_api_events_port {
-                    devnet_config.stacks_api_events_port = val;
-                }
-
-                if let Some(val) = devnet_override.bitcoin_explorer_port {
-                    devnet_config.bitcoin_explorer_port = val;
-                }
-
-                if let Some(val) = devnet_override.stacks_explorer_port {
-                    devnet_config.stacks_explorer_port = val;
-                }
-
-                if let Some(ref val) = devnet_override.bitcoin_node_username {
-                    devnet_config.bitcoin_node_username = val.clone();
-                }
-
-                if let Some(ref val) = devnet_override.bitcoin_node_password {
-                    devnet_config.bitcoin_node_password = val.clone();
-                }
-
-                if let Some(ref val) = devnet_override.miner_mnemonic {
-                    devnet_config.miner_mnemonic = val.clone();
-                }
-
-                if let Some(ref val) = devnet_override.miner_derivation_path {
-                    devnet_config.miner_derivation_path = val.clone();
-                }
-
-                if let Some(val) = devnet_override.bitcoin_controller_block_time {
-                    devnet_config.bitcoin_controller_block_time = val;
-                }
-
-                if let Some(ref val) = devnet_override.working_dir {
-                    devnet_config.working_dir = val.clone();
-                }
-
-                if let Some(val) = devnet_override.postgres_port {
-                    devnet_config.postgres_port = val;
-                }
-
-                if let Some(ref val) = devnet_override.postgres_username {
-                    devnet_config.postgres_username = val.clone();
-                }
-
-                if let Some(ref val) = devnet_override.postgres_password {
-                    devnet_config.postgres_password = val.clone();
-                }
-
-                if let Some(ref val) = devnet_override.stacks_api_postgres_database {
-                    devnet_config.stacks_api_postgres_database = val.clone();
-                }
-
-                if let Some(ref val) = devnet_override.subnet_api_postgres_database {
-                    devnet_config.subnet_api_postgres_database = val.clone();
-                }
-
-                if let Some(ref val) = devnet_override.pox_stacking_orders {
-                    devnet_config.pox_stacking_orders = val.clone();
-                }
-
-                if let Some(ref val) = devnet_override.execute_script {
-                    devnet_config.execute_script = val.clone();
-                }
-
-                if let Some(ref val) = devnet_override.bitcoin_node_image_url {
-                    devnet_config.bitcoin_node_image_url = val.clone();
-                }
-
-                if let Some(ref val) = devnet_override.bitcoin_explorer_image_url {
-                    devnet_config.bitcoin_explorer_image_url = val.clone();
-                }
-
-                if let Some(ref val) = devnet_override.stacks_node_image_url {
-                    devnet_config.stacks_node_image_url = val.clone();
-                }
-
-                if let Some(ref val) = devnet_override.stacks_api_image_url {
-                    devnet_config.stacks_api_image_url = val.clone();
-                }
-
-                if let Some(ref val) = devnet_override.stacks_explorer_image_url {
-                    devnet_config.stacks_explorer_image_url = val.clone();
-                }
-
-                if let Some(ref val) = devnet_override.postgres_image_url {
-                    devnet_config.postgres_image_url = val.clone();
-                }
-
-                if let Some(val) = devnet_override.disable_bitcoin_explorer {
-                    devnet_config.disable_bitcoin_explorer = val;
-                }
-
-                if let Some(val) = devnet_override.disable_stacks_explorer {
-                    devnet_config.disable_stacks_explorer = val;
-                }
-
-                if let Some(val) = devnet_override.disable_stacks_api {
-                    devnet_config.disable_stacks_api = val;
-                }
-
-                if let Some(val) = devnet_override.bitcoin_controller_automining_disabled {
-                    devnet_config.bitcoin_controller_automining_disabled = val;
-                }
-
-                if let Some(val) = devnet_override.enable_subnet_node {
-                    devnet_config.enable_subnet_node = val;
-                }
-
-                if let Some(val) = devnet_override.subnet_node_p2p_port {
-                    devnet_config.subnet_node_p2p_port = val;
-                }
-
-                if let Some(val) = devnet_override.subnet_node_rpc_port {
-                    devnet_config.subnet_node_rpc_port = val;
-                }
-
-                if let Some(val) = devnet_override.subnet_events_ingestion_port {
-                    devnet_config.subnet_events_ingestion_port = val;
-                }
-
-                if let Some(ref val) = devnet_override.subnet_node_events_observers {
-                    devnet_config.subnet_node_events_observers = val.clone();
-                }
-
-                if let Some(ref val) = devnet_override.subnet_node_image_url {
-                    devnet_config.subnet_node_image_url = val.clone();
-                }
-
-                if let Some(ref val) = devnet_override.subnet_leader_derivation_path {
-                    devnet_config.subnet_leader_derivation_path = val.clone();
-                }
-
-                if let Some(ref val) = devnet_override.subnet_leader_mnemonic {
-                    devnet_config.subnet_leader_mnemonic = val.clone();
-                }
-
-                if let Some(ref val) = devnet_override.subnet_leader_mnemonic {
-                    devnet_config.subnet_leader_mnemonic = val.clone();
-                }
-            }
-            _ => {}
-        };
+        let name = manifest.project.name.to_string();
+        let network_name = network_config
+            .devnet
+            .as_ref()
+            .and_then(|c| c.network_id)
+            .and_then(|network_id| Some(format!("{}-{}.devnet", name, network_id)))
+            .or_else(|| Some(format!("{}.devnet", name)))
+            .unwrap();
 
         let docker_client = match network_config.devnet {
             Some(ref _devnet) => {
@@ -317,7 +171,6 @@ impl DevnetOrchestrator {
             "Initiating Devnet boot sequence (working_dir: {})",
             devnet_config.working_dir
         )));
-
         let mut devnet_path = PathBuf::from(&devnet_config.working_dir);
         devnet_path.push("data");
 
@@ -968,14 +821,14 @@ p2p_bind = "0.0.0.0:{stacks_node_p2p_port}"
 miner = true
 seed = "{miner_secret_key_hex}"
 local_peer_seed = "{miner_secret_key_hex}"
-wait_time_for_microblocks = 5000
+wait_time_for_microblocks = 1000
 wait_time_for_blocks = 0
 pox_sync_sample_secs = 10
-microblock_frequency = 15000
+microblock_frequency = 8000
 
 [miner]
-first_attempt_time_ms = 10000
-subsequent_attempt_time_ms = 10000
+first_attempt_time_ms = 5000
+subsequent_attempt_time_ms = 2000
 # microblock_attempt_time_ms = 15000
 "#,
             stacks_node_rpc_port = devnet_config.stacks_node_rpc_port,
@@ -1055,7 +908,7 @@ peer_port = {bitcoin_node_p2p_port}
 
         if devnet_config.enable_next_features {
             stacks_conf.push_str(&format!(
-                r#"pox_2_activation = {epoch_2_1}
+                r#"pox_2_activation = {pox_2_activation}
 
 [[burnchain.epochs]]
 epoch_name = "1.0"
@@ -1076,6 +929,7 @@ start_height = {epoch_2_1}
                 epoch_2_0 = devnet_config.epoch_2_0,
                 epoch_2_05 = devnet_config.epoch_2_05,
                 epoch_2_1 = devnet_config.epoch_2_1,
+                pox_2_activation = devnet_config.pox_2_activation,
             ));
         }
 

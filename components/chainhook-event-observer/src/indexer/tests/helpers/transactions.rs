@@ -48,6 +48,7 @@ pub fn generate_test_tx_stacks_contract_call(
             result: format!("(ok true)"),
             sender: format!("{}", sender),
             fee: 0,
+            nonce: 0,
             kind: StacksTransactionKind::ContractCall(StacksContractCallData {
                 contract_identifier: contract_identifier.to_string(),
                 method: method.to_string(),

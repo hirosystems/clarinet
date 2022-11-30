@@ -22,7 +22,7 @@ use tracing::{self, debug, error, info, warn};
 use tracing_appender;
 
 use chainhook_types::{BitcoinChainEvent, StacksChainEvent};
-use chains_coordinator::start_chains_coordinator;
+use chains_coordinator::{start_chains_coordinator, BitcoinMiningCommand};
 use clarinet_deployments::types::DeploymentSpecification;
 use hiro_system_kit;
 pub use orchestrator::DevnetOrchestrator;
@@ -34,7 +34,6 @@ use self::chains_coordinator::DevnetEventObserverConfig;
 #[derive(Debug)]
 pub enum ChainsCoordinatorCommand {
     Terminate,
-    ProtocolDeployed,
 }
 
 pub fn block_on<F, R>(future: F) -> R
@@ -213,14 +212,13 @@ pub enum DevnetEvent {
     Tick,
     ServiceStatus(ServiceStatusData),
     ProtocolDeployingProgress(ProtocolDeployingData),
-    ProtocolDeployed,
+    BootCompleted(Sender<BitcoinMiningCommand>),
     StacksChainEvent(StacksChainEvent),
     BitcoinChainEvent(BitcoinChainEvent),
     MempoolAdmission(MempoolAdmissionData),
     FatalError(String),
     // Restart,
     // Terminate,
-    // Microblock(MicroblockData),
 }
 
 #[allow(dead_code)]
@@ -315,7 +313,7 @@ pub struct ProtocolDeployingData {
 }
 
 #[derive(Clone, Debug)]
-pub struct ProtocolDeployedData {
+pub struct BootCompletedData {
     pub contracts_deployed: Vec<String>,
 }
 
