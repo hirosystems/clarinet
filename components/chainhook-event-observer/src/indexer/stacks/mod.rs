@@ -248,9 +248,11 @@ pub fn standardize_stacks_block(
     chain_ctx: &mut StacksChainContext,
     ctx: &Context,
 ) -> Result<StacksBlockData, String> {
-    let pox_cycle_length: u64 =
-        (ctx.pox_info.prepare_phase_block_length + ctx.pox_info.reward_phase_block_length).into();
-    let current_len = block.burn_block_height - (1 + ctx.pox_info.first_burnchain_block_height);
+    let pox_cycle_length: u64 = (chain_ctx.pox_info.prepare_phase_block_length
+        + chain_ctx.pox_info.reward_phase_block_length)
+        .into();
+    let current_len =
+        block.burn_block_height - (1 + chain_ctx.pox_info.first_burnchain_block_height);
     let pox_cycle_id: u32 = (current_len / pox_cycle_length).try_into().unwrap();
     let mut events: HashMap<&String, Vec<&NewEvent>> = HashMap::new();
     for event in block.events.iter() {

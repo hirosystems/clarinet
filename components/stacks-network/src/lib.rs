@@ -7,6 +7,9 @@ pub mod chains_coordinator;
 mod orchestrator;
 mod ui;
 
+pub use chainhook_event_observer::utils::Context;
+pub use orchestrator::DevnetOrchestrator;
+
 use std::{
     sync::{
         mpsc::{self, channel, Sender},
@@ -16,9 +19,7 @@ use std::{
     time::Duration,
 };
 
-use chainhook_event_observer::{
-    chainhooks::types::HookFormation, observer::MempoolAdmissionData, utils::Context,
-};
+use chainhook_event_observer::{chainhooks::types::HookFormation, observer::MempoolAdmissionData};
 use chrono::prelude::*;
 use tracing::{self, debug, error, info, warn};
 use tracing_appender;
@@ -27,7 +28,6 @@ use chainhook_types::{BitcoinChainEvent, StacksChainEvent};
 use chains_coordinator::{start_chains_coordinator, BitcoinMiningCommand};
 use clarinet_deployments::types::DeploymentSpecification;
 use hiro_system_kit;
-pub use orchestrator::DevnetOrchestrator;
 use std::sync::atomic::{AtomicBool, Ordering};
 
 use self::chains_coordinator::DevnetEventObserverConfig;
