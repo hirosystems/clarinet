@@ -384,7 +384,7 @@ pub fn process_request(command: LspRequest, editor_state: &EditorStateInput) -> 
             let file_url = params.text_document.uri;
             let contract_location = match get_contract_location(&file_url) {
                 Some(contract_location) => contract_location,
-                None => return LspRequestResponse::Hover(None),
+                None => return LspRequestResponse::DocumentSymbol(vec![]),
             };
 
             LspRequestResponse::DocumentSymbol(
