@@ -553,6 +553,9 @@ pub fn serialize_to_json(value: &ClarityValue) -> serde_json::Value {
             }
             json!(list)
         }
+        ClarityValue::CallableContract(callable) => {
+            json!(format!("{}", callable.contract_identifier))
+        }
     }
 }
 
