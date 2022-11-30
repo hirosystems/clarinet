@@ -4,6 +4,11 @@ export type ExpectSTXTransferEvent = {
   recipient: string;
 };
 
+export type ExpectSTXBurnEvent = {
+  amount: bigint;
+  sender: string;
+};
+
 export type ExpectFungibleTokenTransferEvent = {
   amount: bigint;
   sender: string;
