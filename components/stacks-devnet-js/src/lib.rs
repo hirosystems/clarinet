@@ -197,7 +197,6 @@ impl StacksDevnet {
                             }
                         }
                         DevnetEvent::BootCompleted(mining_tx) => {
-                            // println!("Mining tx received from devnet event");
                             let _ = meta_mining_command_tx.send(mining_tx);
                         }
                         _ => {}
@@ -206,27 +205,26 @@ impl StacksDevnet {
             }
         });
 
+        // Bitcoin mining command relaying - threading model 1
+        // Keeping this model around, for eventual future usage
         // thread::spawn(move || {
         //     if let Ok(ref mining_tx) = meta_mining_command_rx.recv() {
-        //         println!("Mining tx injected in relayer thread");
         //         while let Ok(command) = relaying_mining_rx.recv() {
-        //             println!("Relaying mining command {:?}", command);
         //             let _ = mining_tx.send(command);
         //         }
         //     }
         // });
 
+        // Bitcoin mining command relaying - threading model 2
         thread::spawn(move || {
             let mut relayer_tx = None;
             while let Ok(command) = relaying_mining_rx.recv() {
                 if relayer_tx.is_none() {
                     if let Ok(mining_tx) = meta_mining_command_rx.recv() {
                         relayer_tx = Some(mining_tx);
-                        // println!("Mining tx injected in relayer thread");
                     }
                 }
                 if let Some(ref tx) = relayer_tx {
-                    // println!("Relaying mining command {:?}", command);
                     let _ = tx.send(command);
                 }
             }
@@ -701,14 +699,13 @@ impl StacksDevnet {
             .this()
             .downcast_or_throw::<JsBox<StacksDevnet>, _>(&mut cx)?;
 
-        // println!("Trigger BitcoinMiningCommand::Mine command from js_on_stacks_block");
+        // Keeping, for eventual future usage
         // let _ = devnet.mining_tx.send(BitcoinMiningCommand::Mine);
 
         let blocks = match devnet.stacks_block_rx.recv() {
             Ok(obj) => obj,
             Err(_) => return Ok(cx.undefined().as_value(&mut cx)),
         };
-        // println!("StacksChainUpdate received");
 
         let js_blocks = serde::to_value(&mut cx, &blocks).expect("Unable to serialize block");
 
@@ -720,14 +717,13 @@ impl StacksDevnet {
             .this()
             .downcast_or_throw::<JsBox<StacksDevnet>, _>(&mut cx)?;
 
-        // println!("Trigger BitcoinMiningCommand::Mine command from js_on_bitcoin_block");
+        // Keeping, for eventual future usage
         // let _ = devnet.mining_tx.send(BitcoinMiningCommand::Mine);
 
         let block = match devnet.bitcoin_block_rx.recv() {
             Ok(obj) => obj,
             Err(err) => panic!("{:?}", err),
         };
-        // println!("BitcoinChainUpdate received");
 
         let js_block = serde::to_value(&mut cx, &block).expect("Unable to serialize block");
 

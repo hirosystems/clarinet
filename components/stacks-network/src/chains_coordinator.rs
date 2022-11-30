@@ -658,7 +658,6 @@ fn handle_bitcoin_mining(
                 continue;
             }
         };
-        // println!("Received {:?}", command);
         match command {
             BitcoinMiningCommand::Start => {
                 stop_miner.store(false, Ordering::SeqCst);

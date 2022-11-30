@@ -484,12 +484,12 @@ pub fn get_tx_description(
     tx_events: &Vec<&NewEvent>,
 ) -> Result<
     (
-        String,                 // Human readable transaction's description (contract-call, publish, ...)
-        StacksTransactionKind,  // Transaction kind
-        u64,                    // Transaction fee
-        u64,                    // Transaction nonce
-        String,                 // Sender's address
-        Option<String>,         // Sponsor's address (optional)
+        String, // Human readable transaction's description (contract-call, publish, ...)
+        StacksTransactionKind, // Transaction kind
+        u64,    // Transaction fee
+        u64,    // Transaction nonce
+        String, // Sender's address
+        Option<String>, // Sponsor's address (optional)
     ),
     String,
 > {

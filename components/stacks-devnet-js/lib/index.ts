@@ -38,7 +38,17 @@ export interface Account {
    * @memberof Account
    */
   balance: number;
+  /**
+   * The derivation path to use
+   * @type {number}
+   * @memberof Account
+   */
   derivation?: string;
+  /**
+   * Should a mainnet/testnet address be constructed
+   * @type {number}
+   * @memberof Account
+   */
   is_mainnet?: boolean;
 }
 
@@ -290,10 +300,35 @@ export interface DevnetConfig {
    * @memberof DevnetConfig
    */
   disable_stacks_api?: boolean;
+  /**
+   * Enable support for Stacks 2.1 (false by default)
+   * @type {boolean}
+   * @memberof DevnetConfig
+   */
   enable_next_features?: boolean;
+  /**
+   * Bitcoin block height starting the epoch 2.0
+   * @type {number}
+   * @memberof DevnetConfig
+   */
   epoch_2_0?: number;
+  /**
+   * Bitcoin block height starting the epoch 2.05
+   * @type {number}
+   * @memberof DevnetConfig
+   */
   epoch_2_05?: number;
+  /**
+   * Bitcoin block height starting the epoch 2.1
+   * @type {number}
+   * @memberof DevnetConfig
+   */
   epoch_2_1?: number;
+  /**
+   * Bitcoin block height activating switch to POX 2.0
+   * @type {number}
+   * @memberof DevnetConfig
+   */
   pox_2_activation?: number;
 }
 
