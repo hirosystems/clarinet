@@ -176,8 +176,7 @@ pub async fn start_chains_coordinator(
 
     // Loop over events being received from Bitcoin and Stacks,
     // and orchestrate the 2 chains + protocol.
-    let protocol_deployment_enabled = config.devnet_config.enable_next_features == false;
-    let mut should_deploy_protocol = protocol_deployment_enabled;
+    let mut should_deploy_protocol = true;
     let boot_completed = Arc::new(AtomicBool::new(false));
 
     let mut deployment_events_rx = Some(deployment_events_rx);
@@ -249,7 +248,7 @@ pub async fn start_chains_coordinator(
                 let _ = devnet_event_tx.send(DevnetEvent::BitcoinChainEvent(chain_update.clone()));
             }
             ObserverEvent::StacksChainEvent(chain_event) => {
-                if protocol_deployment_enabled && should_deploy_protocol {
+                if should_deploy_protocol {
                     should_deploy_protocol = false;
 
                     let automining_disabled =
@@ -284,7 +283,7 @@ pub async fn start_chains_coordinator(
                             }
                         },
                     );
-                } else if !protocol_deployment_enabled && !boot_completed.load(Ordering::SeqCst) {
+                } else if !boot_completed.load(Ordering::SeqCst) {
                     boot_completed.store(true, Ordering::SeqCst);
                     let _ =
                         devnet_event_tx.send(DevnetEvent::BootCompleted(mining_command_tx.clone()));
