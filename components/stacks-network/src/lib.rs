@@ -7,6 +7,9 @@ pub mod chains_coordinator;
 mod orchestrator;
 mod ui;
 
+pub use chainhook_event_observer::utils::Context;
+pub use orchestrator::DevnetOrchestrator;
+
 use std::{
     sync::{
         mpsc::{self, channel, Sender},
@@ -25,7 +28,6 @@ use chainhook_types::{BitcoinChainEvent, StacksChainEvent};
 use chains_coordinator::{start_chains_coordinator, BitcoinMiningCommand};
 use clarinet_deployments::types::DeploymentSpecification;
 use hiro_system_kit;
-pub use orchestrator::DevnetOrchestrator;
 use std::sync::atomic::{AtomicBool, Ordering};
 
 use self::chains_coordinator::DevnetEventObserverConfig;
@@ -50,6 +52,7 @@ pub async fn do_run_devnet(
     chainhooks: &mut Option<HookFormation>,
     log_tx: Option<Sender<LogData>>,
     display_dashboard: bool,
+    ctx: Context,
 ) -> Result<
     (
         Option<mpsc::Receiver<DevnetEvent>>,
@@ -110,6 +113,7 @@ pub async fn do_run_devnet(
                 moved_orchestrator_terminator_tx,
                 observer_command_tx,
                 observer_command_rx,
+                ctx,
             );
             let rt = hiro_system_kit::create_basic_runtime();
             rt.block_on(future)

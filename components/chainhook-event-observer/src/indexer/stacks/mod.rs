@@ -4,11 +4,13 @@ pub use blocks_pool::StacksBlockPool;
 
 use crate::indexer::AssetClassCache;
 use crate::indexer::{IndexerConfig, StacksChainContext};
+use crate::utils::Context;
 use chainhook_types::*;
 use clarity_repl::clarity::codec::StacksMessageCodec;
 use clarity_repl::clarity::util::hash::hex_bytes;
 use clarity_repl::clarity::vm::types::Value as ClarityValue;
 use clarity_repl::codec::{StacksTransaction, TransactionAuth, TransactionPayload};
+use hiro_system_kit::slog;
 use rocket::serde::json::Value as JsonValue;
 use rocket::serde::Deserialize;
 use std::collections::{BTreeMap, HashMap, HashSet};
@@ -29,7 +31,7 @@ pub struct NewBlock {
     pub parent_microblock_sequence: u64,
     pub parent_burn_block_hash: String,
     pub parent_burn_block_height: u64,
-    pub parent_burn_block_timestamp: u64,
+    pub parent_burn_block_timestamp: i64,
     pub transactions: Vec<NewTransaction>,
     pub events: Vec<NewEvent>,
     pub matured_miner_rewards: Vec<MaturedMinerReward>,
@@ -61,7 +63,7 @@ pub struct NewMicroblockTrail {
     pub parent_index_block_hash: String,
     pub burn_block_hash: String,
     pub burn_block_height: u64,
-    pub burn_block_timestamp: u64,
+    pub burn_block_timestamp: i64,
     pub transactions: Vec<NewMicroblockTransaction>,
     pub events: Vec<NewEvent>,
 }
@@ -221,31 +223,36 @@ pub fn standardize_stacks_serialized_block_header(
 pub fn standardize_stacks_serialized_block(
     indexer_config: &IndexerConfig,
     serialized_block: &str,
-    ctx: &mut StacksChainContext,
+    chain_ctx: &mut StacksChainContext,
+    ctx: &Context,
 ) -> Result<StacksBlockData, String> {
     let mut block: NewBlock = serde_json::from_str(serialized_block)
         .map_err(|e| format!("unable to parse stacks block_header {}", e.to_string()))?;
-    standardize_stacks_block(indexer_config, &mut block, ctx)
+    standardize_stacks_block(indexer_config, &mut block, chain_ctx, ctx)
 }
 
 pub fn standardize_stacks_marshalled_block(
     indexer_config: &IndexerConfig,
     marshalled_block: JsonValue,
-    ctx: &mut StacksChainContext,
+    chain_ctx: &mut StacksChainContext,
+    ctx: &Context,
 ) -> Result<StacksBlockData, String> {
     let mut block: NewBlock = serde_json::from_value(marshalled_block)
         .map_err(|e| format!("unable to parse stacks block {}", e.to_string()))?;
-    standardize_stacks_block(indexer_config, &mut block, ctx)
+    standardize_stacks_block(indexer_config, &mut block, chain_ctx, ctx)
 }
 
 pub fn standardize_stacks_block(
     indexer_config: &IndexerConfig,
     block: &mut NewBlock,
-    ctx: &mut StacksChainContext,
+    chain_ctx: &mut StacksChainContext,
+    ctx: &Context,
 ) -> Result<StacksBlockData, String> {
-    let pox_cycle_length: u64 =
-        (ctx.pox_info.prepare_phase_block_length + ctx.pox_info.reward_phase_block_length).into();
-    let current_len = block.burn_block_height - (1 + ctx.pox_info.first_burnchain_block_height);
+    let pox_cycle_length: u64 = (chain_ctx.pox_info.prepare_phase_block_length
+        + chain_ctx.pox_info.reward_phase_block_length)
+        .into();
+    let current_len =
+        block.burn_block_height - (1 + chain_ctx.pox_info.first_burnchain_block_height);
     let pox_cycle_id: u32 = (current_len / pox_cycle_length).try_into().unwrap();
     let mut events: HashMap<&String, Vec<&NewEvent>> = HashMap::new();
     for event in block.events.iter() {
@@ -272,7 +279,7 @@ pub fn standardize_stacks_block(
         let (receipt, operations) = get_standardized_stacks_receipt(
             &tx.txid,
             events,
-            &mut ctx.asset_class_map,
+            &mut chain_ctx.asset_class_map,
             &indexer_config.stacks_node_rpc_url,
             true,
         );
@@ -284,7 +291,7 @@ pub fn standardize_stacks_block(
             operations,
             metadata: StacksTransactionMetadata {
                 success: tx.status == "success",
-                result: get_value_description(&tx.raw_result),
+                result: get_value_description(&tx.raw_result, ctx),
                 raw_tx: tx.raw_tx.clone(),
                 sender,
                 nonce,
@@ -323,7 +330,7 @@ pub fn standardize_stacks_block(
             hash: block.parent_index_block_hash.clone(),
             index: block.block_height - 1,
         },
-        timestamp: 0,
+        timestamp: block.parent_burn_block_timestamp,
         metadata: StacksBlockMetadata {
             bitcoin_anchor_block_identifier: BlockIdentifier {
                 hash: block.burn_block_hash.clone(),
@@ -342,29 +349,32 @@ pub fn standardize_stacks_block(
 pub fn standardize_stacks_serialized_microblock_trail(
     indexer_config: &IndexerConfig,
     serialized_microblock_trail: &str,
-    ctx: &mut StacksChainContext,
+    chain_ctx: &mut StacksChainContext,
+    ctx: &Context,
 ) -> Result<Vec<StacksMicroblockData>, String> {
     let mut microblock_trail: NewMicroblockTrail =
         serde_json::from_str(serialized_microblock_trail)
             .map_err(|e| format!("unable to parse microblock trail {}", e.to_string()))?;
-    standardize_stacks_microblock_trail(indexer_config, &mut microblock_trail, ctx)
+    standardize_stacks_microblock_trail(indexer_config, &mut microblock_trail, chain_ctx, ctx)
 }
 
 pub fn standardize_stacks_marshalled_microblock_trail(
     indexer_config: &IndexerConfig,
     marshalled_microblock_trail: JsonValue,
-    ctx: &mut StacksChainContext,
+    chain_ctx: &mut StacksChainContext,
+    ctx: &Context,
 ) -> Result<Vec<StacksMicroblockData>, String> {
     let mut microblock_trail: NewMicroblockTrail =
         serde_json::from_value(marshalled_microblock_trail)
             .map_err(|e| format!("unable to parse microblock trail {}", e.to_string()))?;
-    standardize_stacks_microblock_trail(indexer_config, &mut microblock_trail, ctx)
+    standardize_stacks_microblock_trail(indexer_config, &mut microblock_trail, chain_ctx, ctx)
 }
 
 pub fn standardize_stacks_microblock_trail(
     indexer_config: &IndexerConfig,
     microblock_trail: &mut NewMicroblockTrail,
-    ctx: &mut StacksChainContext,
+    chain_ctx: &mut StacksChainContext,
+    ctx: &Context,
 ) -> Result<Vec<StacksMicroblockData>, String> {
     let mut events: HashMap<&String, Vec<&NewEvent>> = HashMap::new();
     for event in microblock_trail.events.iter() {
@@ -389,7 +399,7 @@ pub fn standardize_stacks_microblock_trail(
         let (receipt, operations) = get_standardized_stacks_receipt(
             &tx.txid,
             events,
-            &mut ctx.asset_class_map,
+            &mut chain_ctx.asset_class_map,
             &indexer_config.stacks_node_rpc_url,
             true,
         );
@@ -415,7 +425,7 @@ pub fn standardize_stacks_microblock_trail(
             operations,
             metadata: StacksTransactionMetadata {
                 success: tx.status == "success",
-                result: get_value_description(&tx.raw_result),
+                result: get_value_description(&tx.raw_result, ctx),
                 raw_tx: tx.raw_tx.clone(),
                 sender,
                 fee,
@@ -444,7 +454,7 @@ pub fn standardize_stacks_microblock_trail(
         microblocks.push(StacksMicroblockData {
             block_identifier,
             parent_block_identifier,
-            timestamp: 0,
+            timestamp: microblock_trail.burn_block_timestamp,
             transactions,
             metadata: StacksMicroblockMetadata {
                 anchor_block_identifier: BlockIdentifier {
@@ -459,7 +469,7 @@ pub fn standardize_stacks_microblock_trail(
     Ok(microblocks)
 }
 
-pub fn get_value_description(raw_value: &str) -> String {
+pub fn get_value_description(raw_value: &str, ctx: &Context) -> String {
     let raw_value = match raw_value.strip_prefix("0x") {
         Some(raw_value) => raw_value,
         _ => return raw_value.to_string(),
@@ -472,7 +482,9 @@ pub fn get_value_description(raw_value: &str) -> String {
     let value = match ClarityValue::consensus_deserialize(&mut Cursor::new(&value_bytes)) {
         Ok(value) => format!("{}", value),
         Err(e) => {
-            error!("unable to deserialize clarity value {:?}", e);
+            ctx.try_log(|logger| {
+                slog::error!(logger, "unable to deserialize clarity value {:?}", e)
+            });
             return raw_value.to_string();
         }
     };

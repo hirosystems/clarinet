@@ -5,9 +5,12 @@ use slog_scope::GlobalLoggerGuard;
 use slog_term;
 use std::sync::Mutex;
 
-#[allow(dead_code)]
-pub fn setup_global_logger() -> GlobalLoggerGuard {
-    slog_scope::set_global_logger(if cfg!(feature = "release") {
+pub fn setup_global_logger(logger: Logger) -> GlobalLoggerGuard {
+    slog_scope::set_global_logger(logger)
+}
+
+pub fn setup_logger() -> Logger {
+    if cfg!(feature = "release") {
         Logger::root(
             Mutex::new(slog_json::Json::default(std::io::stderr())).map(slog::Fuse),
             slog::o!(),
@@ -18,5 +21,5 @@ pub fn setup_global_logger() -> GlobalLoggerGuard {
         let drain = slog_async::Async::new(drain).build().fuse();
         let drain = AtomicSwitch::new(drain);
         Logger::root(drain.fuse(), o!())
-    })
+    }
 }

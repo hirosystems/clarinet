@@ -1,6 +1,9 @@
+use crate::utils::Context;
+
 use super::{super::StacksChainEventExpectation, BlockEvent};
 use super::{microblocks, stacks_blocks};
 use chainhook_types::StacksChainEvent;
+use hiro_system_kit::slog;
 
 pub fn expect_no_chain_update() -> StacksChainEventExpectation {
     Box::new(move |chain_event_to_check: Option<StacksChainEvent>| {
@@ -31,6 +34,7 @@ pub fn expect_chain_updated_with_microblock(
 pub fn expect_chain_updated_with_microblocks(
     expected_microblocks: Vec<BlockEvent>,
 ) -> StacksChainEventExpectation {
+    let ctx = Context::empty();
     Box::new(move |chain_event_to_check: Option<StacksChainEvent>| {
         assert!(
             match chain_event_to_check {
@@ -43,10 +47,14 @@ pub fn expect_chain_updated_with_microblocks(
                             BlockEvent::Microblock(expected_microblock) => expected_microblock,
                             _ => unreachable!(),
                         };
-                        debug!(
-                            "Checking {} and {}",
-                            expected_microblock.block_identifier, new_microblock.block_identifier
-                        );
+                        ctx.try_log(|logger| {
+                            slog::debug!(
+                                logger,
+                                "Checking {} and {}",
+                                expected_microblock.block_identifier,
+                                new_microblock.block_identifier
+                            )
+                        });
                         assert!(
                             new_microblock
                                 .block_identifier
@@ -70,6 +78,7 @@ pub fn expect_chain_updated_with_blocks(
     expected_blocks: Vec<BlockEvent>,
     confirmed_blocks: Vec<BlockEvent>,
 ) -> StacksChainEventExpectation {
+    let ctx = Context::empty();
     Box::new(move |chain_event_to_check: Option<StacksChainEvent>| {
         assert!(
             match chain_event_to_check {
@@ -81,10 +90,14 @@ pub fn expect_chain_updated_with_blocks(
                             BlockEvent::Block(expected_block) => expected_block,
                             _ => unreachable!(),
                         };
-                        debug!(
-                            "Checking {} and {}",
-                            expected_block.block_identifier, new_block.block.block_identifier
-                        );
+                        ctx.try_log(|logger| {
+                            slog::debug!(
+                                logger,
+                                "Checking {} and {}",
+                                expected_block.block_identifier,
+                                new_block.block.block_identifier
+                            )
+                        });
                         assert!(
                             new_block
                                 .block
@@ -103,10 +116,14 @@ pub fn expect_chain_updated_with_blocks(
                             BlockEvent::Block(block) => block,
                             _ => unreachable!(),
                         };
-                        debug!(
-                            "Checking {} and {}",
-                            expected_block.block_identifier, confirmed_block.block_identifier
-                        );
+                        ctx.try_log(|logger| {
+                            slog::debug!(
+                                logger,
+                                "Checking {} and {}",
+                                expected_block.block_identifier,
+                                confirmed_block.block_identifier
+                            )
+                        });
                         assert!(
                             confirmed_block
                                 .block_identifier

@@ -35,4 +35,5 @@ rocket_okapi = "0.8.0-rc.1"
 
 [features]
 default = ["cli"]
-cli = ["clap", "clap_generate", "toml", "ctrlc", "hiro_system_kit/log"]
+log = ["hiro_system_kit/log"]
+cli = ["clap", "clap_generate", "toml", "ctrlc", "log"]
