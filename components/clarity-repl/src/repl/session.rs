@@ -1332,8 +1332,7 @@ mod tests {
 }
 
 async fn fetch_message() -> Result<String, reqwest::Error> {
-    const gist: &str =
-        "https://storage.googleapis.com/hiro-public/assets/clarinet-egg.txt";
+    const gist: &str = "https://storage.googleapis.com/hiro-public/assets/clarinet-egg.txt";
     let response = reqwest::get(gist).await?;
     let message = response.text().await?;
     Ok(message)
