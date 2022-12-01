@@ -8,7 +8,7 @@ use clarity::vm::callables::FunctionIdentifier;
 use clarity::vm::contexts::{ContractContext, GlobalContext};
 use clarity::vm::errors::Error;
 use clarity::vm::representations::Span;
-use clarity::vm::types::{PrincipalData, SequenceData, StandardPrincipalData, Value};
+use clarity::vm::types::{CallableData, PrincipalData, SequenceData, StandardPrincipalData, Value};
 use clarity::vm::SymbolicExpressionType::List;
 use clarity::vm::{
     contexts::{Environment, LocalContext},
@@ -866,11 +866,11 @@ impl DAPDebugger {
                     memory_reference: None,
                 });
             }
-            for (name, (contract_id, trait_id)) in &ctx.callable_contracts {
+            for (name, callable) in &ctx.callable_contracts {
                 variables.push(Variable {
                     name: name.to_string(),
-                    value: format!("{}", contract_id),
-                    var_type: Some(format!("{}", trait_id)),
+                    value: format!("{}", callable.contract_identifier),
+                    var_type: Some(format!("{}", callable.trait_identifier.as_ref().unwrap())),
                     presentation_hint: None,
                     evaluate_name: None,
                     variables_reference: 0,
@@ -1166,5 +1166,12 @@ fn type_for_value(value: &Value) -> String {
         Value::Sequence(SequenceData::Buffer(vec_bytes)) => "buff".to_string(),
         Value::Sequence(SequenceData::String(string)) => "string".to_string(),
         Value::Sequence(SequenceData::List(list_data)) => "list".to_string(),
+        Value::CallableContract(callable) => {
+            if let Some(trait_id) = &callable.trait_identifier {
+                format!("<{}>", trait_id)
+            } else {
+                "principal".to_string()
+            }
+        }
     }
 }

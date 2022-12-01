@@ -1,43 +1,35 @@
 use super::utils;
-
-use crate::lsp::{clarity_diagnostics_to_tower_lsp_type, completion_item_type_to_tower_lsp_type};
+use crate::lsp::clarity_diagnostics_to_tower_lsp_type;
 use clarity_lsp::backend::{
-    process_notification, process_request, LspNotification, LspRequest, LspResponse,
+    process_notification, process_request, EditorStateInput, LspNotification,
+    LspNotificationResponse, LspRequest, LspRequestResponse,
 };
+use clarity_lsp::lsp_types::{DocumentSymbolParams, DocumentSymbolResponse};
 use clarity_lsp::state::EditorState;
 use crossbeam_channel::{Receiver as MultiplexableReceiver, Select, Sender as MultiplexableSender};
 use serde_json::Value;
 use std::sync::mpsc::{Receiver, Sender};
 use std::sync::Arc;
 use std::sync::Mutex;
-use tower_lsp::jsonrpc::Result;
+use tower_lsp::jsonrpc::{Error, ErrorCode, Result};
 use tower_lsp::lsp_types::{
-    CompletionOptions, CompletionParams, CompletionResponse, DeclarationCapability,
-    DidChangeTextDocumentParams, DidCloseTextDocumentParams, DidOpenTextDocumentParams,
-    DidSaveTextDocumentParams, ExecuteCommandParams, HoverProviderCapability, InitializeParams,
-    InitializeResult, InitializedParams, MessageType, ServerCapabilities,
-    TextDocumentSyncCapability, TextDocumentSyncKind, TextDocumentSyncOptions,
-    TextDocumentSyncSaveOptions, Url,
+    CompletionParams, CompletionResponse, DidChangeTextDocumentParams, DidCloseTextDocumentParams,
+    DidOpenTextDocumentParams, DidSaveTextDocumentParams, ExecuteCommandParams, Hover, HoverParams,
+    InitializeParams, InitializeResult, InitializedParams, MessageType, Url,
 };
 use tower_lsp::{async_trait, Client, LanguageServer};
 
-// The LSP is being initialized when clarity files are being detected in the project.
-// We want the LSP to be notified when 2 kind of edits happened:
-// - .clar file opened:
-//      - if the state is empty
-//      - if the state is ready
-// - Clarinet.toml file saved
-// - .clar files saved
-//      - if indexed in `Clarinet.toml`:
-//      - if not indexed:
-// - Clarinet.toml file saved
+pub enum LspResponse {
+    Notification(LspNotificationResponse),
+    Request(LspRequestResponse),
+}
 
 pub async fn start_language_server(
     notification_rx: MultiplexableReceiver<LspNotification>,
     request_rx: MultiplexableReceiver<LspRequest>,
     response_tx: Sender<LspResponse>,
 ) {
-    let mut editor_state = EditorState::new();
+    let mut editor_state = EditorStateInput::Owned(EditorState::new());
 
     let mut sel = Select::new();
     let notifications_oper = sel.recv(&notification_rx);
@@ -49,8 +41,8 @@ pub async fn start_language_server(
             i if i == notifications_oper => match oper.recv(&notification_rx) {
                 Ok(notification) => {
                     let result = process_notification(notification, &mut editor_state, None).await;
-                    if let Ok(lsp_response) = result {
-                        let _ = response_tx.send(lsp_response);
+                    if let Ok(response) = result {
+                        let _ = response_tx.send(LspResponse::Notification(response));
                     }
                 }
                 Err(_e) => {
@@ -59,8 +51,8 @@ pub async fn start_language_server(
             },
             i if i == requests_oper => match oper.recv(&request_rx) {
                 Ok(request) => {
-                    let lsp_response = process_request(request, &mut editor_state);
-                    let _ = response_tx.send(lsp_response);
+                    let request_response = process_request(request, &editor_state);
+                    let _ = response_tx.send(LspResponse::Request(request_response));
                 }
                 Err(_e) => {
                     continue;
@@ -74,22 +66,22 @@ pub async fn start_language_server(
 #[derive(Debug)]
 pub struct LspNativeBridge {
     client: Client,
-    request_tx: Arc<Mutex<MultiplexableSender<LspRequest>>>,
     notification_tx: Arc<Mutex<MultiplexableSender<LspNotification>>>,
+    request_tx: Arc<Mutex<MultiplexableSender<LspRequest>>>,
     response_rx: Arc<Mutex<Receiver<LspResponse>>>,
 }
 
 impl LspNativeBridge {
     pub fn new(
         client: Client,
-        request_tx: MultiplexableSender<LspRequest>,
         notification_tx: MultiplexableSender<LspNotification>,
+        request_tx: MultiplexableSender<LspRequest>,
         response_rx: Receiver<LspResponse>,
     ) -> Self {
         Self {
             client,
-            request_tx: Arc::new(Mutex::new(request_tx)),
             notification_tx: Arc::new(Mutex::new(notification_tx)),
+            request_tx: Arc::new(Mutex::new(request_tx)),
             response_rx: Arc::new(Mutex::new(response_rx)),
         }
     }
@@ -97,31 +89,20 @@ impl LspNativeBridge {
 
 #[async_trait]
 impl LanguageServer for LspNativeBridge {
-    async fn initialize(&self, _params: InitializeParams) -> Result<InitializeResult> {
-        Ok(InitializeResult {
-            server_info: None,
-            capabilities: ServerCapabilities {
-                text_document_sync: Some(TextDocumentSyncCapability::Options(
-                    TextDocumentSyncOptions {
-                        open_close: Some(true),
-                        change: Some(TextDocumentSyncKind::Full),
-                        will_save: Some(true),
-                        will_save_wait_until: Some(false),
-                        save: Some(TextDocumentSyncSaveOptions::Supported(true)),
-                    },
-                )),
-                completion_provider: Some(CompletionOptions {
-                    resolve_provider: Some(false),
-                    trigger_characters: None,
-                    all_commit_characters: None,
-                    work_done_progress_options: Default::default(),
-                }),
-                type_definition_provider: None,
-                hover_provider: Some(HoverProviderCapability::Simple(false)),
-                declaration_provider: Some(DeclarationCapability::Simple(false)),
-                ..ServerCapabilities::default()
-            },
-        })
+    async fn initialize(&self, params: InitializeParams) -> Result<InitializeResult> {
+        let _ = match self.request_tx.lock() {
+            Ok(tx) => tx.send(LspRequest::Initialize(params)),
+            Err(_) => return Err(Error::new(ErrorCode::InternalError)),
+        };
+
+        let response_rx = self.response_rx.lock().expect("failed to lock response_rx");
+        let ref response = response_rx.recv().expect("failed to get value from recv");
+        if let LspResponse::Request(request_response) = response {
+            if let LspRequestResponse::Initialize(initialize) = request_response {
+                return Ok(initialize.to_owned());
+            }
+        }
+        Err(Error::new(ErrorCode::InternalError))
     }
 
     async fn initialized(&self, _params: InitializedParams) {}
@@ -135,32 +116,57 @@ impl LanguageServer for LspNativeBridge {
     }
 
     async fn completion(&self, params: CompletionParams) -> Result<Option<CompletionResponse>> {
-        // We receive notifications for toml and clar files, but only want to achieve this capability
-        // for clar files.
-        let file_url = params.text_document_position.text_document.uri;
-        let contract_location = match utils::get_contract_location(&file_url) {
-            Some(location) => location,
-            _ => return Ok(None),
-        };
-
         let _ = match self.request_tx.lock() {
-            Ok(tx) => tx.send(LspRequest::GetIntellisense(contract_location)),
+            Ok(tx) => tx.send(LspRequest::Completion(params)),
             Err(_) => return Ok(None),
         };
 
-        let mut keywords = vec![];
-        if let Ok(response_rx) = self.response_rx.lock() {
-            if let Ok(ref mut response) = response_rx.recv() {
-                keywords.append(&mut response.completion_items);
+        let response_rx = self.response_rx.lock().expect("failed to lock response_rx");
+        let ref response = response_rx.recv().expect("failed to get value from recv");
+        if let LspResponse::Request(request_response) = response {
+            if let LspRequestResponse::CompletionItems(items) = request_response {
+                return Ok(Some(CompletionResponse::from(items.to_vec())));
             }
         }
 
-        let mut completion_items = vec![];
-        for mut item in keywords.drain(..) {
-            completion_items.push(completion_item_type_to_tower_lsp_type(&mut item));
+        Ok(None)
+    }
+
+    async fn document_symbol(
+        &self,
+        params: DocumentSymbolParams,
+    ) -> Result<Option<DocumentSymbolResponse>> {
+        let _ = match self.request_tx.lock() {
+            Ok(tx) => tx.send(LspRequest::DocumentSymbol(params)),
+            Err(_) => return Ok(None),
+        };
+
+        let response_rx = self.response_rx.lock().expect("failed to lock response_rx");
+        let ref response = response_rx.recv().expect("failed to get value from recv");
+        if let LspResponse::Request(request_response) = response {
+            if let LspRequestResponse::DocumentSymbol(symbols) = request_response {
+                return Ok(Some(DocumentSymbolResponse::Nested(symbols.to_vec())));
+            }
         }
 
-        Ok(Some(CompletionResponse::from(completion_items)))
+        Ok(None)
+    }
+
+    async fn hover(&self, params: HoverParams) -> Result<Option<Hover>> {
+        let _ = match self.request_tx.lock() {
+            Ok(tx) => tx.send(LspRequest::Hover(params)),
+            Err(_) => return Ok(None),
+        };
+
+        let response_rx = self.response_rx.lock().expect("failed to lock response_rx");
+        let ref response = response_rx.recv().expect("failed to get value from recv");
+        if let LspResponse::Request(request_response) = response {
+            if let LspRequestResponse::Hover(data) = request_response {
+                return Ok(data.to_owned());
+            }
+        }
+
+        Ok(None)
     }
 
     async fn did_open(&self, params: DidOpenTextDocumentParams) {
@@ -178,14 +184,14 @@ impl LanguageServer for LspNativeBridge {
             };
         } else {
             self.client
-                .log_message(MessageType::Warning, "Unsupported file opened")
+                .log_message(MessageType::WARNING, "Unsupported file opened")
                 .await;
             return;
         };
 
         self.client
             .log_message(
-                MessageType::Warning,
+                MessageType::WARNING,
                 "Command submitted to background thread",
             )
             .await;
@@ -193,8 +199,11 @@ impl LanguageServer for LspNativeBridge {
         let mut notification = None;
         if let Ok(response_rx) = self.response_rx.lock() {
             if let Ok(ref mut response) = response_rx.recv() {
-                aggregated_diagnostics.append(&mut response.aggregated_diagnostics);
-                notification = response.notification.take();
+                if let LspResponse::Notification(notification_response) = response {
+                    aggregated_diagnostics
+                        .append(&mut notification_response.aggregated_diagnostics);
+                    notification = notification_response.notification.take();
+                }
             }
         }
         for (location, mut diags) in aggregated_diagnostics.drain(..) {
@@ -218,14 +227,14 @@ impl LanguageServer for LspNativeBridge {
     async fn did_save(&self, params: DidSaveTextDocumentParams) {
         if let Some(contract_location) = utils::get_contract_location(&params.text_document.uri) {
             let _ = match self.notification_tx.lock() {
-                Ok(tx) => tx.send(LspNotification::ContractChanged(contract_location)),
+                Ok(tx) => tx.send(LspNotification::ContractSaved(contract_location)),
                 Err(_) => return,
             };
         } else if let Some(manifest_location) =
             utils::get_manifest_location(&params.text_document.uri)
         {
             let _ = match self.notification_tx.lock() {
-                Ok(tx) => tx.send(LspNotification::ManifestChanged(manifest_location)),
+                Ok(tx) => tx.send(LspNotification::ManifestSaved(manifest_location)),
                 Err(_) => return,
             };
         } else {
@@ -236,8 +245,11 @@ impl LanguageServer for LspNativeBridge {
         let mut notification = None;
         if let Ok(response_rx) = self.response_rx.lock() {
             if let Ok(ref mut response) = response_rx.recv() {
-                aggregated_diagnostics.append(&mut response.aggregated_diagnostics);
-                notification = response.notification.take();
+                if let LspResponse::Notification(notification_response) = response {
+                    aggregated_diagnostics
+                        .append(&mut notification_response.aggregated_diagnostics);
+                    notification = notification_response.notification.take();
+                }
             }
         }
 
@@ -259,18 +271,33 @@ impl LanguageServer for LspNativeBridge {
         }
     }
 
-    async fn did_change(&self, _changes: DidChangeTextDocumentParams) {}
+    async fn did_change(&self, params: DidChangeTextDocumentParams) {
+        if let Some(contract_location) = utils::get_contract_location(&params.text_document.uri) {
+            if let Ok(tx) = self.notification_tx.lock() {
+                let _ = tx.send(LspNotification::ContractChanged(
+                    contract_location,
+                    params.content_changes[0].text.to_string(),
+                ));
+            };
+        }
+    }
 
-    async fn did_close(&self, _: DidCloseTextDocumentParams) {}
+    async fn did_close(&self, params: DidCloseTextDocumentParams) {
+        if let Some(contract_location) = utils::get_contract_location(&params.text_document.uri) {
+            if let Ok(tx) = self.notification_tx.lock() {
+                let _ = tx.send(LspNotification::ContractClosed(contract_location));
+            };
+        }
+    }
 }
 
 pub fn message_level_type_to_tower_lsp_type(
     level: &clarity_lsp::lsp_types::MessageType,
 ) -> tower_lsp::lsp_types::MessageType {
     match level {
-        &clarity_lsp::lsp_types::MessageType::ERROR => tower_lsp::lsp_types::MessageType::Error,
-        &clarity_lsp::lsp_types::MessageType::WARNING => tower_lsp::lsp_types::MessageType::Warning,
-        &clarity_lsp::lsp_types::MessageType::INFO => tower_lsp::lsp_types::MessageType::Info,
-        _ => tower_lsp::lsp_types::MessageType::Log,
+        &clarity_lsp::lsp_types::MessageType::ERROR => tower_lsp::lsp_types::MessageType::ERROR,
+        &clarity_lsp::lsp_types::MessageType::WARNING => tower_lsp::lsp_types::MessageType::WARNING,
+        &clarity_lsp::lsp_types::MessageType::INFO => tower_lsp::lsp_types::MessageType::INFO,
+        _ => tower_lsp::lsp_types::MessageType::LOG,
     }
 }

@@ -41,10 +41,10 @@ export interface StacksChainUpdate {
  */
 export interface StacksBlockUpdate {
   /**
-   * @type {Array<Block>}
+   * @type {Block}
    * @memberof StacksBlockUpdate
    */
-  new_blocks: Array<Block>;
+  block: Block;
   /**
    * @type {Array<Block>}
    * @memberof StacksBlockUpdate
@@ -299,6 +299,11 @@ export interface StacksTransactionMetadata {
    */
   fee: number;
   /**
+   * @type {number}
+   * @memberof StacksTransactionMetadata
+   */
+  nonce: number;
+  /**
    * @type {StacksTransactionKind}
    * @memberof StacksTransactionMetadata
    */
@@ -434,6 +439,7 @@ export interface StacksSTXTransferEventData {
   sender: string;
   recipient: string;
   amount: string;
+  memo?: string;
 }
 
 export interface StacksSTXMintEventData {

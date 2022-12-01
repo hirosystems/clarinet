@@ -1,12 +1,13 @@
-use crate::indexer::{ChainSegment, ChainSegmentIncompatibility};
-use crate::utils::AbstractBlock;
-use bitcoincore_rpc::bitcoin::Block;
+use crate::{
+    indexer::{ChainSegment, ChainSegmentIncompatibility},
+    utils::Context,
+};
 use chainhook_types::{
     BitcoinBlockData, BitcoinChainEvent, BitcoinChainUpdatedWithBlocksData,
-    BitcoinChainUpdatedWithReorgData, BitcoinTransactionData, BlockIdentifier, Chain,
+    BitcoinChainUpdatedWithReorgData, BlockIdentifier,
 };
-use clarity_repl::clarity::util::hash::to_hex;
-use std::collections::{hash_map::Entry, BTreeMap, BTreeSet, HashMap, HashSet, VecDeque};
+use hiro_system_kit::slog;
+use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 
 pub struct BitcoinBlockPool {
     canonical_fork_id: usize,
@@ -30,34 +31,49 @@ impl BitcoinBlockPool {
     pub fn process_block(
         &mut self,
         block: BitcoinBlockData,
-    ) -> Result<Option<BitcoinChainEvent>, ()> {
-        info!("Start processing Bitcoin {}", block.block_identifier);
+        ctx: &Context,
+    ) -> Result<Option<BitcoinChainEvent>, String> {
+        ctx.try_log(|logger| {
+            slog::info!(
+                logger,
+                "Start processing Bitcoin {}",
+                block.block_identifier
+            )
+        });
 
         // Keep block data in memory
         let existing_entry = self
             .block_store
             .insert(block.block_identifier.clone(), block.clone());
         if existing_entry.is_some() {
-            warn!(
-                "Bitcoin {} has already been processed",
-                block.block_identifier
-            );
+            ctx.try_log(|logger| {
+                slog::warn!(
+                    logger,
+                    "Bitcoin {} has already been processed",
+                    block.block_identifier
+                )
+            });
             return Ok(None);
         }
 
         for (i, fork) in self.forks.iter() {
-            info!("Active fork {}: {}", i, fork);
+            ctx.try_log(|logger| slog::info!(logger, "Active fork {}: {}", i, fork));
         }
         // Retrieve previous canonical fork
         let previous_canonical_fork_id = self.canonical_fork_id;
         let previous_canonical_fork = match self.forks.get(&previous_canonical_fork_id) {
             Some(fork) => fork.clone(),
-            None => return Err(()),
+            None => {
+                ctx.try_log(|logger| {
+                    slog::error!(logger, "unable to retrieve previous bitcoin fork")
+                });
+                return Ok(None);
+            }
         };
 
         let mut fork_updated = None;
         for (_, fork) in self.forks.iter_mut() {
-            let (block_appended, mut new_fork) = fork.try_append_block(&block);
+            let (block_appended, mut new_fork) = fork.try_append_block(&block, ctx);
             if block_appended {
                 if let Some(new_fork) = new_fork.take() {
                     let fork_id = self.forks.len();
@@ -73,17 +89,24 @@ impl BitcoinBlockPool {
 
         let fork_updated = match fork_updated.take() {
             Some(fork) => {
-                info!(
-                    "Bitcoin {} successfully appended to {}",
-                    block.block_identifier, fork
-                );
+                ctx.try_log(|logger| {
+                    slog::debug!(
+                        logger,
+                        "Bitcoin {} successfully appended to {}",
+                        block.block_identifier,
+                        fork
+                    )
+                });
                 fork
             }
             None => {
-                info!(
-                    "Unable to process Bitcoin {} - inboxed for later",
-                    block.block_identifier
-                );
+                ctx.try_log(|logger| {
+                    slog::debug!(
+                        logger,
+                        "Unable to process Bitcoin {} - inboxed for later",
+                        block.block_identifier
+                    )
+                });
                 self.orphans.insert(block.block_identifier.clone());
                 return Ok(None);
             }
@@ -109,7 +132,7 @@ impl BitcoinBlockPool {
                     None => continue,
                 };
 
-                let (orphan_appended, mut new_fork) = fork_updated.try_append_block(&block);
+                let (orphan_appended, mut new_fork) = fork_updated.try_append_block(&block, ctx);
                 if orphan_appended {
                     applied.insert(orphan_block_identifier);
                     orphans_to_untrack.insert(orphan_block_identifier);
@@ -123,7 +146,7 @@ impl BitcoinBlockPool {
 
         // Update orphans
         for orphan in orphans_to_untrack.into_iter() {
-            info!("Dequeuing orphan {}", orphan);
+            ctx.try_log(|logger| slog::info!(logger, "Dequeuing orphan {}", orphan));
             self.orphans.remove(orphan);
         }
 
@@ -131,23 +154,29 @@ impl BitcoinBlockPool {
         let mut canonical_fork_id = 0;
         let mut highest_height = 0;
         for (fork_id, fork) in self.forks.iter() {
-            info!("Active fork: {} - {}", fork_id, fork);
+            ctx.try_log(|logger| slog::info!(logger, "Active fork: {} - {}", fork_id, fork));
             if fork.get_length() >= highest_height {
                 highest_height = fork.get_length();
                 canonical_fork_id = *fork_id;
             }
         }
-        info!("Active fork selected as canonical: {}", canonical_fork_id);
+        ctx.try_log(|logger| {
+            slog::info!(
+                logger,
+                "Active fork selected as canonical: {}",
+                canonical_fork_id
+            )
+        });
 
         self.canonical_fork_id = canonical_fork_id;
         // Generate chain event from the previous and current canonical forks
         let canonical_fork = self.forks.get(&canonical_fork_id).unwrap().clone();
         if canonical_fork.eq(&previous_canonical_fork) {
-            info!("Canonical fork unchanged");
+            ctx.try_log(|logger| slog::info!(logger, "Canonical fork unchanged"));
             return Ok(None);
         }
 
-        let res = self.generate_block_chain_event(&canonical_fork, &previous_canonical_fork);
+        let res = self.generate_block_chain_event(&canonical_fork, &previous_canonical_fork, ctx);
         let mut chain_event = match res {
             Ok(chain_event) => chain_event,
             Err(ChainSegmentIncompatibility::ParentBlockUnknown) => {
@@ -157,12 +186,16 @@ impl BitcoinBlockPool {
             _ => return Ok(None),
         };
 
-        self.collect_and_prune_confirmed_blocks(&mut chain_event);
+        self.collect_and_prune_confirmed_blocks(&mut chain_event, ctx);
 
         Ok(Some(chain_event))
     }
 
-    pub fn collect_and_prune_confirmed_blocks(&mut self, chain_event: &mut BitcoinChainEvent) {
+    pub fn collect_and_prune_confirmed_blocks(
+        &mut self,
+        chain_event: &mut BitcoinChainEvent,
+        ctx: &Context,
+    ) {
         let (tip, confirmed_blocks) = match chain_event {
             BitcoinChainEvent::ChainUpdatedWithBlocks(ref mut event) => {
                 match event.new_blocks.last() {
@@ -219,7 +252,9 @@ impl BitcoinBlockPool {
         for confirmed_block in canonical_segment[6..].into_iter() {
             let block = match self.block_store.remove(confirmed_block) {
                 None => {
-                    error!("unable to retrieve data for {}", confirmed_block);
+                    ctx.try_log(|logger| {
+                        slog::error!(logger, "unable to retrieve data for {}", confirmed_block)
+                    });
                     return;
                 }
                 Some(block) => block,
@@ -241,6 +276,7 @@ impl BitcoinBlockPool {
         &mut self,
         canonical_segment: &ChainSegment,
         other_segment: &ChainSegment,
+        ctx: &Context,
     ) -> Result<BitcoinChainEvent, ChainSegmentIncompatibility> {
         if other_segment.is_empty() {
             let mut new_blocks = vec![];
@@ -250,10 +286,13 @@ impl BitcoinBlockPool {
                 let block = match self.block_store.get(block_identifier) {
                     Some(block) => block.clone(),
                     None => {
-                        error!(
-                            "unable to retrive Bitcoin {} from block store",
-                            block_identifier
-                        );
+                        ctx.try_log(|logger| {
+                            slog::error!(
+                                logger,
+                                "unable to retrive Bitcoin {} from block store",
+                                block_identifier
+                            )
+                        });
                         return Err(ChainSegmentIncompatibility::Unknown);
                     }
                 };
@@ -266,7 +305,8 @@ impl BitcoinBlockPool {
                 },
             ));
         }
-        if let Ok(divergence) = canonical_segment.try_identify_divergence(other_segment, false) {
+        if let Ok(divergence) = canonical_segment.try_identify_divergence(other_segment, false, ctx)
+        {
             if divergence.blocks_to_rollback.is_empty() {
                 let mut new_blocks = vec![];
                 for i in 0..divergence.blocks_to_apply.len() {
@@ -313,10 +353,14 @@ impl BitcoinBlockPool {
                 ));
             }
         }
-        info!(
-            "Unable to infer chain event out of {} and {}",
-            canonical_segment, other_segment
-        );
+        ctx.try_log(|logger| {
+            slog::debug!(
+                logger,
+                "Unable to infer chain event out of {} and {}",
+                canonical_segment,
+                other_segment
+            )
+        });
         Err(ChainSegmentIncompatibility::ParentBlockUnknown)
     }
 }

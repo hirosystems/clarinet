@@ -24,7 +24,7 @@ WORKDIR /src/components/chainhook-node
 
 RUN mkdir /out
 
-RUN cargo build --release
+RUN cargo build --features release --release
 
 RUN cp target/release/chainhook-node /out
 

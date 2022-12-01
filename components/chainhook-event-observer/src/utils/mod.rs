@@ -1,7 +1,36 @@
 use chainhook_types::{
     BitcoinBlockData, BlockIdentifier, StacksBlockData, StacksMicroblockData, StacksTransactionData,
 };
+use hiro_system_kit::slog::Logger;
 use serde_json::Value as JsonValue;
+
+#[derive(Clone)]
+pub struct Context {
+    pub logger: Option<Logger>,
+    pub tracer: bool,
+}
+
+impl Context {
+    pub fn empty() -> Context {
+        Context {
+            logger: None,
+            tracer: false,
+        }
+    }
+
+    pub fn try_log<F>(&self, closure: F)
+    where
+        F: FnOnce(&Logger),
+    {
+        if let Some(ref logger) = self.logger {
+            closure(logger)
+        }
+    }
+
+    pub fn expect_logger(&self) -> &Logger {
+        self.logger.as_ref().unwrap()
+    }
+}
 
 pub trait AbstractStacksBlock {
     fn get_identifier(&self) -> &BlockIdentifier;

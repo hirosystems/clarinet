@@ -1,13 +1,5 @@
-#![allow(unused_imports)]
-
 #[macro_use]
 extern crate rocket;
-
-#[macro_use]
-extern crate slog_scope;
-
-#[macro_use]
-extern crate serde;
 
 #[macro_use]
 extern crate serde_derive;
@@ -15,24 +7,27 @@ extern crate serde_derive;
 #[macro_use]
 extern crate serde_json;
 
+#[macro_use]
+extern crate hiro_system_kit;
+
 pub mod chainhooks;
 pub mod indexer;
 pub mod observer;
 pub mod utils;
 
-use slog::Drain;
-use std::sync::Mutex;
+use crate::utils::Context;
+use hiro_system_kit::log::setup_logger;
+use hiro_system_kit::slog;
 
 use crate::chainhooks::types::HookFormation;
 use clap::Parser;
 use ctrlc;
 use observer::{EventHandler, EventObserverConfig, ObserverCommand};
-use std::collections::{HashMap, HashSet};
+use std::collections::HashSet;
 use std::fs::File;
 use std::io::{BufReader, Read};
 use std::path::PathBuf;
-use std::sync::mpsc::{channel, Receiver, Sender};
-use toml::value::Value;
+use std::sync::mpsc::channel;
 
 /// Simple program to greet a person
 #[derive(Parser, Debug)]
@@ -45,17 +40,14 @@ struct Args {
 
 #[rocket::main]
 async fn main() {
-    let logger = slog::Logger::root(
-        Mutex::new(slog_json::Json::default(std::io::stderr())).map(slog::Fuse),
-        slog::o!("version" => env!("CARGO_PKG_VERSION")),
-    );
-
-    // slog_stdlog uses the logger from slog_scope, so set a logger there
-    let _guard = slog_scope::set_global_logger(logger);
+    let context = Context {
+        logger: Some(setup_logger()),
+        tracer: false,
+    };
 
     let args = Args::parse();
-    let config_path = get_config_path_or_exit(&args.config_path);
-    let config = EventObserverConfig::from_path(&config_path);
+    let config_path = get_config_path_or_exit(&args.config_path, &context);
+    let config = EventObserverConfig::from_path(&config_path, &context);
     let (command_tx, command_rx) = channel();
     let tx_terminator = command_tx.clone();
 
@@ -66,7 +58,7 @@ async fn main() {
     })
     .expect("Error setting Ctrl-C handler");
 
-    let _ = observer::start_event_observer(config, command_tx, command_rx, None).await;
+    let _ = observer::start_event_observer(config, command_tx, command_rx, None, context).await;
 }
 
 #[derive(Serialize, Deserialize, Debug, Default)]
@@ -80,19 +72,22 @@ pub struct EventObserverConfigFile {
     pub control_port: Option<u16>,
     pub bitcoin_node_username: String,
     pub bitcoin_node_password: String,
-    pub bitcoin_node_rpc_host: String,
-    pub bitcoin_node_rpc_port: u16,
-    pub stacks_node_rpc_host: String,
-    pub stacks_node_rpc_port: u16,
+    pub bitcoin_node_rpc_url: String,
+    pub stacks_node_rpc_url: String,
     pub operators: Option<Vec<String>>,
 }
 
 impl EventObserverConfig {
-    pub fn from_path(path: &PathBuf) -> EventObserverConfig {
+    pub fn from_path(path: &PathBuf, ctx: &Context) -> EventObserverConfig {
         let path = match File::open(path) {
             Ok(path) => path,
             Err(_e) => {
-                error!("Error: unable to locate Clarinet.toml in current directory");
+                ctx.try_log(|logger| {
+                    slog::error!(
+                        logger,
+                        "Error: unable to locate Clarinet.toml in current directory"
+                    )
+                });
                 std::process::exit(1);
             }
         };
@@ -103,15 +98,18 @@ impl EventObserverConfig {
         let file: EventObserverConfigFile = match toml::from_slice(&file_buffer[..]) {
             Ok(s) => s,
             Err(e) => {
-                error!("Unable to read config {}", e);
+                ctx.try_log(|logger| error!(logger, "Unable to read config {}", e));
                 std::process::exit(1);
             }
         };
 
-        EventObserverConfig::from_config_file(file)
+        EventObserverConfig::from_config_file(file, ctx)
     }
 
-    pub fn from_config_file(mut config_file: EventObserverConfigFile) -> EventObserverConfig {
+    pub fn from_config_file(
+        mut config_file: EventObserverConfigFile,
+        _ctx: &Context,
+    ) -> EventObserverConfig {
         let event_handlers = match config_file.webhooks.take() {
             Some(webhooks) => webhooks
                 .into_iter()
@@ -141,10 +139,8 @@ impl EventObserverConfig {
                 .unwrap_or(observer::DEFAULT_CONTROL_PORT),
             bitcoin_node_username: config_file.bitcoin_node_username.clone(),
             bitcoin_node_password: config_file.bitcoin_node_password.clone(),
-            bitcoin_node_rpc_host: config_file.bitcoin_node_rpc_host.clone(),
-            bitcoin_node_rpc_port: config_file.bitcoin_node_rpc_port.clone(),
-            stacks_node_rpc_host: config_file.stacks_node_rpc_host.clone(),
-            stacks_node_rpc_port: config_file.stacks_node_rpc_port.clone(),
+            bitcoin_node_rpc_url: config_file.bitcoin_node_rpc_url.clone(),
+            stacks_node_rpc_url: config_file.stacks_node_rpc_url.clone(),
             operators,
             display_logs: true,
         };
@@ -152,11 +148,11 @@ impl EventObserverConfig {
     }
 }
 
-fn get_config_path_or_exit(path: &Option<String>) -> PathBuf {
+fn get_config_path_or_exit(path: &Option<String>, ctx: &Context) -> PathBuf {
     if let Some(path) = path {
         let manifest_path = PathBuf::from(path);
         if !manifest_path.exists() {
-            error!("Could not find Observer.toml");
+            ctx.try_log(|logger| slog::error!(logger, "Could not find Observer.toml"));
             std::process::exit(1);
         }
         manifest_path
@@ -171,7 +167,7 @@ fn get_config_path_or_exit(path: &Option<String>) -> PathBuf {
             current_dir.pop();
 
             if !current_dir.pop() {
-                error!("Could not find Observer.toml");
+                ctx.try_log(|logger| slog::error!(logger, "Could not find Observer.toml"));
                 std::process::exit(1);
             }
         }

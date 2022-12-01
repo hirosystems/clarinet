@@ -2,6 +2,7 @@ use super::DigestingCommand;
 use crate::config::Config;
 use chainhook_event_observer::indexer;
 use chainhook_event_observer::indexer::Indexer;
+use chainhook_event_observer::utils::Context;
 use redis::Commands;
 use std::cmp::Ordering;
 use std::{collections::BinaryHeap, process, sync::mpsc::Receiver};
@@ -17,7 +18,11 @@ struct Job {
     pub priority: u64,
 }
 
-pub fn start(command_rx: Receiver<DigestingCommand>, config: &Config) -> Result<(), String> {
+pub fn start(
+    command_rx: Receiver<DigestingCommand>,
+    config: &Config,
+    ctx: &Context,
+) -> Result<(), String> {
     // let mut bit_vector
     let mut job_queue: BinaryHeap<Job> = BinaryHeap::new();
     let redis_config = config.expected_redis_config();
@@ -39,11 +44,18 @@ pub fn start(command_rx: Receiver<DigestingCommand>, config: &Config) -> Result<
                     let payload: String = con
                         .hget(&key, "blob")
                         .expect("unable to retrieve tip height");
-                    let block_data = indexer::stacks::standardize_stacks_serialized_block(
+                    let block_data = match indexer::stacks::standardize_stacks_serialized_block(
                         &indexer.config,
                         &payload,
                         &mut indexer.stacks_context,
-                    );
+                        ctx,
+                    ) {
+                        Ok(block) => block,
+                        Err(e) => {
+                            error!(&ctx.expect_logger(), "{e}");
+                            continue;
+                        }
+                    };
                     let _: Result<(), redis::RedisError> = con.hset_multiple(
                         &key,
                         &[
@@ -53,7 +65,11 @@ pub fn start(command_rx: Receiver<DigestingCommand>, config: &Config) -> Result<
                         ],
                     );
                     if block_digested > 0 && job_queue.is_empty() {
-                        info!("Seeding completed - {} block processed", block_digested + 1);
+                        info!(
+                            ctx.expect_logger(),
+                            "Seeding completed - {} block processed",
+                            block_digested + 1
+                        );
                     }
                     block_digested += 1;
                 }
@@ -65,13 +81,17 @@ pub fn start(command_rx: Receiver<DigestingCommand>, config: &Config) -> Result<
                         .collect();
                     let _: Result<(), redis::RedisError> = con.del(&keys_to_prune);
                     debug!(
+                        ctx.expect_logger(),
                         "{} Stacks orphaned blocks removed from storage",
                         keys_to_prune.len()
                     );
-                    info!("Initial ingestion succesfully performed")
+                    info!(
+                        ctx.expect_logger(),
+                        "Initial ingestion succesfully performed"
+                    )
                 }
                 DigestingCommand::Terminate | DigestingCommand::Kill => {
-                    info!("Terminating");
+                    info!(ctx.expect_logger(), "Terminating");
                     return Ok(());
                 }
             }
@@ -82,7 +102,10 @@ pub fn start(command_rx: Receiver<DigestingCommand>, config: &Config) -> Result<
         let command = match command_rx.recv() {
             Ok(command) => command,
             Err(e) => {
-                error!("block digestion channel broken {:?}", e);
+                error!(
+                    ctx.expect_logger(),
+                    "block digestion channel broken {:?}", e
+                );
                 process::exit(1);
             }
         };

@@ -1,6 +1,7 @@
 use std::sync::mpsc::{self, Sender};
 
 use crate::chainhooks::load_chainhooks;
+use chainhook_event_observer::utils::Context;
 use chainhook_types::{BitcoinNetwork, StacksNetwork};
 use clarinet_deployments::types::DeploymentSpecification;
 use stacks_network::{
@@ -37,5 +38,6 @@ pub fn run_devnet(
         &mut Some(hooks),
         log_tx,
         display_dashboard,
+        Context::empty(),
     ))
 }

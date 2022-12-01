@@ -16,9 +16,12 @@ use toml::value::Value;
 pub const DEFAULT_DERIVATION_PATH: &str = "m/44'/5757'/0'/0/0";
 pub const DEFAULT_BITCOIN_NODE_IMAGE: &str = "quay.io/hirosystems/bitcoind:devnet-v2";
 pub const DEFAULT_STACKS_NODE_IMAGE: &str = "quay.io/hirosystems/stacks-node:devnet-v2";
+pub const DEFAULT_STACKS_NODE_NEXT_IMAGE: &str = "quay.io/hirosystems/stacks-node:devnet-v3-beta1";
 pub const DEFAULT_BITCOIN_EXPLORER_IMAGE: &str = "quay.io/hirosystems/bitcoin-explorer:devnet";
-pub const DEFAULT_STACKS_API_IMAGE: &str = "blockstack/stacks-blockchain-api:latest";
+pub const DEFAULT_STACKS_API_IMAGE: &str = "hirosystems/stacks-blockchain-api:latest";
+pub const DEFAULT_STACKS_API_NEXT_IMAGE: &str = "hirosystems/stacks-blockchain-api:stacks-2.1";
 pub const DEFAULT_STACKS_EXPLORER_IMAGE: &str = "hirosystems/explorer:latest";
+pub const DEFAULT_STACKS_EXPLORER_NEXT_IMAGE: &str = "hirosystems/explorer:feat-stacks-2.1";
 pub const DEFAULT_POSTGRES_IMAGE: &str = "postgres:14";
 pub const DEFAULT_SUBNET_NODE_IMAGE: &str = "hirosystems/hyperchains:0.0.4-stretch";
 pub const DEFAULT_SUBNET_CONTRACT_ID: &str = "STXMJXCJDCT4WPF2X1HE42T6ZCCK3TPMBRZ51JEG.hc-alpha";
@@ -31,6 +34,11 @@ pub const DEFAULT_DOCKER_SOCKET: &str = "unix:///var/run/docker.sock";
 pub const DEFAULT_DOCKER_SOCKET: &str = "npipe:////./pipe/docker_engine";
 #[cfg(target_family = "wasm")]
 pub const DEFAULT_DOCKER_SOCKET: &str = "/var/run/docker.sock";
+
+pub const DEFAULT_EPOCH_2_0: u64 = 100;
+pub const DEFAULT_EPOCH_2_05: u64 = 102;
+pub const DEFAULT_EPOCH_2_1: u64 = 106;
+pub const DEFAULT_POX2_ACTIVATION: u64 = 108;
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct NetworkManifestFile {
@@ -51,6 +59,7 @@ pub struct NetworkConfigFile {
 
 #[derive(Serialize, Deserialize, Debug, Default)]
 pub struct DevnetConfigFile {
+    pub network_id: Option<u16>,
     pub orchestrator_port: Option<u16>,
     pub orchestrator_control_port: Option<u16>,
     pub bitcoin_node_p2p_port: Option<u16>,
@@ -58,6 +67,9 @@ pub struct DevnetConfigFile {
     pub stacks_node_p2p_port: Option<u16>,
     pub stacks_node_rpc_port: Option<u16>,
     pub stacks_node_events_observers: Option<Vec<String>>,
+    pub stacks_node_env_vars: Option<Vec<String>>,
+    pub stacks_api_env_vars: Option<Vec<String>>,
+    pub stacks_explorer_env_vars: Option<Vec<String>>,
     pub stacks_api_port: Option<u16>,
     pub stacks_api_events_port: Option<u16>,
     pub bitcoin_explorer_port: Option<u16>,
@@ -103,6 +115,11 @@ pub struct DevnetConfigFile {
     pub disable_subnet_api: Option<bool>,
     pub docker_host: Option<String>,
     pub components_host: Option<String>,
+    pub enable_next_features: Option<bool>,
+    pub epoch_2_0: Option<u64>,
+    pub epoch_2_05: Option<u64>,
+    pub epoch_2_1: Option<u64>,
+    pub pox_2_activation: Option<u64>,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -147,6 +164,7 @@ pub struct NetworkConfig {
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct DevnetConfig {
+    pub network_id: Option<u16>,
     pub orchestrator_ingestion_port: u16,
     pub orchestrator_control_port: u16,
     pub bitcoin_node_p2p_port: u16,
@@ -156,9 +174,12 @@ pub struct DevnetConfig {
     pub stacks_node_p2p_port: u16,
     pub stacks_node_rpc_port: u16,
     pub stacks_node_events_observers: Vec<String>,
+    pub stacks_node_env_vars: Vec<String>,
     pub stacks_api_port: u16,
     pub stacks_api_events_port: u16,
+    pub stacks_api_env_vars: Vec<String>,
     pub stacks_explorer_port: u16,
+    pub stacks_explorer_env_vars: Vec<String>,
     pub bitcoin_explorer_port: u16,
     pub bitcoin_controller_block_time: u32,
     pub bitcoin_controller_automining_disabled: bool,
@@ -209,6 +230,11 @@ pub struct DevnetConfig {
     pub disable_subnet_api: bool,
     pub docker_host: String,
     pub components_host: String,
+    pub enable_next_features: bool,
+    pub epoch_2_0: u64,
+    pub epoch_2_05: u64,
+    pub epoch_2_1: u64,
+    pub pox_2_activation: u64,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -236,10 +262,16 @@ impl NetworkManifest {
         project_manifest_location: &FileLocation,
         networks: &(BitcoinNetwork, StacksNetwork),
         cache_location: Option<&FileLocation>,
+        devnet_override: Option<DevnetConfigFile>,
     ) -> Result<NetworkManifest, String> {
         let network_manifest_location =
             project_manifest_location.get_network_manifest_location(&networks.1)?;
-        NetworkManifest::from_location(&network_manifest_location, networks, cache_location)
+        NetworkManifest::from_location(
+            &network_manifest_location,
+            networks,
+            cache_location,
+            devnet_override,
+        )
     }
 
     pub async fn from_project_manifest_location_using_file_accessor(
@@ -255,13 +287,19 @@ impl NetworkManifest {
 
         let mut network_manifest_file: NetworkManifestFile =
             toml::from_slice(&content.as_bytes()).unwrap();
-        NetworkManifest::from_network_manifest_file(&mut network_manifest_file, networks, None)
+        NetworkManifest::from_network_manifest_file(
+            &mut network_manifest_file,
+            networks,
+            None,
+            None,
+        )
     }
 
     pub fn from_location(
         location: &FileLocation,
         networks: &(BitcoinNetwork, StacksNetwork),
         cache_location: Option<&FileLocation>,
+        devnet_override: Option<DevnetConfigFile>,
     ) -> Result<NetworkManifest, String> {
         let network_manifest_file_content = location.read_content()?;
         let mut network_manifest_file: NetworkManifestFile =
@@ -270,6 +308,7 @@ impl NetworkManifest {
             &mut network_manifest_file,
             networks,
             cache_location,
+            devnet_override,
         )
     }
 
@@ -277,6 +316,7 @@ impl NetworkManifest {
         network_manifest_file: &mut NetworkManifestFile,
         networks: &(BitcoinNetwork, StacksNetwork),
         cache_location: Option<&FileLocation>,
+        devnet_override: Option<DevnetConfigFile>,
     ) -> Result<NetworkManifest, String> {
         let stacks_node_rpc_address = match (
             &network_manifest_file.network.node_rpc_address,
@@ -368,8 +408,210 @@ impl NetworkManifest {
                 _ => DevnetConfigFile::default(),
             };
 
+            if let Some(ref devnet_override) = devnet_override {
+                if let Some(val) = devnet_override.orchestrator_port {
+                    devnet_config.orchestrator_port = Some(val);
+                }
+
+                if let Some(val) = devnet_override.orchestrator_control_port {
+                    devnet_config.orchestrator_control_port = Some(val);
+                }
+
+                if let Some(val) = devnet_override.bitcoin_node_p2p_port {
+                    devnet_config.bitcoin_node_p2p_port = Some(val);
+                }
+
+                if let Some(val) = devnet_override.bitcoin_node_rpc_port {
+                    devnet_config.bitcoin_node_rpc_port = Some(val);
+                }
+
+                if let Some(val) = devnet_override.stacks_node_p2p_port {
+                    devnet_config.stacks_node_p2p_port = Some(val);
+                }
+
+                if let Some(val) = devnet_override.stacks_node_rpc_port {
+                    devnet_config.stacks_node_rpc_port = Some(val);
+                }
+
+                if let Some(ref val) = devnet_override.stacks_node_events_observers {
+                    devnet_config.stacks_node_events_observers = Some(val.clone());
+                }
+
+                if let Some(val) = devnet_override.stacks_api_port {
+                    devnet_config.stacks_api_port = Some(val);
+                }
+
+                if let Some(val) = devnet_override.stacks_api_events_port {
+                    devnet_config.stacks_api_events_port = Some(val);
+                }
+
+                if let Some(val) = devnet_override.bitcoin_explorer_port {
+                    devnet_config.bitcoin_explorer_port = Some(val);
+                }
+
+                if let Some(val) = devnet_override.stacks_explorer_port {
+                    devnet_config.stacks_explorer_port = Some(val);
+                }
+
+                if let Some(ref val) = devnet_override.bitcoin_node_username {
+                    devnet_config.bitcoin_node_username = Some(val.clone());
+                }
+
+                if let Some(ref val) = devnet_override.bitcoin_node_password {
+                    devnet_config.bitcoin_node_password = Some(val.clone());
+                }
+
+                if let Some(ref val) = devnet_override.miner_mnemonic {
+                    devnet_config.miner_mnemonic = Some(val.clone());
+                }
+
+                if let Some(ref val) = devnet_override.miner_derivation_path {
+                    devnet_config.miner_derivation_path = Some(val.clone());
+                }
+
+                if let Some(val) = devnet_override.bitcoin_controller_block_time {
+                    devnet_config.bitcoin_controller_block_time = Some(val);
+                }
+
+                if let Some(ref val) = devnet_override.working_dir {
+                    devnet_config.working_dir = Some(val.clone());
+                }
+
+                if let Some(val) = devnet_override.postgres_port {
+                    devnet_config.postgres_port = Some(val);
+                }
+
+                if let Some(ref val) = devnet_override.postgres_username {
+                    devnet_config.postgres_username = Some(val.clone());
+                }
+
+                if let Some(ref val) = devnet_override.postgres_password {
+                    devnet_config.postgres_password = Some(val.clone());
+                }
+
+                if let Some(ref val) = devnet_override.stacks_api_postgres_database {
+                    devnet_config.stacks_api_postgres_database = Some(val.clone());
+                }
+
+                if let Some(ref val) = devnet_override.subnet_api_postgres_database {
+                    devnet_config.subnet_api_postgres_database = Some(val.clone());
+                }
+
+                if let Some(ref val) = devnet_override.pox_stacking_orders {
+                    devnet_config.pox_stacking_orders = Some(val.clone());
+                }
+
+                if let Some(ref val) = devnet_override.execute_script {
+                    devnet_config.execute_script = Some(val.clone());
+                }
+
+                if let Some(ref val) = devnet_override.bitcoin_node_image_url {
+                    devnet_config.bitcoin_node_image_url = Some(val.clone());
+                }
+
+                if let Some(ref val) = devnet_override.bitcoin_explorer_image_url {
+                    devnet_config.bitcoin_explorer_image_url = Some(val.clone());
+                }
+
+                if let Some(ref val) = devnet_override.stacks_node_image_url {
+                    devnet_config.stacks_node_image_url = Some(val.clone());
+                }
+
+                if let Some(ref val) = devnet_override.stacks_api_image_url {
+                    devnet_config.stacks_api_image_url = Some(val.clone());
+                }
+
+                if let Some(ref val) = devnet_override.stacks_explorer_image_url {
+                    devnet_config.stacks_explorer_image_url = Some(val.clone());
+                }
+
+                if let Some(ref val) = devnet_override.postgres_image_url {
+                    devnet_config.postgres_image_url = Some(val.clone());
+                }
+
+                if let Some(val) = devnet_override.disable_bitcoin_explorer {
+                    devnet_config.disable_bitcoin_explorer = Some(val);
+                }
+
+                if let Some(val) = devnet_override.disable_stacks_explorer {
+                    devnet_config.disable_stacks_explorer = Some(val);
+                }
+
+                if let Some(val) = devnet_override.disable_stacks_api {
+                    devnet_config.disable_stacks_api = Some(val);
+                }
+
+                if let Some(val) = devnet_override.bitcoin_controller_automining_disabled {
+                    devnet_config.bitcoin_controller_automining_disabled = Some(val);
+                }
+
+                if let Some(val) = devnet_override.enable_subnet_node {
+                    devnet_config.enable_subnet_node = Some(val);
+                }
+
+                if let Some(val) = devnet_override.subnet_node_p2p_port {
+                    devnet_config.subnet_node_p2p_port = Some(val);
+                }
+
+                if let Some(val) = devnet_override.subnet_node_rpc_port {
+                    devnet_config.subnet_node_rpc_port = Some(val);
+                }
+
+                if let Some(val) = devnet_override.subnet_events_ingestion_port {
+                    devnet_config.subnet_events_ingestion_port = Some(val);
+                }
+
+                if let Some(ref val) = devnet_override.subnet_node_events_observers {
+                    devnet_config.subnet_node_events_observers = Some(val.clone());
+                }
+
+                if let Some(ref val) = devnet_override.subnet_node_image_url {
+                    devnet_config.subnet_node_image_url = Some(val.clone());
+                }
+
+                if let Some(ref val) = devnet_override.subnet_leader_derivation_path {
+                    devnet_config.subnet_leader_derivation_path = Some(val.clone());
+                }
+
+                if let Some(ref val) = devnet_override.subnet_leader_mnemonic {
+                    devnet_config.subnet_leader_mnemonic = Some(val.clone());
+                }
+
+                if let Some(ref val) = devnet_override.subnet_leader_mnemonic {
+                    devnet_config.subnet_leader_mnemonic = Some(val.clone());
+                }
+
+                if let Some(ref val) = devnet_override.enable_next_features {
+                    devnet_config.enable_next_features = Some(val.clone());
+                }
+
+                if let Some(ref val) = devnet_override.epoch_2_0 {
+                    devnet_config.epoch_2_0 = Some(val.clone());
+                }
+
+                if let Some(ref val) = devnet_override.epoch_2_05 {
+                    devnet_config.epoch_2_05 = Some(val.clone());
+                }
+
+                if let Some(ref val) = devnet_override.epoch_2_1 {
+                    devnet_config.epoch_2_1 = Some(val.clone());
+                }
+
+                if let Some(ref val) = devnet_override.pox_2_activation {
+                    devnet_config.pox_2_activation = Some(val.clone());
+                }
+
+                if let Some(val) = devnet_override.network_id {
+                    devnet_config.network_id = Some(val);
+                }
+            };
+
             let now = clarity_repl::clarity::util::get_epoch_time_secs();
-            let devnet_dir = format!("stacks-devnet-{}/", now);
+            let devnet_dir = if let Some(network_id) = devnet_config.network_id {
+                format!("stacks-devnet-{}-{}/", now, network_id)
+            } else {
+                format!("stacks-devnet-{}/", now)
+            };
             let default_working_dir = match cache_location {
                 Some(cache_location) => {
                     let mut devnet_location = cache_location.clone();
@@ -462,8 +704,10 @@ impl NetworkManifest {
                 .expect("default deployer account unavailable");
             let remapped_subnet_contract_id =
                 format!("{}.{}", default_deployer.stx_address, contract_id.name);
+            let enable_next_features = devnet_config.enable_next_features.unwrap_or(false);
 
             let mut config = DevnetConfig {
+                network_id: devnet_config.network_id,
                 orchestrator_ingestion_port: devnet_config.orchestrator_port.unwrap_or(20445),
                 orchestrator_control_port: devnet_config.orchestrator_control_port.unwrap_or(20446),
                 bitcoin_node_p2p_port: devnet_config.bitcoin_node_p2p_port.unwrap_or(18444),
@@ -525,14 +769,20 @@ impl NetworkManifest {
                     .bitcoin_node_image_url
                     .take()
                     .unwrap_or(DEFAULT_BITCOIN_NODE_IMAGE.to_string()),
-                stacks_node_image_url: devnet_config
-                    .stacks_node_image_url
-                    .take()
-                    .unwrap_or(DEFAULT_STACKS_NODE_IMAGE.to_string()),
-                stacks_api_image_url: devnet_config
-                    .stacks_api_image_url
-                    .take()
-                    .unwrap_or(DEFAULT_STACKS_API_IMAGE.to_string()),
+                stacks_node_image_url: devnet_config.stacks_node_image_url.take().unwrap_or(
+                    match enable_next_features {
+                        true => DEFAULT_STACKS_NODE_NEXT_IMAGE,
+                        false => DEFAULT_STACKS_NODE_IMAGE,
+                    }
+                    .to_string(),
+                ),
+                stacks_api_image_url: devnet_config.stacks_api_image_url.take().unwrap_or(
+                    match enable_next_features {
+                        true => DEFAULT_STACKS_API_NEXT_IMAGE,
+                        false => DEFAULT_STACKS_API_IMAGE,
+                    }
+                    .to_string(),
+                ),
                 postgres_image_url: devnet_config
                     .postgres_image_url
                     .take()
@@ -540,7 +790,13 @@ impl NetworkManifest {
                 stacks_explorer_image_url: devnet_config
                     .stacks_explorer_image_url
                     .take()
-                    .unwrap_or(DEFAULT_STACKS_EXPLORER_IMAGE.to_string()),
+                    .unwrap_or(
+                        match enable_next_features {
+                            true => DEFAULT_STACKS_EXPLORER_NEXT_IMAGE,
+                            false => DEFAULT_STACKS_EXPLORER_IMAGE,
+                        }
+                        .to_string(),
+                    ),
                 bitcoin_explorer_image_url: devnet_config
                     .bitcoin_explorer_image_url
                     .take()
@@ -580,6 +836,19 @@ impl NetworkManifest {
                     .docker_host
                     .unwrap_or(DEFAULT_DOCKER_SOCKET.into()),
                 components_host: devnet_config.components_host.unwrap_or("127.0.0.1".into()),
+                epoch_2_0: devnet_config.epoch_2_0.unwrap_or(DEFAULT_EPOCH_2_0),
+                epoch_2_05: devnet_config.epoch_2_05.unwrap_or(DEFAULT_EPOCH_2_05),
+                epoch_2_1: devnet_config.epoch_2_1.unwrap_or(DEFAULT_EPOCH_2_1),
+                pox_2_activation: devnet_config
+                    .pox_2_activation
+                    .unwrap_or(DEFAULT_POX2_ACTIVATION),
+                stacks_node_env_vars: devnet_config.stacks_node_env_vars.take().unwrap_or(vec![]),
+                stacks_api_env_vars: devnet_config.stacks_api_env_vars.take().unwrap_or(vec![]),
+                stacks_explorer_env_vars: devnet_config
+                    .stacks_explorer_env_vars
+                    .take()
+                    .unwrap_or(vec![]),
+                enable_next_features,
             };
             if !config.disable_stacks_api && config.disable_stacks_api {
                 config.disable_stacks_api = false;

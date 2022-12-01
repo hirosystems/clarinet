@@ -7,6 +7,9 @@ pub mod chains_coordinator;
 mod orchestrator;
 mod ui;
 
+pub use chainhook_event_observer::utils::Context;
+pub use orchestrator::DevnetOrchestrator;
+
 use std::{
     sync::{
         mpsc::{self, channel, Sender},
@@ -22,10 +25,9 @@ use tracing::{self, debug, error, info, warn};
 use tracing_appender;
 
 use chainhook_types::{BitcoinChainEvent, StacksChainEvent};
-use chains_coordinator::start_chains_coordinator;
+use chains_coordinator::{start_chains_coordinator, BitcoinMiningCommand};
 use clarinet_deployments::types::DeploymentSpecification;
 use hiro_system_kit;
-pub use orchestrator::DevnetOrchestrator;
 use std::sync::atomic::{AtomicBool, Ordering};
 
 use self::chains_coordinator::DevnetEventObserverConfig;
@@ -34,7 +36,6 @@ use self::chains_coordinator::DevnetEventObserverConfig;
 #[derive(Debug)]
 pub enum ChainsCoordinatorCommand {
     Terminate,
-    ProtocolDeployed,
 }
 
 pub fn block_on<F, R>(future: F) -> R
@@ -51,6 +52,7 @@ pub async fn do_run_devnet(
     chainhooks: &mut Option<HookFormation>,
     log_tx: Option<Sender<LogData>>,
     display_dashboard: bool,
+    ctx: Context,
 ) -> Result<
     (
         Option<mpsc::Receiver<DevnetEvent>>,
@@ -111,6 +113,7 @@ pub async fn do_run_devnet(
                 moved_orchestrator_terminator_tx,
                 observer_command_tx,
                 observer_command_rx,
+                ctx,
             );
             let rt = hiro_system_kit::create_basic_runtime();
             rt.block_on(future)
@@ -213,14 +216,13 @@ pub enum DevnetEvent {
     Tick,
     ServiceStatus(ServiceStatusData),
     ProtocolDeployingProgress(ProtocolDeployingData),
-    ProtocolDeployed,
+    BootCompleted(Sender<BitcoinMiningCommand>),
     StacksChainEvent(StacksChainEvent),
     BitcoinChainEvent(BitcoinChainEvent),
     MempoolAdmission(MempoolAdmissionData),
     FatalError(String),
     // Restart,
     // Terminate,
-    // Microblock(MicroblockData),
 }
 
 #[allow(dead_code)]
@@ -315,7 +317,7 @@ pub struct ProtocolDeployingData {
 }
 
 #[derive(Clone, Debug)]
-pub struct ProtocolDeployedData {
+pub struct BootCompletedData {
     pub contracts_deployed: Vec<String>,
 }
 

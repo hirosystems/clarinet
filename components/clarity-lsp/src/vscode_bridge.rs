@@ -1,5 +1,8 @@
 extern crate console_error_panic_hook;
-use crate::backend::{process_notification, process_request, LspNotification, LspRequest};
+use crate::backend::{
+    process_notification, process_request, EditorStateInput, LspNotification, LspRequest,
+    LspRequestResponse,
+};
 use crate::state::EditorState;
 use crate::utils::{
     clarity_diagnostics_to_lsp_type, get_contract_location, get_manifest_location, log,
@@ -7,12 +10,13 @@ use crate::utils::{
 use clarinet_files::{FileAccessor, WASMFileSystemAccessor};
 use js_sys::{Function as JsFunction, Promise};
 use lsp_types::notification::{
-    DidOpenTextDocument, DidSaveTextDocument, Initialized, Notification,
+    DidChangeTextDocument, DidCloseTextDocument, DidOpenTextDocument, DidSaveTextDocument,
+    Initialized, Notification,
 };
+use lsp_types::request::{Completion, DocumentSymbolRequest, HoverRequest, Initialize, Request};
 use lsp_types::{
-    request::{Completion, Request},
-    CompletionParams, DidOpenTextDocumentParams, DidSaveTextDocumentParams,
-    PublishDiagnosticsParams, Url,
+    DidChangeTextDocumentParams, DidCloseTextDocumentParams, DidOpenTextDocumentParams,
+    DidSaveTextDocumentParams, PublishDiagnosticsParams, Url,
 };
 use serde_wasm_bindgen::{from_value as decode_from_js, to_value as encode_to_js};
 use std::panic;
@@ -22,10 +26,10 @@ use wasm_bindgen_futures::future_to_promise;
 
 #[wasm_bindgen]
 pub struct LspVscodeBridge {
-    editor_state_lock: Arc<RwLock<EditorState>>,
     client_diagnostic_tx: JsFunction,
     _client_notification_tx: JsFunction,
     backend_to_client_tx: JsFunction,
+    editor_state_lock: Arc<RwLock<EditorState>>,
 }
 
 #[wasm_bindgen]
@@ -38,24 +42,20 @@ impl LspVscodeBridge {
     ) -> LspVscodeBridge {
         panic::set_hook(Box::new(console_error_panic_hook::hook));
 
-        let editor_state_lock = Arc::new(RwLock::new(EditorState::new()));
         LspVscodeBridge {
-            editor_state_lock,
             client_diagnostic_tx,
             _client_notification_tx,
-            backend_to_client_tx,
+            backend_to_client_tx: backend_to_client_tx.clone(),
+            editor_state_lock: Arc::new(RwLock::new(EditorState::new())),
         }
     }
 
     #[wasm_bindgen(js_name=onNotification)]
     pub fn notification_handler(&self, method: String, js_params: JsValue) -> Promise {
-        let file_accessor: Box<dyn FileAccessor> = Box::new(WASMFileSystemAccessor::new(
-            self.backend_to_client_tx.clone(),
-        ));
-
-        match method.as_str() {
+        let command = match method.as_str() {
             Initialized::METHOD => {
                 log!("clarity extension initialized");
+                return Promise::resolve(&JsValue::FALSE);
             }
 
             DidOpenTextDocument::METHOD => {
@@ -63,48 +63,15 @@ impl LspVscodeBridge {
                     Ok(params) => params,
                     Err(err) => return Promise::reject(&JsValue::from(format!("error: {}", err))),
                 };
-                let uri = params.text_document.uri;
+                let uri = &params.text_document.uri;
 
-                let command = if let Some(contract_location) = get_contract_location(&uri) {
-                    LspNotification::ContractOpened(contract_location)
-                } else if let Some(manifest_location) = get_manifest_location(&uri) {
+                if let Some(contract_location) = get_contract_location(uri) {
+                    LspNotification::ContractOpened(contract_location.clone())
+                } else if let Some(manifest_location) = get_manifest_location(uri) {
                     LspNotification::ManifestOpened(manifest_location)
                 } else {
                     return Promise::reject(&JsValue::from_str("Unsupported file opened"));
-                };
-
-                let editor_state_lock = self.editor_state_lock.clone();
-                let send_diagnostic = self.client_diagnostic_tx.clone();
-
-                return future_to_promise(async move {
-                    let mut result = match editor_state_lock.try_write() {
-                        Ok(mut editor_state) => {
-                            process_notification(command, &mut editor_state, Some(&file_accessor))
-                                .await
-                        }
-                        Err(_) => return Err(JsValue::from("unable to lock editor_state")),
-                    };
-
-                    let mut aggregated_diagnostics = vec![];
-
-                    if let Ok(ref mut response) = result {
-                        aggregated_diagnostics.append(&mut response.aggregated_diagnostics);
-                    }
-
-                    for (location, mut diags) in aggregated_diagnostics.into_iter() {
-                        if let Ok(uri) = Url::parse(&location.to_string()) {
-                            let value = PublishDiagnosticsParams {
-                                uri,
-                                diagnostics: clarity_diagnostics_to_lsp_type(&mut diags),
-                                version: None,
-                            };
-
-                            send_diagnostic.call1(&JsValue::NULL, &encode_to_js(&value)?)?;
-                        }
-                    }
-
-                    Ok(JsValue::TRUE)
-                });
+                }
             }
 
             DidSaveTextDocument::METHOD => {
@@ -114,72 +81,128 @@ impl LspVscodeBridge {
                 };
                 let uri = &params.text_document.uri;
 
-                let command = if let Some(contract_location) = get_contract_location(uri) {
-                    LspNotification::ContractChanged(contract_location)
+                if let Some(contract_location) = get_contract_location(uri) {
+                    LspNotification::ContractSaved(contract_location)
                 } else if let Some(manifest_location) = get_manifest_location(uri) {
-                    LspNotification::ManifestChanged(manifest_location)
+                    LspNotification::ManifestSaved(manifest_location)
                 } else {
                     return Promise::reject(&JsValue::from_str("Unsupported file opened"));
-                };
-
-                let editor_state_lock = self.editor_state_lock.clone();
-                let send_diagnostic = self.client_diagnostic_tx.clone();
-
-                return future_to_promise(async move {
-                    let mut result = match editor_state_lock.try_write() {
-                        Ok(mut editor_state) => {
-                            process_notification(command, &mut editor_state, Some(&file_accessor))
-                                .await
-                        }
-                        Err(_) => return Err(JsValue::from("unable to lock editor_state")),
-                    };
-
-                    let mut aggregated_diagnostics = vec![];
-
-                    if let Ok(ref mut response) = result {
-                        aggregated_diagnostics.append(&mut response.aggregated_diagnostics);
-                    }
-
-                    for (location, mut diags) in aggregated_diagnostics.into_iter() {
-                        if let Ok(uri) = Url::parse(&location.to_string()) {
-                            let value = PublishDiagnosticsParams {
-                                uri,
-                                diagnostics: clarity_diagnostics_to_lsp_type(&mut diags),
-                                version: None,
-                            };
-
-                            send_diagnostic.call1(&JsValue::NULL, &encode_to_js(&value)?)?;
-                        }
-                    }
-
-                    Ok(JsValue::TRUE)
-                });
+                }
             }
+
+            DidChangeTextDocument::METHOD => {
+                let params: DidChangeTextDocumentParams = match decode_from_js(js_params) {
+                    Ok(params) => params,
+                    Err(err) => return Promise::reject(&JsValue::from(format!("error: {}", err))),
+                };
+                let uri = &params.text_document.uri;
+
+                if let Some(contract_location) = get_contract_location(uri) {
+                    LspNotification::ContractChanged(
+                        contract_location,
+                        params.content_changes[0].text.to_string(),
+                    )
+                } else {
+                    return Promise::resolve(&JsValue::FALSE);
+                }
+            }
+
+            DidCloseTextDocument::METHOD => {
+                let params: DidCloseTextDocumentParams = match decode_from_js(js_params) {
+                    Ok(params) => params,
+                    Err(err) => return Promise::reject(&JsValue::from(format!("error: {}", err))),
+                };
+                let uri = &params.text_document.uri;
+
+                if let Some(contract_location) = get_contract_location(uri) {
+                    LspNotification::ContractClosed(contract_location)
+                } else {
+                    return Promise::resolve(&JsValue::FALSE);
+                }
+            }
+
             _ => {
                 #[cfg(debug_assertions)]
                 log!("unexpected notification ({})", method);
+                return Promise::resolve(&JsValue::FALSE);
             }
-        }
+        };
 
-        return Promise::resolve(&JsValue::NULL);
+        let mut editor_state_lock = EditorStateInput::RwLock(self.editor_state_lock.clone());
+        let send_diagnostic = self.client_diagnostic_tx.clone();
+        let file_accessor: Box<dyn FileAccessor> = Box::new(WASMFileSystemAccessor::new(
+            self.backend_to_client_tx.clone(),
+        ));
+
+        future_to_promise(async move {
+            let mut result =
+                process_notification(command, &mut editor_state_lock, Some(&file_accessor)).await;
+
+            let mut aggregated_diagnostics = vec![];
+            if let Ok(ref mut response) = result {
+                aggregated_diagnostics.append(&mut response.aggregated_diagnostics);
+            }
+
+            for (location, mut diags) in aggregated_diagnostics.into_iter() {
+                if let Ok(uri) = Url::parse(&location.to_string()) {
+                    send_diagnostic.call1(
+                        &JsValue::NULL,
+                        &encode_to_js(&PublishDiagnosticsParams {
+                            uri,
+                            diagnostics: clarity_diagnostics_to_lsp_type(&mut diags),
+                            version: None,
+                        })?,
+                    )?;
+                }
+            }
+
+            Ok(JsValue::TRUE)
+        })
     }
 
     #[wasm_bindgen(js_name=onRequest)]
     pub fn request_handler(&self, method: String, js_params: JsValue) -> Result<JsValue, JsValue> {
         match method.as_str() {
-            Completion::METHOD => {
-                let params: CompletionParams = decode_from_js(js_params)?;
-                let file_url = params.text_document_position.text_document.uri;
-                let location = get_contract_location(&file_url).ok_or(JsValue::NULL)?;
-                let command = LspRequest::GetIntellisense(location);
-                let editor_state = self
-                    .editor_state_lock
-                    .try_read()
-                    .map_err(|_| JsValue::NULL)?;
-                let lsp_response = process_request(command, &editor_state);
-
-                return encode_to_js(&lsp_response.completion_items).map_err(|_| JsValue::NULL);
+            Initialize::METHOD => {
+                let lsp_response = process_request(
+                    LspRequest::Initialize(decode_from_js(js_params)?),
+                    &EditorStateInput::RwLock(self.editor_state_lock.clone()),
+                );
+                if let LspRequestResponse::Initialize(response) = lsp_response {
+                    return encode_to_js(&response).map_err(|_| JsValue::NULL);
+                }
             }
+
+            Completion::METHOD => {
+                let lsp_response = process_request(
+                    LspRequest::Completion(decode_from_js(js_params)?),
+                    &EditorStateInput::RwLock(self.editor_state_lock.clone()),
+                );
+                if let LspRequestResponse::CompletionItems(response) = lsp_response {
+                    return encode_to_js(&response).map_err(|_| JsValue::NULL);
+                }
+            }
+
+            DocumentSymbolRequest::METHOD => {
+                let lsp_response = process_request(
+                    LspRequest::DocumentSymbol(decode_from_js(js_params)?),
+                    &EditorStateInput::RwLock(self.editor_state_lock.clone()),
+                );
+                if let LspRequestResponse::DocumentSymbol(response) = lsp_response {
+                    return encode_to_js(&response).map_err(|_| JsValue::NULL);
+                }
+            }
+
+            HoverRequest::METHOD => {
+                let lsp_response = process_request(
+                    LspRequest::Hover(decode_from_js(js_params)?),
+                    &EditorStateInput::RwLock(self.editor_state_lock.clone()),
+                );
+                if let LspRequestResponse::Hover(response) = lsp_response {
+                    return encode_to_js(&response).map_err(|_| JsValue::NULL);
+                }
+            }
+
             _ => {
                 #[cfg(debug_assertions)]
                 log!("unexpected request ({})", method);

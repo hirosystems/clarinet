@@ -11,7 +11,7 @@ use clarity_repl::clarity::vm::types::{
     PrincipalData, QualifiedContractIdentifier, StandardPrincipalData,
 };
 use clarity_repl::clarity::vm::{ClarityName, Value};
-use clarity_repl::clarity::{ContractName, EvaluationResult};
+use clarity_repl::clarity::{ClarityVersion, ContractName, EvaluationResult};
 use clarity_repl::codec::{
     SinglesigHashMode, SinglesigSpendingCondition, StacksString, StacksTransactionSigner,
     TokenTransferMemo, TransactionAuth, TransactionContractCall, TransactionPayload,
@@ -174,6 +174,7 @@ pub fn encode_stx_transfer(
 pub fn encode_contract_publish(
     contract_name: &ContractName,
     source: &str,
+    clarity_version: Option<ClarityVersion>,
     account: &AccountConfig,
     nonce: u64,
     tx_fee: u64,
@@ -186,7 +187,7 @@ pub fn encode_contract_publish(
     };
     sign_transaction_payload(
         account,
-        TransactionPayload::SmartContract(payload),
+        TransactionPayload::SmartContract(payload, clarity_version),
         nonce,
         tx_fee,
         anchor_mode,
@@ -221,7 +222,7 @@ pub enum TransactionCheck {
 pub enum DeploymentEvent {
     TransactionUpdate(TransactionTracker),
     Interrupted(String),
-    ProtocolDeployed,
+    DeploymentCompleted,
 }
 
 pub enum DeploymentCommand {
@@ -291,11 +292,13 @@ pub fn update_deployment_costs(
                     };
                 }
                 TransactionSpecification::ContractPublish(tx) => {
-                    let transaction_payload =
-                        TransactionPayload::SmartContract(TransactionSmartContract {
+                    let transaction_payload = TransactionPayload::SmartContract(
+                        TransactionSmartContract {
                             name: tx.contract_name.clone(),
                             code_body: StacksString::from_str(&tx.source).unwrap(),
-                        });
+                        },
+                        None,
+                    );
 
                     match stacks_rpc.estimate_transaction_fee(&transaction_payload, priority) {
                         Ok(fee) => {
@@ -328,6 +331,7 @@ pub fn apply_on_chain_deployment(
         &manifest.location,
         &deployment.network.get_networks(),
         None,
+        None,
     )
     .expect("unable to load network manifest");
     let delay_between_checks: u64 = 10;
@@ -339,12 +343,15 @@ pub fn apply_on_chain_deployment(
     let mut accounts_cached_nonces: BTreeMap<String, u64> = BTreeMap::new();
     let mut stx_accounts_lookup: BTreeMap<String, &AccountConfig> = BTreeMap::new();
     let mut btc_accounts_lookup: BTreeMap<String, &AccountConfig> = BTreeMap::new();
-
+    let mut clarity_version_available = false;
     if !fetch_initial_nonces {
         if network == StacksNetwork::Devnet {
             for (_, account) in network_manifest.accounts.iter() {
                 accounts_cached_nonces.insert(account.stx_address.clone(), 0);
             }
+            if let Some(ref devnet) = network_manifest.devnet {
+                clarity_version_available = devnet.enable_next_features;
+            };
         }
     }
 
@@ -541,9 +548,16 @@ pub fn apply_on_chain_deployment(
                         false => TransactionAnchorMode::Any,
                     };
 
+                    let clarity_version = if clarity_version_available {
+                        Some(tx.clarity_version.clone())
+                    } else {
+                        None
+                    };
+
                     let transaction = match encode_contract_publish(
                         &tx.contract_name,
                         &source,
+                        clarity_version,
                         *account,
                         nonce,
                         tx.cost,
@@ -619,6 +633,7 @@ pub fn apply_on_chain_deployment(
                     let transaction = match encode_contract_publish(
                         &tx.contract_id.name,
                         &source,
+                        None,
                         *account,
                         nonce,
                         tx.cost,
@@ -689,7 +704,7 @@ pub fn apply_on_chain_deployment(
                     ongoing_batch.insert(res.txid, tracker);
                 }
                 Err(e) => {
-                    let message = format!("unable to post transaction\n{:?}", e);
+                    let message = format!("unable to post transaction\n{}", e.to_string());
                     tracker.status = TransactionStatus::Error(message.clone());
 
                     let _ = deployment_event_tx
@@ -728,13 +743,16 @@ pub fn apply_on_chain_deployment(
                     )) => {
                         let deployer_address = deployer.to_address();
                         let res = stacks_rpc.get_contract_source(&deployer_address, &contract_name);
-                        if let Ok(_contract) = res {
-                            tracker.status = TransactionStatus::Confirmed;
-                            let _ = deployment_event_tx
-                                .send(DeploymentEvent::TransactionUpdate(tracker.clone()));
-                        } else {
-                            keep_looping = true;
-                            break;
+                        match res {
+                            Ok(_contract) => {
+                                tracker.status = TransactionStatus::Confirmed;
+                                let _ = deployment_event_tx
+                                    .send(DeploymentEvent::TransactionUpdate(tracker.clone()));
+                            }
+                            Err(_e) => {
+                                keep_looping = true;
+                                break;
+                            }
                         }
                     }
                     TransactionStatus::Broadcasted(TransactionCheck::NonceCheck(
@@ -763,7 +781,7 @@ pub fn apply_on_chain_deployment(
         }
     }
 
-    let _ = deployment_event_tx.send(DeploymentEvent::ProtocolDeployed);
+    let _ = deployment_event_tx.send(DeploymentEvent::DeploymentCompleted);
 }
 
 pub fn get_initial_transactions_trackers(

@@ -1,5 +1,6 @@
 use crate::config::Config;
 use chainhook_event_observer::indexer::{self, Indexer};
+use chainhook_event_observer::utils::Context;
 use chainhook_types::BlockIdentifier;
 use redis::Commands;
 use serde::Deserialize;
@@ -35,12 +36,17 @@ pub enum RecordKind {
 pub fn start(
     digestion_tx: Sender<DigestingCommand>,
     config: &Config,
+    ctx: Context,
 ) -> Result<(BlockIdentifier, BlockIdentifier), String> {
     let (stacks_record_tx, stacks_record_rx) = channel();
     let (bitcoin_record_tx, bitcoin_record_rx) = channel();
 
     let seed_tsv_path = config.expected_local_tsv_file().clone();
-    info!("Initialize storage with events {}", seed_tsv_path.display());
+    info!(
+        ctx.expect_logger(),
+        "Initialize storage with events {}",
+        seed_tsv_path.display()
+    );
     let parsing_handle = thread::spawn(move || {
         let mut reader_builder = csv::ReaderBuilder::default()
             .has_headers(false)
@@ -103,7 +109,15 @@ pub fn start(
         while let Ok(Some(record)) = stacks_record_rx.recv() {
             let (block_identifier, parent_block_identifier) = match &record.kind {
                 RecordKind::StacksBlockReceived => {
-                    indexer::stacks::standardize_stacks_serialized_block_header(&record.raw_log)
+                    match indexer::stacks::standardize_stacks_serialized_block_header(
+                        &record.raw_log,
+                    ) {
+                        Ok(data) => data,
+                        Err(e) => {
+                            error!(ctx.expect_logger(), "{e}");
+                            continue;
+                        }
+                    }
                 }
                 _ => unreachable!(),
             };
@@ -142,7 +156,10 @@ pub fn start(
                     .expect("unable to retrieve tip height");
                 serde_json::from_str(&payload).unwrap()
             };
-            info!("Local storage seeded, no new block to process");
+            info!(
+                ctx.expect_logger(),
+                "Local storage seeded, no new block to process"
+            );
             return Ok(block_identifier);
         }
 
@@ -153,8 +170,8 @@ pub fn start(
             .collect();
 
         info!(
-            "Start processing canonical Stacks blocks from chain tip #{}",
-            tip_height
+            ctx.expect_logger(),
+            "Start processing canonical Stacks blocks from chain tip #{}", tip_height
         );
         // Retrieve all the headers stored at this height (SCAN - expensive)
         let mut selected_tip = BlockIdentifier::default();
@@ -179,7 +196,10 @@ pub fn start(
             let _ = digestion_tx.send(DigestingCommand::DigestSeedBlock(cursor.clone()));
             cursor = parent_block_identifier.clone();
         }
-        info!("{} Stacks blocks queued for processing", tip_height);
+        info!(
+            ctx.expect_logger(),
+            "{} Stacks blocks queued for processing", tip_height
+        );
 
         let _ = digestion_tx.send(DigestingCommand::GarbageCollect);
         Ok(selected_tip)

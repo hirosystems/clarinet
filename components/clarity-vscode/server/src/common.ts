@@ -1,17 +1,14 @@
 import {
-  TextDocumentSyncKind,
   CompletionRequest,
-  MarkupKind,
-  InsertTextFormat,
   DidOpenTextDocumentParams,
   DidCloseTextDocumentNotification,
   DidOpenTextDocumentNotification,
-  CompletionItemKind,
+  InitializeRequest,
 } from "vscode-languageserver";
-import type { ServerCapabilities, Connection } from "vscode-languageserver";
+import type { Connection } from "vscode-languageserver";
 
 // this type is the same for the browser and node but node isn't alwasy built in dev
-import type { LspVscodeBridge } from "./clarity-lsp-browser";
+import type { LspVscodeBridge } from "./clarity-lsp-browser/lsp-browser";
 
 const VALID_PROTOCOLS = ["file", "vscode-vfs", "vscode-test-web"];
 
@@ -19,18 +16,9 @@ export function initConnection(
   connection: Connection,
   bridge: LspVscodeBridge,
 ) {
-  connection.onInitialize(() => {
-    const capabilities: ServerCapabilities = {
-      textDocumentSync: {
-        change: TextDocumentSyncKind.None,
-        willSave: false,
-        openClose: true,
-        save: { includeText: false },
-      },
-      completionProvider: {},
-    };
-    return { capabilities };
-  });
+  connection.onInitialize(async (params) =>
+    bridge.onRequest(InitializeRequest.method, params),
+  );
 
   const notifications: [string, unknown][] = [];
   async function consumeNotification() {
@@ -49,16 +37,14 @@ export function initConnection(
     // vscode.dev sends didOpen notification twice
     // including a notification with a read only github:// url
     // instead of vscode-vfs://
-    if (method === DidOpenTextDocumentNotification.method) {
+    if (
+      method === DidOpenTextDocumentNotification.method ||
+      method === DidCloseTextDocumentNotification.method
+    ) {
       const [protocol] = (
         params as DidOpenTextDocumentParams
       ).textDocument.uri.split("://");
-
       if (!VALID_PROTOCOLS.includes(protocol)) return;
-    } else if (method === DidCloseTextDocumentNotification.method) {
-      // ignore didClose notifications
-      // it fires twice as well for nothing
-      return;
     }
 
     notifications.push([method, params]);
@@ -74,24 +60,7 @@ export function initConnection(
     // in the (occasional) event of a completion request happening while the server has
     // notifications to handle, let's ignore the completion request
     if (notifications.length > 0) return null;
-    const res = await bridge.onRequest(CompletionRequest.method, params);
-    if (!res) return null;
-    return res.map((item: Record<string, any>) => {
-      return {
-        ...item,
-        insertText: item.insert_text,
-        insertTextFormat:
-          item.insert_text_format === "PlainText"
-            ? InsertTextFormat.PlainText
-            : InsertTextFormat.Snippet,
-        // @ts-ignore
-        kind: CompletionItemKind[item.kind],
-        documentation: {
-          kind: MarkupKind.Markdown,
-          value: item.markdown_documentation,
-        },
-      };
-    });
+    return bridge.onRequest(CompletionRequest.method, params);
   });
 
   connection.listen();

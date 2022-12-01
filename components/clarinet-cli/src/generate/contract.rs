@@ -86,8 +86,8 @@ Clarinet.test({{
     name: "Ensure that <...>",
     async fn(chain: Chain, accounts: Map<string, Account>) {{
         let block = chain.mineBlock([
-            /* 
-             * Add transactions with: 
+            /*
+             * Add transactions with:
              * Tx.contractCall(...)
             */
         ]);
@@ -95,8 +95,8 @@ Clarinet.test({{
         assertEquals(block.height, 2);
 
         block = chain.mineBlock([
-            /* 
-             * Add transactions with: 
+            /*
+             * Add transactions with:
              * Tx.contractCall(...)
             */
         ]);

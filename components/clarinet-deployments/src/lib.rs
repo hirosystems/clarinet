@@ -205,6 +205,7 @@ pub async fn generate_default_deployment(
             &manifest.location,
             &network.get_networks(),
             Some(&manifest.project.cache_location),
+            None,
         )?,
         Some(file_accessor) => {
             NetworkManifest::from_project_manifest_location_using_file_accessor(
@@ -352,12 +353,13 @@ pub async fn generate_default_deployment(
                 Some(ast) => ast,
                 None => {
                     // Download the code
-                    let (source, contract_location) = requirements::retrieve_contract(
-                        &contract_id,
-                        &cache_location,
-                        &file_accessor,
-                    )
-                    .await?;
+                    let (source, clarity_version, contract_location) =
+                        requirements::retrieve_contract(
+                            &contract_id,
+                            &cache_location,
+                            &file_accessor,
+                        )
+                        .await?;
 
                     // Build the struct representing the requirement in the deployment
                     if network.is_simnet() {
@@ -394,6 +396,7 @@ pub async fn generate_default_deployment(
                             location: contract_location,
                             cost: deployment_fee_rate * source.len() as u64,
                             remap_principals,
+                            clarity_version,
                         };
                         requirements_publish.insert(contract_id.clone(), data);
                     }
@@ -505,8 +508,8 @@ pub async fn generate_default_deployment(
 
                 let source = contract_location.read_content_as_utf8().map_err(|_| {
                     format!(
-                        "unable to find contract at path {}",
-                        contract_config.expect_contract_path_as_str()
+                        "unable to find contract at {}",
+                        contract_location.to_string()
                     )
                 })?;
                 sources.insert(contract_location.to_string(), source);
@@ -567,7 +570,7 @@ pub async fn generate_default_deployment(
             .get(&contract_location.to_string())
             .ok_or(format!(
                 "Invalid Clarinet.toml, source file not found for: {}",
-                name
+                &name
             ))?
             .clone();
 

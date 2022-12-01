@@ -186,7 +186,7 @@ pub trait ASTVisitor<'a> {
                         Add | Subtract | Multiply | Divide | Modulo | Power | Sqrti | Log2 => {
                             self.traverse_arithmetic(expr, native_function, &args)
                         }
-                        BitwiseXOR => self.traverse_binary_bitwise(
+                        BitwiseXor => self.traverse_binary_bitwise(
                             expr,
                             native_function,
                             args.get(0).unwrap_or(&DEFAULT_EXPR),
@@ -211,12 +211,12 @@ pub trait ASTVisitor<'a> {
                                 .unwrap_or_default();
                             self.traverse_let(expr, &bindings, &args[1..])
                         }
-                        ElementAt => self.traverse_element_at(
+                        ElementAt | ElementAtAlias => self.traverse_element_at(
                             expr,
                             args.get(0).unwrap_or(&DEFAULT_EXPR),
                             args.get(1).unwrap_or(&DEFAULT_EXPR),
                         ),
-                        IndexOf => self.traverse_index_of(
+                        IndexOf | IndexOfAlias => self.traverse_index_of(
                             expr,
                             args.get(0).unwrap_or(&DEFAULT_EXPR),
                             args.get(1).unwrap_or(&DEFAULT_EXPR),
@@ -637,6 +637,21 @@ pub trait ASTVisitor<'a> {
                             .traverse_to_consensus_buff(expr, args.get(0).unwrap_or(&DEFAULT_EXPR)),
                         FromConsensusBuff => self.traverse_from_consensus_buff(
                             expr,
+                            args.get(0).unwrap_or(&DEFAULT_EXPR),
+                            args.get(1).unwrap_or(&DEFAULT_EXPR),
+                        ),
+                        ReplaceAt => self.traverse_replace_at(
+                            expr,
+                            args.get(0).unwrap_or(&DEFAULT_EXPR),
+                            args.get(1).unwrap_or(&DEFAULT_EXPR),
+                            args.get(2).unwrap_or(&DEFAULT_EXPR),
+                        ),
+                        BitwiseAnd | BitwiseOr | BitwiseNot | BitwiseXor2 => {
+                            self.traverse_bitwise(expr, native_function, &args)
+                        }
+                        BitwiseLShift | BitwiseRShift => self.traverse_bit_shift(
+                            expr,
+                            native_function,
                             args.get(0).unwrap_or(&DEFAULT_EXPR),
                             args.get(1).unwrap_or(&DEFAULT_EXPR),
                         ),
@@ -2429,6 +2444,74 @@ pub trait ASTVisitor<'a> {
     ) -> bool {
         true
     }
+
+    fn traverse_bitwise(
+        &mut self,
+        expr: &'a SymbolicExpression,
+        func: NativeFunctions,
+        operands: &'a [SymbolicExpression],
+    ) -> bool {
+        for operand in operands {
+            if !self.traverse_expr(operand) {
+                return false;
+            }
+        }
+        self.visit_bitwise(expr, func, operands)
+    }
+
+    fn visit_bitwise(
+        &mut self,
+        expr: &'a SymbolicExpression,
+        func: NativeFunctions,
+        operands: &'a [SymbolicExpression],
+    ) -> bool {
+        true
+    }
+
+    fn traverse_replace_at(
+        &mut self,
+        expr: &'a SymbolicExpression,
+        sequence: &'a SymbolicExpression,
+        index: &'a SymbolicExpression,
+        element: &'a SymbolicExpression,
+    ) -> bool {
+        self.traverse_expr(sequence)
+            && self.traverse_expr(index)
+            && self.traverse_expr(element)
+            && self.visit_replace_at(expr, sequence, element, index)
+    }
+
+    fn visit_replace_at(
+        &mut self,
+        expr: &'a SymbolicExpression,
+        sequence: &'a SymbolicExpression,
+        index: &'a SymbolicExpression,
+        element: &'a SymbolicExpression,
+    ) -> bool {
+        true
+    }
+
+    fn traverse_bit_shift(
+        &mut self,
+        expr: &'a SymbolicExpression,
+        func: NativeFunctions,
+        input: &'a SymbolicExpression,
+        shamt: &'a SymbolicExpression,
+    ) -> bool {
+        self.traverse_expr(input)
+            && self.traverse_expr(shamt)
+            && self.visit_bit_shift(expr, func, input, shamt)
+    }
+
+    fn visit_bit_shift(
+        &mut self,
+        expr: &'a SymbolicExpression,
+        func: NativeFunctions,
+        input: &'a SymbolicExpression,
+        shamt: &'a SymbolicExpression,
+    ) -> bool {
+        true
+    }
 }
 
 pub fn traverse<'a>(visitor: &mut impl ASTVisitor<'a>, exprs: &'a [SymbolicExpression]) -> bool {
@@ -2454,6 +2537,9 @@ fn match_tuple(
                     let mut tuple_map = HashMap::new();
                     for element in args {
                         let pair = element.match_list().unwrap_or_default();
+                        if pair.len() != 2 {
+                            return None;
+                        }
                         tuple_map.insert(pair[0].match_atom(), &pair[1]);
                     }
                     return Some(tuple_map);
