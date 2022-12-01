@@ -301,7 +301,7 @@ pub fn standardize_stacks_block(
                 execution_cost: tx.execution_cost.clone(),
                 receipt,
                 description,
-                position: StacksTransactionPosition::Index(tx.tx_index),
+                position: StacksTransactionPosition::anchor_block(tx.tx_index),
                 proof: None,
             },
         });
@@ -435,7 +435,7 @@ pub fn standardize_stacks_microblock_trail(
                 execution_cost: tx.execution_cost.clone(),
                 receipt,
                 description,
-                position: StacksTransactionPosition::Microblock(
+                position: StacksTransactionPosition::micro_block(
                     microblock_identifier.clone(),
                     tx.tx_index,
                 ),

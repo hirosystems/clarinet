@@ -187,8 +187,34 @@ pub struct StacksTransactionMetadata {
 #[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
 #[serde(untagged)]
 pub enum StacksTransactionPosition {
-    Index(usize),
-    Microblock(BlockIdentifier, usize),
+    AnchorBlock(AnchorBlockPosition),
+    MicroBlock(MicroBlockPosition),
+}
+
+impl StacksTransactionPosition {
+    pub fn anchor_block(index: usize) -> StacksTransactionPosition {
+        StacksTransactionPosition::AnchorBlock(AnchorBlockPosition {
+            index
+        })
+    }
+
+    pub fn micro_block(micro_block_identifier: BlockIdentifier, index: usize) -> StacksTransactionPosition {
+        StacksTransactionPosition::MicroBlock(MicroBlockPosition {
+            micro_block_identifier,
+            index,
+        })
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
+pub struct AnchorBlockPosition {
+    index: usize,
+}
+
+#[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
+pub struct MicroBlockPosition {
+    micro_block_identifier: BlockIdentifier,
+    index: usize,
 }
 
 #[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]

@@ -63,7 +63,7 @@ pub fn generate_test_tx_stacks_contract_call(
             },
             description: format!("contract call {}::{}", contract_identifier, method),
             sponsor: None,
-            position: chainhook_types::StacksTransactionPosition::Index(0),
+            position: chainhook_types::StacksTransactionPosition::anchor_block(0),
             proof: None,
         },
     }
