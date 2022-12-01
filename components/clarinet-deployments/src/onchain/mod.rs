@@ -378,7 +378,15 @@ pub fn apply_on_chain_deployment(
     let mut index = 0;
     let mut contracts_ids_to_remap: HashSet<(String, String)> = HashSet::new();
     for batch_spec in deployment.plan.batches.iter() {
-        let epoch = batch_spec.epoch.unwrap_or(default_epoch);
+        let epoch = match batch_spec.epoch {
+            Some(epoch) => {
+                if fetch_initial_nonces {
+                    println!("warning: 'epoch' specified for a deployment batch is ignored when applying a deployment plan. This field should only be specified for deployments plans used to launch a devnet with 'clarinet integrate'.");
+                }
+                epoch
+            }
+            None => default_epoch,
+        };
         let mut batch = Vec::new();
         for transaction in batch_spec.transactions.iter() {
             let tracker = match transaction {
@@ -694,10 +702,11 @@ pub fn apply_on_chain_deployment(
     for (epoch, batch) in batches.into_iter() {
         // Ensure we've reached the appropriate epoch for this batch
         let after_block = match epoch {
+            EpochSpec::Epoch2_0 => network_manifest.devnet.as_ref().unwrap().epoch_2_0,
             EpochSpec::Epoch2_05 => network_manifest.devnet.as_ref().unwrap().epoch_2_05,
             EpochSpec::Epoch2_1 => network_manifest.devnet.as_ref().unwrap().epoch_2_1,
         };
-        while current_block_height < after_block {
+        while !fetch_initial_nonces && current_block_height < after_block {
             let new_block_height = match stacks_rpc.get_info() {
                 Ok(info) => info.burn_block_height,
                 _ => {
