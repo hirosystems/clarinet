@@ -609,6 +609,13 @@ impl StacksNetwork {
         }
     }
 
+    pub fn is_testnet(&self) -> bool {
+        match self {
+            StacksNetwork::Testnet => true,
+            _ => false,
+        }
+    }
+
     pub fn either_devnet_or_testnet(&self) -> bool {
         match self {
             StacksNetwork::Devnet | StacksNetwork::Testnet => true,
