@@ -775,11 +775,15 @@ impl Session {
         ));
     }
 
+    #[cfg(not(feature = "wasm"))]
     fn easter_egg(&self, output: &mut Vec<String>) {
         let result = hiro_system_kit::nestable_block_on(fetch_message());
         let message = result.unwrap_or("You found it!".to_string());
         println!("{}", message);
     }
+
+    #[cfg(feature = "wasm")]
+    fn easter_egg(&self, output: &mut Vec<String>) {}
 
     fn parse_and_advance_chain_tip(&mut self, output: &mut Vec<String>, command: &str) {
         let args: Vec<_> = command.split(' ').collect();
