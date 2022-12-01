@@ -10,21 +10,28 @@ use super::ChainhookEvent;
 use super::DeploymentCache;
 use super::SessionArtifacts;
 use crate::runner::api_v1::utils::serialize_event;
-use chainhook_event_observer::chainhooks::evaluate_stacks_chainhook_on_transaction;
-use chainhook_event_observer::chainhooks::handle_stacks_hook_action;
+use chainhook_event_observer::chainhooks::stacks::evaluate_stacks_transaction_predicate_on_transaction;
+use chainhook_event_observer::chainhooks::stacks::handle_stacks_hook_action;
+use chainhook_event_observer::chainhooks::stacks::StacksChainhookOccurrence;
+use chainhook_event_observer::chainhooks::stacks::StacksTriggerChainhook;
 use chainhook_event_observer::chainhooks::types::StacksChainhookSpecification;
-use chainhook_event_observer::chainhooks::StacksChainhookOccurrence;
-use chainhook_event_observer::chainhooks::StacksTriggerChainhook;
 use chainhook_event_observer::indexer::stacks::get_standardized_stacks_receipt;
+use chainhook_event_observer::utils::Context;
 use chainhook_types::BlockIdentifier;
+use chainhook_types::StacksBlockData;
+use chainhook_types::StacksBlockMetadata;
 use chainhook_types::StacksContractCallData;
 use chainhook_types::StacksContractDeploymentData;
 use chainhook_types::StacksTransactionData;
 use chainhook_types::StacksTransactionKind;
 use chainhook_types::StacksTransactionMetadata;
 use chainhook_types::TransactionIdentifier;
+use chrono::{DateTime, NaiveDateTime, Utc};
 use clarinet_deployments::update_session_with_contracts_executions;
+use clarity_repl::clarity::stacks_common::util::hash::MerkleTree;
+use clarity_repl::clarity::util::hash::hex_bytes;
 use clarity_repl::clarity::util::hash::to_hex;
+use clarity_repl::clarity::util::hash::Sha512Trunc256Sum;
 use clarity_repl::clarity::vm::analysis::contract_interface_builder::build_contract_interface;
 use clarity_repl::clarity::vm::EvaluationResult;
 use clarity_repl::clarity::ClarityVersion;
@@ -41,7 +48,10 @@ use deno_core::located_script_name;
 use deno_core::serde_json::{json, Value};
 use deno_core::{op, Extension};
 use deno_core::{ModuleSpecifier, OpState};
+use sha2::{Digest, Sha256};
 use std::collections::{BTreeMap, HashMap};
+use std::fs::OpenOptions;
+use std::io::Write;
 use std::sync::mpsc::{self, Sender};
 use std::thread::sleep;
 use std::time::Duration;
@@ -240,7 +250,7 @@ pub async fn run_bridge(
 
 #[op]
 pub fn deprecation_notice(_state: &mut OpState, _args: Value, _: ()) -> Result<(), AnyError> {
-    println!("{}: clarinet v{} is incompatible with the version of the library being imported in the test files.", red!("error"), option_env!("CARGO_PKG_VERSION").expect("Unable to detect version"));
+    println!("{} clarinet v{} is incompatible with the version of the library being imported in the test files.", red!("error:"), option_env!("CARGO_PKG_VERSION").expect("Unable to detect version"));
     println!("The test files should import the latest version.");
     std::process::exit(1);
 }
@@ -279,7 +289,7 @@ fn new_session(state: &mut OpState, args: NewSessionArgs) -> Result<String, AnyE
                     if entry.is_none() {
                         // TODO(lgalabru): Ability to specify a deployment plan in tests
                         // https://github.com/hirosystems/clarinet/issues/357
-                        println!("{}: feature identified, but is not supported yet. Please comment in https://github.com/hirosystems/clarinet/issues/357", red!("Error"));
+                        println!("{}", format_err!("feature identified, but is not supported yet. Please comment in https://github.com/hirosystems/clarinet/issues/357"));
                         std::process::exit(1);
                     }
                 }
@@ -382,8 +392,8 @@ fn load_deployment(state: &mut OpState, args: LoadDeploymentArgs) -> Result<Stri
             }
             Err(_e) => {
                 println!(
-                    "{}: unable to load deployment {:?} in test {}",
-                    red!("Error"),
+                    "{} unable to load deployment {:?} in test {}",
+                    red!("error:"),
                     args.deployment_path,
                     label
                 );
@@ -481,7 +491,7 @@ struct CallReadOnlyFnArgs {
 #[op]
 fn call_read_only_fn(state: &mut OpState, args: CallReadOnlyFnArgs) -> Result<String, AnyError> {
     let (result, events) = perform_block(state, args.session_id, |_name, session| {
-        let execution = match session.invoke_contract_call(
+        let (execution, _contract_id) = match session.invoke_contract_call(
             &args.contract,
             &args.method,
             &args.args,
@@ -599,7 +609,7 @@ fn mine_block(state: &mut OpState, args: MineBlockArgs) -> Result<String, AnyErr
         let mut transactions = vec![];
         for (index, tx) in args.transactions.iter().enumerate() {
             if let Some(ref args) = tx.contract_call {
-                let execution = match session.invoke_contract_call(
+                let (execution, contract_id) = match session.invoke_contract_call(
                     &args.contract,
                     &args.method,
                     &args.args,
@@ -622,13 +632,14 @@ fn mine_block(state: &mut OpState, args: MineBlockArgs) -> Result<String, AnyErr
                         continue;
                     }
                 };
+
                 let kind = StacksTransactionKind::ContractCall(StacksContractCallData {
-                    contract_identifier: args.contract.clone(),
+                    contract_identifier: contract_id.to_string(),
                     method: args.method.clone(),
                     args: args.args.clone(),
                 });
                 transactions.push((
-                    wrap_result_in_simulate_transaction(index, &tx.sender, kind, &execution),
+                    wrap_result_in_simulated_transaction(index, &tx.sender, kind, &execution),
                     execution.events,
                 ));
             } else {
@@ -675,19 +686,15 @@ fn mine_block(state: &mut OpState, args: MineBlockArgs) -> Result<String, AnyErr
                             code: contract.expect_in_memory_code_source().to_string(),
                         });
                     transactions.push((
-                        wrap_result_in_simulate_transaction(index, &tx.sender, kind, &execution),
+                        wrap_result_in_simulated_transaction(index, &tx.sender, kind, &execution),
                         execution.events,
                     ));
                 } else if let Some(ref args) = tx.transfer_stx {
-                    let snippet = format!(
-                        "(stx-transfer? u{} tx-sender '{})",
-                        args.amount, args.recipient
-                    );
-                    let execution = match session.eval(snippet.clone(), None, false) {
+                    let execution = match session.stx_transfer(args.amount, &args.recipient) {
                         Ok(res) => res,
                         Err(diagnostics) => {
                             let mut message =
-                                format!("{}: {}", red!("STX transfer runtime error"), snippet);
+                                format!("{}: {}", red!("STX transfer runtime error"), tx.sender);
                             if let Some(diag) = diagnostics.last() {
                                 message = format!("{} -> {}", message, diag.message);
                             }
@@ -697,7 +704,7 @@ fn mine_block(state: &mut OpState, args: MineBlockArgs) -> Result<String, AnyErr
                     };
                     let kind = StacksTransactionKind::NativeTokenTransfer;
                     transactions.push((
-                        wrap_result_in_simulate_transaction(index, &tx.sender, kind, &execution),
+                        wrap_result_in_simulated_transaction(index, &tx.sender, kind, &execution),
                         execution.events,
                     ));
                 }
@@ -721,28 +728,86 @@ fn mine_block(state: &mut OpState, args: MineBlockArgs) -> Result<String, AnyErr
     }
 
     if !chainhooks.is_empty() {
+        let txids = transactions
+            .iter()
+            .map(|t| hex_bytes(&t.0.transaction_identifier.hash[2..]).unwrap())
+            .collect::<Vec<Vec<u8>>>();
+        let merkle_tree = MerkleTree::<Sha512Trunc256Sum>::new(&txids);
+
         for chainhook in chainhooks.iter() {
+            let mut hits = vec![];
             for (tx, _) in transactions.iter() {
-                if evaluate_stacks_chainhook_on_transaction(tx, chainhook) {
-                    let simulated_block = BlockIdentifier {
+                if evaluate_stacks_transaction_predicate_on_transaction(
+                    tx,
+                    chainhook,
+                    &Context::empty(),
+                ) {
+                    hits.push(tx);
+                }
+            }
+            if hits.len() > 0 {
+                let simulated_block = StacksBlockData {
+                    block_identifier: BlockIdentifier {
                         index: block_height.into(),
-                        hash: format!("0x{}", to_hex(&block_height.to_be_bytes())),
-                    };
-                    let result = handle_stacks_hook_action(
-                        StacksTriggerChainhook {
-                            chainhook: chainhook,
-                            apply: vec![(tx, &simulated_block)],
-                            rollback: vec![],
+                        hash: format!("0x{}", merkle_tree.root().to_hex()),
+                    },
+                    parent_block_identifier: BlockIdentifier {
+                        index: block_height.saturating_sub(1).into(),
+                        hash: format!("0x{}", merkle_tree.root().to_hex()),
+                    },
+                    timestamp: block_height.into(),
+                    transactions: vec![],
+                    metadata: StacksBlockMetadata {
+                        bitcoin_anchor_block_identifier: BlockIdentifier {
+                            index: block_height.saturating_sub(1).into(),
+                            hash: format!("0x{}", merkle_tree.root().to_hex()),
                         },
-                        &HashMap::new(),
-                    );
-                    if let Some(StacksChainhookOccurrence::Http(action)) = result {
+                        pox_cycle_index: 0,
+                        pox_cycle_position: 0,
+                        pox_cycle_length: 0,
+                        confirm_microblock_identifier: None,
+                    },
+                };
+                let result = handle_stacks_hook_action(
+                    StacksTriggerChainhook {
+                        chainhook: chainhook,
+                        apply: vec![(hits, &simulated_block)],
+                        rollback: vec![],
+                    },
+                    &HashMap::new(),
+                    &Context::empty(),
+                );
+                match result {
+                    Some(StacksChainhookOccurrence::Http(action)) => {
                         let chainhook_tx = match state.try_borrow::<Sender<ChainhookEvent>>() {
                             Some(chainhook_tx) => chainhook_tx,
                             None => panic!(),
                         };
                         let _ = chainhook_tx.send(ChainhookEvent::PerformRequest(action));
                     }
+                    Some(StacksChainhookOccurrence::File(path, bytes)) => {
+                        let mut file_path = std::env::current_dir().unwrap();
+                        file_path.push(path);
+                        if !file_path.exists() {
+                            match std::fs::File::open(&file_path) {
+                                Ok(ref mut file) => {
+                                    let _ = file.write_all(&bytes);
+                                }
+                                Err(e) => println!("unable to create file {:?}", e),
+                            }
+                        }
+                        let mut file = OpenOptions::new()
+                            .create(false)
+                            .write(true)
+                            .append(true)
+                            .open(file_path)
+                            .unwrap();
+
+                        if let Err(e) = writeln!(file, "{}", String::from_utf8(bytes).unwrap()) {
+                            eprintln!("Couldn't write to file: {}", e);
+                        }
+                    }
+                    _ => {}
                 }
             }
         }
@@ -783,7 +848,7 @@ where
     }
 }
 
-fn wrap_result_in_simulate_transaction(
+fn wrap_result_in_simulated_transaction(
     index: usize,
     sender: &str,
     kind: StacksTransactionKind,
@@ -793,7 +858,11 @@ fn wrap_result_in_simulate_transaction(
         EvaluationResult::Snippet(ref result) => utils::value_to_string(&result.result),
         _ => unreachable!("Contract result from snippet"),
     };
-    let txid = format!("{}", index);
+    let (txid, _timestamp) = {
+        let timestamp = DateTime::<Utc>::from_utc(NaiveDateTime::from_timestamp(61, 0), Utc);
+        let bytes = Sha256::digest(timestamp.timestamp_micros().to_be_bytes()).to_vec();
+        (format!("0x{}", to_hex(&bytes)), timestamp)
+    };
     let mut asset_class_cache = HashMap::new();
     let events = execution
         .events
@@ -811,12 +880,14 @@ fn wrap_result_in_simulate_transaction(
             result,
             sender: sender.to_string(),
             fee: 0,
+            nonce: 0,
             kind,
             receipt,
             description: String::new(),
             sponsor: None,
             execution_cost: None,
             position: chainhook_types::StacksTransactionPosition::Index(index),
+            proof: None,
         },
     };
     transaction

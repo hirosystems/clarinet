@@ -1,6 +1,6 @@
 // Copyright 2018-2022 the Deno authors. All rights reserved. MIT license.
 
-use crate::utils::nestable_block_on;
+use hiro_system_kit::nestable_block_on;
 
 use super::vendor::deno_cli::args::{ConfigFlag, TypeCheckMode};
 use super::vendor::deno_cli::args::{DenoSubcommand, Flags, TestFlags};
@@ -149,8 +149,8 @@ pub async fn do_run_scripts(
                                 if !r.status().is_success() {
                                     let body = nestable_block_on(r.text()).unwrap();
                                     println!(
-                                        "{}: unable to invoke chainhook ({})",
-                                        red!("error"),
+                                        "{} unable to invoke chainhook ({})",
+                                        red!("error:"),
                                         body
                                     );
                                     std::process::exit(1);
@@ -158,8 +158,8 @@ pub async fn do_run_scripts(
                             }
                             Err(e) => {
                                 println!(
-                                    "{}: unable to invoke chainhook ({})",
-                                    red!("error"),
+                                    "{} unable to invoke chainhook ({})",
+                                    red!("error:"),
                                     e.to_string()
                                 );
                                 std::process::exit(1);

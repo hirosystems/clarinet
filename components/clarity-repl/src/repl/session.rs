@@ -233,8 +233,10 @@ impl Session {
         output.join("\n")
     }
 
-    pub fn handle_command(&mut self, command: &str) -> Vec<String> {
+    pub fn handle_command(&mut self, command: &str) -> (bool, Vec<String>) {
         let mut output = Vec::<String>::new();
+        #[allow(unused_mut)]
+        let mut reload = false;
         match command {
             "::help" => self.display_help(&mut output),
             "/-/" => self.easter_egg(&mut output),
@@ -259,12 +261,14 @@ impl Session {
             #[cfg(feature = "cli")]
             cmd if cmd.starts_with("::trace") => self.trace(&mut output, cmd),
             #[cfg(feature = "cli")]
+            cmd if cmd.starts_with("::reload") => reload = true,
+            #[cfg(feature = "cli")]
             cmd if cmd.starts_with("::read") => self.read(&mut output, cmd),
 
             snippet => self.run_snippet(&mut output, self.show_costs, snippet),
         }
 
-        output
+        (reload, output)
     }
 
     #[cfg(feature = "cli")]
@@ -487,6 +491,15 @@ impl Session {
         self.run_snippet(output, self.show_costs, &snippet.to_string());
     }
 
+    pub fn stx_transfer(
+        &mut self,
+        amount: u64,
+        recipient: &str,
+    ) -> Result<ExecutionResult, Vec<Diagnostic>> {
+        let snippet = format!("(stx-transfer? u{} tx-sender '{})", amount, recipient);
+        self.eval(snippet.clone(), None, false)
+    }
+
     pub fn deploy_contract(
         &mut self,
         contract: &ClarityContract,
@@ -550,7 +563,7 @@ impl Session {
         args: &Vec<String>,
         sender: &str,
         test_name: String,
-    ) -> Result<ExecutionResult, Vec<Diagnostic>> {
+    ) -> Result<(ExecutionResult, QualifiedContractIdentifier), Vec<Diagnostic>> {
         let initial_tx_sender = self.get_tx_sender();
         // Kludge for handling fully qualified contract_id vs sugared syntax
         let first_char = contract.chars().next().unwrap();
@@ -587,9 +600,9 @@ impl Session {
             }
         };
         self.set_tx_sender(initial_tx_sender);
-        // if let Some(coverage) = result.coverage.take() {
-        //     self.coverage_reports.push(coverage);
-        // }
+        self.coverage_reports.push(coverage);
+
+        let contract_identifier = QualifiedContractIdentifier::parse(&contract_id).unwrap();
         if let Some(ref cost) = execution.cost {
             self.costs_reports.push(CostsReport {
                 test_name,
@@ -599,7 +612,8 @@ impl Session {
                 cost_result: cost.clone(),
             });
         }
-        Ok(execution)
+
+        Ok((execution, contract_identifier))
     }
 
     // pub fn build_ast(
@@ -1195,18 +1209,15 @@ mod tests {
         session.encode(&mut output, "::encode { foo false }");
         assert_eq!(
             output[0],
-            format!(
-                "{}: Tuple literal construction expects a colon at index 1",
-                red!("error")
-            )
+            format_err!("Tuple literal construction expects a colon at index 1")
         );
 
         session.encode(&mut output, "::encode (foo 1)");
         assert_eq!(
             output[2],
             format!(
-                "encode:1:1: {}: use of unresolved function 'foo'",
-                red!("error")
+                "encode:1:1: {} use of unresolved function 'foo'",
+                red!("error:")
             )
         );
     }
@@ -1283,23 +1294,23 @@ mod tests {
 
         // assert data-var is set to 0
         assert_eq!(
-            session.handle_command("(contract-call? .contract get-x)")[0],
+            session.handle_command("(contract-call? .contract get-x)").1[0],
             green!("u0")
         );
 
         // advance chain tip and test at-block
         session.advance_chain_tip(10000);
         assert_eq!(
-            session.handle_command("(contract-call? .contract get-x)")[0],
+            session.handle_command("(contract-call? .contract get-x)").1[0],
             green!("u0")
         );
         session.handle_command("(contract-call? .contract incr)");
         assert_eq!(
-            session.handle_command("(contract-call? .contract get-x)")[0],
+            session.handle_command("(contract-call? .contract get-x)").1[0],
             green!("u1")
         );
-        assert_eq!(session.handle_command("(at-block (unwrap-panic (get-block-info? id-header-hash u0)) (contract-call? .contract get-x))")[0], green!("u0"));
-        assert_eq!(session.handle_command("(at-block (unwrap-panic (get-block-info? id-header-hash u5000)) (contract-call? .contract get-x))")[0], green!("u0"));
+        assert_eq!(session.handle_command("(at-block (unwrap-panic (get-block-info? id-header-hash u0)) (contract-call? .contract get-x))").1[0], green!("u0"));
+        assert_eq!(session.handle_command("(at-block (unwrap-panic (get-block-info? id-header-hash u5000)) (contract-call? .contract get-x))").1[0], green!("u0"));
 
         // advance chain tip again and test at-block
         // do this twice to make sure that the lookup table is being updated properly
@@ -1307,15 +1318,15 @@ mod tests {
         session.advance_chain_tip(10);
 
         assert_eq!(
-            session.handle_command("(contract-call? .contract get-x)")[0],
+            session.handle_command("(contract-call? .contract get-x)").1[0],
             green!("u1")
         );
         session.handle_command("(contract-call? .contract incr)");
         assert_eq!(
-            session.handle_command("(contract-call? .contract get-x)")[0],
+            session.handle_command("(contract-call? .contract get-x)").1[0],
             green!("u2")
         );
-        assert_eq!(session.handle_command("(at-block (unwrap-panic (get-block-info? id-header-hash u10000)) (contract-call? .contract get-x))")[0], green!("u1"));
+        assert_eq!(session.handle_command("(at-block (unwrap-panic (get-block-info? id-header-hash u10000)) (contract-call? .contract get-x))").1[0], green!("u1"));
     }
 }
 

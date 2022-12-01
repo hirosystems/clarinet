@@ -1,15 +1,27 @@
 use clarity_repl::clarity::codec::StacksMessageCodec;
-use clarity_repl::clarity::util::hash::{bytes_to_hex, hex_bytes};
+use clarity_repl::clarity::util::hash::{bytes_to_hex, hex_bytes, to_hex};
 use clarity_repl::clarity::vm::types::Value;
 
 use reqwest::blocking::Client;
 use std::io::Cursor;
 
-use clarity_repl::codec::StacksTransaction;
+use clarity_repl::codec::{StacksTransaction, TransactionPayload};
 
 #[derive(Debug)]
 pub enum RpcError {
     Generic,
+    StatusCode(u16),
+    Message(String),
+}
+
+impl RpcError {
+    pub fn to_string(&self) -> String {
+        match &self {
+            RpcError::Message(e) => e.clone(),
+            RpcError::StatusCode(e) => format!("error status code {}", e),
+            RpcError::Generic => "unknown error".into(),
+        }
+    }
 }
 
 pub struct StacksRpc {
@@ -60,9 +72,9 @@ impl PoxInfo {
             contract_id: "ST000000000000000000002AMW42H.pox".into(),
             pox_activation_threshold_ustx: 0,
             first_burnchain_block_height: 100,
-            prepare_phase_block_length: 5,
-            reward_phase_block_length: 10,
-            reward_slots: 20,
+            prepare_phase_block_length: 4,
+            reward_phase_block_length: 6,
+            reward_slots: 12,
             total_liquid_supply_ustx: 1000000000000000,
             ..Default::default()
         }
@@ -88,12 +100,42 @@ pub struct Contract {
     pub publish_height: u64,
 }
 
+#[derive(Deserialize, Debug)]
+pub struct FeeEstimationReport {
+    pub estimations: Vec<FeeEstimation>,
+}
+
+#[derive(Deserialize, Debug)]
+pub struct FeeEstimation {
+    pub fee: u64,
+}
+
 impl StacksRpc {
     pub fn new(url: &str) -> Self {
         Self {
             url: url.into(),
             client: Client::builder().build().unwrap(),
         }
+    }
+
+    pub fn estimate_transaction_fee(
+        &self,
+        transaction_payload: &TransactionPayload,
+        priority: usize,
+    ) -> Result<u64, RpcError> {
+        let tx = transaction_payload.serialize_to_vec();
+        let payload = json!({ "transaction_payload": to_hex(&tx) });
+        let path = format!("{}/v2/fees/transaction", self.url);
+        let res: FeeEstimationReport = self
+            .client
+            .post(&path)
+            .json(&payload)
+            .send()
+            .map_err(|e| RpcError::Message(e.to_string()))?
+            .json()
+            .map_err(|e| RpcError::Message(e.to_string()))?;
+
+        Ok(res.estimations[priority].fee)
     }
 
     pub fn post_transaction(
@@ -108,11 +150,14 @@ impl StacksRpc {
             .header("Content-Type", "application/octet-stream")
             .body(tx)
             .send()
-            .unwrap();
+            .map_err(|e| RpcError::Message(e.to_string()))?;
 
         if !res.status().is_success() {
-            println!("{}", res.text().unwrap());
-            return Err(RpcError::Generic);
+            let err = match res.text() {
+                Ok(message) => RpcError::Message(message),
+                Err(e) => RpcError::Message(e.to_string()),
+            };
+            return Err(err);
         }
 
         let txid: String = res.json().unwrap();
@@ -127,9 +172,9 @@ impl StacksRpc {
             .client
             .get(&request_url)
             .send()
-            .expect("Unable to retrieve account")
+            .map_err(|e| RpcError::Message(e.to_string()))?
             .json()
-            .expect("Unable to parse contract");
+            .map_err(|e| RpcError::Message(e.to_string()))?;
         let nonce = res.nonce;
         Ok(nonce)
     }
@@ -141,9 +186,9 @@ impl StacksRpc {
             .client
             .get(&request_url)
             .send()
-            .expect("Unable to retrieve account")
+            .map_err(|e| RpcError::Message(e.to_string()))?
             .json()
-            .expect("Unable to parse contract");
+            .map_err(|e| RpcError::Message(e.to_string()))?;
         Ok(res)
     }
 
@@ -154,9 +199,9 @@ impl StacksRpc {
             .client
             .get(&request_url)
             .send()
-            .expect("Unable to retrieve account")
+            .map_err(|e| RpcError::Message(e.to_string()))?
             .json()
-            .expect("Unable to parse contract");
+            .map_err(|e| RpcError::Message(e.to_string()))?;
         Ok(res)
     }
 
@@ -175,9 +220,9 @@ impl StacksRpc {
         match res {
             Ok(response) => match response.json() {
                 Ok(value) => Ok(value),
-                _ => Err(RpcError::Generic),
+                Err(e) => Err(RpcError::Message(format!("{}", e.to_string()))),
             },
-            _ => Err(RpcError::Generic),
+            Err(e) => Err(RpcError::Message(format!("{}", e.to_string()))),
         }
     }
 
@@ -209,8 +254,11 @@ impl StacksRpc {
             .unwrap();
 
         if !res.status().is_success() {
-            println!("{}", res.text().unwrap());
-            return Err(RpcError::Generic);
+            let error = match res.text() {
+                Ok(message) => RpcError::Message(message),
+                _ => RpcError::Generic,
+            };
+            return Err(error);
         }
 
         #[derive(Deserialize, Debug)]

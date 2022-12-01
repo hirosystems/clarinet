@@ -21,6 +21,10 @@ impl DeploymentSynthesis {
                     TransactionSpecification::ContractPublish(tx) => {
                         total_cost += tx.cost;
                     }
+                    TransactionSpecification::StxTransfer(tx) => {
+                        total_cost += tx.cost;
+                        total_cost += tx.mstx_amount;
+                    }
                     _ => {}
                 }
             }
@@ -30,7 +34,6 @@ impl DeploymentSynthesis {
             Ok(res) => res,
             Err(err) => panic!("unable to serialize deployment {}", err),
         };
-
         return DeploymentSynthesis {
             total_cost,
             blocks_count,

@@ -46,7 +46,6 @@ version: 1
 chain: bitcoin
 networks:
     regtest:
-        oreo-url: http://localhost:20446/
         predicate:
             confirmations: 1                                    # 1 to 7. 1 = optimistic and better UX except when the chain is forking
             tx-out:                                             # support tx-in, tx-out.
@@ -89,7 +88,6 @@ version: 1
 chain: stacks
 networks:
     devnet:
-        oreo-url: http://localhost:20446/
         predicate:
             print-event:
                 contract-identifier: ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM.cbtc-token

@@ -1,4 +1,5 @@
 use clarinet_files::FileLocation;
+use clarity_repl::clarity::util::hash::{hex_bytes, to_hex};
 use clarity_repl::clarity::vm::analysis::ContractAnalysis;
 use clarity_repl::clarity::vm::ast::ContractAST;
 use clarity_repl::clarity::vm::diagnostic::Diagnostic;
@@ -53,6 +54,20 @@ pub enum TransactionSpecificationFile {
     EmulatedContractPublish(EmulatedContractPublishSpecificationFile),
     RequirementPublish(RequirementPublishSpecificationFile),
     BtcTransfer(BtcTransferSpecificationFile),
+    StxTransfer(StxTransferSpecificationFile),
+}
+
+#[derive(Debug, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub struct StxTransferSpecificationFile {
+    pub expected_sender: String,
+    pub recipient: String,
+    pub mstx_amount: u64,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub memo: Option<String>,
+    pub cost: u64,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub anchor_block_only: Option<bool>,
 }
 
 #[derive(Debug, PartialEq, Serialize, Deserialize)]
@@ -89,6 +104,8 @@ pub struct RequirementPublishSpecificationFile {
     pub path: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub url: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub clarity_version: Option<u8>,
 }
 
 #[derive(Debug, PartialEq, Serialize, Deserialize)]
@@ -147,6 +164,69 @@ pub enum TransactionSpecification {
     EmulatedContractCall(EmulatedContractCallSpecification),
     EmulatedContractPublish(EmulatedContractPublishSpecification),
     BtcTransfer(BtcTransferSpecification),
+    StxTransfer(StxTransferSpecification),
+}
+
+#[derive(Debug, PartialEq, Clone)]
+pub struct StxTransferSpecification {
+    pub expected_sender: StandardPrincipalData,
+    pub recipient: PrincipalData,
+    pub mstx_amount: u64,
+    pub memo: [u8; 34],
+    pub cost: u64,
+    pub anchor_block_only: bool,
+}
+
+impl StxTransferSpecification {
+    pub fn from_specifications(
+        specs: &StxTransferSpecificationFile,
+    ) -> Result<StxTransferSpecification, String> {
+        let expected_sender = match PrincipalData::parse_standard_principal(&specs.expected_sender)
+        {
+            Ok(res) => res,
+            Err(_) => {
+                return Err(format!(
+                    "unable to parse expected sender '{}' as a valid Stacks address",
+                    specs.expected_sender
+                ))
+            }
+        };
+
+        let recipient = match PrincipalData::parse(&specs.recipient) {
+            Ok(res) => res,
+            Err(_) => {
+                return Err(format!(
+                    "unable to parse recipient '{}' as a valid Stacks address",
+                    specs.expected_sender
+                ))
+            }
+        };
+
+        let mut memo = [0u8; 34];
+        if let Some(ref hex_memo) = specs.memo {
+            if !hex_memo.is_empty() && !hex_memo.starts_with("0x") {
+                return Err(format!(
+                    "unable to parse memo (up to 34 bytes, starting with '0x')",
+                ));
+            }
+            match hex_bytes(&hex_memo[2..]) {
+                Ok(ref mut bytes) => {
+                    bytes.resize(34, 0);
+                    memo.copy_from_slice(&bytes);
+                }
+                Err(_) => return Err(format!("unable to parse memo (up to 34 bytes)",)),
+            }
+        }
+
+        Ok(StxTransferSpecification {
+            expected_sender,
+            recipient,
+            memo,
+            mstx_amount: specs.mstx_amount,
+            cost: specs.cost,
+            anchor_block_only: specs.anchor_block_only.unwrap_or(true),
+        })
+    }
 }
 
 #[derive(Debug, PartialEq, Clone)]
@@ -309,6 +389,7 @@ pub struct RequirementPublishSpecification {
     pub remap_sender: StandardPrincipalData,
     pub remap_principals: BTreeMap<StandardPrincipalData, StandardPrincipalData>,
     pub source: String,
+    pub clarity_version: ClarityVersion,
     pub cost: u64,
     pub location: FileLocation,
 }
@@ -375,11 +456,27 @@ impl RequirementPublishSpecification {
 
         let source = location.read_content_as_utf8()?;
 
+        let clarity_version = match specs.clarity_version {
+            Some(clarity_version) => {
+                if clarity_version.eq(&1) {
+                    Ok(ClarityVersion::Clarity1)
+                } else if clarity_version.eq(&2) {
+                    Ok(ClarityVersion::Clarity2)
+                } else {
+                    Err(format!(
+                        "unable to parse clarity_version (can either be '1' or '2'",
+                    ))
+                }
+            }
+            _ => Ok(DEFAULT_CLARITY_VERSION),
+        }?;
+
         Ok(RequirementPublishSpecification {
             contract_id,
             remap_sender,
             remap_principals,
             source,
+            clarity_version,
             location: location,
             cost: specs.cost,
         })
@@ -582,7 +679,11 @@ impl DeploymentSpecification {
                                     contracts.insert(contract_id, (spec.source.clone(), spec.location.clone()));
                                     TransactionSpecification::EmulatedContractPublish(spec)
                                 }
-                                _ => {
+                                TransactionSpecificationFile::StxTransfer(spec) => {
+                                    let spec = StxTransferSpecification::from_specifications(spec)?;
+                                    TransactionSpecification::StxTransfer(spec)
+                                }
+                                TransactionSpecificationFile::BtcTransfer(_) | TransactionSpecificationFile::ContractCall(_) | TransactionSpecificationFile::ContractPublish(_) | TransactionSpecificationFile::RequirementPublish(_) => {
                                     return Err(format!("{} only supports transactions of type 'emulated-contract-call' and 'emulated-contract-publish", specs.network.to_lowercase()))
                                 }
                             };
@@ -627,7 +728,11 @@ impl DeploymentSpecification {
                                     let spec = BtcTransferSpecification::from_specifications(spec)?;
                                     TransactionSpecification::BtcTransfer(spec)
                                 }
-                                _ => {
+                                TransactionSpecificationFile::StxTransfer(spec) => {
+                                    let spec = StxTransferSpecification::from_specifications(spec)?;
+                                    TransactionSpecification::StxTransfer(spec)
+                                }
+                                TransactionSpecificationFile::EmulatedContractCall(_) | TransactionSpecificationFile::EmulatedContractPublish(_) => {
                                     return Err(format!("{} only supports transactions of type 'contract-call' and 'contract-publish'", specs.network.to_lowercase()))
                                 }
                             };
@@ -868,6 +973,10 @@ impl TransactionPlanSpecification {
                                 path: None,
                                 url: None,
                                 cost: tx.cost,
+                                clarity_version: match tx.clarity_version {
+                                    ClarityVersion::Clarity1 => Some(1),
+                                    ClarityVersion::Clarity2 => Some(2),
+                                },
                             },
                         )
                     }
@@ -877,6 +986,20 @@ impl TransactionPlanSpecification {
                             recipient: tx.recipient.clone(),
                             sats_amount: tx.sats_amount,
                             sats_per_byte: tx.sats_per_byte,
+                        })
+                    }
+                    TransactionSpecification::StxTransfer(tx) => {
+                        TransactionSpecificationFile::StxTransfer(StxTransferSpecificationFile {
+                            expected_sender: tx.expected_sender.to_address(),
+                            recipient: tx.recipient.to_string(),
+                            mstx_amount: tx.mstx_amount,
+                            memo: if tx.memo == [0; 34] {
+                                None
+                            } else {
+                                Some(format!("0x{}", to_hex(&tx.memo)))
+                            },
+                            cost: tx.cost,
+                            anchor_block_only: Some(tx.anchor_block_only),
                         })
                     }
                 };

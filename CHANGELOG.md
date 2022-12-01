@@ -1,3 +1,72 @@
+#### 1.1.0 (2022-11-17)
+
+##### New Features
+
+*  Support for Stacks 2.1 ([790c14bf](https://github.com/hirosystems/clarinet/commit/790c14bf8fd4a30d1f50c2c4a55873aecac1a076))
+*  Display clarity documentation on hover in VSCode ([e605acb4](https://github.com/hirosystems/clarinet/commit/e605acb49f0892cb75b7a16edf37807f29133a20))
+
+##### Chores
+
+*  Better error management in chainhook-node ([353ceb61](https://github.com/hirosystems/clarinet/commit/353ceb617b8a5b710331fe3387b07f6ad48e3f48))
+
+#### 1.0.6 (2022-11-10)
+
+##### New Features
+
+*  Ability for chainhook-node to start with custom config ([473c86ba](https://github.com/hirosystems/clarinet/commit/473c86babe41f0c16ea9c370890d440a698dfa08))
+*  Draft bitcoin replay implementation ([8580092e](https://github.com/hirosystems/clarinet/commit/8580092e2e8661c3d6e653be2c3f687774e560fa))
+
+##### Bug Fixes
+
+*  Filter out boot contracts from requirement dependencies ([34fbcf96](https://github.com/hirosystems/clarinet/commit/34fbcf9686a9bdcdf2e11715abbcb9fa301e4dfb))
+*  Deno expect events ([8bdcd392](https://github.com/hirosystems/clarinet/commit/8bdcd39254c8fb269245005f30b2f930df8dd7ea))
+*  Fix issue with check-checker requiring checking on bools ([ef738fe3](https://github.com/hirosystems/clarinet/commit/ef738fe3f98cbdb87dd8e510d5ed0857817350eb))
+
+##### Refactors
+
+*  Add serverless dependency in cbtc example and upgrade dependencies ([f065f2b](https://github.com/hirosystems/clarinet/pull/660/commits/f065f2b3d5268689b7d2b77bba668f352bb53ca2))
+*  Get_bitcoin_proof ([5a3a8ee9](https://github.com/hirosystems/clarinet/commit/5a3a8ee97a4b6db895c048ba9d67ac3423abe5de))
+
+#### 1.0.5 (2022-11-03)
+
+##### New Features
+
+*  Many chainhooks enhancements: event payload augmented, new predicates (segwit, etc) implemented. Documentation coming soon!
+*  Introducing clarity-jupyter-kernel ([1c118513](https://github.com/hirosystems/clarinet/commit/1c1185136a1c52248a1b20ba43b5887fbaa4ef4d))
+*  Ability to use low/medium/high cost dynamic presets in deployment plans ([86219c4e](https://github.com/hirosystems/clarinet/commit/86219c4e52997d8aad059e871c96f96a5834c616))
+*  Ability to send STX in deployment plans ([c9e3bac4](https://github.com/hirosystems/clarinet/commit/c9e3bac44c2fe97f2f6b5f6578cc309f2cc2e38f))
+
+##### Bug Fixes
+
+*  Termination in `clarinet integrate --no-dashboard` mode fixed ([2cdb09a6](https://github.com/hirosystems/clarinet/commit/2cdb09a6aeed631236971f4d4206ff97b742683e))
+*  Check print predicate for contained value ([0f5956dc](https://github.com/hirosystems/clarinet/commit/0f5956dc1019f25d14c4204d7cece8923d74ae7b))
+*  Improved keyword recognition in VSCode grammar file ([e690b371](https://github.com/hirosystems/clarinet/commit/e690b371331ed8ec4d27cbc609581c9f07e04888), [119dce57](https://github.com/hirosystems/clarinet/commit/119dce577dd654e471a3054c206c593bdf78bb1b))
+*  Fixed stacks-js-helper generator ([11562ae7](https://github.com/hirosystems/clarinet/commit/11562ae739170a799620f4a62462219304dafc19))
+
+##### Chores
+
+*  Types improvements clarinet deno library ([3bc5c51c](https://github.com/hirosystems/clarinet/commit/3bc5c51cda35bdc52c8867fe222341680e0e3880))
+*  Add tests to the clarinet deno library ([d5b7555d](https://github.com/hirosystems/clarinet/commit/d5b7555d5a3acf4d5d53e32f06e6b80520b93c4e), [062a7144](https://github.com/hirosystems/clarinet/commit/062a7144f25e019dbacd62f8874e2d0a783fd20f))
+
+#### 1.0.4 (2022-10-17)
+
+##### New Features
+
+*  Devnet chainstate now lives in `cache` directory specified in Clarinet.toml ([a6fb383f](https://github.com/hirosystems/clarinet/commit/a6fb383fecb936d27386f3f914f98dda89a67dda))
+*  Ability to pass wildcards for chainhook testing ([08f75a2a](https://github.com/hirosystems/clarinet/commit/08f75a2a2abcf1cbc1b2c60115cc7d939d090fbd))
+*  Ability to use write-to-file as action (chainhooks) ([fb19e392](https://github.com/hirosystems/clarinet/commit/fb19e392836430d029aa8374a625a49451b38ad9))
+*  Introduce stacks-network component ([ace64116](https://github.com/hirosystems/clarinet/commit/ace641164465d7a253375365a2f805a650981d09))
+
+##### Bug Fixes
+
+*  Bump ingestion limits to 5 mb ([e4d539da](https://github.com/hirosystems/clarinet/commit/e4d539da703371d6046a64088e18fb23d0452575))
+*  Fix invalid bitcoin txid ([03783a41](https://github.com/hirosystems/clarinet/commit/03783a414837afc78c7688741d42ab4309389abb))
+*  Fix coverage tracking ([1a4836d1](https://github.com/hirosystems/clarinet/commit/1a4836d1d6e35e835a76465caf0b3be01a5b2aee))
+*  Fix crash occuring on NFTMintEvent ([d5dc3fc0](https://github.com/hirosystems/clarinet/commit/d5dc3fc0454a51a5a9708a66b63cb5ccf58c3b24))
+*  Resolve boot contract in LSP ([ad34037c](https://github.com/hirosystems/clarinet/commit/ad34037cbd4d6f30360a08817e497a8c9a9ef2de))
+*  Better error ([d42f7ed6](https://github.com/hirosystems/clarinet/commit/d42f7ed680097e672611ab1a581f55f32208dd11))
+*  Performance optimisation with parser v2 ([c1712489](https://github.com/hirosystems/clarinet/commit/c171248997a357d8e6a1bc074b79a0452de6235f))
+
 #### 1.0.0 (2022-10-06)
 
 ##### New Features

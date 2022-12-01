@@ -1,9 +1,8 @@
 use super::BlockEvent;
 use chainhook_types::{
-    BlockIdentifier, StacksBlockData, StacksMicroblockData, StacksMicroblockMetadata,
-    StacksTransactionData, StacksTransactionMetadata,
+    BlockIdentifier, StacksMicroblockData, StacksMicroblockMetadata, StacksTransactionData,
 };
-use clarity_repl::clarity::util::hash::{hex_bytes, to_hex};
+use clarity_repl::clarity::util::hash::to_hex;
 
 pub fn generate_test_microblock(
     fork_id: u8,

@@ -5,10 +5,13 @@ members = [
     "components/clarinet-files",
     "components/clarinet-utils",
     "components/clarity-lsp",
+    "components/clarity-jupyter-kernel",
     "components/stacks-rpc-client",
     "components/stacks-devnet-js",
+    "components/stacks-network",
     "components/chainhook-types-rs",
     "components/chainhook-event-observer",
-    "components/chainhook-db"
+    "components/chainhook-node",
+    "components/hiro-system-kit",
 ]
 default-members = ["components/clarinet-cli", "components/chainhook-event-observer"]

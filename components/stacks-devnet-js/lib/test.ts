@@ -5,7 +5,7 @@ const devnet = new StacksDevnetOrchestrator({
     logs: true,
     accounts: [
         {
-            id: "wallet_9",
+            label: "wallet_9",
             mnemonic: "sell invite acquire kitten bamboo drastic jelly vivid peace spawn twice guilt pave pen trash pretty park cube fragile unaware remain midnight betray rebuild",
             balance: 100_000_000,
         }

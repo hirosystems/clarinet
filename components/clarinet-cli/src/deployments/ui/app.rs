@@ -1,4 +1,4 @@
-use crate::deployments::TransactionTracker;
+use clarinet_deployments::onchain::TransactionTracker;
 use tui::widgets::ListState;
 
 pub struct StatefulList<T> {

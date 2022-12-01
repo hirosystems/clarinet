@@ -7,17 +7,15 @@ extern crate serde_derive;
 extern crate serde_json;
 
 #[macro_use]
-mod macros;
+extern crate hiro_system_kit;
 
 mod chainhooks;
 mod deployments;
 mod frontend;
 mod generate;
-mod integrate;
+pub mod integrate;
 mod lsp;
 mod runner;
-mod types;
-mod utils;
 
 use frontend::cli;
 

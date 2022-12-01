@@ -18,6 +18,8 @@ extern crate serde_json;
 extern crate lazy_static;
 #[macro_use]
 extern crate serde_derive;
+#[macro_use]
+extern crate hiro_system_kit;
 
 #[macro_use]
 mod macros;
@@ -82,7 +84,7 @@ pub fn handle_command(command: &str) -> String {
         }
     };
 
-    let output_lines = session.handle_command(command);
+    let (_, output_lines) = session.handle_command(command);
 
     unsafe {
         WASM_GLOBAL_CONTEXT.session = Some(session);

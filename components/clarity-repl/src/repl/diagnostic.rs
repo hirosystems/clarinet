@@ -6,9 +6,9 @@ use std::fmt;
 
 fn level_to_string(level: &Level) -> String {
     match level {
-        Level::Note => format!("{}", blue!("note")),
-        Level::Warning => format!("{}", yellow!("warning")),
-        Level::Error => format!("{}", red!("error")),
+        Level::Note => format!("{}", blue!("note:")),
+        Level::Warning => format!("{}", yellow!("warning:")),
+        Level::Error => format!("{}", red!("error:")),
     }
 }
 
@@ -18,7 +18,7 @@ pub fn output_diagnostic(diagnostic: &Diagnostic, name: &str, lines: &Vec<String
     let mut output = Vec::new();
     if diagnostic.spans.len() > 0 {
         output.push(format!(
-            "{}:{}:{}: {}: {}",
+            "{}:{}:{}: {} {}",
             name, // diagnostic.spans[0].filename,
             diagnostic.spans[0].start_line,
             diagnostic.spans[0].start_column,
@@ -27,7 +27,7 @@ pub fn output_diagnostic(diagnostic: &Diagnostic, name: &str, lines: &Vec<String
         ));
     } else {
         output.push(format!(
-            "{}: {}",
+            "{} {}",
             level_to_string(&diagnostic.level),
             diagnostic.message,
         ));

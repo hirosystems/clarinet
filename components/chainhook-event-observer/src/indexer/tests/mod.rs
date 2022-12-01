@@ -1,7 +1,9 @@
 pub mod helpers;
+use crate::utils::Context;
+
 use self::helpers::BlockEvent;
 use super::{BitcoinBlockPool, StacksBlockPool};
-use chainhook_types::{BitcoinBlockData, BitcoinChainEvent, StacksBlockData, StacksChainEvent};
+use chainhook_types::{BitcoinBlockData, BitcoinChainEvent, StacksChainEvent};
 
 pub type StacksChainEventExpectation = Box<dyn Fn(Option<StacksChainEvent>) -> ()>;
 
@@ -12,11 +14,15 @@ pub fn process_stacks_blocks_and_check_expectations(
     for (block_event, check_chain_event_expectations) in steps.into_iter() {
         match block_event {
             BlockEvent::Block(block) => {
-                let chain_event = blocks_processor.process_block(block).unwrap();
+                let chain_event = blocks_processor
+                    .process_block(block, &Context::empty())
+                    .unwrap();
                 check_chain_event_expectations(chain_event);
             }
             BlockEvent::Microblock(microblock) => {
-                let chain_event = blocks_processor.process_microblocks(vec![microblock]);
+                let chain_event = blocks_processor
+                    .process_microblocks(vec![microblock], &Context::empty())
+                    .unwrap();
                 check_chain_event_expectations(chain_event);
             }
         }
@@ -30,7 +36,9 @@ pub fn process_bitcoin_blocks_and_check_expectations(
 ) {
     let mut blocks_processor = BitcoinBlockPool::new();
     for (block, check_chain_event_expectations) in steps.into_iter() {
-        let chain_event = blocks_processor.process_block(block).unwrap();
+        let chain_event = blocks_processor
+            .process_block(block, &Context::empty())
+            .unwrap();
         check_chain_event_expectations(chain_event);
     }
 }

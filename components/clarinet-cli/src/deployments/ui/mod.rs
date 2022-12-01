@@ -3,8 +3,8 @@ mod app;
 #[allow(dead_code)]
 mod ui;
 
-use super::{DeploymentEvent, TransactionTracker};
 use app::App;
+use clarinet_deployments::onchain::{DeploymentEvent, TransactionTracker};
 use crossterm::{
     execute,
     terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
@@ -35,7 +35,7 @@ pub fn start_ui(
             Ok(DeploymentEvent::TransactionUpdate(update)) => {
                 app.display_contract_status_update(update);
             }
-            Ok(DeploymentEvent::ProtocolDeployed) => {
+            Ok(DeploymentEvent::DeploymentCompleted) => {
                 break Ok(());
             }
             Ok(DeploymentEvent::Interrupted(message)) => {

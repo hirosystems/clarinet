@@ -1,24 +1,29 @@
-use crate::chainhooks::check_chainhooks;
 use crate::chainhooks::types::ChainhookSpecificationFile;
+use crate::chainhooks::{check_chainhooks, load_chainhooks};
 use crate::deployments::types::DeploymentSynthesis;
 use crate::deployments::{
-    self, apply_on_chain_deployment, check_deployments, generate_default_deployment,
-    get_absolute_deployment_path, get_default_deployment_path, get_initial_transactions_trackers,
-    load_deployment, write_deployment, DeploymentCommand, DeploymentEvent,
+    self, check_deployments, generate_default_deployment, get_absolute_deployment_path,
+    write_deployment,
 };
 use crate::generate::{
     self,
     changes::{Changes, TOMLEdition},
 };
-use crate::integrate::{self, DevnetOrchestrator};
+use crate::integrate;
 use crate::lsp::run_lsp;
 use crate::runner::run_scripts;
 use crate::runner::DeploymentCache;
 use chainhook_event_observer::chainhooks::types::ChainhookSpecification;
 use chainhook_types::StacksNetwork;
 use chainhook_types::{BitcoinNetwork, Chain};
-use clarinet_deployments::setup_session_with_deployment;
+use clarinet_deployments::onchain::{
+    apply_on_chain_deployment, get_initial_transactions_trackers, update_deployment_costs,
+    DeploymentCommand, DeploymentEvent,
+};
 use clarinet_deployments::types::{DeploymentGenerationArtifacts, DeploymentSpecification};
+use clarinet_deployments::{
+    get_default_deployment_path, load_deployment, setup_session_with_deployment,
+};
 use clarinet_files::{FileLocation, ProjectManifest, ProjectManifestFile, RequirementConfig};
 use clarity_repl::analysis::call_checker::ContractAnalysis;
 use clarity_repl::clarity::vm::analysis::AnalysisDatabase;
@@ -29,6 +34,7 @@ use clarity_repl::clarity::ClarityVersion;
 use clarity_repl::repl::diagnostic::{output_code, output_diagnostic};
 use clarity_repl::repl::{ClarityCodeSource, ClarityContract, ContractDeployer, DEFAULT_EPOCH};
 use clarity_repl::{analysis, repl, Terminal};
+use stacks_network::{self, DevnetOrchestrator};
 use std::collections::HashMap;
 use std::fs::{self, File};
 use std::io::prelude::*;
@@ -225,6 +231,38 @@ struct GenerateDeployment {
         conflicts_with = "mainnet"
     )]
     pub no_batch: bool,
+    /// Compute and set cost, using low priority (network connection required)
+    #[clap(
+        long = "low-cost",
+        conflicts_with = "medium-cost",
+        conflicts_with = "high-cost",
+        conflicts_with = "manual-cost"
+    )]
+    pub low_cost: bool,
+    /// Compute and set cost, using medium priority (network connection required)
+    #[clap(
+        conflicts_with = "low-cost",
+        long = "medium-cost",
+        conflicts_with = "high-cost",
+        conflicts_with = "manual-cost"
+    )]
+    pub medium_cost: bool,
+    /// Compute and set cost, using high priority (network connection required)
+    #[clap(
+        conflicts_with = "low-cost",
+        conflicts_with = "medium-cost",
+        long = "high-cost",
+        conflicts_with = "manual-cost"
+    )]
+    pub high_cost: bool,
+    /// Leave cost estimation manual
+    #[clap(
+        conflicts_with = "low-cost",
+        conflicts_with = "medium-cost",
+        conflicts_with = "high-cost",
+        long = "manual-cost"
+    )]
+    pub manual_cost: bool,
 }
 
 #[derive(Parser, PartialEq, Clone, Debug)]
@@ -512,7 +550,7 @@ pub fn main() {
                 let current_dir = match env::current_dir() {
                     Ok(dir) => dir,
                     Err(e) => {
-                        println!("{}: Unable to get current directory: {}", red!("error"), e);
+                        println!("{}{}", format_err!("unable to get current directory"), e);
                         std::process::exit(1);
                     }
                 };
@@ -557,7 +595,7 @@ pub fn main() {
             ) {
                 Ok(changes) => changes,
                 Err(message) => {
-                    println!("{}: {}", red!("error"), message);
+                    println!("{}", format_err!(message));
                     std::process::exit(1);
                 }
             };
@@ -583,7 +621,7 @@ pub fn main() {
                 println!("Checking deployments");
                 let res = check_deployments(&manifest);
                 if let Err(message) = res {
-                    println!("{}: {}", red!("error"), message);
+                    println!("{}", format_err!(message));
                     process::exit(1);
                 }
             }
@@ -602,25 +640,71 @@ pub fn main() {
 
                 let default_deployment_path =
                     get_default_deployment_path(&manifest, &network).unwrap();
-                let (deployment, _) =
+                let (mut deployment, _) =
                     match generate_default_deployment(&manifest, &network, cmd.no_batch) {
                         Ok(deployment) => deployment,
                         Err(message) => {
-                            println!("{}: {}", red!("error"), message);
+                            println!("{}", format_err!(message));
                             std::process::exit(1);
                         }
                     };
-                let res = write_deployment(&deployment, &default_deployment_path, true);
-                if let Err(message) = res {
-                    println!("{}: {}", red!("error"), message);
-                    process::exit(1);
+
+                if !cmd.manual_cost && network.either_testnet_or_mainnet() {
+                    let priority = match (cmd.low_cost, cmd.medium_cost, cmd.high_cost) {
+                        (_, _, true) => 2,
+                        (_, true, _) => 1,
+                        (true, _, _) => 0,
+                        (false, false, false) => {
+                            println!("{}", format_err!("cost strategy not specified (--low-cost, --medium-cost, --high-cost, --manual-cost)"));
+                            std::process::exit(1);
+                        }
+                    };
+                    match update_deployment_costs(&mut deployment, priority) {
+                        Ok(_) => {}
+                        Err(message) => {
+                            println!(
+                                "{} unable to update costs\n{}",
+                                yellow!("warning:"),
+                                message
+                            );
+                        }
+                    };
                 }
 
-                println!(
-                    "{} {}",
-                    green!("Generated file"),
-                    default_deployment_path.get_relative_location().unwrap()
-                );
+                let write_plan = if default_deployment_path.exists() {
+                    let existing_deployment =
+                        match load_deployment(&manifest, &default_deployment_path) {
+                            Ok(deployment) => deployment,
+                            Err(message) => {
+                                println!(
+                                    "{}",
+                                    format_err!(format!(
+                                        "unable to load {}\n{}",
+                                        default_deployment_path.to_string(),
+                                        message
+                                    ))
+                                );
+                                process::exit(1);
+                            }
+                        };
+                    should_existing_plan_be_replaced(&existing_deployment, &deployment)
+                } else {
+                    true
+                };
+
+                if write_plan {
+                    let res = write_deployment(&deployment, &default_deployment_path, false);
+                    if let Err(message) = res {
+                        println!("{}", format_err!(message));
+                        process::exit(1);
+                    }
+
+                    println!(
+                        "{} {}",
+                        green!("Generated file"),
+                        default_deployment_path.get_relative_location().unwrap()
+                    );
+                }
             }
             Deployments::ApplyDeployment(cmd) => {
                 let manifest = load_manifest_or_exit(cmd.manifest_path);
@@ -644,8 +728,8 @@ pub fn main() {
                         match res {
                             Some(Ok(deployment)) => {
                                 println!(
-                                    "{}: using existing deployments/default.{}-plan.yaml",
-                                    yellow!("note"),
+                                    "{} using existing deployments/default.{}-plan.yaml",
+                                    yellow!("note:"),
                                     format!("{:?}", network).to_lowercase(),
                                 );
                                 Ok(deployment)
@@ -747,7 +831,7 @@ pub fn main() {
                             DeploymentEvent::TransactionUpdate(update) => {
                                 println!("{} {:?} {}", blue!("➡"), update.status, update.name);
                             }
-                            DeploymentEvent::ProtocolDeployed => {
+                            DeploymentEvent::DeploymentCompleted => {
                                 println!(
                                     "{} Transactions successfully confirmed on {:?}",
                                     green!("✔"),
@@ -781,8 +865,8 @@ pub fn main() {
                     (false, true) => Chain::Stacks,
                     (_, _) => {
                         println!(
-                            "{}: either --bitcoin or --stacks must be passed",
-                            red!("error")
+                            "{}",
+                            format_err!("either --bitcoin or --stacks must be passed")
                         );
                         process::exit(1);
                     }
@@ -792,7 +876,7 @@ pub fn main() {
                     match generate::get_changes_for_new_chainhook(&manifest, cmd.name, chain) {
                         Ok(changes) => changes,
                         Err(message) => {
-                            println!("{}: {}", red!("error"), message);
+                            println!("{}", format_err!(message));
                             std::process::exit(1);
                         }
                     };
@@ -827,7 +911,7 @@ pub fn main() {
                 ) {
                     Ok(changes) => changes,
                     Err(message) => {
-                        println!("{}: {}", red!("error"), message);
+                        println!("{}", format_err!(message));
                         std::process::exit(1);
                     }
                 };
@@ -865,70 +949,78 @@ pub fn main() {
             }
         },
         Command::Console(cmd) => {
-            let manifest = load_manifest_or_warn(cmd.manifest_path);
+            // Loop to handle `::reload` command
+            loop {
+                let manifest = load_manifest_or_warn(cmd.manifest_path.clone());
 
-            let mut terminal = match manifest {
-                Some(ref manifest) => {
-                    let (deployment, _, artifacts) = load_deployment_and_artifacts_or_exit(
-                        manifest,
-                        &cmd.deployment_plan_path,
-                        cmd.use_on_disk_deployment_plan,
-                        cmd.use_computed_deployment_plan,
-                    );
+                let mut terminal = match manifest {
+                    Some(ref manifest) => {
+                        let (deployment, _, artifacts) = load_deployment_and_artifacts_or_exit(
+                            manifest,
+                            &cmd.deployment_plan_path,
+                            cmd.use_on_disk_deployment_plan,
+                            cmd.use_computed_deployment_plan,
+                        );
 
-                    if !artifacts.success {
-                        let diags_digest = DiagnosticsDigest::new(&artifacts.diags, &deployment);
-                        if diags_digest.has_feedbacks() {
-                            println!("{}", diags_digest.message);
+                        if !artifacts.success {
+                            let diags_digest =
+                                DiagnosticsDigest::new(&artifacts.diags, &deployment);
+                            if diags_digest.has_feedbacks() {
+                                println!("{}", diags_digest.message);
+                            }
+                            if diags_digest.errors > 0 {
+                                println!(
+                                    "{} {} detected",
+                                    red!("x"),
+                                    pluralize!(diags_digest.errors, "error")
+                                );
+                            }
+                            std::process::exit(1);
                         }
-                        if diags_digest.errors > 0 {
-                            println!(
-                                "{} {} detected",
-                                red!("x"),
-                                pluralize!(diags_digest.errors, "error")
-                            );
-                        }
-                        std::process::exit(1);
+
+                        Terminal::load(artifacts.session)
                     }
+                    None => Terminal::new(repl::SessionSettings::default()),
+                };
+                let reload = terminal.start();
 
-                    Terminal::load(artifacts.session)
-                }
-                None => Terminal::new(repl::SessionSettings::default()),
-            };
-            terminal.start();
-
-            if hints_enabled {
-                display_post_console_hint();
-            }
-
-            // Report telemetry
-            if let Some(manifest) = manifest {
-                if manifest.project.telemetry {
-                    #[cfg(feature = "telemetry")]
-                    telemetry_report_event(DeveloperUsageEvent::PokeExecuted(
-                        DeveloperUsageDigest::new(
-                            &manifest.project.name,
-                            &manifest.project.authors,
-                        ),
-                    ));
-
-                    #[cfg(feature = "telemetry")]
-                    let mut debug_count = 0;
-                    for command in terminal.session.executed {
-                        if command.starts_with("::debug") {
-                            debug_count += 1;
-                        }
-                    }
-                    if debug_count > 0 {
-                        telemetry_report_event(DeveloperUsageEvent::DebugStarted(
+                // Report telemetry
+                if let Some(manifest) = manifest {
+                    if manifest.project.telemetry {
+                        #[cfg(feature = "telemetry")]
+                        telemetry_report_event(DeveloperUsageEvent::PokeExecuted(
                             DeveloperUsageDigest::new(
                                 &manifest.project.name,
                                 &manifest.project.authors,
                             ),
-                            debug_count,
                         ));
+
+                        #[cfg(feature = "telemetry")]
+                        let mut debug_count = 0;
+                        for command in terminal.session.executed {
+                            if command.starts_with("::debug") {
+                                debug_count += 1;
+                            }
+                        }
+                        if debug_count > 0 {
+                            telemetry_report_event(DeveloperUsageEvent::DebugStarted(
+                                DeveloperUsageDigest::new(
+                                    &manifest.project.name,
+                                    &manifest.project.authors,
+                                ),
+                                debug_count,
+                            ));
+                        }
                     }
                 }
+
+                if !reload {
+                    break;
+                }
+            }
+
+            if hints_enabled {
+                display_post_console_hint();
             }
         }
         Command::Check(cmd) if cmd.file.is_some() => {
@@ -940,7 +1032,7 @@ pub fn main() {
             let code_source = match fs::read_to_string(&file) {
                 Ok(code) => code,
                 _ => {
-                    println!("{}: unable to read file: '{}'", red!("error"), file);
+                    println!("{} unable to read file: '{}'", red!("error:"), file);
                     std::process::exit(1);
                 }
             };
@@ -1051,33 +1143,50 @@ pub fn main() {
             let cache_location = manifest.project.cache_location.clone();
             let mut stacks_chainhooks = vec![];
             let mine_block_delay = cmd.mine_block_delay.unwrap_or(0);
-            for chainhook_relative_path in cmd.chainhooks.iter() {
-                let mut chainhook_location = manifest
-                    .location
-                    .get_project_root_location()
-                    .expect("unable to get root location");
-                chainhook_location
-                    .append_path(chainhook_relative_path)
-                    .expect("unable to build path");
-                match ChainhookSpecificationFile::parse(
-                    &chainhook_location.to_string().into(),
+
+            if cmd.chainhooks.contains(&"*".to_string()) {
+                match load_chainhooks(
+                    &manifest.location,
                     &(BitcoinNetwork::Regtest, StacksNetwork::Devnet),
                 ) {
-                    Ok(hook) => match hook {
-                        ChainhookSpecification::Bitcoin(_) => {
-                            println!(
-                                "{}: bitcoin chainhooks not supported in test environments",
-                                red!("error")
-                            );
-                            std::process::exit(1);
-                        }
-                        ChainhookSpecification::Stacks(hook) => stacks_chainhooks.push(hook),
-                    },
-                    Err(msg) => {
-                        println!("{}: unable to load chainhooks ({})", red!("error"), msg);
-                        std::process::exit(1);
+                    Ok(ref mut formation) => {
+                        stacks_chainhooks.append(&mut formation.stacks_chainhooks);
+                    }
+                    Err(e) => {
+                        println!("{} unable to load chainhooks - {}", red!("error:"), e);
                     }
                 };
+            } else {
+                for chainhook_relative_path in cmd.chainhooks.iter() {
+                    let mut chainhook_location = manifest
+                        .location
+                        .get_project_root_location()
+                        .expect("unable to get root location");
+                    chainhook_location
+                        .append_path(chainhook_relative_path)
+                        .expect("unable to build path");
+                    match ChainhookSpecificationFile::parse(
+                        &chainhook_location.to_string().into(),
+                        &(BitcoinNetwork::Regtest, StacksNetwork::Devnet),
+                    ) {
+                        Ok(hook) => match hook {
+                            ChainhookSpecification::Bitcoin(_) => {
+                                println!(
+                                    "{}",
+                                    format_err!(
+                                        "bitcoin chainhooks not supported in test environments"
+                                    )
+                                );
+                                std::process::exit(1);
+                            }
+                            ChainhookSpecification::Stacks(hook) => stacks_chainhooks.push(hook),
+                        },
+                        Err(msg) => {
+                            println!("{} unable to load chainhooks ({})", red!("error:"), msg);
+                            std::process::exit(1);
+                        }
+                    };
+                }
             }
 
             let (success, _count) = match run_scripts(
@@ -1101,7 +1210,7 @@ pub fn main() {
             ) {
                 Ok(count) => (true, count),
                 Err((e, count)) => {
-                    println!("{}: {}", red!("error:"), e);
+                    println!("{} {}", red!("error:"), e);
                     (false, count)
                 }
             };
@@ -1159,8 +1268,8 @@ pub fn main() {
                     match res {
                         Some(Ok(deployment)) => {
                             println!(
-                                "{}: using existing deployments/default.devnet-plan.yaml",
-                                yellow!("note")
+                                "{} using existing deployments/default.devnet-plan.yaml",
+                                yellow!("note:")
                             );
                             // TODO(lgalabru): Think more about the desired DX.
                             // Compute the latest version, display differences and propose overwrite?
@@ -1207,7 +1316,7 @@ pub fn main() {
             let deployment = match result {
                 Ok(deployment) => deployment,
                 Err(e) => {
-                    println!("{}", e);
+                    println!("{}", format_err!(e));
                     std::process::exit(1);
                 }
             };
@@ -1215,7 +1324,7 @@ pub fn main() {
             let orchestrator = match DevnetOrchestrator::new(manifest, None) {
                 Ok(orchestrator) => orchestrator,
                 Err(e) => {
-                    println!("{}: {}", red!("error"), e);
+                    println!("{}", format_err!(e));
                     process::exit(1);
                 }
             };
@@ -1231,7 +1340,7 @@ pub fn main() {
             }
             if let Err(e) = integrate::run_devnet(orchestrator, deployment, None, !cmd.no_dashboard)
             {
-                println!("{}: {}", red!("error"), e);
+                println!("{}", format_err!(e));
                 process::exit(1);
             }
             if hints_enabled {
@@ -1242,7 +1351,7 @@ pub fn main() {
         Command::DAP => match super::dap::run_dap() {
             Ok(_) => (),
             Err(e) => {
-                println!("{}: {}", red!("error"), e);
+                println!("{}", red!(e));
                 process::exit(1);
             }
         },
@@ -1253,8 +1362,8 @@ pub fn main() {
                 Ok(file) => file,
                 Err(e) => {
                     println!(
-                        "{}: Unable to create file {}: {}",
-                        red!("error"),
+                        "{} Unable to create file {}: {}",
+                        red!("error:"),
                         file_name,
                         e
                     );
@@ -1307,8 +1416,8 @@ fn get_manifest_location_or_warn(path: Option<String>) -> Option<FileLocation> {
         Some(manifest_location) => Some(manifest_location),
         None => {
             println!(
-                "{}: no manifest found. Continuing with default.",
-                green!("note")
+                "{} no manifest found, starting with default settings.",
+                yellow!("note:")
             );
             None
         }
@@ -1321,8 +1430,8 @@ fn load_manifest_or_exit(path: Option<String>) -> ProjectManifest {
         Ok(manifest) => manifest,
         Err(message) => {
             println!(
-                "{}: Syntax errors in Clarinet.toml\n{}",
-                red!("error"),
+                "{} syntax errors in Clarinet.toml\n{}",
+                red!("error:"),
                 message,
             );
             process::exit(1);
@@ -1338,8 +1447,8 @@ fn load_manifest_or_warn(path: Option<String>) -> Option<ProjectManifest> {
             Ok(manifest) => manifest,
             Err(message) => {
                 println!(
-                    "{}: Syntax errors in Clarinet.toml\n{}",
-                    red!("error"),
+                    "{} syntax errors in Clarinet.toml\n{}",
+                    red!("error:"),
                     message,
                 );
                 process::exit(1);
@@ -1372,8 +1481,8 @@ fn load_deployment_and_artifacts_or_exit(
             match res {
                 Some(Ok(deployment)) => {
                     println!(
-                        "{}: using deployments/default.simnet-plan.yaml",
-                        yellow!("note")
+                        "{} using deployments/default.simnet-plan.yaml",
+                        yellow!("note:")
                     );
                     let artifacts = setup_session_with_deployment(&manifest, &deployment, None);
                     Ok((deployment, None, artifacts))
@@ -1420,9 +1529,51 @@ fn load_deployment_and_artifacts_or_exit(
     match result {
         Ok(deployment) => deployment,
         Err(e) => {
-            println!("{}: {}", red!("error"), e);
+            println!("{}", format_err!(e));
             process::exit(1);
         }
+    }
+}
+
+pub fn should_existing_plan_be_replaced(
+    existing_plan: &DeploymentSpecification,
+    new_plan: &DeploymentSpecification,
+) -> bool {
+    use similar::{ChangeTag, TextDiff};
+
+    let existing_file = serde_yaml::to_string(&existing_plan.to_specification_file()).unwrap();
+
+    let new_file = serde_yaml::to_string(&new_plan.to_specification_file()).unwrap();
+
+    if existing_file == new_file {
+        return false;
+    }
+
+    println!("{}", blue!("A new deployment plan was computed and differs from the default deployment plan currently saved on disk:"));
+
+    let diffs = TextDiff::from_lines(&existing_file, &new_file);
+
+    for change in diffs.iter_all_changes() {
+        let formatted_change = match change.tag() {
+            ChangeTag::Delete => {
+                format!("{} {}", red!("-"), red!(format!("{}", change)))
+            }
+            ChangeTag::Insert => {
+                format!("{} {}", green!("+"), green!(format!("{}", change)))
+            }
+            ChangeTag::Equal => format!("  {}", change),
+        };
+        print!("{}", formatted_change);
+    }
+
+    println!("{}", yellow!("Overwrite? [Y/n]"));
+    let mut buffer = String::new();
+    std::io::stdin().read_line(&mut buffer).unwrap();
+
+    if buffer.starts_with("n") {
+        return false;
+    } else {
+        return true;
     }
 }
 
@@ -1500,8 +1651,8 @@ pub fn load_deployment_if_exists(
             }
             Err(message) => {
                 println!(
-                    "{}: unable to compute an updated plan\n{}",
-                    red!("error"),
+                    "{} unable to compute an updated plan\n{}",
+                    red!("error:"),
                     message
                 );
                 Some(load_deployment(manifest, &default_deployment_location))
@@ -1533,8 +1684,8 @@ fn execute_changes(changes: Vec<Changes>) -> bool {
                 if let Ok(entry) = fs::metadata(&options.path) {
                     if entry.is_file() {
                         println!(
-                            "{}: file already exists at path {}",
-                            yellow!("warning"),
+                            "{} file already exists at path {}",
+                            yellow!("warning:"),
                             options.path
                         );
                         continue;
@@ -1544,8 +1695,8 @@ fn execute_changes(changes: Vec<Changes>) -> bool {
                     Ok(file) => file,
                     Err(e) => {
                         println!(
-                            "{}: Unable to create file {}: {}",
-                            red!("error"),
+                            "{} Unable to create file {}: {}",
+                            red!("error:"),
                             options.path,
                             e
                         );
@@ -1556,8 +1707,8 @@ fn execute_changes(changes: Vec<Changes>) -> bool {
                     Ok(_) => (),
                     Err(e) => {
                         println!(
-                            "{}: Unable to write file {}: {}",
-                            red!("error"),
+                            "{} Unable to write file {}: {}",
+                            red!("error:"),
                             options.path,
                             e
                         );
@@ -1571,8 +1722,8 @@ fn execute_changes(changes: Vec<Changes>) -> bool {
                     Ok(_) => (),
                     Err(e) => {
                         println!(
-                            "{}: Unable to create directory {}: {}",
-                            red!("error"),
+                            "{} Unable to create directory {}: {}",
+                            red!("error:"),
                             options.path,
                             e
                         );
@@ -1589,7 +1740,7 @@ fn execute_changes(changes: Vec<Changes>) -> bool {
                         let project_manifest_content = match manifest_location.read_content() {
                             Ok(content) => content,
                             Err(message) => {
-                                println!("{}: {}", red!("error"), message);
+                                println!("{}", format_err!(message));
                                 return false;
                             }
                         };
@@ -1599,8 +1750,8 @@ fn execute_changes(changes: Vec<Changes>) -> bool {
                                 Ok(manifest) => manifest,
                                 Err(message) => {
                                     println!(
-                                        "{}: Failed to process manifest file: {}",
-                                        red!("error"),
+                                        "{} Failed to process manifest file: {}",
+                                        red!("error:"),
                                         message
                                     );
                                     return false;
@@ -1612,7 +1763,7 @@ fn execute_changes(changes: Vec<Changes>) -> bool {
                         ) {
                             Ok(content) => content,
                             Err(message) => {
-                                println!("{}: {}", red!("error"), message);
+                                println!("{}", format_err!(message));
                                 return false;
                             }
                         }
@@ -1644,7 +1795,7 @@ fn execute_changes(changes: Vec<Changes>) -> bool {
         let toml_value = match toml::Value::try_from(&project_manifest) {
             Ok(value) => value,
             Err(e) => {
-                println!("{}: failed encoding config file ({})", red!("error"), e);
+                println!("{} failed encoding config file ({})", red!("error:"), e);
                 return false;
             }
         };
@@ -1652,7 +1803,7 @@ fn execute_changes(changes: Vec<Changes>) -> bool {
         let pretty_toml = match toml::ser::to_string_pretty(&toml_value) {
             Ok(value) => value,
             Err(e) => {
-                println!("{}: failed formatting config file ({})", red!("error"), e);
+                println!("{} failed formatting config file ({})", red!("error:"), e);
                 return false;
             }
         };
@@ -1662,8 +1813,8 @@ fn execute_changes(changes: Vec<Changes>) -> bool {
             .write_content(pretty_toml.as_bytes())
         {
             println!(
-                "{}: Unable to update manifest file - {}",
-                red!("error"),
+                "{} Unable to update manifest file - {}",
+                red!("error:"),
                 message
             );
             return false;
@@ -1718,11 +1869,11 @@ impl DiagnosticsDigest {
                 match diagnostic.level {
                     Level::Error => {
                         errors += 1;
-                        outputs.push(format!("{}: {}", red!("error"), diagnostic.message));
+                        outputs.push(format_err!(diagnostic.message));
                     }
                     Level::Warning => {
                         warnings += 1;
-                        outputs.push(format!("{}: {}", yellow!("warning"), diagnostic.message));
+                        outputs.push(format!("{} {}", yellow!("warning:"), diagnostic.message));
                     }
                     Level::Note => {
                         outputs.push(format!("{}: {}", green!("note:"), diagnostic.message));

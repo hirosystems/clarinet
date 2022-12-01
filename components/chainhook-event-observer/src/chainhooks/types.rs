@@ -1,10 +1,7 @@
 use clarity_repl::clarity::util::hash::hex_bytes;
+use reqwest::Url;
 use serde::ser::{SerializeSeq, Serializer};
 use serde::{Deserialize, Serialize};
-use std::collections::BTreeMap;
-use std::fs::File;
-use std::io::{BufReader, Read};
-use std::path::PathBuf;
 
 use chainhook_types::{BitcoinNetwork, StacksNetwork};
 
@@ -22,6 +19,30 @@ impl HookFormation {
             stacks_chainhooks: vec![],
             bitcoin_chainhooks: vec![],
         }
+    }
+
+    pub fn get_serialized_stacks_predicates(
+        &self,
+    ) -> Vec<(&String, &StacksNetwork, &StacksTransactionFilterPredicate)> {
+        let mut stacks = vec![];
+        for chainhook in self.stacks_chainhooks.iter() {
+            stacks.push((
+                &chainhook.uuid,
+                &chainhook.network,
+                &chainhook.transaction_predicate,
+            ));
+        }
+        stacks
+    }
+
+    pub fn get_serialized_bitcoin_predicates(
+        &self,
+    ) -> Vec<(&String, &BitcoinNetwork, &BitcoinTransactionFilterPredicate)> {
+        let mut bitcoin = vec![];
+        for chainhook in self.bitcoin_chainhooks.iter() {
+            bitcoin.push((&chainhook.uuid, &chainhook.network, &chainhook.predicate));
+        }
+        bitcoin
     }
 
     pub fn register_hook(&mut self, hook: ChainhookSpecification) {
@@ -103,6 +124,18 @@ impl ChainhookSpecification {
             Self::Stacks(data) => &data.uuid,
         }
     }
+
+    pub fn validate(&self) -> Result<(), String> {
+        match &self {
+            Self::Bitcoin(data) => {
+                let _ = data.action.validate()?;
+            }
+            Self::Stacks(data) => {
+                let _ = data.action.validate()?;
+            }
+        }
+        Ok(())
+    }
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, JsonSchema)]
@@ -117,7 +150,7 @@ pub struct BitcoinChainhookSpecification {
     pub end_block: Option<u64>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub expire_after_occurrence: Option<u64>,
-    pub predicate: BitcoinHookPredicate,
+    pub predicate: BitcoinTransactionFilterPredicate,
     pub action: HookAction,
 }
 
@@ -125,7 +158,22 @@ pub struct BitcoinChainhookSpecification {
 #[serde(rename_all = "snake_case")]
 pub enum HookAction {
     Http(HttpHook),
+    File(FileHook),
     Noop,
+}
+
+impl HookAction {
+    pub fn validate(&self) -> Result<(), String> {
+        match &self {
+            HookAction::Http(spec) => {
+                let _ = Url::parse(&spec.url)
+                    .map_err(|e| format!("hook action url invalid ({})", e.to_string()))?;
+            }
+            HookAction::File(_) => {}
+            HookAction::Noop => {}
+        }
+        Ok(())
+    }
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, JsonSchema)]
@@ -134,6 +182,12 @@ pub struct HttpHook {
     pub url: String,
     pub method: String,
     pub authorization_header: String,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub struct FileHook {
+    pub path: String,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, JsonSchema)]
@@ -182,15 +236,15 @@ impl ScriptTemplate {
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, JsonSchema)]
 #[serde(rename_all = "snake_case")]
-pub struct BitcoinHookPredicate {
+pub struct BitcoinTransactionFilterPredicate {
     pub scope: Scope,
     #[serde(flatten)]
     pub kind: BitcoinPredicateType,
 }
 
-impl BitcoinHookPredicate {
-    pub fn new(scope: Scope, kind: BitcoinPredicateType) -> BitcoinHookPredicate {
-        BitcoinHookPredicate { scope, kind }
+impl BitcoinTransactionFilterPredicate {
+    pub fn new(scope: Scope, kind: BitcoinPredicateType) -> BitcoinTransactionFilterPredicate {
+        BitcoinTransactionFilterPredicate { scope, kind }
     }
 }
 
@@ -198,12 +252,137 @@ impl BitcoinHookPredicate {
 #[serde(rename_all = "snake_case")]
 #[serde(tag = "type", content = "rule")]
 pub enum BitcoinPredicateType {
-    Hex(MatchingRule),
-    P2pkh(MatchingRule),
-    P2sh(MatchingRule),
-    P2wpkh(MatchingRule),
-    P2wsh(MatchingRule),
-    Script(ScriptTemplate),
+    TransactionIdentifierHash(ExactMatchingRule),
+    OpReturn(MatchingRule),
+    P2pkh(ExactMatchingRule),
+    P2sh(ExactMatchingRule),
+    P2wpkh(ExactMatchingRule),
+    P2wsh(ExactMatchingRule),
+    Pox(PoxPredicate),
+    Pob(PobPredicate),
+    KeyRegistration(KeyRegistrationPredicate),
+    TransferSTX(TransferSTXPredicate),
+    LockSTX(LockSTXPredicate),
+}
+
+pub fn get_canonical_magic_bytes(network: &BitcoinNetwork) -> [u8; 2] {
+    match network {
+        BitcoinNetwork::Mainnet => ['X' as u8, '2' as u8],
+        BitcoinNetwork::Testnet => ['T' as u8, '2' as u8],
+        BitcoinNetwork::Regtest => ['i' as u8, 'd' as u8],
+    }
+}
+
+pub struct PoxConfig {
+    pub genesis_block_height: u64,
+    pub prepare_phase_len: u64,
+    pub reward_phase_len: u64,
+    pub rewarded_addresses_per_block: usize,
+}
+
+impl PoxConfig {
+    pub fn is_consensus_rewarding_participants_at_block_height(&self, block_height: u64) -> bool {
+        (block_height.saturating_div(self.genesis_block_height) % self.get_pox_cycle_len())
+            >= self.prepare_phase_len
+    }
+
+    pub fn get_pox_cycle_len(&self) -> u64 {
+        self.prepare_phase_len + self.reward_phase_len
+    }
+}
+
+const POX_CONFIG_MAINNET: PoxConfig = PoxConfig {
+    genesis_block_height: 666050,
+    prepare_phase_len: 2100,
+    reward_phase_len: 100,
+    rewarded_addresses_per_block: 2,
+};
+
+const POX_CONFIG_TESTNET: PoxConfig = PoxConfig {
+    genesis_block_height: 2000000,
+    prepare_phase_len: 1050,
+    reward_phase_len: 50,
+    rewarded_addresses_per_block: 2,
+};
+
+const POX_CONFIG_DEVNET: PoxConfig = PoxConfig {
+    genesis_block_height: 100,
+    prepare_phase_len: 10,
+    reward_phase_len: 5,
+    rewarded_addresses_per_block: 2,
+};
+
+pub fn get_canonical_pox_config(network: &BitcoinNetwork) -> PoxConfig {
+    match network {
+        BitcoinNetwork::Mainnet => POX_CONFIG_MAINNET,
+        BitcoinNetwork::Testnet => POX_CONFIG_TESTNET,
+        BitcoinNetwork::Regtest => POX_CONFIG_DEVNET,
+    }
+}
+
+#[derive(Debug, Clone, PartialEq)]
+#[repr(u8)]
+pub enum StacksOpcodes {
+    BlockCommit = '[' as u8,
+    KeyRegister = '^' as u8,
+    StackStx = 'x' as u8,
+    PreStx = 'p' as u8,
+    TransferStx = '$' as u8,
+}
+
+impl TryFrom<u8> for StacksOpcodes {
+    type Error = ();
+
+    fn try_from(v: u8) -> Result<Self, Self::Error> {
+        match v {
+            x if x == StacksOpcodes::BlockCommit as u8 => Ok(StacksOpcodes::BlockCommit),
+            x if x == StacksOpcodes::KeyRegister as u8 => Ok(StacksOpcodes::KeyRegister),
+            x if x == StacksOpcodes::StackStx as u8 => Ok(StacksOpcodes::StackStx),
+            x if x == StacksOpcodes::PreStx as u8 => Ok(StacksOpcodes::PreStx),
+            x if x == StacksOpcodes::TransferStx as u8 => Ok(StacksOpcodes::TransferStx),
+            _ => Err(()),
+        }
+    }
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum KeyRegistrationPredicate {
+    Any,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum TransferSTXPredicate {
+    Any,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum LockSTXPredicate {
+    Any,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum PoxPredicate {
+    Any,
+    Recipient(MatchingRule),
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum PobPredicate {
+    Any,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum BlockIdentifierIndexRule {
+    Equals(u64),
+    HigherThan(u64),
+    LowerThan(u64),
+    Between(u64, u64),
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, JsonSchema)]
@@ -222,6 +401,19 @@ pub enum MatchingRule {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum ExactMatchingRule {
+    Equals(String),
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum BlockIdentifierHashRule {
+    Equals(String),
+    BuildsOff(String),
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, JsonSchema)]
 pub struct StacksChainhookSpecification {
     pub uuid: String,
     pub name: String,
@@ -237,19 +429,33 @@ pub struct StacksChainhookSpecification {
     pub capture_all_events: Option<bool>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub decode_clarity_values: Option<bool>,
-    pub predicate: StacksHookPredicate,
+    #[serde(rename = "predicate")]
+    pub transaction_predicate: StacksTransactionFilterPredicate,
+    pub block_predicate: Option<StacksBlockFilterPredicate>,
     pub action: HookAction,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 #[serde(tag = "type", content = "rule")]
-pub enum StacksHookPredicate {
+pub enum StacksBlockFilterPredicate {
+    BlockIdentifierHash(BlockIdentifierHashRule),
+    BlockIdentifierIndex(BlockIdentifierIndexRule),
+    BitcoinBlockIdentifierHash(BlockIdentifierHashRule),
+    BitcoinBlockIdentifierIndex(BlockIdentifierHashRule),
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, JsonSchema)]
+#[serde(rename_all = "snake_case")]
+#[serde(tag = "type", content = "rule")]
+pub enum StacksTransactionFilterPredicate {
+    ContractDeployment(StacksContractDeploymentPredicate),
     ContractCall(StacksContractCallBasedPredicate),
     PrintEvent(StacksPrintEventBasedPredicate),
     FtEvent(StacksFtEventBasedPredicate),
     NftEvent(StacksNftEventBasedPredicate),
     StxEvent(StacksStxEventBasedPredicate),
+    TransactionIdentifierHash(String),
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, JsonSchema)]
@@ -257,6 +463,14 @@ pub enum StacksHookPredicate {
 pub struct StacksContractCallBasedPredicate {
     pub contract_identifier: String,
     pub method: String,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, JsonSchema)]
+#[serde(rename_all = "snake_case")]
+#[serde(tag = "type", content = "rule")]
+pub enum StacksContractDeploymentPredicate {
+    Principal(String),
+    Trait(String),
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, JsonSchema)]

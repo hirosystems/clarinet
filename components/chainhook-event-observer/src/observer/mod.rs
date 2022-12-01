@@ -1,42 +1,39 @@
-use crate::chainhooks::types::{ChainhookSpecification, HookFormation};
-use crate::chainhooks::{
-    evaluate_bitcoin_chainhooks_on_chain_event, evaluate_stacks_chainhooks_on_chain_event,
-    handle_bitcoin_hook_action, handle_stacks_hook_action, BitcoinChainhookOccurrence,
-    BitcoinChainhookOccurrencePayload, StacksChainhookOccurrence, StacksChainhookOccurrencePayload,
+use crate::chainhooks::bitcoin::{
+    evaluate_bitcoin_chainhooks_on_chain_event, handle_bitcoin_hook_action,
+    BitcoinChainhookOccurrence, BitcoinChainhookOccurrencePayload,
 };
+use crate::chainhooks::stacks::{
+    evaluate_stacks_chainhooks_on_chain_event, handle_stacks_hook_action,
+    StacksChainhookOccurrence, StacksChainhookOccurrencePayload,
+};
+use crate::chainhooks::types::{ChainhookSpecification, HookFormation};
 use crate::indexer::{self, Indexer, IndexerConfig};
-use crate::utils;
+use crate::utils::Context;
 use bitcoincore_rpc::bitcoin::{BlockHash, Txid};
 use bitcoincore_rpc::{Auth, Client, RpcApi};
 use chainhook_types::{
-    BitcoinChainEvent, StacksChainEvent, StacksNetwork, StacksTransactionData,
+    BitcoinChainEvent, BitcoinNetwork, BlockIdentifier, StacksChainEvent, StacksNetwork,
     TransactionIdentifier,
 };
 use clarity_repl::clarity::util::hash::bytes_to_hex;
+use hiro_system_kit;
+use hiro_system_kit::slog;
 use reqwest::Client as HttpClient;
 use rocket::config::{Config, LogLevel};
+use rocket::data::{Limits, ToByteUnit};
 use rocket::http::Status;
-use rocket::outcome::IntoOutcome;
 use rocket::request::{self, FromRequest, Outcome, Request};
 use rocket::serde::json::{json, Json, Value as JsonValue};
 use rocket::serde::Deserialize;
 use rocket::State;
-use serde_json::error;
-use stacks_rpc_client::{PoxInfo, StacksRpc};
-use std::collections::{HashMap, HashSet, VecDeque};
-use std::convert::TryFrom;
+use rocket_okapi::{openapi, openapi_get_routes, request::OpenApiFromRequest};
+use std::collections::{HashMap, HashSet};
 use std::error::Error;
-use std::iter::FromIterator;
 use std::net::{IpAddr, Ipv4Addr};
-use std::path::PathBuf;
 use std::str;
 use std::str::FromStr;
-use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc::{Receiver, Sender};
 use std::sync::{Arc, Mutex, RwLock};
-
-use rocket_okapi::{openapi, openapi_get_routes, request::OpenApiFromRequest};
-use schemars::JsonSchema;
 
 pub const DEFAULT_INGESTION_PORT: u16 = 20445;
 pub const DEFAULT_CONTROL_PORT: u16 = 20446;
@@ -117,10 +114,8 @@ pub struct EventObserverConfig {
     pub control_port: u16,
     pub bitcoin_node_username: String,
     pub bitcoin_node_password: String,
-    pub bitcoin_node_rpc_host: String,
-    pub bitcoin_node_rpc_port: u16,
-    pub stacks_node_rpc_host: String,
-    pub stacks_node_rpc_port: u16,
+    pub bitcoin_node_rpc_url: String,
+    pub stacks_node_rpc_url: String,
     pub operators: HashSet<String>,
     pub display_logs: bool,
 }
@@ -189,8 +184,7 @@ pub struct BitcoinRPCRequest {
 pub struct BitcoinConfig {
     pub username: String,
     pub password: String,
-    pub rpc_host: String,
-    pub rpc_port: u16,
+    pub rpc_url: String,
 }
 
 #[derive(Debug, Clone)]
@@ -209,20 +203,17 @@ pub async fn start_event_observer(
     observer_commands_tx: Sender<ObserverCommand>,
     observer_commands_rx: Receiver<ObserverCommand>,
     observer_events_tx: Option<Sender<ObserverEvent>>,
+    ctx: Context,
 ) -> Result<(), Box<dyn Error>> {
-    info!("Event observer starting with config {:?}", config);
+    ctx.try_log(|logger| slog::info!(logger, "Event observer starting with config {:?}", config));
 
     let indexer = Indexer::new(IndexerConfig {
-        stacks_node_rpc_url: format!(
-            "{}:{}",
-            config.stacks_node_rpc_host, config.stacks_node_rpc_port
-        ),
-        bitcoin_node_rpc_url: format!(
-            "{}:{}",
-            config.bitcoin_node_rpc_host, config.bitcoin_node_rpc_port
-        ),
+        stacks_node_rpc_url: config.stacks_node_rpc_url.clone(),
+        bitcoin_node_rpc_url: config.bitcoin_node_rpc_url.clone(),
         bitcoin_node_rpc_username: config.bitcoin_node_username.clone(),
         bitcoin_node_rpc_password: config.bitcoin_node_password.clone(),
+        stacks_network: StacksNetwork::Devnet,
+        bitcoin_network: BitcoinNetwork::Regtest,
     });
 
     let log_level = if config.display_logs {
@@ -241,8 +232,7 @@ pub async fn start_event_observer(
     let bitcoin_config = BitcoinConfig {
         username: config.bitcoin_node_username.clone(),
         password: config.bitcoin_node_password.clone(),
-        rpc_host: config.bitcoin_node_rpc_host.clone(),
-        rpc_port: config.bitcoin_node_rpc_port,
+        rpc_url: config.bitcoin_node_rpc_url.clone(),
     };
 
     let mut entries = HashMap::new();
@@ -268,6 +258,7 @@ pub async fn start_event_observer(
 
     let background_job_tx_mutex = Arc::new(Mutex::new(observer_commands_tx.clone()));
 
+    let limits = Limits::default().limit("json", 4.megabytes());
     let ingestion_config = Config {
         port: ingestion_port,
         workers: 3,
@@ -275,6 +266,8 @@ pub async fn start_event_observer(
         keep_alive: 5,
         temp_dir: std::env::temp_dir().into(),
         log_level: log_level.clone(),
+        cli_colors: false,
+        limits,
         ..Config::default()
     };
 
@@ -286,21 +279,26 @@ pub async fn start_event_observer(
         handle_new_mempool_tx,
         handle_drop_mempool_tx,
         handle_new_attachement,
+        handle_mined_block,
+        handle_mined_microblock,
     ];
 
     if bitcoin_rpc_proxy_enabled {
         routes.append(&mut routes![handle_bitcoin_rpc_call]);
     }
 
+    let ctx_cloned = ctx.clone();
+
     let _ = std::thread::spawn(move || {
         let future = rocket::custom(ingestion_config)
             .manage(indexer_rw_lock)
             .manage(background_job_tx_mutex)
             .manage(bitcoin_config)
+            .manage(ctx_cloned)
             .mount("/", routes)
             .launch();
 
-        let _ = utils::nestable_block_on(future);
+        let _ = hiro_system_kit::nestable_block_on(future);
     });
 
     let control_config = Config {
@@ -310,6 +308,7 @@ pub async fn start_event_observer(
         keep_alive: 5,
         temp_dir: std::env::temp_dir().into(),
         log_level,
+        cli_colors: false,
         ..Config::default()
     };
 
@@ -323,15 +322,17 @@ pub async fn start_event_observer(
 
     let background_job_tx_mutex = Arc::new(Mutex::new(observer_commands_tx.clone()));
     let managed_chainhook_store = chainhook_store.clone();
+    let ctx_cloned = ctx.clone();
 
     let _ = std::thread::spawn(move || {
         let future = rocket::custom(control_config)
             .manage(background_job_tx_mutex)
             .manage(managed_chainhook_store)
+            .manage(ctx_cloned)
             .mount("/", routes)
             .launch();
 
-        let _ = utils::nestable_block_on(future);
+        let _ = hiro_system_kit::nestable_block_on(future);
     });
 
     // This loop is used for handling background jobs, emitted by HTTP calls.
@@ -340,8 +341,29 @@ pub async fn start_event_observer(
         chainhook_store,
         observer_commands_rx,
         observer_events_tx,
+        ctx,
     )
     .await
+}
+
+pub fn get_bitcoin_proof(
+    bitcoin_client_rpc: &Client,
+    transaction_identifier: &TransactionIdentifier,
+    block_identifier: &BlockIdentifier,
+) -> Result<String, String> {
+    let txid = Txid::from_str(&transaction_identifier.hash[2..]).expect("unable to build txid");
+    let block_hash =
+        BlockHash::from_str(&block_identifier.hash[2..]).expect("unable to build block_hash");
+
+    let res = bitcoin_client_rpc.get_tx_out_proof(&vec![txid], Some(&block_hash));
+    match res {
+        Ok(proof) => Ok(format!("0x{}", bytes_to_hex(&proof))),
+        Err(e) => Err(format!(
+            "failed collecting proof for transaction {}: {}",
+            transaction_identifier.hash,
+            e.to_string()
+        )),
+    }
 }
 
 pub async fn start_observer_commands_handler(
@@ -349,6 +371,7 @@ pub async fn start_observer_commands_handler(
     chainhook_store: Arc<RwLock<ChainhookStore>>,
     observer_commands_rx: Receiver<ObserverCommand>,
     observer_events_tx: Option<Sender<ObserverEvent>>,
+    ctx: Context,
 ) -> Result<(), Box<dyn Error>> {
     let mut chainhooks_occurrences_tracker: HashMap<String, u64> = HashMap::new();
     let event_handlers = config.event_handlers.clone();
@@ -366,7 +389,7 @@ pub async fn start_observer_commands_handler(
         };
         match command {
             ObserverCommand::Terminate => {
-                info!("Handling Termination command");
+                ctx.try_log(|logger| slog::info!(logger, "Handling Termination command"));
                 if let Some(ref tx) = observer_events_tx {
                     let _ = tx.send(ObserverEvent::Info("Terminating event observer".into()));
                     let _ = tx.send(ObserverEvent::Terminate);
@@ -374,7 +397,9 @@ pub async fn start_observer_commands_handler(
                 break;
             }
             ObserverCommand::PropagateBitcoinChainEvent(chain_event) => {
-                info!("Handling PropagateBitcoinChainEvent command");
+                ctx.try_log(|logger| {
+                    slog::info!(logger, "Handling PropagateBitcoinChainEvent command")
+                });
                 for event_handler in event_handlers.iter() {
                     event_handler.propagate_bitcoin_event(&chain_event).await;
                 }
@@ -385,7 +410,9 @@ pub async fn start_observer_commands_handler(
                 if config.hooks_enabled {
                     match chainhook_store.read() {
                         Err(e) => {
-                            error!("unable to obtain lock {:?}", e);
+                            ctx.try_log(|logger| {
+                                slog::error!(logger, "unable to obtain lock {:?}", e)
+                            });
                             continue;
                         }
                         Ok(chainhook_store_reader) => {
@@ -395,20 +422,26 @@ pub async fn start_observer_commands_handler(
                                 .map(|v| &v.bitcoin_chainhooks)
                                 .flatten()
                                 .collect::<Vec<_>>();
-                            info!(
-                                "Evaluating {} bitcoin chainhooks registered",
-                                bitcoin_chainhooks.len()
-                            );
+                            ctx.try_log(|logger| {
+                                slog::info!(
+                                    logger,
+                                    "Evaluating {} bitcoin chainhooks registered",
+                                    bitcoin_chainhooks.len()
+                                )
+                            });
 
                             let chainhooks_candidates = evaluate_bitcoin_chainhooks_on_chain_event(
                                 &chain_event,
                                 bitcoin_chainhooks,
                             );
 
-                            info!(
-                                "{} bitcoin chainhooks positive evaluations",
-                                chainhooks_candidates.len()
-                            );
+                            ctx.try_log(|logger| {
+                                slog::info!(
+                                    logger,
+                                    "{} bitcoin chainhooks positive evaluations",
+                                    chainhooks_candidates.len()
+                                )
+                            });
 
                             let mut chainhooks_to_trigger = vec![];
 
@@ -428,65 +461,56 @@ pub async fn start_observer_commands_handler(
                                 }
                             }
 
+                            let bitcoin_client_rpc = Client::new(
+                                &config.bitcoin_node_rpc_url,
+                                Auth::UserPass(
+                                    config.bitcoin_node_username.to_string(),
+                                    config.bitcoin_node_password.to_string(),
+                                ),
+                            )
+                            .expect("unable to build http client");
+
                             let mut proofs = HashMap::new();
                             for hook_to_trigger in chainhooks_to_trigger.iter() {
-                                for (transaction, block_identifier) in hook_to_trigger.apply.iter()
-                                {
-                                    if !proofs.contains_key(&transaction.transaction_identifier) {
-                                        info!(
-                                            "collecting proof for transaction {}",
-                                            transaction.transaction_identifier.hash
-                                        );
-
-                                        let rpc = Client::new(
-                                            &format!(
-                                                "{}:{}",
-                                                config.bitcoin_node_rpc_host,
-                                                config.bitcoin_node_rpc_port
-                                            ),
-                                            Auth::UserPass(
-                                                config.bitcoin_node_username.to_string(),
-                                                config.bitcoin_node_password.to_string(),
-                                            ),
-                                        )
-                                        .expect("unable to build http client");
-                                        let txid = Txid::from_str(
-                                            &transaction.transaction_identifier.hash[2..],
-                                        )
-                                        .expect("unable to build txid");
-                                        let block_hash =
-                                            BlockHash::from_str(&block_identifier.hash[2..])
-                                                .expect("unable to build block_hash");
-
-                                        info!(
-                                            "collecting proof for transaction {} / {}",
-                                            txid, block_hash
-                                        );
-
-                                        let res =
-                                            rpc.get_tx_out_proof(&vec![txid], Some(&block_hash));
-                                        if let Ok(proof) = res {
-                                            info!(
-                                                "succeeded collecting proof for transaction {}",
-                                                transaction.transaction_identifier.hash
-                                            );
-                                            proofs.insert(
+                                for (transactions, block) in hook_to_trigger.apply.iter() {
+                                    for transaction in transactions.iter() {
+                                        if !proofs.contains_key(&transaction.transaction_identifier)
+                                        {
+                                            ctx.try_log(|logger| {
+                                                slog::info!(
+                                                    logger,
+                                                    "collecting proof for transaction {}",
+                                                    transaction.transaction_identifier.hash
+                                                )
+                                            });
+                                            match get_bitcoin_proof(
+                                                &bitcoin_client_rpc,
                                                 &transaction.transaction_identifier,
-                                                bytes_to_hex(&proof),
-                                            );
-                                        } else {
-                                            info!(
-                                                "failed collecting proof for transaction {}",
-                                                transaction.transaction_identifier.hash
-                                            );
+                                                &block.block_identifier,
+                                            ) {
+                                                Ok(proof) => {
+                                                    proofs.insert(
+                                                        &transaction.transaction_identifier,
+                                                        proof,
+                                                    );
+                                                }
+                                                Err(e) => {
+                                                    ctx.try_log(|logger| {
+                                                        slog::error!(logger, "{e}")
+                                                    });
+                                                }
+                                            }
                                         }
                                     }
                                 }
                             }
-                            info!(
-                                "{} bitcoin chainhooks will be triggered",
-                                chainhooks_to_trigger.len()
-                            );
+                            ctx.try_log(|logger| {
+                                slog::info!(
+                                    logger,
+                                    "{} bitcoin chainhooks will be triggered",
+                                    chainhooks_to_trigger.len()
+                                )
+                            });
 
                             if let Some(ref tx) = observer_events_tx {
                                 let _ = tx.send(ObserverEvent::HooksTriggered(
@@ -501,6 +525,13 @@ pub async fn start_observer_commands_handler(
                                         BitcoinChainhookOccurrence::Http(request) => {
                                             requests.push(request);
                                         }
+                                        BitcoinChainhookOccurrence::File(_path, _bytes) => ctx
+                                            .try_log(|logger| {
+                                                slog::info!(
+                                                    logger,
+                                                    "Writing to disk not supported in server mode"
+                                                )
+                                            }),
                                         BitcoinChainhookOccurrence::Data(payload) => {
                                             if let Some(ref tx) = observer_events_tx {
                                                 let _ = tx.send(
@@ -516,15 +547,20 @@ pub async fn start_observer_commands_handler(
                         }
                     };
                 }
-                info!(
-                    "{} bitcoin chainhooks to deregister",
-                    hooks_ids_to_deregister.len()
-                );
+                ctx.try_log(|logger| {
+                    slog::info!(
+                        logger,
+                        "{} bitcoin chainhooks to deregister",
+                        hooks_ids_to_deregister.len()
+                    )
+                });
 
                 for hook_uuid in hooks_ids_to_deregister.iter() {
                     match chainhook_store.write() {
                         Err(e) => {
-                            error!("unable to obtain lock {:?}", e);
+                            ctx.try_log(|logger| {
+                                slog::error!(logger, "unable to obtain lock {:?}", e)
+                            });
                             continue;
                         }
                         Ok(mut chainhook_store_writer) => {
@@ -550,8 +586,36 @@ pub async fn start_observer_commands_handler(
 
                 for request in requests.into_iter() {
                     // todo(lgalabru): collect responses for reporting
-                    info!("Dispatching request from bitcoin chainhook {:?}", request);
-                    let _ = request.send().await;
+                    ctx.try_log(|logger| {
+                        slog::info!(
+                            logger,
+                            "Dispatching request from bitcoin chainhook {:?}",
+                            request
+                        )
+                    });
+                    match request.send().await {
+                        Ok(res) => {
+                            if res.status().is_success() {
+                                ctx.try_log(|logger| {
+                                    slog::info!(logger, "Trigger {} successful", res.url())
+                                });
+                            } else {
+                                ctx.try_log(|logger| {
+                                    slog::warn!(
+                                        logger,
+                                        "Trigger {} failed with status {}",
+                                        res.url(),
+                                        res.status()
+                                    )
+                                });
+                            }
+                        }
+                        Err(e) => {
+                            ctx.try_log(|logger| {
+                                slog::warn!(logger, "Unable to build and send request {:?}", e)
+                            });
+                        }
+                    }
                 }
 
                 if let Some(ref tx) = observer_events_tx {
@@ -559,7 +623,9 @@ pub async fn start_observer_commands_handler(
                 }
             }
             ObserverCommand::PropagateStacksChainEvent(chain_event) => {
-                info!("Handling PropagateStacksChainEvent command");
+                ctx.try_log(|logger| {
+                    slog::info!(logger, "Handling PropagateStacksChainEvent command")
+                });
                 for event_handler in event_handlers.iter() {
                     event_handler.propagate_stacks_event(&chain_event).await;
                 }
@@ -568,7 +634,9 @@ pub async fn start_observer_commands_handler(
                 if config.hooks_enabled {
                     match chainhook_store.read() {
                         Err(e) => {
-                            error!("unable to obtain lock {:?}", e);
+                            ctx.try_log(|logger| {
+                                slog::error!(logger, "unable to obtain lock {:?}", e)
+                            });
                             continue;
                         }
                         Ok(chainhook_store_reader) => {
@@ -583,6 +651,7 @@ pub async fn start_observer_commands_handler(
                             let chainhooks_candidates = evaluate_stacks_chainhooks_on_chain_event(
                                 &chain_event,
                                 stacks_chainhooks,
+                                &ctx,
                             );
 
                             let mut chainhooks_to_trigger = vec![];
@@ -611,12 +680,19 @@ pub async fn start_observer_commands_handler(
                             let proofs = HashMap::new();
                             for chainhook_to_trigger in chainhooks_to_trigger.into_iter() {
                                 if let Some(result) =
-                                    handle_stacks_hook_action(chainhook_to_trigger, &proofs)
+                                    handle_stacks_hook_action(chainhook_to_trigger, &proofs, &ctx)
                                 {
                                     match result {
                                         StacksChainhookOccurrence::Http(request) => {
                                             requests.push(request);
                                         }
+                                        StacksChainhookOccurrence::File(_path, _bytes) => ctx
+                                            .try_log(|logger| {
+                                                slog::info!(
+                                                    logger,
+                                                    "Writing to disk not supported in server mode"
+                                                )
+                                            }),
                                         StacksChainhookOccurrence::Data(payload) => {
                                             if let Some(ref tx) = observer_events_tx {
                                                 let _ = tx.send(
@@ -636,7 +712,9 @@ pub async fn start_observer_commands_handler(
                 for hook_uuid in hooks_ids_to_deregister.iter() {
                     match chainhook_store.write() {
                         Err(e) => {
-                            error!("unable to obtain lock {:?}", e);
+                            ctx.try_log(|logger| {
+                                slog::error!(logger, "unable to obtain lock {:?}", e)
+                            });
                             continue;
                         }
                         Ok(mut chainhook_store_writer) => {
@@ -662,7 +740,36 @@ pub async fn start_observer_commands_handler(
 
                 for request in requests.into_iter() {
                     // todo(lgalabru): collect responses for reporting
-                    let _ = request.send().await;
+                    ctx.try_log(|logger| {
+                        slog::info!(
+                            logger,
+                            "Dispatching request from stacks chainhook {:?}",
+                            request
+                        )
+                    });
+                    match request.send().await {
+                        Ok(res) => {
+                            if res.status().is_success() {
+                                ctx.try_log(|logger| {
+                                    slog::info!(logger, "Trigger {} successful", res.url())
+                                });
+                            } else {
+                                ctx.try_log(|logger| {
+                                    slog::warn!(
+                                        logger,
+                                        "Trigger {} failed with status {}",
+                                        res.url(),
+                                        res.status()
+                                    )
+                                });
+                            }
+                        }
+                        Err(e) => {
+                            ctx.try_log(|logger| {
+                                slog::warn!(logger, "Unable to build and send request {:?}", e)
+                            });
+                        }
+                    }
                 }
 
                 if let Some(ref tx) = observer_events_tx {
@@ -670,13 +777,17 @@ pub async fn start_observer_commands_handler(
                 }
             }
             ObserverCommand::PropagateStacksMempoolEvent(mempool_event) => {
-                info!("Handling PropagateStacksMempoolEvent command");
+                ctx.try_log(|logger| {
+                    slog::info!(logger, "Handling PropagateStacksMempoolEvent command")
+                });
                 if let Some(ref tx) = observer_events_tx {
                     let _ = tx.send(ObserverEvent::StacksChainMempoolEvent(mempool_event));
                 }
             }
             ObserverCommand::NotifyBitcoinTransactionProxied => {
-                info!("Handling NotifyBitcoinTransactionProxied command");
+                ctx.try_log(|logger| {
+                    slog::info!(logger, "Handling NotifyBitcoinTransactionProxied command")
+                });
                 for event_handler in event_handlers.iter() {
                     event_handler.notify_bitcoin_transaction_proxied().await;
                 }
@@ -686,18 +797,21 @@ pub async fn start_observer_commands_handler(
             }
             ObserverCommand::RegisterHook(hook, api_key) => match chainhook_store.write() {
                 Err(e) => {
-                    error!("unable to obtain lock {:?}", e);
+                    ctx.try_log(|logger| slog::error!(logger, "unable to obtain lock {:?}", e));
                     continue;
                 }
                 Ok(mut chainhook_store_writer) => {
-                    info!("Handling RegisterHook command");
+                    ctx.try_log(|logger| slog::info!(logger, "Handling RegisterHook command"));
                     let hook_formation = match chainhook_store_writer.entries.get_mut(&api_key) {
                         Some(hook_formation) => hook_formation,
                         None => {
-                            error!(
-                                "Unable to retrieve chainhooks associated with {:?}",
-                                api_key
-                            );
+                            ctx.try_log(|logger| {
+                                slog::error!(
+                                    logger,
+                                    "Unable to retrieve chainhooks associated with {:?}",
+                                    api_key
+                                )
+                            });
                             continue;
                         }
                     };
@@ -711,19 +825,24 @@ pub async fn start_observer_commands_handler(
             ObserverCommand::DeregisterStacksHook(hook_uuid, api_key) => {
                 match chainhook_store.write() {
                     Err(e) => {
-                        error!("unable to obtain lock {:?}", e);
+                        ctx.try_log(|logger| slog::error!(logger, "unable to obtain lock {:?}", e));
                         continue;
                     }
                     Ok(mut chainhook_store_writer) => {
-                        info!("Handling DeregisterStacksHook command");
+                        ctx.try_log(|logger| {
+                            slog::info!(logger, "Handling DeregisterStacksHook command")
+                        });
                         let hook_formation = match chainhook_store_writer.entries.get_mut(&api_key)
                         {
                             Some(hook_formation) => hook_formation,
                             None => {
-                                error!(
-                                    "Unable to retrieve chainhooks associated with {:?}",
-                                    api_key
-                                );
+                                ctx.try_log(|logger| {
+                                    slog::error!(
+                                        logger,
+                                        "Unable to retrieve chainhooks associated with {:?}",
+                                        api_key
+                                    )
+                                });
                                 continue;
                             }
                         };
@@ -740,19 +859,24 @@ pub async fn start_observer_commands_handler(
             ObserverCommand::DeregisterBitcoinHook(hook_uuid, api_key) => {
                 match chainhook_store.write() {
                     Err(e) => {
-                        error!("unable to obtain lock {:?}", e);
+                        ctx.try_log(|logger| slog::error!(logger, "unable to obtain lock {:?}", e));
                         continue;
                     }
                     Ok(mut chainhook_store_writer) => {
-                        info!("Handling DeregisterBitcoinHook command");
+                        ctx.try_log(|logger| {
+                            slog::info!(logger, "Handling DeregisterBitcoinHook command")
+                        });
                         let hook_formation = match chainhook_store_writer.entries.get_mut(&api_key)
                         {
                             Some(hook_formation) => hook_formation,
                             None => {
-                                error!(
-                                    "Unable to retrieve chainhooks associated with {:?}",
-                                    api_key
-                                );
+                                ctx.try_log(|logger| {
+                                    slog::error!(
+                                        logger,
+                                        "Unable to retrieve chainhooks associated with {:?}",
+                                        api_key
+                                    )
+                                });
                                 continue;
                             }
                         };
@@ -773,8 +897,8 @@ pub async fn start_observer_commands_handler(
 
 #[openapi(skip)]
 #[rocket::get("/ping", format = "application/json")]
-pub fn handle_ping() -> Json<JsonValue> {
-    info!("GET /ping");
+pub fn handle_ping(ctx: &State<Context>) -> Json<JsonValue> {
+    ctx.try_log(|logger| slog::info!(logger, "GET /ping"));
     Json(json!({
         "status": 200,
         "result": "Ok",
@@ -787,29 +911,56 @@ pub fn handle_new_bitcoin_block(
     indexer_rw_lock: &State<Arc<RwLock<Indexer>>>,
     marshalled_block: Json<JsonValue>,
     background_job_tx: &State<Arc<Mutex<Sender<ObserverCommand>>>>,
+    ctx: &State<Context>,
 ) -> Json<JsonValue> {
-    info!("POST /new_burn_block");
+    ctx.try_log(|logger| slog::info!(logger, "POST /new_burn_block"));
     // Standardize the structure of the block, and identify the
     // kind of update that this new block would imply, taking
     // into account the last 7 blocks.
     let chain_update = match indexer_rw_lock.inner().write() {
-        Ok(mut indexer) => indexer.handle_bitcoin_block(marshalled_block.into_inner()),
-        _ => {
+        Ok(mut indexer) => indexer.handle_bitcoin_block(marshalled_block.into_inner(), &ctx),
+        Err(e) => {
+            ctx.try_log(|logger| {
+                slog::warn!(
+                    logger,
+                    "unable to acquire indexer_rw_lock: {}",
+                    e.to_string()
+                )
+            });
             return Json(json!({
                 "status": 500,
                 "result": "Unable to acquire lock",
-            }))
+            }));
         }
     };
 
-    if let Ok(Some(chain_event)) = chain_update {
-        let background_job_tx = background_job_tx.inner();
-        match background_job_tx.lock() {
-            Ok(tx) => {
-                let _ = tx.send(ObserverCommand::PropagateBitcoinChainEvent(chain_event));
-            }
-            _ => {}
-        };
+    match chain_update {
+        Ok(Some(chain_event)) => {
+            match background_job_tx.lock() {
+                Ok(tx) => {
+                    let _ = tx.send(ObserverCommand::PropagateBitcoinChainEvent(chain_event));
+                }
+                Err(e) => {
+                    ctx.try_log(|logger| {
+                        slog::warn!(
+                            logger,
+                            "unable to acquire background_job_tx: {}",
+                            e.to_string()
+                        )
+                    });
+                    return Json(json!({
+                        "status": 500,
+                        "result": "Unable to acquire lock",
+                    }));
+                }
+            };
+        }
+        Ok(None) => {
+            ctx.try_log(|logger| slog::info!(logger, "unable to infer chain progress"));
+        }
+        Err(e) => {
+            ctx.try_log(|logger| slog::error!(logger, "unable to handle bitcoin block: {}", e))
+        }
     }
 
     Json(json!({
@@ -824,8 +975,9 @@ pub fn handle_new_stacks_block(
     indexer_rw_lock: &State<Arc<RwLock<Indexer>>>,
     marshalled_block: Json<JsonValue>,
     background_job_tx: &State<Arc<Mutex<Sender<ObserverCommand>>>>,
+    ctx: &State<Context>,
 ) -> Json<JsonValue> {
-    info!("POST /new_block");
+    ctx.try_log(|logger| slog::info!(logger, "POST /new_block"));
     // Standardize the structure of the block, and identify the
     // kind of update that this new block would imply, taking
     // into account the last 7 blocks.
@@ -833,25 +985,51 @@ pub fn handle_new_stacks_block(
     let (_pox_info, chain_event) = match indexer_rw_lock.inner().write() {
         Ok(mut indexer) => {
             let pox_info = indexer.get_pox_info();
-            let chain_event = indexer.handle_stacks_marshalled_block(marshalled_block.into_inner());
+            let chain_event =
+                indexer.handle_stacks_marshalled_block(marshalled_block.into_inner(), &ctx);
             (pox_info, chain_event)
         }
-        _ => {
+        Err(e) => {
+            ctx.try_log(|logger| {
+                slog::warn!(
+                    logger,
+                    "unable to acquire indexer_rw_lock: {}",
+                    e.to_string()
+                )
+            });
             return Json(json!({
                 "status": 500,
                 "result": "Unable to acquire lock",
-            }))
+            }));
         }
     };
 
-    if let Ok(Some(chain_event)) = chain_event {
-        let background_job_tx = background_job_tx.inner();
-        match background_job_tx.lock() {
-            Ok(tx) => {
-                let _ = tx.send(ObserverCommand::PropagateStacksChainEvent(chain_event));
-            }
-            _ => {}
-        };
+    match chain_event {
+        Ok(Some(chain_event)) => {
+            let background_job_tx = background_job_tx.inner();
+            match background_job_tx.lock() {
+                Ok(tx) => {
+                    let _ = tx.send(ObserverCommand::PropagateStacksChainEvent(chain_event));
+                }
+                Err(e) => {
+                    ctx.try_log(|logger| {
+                        slog::warn!(
+                            logger,
+                            "unable to acquire background_job_tx: {}",
+                            e.to_string()
+                        )
+                    });
+                    return Json(json!({
+                        "status": 500,
+                        "result": "Unable to acquire lock",
+                    }));
+                }
+            };
+        }
+        Ok(None) => {
+            ctx.try_log(|logger| slog::info!(logger, "unable to infer chain progress"));
+        }
+        Err(e) => ctx.try_log(|logger| slog::error!(logger, "{}", e)),
     }
 
     Json(json!({
@@ -870,32 +1048,62 @@ pub fn handle_new_microblocks(
     indexer_rw_lock: &State<Arc<RwLock<Indexer>>>,
     marshalled_microblock: Json<JsonValue>,
     background_job_tx: &State<Arc<Mutex<Sender<ObserverCommand>>>>,
+    ctx: &State<Context>,
 ) -> Json<JsonValue> {
-    info!("POST /new_microblocks");
+    ctx.try_log(|logger| slog::info!(logger, "POST /new_microblocks"));
     // Standardize the structure of the microblock, and identify the
     // kind of update that this new microblock would imply
-    let mut chain_event = match indexer_rw_lock.inner().write() {
+    let chain_event = match indexer_rw_lock.inner().write() {
         Ok(mut indexer) => {
-            let chain_event = indexer
-                .handle_stacks_marshalled_microblock_trail(marshalled_microblock.into_inner());
+            let chain_event = indexer.handle_stacks_marshalled_microblock_trail(
+                marshalled_microblock.into_inner(),
+                &ctx,
+            );
             chain_event
         }
-        _ => {
+        Err(e) => {
+            ctx.try_log(|logger| {
+                slog::warn!(
+                    logger,
+                    "unable to acquire background_job_tx: {}",
+                    e.to_string()
+                )
+            });
             return Json(json!({
                 "status": 500,
                 "result": "Unable to acquire lock",
-            }))
+            }));
         }
     };
 
-    if let Some(chain_event) = chain_event.take() {
-        let background_job_tx = background_job_tx.inner();
-        match background_job_tx.lock() {
-            Ok(tx) => {
-                let _ = tx.send(ObserverCommand::PropagateStacksChainEvent(chain_event));
-            }
-            _ => {}
-        };
+    match chain_event {
+        Ok(Some(chain_event)) => {
+            let background_job_tx = background_job_tx.inner();
+            match background_job_tx.lock() {
+                Ok(tx) => {
+                    let _ = tx.send(ObserverCommand::PropagateStacksChainEvent(chain_event));
+                }
+                Err(e) => {
+                    ctx.try_log(|logger| {
+                        slog::warn!(
+                            logger,
+                            "unable to acquire background_job_tx: {}",
+                            e.to_string()
+                        )
+                    });
+                    return Json(json!({
+                        "status": 500,
+                        "result": "Unable to acquire lock",
+                    }));
+                }
+            };
+        }
+        Ok(None) => {
+            ctx.try_log(|logger| slog::info!(logger, "unable to infer chain progress"));
+        }
+        Err(e) => {
+            ctx.try_log(|logger| slog::error!(logger, "unable to handle stacks microblock: {}", e));
+        }
     }
 
     Json(json!({
@@ -909,8 +1117,9 @@ pub fn handle_new_microblocks(
 pub fn handle_new_mempool_tx(
     raw_txs: Json<Vec<String>>,
     background_job_tx: &State<Arc<Mutex<Sender<ObserverCommand>>>>,
+    ctx: &State<Context>,
 ) -> Json<JsonValue> {
-    info!("POST /new_mempool_tx");
+    ctx.try_log(|logger| slog::info!(logger, "POST /new_mempool_tx"));
     let transactions = raw_txs
         .iter()
         .map(|tx_data| {
@@ -941,8 +1150,8 @@ pub fn handle_new_mempool_tx(
 
 #[openapi(skip)]
 #[post("/drop_mempool_tx", format = "application/json")]
-pub fn handle_drop_mempool_tx() -> Json<JsonValue> {
-    info!("POST /drop_mempool_tx");
+pub fn handle_drop_mempool_tx(ctx: &State<Context>) -> Json<JsonValue> {
+    ctx.try_log(|logger| slog::info!(logger, "POST /drop_mempool_tx"));
     // TODO(lgalabru): use propagate mempool events
     Json(json!({
         "status": 200,
@@ -951,8 +1160,28 @@ pub fn handle_drop_mempool_tx() -> Json<JsonValue> {
 }
 
 #[post("/attachments/new", format = "application/json")]
-pub fn handle_new_attachement() -> Json<JsonValue> {
-    info!("POST /attachments/new");
+pub fn handle_new_attachement(ctx: &State<Context>) -> Json<JsonValue> {
+    ctx.try_log(|logger| slog::info!(logger, "POST /attachments/new"));
+    Json(json!({
+        "status": 200,
+        "result": "Ok",
+    }))
+}
+
+#[openapi(skip)]
+#[post("/mined_block", format = "application/json", data = "<payload>")]
+pub fn handle_mined_block(payload: Json<JsonValue>, ctx: &State<Context>) -> Json<JsonValue> {
+    ctx.try_log(|logger| slog::info!(logger, "POST /mined_block {:?}", payload));
+    Json(json!({
+        "status": 200,
+        "result": "Ok",
+    }))
+}
+
+#[openapi(skip)]
+#[post("/mined_microblock", format = "application/json", data = "<payload>")]
+pub fn handle_mined_microblock(payload: Json<JsonValue>, ctx: &State<Context>) -> Json<JsonValue> {
+    ctx.try_log(|logger| slog::info!(logger, "POST /mined_microblock {:?}", payload));
     Json(json!({
         "status": 200,
         "result": "Ok",
@@ -965,8 +1194,9 @@ pub async fn handle_bitcoin_rpc_call(
     bitcoin_config: &State<BitcoinConfig>,
     bitcoin_rpc_call: Json<BitcoinRPCRequest>,
     background_job_tx: &State<Arc<Mutex<Sender<ObserverCommand>>>>,
+    ctx: &State<Context>,
 ) -> Json<JsonValue> {
-    info!("POST /");
+    ctx.try_log(|logger| slog::info!(logger, "POST /"));
 
     use base64::encode;
     use reqwest::Client;
@@ -980,12 +1210,10 @@ pub async fn handle_bitcoin_rpc_call(
         "{}:{}",
         bitcoin_config.username, bitcoin_config.password
     ));
+
     let client = Client::new();
     let builder = client
-        .post(format!(
-            "{}:{}/",
-            bitcoin_config.rpc_host, bitcoin_config.rpc_port
-        ))
+        .post(&bitcoin_config.rpc_url)
         .header("Content-Type", "application/json")
         .timeout(std::time::Duration::from_secs(5))
         .header("Authorization", format!("Basic {}", token));
@@ -1012,21 +1240,58 @@ pub async fn handle_bitcoin_rpc_call(
 #[get("/v1/chainhooks", format = "application/json")]
 pub fn handle_get_hooks(
     chainhook_store: &State<Arc<RwLock<ChainhookStore>>>,
+    ctx: &State<Context>,
     api_key: ApiKey,
 ) -> Json<JsonValue> {
-    info!("GET /v1/chainhooks");
+    ctx.try_log(|logger| slog::info!(logger, "GET /v1/chainhooks"));
     if let Ok(chainhook_store_reader) = chainhook_store.inner().read() {
         match chainhook_store_reader.entries.get(&api_key) {
             None => {
-                info!("No chainhook registered for api key {:?}", api_key.0);
+                ctx.try_log(|logger| {
+                    slog::info!(
+                        logger,
+                        "No chainhook registered for api key {:?}",
+                        api_key.0
+                    )
+                });
                 Json(json!({
                     "status": 404,
                 }))
             }
-            Some(hooks) => Json(json!({
-                "status": 200,
-                "result": hooks,
-            })),
+            Some(hooks) => {
+                let mut predicates = vec![];
+                let mut stacks_predicates = hooks
+                    .get_serialized_stacks_predicates()
+                    .iter()
+                    .map(|(uuid, network, predicate)| {
+                        json!({
+                            "chain": "stacks",
+                            "uuid": uuid,
+                            "network": network,
+                            "predicate": predicate,
+                        })
+                    })
+                    .collect::<Vec<_>>();
+                predicates.append(&mut stacks_predicates);
+                let mut bitcoin_predicates = hooks
+                    .get_serialized_bitcoin_predicates()
+                    .iter()
+                    .map(|(uuid, network, predicate)| {
+                        json!({
+                            "chain": "bitcoin",
+                            "uuid": uuid,
+                            "network": network,
+                            "predicate": predicate,
+                        })
+                    })
+                    .collect::<Vec<_>>();
+                predicates.append(&mut bitcoin_predicates);
+
+                Json(json!({
+                    "status": 200,
+                    "result": predicates
+                }))
+            }
         }
     } else {
         Json(json!({
@@ -1041,10 +1306,18 @@ pub fn handle_get_hooks(
 pub fn handle_create_hook(
     hook: Json<ChainhookSpecification>,
     background_job_tx: &State<Arc<Mutex<Sender<ObserverCommand>>>>,
+    ctx: &State<Context>,
     api_key: ApiKey,
 ) -> Json<JsonValue> {
-    info!("POST /v1/chainhooks");
+    ctx.try_log(|logger| slog::info!(logger, "POST /v1/chainhooks"));
     let hook = hook.into_inner();
+    if let Err(e) = hook.validate() {
+        return Json(json!({
+            "status": 422,
+            "error": e,
+        }));
+    }
+
     let background_job_tx = background_job_tx.inner();
     match background_job_tx.lock() {
         Ok(tx) => {
@@ -1064,9 +1337,11 @@ pub fn handle_create_hook(
 pub fn handle_delete_stacks_hook(
     hook_uuid: String,
     background_job_tx: &State<Arc<Mutex<Sender<ObserverCommand>>>>,
+    ctx: &State<Context>,
     api_key: ApiKey,
 ) -> Json<JsonValue> {
-    info!("POST /v1/chainhooks/stacks/<hook_uuid>");
+    ctx.try_log(|logger| slog::info!(logger, "DELETE /v1/chainhooks/stacks/<hook_uuid>"));
+
     let background_job_tx = background_job_tx.inner();
     match background_job_tx.lock() {
         Ok(tx) => {
@@ -1086,9 +1361,11 @@ pub fn handle_delete_stacks_hook(
 pub fn handle_delete_bitcoin_hook(
     hook_uuid: String,
     background_job_tx: &State<Arc<Mutex<Sender<ObserverCommand>>>>,
+    ctx: &State<Context>,
     api_key: ApiKey,
 ) -> Json<JsonValue> {
-    info!("DELETE /v1/chainhooks/bitcoin/<hook_uuid>");
+    ctx.try_log(|logger| slog::info!(logger, "DELETE /v1/chainhooks/stacks/<hook_uuid>"));
+
     let background_job_tx = background_job_tx.inner();
     match background_job_tx.lock() {
         Ok(tx) => {

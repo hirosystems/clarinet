@@ -41,10 +41,10 @@ export interface StacksChainUpdate {
  */
 export interface StacksBlockUpdate {
   /**
-   * @type {Array<Block>}
+   * @type {Block}
    * @memberof StacksBlockUpdate
    */
-  new_blocks: Array<Block>;
+  block: Block;
   /**
    * @type {Array<Block>}
    * @memberof StacksBlockUpdate
@@ -58,8 +58,8 @@ export interface StacksBlockUpdate {
 }
 
 export interface BitcoinChainEvent {
-  apply: BitcoinApply[];
-  rollback: BitcoinRollback[];
+  apply: Block[];
+  rollback: Block[];
   chainhook: {
     uuid: string;
     predicate: BitcoinPredicate;
@@ -67,36 +67,12 @@ export interface BitcoinChainEvent {
 }
 
 export interface StacksChainEvent {
-  apply: StacksApply[];
-  rollback: StacksRollback[];
+  apply: Block[];
+  rollback: Block[];
   chainhook: {
     uuid: string;
     predicate: StacksPredicate;
   };
-}
-
-export interface BitcoinApply {
-  transaction: BitcoinTransaction;
-  proof: string;
-  block_identifier: BlockIdentifier;
-  confirmations: number;
-}
-
-export interface BitcoinRollback {
-  transaction: BitcoinTransaction;
-  block_identifier: BlockIdentifier;
-}
-
-export interface StacksApply {
-  transaction: StacksTransaction;
-  proof: string;
-  block_identifier: BlockIdentifier;
-  confirmations: number;
-}
-
-export interface StacksRollback {
-  transaction: BitcoinTransaction;
-  block_identifier: BlockIdentifier;
 }
 
 export interface StacksChainhook {
@@ -323,6 +299,11 @@ export interface StacksTransactionMetadata {
    */
   fee: number;
   /**
+   * @type {number}
+   * @memberof StacksTransactionMetadata
+   */
+  nonce: number;
+  /**
    * @type {StacksTransactionKind}
    * @memberof StacksTransactionMetadata
    */
@@ -342,6 +323,11 @@ export interface StacksTransactionMetadata {
    * @memberof StacksTransactionMetadata
    */
   position: number | any;
+  /**
+   * @type {string}
+   * @memberof StacksTransactionMetadata
+   */
+  proof?: string;
 }
 
 export interface StacksTransactionReceipt {
@@ -453,6 +439,7 @@ export interface StacksSTXTransferEventData {
   sender: string;
   recipient: string;
   amount: string;
+  memo?: string;
 }
 
 export interface StacksSTXMintEventData {
@@ -549,6 +536,11 @@ export interface StacksSmartContractEventData {
 export interface BitcoinTransactionMetadata {
   inputs: Input[];
   outputs: Output[];
+  /**
+   * @type {string}
+   * @memberof StacksTransactionMetadata
+   */
+  proof?: string;
 }
 
 export interface Input {

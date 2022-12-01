@@ -14,6 +14,8 @@ extern crate lazy_static;
 extern crate serde_derive;
 #[macro_use]
 extern crate prettytable;
+#[macro_use]
+extern crate hiro_system_kit;
 
 #[macro_use]
 mod macros;
@@ -47,14 +49,16 @@ fn main() {
                 }
             };
 
-            let output = session.handle_command(&code_str);
+            let (_, output) = session.handle_command(&code_str);
             for line in output {
                 println!("{}", line);
             }
         }
-        None => {
-            let mut terminal = Terminal::new(settings);
-            terminal.start();
-        }
+        None => loop {
+            let mut terminal = Terminal::new(settings.clone());
+            if !terminal.start() {
+                break;
+            }
+        },
     }
 }

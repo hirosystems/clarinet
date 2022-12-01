@@ -8,6 +8,8 @@ extern crate serde;
 #[macro_use]
 extern crate serde_derive;
 
+#[cfg(feature = "onchain")]
+pub mod onchain;
 pub mod requirements;
 pub mod types;
 
@@ -16,7 +18,7 @@ use self::types::{
     TransactionPlanSpecification, TransactionsBatchSpecification, WalletSpecification,
 };
 use chainhook_types::StacksNetwork;
-use clarinet_files::FileAccessor;
+use clarinet_files::{FileAccessor, FileLocation};
 use clarinet_files::{NetworkManifest, ProjectManifest};
 use clarity_repl::analysis::ast_dependency_detector::{ASTDependencyDetector, DependencySet};
 use clarity_repl::clarity::vm::ast::ContractAST;
@@ -29,7 +31,7 @@ use clarity_repl::clarity::vm::ExecutionResult;
 use clarity_repl::repl::session::BOOT_CONTRACTS_DATA;
 use clarity_repl::repl::Session;
 use clarity_repl::repl::SessionSettings;
-use std::collections::{BTreeMap, HashMap, VecDeque};
+use std::collections::{BTreeMap, BTreeSet, HashMap, VecDeque};
 use types::ContractPublishSpecification;
 use types::DeploymentGenerationArtifacts;
 use types::RequirementPublishSpecification;
@@ -136,6 +138,12 @@ pub fn update_session_with_contracts_executions(
                 | TransactionSpecification::ContractPublish(_) => {
                     panic!("emulated-contract-call and emulated-contract-publish are the only operations admitted in simnet deployments")
                 }
+                TransactionSpecification::StxTransfer(tx) => {
+                    let default_tx_sender = session.get_tx_sender();
+                    session.set_tx_sender(tx.expected_sender.to_string());
+                    let _ = session.stx_transfer(tx.mstx_amount, &tx.recipient.to_string());
+                    session.set_tx_sender(default_tx_sender);
+                }
                 TransactionSpecification::EmulatedContractPublish(tx) => {
                     let default_tx_sender = session.get_tx_sender();
                     session.set_tx_sender(tx.emulated_sender.to_string());
@@ -196,6 +204,8 @@ pub async fn generate_default_deployment(
         None => NetworkManifest::from_project_manifest_location(
             &manifest.location,
             &network.get_networks(),
+            Some(&manifest.project.cache_location),
+            None,
         )?,
         Some(file_accessor) => {
             NetworkManifest::from_project_manifest_location_using_file_accessor(
@@ -285,10 +295,10 @@ pub async fn generate_default_deployment(
     let session = Session::new(settings.clone());
 
     let boot_contracts_data = BOOT_CONTRACTS_DATA.clone();
-    let mut boot_contracts_ids = Vec::new();
+    let mut boot_contracts_ids = BTreeSet::new();
     let mut boot_contracts_asts = BTreeMap::new();
     for (id, (_, ast)) in boot_contracts_data {
-        boot_contracts_ids.push(id.clone());
+        boot_contracts_ids.insert(id.clone());
         boot_contracts_asts.insert(id, ast);
     }
     requirements_asts.append(&mut boot_contracts_asts);
@@ -343,12 +353,13 @@ pub async fn generate_default_deployment(
                 Some(ast) => ast,
                 None => {
                     // Download the code
-                    let (source, contract_location) = requirements::retrieve_contract(
-                        &contract_id,
-                        &cache_location,
-                        &file_accessor,
-                    )
-                    .await?;
+                    let (source, clarity_version, contract_location) =
+                        requirements::retrieve_contract(
+                            &contract_id,
+                            &cache_location,
+                            &file_accessor,
+                        )
+                        .await?;
 
                     // Build the struct representing the requirement in the deployment
                     if network.is_simnet() {
@@ -385,6 +396,7 @@ pub async fn generate_default_deployment(
                             location: contract_location,
                             cost: deployment_fee_rate * source.len() as u64,
                             remap_principals,
+                            clarity_version,
                         };
                         requirements_publish.insert(contract_id.clone(), data);
                     }
@@ -446,11 +458,14 @@ pub async fn generate_default_deployment(
 
         // Avoid listing requirements as deployment transactions to the deployment specification on Mainnet
         if !network.is_mainnet() {
-            let ordered_contracts_ids =
+            let mut ordered_contracts_ids =
                 match ASTDependencyDetector::order_contracts(&requirements_deps) {
                     Ok(ordered_contracts) => ordered_contracts,
                     Err(e) => return Err(format!("unable to order requirements {}", e)),
                 };
+
+            // Filter out boot contracts from requirement dependencies
+            ordered_contracts_ids.retain(|contract_id| !boot_contracts_ids.contains(contract_id));
 
             if network.is_simnet() {
                 for contract_id in ordered_contracts_ids.iter() {
@@ -484,8 +499,19 @@ pub async fn generate_default_deployment(
                 let mut contract_location = base_location.clone();
                 contract_location
                     .append_path(&contract_config.expect_contract_path_as_str())
-                    .unwrap();
-                let source = contract_location.read_content_as_utf8().unwrap();
+                    .map_err(|_| {
+                        format!(
+                            "unable to build path for contract {}",
+                            contract_config.expect_contract_path_as_str()
+                        )
+                    })?;
+
+                let source = contract_location.read_content_as_utf8().map_err(|_| {
+                    format!(
+                        "unable to find contract at {}",
+                        contract_location.to_string()
+                    )
+                })?;
                 sources.insert(contract_location.to_string(), source);
             }
             sources
@@ -544,7 +570,7 @@ pub async fn generate_default_deployment(
             .get(&contract_location.to_string())
             .ok_or(format!(
                 "Invalid Clarinet.toml, source file not found for: {}",
-                name
+                &name
             ))?
             .clone();
 
@@ -557,7 +583,7 @@ pub async fn generate_default_deployment(
                 deployer: ContractDeployer::Address(sender.to_address()),
                 name: contract_name.to_string(),
                 clarity_version: contract_config.clarity_version,
-                epoch: forced_epoch.unwrap_or(DEFAULT_EPOCH),
+                epoch: forced_epoch.unwrap_or(contract_config.epoch),
             },
         );
 
@@ -717,4 +743,40 @@ pub async fn generate_default_deployment(
     };
 
     Ok((deployment, artifacts))
+}
+
+pub fn get_default_deployment_path(
+    manifest: &ProjectManifest,
+    network: &StacksNetwork,
+) -> Result<FileLocation, String> {
+    let mut deployment_path = manifest.location.get_project_root_location()?;
+    deployment_path.append_path("deployments")?;
+    deployment_path.append_path(match network {
+        StacksNetwork::Simnet => "default.simnet-plan.yaml",
+        StacksNetwork::Devnet => "default.devnet-plan.yaml",
+        StacksNetwork::Testnet => "default.testnet-plan.yaml",
+        StacksNetwork::Mainnet => "default.mainnet-plan.yaml",
+    })?;
+    Ok(deployment_path)
+}
+
+pub fn load_deployment(
+    manifest: &ProjectManifest,
+    deployment_plan_location: &FileLocation,
+) -> Result<DeploymentSpecification, String> {
+    let project_root_location = manifest.location.get_project_root_location()?;
+    let spec = match DeploymentSpecification::from_config_file(
+        &deployment_plan_location,
+        &project_root_location,
+    ) {
+        Ok(spec) => spec,
+        Err(msg) => {
+            return Err(format!(
+                "error: {} syntax incorrect\n{}",
+                deployment_plan_location.to_string(),
+                msg
+            ));
+        }
+    };
+    Ok(spec)
 }

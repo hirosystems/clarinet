@@ -1,6 +1,6 @@
 [package]
 name = "clarinet-cli"
-version = "1.0.3"
+version = "1.1.0"
 authors = ["Ludo Galabru <ludo@hiro.so>", "Brice Dobry <brice@hiro.so>"]
 edition = "2021"
 description = "Clarinet is a simple, modern and opinionated runtime for testing, integrating and deploying Clarity smart contracts."
@@ -39,7 +39,7 @@ serde = { version = "1.0.136", features = ["derive"] }
 lzzzz = '1.0'
 
 [dependencies]
-clap = { version = "3.1.6", features = ["derive"], optional = true }
+clap = { version = "3.2.23", features = ["derive"], optional = true }
 clap_generate = { version = "3.0.3", optional = true }
 toml = { version = "0.5.6", features = ["preserve_order"] }
 serde = { version = "1.0.136", features = ["derive"] }
@@ -47,7 +47,7 @@ serde_json = { version = "1.0.79", features = ["preserve_order"] }
 serde_derive = "1"
 deno_emit = { version = "0.4.0", optional = true }
 deno_graph = { version = "0.29.0", optional = true }
-deno_core =  { version = "0.146.0", optional = true }
+deno_core = { version = "0.146.0", optional = true }
 deno_ast = { version = "0.17.0", features = ["cjs"], optional = true }
 deno_tls = { version = "0.51.0", optional = true }
 deno_web = { version = "0.95.0", optional = true }
@@ -59,7 +59,13 @@ lzzzz = '1.0'
 deno_console = { version = "0.64.0", optional = true }
 deno_webstorage = { version = "0.59.0", optional = true }
 deno_broadcast_channel = { version = "0.58.0", optional = true }
-hyper = { version = "0.14.18", features = ["server", "stream", "http1", "http2", "runtime"] }
+hyper = { version = "0.14.18", features = [
+    "server",
+    "stream",
+    "http1",
+    "http2",
+    "runtime",
+] }
 http = "0.2.6"
 ###
 rsa = "=0.7.0-pre"
@@ -67,7 +73,7 @@ deno_fetch = { version = "0.87.0", optional = true }
 deno_crypto = { version = "0.78.0", optional = true }
 import_map = { version = "=0.12.1", optional = true }
 once_cell = { version = "1.13.0", optional = true }
-walkdir =  { version = "=2.3.2", optional = true }
+walkdir = { version = "=2.3.2", optional = true }
 node_resolver = { version = "0.1.1", optional = true }
 cache_control = { version = "=0.2.0", optional = true }
 notify = "=5.0.0-pre.7"
@@ -93,7 +99,9 @@ twox-hash = "1.6.3"
 data-url = "=0.1.1"
 os_pipe = "1.0.1"
 tokio-util = { version = "0.7.1", features = ["io"], optional = true }
-clarity_repl = { package = "clarity-repl", path = "../clarity-repl", features = ["cli"] }
+clarity_repl = { package = "clarity-repl", path = "../clarity-repl", features = [
+    "cli",
+] }
 aes = "0.7.5"
 base64 = "0.13.0"
 block-modes = "0.8.1"
@@ -108,7 +116,6 @@ tokio = { version = "=1.17.0", features = ["full"] }
 lazy_static = "1.4.0"
 atty = "0.2.14"
 termcolor = "1.1.2"
-ansi_term = "0.12.1"
 text-size = "=1.1.0"
 regex = "1.5.5"
 libc = "0.2.86"
@@ -117,40 +124,42 @@ percent-encoding = "2.1.0"
 pin-project = "1.0.5"
 indexmap = { version = "1.6.1", features = ["serde"] }
 shell-escape = "0.1.5"
-tiny-hderive = "0.3.0"
 reqwest = { version = "0.11", default-features = false, features = [
     "blocking",
     "json",
     "rustls-tls",
 ] }
-bollard = "0.11.0"
 crossterm = "0.22.1"
-chrono = "0.4.20"
 base58 = "0.2.0"
-tracing = "0.1"
-tracing-subscriber = "0.3.3"
-tracing-appender = "0.2.0"
 ctrlc = "3.1.9"
 strum = { version = "0.23.0", features = ["derive"] }
 bitcoin = "0.28.1"
-bitcoincore-rpc = "0.14.0"
-bitcoincore-rpc-json = "0.14.0"
 segment = { version = "0.1.2", optional = true }
 mac_address = { version = "1.1.2", optional = true }
-tower-lsp = { version = "0.14.0", optional = true }
+tower-lsp = { version = "0.17.0", optional = true }
 hex = "0.4.3"
 serde_yaml = "0.8.23"
 chainhook_event_observer = { package = "chainhook-event-observer", default-features = false, path = "../chainhook-event-observer" }
 chainhook_types = { package = "chainhook-types", path = "../chainhook-types-rs" }
-stacks_rpc_client = { package = "stacks-rpc-client", path = "../stacks-rpc-client" }
-clarinet_files = { package = "clarinet-files", path = "../clarinet-files", features = ["cli"]  }
-clarity_lsp = { package = "clarity-lsp", path = "../clarity-lsp", features = ["cli"]  }
-clarinet_deployments = { package = "clarinet-deployments", path = "../clarinet-deployments", features = ["cli"]  }
-clarinet_utils = { package = "clarinet-utils", path = "../clarinet-utils"  }
+clarinet_files = { package = "clarinet-files", path = "../clarinet-files", features = [
+    "cli",
+] }
+clarity_lsp = { package = "clarity-lsp", path = "../clarity-lsp", features = [
+    "cli",
+] }
+clarinet_deployments = { package = "clarinet-deployments", path = "../clarinet-deployments", features = [
+    "cli",
+] }
+hiro_system_kit = { package = "hiro-system-kit", path = "../hiro-system-kit" }
+clarinet_utils = { package = "clarinet-utils", path = "../clarinet-utils" }
+stacks_network = { package = "stacks-network", path = "../stacks-network" }
 num_cpus = "1.13.1"
 mio = "=0.8.2"
 similar = "2.1.0"
 crossbeam-channel = "0.5.6"
+chrono = "0.4.20"
+sha2 = "0.10.0"
+ansi_term = "0.12.1"
 
 [dependencies.tui]
 version = "0.18.0"
@@ -174,7 +183,7 @@ winapi = { version = "0.3.9", features = [
     "std",
     "handleapi",
     "ws2ipdef",
-    "ws2tcpip"
+    "ws2tcpip",
 ] }
 
 [package.metadata.winres]

@@ -1,0 +1,44 @@
+[package]
+name = "stacks-network"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+bollard = "0.11.0"
+crossterm = { version = "0.22.1", optional = true }
+bitcoin = "0.28.1"
+bitcoincore-rpc = "0.14.0"
+serde = { version = "1.0.136", features = ["derive"] }
+serde_json = { version = "1.0.79", features = ["preserve_order"] }
+serde_derive = "1"
+tracing = "0.1"
+tracing-subscriber = "0.3.3"
+tracing-appender = "0.2.0"
+ctrlc = "3.1.9"
+reqwest = { version = "0.11", default-features = false, features = [
+    "blocking",
+    "json",
+    "rustls-tls",
+] }
+tui = { version = "0.18.0", default-features = false, features = [
+    "crossterm",
+] }
+
+chrono = "0.4.20"
+futures = "0.3.12"
+base58 = "0.2.0"
+
+chainhook_event_observer = { package = "chainhook-event-observer", default-features = false, features = ["log"], path = "../chainhook-event-observer" }
+chainhook_types = { package = "chainhook-types", path = "../chainhook-types-rs" }
+stacks_rpc_client = { package = "stacks-rpc-client", path = "../stacks-rpc-client" }
+clarinet_files = { package = "clarinet-files", path = "../clarinet-files", features = ["cli"]  }
+clarinet_deployments = { package = "clarinet-deployments", path = "../clarinet-deployments", features = ["cli"]  }
+clarinet_utils = { package = "clarinet-utils", path = "../clarinet-utils"  }
+hiro_system_kit = { package = "hiro-system-kit", path = "../hiro-system-kit" }
+clarity_repl = { package = "clarity-repl", path = "../clarity-repl", features = ["cli"] }
+dirs = { version = "4.0.0" }
+
+[features]
+default = ["crossterm"]

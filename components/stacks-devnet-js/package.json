@@ -1,6 +1,6 @@
 {
   "name": "@hirosystems/stacks-devnet-js",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "stacks-devnet-js is a library for writing end to end tests for protocols interacting with the Stacks blockchain and the Bitcoin blockchain.",
   "author": "Ludo Galabru",
   "repository": "https://github.com/hirosystems/clarinet/tree/main/components/stacks-devnet-js",
@@ -27,7 +27,7 @@
     "version": "npm run build-release"
   },
   "dependencies": {
-    "@hirosystems/chainhook-types": "^1.0.0",
+    "@hirosystems/chainhook-types": "^1.1.1-rc.2",
     "@mapbox/node-pre-gyp": "^1.0.8",
     "neon-cli": "^0.9.1",
     "node-pre-gyp-github": "^1.4.3",

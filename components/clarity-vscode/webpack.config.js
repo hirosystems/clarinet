@@ -51,6 +51,11 @@ const clientBrowserConfig = {
   },
   output: browserOutput,
   resolve: browserResolve,
+  plugins: [
+    new webpack.DefinePlugin({
+      __DEV_MODE__: JSON.stringify(false),
+    }),
+  ],
   module: { rules: [swcLoader] },
   externals: { vscode: "commonjs vscode" },
 };
@@ -64,6 +69,11 @@ const clientNodeConfig = {
   entry: { clientNode: "./src/clientNode.ts" },
   output: browserOutput,
   resolve: browserResolve,
+  plugins: [
+    new webpack.DefinePlugin({
+      __DEV_MODE__: JSON.stringify(false),
+    }),
+  ],
   module: { rules: [swcLoader] },
   externals: { vscode: "commonjs vscode" },
 };
