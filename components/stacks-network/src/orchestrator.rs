@@ -1464,7 +1464,7 @@ events_keys = ["*"]
         Ok(())
     }
 
-    pub async fn boot_stacks_api_container(&self, ctx: &Context) -> Result<(), String> {
+    pub async fn boot_stacks_api_container(&self, _ctx: &Context) -> Result<(), String> {
         let container = match &self.stacks_api_container_id {
             Some(container) => container.clone(),
             _ => return Err(format!("unable to boot container")),
@@ -1735,7 +1735,7 @@ events_keys = ["*"]
         Ok(())
     }
 
-    pub async fn boot_postgres_container(&self, ctx: &Context) -> Result<(), String> {
+    pub async fn boot_postgres_container(&self, _ctx: &Context) -> Result<(), String> {
         let container = match &self.postgres_container_id {
             Some(container) => container.clone(),
             _ => return Err(format!("unable to boot container")),
@@ -1857,7 +1857,7 @@ events_keys = ["*"]
         Ok(())
     }
 
-    pub async fn boot_stacks_explorer_container(&self, ctx: &Context) -> Result<(), String> {
+    pub async fn boot_stacks_explorer_container(&self, _ctx: &Context) -> Result<(), String> {
         let container = match &self.stacks_explorer_container_id {
             Some(container) => container.clone(),
             _ => return Err(format!("unable to boot container")),
@@ -1988,7 +1988,7 @@ events_keys = ["*"]
         Ok(())
     }
 
-    pub async fn boot_bitcoin_explorer_container(&self, ctx: &Context) -> Result<(), String> {
+    pub async fn boot_bitcoin_explorer_container(&self, _ctx: &Context) -> Result<(), String> {
         let container = match &self.bitcoin_explorer_container_id {
             Some(container) => container.clone(),
             _ => return Err(format!("unable to boot container")),
