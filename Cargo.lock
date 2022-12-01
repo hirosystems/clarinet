@@ -1146,7 +1146,7 @@ dependencies = [
 
 [[package]]
 name = "clarity-repl"
-version = "1.1.0"
+version = "1.2.0"
 dependencies = [
  "ansi_term",
  "atty",
@@ -1168,8 +1168,8 @@ dependencies = [
  "rand_pcg 0.3.1",
  "rand_seeder",
  "regex",
+ "reqwest",
  "ripemd160 0.9.1",
- "ripemd160",
  "rustyline",
  "serde",
  "serde_derive",

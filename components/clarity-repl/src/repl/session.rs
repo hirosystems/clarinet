@@ -26,6 +26,7 @@ use clarity::vm::variables::NativeVariables;
 use clarity::vm::{
     ClarityVersion, ContractName, CostSynthesis, EvalHook, EvaluationResult, ExecutionResult,
 };
+use reqwest;
 use std::collections::{BTreeMap, BTreeSet, HashMap, VecDeque};
 use std::convert::TryFrom;
 use std::fmt;
@@ -775,7 +776,7 @@ impl Session {
     }
 
     fn easter_egg(&self, output: &mut Vec<String>) {
-        let result = nestable_block_on(fetch_message());
+        let result = hiro_system_kit::nestable_block_on(fetch_message());
         let message = result.unwrap_or("You found it!".to_string());
         println!("{}", message);
     }
@@ -1330,25 +1331,9 @@ mod tests {
     }
 }
 
-use reqwest;
-use std::future::Future;
-use tokio;
-
-pub fn nestable_block_on<F: Future>(future: F) -> F::Output {
-    let (handle, _rt) = match tokio::runtime::Handle::try_current() {
-        Ok(h) => (h, None),
-        Err(_) => {
-            let rt = tokio::runtime::Runtime::new().unwrap();
-            (rt.handle().clone(), Some(rt))
-        }
-    };
-    let response = handle.block_on(async { future.await });
-    response
-}
-
 async fn fetch_message() -> Result<String, reqwest::Error> {
     const gist: &str =
-        "https://gist.githubusercontent.com/obycode/d10b5a40cd926275ff6bde07d2270f2a/raw/";
+        "https://storage.googleapis.com/hiro-public/assets/clarinet-egg.txt";
     let response = reqwest::get(gist).await?;
     let message = response.text().await?;
     Ok(message)
