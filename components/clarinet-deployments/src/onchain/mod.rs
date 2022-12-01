@@ -334,7 +334,7 @@ pub fn apply_on_chain_deployment(
         None,
     )
     .expect("unable to load network manifest");
-    let delay_between_checks: u64 = 10;
+    let delay_between_checks: u64 = 5;
     // Load deployers, deployment_fee_rate
     // Check fee, balances and deployers
 

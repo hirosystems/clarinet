@@ -722,7 +722,7 @@ impl NetworkManifest {
                     .unwrap_or("devnet".to_string()),
                 bitcoin_controller_block_time: devnet_config
                     .bitcoin_controller_block_time
-                    .unwrap_or(90_000),
+                    .unwrap_or(60_000),
                 bitcoin_controller_automining_disabled: devnet_config
                     .bitcoin_controller_automining_disabled
                     .unwrap_or(false),

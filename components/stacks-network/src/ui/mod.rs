@@ -33,15 +33,41 @@ pub fn start_ui(
     devnet_path: &str,
     subnet_enabled: bool,
     ctx: &Context,
-) -> Result<(), Box<dyn Error>> {
-    enable_raw_mode()?;
+) -> Result<(), String> {
+    let res = do_start_ui(
+        devnet_events_tx,
+        devnet_events_rx,
+        chains_coordinator_commands_tx,
+        observer_command_tx,
+        orchestrator_terminated_rx,
+        devnet_path,
+        subnet_enabled,
+        ctx,
+    );
+    if let Err(ref _e) = res {
+        // potential additional cleaning
+    }
+    res
+}
+
+pub fn do_start_ui(
+    devnet_events_tx: Sender<DevnetEvent>,
+    devnet_events_rx: Receiver<DevnetEvent>,
+    chains_coordinator_commands_tx: Sender<ChainsCoordinatorCommand>,
+    observer_command_tx: Sender<ObserverCommand>,
+    orchestrator_terminated_rx: Receiver<bool>,
+    devnet_path: &str,
+    subnet_enabled: bool,
+    ctx: &Context,
+) -> Result<(), String> {
+    enable_raw_mode().map_err(|e| format!("unable to start terminal ui: {}", e.to_string()))?;
 
     let mut stdout = stdout();
-    execute!(stdout, EnterAlternateScreen)?;
+    execute!(stdout, EnterAlternateScreen).map_err(|e| format!("unable to start terminal ui: {}", e.to_string()))?;
 
     let backend = CrosstermBackend::new(stdout);
 
-    let mut terminal = Terminal::new(backend)?;
+    let mut terminal = Terminal::new(backend).map_err(|e| format!("unable to start terminal ui: {}", e.to_string()))?;
 
     // Setup input handling
     let tick_rate = Duration::from_millis(500);
@@ -68,12 +94,22 @@ pub fn start_ui(
 
     let mut app = App::new("Clarinet", devnet_path, subnet_enabled);
 
-    terminal.clear()?;
+    terminal.clear().map_err(|e| format!("unable to start terminal ui: {}", e.to_string()))?;
 
     loop {
-        terminal.draw(|f| ui::draw(f, &mut app))?;
-        match devnet_events_rx.recv()? {
-
+        terminal.draw(|f| ui::draw(f, &mut app)).map_err(|e| format!("unable to update ui: {}", e.to_string()))?;
+        let event = match devnet_events_rx.recv() {
+            Ok(event) => event,
+            Err(e) => {
+                let _ = terminate(
+                    &mut terminal,
+                    chains_coordinator_commands_tx,
+                    observer_command_tx,
+                    orchestrator_terminated_rx);
+                break
+            }
+        };
+        match event {
             DevnetEvent::KeyEvent(event) => match (event.modifiers, event.code) {
                 (KeyModifiers::CONTROL, KeyCode::Char('c')) => {
                     app.display_log(DevnetEvent::log_warning("Ctrl+C received, initiating termination sequence.".into()), ctx);
@@ -163,7 +199,7 @@ pub fn start_ui(
                     chains_coordinator_commands_tx,
                     observer_command_tx,
                     orchestrator_terminated_rx);
-                break;
+                return Err(message)
             },
             DevnetEvent::BootCompleted(_) => {
                 app.display_log(DevnetEvent::log_success("Local Devnet network ready".into()), ctx);

@@ -730,7 +730,7 @@ rpcport={bitcoin_node_rpc_port}
         let containers = match res {
             Ok(containers) => containers,
             Err(e) => {
-                let err = format!("unable to start Devnet: use our guide to troubleshoot this issue https://docs.hiro.so/clarinet/troubleshooting#i-am-unable-to-start-devnet-though-my-docker-is-running\n{}", e.to_string());
+                let err = format!("unable to communicate with Docker: {}\nvisit https://docs.hiro.so/clarinet/troubleshooting#i-am-unable-to-start-devnet-though-my-docker-is-running to resolve this issue.", e.to_string());
                 return Err(err);
             }
         };

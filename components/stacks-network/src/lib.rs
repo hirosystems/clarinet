@@ -16,7 +16,7 @@ use std::{
         Arc,
     },
     thread::sleep,
-    time::Duration,
+    time::Duration
 };
 
 use chainhook_event_observer::{chainhooks::types::HookFormation, observer::MempoolAdmissionData};
@@ -127,12 +127,18 @@ pub async fn do_run_devnet(
     // The devnet orchestrator should be able to send some events to the UI thread,
     // and should be able to be restarted/terminated
     let orchestrator_event_tx = devnet_events_tx.clone();
+    let chains_coordinator_commands_tx_moved = chains_coordinator_commands_tx.clone();
     let ctx_moved = ctx.clone();
     let orchestrator_handle = hiro_system_kit::thread_named("Devnet orchestrator")
         .spawn(move || {
-            let future = devnet.start(orchestrator_event_tx, terminator_rx, &ctx_moved);
+            let future = devnet.start(orchestrator_event_tx.clone(), terminator_rx, &ctx_moved);
             let rt = hiro_system_kit::create_basic_runtime();
-            rt.block_on(future)
+            let res = rt.block_on(future);
+            if let Err(ref e) = res {
+                let _ = orchestrator_event_tx.send(DevnetEvent::FatalError(e.clone()));
+                let _ = chains_coordinator_commands_tx_moved.send(ChainsCoordinatorCommand::Terminate);
+            }
+            res
         })
         .expect("unable to retrieve join handle");
 
@@ -148,7 +154,7 @@ pub async fn do_run_devnet(
             &devnet_path,
             devnet_config.enable_subnet_node,
             &ctx,
-        );
+        )?;
 
         if let Err(e) = chains_coordinator_handle.join() {
             if let Ok(message) = e.downcast::<String>() {

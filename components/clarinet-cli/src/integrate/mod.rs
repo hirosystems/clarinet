@@ -52,8 +52,6 @@ pub fn run_devnet(
         .map_err(|e| format!("unable to working_dir {}\n{}", working_dir, e.to_string()))?;
     log_path.push("devnet.log");
 
-    println!("{}", log_path.display());
-
     let file = OpenOptions::new()
         .create(true)
         .write(true)
@@ -71,12 +69,15 @@ pub fn run_devnet(
         tracer: false,
     };
 
-    hiro_system_kit::nestable_block_on(do_run_devnet(
+    let res = hiro_system_kit::nestable_block_on(do_run_devnet(
         devnet,
         deployment,
         &mut Some(hooks),
         log_tx,
         display_dashboard,
         ctx,
-    ))
+    ));
+    println!("{} logs and chainstate available at location {}", yellow!("terminating devnet network:"), working_dir);
+
+    res
 }
