@@ -26,6 +26,7 @@ use clarity::vm::variables::NativeVariables;
 use clarity::vm::{
     ClarityVersion, ContractName, CostSynthesis, EvalHook, EvaluationResult, ExecutionResult,
 };
+use reqwest;
 use std::collections::{BTreeMap, BTreeSet, HashMap, VecDeque};
 use std::convert::TryFrom;
 use std::fmt;
@@ -239,6 +240,7 @@ impl Session {
         let mut reload = false;
         match command {
             "::help" => self.display_help(&mut output),
+            "/-/" => self.easter_egg(&mut output),
             cmd if cmd.starts_with("::list_functions") => self.display_functions(&mut output),
             cmd if cmd.starts_with("::describe_function") => self.display_doc(&mut output, cmd),
             cmd if cmd.starts_with("::mint_stx") => self.mint_stx(&mut output, cmd),
@@ -771,6 +773,12 @@ impl Session {
             "{}",
             help_colour.paint("::read <filename>\t\t\tRead expressions from a file")
         ));
+    }
+
+    fn easter_egg(&self, output: &mut Vec<String>) {
+        let result = hiro_system_kit::nestable_block_on(fetch_message());
+        let message = result.unwrap_or("You found it!".to_string());
+        println!("{}", message);
     }
 
     fn parse_and_advance_chain_tip(&mut self, output: &mut Vec<String>, command: &str) {
@@ -1321,4 +1329,12 @@ mod tests {
         );
         assert_eq!(session.handle_command("(at-block (unwrap-panic (get-block-info? id-header-hash u10000)) (contract-call? .contract get-x))").1[0], green!("u1"));
     }
+}
+
+async fn fetch_message() -> Result<String, reqwest::Error> {
+    const gist: &str =
+        "https://storage.googleapis.com/hiro-public/assets/clarinet-egg.txt";
+    let response = reqwest::get(gist).await?;
+    let message = response.text().await?;
+    Ok(message)
 }
