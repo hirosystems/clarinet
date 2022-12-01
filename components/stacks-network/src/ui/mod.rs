@@ -8,7 +8,7 @@ mod util;
 use super::DevnetEvent;
 use crate::ChainsCoordinatorCommand;
 use app::App;
-use chainhook_event_observer::observer::ObserverCommand;
+use chainhook_event_observer::{observer::ObserverCommand, utils::Context};
 use chainhook_types::StacksChainEvent;
 use crossterm::{
     event::{self, Event, KeyCode, KeyModifiers},
@@ -32,6 +32,7 @@ pub fn start_ui(
     orchestrator_terminated_rx: Receiver<bool>,
     devnet_path: &str,
     subnet_enabled: bool,
+    ctx: &Context,
 ) -> Result<(), Box<dyn Error>> {
     enable_raw_mode()?;
 
@@ -75,7 +76,7 @@ pub fn start_ui(
 
             DevnetEvent::KeyEvent(event) => match (event.modifiers, event.code) {
                 (KeyModifiers::CONTROL, KeyCode::Char('c')) => {
-                    app.display_log(DevnetEvent::log_warning("Ctrl+C received, initiating termination sequence.".into()));
+                    app.display_log(DevnetEvent::log_warning("Ctrl+C received, initiating termination sequence.".into()), ctx);
                     let _ = terminate(
                         &mut terminal,
                         chains_coordinator_commands_tx,
@@ -93,7 +94,7 @@ pub fn start_ui(
                 app.on_tick();
             },
             DevnetEvent::Log(log) => {
-                app.display_log(log);
+                app.display_log(log, ctx);
             },
             DevnetEvent::ServiceStatus(status) => {
                 app.display_service_status_update(status);
@@ -156,7 +157,7 @@ pub fn start_ui(
                 // Display something
             }
             DevnetEvent::FatalError(message) => {
-                app.display_log(DevnetEvent::log_error(format!("Fatal: {}", message)));
+                app.display_log(DevnetEvent::log_error(format!("Fatal: {}", message)), ctx);
                 let _ = terminate(
                     &mut terminal,
                     chains_coordinator_commands_tx,
@@ -165,7 +166,7 @@ pub fn start_ui(
                 break;
             },
             DevnetEvent::BootCompleted(_) => {
-                app.display_log(DevnetEvent::log_success("Local Devnet network ready".into()));
+                app.display_log(DevnetEvent::log_success("Local Devnet network ready".into()), ctx);
             }
             // DevnetEvent::Terminate => {
 
