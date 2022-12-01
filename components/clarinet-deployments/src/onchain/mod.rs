@@ -708,7 +708,16 @@ pub fn apply_on_chain_deployment(
         };
         while !fetch_initial_nonces && current_block_height < after_block {
             let new_block_height = match stacks_rpc.get_info() {
-                Ok(info) => info.burn_block_height,
+                Ok(info) => {
+                    if info.stacks_tip_height == 0 {
+                        // Always loop if we have not yet seen the genesis block.
+                        std::thread::sleep(std::time::Duration::from_secs(
+                            delay_between_checks.into(),
+                        ));
+                        continue;
+                    }
+                    info.burn_block_height
+                }
                 _ => {
                     std::thread::sleep(std::time::Duration::from_secs(delay_between_checks.into()));
                     continue;
