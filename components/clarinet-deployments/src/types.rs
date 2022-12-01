@@ -1,4 +1,5 @@
 use clarinet_files::FileLocation;
+use clarity_repl::clarity::stacks_common::types::StacksEpochId;
 use clarity_repl::clarity::util::hash::{hex_bytes, to_hex};
 use clarity_repl::clarity::vm::analysis::ContractAnalysis;
 use clarity_repl::clarity::vm::ast::ContractAST;
@@ -20,15 +21,22 @@ use std::collections::HashMap;
 
 #[derive(Serialize, Deserialize, PartialEq, Debug, Clone, Copy, Eq, PartialOrd, Ord)]
 pub enum EpochSpec {
+    #[serde(rename = "2.0")]
+    Epoch2_0,
     #[serde(rename = "2.05")]
     Epoch2_05,
     #[serde(rename = "2.1")]
     Epoch2_1,
 }
 
-impl Default for EpochSpec {
-    fn default() -> Self {
-        Self::Epoch2_1
+impl From<StacksEpochId> for EpochSpec {
+    fn from(epoch: StacksEpochId) -> Self {
+        match epoch {
+            StacksEpochId::Epoch20 => EpochSpec::Epoch2_0,
+            StacksEpochId::Epoch2_05 => EpochSpec::Epoch2_05,
+            StacksEpochId::Epoch21 => EpochSpec::Epoch2_1,
+            StacksEpochId::Epoch10 => unreachable!("epoch 1.0 is not supported"),
+        }
     }
 }
 
