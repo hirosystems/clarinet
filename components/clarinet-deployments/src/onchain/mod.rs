@@ -614,9 +614,12 @@ pub fn apply_on_chain_deployment(
                     .to_string();
                     contracts_ids_to_remap.insert((old_contract_id, new_contract_id));
 
-                    // Testnet handling: don't re-deploy previously deployed contracts 
+                    // Testnet handling: don't re-deploy previously deployed contracts
                     if deployment.network.is_testnet() {
-                        let res = stacks_rpc.get_contract_source(&tx.remap_sender.to_address(), &tx.contract_id.name.to_string());
+                        let res = stacks_rpc.get_contract_source(
+                            &tx.remap_sender.to_address(),
+                            &tx.contract_id.name.to_string(),
+                        );
                         if let Ok(_contract) = res {
                             continue;
                         }

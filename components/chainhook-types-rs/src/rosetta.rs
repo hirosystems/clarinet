@@ -193,12 +193,13 @@ pub enum StacksTransactionPosition {
 
 impl StacksTransactionPosition {
     pub fn anchor_block(index: usize) -> StacksTransactionPosition {
-        StacksTransactionPosition::AnchorBlock(AnchorBlockPosition {
-            index
-        })
+        StacksTransactionPosition::AnchorBlock(AnchorBlockPosition { index })
     }
 
-    pub fn micro_block(micro_block_identifier: BlockIdentifier, index: usize) -> StacksTransactionPosition {
+    pub fn micro_block(
+        micro_block_identifier: BlockIdentifier,
+        index: usize,
+    ) -> StacksTransactionPosition {
         StacksTransactionPosition::MicroBlock(MicroBlockPosition {
             micro_block_identifier,
             index,
