@@ -327,14 +327,11 @@ pub fn apply_on_chain_deployment(
     deployment_command_rx: Receiver<DeploymentCommand>,
     fetch_initial_nonces: bool,
 ) {
-    let network_manifest = NetworkManifest::from_project_manifest_location(
-        &manifest.location,
-        &deployment.network.get_networks(),
-        None,
-        None,
-    )
-    .expect("unable to load network manifest");
-    let delay_between_checks: u64 = 5;
+    let network = deployment.network.get_networks();
+    let network_manifest =
+        NetworkManifest::from_project_manifest_location(&manifest.location, &network, None, None)
+            .expect("unable to load network manifest");
+    let delay_between_checks: u64 = if network.1.is_devnet() { 1 } else { 10 };
     // Load deployers, deployment_fee_rate
     // Check fee, balances and deployers
 
