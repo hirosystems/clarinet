@@ -38,7 +38,7 @@ pub const DEFAULT_DOCKER_SOCKET: &str = "/var/run/docker.sock";
 pub const DEFAULT_EPOCH_2_0: u64 = 100;
 pub const DEFAULT_EPOCH_2_05: u64 = 102;
 pub const DEFAULT_EPOCH_2_1: u64 = 106;
-pub const DEFAULT_POX2_ACTIVATION: u64 = 108;
+pub const DEFAULT_POX2_ACTIVATION: u64 = 109;
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct NetworkManifestFile {
