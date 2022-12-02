@@ -84,6 +84,7 @@ pub fn read_deployment_or_generate_default(
     Ok((deployment, artifacts))
 }
 
+#[allow(dead_code)]
 struct StacksDevnet {
     tx: mpsc::Sender<DevnetCommand>,
     mining_tx: mpsc::Sender<BitcoinMiningCommand>,

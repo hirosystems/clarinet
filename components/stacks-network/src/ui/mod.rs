@@ -100,7 +100,7 @@ pub fn do_start_ui(
         terminal.draw(|f| ui::draw(f, &mut app)).map_err(|e| format!("unable to update ui: {}", e.to_string()))?;
         let event = match devnet_events_rx.recv() {
             Ok(event) => event,
-            Err(e) => {
+            Err(_e) => {
                 let _ = terminate(
                     &mut terminal,
                     chains_coordinator_commands_tx,
