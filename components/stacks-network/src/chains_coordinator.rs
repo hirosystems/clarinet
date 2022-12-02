@@ -283,13 +283,6 @@ pub async fn start_chains_coordinator(
                             }
                         },
                     );
-                } else if !boot_completed.load(Ordering::SeqCst) {
-                    boot_completed.store(true, Ordering::SeqCst);
-                    let _ =
-                        devnet_event_tx.send(DevnetEvent::BootCompleted(mining_command_tx.clone()));
-                    if !config.devnet_config.bitcoin_controller_automining_disabled {
-                        let _ = mining_command_tx.send(BitcoinMiningCommand::Start);
-                    }
                 }
 
                 let known_tip = match &chain_event {
