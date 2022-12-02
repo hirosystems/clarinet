@@ -816,8 +816,8 @@ impl NetworkManifest {
                 subnet_leader_mnemonic,
                 subnet_leader_secret_key_hex,
                 subnet_leader_derivation_path,
-                subnet_node_p2p_port: devnet_config.stacks_node_p2p_port.unwrap_or(30444),
-                subnet_node_rpc_port: devnet_config.stacks_node_rpc_port.unwrap_or(30443),
+                subnet_node_p2p_port: devnet_config.subnet_node_p2p_port.unwrap_or(30444),
+                subnet_node_rpc_port: devnet_config.subnet_node_rpc_port.unwrap_or(30443),
                 subnet_events_ingestion_port,
                 subnet_node_events_observers: devnet_config
                     .subnet_node_events_observers
