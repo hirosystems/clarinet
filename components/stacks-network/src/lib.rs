@@ -16,7 +16,7 @@ use std::{
         Arc,
     },
     thread::sleep,
-    time::Duration
+    time::Duration,
 };
 
 use chainhook_event_observer::{chainhooks::types::HookFormation, observer::MempoolAdmissionData};
@@ -136,7 +136,8 @@ pub async fn do_run_devnet(
             let res = rt.block_on(future);
             if let Err(ref e) = res {
                 let _ = orchestrator_event_tx.send(DevnetEvent::FatalError(e.clone()));
-                let _ = chains_coordinator_commands_tx_moved.send(ChainsCoordinatorCommand::Terminate);
+                let _ =
+                    chains_coordinator_commands_tx_moved.send(ChainsCoordinatorCommand::Terminate);
             }
             res
         })
@@ -173,12 +174,8 @@ pub async fn do_run_devnet(
         let moved_orchestrator_terminator_tx = orchestrator_terminator_tx.clone();
         let moved_events_observer_commands_tx = chains_coordinator_commands_tx.clone();
         ctrlc::set_handler(move || {
-            moved_events_observer_commands_tx
-                .send(ChainsCoordinatorCommand::Terminate)
-                .expect("Unable to terminate devnet");
-            moved_orchestrator_terminator_tx
-                .send(true)
-                .expect("Unable to terminate devnet");
+            let _ = moved_events_observer_commands_tx.send(ChainsCoordinatorCommand::Terminate);
+            let _ = moved_orchestrator_terminator_tx.send(true);
             termination_writer.store(true, Ordering::SeqCst);
         })
         .expect("Error setting Ctrl-C handler");

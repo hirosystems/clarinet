@@ -63,11 +63,13 @@ pub fn do_start_ui(
     enable_raw_mode().map_err(|e| format!("unable to start terminal ui: {}", e.to_string()))?;
 
     let mut stdout = stdout();
-    execute!(stdout, EnterAlternateScreen).map_err(|e| format!("unable to start terminal ui: {}", e.to_string()))?;
+    execute!(stdout, EnterAlternateScreen)
+        .map_err(|e| format!("unable to start terminal ui: {}", e.to_string()))?;
 
     let backend = CrosstermBackend::new(stdout);
 
-    let mut terminal = Terminal::new(backend).map_err(|e| format!("unable to start terminal ui: {}", e.to_string()))?;
+    let mut terminal = Terminal::new(backend)
+        .map_err(|e| format!("unable to start terminal ui: {}", e.to_string()))?;
 
     // Setup input handling
     let tick_rate = Duration::from_millis(500);
@@ -94,10 +96,14 @@ pub fn do_start_ui(
 
     let mut app = App::new("Clarinet", devnet_path, subnet_enabled);
 
-    terminal.clear().map_err(|e| format!("unable to start terminal ui: {}", e.to_string()))?;
+    terminal
+        .clear()
+        .map_err(|e| format!("unable to start terminal ui: {}", e.to_string()))?;
 
     loop {
-        terminal.draw(|f| ui::draw(f, &mut app)).map_err(|e| format!("unable to update ui: {}", e.to_string()))?;
+        terminal
+            .draw(|f| ui::draw(f, &mut app))
+            .map_err(|e| format!("unable to update ui: {}", e.to_string()))?;
         let event = match devnet_events_rx.recv() {
             Ok(event) => event,
             Err(_e) => {
@@ -105,8 +111,9 @@ pub fn do_start_ui(
                     &mut terminal,
                     chains_coordinator_commands_tx,
                     observer_command_tx,
-                    orchestrator_terminated_rx);
-                break
+                    orchestrator_terminated_rx,
+                );
+                break;
             }
         };
         match event {

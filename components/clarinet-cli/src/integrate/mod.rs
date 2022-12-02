@@ -77,7 +77,11 @@ pub fn run_devnet(
         display_dashboard,
         ctx,
     ));
-    println!("{} logs and chainstate available at location {}", yellow!("terminating devnet network:"), working_dir);
+    println!(
+        "{} logs and chainstate available at location {}",
+        yellow!("terminating devnet network:"),
+        working_dir
+    );
 
     res
 }
