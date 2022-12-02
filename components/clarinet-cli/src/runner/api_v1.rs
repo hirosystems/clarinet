@@ -856,7 +856,10 @@ fn wrap_result_in_simulated_transaction(
 ) -> StacksTransactionData {
     let result = match execution.result {
         EvaluationResult::Snippet(ref result) => utils::value_to_string(&result.result),
-        _ => unreachable!("Contract result from snippet"),
+        EvaluationResult::Contract(ref contract) => match contract.result {
+            Some(ref result) => utils::value_to_string(result),
+            _ => (&"(ok true)").to_string(),
+        },
     };
     let (txid, _timestamp) = {
         let timestamp = DateTime::<Utc>::from_utc(NaiveDateTime::from_timestamp(61, 0), Utc);
