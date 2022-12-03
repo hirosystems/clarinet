@@ -11,6 +11,7 @@ use clarinet_deployments::onchain::{
 use clarinet_deployments::types::DeploymentSpecification;
 use clarinet_files::{self, AccountConfig, DevnetConfig, NetworkManifest, ProjectManifest};
 use hiro_system_kit;
+use hiro_system_kit::slog;
 
 use chainhook_event_observer::observer::{
     start_event_observer, EventObserverConfig, ObserverCommand, ObserverEvent,
@@ -31,7 +32,6 @@ use std::str;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc::{channel, Receiver, Sender};
 use std::sync::Arc;
-use tracing::info;
 
 #[derive(Deserialize)]
 pub struct NewTransaction {
@@ -76,8 +76,9 @@ impl DevnetEventObserverConfig {
         manifest: ProjectManifest,
         deployment: DeploymentSpecification,
         chainhooks: HookFormation,
+        ctx: &Context,
     ) -> Self {
-        info!("Checking contracts");
+        ctx.try_log(|logger| slog::info!(logger, "Checking contracts"));
         let network_manifest = NetworkManifest::from_project_manifest_location(
             &manifest.location,
             &StacksNetwork::Devnet.get_networks(),
@@ -154,13 +155,14 @@ pub async fn start_chains_coordinator(
     let event_observer_config = config.event_observer_config.clone();
     let observer_event_tx_moved = observer_event_tx.clone();
     let observer_command_tx_moved = observer_command_tx.clone();
+    let ctx_moved = ctx.clone();
     let _ = hiro_system_kit::thread_named("Event observer").spawn(move || {
         let future = start_event_observer(
             event_observer_config,
             observer_command_tx_moved,
             observer_command_rx,
             Some(observer_event_tx_moved),
-            ctx,
+            ctx_moved,
         );
         let _ = hiro_system_kit::nestable_block_on(future);
     });
@@ -281,13 +283,6 @@ pub async fn start_chains_coordinator(
                             }
                         },
                     );
-                } else if !boot_completed.load(Ordering::SeqCst) {
-                    boot_completed.store(true, Ordering::SeqCst);
-                    let _ =
-                        devnet_event_tx.send(DevnetEvent::BootCompleted(mining_command_tx.clone()));
-                    if !config.devnet_config.bitcoin_controller_automining_disabled {
-                        let _ = mining_command_tx.send(BitcoinMiningCommand::Start);
-                    }
                 }
 
                 let known_tip = match &chain_event {
@@ -390,7 +385,7 @@ pub async fn start_chains_coordinator(
             }
             ObserverEvent::HookRegistered(hook) => {
                 let message = format!("New hook \"{}\" registered", hook.name());
-                info!("{}", message);
+                ctx.try_log(|logger| slog::info!(logger, "{}", message));
                 let _ = devnet_event_tx.send(DevnetEvent::info(message));
             }
             ObserverEvent::HookDeregistered(_hook) => {}

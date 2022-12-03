@@ -889,7 +889,7 @@ fn wrap_result_in_simulated_transaction(
             description: String::new(),
             sponsor: None,
             execution_cost: None,
-            position: chainhook_types::StacksTransactionPosition::Index(index),
+            position: chainhook_types::StacksTransactionPosition::anchor_block(index),
             proof: None,
         },
     };

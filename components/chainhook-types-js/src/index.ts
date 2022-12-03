@@ -279,10 +279,10 @@ export interface StacksTransactionMetadata {
    */
   description: string;
   /**
-   * @type {boolean}
+   * @type {string}
    * @memberof StacksTransactionMetadata
    */
-  raw_tx: boolean;
+  raw_tx: string;
   /**
    * @type {string}
    * @memberof StacksTransactionMetadata
@@ -319,15 +319,34 @@ export interface StacksTransactionMetadata {
    */
   execution_cost?: StacksTransactionExecutionCost;
   /**
-   * @type {number|any}
+   * @type {AnchorBlockPosition | MicroBlockPosition}
    * @memberof StacksTransactionMetadata
    */
-  position: number | any;
-  /**
+  position: AnchorBlockPosition | MicroBlockPosition;
+   /**
    * @type {string}
    * @memberof StacksTransactionMetadata
    */
   proof?: string;
+}
+
+/**
+ * MicroBlockPosition
+ * @export
+ * @interface MicroBlockPosition
+ */
+ export interface MicroBlockPosition {
+  micro_block_identifier: BlockIdentifier,
+  index: number
+}
+
+/**
+ * AnchorBlockPosition
+ * @export
+ * @interface AnchorBlockPosition
+ */
+ export interface AnchorBlockPosition {
+  index: number
 }
 
 export interface StacksTransactionReceipt {

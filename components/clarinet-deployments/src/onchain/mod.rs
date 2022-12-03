@@ -327,14 +327,11 @@ pub fn apply_on_chain_deployment(
     deployment_command_rx: Receiver<DeploymentCommand>,
     fetch_initial_nonces: bool,
 ) {
-    let network_manifest = NetworkManifest::from_project_manifest_location(
-        &manifest.location,
-        &deployment.network.get_networks(),
-        None,
-        None,
-    )
-    .expect("unable to load network manifest");
-    let delay_between_checks: u64 = 10;
+    let network = deployment.network.get_networks();
+    let network_manifest =
+        NetworkManifest::from_project_manifest_location(&manifest.location, &network, None, None)
+            .expect("unable to load network manifest");
+    let delay_between_checks: u64 = if network.1.is_devnet() { 1 } else { 10 };
     // Load deployers, deployment_fee_rate
     // Check fee, balances and deployers
 
@@ -613,6 +610,17 @@ pub fn apply_on_chain_deployment(
                     )
                     .to_string();
                     contracts_ids_to_remap.insert((old_contract_id, new_contract_id));
+
+                    // Testnet handling: don't re-deploy previously deployed contracts
+                    if deployment.network.is_testnet() {
+                        let res = stacks_rpc.get_contract_source(
+                            &tx.remap_sender.to_address(),
+                            &tx.contract_id.name.to_string(),
+                        );
+                        if let Ok(_contract) = res {
+                            continue;
+                        }
+                    }
 
                     // Retrieve nonce for issuer
                     let issuer_address = tx.remap_sender.to_address();
