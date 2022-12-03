@@ -146,6 +146,8 @@ where
     let rt = hiro_system_kit::create_basic_runtime();
     rt.block_on(future)
 }
+
+#[derive(Debug)]
 pub struct SessionArtifacts {
     pub coverage_reports: Vec<TestCoverageReport>,
     pub costs_reports: Vec<CostsReport>,
