@@ -9,14 +9,23 @@ pub use tokio_helpers::*;
 #[cfg(feature = "log")]
 pub mod log;
 
-#[cfg(feature = "log")]
-pub extern crate slog_scope;
+// #[cfg(feature = "log")]
+// pub extern crate slog_scope;
 
-#[cfg(feature = "log")]
-pub use slog_scope::*;
+// #[cfg(feature = "log")]
+// pub use slog_scope::*;
 
 #[cfg(feature = "log")]
 pub extern crate slog;
+
+#[cfg(feature = "log")]
+pub use slog::*;
+
+#[cfg(feature = "log")]
+pub extern crate slog_term;
+
+#[cfg(feature = "log")]
+pub extern crate slog_async;
 
 use std::thread::Builder;
 

@@ -2,19 +2,23 @@
 
 ## Usage
 
-Start a Testnet node 
+To get started, [build `clarinet` from source](https://github.com/hirosystems/clarinet#install-from-source-using-cargo), and then `cd components/chainhook-node` and run `cargo install --path .` to install `chainhook-node`.
+
+Before running `chainhook-node`, you need to [install redis](https://redis.io/docs/getting-started/installation/) and run a redis server locally.
+
+ ### Start a Testnet node 
 
 ```bash
 $ chainhook-node start --testnet
 ```
 
-Start a Mainnet node 
+### Start a Mainnet node 
 
 ```bash
 $ chainhook-node start --mainnet
 ```
 
-Start a Devnet node 
+### Start a Devnet node 
 
 ```bash
 $ chainhook-node start --devnet

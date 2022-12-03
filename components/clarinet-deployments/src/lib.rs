@@ -32,10 +32,10 @@ use clarity_repl::repl::session::BOOT_CONTRACTS_DATA;
 use clarity_repl::repl::Session;
 use clarity_repl::repl::SessionSettings;
 use std::collections::{BTreeMap, BTreeSet, HashMap, VecDeque};
-use types::ContractPublishSpecification;
 use types::DeploymentGenerationArtifacts;
 use types::RequirementPublishSpecification;
 use types::TransactionSpecification;
+use types::{ContractPublishSpecification, EpochSpec};
 
 pub fn setup_session_with_deployment(
     manifest: &ProjectManifest,
@@ -205,6 +205,7 @@ pub async fn generate_default_deployment(
             &manifest.location,
             &network.get_networks(),
             Some(&manifest.project.cache_location),
+            None,
         )?,
         Some(file_accessor) => {
             NetworkManifest::from_project_manifest_location_using_file_accessor(
@@ -283,7 +284,7 @@ pub async fn generate_default_deployment(
             }
         };
 
-    let mut transactions = vec![];
+    let mut transactions = BTreeMap::new();
     let mut contracts_map = BTreeMap::new();
     let mut requirements_asts = BTreeMap::new();
     let mut requirements_deps = HashMap::new();
@@ -324,6 +325,9 @@ pub async fn generate_default_deployment(
         let cache_location = &manifest.project.cache_location;
         let mut emulated_contracts_publish = HashMap::new();
         let mut requirements_publish = HashMap::new();
+        // TODO: This is fine for now, but will need to be changed after 2.1 is live and
+        //       there are requirements that need to be deployed in epoch 2.1.
+        let requirements_epoch = EpochSpec::Epoch2_0;
 
         // Load all the requirements
         // Some requirements are explicitly listed, some are discovered as we compute the ASTs.
@@ -472,7 +476,7 @@ pub async fn generate_default_deployment(
                         .remove(contract_id)
                         .expect("unable to retrieve contract");
                     let tx = TransactionSpecification::EmulatedContractPublish(data);
-                    transactions.push(tx);
+                    add_transaction_to_epoch(&mut transactions, tx, &requirements_epoch);
                 }
             } else if network.either_devnet_or_testnet() {
                 for contract_id in ordered_contracts_ids.iter() {
@@ -480,7 +484,7 @@ pub async fn generate_default_deployment(
                         .remove(contract_id)
                         .expect("unable to retrieve contract");
                     let tx = TransactionSpecification::RequirementPublish(data);
-                    transactions.push(tx);
+                    add_transaction_to_epoch(&mut transactions, tx, &requirements_epoch);
                 }
             }
         }
@@ -489,10 +493,22 @@ pub async fn generate_default_deployment(
     let mut contracts = HashMap::new();
     let mut contracts_sources = HashMap::new();
 
+    let base_location = manifest.location.clone().get_parent_location()?;
+
     let sources: HashMap<String, String> = match file_accessor {
         None => {
             let mut sources = HashMap::new();
-            for (contract_location, _) in manifest.contracts_settings.iter() {
+            for (_, contract_config) in manifest.contracts.iter() {
+                let mut contract_location = base_location.clone();
+                contract_location
+                    .append_path(&contract_config.expect_contract_path_as_str())
+                    .map_err(|_| {
+                        format!(
+                            "unable to build path for contract {}",
+                            contract_config.expect_contract_path_as_str()
+                        )
+                    })?;
+
                 let source = contract_location.read_content_as_utf8().map_err(|_| {
                     format!(
                         "unable to find contract at {}",
@@ -505,9 +521,15 @@ pub async fn generate_default_deployment(
         }
         Some(file_accessor) => {
             let contracts_location = manifest
-                .contracts_settings
+                .contracts
                 .iter()
-                .map(|(contract_location, _)| contract_location.to_string())
+                .map(|(_, contract_config)| {
+                    let mut contract_location = base_location.clone();
+                    contract_location
+                        .append_path(&contract_config.expect_contract_path_as_str())
+                        .unwrap();
+                    contract_location.to_string()
+                })
                 .collect();
             file_accessor
                 .read_contracts_content(contracts_location)
@@ -515,15 +537,10 @@ pub async fn generate_default_deployment(
         }
     };
 
-    for (contract_location, contract_config) in manifest.contracts_settings.iter() {
-        let contract_name = match ContractName::try_from(contract_config.name.to_string()) {
+    for (name, contract_config) in manifest.contracts.iter() {
+        let contract_name = match ContractName::try_from(name.to_string()) {
             Ok(res) => res,
-            Err(_) => {
-                return Err(format!(
-                    "unable to use {} as a valid contract name",
-                    contract_config.name
-                ))
-            }
+            Err(_) => return Err(format!("unable to use {} as a valid contract name", name)),
         };
 
         let deployer = match &contract_config.deployer {
@@ -550,11 +567,13 @@ pub async fn generate_default_deployment(
             }
         };
 
+        let mut contract_location = base_location.clone();
+        contract_location.append_path(&contract_config.expect_contract_path_as_str())?;
         let source = sources
             .get(&contract_location.to_string())
             .ok_or(format!(
                 "Invalid Clarinet.toml, source file not found for: {}",
-                &contract_config.name
+                &name
             ))?
             .clone();
 
@@ -577,7 +596,7 @@ pub async fn generate_default_deployment(
                     contract_name,
                     emulated_sender: sender,
                     source,
-                    location: contract_location.clone(),
+                    location: contract_location,
                     clarity_version: contract_config.clarity_version,
                 },
             )
@@ -585,7 +604,7 @@ pub async fn generate_default_deployment(
             TransactionSpecification::ContractPublish(ContractPublishSpecification {
                 contract_name,
                 expected_sender: sender,
-                location: contract_location.clone(),
+                location: contract_location,
                 cost: deployment_fee_rate
                     .saturating_mul(source.as_bytes().len().try_into().unwrap()),
                 source,
@@ -601,13 +620,15 @@ pub async fn generate_default_deployment(
 
     let mut contract_asts = HashMap::new();
     let mut contract_diags = HashMap::new();
+    let mut contract_epochs = HashMap::new();
 
     let mut asts_success = true;
 
     for (contract_id, contract) in contracts_sources.into_iter() {
         let (ast, diags, ast_success) = session.interpreter.build_ast(&contract);
         contract_asts.insert(contract_id.clone(), ast);
-        contract_diags.insert(contract_id, diags);
+        contract_diags.insert(contract_id.clone(), diags);
+        contract_epochs.insert(contract_id, contract.epoch);
         asts_success = asts_success && ast_success;
     }
 
@@ -657,7 +678,11 @@ pub async fn generate_default_deployment(
             }
             _ => unreachable!(),
         }
-        transactions.push(tx);
+        add_transaction_to_epoch(
+            &mut transactions,
+            tx,
+            &EpochSpec::from(contract_epochs[contract_id]),
+        );
     }
 
     let tx_chain_limit = match no_batch {
@@ -666,11 +691,16 @@ pub async fn generate_default_deployment(
     };
 
     let mut batches = vec![];
-    for (id, transactions) in transactions.chunks(tx_chain_limit).enumerate() {
-        batches.push(TransactionsBatchSpecification {
-            id: id,
-            transactions: transactions.to_vec(),
-        })
+    let mut batch_count = 0;
+    for (epoch, epoch_transactions) in transactions {
+        for txs in epoch_transactions.chunks(tx_chain_limit) {
+            batches.push(TransactionsBatchSpecification {
+                id: batch_count,
+                transactions: txs.to_vec(),
+                epoch: Some(epoch),
+            });
+            batch_count += 1;
+        }
     }
 
     let mut wallets = vec![];
@@ -727,6 +757,21 @@ pub async fn generate_default_deployment(
     };
 
     Ok((deployment, artifacts))
+}
+
+fn add_transaction_to_epoch(
+    transactions: &mut BTreeMap<EpochSpec, Vec<TransactionSpecification>>,
+    transaction: TransactionSpecification,
+    epoch: &EpochSpec,
+) {
+    let epoch_transactions = match transactions.get_mut(epoch) {
+        Some(v) => v,
+        None => {
+            transactions.insert(*epoch, vec![]);
+            transactions.get_mut(epoch).unwrap()
+        }
+    };
+    epoch_transactions.push(transaction);
 }
 
 pub fn get_default_deployment_path(

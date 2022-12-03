@@ -84,7 +84,7 @@ pub fn handle_command(command: &str) -> String {
         }
     };
 
-    let output_lines = session.handle_command(command);
+    let (_, output_lines) = session.handle_command(command);
 
     unsafe {
         WASM_GLOBAL_CONTEXT.session = Some(session);

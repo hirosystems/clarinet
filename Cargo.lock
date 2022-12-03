@@ -916,7 +916,7 @@ dependencies = [
 
 [[package]]
 name = "clarinet-cli"
-version = "1.1.0"
+version = "1.2.0"
 dependencies = [
  "aes 0.7.5",
  "ansi_term",
@@ -1085,7 +1085,7 @@ dependencies = [
 [[package]]
 name = "clarity"
 version = "0.0.1"
-source = "git+https://github.com/stacks-network/stacks-blockchain.git?rev=e7482540e17099698ab79aa428c9d9bf2e4ac281#e7482540e17099698ab79aa428c9d9bf2e4ac281"
+source = "git+https://github.com/stacks-network/stacks-blockchain.git?rev=601ac7a0b4ed3de027382a33560d079aaa337b4d#601ac7a0b4ed3de027382a33560d079aaa337b4d"
 dependencies = [
  "integer-sqrt",
  "lazy_static",
@@ -1146,7 +1146,7 @@ dependencies = [
 
 [[package]]
 name = "clarity-repl"
-version = "1.1.0"
+version = "1.2.0"
 dependencies = [
  "ansi_term",
  "atty",
@@ -1168,6 +1168,7 @@ dependencies = [
  "rand_pcg 0.3.1",
  "rand_seeder",
  "regex",
+ "reqwest",
  "ripemd160 0.9.1",
  "rustyline",
  "serde",
@@ -6086,7 +6087,7 @@ dependencies = [
 [[package]]
 name = "stacks-common"
 version = "0.0.1"
-source = "git+https://github.com/stacks-network/stacks-blockchain.git?rev=e7482540e17099698ab79aa428c9d9bf2e4ac281#e7482540e17099698ab79aa428c9d9bf2e4ac281"
+source = "git+https://github.com/stacks-network/stacks-blockchain.git?rev=601ac7a0b4ed3de027382a33560d079aaa337b4d#601ac7a0b4ed3de027382a33560d079aaa337b4d"
 dependencies = [
  "chrono",
  "curve25519-dalek",
@@ -6109,7 +6110,7 @@ dependencies = [
 
 [[package]]
 name = "stacks-devnet-js"
-version = "1.1.0"
+version = "1.2.0"
 dependencies = [
  "chainhook-types",
  "clarinet-deployments",

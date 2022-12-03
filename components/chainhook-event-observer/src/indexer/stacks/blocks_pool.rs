@@ -1,10 +1,14 @@
-use crate::indexer::{ChainSegment, ChainSegmentIncompatibility};
+use crate::{
+    indexer::{ChainSegment, ChainSegmentIncompatibility},
+    utils::Context,
+};
 use chainhook_types::{
     BlockIdentifier, StacksBlockData, StacksBlockUpdate, StacksChainEvent,
     StacksChainUpdatedWithBlocksData, StacksChainUpdatedWithMicroblocksData,
     StacksChainUpdatedWithMicroblocksReorgData, StacksChainUpdatedWithReorgData,
     StacksMicroblockData,
 };
+use hiro_system_kit::slog;
 use std::collections::{hash_map::Entry, BTreeMap, BTreeSet, HashMap, HashSet};
 
 pub struct StacksBlockPool {
@@ -37,37 +41,45 @@ impl StacksBlockPool {
     pub fn process_block(
         &mut self,
         block: StacksBlockData,
+        ctx: &Context,
     ) -> Result<Option<StacksChainEvent>, String> {
-        info!("Start processing Stacks {}", block.block_identifier);
+        ctx.try_log(|logger| {
+            slog::info!(logger, "Start processing Stacks {}", block.block_identifier)
+        });
 
         // Keep block data in memory
         let existing_entry = self
             .block_store
             .insert(block.block_identifier.clone(), block.clone());
         if existing_entry.is_some() {
-            warn!(
-                "Stacks {} has already been processed",
-                block.block_identifier
-            );
+            ctx.try_log(|logger| {
+                slog::warn!(
+                    logger,
+                    "Stacks {} has already been processed",
+                    block.block_identifier
+                )
+            });
             return Ok(None);
         }
 
         for (i, fork) in self.forks.iter() {
-            info!("Active fork {}: {}", i, fork);
+            ctx.try_log(|logger| slog::info!(logger, "Active fork {}: {}", i, fork));
         }
         // Retrieve previous canonical fork
         let previous_canonical_fork_id = self.canonical_fork_id;
         let previous_canonical_fork = match self.forks.get(&previous_canonical_fork_id) {
             Some(fork) => fork.clone(),
             None => {
-                error!("unable to retrieve previous stacks fork");
+                ctx.try_log(|logger| {
+                    slog::error!(logger, "unable to retrieve previous stacks fork")
+                });
                 return Ok(None);
             }
         };
 
         let mut fork_updated = None;
         for (_, fork) in self.forks.iter_mut() {
-            let (block_appended, mut new_fork) = fork.try_append_block(&block);
+            let (block_appended, mut new_fork) = fork.try_append_block(&block, ctx);
             if block_appended {
                 if let Some(new_fork) = new_fork.take() {
                     let number_of_forks = self.forks.len();
@@ -89,17 +101,24 @@ impl StacksBlockPool {
 
         let fork_updated = match fork_updated.take() {
             Some(fork) => {
-                info!(
-                    "Stacks {} successfully appended to {}",
-                    block.block_identifier, fork
-                );
+                ctx.try_log(|logger| {
+                    slog::info!(
+                        logger,
+                        "Stacks {} successfully appended to {}",
+                        block.block_identifier,
+                        fork
+                    )
+                });
                 fork
             }
             None => {
-                error!(
-                    "Unable to process Stacks {} - inboxed for later",
-                    block.block_identifier
-                );
+                ctx.try_log(|logger| {
+                    slog::error!(
+                        logger,
+                        "Unable to process Stacks {} - inboxed for later",
+                        block.block_identifier
+                    )
+                });
                 self.orphans.insert(block.block_identifier.clone());
                 return Ok(None);
             }
@@ -124,7 +143,7 @@ impl StacksBlockPool {
                     None => continue,
                 };
 
-                let (orphan_appended, _new_fork) = fork_updated.try_append_block(&block);
+                let (orphan_appended, _new_fork) = fork_updated.try_append_block(&block, ctx);
                 if orphan_appended {
                     applied.insert(orphan_block_identifier);
                     orphans_to_untrack.insert(orphan_block_identifier);
@@ -135,7 +154,7 @@ impl StacksBlockPool {
 
         // Update orphans
         for orphan in orphans_to_untrack.into_iter() {
-            info!("Dequeuing orphan {}", orphan);
+            ctx.try_log(|logger| slog::info!(logger, "Dequeuing orphan {}", orphan));
             self.orphans.remove(orphan);
         }
 
@@ -149,10 +168,15 @@ impl StacksBlockPool {
                 .get(fork.get_tip())
                 .map(|b| b.metadata.bitcoin_anchor_block_identifier.index)
                 .unwrap_or(0);
-            info!(
-                "Active fork: {} - {} / {}",
-                fork_id, fork, tip_bitcoin_height
-            );
+            ctx.try_log(|logger| {
+                slog::info!(
+                    logger,
+                    "Active fork: {} - {} / {}",
+                    fork_id,
+                    fork,
+                    tip_bitcoin_height
+                )
+            });
             if tip_bitcoin_height > highest_bitcoin_height
                 || (tip_bitcoin_height == highest_bitcoin_height && fork_id > &canonical_fork_id)
             {
@@ -164,17 +188,23 @@ impl StacksBlockPool {
                 }
             }
         }
-        info!("Active fork selected as canonical: {}", canonical_fork_id);
+        ctx.try_log(|logger| {
+            slog::info!(
+                logger,
+                "Active fork selected as canonical: {}",
+                canonical_fork_id
+            )
+        });
 
         self.canonical_fork_id = canonical_fork_id;
         // Generate chain event from the previous and current canonical forks
         let canonical_fork = self.forks.get(&canonical_fork_id).unwrap().clone();
         if canonical_fork.eq(&previous_canonical_fork) {
-            info!("Canonical fork unchanged");
+            ctx.try_log(|logger| slog::info!(logger, "Canonical fork unchanged"));
             return Ok(None);
         }
 
-        let res = self.generate_block_chain_event(&canonical_fork, &previous_canonical_fork);
+        let res = self.generate_block_chain_event(&canonical_fork, &previous_canonical_fork, ctx);
         let mut chain_event = match res {
             Ok(chain_event) => chain_event,
             Err(ChainSegmentIncompatibility::ParentBlockUnknown) => {
@@ -184,12 +214,16 @@ impl StacksBlockPool {
             _ => return Ok(None),
         };
 
-        self.collect_and_prune_confirmed_blocks(&mut chain_event);
+        self.collect_and_prune_confirmed_blocks(&mut chain_event, ctx);
 
         Ok(Some(chain_event))
     }
 
-    pub fn collect_and_prune_confirmed_blocks(&mut self, chain_event: &mut StacksChainEvent) {
+    pub fn collect_and_prune_confirmed_blocks(
+        &mut self,
+        chain_event: &mut StacksChainEvent,
+        ctx: &Context,
+    ) {
         let (tip, confirmed_blocks) = match chain_event {
             StacksChainEvent::ChainUpdatedWithBlocks(ref mut event) => {
                 match event.new_blocks.last() {
@@ -227,7 +261,7 @@ impl StacksBlockPool {
         };
 
         if canonical_segment.len() < 7 {
-            info!("No block to confirm");
+            ctx.try_log(|logger| slog::info!(logger, "No block to confirm"));
             return;
         }
         // Any block beyond 6th ancestor is considered as confirmed and can be pruned
@@ -262,7 +296,9 @@ impl StacksBlockPool {
         for confirmed_block in blocks_to_confirm.iter() {
             let block = match self.block_store.remove(confirmed_block) {
                 None => {
-                    error!("unable to retrieve data for {}", confirmed_block);
+                    ctx.try_log(|logger| {
+                        slog::error!(logger, "unable to retrieve data for {}", confirmed_block)
+                    });
                     return;
                 }
                 Some(block) => block,
@@ -341,14 +377,17 @@ impl StacksBlockPool {
         }
         // confirmed_blocks.reverse();
 
-        debug!("AFTER: {:?}", confirmed_blocks.len());
+        ctx.try_log(|logger| slog::debug!(logger, "AFTER: {:?}", confirmed_blocks.len()));
     }
 
     pub fn process_microblocks(
         &mut self,
         microblocks: Vec<StacksMicroblockData>,
+        ctx: &Context,
     ) -> Result<Option<StacksChainEvent>, String> {
-        info!("Start processing {} microblocks", microblocks.len());
+        ctx.try_log(|logger| {
+            slog::info!(logger, "Start processing {} microblocks", microblocks.len())
+        });
 
         let mut previous_canonical_micro_fork = None;
 
@@ -366,10 +405,14 @@ impl StacksBlockPool {
                 anchor_block_updated = Some(block.block_identifier.clone());
                 microblock.metadata.anchor_block_identifier = block.block_identifier.clone();
             }
-            info!(
-                "Processing microblock {}, extending anchor {}",
-                microblock.block_identifier, microblock.metadata.anchor_block_identifier
-            );
+            ctx.try_log(|logger| {
+                slog::info!(
+                    logger,
+                    "Processing microblock {}, extending anchor {}",
+                    microblock.block_identifier,
+                    microblock.metadata.anchor_block_identifier
+                )
+            });
 
             // Keep microblock data in memory
             self.microblock_store.insert(
@@ -386,17 +429,26 @@ impl StacksBlockPool {
                 self.canonical_micro_fork_id
                     .get(&microblock.metadata.anchor_block_identifier),
             ) {
-                info!(
-                    "Previous fork selected as canonical: {}",
-                    microforks[*micro_fork_id]
-                );
+                ctx.try_log(|logger| {
+                    slog::info!(
+                        logger,
+                        "Previous fork selected as canonical: {}",
+                        microforks[*micro_fork_id]
+                    )
+                });
                 previous_canonical_micro_fork = Some(microforks[*micro_fork_id].clone());
             }
 
             let mut micro_fork_updated = None;
 
             if microblock.block_identifier.index == 0 {
-                info!("Initiating new micro fork {}", microblock.block_identifier);
+                ctx.try_log(|logger| {
+                    slog::info!(
+                        logger,
+                        "Initiating new micro fork {}",
+                        microblock.block_identifier
+                    )
+                });
                 let mut microfork = ChainSegment::new();
                 microfork.append_block_identifier(&&microblock.block_identifier);
 
@@ -420,14 +472,16 @@ impl StacksBlockPool {
                 {
                     for micro_fork in microforks.iter_mut() {
                         let (block_appended, mut new_micro_fork) =
-                            micro_fork.try_append_block(&microblock);
+                            micro_fork.try_append_block(&microblock, ctx);
                         if block_appended {
-                            info!(
+                            ctx.try_log(|logger| {
+                                slog::info!(logger,
                                 "Attempt to append micro fork {} with {} (parent = {}) succeeded",
                                 micro_fork,
                                 microblock.block_identifier,
                                 microblock.parent_block_identifier
-                            );
+                            )
+                            });
                             if let Some(new_micro_fork) = new_micro_fork.take() {
                                 microforks.push(new_micro_fork);
                                 micro_fork_updated = microforks.last_mut();
@@ -437,12 +491,15 @@ impl StacksBlockPool {
                             // A block can only be added to one segment
                             break;
                         } else {
-                            error!(
-                                "Attempt to append micro fork {} with {} (parent = {}) failed",
-                                micro_fork,
-                                microblock.block_identifier,
-                                microblock.parent_block_identifier
-                            );
+                            ctx.try_log(|logger| {
+                                slog::error!(
+                                    logger,
+                                    "Attempt to append micro fork {} with {} (parent = {}) failed",
+                                    micro_fork,
+                                    microblock.block_identifier,
+                                    microblock.parent_block_identifier
+                                )
+                            });
                         }
                     }
                 }
@@ -478,7 +535,8 @@ impl StacksBlockPool {
                         None => continue,
                     };
 
-                    let (orphan_appended, _new_fork) = micro_fork_updated.try_append_block(&block);
+                    let (orphan_appended, _new_fork) =
+                        micro_fork_updated.try_append_block(&block, ctx);
                     if orphan_appended {
                         applied.insert(orphan_key);
                         orphans_to_untrack.insert(orphan_key);
@@ -489,7 +547,14 @@ impl StacksBlockPool {
 
             // Update orphans
             for orphan in orphans_to_untrack.into_iter() {
-                info!("Dequeuing orphaned microblock ({}, {})", orphan.0, orphan.1);
+                ctx.try_log(|logger| {
+                    slog::info!(
+                        logger,
+                        "Dequeuing orphaned microblock ({}, {})",
+                        orphan.0,
+                        orphan.1
+                    )
+                });
                 self.micro_orphans.remove(orphan);
             }
 
@@ -497,16 +562,20 @@ impl StacksBlockPool {
         }
 
         if micro_forks_updated.is_empty() {
-            info!("Unable to process microblocks - inboxed for later");
+            ctx.try_log(|logger| {
+                slog::info!(logger, "Unable to process microblocks - inboxed for later")
+            });
             return Ok(None);
         } else {
-            info!("Microblocks successfully appended");
+            ctx.try_log(|logger| slog::info!(logger, "Microblocks successfully appended"));
         }
 
         let anchor_block_updated = match anchor_block_updated {
             Some(anchor_block_updated) => anchor_block_updated,
             None => {
-                info!("Microblock was received before its anchorblock");
+                ctx.try_log(|logger| {
+                    slog::info!(logger, "Microblock was received before its anchorblock")
+                });
                 return Ok(None);
             }
         };
@@ -524,7 +593,7 @@ impl StacksBlockPool {
         let mut canonical_micro_fork_id = 0;
         let mut highest_height = 0;
         for (fork_id, fork) in microforks.iter().enumerate() {
-            info!("Active microfork: {} - {}", fork_id, fork);
+            ctx.try_log(|logger| slog::info!(logger, "Active microfork: {} - {}", fork_id, fork));
             if fork.get_length() >= highest_height {
                 highest_height = fork.get_length();
                 canonical_micro_fork_id = fork_id;
@@ -537,15 +606,19 @@ impl StacksBlockPool {
         // Generate chain event from the previous and current canonical forks
         let canonical_micro_fork = microforks.get(canonical_micro_fork_id).unwrap();
 
-        info!(
-            "Active microfork selected as canonical: {}",
-            canonical_micro_fork
-        );
+        ctx.try_log(|logger| {
+            slog::info!(
+                logger,
+                "Active microfork selected as canonical: {}",
+                canonical_micro_fork
+            )
+        });
 
         let chain_event = self.generate_microblock_chain_event(
             &anchor_block_updated,
             canonical_micro_fork,
             &previous_canonical_micro_fork,
+            ctx,
         );
 
         Ok(chain_event)
@@ -573,6 +646,7 @@ impl StacksBlockPool {
         &mut self,
         block: &StacksBlockData,
         diff_enabled: bool,
+        ctx: &Context,
     ) -> (Option<StacksChainEvent>, Option<Vec<StacksMicroblockData>>) {
         match (
             &block.metadata.confirm_microblock_identifier,
@@ -613,6 +687,7 @@ impl StacksBlockPool {
                             &block.parent_block_identifier,
                             &new_canonical_segment,
                             &previous_canonical_segment,
+                            ctx,
                         );
                         (chain_event, None)
                     } else {
@@ -691,6 +766,7 @@ impl StacksBlockPool {
         &mut self,
         canonical_segment: &ChainSegment,
         other_segment: &ChainSegment,
+        ctx: &Context,
     ) -> Result<StacksChainEvent, ChainSegmentIncompatibility> {
         if other_segment.is_empty() {
             let mut new_blocks = vec![];
@@ -700,14 +776,17 @@ impl StacksBlockPool {
                 let block = match self.block_store.get(block_identifier) {
                     Some(block) => block.clone(),
                     None => {
-                        error!(
-                            "unable to retrieve Stacks {} from block store",
-                            block_identifier
-                        );
+                        ctx.try_log(|logger| {
+                            slog::error!(
+                                logger,
+                                "unable to retrieve Stacks {} from block store",
+                                block_identifier
+                            )
+                        });
                         return Err(ChainSegmentIncompatibility::Unknown);
                     }
                 };
-                let block_update = match self.confirm_microblocks_for_block(&block, true) {
+                let block_update = match self.confirm_microblocks_for_block(&block, true, ctx) {
                     (Some(ref mut chain_event), _) => {
                         let mut update = StacksBlockUpdate::new(block);
                         match chain_event {
@@ -739,7 +818,8 @@ impl StacksBlockPool {
                 },
             ));
         }
-        if let Ok(divergence) = canonical_segment.try_identify_divergence(other_segment, false) {
+        if let Ok(divergence) = canonical_segment.try_identify_divergence(other_segment, false, ctx)
+        {
             if divergence.blocks_to_rollback.is_empty() {
                 let mut new_blocks = vec![];
                 for i in 0..divergence.blocks_to_apply.len() {
@@ -748,7 +828,7 @@ impl StacksBlockPool {
                         Some(block) => block.clone(),
                         None => panic!("unable to retrive block from block store"),
                     };
-                    let block_update = match self.confirm_microblocks_for_block(&block, true) {
+                    let block_update = match self.confirm_microblocks_for_block(&block, true, ctx) {
                         (Some(ref mut chain_event), None) => {
                             let mut update = StacksBlockUpdate::new(block);
                             match chain_event {
@@ -807,7 +887,7 @@ impl StacksBlockPool {
                                     None => panic!("unable to retrive block from block store"),
                                 };
                                 let block_update = match self
-                                    .confirm_microblocks_for_block(&block, false)
+                                    .confirm_microblocks_for_block(&block, false, ctx)
                                 {
                                     (_, Some(microblocks_to_apply)) => {
                                         let mut update = StacksBlockUpdate::new(block);
@@ -824,10 +904,14 @@ impl StacksBlockPool {
                 ));
             }
         }
-        warn!(
-            "Unable to infer chain event out of {} and {}",
-            canonical_segment, other_segment
-        );
+        ctx.try_log(|logger| {
+            slog::warn!(
+                logger,
+                "Unable to infer chain event out of {} and {}",
+                canonical_segment,
+                other_segment
+            )
+        });
         Err(ChainSegmentIncompatibility::ParentBlockUnknown)
     }
 
@@ -836,6 +920,7 @@ impl StacksBlockPool {
         anchor_block_identifier: &BlockIdentifier,
         new_canonical_segment: &ChainSegment,
         previous_canonical_segment: &Option<ChainSegment>,
+        ctx: &Context,
     ) -> Option<StacksChainEvent> {
         let previous_canonical_segment = match previous_canonical_segment {
             Some(previous_canonical_segment) if !previous_canonical_segment.is_empty() => {
@@ -865,7 +950,7 @@ impl StacksBlockPool {
         }
 
         if let Ok(divergence) =
-            new_canonical_segment.try_identify_divergence(previous_canonical_segment, true)
+            new_canonical_segment.try_identify_divergence(previous_canonical_segment, true, ctx)
         {
             if divergence.blocks_to_rollback.is_empty() {
                 let mut new_microblocks = vec![];

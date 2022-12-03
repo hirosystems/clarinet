@@ -4,6 +4,7 @@ use clarity_lsp::backend::{
     process_notification, process_request, EditorStateInput, LspNotification,
     LspNotificationResponse, LspRequest, LspRequestResponse,
 };
+use clarity_lsp::lsp_types::{DocumentSymbolParams, DocumentSymbolResponse};
 use clarity_lsp::state::EditorState;
 use crossbeam_channel::{Receiver as MultiplexableReceiver, Select, Sender as MultiplexableSender};
 use serde_json::Value;
@@ -125,6 +126,26 @@ impl LanguageServer for LspNativeBridge {
         if let LspResponse::Request(request_response) = response {
             if let LspRequestResponse::CompletionItems(items) = request_response {
                 return Ok(Some(CompletionResponse::from(items.to_vec())));
+            }
+        }
+
+        Ok(None)
+    }
+
+    async fn document_symbol(
+        &self,
+        params: DocumentSymbolParams,
+    ) -> Result<Option<DocumentSymbolResponse>> {
+        let _ = match self.request_tx.lock() {
+            Ok(tx) => tx.send(LspRequest::DocumentSymbol(params)),
+            Err(_) => return Ok(None),
+        };
+
+        let response_rx = self.response_rx.lock().expect("failed to lock response_rx");
+        let ref response = response_rx.recv().expect("failed to get value from recv");
+        if let LspResponse::Request(request_response) = response {
+            if let LspRequestResponse::DocumentSymbol(symbols) = request_response {
+                return Ok(Some(DocumentSymbolResponse::Nested(symbols.to_vec())));
             }
         }
 

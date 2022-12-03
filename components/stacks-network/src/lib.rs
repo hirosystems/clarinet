@@ -7,6 +7,9 @@ pub mod chains_coordinator;
 mod orchestrator;
 mod ui;
 
+pub use chainhook_event_observer::utils::Context;
+pub use orchestrator::DevnetOrchestrator;
+
 use std::{
     sync::{
         mpsc::{self, channel, Sender},
@@ -17,16 +20,14 @@ use std::{
 };
 
 use chainhook_event_observer::{chainhooks::types::HookFormation, observer::MempoolAdmissionData};
-use chrono::prelude::*;
-use tracing::{self, debug, error, info, warn};
-use tracing_appender;
-
 use chainhook_types::{BitcoinChainEvent, StacksChainEvent};
-use chains_coordinator::start_chains_coordinator;
+use chains_coordinator::{start_chains_coordinator, BitcoinMiningCommand};
+use chrono::prelude::*;
 use clarinet_deployments::types::DeploymentSpecification;
 use hiro_system_kit;
-pub use orchestrator::DevnetOrchestrator;
+use hiro_system_kit::slog;
 use std::sync::atomic::{AtomicBool, Ordering};
+use tracing_appender;
 
 use self::chains_coordinator::DevnetEventObserverConfig;
 
@@ -34,7 +35,6 @@ use self::chains_coordinator::DevnetEventObserverConfig;
 #[derive(Debug)]
 pub enum ChainsCoordinatorCommand {
     Terminate,
-    ProtocolDeployed,
 }
 
 pub fn block_on<F, R>(future: F) -> R
@@ -51,6 +51,7 @@ pub async fn do_run_devnet(
     chainhooks: &mut Option<HookFormation>,
     log_tx: Option<Sender<LogData>>,
     display_dashboard: bool,
+    ctx: Context,
 ) -> Result<
     (
         Option<mpsc::Receiver<DevnetEvent>>,
@@ -72,7 +73,8 @@ pub async fn do_run_devnet(
         _ => Err("Unable to retrieve config"),
     }?;
 
-    let file_appender = tracing_appender::rolling::never(&devnet_config.working_dir, "devnet.log");
+    let file_appender =
+        tracing_appender::rolling::never(&devnet_config.working_dir, "networking.log");
     let (non_blocking, _guard) = tracing_appender::non_blocking(file_appender);
 
     tracing_subscriber::fmt()
@@ -92,6 +94,7 @@ pub async fn do_run_devnet(
         devnet.manifest.clone(),
         deployment,
         hooks,
+        &ctx,
     );
     let chains_coordinator_tx = devnet_events_tx.clone();
     let (chains_coordinator_commands_tx, chains_coordinator_commands_rx) = channel();
@@ -101,6 +104,7 @@ pub async fn do_run_devnet(
     let moved_chains_coordinator_commands_tx = chains_coordinator_commands_tx.clone();
     let moved_observer_command_tx = observer_command_tx.clone();
 
+    let ctx_moved = ctx.clone();
     let chains_coordinator_handle = hiro_system_kit::thread_named("Chains coordinator")
         .spawn(move || {
             let future = start_chains_coordinator(
@@ -111,6 +115,7 @@ pub async fn do_run_devnet(
                 moved_orchestrator_terminator_tx,
                 observer_command_tx,
                 observer_command_rx,
+                ctx_moved,
             );
             let rt = hiro_system_kit::create_basic_runtime();
             rt.block_on(future)
@@ -122,16 +127,24 @@ pub async fn do_run_devnet(
     // The devnet orchestrator should be able to send some events to the UI thread,
     // and should be able to be restarted/terminated
     let orchestrator_event_tx = devnet_events_tx.clone();
+    let chains_coordinator_commands_tx_moved = chains_coordinator_commands_tx.clone();
+    let ctx_moved = ctx.clone();
     let orchestrator_handle = hiro_system_kit::thread_named("Devnet orchestrator")
         .spawn(move || {
-            let future = devnet.start(orchestrator_event_tx, terminator_rx);
+            let future = devnet.start(orchestrator_event_tx.clone(), terminator_rx, &ctx_moved);
             let rt = hiro_system_kit::create_basic_runtime();
-            rt.block_on(future)
+            let res = rt.block_on(future);
+            if let Err(ref e) = res {
+                let _ = orchestrator_event_tx.send(DevnetEvent::FatalError(e.clone()));
+                let _ =
+                    chains_coordinator_commands_tx_moved.send(ChainsCoordinatorCommand::Terminate);
+            }
+            res
         })
         .expect("unable to retrieve join handle");
 
     if display_dashboard {
-        info!("Starting Devnet");
+        ctx.try_log(|logger| slog::info!(logger, "Starting Devnet"));
         let moved_chains_coordinator_commands_tx = chains_coordinator_commands_tx.clone();
         let _ = ui::start_ui(
             devnet_events_tx,
@@ -141,7 +154,8 @@ pub async fn do_run_devnet(
             orchestrator_terminated_rx,
             &devnet_path,
             devnet_config.enable_subnet_node,
-        );
+            &ctx,
+        )?;
 
         if let Err(e) = chains_coordinator_handle.join() {
             if let Ok(message) = e.downcast::<String>() {
@@ -160,12 +174,8 @@ pub async fn do_run_devnet(
         let moved_orchestrator_terminator_tx = orchestrator_terminator_tx.clone();
         let moved_events_observer_commands_tx = chains_coordinator_commands_tx.clone();
         ctrlc::set_handler(move || {
-            moved_events_observer_commands_tx
-                .send(ChainsCoordinatorCommand::Terminate)
-                .expect("Unable to terminate devnet");
-            moved_orchestrator_terminator_tx
-                .send(true)
-                .expect("Unable to terminate devnet");
+            let _ = moved_events_observer_commands_tx.send(ChainsCoordinatorCommand::Terminate);
+            let _ = moved_orchestrator_terminator_tx.send(true);
             termination_writer.store(true, Ordering::SeqCst);
         })
         .expect("Error setting Ctrl-C handler");
@@ -179,10 +189,18 @@ pub async fn do_run_devnet(
                         } else {
                             println!("{}", log.message);
                             match log.level {
-                                LogLevel::Debug => debug!("{}", log.message),
-                                LogLevel::Info | LogLevel::Success => info!("{}", log.message),
-                                LogLevel::Warning => warn!("{}", log.message),
-                                LogLevel::Error => error!("{}", log.message),
+                                LogLevel::Debug => {
+                                    ctx.try_log(|logger| slog::debug!(logger, "{}", log.message))
+                                }
+                                LogLevel::Info | LogLevel::Success => {
+                                    ctx.try_log(|logger| slog::info!(logger, "{}", log.message))
+                                }
+                                LogLevel::Warning => {
+                                    ctx.try_log(|logger| slog::warn!(logger, "{}", log.message))
+                                }
+                                LogLevel::Error => {
+                                    ctx.try_log(|logger| slog::error!(logger, "{}", log.message))
+                                }
                             }
                         }
                     }
@@ -213,14 +231,13 @@ pub enum DevnetEvent {
     Tick,
     ServiceStatus(ServiceStatusData),
     ProtocolDeployingProgress(ProtocolDeployingData),
-    ProtocolDeployed,
+    BootCompleted(Sender<BitcoinMiningCommand>),
     StacksChainEvent(StacksChainEvent),
     BitcoinChainEvent(BitcoinChainEvent),
     MempoolAdmission(MempoolAdmissionData),
     FatalError(String),
     // Restart,
     // Terminate,
-    // Microblock(MicroblockData),
 }
 
 #[allow(dead_code)]
@@ -315,7 +332,7 @@ pub struct ProtocolDeployingData {
 }
 
 #[derive(Clone, Debug)]
-pub struct ProtocolDeployedData {
+pub struct BootCompletedData {
     pub contracts_deployed: Vec<String>,
 }
 

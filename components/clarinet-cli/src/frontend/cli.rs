@@ -831,7 +831,7 @@ pub fn main() {
                             DeploymentEvent::TransactionUpdate(update) => {
                                 println!("{} {:?} {}", blue!("➡"), update.status, update.name);
                             }
-                            DeploymentEvent::ProtocolDeployed => {
+                            DeploymentEvent::DeploymentCompleted => {
                                 println!(
                                     "{} Transactions successfully confirmed on {:?}",
                                     green!("✔"),
@@ -949,70 +949,78 @@ pub fn main() {
             }
         },
         Command::Console(cmd) => {
-            let manifest = load_manifest_or_warn(cmd.manifest_path);
+            // Loop to handle `::reload` command
+            loop {
+                let manifest = load_manifest_or_warn(cmd.manifest_path.clone());
 
-            let mut terminal = match manifest {
-                Some(ref manifest) => {
-                    let (deployment, _, artifacts) = load_deployment_and_artifacts_or_exit(
-                        manifest,
-                        &cmd.deployment_plan_path,
-                        cmd.use_on_disk_deployment_plan,
-                        cmd.use_computed_deployment_plan,
-                    );
+                let mut terminal = match manifest {
+                    Some(ref manifest) => {
+                        let (deployment, _, artifacts) = load_deployment_and_artifacts_or_exit(
+                            manifest,
+                            &cmd.deployment_plan_path,
+                            cmd.use_on_disk_deployment_plan,
+                            cmd.use_computed_deployment_plan,
+                        );
 
-                    if !artifacts.success {
-                        let diags_digest = DiagnosticsDigest::new(&artifacts.diags, &deployment);
-                        if diags_digest.has_feedbacks() {
-                            println!("{}", diags_digest.message);
+                        if !artifacts.success {
+                            let diags_digest =
+                                DiagnosticsDigest::new(&artifacts.diags, &deployment);
+                            if diags_digest.has_feedbacks() {
+                                println!("{}", diags_digest.message);
+                            }
+                            if diags_digest.errors > 0 {
+                                println!(
+                                    "{} {} detected",
+                                    red!("x"),
+                                    pluralize!(diags_digest.errors, "error")
+                                );
+                            }
+                            std::process::exit(1);
                         }
-                        if diags_digest.errors > 0 {
-                            println!(
-                                "{} {} detected",
-                                red!("x"),
-                                pluralize!(diags_digest.errors, "error")
-                            );
-                        }
-                        std::process::exit(1);
+
+                        Terminal::load(artifacts.session)
                     }
+                    None => Terminal::new(repl::SessionSettings::default()),
+                };
+                let reload = terminal.start();
 
-                    Terminal::load(artifacts.session)
-                }
-                None => Terminal::new(repl::SessionSettings::default()),
-            };
-            terminal.start();
-
-            if hints_enabled {
-                display_post_console_hint();
-            }
-
-            // Report telemetry
-            if let Some(manifest) = manifest {
-                if manifest.project.telemetry {
-                    #[cfg(feature = "telemetry")]
-                    telemetry_report_event(DeveloperUsageEvent::PokeExecuted(
-                        DeveloperUsageDigest::new(
-                            &manifest.project.name,
-                            &manifest.project.authors,
-                        ),
-                    ));
-
-                    #[cfg(feature = "telemetry")]
-                    let mut debug_count = 0;
-                    for command in terminal.session.executed {
-                        if command.starts_with("::debug") {
-                            debug_count += 1;
-                        }
-                    }
-                    if debug_count > 0 {
-                        telemetry_report_event(DeveloperUsageEvent::DebugStarted(
+                // Report telemetry
+                if let Some(manifest) = manifest {
+                    if manifest.project.telemetry {
+                        #[cfg(feature = "telemetry")]
+                        telemetry_report_event(DeveloperUsageEvent::PokeExecuted(
                             DeveloperUsageDigest::new(
                                 &manifest.project.name,
                                 &manifest.project.authors,
                             ),
-                            debug_count,
                         ));
+
+                        #[cfg(feature = "telemetry")]
+                        let mut debug_count = 0;
+                        for command in terminal.session.executed {
+                            if command.starts_with("::debug") {
+                                debug_count += 1;
+                            }
+                        }
+                        if debug_count > 0 {
+                            telemetry_report_event(DeveloperUsageEvent::DebugStarted(
+                                DeveloperUsageDigest::new(
+                                    &manifest.project.name,
+                                    &manifest.project.authors,
+                                ),
+                                debug_count,
+                            ));
+                        }
                     }
                 }
+
+                if !reload {
+                    break;
+                }
+            }
+
+            if hints_enabled {
+                display_post_console_hint();
             }
         }
         Command::Check(cmd) if cmd.file.is_some() => {
@@ -1201,10 +1209,7 @@ pub fn main() {
                 mine_block_delay,
             ) {
                 Ok(count) => (true, count),
-                Err((e, count)) => {
-                    println!("{} {}", red!("error:"), e);
-                    (false, count)
-                }
+                Err((e, count)) => (false, count),
             };
             if hints_enabled {
                 display_tests_pro_tips_hint();

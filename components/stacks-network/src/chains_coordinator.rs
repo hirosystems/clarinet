@@ -4,12 +4,14 @@ use crate::{ServiceStatusData, Status};
 use base58::FromBase58;
 use bitcoincore_rpc::{Auth, Client, RpcApi};
 use chainhook_event_observer::chainhooks::types::HookFormation;
+use chainhook_event_observer::utils::Context;
 use clarinet_deployments::onchain::{
     apply_on_chain_deployment, DeploymentCommand, DeploymentEvent,
 };
 use clarinet_deployments::types::DeploymentSpecification;
 use clarinet_files::{self, AccountConfig, DevnetConfig, NetworkManifest, ProjectManifest};
 use hiro_system_kit;
+use hiro_system_kit::slog;
 
 use chainhook_event_observer::observer::{
     start_event_observer, EventObserverConfig, ObserverCommand, ObserverEvent,
@@ -30,7 +32,6 @@ use std::str;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc::{channel, Receiver, Sender};
 use std::sync::Arc;
-use tracing::info;
 
 #[derive(Deserialize)]
 pub struct NewTransaction {
@@ -61,7 +62,7 @@ pub struct ContractReadonlyCall {
     pub result: String,
 }
 
-#[allow(dead_code)]
+#[derive(Debug)]
 pub enum BitcoinMiningCommand {
     Start,
     Pause,
@@ -75,12 +76,14 @@ impl DevnetEventObserverConfig {
         manifest: ProjectManifest,
         deployment: DeploymentSpecification,
         chainhooks: HookFormation,
+        ctx: &Context,
     ) -> Self {
-        info!("Checking contracts");
+        ctx.try_log(|logger| slog::info!(logger, "Checking contracts"));
         let network_manifest = NetworkManifest::from_project_manifest_location(
             &manifest.location,
             &StacksNetwork::Devnet.get_networks(),
             Some(&manifest.project.cache_location),
+            None,
         )
         .expect("unable to load network manifest");
 
@@ -119,10 +122,11 @@ pub async fn start_chains_coordinator(
     config: DevnetEventObserverConfig,
     devnet_event_tx: Sender<DevnetEvent>,
     chains_coordinator_commands_rx: Receiver<ChainsCoordinatorCommand>,
-    chains_coordinator_commands_tx: Sender<ChainsCoordinatorCommand>,
+    _chains_coordinator_commands_tx: Sender<ChainsCoordinatorCommand>,
     chains_coordinator_terminator_tx: Sender<bool>,
     observer_command_tx: Sender<ObserverCommand>,
     observer_command_rx: Receiver<ObserverCommand>,
+    ctx: Context,
 ) -> Result<(), String> {
     let (deployment_events_tx, deployment_events_rx) = channel();
     let (deployment_commands_tx, deployments_command_rx) = channel();
@@ -151,12 +155,14 @@ pub async fn start_chains_coordinator(
     let event_observer_config = config.event_observer_config.clone();
     let observer_event_tx_moved = observer_event_tx.clone();
     let observer_command_tx_moved = observer_command_tx.clone();
+    let ctx_moved = ctx.clone();
     let _ = hiro_system_kit::thread_named("Event observer").spawn(move || {
         let future = start_event_observer(
             event_observer_config,
             observer_command_tx_moved,
             observer_command_rx,
             Some(observer_event_tx_moved),
+            ctx_moved,
         );
         let _ = hiro_system_kit::nestable_block_on(future);
     });
@@ -171,7 +177,7 @@ pub async fn start_chains_coordinator(
     // Loop over events being received from Bitcoin and Stacks,
     // and orchestrate the 2 chains + protocol.
     let mut should_deploy_protocol = true;
-    let protocol_deployed = Arc::new(AtomicBool::new(false));
+    let boot_completed = Arc::new(AtomicBool::new(false));
 
     let mut deployment_events_rx = Some(deployment_events_rx);
     let mut subnet_initialized = false;
@@ -248,7 +254,7 @@ pub async fn start_chains_coordinator(
                     let automining_disabled =
                         config.devnet_config.bitcoin_controller_automining_disabled;
                     let mining_command_tx_moved = mining_command_tx.clone();
-                    let protocol_deployed_moved = protocol_deployed.clone();
+                    let boot_completed_moved = boot_completed.clone();
                     let (deployment_progress_tx, deployment_progress_rx) = channel();
 
                     if let Some(deployment_events_rx) = deployment_events_rx.take() {
@@ -257,15 +263,15 @@ pub async fn start_chains_coordinator(
                             deployment_progress_tx,
                             &deployment_commands_tx,
                             &devnet_event_tx,
-                            &chains_coordinator_commands_tx,
+                            mining_command_tx.clone(),
                         )
                     }
 
                     let _ = hiro_system_kit::thread_named("Deployment monitoring").spawn(
                         move || loop {
                             match deployment_progress_rx.recv() {
-                                Ok(DeploymentEvent::ProtocolDeployed) => {
-                                    protocol_deployed_moved.store(true, Ordering::SeqCst);
+                                Ok(DeploymentEvent::DeploymentCompleted) => {
+                                    boot_completed_moved.store(true, Ordering::SeqCst);
                                     if !automining_disabled {
                                         let _ = mining_command_tx_moved
                                             .send(BitcoinMiningCommand::Start);
@@ -319,21 +325,38 @@ pub async fn start_chains_coordinator(
                         known_tip.block.block_identifier.index
                     ),
                 }));
-                let _ = devnet_event_tx.send(DevnetEvent::info(format!(
-                    "Stacks Block #{} anchored in Bitcoin block #{} includes {} transactions",
-                    known_tip.block.block_identifier.index,
-                    known_tip
-                        .block
-                        .metadata
-                        .bitcoin_anchor_block_identifier
-                        .index,
-                    known_tip.block.transactions.len(),
-                )));
+                let message = if known_tip.block.block_identifier.index == 1 {
+                    format!(
+                        "Genesis Stacks block anchored in Bitcoin block #{} includes {} transactions",
+                        known_tip
+                            .block
+                            .metadata
+                            .bitcoin_anchor_block_identifier
+                            .index,
+                        known_tip.block.transactions.len(),
+                    )
+                } else {
+                    format!(
+                        "Stacks block #{} anchored in Bitcoin block #{} includes {} transactions",
+                        known_tip.block.block_identifier.index,
+                        known_tip
+                            .block
+                            .metadata
+                            .bitcoin_anchor_block_identifier
+                            .index,
+                        known_tip.block.transactions.len(),
+                    )
+                };
+                let _ = devnet_event_tx.send(DevnetEvent::info(message));
 
                 let should_submit_pox_orders = known_tip.block.metadata.pox_cycle_position
                     == (known_tip.block.metadata.pox_cycle_length - 2);
                 if should_submit_pox_orders {
-                    let bitcoin_block_height = known_tip.block.block_identifier.index;
+                    let bitcoin_block_height = known_tip
+                        .block
+                        .metadata
+                        .bitcoin_anchor_block_identifier
+                        .index;
                     let res = publish_stacking_orders(
                         &config.devnet_config,
                         &config.accounts,
@@ -350,7 +373,7 @@ pub async fn start_chains_coordinator(
                 }
             }
             ObserverEvent::NotifyBitcoinTransactionProxied => {
-                if !protocol_deployed.load(Ordering::SeqCst) {
+                if !boot_completed.load(Ordering::SeqCst) {
                     std::thread::sleep(std::time::Duration::from_secs(1));
                     mine_bitcoin_block(
                         config.devnet_config.bitcoin_node_rpc_port,
@@ -362,7 +385,7 @@ pub async fn start_chains_coordinator(
             }
             ObserverEvent::HookRegistered(hook) => {
                 let message = format!("New hook \"{}\" registered", hook.name());
-                info!("{}", message);
+                ctx.try_log(|logger| slog::info!(logger, "{}", message));
                 let _ = devnet_event_tx.send(DevnetEvent::info(message));
             }
             ObserverEvent::HookDeregistered(_hook) => {}
@@ -432,11 +455,9 @@ pub fn perform_protocol_deployment(
     deployment_events_tx: Sender<DeploymentEvent>,
     deployment_commands_tx: &Sender<DeploymentCommand>,
     devnet_event_tx: &Sender<DevnetEvent>,
-    chains_coordinator_commands_tx: &Sender<ChainsCoordinatorCommand>,
+    bitcoin_mining_tx: Sender<BitcoinMiningCommand>,
 ) {
     let devnet_event_tx = devnet_event_tx.clone();
-    let chains_coordinator_commands_tx = chains_coordinator_commands_tx.clone();
-
     let _ = deployment_commands_tx.send(DeploymentCommand::Start);
 
     let _ = hiro_system_kit::thread_named("Deployment perform").spawn(move || {
@@ -451,11 +472,9 @@ pub fn perform_protocol_deployment(
                     // Terminate
                     break;
                 }
-                DeploymentEvent::ProtocolDeployed => {
-                    let _ = chains_coordinator_commands_tx
-                        .send(ChainsCoordinatorCommand::ProtocolDeployed);
-                    let _ = devnet_event_tx.send(DevnetEvent::ProtocolDeployed);
-                    let _ = deployment_events_tx.send(DeploymentEvent::ProtocolDeployed);
+                DeploymentEvent::DeploymentCompleted => {
+                    let _ = devnet_event_tx.send(DevnetEvent::BootCompleted(bitcoin_mining_tx));
+                    let _ = deployment_events_tx.send(DeploymentEvent::DeploymentCompleted);
                     break;
                 }
             }
@@ -484,7 +503,7 @@ pub async fn publish_stacking_orders(
         .expect("Unable to parse contract");
 
     for pox_stacking_order in devnet_config.pox_stacking_orders.iter() {
-        if pox_stacking_order.start_at_cycle == (pox_info.reward_cycle_id + 1) {
+        if pox_stacking_order.start_at_cycle - 1 == pox_info.reward_cycle_id {
             let mut account = None;
             let mut accounts_iter = accounts.iter();
             while let Some(e) = accounts_iter.next() {

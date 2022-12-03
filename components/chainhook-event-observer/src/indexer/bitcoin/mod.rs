@@ -3,6 +3,7 @@ use crate::chainhooks::types::{
     get_canonical_magic_bytes, get_canonical_pox_config, PoxConfig, StacksOpcodes,
 };
 use crate::indexer::IndexerConfig;
+use crate::utils::Context;
 use bitcoincore_rpc::bitcoin::hashes::Hash;
 use bitcoincore_rpc::bitcoin::{Block, BlockHash};
 use bitcoincore_rpc::{Auth, Client, RpcApi};
@@ -15,6 +16,7 @@ use chainhook_types::{
     TransferSTXData,
 };
 use clarity_repl::clarity::util::hash::{hex_bytes, to_hex};
+use hiro_system_kit::slog;
 use rocket::serde::json::Value as JsonValue;
 
 #[derive(Deserialize)]
@@ -36,6 +38,7 @@ pub struct RewardParticipant {
 pub fn standardize_bitcoin_block(
     indexer_config: &IndexerConfig,
     marshalled_block: JsonValue,
+    ctx: &Context,
 ) -> Result<BitcoinBlockData, String> {
     let auth = Auth::UserPass(
         indexer_config.bitcoin_node_rpc_username.clone(),
@@ -59,13 +62,14 @@ pub fn standardize_bitcoin_block(
         .get_block(&block_hash)
         .map_err(|e| format!("unable for invoke rpc get_block: {}", e.to_string()))?;
     let block_height = partial_block.burn_block_height;
-    Ok(build_block(block, block_height, indexer_config))
+    Ok(build_block(block, block_height, indexer_config, ctx))
 }
 
 pub fn build_block(
     block: Block,
     block_height: u64,
     indexer_config: &IndexerConfig,
+    ctx: &Context,
 ) -> BitcoinBlockData {
     let mut transactions = vec![];
 
@@ -95,9 +99,13 @@ pub fn build_block(
         let mut outputs = vec![];
         let mut stacks_operations = vec![];
 
-        if let Some(op) =
-            try_parse_stacks_operation(&tx.output, &pox_config, &expected_magic_bytes, block_height)
-        {
+        if let Some(op) = try_parse_stacks_operation(
+            &tx.output,
+            &pox_config,
+            &expected_magic_bytes,
+            block_height,
+            ctx,
+        ) {
             stacks_operations.push(op);
         }
 
@@ -143,6 +151,7 @@ fn try_parse_stacks_operation(
     pox_config: &PoxConfig,
     expected_magic_bytes: &[u8; 2],
     block_height: u64,
+    ctx: &Context,
 ) -> Option<StacksBaseChainOperation> {
     if outputs.is_empty() {
         return None;
@@ -166,10 +175,13 @@ fn try_parse_stacks_operation(
     let op_type: StacksOpcodes = match op_return_output[5].try_into() {
         Ok(op) => op,
         Err(_) => {
-            debug!(
-                "Stacks operation parsing - opcode unknown {}",
-                op_return_output[5]
-            );
+            ctx.try_log(|logger| {
+                slog::debug!(
+                    logger,
+                    "Stacks operation parsing - opcode unknown {}",
+                    op_return_output[5]
+                )
+            });
             return None;
         }
     };

@@ -60,6 +60,20 @@ impl Serialize for ClarityContract {
                 map.serialize_entry("clarity_version", &2)?;
             }
         }
+        match self.epoch {
+            StacksEpochId::Epoch10 => {
+                map.serialize_entry("epoch", &1.0)?;
+            }
+            StacksEpochId::Epoch20 => {
+                map.serialize_entry("epoch", &2.0)?;
+            }
+            StacksEpochId::Epoch2_05 => {
+                map.serialize_entry("epoch", &2.05)?;
+            }
+            StacksEpochId::Epoch21 => {
+                map.serialize_entry("epoch", &2.1)?;
+            }
+        }
         map.end()
     }
 }

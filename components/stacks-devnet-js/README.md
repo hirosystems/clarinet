@@ -25,10 +25,10 @@ import {
   AnchorMode,
 } from '@stacks/transactions';
 import { StacksTestnet }from '@stacks/network';
-import { StacksDevnetOrchestrator } from "stacks-devnet-js";
+import { DevnetNetworkOrchestrator } from "stacks-devnet-js";
 import BigNum from 'bn.js';
 
-const orchestrator = new StacksDevnetOrchestrator({
+const orchestrator = new DevnetNetworkOrchestrator({
   path: "../protocol/Clarinet.toml",
   logs: false,
 });

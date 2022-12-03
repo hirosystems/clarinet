@@ -35,7 +35,7 @@ pub fn start_ui(
             Ok(DeploymentEvent::TransactionUpdate(update)) => {
                 app.display_contract_status_update(update);
             }
-            Ok(DeploymentEvent::ProtocolDeployed) => {
+            Ok(DeploymentEvent::DeploymentCompleted) => {
                 break Ok(());
             }
             Ok(DeploymentEvent::Interrupted(message)) => {

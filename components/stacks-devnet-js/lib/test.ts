@@ -1,11 +1,11 @@
-import { StacksDevnetOrchestrator } from "./index";
+import { DevnetNetworkOrchestrator } from "./index";
 
-const devnet = new StacksDevnetOrchestrator({
-    path: "../examples/counter/Clarinet.toml",
+const devnet = new DevnetNetworkOrchestrator({
+    clarinetManifestPath: "../examples/counter/Clarinet.toml",
     logs: true,
     accounts: [
         {
-            id: "wallet_9",
+            label: "wallet_9",
             mnemonic: "sell invite acquire kitten bamboo drastic jelly vivid peace spawn twice guilt pave pen trash pretty park cube fragile unaware remain midnight betray rebuild",
             balance: 100_000_000,
         }
