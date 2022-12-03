@@ -1944,7 +1944,7 @@ fn display_post_check_hint() {
         "{}",
         yellow!("    Run all run tests in the ./tests folder.\n")
     );
-    println!("{}", yellow!("Find more information on testing with Clarinet here: https://docs.hiro.so/smart-contracts/clarinet#testing-with-the-test-harness"));
+    println!("{}", yellow!("Find more information on testing with Clarinet here: https://docs.hiro.so/clarinet/how-to-guides/how-to-set-up-local-development-environment#testing-with-the-test-harness"));
     display_hint_footer();
 }
 
@@ -1967,7 +1967,7 @@ fn display_post_console_hint() {
         yellow!("    Check contract syntax for all files in ./contracts.\n")
     );
 
-    println!("{}", yellow!("Find more information on writing contracts with Clarinet here: https://docs.hiro.so/smart-contracts/clarinet#developing-a-clarity-smart-contract"));
+    println!("{}", yellow!("Find more information on writing contracts with Clarinet here: https://docs.hiro.so/clarinet/how-to-guides/how-to-set-up-local-development-environment#developing-a-clarity-smart-contract"));
     display_hint_footer();
 }
 
@@ -2005,8 +2005,8 @@ fn display_tests_pro_tips_hint() {
         yellow!("    Deploy all contracts to a local dockerized blockchain setup (Devnet).\n")
     );
 
-    println!("{}", yellow!("Find more information on testing with Clarinet here: https://docs.hiro.so/smart-contracts/clarinet#testing-with-clarinet"));
-    println!("{}", yellow!("And learn more about local integration testing here: https://docs.hiro.so/smart-contracts/devnet"));
+    println!("{}", yellow!("Find more information on testing with Clarinet here: https://docs.hiro.so/clarinet/how-to-guides/how-to-set-up-local-development-environment#testing-with-clarinet"));
+    println!("{}", yellow!("And learn more about local integration testing here: https://docs.hiro.so/clarinet/how-to-guides/how-to-run-integration-environment"));
     display_hint_footer();
 }
 
@@ -2036,7 +2036,7 @@ fn display_deploy_hint() {
     );
     println!(
         "{}",
-        yellow!("Find more information on the DevNet here: https://docs.hiro.so/smart-contracts/devnet/")
+        yellow!("Find more information on the DevNet here: https://docs.hiro.so/clarinet/how-to-guides/how-to-run-integration-environment")
     );
     display_hint_footer();
 }
