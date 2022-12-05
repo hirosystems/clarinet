@@ -6,7 +6,7 @@ use crate::chainhooks::stacks::{
     evaluate_stacks_chainhooks_on_chain_event, handle_stacks_hook_action,
     StacksChainhookOccurrence, StacksChainhookOccurrencePayload,
 };
-use crate::chainhooks::types::{ChainhookSpecification, HookFormation};
+use crate::chainhooks::types::{ChainhookConfig, ChainhookSpecification};
 use crate::indexer::{self, Indexer, IndexerConfig};
 use crate::utils::Context;
 use bitcoincore_rpc::bitcoin::{BlockHash, Txid};
@@ -107,7 +107,7 @@ pub struct EventObserverConfig {
     pub normalization_enabled: bool,
     pub grpc_server_enabled: bool,
     pub hooks_enabled: bool,
-    pub initial_hook_formation: Option<HookFormation>,
+    pub initial_hook_formation: Option<ChainhookConfig>,
     pub bitcoin_rpc_proxy_enabled: bool,
     pub event_handlers: Vec<EventHandler>,
     pub ingestion_port: u16,
@@ -189,7 +189,7 @@ pub struct BitcoinConfig {
 
 #[derive(Debug, Clone)]
 pub struct ChainhookStore {
-    entries: HashMap<ApiKey, HookFormation>,
+    entries: HashMap<ApiKey, ChainhookConfig>,
 }
 
 impl ChainhookStore {
@@ -237,8 +237,8 @@ pub async fn start_event_observer(
 
     let mut entries = HashMap::new();
     if config.operators.is_empty() {
-        // If authorization not required, we create a default HookFormation
-        let mut hook_formation = HookFormation::new();
+        // If authorization not required, we create a default ChainhookConfig
+        let mut hook_formation = ChainhookConfig::new();
         if let Some(ref mut initial_hook_formation) = config.initial_hook_formation {
             hook_formation
                 .stacks_chainhooks
@@ -250,7 +250,7 @@ pub async fn start_event_observer(
         entries.insert(ApiKey(None), hook_formation);
     } else {
         for operator in config.operators.iter() {
-            entries.insert(ApiKey(Some(operator.clone())), HookFormation::new());
+            entries.insert(ApiKey(Some(operator.clone())), ChainhookConfig::new());
         }
     }
     let chainhook_store = Arc::new(RwLock::new(ChainhookStore { entries }));

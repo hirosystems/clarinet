@@ -19,7 +19,7 @@ use crate::utils::Context;
 use hiro_system_kit::log::setup_logger;
 use hiro_system_kit::slog;
 
-use crate::chainhooks::types::HookFormation;
+use crate::chainhooks::types::ChainhookConfig;
 use clap::Parser;
 use ctrlc;
 use observer::{EventHandler, EventObserverConfig, ObserverCommand};
@@ -128,7 +128,7 @@ impl EventObserverConfig {
             normalization_enabled: config_file.normalization_enabled.unwrap_or(true),
             grpc_server_enabled: config_file.grpc_server_enabled.unwrap_or(false),
             hooks_enabled: config_file.hooks_enabled.unwrap_or(false),
-            initial_hook_formation: Some(HookFormation::new()),
+            initial_hook_formation: Some(ChainhookConfig::new()),
             bitcoin_rpc_proxy_enabled: config_file.bitcoin_rpc_proxy_enabled.unwrap_or(false),
             event_handlers: event_handlers,
             ingestion_port: config_file

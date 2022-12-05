@@ -1,9 +1,10 @@
 use super::ChainsCoordinatorCommand;
 use super::DevnetEvent;
+use crate::orchestrator::ServiceIpAddressMap;
 use crate::{ServiceStatusData, Status};
 use base58::FromBase58;
 use bitcoincore_rpc::{Auth, Client, RpcApi};
-use chainhook_event_observer::chainhooks::types::HookFormation;
+use chainhook_event_observer::chainhooks::types::ChainhookConfig;
 use chainhook_event_observer::utils::Context;
 use clarinet_deployments::onchain::{
     apply_on_chain_deployment, DeploymentCommand, DeploymentEvent,
@@ -49,6 +50,7 @@ pub struct DevnetEventObserverConfig {
     pub deployment: DeploymentSpecification,
     pub manifest: ProjectManifest,
     pub deployment_fee_rate: u64,
+    pub ip_address_setup: ServiceIpAddressMap,
 }
 
 #[derive(Clone, Debug)]
@@ -75,8 +77,9 @@ impl DevnetEventObserverConfig {
         devnet_config: DevnetConfig,
         manifest: ProjectManifest,
         deployment: DeploymentSpecification,
-        chainhooks: HookFormation,
+        chainhooks: ChainhookConfig,
         ctx: &Context,
+        ip_address_setup: ServiceIpAddressMap,
     ) -> Self {
         ctx.try_log(|logger| slog::info!(logger, "Checking contracts"));
         let network_manifest = NetworkManifest::from_project_manifest_location(
@@ -99,10 +102,13 @@ impl DevnetEventObserverConfig {
             bitcoin_node_username: devnet_config.bitcoin_node_username.clone(),
             bitcoin_node_password: devnet_config.bitcoin_node_password.clone(),
             bitcoin_node_rpc_url: format!(
-                "http://localhost:{}",
-                devnet_config.bitcoin_node_rpc_port
+                "http://{}:{}",
+                ip_address_setup.bitcoin_node_ip_address, devnet_config.bitcoin_node_rpc_port
             ),
-            stacks_node_rpc_url: format!("http://localhost:{}", devnet_config.stacks_node_rpc_port),
+            stacks_node_rpc_url: format!(
+                "http://{}:{}",
+                ip_address_setup.stacks_node_ip_address, devnet_config.stacks_node_rpc_port
+            ),
             operators: HashSet::new(),
             display_logs: true,
         };
@@ -114,6 +120,7 @@ impl DevnetEventObserverConfig {
             manifest,
             deployment,
             deployment_fee_rate: network_manifest.network.deployment_fee_rate,
+            ip_address_setup,
         }
     }
 }
@@ -136,6 +143,7 @@ pub async fn start_chains_coordinator(
         &config.deployment,
         deployment_events_tx,
         deployments_command_rx,
+        &config.ip_address_setup,
     );
 
     if let Some(ref hooks) = config.event_observer_config.initial_hook_formation {
@@ -169,7 +177,7 @@ pub async fn start_chains_coordinator(
 
     // Spawn bitcoin miner controller
     let (mining_command_tx, mining_command_rx) = channel();
-    let devnet_config = config.devnet_config.clone();
+    let devnet_config = config.clone();
     let _ = hiro_system_kit::thread_named("Bitcoin mining").spawn(move || {
         handle_bitcoin_mining(mining_command_rx, &devnet_config);
     });
@@ -376,6 +384,7 @@ pub async fn start_chains_coordinator(
                 if !boot_completed.load(Ordering::SeqCst) {
                     std::thread::sleep(std::time::Duration::from_secs(1));
                     mine_bitcoin_block(
+                        &config.ip_address_setup.bitcoin_node_ip_address,
                         config.devnet_config.bitcoin_node_rpc_port,
                         config.devnet_config.bitcoin_node_username.as_str(),
                         &config.devnet_config.bitcoin_node_password.as_str(),
@@ -435,6 +444,7 @@ pub fn prepare_protocol_deployment(
     deployment: &DeploymentSpecification,
     deployment_event_tx: Sender<DeploymentEvent>,
     deployment_command_rx: Receiver<DeploymentCommand>,
+    ip_address_setup: &ServiceIpAddressMap,
 ) {
     let manifest = manifest.clone();
     let deployment = deployment.clone();
@@ -584,12 +594,16 @@ pub async fn publish_stacking_orders(
 }
 
 pub fn invalidate_bitcoin_chain_tip(
+    bitcoin_node_ip_address: &str,
     bitcoin_node_rpc_port: u16,
     bitcoin_node_username: &str,
     bitcoin_node_password: &str,
 ) {
     let rpc = Client::new(
-        &format!("http://localhost:{}", bitcoin_node_rpc_port),
+        &format!(
+            "http://{}:{}",
+            bitcoin_node_ip_address, bitcoin_node_rpc_port
+        ),
         Auth::UserPass(
             bitcoin_node_username.to_string(),
             bitcoin_node_password.to_string(),
@@ -604,6 +618,7 @@ pub fn invalidate_bitcoin_chain_tip(
 }
 
 pub fn mine_bitcoin_block(
+    bitcoin_node_ip_address: &str,
     bitcoin_node_rpc_port: u16,
     bitcoin_node_username: &str,
     bitcoin_node_password: &str,
@@ -612,7 +627,10 @@ pub fn mine_bitcoin_block(
     use bitcoincore_rpc::bitcoin::Address;
     use std::str::FromStr;
     let rpc = match Client::new(
-        &format!("http://localhost:{}", bitcoin_node_rpc_port),
+        &format!(
+            "http://{}:{}",
+            bitcoin_node_ip_address, bitcoin_node_rpc_port
+        ),
         Auth::UserPass(
             bitcoin_node_username.to_string(),
             bitcoin_node_password.to_string(),
@@ -644,7 +662,7 @@ pub fn mine_bitcoin_block(
 
 fn handle_bitcoin_mining(
     mining_command_rx: Receiver<BitcoinMiningCommand>,
-    devnet_config: &DevnetConfig,
+    config: &DevnetEventObserverConfig,
 ) {
     let stop_miner = Arc::new(AtomicBool::new(false));
     loop {
@@ -659,17 +677,21 @@ fn handle_bitcoin_mining(
             BitcoinMiningCommand::Start => {
                 stop_miner.store(false, Ordering::SeqCst);
                 let stop_miner_reader = stop_miner.clone();
-                let devnet_config = devnet_config.clone();
+                let config_moved = config.clone();
                 let _ =
                     hiro_system_kit::thread_named("Bitcoin mining runloop").spawn(move || loop {
                         std::thread::sleep(std::time::Duration::from_millis(
-                            devnet_config.bitcoin_controller_block_time.into(),
+                            config_moved
+                                .devnet_config
+                                .bitcoin_controller_block_time
+                                .into(),
                         ));
                         mine_bitcoin_block(
-                            devnet_config.bitcoin_node_rpc_port,
-                            &devnet_config.bitcoin_node_username,
-                            &devnet_config.bitcoin_node_password,
-                            &devnet_config.miner_btc_address,
+                            &config_moved.ip_address_setup.bitcoin_node_ip_address,
+                            config_moved.devnet_config.bitcoin_node_rpc_port,
+                            &config_moved.devnet_config.bitcoin_node_username,
+                            &config_moved.devnet_config.bitcoin_node_password,
+                            &config_moved.devnet_config.miner_btc_address,
                         );
                         if stop_miner_reader.load(Ordering::SeqCst) {
                             break;
@@ -681,17 +703,19 @@ fn handle_bitcoin_mining(
             }
             BitcoinMiningCommand::Mine => {
                 mine_bitcoin_block(
-                    devnet_config.bitcoin_node_rpc_port,
-                    devnet_config.bitcoin_node_username.as_str(),
-                    &devnet_config.bitcoin_node_password.as_str(),
-                    &devnet_config.miner_btc_address.as_str(),
+                    &config.ip_address_setup.bitcoin_node_ip_address,
+                    config.devnet_config.bitcoin_node_rpc_port,
+                    config.devnet_config.bitcoin_node_username.as_str(),
+                    &config.devnet_config.bitcoin_node_password.as_str(),
+                    &config.devnet_config.miner_btc_address.as_str(),
                 );
             }
             BitcoinMiningCommand::InvalidateChainTip => {
                 invalidate_bitcoin_chain_tip(
-                    devnet_config.bitcoin_node_rpc_port,
-                    &devnet_config.bitcoin_node_username.as_str(),
-                    &devnet_config.bitcoin_node_password.as_str(),
+                    &config.ip_address_setup.bitcoin_node_ip_address,
+                    config.devnet_config.bitcoin_node_rpc_port,
+                    &config.devnet_config.bitcoin_node_username.as_str(),
+                    &config.devnet_config.bitcoin_node_password.as_str(),
                 );
             }
         }
