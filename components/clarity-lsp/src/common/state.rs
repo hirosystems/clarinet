@@ -349,15 +349,28 @@ impl EditorState {
 
                 let definition_contract_location =
                     protocol.locations_lookup.get(contract_identifier)?;
-                let range = protocol
-                    .contracts
-                    .get(definition_contract_location)?
-                    .definitions
-                    .get(function_name)?;
+
+                // if the contract is opened and eventually contains unsaved changes,
+                // its public defintions are computed on the fly, which is fairly fast
+                if let Some(expressions) = self
+                    .active_contracts
+                    .get(definition_contract_location)
+                    .and_then(|c| c.expressions.as_ref())
+                {
+                    let public_definitions = get_public_function_definitions(&expressions)?;
+                    return Some(Location {
+                        range: *public_definitions.get(function_name)?,
+                        uri: Url::parse(&definition_contract_location.to_string()).ok()?,
+                    });
+                };
 
                 return Some(Location {
+                    range: *protocol
+                        .contracts
+                        .get(definition_contract_location)?
+                        .definitions
+                        .get(function_name)?,
                     uri: Url::parse(&definition_contract_location.to_string()).ok()?,
-                    range: range.clone(),
                 });
             }
         };
