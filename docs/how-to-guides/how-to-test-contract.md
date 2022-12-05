@@ -2,13 +2,37 @@
 title: Test Contract
 ---
 
-Clarinet provides a testing harness based on Deno that enables you to create automated unit tests or pseudo-integration tests using Typescript.
+Clarinet supports automatic testing, where your blockchain application requirements can be converted to test cases. Clarinet comes with a testing harness based on Deno that applies the unit tests you write in TypeScript to your smart contracts.
 
-```bash
-$ clarinet test
+## Clarity contracts and unit tests
+
+Let us consider a `counter` smart contract to get a basic understanding of how to write unit tests for our application requirements.
+
+```clarity
+;; counter
+(define-data-var counter uint u1) ;; counter initialized to 1
+
+(define-public (increment (step uint)) ;; increment counter, print new-val
+    (let ((new-val (+ step (var-get counter)))) 
+        (var-set counter new-val)
+        (print { object: "counter", action: "incremented", value: new-val })
+        (ok new-val)))
+
+(define-public (decrement (step uint)) ;; decrement counter, print new-val
+    (let ((new-val (- step (var-get counter)))) 
+        (var-set counter new-val)
+        (print { object: "counter", action: "decremented", value: new-val })
+        (ok new-val)))
+
+(define-read-only (read-counter) ;; read value of counter
+    (ok (var-get counter)))
 ```
 
-When you use `clarinet contract new foo` to create a new contract, Clarinet automatically creates a unit test file for this new contract, _tests/foo_test.ts_. Other files under the _tests/_ directory following the Deno test naming convention will also be included:
+Our `counter` application keeps track of an initialized value, allows for incrementing and decrementing, and prints actions as a log. Let us turn these requirements into unit tests.
+
+### Unit tests for `counter` example
+
+When you created your Clarity contract with `$ clarinet contract new <my-project>`, Clarinet automatically created a test file for the contract within the tests directory:  `tests/my-projects_test.ts`. Other files under the `tests/` directory following the Deno test naming convention will also be included:
 
 - named test.{ts, tsx, mts, js, mjs, jsx, cjs, cts},
 - or ending with .test.{ts, tsx, mts, js, mjs, jsx, cjs, cts},
@@ -21,6 +45,112 @@ Within these tests, developers can simulate mining a block containing transactio
 > If you see an error in Visual Studio Code (VS Code) on the imports in the generated test file(s), that says, "An import path cannot end with a '.ts' extension" (example below), installing the [Deno extension](https://marketplace.visualstudio.com/items?itemName=denoland.vscode-deno) will resolve this error.
 
 ![VS Code deno error](../images/deno-error.png)
+
+To define a Clarinet test you need to register it with a call to `Clarinet.test()`. In the example unit test below, you see us
+1. Importing the relevant classes from the Clarinet module on Deno
+2. Instantiating and passing common Clarinet objects to our `Clarinet.test()` API call
+3. Defining a user `wallet_1`, calling `increment`, and asserting its results
+
+```TypeScript
+// counter_test.ts - A unit test file
+import { Clarinet, Tx, Chain, Account, types } from 'https://deno.land/x/clarinet@v1.0.5/index.ts';
+
+Clarinet.test({
+    name: "Ensure that increment works.",
+    async fn(chain: Chain, accounts: Map<string, Account>) {
+        let wallet_1 = accounts.get("wallet_1")!; // instantiate a user
+
+        let block = chain.mineBlock([
+            Tx.contractCall("counter", "increment", [types.uint(3)], wallet_1.address) // increment counter by 3
+        ]);
+
+        block.receipts[0].result // ensure that counter returned 3
+            .expectOk()
+            .expectUint(3)
+    },
+});
+```
+
+We run this test with
+```zsh
+$ clarinet test
+```
+
+For a complete list of classes, objects, and interfaces available, see the [Deno's Clarinet module index](https://deno.land/x/clarinet/index.ts).
+
+For a step by step walkthrough in using `clarinet test`, you can also watch [Executing Tests and Checking Code Coverage](https://www.youtube.com/watch?v=j2TZ560xEPA&list=PL5Ujm489LoJaAz9kUJm8lYUWdGJ2AnQTb&index=10).
+
+
+### Comprehensive unit tests for `counter`
+
+Let us now write a higher coverage test suite.
+
+
+```TypeScript
+// counter_test.ts - a comprehensive unit test file
+import { Clarinet, Tx, Chain, Account, Contract, types } from 'https://deno.land/x/clarinet@v1.0.2/index.ts';
+import { assertEquals } from "https://deno.land/std@0.90.0/testing/asserts.ts";
+
+Clarinet.test({
+    name: "Ensure that counter can be incremented multiples per block, accross multiple blocks",
+    async fn(chain: Chain, accounts: Map<string, Account>, contracts: Map<string, Contract>) {
+        let wallet_1 = accounts.get("wallet_1")!;
+        let wallet_2 = accounts.get("wallet_2")!; // multiple users
+
+        let block = chain.mineBlock([
+            Tx.contractCall("counter", "increment", [types.uint(1)], wallet_1.address),
+            Tx.contractCall("counter", "increment", [types.uint(4)], wallet_1.address),
+            Tx.contractCall("counter", "increment", [types.uint(10)], wallet_1.address)
+        ]); // multiple contract calls
+
+        assertEquals(block.height, 2); // asserting block height
+        block.receipts[0].result // checking log for expected results
+            .expectOk()
+            .expectUint(2);
+        block.receipts[1].result
+            .expectOk()
+            .expectUint(6);
+        block.receipts[2].result
+            .expectOk()
+            .expectUint(16);
+
+        block = chain.mineBlock([
+            Tx.contractCall("counter", "increment", [types.uint(1)], wallet_1.address),
+            Tx.contractCall("counter", "increment", [types.uint(4)], wallet_1.address),
+            Tx.contractCall("counter", "increment", [types.uint(10)], wallet_1.address),
+            Tx.transferSTX(1, wallet_2.address, wallet_1.address),
+        ]); // more contract calls, and an STX transfer
+
+        assertEquals(block.height, 3);
+        block.receipts[0].result
+            .expectOk()
+            .expectUint(17);
+        block.receipts[1].result
+            .expectOk()
+            .expectUint(21);
+        block.receipts[2].result
+            .expectOk()
+            .expectUint(31); 
+
+        let result = chain.getAssetsMaps(); // asserting account balances
+        assertEquals(result.assets["STX"][wallet_1.address], 99999999999999);
+
+        let call = chain.callReadOnlyFn("counter", "read-counter", [], wallet_1.address)
+        call.result
+            .expectOk()
+            .expectUint(31); // asserting a final counter value
+
+        "0x0001020304".expectBuff(new Uint8Array([0, 1, 2, 3, 4])); // asserting buffers
+        "ST1HTBVD3JG9C05J7HBJTHGR0GGW7KXW28M5JS8QE.plaid-token".expectPrincipal('ST1HTBVD3JG9C05J7HBJTHGR0GGW7KXW28M5JS8QE.plaid-token'); // asserting principals
+    },
+});
+```
+
+Here, variously, we:
+- instantiated multiple accounts
+- called functions across multiple blocks
+- asserted block heights between transactions
+- tested transfers and balances
 
 ## Measure and increase code coverage
 
@@ -233,22 +363,3 @@ jobs:
 
 Or add the steps above in your existing workflows. The generated code coverage output can then be 
 used as is with GitHub Apps like https://codecov.io.
-
-## Monitor test coverage
-
-To help developers maximizing their test coverage, Clarinet can produce a `lcov` report, using the following option:
-
-```bash
-$ clarinet test --coverage
-```
-
-From there, developers can use the `lcov` tooling suite to produce HTML reports:
-
-```bash
-$ brew install lcov
-$ genhtml coverage.lcov
-$ open index.html
-
-For a step by step walkthrough, you can also watch [Executing Tests and Checking Code Coverage](https://www.youtube.com/watch?v=j2TZ560xEPA&list=PL5Ujm489LoJaAz9kUJm8lYUWdGJ2AnQTb&index=10).
-
-
