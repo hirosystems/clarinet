@@ -643,12 +643,12 @@ jobs:
             description: Clarinet is a simple, modern and opinionated runtime for testing, integrating and deploying Clarity smart contracts.
             image: ${{ github.repository }}
             artifact: clarinet-linux-x64-glibc
-            dockerfile: dockerfiles/ci/clarinet.dockerfile
+            dockerfile: dockerfiles/components/clarinet.dockerfile
           - name: Chainhook Node
             description: A Stacks event observer.
             image: ${{ github.repository_owner }}/chainhook-node
             artifact: chainhook-node-linux-x64-glibc
-            dockerfile: dockerfiles/ci/chainhook-node.dockerfile
+            dockerfile: dockerfiles/components/chainhook-node.dockerfile
     steps:
       - name: Checkout
         uses: actions/checkout@v3
