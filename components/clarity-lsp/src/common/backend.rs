@@ -141,18 +141,20 @@ pub async fn process_notification(
                     }
                 }?;
 
-                let lookup_clarity_version = editor_state.try_read(|es| {
+                let lookup_metadata = editor_state.try_read(|es| {
                     match es.contracts_lookup.get(&contract_location) {
-                        Some(metadata) => Some(metadata.clarity_version),
+                        Some(metadata) => {
+                            Some((metadata.clarity_version, metadata.deployer.clone()))
+                        }
                         None => None,
                     }
                 })?;
 
-                let clarity_version = match lookup_clarity_version {
-                    Some(clarity_version) => clarity_version,
+                let (clarity_version, deployer) = match lookup_metadata {
+                    Some((clarity_version, deployer)) => (clarity_version, deployer),
                     None => {
                         // if the contract isn't in loopkup yet, get version directly from manifest
-                        match file_accessor {
+                        let settings = match file_accessor {
                             None => ProjectManifest::from_location(&manifest_location),
                             Some(file_accessor) => {
                                 ProjectManifest::from_file_accessor(
@@ -165,7 +167,9 @@ pub async fn process_notification(
                         .contracts_settings
                         .get(&contract_location)
                         .ok_or("contract not found in manifest")?
-                        .clarity_version
+                        .clone();
+
+                        (settings.clarity_version, settings.deployer.clone())
                     }
                 };
 
@@ -173,6 +177,7 @@ pub async fn process_notification(
                     es.insert_active_contract(
                         contract_location.clone(),
                         clarity_version,
+                        deployer,
                         contract_source.as_str(),
                     )
                 })?;

@@ -1,28 +1,37 @@
 use std::collections::HashMap;
 
-use super::helpers::{get_atom_start_at_position, span_to_range};
-use clarinet_files::FileLocation;
+use super::helpers::span_to_range;
+
 use clarity_repl::analysis::ast_visitor::{traverse, ASTVisitor, TypedVar};
+use clarity_repl::clarity::vm::types::{QualifiedContractIdentifier, StandardPrincipalData};
 use clarity_repl::clarity::{ClarityName, SymbolicExpression};
-use lsp_types::{Location, Position, Range, Url};
+use lsp_types::Range;
 
 #[cfg(feature = "wasm")]
 #[allow(unused_imports)]
 use crate::utils::log;
 
+#[derive(Clone, Debug, PartialEq)]
+pub enum DefinitionLocation {
+    Internal(Range),
+    External(QualifiedContractIdentifier, ClarityName),
+}
+
 #[derive(Clone, Debug)]
 pub struct Definitions {
-    pub tokens: HashMap<(u32, u32), Range>,
+    pub tokens: HashMap<(u32, u32), DefinitionLocation>,
     global: HashMap<ClarityName, Range>,
     local: HashMap<u64, HashMap<ClarityName, Range>>,
+    deployer: Option<StandardPrincipalData>,
 }
 
 impl<'a> Definitions {
-    pub fn new() -> Self {
+    pub fn new(deployer: Option<StandardPrincipalData>) -> Self {
         Self {
             tokens: HashMap::new(),
             global: HashMap::new(),
             local: HashMap::new(),
+            deployer,
         }
     }
 
@@ -50,8 +59,10 @@ impl<'a> Definitions {
     ) -> Option<()> {
         let range = self.global.get(token)?;
         let keyword = expr.match_list()?.get(index)?;
-        self.tokens
-            .insert((keyword.span.start_line, keyword.span.start_column), *range);
+        self.tokens.insert(
+            (keyword.span.start_line, keyword.span.start_column),
+            DefinitionLocation::Internal(*range),
+        );
         Some(())
     }
 }
@@ -76,15 +87,19 @@ impl<'a> ASTVisitor<'a> for Definitions {
     fn visit_atom(&mut self, expr: &'a SymbolicExpression, atom: &'a ClarityName) -> bool {
         for scope in self.local.values() {
             if let Some(range) = scope.get(atom) {
-                self.tokens
-                    .insert((expr.span.start_line, expr.span.start_column), *range);
+                self.tokens.insert(
+                    (expr.span.start_line, expr.span.start_column),
+                    DefinitionLocation::Internal(*range),
+                );
                 return true;
             }
         }
 
         if let Some(range) = self.global.get(atom) {
-            self.tokens
-                .insert((expr.span.start_line, expr.span.start_column), *range);
+            self.tokens.insert(
+                (expr.span.start_line, expr.span.start_column),
+                DefinitionLocation::Internal(*range),
+            );
         }
         true
     }
@@ -153,8 +168,10 @@ impl<'a> ASTVisitor<'a> for Definitions {
         _args: &'a [SymbolicExpression],
     ) -> bool {
         if let Some(range) = self.global.get(name) {
-            self.tokens
-                .insert((expr.span.start_line, expr.span.start_column + 1), *range);
+            self.tokens.insert(
+                (expr.span.start_line, expr.span.start_column + 1),
+                DefinitionLocation::Internal(*range),
+            );
         }
         true
     }
@@ -253,6 +270,38 @@ impl<'a> ASTVisitor<'a> for Definitions {
         _recipient: &'a SymbolicExpression,
     ) -> bool {
         self.get_definition_for_arg_at_index(expr, token, 1);
+        true
+    }
+
+    fn visit_static_contract_call(
+        &mut self,
+        expr: &'a SymbolicExpression,
+        identifier: &'a QualifiedContractIdentifier,
+        function_name: &'a ClarityName,
+        _args: &'a [SymbolicExpression],
+    ) -> bool {
+        if let Some(list) = expr.match_list() {
+            if let Some(SymbolicExpression { span, .. }) = list.get(2) {
+                let identifier = if identifier.issuer == StandardPrincipalData::transient() {
+                    match &self.deployer {
+                        Some(deployer) => QualifiedContractIdentifier::parse(&format!(
+                            "{:}.{:}",
+                            deployer, identifier.name
+                        ))
+                        .expect("failed to set contract name"),
+                        None => identifier.to_owned(),
+                    }
+                } else {
+                    identifier.to_owned()
+                };
+
+                self.tokens.insert(
+                    (span.start_line, span.start_column),
+                    DefinitionLocation::External(identifier, function_name.to_owned()),
+                );
+            };
+        };
+
         true
     }
 
@@ -448,33 +497,52 @@ impl<'a> ASTVisitor<'a> for Definitions {
     }
 }
 
+pub fn get_definitions(
+    expressions: &Vec<SymbolicExpression>,
+    deployer: Option<StandardPrincipalData>,
+) -> HashMap<(u32, u32), DefinitionLocation> {
+    #[cfg(feature = "wasm")]
+    web_sys::console::time_with_label("compute ast definitions");
+
+    let mut definitions_visitor = Definitions::new(deployer);
+    definitions_visitor.run(expressions);
+
+    #[cfg(feature = "wasm")]
+    web_sys::console::time_end_with_label("compute ast definitions");
+
+    definitions_visitor.tokens
+}
+
 #[cfg(test)]
 mod definitions_visitor_tests {
     use std::collections::HashMap;
 
+    use clarity_repl::clarity::ast::build_ast_with_rules;
     use clarity_repl::clarity::stacks_common::types::StacksEpochId;
+    use clarity_repl::clarity::vm::types::StandardPrincipalData;
     use clarity_repl::clarity::{
-        ast::build_ast, vm::types::QualifiedContractIdentifier, ClarityVersion, SymbolicExpression,
+        vm::types::QualifiedContractIdentifier, ClarityVersion, SymbolicExpression,
     };
     use lsp_types::{Position, Range};
 
-    use super::Definitions;
+    use super::{DefinitionLocation, Definitions};
 
     fn get_ast(source: &str) -> Vec<SymbolicExpression> {
-        let contract_ast = build_ast(
+        let contract_ast = build_ast_with_rules(
             &QualifiedContractIdentifier::transient(),
             source,
             &mut (),
             ClarityVersion::Clarity1,
             StacksEpochId::Epoch21,
+            clarity_repl::clarity::ast::ASTRules::Typical,
         )
         .unwrap();
         return contract_ast.expressions;
     }
 
-    fn get_tokens(sources: &str) -> HashMap<(u32, u32), Range> {
+    fn get_tokens(sources: &str) -> HashMap<(u32, u32), DefinitionLocation> {
         let ast = get_ast(sources);
-        let mut definitions_visitor = Definitions::new();
+        let mut definitions_visitor = Definitions::new(Some(StandardPrincipalData::transient()));
         definitions_visitor.run(&ast);
         definitions_visitor.tokens
     }
@@ -491,7 +559,10 @@ mod definitions_visitor_tests {
         let tokens = get_tokens("(define-private (func (arg1 int)) (ok arg1))");
         assert_eq!(tokens.keys().len(), 1);
         assert_eq!(tokens.keys().next(), Some(&(1, 39)));
-        assert_eq!(tokens.values().next(), Some(&new_range(0, 22, 0, 32)));
+        assert_eq!(
+            tokens.values().next(),
+            Some(&DefinitionLocation::Internal(new_range(0, 22, 0, 32)))
+        );
     }
 
     #[test]
@@ -499,7 +570,10 @@ mod definitions_visitor_tests {
         let tokens = get_tokens("(define-read-only (func (arg1 int)) (ok arg1))");
         assert_eq!(tokens.keys().len(), 1);
         assert_eq!(tokens.keys().next(), Some(&(1, 41)));
-        assert_eq!(tokens.values().next(), Some(&new_range(0, 24, 0, 34)));
+        assert_eq!(
+            tokens.values().next(),
+            Some(&DefinitionLocation::Internal(new_range(0, 24, 0, 34)))
+        );
     }
 
     #[test]
@@ -507,7 +581,10 @@ mod definitions_visitor_tests {
         let tokens = get_tokens("(define-public (func (arg1 int)) (ok arg1))");
         assert_eq!(tokens.keys().len(), 1);
         assert_eq!(tokens.keys().next(), Some(&(1, 38)));
-        assert_eq!(tokens.values().next(), Some(&new_range(0, 21, 0, 31)));
+        assert_eq!(
+            tokens.values().next(),
+            Some(&DefinitionLocation::Internal(new_range(0, 21, 0, 31)))
+        );
     }
 
     #[test]
@@ -515,7 +592,10 @@ mod definitions_visitor_tests {
         let tokens = get_tokens("(let ((val1 u1)) (ok val1))");
         assert_eq!(tokens.len(), 1);
         assert_eq!(tokens.keys().next(), Some(&(1, 22)));
-        assert_eq!(tokens.values().next(), Some(&new_range(0, 6, 0, 15)));
+        assert_eq!(
+            tokens.values().next(),
+            Some(&DefinitionLocation::Internal(new_range(0, 6, 0, 15)))
+        );
     }
 
     #[test]
@@ -532,8 +612,14 @@ mod definitions_visitor_tests {
 
         let expected_range = new_range(0, 0, 0, 28);
         assert_eq!(tokens.len(), 2);
-        assert_eq!(tokens.get(&(2, 10)), Some(&expected_range));
-        assert_eq!(tokens.get(&(3, 10)), Some(&expected_range));
+        assert_eq!(
+            tokens.get(&(2, 10)),
+            Some(&DefinitionLocation::Internal(expected_range))
+        );
+        assert_eq!(
+            tokens.get(&(3, 10)),
+            Some(&DefinitionLocation::Internal(expected_range))
+        );
     }
 
     #[test]
@@ -552,10 +638,22 @@ mod definitions_visitor_tests {
 
         let expected_range = new_range(0, 0, 0, 33);
         assert_eq!(tokens.len(), 4);
-        assert_eq!(tokens.get(&(2, 13)), Some(&expected_range));
-        assert_eq!(tokens.get(&(3, 11)), Some(&expected_range));
-        assert_eq!(tokens.get(&(4, 10)), Some(&expected_range));
-        assert_eq!(tokens.get(&(5, 13)), Some(&expected_range));
+        assert_eq!(
+            tokens.get(&(2, 13)),
+            Some(&DefinitionLocation::Internal(expected_range))
+        );
+        assert_eq!(
+            tokens.get(&(3, 11)),
+            Some(&DefinitionLocation::Internal(expected_range))
+        );
+        assert_eq!(
+            tokens.get(&(4, 10)),
+            Some(&DefinitionLocation::Internal(expected_range))
+        );
+        assert_eq!(
+            tokens.get(&(5, 13)),
+            Some(&DefinitionLocation::Internal(expected_range))
+        );
     }
 
     #[test]
@@ -575,11 +673,26 @@ mod definitions_visitor_tests {
 
         let expected_range = new_range(0, 0, 0, 29);
         assert_eq!(tokens.len(), 5);
-        assert_eq!(tokens.get(&(2, 11)), Some(&expected_range));
-        assert_eq!(tokens.get(&(3, 11)), Some(&expected_range));
-        assert_eq!(tokens.get(&(4, 17)), Some(&expected_range));
-        assert_eq!(tokens.get(&(5, 16)), Some(&expected_range));
-        assert_eq!(tokens.get(&(6, 15)), Some(&expected_range));
+        assert_eq!(
+            tokens.get(&(2, 11)),
+            Some(&DefinitionLocation::Internal(expected_range))
+        );
+        assert_eq!(
+            tokens.get(&(3, 11)),
+            Some(&DefinitionLocation::Internal(expected_range))
+        );
+        assert_eq!(
+            tokens.get(&(4, 17)),
+            Some(&DefinitionLocation::Internal(expected_range))
+        );
+        assert_eq!(
+            tokens.get(&(5, 16)),
+            Some(&DefinitionLocation::Internal(expected_range))
+        );
+        assert_eq!(
+            tokens.get(&(6, 15)),
+            Some(&DefinitionLocation::Internal(expected_range))
+        );
     }
 
     #[test]
@@ -587,120 +700,9 @@ mod definitions_visitor_tests {
         let tokens = get_tokens("(define-public (ok-tuple (arg1 int)) (ok { value: arg1 }))");
 
         assert_eq!(tokens.len(), 1);
-        assert_eq!(tokens.get(&(1, 51)), Some(&new_range(0, 25, 0, 35)));
-    }
-}
-
-pub fn find_definition(
-    location: &FileLocation,
-    position: &Position,
-    expressions: &Vec<SymbolicExpression>,
-) -> Option<Location> {
-    #[cfg(feature = "wasm")]
-    web_sys::console::time_with_label("compute ast definitions");
-
-    let position_hash = get_atom_start_at_position(position, expressions)?;
-    let mut definitions_visitor = Definitions::new();
-    definitions_visitor.run(expressions);
-
-    #[cfg(feature = "wasm")]
-    web_sys::console::time_end_with_label("compute ast definitions");
-
-    let range = definitions_visitor.tokens.get(&position_hash)?;
-    let uri = Url::parse(&location.to_string()).ok()?;
-    return Some(Location {
-        uri,
-        range: range.clone(),
-    });
-}
-
-#[cfg(test)]
-mod find_definition_tests {
-    use clarinet_files::FileLocation;
-    use clarity_repl::clarity::stacks_common::types::StacksEpochId;
-
-    use clarity_repl::clarity::{
-        ast::build_ast, vm::types::QualifiedContractIdentifier, ClarityVersion, SymbolicExpression,
-    };
-    use lsp_types::{Location, Position, Range, Url};
-
-    use super::find_definition;
-
-    fn get_ast(source: &str) -> Vec<SymbolicExpression> {
-        let contract_ast = build_ast(
-            &QualifiedContractIdentifier::transient(),
-            source,
-            &mut (),
-            ClarityVersion::Clarity1,
-            StacksEpochId::Epoch21,
-        )
-        .unwrap();
-        return contract_ast.expressions;
-    }
-
-    #[test]
-    fn find_let_binding_tests() {
-        let sources = vec!["(define-public (a-func)", "  (let ((arg1 u1)) (ok arg1)))"].join("\n");
-        let ast = get_ast(sources.as_str());
-        let url = Url::parse("https://example.com/contract.clar").unwrap();
-
-        let result = find_definition(
-            &FileLocation::Url { url: url.clone() },
-            &Position {
-                line: 2,
-                character: 25,
-            },
-            &ast,
-        );
-
         assert_eq!(
-            result,
-            Some(Location {
-                uri: url,
-                range: Range {
-                    start: Position {
-                        line: 1,
-                        character: 8
-                    },
-                    end: Position {
-                        line: 1,
-                        character: 17
-                    }
-                }
-            })
-        )
-    }
-
-    #[test]
-    fn arg_in_tuple_tests() {
-        let sources = "(define-public (ok-tuple (arg1 int)) (ok { value: arg1 }))";
-        let ast = get_ast(sources);
-        let url = Url::parse("https://example.com/contract.clar").unwrap();
-
-        let result = find_definition(
-            &FileLocation::Url { url: url.clone() },
-            &Position {
-                line: 1,
-                character: 52,
-            },
-            &ast,
+            tokens.get(&(1, 51)),
+            Some(&DefinitionLocation::Internal(new_range(0, 25, 0, 35)))
         );
-
-        assert_eq!(
-            result,
-            Some(Location {
-                uri: url,
-                range: Range {
-                    start: Position {
-                        line: 1,
-                        character: 8
-                    },
-                    end: Position {
-                        line: 1,
-                        character: 17
-                    }
-                }
-            })
-        )
     }
 }

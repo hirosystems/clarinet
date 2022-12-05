@@ -496,7 +496,7 @@ impl<'a> ASTVisitor<'a> for ASTSymbols {
 mod tests {
     use clarity_repl::clarity::ast::{build_ast_with_rules, ASTRules};
     use clarity_repl::clarity::{
-        representations::Span, stacks_common::types::StacksEpochId,
+        ast::build_ast_with_rules, representations::Span, stacks_common::types::StacksEpochId,
         vm::types::QualifiedContractIdentifier, ClarityVersion, SymbolicExpression,
     };
     use lsp_types::{DocumentSymbol, SymbolKind};

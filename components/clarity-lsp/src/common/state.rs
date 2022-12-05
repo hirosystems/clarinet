@@ -1,5 +1,5 @@
 use crate::types::{CompletionItem, CompletionMaps};
-use crate::utils::{self};
+use crate::utils;
 use chainhook_types::StacksNetwork;
 use clarinet_deployments::{
     generate_default_deployment, initiate_session_from_deployment,
@@ -15,28 +15,35 @@ use clarity_repl::clarity::stacks_common::types::StacksEpochId;
 use clarity_repl::clarity::vm::ast::ContractAST;
 use clarity_repl::clarity::vm::types::QualifiedContractIdentifier;
 use clarity_repl::clarity::vm::EvaluationResult;
-use clarity_repl::clarity::{ClarityVersion, SymbolicExpression};
-use clarity_repl::repl::DEFAULT_CLARITY_VERSION;
-use lsp_types::{DocumentSymbol, Hover, MessageType, Position};
+use clarity_repl::clarity::{ClarityName, ClarityVersion, SymbolicExpression};
+use clarity_repl::repl::{ContractDeployer, DEFAULT_CLARITY_VERSION};
+use lsp_types::{DocumentSymbol, Hover, Location, MessageType, Position, Range, Url};
 use std::borrow::BorrowMut;
 use std::collections::{HashMap, HashSet};
 use std::vec;
 
-use super::requests::definitions::find_definition;
+use super::requests::definitions::{get_definitions, DefinitionLocation};
 use super::requests::document_symbols::ASTSymbols;
+use super::requests::helpers::{get_atom_start_at_position, get_public_function_definitions};
 use super::requests::hover::get_expression_documentation;
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct ActiveContractData {
     pub clarity_version: ClarityVersion,
     pub epoch: StacksEpochId,
+    pub deployer: ContractDeployer,
     pub expressions: Option<Vec<SymbolicExpression>>,
     pub diagnostic: Option<ClarityDiagnostic>,
     source: String,
 }
 
 impl ActiveContractData {
-    pub fn new(clarity_version: ClarityVersion, epoch: StacksEpochId, source: &str) -> Self {
+    pub fn new(
+        clarity_version: ClarityVersion,
+        epoch: StacksEpochId,
+        deployer: ContractDeployer,
+        source: &str,
+    ) -> Self {
         match build_ast_with_rules(
             &QualifiedContractIdentifier::transient(),
             source,
@@ -48,6 +55,7 @@ impl ActiveContractData {
             Ok(ast) => ActiveContractData {
                 clarity_version,
                 epoch,
+                deployer,
                 expressions: Some(ast.expressions),
                 diagnostic: None,
                 source: source.to_string(),
@@ -55,6 +63,7 @@ impl ActiveContractData {
             Err(err) => ActiveContractData {
                 clarity_version,
                 epoch,
+                deployer,
                 expressions: None,
                 diagnostic: Some(err.diagnostic),
                 source: source.to_string(),
@@ -97,6 +106,7 @@ pub struct ContractState {
     notes: Vec<ClarityDiagnostic>,
     contract_id: QualifiedContractIdentifier,
     analysis: Option<ContractAnalysis>,
+    definitions: HashMap<ClarityName, Range>,
     location: FileLocation,
     clarity_version: ClarityVersion,
 }
@@ -108,6 +118,7 @@ impl ContractState {
         _deps: DependencySet,
         mut diags: Vec<ClarityDiagnostic>,
         analysis: Option<ContractAnalysis>,
+        definitions: HashMap<ClarityName, Range>,
         location: FileLocation,
         clarity_version: ClarityVersion,
     ) -> ContractState {
@@ -141,6 +152,7 @@ impl ContractState {
             warnings,
             notes,
             analysis,
+            definitions,
             location,
             clarity_version,
         }
@@ -153,6 +165,7 @@ pub struct ContractMetadata {
     pub manifest_location: FileLocation,
     pub relative_path: String,
     pub clarity_version: ClarityVersion,
+    pub deployer: ContractDeployer,
 }
 
 #[derive(Clone, Default, Debug)]
@@ -196,6 +209,13 @@ impl EditorState {
                 .get_relative_path_from_base(&base_location)
                 .expect("could not find relative location");
 
+            let deployer = match &contract_state.analysis {
+                Some(analysis) => {
+                    ContractDeployer::ContractIdentifier(analysis.contract_identifier.clone())
+                }
+                None => ContractDeployer::DefaultDeployer,
+            };
+
             self.contracts_lookup.insert(
                 contract_location.clone(),
                 ContractMetadata {
@@ -203,6 +223,7 @@ impl EditorState {
                     manifest_location: manifest_location.clone(),
                     relative_path,
                     clarity_version: contract_state.clarity_version,
+                    deployer,
                 },
             );
 
@@ -294,7 +315,42 @@ impl EditorState {
             line: position.line + 1,
             character: position.character + 1,
         };
-        find_definition(contract_location, &position, contract.expressions.as_ref()?)
+
+        let metadata = self.contracts_lookup.get(contract_location)?;
+        let deployer = match &metadata.deployer {
+            ContractDeployer::ContractIdentifier(QualifiedContractIdentifier {
+                issuer,
+                name: _,
+            }) => Some(issuer.to_owned()),
+            _ => None,
+        };
+
+        let position_hash = get_atom_start_at_position(&position, contract.expressions.as_ref()?)?;
+        let tokens = get_definitions(contract.expressions.as_ref()?, deployer);
+        match tokens.get(&position_hash)? {
+            DefinitionLocation::Internal(range) => {
+                return Some(Location {
+                    uri: Url::parse(&contract_location.to_string()).ok()?,
+                    range: range.clone(),
+                });
+            }
+            DefinitionLocation::External(contract_identifier, function_name) => {
+                let protocol = self.protocols.get(&metadata.manifest_location)?;
+
+                let definition_contract_location =
+                    protocol.locations_lookup.get(contract_identifier)?;
+                let range = protocol
+                    .contracts
+                    .get(definition_contract_location)?
+                    .definitions
+                    .get(function_name)?;
+
+                return Some(Location {
+                    uri: Url::parse(&definition_contract_location.to_string()).ok()?,
+                    range: range.clone(),
+                });
+            }
+        };
     }
 
     pub fn get_hover_data(
@@ -397,10 +453,11 @@ impl EditorState {
         &mut self,
         contract_location: FileLocation,
         clarity_version: ClarityVersion,
+        deployer: ContractDeployer,
         source: &str,
     ) {
         let epoch = StacksEpochId::Epoch21;
-        let contract = ActiveContractData::new(clarity_version, epoch, source);
+        let contract = ActiveContractData::new(clarity_version, epoch, deployer, source);
         self.active_contracts.insert(contract_location, contract);
     }
 
@@ -421,13 +478,12 @@ impl EditorState {
 #[derive(Clone, Default, Debug)]
 pub struct ProtocolState {
     contracts: HashMap<FileLocation, ContractState>,
+    locations_lookup: HashMap<QualifiedContractIdentifier, FileLocation>,
 }
 
 impl ProtocolState {
-    pub fn new() -> ProtocolState {
-        ProtocolState {
-            contracts: HashMap::new(),
-        }
+    pub fn new() -> Self {
+        ProtocolState::default()
     }
 
     pub fn consolidate(
@@ -436,6 +492,7 @@ impl ProtocolState {
         asts: &mut HashMap<QualifiedContractIdentifier, ContractAST>,
         deps: &mut HashMap<QualifiedContractIdentifier, DependencySet>,
         diags: &mut HashMap<QualifiedContractIdentifier, Vec<ClarityDiagnostic>>,
+        definitions: &mut HashMap<QualifiedContractIdentifier, HashMap<ClarityName, Range>>,
         analyses: &mut HashMap<QualifiedContractIdentifier, Option<ContractAnalysis>>,
     ) {
         // Remove old paths
@@ -463,18 +520,26 @@ impl ProtocolState {
                 Some(analysis) => analysis.clarity_version,
                 None => DEFAULT_CLARITY_VERSION,
             };
+            let definitions = match definitions.remove(&contract_id) {
+                Some(definitions) => definitions,
+                None => HashMap::new(),
+            };
 
             let contract_state = ContractState::new(
-                contract_id,
+                contract_id.clone(),
                 ast,
                 deps,
                 diags,
                 analysis,
+                definitions,
                 contract_location.clone(),
                 clarity_version,
             );
             self.contracts
                 .insert(contract_location.clone(), contract_state);
+
+            self.locations_lookup
+                .insert(contract_id, contract_location.clone());
         }
     }
 
@@ -511,6 +576,7 @@ pub async fn build_state(
 ) -> Result<(), String> {
     let mut locations = HashMap::new();
     let mut analyses = HashMap::new();
+    let mut definitions = HashMap::new();
 
     // In the LSP use case, trying to load an existing deployment
     // might not be suitable, in an edition context, we should
@@ -553,8 +619,16 @@ pub async fn build_state(
                 if let Some(entry) = artifacts.diags.get_mut(&contract_id) {
                     entry.append(&mut execution_result.diagnostics);
                 }
+
                 match execution_result.result {
                     EvaluationResult::Contract(contract_result) => {
+                        if let Some(ast) = artifacts.asts.get(&contract_id) {
+                            if let Some(public_definitions) =
+                                get_public_function_definitions(&ast.expressions)
+                            {
+                                definitions.insert(contract_id.clone(), public_definitions);
+                            }
+                        }
                         analyses
                             .insert(contract_id.clone(), Some(contract_result.contract.analysis));
                     }
@@ -575,6 +649,7 @@ pub async fn build_state(
         &mut artifacts.asts,
         &mut artifacts.deps,
         &mut artifacts.diags,
+        &mut definitions,
         &mut analyses,
     );
 
