@@ -216,13 +216,17 @@ pub async fn process_notification(
                 }
             };
 
-            // TODO(lgalabru): introduce partial analysis #604
-            // We will rebuild the entire state, without trying any optimizations for now
+            // TODO(): introduce partial analysis #604
             let mut protocol_state = ProtocolState::new();
             match build_state(&manifest_location, &mut protocol_state, file_accessor).await {
-                Ok(_contracts_updates) => {
-                    editor_state
-                        .try_write(|es| es.index_protocol(manifest_location, protocol_state))?;
+                Ok(_) => {
+                    editor_state.try_write(|es| {
+                        es.index_protocol(manifest_location, protocol_state);
+
+                        if let Some(contract) = es.active_contracts.get_mut(&contract_location) {
+                            contract.update_definitions();
+                        };
+                    })?;
 
                     let (aggregated_diagnostics, notification) =
                         editor_state.try_read(|es| es.get_aggregated_diagnostics())?;
@@ -236,16 +240,10 @@ pub async fn process_notification(
         }
 
         LspNotification::ContractChanged(contract_location, contract_source) => {
-            match editor_state
-                .try_write(|es| es.update_active_contract(&contract_location, &contract_source))?
-            {
-                Ok(_result) => {
-                    // In case the source can not be parsed, the diagnostic could be sent but it would
-                    // remove the other diagnostic errors (types, check-checker, etc).
-                    // Let's address it as part of #604
-                    // let aggregated_diagnostics = vec![(contract_location, vec![diagnostic.unwrap()])],
-                    return Ok(LspNotificationResponse::default());
-                }
+            match editor_state.try_write(|es| {
+                es.update_active_contract(&contract_location, &contract_source, false)
+            })? {
+                Ok(_result) => Ok(LspNotificationResponse::default()),
                 Err(err) => Ok(LspNotificationResponse::error(&err)),
             }
         }
@@ -398,16 +396,12 @@ pub fn process_request(command: LspRequest, editor_state: &EditorStateInput) -> 
             };
             let position = params.text_document_position_params.position;
 
-            #[cfg(feature = "wasm")]
-            web_sys::console::time_with_label("search def");
             let location = match editor_state
                 .try_read(|es| es.get_definition_location(&contract_location, &position))
             {
                 Ok(location) => location,
                 Err(_) => None,
             };
-            #[cfg(feature = "wasm")]
-            web_sys::console::time_end_with_label("search def");
 
             LspRequestResponse::Definition(location)
         }

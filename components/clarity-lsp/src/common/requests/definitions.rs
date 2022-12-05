@@ -499,17 +499,10 @@ impl<'a> ASTVisitor<'a> for Definitions {
 
 pub fn get_definitions(
     expressions: &Vec<SymbolicExpression>,
-    deployer: Option<StandardPrincipalData>,
+    issuer: Option<StandardPrincipalData>,
 ) -> HashMap<(u32, u32), DefinitionLocation> {
-    #[cfg(feature = "wasm")]
-    web_sys::console::time_with_label("compute ast definitions");
-
-    let mut definitions_visitor = Definitions::new(deployer);
+    let mut definitions_visitor = Definitions::new(issuer);
     definitions_visitor.run(expressions);
-
-    #[cfg(feature = "wasm")]
-    web_sys::console::time_end_with_label("compute ast definitions");
-
     definitions_visitor.tokens
 }
 

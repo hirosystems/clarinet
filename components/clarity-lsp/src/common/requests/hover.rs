@@ -94,16 +94,3 @@ pub fn get_expression_documentation(
         None => None,
     }
 }
-
-// fn search_external_func() {
-//     let metadata = self.contracts_lookup.get(contract_location)?;
-//     let analysis = self
-//         .protocols
-//         .get(&metadata.manifest_location)?
-//         .contracts
-//         .get(contract_location)?
-//         .analysis
-//         .as_ref()?;
-
-//     let _private_func = analysis.public_function_types.get(&expr)?;
-// }

@@ -13,7 +13,7 @@ use clarity_repl::clarity::ast::{build_ast_with_rules, ASTRules};
 use clarity_repl::clarity::diagnostic::{Diagnostic as ClarityDiagnostic, Level as ClarityLevel};
 use clarity_repl::clarity::stacks_common::types::StacksEpochId;
 use clarity_repl::clarity::vm::ast::ContractAST;
-use clarity_repl::clarity::vm::types::QualifiedContractIdentifier;
+use clarity_repl::clarity::vm::types::{QualifiedContractIdentifier, StandardPrincipalData};
 use clarity_repl::clarity::vm::EvaluationResult;
 use clarity_repl::clarity::{ClarityName, ClarityVersion, SymbolicExpression};
 use clarity_repl::repl::{ContractDeployer, DEFAULT_CLARITY_VERSION};
@@ -31,8 +31,9 @@ use super::requests::hover::get_expression_documentation;
 pub struct ActiveContractData {
     pub clarity_version: ClarityVersion,
     pub epoch: StacksEpochId,
-    pub deployer: ContractDeployer,
+    pub issuer: Option<StandardPrincipalData>,
     pub expressions: Option<Vec<SymbolicExpression>>,
+    pub definitions: Option<HashMap<(u32, u32), DefinitionLocation>>,
     pub diagnostic: Option<ClarityDiagnostic>,
     source: String,
 }
@@ -41,7 +42,7 @@ impl ActiveContractData {
     pub fn new(
         clarity_version: ClarityVersion,
         epoch: StacksEpochId,
-        deployer: ContractDeployer,
+        issuer: Option<StandardPrincipalData>,
         source: &str,
     ) -> Self {
         match build_ast_with_rules(
@@ -55,24 +56,27 @@ impl ActiveContractData {
             Ok(ast) => ActiveContractData {
                 clarity_version,
                 epoch,
-                deployer,
-                expressions: Some(ast.expressions),
+                issuer: issuer.clone(),
+                expressions: Some(ast.expressions.clone()),
+                definitions: Some(get_definitions(&ast.expressions, issuer)),
                 diagnostic: None,
                 source: source.to_string(),
             },
             Err(err) => ActiveContractData {
                 clarity_version,
                 epoch,
-                deployer,
+                issuer,
                 expressions: None,
+                definitions: None,
                 diagnostic: Some(err.diagnostic),
                 source: source.to_string(),
             },
         }
     }
 
-    pub fn update(&mut self, source: &str) {
+    pub fn update(&mut self, source: &str, with_definitions: bool) {
         self.source = source.to_string();
+        self.definitions = None;
         match build_ast_with_rules(
             &QualifiedContractIdentifier::transient(),
             source,
@@ -84,6 +88,9 @@ impl ActiveContractData {
             Ok(ast) => {
                 self.expressions = Some(ast.expressions);
                 self.diagnostic = None;
+                if with_definitions {
+                    self.update_definitions();
+                }
             }
             Err(err) => {
                 self.expressions = None;
@@ -92,9 +99,15 @@ impl ActiveContractData {
         };
     }
 
+    pub fn update_definitions(&mut self) {
+        if let Some(expressions) = &self.expressions {
+            self.definitions = Some(get_definitions(&expressions, self.issuer.clone()));
+        }
+    }
+
     pub fn update_clarity_version(&mut self, clarity_version: ClarityVersion) {
         self.clarity_version = clarity_version;
-        self.update(&self.source.clone());
+        self.update(&self.source.clone(), true);
     }
 }
 
@@ -317,17 +330,14 @@ impl EditorState {
         };
 
         let metadata = self.contracts_lookup.get(contract_location)?;
-        let deployer = match &metadata.deployer {
-            ContractDeployer::ContractIdentifier(QualifiedContractIdentifier {
-                issuer,
-                name: _,
-            }) => Some(issuer.to_owned()),
-            _ => None,
-        };
 
         let position_hash = get_atom_start_at_position(&position, contract.expressions.as_ref()?)?;
-        let tokens = get_definitions(contract.expressions.as_ref()?, deployer);
-        match tokens.get(&position_hash)? {
+        let definitions = match &contract.definitions {
+            Some(definitions) => definitions.to_owned(),
+            None => get_definitions(contract.expressions.as_ref()?, contract.issuer.clone()),
+        };
+
+        match definitions.get(&position_hash)? {
             DefinitionLocation::Internal(range) => {
                 return Some(Location {
                     uri: Url::parse(&contract_location.to_string()).ok()?,
@@ -456,8 +466,15 @@ impl EditorState {
         deployer: ContractDeployer,
         source: &str,
     ) {
+        let issuer = match &deployer {
+            ContractDeployer::ContractIdentifier(QualifiedContractIdentifier {
+                issuer,
+                name: _,
+            }) => Some(issuer.to_owned()),
+            _ => None,
+        };
         let epoch = StacksEpochId::Epoch21;
-        let contract = ActiveContractData::new(clarity_version, epoch, deployer, source);
+        let contract = ActiveContractData::new(clarity_version, epoch, issuer, source);
         self.active_contracts.insert(contract_location, contract);
     }
 
@@ -465,12 +482,13 @@ impl EditorState {
         &mut self,
         contract_location: &FileLocation,
         source: &str,
+        with_definitions: bool,
     ) -> Result<ActiveContractData, String> {
         let contract_state = self
             .active_contracts
             .get_mut(contract_location)
             .ok_or("contract not in active_contracts")?;
-        contract_state.update(source);
+        contract_state.update(source, with_definitions);
         Ok(contract_state.to_owned())
     }
 }
