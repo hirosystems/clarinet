@@ -79,10 +79,10 @@ pub async fn do_run_devnet(
         tracing_appender::rolling::never(&devnet_config.working_dir, "networking.log");
     let (non_blocking, _guard) = tracing_appender::non_blocking(file_appender);
 
-    tracing_subscriber::fmt()
+    let _ = tracing_subscriber::fmt()
         .with_max_level(tracing::Level::INFO)
         .with_writer(non_blocking)
-        .init();
+        .try_init();
 
     let ip_address_setup = devnet.prepare_network().await?;
 
