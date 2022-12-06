@@ -225,81 +225,18 @@ impl DevnetOrchestrator {
             .and_then(|map| map.get("Gateway"))
             .ok_or("unable to retrieve gateway")?;
 
-        let ip = gateway
-            .split(".")
-            .map(|c| c.parse::<u8>())
-            .collect::<Result<Vec<u8>, _>>()
-            .map_err(|e| format!("unable to extract ip address"))?;
-
         let use_virtual_port_map = false;
 
         let ip_address_map = if use_virtual_port_map {
-            // Must conform to boot sequence:
-            // 1) bitcoind
-            // 2) event observers (api, subnet)
-            // 3) stacks-node
-            // 4) stacks-explorer
-            // 5) bitcoin-explorer
-
-            let mut cursor = 1;
-            let bitcoin_node_ip_address =
-                format!("{}.{}.{}.{}", ip[0], ip[1], ip[2], ip[3] + cursor);
-            // let bitcoin_node_ip_address = format!("localhost");
-            let postgres_ip_address = match devnet_config.disable_stacks_api {
-                true => format!("0.0.0.0"),
-                false => {
-                    cursor += 1;
-                    format!("{}.{}.{}.{}", ip[0], ip[1], ip[2], ip[3] + cursor)
-                }
-            };
-            let stacks_api_ip_address = match devnet_config.disable_stacks_api {
-                true => format!("0.0.0.0"),
-                false => {
-                    cursor += 1;
-                    format!("{}.{}.{}.{}", ip[0], ip[1], ip[2], ip[3] + cursor)
-                }
-            };
-            let subnet_node_ip_address = match devnet_config.enable_subnet_node {
-                false => format!("0.0.0.0"),
-                true => {
-                    cursor += 1;
-                    format!("{}.{}.{}.{}", ip[0], ip[1], ip[2], ip[3] + cursor)
-                }
-            };
-            let subnet_api_ip_address = match devnet_config.enable_subnet_node {
-                false => format!("0.0.0.0"),
-                true => {
-                    cursor += 1;
-                    format!("{}.{}.{}.{}", ip[0], ip[1], ip[2], ip[3] + cursor)
-                }
-            };
-            cursor += 1;
-            let stacks_node_ip_address =
-                format!("{}.{}.{}.{}", ip[0], ip[1], ip[2], ip[3] + cursor);
-            let stacks_explorer_ip_address = match devnet_config.disable_stacks_explorer {
-                true => format!("0.0.0.0"),
-                false => {
-                    cursor += 1;
-                    format!("{}.{}.{}.{}", ip[0], ip[1], ip[2], ip[3] + cursor)
-                }
-            };
-            let bitcoin_explorer_ip_address = match devnet_config.disable_bitcoin_explorer {
-                true => format!("0.0.0.0"),
-                false => {
-                    cursor += 1;
-                    format!("{}.{}.{}.{}", ip[0], ip[1], ip[2], ip[3] + cursor)
-                }
-            };
-
             ServiceIpAddressMap {
-                bitcoin_node_ip_address,
-                stacks_node_ip_address,
-                postgres_ip_address,
-                stacks_api_ip_address,
-                stacks_explorer_ip_address,
-                bitcoin_explorer_ip_address,
-                subnet_node_ip_address,
-                subnet_api_ip_address,
+                bitcoin_node_ip_address: gateway.clone(),
+                stacks_node_ip_address: gateway.clone(),
+                postgres_ip_address: gateway.clone(),
+                stacks_api_ip_address: gateway.clone(),
+                stacks_explorer_ip_address: gateway.clone(),
+                bitcoin_explorer_ip_address: gateway.clone(),
+                subnet_node_ip_address: gateway.clone(),
+                subnet_api_ip_address: gateway.clone(),
             }
         } else {
             ServiceIpAddressMap {
