@@ -189,6 +189,12 @@ pub struct BitcoinConfig {
 }
 
 #[derive(Debug, Clone)]
+pub struct ServicesConfig {
+    pub stacks_node_url: String,
+    pub bitcoin_node_url: String,
+}
+
+#[derive(Debug, Clone)]
 pub struct ChainhookStore {
     entries: HashMap<ApiKey, ChainhookConfig>,
 }
@@ -234,6 +240,11 @@ pub async fn start_event_observer(
         username: config.bitcoin_node_username.clone(),
         password: config.bitcoin_node_password.clone(),
         rpc_url: config.bitcoin_node_rpc_url.clone(),
+    };
+
+    let services_config = ServicesConfig {
+        stacks_node_url: config.bitcoin_node_rpc_url.clone(),
+        bitcoin_node_url: config.stacks_node_rpc_url.clone(),
     };
 
     let mut entries = HashMap::new();
@@ -346,6 +357,8 @@ pub async fn start_event_observer(
         chainhook_store,
         observer_commands_rx,
         observer_events_tx,
+        Some(ingestion_shutdown),
+        Some(control_shutdown),
         ctx,
     )
     .await
