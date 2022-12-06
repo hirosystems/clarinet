@@ -141,7 +141,7 @@ pub async fn process_notification(
                     }
                 }?;
 
-                let lookup_metadata = editor_state.try_read(|es| {
+                let metadata_from_lookup = editor_state.try_read(|es| {
                     match es.contracts_lookup.get(&contract_location) {
                         Some(metadata) => {
                             Some((metadata.clarity_version, metadata.deployer.clone()))
@@ -150,7 +150,7 @@ pub async fn process_notification(
                     }
                 })?;
 
-                let (clarity_version, deployer) = match lookup_metadata {
+                let (clarity_version, deployer) = match metadata_from_lookup {
                     Some((clarity_version, deployer)) => (clarity_version, deployer),
                     None => {
                         // if the contract isn't in loopkup yet, get version directly from manifest
@@ -222,7 +222,6 @@ pub async fn process_notification(
                 Ok(_) => {
                     editor_state.try_write(|es| {
                         es.index_protocol(manifest_location, protocol_state);
-
                         if let Some(contract) = es.active_contracts.get_mut(&contract_location) {
                             contract.update_definitions();
                         };

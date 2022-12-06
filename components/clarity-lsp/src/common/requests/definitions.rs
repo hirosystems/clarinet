@@ -17,6 +17,9 @@ pub enum DefinitionLocation {
     External(QualifiedContractIdentifier, ClarityName),
 }
 
+// `global` holds all of the top-level user-defined keywords that are available in the global scope
+// `local` holds the locally user-defined keywords: function parameters, let and match bindings
+// when a user-defined keyword is used in the code, its position and definition location are stored in `tokens`
 #[derive(Clone, Debug)]
 pub struct Definitions {
     pub tokens: HashMap<(u32, u32), DefinitionLocation>,
@@ -51,7 +54,9 @@ impl<'a> Definitions {
         Some(())
     }
 
-    fn get_definition_for_arg_at_index(
+    // helper method to retrieve definitions of global keyword used in methods such as
+    // (var-get <global-keyword>) (map-insert <global-keyword> ...) (nft-burn <global-keyword> ...)
+    fn set_definition_for_arg_at_index(
         &mut self,
         expr: &SymbolicExpression,
         token: &ClarityName,
@@ -75,6 +80,7 @@ impl<'a> ASTVisitor<'a> for Definitions {
             Atom(name) => self.visit_atom(expr, name),
             List(exprs) => {
                 let result = self.traverse_list(expr, &exprs);
+                // clear local scope after traversing it
                 self.local.remove(&expr.id);
                 result
             }
@@ -85,6 +91,8 @@ impl<'a> ASTVisitor<'a> for Definitions {
     }
 
     fn visit_atom(&mut self, expr: &'a SymbolicExpression, atom: &'a ClarityName) -> bool {
+        // iterate on local scopes to find if the variable is declared in one of them
+        // the order does not matter because variable shadowing is not allowed
         for scope in self.local.values() {
             if let Some(range) = scope.get(atom) {
                 self.tokens.insert(
@@ -110,12 +118,12 @@ impl<'a> ASTVisitor<'a> for Definitions {
         name: &'a ClarityName,
         _value: &'a SymbolicExpression,
     ) -> bool {
-        self.get_definition_for_arg_at_index(expr, name, 1);
+        self.set_definition_for_arg_at_index(expr, name, 1);
         true
     }
 
     fn visit_var_get(&mut self, expr: &'a SymbolicExpression, name: &'a ClarityName) -> bool {
-        self.get_definition_for_arg_at_index(expr, name, 1);
+        self.set_definition_for_arg_at_index(expr, name, 1);
         true
     }
 
@@ -126,7 +134,7 @@ impl<'a> ASTVisitor<'a> for Definitions {
         _key: &HashMap<Option<&'a ClarityName>, &'a SymbolicExpression>,
         _value: &HashMap<Option<&'a ClarityName>, &'a SymbolicExpression>,
     ) -> bool {
-        self.get_definition_for_arg_at_index(expr, name, 1);
+        self.set_definition_for_arg_at_index(expr, name, 1);
         true
     }
 
@@ -136,7 +144,7 @@ impl<'a> ASTVisitor<'a> for Definitions {
         name: &'a ClarityName,
         _key: &HashMap<Option<&'a ClarityName>, &'a SymbolicExpression>,
     ) -> bool {
-        self.get_definition_for_arg_at_index(expr, name, 1);
+        self.set_definition_for_arg_at_index(expr, name, 1);
         true
     }
 
@@ -147,7 +155,7 @@ impl<'a> ASTVisitor<'a> for Definitions {
         _key: &HashMap<Option<&'a ClarityName>, &'a SymbolicExpression>,
         _value: &HashMap<Option<&'a ClarityName>, &'a SymbolicExpression>,
     ) -> bool {
-        self.get_definition_for_arg_at_index(expr, name, 1);
+        self.set_definition_for_arg_at_index(expr, name, 1);
         true
     }
 
@@ -157,7 +165,7 @@ impl<'a> ASTVisitor<'a> for Definitions {
         name: &'a ClarityName,
         _key: &HashMap<Option<&'a ClarityName>, &'a SymbolicExpression>,
     ) -> bool {
-        self.get_definition_for_arg_at_index(expr, name, 1);
+        self.set_definition_for_arg_at_index(expr, name, 1);
         true
     }
 
@@ -183,7 +191,7 @@ impl<'a> ASTVisitor<'a> for Definitions {
         _amount: &'a SymbolicExpression,
         _recipient: &'a SymbolicExpression,
     ) -> bool {
-        self.get_definition_for_arg_at_index(expr, token, 1);
+        self.set_definition_for_arg_at_index(expr, token, 1);
         true
     }
 
@@ -194,7 +202,7 @@ impl<'a> ASTVisitor<'a> for Definitions {
         _amount: &'a SymbolicExpression,
         _sender: &'a SymbolicExpression,
     ) -> bool {
-        self.get_definition_for_arg_at_index(expr, token, 1);
+        self.set_definition_for_arg_at_index(expr, token, 1);
         true
     }
 
@@ -204,7 +212,7 @@ impl<'a> ASTVisitor<'a> for Definitions {
         token: &'a ClarityName,
         _owner: &'a SymbolicExpression,
     ) -> bool {
-        self.get_definition_for_arg_at_index(expr, token, 1);
+        self.set_definition_for_arg_at_index(expr, token, 1);
         true
     }
 
@@ -213,7 +221,7 @@ impl<'a> ASTVisitor<'a> for Definitions {
         expr: &'a SymbolicExpression,
         token: &'a ClarityName,
     ) -> bool {
-        self.get_definition_for_arg_at_index(expr, token, 1);
+        self.set_definition_for_arg_at_index(expr, token, 1);
         true
     }
 
@@ -225,7 +233,7 @@ impl<'a> ASTVisitor<'a> for Definitions {
         _sender: &'a SymbolicExpression,
         _recipient: &'a SymbolicExpression,
     ) -> bool {
-        self.get_definition_for_arg_at_index(expr, token, 1);
+        self.set_definition_for_arg_at_index(expr, token, 1);
         true
     }
 
@@ -236,7 +244,7 @@ impl<'a> ASTVisitor<'a> for Definitions {
         _identifier: &'a SymbolicExpression,
         _sender: &'a SymbolicExpression,
     ) -> bool {
-        self.get_definition_for_arg_at_index(expr, token, 1);
+        self.set_definition_for_arg_at_index(expr, token, 1);
         true
     }
 
@@ -246,7 +254,7 @@ impl<'a> ASTVisitor<'a> for Definitions {
         token: &'a ClarityName,
         _identifier: &'a SymbolicExpression,
     ) -> bool {
-        self.get_definition_for_arg_at_index(expr, token, 1);
+        self.set_definition_for_arg_at_index(expr, token, 1);
         true
     }
 
@@ -257,7 +265,7 @@ impl<'a> ASTVisitor<'a> for Definitions {
         _identifier: &'a SymbolicExpression,
         _recipient: &'a SymbolicExpression,
     ) -> bool {
-        self.get_definition_for_arg_at_index(expr, token, 1);
+        self.set_definition_for_arg_at_index(expr, token, 1);
         true
     }
 
@@ -269,7 +277,7 @@ impl<'a> ASTVisitor<'a> for Definitions {
         _sender: &'a SymbolicExpression,
         _recipient: &'a SymbolicExpression,
     ) -> bool {
-        self.get_definition_for_arg_at_index(expr, token, 1);
+        self.set_definition_for_arg_at_index(expr, token, 1);
         true
     }
 
