@@ -74,7 +74,7 @@ impl ActiveContractData {
         }
     }
 
-    pub fn update(&mut self, source: &str, with_definitions: bool) {
+    pub fn update_sources(&mut self, source: &str, with_definitions: bool) {
         self.source = source.to_string();
         self.definitions = None;
         match build_ast_with_rules(
@@ -107,7 +107,12 @@ impl ActiveContractData {
 
     pub fn update_clarity_version(&mut self, clarity_version: ClarityVersion) {
         self.clarity_version = clarity_version;
-        self.update(&self.source.clone(), true);
+        self.update_sources(&self.source.clone(), true);
+    }
+
+    pub fn update_issuer(&mut self, issuer: Option<StandardPrincipalData>) {
+        self.issuer = issuer;
+        self.update_definitions();
     }
 }
 
@@ -229,6 +234,20 @@ impl EditorState {
                 None => ContractDeployer::DefaultDeployer,
             };
 
+            if let Some(active_contract) = self.active_contracts.get_mut(contract_location) {
+                if active_contract.clarity_version != contract_state.clarity_version {
+                    active_contract.update_clarity_version(contract_state.clarity_version)
+                }
+
+                let issuer = match &deployer {
+                    ContractDeployer::ContractIdentifier(id) => Some(id.issuer.to_owned()),
+                    _ => None,
+                };
+                if active_contract.issuer.is_none() || active_contract.issuer != issuer {
+                    active_contract.update_issuer(issuer)
+                }
+            }
+
             self.contracts_lookup.insert(
                 contract_location.clone(),
                 ContractMetadata {
@@ -239,12 +258,6 @@ impl EditorState {
                     deployer,
                 },
             );
-
-            if let Some(active_contract) = self.active_contracts.get_mut(contract_location) {
-                if active_contract.clarity_version != contract_state.clarity_version {
-                    active_contract.update_clarity_version(contract_state.clarity_version)
-                }
-            }
         }
         self.protocols.insert(manifest_location, protocol);
     }
@@ -476,16 +489,9 @@ impl EditorState {
         &mut self,
         contract_location: FileLocation,
         clarity_version: ClarityVersion,
-        deployer: ContractDeployer,
+        issuer: Option<StandardPrincipalData>,
         source: &str,
     ) {
-        let issuer = match &deployer {
-            ContractDeployer::ContractIdentifier(QualifiedContractIdentifier {
-                issuer,
-                name: _,
-            }) => Some(issuer.to_owned()),
-            _ => None,
-        };
         let epoch = StacksEpochId::Epoch21;
         let contract = ActiveContractData::new(clarity_version, epoch, issuer, source);
         self.active_contracts.insert(contract_location, contract);
@@ -496,13 +502,13 @@ impl EditorState {
         contract_location: &FileLocation,
         source: &str,
         with_definitions: bool,
-    ) -> Result<ActiveContractData, String> {
+    ) -> Result<(), String> {
         let contract_state = self
             .active_contracts
             .get_mut(contract_location)
             .ok_or("contract not in active_contracts")?;
-        contract_state.update(source, with_definitions);
-        Ok(contract_state.to_owned())
+        contract_state.update_sources(source, with_definitions);
+        Ok(())
     }
 }
 

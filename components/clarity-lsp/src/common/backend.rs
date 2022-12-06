@@ -4,6 +4,7 @@ use crate::types::{CompletionItemKind, InsertTextFormat};
 use crate::utils::get_contract_location;
 use clarinet_files::{FileAccessor, FileLocation, ProjectManifest};
 use clarity_repl::clarity::diagnostic::Diagnostic;
+use clarity_repl::repl::ContractDeployer;
 use lsp_types::{
     CompletionItem, CompletionOptions, CompletionParams, DocumentSymbol, DocumentSymbolParams,
     Documentation, GotoDefinitionParams, Hover, HoverParams, HoverProviderCapability,
@@ -141,7 +142,7 @@ pub async fn process_notification(
                     }
                 }?;
 
-                let metadata_from_lookup = editor_state.try_read(|es| {
+                let metadata = editor_state.try_read(|es| {
                     match es.contracts_lookup.get(&contract_location) {
                         Some(metadata) => {
                             Some((metadata.clarity_version, metadata.deployer.clone()))
@@ -150,11 +151,11 @@ pub async fn process_notification(
                     }
                 })?;
 
-                let (clarity_version, deployer) = match metadata_from_lookup {
-                    Some((clarity_version, deployer)) => (clarity_version, deployer),
+                // if the contract isn't in lookup yet, fallback on manifest, to be improved in #668
+                let clarity_version = match metadata {
+                    Some((clarity_version, _)) => clarity_version,
                     None => {
-                        // if the contract isn't in loopkup yet, get version directly from manifest
-                        let settings = match file_accessor {
+                        match file_accessor {
                             None => ProjectManifest::from_location(&manifest_location),
                             Some(file_accessor) => {
                                 ProjectManifest::from_file_accessor(
@@ -167,17 +168,21 @@ pub async fn process_notification(
                         .contracts_settings
                         .get(&contract_location)
                         .ok_or("contract not found in manifest")?
-                        .clone();
-
-                        (settings.clarity_version, settings.deployer.clone())
+                        .clone()
+                        .clarity_version
                     }
                 };
+
+                let issuer = metadata.and_then(|(_, deployer)| match deployer {
+                    ContractDeployer::ContractIdentifier(id) => Some(id.issuer.to_owned()),
+                    _ => None,
+                });
 
                 editor_state.try_write(|es| {
                     es.insert_active_contract(
                         contract_location.clone(),
                         clarity_version,
-                        deployer,
+                        issuer,
                         contract_source.as_str(),
                     )
                 })?;
