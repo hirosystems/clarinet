@@ -165,11 +165,17 @@ impl StacksDevnet {
         thread::spawn(move || {
             if let Ok(DevnetCommand::Start(callback)) = rx.recv() {
                 // Start devnet
-                let (devnet_events_rx, terminator_tx) =
+                let (devnet_events_rx, terminator_tx, chains_coordinator_command_tx) =
                     match run_devnet(devnet, deployment, Some(log_tx), false) {
-                        Ok((Some(devnet_events_rx), Some(terminator_tx), _)) => {
-                            (devnet_events_rx, terminator_tx)
-                        }
+                        Ok((
+                            Some(devnet_events_rx),
+                            Some(terminator_tx),
+                            Some(chains_coordinator_command_tx),
+                        )) => (
+                            devnet_events_rx,
+                            terminator_tx,
+                            chains_coordinator_command_tx,
+                        ),
                         _ => std::process::exit(1),
                     };
                 meta_devnet_command_tx
@@ -184,9 +190,9 @@ impl StacksDevnet {
                 while let Ok(message) = rx.recv() {
                     match message {
                         DevnetCommand::Stop(callback) => {
-                            terminator_tx
-                                .send(true)
-                                .expect("Unable to terminate Devnet");
+                            let _ = chains_coordinator_command_tx
+                                .send(ChainsCoordinatorCommand::Terminate);
+                            let _ = terminator_tx.send(true);
                             if let Some(c) = callback {
                                 c(&channel);
                             }

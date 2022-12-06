@@ -107,7 +107,6 @@ pub async fn do_run_devnet(
     let (observer_command_tx, observer_command_rx) = channel();
     let moved_orchestrator_terminator_tx = orchestrator_terminator_tx.clone();
     let moved_chains_coordinator_commands_tx = chains_coordinator_commands_tx.clone();
-    let moved_observer_command_tx = observer_command_tx.clone();
 
     let ctx_moved = ctx.clone();
     let chains_coordinator_handle = hiro_system_kit::thread_named("Chains coordinator")
@@ -155,7 +154,6 @@ pub async fn do_run_devnet(
             devnet_events_tx,
             devnet_events_rx,
             moved_chains_coordinator_commands_tx,
-            moved_observer_command_tx,
             orchestrator_terminated_rx,
             &devnet_path,
             devnet_config.enable_subnet_node,
