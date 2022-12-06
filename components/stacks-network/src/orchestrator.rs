@@ -39,7 +39,7 @@ pub struct DevnetOrchestrator {
     subnet_node_container_id: Option<String>,
     subnet_api_container_id: Option<String>,
     docker_client: Option<Docker>,
-    ip_address_map: Option<ServiceIpAddressMap>,
+    services_map_hosts: Option<ServicesMapHosts>,
 }
 
 pub enum DevnetServices {
@@ -67,15 +67,15 @@ impl DevnetServices {
 }
 
 #[derive(Clone, Debug)]
-pub struct ServiceIpAddressMap {
-    pub bitcoin_node_ip_address: String,
-    pub stacks_node_ip_address: String,
-    pub stacks_api_ip_address: String,
-    pub postgres_ip_address: String,
-    pub stacks_explorer_ip_address: String,
-    pub bitcoin_explorer_ip_address: String,
-    pub subnet_node_ip_address: String,
-    pub subnet_api_ip_address: String,
+pub struct ServicesMapHosts {
+    pub bitcoin_node_host: String,
+    pub stacks_node_host: String,
+    pub stacks_api_host: String,
+    pub postgres_host: String,
+    pub stacks_explorer_host: String,
+    pub bitcoin_explorer_host: String,
+    pub subnet_node_host: String,
+    pub subnet_api_host: String,
 }
 
 impl DevnetOrchestrator {
@@ -173,11 +173,11 @@ impl DevnetOrchestrator {
             postgres_container_id: None,
             subnet_node_container_id: None,
             subnet_api_container_id: None,
-            ip_address_map: None,
+            services_map_hosts: None,
         })
     }
 
-    pub async fn prepare_network(&mut self) -> Result<ServiceIpAddressMap, String> {
+    pub async fn prepare_network(&mut self) -> Result<ServicesMapHosts, String> {
         let (docker, devnet_config) = match (&self.docker_client, &self.network_config) {
             (Some(ref docker), Some(ref network_config)) => match network_config.devnet {
                 Some(ref devnet_config) => (docker, devnet_config),
@@ -227,121 +227,36 @@ impl DevnetOrchestrator {
 
         let use_virtual_port_map = false;
 
-        let ip_address_map = if use_virtual_port_map {
-            ServiceIpAddressMap {
-                bitcoin_node_ip_address: gateway.clone(),
-                stacks_node_ip_address: gateway.clone(),
-                postgres_ip_address: gateway.clone(),
-                stacks_api_ip_address: gateway.clone(),
-                stacks_explorer_ip_address: gateway.clone(),
-                bitcoin_explorer_ip_address: gateway.clone(),
-                subnet_node_ip_address: gateway.clone(),
-                subnet_api_ip_address: gateway.clone(),
+        let services_map_hosts = if use_virtual_port_map {
+            ServicesMapHosts {
+                bitcoin_node_host: format!("{}:{}", gateway, devnet_config.bitcoin_node_rpc_port),
+                stacks_node_host: format!("{}:{}", gateway, devnet_config.stacks_node_rpc_port),
+                postgres_host: format!("{}:{}", gateway, devnet_config.postgres_port),
+                stacks_api_host: format!("{}:{}", gateway, devnet_config.stacks_api_port),
+                stacks_explorer_host: format!("{}:{}", gateway, devnet_config.stacks_explorer_port),
+                bitcoin_explorer_host: format!(
+                    "{}:{}",
+                    gateway, devnet_config.bitcoin_explorer_port
+                ),
+                subnet_node_host: format!("{}:{}", gateway, devnet_config.subnet_node_rpc_port),
+                subnet_api_host: format!("{}:{}", gateway, devnet_config.subnet_api_port),
             }
         } else {
-            ServiceIpAddressMap {
-                bitcoin_node_ip_address: "localhost".into(),
-                stacks_node_ip_address: "localhost".into(),
-                postgres_ip_address: "localhost".into(),
-                stacks_api_ip_address: "localhost".into(),
-                stacks_explorer_ip_address: "localhost".into(),
-                bitcoin_explorer_ip_address: "localhost".into(),
-                subnet_node_ip_address: "localhost".into(),
-                subnet_api_ip_address: "localhost".into(),
+            ServicesMapHosts {
+                bitcoin_node_host: format!("localhost:{}", devnet_config.bitcoin_node_rpc_port),
+                stacks_node_host: format!("localhost:{}", devnet_config.stacks_node_rpc_port),
+                postgres_host: format!("localhost:{}", devnet_config.postgres_port),
+                stacks_api_host: format!("localhost:{}", devnet_config.stacks_api_port),
+                stacks_explorer_host: format!("localhost:{}", devnet_config.stacks_explorer_port),
+                bitcoin_explorer_host: format!("localhost:{}", devnet_config.bitcoin_explorer_port),
+                subnet_node_host: format!("localhost:{}", devnet_config.subnet_node_rpc_port),
+                subnet_api_host: format!("localhost:{}", devnet_config.subnet_api_port),
             }
         };
 
-        self.ip_address_map = Some(ip_address_map.clone());
+        self.services_map_hosts = Some(services_map_hosts.clone());
 
-        Ok(ip_address_map)
-    }
-
-    pub fn get_stacks_node_url(&self) -> String {
-        match self.network_config {
-            Some(ref config) => match (&config.devnet, &self.ip_address_map) {
-                (Some(ref devnet), Some(ref ip_address_map)) => {
-                    format!(
-                        "http://{}:{}",
-                        ip_address_map.stacks_node_ip_address, devnet.stacks_node_rpc_port
-                    )
-                }
-                (Some(ref devnet), _) => {
-                    format!("http://localhost:{}", devnet.stacks_node_rpc_port)
-                }
-                _ => unreachable!(),
-            },
-            _ => unreachable!(),
-        }
-    }
-
-    pub fn get_bitcoin_node_url(&self) -> String {
-        match self.network_config {
-            Some(ref config) => match (&config.devnet, &self.ip_address_map) {
-                (Some(ref devnet), Some(ref ip_address_map)) => {
-                    format!(
-                        "http://{}:{}",
-                        ip_address_map.bitcoin_node_ip_address, devnet.bitcoin_node_rpc_port
-                    )
-                }
-                (Some(ref devnet), _) => {
-                    format!("http://localhost:{}", devnet.bitcoin_node_rpc_port)
-                }
-                _ => unreachable!(),
-            },
-            _ => unreachable!(),
-        }
-    }
-
-    pub fn get_stacks_api_url(&self) -> String {
-        match self.network_config {
-            Some(ref config) => match (&config.devnet, &self.ip_address_map) {
-                (Some(ref devnet), Some(ref ip_address_map)) => {
-                    format!(
-                        "http://{}:{}",
-                        ip_address_map.stacks_api_ip_address, devnet.stacks_api_port
-                    )
-                }
-                (Some(ref devnet), _) => format!("http://localhost:{}", devnet.stacks_api_port),
-                _ => unreachable!(),
-            },
-            _ => unreachable!(),
-        }
-    }
-
-    pub fn get_bitcoin_explorer_url(&self) -> String {
-        match self.network_config {
-            Some(ref config) => match (&config.devnet, &self.ip_address_map) {
-                (Some(ref devnet), Some(ref ip_address_map)) => {
-                    format!(
-                        "http://{}:{}",
-                        ip_address_map.bitcoin_explorer_ip_address, devnet.bitcoin_explorer_port
-                    )
-                }
-                (Some(ref devnet), _) => {
-                    format!("http://localhost:{}", devnet.bitcoin_explorer_port)
-                }
-                _ => unreachable!(),
-            },
-            _ => unreachable!(),
-        }
-    }
-
-    pub fn get_stacks_explorer_url(&self) -> String {
-        match self.network_config {
-            Some(ref config) => match (&config.devnet, &self.ip_address_map) {
-                (Some(ref devnet), Some(ref ip_address_map)) => {
-                    format!(
-                        "http://{}:{}",
-                        ip_address_map.stacks_explorer_ip_address, devnet.stacks_explorer_port
-                    )
-                }
-                (Some(ref devnet), _) => {
-                    format!("http://localhost:{}", devnet.stacks_explorer_port)
-                }
-                _ => unreachable!(),
-            },
-            _ => unreachable!(),
-        }
+        Ok(services_map_hosts)
     }
 
     pub async fn start(
@@ -2500,12 +2415,8 @@ events_keys = ["*"]
 
         let rpc = Client::new(
             &format!(
-                "http://{}:{}/",
-                self.ip_address_map
-                    .as_ref()
-                    .unwrap()
-                    .bitcoin_node_ip_address,
-                devnet_config.bitcoin_node_rpc_port
+                "http://{}/",
+                self.services_map_hosts.as_ref().unwrap().bitcoin_node_host
             ),
             Auth::UserPass(
                 devnet_config.bitcoin_node_username.to_string(),

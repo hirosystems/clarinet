@@ -3,7 +3,7 @@
 const {
   stacksDevnetNew,
   stacksDevnetStart,
-  stacksDevnetStop,
+  stacksDevnetTerminate,
   stacksDevnetWaitForStacksBlock,
   stacksDevnetWaitForBitcoinBlock,
   stacksDevnetGetStacksNodeUrl,
@@ -514,7 +514,7 @@ export class DevnetNetworkOrchestrator {
    * @summary Terminates the containers
    * @memberof DevnetNetworkOrchestrator
    */
-  stop() {
-    stacksDevnetStop.call(this.handle);
+  terminate(): boolean {
+    return stacksDevnetTerminate.call(this.handle);
   }
 }

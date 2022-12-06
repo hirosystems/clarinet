@@ -32,4 +32,4 @@ let block = devnet.waitForStacksBlock();
 
 console.log(`Hello from JS ${JSON.stringify(block)}`);
 
-devnet.stop();
+devnet.terminate();

@@ -12,7 +12,7 @@ pub use orchestrator::DevnetOrchestrator;
 
 use std::{
     sync::{
-        mpsc::{self, channel, Sender},
+        mpsc::{self, channel, Receiver, Sender},
         Arc,
     },
     thread::sleep,
@@ -54,6 +54,8 @@ pub async fn do_run_devnet(
     log_tx: Option<Sender<LogData>>,
     display_dashboard: bool,
     ctx: Context,
+    orchestrator_terminated_tx: Sender<bool>,
+    orchestrator_terminated_rx: Option<Receiver<bool>>,
 ) -> Result<
     (
         Option<mpsc::Receiver<DevnetEvent>>,
@@ -63,9 +65,8 @@ pub async fn do_run_devnet(
     String,
 > {
     let (devnet_events_tx, devnet_events_rx) = channel();
-    let (termination_success_tx, orchestrator_terminated_rx) = channel();
 
-    devnet.termination_success_tx = Some(termination_success_tx);
+    devnet.termination_success_tx = Some(orchestrator_terminated_tx);
 
     let devnet_config = match devnet.network_config {
         Some(ref network_config) => match &network_config.devnet {
@@ -154,7 +155,9 @@ pub async fn do_run_devnet(
             devnet_events_tx,
             devnet_events_rx,
             moved_chains_coordinator_commands_tx,
-            orchestrator_terminated_rx,
+            orchestrator_terminated_rx.expect(
+                "orchestrator_terminated_rx should be provided when display_dashboard set to true",
+            ),
             &devnet_path,
             devnet_config.enable_subnet_node,
             &ctx,

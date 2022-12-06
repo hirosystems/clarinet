@@ -1,6 +1,6 @@
 use super::ChainsCoordinatorCommand;
 use super::DevnetEvent;
-use crate::orchestrator::ServiceIpAddressMap;
+use crate::orchestrator::ServicesMapHosts;
 use crate::{ServiceStatusData, Status};
 use base58::FromBase58;
 use bitcoincore_rpc::{Auth, Client, RpcApi};
@@ -50,7 +50,7 @@ pub struct DevnetEventObserverConfig {
     pub deployment: DeploymentSpecification,
     pub manifest: ProjectManifest,
     pub deployment_fee_rate: u64,
-    pub ip_address_setup: ServiceIpAddressMap,
+    pub services_map_hosts: ServicesMapHosts,
 }
 
 #[derive(Clone, Debug)]
@@ -79,7 +79,7 @@ impl DevnetEventObserverConfig {
         deployment: DeploymentSpecification,
         chainhooks: ChainhookConfig,
         ctx: &Context,
-        ip_address_setup: ServiceIpAddressMap,
+        services_map_hosts: ServicesMapHosts,
     ) -> Self {
         ctx.try_log(|logger| slog::info!(logger, "Checking contracts"));
         let network_manifest = NetworkManifest::from_project_manifest_location(
@@ -101,14 +101,8 @@ impl DevnetEventObserverConfig {
             control_port: devnet_config.orchestrator_control_port,
             bitcoin_node_username: devnet_config.bitcoin_node_username.clone(),
             bitcoin_node_password: devnet_config.bitcoin_node_password.clone(),
-            bitcoin_node_rpc_url: format!(
-                "http://{}:{}",
-                ip_address_setup.bitcoin_node_ip_address, devnet_config.bitcoin_node_rpc_port
-            ),
-            stacks_node_rpc_url: format!(
-                "http://{}:{}",
-                ip_address_setup.stacks_node_ip_address, devnet_config.stacks_node_rpc_port
-            ),
+            bitcoin_node_rpc_url: format!("http://{}", services_map_hosts.bitcoin_node_host),
+            stacks_node_rpc_url: format!("http://{}", services_map_hosts.stacks_node_host),
             operators: HashSet::new(),
             display_logs: true,
         };
@@ -120,7 +114,7 @@ impl DevnetEventObserverConfig {
             manifest,
             deployment,
             deployment_fee_rate: network_manifest.network.deployment_fee_rate,
-            ip_address_setup,
+            services_map_hosts,
         }
     }
 }
@@ -130,7 +124,7 @@ pub async fn start_chains_coordinator(
     devnet_event_tx: Sender<DevnetEvent>,
     chains_coordinator_commands_rx: Receiver<ChainsCoordinatorCommand>,
     _chains_coordinator_commands_tx: Sender<ChainsCoordinatorCommand>,
-    chains_coordinator_terminator_tx: Sender<bool>,
+    orchestrator_terminator_tx: Sender<bool>,
     observer_command_tx: Sender<ObserverCommand>,
     observer_command_rx: Receiver<ObserverCommand>,
     ctx: Context,
@@ -143,7 +137,7 @@ pub async fn start_chains_coordinator(
         &config.deployment,
         deployment_events_tx,
         deployments_command_rx,
-        &config.ip_address_setup,
+        &config.services_map_hosts,
     );
 
     if let Some(ref hooks) = config.event_observer_config.initial_hook_formation {
@@ -194,7 +188,7 @@ pub async fn start_chains_coordinator(
     loop {
         // Did we receive a termination notice?
         if let Ok(ChainsCoordinatorCommand::Terminate) = chains_coordinator_commands_rx.try_recv() {
-            let _ = chains_coordinator_terminator_tx.send(true);
+            let _ = orchestrator_terminator_tx.send(true);
             let _ = observer_command_tx.send(ObserverCommand::Terminate);
             let _ = mining_command_tx.send(BitcoinMiningCommand::Pause);
             break;
@@ -385,8 +379,7 @@ pub async fn start_chains_coordinator(
                 if !boot_completed.load(Ordering::SeqCst) {
                     std::thread::sleep(std::time::Duration::from_secs(1));
                     let res = mine_bitcoin_block(
-                        &config.ip_address_setup.bitcoin_node_ip_address,
-                        config.devnet_config.bitcoin_node_rpc_port,
+                        &config.services_map_hosts.bitcoin_node_host,
                         config.devnet_config.bitcoin_node_username.as_str(),
                         &config.devnet_config.bitcoin_node_password.as_str(),
                         &config.devnet_config.miner_btc_address.as_str(),
@@ -448,7 +441,7 @@ pub fn prepare_protocol_deployment(
     deployment: &DeploymentSpecification,
     deployment_event_tx: Sender<DeploymentEvent>,
     deployment_command_rx: Receiver<DeploymentCommand>,
-    ip_address_setup: &ServiceIpAddressMap,
+    services_map_hosts: &ServicesMapHosts,
 ) {
     let manifest = manifest.clone();
     let deployment = deployment.clone();
@@ -598,16 +591,12 @@ pub async fn publish_stacking_orders(
 }
 
 pub fn invalidate_bitcoin_chain_tip(
-    bitcoin_node_ip_address: &str,
-    bitcoin_node_rpc_port: u16,
+    bitcoin_node_host: &str,
     bitcoin_node_username: &str,
     bitcoin_node_password: &str,
 ) {
     let rpc = Client::new(
-        &format!(
-            "http://{}:{}",
-            bitcoin_node_ip_address, bitcoin_node_rpc_port
-        ),
+        &format!("http://{}", bitcoin_node_host),
         Auth::UserPass(
             bitcoin_node_username.to_string(),
             bitcoin_node_password.to_string(),
@@ -622,8 +611,7 @@ pub fn invalidate_bitcoin_chain_tip(
 }
 
 pub fn mine_bitcoin_block(
-    bitcoin_node_ip_address: &str,
-    bitcoin_node_rpc_port: u16,
+    bitcoin_node_host: &str,
     bitcoin_node_username: &str,
     bitcoin_node_password: &str,
     miner_btc_address: &str,
@@ -631,10 +619,7 @@ pub fn mine_bitcoin_block(
     use bitcoincore_rpc::bitcoin::Address;
     use std::str::FromStr;
     let rpc = Client::new(
-        &format!(
-            "http://{}:{}",
-            bitcoin_node_ip_address, bitcoin_node_rpc_port
-        ),
+        &format!("http://{}", bitcoin_node_host),
         Auth::UserPass(
             bitcoin_node_username.to_string(),
             bitcoin_node_password.to_string(),
@@ -676,8 +661,7 @@ fn handle_bitcoin_mining(
                                 .into(),
                         ));
                         let res = mine_bitcoin_block(
-                            &config_moved.ip_address_setup.bitcoin_node_ip_address,
-                            config_moved.devnet_config.bitcoin_node_rpc_port,
+                            &config_moved.services_map_hosts.bitcoin_node_host,
                             &config_moved.devnet_config.bitcoin_node_username,
                             &config_moved.devnet_config.bitcoin_node_password,
                             &config_moved.devnet_config.miner_btc_address,
@@ -695,8 +679,7 @@ fn handle_bitcoin_mining(
             }
             BitcoinMiningCommand::Mine => {
                 let res = mine_bitcoin_block(
-                    &config.ip_address_setup.bitcoin_node_ip_address,
-                    config.devnet_config.bitcoin_node_rpc_port,
+                    &config.services_map_hosts.bitcoin_node_host,
                     config.devnet_config.bitcoin_node_username.as_str(),
                     &config.devnet_config.bitcoin_node_password.as_str(),
                     &config.devnet_config.miner_btc_address.as_str(),
@@ -707,8 +690,7 @@ fn handle_bitcoin_mining(
             }
             BitcoinMiningCommand::InvalidateChainTip => {
                 invalidate_bitcoin_chain_tip(
-                    &config.ip_address_setup.bitcoin_node_ip_address,
-                    config.devnet_config.bitcoin_node_rpc_port,
+                    &config.services_map_hosts.bitcoin_node_host,
                     &config.devnet_config.bitcoin_node_username.as_str(),
                     &config.devnet_config.bitcoin_node_password.as_str(),
                 );

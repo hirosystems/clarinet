@@ -275,7 +275,6 @@ pub async fn start_event_observer(
     shutdown_config.ctrlc = false;
     shutdown_config.grace = 0;
     shutdown_config.mercy = 0;
-    shutdown_config.force = true;
 
     let ingestion_config = Config {
         port: ingestion_port,
@@ -316,7 +315,7 @@ pub async fn start_event_observer(
         .mount("/", routes)
         .ignite()
         .await?;
-    let ingestion_shutdown = ignite.shutdown();
+    let ingestion_shutdown = Some(ignite.shutdown());
 
     let _ = std::thread::spawn(move || {
         let _ = hiro_system_kit::nestable_block_on(ignite.launch());
@@ -324,9 +323,8 @@ pub async fn start_event_observer(
 
     let mut shutdown_config = config::Shutdown::default();
     shutdown_config.ctrlc = false;
-    shutdown_config.grace = 0;
-    shutdown_config.mercy = 0;
-    shutdown_config.force = true;
+    shutdown_config.grace = 1;
+    shutdown_config.mercy = 1;
 
     let control_config = Config {
         port: control_port,
@@ -359,7 +357,7 @@ pub async fn start_event_observer(
         .mount("/", routes)
         .ignite()
         .await?;
-    let control_shutdown = ignite.shutdown();
+    let control_shutdown = Some(ignite.shutdown());
 
     let _ = std::thread::spawn(move || {
         let _ = hiro_system_kit::nestable_block_on(ignite.launch());
@@ -371,8 +369,8 @@ pub async fn start_event_observer(
         chainhook_store,
         observer_commands_rx,
         observer_events_tx,
-        Some(ingestion_shutdown),
-        Some(control_shutdown),
+        ingestion_shutdown,
+        control_shutdown,
         ctx,
     )
     .await
