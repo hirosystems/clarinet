@@ -145,12 +145,8 @@ impl LanguageServer for LspNativeBridge {
 
         let response_rx = self.response_rx.lock().expect("failed to lock response_rx");
         let ref response = response_rx.recv().expect("failed to get value from recv");
-        if let LspResponse::Request(request_response) = response {
-            if let LspRequestResponse::Definition(data) = request_response {
-                if let Some(data) = data {
-                    return Ok(Some(GotoDefinitionResponse::Scalar(data.to_owned())));
-                }
-            }
+        if let LspResponse::Request(LspRequestResponse::Definition(Some(data))) = response {
+            return Ok(Some(GotoDefinitionResponse::Scalar(data.to_owned())));
         }
 
         Ok(None)
