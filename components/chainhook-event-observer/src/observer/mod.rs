@@ -19,7 +19,7 @@ use clarity_repl::clarity::util::hash::bytes_to_hex;
 use hiro_system_kit;
 use hiro_system_kit::slog;
 use reqwest::Client as HttpClient;
-use rocket::config::{Config, LogLevel};
+use rocket::config::{self, Config, LogLevel};
 use rocket::data::{Limits, ToByteUnit};
 use rocket::http::Status;
 use rocket::request::{self, FromRequest, Outcome, Request};
@@ -271,6 +271,12 @@ pub async fn start_event_observer(
     let background_job_tx_mutex = Arc::new(Mutex::new(observer_commands_tx.clone()));
 
     let limits = Limits::default().limit("json", 4.megabytes());
+    let mut shutdown_config = config::Shutdown::default();
+    shutdown_config.ctrlc = false;
+    shutdown_config.grace = 0;
+    shutdown_config.mercy = 0;
+    shutdown_config.force = true;
+
     let ingestion_config = Config {
         port: ingestion_port,
         workers: 3,
@@ -280,6 +286,7 @@ pub async fn start_event_observer(
         log_level: log_level.clone(),
         cli_colors: false,
         limits,
+        shutdown: shutdown_config,
         ..Config::default()
     };
 
@@ -315,6 +322,12 @@ pub async fn start_event_observer(
         let _ = hiro_system_kit::nestable_block_on(ignite.launch());
     });
 
+    let mut shutdown_config = config::Shutdown::default();
+    shutdown_config.ctrlc = false;
+    shutdown_config.grace = 0;
+    shutdown_config.mercy = 0;
+    shutdown_config.force = true;
+
     let control_config = Config {
         port: control_port,
         workers: 1,
@@ -323,6 +336,7 @@ pub async fn start_event_observer(
         temp_dir: std::env::temp_dir().into(),
         log_level,
         cli_colors: false,
+        shutdown: shutdown_config,
         ..Config::default()
     };
 
