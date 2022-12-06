@@ -25,6 +25,7 @@ use rocket::http::Status;
 use rocket::request::{self, FromRequest, Outcome, Request};
 use rocket::serde::json::{json, Json, Value as JsonValue};
 use rocket::serde::Deserialize;
+use rocket::Shutdown;
 use rocket::State;
 use rocket_okapi::{openapi, openapi_get_routes, request::OpenApiFromRequest};
 use std::collections::{HashMap, HashSet};
@@ -288,17 +289,19 @@ pub async fn start_event_observer(
     }
 
     let ctx_cloned = ctx.clone();
+    let ignite = rocket::custom(ingestion_config)
+        .manage(indexer_rw_lock)
+        .manage(background_job_tx_mutex)
+        .manage(bitcoin_config)
+        .manage(ctx_cloned)
+        .manage(services_config)
+        .mount("/", routes)
+        .ignite()
+        .await?;
+    let ingestion_shutdown = ignite.shutdown();
 
     let _ = std::thread::spawn(move || {
-        let future = rocket::custom(ingestion_config)
-            .manage(indexer_rw_lock)
-            .manage(background_job_tx_mutex)
-            .manage(bitcoin_config)
-            .manage(ctx_cloned)
-            .mount("/", routes)
-            .launch();
-
-        let _ = hiro_system_kit::nestable_block_on(future);
+        let _ = hiro_system_kit::nestable_block_on(ignite.launch());
     });
 
     let control_config = Config {
@@ -324,15 +327,17 @@ pub async fn start_event_observer(
     let managed_chainhook_store = chainhook_store.clone();
     let ctx_cloned = ctx.clone();
 
-    let _ = std::thread::spawn(move || {
-        let future = rocket::custom(control_config)
-            .manage(background_job_tx_mutex)
-            .manage(managed_chainhook_store)
-            .manage(ctx_cloned)
-            .mount("/", routes)
-            .launch();
+    let ignite = rocket::custom(control_config)
+        .manage(background_job_tx_mutex)
+        .manage(managed_chainhook_store)
+        .manage(ctx_cloned)
+        .mount("/", routes)
+        .ignite()
+        .await?;
+    let control_shutdown = ignite.shutdown();
 
-        let _ = hiro_system_kit::nestable_block_on(future);
+    let _ = std::thread::spawn(move || {
+        let _ = hiro_system_kit::nestable_block_on(ignite.launch());
     });
 
     // This loop is used for handling background jobs, emitted by HTTP calls.
@@ -371,6 +376,8 @@ pub async fn start_observer_commands_handler(
     chainhook_store: Arc<RwLock<ChainhookStore>>,
     observer_commands_rx: Receiver<ObserverCommand>,
     observer_events_tx: Option<Sender<ObserverEvent>>,
+    ingestion_shutdown: Option<Shutdown>,
+    control_shutdown: Option<Shutdown>,
     ctx: Context,
 ) -> Result<(), Box<dyn Error>> {
     let mut chainhooks_occurrences_tracker: HashMap<String, u64> = HashMap::new();
@@ -390,6 +397,12 @@ pub async fn start_observer_commands_handler(
         match command {
             ObserverCommand::Terminate => {
                 ctx.try_log(|logger| slog::info!(logger, "Handling Termination command"));
+                if let Some(ingestion_shutdown) = ingestion_shutdown {
+                    ingestion_shutdown.notify();
+                }
+                if let Some(control_shutdown) = control_shutdown {
+                    control_shutdown.notify();
+                }
                 if let Some(ref tx) = observer_events_tx {
                     let _ = tx.send(ObserverEvent::Info("Terminating event observer".into()));
                     let _ = tx.send(ObserverEvent::Terminate);

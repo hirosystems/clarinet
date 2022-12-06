@@ -159,6 +159,8 @@ fn test_stacks_chainhook_register_deregister() {
             Arc::new(RwLock::new(chainhook_store)),
             observer_commands_rx,
             Some(observer_events_tx),
+            None,
+            None,
             Context::empty(),
         ));
     });
@@ -395,6 +397,8 @@ fn test_stacks_chainhook_auto_deregister() {
             Arc::new(RwLock::new(chainhook_store)),
             observer_commands_rx,
             Some(observer_events_tx),
+            None,
+            None,
             Context::empty(),
         ));
     });
@@ -552,6 +556,8 @@ fn test_bitcoin_chainhook_register_deregister() {
             Arc::new(RwLock::new(chainhook_store)),
             observer_commands_rx,
             Some(observer_events_tx),
+            None,
+            None,
             Context::empty(),
         ));
     });
@@ -809,6 +815,8 @@ fn test_bitcoin_chainhook_auto_deregister() {
             Arc::new(RwLock::new(chainhook_store)),
             observer_commands_rx,
             Some(observer_events_tx),
+            None,
+            None,
             Context::empty(),
         ));
     });

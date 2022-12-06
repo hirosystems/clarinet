@@ -178,12 +178,11 @@ pub async fn do_run_devnet(
         let termination_writer = termination_reader.clone();
         let moved_orchestrator_terminator_tx = orchestrator_terminator_tx.clone();
         let moved_events_observer_commands_tx = chains_coordinator_commands_tx.clone();
-        ctrlc::set_handler(move || {
+        let _ = ctrlc::set_handler(move || {
             let _ = moved_events_observer_commands_tx.send(ChainsCoordinatorCommand::Terminate);
             let _ = moved_orchestrator_terminator_tx.send(true);
             termination_writer.store(true, Ordering::SeqCst);
-        })
-        .expect("Error setting Ctrl-C handler");
+        });
 
         if log_tx.is_none() {
             loop {
