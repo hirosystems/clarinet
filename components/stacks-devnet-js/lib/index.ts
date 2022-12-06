@@ -7,6 +7,10 @@ const {
   stacksDevnetWaitForStacksBlock,
   stacksDevnetWaitForBitcoinBlock,
   stacksDevnetGetStacksNodeUrl,
+  stacksDevnetGetBitcoinNodeUrl,
+  stacksDevnetGetStacksApiUrl,
+  stacksDevnetGetStacksExplorerUrl,
+  stacksDevnetGetBitcoinExplorerUrl,
 } = require("../native/index.node");
 import {
   BitcoinChainUpdate,
@@ -386,41 +390,41 @@ export class DevnetNetworkFactory {
 }
 
 export function getIsolatedNetworkConfigUsingNetworkId(networkId: number, networkConfig: NetworkConfig, interval = 10000) {
-    // Manifest path
-    var manifestPath = networkConfig.clarinetManifestPath === undefined ? "./Clarinet.toml" : networkConfig.clarinetManifestPath;
-    // Logs
-    var logs = networkConfig.logs;
-    logs ||= false;
-    // Accounts
-    var accounts = networkConfig.accounts;
-    accounts ||= [];
-    // Devnet settings
-    var devnetDefaults = {
-      network_id: networkId,
-      bitcoin_controller_automining_disabled: false,
-      bitcoin_node_p2p_port: interval + networkId * 20 + 1,
-      bitcoin_node_rpc_port: interval + networkId * 20 + 2,
-      stacks_node_p2p_port: interval + networkId * 20 + 3,
-      stacks_node_rpc_port: interval + networkId * 20 + 4,
-      orchestrator_port: interval + networkId * 20 + 5,
-      orchestrator_control_port: interval + networkId * 20 + 6,
-      stacks_api_port: interval + networkId * 20 + 7,
-      stacks_api_events_port: interval + networkId * 20 + 8,
-      postgres_port: interval + networkId * 20 + 9,
-      stacks_explorer_port: interval + networkId * 20 + 10,
-      bitcoin_explorer_port: interval + networkId * 20 + 11,
-      subnet_node_p2p_port: interval + networkId * 20 + 12,
-      subnet_node_rpc_port: interval + networkId * 20 + 13,
-      subnet_api_port: interval + networkId * 20 + 14,
-      subnet_api_events_port: interval + networkId * 20 + 15,
-    };
-    var devnet = Object.assign(devnetDefaults, networkConfig.devnet);
-    return {
-      clarinetManifestPath: manifestPath,
-      logs,
-      accounts,
-      devnet: devnet,
-    };
+  // Manifest path
+  var manifestPath = networkConfig.clarinetManifestPath === undefined ? "./Clarinet.toml" : networkConfig.clarinetManifestPath;
+  // Logs
+  var logs = networkConfig.logs;
+  logs ||= false;
+  // Accounts
+  var accounts = networkConfig.accounts;
+  accounts ||= [];
+  // Devnet settings
+  var devnetDefaults = {
+    network_id: networkId,
+    bitcoin_controller_automining_disabled: false,
+    bitcoin_node_p2p_port: interval + networkId * 20 + 1,
+    bitcoin_node_rpc_port: interval + networkId * 20 + 2,
+    stacks_node_p2p_port: interval + networkId * 20 + 3,
+    stacks_node_rpc_port: interval + networkId * 20 + 4,
+    orchestrator_port: interval + networkId * 20 + 5,
+    orchestrator_control_port: interval + networkId * 20 + 6,
+    stacks_api_port: interval + networkId * 20 + 7,
+    stacks_api_events_port: interval + networkId * 20 + 8,
+    postgres_port: interval + networkId * 20 + 9,
+    stacks_explorer_port: interval + networkId * 20 + 10,
+    bitcoin_explorer_port: interval + networkId * 20 + 11,
+    subnet_node_p2p_port: interval + networkId * 20 + 12,
+    subnet_node_rpc_port: interval + networkId * 20 + 13,
+    subnet_api_port: interval + networkId * 20 + 14,
+    subnet_api_events_port: interval + networkId * 20 + 15,
+  };
+  var devnet = Object.assign(devnetDefaults, networkConfig.devnet);
+  return {
+    clarinetManifestPath: manifestPath,
+    logs,
+    accounts,
+    devnet: devnet,
+  };
 }
 
 export class DevnetNetworkOrchestrator {
@@ -456,6 +460,38 @@ export class DevnetNetworkOrchestrator {
    */
   getStacksNodeUrl() {
     return stacksDevnetGetStacksNodeUrl.call(this.handle);
+  }
+
+  /**
+   * @summary Returns the URL of the bitcoin-node container
+   * @memberof DevnetNetworkOrchestrator
+   */
+  getBitcoinNodeUrl() {
+    return stacksDevnetGetBitcoinNodeUrl.call(this.handle);
+  }
+
+  /**
+   * @summary Returns the URL of the stacks-api container
+   * @memberof DevnetNetworkOrchestrator
+   */
+  getStacksApiUrl() {
+    return stacksDevnetGetStacksApiUrl.call(this.handle);
+  }
+
+  /**
+   * @summary Returns the URL of the stacks-explorer container
+   * @memberof DevnetNetworkOrchestrator
+   */
+  getStacksExplorerUrl() {
+    return stacksDevnetGetStacksExplorerUrl.call(this.handle);
+  }
+
+  /**
+   * @summary Returns the URL of the bitcoin-explorer container
+   * @memberof DevnetNetworkOrchestrator
+   */
+  getBitcoinExplorerUrl() {
+    return stacksDevnetGetBitcoinExplorerUrl.call(this.handle);
   }
 
   /**

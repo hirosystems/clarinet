@@ -90,7 +90,11 @@ struct StacksDevnet {
     mining_tx: mpsc::Sender<BitcoinMiningCommand>,
     bitcoin_block_rx: mpsc::Receiver<BitcoinChainUpdatedWithBlocksData>,
     stacks_block_rx: mpsc::Receiver<StacksChainUpdatedWithBlocksData>,
-    node_url: String,
+    bitcoin_node_url: String,
+    stacks_node_url: String,
+    stacks_api_url: String,
+    stacks_explorer_url: String,
+    bitcoin_explorer_url: String,
 }
 
 enum DevnetCommand {
@@ -137,7 +141,26 @@ impl StacksDevnet {
             }
         };
 
-        let node_url = devnet.get_stacks_node_url();
+        let (
+            bitcoin_node_url,
+            stacks_node_url,
+            stacks_api_url,
+            stacks_explorer_url,
+            bitcoin_explorer_url,
+        ) = devnet
+            .network_config
+            .as_ref()
+            .and_then(|config| config.devnet.as_ref())
+            .and_then(|devnet| {
+                Some((
+                    format!("http://localhost:{}", devnet.bitcoin_node_p2p_port),
+                    format!("http://localhost:{}", devnet.stacks_node_rpc_port),
+                    format!("http://localhost:{}", devnet.stacks_api_port),
+                    format!("http://localhost:{}", devnet.stacks_explorer_port),
+                    format!("http://localhost:{}", devnet.bitcoin_explorer_port),
+                ))
+            })
+            .expect("unable to read config");
 
         thread::spawn(move || {
             if let Ok(DevnetCommand::Start(callback)) = rx.recv() {
@@ -201,6 +224,11 @@ impl StacksDevnet {
                         DevnetEvent::BootCompleted(mining_tx) => {
                             let _ = meta_mining_command_tx.send(mining_tx);
                         }
+                        DevnetEvent::FatalError(error) => {
+                            if logs_enabled {
+                                println!("{:?}", error);
+                            }
+                        }
                         _ => {}
                     }
                 }
@@ -237,7 +265,11 @@ impl StacksDevnet {
             mining_tx: relaying_mining_tx,
             bitcoin_block_rx,
             stacks_block_rx,
-            node_url,
+            bitcoin_node_url,
+            stacks_node_url,
+            stacks_api_url,
+            stacks_explorer_url,
+            bitcoin_explorer_url,
         }
     }
 
@@ -249,7 +281,8 @@ impl StacksDevnet {
     }
 
     fn stop(&self, callback: Option<DevnetCallback>) -> Result<(), mpsc::SendError<DevnetCommand>> {
-        self.tx.send(DevnetCommand::Stop(callback))
+        self.tx.send(DevnetCommand::Stop(callback))?;
+        Ok(())
     }
 }
 
@@ -732,12 +765,48 @@ impl StacksDevnet {
         Ok(js_block)
     }
 
+    fn js_get_bitcoin_node_url(mut cx: FunctionContext) -> JsResult<JsString> {
+        let devnet = cx
+            .this()
+            .downcast_or_throw::<JsBox<StacksDevnet>, _>(&mut cx)?;
+
+        let val = JsString::new(&mut cx, devnet.bitcoin_node_url.to_string());
+        Ok(val)
+    }
+
     fn js_get_stacks_node_url(mut cx: FunctionContext) -> JsResult<JsString> {
         let devnet = cx
             .this()
             .downcast_or_throw::<JsBox<StacksDevnet>, _>(&mut cx)?;
 
-        let val = JsString::new(&mut cx, devnet.node_url.to_string());
+        let val = JsString::new(&mut cx, devnet.stacks_node_url.to_string());
+        Ok(val)
+    }
+
+    fn js_get_bitcoin_explorer_url(mut cx: FunctionContext) -> JsResult<JsString> {
+        let devnet = cx
+            .this()
+            .downcast_or_throw::<JsBox<StacksDevnet>, _>(&mut cx)?;
+
+        let val = JsString::new(&mut cx, devnet.bitcoin_explorer_url.to_string());
+        Ok(val)
+    }
+
+    fn js_get_stacks_explorer_url(mut cx: FunctionContext) -> JsResult<JsString> {
+        let devnet = cx
+            .this()
+            .downcast_or_throw::<JsBox<StacksDevnet>, _>(&mut cx)?;
+
+        let val = JsString::new(&mut cx, devnet.stacks_explorer_url.to_string());
+        Ok(val)
+    }
+
+    fn js_get_stacks_api_url(mut cx: FunctionContext) -> JsResult<JsString> {
+        let devnet = cx
+            .this()
+            .downcast_or_throw::<JsBox<StacksDevnet>, _>(&mut cx)?;
+
+        let val = JsString::new(&mut cx, devnet.stacks_api_url.to_string());
         Ok(val)
     }
 }
@@ -756,10 +825,25 @@ fn main(mut cx: ModuleContext) -> NeonResult<()> {
         StacksDevnet::js_on_bitcoin_block,
     )?;
     cx.export_function(
+        "stacksDevnetGetBitcoinNodeUrl",
+        StacksDevnet::js_get_bitcoin_node_url,
+    )?;
+    cx.export_function(
         "stacksDevnetGetStacksNodeUrl",
         StacksDevnet::js_get_stacks_node_url,
     )?;
-
+    cx.export_function(
+        "stacksDevnetGetBitcoinExplorerUrl",
+        StacksDevnet::js_get_bitcoin_explorer_url,
+    )?;
+    cx.export_function(
+        "stacksDevnetGetStacksExplorerUrl",
+        StacksDevnet::js_get_stacks_explorer_url,
+    )?;
+    cx.export_function(
+        "stacksDevnetGetStacksApiUrl",
+        StacksDevnet::js_get_stacks_api_url,
+    )?;
     Ok(())
 }
 
