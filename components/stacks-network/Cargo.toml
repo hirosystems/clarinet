@@ -8,8 +8,8 @@ edition = "2021"
 [dependencies]
 bollard = "0.11.0"
 crossterm = { version = "0.22.1", optional = true }
-bitcoin = "0.28.1"
-bitcoincore-rpc = "0.14.0"
+bitcoin = "0.29.2"
+bitcoincore-rpc = "0.16.0"
 serde = { version = "1.0.136", features = ["derive"] }
 serde_json = { version = "1.0.79", features = ["preserve_order"] }
 serde_derive = "1"

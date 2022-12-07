@@ -133,7 +133,7 @@ crossterm = "0.22.1"
 base58 = "0.2.0"
 ctrlc = "3.1.9"
 strum = { version = "0.23.0", features = ["derive"] }
-bitcoin = "0.28.1"
+bitcoin = "0.29.2"
 segment = { version = "0.1.2", optional = true }
 mac_address = { version = "1.1.2", optional = true }
 tower-lsp = { version = "0.17.0", optional = true }

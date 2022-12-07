@@ -14,7 +14,7 @@ libsecp256k1 = "0.7.0"
 toml = { version = "0.5.6", features = ["preserve_order"] }
 url = { version = "2.2.2", features = ["serde"] }
 tiny-hderive = "0.3.0"
-bitcoin = { version = "0.28.1", optional = true }
+bitcoin = { version = "0.29.2", optional = true }
 
 # wasm
 js-sys = { version = "0.3", optional = true }
