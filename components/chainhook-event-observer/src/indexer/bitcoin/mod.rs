@@ -58,9 +58,13 @@ pub fn standardize_bitcoin_block(
         block_hash_bytes.reverse();
         BlockHash::from_slice(&block_hash_bytes).unwrap()
     };
-    let block = rpc
-        .get_block(&block_hash)
-        .map_err(|e| format!("unable for invoke rpc get_block from {}: {}", indexer_config.bitcoin_node_rpc_url, e.to_string()))?;
+    let block = rpc.get_block(&block_hash).map_err(|e| {
+        format!(
+            "unable for invoke rpc get_block from {}: {}",
+            indexer_config.bitcoin_node_rpc_url,
+            e.to_string()
+        )
+    })?;
     let block_height = partial_block.burn_block_height;
     Ok(build_block(block, block_height, indexer_config, ctx))
 }
