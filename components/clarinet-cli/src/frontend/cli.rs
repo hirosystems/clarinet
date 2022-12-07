@@ -1209,7 +1209,7 @@ pub fn main() {
                 mine_block_delay,
             ) {
                 Ok(count) => (true, count),
-                Err((e, count)) => (false, count),
+                Err((_e, count)) => (false, count),
             };
             if hints_enabled {
                 display_tests_pro_tips_hint();
