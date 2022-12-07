@@ -917,14 +917,23 @@ p2p_bind = "0.0.0.0:{stacks_node_p2p_port}"
 miner = true
 seed = "{miner_secret_key_hex}"
 local_peer_seed = "{miner_secret_key_hex}"
-wait_time_for_microblocks = 1000
+pox_sync_sample_secs = 0
 wait_time_for_blocks = 0
-pox_sync_sample_secs = 10
-microblock_frequency = 8000
+wait_time_for_microblocks = 50
+microblock_frequency = 1000
+
+[connection_options]
+# inv_sync_interval = 10
+# download_interval = 10
+# walk_interval = 10
+disable_block_download = true
+disable_inbound_handshakes = true
+disable_inbound_walks = true
+public_ip_address = "1.1.1.1:1234"
 
 [miner]
 first_attempt_time_ms = 5000
-subsequent_attempt_time_ms = 2000
+subsequent_attempt_time_ms = 5000
 # microblock_attempt_time_ms = 15000
 "#,
             stacks_node_rpc_port = devnet_config.stacks_node_rpc_port,
@@ -990,7 +999,9 @@ events_keys = ["*"]
 chain = "bitcoin"
 mode = "krypton"
 poll_time_secs = 1
+timeout = 30
 peer_host = "host.docker.internal"
+rpc_ssl = false
 username = "{bitcoin_node_username}"
 password = "{bitcoin_node_password}"
 rpc_port = {orchestrator_ingestion_port}

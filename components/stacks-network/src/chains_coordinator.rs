@@ -643,7 +643,7 @@ fn handle_bitcoin_mining(
             Ok(cmd) => cmd,
             Err(_e) => {
                 // TODO(lgalabru): cascade termination
-                continue;
+                break;
             }
         };
         match command {
