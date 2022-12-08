@@ -326,6 +326,8 @@ pub fn apply_on_chain_deployment(
     deployment_event_tx: Sender<DeploymentEvent>,
     deployment_command_rx: Receiver<DeploymentCommand>,
     fetch_initial_nonces: bool,
+    override_bitcoin_rpc_url: Option<String>,
+    override_stacks_rpc_url: Option<String>,
 ) {
     let network = deployment.network.get_networks();
     let network_manifest =
@@ -359,14 +361,22 @@ pub fn apply_on_chain_deployment(
         btc_accounts_lookup.insert(account.btc_address.clone(), account);
     }
 
-    let stacks_node_url = deployment
-        .stacks_node
-        .expect("unable to get stacks node rcp address");
+    let stacks_node_url = if let Some(url) = override_stacks_rpc_url {
+        url
+    } else {
+        deployment
+            .stacks_node
+            .expect("unable to get stacks node rcp address")
+    };
     let stacks_rpc = StacksRpc::new(&stacks_node_url);
 
-    let bitcoin_node_url = deployment
-        .bitcoin_node
-        .expect("unable to get bitcoin node rcp address");
+    let bitcoin_node_url = if let Some(url) = override_bitcoin_rpc_url {
+        url
+    } else {
+        deployment
+            .bitcoin_node
+            .expect("unable to get bitcoin node rcp address")
+    };
 
     // Phase 1: we traverse the deployment plan and encode all the transactions,
     // keeping the order.

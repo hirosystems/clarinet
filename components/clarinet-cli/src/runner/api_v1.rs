@@ -862,7 +862,7 @@ fn wrap_result_in_simulated_transaction(
         },
     };
     let (txid, _timestamp) = {
-        let timestamp = DateTime::<Utc>::from_utc(NaiveDateTime::from_timestamp(61, 0), Utc);
+        let timestamp = DateTime::<Utc>::from_utc(NaiveDateTime::from_timestamp_opt(61, 0).unwrap(), Utc);
         let bytes = Sha256::digest(timestamp.timestamp_micros().to_be_bytes()).to_vec();
         (format!("0x{}", to_hex(&bytes)), timestamp)
     };

@@ -53,6 +53,22 @@ pub struct DevnetEventObserverConfig {
     pub services_map_hosts: ServicesMapHosts,
 }
 
+impl DevnetEventObserverConfig {
+    pub fn consolidated_stacks_rpc_url(&self) -> String {
+        format!(
+            "http://{}:{}",
+            self.services_map_hosts.stacks_node_host, self.devnet_config.stacks_node_rpc_port
+        )
+    }
+
+    pub fn consolidated_bitcoin_rpc_url(&self) -> String {
+        format!(
+            "http://{}:{}",
+            self.services_map_hosts.bitcoin_node_host, self.devnet_config.bitcoin_node_rpc_port
+        )
+    }
+}
+
 #[derive(Clone, Debug)]
 pub struct DevnetInitializationStatus {
     pub should_deploy_protocol: bool,
@@ -137,7 +153,8 @@ pub async fn start_chains_coordinator(
         &config.deployment,
         deployment_events_tx,
         deployments_command_rx,
-        &config.services_map_hosts,
+        Some(config.consolidated_bitcoin_rpc_url()),
+        Some(config.consolidated_stacks_rpc_url()),
     );
 
     if let Some(ref hooks) = config.event_observer_config.initial_hook_formation {
@@ -441,7 +458,8 @@ pub fn prepare_protocol_deployment(
     deployment: &DeploymentSpecification,
     deployment_event_tx: Sender<DeploymentEvent>,
     deployment_command_rx: Receiver<DeploymentCommand>,
-    services_map_hosts: &ServicesMapHosts,
+    override_bitcoin_rpc_url: Option<String>,
+    override_stacks_rpc_url: Option<String>,
 ) {
     let manifest = manifest.clone();
     let deployment = deployment.clone();
@@ -453,6 +471,8 @@ pub fn prepare_protocol_deployment(
             deployment_event_tx,
             deployment_command_rx,
             false,
+            override_bitcoin_rpc_url,
+            override_stacks_rpc_url,
         );
     });
 }
