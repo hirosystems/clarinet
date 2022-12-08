@@ -44,7 +44,7 @@ use super::SessionSettings;
 static BOOT_TESTNET_ADDRESS: &str = "ST000000000000000000002AMW42H";
 static BOOT_MAINNET_ADDRESS: &str = "SP000000000000000000002Q6VF78";
 
-static V2_BOOT_CONTRACTS: &[&str] = &["pox-2"];
+static V2_BOOT_CONTRACTS: &[&str] = &["pox-2", "costs-3"];
 
 lazy_static! {
     static ref BOOT_TESTNET_PRINCIPAL: StandardPrincipalData =
@@ -56,7 +56,7 @@ lazy_static! {
 lazy_static! {
     pub static ref BOOT_CONTRACTS_DATA: BTreeMap<QualifiedContractIdentifier, (ClarityContract, ContractAST)> = {
         let mut result = BTreeMap::new();
-        let deploy: [(&StandardPrincipalData, [(&str, &str); 9]); 2] = [
+        let deploy: [(&StandardPrincipalData, [(&str, &str); 10]); 2] = [
             (&*BOOT_TESTNET_PRINCIPAL, *STACKS_BOOT_CODE_TESTNET),
             (&*BOOT_MAINNET_PRINCIPAL, *STACKS_BOOT_CODE_MAINNET),
         ];
@@ -65,17 +65,19 @@ lazy_static! {
             ClarityInterpreter::new(StandardPrincipalData::transient(), Settings::default());
         for (deployer, boot_code) in deploy.iter() {
             for (name, code) in boot_code.iter() {
-                let clarity_version = if V2_BOOT_CONTRACTS.contains(name) {
-                    ClarityVersion::Clarity2
+                let (epoch, clarity_version) = if (*name).eq("pox-2") || (*name).eq("costs-3") {
+                    (StacksEpochId::Epoch21, ClarityVersion::Clarity2)
+                } else if (*name).eq("cost-2") {
+                    (StacksEpochId::Epoch2_05, ClarityVersion::Clarity1)
                 } else {
-                    ClarityVersion::Clarity1
+                    (StacksEpochId::Epoch20, ClarityVersion::Clarity1)
                 };
 
                 let boot_contract = ClarityContract {
                     code_source: ClarityCodeSource::ContractInMemory(code.to_string()),
                     deployer: ContractDeployer::Address(deployer.to_address()),
                     name: name.to_string(),
-                    epoch: StacksEpochId::Epoch20,
+                    epoch,
                     clarity_version,
                 };
                 let (ast, _, _) = interpreter.build_ast(&boot_contract);
@@ -178,7 +180,7 @@ impl Session {
                 .include_boot_contracts
                 .contains(&name.to_string())
             {
-                let (epoch, clarity_version) = if (*name).eq("pox-2") || (*name).eq("cost-3") {
+                let (epoch, clarity_version) = if (*name).eq("pox-2") || (*name).eq("costs-3") {
                     (StacksEpochId::Epoch21, ClarityVersion::Clarity2)
                 } else if (*name).eq("cost-2") {
                     (StacksEpochId::Epoch2_05, ClarityVersion::Clarity1)
@@ -588,7 +590,7 @@ impl Session {
             code_source: ClarityCodeSource::ContractInMemory(contract_call),
             name: "contract-call".to_string(),
             deployer: ContractDeployer::Address(sender.to_string()),
-            epoch: StacksEpochId::Epoch20,
+            epoch: StacksEpochId::Epoch21,
             clarity_version: ClarityVersion::Clarity1,
         };
 
@@ -1270,7 +1272,7 @@ mod tests {
     #[test]
     fn evaluate_at_block() {
         let mut settings = SessionSettings::default();
-        settings.include_boot_contracts = vec!["costs".into(), "costs-2".into()];
+        settings.include_boot_contracts = vec!["costs".into(), "costs-2".into(), "costs-3".into()];
 
         let mut session = Session::new(settings);
         session.start().expect("session could not start");
