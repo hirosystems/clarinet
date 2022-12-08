@@ -7,6 +7,7 @@ use crate::chainhooks::stacks::{
     StacksChainhookOccurrence, StacksChainhookOccurrencePayload,
 };
 use crate::chainhooks::types::{ChainhookConfig, ChainhookSpecification};
+use crate::indexer::bitcoin::retrieve_full_block;
 use crate::indexer::{self, Indexer, IndexerConfig};
 use crate::utils::Context;
 use bitcoincore_rpc::bitcoin::{BlockHash, Txid};
@@ -108,7 +109,7 @@ pub struct EventObserverConfig {
     pub normalization_enabled: bool,
     pub grpc_server_enabled: bool,
     pub hooks_enabled: bool,
-    pub initial_hook_formation: Option<ChainhookConfig>,
+    pub chainhook_config: Option<ChainhookConfig>,
     pub bitcoin_rpc_proxy_enabled: bool,
     pub event_handlers: Vec<EventHandler>,
     pub ingestion_port: u16,
@@ -251,13 +252,13 @@ pub async fn start_event_observer(
     if config.operators.is_empty() {
         // If authorization not required, we create a default ChainhookConfig
         let mut hook_formation = ChainhookConfig::new();
-        if let Some(ref mut initial_hook_formation) = config.initial_hook_formation {
+        if let Some(ref mut initial_chainhook_config) = config.chainhook_config {
             hook_formation
                 .stacks_chainhooks
-                .append(&mut initial_hook_formation.stacks_chainhooks);
+                .append(&mut initial_chainhook_config.stacks_chainhooks);
             hook_formation
                 .bitcoin_chainhooks
-                .append(&mut initial_hook_formation.bitcoin_chainhooks);
+                .append(&mut initial_chainhook_config.bitcoin_chainhooks);
         }
         entries.insert(ApiKey(None), hook_formation);
     } else {
@@ -853,10 +854,12 @@ pub async fn start_observer_commands_handler(
                             continue;
                         }
                     };
-                    hook_formation.register_hook(hook.clone());
-                    chainhooks_lookup.insert(hook.uuid().to_string(), api_key.clone());
+                    let mut registered_hook = hook.clone();
+                    registered_hook.set_owner_uuid(&api_key);
+                    hook_formation.register_hook(registered_hook.clone());
+                    chainhooks_lookup.insert(registered_hook.uuid().to_string(), api_key.clone());
                     if let Some(ref tx) = observer_events_tx {
-                        let _ = tx.send(ObserverEvent::HookRegistered(hook));
+                        let _ = tx.send(ObserverEvent::HookRegistered(registered_hook));
                     }
                 }
             },
@@ -945,8 +948,9 @@ pub fn handle_ping(ctx: &State<Context>) -> Json<JsonValue> {
 
 #[openapi(skip)]
 #[post("/new_burn_block", format = "json", data = "<marshalled_block>")]
-pub fn handle_new_bitcoin_block(
+pub async fn handle_new_bitcoin_block(
     indexer_rw_lock: &State<Arc<RwLock<Indexer>>>,
+    bitcoin_config: &State<BitcoinConfig>,
     marshalled_block: Json<JsonValue>,
     background_job_tx: &State<Arc<Mutex<Sender<ObserverCommand>>>>,
     ctx: &State<Context>,
@@ -955,8 +959,23 @@ pub fn handle_new_bitcoin_block(
     // Standardize the structure of the block, and identify the
     // kind of update that this new block would imply, taking
     // into account the last 7 blocks.
+
+    let (block_height, block) =
+        match retrieve_full_block(bitcoin_config, marshalled_block.into_inner(), ctx).await {
+            Ok(block) => block,
+            Err(e) => {
+                ctx.try_log(|logger| {
+                    slog::warn!(logger, "unable to retrieve_full_block: {}", e.to_string())
+                });
+                return Json(json!({
+                    "status": 500,
+                    "result": "unable to retrieve_full_block",
+                }));
+            }
+        };
+
     let chain_update = match indexer_rw_lock.inner().write() {
-        Ok(mut indexer) => indexer.handle_bitcoin_block(marshalled_block.into_inner(), &ctx),
+        Ok(mut indexer) => indexer.handle_bitcoin_block(block_height, block, &ctx),
         Err(e) => {
             ctx.try_log(|logger| {
                 slog::warn!(
@@ -1419,7 +1438,7 @@ pub fn handle_delete_bitcoin_hook(
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash, OpenApiFromRequest)]
-pub struct ApiKey(Option<String>);
+pub struct ApiKey(pub Option<String>);
 
 #[derive(Debug)]
 pub enum ApiKeyError {

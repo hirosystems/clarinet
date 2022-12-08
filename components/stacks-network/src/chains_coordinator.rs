@@ -96,7 +96,7 @@ impl DevnetEventObserverConfig {
             hooks_enabled: true,
             bitcoin_rpc_proxy_enabled: true,
             event_handlers: vec![],
-            initial_hook_formation: Some(chainhooks),
+            chainhook_config: Some(chainhooks),
             ingestion_port: devnet_config.orchestrator_ingestion_port,
             control_port: devnet_config.orchestrator_control_port,
             bitcoin_node_username: devnet_config.bitcoin_node_username.clone(),
@@ -145,8 +145,7 @@ pub async fn start_chains_coordinator(
         if chainhooks_count > 0 {
             devnet_event_tx
                 .send(DevnetEvent::info(format!(
-                    "{} chainhooks registered",
-                    hooks.bitcoin_chainhooks.len() + hooks.stacks_chainhooks.len()
+                    "{chainhooks_count} chainhooks registered",
                 )))
                 .expect("Unable to terminate event observer");
         }

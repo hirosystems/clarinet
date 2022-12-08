@@ -29,7 +29,7 @@ fn generate_test_config() -> (EventObserverConfig, ChainhookStore) {
         normalization_enabled: true,
         grpc_server_enabled: false,
         hooks_enabled: true,
-        initial_hook_formation: Some(ChainhookConfig::new()),
+        chainhook_config: Some(ChainhookConfig::new()),
         bitcoin_rpc_proxy_enabled: false,
         event_handlers: vec![],
         ingestion_port: 0,
@@ -55,6 +55,7 @@ fn stacks_chainhook_contract_call(
     let spec = StacksChainhookSpecification {
         uuid: format!("{}", id),
         name: format!("Chainhook {}", id),
+        owner_uuid: None,
         network: StacksNetwork::Devnet,
         version: 1,
         start_block: None,
@@ -82,6 +83,7 @@ fn bitcoin_chainhook_p2pkh(
     let spec = BitcoinChainhookSpecification {
         uuid: format!("{}", id),
         name: format!("Chainhook {}", id),
+        owner_uuid: None,
         network: BitcoinNetwork::Regtest,
         version: 1,
         start_block: None,
