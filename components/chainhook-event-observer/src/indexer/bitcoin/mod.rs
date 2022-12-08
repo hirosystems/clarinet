@@ -14,7 +14,7 @@ use chainhook_types::{
     PoxBlockCommitmentData, PoxReward, StacksBaseChainOperation, TransactionIdentifier,
     TransferSTXData,
 };
-use clarity_repl::clarity::util::hash::to_hex;
+use clarity_repl::clarity::util::hash::{hex_bytes, to_hex};
 use hiro_system_kit::slog;
 use rocket::serde::json::Value as JsonValue;
 
@@ -54,7 +54,7 @@ pub fn standardize_bitcoin_block(
     let http_client = HttpClient::builder()
         .build()
         .expect("Unable to build http client");
-    let block: Block = http_client
+    let response_hex = http_client
         .post(&indexer_config.bitcoin_node_rpc_url)
         .basic_auth(
             &indexer_config.bitcoin_node_rpc_username,
@@ -65,8 +65,16 @@ pub fn standardize_bitcoin_block(
         .json(&body)
         .send()
         .map_err(|e| format!("unable to send request ({})", e))?
-        .json()
+        .json::<bitcoincore_rpc::jsonrpc::Response>()
+        .map_err(|e| format!("unable to parse response ({})", e))?
+        .result::<String>()
         .map_err(|e| format!("unable to parse response ({})", e))?;
+
+    let bytes = hex_bytes(&response_hex)
+        .map_err(|e| format!("unable to retrieve bytes from response ({})", e))?;
+
+    let block = bitcoincore_rpc::bitcoin::consensus::encode::deserialize(&bytes)
+        .map_err(|e| format!("unable to deserialize bitcoin block ({})", e))?;
 
     let block_height = partial_block.burn_block_height;
     Ok(build_block(block, block_height, indexer_config, ctx))
