@@ -342,8 +342,6 @@ impl EditorState {
             character: position.character + 1,
         };
 
-        let metadata = self.contracts_lookup.get(contract_location)?;
-
         let position_hash = get_atom_start_at_position(&position, contract.expressions.as_ref()?)?;
         let definitions = match &contract.definitions {
             Some(definitions) => definitions.to_owned(),
@@ -358,13 +356,14 @@ impl EditorState {
                 });
             }
             DefinitionLocation::External(contract_identifier, function_name) => {
+                let metadata = self.contracts_lookup.get(contract_location)?;
                 let protocol = self.protocols.get(&metadata.manifest_location)?;
 
                 let definition_contract_location =
                     protocol.locations_lookup.get(contract_identifier)?;
 
                 // if the contract is opened and eventually contains unsaved changes,
-                // its public defintions are computed on the fly, which is fairly fast
+                // its public definitions are computed on the fly, which is fairly fast
                 if let Some(expressions) = self
                     .active_contracts
                     .get(definition_contract_location)
