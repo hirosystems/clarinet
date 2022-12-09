@@ -25,6 +25,7 @@ use clarity::vm::types::{
 use clarity::vm::variables::NativeVariables;
 use clarity::vm::{
     ClarityVersion, ContractName, CostSynthesis, EvalHook, EvaluationResult, ExecutionResult,
+    StacksEpoch,
 };
 use reqwest;
 use std::collections::{BTreeMap, BTreeSet, HashMap, VecDeque};
@@ -124,6 +125,7 @@ pub struct Session {
     pub initial_contracts_analysis: Vec<(ContractAnalysis, String, String)>,
     pub show_costs: bool,
     pub executed: Vec<String>,
+    pub current_epoch: StacksEpochId,
 }
 
 impl Session {
@@ -151,6 +153,7 @@ impl Session {
             show_costs: false,
             settings,
             executed: Vec::new(),
+            current_epoch: StacksEpochId::Epoch2_05,
         }
     }
 
@@ -257,6 +260,8 @@ impl Session {
                 self.parse_and_advance_chain_tip(&mut output, cmd)
             }
             cmd if cmd.starts_with("::toggle_costs") => self.toggle_costs(&mut output),
+            cmd if cmd.starts_with("::get_epoch") => self.get_epoch(&mut output),
+            cmd if cmd.starts_with("::set_epoch") => self.set_epoch(&mut output, cmd),
             cmd if cmd.starts_with("::encode") => self.encode(&mut output, cmd),
             cmd if cmd.starts_with("::decode") => self.decode(&mut output, cmd),
             #[cfg(feature = "cli")]
@@ -590,8 +595,8 @@ impl Session {
             code_source: ClarityCodeSource::ContractInMemory(contract_call),
             name: "contract-call".to_string(),
             deployer: ContractDeployer::Address(sender.to_string()),
-            epoch: StacksEpochId::Epoch21,
-            clarity_version: ClarityVersion::Clarity1,
+            epoch: self.current_epoch.clone(),
+            clarity_version: ClarityVersion::default_for_epoch(self.current_epoch),
         };
 
         self.set_tx_sender(sender.into());
@@ -663,8 +668,8 @@ impl Session {
             code_source: ClarityCodeSource::ContractInMemory(snippet),
             name: format!("contract-{}", self.contracts.len()),
             deployer: ContractDeployer::DefaultDeployer,
-            clarity_version: ClarityVersion::default_for_epoch(DEFAULT_EPOCH),
-            epoch: DEFAULT_EPOCH,
+            clarity_version: ClarityVersion::default_for_epoch(self.current_epoch),
+            epoch: self.current_epoch,
         };
         let contract_identifier =
             contract.expect_resolved_contract_identifier(Some(&self.interpreter.get_tx_sender()));
@@ -753,6 +758,10 @@ impl Session {
         output.push(format!(
             "{}",
             help_colour.paint("::advance_chain_tip <count>\t\tSimulate mining of <count> blocks")
+        ));
+        output.push(format!(
+            "{}",
+            help_colour.paint("::set_epoch <2.0> | <2.05> | <2.1>\tUpdate the current epoch")
         ));
         output.push(format!(
             "{}",
@@ -865,6 +874,25 @@ impl Session {
     pub fn toggle_costs(&mut self, output: &mut Vec<String>) {
         self.show_costs = !self.show_costs;
         output.push(green!(format!("Always show costs: {}", self.show_costs)))
+    }
+
+    pub fn get_epoch(&mut self, output: &mut Vec<String>) {
+        output.push(format!("Current epoch: {}", self.current_epoch))
+    }
+
+    pub fn set_epoch(&mut self, output: &mut Vec<String>, cmd: &str) {
+        let epoch = match cmd.split_once(" ") {
+            Some((_, epoch)) if epoch.eq("2.0") => StacksEpochId::Epoch20,
+            Some((_, epoch)) if epoch.eq("2.05") => StacksEpochId::Epoch2_05,
+            Some((_, epoch)) if epoch.eq("2.1") => StacksEpochId::Epoch21,
+            _ => return output.push(red!("Usage: ::set_epoch 2.0 | 2.05 | 2.1")),
+        };
+        self.update_epoch(epoch);
+        output.push(green!(format!("Epoch updated to: {epoch}")))
+    }
+
+    pub fn update_epoch(&mut self, epoch: StacksEpochId) {
+        self.current_epoch = epoch;
     }
 
     pub fn encode(&mut self, output: &mut Vec<String>, cmd: &str) {
@@ -1206,6 +1234,32 @@ mod tests {
         assert_eq!(
             output[0],
             green!("0c00000002036261720403666f6f0d0000000568656c6c6f")
+        );
+    }
+
+    #[test]
+    fn epoch_switch() {
+        let mut session = Session::new(SessionSettings::default());
+        session.update_epoch(StacksEpochId::Epoch20);
+        let diags = session
+            .eval("(slice? \"blockstack\" u5 u10)".into(), None, false)
+            .unwrap_err();
+        assert_eq!(
+            diags[0].message,
+            format!("use of unresolved function 'slice?'",)
+        );
+        session.update_epoch(StacksEpochId::Epoch21);
+        let res = session
+            .eval("(slice? \"blockstack\" u5 u10)".into(), None, false)
+            .unwrap();
+        let res = match res.result {
+            EvaluationResult::Contract(_) => unreachable!(),
+            EvaluationResult::Snippet(res) => res,
+        };
+        assert_eq!(
+            res.result,
+            Value::some(Value::string_ascii_from_bytes("stack".as_bytes().to_vec()).unwrap())
+                .unwrap()
         );
     }
 
