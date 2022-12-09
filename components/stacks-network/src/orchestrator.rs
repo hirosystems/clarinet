@@ -2430,8 +2430,6 @@ events_keys = ["*"]
                 Err(_e) => {}
             }
             std::thread::sleep(std::time::Duration::from_secs(1));
-            // // let res = self.docker_client.as_ref().unwrap().inspect_container(self.bitcoin_node_container_id.as_ref().unwrap(), None).await;
-            // println!("{:?}", res);
             let _ = devnet_event_tx.send(DevnetEvent::info(format!("Waiting for bitcoin-node",)));
         }
 
