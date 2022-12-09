@@ -808,7 +808,9 @@ pub fn main() {
 
                 std::thread::spawn(move || {
                     let manifest = manifest_moved;
-                    apply_on_chain_deployment(&manifest, deployment, event_tx, command_rx, true, None, None);
+                    apply_on_chain_deployment(
+                        &manifest, deployment, event_tx, command_rx, true, None, None,
+                    );
                 });
 
                 let _ = command_tx.send(DeploymentCommand::Start);
