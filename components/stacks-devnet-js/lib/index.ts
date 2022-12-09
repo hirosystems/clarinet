@@ -390,14 +390,9 @@ export class DevnetNetworkFactory {
 }
 
 export function getIsolatedNetworkConfigUsingNetworkId(networkId: number, networkConfig: NetworkConfig, interval = 10000) {
-  // Manifest path
-  var manifestPath = networkConfig.clarinetManifestPath === undefined ? "./Clarinet.toml" : networkConfig.clarinetManifestPath;
-  // Logs
-  var logs = networkConfig.logs;
-  logs ||= false;
-  // Accounts
-  var accounts = networkConfig.accounts;
-  accounts ||= [];
+  const manifestPath = networkConfig.clarinetManifestPath || "./Clarinet.toml";
+  const logs = networkConfig.logs || false;
+  const accounts = networkConfig.accounts || [];
   // Devnet settings
   var devnetDefaults = {
     network_id: networkId,
