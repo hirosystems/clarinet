@@ -40,6 +40,16 @@ impl From<StacksEpochId> for EpochSpec {
     }
 }
 
+impl Into<StacksEpochId> for EpochSpec {
+    fn into(self) -> StacksEpochId {
+        match self {
+            EpochSpec::Epoch2_0 => StacksEpochId::Epoch20,
+            EpochSpec::Epoch2_05 => StacksEpochId::Epoch2_05,
+            EpochSpec::Epoch2_1 => StacksEpochId::Epoch21,
+        }
+    }
+}
+
 pub struct DeploymentGenerationArtifacts {
     pub asts: HashMap<QualifiedContractIdentifier, ContractAST>,
     pub deps: HashMap<QualifiedContractIdentifier, DependencySet>,

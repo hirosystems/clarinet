@@ -130,6 +130,9 @@ pub fn update_session_with_contracts_executions(
 
     let mut results = BTreeMap::new();
     for batch in deployment.plan.batches.iter() {
+        if let Some(spec) = batch.epoch {
+            session.update_epoch(spec.into());
+        }
         for transaction in batch.transactions.iter() {
             match transaction {
                 TransactionSpecification::RequirementPublish(_)
