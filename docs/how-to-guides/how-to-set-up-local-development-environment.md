@@ -57,6 +57,7 @@ section, you can always check your Clarity syntax using the `clarinet check` com
 you are currently developing in the active project.
 
 There are two tools in Clarinet you can use to test smart contracts: the console, an interactive Clarity REPL, and the test harness, a testing framework written in Typescript.
+When developing a new smart contract using local Clarity REPL, you can exercise a contract without the need to wait for block times in a live blockchain.
 
 ### Testing with the console
 

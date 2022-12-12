@@ -23,16 +23,9 @@ To view these video tutorials, please see [Hiro's Youtube channel](https://www.y
 
 For more latest information on Clarinet product, refer to [blog posts on Clarinet](https://www.hiro.so/search?query=Clarinet).
 
-The Clarinet tool is used for developing smart contracts using a larger development strategy that involves:
-
-- Building and testing the contract locally.
-- Deploying the final draft contract to a testnet environment.
-- Testing on a live blockchain.
-- Deploying the final contract to the mainnet.
-
 When developing smart contracts, you can also use the [Clarity Visual Studio Code plugin](https://marketplace.visualstudio.com/items?itemName=HiroSystems.clarity-lsp).
 
-- When developing a new smart contract using local Clarity REPL, you can exercise a contract without the need to wait for block times in a live blockchain.
 
-- Clarinet allows you to instantly initialize wallets and populate them with tokens, which helps to interactively or programmatically test the behavior of the smart contract. Blocks are mined instantly, so you can control the number of blocks that are mined between testing transactions.
+
+
 

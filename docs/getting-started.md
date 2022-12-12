@@ -53,7 +53,7 @@ For more information on how to install Clarinet on Windows, please see the [Sett
 
 If you would like to install Clarinet from pre-built binaries, you must first download the latest release from the 
 [Hiro releases page](https://github.com/hirosystems/clarinet/releases). When you have downloaded the latest release,
-Uuzip the binary and then copy it to a location that is already in your path, such as `/usr/local/bin` using the command shwon below.
+unzip the binary and then copy it to a location that is already in your path, such as `/usr/local/bin` using the command shwon below.
 
 ```sh
 # note: you can change the v0.27.0 with version that are available in the releases page.
@@ -66,10 +66,10 @@ mv ./clarinet /usr/local/bin
 >**_NOTE:_**
 >
 >If you are using macOS, you may receive security errors when trying to run the pre-compiled binary. 
->You can resolve the security warning by using the command below.
+>In order to resolve the security warning, use the command below and replace the path `/usr/local/bin/clarinet` with your local binary file.
 
 ```sh
-xattr -d com.apple.quarantine /path/to/downloaded/clarinet/binary
+xattr -d com.apple.quarantine /usr/local/bin/clarinet
 ```
 
 ### Install from source using Cargo
@@ -108,8 +108,7 @@ git pull
 git submodule update --recursive
 ```
 
-
-Now that you have installed and built Clarinet, you can [create a new project](how-to-guides/how-to-create-new-project.md), [add a new contract](how-to-guides/how-to-add-contract.md) and then populate the project with smart contracts.
+Now that you have installed and built Clarinet, you can [create a new project](how-to-guides/how-to-create-new-project.md), and then [populate the project with smart contracts](how-to-guides/how-to-add-contract.md).
 
 Clarinet also provides tools for interacting with your contracts in a Read, Evaluate, Print, Loop (REPL) console, and perform automated [testing of contracts](how-to-guides/how-to-test-contract.md).
 
