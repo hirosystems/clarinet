@@ -46,6 +46,8 @@ Within these tests, developers can simulate mining a block containing transactio
 
 ![VS Code deno error](../images/deno-error.png)
 
+Clarinet allows you to instantly initialize wallets and populate them with tokens, which helps to interactively or programmatically test the behavior of the smart contract. Blocks are mined instantly, so you can control the number of blocks that are mined between testing transactions.
+
 To define a Clarinet test you need to register it with a call to `Clarinet.test()`. In the example unit test below, you see us
 1. Importing the relevant classes from the Clarinet module on Deno
 2. Instantiating and passing common Clarinet objects to our `Clarinet.test()` API call
