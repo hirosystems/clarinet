@@ -8,7 +8,7 @@ mod util;
 use super::DevnetEvent;
 use crate::ChainsCoordinatorCommand;
 use app::App;
-use chainhook_event_observer::{observer::ObserverCommand, utils::Context};
+use chainhook_event_observer::utils::Context;
 use chainhook_types::StacksChainEvent;
 use crossterm::{
     event::{self, Event, KeyCode, KeyModifiers},
@@ -28,7 +28,6 @@ pub fn start_ui(
     devnet_events_tx: Sender<DevnetEvent>,
     devnet_events_rx: Receiver<DevnetEvent>,
     chains_coordinator_commands_tx: Sender<ChainsCoordinatorCommand>,
-    observer_command_tx: Sender<ObserverCommand>,
     orchestrator_terminated_rx: Receiver<bool>,
     devnet_path: &str,
     subnet_enabled: bool,
@@ -38,7 +37,6 @@ pub fn start_ui(
         devnet_events_tx,
         devnet_events_rx,
         chains_coordinator_commands_tx,
-        observer_command_tx,
         orchestrator_terminated_rx,
         devnet_path,
         subnet_enabled,
@@ -54,7 +52,6 @@ pub fn do_start_ui(
     devnet_events_tx: Sender<DevnetEvent>,
     devnet_events_rx: Receiver<DevnetEvent>,
     chains_coordinator_commands_tx: Sender<ChainsCoordinatorCommand>,
-    observer_command_tx: Sender<ObserverCommand>,
     orchestrator_terminated_rx: Receiver<bool>,
     devnet_path: &str,
     subnet_enabled: bool,
@@ -110,7 +107,6 @@ pub fn do_start_ui(
                 let _ = terminate(
                     &mut terminal,
                     chains_coordinator_commands_tx,
-                    observer_command_tx,
                     orchestrator_terminated_rx,
                 );
                 break;
@@ -123,7 +119,6 @@ pub fn do_start_ui(
                     let _ = terminate(
                         &mut terminal,
                         chains_coordinator_commands_tx,
-                        observer_command_tx,
                         orchestrator_terminated_rx);
                     break;
                 }
@@ -204,7 +199,6 @@ pub fn do_start_ui(
                 let _ = terminate(
                     &mut terminal,
                     chains_coordinator_commands_tx,
-                    observer_command_tx,
                     orchestrator_terminated_rx);
                 return Err(message)
             },
@@ -229,16 +223,12 @@ pub fn do_start_ui(
 fn terminate(
     terminal: &mut Terminal<CrosstermBackend<Stdout>>,
     chains_coordinator_commands_tx: Sender<ChainsCoordinatorCommand>,
-    observer_command_tx: Sender<ObserverCommand>,
     orchestrator_terminated_rx: Receiver<bool>,
 ) -> Result<(), Box<dyn Error>> {
     disable_raw_mode()?;
     execute!(terminal.backend_mut(), LeaveAlternateScreen,)?;
     chains_coordinator_commands_tx
         .send(ChainsCoordinatorCommand::Terminate)
-        .expect("Unable to terminate devnet");
-    observer_command_tx
-        .send(ObserverCommand::Terminate)
         .expect("Unable to terminate devnet");
     match orchestrator_terminated_rx.recv()? {
         _ => {}

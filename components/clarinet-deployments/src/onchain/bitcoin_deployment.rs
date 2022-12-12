@@ -4,7 +4,9 @@ use base58::FromBase58;
 use bitcoin::blockdata::opcodes;
 use bitcoin::blockdata::script::Builder;
 use bitcoin::consensus::encode;
-use bitcoin::{OutPoint, Script, Transaction, TxIn, TxOut, Txid, Witness};
+use bitcoin::{
+    OutPoint, PackedLockTime, Script, Sequence, Transaction, TxIn, TxOut, Txid, Witness,
+};
 use bitcoincore_rpc::bitcoin::secp256k1::{Message, PublicKey, Secp256k1, SecretKey};
 use bitcoincore_rpc::bitcoin::Address;
 use bitcoincore_rpc::Client;
@@ -20,7 +22,7 @@ pub fn build_transaction_spec(
 ) -> (Transaction, Vec<ListUnspentResultEntry>) {
     let mut transaction = Transaction {
         version: 1,
-        lock_time: 0,
+        lock_time: PackedLockTime(0),
         input: vec![],
         output: vec![],
     };
@@ -34,7 +36,7 @@ pub fn build_transaction_spec(
     let total_required = tx_spec.sats_amount + tx_fee;
     utxos.sort_by(|a, b| a.amount.cmp(&b.amount));
     for (i, utxo) in utxos.iter().enumerate() {
-        cumulated_amount += utxo.amount.as_sat();
+        cumulated_amount += utxo.amount.to_sat();
         selected_utxos_indices.push(i);
         if cumulated_amount >= total_required {
             break;
@@ -54,7 +56,7 @@ pub fn build_transaction_spec(
                 vout: utxo.vout,
             },
             script_sig: Script::new(),
-            sequence: 0xFFFFFFFD, // allow RBF
+            sequence: Sequence(0xFFFFFFFD), // allow RBF
             witness: Witness::new(),
         };
         transaction.input.push(input);
@@ -63,7 +65,6 @@ pub fn build_transaction_spec(
 
     // Prepare Recipient output
     let address = {
-        use bitcoin::Address;
         match Address::from_str(&tx_spec.recipient) {
             Ok(address) => address,
             Err(e) => panic!("{:?}", e),
@@ -111,7 +112,7 @@ pub fn sign_transaction(
             let message =
                 Message::from_slice(&sig_hash_bytes[..]).expect("Unable to create Message");
             let secp = Secp256k1::new();
-            let signature = secp.sign_recoverable(&message, signer);
+            let signature = secp.sign_ecdsa_recoverable(&message, signer);
             let public_key = PublicKey::from_secret_key(&secp, &signer);
             let sig_der = signature.to_standard().serialize_der();
             (sig_der, public_key)

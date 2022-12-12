@@ -8,14 +8,14 @@ use chainhook_types::{BitcoinNetwork, StacksNetwork};
 use schemars::JsonSchema;
 
 #[derive(Clone, Debug, JsonSchema)]
-pub struct HookFormation {
+pub struct ChainhookConfig {
     pub stacks_chainhooks: Vec<StacksChainhookSpecification>,
     pub bitcoin_chainhooks: Vec<BitcoinChainhookSpecification>,
 }
 
-impl HookFormation {
-    pub fn new() -> HookFormation {
-        HookFormation {
+impl ChainhookConfig {
+    pub fn new() -> ChainhookConfig {
+        ChainhookConfig {
             stacks_chainhooks: vec![],
             bitcoin_chainhooks: vec![],
         }
@@ -85,7 +85,7 @@ impl HookFormation {
     }
 }
 
-impl Serialize for HookFormation {
+impl Serialize for ChainhookConfig {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: Serializer,

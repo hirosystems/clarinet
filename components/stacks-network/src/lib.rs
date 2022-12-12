@@ -12,14 +12,16 @@ pub use orchestrator::DevnetOrchestrator;
 
 use std::{
     sync::{
-        mpsc::{self, channel, Sender},
+        mpsc::{self, channel, Receiver, Sender},
         Arc,
     },
     thread::sleep,
     time::Duration,
 };
 
-use chainhook_event_observer::{chainhooks::types::HookFormation, observer::MempoolAdmissionData};
+use chainhook_event_observer::{
+    chainhooks::types::ChainhookConfig, observer::MempoolAdmissionData,
+};
 use chainhook_types::{BitcoinChainEvent, StacksChainEvent};
 use chains_coordinator::{start_chains_coordinator, BitcoinMiningCommand};
 use chrono::prelude::*;
@@ -48,10 +50,12 @@ where
 pub async fn do_run_devnet(
     mut devnet: DevnetOrchestrator,
     deployment: DeploymentSpecification,
-    chainhooks: &mut Option<HookFormation>,
+    chainhooks: &mut Option<ChainhookConfig>,
     log_tx: Option<Sender<LogData>>,
     display_dashboard: bool,
     ctx: Context,
+    orchestrator_terminated_tx: Sender<bool>,
+    orchestrator_terminated_rx: Option<Receiver<bool>>,
 ) -> Result<
     (
         Option<mpsc::Receiver<DevnetEvent>>,
@@ -61,9 +65,8 @@ pub async fn do_run_devnet(
     String,
 > {
     let (devnet_events_tx, devnet_events_rx) = channel();
-    let (termination_success_tx, orchestrator_terminated_rx) = channel();
 
-    devnet.termination_success_tx = Some(termination_success_tx);
+    devnet.termination_success_tx = Some(orchestrator_terminated_tx);
 
     let devnet_config = match devnet.network_config {
         Some(ref network_config) => match &network_config.devnet {
@@ -77,16 +80,18 @@ pub async fn do_run_devnet(
         tracing_appender::rolling::never(&devnet_config.working_dir, "networking.log");
     let (non_blocking, _guard) = tracing_appender::non_blocking(file_appender);
 
-    tracing_subscriber::fmt()
+    let _ = tracing_subscriber::fmt()
         .with_max_level(tracing::Level::INFO)
         .with_writer(non_blocking)
-        .init();
+        .try_init();
+
+    let ip_address_setup = devnet.prepare_network().await?;
 
     // The event observer should be able to send some events to the UI thread,
     // and should be able to be terminated
     let hooks = match chainhooks.take() {
         Some(hooks) => hooks,
-        _ => HookFormation::new(),
+        _ => ChainhookConfig::new(),
     };
     let devnet_path = devnet_config.working_dir.clone();
     let config = DevnetEventObserverConfig::new(
@@ -95,6 +100,7 @@ pub async fn do_run_devnet(
         deployment,
         hooks,
         &ctx,
+        ip_address_setup,
     );
     let chains_coordinator_tx = devnet_events_tx.clone();
     let (chains_coordinator_commands_tx, chains_coordinator_commands_rx) = channel();
@@ -102,7 +108,6 @@ pub async fn do_run_devnet(
     let (observer_command_tx, observer_command_rx) = channel();
     let moved_orchestrator_terminator_tx = orchestrator_terminator_tx.clone();
     let moved_chains_coordinator_commands_tx = chains_coordinator_commands_tx.clone();
-    let moved_observer_command_tx = observer_command_tx.clone();
 
     let ctx_moved = ctx.clone();
     let chains_coordinator_handle = hiro_system_kit::thread_named("Chains coordinator")
@@ -150,8 +155,9 @@ pub async fn do_run_devnet(
             devnet_events_tx,
             devnet_events_rx,
             moved_chains_coordinator_commands_tx,
-            moved_observer_command_tx,
-            orchestrator_terminated_rx,
+            orchestrator_terminated_rx.expect(
+                "orchestrator_terminated_rx should be provided when display_dashboard set to true",
+            ),
             &devnet_path,
             devnet_config.enable_subnet_node,
             &ctx,
@@ -173,12 +179,11 @@ pub async fn do_run_devnet(
         let termination_writer = termination_reader.clone();
         let moved_orchestrator_terminator_tx = orchestrator_terminator_tx.clone();
         let moved_events_observer_commands_tx = chains_coordinator_commands_tx.clone();
-        ctrlc::set_handler(move || {
+        let _ = ctrlc::set_handler(move || {
             let _ = moved_events_observer_commands_tx.send(ChainsCoordinatorCommand::Terminate);
             let _ = moved_orchestrator_terminator_tx.send(true);
             termination_writer.store(true, Ordering::SeqCst);
-        })
-        .expect("Error setting Ctrl-C handler");
+        });
 
         if log_tx.is_none() {
             loop {

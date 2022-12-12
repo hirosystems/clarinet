@@ -1,6 +1,6 @@
 use crate::chainhooks::types::{
     BitcoinChainhookSpecification, BitcoinPredicateType, BitcoinTransactionFilterPredicate,
-    ChainhookSpecification, ExactMatchingRule, HookAction, HookFormation, Scope,
+    ChainhookConfig, ChainhookSpecification, ExactMatchingRule, HookAction, Scope,
     StacksChainhookSpecification, StacksContractCallBasedPredicate,
     StacksTransactionFilterPredicate,
 };
@@ -29,7 +29,7 @@ fn generate_test_config() -> (EventObserverConfig, ChainhookStore) {
         normalization_enabled: true,
         grpc_server_enabled: false,
         hooks_enabled: true,
-        initial_hook_formation: Some(HookFormation::new()),
+        initial_hook_formation: Some(ChainhookConfig::new()),
         bitcoin_rpc_proxy_enabled: false,
         event_handlers: vec![],
         ingestion_port: 0,
@@ -42,7 +42,7 @@ fn generate_test_config() -> (EventObserverConfig, ChainhookStore) {
         display_logs: false,
     };
     let mut entries = HashMap::new();
-    entries.insert(ApiKey(None), HookFormation::new());
+    entries.insert(ApiKey(None), ChainhookConfig::new());
     let chainhook_store = ChainhookStore { entries };
     (config, chainhook_store)
 }
@@ -159,6 +159,8 @@ fn test_stacks_chainhook_register_deregister() {
             Arc::new(RwLock::new(chainhook_store)),
             observer_commands_rx,
             Some(observer_events_tx),
+            None,
+            None,
             Context::empty(),
         ));
     });
@@ -395,6 +397,8 @@ fn test_stacks_chainhook_auto_deregister() {
             Arc::new(RwLock::new(chainhook_store)),
             observer_commands_rx,
             Some(observer_events_tx),
+            None,
+            None,
             Context::empty(),
         ));
     });
@@ -552,6 +556,8 @@ fn test_bitcoin_chainhook_register_deregister() {
             Arc::new(RwLock::new(chainhook_store)),
             observer_commands_rx,
             Some(observer_events_tx),
+            None,
+            None,
             Context::empty(),
         ));
     });
@@ -809,6 +815,8 @@ fn test_bitcoin_chainhook_auto_deregister() {
             Arc::new(RwLock::new(chainhook_store)),
             observer_commands_rx,
             Some(observer_events_tx),
+            None,
+            None,
             Context::empty(),
         ));
     });

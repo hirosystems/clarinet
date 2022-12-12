@@ -1,12 +1,11 @@
 mod blocks_pool;
+
 use crate::chainhooks::types::{
     get_canonical_magic_bytes, get_canonical_pox_config, PoxConfig, StacksOpcodes,
 };
 use crate::indexer::IndexerConfig;
 use crate::utils::Context;
-use bitcoincore_rpc::bitcoin::hashes::Hash;
-use bitcoincore_rpc::bitcoin::{Block, BlockHash};
-use bitcoincore_rpc::{Auth, Client, RpcApi};
+use bitcoincore_rpc::bitcoin::Block;
 pub use blocks_pool::BitcoinBlockPool;
 use chainhook_types::bitcoin::{OutPoint, TxIn, TxOut};
 use chainhook_types::{
@@ -40,27 +39,43 @@ pub fn standardize_bitcoin_block(
     marshalled_block: JsonValue,
     ctx: &Context,
 ) -> Result<BitcoinBlockData, String> {
-    let auth = Auth::UserPass(
-        indexer_config.bitcoin_node_rpc_username.clone(),
-        indexer_config.bitcoin_node_rpc_password.clone(),
-    );
-    let rpc = Client::new(&indexer_config.bitcoin_node_rpc_url, auth).map_err(|e| {
-        format!(
-            "unable for bitcoin rpc initialize client: {}",
-            e.to_string()
-        )
-    })?;
     let partial_block: NewBitcoinBlock = serde_json::from_value(marshalled_block)
         .map_err(|e| format!("unable for parse bitcoin block: {}", e.to_string()))?;
-    let block_hash = {
-        let block_hash_str = partial_block.burn_block_hash.strip_prefix("0x").unwrap();
-        let mut block_hash_bytes = hex_bytes(&block_hash_str).unwrap();
-        block_hash_bytes.reverse();
-        BlockHash::from_slice(&block_hash_bytes).unwrap()
-    };
-    let block = rpc
-        .get_block(&block_hash)
-        .map_err(|e| format!("unable for invoke rpc get_block: {}", e.to_string()))?;
+    let block_hash = partial_block.burn_block_hash.strip_prefix("0x").unwrap();
+
+    use reqwest::blocking::Client as HttpClient;
+
+    let body = json!({
+        "jsonrpc": "1.0",
+        "id": "chainhook-node",
+        "method": "getblock",
+        "params": [block_hash, 0]
+    });
+    let http_client = HttpClient::builder()
+        .build()
+        .expect("Unable to build http client");
+    let response_hex = http_client
+        .post(&indexer_config.bitcoin_node_rpc_url)
+        .basic_auth(
+            &indexer_config.bitcoin_node_rpc_username,
+            Some(&indexer_config.bitcoin_node_rpc_password),
+        )
+        .header("Content-Type", "application/json")
+        .header("Host", &indexer_config.bitcoin_node_rpc_url[7..])
+        .json(&body)
+        .send()
+        .map_err(|e| format!("unable to send request ({})", e))?
+        .json::<bitcoincore_rpc::jsonrpc::Response>()
+        .map_err(|e| format!("unable to parse response ({})", e))?
+        .result::<String>()
+        .map_err(|e| format!("unable to parse response ({})", e))?;
+
+    let bytes = hex_bytes(&response_hex)
+        .map_err(|e| format!("unable to retrieve bytes from response ({})", e))?;
+
+    let block = bitcoincore_rpc::bitcoin::consensus::encode::deserialize(&bytes)
+        .map_err(|e| format!("unable to deserialize bitcoin block ({})", e))?;
+
     let block_height = partial_block.burn_block_height;
     Ok(build_block(block, block_height, indexer_config, ctx))
 }
