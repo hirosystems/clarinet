@@ -1,8 +1,4 @@
-use super::super::tests::{
-    helpers, process_bitcoin_blocks_and_check_expectations, BitcoinChainEventExpectation,
-};
-use super::BitcoinBlockPool;
-use chainhook_types::{BitcoinBlockData, BitcoinChainEvent};
+use super::super::tests::{helpers, process_bitcoin_blocks_and_check_expectations};
 
 #[test]
 fn test_bitcoin_vector_001() {

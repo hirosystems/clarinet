@@ -1,6 +1,9 @@
+use crate::utils::Context;
+
 use super::super::BitcoinChainEventExpectation;
 use super::bitcoin_blocks;
 use chainhook_types::{BitcoinBlockData, BitcoinChainEvent};
+use hiro_system_kit::slog;
 
 pub fn expect_no_chain_update() -> BitcoinChainEventExpectation {
     Box::new(move |chain_event_to_check: Option<BitcoinChainEvent>| {
@@ -26,6 +29,7 @@ pub fn expect_chain_updated_with_blocks(
     expected_blocks: Vec<BitcoinBlockData>,
     confirmed_blocks: Vec<BitcoinBlockData>,
 ) -> BitcoinChainEventExpectation {
+    let ctx = Context::empty();
     Box::new(move |chain_event_to_check: Option<BitcoinChainEvent>| {
         assert!(
             match chain_event_to_check {
@@ -33,10 +37,14 @@ pub fn expect_chain_updated_with_blocks(
                     assert_eq!(expected_blocks.len(), event.new_blocks.len());
                     for (expected_block, new_block) in expected_blocks.iter().zip(&event.new_blocks)
                     {
-                        debug!(
-                            "Checking {} and {}",
-                            expected_block.block_identifier, new_block.block_identifier
-                        );
+                        ctx.try_log(|logger| {
+                            slog::debug!(
+                                logger,
+                                "Checking {} and {}",
+                                expected_block.block_identifier,
+                                new_block.block_identifier
+                            )
+                        });
                         assert!(
                             new_block
                                 .block_identifier
@@ -50,10 +58,14 @@ pub fn expect_chain_updated_with_blocks(
                     for (expected_block, confirmed_block) in
                         confirmed_blocks.iter().zip(&event.confirmed_blocks)
                     {
-                        debug!(
-                            "Checking {} and {}",
-                            expected_block.block_identifier, confirmed_block.block_identifier
-                        );
+                        ctx.try_log(|logger| {
+                            slog::debug!(
+                                logger,
+                                "Checking {} and {}",
+                                expected_block.block_identifier,
+                                confirmed_block.block_identifier
+                            )
+                        });
                         assert!(
                             confirmed_block
                                 .block_identifier

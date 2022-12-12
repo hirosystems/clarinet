@@ -4,7 +4,6 @@ version: 1
 chain: bitcoin
 networks:
   regtest:
-    oreo-url: 'http://localhost:20446/'
     predicate:
       scope: outputs
       p2wpkh:

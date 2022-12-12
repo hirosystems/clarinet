@@ -11,7 +11,7 @@ use clarity_repl::clarity::vm::types::{
     PrincipalData, QualifiedContractIdentifier, StandardPrincipalData,
 };
 use clarity_repl::clarity::vm::{ClarityName, Value};
-use clarity_repl::clarity::{ContractName, EvaluationResult};
+use clarity_repl::clarity::{ClarityVersion, ContractName, EvaluationResult};
 use clarity_repl::codec::{
     SinglesigHashMode, SinglesigSpendingCondition, StacksString, StacksTransactionSigner,
     TokenTransferMemo, TransactionAuth, TransactionContractCall, TransactionPayload,
@@ -33,7 +33,7 @@ use libsecp256k1::{PublicKey, SecretKey};
 
 mod bitcoin_deployment;
 
-use crate::types::{DeploymentSpecification, TransactionSpecification};
+use crate::types::{DeploymentSpecification, EpochSpec, TransactionSpecification};
 
 fn get_btc_keypair(
     account: &AccountConfig,
@@ -174,6 +174,7 @@ pub fn encode_stx_transfer(
 pub fn encode_contract_publish(
     contract_name: &ContractName,
     source: &str,
+    clarity_version: Option<ClarityVersion>,
     account: &AccountConfig,
     nonce: u64,
     tx_fee: u64,
@@ -186,7 +187,7 @@ pub fn encode_contract_publish(
     };
     sign_transaction_payload(
         account,
-        TransactionPayload::SmartContract(payload),
+        TransactionPayload::SmartContract(payload, clarity_version),
         nonce,
         tx_fee,
         anchor_mode,
@@ -221,7 +222,7 @@ pub enum TransactionCheck {
 pub enum DeploymentEvent {
     TransactionUpdate(TransactionTracker),
     Interrupted(String),
-    ProtocolDeployed,
+    DeploymentCompleted,
 }
 
 pub enum DeploymentCommand {
@@ -291,11 +292,13 @@ pub fn update_deployment_costs(
                     };
                 }
                 TransactionSpecification::ContractPublish(tx) => {
-                    let transaction_payload =
-                        TransactionPayload::SmartContract(TransactionSmartContract {
+                    let transaction_payload = TransactionPayload::SmartContract(
+                        TransactionSmartContract {
                             name: tx.contract_name.clone(),
                             code_body: StacksString::from_str(&tx.source).unwrap(),
-                        });
+                        },
+                        None,
+                    );
 
                     match stacks_rpc.estimate_transaction_fee(&transaction_payload, priority) {
                         Ok(fee) => {
@@ -324,13 +327,11 @@ pub fn apply_on_chain_deployment(
     deployment_command_rx: Receiver<DeploymentCommand>,
     fetch_initial_nonces: bool,
 ) {
-    let network_manifest = NetworkManifest::from_project_manifest_location(
-        &manifest.location,
-        &deployment.network.get_networks(),
-        None,
-    )
-    .expect("unable to load network manifest");
-    let delay_between_checks: u64 = 10;
+    let network = deployment.network.get_networks();
+    let network_manifest =
+        NetworkManifest::from_project_manifest_location(&manifest.location, &network, None, None)
+            .expect("unable to load network manifest");
+    let delay_between_checks: u64 = if network.1.is_devnet() { 1 } else { 10 };
     // Load deployers, deployment_fee_rate
     // Check fee, balances and deployers
 
@@ -339,12 +340,17 @@ pub fn apply_on_chain_deployment(
     let mut accounts_cached_nonces: BTreeMap<String, u64> = BTreeMap::new();
     let mut stx_accounts_lookup: BTreeMap<String, &AccountConfig> = BTreeMap::new();
     let mut btc_accounts_lookup: BTreeMap<String, &AccountConfig> = BTreeMap::new();
-
+    let mut default_epoch = EpochSpec::Epoch2_05;
     if !fetch_initial_nonces {
         if network == StacksNetwork::Devnet {
             for (_, account) in network_manifest.accounts.iter() {
                 accounts_cached_nonces.insert(account.stx_address.clone(), 0);
             }
+            if let Some(ref devnet) = network_manifest.devnet {
+                if devnet.enable_next_features {
+                    default_epoch = EpochSpec::Epoch2_1;
+                }
+            };
         }
     }
 
@@ -369,6 +375,15 @@ pub fn apply_on_chain_deployment(
     let mut index = 0;
     let mut contracts_ids_to_remap: HashSet<(String, String)> = HashSet::new();
     for batch_spec in deployment.plan.batches.iter() {
+        let epoch = match batch_spec.epoch {
+            Some(epoch) => {
+                if fetch_initial_nonces {
+                    println!("warning: 'epoch' specified for a deployment batch is ignored when applying a deployment plan. This field should only be specified for deployments plans used to launch a devnet with 'clarinet integrate'.");
+                }
+                epoch
+            }
+            None => default_epoch,
+        };
         let mut batch = Vec::new();
         for transaction in batch_spec.transactions.iter() {
             let tracker = match transaction {
@@ -541,9 +556,16 @@ pub fn apply_on_chain_deployment(
                         false => TransactionAnchorMode::Any,
                     };
 
+                    let clarity_version = if epoch >= EpochSpec::Epoch2_1 {
+                        Some(tx.clarity_version.clone())
+                    } else {
+                        None
+                    };
+
                     let transaction = match encode_contract_publish(
                         &tx.contract_name,
                         &source,
+                        clarity_version,
                         *account,
                         nonce,
                         tx.cost,
@@ -589,6 +611,17 @@ pub fn apply_on_chain_deployment(
                     .to_string();
                     contracts_ids_to_remap.insert((old_contract_id, new_contract_id));
 
+                    // Testnet handling: don't re-deploy previously deployed contracts
+                    if deployment.network.is_testnet() {
+                        let res = stacks_rpc.get_contract_source(
+                            &tx.remap_sender.to_address(),
+                            &tx.contract_id.name.to_string(),
+                        );
+                        if let Ok(_contract) = res {
+                            continue;
+                        }
+                    }
+
                     // Retrieve nonce for issuer
                     let issuer_address = tx.remap_sender.to_address();
                     let nonce = match accounts_cached_nonces.get(&issuer_address) {
@@ -619,6 +652,7 @@ pub fn apply_on_chain_deployment(
                     let transaction = match encode_contract_publish(
                         &tx.contract_id.name,
                         &source,
+                        None,
                         *account,
                         nonce,
                         tx.cost,
@@ -657,7 +691,7 @@ pub fn apply_on_chain_deployment(
             index += 1;
         }
 
-        batches.push_back(batch);
+        batches.push_back((epoch, batch));
     }
 
     let _cmd = match deployment_command_rx.recv() {
@@ -673,7 +707,41 @@ pub fn apply_on_chain_deployment(
     // Phase 2: we submit all the transactions previously encoded,
     // and wait for their inclusion in a block before moving to the next batch.
     let mut current_block_height = 0;
-    for batch in batches.into_iter() {
+    for (epoch, batch) in batches.into_iter() {
+        // Ensure we've reached the appropriate epoch for this batch
+        let after_block = match epoch {
+            EpochSpec::Epoch2_0 => network_manifest.devnet.as_ref().unwrap().epoch_2_0,
+            EpochSpec::Epoch2_05 => network_manifest.devnet.as_ref().unwrap().epoch_2_05,
+            EpochSpec::Epoch2_1 => network_manifest.devnet.as_ref().unwrap().epoch_2_1,
+        };
+        while !fetch_initial_nonces && current_block_height < after_block {
+            let new_block_height = match stacks_rpc.get_info() {
+                Ok(info) => {
+                    if info.stacks_tip_height == 0 {
+                        // Always loop if we have not yet seen the genesis block.
+                        std::thread::sleep(std::time::Duration::from_secs(
+                            delay_between_checks.into(),
+                        ));
+                        continue;
+                    }
+                    info.burn_block_height
+                }
+                _ => {
+                    std::thread::sleep(std::time::Duration::from_secs(delay_between_checks.into()));
+                    continue;
+                }
+            };
+
+            // If no block has been mined since `delay_between_checks`,
+            // avoid flooding the stacks-node with status update requests.
+            if new_block_height <= current_block_height {
+                std::thread::sleep(std::time::Duration::from_secs(delay_between_checks.into()));
+                continue;
+            }
+
+            current_block_height = new_block_height;
+        }
+
         let mut ongoing_batch = BTreeMap::new();
         for mut tracker in batch.into_iter() {
             let (transaction, check) = match tracker.status {
@@ -689,7 +757,7 @@ pub fn apply_on_chain_deployment(
                     ongoing_batch.insert(res.txid, tracker);
                 }
                 Err(e) => {
-                    let message = format!("unable to post transaction\n{:?}", e);
+                    let message = format!("unable to post transaction\n{}", e.to_string());
                     tracker.status = TransactionStatus::Error(message.clone());
 
                     let _ = deployment_event_tx
@@ -728,13 +796,16 @@ pub fn apply_on_chain_deployment(
                     )) => {
                         let deployer_address = deployer.to_address();
                         let res = stacks_rpc.get_contract_source(&deployer_address, &contract_name);
-                        if let Ok(_contract) = res {
-                            tracker.status = TransactionStatus::Confirmed;
-                            let _ = deployment_event_tx
-                                .send(DeploymentEvent::TransactionUpdate(tracker.clone()));
-                        } else {
-                            keep_looping = true;
-                            break;
+                        match res {
+                            Ok(_contract) => {
+                                tracker.status = TransactionStatus::Confirmed;
+                                let _ = deployment_event_tx
+                                    .send(DeploymentEvent::TransactionUpdate(tracker.clone()));
+                            }
+                            Err(_e) => {
+                                keep_looping = true;
+                                break;
+                            }
                         }
                     }
                     TransactionStatus::Broadcasted(TransactionCheck::NonceCheck(
@@ -763,7 +834,7 @@ pub fn apply_on_chain_deployment(
         }
     }
 
-    let _ = deployment_event_tx.send(DeploymentEvent::ProtocolDeployed);
+    let _ = deployment_event_tx.send(DeploymentEvent::DeploymentCompleted);
 }
 
 pub fn get_initial_transactions_trackers(

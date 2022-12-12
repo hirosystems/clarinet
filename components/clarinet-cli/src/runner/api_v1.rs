@@ -16,6 +16,7 @@ use chainhook_event_observer::chainhooks::stacks::StacksChainhookOccurrence;
 use chainhook_event_observer::chainhooks::stacks::StacksTriggerChainhook;
 use chainhook_event_observer::chainhooks::types::StacksChainhookSpecification;
 use chainhook_event_observer::indexer::stacks::get_standardized_stacks_receipt;
+use chainhook_event_observer::utils::Context;
 use chainhook_types::BlockIdentifier;
 use chainhook_types::StacksBlockData;
 use chainhook_types::StacksBlockMetadata;
@@ -736,7 +737,11 @@ fn mine_block(state: &mut OpState, args: MineBlockArgs) -> Result<String, AnyErr
         for chainhook in chainhooks.iter() {
             let mut hits = vec![];
             for (tx, _) in transactions.iter() {
-                if evaluate_stacks_transaction_predicate_on_transaction(tx, chainhook) {
+                if evaluate_stacks_transaction_predicate_on_transaction(
+                    tx,
+                    chainhook,
+                    &Context::empty(),
+                ) {
                     hits.push(tx);
                 }
             }
@@ -770,6 +775,7 @@ fn mine_block(state: &mut OpState, args: MineBlockArgs) -> Result<String, AnyErr
                         rollback: vec![],
                     },
                     &HashMap::new(),
+                    &Context::empty(),
                 );
                 match result {
                     Some(StacksChainhookOccurrence::Http(action)) => {
@@ -850,7 +856,10 @@ fn wrap_result_in_simulated_transaction(
 ) -> StacksTransactionData {
     let result = match execution.result {
         EvaluationResult::Snippet(ref result) => utils::value_to_string(&result.result),
-        _ => unreachable!("Contract result from snippet"),
+        EvaluationResult::Contract(ref contract) => match contract.result {
+            Some(ref result) => utils::value_to_string(result),
+            _ => (&"(ok true)").to_string(),
+        },
     };
     let (txid, _timestamp) = {
         let timestamp = DateTime::<Utc>::from_utc(NaiveDateTime::from_timestamp(61, 0), Utc);
@@ -874,12 +883,13 @@ fn wrap_result_in_simulated_transaction(
             result,
             sender: sender.to_string(),
             fee: 0,
+            nonce: 0,
             kind,
             receipt,
             description: String::new(),
             sponsor: None,
             execution_cost: None,
-            position: chainhook_types::StacksTransactionPosition::Index(index),
+            position: chainhook_types::StacksTransactionPosition::anchor_block(index),
             proof: None,
         },
     };

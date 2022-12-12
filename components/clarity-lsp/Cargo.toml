@@ -4,12 +4,13 @@ name = "clarity-lsp"
 version = "1.0.0"
 
 [dependencies]
+lazy_static = "1.4.0"
 lsp-types = "0.93.0"
 serde = { version = "1.0.136", features = ["derive"] }
 chainhook_types = { package = "chainhook-types", path = "../chainhook-types-rs" }
-clarinet_files =  { package = "clarinet-files", path = "../clarinet-files", default-features = false }
+clarinet_files = { package = "clarinet-files", path = "../clarinet-files", default-features = false }
 clarity_repl = { package = "clarity-repl", path = "../clarity-repl", default-features = false, optional = true }
-clarinet_deployments =  { package = "clarinet-deployments", path = "../clarinet-deployments", default-features = false }
+clarinet_deployments = { package = "clarinet-deployments", path = "../clarinet-deployments", default-features = false }
 
 # WASM
 console_error_panic_hook = { version = "0.1", optional = true }
