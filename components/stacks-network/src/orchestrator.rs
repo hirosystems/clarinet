@@ -988,6 +988,7 @@ poll_time_secs = 1
 timeout = 30
 peer_host = "host.docker.internal"
 rpc_ssl = false
+wallet_name = "devnet"
 username = "{bitcoin_node_username}"
 password = "{bitcoin_node_password}"
 rpc_port = {orchestrator_ingestion_port}
