@@ -281,6 +281,37 @@ impl<'a> ASTVisitor<'a> for Definitions {
         true
     }
 
+    fn visit_map(
+        &mut self,
+        expr: &'a SymbolicExpression,
+        func: &'a ClarityName,
+        _sequences: &'a [SymbolicExpression],
+    ) -> bool {
+        self.set_definition_for_arg_at_index(expr, func, 1);
+        true
+    }
+
+    fn visit_filter(
+        &mut self,
+        expr: &'a SymbolicExpression,
+        func: &'a ClarityName,
+        _sequence: &'a SymbolicExpression,
+    ) -> bool {
+        self.set_definition_for_arg_at_index(expr, func, 1);
+        true
+    }
+
+    fn visit_fold(
+        &mut self,
+        expr: &'a SymbolicExpression,
+        func: &'a ClarityName,
+        _sequence: &'a SymbolicExpression,
+        _initial: &'a SymbolicExpression,
+    ) -> bool {
+        self.set_definition_for_arg_at_index(expr, func, 1);
+        true
+    }
+
     fn visit_static_contract_call(
         &mut self,
         expr: &'a SymbolicExpression,
@@ -704,6 +735,42 @@ mod definitions_visitor_tests {
         assert_eq!(
             tokens.get(&(1, 51)),
             Some(&DefinitionLocation::Internal(new_range(0, 25, 0, 35)))
+        );
+    }
+
+    #[test]
+    fn find_definition_in_map() {
+        let tokens =
+            get_tokens("(define-private (double (n int)) (* n 2)) (map double (list 1 2))");
+
+        assert_eq!(tokens.len(), 2);
+        assert_eq!(
+            tokens.get(&(1, 48)),
+            Some(&DefinitionLocation::Internal(new_range(0, 0, 0, 41)))
+        );
+    }
+
+    #[test]
+    fn find_definition_in_filter() {
+        let tokens =
+            get_tokens("(define-private (is-even (n int)) (is-eq (* (/ n 2) 2) n)) (filter is-even (list 0 1 2 3 4 5))");
+
+        assert_eq!(tokens.len(), 3);
+        assert_eq!(
+            tokens.get(&(1, 68)),
+            Some(&DefinitionLocation::Internal(new_range(0, 0, 0, 58)))
+        );
+    }
+
+    #[test]
+    fn find_definition_in_fold() {
+        let tokens =
+            get_tokens("(define-private (sum (a int) (b int)) (+ a b)) (fold sum (list 1 2) 0)");
+
+        assert_eq!(tokens.len(), 3);
+        assert_eq!(
+            tokens.get(&(1, 54)),
+            Some(&DefinitionLocation::Internal(new_range(0, 0, 0, 46)))
         );
     }
 }
