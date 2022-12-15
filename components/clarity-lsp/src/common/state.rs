@@ -312,19 +312,7 @@ impl EditorState {
                 Some(expressions) => expressions,
                 None => return vec![],
             },
-            None => {
-                let analysis = self
-                    .contracts_lookup
-                    .get(contract_location)
-                    .and_then(|c| self.protocols.get(&c.manifest_location))
-                    .and_then(|p| p.contracts.get(contract_location))
-                    .and_then(|c| c.analysis.as_ref());
-
-                match analysis {
-                    Some(analysis) => &analysis.expressions,
-                    None => return vec![],
-                }
-            }
+            None => return vec![],
         };
 
         let ast_symbols = ASTSymbols::new();
