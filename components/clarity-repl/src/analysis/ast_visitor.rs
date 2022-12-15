@@ -144,14 +144,17 @@ pub trait ASTVisitor<'a> {
                             args.get(1).unwrap_or(&DEFAULT_EXPR),
                             args.get(2).unwrap_or(&DEFAULT_EXPR),
                         ),
-                        DefineFunctions::Trait => self.traverse_define_trait(
-                            expr,
-                            args.get(0)
-                                .unwrap_or(&DEFAULT_EXPR)
-                                .match_atom()
-                                .unwrap_or(&DEFAULT_NAME),
-                            &args[1..],
-                        ),
+                        DefineFunctions::Trait => {
+                            let params = if args.len() >= 1 { &args[1..] } else { &[] };
+                            self.traverse_define_trait(
+                                expr,
+                                args.get(0)
+                                    .unwrap_or(&DEFAULT_EXPR)
+                                    .match_atom()
+                                    .unwrap_or(&DEFAULT_NAME),
+                                params,
+                            )
+                        }
                         DefineFunctions::UseTrait => self.traverse_use_trait(
                             expr,
                             args.get(0)
@@ -209,7 +212,8 @@ pub trait ASTVisitor<'a> {
                         Let => {
                             let bindings = match_pairs(args.get(0).unwrap_or(&DEFAULT_EXPR))
                                 .unwrap_or_default();
-                            self.traverse_let(expr, &bindings, &args[1..])
+                            let params = if args.len() >= 1 { &args[1..] } else { &[] };
+                            self.traverse_let(expr, &bindings, params)
                         }
                         ElementAt | ElementAtAlias => self.traverse_element_at(
                             expr,
@@ -227,7 +231,8 @@ pub trait ASTVisitor<'a> {
                                 .unwrap_or(&DEFAULT_EXPR)
                                 .match_atom()
                                 .unwrap_or(&DEFAULT_NAME);
-                            self.traverse_map(expr, name, &args[1..])
+                            let params = if args.len() >= 1 { &args[1..] } else { &[] };
+                            self.traverse_map(expr, name, params)
                         }
                         Fold => {
                             let name = args
@@ -388,6 +393,7 @@ pub trait ASTVisitor<'a> {
                                 .unwrap_or(&DEFAULT_EXPR)
                                 .match_atom()
                                 .unwrap_or(&DEFAULT_NAME);
+                            let params = if args.len() >= 2 { &args[2..] } else { &[] };
                             if let SymbolicExpressionType::LiteralValue(Value::Principal(
                                 PrincipalData::Contract(ref contract_identifier),
                             )) = args.get(0).unwrap_or(&DEFAULT_EXPR).expr
@@ -396,14 +402,14 @@ pub trait ASTVisitor<'a> {
                                     expr,
                                     contract_identifier,
                                     function_name,
-                                    &args[2..],
+                                    params,
                                 )
                             } else {
                                 self.traverse_dynamic_contract_call(
                                     expr,
                                     args.get(0).unwrap_or(&DEFAULT_EXPR),
                                     function_name,
-                                    &args[2..],
+                                    params,
                                 )
                             }
                         }
