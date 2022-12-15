@@ -416,7 +416,6 @@ pub fn process_request(command: LspRequest, editor_state: &EditorStateInput) -> 
                 Some(contract_location) => contract_location,
                 None => return LspRequestResponse::DocumentSymbol(vec![]),
             };
-
             LspRequestResponse::DocumentSymbol(
                 match editor_state
                     .try_read(|es| es.get_document_symbols_for_contract(&contract_location))
