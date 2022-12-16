@@ -424,13 +424,15 @@ export function getIsolatedNetworkConfigUsingNetworkId(networkId: number, networ
 
 export class DevnetNetworkOrchestrator {
   handle: any;
+  lastCooldownEndedAt: Date;
+  defaultCooldown: number;
 
   /**
    * @summary Construct a new DevnetNetworkOrchestrator
    * @param {NetworkConfig} manifest
    * @memberof DevnetNetworkOrchestrator
    */
-  constructor(config: NetworkConfig) {
+  constructor(config: NetworkConfig, defaultCooldown = 3000) {
     let manifestPath = config.clarinetManifestPath!;
     var logs = config.logs;
     logs ||= false;
@@ -439,14 +441,16 @@ export class DevnetNetworkOrchestrator {
     var devnet = config.devnet;
     devnet ||= {};
     this.handle = stacksDevnetNew(manifestPath, logs, accounts, devnet);
+    this.lastCooldownEndedAt = new Date();
+    this.defaultCooldown = defaultCooldown;
   }
 
   /**
    * @summary Start orchestrating containers
    * @memberof DevnetNetworkOrchestrator
    */
-  start() {
-    return stacksDevnetStart.call(this.handle);
+  start(timeout: number = 600, emptyBuffer: boolean = true) {
+    return stacksDevnetStart.call(this.handle, timeout, emptyBuffer);
   }
 
   /**
@@ -489,20 +493,38 @@ export class DevnetNetworkOrchestrator {
     return stacksDevnetGetBitcoinExplorerUrl.call(this.handle);
   }
 
+
   /**
    * @summary Wait for the next Stacks block
    * @memberof DevnetNetworkOrchestrator
    */
-  waitForStacksBlock(): StacksChainUpdate {
-    return stacksDevnetWaitForStacksBlock.call(this.handle);
+  async waitForStacksBlock(): Promise<StacksChainUpdate> {
+    let now = new Date();
+    let ms_elapsed = (now.getTime() - this.lastCooldownEndedAt.getTime());
+    let cooldown = Math.max(0, this.defaultCooldown - ms_elapsed);
+    let wait = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+    this.lastCooldownEndedAt = now
+    return wait(cooldown)
+      .then(() => {
+        this.lastCooldownEndedAt = new Date();
+        return stacksDevnetWaitForStacksBlock.call(this.handle)
+      });
   }
 
   /**
    * @summary Wait for the next Bitcoin block
    * @memberof DevnetNetworkOrchestrator
    */
-  waitForBitcoinBlock(): BitcoinChainUpdate {
-    return stacksDevnetWaitForBitcoinBlock.call(this.handle);
+  async waitForBitcoinBlock(): Promise<BitcoinChainUpdate> {
+    let now = new Date();
+    let ms_elapsed = (now.getTime() - this.lastCooldownEndedAt.getTime());
+    let cooldown = Math.max(0, this.defaultCooldown - ms_elapsed);
+    let wait = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+    return wait(cooldown)
+      .then(() => {
+        this.lastCooldownEndedAt = new Date();
+        return stacksDevnetWaitForBitcoinBlock.call(this.handle)
+      });
   }
 
   /**
