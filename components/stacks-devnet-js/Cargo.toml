@@ -17,6 +17,7 @@ clarinet_utils = { package = "clarinet-utils", path = "../clarinet-utils" }
 clarinet_deployments = { package = "clarinet-deployments", path = "../clarinet-deployments" }
 stacks_network = { package = "stacks-network", path = "../stacks-network" }
 hiro_system_kit = { package = "hiro-system-kit", path = "../hiro-system-kit" }
+crossbeam-channel = "0.5.6"
 
 [dependencies.neon]
 version = "0.9.1"

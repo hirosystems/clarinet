@@ -209,7 +209,7 @@ pub async fn start_event_observer(
     mut config: EventObserverConfig,
     observer_commands_tx: Sender<ObserverCommand>,
     observer_commands_rx: Receiver<ObserverCommand>,
-    observer_events_tx: Option<Sender<ObserverEvent>>,
+    observer_events_tx: Option<crossbeam_channel::Sender<ObserverEvent>>,
     ctx: Context,
 ) -> Result<(), Box<dyn Error>> {
     ctx.try_log(|logger| slog::info!(logger, "Event observer starting with config {:?}", config));
@@ -401,7 +401,7 @@ pub async fn start_observer_commands_handler(
     config: EventObserverConfig,
     chainhook_store: Arc<RwLock<ChainhookStore>>,
     observer_commands_rx: Receiver<ObserverCommand>,
-    observer_events_tx: Option<Sender<ObserverEvent>>,
+    observer_events_tx: Option<crossbeam_channel::Sender<ObserverEvent>>,
     ingestion_shutdown: Option<Shutdown>,
     control_shutdown: Option<Shutdown>,
     ctx: Context,

@@ -2428,7 +2428,10 @@ events_keys = ["*"]
         loop {
             match rpc.get_network_info() {
                 Ok(_r) => break,
-                Err(_e) => {}
+                Err(_e) => {
+                    let _ = devnet_event_tx
+                        .send(DevnetEvent::info(format!("Error ({})", _e.to_string())));
+                }
             }
             std::thread::sleep(std::time::Duration::from_secs(1));
             let _ = devnet_event_tx.send(DevnetEvent::info(format!("Waiting for bitcoin-node",)));

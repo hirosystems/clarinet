@@ -110,7 +110,9 @@ impl StacksDevnet {
         let devnet = match DevnetOrchestrator::new(manifest, Some(devnet_overrides)) {
             Ok(devnet) => devnet,
             Err(message) => {
-                println!("{}", message);
+                if logs_enabled {
+                    println!("Fatal error: {}", message);
+                }
                 std::process::exit(1);
             }
         };
@@ -158,7 +160,13 @@ impl StacksDevnet {
                                 _,
                                 Some(chains_coordinator_command_tx),
                             )) => (devnet_events_rx, chains_coordinator_command_tx),
-                            _ => std::process::exit(1),
+                            Err(e) => {
+                                if logs_enabled {
+                                    println!("Fatal error: {}", e);
+                                }
+                                return;
+                            }
+                            _ => unreachable!(),
                         };
                         meta_devnet_command_tx
                             .send(devnet_events_rx)
@@ -170,7 +178,12 @@ impl StacksDevnet {
                         break chains_coordinator_command_tx;
                     }
                     Ok(_) => {}
-                    Err(e) => panic!("{}", e.to_string()),
+                    Err(e) => {
+                        if logs_enabled {
+                            println!("Fatal error: {}", e.to_string());
+                        }
+                        return;
+                    }
                 }
             };
 
@@ -188,7 +201,10 @@ impl StacksDevnet {
                     }
                     Ok(DevnetCommand::Start(_)) => {}
                     Err(e) => {
-                        panic!("{}", e.to_string());
+                        if logs_enabled {
+                            println!("Fatal error: {}", e.to_string());
+                        }
+                        return;
                     }
                 }
             }
@@ -224,6 +240,7 @@ impl StacksDevnet {
                             if logs_enabled {
                                 println!("{:?}", error);
                             }
+                            break;
                         }
                         _ => {}
                     }
