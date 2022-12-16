@@ -1212,12 +1212,9 @@ pub fn main() {
             ) {
                 Ok(count) => (true, count),
                 Err((e, count)) => {
-                    println!(
-                        "{}",
-                        format_err!(e.to_string())
-                    );
+                    println!("{}", format_err!(e.to_string()));
                     (false, count)
-                },
+                }
             };
             if hints_enabled {
                 display_tests_pro_tips_hint();
