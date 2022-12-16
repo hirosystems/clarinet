@@ -51,8 +51,8 @@ impl Into<StacksEpochId> for EpochSpec {
 }
 
 pub struct DeploymentGenerationArtifacts {
-    pub asts: HashMap<QualifiedContractIdentifier, ContractAST>,
-    pub deps: HashMap<QualifiedContractIdentifier, DependencySet>,
+    pub asts: BTreeMap<QualifiedContractIdentifier, ContractAST>,
+    pub deps: BTreeMap<QualifiedContractIdentifier, DependencySet>,
     pub diags: HashMap<QualifiedContractIdentifier, Vec<Diagnostic>>,
     pub analysis: HashMap<QualifiedContractIdentifier, ContractAnalysis>,
     pub session: Session,

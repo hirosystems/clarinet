@@ -19,7 +19,7 @@ use clarity_repl::clarity::{ClarityName, ClarityVersion, SymbolicExpression};
 use clarity_repl::repl::{ContractDeployer, DEFAULT_CLARITY_VERSION};
 use lsp_types::{DocumentSymbol, Hover, Location, MessageType, Position, Range, Url};
 use std::borrow::BorrowMut;
-use std::collections::{HashMap, HashSet};
+use std::collections::{BTreeMap, HashMap, HashSet};
 use std::vec;
 
 use super::requests::definitions::{get_definitions, DefinitionLocation};
@@ -513,8 +513,8 @@ impl ProtocolState {
     pub fn consolidate(
         &mut self,
         locations: &mut HashMap<QualifiedContractIdentifier, FileLocation>,
-        asts: &mut HashMap<QualifiedContractIdentifier, ContractAST>,
-        deps: &mut HashMap<QualifiedContractIdentifier, DependencySet>,
+        asts: &mut BTreeMap<QualifiedContractIdentifier, ContractAST>,
+        deps: &mut BTreeMap<QualifiedContractIdentifier, DependencySet>,
         diags: &mut HashMap<QualifiedContractIdentifier, Vec<ClarityDiagnostic>>,
         definitions: &mut HashMap<QualifiedContractIdentifier, HashMap<ClarityName, Range>>,
         analyses: &mut HashMap<QualifiedContractIdentifier, Option<ContractAnalysis>>,
