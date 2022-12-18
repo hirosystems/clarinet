@@ -38,7 +38,7 @@ jobs:
     needs: pre_run
     strategy:
       matrix:
-        component: ["chainhook-event-observer", "stacks-rpc-client", "clarity-repl", "clarinet-files", "clarinet-deployments", "chainhook-types-rs", "clarity-jupyter-kernel"]
+        component: ["chainhook-event-observer", "stacks-rpc-client", "clarity-repl", "clarity-lsp", "clarinet-files", "clarinet-deployments", "chainhook-types-rs", "clarity-jupyter-kernel"]
     steps:
       - name: Publish to crates (chainhook-event-observer - lib)
         if: matrix.component == 'chainhook-event-observer'
