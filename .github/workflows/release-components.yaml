@@ -1,0 +1,58 @@
+name: Build Release for Components 
+on:
+  pull_request:
+  push:
+    tags:
+     - 'v*'
+    paths-ignore:
+     - '**/CHANGELOG.md'
+     - '**/package.json'
+     - '**/package-lock.json'
+    paths:
+     - components/*
+    branches:
+     - main
+     - develop
+
+  workflow_dispatch:
+
+jobs:
+  pre_run:
+    name: Initialize
+    runs-on: ubuntu-latest
+    steps:
+      - name: Cancel Previous Runs
+        uses: styfle/cancel-workflow-action@ad6cb1b847ffb509a69b745b6ee2f1d14dfe14b8
+        with:
+          access_token: ${{ github.token }}
+      
+      - name: Checkout repository
+        uses: actions/checkout@v2
+
+      - name: Install stable toolchain
+        uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: stable
+          override: true
+
+  typescript:
+    name: TypeScript
+    runs-on: ubuntu-latest
+    needs: pre_run
+    strategy:
+      matrix:
+        component: ["chainhook-event-observer", "stacks-rpc-client", "clarity-repl", "clarinet-files", "clarinet-deployments", "chainhook-types-rs", "clarity-jupyter-kernel"]
+    steps:
+      - name: Publish to crates (chainhook-event-observer - lib)
+        if: matrix.component == 'chainhook-event-observer'
+        run: cargo publish --token ${CRATES_TOKEN} --lib
+        env:
+          CRATES_TOKEN: ${{ secrets.CRATES_TOKEN }}
+        working-directory: ./components/${{ matrix.component }}/
+      - name: Publish to Crates (other components)
+        if: matrix.component != 'chainhook-event-observer'
+        run: cargo publish --token ${CRATES_TOKEN}
+        env:
+          CRATES_TOKEN: ${{ secrets.CRATES_TOKEN }}
+        working-directory: ./components/${{ matrix.component }}/
