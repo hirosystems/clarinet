@@ -18,7 +18,7 @@ use chainhook_types::{
 };
 use hiro_system_kit;
 use std::collections::{HashMap, HashSet};
-use std::sync::mpsc::{channel, Receiver, Sender};
+use std::sync::mpsc::{channel, Sender};
 use std::sync::{Arc, RwLock};
 
 use super::ObserverEvent;

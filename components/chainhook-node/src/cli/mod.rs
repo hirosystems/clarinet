@@ -7,8 +7,8 @@ use chainhook_event_observer::chainhooks::bitcoin::{
     handle_bitcoin_hook_action, BitcoinChainhookOccurrence, BitcoinTriggerChainhook,
 };
 use chainhook_event_observer::chainhooks::types::ChainhookConfig;
-use chainhook_event_observer::indexer::IndexerConfig;
 use chainhook_event_observer::indexer::bitcoin::standardize_bitcoin_block;
+use chainhook_event_observer::indexer::IndexerConfig;
 use chainhook_event_observer::observer::{
     start_event_observer, EventObserverConfig, ObserverCommand, ObserverEvent,
 };
@@ -23,8 +23,9 @@ use chainhook_event_observer::{
 
 use bitcoincore_rpc::{Auth, Client, RpcApi};
 use chainhook_types::{
-    BitcoinBlockData, BitcoinBlockMetadata, BitcoinTransactionData, BlockIdentifier,
-    StacksBlockData, StacksBlockMetadata, StacksChainEvent, StacksNetwork, StacksTransactionData, BitcoinNetwork,
+    BitcoinBlockData, BitcoinBlockMetadata, BitcoinNetwork, BitcoinTransactionData,
+    BlockIdentifier, StacksBlockData, StacksBlockMetadata, StacksChainEvent, StacksNetwork,
+    StacksTransactionData,
 };
 use clap::{Parser, Subcommand};
 use ctrlc;
@@ -188,7 +189,6 @@ pub fn start_replay_flow(
     apply: bool,
     ctx: Context,
 ) {
-
     let indexer_config = match network {
         StacksNetwork::Mainnet => IndexerConfig {
             bitcoin_network: BitcoinNetwork::Mainnet,
@@ -214,7 +214,7 @@ pub fn start_replay_flow(
             bitcoin_node_rpc_username: bitcoind_rpc_url.username().to_string(),
             bitcoin_node_rpc_password: bitcoind_rpc_url.password().unwrap().to_string(),
         },
-        _ => unreachable!()
+        _ => unreachable!(),
     };
 
     let (digestion_tx, digestion_rx) = channel();
@@ -596,7 +596,13 @@ pub fn start_replay_flow(
 
                                     let block = match bitcoin_rpc.get_block(&block_hash) {
                                         Ok(block) => {
-                                            standardize_bitcoin_block(&indexer_config, cursor, block, &ctx).unwrap() // todo
+                                            standardize_bitcoin_block(
+                                                &indexer_config,
+                                                cursor,
+                                                block,
+                                                &ctx,
+                                            )
+                                            .unwrap() // todo
                                         }
                                         Err(e) => {
                                             error!(

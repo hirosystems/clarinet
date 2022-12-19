@@ -45,29 +45,29 @@ pub async fn retrieve_full_block(
     let block_hash = partial_block.burn_block_hash.strip_prefix("0x").unwrap();
 
     use reqwest::Client as HttpClient;
-        let body = json!({
-            "jsonrpc": "1.0",
-            "id": "chainhook-node",
-            "method": "getblock",
-            "params": [block_hash, 0]
-        });
-        let http_client = HttpClient::builder()
-            .build()
-            .expect("Unable to build http client");
-            let response_hex = http_client
-            .post(&bitcoin_config.rpc_url)
-            .basic_auth(&bitcoin_config.username, Some(&bitcoin_config.password))
-            .header("Content-Type", "application/json")
-            .header("Host", &bitcoin_config.rpc_url[7..])
-            .json(&body)
-            .send()
-            .await
-            .map_err(|e| format!("unable to send request ({})", e))?
-            .json::<bitcoincore_rpc::jsonrpc::Response>()
-            .await
-            .map_err(|e| format!("unable to parse response ({})", e))?
-            .result::<String>()
-            .map_err(|e| format!("unable to parse response ({})", e))?;
+    let body = json!({
+        "jsonrpc": "1.0",
+        "id": "chainhook-node",
+        "method": "getblock",
+        "params": [block_hash, 0]
+    });
+    let http_client = HttpClient::builder()
+        .build()
+        .expect("Unable to build http client");
+    let response_hex = http_client
+        .post(&bitcoin_config.rpc_url)
+        .basic_auth(&bitcoin_config.username, Some(&bitcoin_config.password))
+        .header("Content-Type", "application/json")
+        .header("Host", &bitcoin_config.rpc_url[7..])
+        .json(&body)
+        .send()
+        .await
+        .map_err(|e| format!("unable to send request ({})", e))?
+        .json::<bitcoincore_rpc::jsonrpc::Response>()
+        .await
+        .map_err(|e| format!("unable to parse response ({})", e))?
+        .result::<String>()
+        .map_err(|e| format!("unable to parse response ({})", e))?;
 
     let bytes = hex_bytes(&response_hex)
         .map_err(|e| format!("unable to retrieve bytes from response ({})", e))?;
