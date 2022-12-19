@@ -253,7 +253,7 @@ pub fn standardize_stacks_block(
         .into();
     let current_len =
         block.burn_block_height - (1 + chain_ctx.pox_info.first_burnchain_block_height);
-    let pox_cycle_id: u32 = (current_len / pox_cycle_length).try_into().unwrap();
+    let pox_cycle_id: u32 = (current_len / pox_cycle_length).try_into().unwrap_or(0);
     let mut events: HashMap<&String, Vec<&NewEvent>> = HashMap::new();
     for event in block.events.iter() {
         events

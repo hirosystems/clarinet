@@ -21,7 +21,7 @@ use hiro_system_kit::slog;
 use reqwest::Client as HttpClient;
 use rocket::config::{self, Config, LogLevel};
 use rocket::data::{Limits, ToByteUnit};
-use rocket::http::Status;
+use rocket::http::{RawStr, Status};
 use rocket::request::{self, FromRequest, Outcome, Request};
 use rocket::serde::json::{json, Json, Value as JsonValue};
 use rocket::serde::Deserialize;
@@ -209,7 +209,7 @@ pub async fn start_event_observer(
     mut config: EventObserverConfig,
     observer_commands_tx: Sender<ObserverCommand>,
     observer_commands_rx: Receiver<ObserverCommand>,
-    observer_events_tx: Option<Sender<ObserverEvent>>,
+    observer_events_tx: Option<crossbeam_channel::Sender<ObserverEvent>>,
     ctx: Context,
 ) -> Result<(), Box<dyn Error>> {
     ctx.try_log(|logger| slog::info!(logger, "Event observer starting with config {:?}", config));
@@ -303,6 +303,7 @@ pub async fn start_event_observer(
 
     if bitcoin_rpc_proxy_enabled {
         routes.append(&mut routes![handle_bitcoin_rpc_call]);
+        routes.append(&mut routes![handle_bitcoin_wallet_rpc_call]);
     }
 
     let ctx_cloned = ctx.clone();
@@ -400,7 +401,7 @@ pub async fn start_observer_commands_handler(
     config: EventObserverConfig,
     chainhook_store: Arc<RwLock<ChainhookStore>>,
     observer_commands_rx: Receiver<ObserverCommand>,
-    observer_events_tx: Option<Sender<ObserverEvent>>,
+    observer_events_tx: Option<crossbeam_channel::Sender<ObserverEvent>>,
     ingestion_shutdown: Option<Shutdown>,
     control_shutdown: Option<Shutdown>,
     ctx: Context,
@@ -1227,6 +1228,43 @@ pub fn handle_mined_microblock(payload: Json<JsonValue>, ctx: &State<Context>) -
 }
 
 #[openapi(skip)]
+#[post("/wallet", format = "application/json", data = "<bitcoin_rpc_call>")]
+pub async fn handle_bitcoin_wallet_rpc_call(
+    bitcoin_config: &State<BitcoinConfig>,
+    bitcoin_rpc_call: Json<BitcoinRPCRequest>,
+    ctx: &State<Context>,
+) -> Json<JsonValue> {
+    ctx.try_log(|logger| slog::info!(logger, "POST /wallet"));
+
+    use base64::encode;
+    use reqwest::Client;
+
+    let bitcoin_rpc_call = bitcoin_rpc_call.into_inner().clone();
+
+    let body = rocket::serde::json::serde_json::to_vec(&bitcoin_rpc_call).unwrap();
+
+    let token = encode(format!(
+        "{}:{}",
+        bitcoin_config.username, bitcoin_config.password
+    ));
+
+    let url = format!("{}", bitcoin_config.rpc_url);
+    let client = Client::new();
+    let builder = client
+        .post(&url)
+        .header("Content-Type", "application/json")
+        .header("Authorization", format!("Basic {}", token))
+        .timeout(std::time::Duration::from_secs(5));
+
+    match builder.body(body).send().await {
+        Ok(res) => Json(res.json().await.unwrap()),
+        Err(_) => Json(json!({
+            "status": 500
+        })),
+    }
+}
+
+#[openapi(skip)]
 #[post("/", format = "application/json", data = "<bitcoin_rpc_call>")]
 pub async fn handle_bitcoin_rpc_call(
     bitcoin_config: &State<BitcoinConfig>,
@@ -1249,12 +1287,21 @@ pub async fn handle_bitcoin_rpc_call(
         bitcoin_config.username, bitcoin_config.password
     ));
 
+    ctx.try_log(|logger| {
+        slog::debug!(
+            logger,
+            "Forwarding {} request to {}",
+            method,
+            bitcoin_config.rpc_url
+        )
+    });
+
     let client = Client::new();
     let builder = client
         .post(&bitcoin_config.rpc_url)
         .header("Content-Type", "application/json")
-        .timeout(std::time::Duration::from_secs(5))
-        .header("Authorization", format!("Basic {}", token));
+        .header("Authorization", format!("Basic {}", token))
+        .timeout(std::time::Duration::from_secs(5));
 
     if method == "sendrawtransaction" {
         let background_job_tx = background_job_tx.inner();
@@ -1267,7 +1314,11 @@ pub async fn handle_bitcoin_rpc_call(
     }
 
     match builder.body(body).send().await {
-        Ok(res) => Json(res.json().await.unwrap()),
+        Ok(res) => {
+            let payload = res.json().await.unwrap();
+            ctx.try_log(|logger| slog::debug!(logger, "Responding with response {:?}", payload));
+            Json(payload)
+        }
         Err(_) => Json(json!({
             "status": 500
         })),

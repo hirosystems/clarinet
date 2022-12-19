@@ -23,10 +23,10 @@ $ rails server
 
 `vault-monitor` exposes an admin readonly user interface at this address `http://localhost:3000/admin`.
 
-In another console, launch `chainhook-db`, using the command:
+In another console, launch `chainhook-node`, using the command:
 
 ```bash
-$ chainhook-db
+$ chainhook-node replay --testnet
 ```
 
 Finally, make `vault-monitor` register a chainhook, using the following command:

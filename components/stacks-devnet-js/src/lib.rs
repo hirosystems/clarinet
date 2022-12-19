@@ -60,6 +60,7 @@ pub fn read_deployment_or_generate_default(
 struct StacksDevnet {
     tx: mpsc::Sender<DevnetCommand>,
     termination_rx: mpsc::Receiver<bool>,
+    devnet_ready_rx: mpsc::Receiver<bool>,
     mining_tx: mpsc::Sender<BitcoinMiningCommand>,
     bitcoin_block_rx: mpsc::Receiver<BitcoinChainUpdatedWithBlocksData>,
     stacks_block_rx: mpsc::Receiver<StacksChainUpdatedWithBlocksData>,
@@ -89,6 +90,7 @@ impl StacksDevnet {
         C: Context<'a>,
     {
         let (tx, rx) = mpsc::channel::<DevnetCommand>();
+        let (devnet_ready_tx, devnet_ready_rx) = mpsc::channel::<bool>();
         let (meta_devnet_command_tx, meta_devnet_command_rx) = mpsc::channel();
         let (termination_tx, termination_rx) = mpsc::channel();
 
@@ -110,7 +112,9 @@ impl StacksDevnet {
         let devnet = match DevnetOrchestrator::new(manifest, Some(devnet_overrides)) {
             Ok(devnet) => devnet,
             Err(message) => {
-                println!("{}", message);
+                if logs_enabled {
+                    println!("Fatal error: {}", message);
+                }
                 std::process::exit(1);
             }
         };
@@ -158,7 +162,13 @@ impl StacksDevnet {
                                 _,
                                 Some(chains_coordinator_command_tx),
                             )) => (devnet_events_rx, chains_coordinator_command_tx),
-                            _ => std::process::exit(1),
+                            Err(e) => {
+                                if logs_enabled {
+                                    println!("Fatal error: {}", e);
+                                }
+                                return;
+                            }
+                            _ => unreachable!(),
                         };
                         meta_devnet_command_tx
                             .send(devnet_events_rx)
@@ -169,8 +179,18 @@ impl StacksDevnet {
                         }
                         break chains_coordinator_command_tx;
                     }
-                    Ok(_) => {}
-                    Err(e) => panic!("{}", e.to_string()),
+                    Ok(DevnetCommand::Stop(callback)) => {
+                        if let Some(c) = callback {
+                            c(&channel);
+                        }
+                        return;
+                    }
+                    Err(e) => {
+                        if logs_enabled {
+                            println!("Fatal error: {}", e.to_string());
+                        }
+                        return;
+                    }
                 }
             };
 
@@ -188,7 +208,10 @@ impl StacksDevnet {
                     }
                     Ok(DevnetCommand::Start(_)) => {}
                     Err(e) => {
-                        panic!("{}", e.to_string());
+                        if logs_enabled {
+                            println!("Fatal error: {}", e.to_string());
+                        }
+                        return;
                     }
                 }
             }
@@ -219,11 +242,13 @@ impl StacksDevnet {
                         }
                         DevnetEvent::BootCompleted(mining_tx) => {
                             let _ = meta_mining_command_tx.send(mining_tx);
+                            let _ = devnet_ready_tx.send(true);
                         }
                         DevnetEvent::FatalError(error) => {
                             if logs_enabled {
                                 println!("{:?}", error);
                             }
+                            break;
                         }
                         _ => {}
                     }
@@ -259,6 +284,7 @@ impl StacksDevnet {
         Self {
             tx,
             termination_rx,
+            devnet_ready_rx,
             mining_tx: relaying_mining_tx,
             bitcoin_block_rx,
             stacks_block_rx,
@@ -270,11 +296,16 @@ impl StacksDevnet {
         }
     }
 
-    fn start(
-        &self,
-        callback: Option<DevnetCallback>,
-    ) -> Result<(), mpsc::SendError<DevnetCommand>> {
-        self.tx.send(DevnetCommand::Start(callback))
+    fn start(&self, timeout: u64, empty_buffer: bool) -> Result<bool, mpsc::RecvTimeoutError> {
+        let _ = self.tx.send(DevnetCommand::Start(None));
+        let res = self
+            .devnet_ready_rx
+            .recv_timeout(std::time::Duration::from_secs(timeout));
+        if empty_buffer && res.is_ok() {
+            while let Ok(_) = self.stacks_block_rx.try_recv() {}
+            while let Ok(_) = self.bitcoin_block_rx.try_recv() {}
+        }
+        res
     }
 }
 
@@ -700,13 +731,12 @@ impl StacksDevnet {
     }
 
     fn js_start(mut cx: FunctionContext) -> JsResult<JsUndefined> {
-        // Get the first argument as a `JsFunction`
-        // let callback = cx.argument::<JsFunction>(0)?.root(&mut cx);
-        // let callback = callback.into_inner(&mut cx);
+        let timeout = cx.argument::<JsNumber>(0)?.value(&mut cx) as u64;
+        let empty_buffer = cx.argument::<JsBoolean>(1)?.value(&mut cx);
 
         cx.this()
             .downcast_or_throw::<JsBox<StacksDevnet>, _>(&mut cx)?
-            .start(None)
+            .start(timeout, empty_buffer)
             .or_else(|err| cx.throw_error(err.to_string()))?;
 
         Ok(cx.undefined())
@@ -733,10 +763,12 @@ impl StacksDevnet {
             .this()
             .downcast_or_throw::<JsBox<StacksDevnet>, _>(&mut cx)?;
 
-        // Keeping, for eventual future usage
-        // let _ = devnet.mining_tx.send(BitcoinMiningCommand::Mine);
+        let _ = devnet.mining_tx.send(BitcoinMiningCommand::Mine);
 
-        let blocks = match devnet.stacks_block_rx.recv() {
+        let blocks = match devnet
+            .stacks_block_rx
+            .recv_timeout(std::time::Duration::from_secs(5))
+        {
             Ok(obj) => obj,
             Err(_) => return Ok(cx.undefined().as_value(&mut cx)),
         };
@@ -751,12 +783,14 @@ impl StacksDevnet {
             .this()
             .downcast_or_throw::<JsBox<StacksDevnet>, _>(&mut cx)?;
 
-        // Keeping, for eventual future usage
-        // let _ = devnet.mining_tx.send(BitcoinMiningCommand::Mine);
+        let _ = devnet.mining_tx.send(BitcoinMiningCommand::Mine);
 
-        let block = match devnet.bitcoin_block_rx.recv() {
+        let block = match devnet
+            .bitcoin_block_rx
+            .recv_timeout(std::time::Duration::from_secs(5))
+        {
             Ok(obj) => obj,
-            Err(err) => panic!("{:?}", err),
+            Err(_) => return Ok(cx.undefined().as_value(&mut cx)),
         };
 
         let js_block = serde::to_value(&mut cx, &block).expect("Unable to serialize block");
