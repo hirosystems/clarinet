@@ -16,7 +16,7 @@ export function initConnection(
   connection: Connection,
   bridge: LspVscodeBridge,
 ) {
-  connection.onInitialize(async (params) =>
+  connection.onInitialize((params) =>
     bridge.onRequest(InitializeRequest.method, params),
   );
 

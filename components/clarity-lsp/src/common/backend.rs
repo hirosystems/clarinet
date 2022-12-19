@@ -277,32 +277,60 @@ pub enum LspRequestResponse {
     Hover(Option<Hover>),
 }
 
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct InitializationOptions {
+    completion: bool,
+    hover: bool,
+    document_symbols: bool,
+    go_to_definition: bool,
+}
+
 pub fn process_request(command: LspRequest, editor_state: &EditorStateInput) -> LspRequestResponse {
     match command {
-        LspRequest::Initialize(_params) => LspRequestResponse::Initialize(InitializeResult {
-            server_info: None,
-            capabilities: ServerCapabilities {
-                text_document_sync: Some(TextDocumentSyncCapability::Options(
-                    TextDocumentSyncOptions {
-                        open_close: Some(true),
-                        change: Some(TextDocumentSyncKind::FULL),
-                        will_save: Some(false),
-                        will_save_wait_until: Some(false),
-                        save: Some(TextDocumentSyncSaveOptions::Supported(true)),
+        LspRequest::Initialize(params) => {
+            let initialization_options: InitializationOptions = params
+                .initialization_options
+                .and_then(|o| serde_json::from_str(o.as_str()?).ok())
+                .expect("failed to parse initialization options");
+
+            LspRequestResponse::Initialize(InitializeResult {
+                server_info: None,
+                capabilities: ServerCapabilities {
+                    text_document_sync: Some(TextDocumentSyncCapability::Options(
+                        TextDocumentSyncOptions {
+                            open_close: Some(true),
+                            change: Some(TextDocumentSyncKind::FULL),
+                            will_save: Some(false),
+                            will_save_wait_until: Some(false),
+                            save: Some(TextDocumentSyncSaveOptions::Supported(true)),
+                        },
+                    )),
+                    completion_provider: match initialization_options.completion {
+                        true => Some(CompletionOptions {
+                            resolve_provider: Some(false),
+                            trigger_characters: None,
+                            all_commit_characters: None,
+                            work_done_progress_options: Default::default(),
+                        }),
+                        false => None,
                     },
-                )),
-                completion_provider: Some(CompletionOptions {
-                    resolve_provider: Some(false),
-                    trigger_characters: None,
-                    all_commit_characters: None,
-                    work_done_progress_options: Default::default(),
-                }),
-                hover_provider: Some(HoverProviderCapability::Simple(true)),
-                document_symbol_provider: Some(lsp_types::OneOf::Left(true)),
-                definition_provider: Some(lsp_types::OneOf::Left(true)),
-                ..ServerCapabilities::default()
-            },
-        }),
+                    hover_provider: match initialization_options.hover {
+                        true => Some(HoverProviderCapability::Simple(true)),
+                        false => None,
+                    },
+                    document_symbol_provider: match initialization_options.document_symbols {
+                        true => Some(lsp_types::OneOf::Left(true)),
+                        false => None,
+                    },
+                    definition_provider: match initialization_options.go_to_definition {
+                        true => Some(lsp_types::OneOf::Left(true)),
+                        false => None,
+                    },
+                    ..ServerCapabilities::default()
+                },
+            })
+        }
 
         LspRequest::Completion(params) => {
             let file_url = params.text_document_position.text_document.uri;
