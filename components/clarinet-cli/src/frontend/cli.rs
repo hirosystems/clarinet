@@ -1211,7 +1211,10 @@ pub fn main() {
                 mine_block_delay,
             ) {
                 Ok(count) => (true, count),
-                Err((_e, count)) => (false, count),
+                Err((e, count)) => {
+                    println!("{}", format_err!(e.to_string()));
+                    (false, count)
+                }
             };
             if hints_enabled {
                 display_tests_pro_tips_hint();

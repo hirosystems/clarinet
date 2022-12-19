@@ -25,7 +25,7 @@ pub fn run_devnet(
     (
         Option<mpsc::Receiver<DevnetEvent>>,
         Option<mpsc::Sender<bool>>,
-        Option<mpsc::Sender<ChainsCoordinatorCommand>>,
+        Option<crossbeam_channel::Sender<ChainsCoordinatorCommand>>,
     ),
     String,
 > {

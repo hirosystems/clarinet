@@ -100,7 +100,7 @@ fn bitcoin_chainhook_p2pkh(
 
 fn generate_and_register_new_stacks_chainhook(
     observer_commands_tx: &Sender<ObserverCommand>,
-    observer_events_rx: &Receiver<ObserverEvent>,
+    observer_events_rx: &crossbeam_channel::Receiver<ObserverEvent>,
     id: u8,
     contract_name: &str,
     method: &str,
@@ -126,7 +126,7 @@ fn generate_and_register_new_stacks_chainhook(
 
 fn generate_and_register_new_bitcoin_chainhook(
     observer_commands_tx: &Sender<ObserverCommand>,
-    observer_events_rx: &Receiver<ObserverEvent>,
+    observer_events_rx: &crossbeam_channel::Receiver<ObserverEvent>,
     id: u8,
     p2pkh_address: &str,
     expire_after_occurrence: Option<u64>,
@@ -152,7 +152,7 @@ fn generate_and_register_new_bitcoin_chainhook(
 #[test]
 fn test_stacks_chainhook_register_deregister() {
     let (observer_commands_tx, observer_commands_rx) = channel();
-    let (observer_events_tx, observer_events_rx) = channel();
+    let (observer_events_tx, observer_events_rx) = crossbeam_channel::unbounded();
 
     let handle = std::thread::spawn(move || {
         let (config, chainhook_store) = generate_test_config();
@@ -390,7 +390,7 @@ fn test_stacks_chainhook_register_deregister() {
 #[test]
 fn test_stacks_chainhook_auto_deregister() {
     let (observer_commands_tx, observer_commands_rx) = channel();
-    let (observer_events_tx, observer_events_rx) = channel();
+    let (observer_events_tx, observer_events_rx) = crossbeam_channel::unbounded();
 
     let handle = std::thread::spawn(move || {
         let (config, chainhook_store) = generate_test_config();
@@ -549,7 +549,7 @@ fn test_stacks_chainhook_auto_deregister() {
 #[test]
 fn test_bitcoin_chainhook_register_deregister() {
     let (observer_commands_tx, observer_commands_rx) = channel();
-    let (observer_events_tx, observer_events_rx) = channel();
+    let (observer_events_tx, observer_events_rx) = crossbeam_channel::unbounded();
 
     let handle = std::thread::spawn(move || {
         let (config, chainhook_store) = generate_test_config();
@@ -808,7 +808,7 @@ fn test_bitcoin_chainhook_register_deregister() {
 #[test]
 fn test_bitcoin_chainhook_auto_deregister() {
     let (observer_commands_tx, observer_commands_rx) = channel();
-    let (observer_events_tx, observer_events_rx) = channel();
+    let (observer_events_tx, observer_events_rx) = crossbeam_channel::unbounded();
 
     let handle = std::thread::spawn(move || {
         let (config, chainhook_store) = generate_test_config();

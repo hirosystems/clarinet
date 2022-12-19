@@ -6,6 +6,7 @@ use base58::FromBase58;
 use bitcoincore_rpc::{Auth, Client, RpcApi};
 use chainhook_event_observer::chainhooks::types::ChainhookConfig;
 use chainhook_event_observer::utils::Context;
+use clarinet_deployments::onchain::TransactionStatus;
 use clarinet_deployments::onchain::{
     apply_on_chain_deployment, DeploymentCommand, DeploymentEvent,
 };
@@ -55,17 +56,11 @@ pub struct DevnetEventObserverConfig {
 
 impl DevnetEventObserverConfig {
     pub fn consolidated_stacks_rpc_url(&self) -> String {
-        format!(
-            "http://{}:{}",
-            self.services_map_hosts.stacks_node_host, self.devnet_config.stacks_node_rpc_port
-        )
+        format!("http://{}", self.services_map_hosts.stacks_node_host)
     }
 
     pub fn consolidated_bitcoin_rpc_url(&self) -> String {
-        format!(
-            "http://{}:{}",
-            self.services_map_hosts.bitcoin_node_host, self.devnet_config.bitcoin_node_rpc_port
-        )
+        format!("http://{}", self.services_map_hosts.bitcoin_node_host)
     }
 }
 
@@ -138,23 +133,41 @@ impl DevnetEventObserverConfig {
 pub async fn start_chains_coordinator(
     config: DevnetEventObserverConfig,
     devnet_event_tx: Sender<DevnetEvent>,
-    chains_coordinator_commands_rx: Receiver<ChainsCoordinatorCommand>,
-    _chains_coordinator_commands_tx: Sender<ChainsCoordinatorCommand>,
+    chains_coordinator_commands_rx: crossbeam_channel::Receiver<ChainsCoordinatorCommand>,
+    _chains_coordinator_commands_tx: crossbeam_channel::Sender<ChainsCoordinatorCommand>,
     orchestrator_terminator_tx: Sender<bool>,
     observer_command_tx: Sender<ObserverCommand>,
     observer_command_rx: Receiver<ObserverCommand>,
     ctx: Context,
 ) -> Result<(), String> {
-    let (deployment_events_tx, deployment_events_rx) = channel();
-    let (deployment_commands_tx, deployments_command_rx) = channel();
+    let mut should_deploy_protocol = true; // Will change when `stacks-network` components becomes compatible with Testnet / Mainnet setups
+    let boot_completed = Arc::new(AtomicBool::new(false));
 
-    prepare_protocol_deployment(
+    let (deployment_commands_tx, deployments_command_rx) = channel();
+    let (deployment_events_tx, deployment_events_rx) = channel();
+    let (mining_command_tx, mining_command_rx) = channel();
+
+    // Set-up the background task in charge of serializing / signing / publishing the contracts.
+    // This tasks can take several seconds to minutes, depending on the complexity of the project.
+    // We start this process as soon as possible, as a background task.
+    // This thread becomes dormant once the encoding is done, and proceed to the actual deployment once
+    // the event DeploymentCommand::Start is received.
+    perform_protocol_deployment(
         &config.manifest,
         &config.deployment,
         deployment_events_tx,
         deployments_command_rx,
         Some(config.consolidated_bitcoin_rpc_url()),
         Some(config.consolidated_stacks_rpc_url()),
+    );
+
+    // Set-up the background task in charge of monitoring contracts deployments.
+    // This thread will be waiting and relaying events emitted by the thread above.
+    relay_devnet_protocol_deployment(
+        deployment_events_rx,
+        &devnet_event_tx,
+        Some(mining_command_tx.clone()),
+        &boot_completed,
     );
 
     if let Some(ref hooks) = config.event_observer_config.initial_hook_formation {
@@ -169,7 +182,7 @@ pub async fn start_chains_coordinator(
     }
 
     // Spawn event observer
-    let (observer_event_tx, observer_event_rx) = channel();
+    let (observer_event_tx, observer_event_rx) = crossbeam_channel::unbounded();
     let event_observer_config = config.event_observer_config.clone();
     let observer_event_tx_moved = observer_event_tx.clone();
     let observer_command_tx_moved = observer_command_tx.clone();
@@ -186,7 +199,6 @@ pub async fn start_chains_coordinator(
     });
 
     // Spawn bitcoin miner controller
-    let (mining_command_tx, mining_command_rx) = channel();
     let devnet_event_tx_moved = devnet_event_tx.clone();
     let devnet_config = config.clone();
     let _ = hiro_system_kit::thread_named("Bitcoin mining").spawn(move || {
@@ -195,27 +207,38 @@ pub async fn start_chains_coordinator(
 
     // Loop over events being received from Bitcoin and Stacks,
     // and orchestrate the 2 chains + protocol.
-    let mut should_deploy_protocol = true;
-    let boot_completed = Arc::new(AtomicBool::new(false));
-
-    let mut deployment_events_rx = Some(deployment_events_rx);
+    let mut deployment_commands_tx = Some(deployment_commands_tx);
     let mut subnet_initialized = false;
 
+    let mut sel = crossbeam_channel::Select::new();
+    let chains_coordinator_commands_oper = sel.recv(&chains_coordinator_commands_rx);
+    let observer_event_oper = sel.recv(&observer_event_rx);
+
     loop {
-        // Did we receive a termination notice?
-        if let Ok(ChainsCoordinatorCommand::Terminate) = chains_coordinator_commands_rx.try_recv() {
-            let _ = orchestrator_terminator_tx.send(true);
-            let _ = observer_command_tx.send(ObserverCommand::Terminate);
-            let _ = mining_command_tx.send(BitcoinMiningCommand::Pause);
-            break;
-        }
-        let command = match observer_event_rx.recv() {
-            Ok(cmd) => cmd,
-            Err(_e) => {
-                // TODO(lgalabru): cascade termination
-                continue;
+        let oper = sel.select();
+        let command = match oper.index() {
+            i if i == chains_coordinator_commands_oper => {
+                match oper.recv(&chains_coordinator_commands_rx) {
+                    Ok(ChainsCoordinatorCommand::Terminate) => {
+                        let _ = orchestrator_terminator_tx.send(true);
+                        let _ = observer_command_tx.send(ObserverCommand::Terminate);
+                        let _ = mining_command_tx.send(BitcoinMiningCommand::Pause);
+                        break;
+                    }
+                    Err(_e) => {
+                        continue;
+                    }
+                }
             }
+            i if i == observer_event_oper => match oper.recv(&observer_event_rx) {
+                Ok(cmd) => cmd,
+                Err(_e) => {
+                    continue;
+                }
+            },
+            _ => unreachable!(),
         };
+
         match command {
             ObserverEvent::Fatal(msg) => {
                 devnet_event_tx
@@ -268,40 +291,16 @@ pub async fn start_chains_coordinator(
             }
             ObserverEvent::StacksChainEvent(chain_event) => {
                 if should_deploy_protocol {
-                    should_deploy_protocol = false;
-
-                    let automining_disabled =
-                        config.devnet_config.bitcoin_controller_automining_disabled;
-                    let mining_command_tx_moved = mining_command_tx.clone();
-                    let boot_completed_moved = boot_completed.clone();
-                    let (deployment_progress_tx, deployment_progress_rx) = channel();
-
-                    if let Some(deployment_events_rx) = deployment_events_rx.take() {
-                        perform_protocol_deployment(
-                            deployment_events_rx,
-                            deployment_progress_tx,
-                            &deployment_commands_tx,
-                            &devnet_event_tx,
-                            mining_command_tx.clone(),
-                        )
-                    }
-
-                    let _ = hiro_system_kit::thread_named("Deployment monitoring").spawn(
-                        move || loop {
-                            match deployment_progress_rx.recv() {
-                                Ok(DeploymentEvent::DeploymentCompleted) => {
-                                    boot_completed_moved.store(true, Ordering::SeqCst);
-                                    if !automining_disabled {
-                                        let _ = mining_command_tx_moved
-                                            .send(BitcoinMiningCommand::Start);
-                                    }
-                                    break;
-                                }
-                                Ok(_) => continue,
-                                _ => break,
+                    if let Some(block) = chain_event.new_block() {
+                        if block.block_identifier.index == 1 {
+                            should_deploy_protocol = false;
+                            if let Some(deployment_commands_tx) = deployment_commands_tx.take() {
+                                deployment_commands_tx
+                                    .send(DeploymentCommand::Start)
+                                    .expect("unable to trigger deployment");
                             }
-                        },
-                    );
+                        }
+                    }
                 }
 
                 let known_tip = match &chain_event {
@@ -452,7 +451,7 @@ pub async fn start_chains_coordinator(
     Ok(())
 }
 
-pub fn prepare_protocol_deployment(
+pub fn perform_protocol_deployment(
     manifest: &ProjectManifest,
     deployment: &DeploymentSpecification,
     deployment_event_tx: Sender<DeploymentEvent>,
@@ -463,7 +462,7 @@ pub fn prepare_protocol_deployment(
     let manifest = manifest.clone();
     let deployment = deployment.clone();
 
-    let _ = hiro_system_kit::thread_named("Deployment preheat").spawn(move || {
+    let _ = hiro_system_kit::thread_named("Deployment execution").spawn(move || {
         apply_on_chain_deployment(
             &manifest,
             deployment,
@@ -476,31 +475,36 @@ pub fn prepare_protocol_deployment(
     });
 }
 
-pub fn perform_protocol_deployment(
+pub fn relay_devnet_protocol_deployment(
     deployment_events_rx: Receiver<DeploymentEvent>,
-    deployment_events_tx: Sender<DeploymentEvent>,
-    deployment_commands_tx: &Sender<DeploymentCommand>,
     devnet_event_tx: &Sender<DevnetEvent>,
-    bitcoin_mining_tx: Sender<BitcoinMiningCommand>,
+    bitcoin_mining_tx: Option<Sender<BitcoinMiningCommand>>,
+    boot_completed: &Arc<AtomicBool>,
 ) {
     let devnet_event_tx = devnet_event_tx.clone();
-    let _ = deployment_commands_tx.send(DeploymentCommand::Start);
-
-    let _ = hiro_system_kit::thread_named("Deployment perform").spawn(move || {
+    let boot_completed = boot_completed.clone();
+    let _ = hiro_system_kit::thread_named("Deployment monitoring").spawn(move || {
         loop {
             let event = match deployment_events_rx.recv() {
                 Ok(event) => event,
                 Err(_e) => break,
             };
             match event {
-                DeploymentEvent::TransactionUpdate(_) => {}
+                DeploymentEvent::TransactionUpdate(tracker) => {
+                    if let TransactionStatus::Error(ref message) = tracker.status {
+                        let _ = devnet_event_tx.send(DevnetEvent::error(message.into()));
+                        break;
+                    }
+                }
                 DeploymentEvent::Interrupted(_) => {
                     // Terminate
                     break;
                 }
                 DeploymentEvent::DeploymentCompleted => {
-                    let _ = devnet_event_tx.send(DevnetEvent::BootCompleted(bitcoin_mining_tx));
-                    let _ = deployment_events_tx.send(DeploymentEvent::DeploymentCompleted);
+                    boot_completed.store(true, Ordering::SeqCst);
+                    if let Some(bitcoin_mining_tx) = bitcoin_mining_tx {
+                        let _ = devnet_event_tx.send(DevnetEvent::BootCompleted(bitcoin_mining_tx));
+                    }
                     break;
                 }
             }

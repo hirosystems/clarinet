@@ -53,59 +53,33 @@ pub trait ASTVisitor<'a> {
                                 .unwrap_or(&DEFAULT_NAME),
                             args.get(1).unwrap_or(&DEFAULT_EXPR),
                         ),
-                        DefineFunctions::PrivateFunction => {
+                        DefineFunctions::PrivateFunction
+                        | DefineFunctions::ReadOnlyFunction
+                        | DefineFunctions::PublicFunction => {
                             match args.get(0).unwrap_or(&DEFAULT_EXPR).match_list() {
                                 Some(signature) => {
-                                    let name = signature[0].match_atom().unwrap_or(&DEFAULT_NAME);
+                                    let name = signature
+                                        .get(0)
+                                        .and_then(|n| n.match_atom())
+                                        .unwrap_or(&DEFAULT_NAME);
                                     let params = match signature.len() {
-                                        1 => None,
+                                        0 | 1 => None,
                                         _ => match_pairs_list(&signature[1..]),
                                     };
-                                    self.traverse_define_private(
-                                        expr,
-                                        name,
-                                        params,
-                                        args.get(1).unwrap_or(&DEFAULT_EXPR),
-                                    );
-                                }
-                                _ => {
-                                    false;
-                                }
-                            }
-                            true
-                        }
-                        DefineFunctions::ReadOnlyFunction => {
-                            match args.get(0).unwrap_or(&DEFAULT_EXPR).match_list() {
-                                Some(signature) => {
-                                    let name = signature[0].match_atom().unwrap_or(&DEFAULT_NAME);
-                                    let params = match signature.len() {
-                                        1 => None,
-                                        _ => match_pairs_list(&signature[1..]),
-                                    };
-                                    self.traverse_define_read_only(
-                                        expr,
-                                        name,
-                                        params,
-                                        args.get(1).unwrap_or(&DEFAULT_EXPR),
-                                    )
-                                }
-                                _ => false,
-                            }
-                        }
-                        DefineFunctions::PublicFunction => {
-                            match args.get(0).unwrap_or(&DEFAULT_EXPR).match_list() {
-                                Some(signature) => {
-                                    let name = signature[0].match_atom().unwrap_or(&DEFAULT_NAME);
-                                    let params = match signature.len() {
-                                        1 => None,
-                                        _ => match_pairs_list(&signature[1..]),
-                                    };
-                                    self.traverse_define_public(
-                                        expr,
-                                        name,
-                                        params,
-                                        args.get(1).unwrap_or(&DEFAULT_EXPR),
-                                    )
+                                    let body = args.get(1).unwrap_or(&DEFAULT_EXPR);
+
+                                    match define_function {
+                                        DefineFunctions::PrivateFunction => {
+                                            self.traverse_define_private(expr, name, params, body)
+                                        }
+                                        DefineFunctions::ReadOnlyFunction => {
+                                            self.traverse_define_read_only(expr, name, params, body)
+                                        }
+                                        DefineFunctions::PublicFunction => {
+                                            self.traverse_define_public(expr, name, params, body)
+                                        }
+                                        _ => unreachable!(),
+                                    }
                                 }
                                 _ => false,
                             }

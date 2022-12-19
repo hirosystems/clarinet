@@ -218,7 +218,7 @@ pub fn start_replay_flow(
     };
 
     let (digestion_tx, digestion_rx) = channel();
-    let (observer_event_tx, observer_event_rx) = channel();
+    let (observer_event_tx, observer_event_rx) = crossbeam_channel::unbounded();
     let (observer_command_tx, observer_command_rx) = channel();
 
     let terminate_digestion_tx = digestion_tx.clone();
@@ -718,7 +718,7 @@ pub fn start_replay_flow(
 
 pub fn start_node(mut config: Config, ctx: Context) {
     let (digestion_tx, digestion_rx) = channel();
-    let (observer_event_tx, observer_event_rx) = channel();
+    let (observer_event_tx, observer_event_rx) = crossbeam_channel::unbounded();
     let (observer_command_tx, observer_command_rx) = channel();
 
     let terminate_digestion_tx = digestion_tx.clone();

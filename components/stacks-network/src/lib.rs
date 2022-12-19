@@ -60,7 +60,7 @@ pub async fn do_run_devnet(
     (
         Option<mpsc::Receiver<DevnetEvent>>,
         Option<mpsc::Sender<bool>>,
-        Option<mpsc::Sender<ChainsCoordinatorCommand>>,
+        Option<crossbeam_channel::Sender<ChainsCoordinatorCommand>>,
     ),
     String,
 > {
@@ -103,7 +103,8 @@ pub async fn do_run_devnet(
         ip_address_setup,
     );
     let chains_coordinator_tx = devnet_events_tx.clone();
-    let (chains_coordinator_commands_tx, chains_coordinator_commands_rx) = channel();
+    let (chains_coordinator_commands_tx, chains_coordinator_commands_rx) =
+        crossbeam_channel::unbounded();
     let (orchestrator_terminator_tx, terminator_rx) = channel();
     let (observer_command_tx, observer_command_rx) = channel();
     let moved_orchestrator_terminator_tx = orchestrator_terminator_tx.clone();
@@ -160,6 +161,7 @@ pub async fn do_run_devnet(
             ),
             &devnet_path,
             devnet_config.enable_subnet_node,
+            !devnet_config.bitcoin_controller_automining_disabled,
             &ctx,
         )?;
 
@@ -207,6 +209,11 @@ pub async fn do_run_devnet(
                                     ctx.try_log(|logger| slog::error!(logger, "{}", log.message))
                                 }
                             }
+                        }
+                    }
+                    Ok(DevnetEvent::BootCompleted(bitcoin_mining_tx)) => {
+                        if !devnet_config.bitcoin_controller_automining_disabled {
+                            let _ = bitcoin_mining_tx.send(BitcoinMiningCommand::Start);
                         }
                     }
                     _ => {}

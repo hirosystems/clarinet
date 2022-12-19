@@ -988,6 +988,7 @@ poll_time_secs = 1
 timeout = 30
 peer_host = "host.docker.internal"
 rpc_ssl = false
+wallet_name = "devnet"
 username = "{bitcoin_node_username}"
 password = "{bitcoin_node_password}"
 rpc_port = {orchestrator_ingestion_port}
@@ -2427,7 +2428,10 @@ events_keys = ["*"]
         loop {
             match rpc.get_network_info() {
                 Ok(_r) => break,
-                Err(_e) => {}
+                Err(_e) => {
+                    let _ = devnet_event_tx
+                        .send(DevnetEvent::info(format!("Error ({})", _e.to_string())));
+                }
             }
             std::thread::sleep(std::time::Duration::from_secs(1));
             let _ = devnet_event_tx.send(DevnetEvent::info(format!("Waiting for bitcoin-node",)));
