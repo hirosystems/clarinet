@@ -170,7 +170,7 @@ pub async fn start_chains_coordinator(
         &boot_completed,
     );
 
-    if let Some(ref hooks) = config.event_observer_config.initial_hook_formation {
+    if let Some(ref hooks) = config.event_observer_config.chainhook_config {
         let chainhooks_count = hooks.bitcoin_chainhooks.len() + hooks.stacks_chainhooks.len();
         if chainhooks_count > 0 {
             devnet_event_tx
