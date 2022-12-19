@@ -30,6 +30,7 @@ ansi_term = "0.12.1"
 atty = "0.2.14"
 bitcoincore-rpc = "0.16.0"
 bitcoincore-rpc-json = "0.16.0"
+crossbeam-channel = "0.5.6"
 
 [dev-dependencies]
 criterion = "0.3"

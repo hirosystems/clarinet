@@ -21,6 +21,12 @@ pub extern crate slog;
 #[cfg(feature = "log")]
 pub use slog::*;
 
+#[cfg(feature = "log")]
+pub extern crate slog_term;
+
+#[cfg(feature = "log")]
+pub extern crate slog_async;
+
 use std::thread::Builder;
 
 pub fn thread_named(name: &str) -> Builder {

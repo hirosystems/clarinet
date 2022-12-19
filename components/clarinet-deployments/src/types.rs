@@ -1,4 +1,5 @@
 use clarinet_files::FileLocation;
+use clarity_repl::clarity::stacks_common::types::StacksEpochId;
 use clarity_repl::clarity::util::hash::{hex_bytes, to_hex};
 use clarity_repl::clarity::vm::analysis::ContractAnalysis;
 use clarity_repl::clarity::vm::ast::ContractAST;
@@ -18,9 +19,40 @@ use clarity_repl::analysis::ast_dependency_detector::DependencySet;
 use clarity_repl::repl::{Session, DEFAULT_CLARITY_VERSION};
 use std::collections::HashMap;
 
+#[derive(Serialize, Deserialize, PartialEq, Debug, Clone, Copy, Eq, PartialOrd, Ord)]
+pub enum EpochSpec {
+    #[serde(rename = "2.0")]
+    Epoch2_0,
+    #[serde(rename = "2.05")]
+    Epoch2_05,
+    #[serde(rename = "2.1")]
+    Epoch2_1,
+}
+
+impl From<StacksEpochId> for EpochSpec {
+    fn from(epoch: StacksEpochId) -> Self {
+        match epoch {
+            StacksEpochId::Epoch20 => EpochSpec::Epoch2_0,
+            StacksEpochId::Epoch2_05 => EpochSpec::Epoch2_05,
+            StacksEpochId::Epoch21 => EpochSpec::Epoch2_1,
+            StacksEpochId::Epoch10 => unreachable!("epoch 1.0 is not supported"),
+        }
+    }
+}
+
+impl Into<StacksEpochId> for EpochSpec {
+    fn into(self) -> StacksEpochId {
+        match self {
+            EpochSpec::Epoch2_0 => StacksEpochId::Epoch20,
+            EpochSpec::Epoch2_05 => StacksEpochId::Epoch2_05,
+            EpochSpec::Epoch2_1 => StacksEpochId::Epoch21,
+        }
+    }
+}
+
 pub struct DeploymentGenerationArtifacts {
-    pub asts: HashMap<QualifiedContractIdentifier, ContractAST>,
-    pub deps: HashMap<QualifiedContractIdentifier, DependencySet>,
+    pub asts: BTreeMap<QualifiedContractIdentifier, ContractAST>,
+    pub deps: BTreeMap<QualifiedContractIdentifier, DependencySet>,
     pub diags: HashMap<QualifiedContractIdentifier, Vec<Diagnostic>>,
     pub analysis: HashMap<QualifiedContractIdentifier, ContractAnalysis>,
     pub session: Session,
@@ -43,6 +75,8 @@ pub struct TransactionPlanSpecificationFile {
 pub struct TransactionsBatchSpecificationFile {
     pub id: usize,
     pub transactions: Vec<TransactionSpecificationFile>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub epoch: Option<EpochSpec>,
 }
 
 #[derive(Debug, PartialEq, Serialize, Deserialize)]
@@ -154,6 +188,7 @@ pub struct EmulatedContractPublishSpecificationFile {
 pub struct TransactionsBatchSpecification {
     pub id: usize,
     pub transactions: Vec<TransactionSpecification>,
+    pub epoch: Option<EpochSpec>,
 }
 
 #[derive(Debug, PartialEq, Clone)]
@@ -692,6 +727,7 @@ impl DeploymentSpecification {
                         batches.push(TransactionsBatchSpecification {
                             id: batch.id,
                             transactions,
+                            epoch: batch.epoch,
                         });
                     }
                 }
@@ -741,6 +777,7 @@ impl DeploymentSpecification {
                         batches.push(TransactionsBatchSpecification {
                             id: batch.id,
                             transactions,
+                            epoch: batch.epoch,
                         });
                     }
                 }
@@ -1009,6 +1046,7 @@ impl TransactionPlanSpecification {
             batches.push(TransactionsBatchSpecificationFile {
                 id: batch.id,
                 transactions,
+                epoch: batch.epoch,
             });
         }
 

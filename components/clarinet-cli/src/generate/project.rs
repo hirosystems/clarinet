@@ -386,6 +386,13 @@ disable_stacks_api = false
 # subnet_events_ingestion_port = 30445
 # subnet_node_events_observers = ["host.docker.internal:8002"]
 
+# For testing in epoch 2.1 / using Clarity2
+# enable_next_features = true
+# epoch_2_0 = 103
+# epoch_2_05 = 104
+# epoch_2_1 = 106
+# pox_2_activation = 109
+
 
 # Send some stacking orders
 [[devnet.pox_stacking_orders]]

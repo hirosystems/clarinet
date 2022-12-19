@@ -1,7 +1,7 @@
-import { StacksDevnetOrchestrator } from "./index";
+import { DevnetNetworkOrchestrator } from "./index";
 
-const devnet = new StacksDevnetOrchestrator({
-    path: "../examples/counter/Clarinet.toml",
+const devnet = new DevnetNetworkOrchestrator({
+    clarinetManifestPath: "../examples/counter/Clarinet.toml",
     logs: true,
     accounts: [
         {
@@ -32,4 +32,4 @@ let block = devnet.waitForStacksBlock();
 
 console.log(`Hello from JS ${JSON.stringify(block)}`);
 
-devnet.stop();
+devnet.terminate();

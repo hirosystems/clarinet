@@ -16,7 +16,7 @@ use toml::value::Value;
 pub const DEFAULT_DERIVATION_PATH: &str = "m/44'/5757'/0'/0/0";
 pub const DEFAULT_BITCOIN_NODE_IMAGE: &str = "quay.io/hirosystems/bitcoind:devnet-v2";
 pub const DEFAULT_STACKS_NODE_IMAGE: &str = "quay.io/hirosystems/stacks-node:devnet-v2";
-pub const DEFAULT_STACKS_NODE_NEXT_IMAGE: &str = "quay.io/hirosystems/stacks-node:devnet-v3-beta1";
+pub const DEFAULT_STACKS_NODE_NEXT_IMAGE: &str = "quay.io/hirosystems/stacks-node:devnet-v3-beta2";
 pub const DEFAULT_BITCOIN_EXPLORER_IMAGE: &str = "quay.io/hirosystems/bitcoin-explorer:devnet";
 pub const DEFAULT_STACKS_API_IMAGE: &str = "hirosystems/stacks-blockchain-api:latest";
 pub const DEFAULT_STACKS_API_NEXT_IMAGE: &str = "hirosystems/stacks-blockchain-api:stacks-2.1";
@@ -38,7 +38,7 @@ pub const DEFAULT_DOCKER_SOCKET: &str = "/var/run/docker.sock";
 pub const DEFAULT_EPOCH_2_0: u64 = 100;
 pub const DEFAULT_EPOCH_2_05: u64 = 102;
 pub const DEFAULT_EPOCH_2_1: u64 = 106;
-pub const DEFAULT_POX2_ACTIVATION: u64 = 108;
+pub const DEFAULT_POX2_ACTIVATION: u64 = 109;
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct NetworkManifestFile {
@@ -722,7 +722,7 @@ impl NetworkManifest {
                     .unwrap_or("devnet".to_string()),
                 bitcoin_controller_block_time: devnet_config
                     .bitcoin_controller_block_time
-                    .unwrap_or(90_000),
+                    .unwrap_or(60_000),
                 bitcoin_controller_automining_disabled: devnet_config
                     .bitcoin_controller_automining_disabled
                     .unwrap_or(false),
@@ -816,8 +816,8 @@ impl NetworkManifest {
                 subnet_leader_mnemonic,
                 subnet_leader_secret_key_hex,
                 subnet_leader_derivation_path,
-                subnet_node_p2p_port: devnet_config.stacks_node_p2p_port.unwrap_or(30444),
-                subnet_node_rpc_port: devnet_config.stacks_node_rpc_port.unwrap_or(30443),
+                subnet_node_p2p_port: devnet_config.subnet_node_p2p_port.unwrap_or(30444),
+                subnet_node_rpc_port: devnet_config.subnet_node_rpc_port.unwrap_or(30443),
                 subnet_events_ingestion_port,
                 subnet_node_events_observers: devnet_config
                     .subnet_node_events_observers

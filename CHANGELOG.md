@@ -1,22 +1,34 @@
-#### 1.1.0 (2022-11-17)
+# [1.2.0](https://github.com/hirosystems/clarinet/compare/v1.1.0...v1.2.0) (2022-12-03)
 
-##### New Features
+### New Features
+
+*  Improve Stacks 2.1 support
+*  Improve `stack-devnet-js` stability
+*  Update Clarity VM
+
+### Bug Fixes
+
+*  `clarinet test` returns status code 1 when failing 
+
+# [1.1.0]() (2022-11-17)
+
+### New Features
 
 *  Support for Stacks 2.1 ([790c14bf](https://github.com/hirosystems/clarinet/commit/790c14bf8fd4a30d1f50c2c4a55873aecac1a076))
 *  Display clarity documentation on hover in VSCode ([e605acb4](https://github.com/hirosystems/clarinet/commit/e605acb49f0892cb75b7a16edf37807f29133a20))
 
-##### Chores
+### Chores
 
 *  Better error management in chainhook-node ([353ceb61](https://github.com/hirosystems/clarinet/commit/353ceb617b8a5b710331fe3387b07f6ad48e3f48))
 
-#### 1.0.6 (2022-11-10)
+# [1.0.6]() (2022-11-10)
 
-##### New Features
+### New Features
 
 *  Ability for chainhook-node to start with custom config ([473c86ba](https://github.com/hirosystems/clarinet/commit/473c86babe41f0c16ea9c370890d440a698dfa08))
 *  Draft bitcoin replay implementation ([8580092e](https://github.com/hirosystems/clarinet/commit/8580092e2e8661c3d6e653be2c3f687774e560fa))
 
-##### Bug Fixes
+### Bug Fixes
 
 *  Filter out boot contracts from requirement dependencies ([34fbcf96](https://github.com/hirosystems/clarinet/commit/34fbcf9686a9bdcdf2e11715abbcb9fa301e4dfb))
 *  Deno expect events ([8bdcd392](https://github.com/hirosystems/clarinet/commit/8bdcd39254c8fb269245005f30b2f930df8dd7ea))
@@ -27,37 +39,37 @@
 *  Add serverless dependency in cbtc example and upgrade dependencies ([f065f2b](https://github.com/hirosystems/clarinet/pull/660/commits/f065f2b3d5268689b7d2b77bba668f352bb53ca2))
 *  Get_bitcoin_proof ([5a3a8ee9](https://github.com/hirosystems/clarinet/commit/5a3a8ee97a4b6db895c048ba9d67ac3423abe5de))
 
-#### 1.0.5 (2022-11-03)
+# [1.0.5]() (2022-11-03)
 
-##### New Features
+### New Features
 
 *  Many chainhooks enhancements: event payload augmented, new predicates (segwit, etc) implemented. Documentation coming soon!
 *  Introducing clarity-jupyter-kernel ([1c118513](https://github.com/hirosystems/clarinet/commit/1c1185136a1c52248a1b20ba43b5887fbaa4ef4d))
 *  Ability to use low/medium/high cost dynamic presets in deployment plans ([86219c4e](https://github.com/hirosystems/clarinet/commit/86219c4e52997d8aad059e871c96f96a5834c616))
 *  Ability to send STX in deployment plans ([c9e3bac4](https://github.com/hirosystems/clarinet/commit/c9e3bac44c2fe97f2f6b5f6578cc309f2cc2e38f))
 
-##### Bug Fixes
+### Bug Fixes
 
 *  Termination in `clarinet integrate --no-dashboard` mode fixed ([2cdb09a6](https://github.com/hirosystems/clarinet/commit/2cdb09a6aeed631236971f4d4206ff97b742683e))
 *  Check print predicate for contained value ([0f5956dc](https://github.com/hirosystems/clarinet/commit/0f5956dc1019f25d14c4204d7cece8923d74ae7b))
 *  Improved keyword recognition in VSCode grammar file ([e690b371](https://github.com/hirosystems/clarinet/commit/e690b371331ed8ec4d27cbc609581c9f07e04888), [119dce57](https://github.com/hirosystems/clarinet/commit/119dce577dd654e471a3054c206c593bdf78bb1b))
 *  Fixed stacks-js-helper generator ([11562ae7](https://github.com/hirosystems/clarinet/commit/11562ae739170a799620f4a62462219304dafc19))
 
-##### Chores
+### Chores
 
 *  Types improvements clarinet deno library ([3bc5c51c](https://github.com/hirosystems/clarinet/commit/3bc5c51cda35bdc52c8867fe222341680e0e3880))
 *  Add tests to the clarinet deno library ([d5b7555d](https://github.com/hirosystems/clarinet/commit/d5b7555d5a3acf4d5d53e32f06e6b80520b93c4e), [062a7144](https://github.com/hirosystems/clarinet/commit/062a7144f25e019dbacd62f8874e2d0a783fd20f))
 
-#### 1.0.4 (2022-10-17)
+# [1.0.4]() (2022-10-17)
 
-##### New Features
+### New Features
 
 *  Devnet chainstate now lives in `cache` directory specified in Clarinet.toml ([a6fb383f](https://github.com/hirosystems/clarinet/commit/a6fb383fecb936d27386f3f914f98dda89a67dda))
 *  Ability to pass wildcards for chainhook testing ([08f75a2a](https://github.com/hirosystems/clarinet/commit/08f75a2a2abcf1cbc1b2c60115cc7d939d090fbd))
 *  Ability to use write-to-file as action (chainhooks) ([fb19e392](https://github.com/hirosystems/clarinet/commit/fb19e392836430d029aa8374a625a49451b38ad9))
 *  Introduce stacks-network component ([ace64116](https://github.com/hirosystems/clarinet/commit/ace641164465d7a253375365a2f805a650981d09))
 
-##### Bug Fixes
+### Bug Fixes
 
 *  Bump ingestion limits to 5 mb ([e4d539da](https://github.com/hirosystems/clarinet/commit/e4d539da703371d6046a64088e18fb23d0452575))
 *  Fix invalid bitcoin txid ([03783a41](https://github.com/hirosystems/clarinet/commit/03783a414837afc78c7688741d42ab4309389abb))
@@ -67,9 +79,9 @@
 *  Better error ([d42f7ed6](https://github.com/hirosystems/clarinet/commit/d42f7ed680097e672611ab1a581f55f32208dd11))
 *  Performance optimisation with parser v2 ([c1712489](https://github.com/hirosystems/clarinet/commit/c171248997a357d8e6a1bc074b79a0452de6235f))
 
-#### 1.0.0 (2022-10-06)
+# [1.0.0]() (2022-10-06)
 
-##### New Features
+### New Features
 
 *  Introducing our brand new re-architected VSCode extension ([README](https://github.com/hirosystems/clarinet/tree/develop/components/clarity-vscode))
 *  All of our tools (REPL, LSP, Clarinet) are now directly derived from the canonical Clarity VM ([#512](https://github.com/hirosystems/clarinet/pull/512), [#535](https://github.com/hirosystems/clarinet/pull/535), [#544](https://github.com/hirosystems/clarinet/pull/544))
@@ -81,7 +93,7 @@
 *  Bitcoin deployment plans now supports transfers to P2WPKH addresses ([c50a4c27](https://github.com/hirosystems/clarinet/commit/c50a4c27857a41d178393306f97e464bffea9b80))
 *  Ability to detect outdated deployment plans and display diffs ([#365](https://github.com/hirosystems/clarinet/issues/365))
 
-##### Bug Fixes
+### Bug Fixes
 
 A myriad of issues were addressed in this new version, the most notable being:
 
@@ -94,12 +106,12 @@ A myriad of issues were addressed in this new version, the most notable being:
 *  Improve debugability of chain.mine_block() ([#91](https://github.com/hirosystems/clarinet/issues/91))
 
 
-##### Documentation
+### Documentation
 
 *  Added new example - How to use Chainhooks for indexing data ([cdeca648](https://github.com/hirosystems/clarinet/commit/cdeca64837e51dd64292ba2f4ddfcdfc3ef77da1))
 *  Added OpenAPI spec for Chainhooks ([01e8979c](https://github.com/hirosystems/clarinet/commit/01e8979c815cff701496d25e07dbf6777ff0afd5))
 
-##### Compatibility Issue
+### Compatibility Issue
 
 Clarinet v1.0.0 is not currently backwards-compatible with older versions of the Clarinet deno library. If you are upgrading Clarinet to Clarinet `v1.0.0`, you will need to enter the following import command in your test files to perform this update.
 ```ts
@@ -109,9 +121,9 @@ import { … } from 'https://deno.land/x/clarinet@v1.0.2/index.ts';
 *Note* The `v1.0.0` library is not compatible with Clarinet versions <= `0.33.0`. Prior versions of the library also will not be compatible with versions >= `1.0.0` of Clarinet because the layer in charge of the communication between Typescript and Rust was upgraded.
 If you are using Clarinet in a *Github Action*, and using the tag `latest` (now pointing to `v1.0.0`), the tests will fail if the import upgrade task is not performed. If you do not want to upgrade, this is possible; however, you will need to specify the docker tag `v0.33.0`, instead of `latest`.
 
-#### 0.33.0 (2022-07-20)
+# [0.33.0]() (2022-07-20)
 
-##### Chores
+### Chores
 
 *  migrate to mono-repo layout ([#481](https://github.com/hirosystems/clarinet/pull/481))
 * **deps:**
@@ -119,15 +131,15 @@ If you are using Clarinet in a *Github Action*, and using the tag `latest` (now 
   *  bump thread_local in /components/stacks-devnet-js ([a6b5065f](https://github.com/hirosystems/clarinet/commit/a6b5065fa9d59df2701bf7cc968203c0b8f7d30d))
   *  bump nix in /components/stacks-devnet-js ([f453b4aa](https://github.com/hirosystems/clarinet/commit/f453b4aae32dee20f9d4f006e70b2518c2878bb3))
 
-##### Continuous Integration
+### Continuous Integration
 
 *  revisit CI and release process ([423c3d36](https://github.com/hirosystems/clarinet/commit/423c3d36c7cb571156bb6553162dbac0b24a2e1c))
 
-##### Documentation Changes
+### Documentation Changes
 
 *  README.md. Removed depends_on() field in the clarinet.toml file and added success message for clarinet check command. ([84d0a327](https://github.com/hirosystems/clarinet/commit/84d0a32776b69520228d2e5149a4a3428e970b56))
 
-##### New Features
+### New Features
 
 *  polish hyperchain integration ([#432](https://github.com/hirosystems/clarinet/pull/432), [#480](https://github.com/hirosystems/clarinet/pull/480), [#494](https://github.com/hirosystems/clarinet/pull/494) )
 *  display microblocks in clarinet terminal UI ([77535aa6](https://github.com/hirosystems/clarinet/commit/77535aa62637f4f42af8f5316c42ea78688efce7))
@@ -137,7 +149,6 @@ If you are using Clarinet in a *Github Action*, and using the tag `latest` (now 
 
 
 # [0.32.0](https://github.com/hirosystems/clarinet/compare/v0.31.1...v0.32.0) (2022-06-23)
-
 
 ### Bug Fixes
 

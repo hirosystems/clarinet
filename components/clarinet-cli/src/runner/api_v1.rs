@@ -28,6 +28,7 @@ use chainhook_types::StacksTransactionMetadata;
 use chainhook_types::TransactionIdentifier;
 use chrono::{DateTime, NaiveDateTime, Utc};
 use clarinet_deployments::update_session_with_contracts_executions;
+use clarity_repl::clarity::stacks_common::types::StacksEpochId;
 use clarity_repl::clarity::stacks_common::util::hash::MerkleTree;
 use clarity_repl::clarity::util::hash::hex_bytes;
 use clarity_repl::clarity::util::hash::to_hex;
@@ -593,6 +594,7 @@ struct DeployContractArgs {
     name: String,
     code: String,
     clarity_version: Option<u8>,
+    epoch: Option<String>,
 }
 
 #[derive(Deserialize)]
@@ -654,7 +656,10 @@ fn mine_block(state: &mut OpState, args: MineBlockArgs) -> Result<String, AnyErr
                             Some(version) if version == 2 => ClarityVersion::Clarity2,
                             _ => DEFAULT_CLARITY_VERSION,
                         },
-                        epoch: DEFAULT_EPOCH,
+                        epoch: match &args.epoch {
+                            Some(epoch) if epoch == "2.1" => StacksEpochId::Epoch21,
+                            _ => DEFAULT_EPOCH,
+                        },
                     };
                     let execution = match session.deploy_contract(
                         &contract,
@@ -856,10 +861,14 @@ fn wrap_result_in_simulated_transaction(
 ) -> StacksTransactionData {
     let result = match execution.result {
         EvaluationResult::Snippet(ref result) => utils::value_to_string(&result.result),
-        _ => unreachable!("Contract result from snippet"),
+        EvaluationResult::Contract(ref contract) => match contract.result {
+            Some(ref result) => utils::value_to_string(result),
+            _ => (&"(ok true)").to_string(),
+        },
     };
     let (txid, _timestamp) = {
-        let timestamp = DateTime::<Utc>::from_utc(NaiveDateTime::from_timestamp(61, 0), Utc);
+        let timestamp =
+            DateTime::<Utc>::from_utc(NaiveDateTime::from_timestamp_opt(61, 0).unwrap(), Utc);
         let bytes = Sha256::digest(timestamp.timestamp_micros().to_be_bytes()).to_vec();
         (format!("0x{}", to_hex(&bytes)), timestamp)
     };
@@ -886,7 +895,7 @@ fn wrap_result_in_simulated_transaction(
             description: String::new(),
             sponsor: None,
             execution_cost: None,
-            position: chainhook_types::StacksTransactionPosition::Index(index),
+            position: chainhook_types::StacksTransactionPosition::anchor_block(index),
             proof: None,
         },
     };

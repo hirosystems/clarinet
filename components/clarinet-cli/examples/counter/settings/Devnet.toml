@@ -111,9 +111,6 @@ enable_subnet_node = false
 # subnet_leader_mnemonic = "female adjust gallery certain visit token during great side clown fitness like hurt clip knife warm bench start reunion globe detail dream depend fortune"
 # disable_subnet_api = true
 enable_next_features = true
-epoch_2_00 = 100
-epoch_2_05 = 107
-epoch_2_1 = 114
 
 # [[devnet.pox_stacking_orders]]
 # start_at_cycle = 3

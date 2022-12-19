@@ -675,7 +675,7 @@ async fn test_specifiers(
     };
 
     let (mut join_results, result) = future::join(join_stream, handler).await;
-
+    let result = result.expect("unable to join thread");
     let mut reports = vec![];
     let mut error = None;
     for mut res in join_results.drain(..) {
