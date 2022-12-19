@@ -173,6 +173,7 @@ impl ProjectManifest {
                 "pox-2".to_string(),
                 "lockup".to_string(),
                 "costs-2".to_string(),
+                "costs-3".to_string(),
                 "cost-voting".to_string(),
                 "bns".to_string(),
             ],

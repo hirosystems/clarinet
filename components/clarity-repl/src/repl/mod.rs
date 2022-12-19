@@ -131,7 +131,7 @@ impl ClarityContract {
     }
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 pub enum ContractDeployer {
     Transient,
     DefaultDeployer,

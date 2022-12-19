@@ -808,7 +808,9 @@ pub fn main() {
 
                 std::thread::spawn(move || {
                     let manifest = manifest_moved;
-                    apply_on_chain_deployment(&manifest, deployment, event_tx, command_rx, true);
+                    apply_on_chain_deployment(
+                        &manifest, deployment, event_tx, command_rx, true, None, None,
+                    );
                 });
 
                 let _ = command_tx.send(DeploymentCommand::Start);
@@ -1209,7 +1211,7 @@ pub fn main() {
                 mine_block_delay,
             ) {
                 Ok(count) => (true, count),
-                Err((e, count)) => (false, count),
+                Err((_e, count)) => (false, count),
             };
             if hints_enabled {
                 display_tests_pro_tips_hint();

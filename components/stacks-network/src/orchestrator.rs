@@ -42,29 +42,15 @@ pub struct DevnetOrchestrator {
     services_map_hosts: Option<ServicesMapHosts>,
 }
 
-pub enum DevnetServices {
-    BitcoinNode,
-    StacksNode,
-    StacksApi,
-    StacksExplorer,
-    BitcoinExplorer,
-    SubnetNode,
-    SubnetApi,
-}
-
-impl DevnetServices {
-    pub fn get_id(&self) -> u8 {
-        match &self {
-            DevnetServices::BitcoinNode => 1,
-            DevnetServices::StacksNode => 2,
-            DevnetServices::StacksApi => 3,
-            DevnetServices::StacksExplorer => 4,
-            DevnetServices::BitcoinExplorer => 5,
-            DevnetServices::SubnetNode => 6,
-            DevnetServices::SubnetApi => 7,
-        }
-    }
-}
+// pub enum DevnetServices {
+//     BitcoinNode,
+//     StacksNode,
+//     StacksApi,
+//     StacksExplorer,
+//     BitcoinExplorer,
+//     SubnetNode,
+//     SubnetApi,
+// }
 
 #[derive(Clone, Debug)]
 pub struct ServicesMapHosts {
@@ -265,7 +251,7 @@ impl DevnetOrchestrator {
         terminator_rx: Receiver<bool>,
         ctx: &Context,
     ) -> Result<(), String> {
-        let (docker, devnet_config) = match (&self.docker_client, &self.network_config) {
+        let (_docker, devnet_config) = match (&self.docker_client, &self.network_config) {
             (Some(ref docker), Some(ref network_config)) => match network_config.devnet {
                 Some(ref devnet_config) => (docker, devnet_config),
                 _ => return Err(format!("unable to get devnet config")),
@@ -2444,8 +2430,6 @@ events_keys = ["*"]
                 Err(_e) => {}
             }
             std::thread::sleep(std::time::Duration::from_secs(1));
-            // // let res = self.docker_client.as_ref().unwrap().inspect_container(self.bitcoin_node_container_id.as_ref().unwrap(), None).await;
-            // println!("{:?}", res);
             let _ = devnet_event_tx.send(DevnetEvent::info(format!("Waiting for bitcoin-node",)));
         }
 
