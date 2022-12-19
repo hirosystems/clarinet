@@ -128,7 +128,7 @@ impl EventObserverConfig {
             normalization_enabled: config_file.normalization_enabled.unwrap_or(true),
             grpc_server_enabled: config_file.grpc_server_enabled.unwrap_or(false),
             hooks_enabled: config_file.hooks_enabled.unwrap_or(false),
-            initial_hook_formation: Some(ChainhookConfig::new()),
+            chainhook_config: Some(ChainhookConfig::new()),
             bitcoin_rpc_proxy_enabled: config_file.bitcoin_rpc_proxy_enabled.unwrap_or(false),
             event_handlers: event_handlers,
             ingestion_port: config_file

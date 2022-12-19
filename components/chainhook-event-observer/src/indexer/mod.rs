@@ -2,6 +2,7 @@ pub mod bitcoin;
 pub mod stacks;
 
 use crate::utils::{AbstractBlock, Context};
+use bitcoincore_rpc::bitcoin::Block;
 use chainhook_types::{
     BitcoinChainEvent, BitcoinNetwork, BlockIdentifier, StacksChainEvent, StacksNetwork,
 };
@@ -65,10 +66,11 @@ impl Indexer {
 
     pub fn handle_bitcoin_block(
         &mut self,
-        marshalled_block: JsonValue,
+        block_height: u64,
+        block: Block,
         ctx: &Context,
     ) -> Result<Option<BitcoinChainEvent>, String> {
-        let block = bitcoin::standardize_bitcoin_block(&self.config, marshalled_block, ctx)?;
+        let block = bitcoin::standardize_bitcoin_block(&self.config, block_height, block, ctx)?;
         let event = self.bitcoin_blocks_pool.process_block(block, ctx);
         event
     }

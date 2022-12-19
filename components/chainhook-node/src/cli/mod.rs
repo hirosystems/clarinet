@@ -6,7 +6,9 @@ use crate::config::Config;
 use chainhook_event_observer::chainhooks::bitcoin::{
     handle_bitcoin_hook_action, BitcoinChainhookOccurrence, BitcoinTriggerChainhook,
 };
-use chainhook_event_observer::indexer::bitcoin::build_block;
+use chainhook_event_observer::chainhooks::types::ChainhookConfig;
+use chainhook_event_observer::indexer::bitcoin::standardize_bitcoin_block;
+use chainhook_event_observer::indexer::IndexerConfig;
 use chainhook_event_observer::observer::{
     start_event_observer, EventObserverConfig, ObserverCommand, ObserverEvent,
 };
@@ -21,8 +23,9 @@ use chainhook_event_observer::{
 
 use bitcoincore_rpc::{Auth, Client, RpcApi};
 use chainhook_types::{
-    BitcoinBlockData, BitcoinBlockMetadata, BitcoinTransactionData, BlockIdentifier,
-    StacksBlockData, StacksBlockMetadata, StacksChainEvent, StacksNetwork, StacksTransactionData,
+    BitcoinBlockData, BitcoinBlockMetadata, BitcoinNetwork, BitcoinTransactionData,
+    BlockIdentifier, StacksBlockData, StacksBlockMetadata, StacksChainEvent, StacksNetwork,
+    StacksTransactionData,
 };
 use clap::{Parser, Subcommand};
 use ctrlc;
@@ -186,6 +189,34 @@ pub fn start_replay_flow(
     apply: bool,
     ctx: Context,
 ) {
+    let indexer_config = match network {
+        StacksNetwork::Mainnet => IndexerConfig {
+            bitcoin_network: BitcoinNetwork::Mainnet,
+            stacks_network: StacksNetwork::Mainnet,
+            stacks_node_rpc_url: "".to_string(),
+            bitcoin_node_rpc_url: bitcoind_rpc_url.host_str().unwrap().to_string(),
+            bitcoin_node_rpc_username: bitcoind_rpc_url.username().to_string(),
+            bitcoin_node_rpc_password: bitcoind_rpc_url.password().unwrap().to_string(),
+        },
+        StacksNetwork::Testnet => IndexerConfig {
+            bitcoin_network: BitcoinNetwork::Testnet,
+            stacks_network: StacksNetwork::Testnet,
+            stacks_node_rpc_url: "".to_string(),
+            bitcoin_node_rpc_url: bitcoind_rpc_url.host_str().unwrap().to_string(),
+            bitcoin_node_rpc_username: bitcoind_rpc_url.username().to_string(),
+            bitcoin_node_rpc_password: bitcoind_rpc_url.password().unwrap().to_string(),
+        },
+        StacksNetwork::Devnet => IndexerConfig {
+            bitcoin_network: BitcoinNetwork::Regtest,
+            stacks_network: StacksNetwork::Devnet,
+            stacks_node_rpc_url: "".to_string(),
+            bitcoin_node_rpc_url: bitcoind_rpc_url.host_str().unwrap().to_string(),
+            bitcoin_node_rpc_username: bitcoind_rpc_url.username().to_string(),
+            bitcoin_node_rpc_password: bitcoind_rpc_url.password().unwrap().to_string(),
+        },
+        _ => unreachable!(),
+    };
+
     let (digestion_tx, digestion_rx) = channel();
     let (observer_event_tx, observer_event_rx) = crossbeam_channel::unbounded();
     let (observer_command_tx, observer_command_rx) = channel();
@@ -289,7 +320,7 @@ pub fn start_replay_flow(
         hooks_enabled: true,
         bitcoin_rpc_proxy_enabled: true,
         event_handlers: vec![],
-        initial_hook_formation: None,
+        chainhook_config: None,
         ingestion_port: DEFAULT_INGESTION_PORT,
         control_port: DEFAULT_CONTROL_PORT,
         bitcoin_node_username: config.network.bitcoin_node_rpc_username.clone(),
@@ -356,12 +387,12 @@ pub fn start_replay_flow(
             }
         };
         match event {
-            ObserverEvent::HookRegistered(chain_hook) => {
+            ObserverEvent::HookRegistered(chainhook) => {
                 // If start block specified, use it.
                 // I no start block specified, depending on the nature the hook, we'd like to retrieve:
                 // - contract-id
 
-                match chain_hook {
+                match chainhook {
                     ChainhookSpecification::Stacks(stacks_hook) => {
                         // Retrieve highest block height stored
                         let tip_height: u64 = redis_con
@@ -565,7 +596,13 @@ pub fn start_replay_flow(
 
                                     let block = match bitcoin_rpc.get_block(&block_hash) {
                                         Ok(block) => {
-                                            build_block(block, cursor, &config.network, &ctx)
+                                            standardize_bitcoin_block(
+                                                &indexer_config,
+                                                cursor,
+                                                block,
+                                                &ctx,
+                                            )
+                                            .unwrap() // todo
                                         }
                                         Err(e) => {
                                             error!(
@@ -763,13 +800,52 @@ pub fn start_node(mut config: Config, ctx: Context) {
         let _ = terminate_observer_command_tx.send(ObserverCommand::Terminate);
     });
 
+    let mut chainhook_config = ChainhookConfig::new();
+
+    {
+        let redis_config = config.expected_redis_config();
+        let client = redis::Client::open(redis_config.uri.clone()).unwrap();
+        let mut redis_con = match client.get_connection() {
+            Ok(con) => con,
+            Err(message) => {
+                error!(ctx.expect_logger(), "Redis: {}", message.to_string());
+                panic!();
+            }
+        };
+
+        let chainhooks_to_load: Vec<String> = redis_con
+            .scan_match("chainhook:*:*:*")
+            .expect("unable to retrieve prunable entries")
+            .into_iter()
+            .collect();
+
+        for key in chainhooks_to_load.iter() {
+            let chainhook = match redis_con.hget::<_, _, String>(key, "specification") {
+                Ok(spec) => {
+                    ChainhookSpecification::deserialize_specification(&spec, key).unwrap()
+                    // todo
+                }
+                Err(e) => {
+                    error!(
+                        ctx.expect_logger(),
+                        "unable to load chainhook associated with key {}: {}",
+                        key,
+                        e.to_string()
+                    );
+                    continue;
+                }
+            };
+            chainhook_config.register_hook(chainhook);
+        }
+    }
+
     let event_observer_config = EventObserverConfig {
         normalization_enabled: true,
         grpc_server_enabled: false,
         hooks_enabled: true,
         bitcoin_rpc_proxy_enabled: true,
         event_handlers: vec![],
-        initial_hook_formation: None,
+        chainhook_config: Some(chainhook_config),
         ingestion_port: DEFAULT_INGESTION_PORT,
         control_port: DEFAULT_CONTROL_PORT,
         bitcoin_node_username: config.network.bitcoin_node_rpc_username.clone(),
@@ -821,12 +897,29 @@ pub fn start_node(mut config: Config, ctx: Context) {
             }
         };
         match event {
-            ObserverEvent::HookRegistered(chain_hook) => {
+            ObserverEvent::HookRegistered(chainhook) => {
                 // If start block specified, use it.
                 // I no start block specified, depending on the nature the hook, we'd like to retrieve:
                 // - contract-id
 
-                match chain_hook {
+                let chainhook_key = chainhook.key();
+                let mut history: Vec<u64> = vec![];
+                let res: Result<(), redis::RedisError> = redis_con.hset_multiple(
+                    &chainhook_key,
+                    &[
+                        ("specification", json!(chainhook).to_string()),
+                        ("history", json!(history).to_string()),
+                        ("scan_progress", json!(0).to_string()),
+                    ],
+                );
+                if let Err(e) = res {
+                    error!(
+                        ctx.expect_logger(),
+                        "unable to store chainhook {chainhook_key}: {}",
+                        e.to_string()
+                    );
+                }
+                match chainhook {
                     ChainhookSpecification::Stacks(stacks_hook) => {
                         // Retrieve highest block height stored
                         let tip_height: u64 = redis_con
@@ -934,6 +1027,10 @@ pub fn start_node(mut config: Config, ctx: Context) {
                         );
                     }
                 }
+            }
+            ObserverEvent::HookDeregistered(chainhook) => {
+                let chainhook_key = chainhook.key();
+                let _: Result<(), redis::RedisError> = redis_con.del(chainhook_key);
             }
             ObserverEvent::BitcoinChainEvent(_chain_update) => {
                 debug!(ctx.expect_logger(), "Bitcoin update not stored");
