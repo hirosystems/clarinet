@@ -126,6 +126,7 @@ pub struct Session {
     pub show_costs: bool,
     pub executed: Vec<String>,
     pub current_epoch: StacksEpochId,
+    keywords_reference: HashMap<String, String>
 }
 
 impl Session {
@@ -154,6 +155,7 @@ impl Session {
             settings,
             executed: Vec::new(),
             current_epoch: StacksEpochId::Epoch2_05,
+            keywords_reference: clarity_keywords()
         }
     }
 
@@ -272,6 +274,7 @@ impl Session {
             cmd if cmd.starts_with("::reload") => reload = true,
             #[cfg(feature = "cli")]
             cmd if cmd.starts_with("::read") => self.read(&mut output, cmd),
+            cmd if cmd.starts_with("::keywords") => self.keywords(&mut output),
 
             snippet => self.run_snippet(&mut output, self.show_costs, snippet),
         }
@@ -711,6 +714,16 @@ impl Session {
         keys
     }
 
+    pub fn get_clarity_keywords(&self) -> Vec<String> {
+        let mut keys = self
+            .keywords_reference
+            .iter()
+            .map(|(k, _)| k.to_string())
+            .collect::<Vec<String>>();
+        keys.sort();
+        keys
+    }
+
     fn display_help(&self, output: &mut Vec<String>) {
         let help_colour = Colour::Yellow;
         let coming_soon_colour = Colour::Black.bold();
@@ -722,6 +735,12 @@ impl Session {
             "{}",
             help_colour.paint(
                 "::list_functions\t\t\tDisplay all the native functions available in clarity"
+            )
+        ));
+        output.push(format!(
+            "{}",
+            help_colour.paint(
+                "::keywords\t\t\t\tDisplay all the native keywords available in clarity"
             )
         ));
         output.push(format!(
@@ -1124,6 +1143,12 @@ impl Session {
         self.get_accounts(&mut output);
         Ok(output.join("\n"))
     }
+
+    fn keywords(&self, output: &mut Vec<String>) {
+        let help_colour = Colour::Yellow;
+        let keywords = self.get_clarity_keywords();
+        output.push(format!("{}", help_colour.paint(keywords.join("\n"))));
+    }
 }
 
 #[derive(Debug, PartialEq)]
@@ -1197,18 +1222,25 @@ fn build_api_reference() -> HashMap<String, String> {
         api_reference.insert(api.name, doc);
     }
 
+    api_reference
+}
+
+fn clarity_keywords() -> HashMap<String, String> {
+    let mut keywords = HashMap::new();
+
     for func in NativeVariables::ALL.iter() {
-        if let Some(api) = make_keyword_reference(&func) {
+        if let Some(key) = make_keyword_reference(&func) {
             let description = {
-                let mut s = api.description.to_string();
+                let mut s = key.description.to_string();
                 s = s.replace("\n", " ");
                 s
             };
-            let doc = format!("Description\n{}\n\nExamples\n{}", description, api.example);
-            api_reference.insert(api.name.to_string(), doc);
+            let doc = format!("Description\n{}\n\nExamples\n{}", description, key.example);
+            keywords.insert(key.name.to_string(), doc);
         }
     }
-    api_reference
+
+    keywords
 }
 
 #[cfg(test)]
