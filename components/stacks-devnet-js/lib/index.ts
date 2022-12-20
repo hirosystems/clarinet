@@ -427,13 +427,14 @@ export class DevnetNetworkOrchestrator {
   handle: any;
   lastCooldownEndedAt: Date;
   defaultCooldown: number;
+  currentCooldown: number;
 
   /**
    * @summary Construct a new DevnetNetworkOrchestrator
    * @param {NetworkConfig} manifest
    * @memberof DevnetNetworkOrchestrator
    */
-  constructor(config: NetworkConfig, defaultCooldown = 3000) {
+  constructor(config: NetworkConfig, defaultCooldown = 4000) {
     let manifestPath = config.clarinetManifestPath!;
     var logs = config.logs;
     logs ||= false;
@@ -444,6 +445,7 @@ export class DevnetNetworkOrchestrator {
     this.handle = stacksDevnetNew(manifestPath, logs, accounts, devnet);
     this.lastCooldownEndedAt = new Date();
     this.defaultCooldown = defaultCooldown;
+    this.currentCooldown = defaultCooldown;
   }
 
   /**
@@ -504,12 +506,14 @@ export class DevnetNetworkOrchestrator {
       try {
         let chainUpdate = await this.mineBitcoinBlockAndHopeForStacksBlock();
         if (chainUpdate == undefined) {
+          this.currentCooldown += this.defaultCooldown;
           errorCount += 1;
           if (errorCount >= maxErrors) {
             throw 'waitForNextStacksBlock maxErrors reached'
           }
           continue;
         }
+        this.currentCooldown = this.defaultCooldown;
         return chainUpdate;
       } catch (error) {
         errorCount += 1;
@@ -527,13 +531,12 @@ export class DevnetNetworkOrchestrator {
   async mineBitcoinBlockAndHopeForStacksBlock(): Promise<StacksChainUpdate | undefined> {
     let now = new Date();
     let ms_elapsed = (now.getTime() - this.lastCooldownEndedAt.getTime());
-    let cooldown = Math.max(0, this.defaultCooldown - ms_elapsed);
+    let cooldown = Math.max(0, this.currentCooldown - ms_elapsed);
     let wait = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
-    this.lastCooldownEndedAt = now
     return wait(cooldown)
       .then(() => {
         this.lastCooldownEndedAt = new Date();
-        return stacksDevnetWaitForStacksBlock.call(this.handle)
+        return stacksDevnetWaitForStacksBlock.call(this.handle, this.currentCooldown)
       })
       .catch(e => {
         this.lastCooldownEndedAt = new Date();
@@ -585,12 +588,16 @@ export class DevnetNetworkOrchestrator {
   async waitForNextBitcoinBlock(): Promise<BitcoinChainUpdate> {
     let now = new Date();
     let ms_elapsed = (now.getTime() - this.lastCooldownEndedAt.getTime());
-    let cooldown = Math.max(0, this.defaultCooldown - ms_elapsed);
+    let cooldown = Math.max(0, this.currentCooldown - ms_elapsed);
     let wait = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
     return wait(cooldown)
       .then(() => {
         this.lastCooldownEndedAt = new Date();
         return stacksDevnetWaitForBitcoinBlock.call(this.handle)
+      })     
+      .catch(e => {
+        this.lastCooldownEndedAt = new Date();
+        throw e
       });
   }
 
