@@ -254,7 +254,7 @@ impl StacksDevnet {
                         }
                         DevnetEvent::FatalError(error) => {
                             if logs_enabled {
-                                println!("{:?}", error);
+                                println!("[erro] {}", error);
                             }
                             break;
                         }

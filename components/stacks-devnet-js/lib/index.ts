@@ -498,7 +498,33 @@ export class DevnetNetworkOrchestrator {
    * @summary Wait for the next Stacks block
    * @memberof DevnetNetworkOrchestrator
    */
-  async waitForNextStacksBlock(): Promise<StacksChainUpdate> {
+  async waitForNextStacksBlock(maxErrors = 5): Promise<StacksChainUpdate> {
+    let errorCount = 0;
+    while (true) {
+      try {
+        let chainUpdate = await this.mineBitcoinBlockAndHopeForStacksBlock();
+        if (chainUpdate == undefined) {
+          errorCount += 1;
+          if (errorCount >= maxErrors) {
+            throw 'waitForNextStacksBlock maxErrors reached'
+          }
+          continue;
+        }
+        return chainUpdate;
+      } catch (error) {
+        errorCount += 1;
+        if (errorCount >= maxErrors) {
+          throw error;
+        }
+      }
+    }
+  }
+
+  /**
+   * @summary Wait for the next Stacks block
+   * @memberof DevnetNetworkOrchestrator
+   */
+  async mineBitcoinBlockAndHopeForStacksBlock(): Promise<StacksChainUpdate | undefined> {
     let now = new Date();
     let ms_elapsed = (now.getTime() - this.lastCooldownEndedAt.getTime());
     let cooldown = Math.max(0, this.defaultCooldown - ms_elapsed);
@@ -520,27 +546,15 @@ export class DevnetNetworkOrchestrator {
    * @memberof DevnetNetworkOrchestrator
    */
   async waitForStacksBlockOfHeight(targetBlockHeight: number, maxErrors = 5): Promise<StacksChainUpdate> {
-    let errorCount = 0;
     while (true) {
       try {
-        let chainUpdate = await this.waitForNextStacksBlock();
-        if (chainUpdate === undefined) {
-          errorCount += 1;
-          if (errorCount >= maxErrors) {
-            throw 'waitForNextStacksBlock maxErrors reached'
-          }
-          continue;
-        }
+        let chainUpdate = await this.waitForNextStacksBlock(maxErrors);
         let currentBlockHeight = chainUpdate.new_blocks[0].block.block_identifier.index;
-        errorCount = 0;
         if (currentBlockHeight >= targetBlockHeight) {
           return chainUpdate;
         }
       } catch (error) {
-        errorCount += 1;
-        if (errorCount >= maxErrors) {
-          throw error;
-        }
+        throw error;
       }
     }
   }
@@ -550,32 +564,20 @@ export class DevnetNetworkOrchestrator {
    * @memberof DevnetNetworkOrchestrator
    */
   async waitForStacksBlockAnchoredOnBitcoinBlockOfHeight(minBitcoinBlockHeight: number, maxErrors = 5): Promise<StacksChainUpdate> {
-    let errorCount = 0;
     while (true) {
       try {
-        let chainUpdate = await this.waitForNextStacksBlock();
-        if (chainUpdate === undefined) {
-          errorCount += 1;
-          if (errorCount >= maxErrors) {
-            throw 'waitForNextStacksBlock maxErrors reached'
-          }
-          continue;
-        }
+        let chainUpdate = await this.waitForNextStacksBlock(maxErrors);
         let metadata = chainUpdate.new_blocks[0].block.metadata! as StacksBlockMetadata;
         let currentBitcoinBlockHeight = metadata.bitcoin_anchor_block_identifier.index;
-        errorCount = 0;
         if (currentBitcoinBlockHeight >= minBitcoinBlockHeight) {
           return chainUpdate;
         }
       } catch (error) {
-        errorCount += 1;
-        if (errorCount >= maxErrors) {
-          throw error;
-        }
+        throw error;
       }
     }
   }
-  
+
   /**
    * @summary Wait for the next Bitcoin block
    * @memberof DevnetNetworkOrchestrator
