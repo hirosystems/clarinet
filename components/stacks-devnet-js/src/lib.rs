@@ -238,10 +238,14 @@ impl StacksDevnet {
                         }
                         DevnetEvent::Log(log) => {
                             if logs_enabled {
-                                println!("{} {}", log, match network_id {
-                                    Some(network_id) => format!("(network #{})", network_id),
-                                    None => "".into()
-                                });
+                                println!(
+                                    "{} {}",
+                                    log,
+                                    match network_id {
+                                        Some(network_id) => format!("(network #{})", network_id),
+                                        None => "".into(),
+                                    }
+                                );
                             }
                         }
                         DevnetEvent::BootCompleted(mining_tx) => {
