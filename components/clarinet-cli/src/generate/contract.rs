@@ -80,7 +80,7 @@ impl GetChangesForNewContract {
         let content = format!(
             r#"
 import {{ Clarinet, Tx, Chain, Account, types }} from 'https://deno.land/x/clarinet@v{}/index.ts';
-import {{ assertEquals }} from 'https://deno.land/std@0.90.0/testing/asserts.ts';
+import {{ assertEquals }} from 'https://deno.land/std@0.170.0/testing/asserts.ts';
 
 Clarinet.test({{
     name: "Ensure that <...>",

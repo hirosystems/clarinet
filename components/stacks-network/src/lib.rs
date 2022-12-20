@@ -11,6 +11,7 @@ pub use chainhook_event_observer::utils::Context;
 pub use orchestrator::DevnetOrchestrator;
 
 use std::{
+    fmt,
     sync::{
         mpsc::{self, channel, Receiver, Sender},
         Arc,
@@ -305,6 +306,22 @@ pub enum LogLevel {
     Debug,
 }
 
+impl fmt::Display for LogLevel {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(
+            f,
+            "{}",
+            match &self {
+                LogLevel::Error => "erro",
+                LogLevel::Warning => "warn",
+                LogLevel::Info => "info",
+                LogLevel::Success => "succ",
+                LogLevel::Debug => "debg",
+            }
+        )
+    }
+}
+
 #[derive(Clone, Debug)]
 pub struct LogData {
     pub occurred_at: String,
@@ -320,6 +337,12 @@ impl LogData {
             message,
             occurred_at: now.format("%b %e %T%.6f").to_string(),
         }
+    }
+}
+
+impl fmt::Display for LogData {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{} [{}] {}", self.occurred_at, self.level, self.message)
     }
 }
 

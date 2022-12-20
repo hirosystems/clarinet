@@ -738,7 +738,7 @@ pub fn apply_on_chain_deployment(
                         }
                         info.burn_block_height
                     }
-                    Err(e) => {
+                    Err(_e) => {
                         std::thread::sleep(std::time::Duration::from_secs(
                             delay_between_checks.into(),
                         ));

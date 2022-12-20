@@ -247,11 +247,11 @@ fn terminate(
     let _ = disable_raw_mode();
     let _ = execute!(terminal.backend_mut(), LeaveAlternateScreen);
     let res = chains_coordinator_commands_tx.send(ChainsCoordinatorCommand::Terminate);
-    if let Err(e) = res {
+    if let Err(_e) = res {
         // Display log
     }
     let res = orchestrator_terminated_rx.recv();
-    if let Err(e) = res {
+    if let Err(_e) = res {
         // Display log
     }
     let _ = terminal.show_cursor();

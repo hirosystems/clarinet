@@ -1,3 +1,18 @@
+# [1.3.0](https://github.com/hirosystems/clarinet/compare/v1.2.0...v1.3.0) (2022-12-20)
+
+### New Features
+
+*  Improved Clarity 2 support ([#711](https://github.com/hirosystems/clarinet/pull/711) [#714](https://github.com/hirosystems/clarinet/pull/714))
+*  Ability to configure VSCode extension features ([340ba9b8](https://github.com/hirosystems/clarinet/commit/340ba9b8c5e57205061c23cdabf1a6e1c3b489a2))
+*  Ability to `Go to definition` in LSP ([#676](https://github.com/hirosystems/clarinet/pull/676))
+*  Press `n` in `clarinet integrate` to mine new blocks manually, improve Devnet responsiveness and termination reliability
+*  Revamped [stacks-devnet-js](https://www.npmjs.com/package/@hirosystems/stacks-devnet-js) testing framework
+
+### Bug Fixes
+
+*  Fix deployment plans issue where contracts keep being re-ordered ([cf8140e6](https://github.com/hirosystems/clarinet/commit/cf8140e6534bfc1a2f01c09addcae3a45d85d290))
+*  Fid deno errors not being displayed ([3d2db0b7](https://github.com/hirosystems/clarinet/commit/3d2db0b7b2b0cbcc585fbcaee5d6291055c46e8e))
+
 # [1.2.0](https://github.com/hirosystems/clarinet/compare/v1.1.0...v1.2.0) (2022-12-03)
 
 ### New Features

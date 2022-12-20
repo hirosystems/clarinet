@@ -89,6 +89,7 @@ impl StacksDevnet {
     where
         C: Context<'a>,
     {
+        let network_id = devnet_overrides.network_id.clone();
         let (tx, rx) = mpsc::channel::<DevnetCommand>();
         let (devnet_ready_tx, devnet_ready_rx) = mpsc::channel::<bool>();
         let (meta_devnet_command_tx, meta_devnet_command_rx) = mpsc::channel();
@@ -237,7 +238,14 @@ impl StacksDevnet {
                         }
                         DevnetEvent::Log(log) => {
                             if logs_enabled {
-                                println!("{:?}", log);
+                                println!(
+                                    "{} {}",
+                                    log,
+                                    match network_id {
+                                        Some(network_id) => format!("(network #{})", network_id),
+                                        None => "".into(),
+                                    }
+                                );
                             }
                         }
                         DevnetEvent::BootCompleted(mining_tx) => {
@@ -255,16 +263,6 @@ impl StacksDevnet {
                 }
             }
         });
-
-        // Bitcoin mining command relaying - threading model 1
-        // Keeping this model around, for eventual future usage
-        // thread::spawn(move || {
-        //     if let Ok(ref mining_tx) = meta_mining_command_rx.recv() {
-        //         while let Ok(command) = relaying_mining_rx.recv() {
-        //             let _ = mining_tx.send(command);
-        //         }
-        //     }
-        // });
 
         // Bitcoin mining command relaying - threading model 2
         thread::spawn(move || {
@@ -296,15 +294,11 @@ impl StacksDevnet {
         }
     }
 
-    fn start(&self, timeout: u64, empty_buffer: bool) -> Result<bool, mpsc::RecvTimeoutError> {
+    fn start(&self, timeout: u64, _empty_buffer: bool) -> Result<bool, mpsc::RecvTimeoutError> {
         let _ = self.tx.send(DevnetCommand::Start(None));
         let res = self
             .devnet_ready_rx
             .recv_timeout(std::time::Duration::from_secs(timeout));
-        if empty_buffer && res.is_ok() {
-            while let Ok(_) = self.stacks_block_rx.try_recv() {}
-            while let Ok(_) = self.bitcoin_block_rx.try_recv() {}
-        }
         res
     }
 }
