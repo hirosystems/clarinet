@@ -38,7 +38,7 @@ pub struct RewardParticipant {
 pub async fn retrieve_full_block(
     bitcoin_config: &BitcoinConfig,
     marshalled_block: JsonValue,
-    ctx: &Context,
+    _ctx: &Context,
 ) -> Result<(u64, Block), String> {
     let partial_block: NewBitcoinBlock = serde_json::from_value(marshalled_block)
         .map_err(|e| format!("unable for parse bitcoin block: {}", e.to_string()))?;
