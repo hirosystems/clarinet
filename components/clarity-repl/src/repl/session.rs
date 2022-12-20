@@ -126,7 +126,7 @@ pub struct Session {
     pub show_costs: bool,
     pub executed: Vec<String>,
     pub current_epoch: StacksEpochId,
-    keywords_reference: HashMap<String, String>
+    keywords_reference: HashMap<String, String>,
 }
 
 impl Session {
@@ -155,7 +155,7 @@ impl Session {
             settings,
             executed: Vec::new(),
             current_epoch: StacksEpochId::Epoch2_05,
-            keywords_reference: clarity_keywords()
+            keywords_reference: clarity_keywords(),
         }
     }
 
@@ -248,8 +248,8 @@ impl Session {
         match command {
             "::help" => self.display_help(&mut output),
             "/-/" => self.easter_egg(&mut output),
-            cmd if cmd.starts_with("::list_functions") => self.display_functions(&mut output),
-            cmd if cmd.starts_with("::describe_function") => self.display_doc(&mut output, cmd),
+            cmd if cmd.starts_with("::functions") => self.display_functions(&mut output),
+            cmd if cmd.starts_with("::describe") => self.display_doc(&mut output, cmd),
             cmd if cmd.starts_with("::mint_stx") => self.mint_stx(&mut output, cmd),
             cmd if cmd.starts_with("::set_tx_sender") => {
                 self.parse_and_set_tx_sender(&mut output, cmd)
@@ -700,8 +700,16 @@ impl Session {
         }
     }
 
-    pub fn lookup_api_reference(&self, keyword: &str) -> Option<&String> {
-        self.api_reference.get(keyword)
+    pub fn lookup_functions_or_keywords_docs(&self, exp: &str) -> Option<&String> {
+        if let Some(function_doc) = self.api_reference.get(exp) {
+            return Some(function_doc);
+        } else {
+            if let Some(keyword_doc) = self.keywords_reference.get(exp) {
+                return Some(keyword_doc);
+            } else {
+                return None;
+            }
+        }
     }
 
     pub fn get_api_reference_index(&self) -> Vec<String> {
@@ -733,20 +741,18 @@ impl Session {
         ));
         output.push(format!(
             "{}",
-            help_colour.paint(
-                "::list_functions\t\t\tDisplay all the native functions available in clarity"
-            )
+            help_colour
+                .paint("::functions\t\t\t\tDisplay all the native functions available in clarity")
+        ));
+        output.push(format!(
+            "{}",
+            help_colour
+                .paint("::keywords\t\t\t\tDisplay all the native keywords available in clarity")
         ));
         output.push(format!(
             "{}",
             help_colour.paint(
-                "::keywords\t\t\t\tDisplay all the native keywords available in clarity"
-            )
-        ));
-        output.push(format!(
-            "{}",
-            help_colour.paint(
-                "::describe_function <function>\t\tDisplay documentation for a given native function fn-name"
+                "::describe <function> | <keyword>\tDisplay documentation for a given native function or keyword"
             )
         ));
         output.push(format!(
@@ -1126,13 +1132,17 @@ impl Session {
         let help_accent_colour = Colour::Yellow.bold();
         let keyword = {
             let mut s = command.to_string();
-            s = s.replace("::describe_function", "");
+            s = s.replace("::describe", "");
             s = s.replace(" ", "");
             s
         };
-        let result = match self.lookup_api_reference(&keyword) {
+
+        let result = match self.lookup_functions_or_keywords_docs(&keyword) {
             Some(doc) => format!("{}", help_colour.paint(doc)),
-            None => format!("{}", help_colour.paint("Function unknown")),
+            None => format!(
+                "{}",
+                Colour::Red.paint("It looks like there aren't matches for your search")
+            ),
         };
         output.push(result);
     }
