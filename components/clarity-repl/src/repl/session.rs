@@ -965,7 +965,7 @@ impl Session {
             let tokens = self.interpreter.get_tokens();
             let mut headers = vec!["Address".to_string()];
             for token in tokens.iter() {
-                if String::from("STX").eq(&String::from(token)) {
+                if token == "STX" {
                     headers.push(String::from("uSTX"));
                 } else {
                     headers.push(String::from(token));
