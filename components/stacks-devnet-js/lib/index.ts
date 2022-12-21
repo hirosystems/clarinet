@@ -102,6 +102,12 @@ export interface PoxStackingOrder {
  */
 export interface DevnetConfig {
   /**
+   * Optional name
+   * @type {string}
+   * @memberof DevnetConfig
+   */
+  name?: string;
+  /**
    * Optional network id
    * @type {number}
    * @memberof DevnetConfig

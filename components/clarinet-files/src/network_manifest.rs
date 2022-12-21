@@ -59,6 +59,7 @@ pub struct NetworkConfigFile {
 
 #[derive(Serialize, Deserialize, Debug, Default)]
 pub struct DevnetConfigFile {
+    pub name: Option<String>,
     pub network_id: Option<u16>,
     pub orchestrator_port: Option<u16>,
     pub orchestrator_control_port: Option<u16>,
@@ -164,6 +165,7 @@ pub struct NetworkConfig {
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct DevnetConfig {
+    pub name: String,
     pub network_id: Option<u16>,
     pub orchestrator_ingestion_port: u16,
     pub orchestrator_control_port: u16,
@@ -409,6 +411,10 @@ impl NetworkManifest {
             };
 
             if let Some(ref devnet_override) = devnet_override {
+                if let Some(ref val) = devnet_override.name {
+                    devnet_config.name = Some(val.clone());
+                }
+
                 if let Some(val) = devnet_override.orchestrator_port {
                     devnet_config.orchestrator_port = Some(val);
                 }
@@ -707,6 +713,7 @@ impl NetworkManifest {
             let enable_next_features = devnet_config.enable_next_features.unwrap_or(false);
 
             let mut config = DevnetConfig {
+                name: devnet_config.name.take().unwrap_or("devnet".into()),
                 network_id: devnet_config.network_id,
                 orchestrator_ingestion_port: devnet_config.orchestrator_port.unwrap_or(20445),
                 orchestrator_control_port: devnet_config.orchestrator_control_port.unwrap_or(20446),
