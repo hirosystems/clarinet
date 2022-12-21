@@ -40,7 +40,7 @@ use types::{ContractPublishSpecification, EpochSpec};
 pub fn setup_session_with_deployment(
     manifest: &ProjectManifest,
     deployment: &DeploymentSpecification,
-    contracts_asts: Option<&HashMap<QualifiedContractIdentifier, ContractAST>>,
+    contracts_asts: Option<&BTreeMap<QualifiedContractIdentifier, ContractAST>>,
 ) -> DeploymentGenerationArtifacts {
     let mut session = initiate_session_from_deployment(&manifest);
     update_session_with_genesis_accounts(&mut session, deployment);
@@ -52,9 +52,9 @@ pub fn setup_session_with_deployment(
         None,
     );
 
-    let deps = HashMap::new();
+    let deps = BTreeMap::new();
     let mut diags = HashMap::new();
-    let mut asts = HashMap::new();
+    let mut asts = BTreeMap::new();
     let mut contracts_analysis = HashMap::new();
     let mut success = true;
     for (contract_id, res) in results.into_iter() {
@@ -116,7 +116,7 @@ pub fn update_session_with_genesis_accounts(
 pub fn update_session_with_contracts_executions(
     session: &mut Session,
     deployment: &DeploymentSpecification,
-    contracts_asts: Option<&HashMap<QualifiedContractIdentifier, ContractAST>>,
+    contracts_asts: Option<&BTreeMap<QualifiedContractIdentifier, ContractAST>>,
     code_coverage_enabled: bool,
     forced_epoch: Option<StacksEpochId>,
 ) -> BTreeMap<QualifiedContractIdentifier, Result<ExecutionResult, Vec<Diagnostic>>> {
@@ -130,6 +130,9 @@ pub fn update_session_with_contracts_executions(
 
     let mut results = BTreeMap::new();
     for batch in deployment.plan.batches.iter() {
+        if let Some(spec) = batch.epoch {
+            session.update_epoch(spec.into());
+        }
         for transaction in batch.transactions.iter() {
             match transaction {
                 TransactionSpecification::RequirementPublish(_)
@@ -287,7 +290,7 @@ pub async fn generate_default_deployment(
     let mut transactions = BTreeMap::new();
     let mut contracts_map = BTreeMap::new();
     let mut requirements_asts = BTreeMap::new();
-    let mut requirements_deps = HashMap::new();
+    let mut requirements_deps = BTreeMap::new();
 
     let mut settings = SessionSettings::default();
     settings.repl_settings = manifest.repl_settings.clone();
@@ -418,7 +421,7 @@ pub async fn generate_default_deployment(
             };
 
             // Detect the eventual dependencies for this AST
-            let mut contract_ast = HashMap::new();
+            let mut contract_ast = BTreeMap::new();
             contract_ast.insert(contract_id.clone(), ast);
             let dependencies =
                 ASTDependencyDetector::detect_dependencies(&contract_ast, &requirements_asts);
@@ -618,7 +621,7 @@ pub async fn generate_default_deployment(
 
     let session = Session::new(settings);
 
-    let mut contract_asts = HashMap::new();
+    let mut contract_asts = BTreeMap::new();
     let mut contract_diags = HashMap::new();
     let mut contract_epochs = HashMap::new();
 

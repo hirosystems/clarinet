@@ -3,14 +3,24 @@
 const {
   stacksDevnetNew,
   stacksDevnetStart,
-  stacksDevnetStop,
+  stacksDevnetTerminate,
   stacksDevnetWaitForStacksBlock,
   stacksDevnetWaitForBitcoinBlock,
   stacksDevnetGetStacksNodeUrl,
+  stacksDevnetGetBitcoinNodeUrl,
+  stacksDevnetGetStacksApiUrl,
+  stacksDevnetGetStacksExplorerUrl,
+  stacksDevnetGetBitcoinExplorerUrl,
 } = require("../native/index.node");
 import {
   BitcoinChainUpdate,
+  Block,
+  StacksBlockMetadata,
+  StacksBlockUpdate,
   StacksChainUpdate,
+  StacksTransaction,
+  StacksTransactionMetadata,
+  Transaction,
 } from "@hirosystems/chainhook-types";
 export * from "@hirosystems/chainhook-types";
 
@@ -96,6 +106,12 @@ export interface PoxStackingOrder {
  * @interface DevnetConfig
  */
 export interface DevnetConfig {
+  /**
+   * Optional name
+   * @type {string}
+   * @memberof DevnetConfig
+   */
+  name?: string;
   /**
    * Optional network id
    * @type {number}
@@ -386,52 +402,50 @@ export class DevnetNetworkFactory {
 }
 
 export function getIsolatedNetworkConfigUsingNetworkId(networkId: number, networkConfig: NetworkConfig, interval = 10000) {
-    // Manifest path
-    var manifestPath = networkConfig.clarinetManifestPath === undefined ? "./Clarinet.toml" : networkConfig.clarinetManifestPath;
-    // Logs
-    var logs = networkConfig.logs;
-    logs ||= false;
-    // Accounts
-    var accounts = networkConfig.accounts;
-    accounts ||= [];
-    // Devnet settings
-    var devnetDefaults = {
-      network_id: networkId,
-      bitcoin_controller_automining_disabled: false,
-      bitcoin_node_p2p_port: interval + networkId * 20 + 1,
-      bitcoin_node_rpc_port: interval + networkId * 20 + 2,
-      stacks_node_p2p_port: interval + networkId * 20 + 3,
-      stacks_node_rpc_port: interval + networkId * 20 + 4,
-      orchestrator_port: interval + networkId * 20 + 5,
-      orchestrator_control_port: interval + networkId * 20 + 6,
-      stacks_api_port: interval + networkId * 20 + 7,
-      stacks_api_events_port: interval + networkId * 20 + 8,
-      postgres_port: interval + networkId * 20 + 9,
-      stacks_explorer_port: interval + networkId * 20 + 10,
-      bitcoin_explorer_port: interval + networkId * 20 + 11,
-      subnet_node_p2p_port: interval + networkId * 20 + 12,
-      subnet_node_rpc_port: interval + networkId * 20 + 13,
-      subnet_api_port: interval + networkId * 20 + 14,
-      subnet_api_events_port: interval + networkId * 20 + 15,
-    };
-    var devnet = Object.assign(devnetDefaults, networkConfig.devnet);
-    return {
-      clarinetManifestPath: manifestPath,
-      logs,
-      accounts,
-      devnet: devnet,
-    };
+  const manifestPath = networkConfig.clarinetManifestPath || "./Clarinet.toml";
+  const logs = networkConfig.logs || false;
+  const accounts = networkConfig.accounts || [];
+  // Devnet settings
+  var devnetDefaults = {
+    network_id: networkId,
+    bitcoin_controller_automining_disabled: false,
+    bitcoin_node_p2p_port: interval + networkId * 20 + 1,
+    bitcoin_node_rpc_port: interval + networkId * 20 + 2,
+    stacks_node_p2p_port: interval + networkId * 20 + 3,
+    stacks_node_rpc_port: interval + networkId * 20 + 4,
+    orchestrator_port: interval + networkId * 20 + 5,
+    orchestrator_control_port: interval + networkId * 20 + 6,
+    stacks_api_port: interval + networkId * 20 + 7,
+    stacks_api_events_port: interval + networkId * 20 + 8,
+    postgres_port: interval + networkId * 20 + 9,
+    stacks_explorer_port: interval + networkId * 20 + 10,
+    bitcoin_explorer_port: interval + networkId * 20 + 11,
+    subnet_node_p2p_port: interval + networkId * 20 + 12,
+    subnet_node_rpc_port: interval + networkId * 20 + 13,
+    subnet_api_port: interval + networkId * 20 + 14,
+    subnet_api_events_port: interval + networkId * 20 + 15,
+  };
+  var devnet = Object.assign(devnetDefaults, networkConfig.devnet);
+  return {
+    clarinetManifestPath: manifestPath,
+    logs,
+    accounts,
+    devnet: devnet,
+  };
 }
 
 export class DevnetNetworkOrchestrator {
   handle: any;
+  lastCooldownEndedAt: Date;
+  defaultCooldown: number;
+  currentCooldown: number;
 
   /**
    * @summary Construct a new DevnetNetworkOrchestrator
    * @param {NetworkConfig} manifest
    * @memberof DevnetNetworkOrchestrator
    */
-  constructor(config: NetworkConfig) {
+  constructor(config: NetworkConfig, defaultCooldown = 4000) {
     let manifestPath = config.clarinetManifestPath!;
     var logs = config.logs;
     logs ||= false;
@@ -440,14 +454,17 @@ export class DevnetNetworkOrchestrator {
     var devnet = config.devnet;
     devnet ||= {};
     this.handle = stacksDevnetNew(manifestPath, logs, accounts, devnet);
+    this.lastCooldownEndedAt = new Date();
+    this.defaultCooldown = defaultCooldown;
+    this.currentCooldown = defaultCooldown;
   }
 
   /**
    * @summary Start orchestrating containers
    * @memberof DevnetNetworkOrchestrator
    */
-  start() {
-    return stacksDevnetStart.call(this.handle);
+  start(timeout: number = 600, emptyBuffer: boolean = true) {
+    return stacksDevnetStart.call(this.handle, timeout, emptyBuffer);
   }
 
   /**
@@ -459,26 +476,166 @@ export class DevnetNetworkOrchestrator {
   }
 
   /**
+   * @summary Returns the URL of the bitcoin-node container
+   * @memberof DevnetNetworkOrchestrator
+   */
+  getBitcoinNodeUrl() {
+    return stacksDevnetGetBitcoinNodeUrl.call(this.handle);
+  }
+
+  /**
+   * @summary Returns the URL of the stacks-api container
+   * @memberof DevnetNetworkOrchestrator
+   */
+  getStacksApiUrl() {
+    return stacksDevnetGetStacksApiUrl.call(this.handle);
+  }
+
+  /**
+   * @summary Returns the URL of the stacks-explorer container
+   * @memberof DevnetNetworkOrchestrator
+   */
+  getStacksExplorerUrl() {
+    return stacksDevnetGetStacksExplorerUrl.call(this.handle);
+  }
+
+  /**
+   * @summary Returns the URL of the bitcoin-explorer container
+   * @memberof DevnetNetworkOrchestrator
+   */
+  getBitcoinExplorerUrl() {
+    return stacksDevnetGetBitcoinExplorerUrl.call(this.handle);
+  }
+
+  /**
    * @summary Wait for the next Stacks block
    * @memberof DevnetNetworkOrchestrator
    */
-  waitForStacksBlock(): StacksChainUpdate {
-    return stacksDevnetWaitForStacksBlock.call(this.handle);
+  async waitForNextStacksBlock(maxErrors = 5): Promise<StacksChainUpdate> {
+    let errorCount = 0;
+    while (true) {
+      try {
+        let chainUpdate = await this.mineBitcoinBlockAndHopeForStacksBlock();
+        if (chainUpdate == undefined) {
+          this.currentCooldown += this.defaultCooldown;
+          errorCount += 1;
+          if (errorCount >= maxErrors) {
+            throw 'waitForNextStacksBlock maxErrors reached'
+          }
+          continue;
+        }
+        this.currentCooldown = this.defaultCooldown;
+        return chainUpdate;
+      } catch (error) {
+        errorCount += 1;
+        if (errorCount >= maxErrors) {
+          throw error;
+        }
+      }
+    }
+  }
+
+  /**
+   * @summary Wait for the next Stacks block
+   * @memberof DevnetNetworkOrchestrator
+   */
+  async mineBitcoinBlockAndHopeForStacksBlock(): Promise<StacksChainUpdate | undefined> {
+    let now = new Date();
+    let ms_elapsed = (now.getTime() - this.lastCooldownEndedAt.getTime());
+    let cooldown = Math.max(0, this.currentCooldown - ms_elapsed);
+    let wait = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+    return wait(cooldown)
+      .then(() => {
+        this.lastCooldownEndedAt = new Date();
+        return stacksDevnetWaitForStacksBlock.call(this.handle, this.currentCooldown)
+      })
+      .catch(e => {
+        this.lastCooldownEndedAt = new Date();
+        throw e
+      });
+  }
+
+  /**
+   * @summary Wait for the next Stacks block
+   * @memberof DevnetNetworkOrchestrator
+   */
+  async waitForStacksBlockOfHeight(targetBlockHeight: number, maxErrors = 5): Promise<StacksChainUpdate> {
+    while (true) {
+      try {
+        let chainUpdate = await this.waitForNextStacksBlock(maxErrors);
+        let currentBlockHeight = chainUpdate.new_blocks[0].block.block_identifier.index;
+        if (currentBlockHeight >= targetBlockHeight) {
+          return chainUpdate;
+        }
+      } catch (error) {
+        throw error;
+      }
+    }
+  }
+
+  /**
+   * @summary Wait for the next Stacks block
+   * @memberof DevnetNetworkOrchestrator
+   */
+  async waitForStacksBlockAnchoredOnBitcoinBlockOfHeight(minBitcoinBlockHeight: number, maxErrors = 5): Promise<StacksChainUpdate> {
+    while (true) {
+      try {
+        let chainUpdate = await this.waitForNextStacksBlock(maxErrors);
+        let metadata = chainUpdate.new_blocks[0].block.metadata! as StacksBlockMetadata;
+        let currentBitcoinBlockHeight = metadata.bitcoin_anchor_block_identifier.index;
+        if (currentBitcoinBlockHeight >= minBitcoinBlockHeight) {
+          return chainUpdate;
+        }
+      } catch (error) {
+        throw error;
+      }
+    }
   }
 
   /**
    * @summary Wait for the next Bitcoin block
    * @memberof DevnetNetworkOrchestrator
    */
-  waitForBitcoinBlock(): BitcoinChainUpdate {
-    return stacksDevnetWaitForBitcoinBlock.call(this.handle);
+  async waitForNextBitcoinBlock(): Promise<BitcoinChainUpdate> {
+    let now = new Date();
+    let ms_elapsed = (now.getTime() - this.lastCooldownEndedAt.getTime());
+    let cooldown = Math.max(0, this.currentCooldown - ms_elapsed);
+    let wait = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+    return wait(cooldown)
+      .then(() => {
+        this.lastCooldownEndedAt = new Date();
+        return stacksDevnetWaitForBitcoinBlock.call(this.handle)
+      })     
+      .catch(e => {
+        this.lastCooldownEndedAt = new Date();
+        throw e
+      });
   }
+
+
+  /**
+   * @summary Wait for the next Bitcoin block
+   * @memberof DevnetNetworkOrchestrator
+   */
+  async waitForStacksBlockIncludingTransaction(txid: string): Promise<{ chainUpdate: StacksChainUpdate, transaction: Transaction }> {
+    while (true) {
+      let chainUpdate = await this.waitForNextStacksBlock();
+      for (const transaction of chainUpdate.new_blocks[0].block.transactions) {
+        if (transaction.transaction_identifier.hash.endsWith(txid)) {
+          return {
+            chainUpdate,
+            transaction,
+          };
+        }
+      }
+    }
+  };
 
   /**
    * @summary Terminates the containers
    * @memberof DevnetNetworkOrchestrator
    */
-  stop() {
-    stacksDevnetStop.call(this.handle);
+  terminate(): boolean {
+    return stacksDevnetTerminate.call(this.handle);
   }
 }

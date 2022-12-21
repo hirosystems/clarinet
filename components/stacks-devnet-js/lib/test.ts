@@ -28,8 +28,8 @@ console.log(devnet.getStacksNodeUrl())
 
 devnet.start();
 
-let block = devnet.waitForStacksBlock();
+let block = devnet.waitForNextStacksBlock();
 
 console.log(`Hello from JS ${JSON.stringify(block)}`);
 
-devnet.stop();
+devnet.terminate();

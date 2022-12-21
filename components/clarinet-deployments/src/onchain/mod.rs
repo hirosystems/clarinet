@@ -219,6 +219,7 @@ pub enum TransactionCheck {
     // BtcTransfer(),
 }
 
+#[derive(Clone, Debug)]
 pub enum DeploymentEvent {
     TransactionUpdate(TransactionTracker),
     Interrupted(String),
@@ -326,6 +327,8 @@ pub fn apply_on_chain_deployment(
     deployment_event_tx: Sender<DeploymentEvent>,
     deployment_command_rx: Receiver<DeploymentCommand>,
     fetch_initial_nonces: bool,
+    override_bitcoin_rpc_url: Option<String>,
+    override_stacks_rpc_url: Option<String>,
 ) {
     let network = deployment.network.get_networks();
     let network_manifest =
@@ -342,16 +345,14 @@ pub fn apply_on_chain_deployment(
     let mut btc_accounts_lookup: BTreeMap<String, &AccountConfig> = BTreeMap::new();
     let mut default_epoch = EpochSpec::Epoch2_05;
     if !fetch_initial_nonces {
-        if network == StacksNetwork::Devnet {
-            for (_, account) in network_manifest.accounts.iter() {
-                accounts_cached_nonces.insert(account.stx_address.clone(), 0);
-            }
-            if let Some(ref devnet) = network_manifest.devnet {
-                if devnet.enable_next_features {
-                    default_epoch = EpochSpec::Epoch2_1;
-                }
-            };
+        for (_, account) in network_manifest.accounts.iter() {
+            accounts_cached_nonces.insert(account.stx_address.clone(), 0);
         }
+        if let Some(ref devnet) = network_manifest.devnet {
+            if devnet.enable_next_features {
+                default_epoch = EpochSpec::Epoch2_1;
+            }
+        };
     }
 
     for (_, account) in network_manifest.accounts.iter() {
@@ -359,14 +360,23 @@ pub fn apply_on_chain_deployment(
         btc_accounts_lookup.insert(account.btc_address.clone(), account);
     }
 
-    let stacks_node_url = deployment
-        .stacks_node
-        .expect("unable to get stacks node rcp address");
+    let stacks_node_url = if let Some(url) = override_stacks_rpc_url {
+        url
+    } else {
+        deployment
+            .stacks_node
+            .expect("unable to get stacks node rcp address")
+    };
+
     let stacks_rpc = StacksRpc::new(&stacks_node_url);
 
-    let bitcoin_node_url = deployment
-        .bitcoin_node
-        .expect("unable to get bitcoin node rcp address");
+    let bitcoin_node_url = if let Some(url) = override_bitcoin_rpc_url {
+        url
+    } else {
+        deployment
+            .bitcoin_node
+            .expect("unable to get bitcoin node rcp address")
+    };
 
     // Phase 1: we traverse the deployment plan and encode all the transactions,
     // keeping the order.
@@ -377,7 +387,7 @@ pub fn apply_on_chain_deployment(
     for batch_spec in deployment.plan.batches.iter() {
         let epoch = match batch_spec.epoch {
             Some(epoch) => {
-                if fetch_initial_nonces {
+                if network != StacksNetwork::Devnet {
                     println!("warning: 'epoch' specified for a deployment batch is ignored when applying a deployment plan. This field should only be specified for deployments plans used to launch a devnet with 'clarinet integrate'.");
                 }
                 epoch
@@ -708,38 +718,43 @@ pub fn apply_on_chain_deployment(
     // and wait for their inclusion in a block before moving to the next batch.
     let mut current_block_height = 0;
     for (epoch, batch) in batches.into_iter() {
-        // Ensure we've reached the appropriate epoch for this batch
-        let after_block = match epoch {
-            EpochSpec::Epoch2_0 => network_manifest.devnet.as_ref().unwrap().epoch_2_0,
-            EpochSpec::Epoch2_05 => network_manifest.devnet.as_ref().unwrap().epoch_2_05,
-            EpochSpec::Epoch2_1 => network_manifest.devnet.as_ref().unwrap().epoch_2_1,
-        };
-        while !fetch_initial_nonces && current_block_height < after_block {
-            let new_block_height = match stacks_rpc.get_info() {
-                Ok(info) => {
-                    if info.stacks_tip_height == 0 {
-                        // Always loop if we have not yet seen the genesis block.
+        if network == StacksNetwork::Devnet {
+            // Devnet only: ensure we've reached the appropriate epoch for this batch
+            let after_block = match epoch {
+                EpochSpec::Epoch2_0 => network_manifest.devnet.as_ref().unwrap().epoch_2_0,
+                EpochSpec::Epoch2_05 => network_manifest.devnet.as_ref().unwrap().epoch_2_05,
+                EpochSpec::Epoch2_1 => network_manifest.devnet.as_ref().unwrap().epoch_2_1,
+            };
+
+            while current_block_height < after_block {
+                let new_block_height = match stacks_rpc.get_info() {
+                    Ok(info) => {
+                        if info.stacks_tip_height == 0 {
+                            // Always loop if we have not yet seen the genesis block.
+                            std::thread::sleep(std::time::Duration::from_secs(
+                                delay_between_checks.into(),
+                            ));
+                            continue;
+                        }
+                        info.burn_block_height
+                    }
+                    Err(_e) => {
                         std::thread::sleep(std::time::Duration::from_secs(
                             delay_between_checks.into(),
                         ));
                         continue;
                     }
-                    info.burn_block_height
-                }
-                _ => {
+                };
+
+                // If no block has been mined since `delay_between_checks`,
+                // avoid flooding the stacks-node with status update requests.
+                if new_block_height <= current_block_height {
                     std::thread::sleep(std::time::Duration::from_secs(delay_between_checks.into()));
                     continue;
                 }
-            };
 
-            // If no block has been mined since `delay_between_checks`,
-            // avoid flooding the stacks-node with status update requests.
-            if new_block_height <= current_block_height {
-                std::thread::sleep(std::time::Duration::from_secs(delay_between_checks.into()));
-                continue;
+                current_block_height = new_block_height;
             }
-
-            current_block_height = new_block_height;
         }
 
         let mut ongoing_batch = BTreeMap::new();

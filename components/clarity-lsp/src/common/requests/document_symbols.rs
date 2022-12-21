@@ -4,8 +4,10 @@ use clarity_repl::{
     analysis::ast_visitor::{traverse, ASTVisitor},
     clarity::{representations::Span, ClarityName, SymbolicExpression, SymbolicExpressionType},
 };
-use lsp_types::{DocumentSymbol, Position, Range, SymbolKind};
+use lsp_types::{DocumentSymbol, SymbolKind};
 use serde::{Deserialize, Serialize};
+
+use super::helpers::span_to_range;
 
 fn symbolic_expression_to_name(symbolic_expr: &SymbolicExpression) -> String {
     match &symbolic_expr.expr {
@@ -45,17 +47,7 @@ fn build_symbol(
     span: &Span,
     children: Option<Vec<DocumentSymbol>>,
 ) -> DocumentSymbol {
-    let range = Range {
-        start: Position {
-            line: span.start_line - 1,
-            character: span.start_column,
-        },
-        end: Position {
-            line: span.end_line - 1,
-            character: span.end_column - 1,
-        },
-    };
-
+    let range = span_to_range(span);
     #[allow(deprecated)]
     DocumentSymbol {
         name: name.to_string(),

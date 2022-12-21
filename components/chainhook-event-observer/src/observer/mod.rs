@@ -6,7 +6,8 @@ use crate::chainhooks::stacks::{
     evaluate_stacks_chainhooks_on_chain_event, handle_stacks_hook_action,
     StacksChainhookOccurrence, StacksChainhookOccurrencePayload,
 };
-use crate::chainhooks::types::{ChainhookSpecification, HookFormation};
+use crate::chainhooks::types::{ChainhookConfig, ChainhookSpecification};
+use crate::indexer::bitcoin::retrieve_full_block;
 use crate::indexer::{self, Indexer, IndexerConfig};
 use crate::utils::Context;
 use bitcoincore_rpc::bitcoin::{BlockHash, Txid};
@@ -19,12 +20,13 @@ use clarity_repl::clarity::util::hash::bytes_to_hex;
 use hiro_system_kit;
 use hiro_system_kit::slog;
 use reqwest::Client as HttpClient;
-use rocket::config::{Config, LogLevel};
+use rocket::config::{self, Config, LogLevel};
 use rocket::data::{Limits, ToByteUnit};
-use rocket::http::Status;
+use rocket::http::{RawStr, Status};
 use rocket::request::{self, FromRequest, Outcome, Request};
 use rocket::serde::json::{json, Json, Value as JsonValue};
 use rocket::serde::Deserialize;
+use rocket::Shutdown;
 use rocket::State;
 use rocket_okapi::{openapi, openapi_get_routes, request::OpenApiFromRequest};
 use std::collections::{HashMap, HashSet};
@@ -107,7 +109,7 @@ pub struct EventObserverConfig {
     pub normalization_enabled: bool,
     pub grpc_server_enabled: bool,
     pub hooks_enabled: bool,
-    pub initial_hook_formation: Option<HookFormation>,
+    pub chainhook_config: Option<ChainhookConfig>,
     pub bitcoin_rpc_proxy_enabled: bool,
     pub event_handlers: Vec<EventHandler>,
     pub ingestion_port: u16,
@@ -188,8 +190,14 @@ pub struct BitcoinConfig {
 }
 
 #[derive(Debug, Clone)]
+pub struct ServicesConfig {
+    pub stacks_node_url: String,
+    pub bitcoin_node_url: String,
+}
+
+#[derive(Debug, Clone)]
 pub struct ChainhookStore {
-    entries: HashMap<ApiKey, HookFormation>,
+    entries: HashMap<ApiKey, ChainhookConfig>,
 }
 
 impl ChainhookStore {
@@ -202,7 +210,7 @@ pub async fn start_event_observer(
     mut config: EventObserverConfig,
     observer_commands_tx: Sender<ObserverCommand>,
     observer_commands_rx: Receiver<ObserverCommand>,
-    observer_events_tx: Option<Sender<ObserverEvent>>,
+    observer_events_tx: Option<crossbeam_channel::Sender<ObserverEvent>>,
     ctx: Context,
 ) -> Result<(), Box<dyn Error>> {
     ctx.try_log(|logger| slog::info!(logger, "Event observer starting with config {:?}", config));
@@ -235,22 +243,27 @@ pub async fn start_event_observer(
         rpc_url: config.bitcoin_node_rpc_url.clone(),
     };
 
+    let services_config = ServicesConfig {
+        stacks_node_url: config.bitcoin_node_rpc_url.clone(),
+        bitcoin_node_url: config.stacks_node_rpc_url.clone(),
+    };
+
     let mut entries = HashMap::new();
     if config.operators.is_empty() {
-        // If authorization not required, we create a default HookFormation
-        let mut hook_formation = HookFormation::new();
-        if let Some(ref mut initial_hook_formation) = config.initial_hook_formation {
+        // If authorization not required, we create a default ChainhookConfig
+        let mut hook_formation = ChainhookConfig::new();
+        if let Some(ref mut initial_chainhook_config) = config.chainhook_config {
             hook_formation
                 .stacks_chainhooks
-                .append(&mut initial_hook_formation.stacks_chainhooks);
+                .append(&mut initial_chainhook_config.stacks_chainhooks);
             hook_formation
                 .bitcoin_chainhooks
-                .append(&mut initial_hook_formation.bitcoin_chainhooks);
+                .append(&mut initial_chainhook_config.bitcoin_chainhooks);
         }
         entries.insert(ApiKey(None), hook_formation);
     } else {
         for operator in config.operators.iter() {
-            entries.insert(ApiKey(Some(operator.clone())), HookFormation::new());
+            entries.insert(ApiKey(Some(operator.clone())), ChainhookConfig::new());
         }
     }
     let chainhook_store = Arc::new(RwLock::new(ChainhookStore { entries }));
@@ -259,6 +272,11 @@ pub async fn start_event_observer(
     let background_job_tx_mutex = Arc::new(Mutex::new(observer_commands_tx.clone()));
 
     let limits = Limits::default().limit("json", 4.megabytes());
+    let mut shutdown_config = config::Shutdown::default();
+    shutdown_config.ctrlc = false;
+    shutdown_config.grace = 0;
+    shutdown_config.mercy = 0;
+
     let ingestion_config = Config {
         port: ingestion_port,
         workers: 3,
@@ -268,6 +286,7 @@ pub async fn start_event_observer(
         log_level: log_level.clone(),
         cli_colors: false,
         limits,
+        shutdown: shutdown_config,
         ..Config::default()
     };
 
@@ -285,21 +304,29 @@ pub async fn start_event_observer(
 
     if bitcoin_rpc_proxy_enabled {
         routes.append(&mut routes![handle_bitcoin_rpc_call]);
+        routes.append(&mut routes![handle_bitcoin_wallet_rpc_call]);
     }
 
     let ctx_cloned = ctx.clone();
+    let ignite = rocket::custom(ingestion_config)
+        .manage(indexer_rw_lock)
+        .manage(background_job_tx_mutex)
+        .manage(bitcoin_config)
+        .manage(ctx_cloned)
+        .manage(services_config)
+        .mount("/", routes)
+        .ignite()
+        .await?;
+    let ingestion_shutdown = Some(ignite.shutdown());
 
     let _ = std::thread::spawn(move || {
-        let future = rocket::custom(ingestion_config)
-            .manage(indexer_rw_lock)
-            .manage(background_job_tx_mutex)
-            .manage(bitcoin_config)
-            .manage(ctx_cloned)
-            .mount("/", routes)
-            .launch();
-
-        let _ = hiro_system_kit::nestable_block_on(future);
+        let _ = hiro_system_kit::nestable_block_on(ignite.launch());
     });
+
+    let mut shutdown_config = config::Shutdown::default();
+    shutdown_config.ctrlc = false;
+    shutdown_config.grace = 1;
+    shutdown_config.mercy = 1;
 
     let control_config = Config {
         port: control_port,
@@ -309,6 +336,7 @@ pub async fn start_event_observer(
         temp_dir: std::env::temp_dir().into(),
         log_level,
         cli_colors: false,
+        shutdown: shutdown_config,
         ..Config::default()
     };
 
@@ -324,15 +352,17 @@ pub async fn start_event_observer(
     let managed_chainhook_store = chainhook_store.clone();
     let ctx_cloned = ctx.clone();
 
-    let _ = std::thread::spawn(move || {
-        let future = rocket::custom(control_config)
-            .manage(background_job_tx_mutex)
-            .manage(managed_chainhook_store)
-            .manage(ctx_cloned)
-            .mount("/", routes)
-            .launch();
+    let ignite = rocket::custom(control_config)
+        .manage(background_job_tx_mutex)
+        .manage(managed_chainhook_store)
+        .manage(ctx_cloned)
+        .mount("/", routes)
+        .ignite()
+        .await?;
+    let control_shutdown = Some(ignite.shutdown());
 
-        let _ = hiro_system_kit::nestable_block_on(future);
+    let _ = std::thread::spawn(move || {
+        let _ = hiro_system_kit::nestable_block_on(ignite.launch());
     });
 
     // This loop is used for handling background jobs, emitted by HTTP calls.
@@ -341,6 +371,8 @@ pub async fn start_event_observer(
         chainhook_store,
         observer_commands_rx,
         observer_events_tx,
+        ingestion_shutdown,
+        control_shutdown,
         ctx,
     )
     .await
@@ -370,7 +402,9 @@ pub async fn start_observer_commands_handler(
     config: EventObserverConfig,
     chainhook_store: Arc<RwLock<ChainhookStore>>,
     observer_commands_rx: Receiver<ObserverCommand>,
-    observer_events_tx: Option<Sender<ObserverEvent>>,
+    observer_events_tx: Option<crossbeam_channel::Sender<ObserverEvent>>,
+    ingestion_shutdown: Option<Shutdown>,
+    control_shutdown: Option<Shutdown>,
     ctx: Context,
 ) -> Result<(), Box<dyn Error>> {
     let mut chainhooks_occurrences_tracker: HashMap<String, u64> = HashMap::new();
@@ -390,6 +424,12 @@ pub async fn start_observer_commands_handler(
         match command {
             ObserverCommand::Terminate => {
                 ctx.try_log(|logger| slog::info!(logger, "Handling Termination command"));
+                if let Some(ingestion_shutdown) = ingestion_shutdown {
+                    ingestion_shutdown.notify();
+                }
+                if let Some(control_shutdown) = control_shutdown {
+                    control_shutdown.notify();
+                }
                 if let Some(ref tx) = observer_events_tx {
                     let _ = tx.send(ObserverEvent::Info("Terminating event observer".into()));
                     let _ = tx.send(ObserverEvent::Terminate);
@@ -815,10 +855,12 @@ pub async fn start_observer_commands_handler(
                             continue;
                         }
                     };
-                    hook_formation.register_hook(hook.clone());
-                    chainhooks_lookup.insert(hook.uuid().to_string(), api_key.clone());
+                    let mut registered_hook = hook.clone();
+                    registered_hook.set_owner_uuid(&api_key);
+                    hook_formation.register_hook(registered_hook.clone());
+                    chainhooks_lookup.insert(registered_hook.uuid().to_string(), api_key.clone());
                     if let Some(ref tx) = observer_events_tx {
-                        let _ = tx.send(ObserverEvent::HookRegistered(hook));
+                        let _ = tx.send(ObserverEvent::HookRegistered(registered_hook));
                     }
                 }
             },
@@ -907,8 +949,9 @@ pub fn handle_ping(ctx: &State<Context>) -> Json<JsonValue> {
 
 #[openapi(skip)]
 #[post("/new_burn_block", format = "json", data = "<marshalled_block>")]
-pub fn handle_new_bitcoin_block(
+pub async fn handle_new_bitcoin_block(
     indexer_rw_lock: &State<Arc<RwLock<Indexer>>>,
+    bitcoin_config: &State<BitcoinConfig>,
     marshalled_block: Json<JsonValue>,
     background_job_tx: &State<Arc<Mutex<Sender<ObserverCommand>>>>,
     ctx: &State<Context>,
@@ -917,8 +960,23 @@ pub fn handle_new_bitcoin_block(
     // Standardize the structure of the block, and identify the
     // kind of update that this new block would imply, taking
     // into account the last 7 blocks.
+
+    let (block_height, block) =
+        match retrieve_full_block(bitcoin_config, marshalled_block.into_inner(), ctx).await {
+            Ok(block) => block,
+            Err(e) => {
+                ctx.try_log(|logger| {
+                    slog::warn!(logger, "unable to retrieve_full_block: {}", e.to_string())
+                });
+                return Json(json!({
+                    "status": 500,
+                    "result": "unable to retrieve_full_block",
+                }));
+            }
+        };
+
     let chain_update = match indexer_rw_lock.inner().write() {
-        Ok(mut indexer) => indexer.handle_bitcoin_block(marshalled_block.into_inner(), &ctx),
+        Ok(mut indexer) => indexer.handle_bitcoin_block(block_height, block, &ctx),
         Err(e) => {
             ctx.try_log(|logger| {
                 slog::warn!(
@@ -1189,6 +1247,43 @@ pub fn handle_mined_microblock(payload: Json<JsonValue>, ctx: &State<Context>) -
 }
 
 #[openapi(skip)]
+#[post("/wallet", format = "application/json", data = "<bitcoin_rpc_call>")]
+pub async fn handle_bitcoin_wallet_rpc_call(
+    bitcoin_config: &State<BitcoinConfig>,
+    bitcoin_rpc_call: Json<BitcoinRPCRequest>,
+    ctx: &State<Context>,
+) -> Json<JsonValue> {
+    ctx.try_log(|logger| slog::info!(logger, "POST /wallet"));
+
+    use base64::encode;
+    use reqwest::Client;
+
+    let bitcoin_rpc_call = bitcoin_rpc_call.into_inner().clone();
+
+    let body = rocket::serde::json::serde_json::to_vec(&bitcoin_rpc_call).unwrap();
+
+    let token = encode(format!(
+        "{}:{}",
+        bitcoin_config.username, bitcoin_config.password
+    ));
+
+    let url = format!("{}", bitcoin_config.rpc_url);
+    let client = Client::new();
+    let builder = client
+        .post(&url)
+        .header("Content-Type", "application/json")
+        .header("Authorization", format!("Basic {}", token))
+        .timeout(std::time::Duration::from_secs(5));
+
+    match builder.body(body).send().await {
+        Ok(res) => Json(res.json().await.unwrap()),
+        Err(_) => Json(json!({
+            "status": 500
+        })),
+    }
+}
+
+#[openapi(skip)]
 #[post("/", format = "application/json", data = "<bitcoin_rpc_call>")]
 pub async fn handle_bitcoin_rpc_call(
     bitcoin_config: &State<BitcoinConfig>,
@@ -1211,12 +1306,21 @@ pub async fn handle_bitcoin_rpc_call(
         bitcoin_config.username, bitcoin_config.password
     ));
 
+    ctx.try_log(|logger| {
+        slog::debug!(
+            logger,
+            "Forwarding {} request to {}",
+            method,
+            bitcoin_config.rpc_url
+        )
+    });
+
     let client = Client::new();
     let builder = client
         .post(&bitcoin_config.rpc_url)
         .header("Content-Type", "application/json")
-        .timeout(std::time::Duration::from_secs(5))
-        .header("Authorization", format!("Basic {}", token));
+        .header("Authorization", format!("Basic {}", token))
+        .timeout(std::time::Duration::from_secs(5));
 
     if method == "sendrawtransaction" {
         let background_job_tx = background_job_tx.inner();
@@ -1229,7 +1333,11 @@ pub async fn handle_bitcoin_rpc_call(
     }
 
     match builder.body(body).send().await {
-        Ok(res) => Json(res.json().await.unwrap()),
+        Ok(res) => {
+            let payload = res.json().await.unwrap();
+            ctx.try_log(|logger| slog::debug!(logger, "Responding with response {:?}", payload));
+            Json(payload)
+        }
         Err(_) => Json(json!({
             "status": 500
         })),
@@ -1381,7 +1489,7 @@ pub fn handle_delete_bitcoin_hook(
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash, OpenApiFromRequest)]
-pub struct ApiKey(Option<String>);
+pub struct ApiKey(pub Option<String>);
 
 #[derive(Debug)]
 pub enum ApiKeyError {

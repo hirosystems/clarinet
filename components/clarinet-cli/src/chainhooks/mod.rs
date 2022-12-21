@@ -4,7 +4,7 @@ use std::path::PathBuf;
 pub mod types;
 use crate::chainhooks::types::ChainhookSpecificationFile;
 
-use chainhook_event_observer::chainhooks::types::{ChainhookSpecification, HookFormation};
+use chainhook_event_observer::chainhooks::types::{ChainhookConfig, ChainhookSpecification};
 
 use chainhook_types::{BitcoinNetwork, StacksNetwork};
 
@@ -13,7 +13,7 @@ use std::fs;
 pub fn load_chainhooks(
     manifest_location: &FileLocation,
     networks: &(BitcoinNetwork, StacksNetwork),
-) -> Result<HookFormation, String> {
+) -> Result<ChainhookConfig, String> {
     let hook_files = get_chainhooks_files(manifest_location)?;
     let mut stacks_chainhooks = vec![];
     let mut bitcoin_chainhooks = vec![];
@@ -26,7 +26,7 @@ pub fn load_chainhooks(
             Err(msg) => return Err(format!("{} syntax incorrect: {}", relative_path, msg)),
         };
     }
-    Ok(HookFormation {
+    Ok(ChainhookConfig {
         stacks_chainhooks,
         bitcoin_chainhooks,
     })

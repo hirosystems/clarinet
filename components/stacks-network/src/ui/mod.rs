@@ -6,9 +6,9 @@ mod ui;
 mod util;
 
 use super::DevnetEvent;
-use crate::ChainsCoordinatorCommand;
+use crate::{chains_coordinator::BitcoinMiningCommand, ChainsCoordinatorCommand};
 use app::App;
-use chainhook_event_observer::{observer::ObserverCommand, utils::Context};
+use chainhook_event_observer::utils::Context;
 use chainhook_types::StacksChainEvent;
 use crossterm::{
     event::{self, Event, KeyCode, KeyModifiers},
@@ -27,21 +27,21 @@ use tui::{backend::CrosstermBackend, Terminal};
 pub fn start_ui(
     devnet_events_tx: Sender<DevnetEvent>,
     devnet_events_rx: Receiver<DevnetEvent>,
-    chains_coordinator_commands_tx: Sender<ChainsCoordinatorCommand>,
-    observer_command_tx: Sender<ObserverCommand>,
+    chains_coordinator_commands_tx: crossbeam_channel::Sender<ChainsCoordinatorCommand>,
     orchestrator_terminated_rx: Receiver<bool>,
     devnet_path: &str,
     subnet_enabled: bool,
+    automining_enabled: bool,
     ctx: &Context,
 ) -> Result<(), String> {
     let res = do_start_ui(
         devnet_events_tx,
         devnet_events_rx,
         chains_coordinator_commands_tx,
-        observer_command_tx,
         orchestrator_terminated_rx,
         devnet_path,
         subnet_enabled,
+        automining_enabled,
         ctx,
     );
     if let Err(ref _e) = res {
@@ -53,11 +53,11 @@ pub fn start_ui(
 pub fn do_start_ui(
     devnet_events_tx: Sender<DevnetEvent>,
     devnet_events_rx: Receiver<DevnetEvent>,
-    chains_coordinator_commands_tx: Sender<ChainsCoordinatorCommand>,
-    observer_command_tx: Sender<ObserverCommand>,
+    chains_coordinator_commands_tx: crossbeam_channel::Sender<ChainsCoordinatorCommand>,
     orchestrator_terminated_rx: Receiver<bool>,
     devnet_path: &str,
     subnet_enabled: bool,
+    automining_enabled: bool,
     ctx: &Context,
 ) -> Result<(), String> {
     enable_raw_mode().map_err(|e| format!("unable to start terminal ui: {}", e.to_string()))?;
@@ -100,6 +100,8 @@ pub fn do_start_ui(
         .clear()
         .map_err(|e| format!("unable to start terminal ui: {}", e.to_string()))?;
 
+    let mut mining_command_tx: Option<Sender<BitcoinMiningCommand>> = None;
+
     loop {
         terminal
             .draw(|f| ui::draw(f, &mut app))
@@ -110,7 +112,6 @@ pub fn do_start_ui(
                 let _ = terminate(
                     &mut terminal,
                     chains_coordinator_commands_tx,
-                    observer_command_tx,
                     orchestrator_terminated_rx,
                 );
                 break;
@@ -123,14 +124,22 @@ pub fn do_start_ui(
                     let _ = terminate(
                         &mut terminal,
                         chains_coordinator_commands_tx,
-                        observer_command_tx,
-                        orchestrator_terminated_rx);
+                        orchestrator_terminated_rx,
+                        );
                     break;
                 }
-                (_, KeyCode::Left) => app.on_left(),
-                (_, KeyCode::Up) => app.on_up(),
-                (_, KeyCode::Right) => app.on_right(),
-                (_, KeyCode::Down) => app.on_down(),
+                (KeyModifiers::NONE, KeyCode::Char('n')) => {
+                    if let Some(ref tx) = mining_command_tx {
+                        let _ = tx.send(BitcoinMiningCommand::Mine);
+                        app.display_log(DevnetEvent::log_success(format!("Bitcoin block mining triggered manually")), ctx);
+                    } else {
+                        app.display_log(DevnetEvent::log_error(format!("Manual block mining not ready")), ctx);
+                    }
+                }
+                (KeyModifiers::NONE, KeyCode::Left) => app.on_left(),
+                (KeyModifiers::NONE, KeyCode::Up) => app.on_up(),
+                (KeyModifiers::NONE, KeyCode::Right) => app.on_right(),
+                (KeyModifiers::NONE, KeyCode::Down) => app.on_down(),
                 _ => {}
             },
             DevnetEvent::Tick => {
@@ -204,12 +213,16 @@ pub fn do_start_ui(
                 let _ = terminate(
                     &mut terminal,
                     chains_coordinator_commands_tx,
-                    observer_command_tx,
-                    orchestrator_terminated_rx);
+                    orchestrator_terminated_rx,
+                    );
                 return Err(message)
             },
-            DevnetEvent::BootCompleted(_) => {
+            DevnetEvent::BootCompleted(bitcoin_mining_tx) => {
                 app.display_log(DevnetEvent::log_success("Local Devnet network ready".into()), ctx);
+                if automining_enabled {
+                    let _ = bitcoin_mining_tx.send(BitcoinMiningCommand::Start);
+                }
+                mining_command_tx = Some(bitcoin_mining_tx);
             }
             // DevnetEvent::Terminate => {
 
@@ -228,21 +241,19 @@ pub fn do_start_ui(
 
 fn terminate(
     terminal: &mut Terminal<CrosstermBackend<Stdout>>,
-    chains_coordinator_commands_tx: Sender<ChainsCoordinatorCommand>,
-    observer_command_tx: Sender<ObserverCommand>,
+    chains_coordinator_commands_tx: crossbeam_channel::Sender<ChainsCoordinatorCommand>,
     orchestrator_terminated_rx: Receiver<bool>,
 ) -> Result<(), Box<dyn Error>> {
-    disable_raw_mode()?;
-    execute!(terminal.backend_mut(), LeaveAlternateScreen,)?;
-    chains_coordinator_commands_tx
-        .send(ChainsCoordinatorCommand::Terminate)
-        .expect("Unable to terminate devnet");
-    observer_command_tx
-        .send(ObserverCommand::Terminate)
-        .expect("Unable to terminate devnet");
-    match orchestrator_terminated_rx.recv()? {
-        _ => {}
+    let _ = disable_raw_mode();
+    let _ = execute!(terminal.backend_mut(), LeaveAlternateScreen);
+    let res = chains_coordinator_commands_tx.send(ChainsCoordinatorCommand::Terminate);
+    if let Err(_e) = res {
+        // Display log
     }
-    terminal.show_cursor()?;
+    let res = orchestrator_terminated_rx.recv();
+    if let Err(_e) = res {
+        // Display log
+    }
+    let _ = terminal.show_cursor();
     Ok(())
 }

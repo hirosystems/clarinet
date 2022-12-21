@@ -2,7 +2,7 @@ use std::{
     fs,
     path::PathBuf,
     str::FromStr,
-    sync::mpsc::{self, Sender},
+    sync::mpsc::{self, channel, Sender},
 };
 
 use crate::chainhooks::load_chainhooks;
@@ -25,7 +25,7 @@ pub fn run_devnet(
     (
         Option<mpsc::Receiver<DevnetEvent>>,
         Option<mpsc::Sender<bool>>,
-        Option<mpsc::Sender<ChainsCoordinatorCommand>>,
+        Option<crossbeam_channel::Sender<ChainsCoordinatorCommand>>,
     ),
     String,
 > {
@@ -69,6 +69,7 @@ pub fn run_devnet(
         tracer: false,
     };
 
+    let (orchestrator_terminated_tx, orchestrator_terminated_rx) = channel();
     let res = hiro_system_kit::nestable_block_on(do_run_devnet(
         devnet,
         deployment,
@@ -76,6 +77,8 @@ pub fn run_devnet(
         log_tx,
         display_dashboard,
         ctx,
+        orchestrator_terminated_tx,
+        Some(orchestrator_terminated_rx),
     ));
     println!(
         "{} logs and chainstate available at location {}",

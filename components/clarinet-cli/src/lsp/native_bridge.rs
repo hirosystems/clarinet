@@ -4,7 +4,9 @@ use clarity_lsp::backend::{
     process_notification, process_request, EditorStateInput, LspNotification,
     LspNotificationResponse, LspRequest, LspRequestResponse,
 };
-use clarity_lsp::lsp_types::{DocumentSymbolParams, DocumentSymbolResponse};
+use clarity_lsp::lsp_types::{
+    DocumentSymbolParams, DocumentSymbolResponse, GotoDefinitionParams, GotoDefinitionResponse,
+};
 use clarity_lsp::state::EditorState;
 use crossbeam_channel::{Receiver as MultiplexableReceiver, Select, Sender as MultiplexableSender};
 use serde_json::Value;
@@ -97,10 +99,8 @@ impl LanguageServer for LspNativeBridge {
 
         let response_rx = self.response_rx.lock().expect("failed to lock response_rx");
         let ref response = response_rx.recv().expect("failed to get value from recv");
-        if let LspResponse::Request(request_response) = response {
-            if let LspRequestResponse::Initialize(initialize) = request_response {
-                return Ok(initialize.to_owned());
-            }
+        if let LspResponse::Request(LspRequestResponse::Initialize(initialize)) = response {
+            return Ok(initialize.to_owned());
         }
         Err(Error::new(ErrorCode::InternalError))
     }
@@ -123,10 +123,26 @@ impl LanguageServer for LspNativeBridge {
 
         let response_rx = self.response_rx.lock().expect("failed to lock response_rx");
         let ref response = response_rx.recv().expect("failed to get value from recv");
-        if let LspResponse::Request(request_response) = response {
-            if let LspRequestResponse::CompletionItems(items) = request_response {
-                return Ok(Some(CompletionResponse::from(items.to_vec())));
-            }
+        if let LspResponse::Request(LspRequestResponse::CompletionItems(items)) = response {
+            return Ok(Some(CompletionResponse::from(items.to_vec())));
+        }
+
+        Ok(None)
+    }
+
+    async fn goto_definition(
+        &self,
+        params: GotoDefinitionParams,
+    ) -> Result<Option<GotoDefinitionResponse>> {
+        let _ = match self.request_tx.lock() {
+            Ok(tx) => tx.send(LspRequest::Definition(params)),
+            Err(_) => return Ok(None),
+        };
+
+        let response_rx = self.response_rx.lock().expect("failed to lock response_rx");
+        let ref response = response_rx.recv().expect("failed to get value from recv");
+        if let LspResponse::Request(LspRequestResponse::Definition(Some(data))) = response {
+            return Ok(Some(GotoDefinitionResponse::Scalar(data.to_owned())));
         }
 
         Ok(None)
@@ -143,10 +159,8 @@ impl LanguageServer for LspNativeBridge {
 
         let response_rx = self.response_rx.lock().expect("failed to lock response_rx");
         let ref response = response_rx.recv().expect("failed to get value from recv");
-        if let LspResponse::Request(request_response) = response {
-            if let LspRequestResponse::DocumentSymbol(symbols) = request_response {
-                return Ok(Some(DocumentSymbolResponse::Nested(symbols.to_vec())));
-            }
+        if let LspResponse::Request(LspRequestResponse::DocumentSymbol(symbols)) = response {
+            return Ok(Some(DocumentSymbolResponse::Nested(symbols.to_vec())));
         }
 
         Ok(None)
@@ -160,10 +174,8 @@ impl LanguageServer for LspNativeBridge {
 
         let response_rx = self.response_rx.lock().expect("failed to lock response_rx");
         let ref response = response_rx.recv().expect("failed to get value from recv");
-        if let LspResponse::Request(request_response) = response {
-            if let LspRequestResponse::Hover(data) = request_response {
-                return Ok(data.to_owned());
-            }
+        if let LspResponse::Request(LspRequestResponse::Hover(data)) = response {
+            return Ok(data.to_owned());
         }
 
         Ok(None)

@@ -53,59 +53,33 @@ pub trait ASTVisitor<'a> {
                                 .unwrap_or(&DEFAULT_NAME),
                             args.get(1).unwrap_or(&DEFAULT_EXPR),
                         ),
-                        DefineFunctions::PrivateFunction => {
+                        DefineFunctions::PrivateFunction
+                        | DefineFunctions::ReadOnlyFunction
+                        | DefineFunctions::PublicFunction => {
                             match args.get(0).unwrap_or(&DEFAULT_EXPR).match_list() {
                                 Some(signature) => {
-                                    let name = signature[0].match_atom().unwrap_or(&DEFAULT_NAME);
+                                    let name = signature
+                                        .get(0)
+                                        .and_then(|n| n.match_atom())
+                                        .unwrap_or(&DEFAULT_NAME);
                                     let params = match signature.len() {
-                                        1 => None,
+                                        0 | 1 => None,
                                         _ => match_pairs_list(&signature[1..]),
                                     };
-                                    self.traverse_define_private(
-                                        expr,
-                                        name,
-                                        params,
-                                        args.get(1).unwrap_or(&DEFAULT_EXPR),
-                                    );
-                                }
-                                _ => {
-                                    false;
-                                }
-                            }
-                            true
-                        }
-                        DefineFunctions::ReadOnlyFunction => {
-                            match args.get(0).unwrap_or(&DEFAULT_EXPR).match_list() {
-                                Some(signature) => {
-                                    let name = signature[0].match_atom().unwrap_or(&DEFAULT_NAME);
-                                    let params = match signature.len() {
-                                        1 => None,
-                                        _ => match_pairs_list(&signature[1..]),
-                                    };
-                                    self.traverse_define_read_only(
-                                        expr,
-                                        name,
-                                        params,
-                                        args.get(1).unwrap_or(&DEFAULT_EXPR),
-                                    )
-                                }
-                                _ => false,
-                            }
-                        }
-                        DefineFunctions::PublicFunction => {
-                            match args.get(0).unwrap_or(&DEFAULT_EXPR).match_list() {
-                                Some(signature) => {
-                                    let name = signature[0].match_atom().unwrap_or(&DEFAULT_NAME);
-                                    let params = match signature.len() {
-                                        1 => None,
-                                        _ => match_pairs_list(&signature[1..]),
-                                    };
-                                    self.traverse_define_public(
-                                        expr,
-                                        name,
-                                        params,
-                                        args.get(1).unwrap_or(&DEFAULT_EXPR),
-                                    )
+                                    let body = args.get(1).unwrap_or(&DEFAULT_EXPR);
+
+                                    match define_function {
+                                        DefineFunctions::PrivateFunction => {
+                                            self.traverse_define_private(expr, name, params, body)
+                                        }
+                                        DefineFunctions::ReadOnlyFunction => {
+                                            self.traverse_define_read_only(expr, name, params, body)
+                                        }
+                                        DefineFunctions::PublicFunction => {
+                                            self.traverse_define_public(expr, name, params, body)
+                                        }
+                                        _ => unreachable!(),
+                                    }
                                 }
                                 _ => false,
                             }
@@ -144,14 +118,17 @@ pub trait ASTVisitor<'a> {
                             args.get(1).unwrap_or(&DEFAULT_EXPR),
                             args.get(2).unwrap_or(&DEFAULT_EXPR),
                         ),
-                        DefineFunctions::Trait => self.traverse_define_trait(
-                            expr,
-                            args.get(0)
-                                .unwrap_or(&DEFAULT_EXPR)
-                                .match_atom()
-                                .unwrap_or(&DEFAULT_NAME),
-                            &args[1..],
-                        ),
+                        DefineFunctions::Trait => {
+                            let params = if args.len() >= 1 { &args[1..] } else { &[] };
+                            self.traverse_define_trait(
+                                expr,
+                                args.get(0)
+                                    .unwrap_or(&DEFAULT_EXPR)
+                                    .match_atom()
+                                    .unwrap_or(&DEFAULT_NAME),
+                                params,
+                            )
+                        }
                         DefineFunctions::UseTrait => self.traverse_use_trait(
                             expr,
                             args.get(0)
@@ -209,7 +186,8 @@ pub trait ASTVisitor<'a> {
                         Let => {
                             let bindings = match_pairs(args.get(0).unwrap_or(&DEFAULT_EXPR))
                                 .unwrap_or_default();
-                            self.traverse_let(expr, &bindings, &args[1..])
+                            let params = if args.len() >= 1 { &args[1..] } else { &[] };
+                            self.traverse_let(expr, &bindings, params)
                         }
                         ElementAt | ElementAtAlias => self.traverse_element_at(
                             expr,
@@ -227,7 +205,8 @@ pub trait ASTVisitor<'a> {
                                 .unwrap_or(&DEFAULT_EXPR)
                                 .match_atom()
                                 .unwrap_or(&DEFAULT_NAME);
-                            self.traverse_map(expr, name, &args[1..])
+                            let params = if args.len() >= 1 { &args[1..] } else { &[] };
+                            self.traverse_map(expr, name, params)
                         }
                         Fold => {
                             let name = args
@@ -388,6 +367,7 @@ pub trait ASTVisitor<'a> {
                                 .unwrap_or(&DEFAULT_EXPR)
                                 .match_atom()
                                 .unwrap_or(&DEFAULT_NAME);
+                            let params = if args.len() >= 2 { &args[2..] } else { &[] };
                             if let SymbolicExpressionType::LiteralValue(Value::Principal(
                                 PrincipalData::Contract(ref contract_identifier),
                             )) = args.get(0).unwrap_or(&DEFAULT_EXPR).expr
@@ -396,14 +376,14 @@ pub trait ASTVisitor<'a> {
                                     expr,
                                     contract_identifier,
                                     function_name,
-                                    &args[2..],
+                                    params,
                                 )
                             } else {
                                 self.traverse_dynamic_contract_call(
                                     expr,
                                     args.get(0).unwrap_or(&DEFAULT_EXPR),
                                     function_name,
-                                    &args[2..],
+                                    params,
                                 )
                             }
                         }

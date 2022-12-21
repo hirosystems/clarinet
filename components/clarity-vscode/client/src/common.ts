@@ -19,6 +19,9 @@ export const clientOpts: LanguageClientOptions = {
   traceOutputChannel: vscode.window.createOutputChannel(
     "Clarity Language Server Trace",
   ),
+  initializationOptions: JSON.stringify(
+    workspace.getConfiguration("clarity-lsp"),
+  ),
 };
 
 declare const __DEV_MODE__: boolean | undefined;
@@ -49,8 +52,28 @@ export async function initClient(
     ),
   );
 
-  workspace.onDidChangeConfiguration((e) => {
-    config = workspace.getConfiguration("clarity-lsp");
+  workspace.onDidChangeConfiguration(async () => {
+    let requireReload = false;
+    let newConfig = workspace.getConfiguration("clarity-lsp");
+    ["completion", "hover", "documentSymbols", "goToDefinition"].forEach(
+      (k) => {
+        if (newConfig[k] !== config[k]) requireReload = true;
+      },
+    );
+
+    config = newConfig;
+
+    if (requireReload) {
+      const userResponse = await vscode.window.showInformationMessage(
+        "Changing Clarity configuration requires to reload VSCode",
+        "Reload VSCode",
+      );
+
+      if (userResponse) {
+        const command = "workbench.action.reloadWindow";
+        await vscode.commands.executeCommand(command);
+      }
+    }
   });
 
   /* clariy lsp */

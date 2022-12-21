@@ -576,6 +576,15 @@ impl StacksChainEvent {
             _ => vec![],
         }
     }
+
+    pub fn new_block(&self) -> Option<&StacksBlockData> {
+        match self {
+            StacksChainEvent::ChainUpdatedWithBlocks(event) => {
+                event.new_blocks.first().and_then(|b| Some(&b.block))
+            }
+            _ => None,
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize)]

@@ -9,12 +9,14 @@ use bollard::exec::CreateExecOptions;
 use bollard::image::CreateImageOptions;
 use bollard::models::{HostConfig, PortBinding};
 use bollard::network::{ConnectNetworkOptions, CreateNetworkOptions, PruneNetworksOptions};
+use bollard::service::Ipam;
 use bollard::Docker;
 use chainhook_event_observer::utils::Context;
 use chainhook_types::StacksNetwork;
 use clarinet_files::{DevnetConfigFile, NetworkManifest, ProjectManifest, DEFAULT_DEVNET_BALANCE};
 use futures::stream::TryStreamExt;
 use hiro_system_kit::slog;
+use reqwest::RequestBuilder;
 use std::collections::HashMap;
 use std::fs::{self, File};
 use std::io::Write;
@@ -38,6 +40,29 @@ pub struct DevnetOrchestrator {
     subnet_node_container_id: Option<String>,
     subnet_api_container_id: Option<String>,
     docker_client: Option<Docker>,
+    services_map_hosts: Option<ServicesMapHosts>,
+}
+
+// pub enum DevnetServices {
+//     BitcoinNode,
+//     StacksNode,
+//     StacksApi,
+//     StacksExplorer,
+//     BitcoinExplorer,
+//     SubnetNode,
+//     SubnetApi,
+// }
+
+#[derive(Clone, Debug)]
+pub struct ServicesMapHosts {
+    pub bitcoin_node_host: String,
+    pub stacks_node_host: String,
+    pub stacks_api_host: String,
+    pub postgres_host: String,
+    pub stacks_explorer_host: String,
+    pub bitcoin_explorer_host: String,
+    pub subnet_node_host: String,
+    pub subnet_api_host: String,
 }
 
 impl DevnetOrchestrator {
@@ -73,13 +98,15 @@ impl DevnetOrchestrator {
         }
 
         let name = manifest.project.name.to_string();
-        let network_name = network_config
-            .devnet
-            .as_ref()
-            .and_then(|c| c.network_id)
-            .and_then(|network_id| Some(format!("{}-{}.devnet", name, network_id)))
-            .or_else(|| Some(format!("{}.devnet", name)))
-            .unwrap();
+        let mut network_name = name.clone();
+        if let Some(ref devnet) = network_config.devnet {
+            if let Some(ref network_id) = devnet.network_id {
+                network_name.push_str(&format!(".{}", network_id));
+            }
+            network_name.push_str(&format!(".{}", devnet.name));
+        } else {
+            network_name.push_str(".net");
+        }
 
         let docker_client = match network_config.devnet {
             Some(ref _devnet) => {
@@ -135,26 +162,11 @@ impl DevnetOrchestrator {
             postgres_container_id: None,
             subnet_node_container_id: None,
             subnet_api_container_id: None,
+            services_map_hosts: None,
         })
     }
 
-    #[allow(dead_code)]
-    pub fn get_stacks_node_url(&self) -> String {
-        match self.network_config {
-            Some(ref config) => match config.devnet {
-                Some(ref devnet) => format!("http://localhost:{}", devnet.stacks_node_rpc_port),
-                _ => unreachable!(),
-            },
-            _ => unreachable!(),
-        }
-    }
-
-    pub async fn start(
-        &mut self,
-        event_tx: Sender<DevnetEvent>,
-        terminator_rx: Receiver<bool>,
-        ctx: &Context,
-    ) -> Result<(), String> {
+    pub async fn prepare_network(&mut self) -> Result<ServicesMapHosts, String> {
         let (docker, devnet_config) = match (&self.docker_client, &self.network_config) {
             (Some(ref docker), Some(ref network_config)) => match network_config.devnet {
                 Some(ref devnet_config) => (docker, devnet_config),
@@ -164,7 +176,91 @@ impl DevnetOrchestrator {
         };
 
         // First, let's make sure that we pruned staled resources correctly
-        self.clean_previous_session().await?;
+        // self.clean_previous_session().await?;
+
+        let mut labels = HashMap::new();
+        labels.insert("project", self.network_name.as_str());
+
+        let mut options = HashMap::new();
+        options.insert("enable_ip_masquerade".into(), "true".into());
+        options.insert("enable_icc".into(), "true".into());
+
+        let network_id = docker
+            .create_network::<&str>(CreateNetworkOptions {
+                name: &self.network_name,
+                driver: "bridge",
+                ipam: Ipam {
+                    options: Some(options),
+                    ..Default::default()
+                },
+                labels,
+                ..Default::default()
+            })
+            .await
+            .map_err(|e| format!("unable to create network: {}", e.to_string()))?
+            .id
+            .ok_or("unable to retrieve network_id")?;
+
+        let res = docker
+            .inspect_network::<&str>(&network_id, None)
+            .await
+            .map_err(|e| format!("unable to retrieve network: {}", e.to_string()))?;
+
+        let gateway = res
+            .ipam
+            .as_ref()
+            .and_then(|ipam| ipam.config.as_ref())
+            .and_then(|config| config.first())
+            .and_then(|map| map.get("Gateway"))
+            .ok_or("unable to retrieve gateway")?;
+
+        let use_virtual_port_map = false;
+
+        let services_map_hosts = if use_virtual_port_map {
+            ServicesMapHosts {
+                bitcoin_node_host: format!("{}:{}", gateway, devnet_config.bitcoin_node_rpc_port),
+                stacks_node_host: format!("{}:{}", gateway, devnet_config.stacks_node_rpc_port),
+                postgres_host: format!("{}:{}", gateway, devnet_config.postgres_port),
+                stacks_api_host: format!("{}:{}", gateway, devnet_config.stacks_api_port),
+                stacks_explorer_host: format!("{}:{}", gateway, devnet_config.stacks_explorer_port),
+                bitcoin_explorer_host: format!(
+                    "{}:{}",
+                    gateway, devnet_config.bitcoin_explorer_port
+                ),
+                subnet_node_host: format!("{}:{}", gateway, devnet_config.subnet_node_rpc_port),
+                subnet_api_host: format!("{}:{}", gateway, devnet_config.subnet_api_port),
+            }
+        } else {
+            ServicesMapHosts {
+                bitcoin_node_host: format!("localhost:{}", devnet_config.bitcoin_node_rpc_port),
+                stacks_node_host: format!("localhost:{}", devnet_config.stacks_node_rpc_port),
+                postgres_host: format!("localhost:{}", devnet_config.postgres_port),
+                stacks_api_host: format!("localhost:{}", devnet_config.stacks_api_port),
+                stacks_explorer_host: format!("localhost:{}", devnet_config.stacks_explorer_port),
+                bitcoin_explorer_host: format!("localhost:{}", devnet_config.bitcoin_explorer_port),
+                subnet_node_host: format!("localhost:{}", devnet_config.subnet_node_rpc_port),
+                subnet_api_host: format!("localhost:{}", devnet_config.subnet_api_port),
+            }
+        };
+
+        self.services_map_hosts = Some(services_map_hosts.clone());
+
+        Ok(services_map_hosts)
+    }
+
+    pub async fn start(
+        &mut self,
+        event_tx: Sender<DevnetEvent>,
+        terminator_rx: Receiver<bool>,
+        ctx: &Context,
+    ) -> Result<(), String> {
+        let (_docker, devnet_config) = match (&self.docker_client, &self.network_config) {
+            (Some(ref docker), Some(ref network_config)) => match network_config.devnet {
+                Some(ref devnet_config) => (docker, devnet_config),
+                _ => return Err(format!("unable to get devnet config")),
+            },
+            _ => return Err(format!("unable to get devnet config")),
+        };
 
         let mut boot_index = 1;
 
@@ -261,18 +357,6 @@ impl DevnetOrchestrator {
             "Creating network {}",
             self.network_name
         )));
-        let mut labels = HashMap::new();
-        labels.insert("project".to_string(), self.network_name.to_string());
-
-        let _network = docker
-            .create_network(CreateNetworkOptions {
-                name: self.network_name.clone(),
-                driver: "bridge".to_string(),
-                labels,
-                ..Default::default()
-            })
-            .await
-            .map_err(|e| format!("unable to create network: {:?}", e))?;
 
         // Start bitcoind
         let _ = event_tx.send(DevnetEvent::info(format!("Starting bitcoin-node")));
@@ -298,7 +382,7 @@ impl DevnetOrchestrator {
         }));
         match self.boot_bitcoin_node_container().await {
             Ok(_) => {
-                self.initialize_bitcoin_node(&event_tx)?;
+                self.initialize_bitcoin_node(&event_tx).await?;
             }
             Err(message) => {
                 let _ = event_tx.send(DevnetEvent::FatalError(message.clone()));
@@ -695,15 +779,27 @@ rpcport={bitcoin_node_rpc_port}
             .map_err(|e| formatted_docker_error("unable to create bitcoind image", e))?;
 
         let config = self.prepare_bitcoin_node_config(1)?;
+        let container_name = format!("bitcoin-node.{}", self.network_name);
         let options = CreateContainerOptions {
-            name: format!("bitcoin-node.{}", self.network_name),
+            name: container_name.as_str(),
         };
 
-        let container = docker
-            .create_container::<String, String>(Some(options), config)
+        let container = match docker
+            .create_container::<&str, String>(Some(options.clone()), config.clone())
             .await
-            .map_err(|e| formatted_docker_error("unable to create bitcoind container", e))?
-            .id;
+            .map_err(|e| formatted_docker_error("unable to create bitcoind container", e))
+        {
+            Ok(container) => container.id,
+            Err(_e) => {
+                // Attempt to clean eventual subsequent artifacts
+                let _ = docker.kill_container::<String>(&container_name, None).await;
+                docker
+                    .create_container::<&str, String>(Some(options), config)
+                    .await
+                    .map_err(|e| formatted_docker_error("unable to create bitcoind container", e))?
+                    .id
+            }
+        };
         ctx.try_log(|logger| slog::info!(logger, "Created container bitcoin-node: {}", container));
         self.bitcoin_node_container_id = Some(container);
 
@@ -754,7 +850,7 @@ rpcport={bitcoin_node_rpc_port}
         Ok(())
     }
 
-    pub async fn boot_bitcoin_node_container(&self) -> Result<(), String> {
+    pub async fn boot_bitcoin_node_container(&mut self) -> Result<(), String> {
         let container = match &self.bitcoin_node_container_id {
             Some(container) => container.clone(),
             _ => return Err(format!("unable to boot container")),
@@ -771,10 +867,10 @@ rpcport={bitcoin_node_rpc_port}
             .map_err(|e| formatted_docker_error("unable to start bitcoind container", e))?;
 
         let res = docker
-            .connect_network(
+            .connect_network::<&str>(
                 &self.network_name,
                 ConnectNetworkOptions {
-                    container,
+                    container: &container,
                     ..Default::default()
                 },
             )
@@ -822,14 +918,23 @@ p2p_bind = "0.0.0.0:{stacks_node_p2p_port}"
 miner = true
 seed = "{miner_secret_key_hex}"
 local_peer_seed = "{miner_secret_key_hex}"
-wait_time_for_microblocks = 1000
+pox_sync_sample_secs = 0
 wait_time_for_blocks = 0
-pox_sync_sample_secs = 10
-microblock_frequency = 8000
+wait_time_for_microblocks = 50
+microblock_frequency = 1000
+
+[connection_options]
+# inv_sync_interval = 10
+# download_interval = 10
+# walk_interval = 10
+disable_block_download = true
+disable_inbound_handshakes = true
+disable_inbound_walks = true
+public_ip_address = "1.1.1.1:1234"
 
 [miner]
 first_attempt_time_ms = 5000
-subsequent_attempt_time_ms = 2000
+subsequent_attempt_time_ms = 5000
 # microblock_attempt_time_ms = 15000
 "#,
             stacks_node_rpc_port = devnet_config.stacks_node_rpc_port,
@@ -895,7 +1000,10 @@ events_keys = ["*"]
 chain = "bitcoin"
 mode = "krypton"
 poll_time_secs = 1
+timeout = 30
 peer_host = "host.docker.internal"
+rpc_ssl = false
+wallet_name = "devnet"
 username = "{bitcoin_node_username}"
 password = "{bitcoin_node_password}"
 rpc_port = {orchestrator_ingestion_port}
@@ -1048,7 +1156,7 @@ start_height = {epoch_2_1}
         Ok(())
     }
 
-    pub async fn boot_stacks_node_container(&self) -> Result<(), String> {
+    pub async fn boot_stacks_node_container(&mut self) -> Result<(), String> {
         let container = match &self.stacks_node_container_id {
             Some(container) => container.clone(),
             _ => return Err(format!("unable to boot container")),
@@ -1065,10 +1173,10 @@ start_height = {epoch_2_1}
             .map_err(|e| formatted_docker_error("unable to start stacks-node container", e))?;
 
         let res = docker
-            .connect_network(
+            .connect_network::<&str>(
                 &self.network_name,
                 ConnectNetworkOptions {
-                    container,
+                    container: &&container,
                     ..Default::default()
                 },
             )
@@ -2258,8 +2366,11 @@ events_keys = ["*"]
             let _ = docker.remove_container(subnet_api_container_id, None);
         }
 
-        // Prune network
+        // Delete network
+        let _ = docker.remove_network(&self.network_name).await;
+
         ctx.try_log(|logger| slog::info!(logger, "Pruning network and containers"));
+
         self.prune().await;
         if let Some(ref tx) = self.termination_success_tx {
             let _ = tx.send(true);
@@ -2302,12 +2413,11 @@ events_keys = ["*"]
             .await;
     }
 
-    pub fn initialize_bitcoin_node(
+    pub async fn initialize_bitcoin_node(
         &self,
         devnet_event_tx: &Sender<DevnetEvent>,
     ) -> Result<(), String> {
         use bitcoincore_rpc::bitcoin::Address;
-        use bitcoincore_rpc::{Auth, Client, RpcApi};
         use std::str::FromStr;
 
         let (devnet_config, accounts) = match &self.network_config {
@@ -2318,21 +2428,49 @@ events_keys = ["*"]
             _ => return Err(format!("unable to initialize bitcoin node")),
         };
 
-        let rpc = Client::new(
-            &format!("http://localhost:{}/", devnet_config.bitcoin_node_rpc_port),
-            Auth::UserPass(
-                devnet_config.bitcoin_node_username.to_string(),
-                devnet_config.bitcoin_node_password.to_string(),
-            ),
-        )
-        .map_err(|e| format!("unable to create RPC client: {:?}", e))?;
+        use reqwest::Client as HttpClient;
+        use serde_json::json;
+
+        let bitcoin_node_url = format!(
+            "http://{}/",
+            self.services_map_hosts.as_ref().unwrap().bitcoin_node_host
+        );
+
+        fn base_builder(node_url: &str, username: &str, password: &str) -> RequestBuilder {
+            let http_client = HttpClient::builder()
+                .build()
+                .expect("Unable to build http client");
+            http_client
+                .post(node_url.clone())
+                .basic_auth(&username, Some(&password))
+                .header("Content-Type", "application/json")
+                .header("Host", &node_url[7..])
+        }
 
         let _ = devnet_event_tx.send(DevnetEvent::info(format!("Configuring bitcoin-node",)));
 
         loop {
-            match rpc.get_network_info() {
+            let network_info = base_builder(
+                &bitcoin_node_url,
+                &devnet_config.bitcoin_node_username,
+                &devnet_config.bitcoin_node_password,
+            )
+            .json(&json!({
+                "jsonrpc": "1.0",
+                "id": "stacks-network",
+                "method": "getnetworkinfo",
+                "params": []
+            }))
+            .send()
+            .await
+            .map_err(|e| format!("unable to send request ({})", e));
+
+            match network_info {
                 Ok(_r) => break,
-                Err(_e) => {}
+                Err(_e) => {
+                    let _ = devnet_event_tx
+                        .send(DevnetEvent::info(format!("Error ({})", _e.to_string())));
+                }
             }
             std::thread::sleep(std::time::Duration::from_secs(1));
             let _ = devnet_event_tx.send(DevnetEvent::info(format!("Waiting for bitcoin-node",)));
@@ -2344,17 +2482,101 @@ events_keys = ["*"]
         let faucet_address = Address::from_str(&devnet_config.faucet_btc_address)
             .map_err(|e| format!("unable to create faucet address: {:?}", e))?;
 
-        let _ = rpc.generate_to_address(3, &miner_address);
-        let _ = rpc.generate_to_address(97, &faucet_address);
-        let _ = rpc.generate_to_address(1, &miner_address);
-        let _ = rpc.create_wallet("", None, None, None, None);
-        let _ = rpc.import_address(&miner_address, None, None);
-        let _ = rpc.import_address(&faucet_address, None, None);
+        let _ = base_builder(
+            &bitcoin_node_url,
+            &devnet_config.bitcoin_node_username,
+            &devnet_config.bitcoin_node_password,
+        )
+        .json(&json!({
+            "jsonrpc": "1.0",
+            "id": "stacks-network",
+            "method": "generatetoaddress",
+            "params": [json!(3), json!(miner_address)]
+        }))
+        .send()
+        .await;
+        let _ = base_builder(
+            &bitcoin_node_url,
+            &devnet_config.bitcoin_node_username,
+            &devnet_config.bitcoin_node_password,
+        )
+        .json(&json!({
+            "jsonrpc": "1.0",
+            "id": "stacks-network",
+            "method": "generatetoaddress",
+            "params": [json!(97), json!(faucet_address)]
+        }))
+        .send()
+        .await;
+        let _ = base_builder(
+            &bitcoin_node_url,
+            &devnet_config.bitcoin_node_username,
+            &devnet_config.bitcoin_node_password,
+        )
+        .json(&json!({
+            "jsonrpc": "1.0",
+            "id": "stacks-network",
+            "method": "generatetoaddress",
+            "params": [json!(1), json!(miner_address)]
+        }))
+        .send()
+        .await;
+        let _ = base_builder(
+            &bitcoin_node_url,
+            &devnet_config.bitcoin_node_username,
+            &devnet_config.bitcoin_node_password,
+        )
+        .json(&json!({
+            "jsonrpc": "1.0",
+            "id": "stacks-network",
+            "method": "createwallet",
+            "params": [json!("")]
+        }))
+        .send()
+        .await;
+        let _ = base_builder(
+            &bitcoin_node_url,
+            &devnet_config.bitcoin_node_username,
+            &devnet_config.bitcoin_node_password,
+        )
+        .json(&json!({
+            "jsonrpc": "1.0",
+            "id": "stacks-network",
+            "method": "importaddress",
+            "params": [json!(miner_address)]
+        }))
+        .send()
+        .await;
+        let _ = base_builder(
+            &bitcoin_node_url,
+            &devnet_config.bitcoin_node_username,
+            &devnet_config.bitcoin_node_password,
+        )
+        .json(&json!({
+            "jsonrpc": "1.0",
+            "id": "stacks-network",
+            "method": "importaddress",
+            "params": [json!(faucet_address)]
+        }))
+        .send()
+        .await;
         // Index devnet's wallets by default
         for (_, account) in accounts.iter() {
             let address = Address::from_str(&account.btc_address)
                 .map_err(|e| format!("unable to create address: {:?}", e))?;
-            let _ = rpc.import_address(&address, None, None);
+            let _ = base_builder(
+                &bitcoin_node_url,
+                &devnet_config.bitcoin_node_username,
+                &devnet_config.bitcoin_node_password,
+            )
+            .json(&json!({
+                "jsonrpc": "1.0",
+                "id": "stacks-network",
+                "method": "importaddress",
+                "params": [json!(address)]
+            }))
+            .send()
+            .await;
         }
         Ok(())
     }
