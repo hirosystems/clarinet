@@ -963,8 +963,7 @@ impl Session {
         let accounts = self.interpreter.get_accounts();
         if accounts.len() > 0 {
             let tokens = self.interpreter.get_tokens();
-            let mut headers = vec!["Address".to_string()];
-            headers.append(&mut tokens.clone());
+            let headers = vec!["Address".to_string(), "uSTX".to_string()];
             let mut headers_cells = vec![];
             for header in headers.iter() {
                 headers_cells.push(Cell::new(&header));
