@@ -3,7 +3,6 @@ use super::DevnetEvent;
 use crate::orchestrator::ServicesMapHosts;
 use crate::{ServiceStatusData, Status};
 use base58::FromBase58;
-use bitcoincore_rpc::{Auth, Client, RpcApi};
 use chainhook_event_observer::chainhooks::types::ChainhookConfig;
 use chainhook_event_observer::utils::Context;
 use clarinet_deployments::onchain::TransactionStatus;
@@ -202,7 +201,9 @@ pub async fn start_chains_coordinator(
     let devnet_event_tx_moved = devnet_event_tx.clone();
     let devnet_config = config.clone();
     let _ = hiro_system_kit::thread_named("Bitcoin mining").spawn(move || {
-        handle_bitcoin_mining(mining_command_rx, &devnet_config, &devnet_event_tx_moved);
+        let future =
+            handle_bitcoin_mining(mining_command_rx, &devnet_config, &devnet_event_tx_moved);
+        let _ = hiro_system_kit::nestable_block_on(future);
     });
 
     // Loop over events being received from Bitcoin and Stacks,
@@ -398,7 +399,8 @@ pub async fn start_chains_coordinator(
                         config.devnet_config.bitcoin_node_username.as_str(),
                         &config.devnet_config.bitcoin_node_password.as_str(),
                         &config.devnet_config.miner_btc_address.as_str(),
-                    );
+                    )
+                    .await;
                     if let Err(e) = res {
                         let _ = devnet_event_tx.send(DevnetEvent::error(e));
                     }
@@ -614,48 +616,48 @@ pub async fn publish_stacking_orders(
 }
 
 pub fn invalidate_bitcoin_chain_tip(
-    bitcoin_node_host: &str,
-    bitcoin_node_username: &str,
-    bitcoin_node_password: &str,
+    _bitcoin_node_host: &str,
+    _bitcoin_node_username: &str,
+    _bitcoin_node_password: &str,
 ) {
-    let rpc = Client::new(
-        &format!("http://{}", bitcoin_node_host),
-        Auth::UserPass(
-            bitcoin_node_username.to_string(),
-            bitcoin_node_password.to_string(),
-        ),
-    )
-    .unwrap();
-
-    let chain_tip = rpc.get_best_block_hash().expect("Unable to get chain tip");
-    let _ = rpc
-        .invalidate_block(&chain_tip)
-        .expect("Unable to invalidate chain tip");
+    unimplemented!()
 }
 
-pub fn mine_bitcoin_block(
+pub async fn mine_bitcoin_block(
     bitcoin_node_host: &str,
     bitcoin_node_username: &str,
     bitcoin_node_password: &str,
     miner_btc_address: &str,
 ) -> Result<(), String> {
     use bitcoincore_rpc::bitcoin::Address;
+    use reqwest::Client as HttpClient;
+    use serde_json::json;
     use std::str::FromStr;
-    let rpc = Client::new(
-        &format!("http://{}", bitcoin_node_host),
-        Auth::UserPass(
-            bitcoin_node_username.to_string(),
-            bitcoin_node_password.to_string(),
-        ),
-    )
-    .map_err(|e| format!("unable to initialize bitcoin rpc client: {}", e.to_string()))?;
+
     let miner_address = Address::from_str(miner_btc_address).unwrap();
-    rpc.generate_to_address(1, &miner_address)
-        .map_err(|e| format!("unable to generate bitcoin block: {}", e.to_string()))?;
+    let _ = HttpClient::builder()
+        .build()
+        .expect("Unable to build http client")
+        .post(format!("http://{}", bitcoin_node_host))
+        .basic_auth(bitcoin_node_username, Some(bitcoin_node_password))
+        .header("Content-Type", "application/json")
+        .header("Host", bitcoin_node_host)
+        .json(&serde_json::json!({
+            "jsonrpc": "1.0",
+            "id": "stacks-network",
+            "method": "generatetoaddress",
+            "params": [json!(1), json!(miner_address)]
+        }))
+        .send()
+        .await
+        .map_err(|e| format!("unable to send request ({})", e))?
+        .json::<bitcoincore_rpc::jsonrpc::Response>()
+        .await
+        .map_err(|e| format!("unable to generate bitcoin block: ({})", e.to_string()))?;
     Ok(())
 }
 
-fn handle_bitcoin_mining(
+async fn handle_bitcoin_mining(
     mining_command_rx: Receiver<BitcoinMiningCommand>,
     config: &DevnetEventObserverConfig,
     devnet_event_tx: &Sender<DevnetEvent>,
@@ -683,12 +685,13 @@ fn handle_bitcoin_mining(
                                 .bitcoin_controller_block_time
                                 .into(),
                         ));
-                        let res = mine_bitcoin_block(
+                        let future = mine_bitcoin_block(
                             &config_moved.services_map_hosts.bitcoin_node_host,
                             &config_moved.devnet_config.bitcoin_node_username,
                             &config_moved.devnet_config.bitcoin_node_password,
                             &config_moved.devnet_config.miner_btc_address,
                         );
+                        let res = hiro_system_kit::nestable_block_on(future);
                         if let Err(e) = res {
                             let _ = devnet_event_tx_moved.send(DevnetEvent::error(e));
                         }
@@ -706,7 +709,8 @@ fn handle_bitcoin_mining(
                     config.devnet_config.bitcoin_node_username.as_str(),
                     &config.devnet_config.bitcoin_node_password.as_str(),
                     &config.devnet_config.miner_btc_address.as_str(),
-                );
+                )
+                .await;
                 if let Err(e) = res {
                     let _ = devnet_event_tx.send(DevnetEvent::error(e));
                 }
