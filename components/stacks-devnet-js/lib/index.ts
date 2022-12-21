@@ -14,8 +14,13 @@ const {
 } = require("../native/index.node");
 import {
   BitcoinChainUpdate,
+  Block,
   StacksBlockMetadata,
+  StacksBlockUpdate,
   StacksChainUpdate,
+  StacksTransaction,
+  StacksTransactionMetadata,
+  Transaction,
 } from "@hirosystems/chainhook-types";
 export * from "@hirosystems/chainhook-types";
 
@@ -606,6 +611,25 @@ export class DevnetNetworkOrchestrator {
         throw e
       });
   }
+
+
+  /**
+   * @summary Wait for the next Bitcoin block
+   * @memberof DevnetNetworkOrchestrator
+   */
+  async waitForStacksBlockIncludingTransaction(txid: string): Promise<{ chainUpdate: StacksChainUpdate, transaction: Transaction }> {
+    while (true) {
+      let chainUpdate = await this.waitForNextStacksBlock();
+      for (const transaction of chainUpdate.new_blocks[0].block.transactions) {
+        if (transaction.transaction_identifier.hash.endsWith(txid)) {
+          return {
+            chainUpdate,
+            transaction,
+          };
+        }
+      }
+    }
+  };
 
   /**
    * @summary Terminates the containers
