@@ -703,13 +703,13 @@ impl Session {
     pub fn lookup_functions_or_keywords_docs(&self, exp: &str) -> Option<&String> {
         if let Some(function_doc) = self.api_reference.get(exp) {
             return Some(function_doc);
-        } else {
-            if let Some(keyword_doc) = self.keywords_reference.get(exp) {
-                return Some(keyword_doc);
-            } else {
-                return None;
-            }
         }
+
+        if let Some(keyword_doc) = self.keywords_reference.get(exp) {
+            return Some(keyword_doc);
+        }
+
+        None
     }
 
     pub fn get_api_reference_index(&self) -> Vec<String> {
