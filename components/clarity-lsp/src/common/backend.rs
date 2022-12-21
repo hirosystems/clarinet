@@ -295,90 +295,81 @@ pub fn process_request(command: LspRequest, editor_state: &EditorStateInput) -> 
 
         LspRequest::Completion(params) => {
             let file_url = params.text_document_position.text_document.uri;
+            let position = params.text_document_position.position;
+
             let contract_location = match get_contract_location(&file_url) {
                 Some(contract_location) => contract_location,
                 None => return LspRequestResponse::CompletionItems(vec![]),
             };
-            let mut completion_items_src = match editor_state
-                .try_read(|es| es.get_completion_items_for_contract(&contract_location))
+            let (mut completion_items_src, should_wrap) = match editor_state
+                .try_read(|es| es.get_completion_items_for_contract(&contract_location, &position))
             {
                 Ok(result) => result,
                 Err(_) => return LspRequestResponse::CompletionItems(vec![]),
             };
 
             let mut completion_items = vec![];
-            // Little big detail: should we wrap the inserted_text with braces?
-            let should_wrap = {
-                // let line = params.text_document_position.position.line;
-                // let char = params.text_document_position.position.character;
-                // let doc = params.text_document_position.text_document.uri;
-                //
-                // TODO(lgalabru): from there, we'd need to get the prior char
-                // and see if a parenthesis was opened. If not, we need to wrap.
-                // The LSP would need to update its local document cache, via
-                // the did_change method.
-                true
-            };
 
-            if should_wrap {
-                for mut item in completion_items_src.drain(..) {
-                    match item.kind {
-                        CompletionItemKind::Event
-                        | CompletionItemKind::Function
-                        | CompletionItemKind::Module
-                        | CompletionItemKind::Class => {
-                            item.insert_text =
-                                Some(format!("({})", item.insert_text.take().unwrap()));
-                        }
-                        _ => {}
+            for mut item in completion_items_src.drain(..) {
+                match item.kind {
+                    CompletionItemKind::Event
+                    | CompletionItemKind::Function
+                    | CompletionItemKind::Module
+                    | CompletionItemKind::Class => {
+                        item.insert_text = if should_wrap {
+                            Some(format!("({})", item.insert_text.take().unwrap()))
+                        } else {
+                            Some(item.insert_text.take().unwrap())
+                        };
                     }
-
-                    let kind = match item.kind {
-                        CompletionItemKind::Class => lsp_types::CompletionItemKind::CLASS,
-                        CompletionItemKind::Event => lsp_types::CompletionItemKind::EVENT,
-                        CompletionItemKind::Field => lsp_types::CompletionItemKind::FIELD,
-                        CompletionItemKind::Function => lsp_types::CompletionItemKind::FUNCTION,
-                        CompletionItemKind::Module => lsp_types::CompletionItemKind::MODULE,
-                        CompletionItemKind::TypeParameter => {
-                            lsp_types::CompletionItemKind::TYPE_PARAMETER
-                        }
-                    };
-
-                    let insert_text_format = match item.insert_text_format {
-                        InsertTextFormat::PlainText => lsp_types::InsertTextFormat::PLAIN_TEXT,
-                        InsertTextFormat::Snippet => lsp_types::InsertTextFormat::SNIPPET,
-                    };
-
-                    let completion_item = CompletionItem {
-                        label: item.label.clone(),
-                        kind: Some(kind),
-                        detail: item.detail.take(),
-                        documentation: item.markdown_documentation.take().and_then(|doc| {
-                            Some(Documentation::MarkupContent(MarkupContent {
-                                kind: MarkupKind::Markdown,
-                                value: doc,
-                            }))
-                        }),
-                        deprecated: None,
-                        preselect: None,
-                        sort_text: None,
-                        filter_text: None,
-                        insert_text: item.insert_text.take(),
-                        insert_text_format: Some(insert_text_format),
-                        insert_text_mode: None,
-                        text_edit: None,
-                        additional_text_edits: None,
-                        command: Some(lsp_types::Command {
-                            title: "triggerParameterHints".into(),
-                            command: "editor.action.triggerParameterHints".into(),
-                            arguments: None,
-                        }),
-                        commit_characters: None,
-                        data: None,
-                        tags: None,
-                    };
-                    completion_items.push(completion_item);
+                    _ => {}
                 }
+
+                let kind = match item.kind {
+                    CompletionItemKind::Class => lsp_types::CompletionItemKind::CLASS,
+                    CompletionItemKind::Event => lsp_types::CompletionItemKind::EVENT,
+                    CompletionItemKind::Field => lsp_types::CompletionItemKind::FIELD,
+                    CompletionItemKind::Function => lsp_types::CompletionItemKind::FUNCTION,
+                    CompletionItemKind::Module => lsp_types::CompletionItemKind::MODULE,
+                    CompletionItemKind::TypeParameter => {
+                        lsp_types::CompletionItemKind::TYPE_PARAMETER
+                    }
+                };
+
+                let insert_text_format = match item.insert_text_format {
+                    InsertTextFormat::PlainText => lsp_types::InsertTextFormat::PLAIN_TEXT,
+                    InsertTextFormat::Snippet => lsp_types::InsertTextFormat::SNIPPET,
+                };
+
+                let completion_item = CompletionItem {
+                    label: item.label.clone(),
+                    kind: Some(kind),
+                    detail: item.detail.take(),
+                    documentation: item.markdown_documentation.take().and_then(|doc| {
+                        Some(Documentation::MarkupContent(MarkupContent {
+                            kind: MarkupKind::Markdown,
+                            value: doc,
+                        }))
+                    }),
+                    deprecated: None,
+                    preselect: None,
+                    sort_text: None,
+                    filter_text: None,
+                    insert_text: item.insert_text.take(),
+                    insert_text_format: Some(insert_text_format),
+                    insert_text_mode: None,
+                    text_edit: None,
+                    additional_text_edits: None,
+                    command: Some(lsp_types::Command {
+                        title: "triggerParameterHints".into(),
+                        command: "editor.action.triggerParameterHints".into(),
+                        arguments: None,
+                    }),
+                    commit_characters: None,
+                    data: None,
+                    tags: None,
+                };
+                completion_items.push(completion_item);
             }
 
             LspRequestResponse::CompletionItems(completion_items)

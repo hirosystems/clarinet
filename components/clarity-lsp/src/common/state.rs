@@ -1,5 +1,6 @@
+use crate::common::requests::completion::check_if_should_wrap;
 use crate::types::{CompletionItem, CompletionMaps};
-use crate::utils;
+use crate::utils::{self};
 use chainhook_types::StacksNetwork;
 use clarinet_deployments::{
     generate_default_deployment, initiate_session_from_deployment,
@@ -290,8 +291,26 @@ impl EditorState {
     pub fn get_completion_items_for_contract(
         &self,
         contract_location: &FileLocation,
-    ) -> Vec<CompletionItem> {
+        position: &Position,
+    ) -> (Vec<CompletionItem>, bool) {
         let mut keywords = self.native_functions.clone();
+
+        let should_wrap = match self.active_contracts.get(contract_location) {
+            Some(active_contract) => {
+                if let Some(line) = active_contract
+                    .source
+                    .lines()
+                    .collect::<Vec<&str>>()
+                    .get(position.line as usize)
+                {
+                    let mut chars = line.chars();
+                    check_if_should_wrap(&mut chars, (position.character - 1) as usize)
+                } else {
+                    true
+                }
+            }
+            None => true,
+        };
 
         let mut user_defined_keywords = self
             .contracts_lookup
@@ -301,7 +320,7 @@ impl EditorState {
             .unwrap_or_default();
 
         keywords.append(&mut user_defined_keywords);
-        keywords
+        (keywords, should_wrap)
     }
 
     pub fn get_document_symbols_for_contract(
