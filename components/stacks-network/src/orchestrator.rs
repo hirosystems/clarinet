@@ -167,16 +167,20 @@ impl DevnetOrchestrator {
         let mut options = HashMap::new();
         options.insert("enable_ip_masquerade".into(), "true".into());
         options.insert("enable_icc".into(), "true".into());
+        options.insert("host_binding_ipv4".into(), "0.0.0.0".into());
+        options.insert("com.docker.network.bridge.enable_icc".into(), "true".into());
+        options.insert("com.docker.network.bridge.enable_ip_masquerade".into(), "true".into());
+        options.insert("com.docker.network.bridge.host_binding_ipv4".into(), "0.0.0.0".into());
 
         let network_id = docker
             .create_network::<&str>(CreateNetworkOptions {
                 name: &self.network_name,
                 driver: "bridge",
                 ipam: Ipam {
-                    options: Some(options),
                     ..Default::default()
                 },
                 labels,
+                options: options,
                 ..Default::default()
             })
             .await
@@ -722,14 +726,16 @@ rpcport={bitcoin_node_rpc_port}
         let config = Config {
             labels: Some(labels),
             image: Some(devnet_config.bitcoin_node_image_url.clone()),
-            domainname: Some(self.network_name.to_string()),
+            // domainname: Some(self.network_name.to_string()),
             tty: None,
             exposed_ports: Some(exposed_ports),
             entrypoint: Some(vec![]),
             env: Some(env),
             host_config: Some(HostConfig {
-                port_bindings: Some(port_bindings),
+                auto_remove: Some(true),
                 binds: Some(binds),
+                network_mode: Some(self.network_name.clone()),
+                port_bindings: Some(port_bindings),
                 extra_hosts: Some(vec!["host.docker.internal:host-gateway".into()]),
                 ..Default::default()
             }),
@@ -848,21 +854,6 @@ rpcport={bitcoin_node_rpc_port}
             .start_container::<String>(&container, None)
             .await
             .map_err(|e| formatted_docker_error("unable to start bitcoind container", e))?;
-
-        let res = docker
-            .connect_network::<&str>(
-                &self.network_name,
-                ConnectNetworkOptions {
-                    container: &container,
-                    ..Default::default()
-                },
-            )
-            .await;
-
-        if let Err(e) = res {
-            let err = format!("Error connecting container: {}", e);
-            return Err(err);
-        }
 
         Ok(())
     }
@@ -1074,7 +1065,7 @@ start_height = {epoch_2_1}
         let config = Config {
             labels: Some(labels),
             image: Some(devnet_config.stacks_node_image_url.clone()),
-            domainname: Some(self.network_name.to_string()),
+            // domainname: Some(self.network_name.to_string()),
             tty: None,
             exposed_ports: Some(exposed_ports),
             entrypoint: Some(vec![
@@ -1084,8 +1075,10 @@ start_height = {epoch_2_1}
             ]),
             env: Some(env),
             host_config: Some(HostConfig {
-                port_bindings: Some(port_bindings),
+                auto_remove: Some(true),
                 binds: Some(binds),
+                network_mode: Some(self.network_name.clone()),
+                port_bindings: Some(port_bindings),
                 extra_hosts: Some(vec!["host.docker.internal:host-gateway".into()]),
                 ..Default::default()
             }),
@@ -1154,21 +1147,6 @@ start_height = {epoch_2_1}
             .start_container::<String>(&container, None)
             .await
             .map_err(|e| formatted_docker_error("unable to start stacks-node container", e))?;
-
-        let res = docker
-            .connect_network::<&str>(
-                &self.network_name,
-                ConnectNetworkOptions {
-                    container: &&container,
-                    ..Default::default()
-                },
-            )
-            .await;
-
-        if let Err(e) = res {
-            let err = format!("Error connecting container: {}", e);
-            return Err(err);
-        }
 
         Ok(())
     }
@@ -1352,7 +1330,7 @@ events_keys = ["*"]
         let config = Config {
             labels: Some(labels),
             image: Some(devnet_config.subnet_node_image_url.clone()),
-            domainname: Some(self.network_name.to_string()),
+            // domainname: Some(self.network_name.to_string()),
             tty: None,
             exposed_ports: Some(exposed_ports),
             entrypoint: Some(vec![
@@ -1366,8 +1344,10 @@ events_keys = ["*"]
                 // "BLOCKSTACK_USE_TEST_GENESIS_CHAINSTATE=1".to_string(),
             ]),
             host_config: Some(HostConfig {
-                port_bindings: Some(port_bindings),
+                auto_remove: Some(true),
                 binds: Some(binds),
+                network_mode: Some(self.network_name.clone()),
+                port_bindings: Some(port_bindings),
                 extra_hosts: Some(vec!["host.docker.internal:host-gateway".into()]),
                 ..Default::default()
             }),
@@ -1436,21 +1416,6 @@ events_keys = ["*"]
             .start_container::<String>(&container, None)
             .await
             .map_err(|e| format!("unable to start container - {}", e))?;
-
-        let res = docker
-            .connect_network(
-                &self.network_name,
-                ConnectNetworkOptions {
-                    container,
-                    ..Default::default()
-                },
-            )
-            .await;
-
-        if let Err(e) = res {
-            let err = format!("Error connecting container: {}", e);
-            return Err(err);
-        }
 
         Ok(())
     }
@@ -1527,11 +1492,13 @@ events_keys = ["*"]
         let config = Config {
             labels: Some(labels),
             image: Some(devnet_config.stacks_api_image_url.clone()),
-            domainname: Some(self.network_name.to_string()),
+            // domainname: Some(self.network_name.to_string()),
             tty: None,
             exposed_ports: Some(exposed_ports),
             env: Some(env),
             host_config: Some(HostConfig {
+                auto_remove: Some(true),
+                network_mode: Some(self.network_name.clone()),
                 port_bindings: Some(port_bindings),
                 extra_hosts: Some(vec!["host.docker.internal:host-gateway".into()]),
                 ..Default::default()
@@ -1570,21 +1537,6 @@ events_keys = ["*"]
             .start_container::<String>(&container, None)
             .await
             .map_err(|e| formatted_docker_error("unable to start stacks-api container", e))?;
-
-        let res = docker
-            .connect_network(
-                &self.network_name,
-                ConnectNetworkOptions {
-                    container,
-                    ..Default::default()
-                },
-            )
-            .await;
-
-        if let Err(e) = res {
-            let err = format!("Error connecting container: {}", e);
-            return Err(err);
-        }
 
         Ok(())
     }
@@ -1632,7 +1584,7 @@ events_keys = ["*"]
         let config = Config {
             labels: Some(labels),
             image: Some(devnet_config.subnet_api_image_url.clone()),
-            domainname: Some(self.network_name.to_string()),
+            // domainname: Some(self.network_name.to_string()),
             tty: None,
             exposed_ports: Some(exposed_ports),
             env: Some(vec![
@@ -1663,6 +1615,8 @@ events_keys = ["*"]
                 "NODE_ENV=development".to_string(),
             ]),
             host_config: Some(HostConfig {
+                auto_remove: Some(true),
+                network_mode: Some(self.network_name.clone()),
                 port_bindings: Some(port_bindings),
                 extra_hosts: Some(vec!["host.docker.internal:host-gateway".into()]),
                 ..Default::default()
@@ -1738,21 +1692,6 @@ events_keys = ["*"]
             .await
             .map_err(|e| formatted_docker_error("unable to start stacks-api container", e))?;
 
-        let res = docker
-            .connect_network(
-                &self.network_name,
-                ConnectNetworkOptions {
-                    container,
-                    ..Default::default()
-                },
-            )
-            .await;
-
-        if let Err(e) = res {
-            let err = format!("Error connecting container: {}", e);
-            return Err(err);
-        }
-
         Ok(())
     }
 
@@ -1795,7 +1734,7 @@ events_keys = ["*"]
         let config = Config {
             labels: Some(labels),
             image: Some(devnet_config.postgres_image_url.clone()),
-            domainname: Some(self.network_name.to_string()),
+            // domainname: Some(self.network_name.to_string()),
             tty: None,
             exposed_ports: Some(exposed_ports),
             env: Some(vec![
@@ -1803,6 +1742,8 @@ events_keys = ["*"]
                 format!("POSTGRES_DB={}", devnet_config.stacks_api_postgres_database),
             ]),
             host_config: Some(HostConfig {
+                auto_remove: Some(true),
+                network_mode: Some(self.network_name.clone()),
                 port_bindings: Some(port_bindings),
                 extra_hosts: Some(vec!["host.docker.internal:host-gateway".into()]),
                 ..Default::default()
@@ -1841,21 +1782,6 @@ events_keys = ["*"]
             .start_container::<String>(&container, None)
             .await
             .map_err(|e| formatted_docker_error("unable to start postgres container", e))?;
-
-        let res = docker
-            .connect_network(
-                &self.network_name,
-                ConnectNetworkOptions {
-                    container,
-                    ..Default::default()
-                },
-            )
-            .await;
-
-        if let Err(e) = res {
-            let err = format!("Error connecting container: {}", e);
-            return Err(err);
-        }
 
         Ok(())
     }
@@ -1918,11 +1844,13 @@ events_keys = ["*"]
         let config = Config {
             labels: Some(labels),
             image: Some(devnet_config.stacks_explorer_image_url.clone()),
-            domainname: Some(self.network_name.to_string()),
+            // domainname: Some(self.network_name.to_string()),
             tty: None,
             exposed_ports: Some(exposed_ports),
             env: Some(env),
             host_config: Some(HostConfig {
+                auto_remove: Some(true),
+                network_mode: Some(self.network_name.clone()),
                 port_bindings: Some(port_bindings),
                 extra_hosts: Some(vec!["host.docker.internal:host-gateway".into()]),
                 ..Default::default()
@@ -1963,21 +1891,6 @@ events_keys = ["*"]
             .start_container::<String>(&container, None)
             .await
             .map_err(|e| format!("unable to create container: {}", e))?;
-
-        let res = docker
-            .connect_network(
-                &self.network_name,
-                ConnectNetworkOptions {
-                    container,
-                    ..Default::default()
-                },
-            )
-            .await;
-
-        if let Err(e) = res {
-            let err = format!("Error connecting container: {}", e);
-            return Err(err);
-        }
 
         Ok(())
     }
@@ -2028,7 +1941,7 @@ events_keys = ["*"]
         let config = Config {
             labels: Some(labels),
             image: Some(devnet_config.bitcoin_explorer_image_url.clone()),
-            domainname: Some(self.network_name.to_string()),
+            // domainname: Some(self.network_name.to_string()),
             tty: None,
             exposed_ports: Some(exposed_ports),
             env: Some(vec![
@@ -2054,6 +1967,8 @@ events_keys = ["*"]
                 format!("BTCEXP_RPC_ALLOWALL=true",),
             ]),
             host_config: Some(HostConfig {
+                auto_remove: Some(true),
+                network_mode: Some(self.network_name.clone()),
                 port_bindings: Some(port_bindings),
                 extra_hosts: Some(vec!["host.docker.internal:host-gateway".into()]),
                 ..Default::default()
@@ -2094,21 +2009,6 @@ events_keys = ["*"]
             .start_container::<String>(&container, None)
             .await
             .map_err(|e| format!("unable to create container: {}", e))?;
-
-        let res = docker
-            .connect_network(
-                &self.network_name,
-                ConnectNetworkOptions {
-                    container,
-                    ..Default::default()
-                },
-            )
-            .await;
-
-        if let Err(e) = res {
-            let err = format!("Error connecting container: {}", e);
-            return Err(err);
-        }
 
         Ok(())
     }
@@ -2234,15 +2134,6 @@ events_keys = ["*"]
         let _ = docker
             .start_container::<String>(&bitcoin_node_c_id, None)
             .await;
-        let _ = docker
-            .connect_network(
-                &self.network_name,
-                ConnectNetworkOptions {
-                    container: bitcoin_node_c_id.clone(),
-                    ..Default::default()
-                },
-            )
-            .await;
 
         let _ = docker
             .start_container::<String>(bitcoin_explorer_c_id, None)
@@ -2260,15 +2151,6 @@ events_keys = ["*"]
 
         let _ = docker
             .start_container::<String>(&stacks_node_c_id, None)
-            .await;
-        let _ = docker
-            .connect_network(
-                &self.network_name,
-                ConnectNetworkOptions {
-                    container: stacks_node_c_id.clone(),
-                    ..Default::default()
-                },
-            )
             .await;
 
         Ok((bitcoin_node_c_id, stacks_node_c_id))
