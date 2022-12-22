@@ -121,6 +121,7 @@ pub struct DevnetConfigFile {
     pub epoch_2_05: Option<u64>,
     pub epoch_2_1: Option<u64>,
     pub pox_2_activation: Option<u64>,
+    pub use_docker_gateway_routing: Option<bool>,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -237,6 +238,7 @@ pub struct DevnetConfig {
     pub epoch_2_05: u64,
     pub epoch_2_1: u64,
     pub pox_2_activation: u64,
+    pub use_docker_gateway_routing: bool,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -610,6 +612,10 @@ impl NetworkManifest {
                 if let Some(val) = devnet_override.network_id {
                     devnet_config.network_id = Some(val);
                 }
+
+                if let Some(val) = devnet_override.use_docker_gateway_routing {
+                    devnet_config.use_docker_gateway_routing = Some(val);
+                }
             };
 
             let now = clarity_repl::clarity::util::get_epoch_time_secs();
@@ -856,6 +862,9 @@ impl NetworkManifest {
                     .take()
                     .unwrap_or(vec![]),
                 enable_next_features,
+                use_docker_gateway_routing: devnet_config
+                    .use_docker_gateway_routing
+                    .unwrap_or(false),
             };
             if !config.disable_stacks_api && config.disable_stacks_api {
                 config.disable_stacks_api = false;

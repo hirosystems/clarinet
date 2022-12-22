@@ -8,7 +8,7 @@ use bollard::errors::Error as DockerError;
 use bollard::exec::CreateExecOptions;
 use bollard::image::CreateImageOptions;
 use bollard::models::{HostConfig, PortBinding};
-use bollard::network::{ConnectNetworkOptions, CreateNetworkOptions, PruneNetworksOptions};
+use bollard::network::{CreateNetworkOptions, PruneNetworksOptions};
 use bollard::service::Ipam;
 use bollard::Docker;
 use chainhook_event_observer::utils::Context;
@@ -169,8 +169,14 @@ impl DevnetOrchestrator {
         options.insert("enable_icc".into(), "true".into());
         options.insert("host_binding_ipv4".into(), "0.0.0.0".into());
         options.insert("com.docker.network.bridge.enable_icc".into(), "true".into());
-        options.insert("com.docker.network.bridge.enable_ip_masquerade".into(), "true".into());
-        options.insert("com.docker.network.bridge.host_binding_ipv4".into(), "0.0.0.0".into());
+        options.insert(
+            "com.docker.network.bridge.enable_ip_masquerade".into(),
+            "true".into(),
+        );
+        options.insert(
+            "com.docker.network.bridge.host_binding_ipv4".into(),
+            "0.0.0.0".into(),
+        );
 
         let network_id = docker
             .create_network::<&str>(CreateNetworkOptions {

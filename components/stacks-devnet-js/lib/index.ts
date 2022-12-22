@@ -186,13 +186,19 @@ export interface DevnetConfig {
   stacks_explorer_port?: number;
   /**
    * Bind bitcoind and stacks-node data volumes (false by default)
-   * @type {number}
+   * @type {boolean}
    * @memberof DevnetConfig
    */
   bind_containers_volumes?: boolean;
   /**
+   * Have the containers communicating through the gateway (false by default, required for certain docker setup)
+   * @type {boolean}
+   * @memberof DevnetConfig
+   */
+  use_docker_gateway_routing?: boolean;
+  /**
    * Disable Bitcoin automining
-   * @type {number}
+   * @type {boolean}
    * @memberof DevnetConfig
    */
   bitcoin_controller_automining_disabled?: boolean;
