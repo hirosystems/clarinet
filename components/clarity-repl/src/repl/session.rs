@@ -988,7 +988,15 @@ impl Session {
         let accounts = self.interpreter.get_accounts();
         if accounts.len() > 0 {
             let tokens = self.interpreter.get_tokens();
-            let headers = vec!["Address".to_string(), "uSTX".to_string()];
+            let mut headers = vec!["Address".to_string()];
+            for token in tokens.iter() {
+                if token == "STX" {
+                    headers.push(String::from("uSTX"));
+                } else {
+                    headers.push(String::from(token));
+                }
+            }
+
             let mut headers_cells = vec![];
             for header in headers.iter() {
                 headers_cells.push(Cell::new(&header));
