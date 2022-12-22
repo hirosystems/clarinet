@@ -58,8 +58,7 @@ impl LspVscodeBridge {
     pub fn notification_handler(&self, method: String, js_params: JsValue) -> Promise {
         let command = match method.as_str() {
             Initialized::METHOD => {
-                log!("clarity extension initialized");
-                return Promise::resolve(&JsValue::FALSE);
+                return Promise::resolve(&JsValue::TRUE);
             }
 
             DidOpenTextDocument::METHOD => {
@@ -170,7 +169,7 @@ impl LspVscodeBridge {
             Initialize::METHOD => {
                 let lsp_response = process_request(
                     LspRequest::Initialize(decode_from_js(js_params)?),
-                    &EditorStateInput::RwLock(self.editor_state_lock.clone()),
+                    &mut EditorStateInput::RwLock(self.editor_state_lock.clone()),
                 );
                 if let LspRequestResponse::Initialize(response) = lsp_response {
                     return response.serialize(&serializer).map_err(|_| JsValue::NULL);
@@ -180,7 +179,7 @@ impl LspVscodeBridge {
             Completion::METHOD => {
                 let lsp_response = process_request(
                     LspRequest::Completion(decode_from_js(js_params)?),
-                    &EditorStateInput::RwLock(self.editor_state_lock.clone()),
+                    &mut EditorStateInput::RwLock(self.editor_state_lock.clone()),
                 );
                 if let LspRequestResponse::CompletionItems(response) = lsp_response {
                     return response.serialize(&serializer).map_err(|_| JsValue::NULL);
@@ -190,7 +189,7 @@ impl LspVscodeBridge {
             SignatureHelpRequest::METHOD => {
                 let lsp_response = process_request(
                     LspRequest::SignatureHelp(decode_from_js(js_params)?),
-                    &EditorStateInput::RwLock(self.editor_state_lock.clone()),
+                    &mut EditorStateInput::RwLock(self.editor_state_lock.clone()),
                 );
                 if let LspRequestResponse::SignatureHelp(response) = lsp_response {
                     return response.serialize(&serializer).map_err(|_| JsValue::NULL);
@@ -200,7 +199,7 @@ impl LspVscodeBridge {
             GotoDefinition::METHOD => {
                 let lsp_response = process_request(
                     LspRequest::Definition(decode_from_js(js_params)?),
-                    &EditorStateInput::RwLock(self.editor_state_lock.clone()),
+                    &mut EditorStateInput::RwLock(self.editor_state_lock.clone()),
                 );
                 if let LspRequestResponse::Definition(response) = lsp_response {
                     return response.serialize(&serializer).map_err(|_| JsValue::NULL);
@@ -210,7 +209,7 @@ impl LspVscodeBridge {
             DocumentSymbolRequest::METHOD => {
                 let lsp_response = process_request(
                     LspRequest::DocumentSymbol(decode_from_js(js_params)?),
-                    &EditorStateInput::RwLock(self.editor_state_lock.clone()),
+                    &mut EditorStateInput::RwLock(self.editor_state_lock.clone()),
                 );
                 if let LspRequestResponse::DocumentSymbol(response) = lsp_response {
                     return response.serialize(&serializer).map_err(|_| JsValue::NULL);
@@ -220,7 +219,7 @@ impl LspVscodeBridge {
             HoverRequest::METHOD => {
                 let lsp_response = process_request(
                     LspRequest::Hover(decode_from_js(js_params)?),
-                    &EditorStateInput::RwLock(self.editor_state_lock.clone()),
+                    &mut EditorStateInput::RwLock(self.editor_state_lock.clone()),
                 );
                 if let LspRequestResponse::Hover(response) = lsp_response {
                     return response.serialize(&serializer).map_err(|_| JsValue::NULL);

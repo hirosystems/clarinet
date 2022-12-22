@@ -16,11 +16,3 @@
 (define-public (call-bns)
   (contract-call? 'SP000000000000000000002Q6VF78.bns can-namespace-be-registered 0x627463)
 )
-
-(define-private (say-hello-to (to (string-ascii 10)))
-  (ok to)
-)
-
-(define-public (say-hello-dap)
-  (say-hello-to "dap")
-)

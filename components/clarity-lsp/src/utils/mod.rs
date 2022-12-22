@@ -1,19 +1,13 @@
 use super::types::*;
 use clarinet_files::FileLocation;
-use clarity_repl::clarity::functions::define::DefineFunctions;
-use clarity_repl::clarity::functions::NativeFunctions;
-use clarity_repl::clarity::variables::NativeVariables;
 use clarity_repl::clarity::vm::analysis::ContractAnalysis;
 use clarity_repl::clarity::vm::diagnostic::{
     Diagnostic as ClarityDiagnostic, Level as ClarityLevel,
 };
-use clarity_repl::clarity::vm::docs::{
-    make_api_reference, make_define_reference, make_keyword_reference,
-};
-use clarity_repl::clarity::vm::types::{BlockInfoProperty, FunctionType};
-use lsp_types::Diagnostic as LspDiagnostic;
-use lsp_types::Url;
+use clarity_repl::clarity::vm::types::FunctionType;
+use lsp_types::{CompletionItem, CompletionItemKind, Diagnostic as LspDiagnostic};
 use lsp_types::{DiagnosticSeverity, Position, Range};
+use lsp_types::{InsertTextFormat, Url};
 
 #[cfg(feature = "wasm")]
 macro_rules! log {
@@ -86,11 +80,10 @@ pub fn build_intellisense(analysis: &ContractAnalysis) -> CompletionMaps {
         let insert_text = format!("{} {}", name, build_intellisense_args(signature).join(" "));
         intra_contract.push(CompletionItem {
             label: name.to_string(),
-            kind: CompletionItemKind::Module,
-            detail: None,
-            markdown_documentation: None,
+            kind: Some(CompletionItemKind::MODULE),
             insert_text: Some(insert_text),
-            insert_text_format: InsertTextFormat::Snippet,
+            insert_text_format: Some(InsertTextFormat::SNIPPET),
+            ..Default::default()
         });
 
         let label = format!(
@@ -107,11 +100,10 @@ pub fn build_intellisense(analysis: &ContractAnalysis) -> CompletionMaps {
         );
         inter_contract.push(CompletionItem {
             label,
-            kind: CompletionItemKind::Event,
-            detail: None,
-            markdown_documentation: None,
+            kind: Some(CompletionItemKind::EVENT),
             insert_text: Some(insert_text),
-            insert_text_format: InsertTextFormat::Snippet,
+            insert_text_format: Some(InsertTextFormat::SNIPPET),
+            ..Default::default()
         });
     }
 
@@ -119,11 +111,10 @@ pub fn build_intellisense(analysis: &ContractAnalysis) -> CompletionMaps {
         let insert_text = format!("{} {}", name, build_intellisense_args(signature).join(" "));
         intra_contract.push(CompletionItem {
             label: name.to_string(),
-            kind: CompletionItemKind::Module,
-            detail: None,
-            markdown_documentation: None,
+            kind: Some(CompletionItemKind::MODULE),
             insert_text: Some(insert_text),
-            insert_text_format: InsertTextFormat::Snippet,
+            insert_text_format: Some(InsertTextFormat::SNIPPET),
+            ..Default::default()
         });
 
         let label = format!(
@@ -139,11 +130,10 @@ pub fn build_intellisense(analysis: &ContractAnalysis) -> CompletionMaps {
         );
         inter_contract.push(CompletionItem {
             label,
-            kind: CompletionItemKind::Event,
-            detail: None,
-            markdown_documentation: None,
+            kind: Some(CompletionItemKind::EVENT),
             insert_text: Some(insert_text),
-            insert_text_format: InsertTextFormat::Snippet,
+            insert_text_format: Some(InsertTextFormat::SNIPPET),
+            ..Default::default()
         });
     }
 
@@ -151,11 +141,10 @@ pub fn build_intellisense(analysis: &ContractAnalysis) -> CompletionMaps {
         let insert_text = format!("{} {}", name, build_intellisense_args(signature).join(" "));
         intra_contract.push(CompletionItem {
             label: name.to_string(),
-            kind: CompletionItemKind::Module,
-            detail: None,
-            markdown_documentation: None,
+            kind: Some(CompletionItemKind::MODULE),
             insert_text: Some(insert_text),
-            insert_text_format: InsertTextFormat::Snippet,
+            insert_text_format: Some(InsertTextFormat::SNIPPET),
+            ..Default::default()
         });
     }
 
@@ -164,105 +153,6 @@ pub fn build_intellisense(analysis: &ContractAnalysis) -> CompletionMaps {
         intra_contract,
         data_fields: vec![],
     }
-}
-
-pub fn build_default_native_keywords_list() -> Vec<CompletionItem> {
-    let native_functions: Vec<CompletionItem> = NativeFunctions::ALL
-        .iter()
-        .map(|func| {
-            let api = make_api_reference(&func);
-            CompletionItem {
-                label: api.name.to_string(),
-                kind: CompletionItemKind::Function,
-                detail: Some(api.name.to_string()),
-                markdown_documentation: Some(api.description.to_string()),
-                insert_text: Some(api.snippet.clone()),
-                insert_text_format: InsertTextFormat::Snippet,
-            }
-        })
-        .collect();
-
-    let define_functions: Vec<CompletionItem> = DefineFunctions::ALL
-        .iter()
-        .map(|func| {
-            let api = make_define_reference(&func);
-            CompletionItem {
-                label: api.name.to_string(),
-                kind: CompletionItemKind::Class,
-                detail: Some(api.name.to_string()),
-                markdown_documentation: Some(api.description.to_string()),
-                insert_text: Some(api.snippet.clone()),
-                insert_text_format: InsertTextFormat::Snippet,
-            }
-        })
-        .collect();
-
-    let native_variables: Vec<CompletionItem> = NativeVariables::ALL
-        .iter()
-        .filter_map(|var| {
-            if let Some(api) = make_keyword_reference(&var) {
-                Some(CompletionItem {
-                    label: api.name.to_string(),
-                    kind: CompletionItemKind::Field,
-                    detail: Some(api.name.to_string()),
-                    markdown_documentation: Some(api.description.to_string()),
-                    insert_text: Some(api.snippet.to_string()),
-                    insert_text_format: InsertTextFormat::PlainText,
-                })
-            } else {
-                None
-            }
-        })
-        .collect();
-
-    let block_properties: Vec<CompletionItem> = BlockInfoProperty::ALL_NAMES
-        .to_vec()
-        .iter()
-        .map(|func| CompletionItem {
-            label: func.to_string(),
-            kind: CompletionItemKind::Field,
-            detail: None,
-            markdown_documentation: None,
-            insert_text: Some(func.to_string()),
-            insert_text_format: InsertTextFormat::PlainText,
-        })
-        .collect();
-
-    let types = vec![
-        "uint",
-        "int",
-        "bool",
-        "list",
-        "tuple",
-        "buff",
-        "string-ascii",
-        "string-utf8",
-        "option",
-        "response",
-        "principal",
-    ]
-    .iter()
-    .map(|var| CompletionItem {
-        label: var.to_string(),
-        kind: CompletionItemKind::TypeParameter,
-        detail: None,
-        markdown_documentation: None,
-        insert_text: Some(var.to_string()),
-        insert_text_format: InsertTextFormat::PlainText,
-    })
-    .collect();
-
-    let items = vec![
-        native_functions,
-        define_functions,
-        native_variables,
-        block_properties,
-        types,
-    ]
-    .into_iter()
-    .flatten()
-    .collect::<Vec<CompletionItem>>();
-    items
 }
 
 pub fn get_manifest_location(text_document_uri: &Url) -> Option<FileLocation> {

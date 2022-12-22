@@ -54,7 +54,7 @@ pub async fn start_language_server(
             },
             i if i == requests_oper => match oper.recv(&request_rx) {
                 Ok(request) => {
-                    let request_response = process_request(request, &editor_state);
+                    let request_response = process_request(request, &mut editor_state);
                     let _ = response_tx.send(LspResponse::Request(request_response));
                 }
                 Err(_e) => {

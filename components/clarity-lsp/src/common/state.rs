@@ -1,4 +1,5 @@
-use crate::types::{CompletionItem, CompletionMaps};
+use crate::common::requests::completion::check_if_should_wrap;
+use crate::types::CompletionMaps;
 use crate::utils;
 use chainhook_types::StacksNetwork;
 use clarinet_deployments::{
@@ -18,12 +19,15 @@ use clarity_repl::clarity::vm::EvaluationResult;
 use clarity_repl::clarity::{ClarityName, ClarityVersion, SymbolicExpression};
 use clarity_repl::repl::{ContractDeployer, DEFAULT_CLARITY_VERSION};
 use lsp_types::{
-    DocumentSymbol, Hover, Location, MessageType, Position, Range, SignatureHelp, Url,
+    CompletionItem, CompletionItemKind, DocumentSymbol, Hover, Location, MessageType, Position,
+    Range, SignatureHelp, Url,
 };
 use std::borrow::BorrowMut;
 use std::collections::{BTreeMap, HashMap, HashSet};
 use std::vec;
 
+use super::requests::capabilities::InitializationOptions;
+use super::requests::completion::{COMPLETION_ITEMS_CLARITY_1, COMPLETION_ITEMS_CLARITY_2};
 use super::requests::definitions::{get_definitions, DefinitionLocation};
 use super::requests::document_symbols::ASTSymbols;
 use super::requests::helpers::{get_atom_start_at_position, get_public_function_definitions};
@@ -194,7 +198,7 @@ pub struct EditorState {
     pub protocols: HashMap<FileLocation, ProtocolState>,
     pub contracts_lookup: HashMap<FileLocation, ContractMetadata>,
     pub active_contracts: HashMap<FileLocation, ActiveContractData>,
-    pub native_functions: Vec<CompletionItem>,
+    pub settings: InitializationOptions,
 }
 
 impl EditorState {
@@ -203,7 +207,7 @@ impl EditorState {
             protocols: HashMap::new(),
             contracts_lookup: HashMap::new(),
             active_contracts: HashMap::new(),
-            native_functions: utils::build_default_native_keywords_list(),
+            settings: InitializationOptions::default(),
         }
     }
 
@@ -290,18 +294,50 @@ impl EditorState {
     pub fn get_completion_items_for_contract(
         &self,
         contract_location: &FileLocation,
-    ) -> Vec<CompletionItem> {
-        let mut keywords = self.native_functions.clone();
+        position: &Position,
+    ) -> Vec<lsp_types::CompletionItem> {
+        let contract = self.active_contracts.get(&contract_location).unwrap();
+        let native_keywords = match contract.clarity_version {
+            ClarityVersion::Clarity1 => COMPLETION_ITEMS_CLARITY_1.to_vec(),
+            ClarityVersion::Clarity2 => COMPLETION_ITEMS_CLARITY_2.to_vec(),
+        };
 
-        let mut user_defined_keywords = self
+        let should_wrap = match self.settings.completion_smart_parenthesis_wrap {
+            true => match self.active_contracts.get(contract_location) {
+                Some(active_contract) => check_if_should_wrap(&active_contract.source, position),
+                None => true,
+            },
+            false => true,
+        };
+
+        let user_defined_keywords = self
             .contracts_lookup
             .get(contract_location)
             .and_then(|d| self.protocols.get(&d.manifest_location))
             .and_then(|p| Some(p.get_completion_items_for_contract(contract_location)))
             .unwrap_or_default();
 
-        keywords.append(&mut user_defined_keywords);
-        keywords
+        let mut completion_items = vec![];
+        for mut item in [native_keywords, user_defined_keywords].concat().drain(..) {
+            match item.kind {
+                Some(
+                    CompletionItemKind::EVENT
+                    | CompletionItemKind::FUNCTION
+                    | CompletionItemKind::MODULE
+                    | CompletionItemKind::CLASS,
+                ) => {
+                    item.insert_text = if should_wrap {
+                        Some(format!("({})", item.insert_text.take().unwrap()))
+                    } else {
+                        Some(item.insert_text.take().unwrap())
+                    };
+                }
+                _ => {}
+            }
+            completion_items.push(item);
+        }
+
+        completion_items
     }
 
     pub fn get_document_symbols_for_contract(

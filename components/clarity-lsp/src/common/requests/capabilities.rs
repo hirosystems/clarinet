@@ -5,10 +5,12 @@ use lsp_types::{
 };
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Clone, Deserialize, Serialize)]
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct InitializationOptions {
     completion: bool,
+    pub completion_smart_parenthesis_wrap: bool,
+    pub completion_include_params_in_snippet: bool,
     document_symbols: bool,
     go_to_definition: bool,
     hover: bool,

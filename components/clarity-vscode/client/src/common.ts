@@ -61,11 +61,16 @@ export async function initClient(
   workspace.onDidChangeConfiguration(async () => {
     let requireReload = false;
     let newConfig = getConfig();
-    ["completion", "hover", "documentSymbols", "goToDefinition"].forEach(
-      (k) => {
-        if (newConfig[k] !== config[k]) requireReload = true;
-      },
-    );
+    [
+      "completion",
+      "completionSmartParenthesisWrap",
+      "completionIncludeParamsInSnippet",
+      "hover",
+      "documentSymbols",
+      "goToDefinition",
+    ].forEach((k) => {
+      if (newConfig[k] !== config[k]) requireReload = true;
+    });
 
     config = newConfig;
 

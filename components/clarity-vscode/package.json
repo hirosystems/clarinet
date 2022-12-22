@@ -83,6 +83,18 @@
             "order": 0,
             "description": "Allow auto completion for native and user-defined functions"
           },
+          "clarity-lsp.completionSmartParenthesisWrap": {
+            "type": "boolean",
+            "default": false,
+            "order": 0,
+            "description": "If set to true, the completion won't wrap a function in parenthesis if an opening parenthesis is already there"
+          },
+          "clarity-lsp.completionIncludeParamsInSnippet": {
+            "type": "boolean",
+            "default": true,
+            "order": 0,
+            "description": "If set to true, the completion of native functions will add the params snippet"
+          },
           "clarity-lsp.hover": {
             "type": "boolean",
             "default": true,
