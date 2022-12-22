@@ -1006,8 +1006,14 @@ impl Session {
     }
 
     pub fn get_costs(&mut self, output: &mut Vec<String>, cmd: &str) {
-        let snippet = cmd.to_string().split_off("::get_costs ".len());
-        self.run_snippet(output, true, &snippet.to_string());
+        let command: String = cmd.to_owned();
+        let v: Vec<&str> = command.split_whitespace().collect();
+
+        if v.len() != 2 {
+            output.push(red!(format!("::get_costs command needs an argument")));
+        } else {
+            self.run_snippet(output, true, &v[1].to_string());
+        }
     }
 
     #[cfg(feature = "cli")]
