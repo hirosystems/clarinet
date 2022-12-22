@@ -207,9 +207,7 @@ impl DevnetOrchestrator {
             .and_then(|map| map.get("Gateway"))
             .ok_or("unable to retrieve gateway")?;
 
-        let use_virtual_port_map = false;
-
-        let services_map_hosts = if use_virtual_port_map {
+        let services_map_hosts = if devnet_config.use_docker_gateway_routing {
             ServicesMapHosts {
                 bitcoin_node_host: format!("{}:{}", gateway, devnet_config.bitcoin_node_rpc_port),
                 stacks_node_host: format!("{}:{}", gateway, devnet_config.stacks_node_rpc_port),
