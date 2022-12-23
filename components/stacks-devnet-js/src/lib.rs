@@ -590,6 +590,13 @@ impl StacksDevnet {
         }
 
         if let Ok(res) = devnet_settings
+            .get(&mut cx, "use_docker_gateway_routing")?
+            .downcast::<JsBoolean, _>(&mut cx)
+        {
+            overrides.use_docker_gateway_routing = Some(res.value(&mut cx));
+        }
+
+        if let Ok(res) = devnet_settings
             .get(&mut cx, "epoch_2_0")?
             .downcast::<JsNumber, _>(&mut cx)
         {
