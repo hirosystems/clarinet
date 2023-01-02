@@ -305,7 +305,12 @@ impl Session {
         };
 
         if let Some(cost) = cost {
-            let headers = vec!["".to_string(), "Consumed".to_string(), "Limit".to_string()];
+            let headers = vec![
+                "".to_string(),
+                "Consumed".to_string(),
+                "Limit".to_string(),
+                "Percentage".to_string(),
+            ];
             let mut headers_cells = vec![];
             for header in headers.iter() {
                 headers_cells.push(Cell::new(&header));
@@ -316,30 +321,52 @@ impl Session {
                 Cell::new("Runtime"),
                 Cell::new(&cost.total.runtime.to_string()),
                 Cell::new(&cost.limit.runtime.to_string()),
+                Cell::new(&(Self::get_costs_percentage(&cost.total.runtime, &cost.limit.runtime))),
             ]));
             table.add_row(Row::new(vec![
                 Cell::new("Read count"),
                 Cell::new(&cost.total.read_count.to_string()),
                 Cell::new(&cost.limit.read_count.to_string()),
+                Cell::new(
+                    &(Self::get_costs_percentage(&cost.total.read_count, &cost.limit.read_count)),
+                ),
             ]));
             table.add_row(Row::new(vec![
                 Cell::new("Read length (bytes)"),
                 Cell::new(&cost.total.read_length.to_string()),
                 Cell::new(&cost.limit.read_length.to_string()),
+                Cell::new(
+                    &(Self::get_costs_percentage(&cost.total.read_length, &cost.limit.read_length)),
+                ),
             ]));
             table.add_row(Row::new(vec![
                 Cell::new("Write count"),
                 Cell::new(&cost.total.write_count.to_string()),
                 Cell::new(&cost.limit.write_count.to_string()),
+                Cell::new(
+                    &(Self::get_costs_percentage(&cost.total.write_count, &cost.limit.write_count)),
+                ),
             ]));
             table.add_row(Row::new(vec![
                 Cell::new("Write length (bytes)"),
                 Cell::new(&cost.total.write_length.to_string()),
                 Cell::new(&cost.limit.write_length.to_string()),
+                Cell::new(
+                    &(Self::get_costs_percentage(
+                        &cost.total.write_length,
+                        &cost.limit.write_length,
+                    )),
+                ),
             ]));
             output.push(format!("{}", table));
         }
         output.append(&mut result);
+    }
+
+    fn get_costs_percentage(consumed: &u64, limit: &u64) -> String {
+        let calc = (*consumed as f64 / *limit as f64) * 100_f64;
+
+        format!("{calc:.2} %")
     }
 
     pub fn formatted_interpretation<'a, 'hooks>(
@@ -979,8 +1006,14 @@ impl Session {
     }
 
     pub fn get_costs(&mut self, output: &mut Vec<String>, cmd: &str) {
-        let snippet = cmd.to_string().split_off("::get_costs ".len());
-        self.run_snippet(output, true, &snippet.to_string());
+        let command: String = cmd.to_owned();
+        let v: Vec<&str> = command.split_whitespace().collect();
+
+        if v.len() != 2 {
+            output.push(red!(format!("::get_costs command needs an argument")));
+        } else {
+            self.run_snippet(output, true, &v[1].to_string());
+        }
     }
 
     #[cfg(feature = "cli")]
