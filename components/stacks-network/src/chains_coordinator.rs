@@ -33,6 +33,7 @@ use std::str;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc::{channel, Receiver, Sender};
 use std::sync::Arc;
+use std::time::Duration;
 
 #[derive(Deserialize)]
 pub struct NewTransaction {
@@ -636,6 +637,7 @@ pub async fn mine_bitcoin_block(
 
     let miner_address = Address::from_str(miner_btc_address).unwrap();
     let _ = HttpClient::builder()
+        .timeout(Duration::from_secs(5))
         .build()
         .expect("Unable to build http client")
         .post(format!("http://{}", bitcoin_node_host))

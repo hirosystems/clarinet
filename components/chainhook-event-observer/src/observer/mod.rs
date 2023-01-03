@@ -22,7 +22,7 @@ use hiro_system_kit::slog;
 use reqwest::Client as HttpClient;
 use rocket::config::{self, Config, LogLevel};
 use rocket::data::{Limits, ToByteUnit};
-use rocket::http::{RawStr, Status};
+use rocket::http::Status;
 use rocket::request::{self, FromRequest, Outcome, Request};
 use rocket::serde::json::{json, Json, Value as JsonValue};
 use rocket::serde::Deserialize;
@@ -36,6 +36,7 @@ use std::str;
 use std::str::FromStr;
 use std::sync::mpsc::{Receiver, Sender};
 use std::sync::{Arc, Mutex, RwLock};
+use std::time::Duration;
 
 pub const DEFAULT_INGESTION_PORT: u16 = 20445;
 pub const DEFAULT_CONTROL_PORT: u16 = 20446;
@@ -68,6 +69,7 @@ impl EventHandler {
                 let url = format!("{}/{}", host, path);
                 let body = rocket::serde::json::serde_json::to_vec(&stacks_event).unwrap();
                 let http_client = HttpClient::builder()
+                    .timeout(Duration::from_secs(20))
                     .build()
                     .expect("Unable to build http client");
                 let _ = http_client
@@ -88,6 +90,7 @@ impl EventHandler {
                 let url = format!("{}/{}", host, path);
                 let body = rocket::serde::json::serde_json::to_vec(&bitcoin_event).unwrap();
                 let http_client = HttpClient::builder()
+                    .timeout(Duration::from_secs(20))
                     .build()
                     .expect("Unable to build http client");
                 let _res = http_client

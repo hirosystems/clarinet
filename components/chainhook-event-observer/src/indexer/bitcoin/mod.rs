@@ -1,5 +1,7 @@
 mod blocks_pool;
 
+use std::time::Duration;
+
 use crate::chainhooks::types::{
     get_canonical_magic_bytes, get_canonical_pox_config, PoxConfig, StacksOpcodes,
 };
@@ -52,6 +54,7 @@ pub async fn retrieve_full_block(
         "params": [block_hash, 0]
     });
     let http_client = HttpClient::builder()
+        .timeout(Duration::from_secs(20))
         .build()
         .expect("Unable to build http client");
     let response_hex = http_client

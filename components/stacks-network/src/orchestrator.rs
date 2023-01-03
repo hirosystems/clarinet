@@ -22,6 +22,7 @@ use std::fs::{self, File};
 use std::io::Write;
 use std::path::PathBuf;
 use std::sync::mpsc::{Receiver, Sender};
+use std::time::Duration;
 
 #[derive(Debug)]
 pub struct DevnetOrchestrator {
@@ -911,8 +912,8 @@ disable_inbound_walks = true
 public_ip_address = "1.1.1.1:1234"
 
 [miner]
-first_attempt_time_ms = 5000
-subsequent_attempt_time_ms = 5000
+first_attempt_time_ms = 500
+subsequent_attempt_time_ms = 1000
 # microblock_attempt_time_ms = 15000
 "#,
             stacks_node_rpc_port = devnet_config.stacks_node_rpc_port,
@@ -2287,6 +2288,8 @@ events_keys = ["*"]
         devnet_event_tx: &Sender<DevnetEvent>,
     ) -> Result<(), String> {
         use bitcoincore_rpc::bitcoin::Address;
+        use reqwest::Client as HttpClient;
+        use serde_json::json;
         use std::str::FromStr;
 
         let (devnet_config, accounts) = match &self.network_config {
@@ -2297,8 +2300,11 @@ events_keys = ["*"]
             _ => return Err(format!("unable to initialize bitcoin node")),
         };
 
-        use reqwest::Client as HttpClient;
-        use serde_json::json;
+        let miner_address = Address::from_str(&devnet_config.miner_btc_address)
+            .map_err(|e| format!("unable to create miner address: {:?}", e))?;
+
+        let faucet_address = Address::from_str(&devnet_config.faucet_btc_address)
+            .map_err(|e| format!("unable to create faucet address: {:?}", e))?;
 
         let bitcoin_node_url = format!(
             "http://{}/",
@@ -2307,10 +2313,12 @@ events_keys = ["*"]
 
         fn base_builder(node_url: &str, username: &str, password: &str) -> RequestBuilder {
             let http_client = HttpClient::builder()
+                .timeout(Duration::from_secs(30))
                 .build()
                 .expect("Unable to build http client");
             http_client
                 .post(node_url.clone())
+                .timeout(Duration::from_secs(3))
                 .basic_auth(&username, Some(&password))
                 .header("Content-Type", "application/json")
                 .header("Host", &node_url[7..])
@@ -2318,6 +2326,9 @@ events_keys = ["*"]
 
         let _ = devnet_event_tx.send(DevnetEvent::info(format!("Configuring bitcoin-node",)));
 
+        let max_errors = 30;
+
+        let mut error_count = 0;
         loop {
             let network_info = base_builder(
                 &bitcoin_node_url,
@@ -2332,108 +2343,154 @@ events_keys = ["*"]
             }))
             .send()
             .await
-            .map_err(|e| format!("unable to send request ({})", e));
+            .map_err(|e| format!("unable to send 'getnetworkinfo' request ({})", e));
 
             match network_info {
                 Ok(_r) => break,
-                Err(_e) => {
-                    let _ = devnet_event_tx
-                        .send(DevnetEvent::info(format!("Error ({})", _e.to_string())));
+                Err(e) => {
+                    error_count += 1;
+                    if error_count > max_errors {
+                        return Err(e);
+                    } else if error_count > 1 {
+                        let _ = devnet_event_tx.send(DevnetEvent::error(e));
+                    }
                 }
             }
             std::thread::sleep(std::time::Duration::from_secs(1));
             let _ = devnet_event_tx.send(DevnetEvent::info(format!("Waiting for bitcoin-node",)));
         }
 
-        let miner_address = Address::from_str(&devnet_config.miner_btc_address)
-            .map_err(|e| format!("unable to create miner address: {:?}", e))?;
+        let mut error_count = 0;
+        loop {
+            let rpc_call = base_builder(
+                &bitcoin_node_url,
+                &devnet_config.bitcoin_node_username,
+                &devnet_config.bitcoin_node_password,
+            )
+            .json(&json!({
+                "jsonrpc": "1.0",
+                "id": "stacks-network",
+                "method": "generatetoaddress",
+                "params": [json!(3), json!(miner_address)]
+            }))
+            .send()
+            .await
+            .map_err(|e| format!("unable to send 'generatetoaddress' request ({})", e));
 
-        let faucet_address = Address::from_str(&devnet_config.faucet_btc_address)
-            .map_err(|e| format!("unable to create faucet address: {:?}", e))?;
+            match rpc_call {
+                Ok(_r) => break,
+                Err(e) => {
+                    error_count += 1;
+                    if error_count > max_errors {
+                        return Err(e);
+                    } else if error_count > 1 {
+                        let _ = devnet_event_tx.send(DevnetEvent::error(e));
+                    }
+                }
+            }
+            std::thread::sleep(std::time::Duration::from_secs(1));
+            let _ = devnet_event_tx.send(DevnetEvent::info(format!("Waiting for bitcoin-node",)));
+        }
 
-        let _ = base_builder(
-            &bitcoin_node_url,
-            &devnet_config.bitcoin_node_username,
-            &devnet_config.bitcoin_node_password,
-        )
-        .json(&json!({
-            "jsonrpc": "1.0",
-            "id": "stacks-network",
-            "method": "generatetoaddress",
-            "params": [json!(3), json!(miner_address)]
-        }))
-        .send()
-        .await;
-        let _ = base_builder(
-            &bitcoin_node_url,
-            &devnet_config.bitcoin_node_username,
-            &devnet_config.bitcoin_node_password,
-        )
-        .json(&json!({
-            "jsonrpc": "1.0",
-            "id": "stacks-network",
-            "method": "generatetoaddress",
-            "params": [json!(97), json!(faucet_address)]
-        }))
-        .send()
-        .await;
-        let _ = base_builder(
-            &bitcoin_node_url,
-            &devnet_config.bitcoin_node_username,
-            &devnet_config.bitcoin_node_password,
-        )
-        .json(&json!({
+        let mut error_count = 0;
+        loop {
+            let rpc_call = base_builder(
+                &bitcoin_node_url,
+                &devnet_config.bitcoin_node_username,
+                &devnet_config.bitcoin_node_password,
+            )
+            .json(&json!({
+                "jsonrpc": "1.0",
+                "id": "stacks-network",
+                "method": "generatetoaddress",
+                "params": [json!(97), json!(faucet_address)]
+            }))
+            .send()
+            .await
+            .map_err(|e| format!("unable to send 'generatetoaddress' request ({})", e));
+
+            match rpc_call {
+                Ok(_r) => break,
+                Err(e) => {
+                    error_count += 1;
+                    if error_count > max_errors {
+                        return Err(e);
+                    } else if error_count > 1 {
+                        let _ = devnet_event_tx.send(DevnetEvent::error(e));
+                    }
+                }
+            }
+            std::thread::sleep(std::time::Duration::from_secs(1));
+            let _ = devnet_event_tx.send(DevnetEvent::info(format!("Waiting for bitcoin-node",)));
+        }
+
+        let mut error_count = 0;
+        loop {
+            let rpc_call = base_builder(
+                &bitcoin_node_url,
+                &devnet_config.bitcoin_node_username,
+                &devnet_config.bitcoin_node_password,
+            )
+            .json(&json!({
             "jsonrpc": "1.0",
             "id": "stacks-network",
             "method": "generatetoaddress",
             "params": [json!(1), json!(miner_address)]
-        }))
-        .send()
-        .await;
-        let _ = base_builder(
-            &bitcoin_node_url,
-            &devnet_config.bitcoin_node_username,
-            &devnet_config.bitcoin_node_password,
-        )
-        .json(&json!({
-            "jsonrpc": "1.0",
-            "id": "stacks-network",
-            "method": "createwallet",
-            "params": [json!("")]
-        }))
-        .send()
-        .await;
-        let _ = base_builder(
-            &bitcoin_node_url,
-            &devnet_config.bitcoin_node_username,
-            &devnet_config.bitcoin_node_password,
-        )
-        .json(&json!({
-            "jsonrpc": "1.0",
-            "id": "stacks-network",
-            "method": "importaddress",
-            "params": [json!(miner_address)]
-        }))
-        .send()
-        .await;
-        let _ = base_builder(
-            &bitcoin_node_url,
-            &devnet_config.bitcoin_node_username,
-            &devnet_config.bitcoin_node_password,
-        )
-        .json(&json!({
-            "jsonrpc": "1.0",
-            "id": "stacks-network",
-            "method": "importaddress",
-            "params": [json!(faucet_address)]
-        }))
-        .send()
-        .await;
-        // Index devnet's wallets by default
-        for (_, account) in accounts.iter() {
-            let address = Address::from_str(&account.btc_address)
-                .map_err(|e| format!("unable to create address: {:?}", e))?;
-            let _ = base_builder(
+            }))
+            .send()
+            .await
+            .map_err(|e| format!("unable to send 'generatetoaddress' request ({})", e));
+
+            match rpc_call {
+                Ok(_r) => break,
+                Err(e) => {
+                    error_count += 1;
+                    if error_count > max_errors {
+                        return Err(e);
+                    } else if error_count > 1 {
+                        let _ = devnet_event_tx.send(DevnetEvent::error(e));
+                    }
+                }
+            }
+            std::thread::sleep(std::time::Duration::from_secs(1));
+            let _ = devnet_event_tx.send(DevnetEvent::info(format!("Waiting for bitcoin-node",)));
+        }
+
+        let mut error_count = 0;
+        loop {
+            let rpc_call = base_builder(
+                &bitcoin_node_url,
+                &devnet_config.bitcoin_node_username,
+                &devnet_config.bitcoin_node_password,
+            )
+            .json(&json!({
+                "jsonrpc": "1.0",
+                "id": "stacks-network",
+                "method": "createwallet",
+                "params": [json!("")]
+            }))
+            .send()
+            .await
+            .map_err(|e| format!("unable to send 'createwallet' request ({})", e));
+
+            match rpc_call {
+                Ok(_r) => break,
+                Err(e) => {
+                    error_count += 1;
+                    if error_count > max_errors {
+                        return Err(e);
+                    } else if error_count > 1 {
+                        let _ = devnet_event_tx.send(DevnetEvent::error(e));
+                    }
+                }
+            }
+            std::thread::sleep(std::time::Duration::from_secs(1));
+            let _ = devnet_event_tx.send(DevnetEvent::info(format!("Waiting for bitcoin-node",)));
+        }
+
+        let mut error_count = 0;
+        loop {
+            let rpc_call = base_builder(
                 &bitcoin_node_url,
                 &devnet_config.bitcoin_node_username,
                 &devnet_config.bitcoin_node_password,
@@ -2442,10 +2499,96 @@ events_keys = ["*"]
                 "jsonrpc": "1.0",
                 "id": "stacks-network",
                 "method": "importaddress",
-                "params": [json!(address)]
+                "params": [json!(miner_address)]
+
             }))
             .send()
-            .await;
+            .await
+            .map_err(|e| format!("unable to send 'importaddress' request ({})", e));
+
+            match rpc_call {
+                Ok(_r) => break,
+                Err(e) => {
+                    error_count += 1;
+                    if error_count > max_errors {
+                        return Err(e);
+                    } else if error_count > 1 {
+                        let _ = devnet_event_tx.send(DevnetEvent::error(e));
+                    }
+                }
+            }
+            std::thread::sleep(std::time::Duration::from_secs(1));
+            let _ = devnet_event_tx.send(DevnetEvent::info(format!("Waiting for bitcoin-node",)));
+        }
+
+        let mut error_count = 0;
+        loop {
+            let rpc_call = base_builder(
+                &bitcoin_node_url,
+                &devnet_config.bitcoin_node_username,
+                &devnet_config.bitcoin_node_password,
+            )
+            .json(&json!({
+            "jsonrpc": "1.0",
+            "id": "stacks-network",
+            "method": "importaddress",
+            "params": [json!(faucet_address)]
+            }))
+            .send()
+            .await
+            .map_err(|e| format!("unable to send 'importaddress' request ({})", e));
+
+            match rpc_call {
+                Ok(_r) => break,
+                Err(e) => {
+                    error_count += 1;
+                    if error_count > max_errors {
+                        return Err(e);
+                    } else if error_count > 1 {
+                        let _ = devnet_event_tx.send(DevnetEvent::error(e));
+                    }
+                }
+            }
+            std::thread::sleep(std::time::Duration::from_secs(1));
+            let _ = devnet_event_tx.send(DevnetEvent::info(format!("Waiting for bitcoin-node",)));
+        }
+        // Index devnet's wallets by default
+        for (_, account) in accounts.iter() {
+            let address = Address::from_str(&account.btc_address)
+                .map_err(|e| format!("unable to create address: {:?}", e))?;
+
+            let mut error_count = 0;
+            loop {
+                let rpc_call = base_builder(
+                    &bitcoin_node_url,
+                    &devnet_config.bitcoin_node_username,
+                    &devnet_config.bitcoin_node_password,
+                )
+                .json(&json!({
+                "jsonrpc": "1.0",
+                "id": "stacks-network",
+                "method": "importaddress",
+                "params": [json!(address)]
+                    }))
+                .send()
+                .await
+                .map_err(|e| format!("unable to send 'importaddress' request ({})", e));
+
+                match rpc_call {
+                    Ok(_r) => break,
+                    Err(e) => {
+                        error_count += 1;
+                        if error_count > max_errors {
+                            return Err(e);
+                        } else if error_count > 1 {
+                            let _ = devnet_event_tx.send(DevnetEvent::error(e));
+                        }
+                    }
+                }
+                std::thread::sleep(std::time::Duration::from_secs(1));
+                let _ =
+                    devnet_event_tx.send(DevnetEvent::info(format!("Waiting for bitcoin-node",)));
+            }
         }
         Ok(())
     }
