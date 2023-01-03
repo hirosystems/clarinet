@@ -75,20 +75,6 @@ impl Indexer {
         event
     }
 
-    pub fn handle_stacks_serialized_block(
-        &mut self,
-        serialized_block: &str,
-        ctx: &Context,
-    ) -> Result<Option<StacksChainEvent>, String> {
-        let block = stacks::standardize_stacks_serialized_block(
-            &self.config,
-            serialized_block,
-            &mut self.stacks_context,
-            ctx,
-        )?;
-        self.stacks_blocks_pool.process_block(block, ctx)
-    }
-
     pub fn handle_stacks_marshalled_block(
         &mut self,
         marshalled_block: JsonValue,
