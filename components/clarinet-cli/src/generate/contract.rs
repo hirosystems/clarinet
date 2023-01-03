@@ -41,20 +41,35 @@ impl GetChangesForNewContract {
         } else {
             format!(
                 r#"
-;; {}
-;; <add a description here>
+;; title: {}
+;; version:
+;; summary:
+;; description:
+
+;; traits
+;;
+
+;; token definitions
+;; 
 
 ;; constants
 ;;
 
-;; data maps and vars
+;; data vars
+;;
+
+;; data maps
+;;
+
+;; public functions
+;;
+
+;; read only functions
 ;;
 
 ;; private functions
 ;;
 
-;; public functions
-;;
 "#,
                 self.contract_name
             )
