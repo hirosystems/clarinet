@@ -91,6 +91,8 @@ pub async fn run_bridge(
     call_read_only_fn_decl.name = "api/v1/call_read_only_fn";
     let mut get_assets_maps_decl = get_assets_maps::decl();
     get_assets_maps_decl.name = "api/v1/get_assets_maps";
+    let mut switch_epoch_decl = switch_epoch::decl();
+    switch_epoch_decl.name = "api/v1/switch_epoch";
     let mut deprecation_notice_decl = deprecation_notice::decl();
     deprecation_notice_decl.name = "api/v1/mine_empty_blocks";
 
@@ -103,6 +105,7 @@ pub async fn run_bridge(
             mine_empty_blocks_decl,
             call_read_only_fn_decl,
             get_assets_maps_decl,
+            switch_epoch_decl,
         ])
         .build();
     custom_extensions.push(clarinet);
@@ -833,6 +836,27 @@ fn mine_block(state: &mut OpState, args: MineBlockArgs) -> Result<String, AnyErr
     });
 
     Ok(payload.to_string())
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct SwitchEpochArgs {
+    session_id: u32,
+    epoch: String,
+}
+
+#[op]
+fn switch_epoch(state: &mut OpState, args: SwitchEpochArgs) -> Result<bool, AnyError> {
+    perform_block(state, args.session_id, |_name, session| {
+        let epoch = match args.epoch {
+            epoch if epoch.eq("2.0") => StacksEpochId::Epoch20,
+            epoch if epoch.eq("2.05") => StacksEpochId::Epoch2_05,
+            epoch if epoch.eq("2.1") => StacksEpochId::Epoch21,
+            _ => return Ok(false),
+        };
+        session.update_epoch(epoch);
+        Ok(true)
+    })
 }
 
 fn perform_block<F, R>(state: &mut OpState, session_id: u32, handler: F) -> Result<R, AnyError>

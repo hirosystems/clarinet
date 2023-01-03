@@ -4,4 +4,5 @@ requirements = []
 
 [contracts.billboard]
 path = "contracts/billboard.clar"
-depends_on = []
+clarity = 1
+epoch = "2.05"

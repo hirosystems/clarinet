@@ -469,7 +469,7 @@ export class DevnetNetworkOrchestrator {
    * @summary Start orchestrating containers
    * @memberof DevnetNetworkOrchestrator
    */
-  start(timeout: number = 600, emptyBuffer: boolean = true) {
+  start(timeout: number = 60, emptyBuffer: boolean = true) {
     return stacksDevnetStart.call(this.handle, timeout, emptyBuffer);
   }
 
@@ -623,8 +623,8 @@ export class DevnetNetworkOrchestrator {
    * @summary Wait for the next Bitcoin block
    * @memberof DevnetNetworkOrchestrator
    */
-  async waitForStacksBlockIncludingTransaction(txid: string): Promise<{ chainUpdate: StacksChainUpdate, transaction: Transaction }> {
-    while (true) {
+  async waitForStacksBlockIncludingTransaction(txid: string, ttl = 5): Promise<{ chainUpdate: StacksChainUpdate, transaction: Transaction }> {
+    while (ttl > 0) {
       let chainUpdate = await this.waitForNextStacksBlock();
       for (const transaction of chainUpdate.new_blocks[0].block.transactions) {
         if (transaction.transaction_identifier.hash.endsWith(txid)) {
@@ -634,7 +634,9 @@ export class DevnetNetworkOrchestrator {
           };
         }
       }
+      ttl -= 1;
     }
+    throw 'waitForStacksBlockIncludingTransaction TTL expired'
   };
 
   /**

@@ -203,6 +203,17 @@ export class Chain {
     };
     return assetsMaps;
   }
+
+  switchEpoch(epoch: string): boolean {
+    const result = JSON.parse(
+      // @ts-ignore
+      Deno.core.opSync("api/v1/switch_epoch", {
+        sessionId: this.sessionId,
+        epoch: epoch
+      })
+    );
+    return result;
+  }
 }
 
 type PreDeploymentFunction = (
