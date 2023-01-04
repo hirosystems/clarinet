@@ -441,7 +441,7 @@ impl DevnetOrchestrator {
             };
         }
 
-        // Start Hyperchain node
+        // Start subnet node
         if enable_subnet_node {
             let _ = event_tx.send(DevnetEvent::info(format!("Starting subnet-node")));
             match self.prepare_subnet_node_container(boot_index, ctx).await {
@@ -1339,7 +1339,7 @@ events_keys = ["*"]
             tty: None,
             exposed_ports: Some(exposed_ports),
             entrypoint: Some(vec![
-                "hyperchain-node".into(),
+                "subnet-node".into(),
                 "start".into(),
                 "--config=/src/subnet-node/Subnet.toml".into(),
             ]),
