@@ -85,7 +85,7 @@
           },
           "clarity-lsp.completionSmartParenthesisWrap": {
             "type": "boolean",
-            "default": false,
+            "default": true,
             "order": 0,
             "description": "If set to true, the completion won't wrap a function in parenthesis if an opening parenthesis is already there"
           },

@@ -27,7 +27,10 @@ use std::collections::{BTreeMap, HashMap, HashSet};
 use std::vec;
 
 use super::requests::capabilities::InitializationOptions;
-use super::requests::completion::{COMPLETION_ITEMS_CLARITY_1, COMPLETION_ITEMS_CLARITY_2};
+use super::requests::completion::{
+    get_contract_defined_data, populate_snippet_with_options, COMPLETION_ITEMS_CLARITY_1,
+    COMPLETION_ITEMS_CLARITY_2,
+};
 use super::requests::definitions::{get_definitions, DefinitionLocation};
 use super::requests::document_symbols::ASTSymbols;
 use super::requests::helpers::{get_atom_start_at_position, get_public_function_definitions};
@@ -317,6 +320,9 @@ impl EditorState {
             .and_then(|p| Some(p.get_completion_items_for_contract(contract_location)))
             .unwrap_or_default();
 
+        let contract_defined_data =
+            get_contract_defined_data(contract.expressions.as_ref()).unwrap_or_default();
+
         let mut completion_items = vec![];
         for mut item in [native_keywords, user_defined_keywords].concat().drain(..) {
             match item.kind {
@@ -326,10 +332,19 @@ impl EditorState {
                     | CompletionItemKind::MODULE
                     | CompletionItemKind::CLASS,
                 ) => {
+                    let mut snippet = item.insert_text.take().unwrap();
+                    if item.kind == Some(CompletionItemKind::FUNCTION) {
+                        snippet = populate_snippet_with_options(
+                            &item.label,
+                            &snippet,
+                            &contract_defined_data,
+                        );
+                    }
+
                     item.insert_text = if should_wrap {
-                        Some(format!("({})", item.insert_text.take().unwrap()))
+                        Some(format!("({})", snippet))
                     } else {
-                        Some(item.insert_text.take().unwrap())
+                        Some(snippet)
                     };
                 }
                 _ => {}

@@ -20,7 +20,7 @@ pub enum DefinitionLocation {
 // `global` holds all of the top-level user-defined keywords that are available in the global scope
 // `local` holds the locally user-defined keywords: function parameters, let and match bindings
 // when a user-defined keyword is used in the code, its position and definition location are stored in `tokens`
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Default)]
 pub struct Definitions {
     pub tokens: HashMap<(u32, u32), DefinitionLocation>,
     global: HashMap<ClarityName, Range>,
@@ -31,10 +31,8 @@ pub struct Definitions {
 impl<'a> Definitions {
     pub fn new(deployer: Option<StandardPrincipalData>) -> Self {
         Self {
-            tokens: HashMap::new(),
-            global: HashMap::new(),
-            local: HashMap::new(),
             deployer,
+            ..Default::default()
         }
     }
 
