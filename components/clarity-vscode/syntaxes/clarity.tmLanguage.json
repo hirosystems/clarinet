@@ -46,6 +46,7 @@
       "name": "meta.define-function",
       "patterns": [
         { "include": "#expression" },
+        { "include": "#user-func" },
         {
           "begin": "(?x) (\\() \\s* ([a-zA-Z][a-zA-Z0-9_\\-\\!\\?]*) \\s*",
           "end": "(\\))",

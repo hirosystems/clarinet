@@ -17,7 +17,9 @@ use clarity_repl::clarity::vm::types::{QualifiedContractIdentifier, StandardPrin
 use clarity_repl::clarity::vm::EvaluationResult;
 use clarity_repl::clarity::{ClarityName, ClarityVersion, SymbolicExpression};
 use clarity_repl::repl::{ContractDeployer, DEFAULT_CLARITY_VERSION};
-use lsp_types::{DocumentSymbol, Hover, Location, MessageType, Position, Range, Url};
+use lsp_types::{
+    DocumentSymbol, Hover, Location, MessageType, Position, Range, SignatureHelp, Url,
+};
 use std::borrow::BorrowMut;
 use std::collections::{BTreeMap, HashMap, HashSet};
 use std::vec;
@@ -26,6 +28,7 @@ use super::requests::definitions::{get_definitions, DefinitionLocation};
 use super::requests::document_symbols::ASTSymbols;
 use super::requests::helpers::{get_atom_start_at_position, get_public_function_definitions};
 use super::requests::hover::get_expression_documentation;
+use super::requests::signature_help::get_signatures;
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct ActiveContractData {
@@ -398,6 +401,27 @@ impl EditorState {
                 value: documentation.to_string(),
             }),
             range: None,
+        })
+    }
+
+    pub fn get_signature_help(
+        &self,
+        contract_location: &FileLocation,
+        position: &lsp_types::Position,
+        active_signature: Option<u32>,
+    ) -> Option<SignatureHelp> {
+        let contract = self.active_contracts.get(&contract_location)?;
+        let position = Position {
+            line: position.line + 1,
+            character: position.character + 1,
+        };
+
+        let signatures = get_signatures(contract, &position)?;
+
+        Some(SignatureHelp {
+            signatures,
+            active_signature,
+            active_parameter: None,
         })
     }
 

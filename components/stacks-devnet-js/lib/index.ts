@@ -186,13 +186,19 @@ export interface DevnetConfig {
   stacks_explorer_port?: number;
   /**
    * Bind bitcoind and stacks-node data volumes (false by default)
-   * @type {number}
+   * @type {boolean}
    * @memberof DevnetConfig
    */
   bind_containers_volumes?: boolean;
   /**
+   * Have the containers communicating through the gateway (false by default, required for certain docker setup)
+   * @type {boolean}
+   * @memberof DevnetConfig
+   */
+  use_docker_gateway_routing?: boolean;
+  /**
    * Disable Bitcoin automining
-   * @type {number}
+   * @type {boolean}
    * @memberof DevnetConfig
    */
   bitcoin_controller_automining_disabled?: boolean;
@@ -463,7 +469,7 @@ export class DevnetNetworkOrchestrator {
    * @summary Start orchestrating containers
    * @memberof DevnetNetworkOrchestrator
    */
-  start(timeout: number = 600, emptyBuffer: boolean = true) {
+  start(timeout: number = 60, emptyBuffer: boolean = true) {
     return stacksDevnetStart.call(this.handle, timeout, emptyBuffer);
   }
 
@@ -617,8 +623,8 @@ export class DevnetNetworkOrchestrator {
    * @summary Wait for the next Bitcoin block
    * @memberof DevnetNetworkOrchestrator
    */
-  async waitForStacksBlockIncludingTransaction(txid: string): Promise<{ chainUpdate: StacksChainUpdate, transaction: Transaction }> {
-    while (true) {
+  async waitForStacksBlockIncludingTransaction(txid: string, ttl = 5): Promise<{ chainUpdate: StacksChainUpdate, transaction: Transaction }> {
+    while (ttl > 0) {
       let chainUpdate = await this.waitForNextStacksBlock();
       for (const transaction of chainUpdate.new_blocks[0].block.transactions) {
         if (transaction.transaction_identifier.hash.endsWith(txid)) {
@@ -628,7 +634,9 @@ export class DevnetNetworkOrchestrator {
           };
         }
       }
+      ttl -= 1;
     }
+    throw 'waitForStacksBlockIncludingTransaction TTL expired'
   };
 
   /**

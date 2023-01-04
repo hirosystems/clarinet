@@ -6,6 +6,7 @@ use clarity_lsp::backend::{
 };
 use clarity_lsp::lsp_types::{
     DocumentSymbolParams, DocumentSymbolResponse, GotoDefinitionParams, GotoDefinitionResponse,
+    SignatureHelp, SignatureHelpParams,
 };
 use clarity_lsp::state::EditorState;
 use crossbeam_channel::{Receiver as MultiplexableReceiver, Select, Sender as MultiplexableSender};
@@ -175,6 +176,21 @@ impl LanguageServer for LspNativeBridge {
         let response_rx = self.response_rx.lock().expect("failed to lock response_rx");
         let ref response = response_rx.recv().expect("failed to get value from recv");
         if let LspResponse::Request(LspRequestResponse::Hover(data)) = response {
+            return Ok(data.to_owned());
+        }
+
+        Ok(None)
+    }
+
+    async fn signature_help(&self, params: SignatureHelpParams) -> Result<Option<SignatureHelp>> {
+        let _ = match self.request_tx.lock() {
+            Ok(tx) => tx.send(LspRequest::SignatureHelp(params)),
+            Err(_) => return Ok(None),
+        };
+
+        let response_rx = self.response_rx.lock().expect("failed to lock response_rx");
+        let ref response = response_rx.recv().expect("failed to get value from recv");
+        if let LspResponse::Request(LspRequestResponse::SignatureHelp(data)) = response {
             return Ok(data.to_owned());
         }
 

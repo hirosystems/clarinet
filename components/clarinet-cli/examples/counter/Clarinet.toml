@@ -6,7 +6,8 @@ telemetry = false
 
 [contracts.counter]
 path = "contracts/counter.clar"
-depends_on = []
+clarity = 1
+epoch = "2.05"
 
 [repl.analysis]
 passes = ["check_checker"]

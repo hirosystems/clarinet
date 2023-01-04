@@ -16,7 +16,7 @@ use toml::value::Value;
 pub const DEFAULT_DERIVATION_PATH: &str = "m/44'/5757'/0'/0/0";
 pub const DEFAULT_BITCOIN_NODE_IMAGE: &str = "quay.io/hirosystems/bitcoind:devnet-v2";
 pub const DEFAULT_STACKS_NODE_IMAGE: &str = "quay.io/hirosystems/stacks-node:devnet-v2";
-pub const DEFAULT_STACKS_NODE_NEXT_IMAGE: &str = "quay.io/hirosystems/stacks-node:devnet-v3-beta2";
+pub const DEFAULT_STACKS_NODE_NEXT_IMAGE: &str = "quay.io/hirosystems/stacks-node:devnet-v3-beta3";
 pub const DEFAULT_BITCOIN_EXPLORER_IMAGE: &str = "quay.io/hirosystems/bitcoin-explorer:devnet";
 pub const DEFAULT_STACKS_API_IMAGE: &str = "hirosystems/stacks-blockchain-api:latest";
 pub const DEFAULT_STACKS_API_NEXT_IMAGE: &str = "hirosystems/stacks-blockchain-api:stacks-2.1";
@@ -121,6 +121,7 @@ pub struct DevnetConfigFile {
     pub epoch_2_05: Option<u64>,
     pub epoch_2_1: Option<u64>,
     pub pox_2_activation: Option<u64>,
+    pub use_docker_gateway_routing: Option<bool>,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -237,6 +238,7 @@ pub struct DevnetConfig {
     pub epoch_2_05: u64,
     pub epoch_2_1: u64,
     pub pox_2_activation: u64,
+    pub use_docker_gateway_routing: bool,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -610,6 +612,10 @@ impl NetworkManifest {
                 if let Some(val) = devnet_override.network_id {
                     devnet_config.network_id = Some(val);
                 }
+
+                if let Some(val) = devnet_override.use_docker_gateway_routing {
+                    devnet_config.use_docker_gateway_routing = Some(val);
+                }
             };
 
             let now = clarity_repl::clarity::util::get_epoch_time_secs();
@@ -856,6 +862,9 @@ impl NetworkManifest {
                     .take()
                     .unwrap_or(vec![]),
                 enable_next_features,
+                use_docker_gateway_routing: devnet_config
+                    .use_docker_gateway_routing
+                    .unwrap_or(false),
             };
             if !config.disable_stacks_api && config.disable_stacks_api {
                 config.disable_stacks_api = false;

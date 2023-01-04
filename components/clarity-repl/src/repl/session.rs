@@ -126,6 +126,7 @@ pub struct Session {
     pub show_costs: bool,
     pub executed: Vec<String>,
     pub current_epoch: StacksEpochId,
+    keywords_reference: HashMap<String, String>,
 }
 
 impl Session {
@@ -154,6 +155,7 @@ impl Session {
             settings,
             executed: Vec::new(),
             current_epoch: StacksEpochId::Epoch2_05,
+            keywords_reference: clarity_keywords(),
         }
     }
 
@@ -246,8 +248,8 @@ impl Session {
         match command {
             "::help" => self.display_help(&mut output),
             "/-/" => self.easter_egg(&mut output),
-            cmd if cmd.starts_with("::list_functions") => self.display_functions(&mut output),
-            cmd if cmd.starts_with("::describe_function") => self.display_doc(&mut output, cmd),
+            cmd if cmd.starts_with("::functions") => self.display_functions(&mut output),
+            cmd if cmd.starts_with("::describe") => self.display_doc(&mut output, cmd),
             cmd if cmd.starts_with("::mint_stx") => self.mint_stx(&mut output, cmd),
             cmd if cmd.starts_with("::set_tx_sender") => {
                 self.parse_and_set_tx_sender(&mut output, cmd)
@@ -272,6 +274,7 @@ impl Session {
             cmd if cmd.starts_with("::reload") => reload = true,
             #[cfg(feature = "cli")]
             cmd if cmd.starts_with("::read") => self.read(&mut output, cmd),
+            cmd if cmd.starts_with("::keywords") => self.keywords(&mut output),
 
             snippet => self.run_snippet(&mut output, self.show_costs, snippet),
         }
@@ -302,7 +305,12 @@ impl Session {
         };
 
         if let Some(cost) = cost {
-            let headers = vec!["".to_string(), "Consumed".to_string(), "Limit".to_string()];
+            let headers = vec![
+                "".to_string(),
+                "Consumed".to_string(),
+                "Limit".to_string(),
+                "Percentage".to_string(),
+            ];
             let mut headers_cells = vec![];
             for header in headers.iter() {
                 headers_cells.push(Cell::new(&header));
@@ -313,30 +321,52 @@ impl Session {
                 Cell::new("Runtime"),
                 Cell::new(&cost.total.runtime.to_string()),
                 Cell::new(&cost.limit.runtime.to_string()),
+                Cell::new(&(Self::get_costs_percentage(&cost.total.runtime, &cost.limit.runtime))),
             ]));
             table.add_row(Row::new(vec![
                 Cell::new("Read count"),
                 Cell::new(&cost.total.read_count.to_string()),
                 Cell::new(&cost.limit.read_count.to_string()),
+                Cell::new(
+                    &(Self::get_costs_percentage(&cost.total.read_count, &cost.limit.read_count)),
+                ),
             ]));
             table.add_row(Row::new(vec![
                 Cell::new("Read length (bytes)"),
                 Cell::new(&cost.total.read_length.to_string()),
                 Cell::new(&cost.limit.read_length.to_string()),
+                Cell::new(
+                    &(Self::get_costs_percentage(&cost.total.read_length, &cost.limit.read_length)),
+                ),
             ]));
             table.add_row(Row::new(vec![
                 Cell::new("Write count"),
                 Cell::new(&cost.total.write_count.to_string()),
                 Cell::new(&cost.limit.write_count.to_string()),
+                Cell::new(
+                    &(Self::get_costs_percentage(&cost.total.write_count, &cost.limit.write_count)),
+                ),
             ]));
             table.add_row(Row::new(vec![
                 Cell::new("Write length (bytes)"),
                 Cell::new(&cost.total.write_length.to_string()),
                 Cell::new(&cost.limit.write_length.to_string()),
+                Cell::new(
+                    &(Self::get_costs_percentage(
+                        &cost.total.write_length,
+                        &cost.limit.write_length,
+                    )),
+                ),
             ]));
             output.push(format!("{}", table));
         }
         output.append(&mut result);
+    }
+
+    fn get_costs_percentage(consumed: &u64, limit: &u64) -> String {
+        let calc = (*consumed as f64 / *limit as f64) * 100_f64;
+
+        format!("{calc:.2} %")
     }
 
     pub fn formatted_interpretation<'a, 'hooks>(
@@ -697,13 +727,31 @@ impl Session {
         }
     }
 
-    pub fn lookup_api_reference(&self, keyword: &str) -> Option<&String> {
-        self.api_reference.get(keyword)
+    pub fn lookup_functions_or_keywords_docs(&self, exp: &str) -> Option<&String> {
+        if let Some(function_doc) = self.api_reference.get(exp) {
+            return Some(function_doc);
+        }
+
+        if let Some(keyword_doc) = self.keywords_reference.get(exp) {
+            return Some(keyword_doc);
+        }
+
+        None
     }
 
     pub fn get_api_reference_index(&self) -> Vec<String> {
         let mut keys = self
             .api_reference
+            .iter()
+            .map(|(k, _)| k.to_string())
+            .collect::<Vec<String>>();
+        keys.sort();
+        keys
+    }
+
+    pub fn get_clarity_keywords(&self) -> Vec<String> {
+        let mut keys = self
+            .keywords_reference
             .iter()
             .map(|(k, _)| k.to_string())
             .collect::<Vec<String>>();
@@ -720,14 +768,18 @@ impl Session {
         ));
         output.push(format!(
             "{}",
-            help_colour.paint(
-                "::list_functions\t\t\tDisplay all the native functions available in clarity"
-            )
+            help_colour
+                .paint("::functions\t\t\t\tDisplay all the native functions available in clarity")
+        ));
+        output.push(format!(
+            "{}",
+            help_colour
+                .paint("::keywords\t\t\t\tDisplay all the native keywords available in clarity")
         ));
         output.push(format!(
             "{}",
             help_colour.paint(
-                "::describe_function <function>\t\tDisplay documentation for a given native function fn-name"
+                "::describe <function> | <keyword>\tDisplay documentation for a given native function or keyword"
             )
         ));
         output.push(format!(
@@ -954,8 +1006,14 @@ impl Session {
     }
 
     pub fn get_costs(&mut self, output: &mut Vec<String>, cmd: &str) {
-        let snippet = cmd.to_string().split_off("::get_costs ".len());
-        self.run_snippet(output, true, &snippet.to_string());
+        let command: String = cmd.to_owned();
+        let v: Vec<&str> = command.split_whitespace().collect();
+
+        if v.len() != 2 {
+            output.push(red!(format!("::get_costs command needs an argument")));
+        } else {
+            self.run_snippet(output, true, &v[1].to_string());
+        }
     }
 
     #[cfg(feature = "cli")]
@@ -964,7 +1022,14 @@ impl Session {
         if accounts.len() > 0 {
             let tokens = self.interpreter.get_tokens();
             let mut headers = vec!["Address".to_string()];
-            headers.append(&mut tokens.clone());
+            for token in tokens.iter() {
+                if token == "STX" {
+                    headers.push(String::from("uSTX"));
+                } else {
+                    headers.push(String::from(token));
+                }
+            }
+
             let mut headers_cells = vec![];
             for header in headers.iter() {
                 headers_cells.push(Cell::new(&header));
@@ -1108,13 +1173,17 @@ impl Session {
         let help_accent_colour = Colour::Yellow.bold();
         let keyword = {
             let mut s = command.to_string();
-            s = s.replace("::describe_function", "");
+            s = s.replace("::describe", "");
             s = s.replace(" ", "");
             s
         };
-        let result = match self.lookup_api_reference(&keyword) {
+
+        let result = match self.lookup_functions_or_keywords_docs(&keyword) {
             Some(doc) => format!("{}", help_colour.paint(doc)),
-            None => format!("{}", help_colour.paint("Function unknown")),
+            None => format!(
+                "{}",
+                Colour::Red.paint("It looks like there aren't matches for your search")
+            ),
         };
         output.push(result);
     }
@@ -1124,6 +1193,12 @@ impl Session {
         self.get_contracts(&mut output);
         self.get_accounts(&mut output);
         Ok(output.join("\n"))
+    }
+
+    fn keywords(&self, output: &mut Vec<String>) {
+        let help_colour = Colour::Yellow;
+        let keywords = self.get_clarity_keywords();
+        output.push(format!("{}", help_colour.paint(keywords.join("\n"))));
     }
 }
 
@@ -1198,18 +1273,25 @@ fn build_api_reference() -> HashMap<String, String> {
         api_reference.insert(api.name, doc);
     }
 
+    api_reference
+}
+
+fn clarity_keywords() -> HashMap<String, String> {
+    let mut keywords = HashMap::new();
+
     for func in NativeVariables::ALL.iter() {
-        if let Some(api) = make_keyword_reference(&func) {
+        if let Some(key) = make_keyword_reference(&func) {
             let description = {
-                let mut s = api.description.to_string();
+                let mut s = key.description.to_string();
                 s = s.replace("\n", " ");
                 s
             };
-            let doc = format!("Description\n{}\n\nExamples\n{}", description, api.example);
-            api_reference.insert(api.name.to_string(), doc);
+            let doc = format!("Description\n{}\n\nExamples\n{}", description, key.example);
+            keywords.insert(key.name.to_string(), doc);
         }
     }
-    api_reference
+
+    keywords
 }
 
 #[cfg(test)]

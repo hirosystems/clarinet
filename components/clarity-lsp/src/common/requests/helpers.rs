@@ -10,10 +10,16 @@ use lsp_types::{Position, Range};
 use crate::utils::log;
 
 pub fn span_to_range(span: &Span) -> Range {
-    Range::new(
-        Position::new(span.start_line - 1, span.start_column - 1),
-        Position::new(span.end_line - 1, span.end_column),
-    )
+    if span == &Span::zero() {
+        return Range::default();
+    }
+
+    {
+        Range::new(
+            Position::new(span.start_line - 1, span.start_column - 1),
+            Position::new(span.end_line - 1, span.end_column),
+        )
+    }
 }
 
 // end_offset is usded to include the end position of a keyword, for go to definition in particular
