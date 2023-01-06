@@ -81,48 +81,48 @@
             "type": "boolean",
             "default": true,
             "order": 0,
-            "description": "Allow auto completion for native and user-defined functions"
+            "description": "Allow auto-completion for native and user-defined functions."
           },
           "clarity-lsp.completionSmartParenthesisWrap": {
             "type": "boolean",
             "default": true,
             "order": 0,
-            "description": "If set to true, the completion won't wrap a function in parenthesis if an opening parenthesis is already there"
+            "description": "If set to true, the auto-completion won't wrap a function with a parenthesis if an opening parenthesis is already there."
           },
           "clarity-lsp.completionIncludeNativePlaceholders": {
             "type": "boolean",
             "default": true,
             "order": 0,
-            "description": "If set to true, the completion of native functions will include arguments placeholder. If set to false, it will only do so for functions interacting with variables, maps, fts and nfts."
+            "description": "If set to true, the auto-completion of native functions will include arguments placeholder. If set to false, it will only do so for functions interacting with variables, maps, FTs, and NFTs."
           },
           "clarity-lsp.hover": {
             "type": "boolean",
             "default": true,
             "order": 0,
-            "description": "Show documentation for native function and keywords on hover"
+            "description": "Show documentation for native function and keywords on hover."
           },
           "clarity-lsp.documentSymbols": {
             "type": "boolean",
             "default": false,
             "order": 0,
-            "description": "Show contract symbols in breadcrumb (beta)"
+            "description": "Show contract symbols in breadcrumb (beta)."
           },
           "clarity-lsp.goToDefinition": {
             "type": "boolean",
             "default": true,
             "order": 0,
-            "description": "Enable go to definition"
+            "description": "Enable go to definition."
           },
           "clarity-lsp.signatureHelp": {
             "type": "boolean",
             "default": true,
             "order": 0,
-            "description": "Show function signature help"
+            "description": "Show function signature help."
           },
           "clarity-lsp.debug.logRequestsTimings": {
             "type": "boolean",
             "default": false,
-            "description": "Log LSP requests performances"
+            "description": "Log LSP requests performances."
           }
         }
       }
