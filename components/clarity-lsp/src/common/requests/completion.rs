@@ -12,6 +12,10 @@ use lsp_types::{
 };
 
 lazy_static! {
+    static ref COMPLETION_ITEMS_CLARITY_1: Vec<CompletionItem> =
+        build_default_native_keywords_list(ClarityVersion::Clarity1);
+    static ref COMPLETION_ITEMS_CLARITY_2: Vec<CompletionItem> =
+        build_default_native_keywords_list(ClarityVersion::Clarity2);
     static ref VAR_FUNCTIONS: Vec<String> = vec![
         NativeFunctions::SetVar.to_string(),
         NativeFunctions::FetchVar.to_string(),
@@ -35,10 +39,6 @@ lazy_static! {
         NativeFunctions::MintAsset.to_string(),
         NativeFunctions::TransferAsset.to_string(),
     ];
-    pub static ref COMPLETION_ITEMS_CLARITY_1: Vec<CompletionItem> =
-        build_default_native_keywords_list(ClarityVersion::Clarity1);
-    pub static ref COMPLETION_ITEMS_CLARITY_2: Vec<CompletionItem> =
-        build_default_native_keywords_list(ClarityVersion::Clarity2);
 }
 
 #[derive(Clone, Debug, Default)]
@@ -47,182 +47,160 @@ pub struct ContractDefinedData {
     pub maps: Vec<String>,
     pub fts: Vec<String>,
     pub nfts: Vec<String>,
+    pub consts: Vec<(String, String)>,
 }
 
-pub fn get_contract_defined_data(
-    expressions: Option<&Vec<SymbolicExpression>>,
-) -> Option<ContractDefinedData> {
-    let mut defined_data = ContractDefinedData {
-        ..Default::default()
-    };
-
-    for expression in expressions? {
-        let (define_function, args) = expression.match_list()?.split_first()?;
-        match DefineFunctions::lookup_by_name(define_function.match_atom()?)? {
-            DefineFunctions::PersistedVariable => defined_data
-                .vars
-                .push(args.first()?.match_atom()?.to_string()),
-            DefineFunctions::Map => defined_data
-                .maps
-                .push(args.first()?.match_atom()?.to_string()),
-            DefineFunctions::FungibleToken => defined_data
-                .fts
-                .push(args.first()?.match_atom()?.to_string()),
-            DefineFunctions::NonFungibleToken => defined_data
-                .nfts
-                .push(args.first()?.match_atom()?.to_string()),
-            _ => (),
+impl ContractDefinedData {
+    pub fn new(expressions: &Vec<SymbolicExpression>) -> Self {
+        let mut defined_data = ContractDefinedData::default();
+        for expression in expressions {
+            expression
+                .match_list()
+                .and_then(|list| list.split_first())
+                .and_then(|(function_name, args)| {
+                    Some((
+                        DefineFunctions::lookup_by_name(function_name.match_atom()?),
+                        args.first()?.match_atom()?.to_string(),
+                        args,
+                    ))
+                })
+                .and_then(|(define_function, name, args)| {
+                    match define_function {
+                        Some(DefineFunctions::PersistedVariable) => defined_data.vars.push(name),
+                        Some(DefineFunctions::Map) => defined_data.maps.push(name),
+                        Some(DefineFunctions::FungibleToken) => defined_data.fts.push(name),
+                        Some(DefineFunctions::NonFungibleToken) => defined_data.nfts.push(name),
+                        Some(DefineFunctions::Constant) => {
+                            defined_data.consts.push((name, args.last()?.to_string()))
+                        }
+                        _ => (),
+                    };
+                    Some(())
+                });
         }
-    }
-    Some(defined_data)
-}
-
-#[cfg(test)]
-mod get_contract_defined_data_tests {
-    use clarity_repl::clarity::ast::build_ast_with_rules;
-    use clarity_repl::clarity::stacks_common::types::StacksEpochId;
-    use clarity_repl::clarity::{vm::types::QualifiedContractIdentifier, ClarityVersion};
-
-    use super::{get_contract_defined_data, ContractDefinedData};
-
-    fn get_defined_data(source: &str) -> Option<ContractDefinedData> {
-        let contract_ast = build_ast_with_rules(
-            &QualifiedContractIdentifier::transient(),
-            source,
-            &mut (),
-            ClarityVersion::Clarity2,
-            StacksEpochId::Epoch21,
-            clarity_repl::clarity::ast::ASTRules::Typical,
-        )
-        .unwrap();
-        get_contract_defined_data(Some(&contract_ast.expressions))
+        defined_data
     }
 
-    #[test]
-    fn get_data_vars() {
-        let data = get_defined_data(
-            "(define-data-var counter uint u1) (define-data-var is-active bool true)",
-        )
-        .unwrap_or_default();
-        assert_eq!(data.vars, ["counter", "is-active"]);
+    pub fn populate_snippet_with_options(&self, name: &String, snippet: &String) -> Option<String> {
+        if VAR_FUNCTIONS.contains(name) && self.vars.len() > 0 {
+            let choices = self.vars.join(",");
+            return Some(snippet.replace("${1:var}", &format!("${{1|{:}|}}", choices)));
+        }
+        if MAP_FUNCTIONS.contains(name) && self.maps.len() > 0 {
+            let choices = self.maps.join(",");
+            return Some(snippet.replace("${1:map-name}", &format!("${{1|{:}|}}", choices)));
+        }
+        if FT_FUNCTIONS.contains(name) && self.fts.len() > 0 {
+            let choices = self.fts.join(",");
+            return Some(snippet.replace("${1:token-name}", &format!("${{1|{:}|}}", choices)));
+        }
+        if NFT_FUNCTIONS.contains(name) && self.nfts.len() > 0 {
+            let choices = self.nfts.join(",");
+            return Some(snippet.replace("${1:asset-name}", &format!("${{1|{:}|}}", choices)));
+        }
+        None
     }
 
-    #[test]
-    fn get_map() {
-        let data = get_defined_data("(define-map names principal { name: (buff 48) })")
-            .unwrap_or_default();
-        assert_eq!(data.maps, ["names"]);
-    }
-
-    #[test]
-    fn get_fts() {
-        let data = get_defined_data("(define-fungible-token clarity-coin)").unwrap_or_default();
-        assert_eq!(data.fts, ["clarity-coin"]);
-    }
-
-    #[test]
-    fn get_nfts() {
-        let data =
-            get_defined_data("(define-non-fungible-token bitcoin-nft uint)").unwrap_or_default();
-        assert_eq!(data.nfts, ["bitcoin-nft"]);
+    pub fn get_consts_completion_item(&self) -> Vec<CompletionItem> {
+        self.consts
+            .iter()
+            .map(|(name, definition)| {
+                CompletionItem::new_simple(name.to_string(), definition.to_string())
+            })
+            .collect()
     }
 }
 
-pub fn populate_snippet_with_options(
-    name: &String,
-    snippet: &String,
-    defined_data: &ContractDefinedData,
-) -> String {
-    if VAR_FUNCTIONS.contains(name) && defined_data.vars.len() > 0 {
-        let choices = defined_data.vars.join(",");
-        return snippet.replace("${1:var}", &format!("${{1|{:}|}}", choices));
-    } else if MAP_FUNCTIONS.contains(name) && defined_data.maps.len() > 0 {
-        let choices = defined_data.maps.join(",");
-        return snippet.replace("${1:map-name}", &format!("${{1|{:}|}}", choices));
-    } else if FT_FUNCTIONS.contains(name) && defined_data.fts.len() > 0 {
-        let choices = defined_data.fts.join(",");
-        return snippet.replace("${1:token-name}", &format!("${{1|{:}|}}", choices));
-    } else if NFT_FUNCTIONS.contains(name) && defined_data.nfts.len() > 0 {
-        let choices = defined_data.nfts.join(",");
-        return snippet.replace("${1:asset-name}", &format!("${{1|{:}|}}", choices));
+pub fn build_completion_item_list(
+    contract_defined_data: &ContractDefinedData,
+    clarity_version: &ClarityVersion,
+    user_defined_keywords: Vec<CompletionItem>,
+    should_wrap: bool,
+    include_native_placeholders: bool,
+) -> Vec<CompletionItem> {
+    let native_keywords = match clarity_version {
+        ClarityVersion::Clarity1 => COMPLETION_ITEMS_CLARITY_1.to_vec(),
+        ClarityVersion::Clarity2 => COMPLETION_ITEMS_CLARITY_2.to_vec(),
+    };
+    let mut completion_items = vec![];
+    completion_items.append(&mut contract_defined_data.get_consts_completion_item());
+    for mut item in [native_keywords, user_defined_keywords].concat().drain(..) {
+        match item.kind {
+            Some(
+                CompletionItemKind::EVENT
+                | CompletionItemKind::FUNCTION
+                | CompletionItemKind::MODULE
+                | CompletionItemKind::CLASS,
+            ) => {
+                let mut snippet = item.insert_text.take().unwrap();
+                let mut snippet_has_choices = false;
+                if item.kind == Some(CompletionItemKind::FUNCTION) {
+                    if let Some(populated_snippet) =
+                        contract_defined_data.populate_snippet_with_options(&item.label, &snippet)
+                    {
+                        snippet_has_choices = true;
+                        snippet = populated_snippet;
+                    }
+                }
+                if !include_native_placeholders
+                    && !snippet_has_choices
+                    && (item.kind == Some(CompletionItemKind::FUNCTION)
+                        || item.kind == Some(CompletionItemKind::CLASS))
+                {
+                    match item.label.as_str() {
+                        "+ (add)" => {
+                            snippet = "+".to_string();
+                        }
+                        "- (subtract)" => {
+                            snippet = "-".to_string();
+                        }
+                        "/ (divide)" => {
+                            snippet = "/".to_string();
+                        }
+                        "* (multiply)" => {
+                            snippet = "*".to_string();
+                        }
+                        "< (less than)" => {
+                            snippet = "<".to_string();
+                        }
+                        "<= (less than or equal)" => {
+                            snippet = "<=".to_string();
+                        }
+                        "> (greater than)" => {
+                            snippet = ">".to_string();
+                        }
+                        ">= (greater than or equal)" => {
+                            snippet = ">=".to_string();
+                        }
+                        _ => snippet = item.label.clone(),
+                    }
+                    snippet.push_str(" $0");
+                }
+
+                item.insert_text = if should_wrap {
+                    Some(format!("({})", snippet))
+                } else {
+                    Some(snippet)
+                };
+            }
+            Some(CompletionItemKind::TYPE_PARAMETER) => {
+                if should_wrap {
+                    match item.label.as_str() {
+                        "tuple" | "buff" | "string-ascii" | "string-utf8" | "optional"
+                        | "response" | "principal" => {
+                            item.insert_text = Some(format!("({} $0)", item.label));
+                            item.insert_text_format = Some(InsertTextFormat::SNIPPET);
+                        }
+                        _ => (),
+                    }
+                }
+            }
+            _ => {}
+        }
+
+        completion_items.push(item);
     }
-    return snippet.to_string();
-}
-
-#[cfg(test)]
-mod populate_snippet_with_options_tests {
-    use clarity_repl::clarity::ast::build_ast_with_rules;
-    use clarity_repl::clarity::stacks_common::types::StacksEpochId;
-    use clarity_repl::clarity::{vm::types::QualifiedContractIdentifier, ClarityVersion};
-
-    use super::{get_contract_defined_data, populate_snippet_with_options, ContractDefinedData};
-
-    fn get_defined_data(source: &str) -> Option<ContractDefinedData> {
-        let contract_ast = build_ast_with_rules(
-            &QualifiedContractIdentifier::transient(),
-            source,
-            &mut (),
-            ClarityVersion::Clarity2,
-            StacksEpochId::Epoch21,
-            clarity_repl::clarity::ast::ASTRules::Typical,
-        )
-        .unwrap();
-        get_contract_defined_data(Some(&contract_ast.expressions))
-    }
-
-    #[test]
-    fn get_data_vars_snippet() {
-        let data = get_defined_data(
-            "(define-data-var counter uint u1) (define-data-var is-active bool true)",
-        )
-        .unwrap_or_default();
-
-        let snippet = populate_snippet_with_options(
-            &"var-get".to_string(),
-            &"var-get ${1:var}".to_string(),
-            &data,
-        );
-        assert_eq!(snippet, "var-get ${1|counter,is-active|}");
-    }
-
-    #[test]
-    fn get_map_snippet() {
-        let data = get_defined_data("(define-map names principal { name: (buff 48) })")
-            .unwrap_or_default();
-
-        let snippet = populate_snippet_with_options(
-            &"map-get?".to_string(),
-            &"map-get? ${1:map-name} ${2:key-tuple}".to_string(),
-            &data,
-        );
-        assert_eq!(snippet, "map-get? ${1|names|} ${2:key-tuple}");
-    }
-
-    #[test]
-    fn get_fts_snippet() {
-        let data = get_defined_data("(define-fungible-token btc u21)").unwrap_or_default();
-        let snippet = populate_snippet_with_options(
-            &"ft-mint?".to_string(),
-            &"ft-mint? ${1:token-name} ${2:amount} ${3:recipient}".to_string(),
-            &data,
-        );
-        assert_eq!(snippet, "ft-mint? ${1|btc|} ${2:amount} ${3:recipient}");
-    }
-
-    #[test]
-    fn get_nfts_snippet() {
-        let data =
-            get_defined_data("(define-non-fungible-token bitcoin-nft uint)").unwrap_or_default();
-        let snippet = populate_snippet_with_options(
-            &"nft-mint?".to_string(),
-            &"nft-mint? ${1:asset-name} ${2:asset-identifier} ${3:recipient}".to_string(),
-            &data,
-        );
-        assert_eq!(
-            snippet,
-            "nft-mint? ${1|bitcoin-nft|} ${2:asset-identifier} ${3:recipient}"
-        );
-    }
+    completion_items
 }
 
 pub fn check_if_should_wrap(source: &str, position: &Position) -> bool {
@@ -250,6 +228,12 @@ pub fn build_default_native_keywords_list(version: ClarityVersion) -> Vec<Comple
     let clarity2_aliased_functions: Vec<NativeFunctions> =
         vec![NativeFunctions::ElementAt, NativeFunctions::IndexOf];
 
+    let command = lsp_types::Command {
+        title: "triggerParameterHints".into(),
+        command: "editor.action.triggerParameterHints".into(),
+        arguments: None,
+    };
+
     let native_functions: Vec<CompletionItem> = NativeFunctions::ALL
         .iter()
         .filter_map(|func| {
@@ -275,6 +259,7 @@ pub fn build_default_native_keywords_list(version: ClarityVersion) -> Vec<Comple
                 })),
                 insert_text: Some(api.snippet.clone()),
                 insert_text_format: Some(InsertTextFormat::SNIPPET),
+                command: Some(command.clone()),
                 ..Default::default()
             })
         })
@@ -297,6 +282,7 @@ pub fn build_default_native_keywords_list(version: ClarityVersion) -> Vec<Comple
                 })),
                 insert_text: Some(api.snippet.clone()),
                 insert_text_format: Some(InsertTextFormat::SNIPPET),
+                command: Some(command.clone()),
                 ..Default::default()
             })
         })
@@ -352,7 +338,7 @@ pub fn build_default_native_keywords_list(version: ClarityVersion) -> Vec<Comple
         "buff",
         "string-ascii",
         "string-utf8",
-        "option",
+        "optional",
         "response",
         "principal",
     ]
@@ -376,4 +362,123 @@ pub fn build_default_native_keywords_list(version: ClarityVersion) -> Vec<Comple
     .into_iter()
     .flatten()
     .collect::<Vec<CompletionItem>>()
+}
+
+#[cfg(test)]
+mod get_contract_defined_data_tests {
+    use clarity_repl::clarity::ast::build_ast_with_rules;
+    use clarity_repl::clarity::stacks_common::types::StacksEpochId;
+    use clarity_repl::clarity::{vm::types::QualifiedContractIdentifier, ClarityVersion};
+
+    use super::ContractDefinedData;
+
+    fn get_defined_data(source: &str) -> ContractDefinedData {
+        let contract_ast = build_ast_with_rules(
+            &QualifiedContractIdentifier::transient(),
+            source,
+            &mut (),
+            ClarityVersion::Clarity2,
+            StacksEpochId::Epoch21,
+            clarity_repl::clarity::ast::ASTRules::Typical,
+        )
+        .unwrap();
+        ContractDefinedData::new(&contract_ast.expressions)
+    }
+
+    #[test]
+    fn get_data_vars() {
+        let data = get_defined_data(
+            "(define-data-var counter uint u1) (define-data-var is-active bool true)",
+        );
+        assert_eq!(data.vars, ["counter", "is-active"]);
+    }
+
+    #[test]
+    fn get_map() {
+        let data = get_defined_data("(define-map names principal { name: (buff 48) })");
+        assert_eq!(data.maps, ["names"]);
+    }
+
+    #[test]
+    fn get_fts() {
+        let data = get_defined_data("(define-fungible-token clarity-coin)");
+        assert_eq!(data.fts, ["clarity-coin"]);
+    }
+
+    #[test]
+    fn get_nfts() {
+        let data = get_defined_data("(define-non-fungible-token bitcoin-nft uint)");
+        assert_eq!(data.nfts, ["bitcoin-nft"]);
+    }
+}
+
+#[cfg(test)]
+mod populate_snippet_with_options_tests {
+    use clarity_repl::clarity::ast::build_ast_with_rules;
+    use clarity_repl::clarity::stacks_common::types::StacksEpochId;
+    use clarity_repl::clarity::{vm::types::QualifiedContractIdentifier, ClarityVersion};
+
+    use super::ContractDefinedData;
+
+    fn get_defined_data(source: &str) -> ContractDefinedData {
+        let contract_ast = build_ast_with_rules(
+            &QualifiedContractIdentifier::transient(),
+            source,
+            &mut (),
+            ClarityVersion::Clarity2,
+            StacksEpochId::Epoch21,
+            clarity_repl::clarity::ast::ASTRules::Typical,
+        )
+        .unwrap();
+        ContractDefinedData::new(&contract_ast.expressions)
+    }
+
+    #[test]
+    fn get_data_vars_snippet() {
+        let data = get_defined_data(
+            "(define-data-var counter uint u1) (define-data-var is-active bool true)",
+        );
+        let snippet = data
+            .populate_snippet_with_options(&"var-get".to_string(), &"var-get ${1:var}".to_string());
+        assert_eq!(snippet, Some("var-get ${1|counter,is-active|}".to_string()));
+    }
+
+    #[test]
+    fn get_map_snippet() {
+        let data = get_defined_data("(define-map names principal { name: (buff 48) })");
+        let snippet = data.populate_snippet_with_options(
+            &"map-get?".to_string(),
+            &"map-get? ${1:map-name} ${2:key-tuple}".to_string(),
+        );
+        assert_eq!(
+            snippet,
+            Some("map-get? ${1|names|} ${2:key-tuple}".to_string())
+        );
+    }
+
+    #[test]
+    fn get_fts_snippet() {
+        let data = get_defined_data("(define-fungible-token btc u21)");
+        let snippet = data.populate_snippet_with_options(
+            &"ft-mint?".to_string(),
+            &"ft-mint? ${1:token-name} ${2:amount} ${3:recipient}".to_string(),
+        );
+        assert_eq!(
+            snippet,
+            Some("ft-mint? ${1|btc|} ${2:amount} ${3:recipient}".to_string())
+        );
+    }
+
+    #[test]
+    fn get_nfts_snippet() {
+        let data = get_defined_data("(define-non-fungible-token bitcoin-nft uint)");
+        let snippet = data.populate_snippet_with_options(
+            &"nft-mint?".to_string(),
+            &"nft-mint? ${1:asset-name} ${2:asset-identifier} ${3:recipient}".to_string(),
+        );
+        assert_eq!(
+            snippet,
+            Some("nft-mint? ${1|bitcoin-nft|} ${2:asset-identifier} ${3:recipient}".to_string())
+        );
+    }
 }

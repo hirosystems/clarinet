@@ -64,7 +64,7 @@ export async function initClient(
     [
       "completion",
       "completionSmartParenthesisWrap",
-      "completionIncludeParamsInSnippet",
+      "completionIncludeNativePlaceholders",
       "hover",
       "documentSymbols",
       "goToDefinition",

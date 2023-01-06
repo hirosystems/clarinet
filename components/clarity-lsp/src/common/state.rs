@@ -19,18 +19,15 @@ use clarity_repl::clarity::vm::EvaluationResult;
 use clarity_repl::clarity::{ClarityName, ClarityVersion, SymbolicExpression};
 use clarity_repl::repl::{ContractDeployer, DEFAULT_CLARITY_VERSION};
 use lsp_types::{
-    CompletionItem, CompletionItemKind, DocumentSymbol, Hover, Location, MessageType, Position,
-    Range, SignatureHelp, Url,
+    CompletionItem, DocumentSymbol, Hover, Location, MessageType, Position, Range, SignatureHelp,
+    Url,
 };
 use std::borrow::BorrowMut;
 use std::collections::{BTreeMap, HashMap, HashSet};
 use std::vec;
 
 use super::requests::capabilities::InitializationOptions;
-use super::requests::completion::{
-    get_contract_defined_data, populate_snippet_with_options, COMPLETION_ITEMS_CLARITY_1,
-    COMPLETION_ITEMS_CLARITY_2,
-};
+use super::requests::completion::{build_completion_item_list, ContractDefinedData};
 use super::requests::definitions::{get_definitions, DefinitionLocation};
 use super::requests::document_symbols::ASTSymbols;
 use super::requests::helpers::{get_atom_start_at_position, get_public_function_definitions};
@@ -299,18 +296,9 @@ impl EditorState {
         contract_location: &FileLocation,
         position: &Position,
     ) -> Vec<lsp_types::CompletionItem> {
-        let contract = self.active_contracts.get(&contract_location).unwrap();
-        let native_keywords = match contract.clarity_version {
-            ClarityVersion::Clarity1 => COMPLETION_ITEMS_CLARITY_1.to_vec(),
-            ClarityVersion::Clarity2 => COMPLETION_ITEMS_CLARITY_2.to_vec(),
-        };
-
-        let should_wrap = match self.settings.completion_smart_parenthesis_wrap {
-            true => match self.active_contracts.get(contract_location) {
-                Some(active_contract) => check_if_should_wrap(&active_contract.source, position),
-                None => true,
-            },
-            false => true,
+        let active_contract = match self.active_contracts.get(&contract_location) {
+            Some(contract) => contract,
+            None => return vec![],
         };
 
         let user_defined_keywords = self
@@ -321,51 +309,33 @@ impl EditorState {
             .unwrap_or_default();
 
         let contract_defined_data =
-            get_contract_defined_data(contract.expressions.as_ref()).unwrap_or_default();
+            ContractDefinedData::new(active_contract.expressions.as_ref().unwrap_or(&vec![]));
 
-        let mut completion_items = vec![];
-        for mut item in [native_keywords, user_defined_keywords].concat().drain(..) {
-            match item.kind {
-                Some(
-                    CompletionItemKind::EVENT
-                    | CompletionItemKind::FUNCTION
-                    | CompletionItemKind::MODULE
-                    | CompletionItemKind::CLASS,
-                ) => {
-                    let mut snippet = item.insert_text.take().unwrap();
-                    if item.kind == Some(CompletionItemKind::FUNCTION) {
-                        snippet = populate_snippet_with_options(
-                            &item.label,
-                            &snippet,
-                            &contract_defined_data,
-                        );
-                    }
+        let should_wrap = match self.settings.completion_smart_parenthesis_wrap {
+            true => check_if_should_wrap(&active_contract.source, position),
+            false => true,
+        };
 
-                    item.insert_text = if should_wrap {
-                        Some(format!("({})", snippet))
-                    } else {
-                        Some(snippet)
-                    };
-                }
-                _ => {}
-            }
-            completion_items.push(item);
-        }
-
-        completion_items
+        build_completion_item_list(
+            &contract_defined_data,
+            &active_contract.clarity_version,
+            user_defined_keywords,
+            should_wrap,
+            self.settings.completion_include_native_placeholders,
+        )
     }
 
     pub fn get_document_symbols_for_contract(
         &self,
         contract_location: &FileLocation,
     ) -> Vec<DocumentSymbol> {
-        let active_contract = self.active_contracts.get(contract_location);
+        let active_contract = match self.active_contracts.get(&contract_location) {
+            Some(contract) => contract,
+            None => return vec![],
+        };
 
-        let expressions = match active_contract {
-            Some(active_contract) => match &active_contract.expressions {
-                Some(expressions) => expressions,
-                None => return vec![],
-            },
+        let expressions = match &active_contract.expressions {
+            Some(expressions) => expressions,
             None => return vec![],
         };
 
@@ -400,7 +370,6 @@ impl EditorState {
             DefinitionLocation::External(contract_identifier, function_name) => {
                 let metadata = self.contracts_lookup.get(contract_location)?;
                 let protocol = self.protocols.get(&metadata.manifest_location)?;
-
                 let definition_contract_location =
                     protocol.locations_lookup.get(contract_identifier)?;
 

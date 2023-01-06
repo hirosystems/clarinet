@@ -77,7 +77,6 @@ pub fn get_signatures(
                     active_parameter = Some(variadic_index.try_into().unwrap());
                 }
             }
-
             SignatureInformation {
                 active_parameter,
                 documentation: None,
@@ -100,7 +99,6 @@ pub fn get_signatures(
 
 #[cfg(test)]
 mod definitions_visitor_tests {
-
     use clarity_repl::clarity::ClarityVersion::Clarity2;
     use clarity_repl::clarity::{
         functions::NativeFunctions, stacks_common::types::StacksEpochId::Epoch21,
@@ -157,9 +155,7 @@ mod definitions_visitor_tests {
 
     #[test]
     fn ensure_all_native_function_have_valid_signature() {
-        let native_methods = NativeFunctions::ALL_NAMES;
-
-        for method in native_methods {
+        for method in NativeFunctions::ALL_NAMES {
             if ["let", "begin"].contains(&method) {
                 continue;
             }
