@@ -3,6 +3,7 @@ use std::collections::HashMap;
 use super::helpers::span_to_range;
 
 use clarity_repl::analysis::ast_visitor::{traverse, ASTVisitor, TypedVar};
+use clarity_repl::clarity::functions::define::DefineFunctions;
 use clarity_repl::clarity::vm::types::{QualifiedContractIdentifier, StandardPrincipalData};
 use clarity_repl::clarity::{ClarityName, SymbolicExpression};
 use lsp_types::Range;
@@ -40,14 +41,18 @@ impl<'a> Definitions {
         traverse(self, &expressions);
     }
 
-    fn set_function_paramaters_scope(&mut self, expr: &SymbolicExpression) -> Option<()> {
+    fn set_function_parameters_scope(&mut self, expr: &SymbolicExpression) -> Option<()> {
         let mut local_scope = HashMap::new();
         let (_, binding_exprs) = expr.match_list()?.get(1)?.match_list()?.split_first()?;
         for binding in binding_exprs {
-            let (name, _) = binding.match_list()?.split_first()?;
-            local_scope.insert(name.match_atom()?.to_owned(), span_to_range(&binding.span));
+            if let Some(name) = binding
+                .match_list()
+                .and_then(|l| l.split_first())
+                .and_then(|(name, _)| name.match_atom())
+            {
+                local_scope.insert(name.to_owned(), span_to_range(&binding.span));
+            }
         }
-
         self.local.insert(expr.id, local_scope);
         Some(())
     }
@@ -322,7 +327,7 @@ impl<'a> ASTVisitor<'a> for Definitions {
                 let identifier = if identifier.issuer == StandardPrincipalData::transient() {
                     match &self.deployer {
                         Some(deployer) => QualifiedContractIdentifier::parse(&format!(
-                            "{:}.{:}",
+                            "{}.{}",
                             deployer, identifier.name
                         ))
                         .expect("failed to set contract name"),
@@ -349,7 +354,7 @@ impl<'a> ASTVisitor<'a> for Definitions {
         parameters: Option<Vec<TypedVar<'a>>>,
         body: &'a SymbolicExpression,
     ) -> bool {
-        self.set_function_paramaters_scope(expr);
+        self.set_function_parameters_scope(expr);
         self.traverse_expr(body) && self.visit_define_private(expr, name, parameters, body)
     }
 
@@ -371,7 +376,7 @@ impl<'a> ASTVisitor<'a> for Definitions {
         parameters: Option<Vec<TypedVar<'a>>>,
         body: &'a SymbolicExpression,
     ) -> bool {
-        self.set_function_paramaters_scope(expr);
+        self.set_function_parameters_scope(expr);
         self.traverse_expr(body) && self.visit_define_read_only(expr, name, parameters, body)
     }
 
@@ -393,7 +398,7 @@ impl<'a> ASTVisitor<'a> for Definitions {
         parameters: Option<Vec<TypedVar<'a>>>,
         body: &'a SymbolicExpression,
     ) -> bool {
-        self.set_function_paramaters_scope(expr);
+        self.set_function_parameters_scope(expr);
         self.traverse_expr(body) && self.visit_define_public(expr, name, parameters, body)
     }
 
@@ -468,10 +473,16 @@ impl<'a> ASTVisitor<'a> for Definitions {
     ) -> bool {
         let local_scope = || -> Option<HashMap<ClarityName, Range>> {
             let mut result = HashMap::new();
+
             let binding_exprs = expr.match_list()?.get(1)?.match_list()?;
             for binding in binding_exprs {
-                let (name, _) = binding.match_list()?.split_first()?;
-                result.insert(name.match_atom()?.to_owned(), span_to_range(&binding.span));
+                if let Some(name) = binding
+                    .match_list()
+                    .and_then(|l| l.split_first())
+                    .and_then(|(name, _)| name.match_atom())
+                {
+                    result.insert(name.to_owned(), span_to_range(&binding.span));
+                }
             }
             Some(result)
         };
@@ -541,6 +552,36 @@ pub fn get_definitions(
     let mut definitions_visitor = Definitions::new(issuer);
     definitions_visitor.run(expressions);
     definitions_visitor.tokens
+}
+
+pub fn get_public_function_definitions(
+    expressions: &Vec<SymbolicExpression>,
+) -> HashMap<ClarityName, Range> {
+    let mut definitions = HashMap::new();
+
+    for expression in expressions {
+        if let Some((function_name, args)) = expression
+            .match_list()
+            .and_then(|l| l.split_first())
+            .and_then(|(function_name, args)| Some((function_name.match_atom()?, args)))
+        {
+            match DefineFunctions::lookup_by_name(function_name) {
+                Some(DefineFunctions::PublicFunction | DefineFunctions::ReadOnlyFunction) => {
+                    if let Some(function_name) = args
+                        .split_first()
+                        .and_then(|(args_list, _)| args_list.match_list()?.split_first())
+                        .and_then(|(function_name, _)| function_name.match_atom())
+                    {
+                        definitions
+                            .insert(function_name.to_owned(), span_to_range(&expression.span));
+                    }
+                }
+                _ => (),
+            }
+        }
+    }
+
+    definitions
 }
 
 #[cfg(test)]

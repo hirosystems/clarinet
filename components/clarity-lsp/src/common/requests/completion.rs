@@ -1,15 +1,23 @@
-use clarity_repl::clarity::{
-    docs::{make_api_reference, make_define_reference, make_keyword_reference},
-    functions::{define::DefineFunctions, NativeFunctions},
-    variables::NativeVariables,
-    vm::types::BlockInfoProperty,
-    ClarityVersion, SymbolicExpression,
+use std::{collections::HashMap, vec};
+
+use clarity_repl::{
+    analysis::ast_visitor::{traverse, ASTVisitor, TypedVar},
+    clarity::{
+        analysis::ContractAnalysis,
+        docs::{make_api_reference, make_define_reference, make_keyword_reference},
+        functions::{define::DefineFunctions, NativeFunctions},
+        variables::NativeVariables,
+        vm::types::{BlockInfoProperty, FunctionType, TypeSignature},
+        ClarityName, ClarityVersion, SymbolicExpression,
+    },
 };
 use lazy_static::lazy_static;
 use lsp_types::{
     CompletionItem, CompletionItemKind, Documentation, InsertTextFormat, MarkupContent, MarkupKind,
     Position,
 };
+
+use super::helpers::is_position_within_span;
 
 lazy_static! {
     static ref COMPLETION_ITEMS_CLARITY_1: Vec<CompletionItem> =
@@ -43,66 +51,79 @@ lazy_static! {
 
 #[derive(Clone, Debug, Default)]
 pub struct ContractDefinedData {
+    position: Position,
+    consts: Vec<(String, String)>,
+    locals: Vec<(String, String)>,
     pub vars: Vec<String>,
     pub maps: Vec<String>,
     pub fts: Vec<String>,
     pub nfts: Vec<String>,
-    pub consts: Vec<(String, String)>,
+    pub functions_completion_items: Vec<CompletionItem>,
 }
 
-impl ContractDefinedData {
-    pub fn new(expressions: &Vec<SymbolicExpression>) -> Self {
-        let mut defined_data = ContractDefinedData::default();
-        for expression in expressions {
-            expression
-                .match_list()
-                .and_then(|list| list.split_first())
-                .and_then(|(function_name, args)| {
-                    Some((
-                        DefineFunctions::lookup_by_name(function_name.match_atom()?),
-                        args.first()?.match_atom()?.to_string(),
-                        args,
-                    ))
-                })
-                .and_then(|(define_function, name, args)| {
-                    match define_function {
-                        Some(DefineFunctions::PersistedVariable) => defined_data.vars.push(name),
-                        Some(DefineFunctions::Map) => defined_data.maps.push(name),
-                        Some(DefineFunctions::FungibleToken) => defined_data.fts.push(name),
-                        Some(DefineFunctions::NonFungibleToken) => defined_data.nfts.push(name),
-                        Some(DefineFunctions::Constant) => {
-                            defined_data.consts.push((name, args.last()?.to_string()))
-                        }
-                        _ => (),
-                    };
-                    Some(())
-                });
-        }
+impl<'a> ContractDefinedData {
+    pub fn new(expressions: &Vec<SymbolicExpression>, position: &Position) -> Self {
+        let mut defined_data = ContractDefinedData {
+            position: position.clone(),
+            ..Default::default()
+        };
+        traverse(&mut defined_data, &expressions);
         defined_data
+    }
+
+    // this methods is in charge of:
+    // 1. set the function completion item with its arguments
+    // 2. set the local binding names if the position is within this function
+    fn set_function_completion_with_bindings(
+        &mut self,
+        expr: &SymbolicExpression,
+        name: &ClarityName,
+        parameters: &Vec<TypedVar<'a>>,
+    ) {
+        let mut completion_args: Vec<String> = vec![];
+        for (i, typed_var) in parameters.iter().enumerate() {
+            if let Ok(signature) = TypeSignature::parse_type_repr(typed_var.type_expr, &mut ()) {
+                completion_args.push(format!("${{{}:{}:{}}}", i + 1, typed_var.name, signature));
+
+                if is_position_within_span(&self.position, &expr.span, 0) {
+                    self.locals
+                        .push((typed_var.name.to_string(), signature.to_string()));
+                }
+            };
+        }
+
+        self.functions_completion_items.push(CompletionItem {
+            label: name.to_string(),
+            kind: Some(CompletionItemKind::MODULE),
+            insert_text: Some(format!("{} {}", name, completion_args.join(" "))),
+            insert_text_format: Some(InsertTextFormat::SNIPPET),
+            ..Default::default()
+        });
     }
 
     pub fn populate_snippet_with_options(&self, name: &String, snippet: &String) -> Option<String> {
         if VAR_FUNCTIONS.contains(name) && self.vars.len() > 0 {
             let choices = self.vars.join(",");
-            return Some(snippet.replace("${1:var}", &format!("${{1|{:}|}}", choices)));
+            return Some(snippet.replace("${1:var}", &format!("${{1|{}|}}", choices)));
         }
         if MAP_FUNCTIONS.contains(name) && self.maps.len() > 0 {
             let choices = self.maps.join(",");
-            return Some(snippet.replace("${1:map-name}", &format!("${{1|{:}|}}", choices)));
+            return Some(snippet.replace("${1:map-name}", &format!("${{1|{}|}}", choices)));
         }
         if FT_FUNCTIONS.contains(name) && self.fts.len() > 0 {
             let choices = self.fts.join(",");
-            return Some(snippet.replace("${1:token-name}", &format!("${{1|{:}|}}", choices)));
+            return Some(snippet.replace("${1:token-name}", &format!("${{1|{}|}}", choices)));
         }
         if NFT_FUNCTIONS.contains(name) && self.nfts.len() > 0 {
             let choices = self.nfts.join(",");
-            return Some(snippet.replace("${1:asset-name}", &format!("${{1|{:}|}}", choices)));
+            return Some(snippet.replace("${1:asset-name}", &format!("${{1|{}|}}", choices)));
         }
         None
     }
 
-    pub fn get_consts_completion_item(&self) -> Vec<CompletionItem> {
-        self.consts
+    pub fn get_contract_completion_items(&self) -> Vec<CompletionItem> {
+        [&self.consts[..], &self.locals[..]]
+            .concat()
             .iter()
             .map(|(name, definition)| {
                 CompletionItem::new_simple(name.to_string(), definition.to_string())
@@ -111,10 +132,156 @@ impl ContractDefinedData {
     }
 }
 
+impl<'a> ASTVisitor<'a> for ContractDefinedData {
+    fn visit_define_constant(
+        &mut self,
+        _expr: &'a SymbolicExpression,
+        name: &'a ClarityName,
+        value: &'a SymbolicExpression,
+    ) -> bool {
+        self.consts.push((name.to_string(), value.to_string()));
+        true
+    }
+
+    fn visit_define_data_var(
+        &mut self,
+        _expr: &'a SymbolicExpression,
+        name: &'a ClarityName,
+        _data_type: &'a SymbolicExpression,
+        _initial: &'a SymbolicExpression,
+    ) -> bool {
+        self.vars.push(name.to_string());
+        true
+    }
+
+    fn visit_define_map(
+        &mut self,
+        _expr: &'a SymbolicExpression,
+        name: &'a ClarityName,
+        _key_type: &'a SymbolicExpression,
+        _value_type: &'a SymbolicExpression,
+    ) -> bool {
+        self.maps.push(name.to_string());
+        true
+    }
+
+    fn visit_define_ft(
+        &mut self,
+        _expr: &'a SymbolicExpression,
+        name: &'a ClarityName,
+        _supply: Option<&'a SymbolicExpression>,
+    ) -> bool {
+        self.fts.push(name.to_string());
+        true
+    }
+
+    fn visit_define_nft(
+        &mut self,
+        _expr: &'a SymbolicExpression,
+        name: &'a ClarityName,
+        _nft_type: &'a SymbolicExpression,
+    ) -> bool {
+        self.nfts.push(name.to_string());
+        true
+    }
+
+    fn visit_define_public(
+        &mut self,
+        expr: &'a SymbolicExpression,
+        name: &'a ClarityName,
+        parameters: Option<Vec<clarity_repl::analysis::ast_visitor::TypedVar<'a>>>,
+        _body: &'a SymbolicExpression,
+    ) -> bool {
+        if let Some(parameters) = parameters {
+            self.set_function_completion_with_bindings(expr, name, &parameters);
+        }
+        true
+    }
+
+    fn visit_define_read_only(
+        &mut self,
+        expr: &'a SymbolicExpression,
+        name: &'a ClarityName,
+        parameters: Option<Vec<clarity_repl::analysis::ast_visitor::TypedVar<'a>>>,
+        _body: &'a SymbolicExpression,
+    ) -> bool {
+        if let Some(parameters) = parameters {
+            self.set_function_completion_with_bindings(expr, name, &parameters);
+        }
+        true
+    }
+
+    fn visit_define_private(
+        &mut self,
+        expr: &'a SymbolicExpression,
+        name: &'a ClarityName,
+        parameters: Option<Vec<clarity_repl::analysis::ast_visitor::TypedVar<'a>>>,
+        _body: &'a SymbolicExpression,
+    ) -> bool {
+        if let Some(parameters) = parameters {
+            self.set_function_completion_with_bindings(expr, name, &parameters);
+        }
+        true
+    }
+
+    fn visit_let(
+        &mut self,
+        expr: &'a SymbolicExpression,
+        bindings: &HashMap<&'a ClarityName, &'a SymbolicExpression>,
+        _body: &'a [SymbolicExpression],
+    ) -> bool {
+        if is_position_within_span(&self.position, &expr.span, 0) {
+            for (name, value) in bindings {
+                self.locals.push((name.to_string(), value.to_string()));
+            }
+        }
+        true
+    }
+}
+
+fn build_contract_calls_args(signature: &FunctionType) -> Vec<String> {
+    let mut args = vec![];
+    if let FunctionType::Fixed(function) = signature {
+        for (i, arg) in function.args.iter().enumerate() {
+            args.push(format!("${{{}:{}:{}}}", i + 1, arg.name, arg.signature));
+        }
+    }
+    args
+}
+
+pub fn get_contract_calls(analysis: &ContractAnalysis) -> Vec<CompletionItem> {
+    let mut inter_contract = vec![];
+    for (name, signature) in analysis
+        .public_function_types
+        .iter()
+        .chain(analysis.read_only_function_types.iter())
+    {
+        let label = format!(
+            "contract-call? .{} {}",
+            analysis.contract_identifier.name.to_string(),
+            name.to_string()
+        );
+        let insert_text = format!(
+            "contract-call? .{} {} {}",
+            analysis.contract_identifier.name.to_string(),
+            name.to_string(),
+            build_contract_calls_args(signature).join(" ")
+        );
+        inter_contract.push(CompletionItem {
+            label,
+            kind: Some(CompletionItemKind::EVENT),
+            insert_text: Some(insert_text),
+            insert_text_format: Some(InsertTextFormat::SNIPPET),
+            ..Default::default()
+        });
+    }
+    inter_contract
+}
+
 pub fn build_completion_item_list(
-    contract_defined_data: &ContractDefinedData,
     clarity_version: &ClarityVersion,
-    user_defined_keywords: Vec<CompletionItem>,
+    active_contract_defined_data: &ContractDefinedData,
+    contract_calls: Vec<CompletionItem>,
     should_wrap: bool,
     include_native_placeholders: bool,
 ) -> Vec<CompletionItem> {
@@ -123,8 +290,17 @@ pub fn build_completion_item_list(
         ClarityVersion::Clarity2 => COMPLETION_ITEMS_CLARITY_2.to_vec(),
     };
     let mut completion_items = vec![];
-    completion_items.append(&mut contract_defined_data.get_consts_completion_item());
-    for mut item in [native_keywords, user_defined_keywords].concat().drain(..) {
+    completion_items.append(&mut active_contract_defined_data.get_contract_completion_items());
+    for mut item in [
+        native_keywords,
+        contract_calls,
+        active_contract_defined_data
+            .functions_completion_items
+            .clone(),
+    ]
+    .concat()
+    .drain(..)
+    {
         match item.kind {
             Some(
                 CompletionItemKind::EVENT
@@ -135,8 +311,8 @@ pub fn build_completion_item_list(
                 let mut snippet = item.insert_text.take().unwrap();
                 let mut snippet_has_choices = false;
                 if item.kind == Some(CompletionItemKind::FUNCTION) {
-                    if let Some(populated_snippet) =
-                        contract_defined_data.populate_snippet_with_options(&item.label, &snippet)
+                    if let Some(populated_snippet) = active_contract_defined_data
+                        .populate_snippet_with_options(&item.label, &snippet)
                     {
                         snippet_has_choices = true;
                         snippet = populated_snippet;
@@ -185,13 +361,11 @@ pub fn build_completion_item_list(
             }
             Some(CompletionItemKind::TYPE_PARAMETER) => {
                 if should_wrap {
-                    match item.label.as_str() {
-                        "tuple" | "buff" | "string-ascii" | "string-utf8" | "optional"
-                        | "response" | "principal" => {
-                            item.insert_text = Some(format!("({} $0)", item.label));
-                            item.insert_text_format = Some(InsertTextFormat::SNIPPET);
-                        }
-                        _ => (),
+                    if let "tuple" | "buff" | "string-ascii" | "string-utf8" | "optional" | "list"
+                    | "response" = item.label.as_str()
+                    {
+                        item.insert_text = Some(format!("({} $0)", item.label));
+                        item.insert_text_format = Some(InsertTextFormat::SNIPPET);
                     }
                 }
             }
@@ -365,10 +539,11 @@ pub fn build_default_native_keywords_list(version: ClarityVersion) -> Vec<Comple
 }
 
 #[cfg(test)]
-mod get_contract_defined_data_tests {
+mod get_contract_global_data_tests {
     use clarity_repl::clarity::ast::build_ast_with_rules;
     use clarity_repl::clarity::stacks_common::types::StacksEpochId;
     use clarity_repl::clarity::{vm::types::QualifiedContractIdentifier, ClarityVersion};
+    use lsp_types::Position;
 
     use super::ContractDefinedData;
 
@@ -382,7 +557,7 @@ mod get_contract_defined_data_tests {
             clarity_repl::clarity::ast::ASTRules::Typical,
         )
         .unwrap();
-        ContractDefinedData::new(&contract_ast.expressions)
+        ContractDefinedData::new(&contract_ast.expressions, &Position::default())
     }
 
     #[test]
@@ -413,10 +588,66 @@ mod get_contract_defined_data_tests {
 }
 
 #[cfg(test)]
+mod get_contract_local_data_tests {
+    use clarity_repl::clarity::ast::build_ast_with_rules;
+    use clarity_repl::clarity::stacks_common::types::StacksEpochId;
+    use clarity_repl::clarity::{vm::types::QualifiedContractIdentifier, ClarityVersion};
+    use lsp_types::Position;
+
+    use super::ContractDefinedData;
+
+    fn get_defined_data(source: &str, position: &Position) -> ContractDefinedData {
+        let contract_ast = build_ast_with_rules(
+            &QualifiedContractIdentifier::transient(),
+            source,
+            &mut (),
+            ClarityVersion::Clarity2,
+            StacksEpochId::Epoch21,
+            clarity_repl::clarity::ast::ASTRules::Typical,
+        )
+        .unwrap();
+        ContractDefinedData::new(&contract_ast.expressions, position)
+    }
+
+    #[test]
+    fn get_function_binding() {
+        let data = get_defined_data(
+            "(define-private (print-arg (arg int)) )",
+            &Position {
+                line: 1,
+                character: 38,
+            },
+        );
+        assert_eq!(data.locals, vec![("arg".to_string(), "int".to_string())]);
+        let data = get_defined_data(
+            "(define-private (print-arg (arg int)) )",
+            &Position {
+                line: 1,
+                character: 40,
+            },
+        );
+        assert_eq!(data.locals, vec![]);
+    }
+
+    #[test]
+    fn get_let_binding() {
+        let data = get_defined_data(
+            "(let ((n u0)) )",
+            &Position {
+                line: 1,
+                character: 15,
+            },
+        );
+        assert_eq!(data.locals, vec![("n".to_string(), "u0".to_string())]);
+    }
+}
+
+#[cfg(test)]
 mod populate_snippet_with_options_tests {
     use clarity_repl::clarity::ast::build_ast_with_rules;
     use clarity_repl::clarity::stacks_common::types::StacksEpochId;
     use clarity_repl::clarity::{vm::types::QualifiedContractIdentifier, ClarityVersion};
+    use lsp_types::Position;
 
     use super::ContractDefinedData;
 
@@ -430,7 +661,7 @@ mod populate_snippet_with_options_tests {
             clarity_repl::clarity::ast::ASTRules::Typical,
         )
         .unwrap();
-        ContractDefinedData::new(&contract_ast.expressions)
+        ContractDefinedData::new(&contract_ast.expressions, &Position::default())
     }
 
     #[test]

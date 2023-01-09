@@ -1,6 +1,4 @@
 use crate::common::requests::completion::check_if_should_wrap;
-use crate::types::CompletionMaps;
-use crate::utils;
 use chainhook_types::StacksNetwork;
 use clarinet_deployments::{
     generate_default_deployment, initiate_session_from_deployment,
@@ -27,10 +25,14 @@ use std::collections::{BTreeMap, HashMap, HashSet};
 use std::vec;
 
 use super::requests::capabilities::InitializationOptions;
-use super::requests::completion::{build_completion_item_list, ContractDefinedData};
-use super::requests::definitions::{get_definitions, DefinitionLocation};
+use super::requests::completion::{
+    build_completion_item_list, get_contract_calls, ContractDefinedData,
+};
+use super::requests::definitions::{
+    get_definitions, get_public_function_definitions, DefinitionLocation,
+};
 use super::requests::document_symbols::ASTSymbols;
-use super::requests::helpers::{get_atom_start_at_position, get_public_function_definitions};
+use super::requests::helpers::get_atom_start_at_position;
 use super::requests::hover::get_expression_documentation;
 use super::requests::signature_help::get_signatures;
 
@@ -125,7 +127,7 @@ impl ActiveContractData {
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct ContractState {
-    intellisense: CompletionMaps,
+    contract_calls: Vec<CompletionItem>,
     errors: Vec<ClarityDiagnostic>,
     warnings: Vec<ClarityDiagnostic>,
     notes: Vec<ClarityDiagnostic>,
@@ -165,14 +167,14 @@ impl ContractState {
             }
         }
 
-        let intellisense = match analysis {
-            Some(ref analysis) => utils::build_intellisense(&analysis),
-            None => CompletionMaps::default(),
+        let contract_calls = match analysis {
+            Some(ref analysis) => get_contract_calls(analysis),
+            None => vec![],
         };
 
         ContractState {
             contract_id,
-            intellisense,
+            contract_calls,
             errors,
             warnings,
             notes,
@@ -301,15 +303,17 @@ impl EditorState {
             None => return vec![],
         };
 
-        let user_defined_keywords = self
+        let contract_calls = self
             .contracts_lookup
             .get(contract_location)
             .and_then(|d| self.protocols.get(&d.manifest_location))
-            .and_then(|p| Some(p.get_completion_items_for_contract(contract_location)))
+            .and_then(|p| Some(p.get_contract_calls_for_contract(contract_location)))
             .unwrap_or_default();
 
-        let contract_defined_data =
-            ContractDefinedData::new(active_contract.expressions.as_ref().unwrap_or(&vec![]));
+        let active_contract_defined_data = ContractDefinedData::new(
+            &active_contract.expressions.as_ref().unwrap_or(&vec![]),
+            position,
+        );
 
         let should_wrap = match self.settings.completion_smart_parenthesis_wrap {
             true => check_if_should_wrap(&active_contract.source, position),
@@ -317,9 +321,9 @@ impl EditorState {
         };
 
         build_completion_item_list(
-            &contract_defined_data,
             &active_contract.clarity_version,
-            user_defined_keywords,
+            &active_contract_defined_data,
+            contract_calls,
             should_wrap,
             self.settings.completion_include_native_placeholders,
         )
@@ -380,7 +384,7 @@ impl EditorState {
                     .get(definition_contract_location)
                     .and_then(|c| c.expressions.as_ref())
                 {
-                    let public_definitions = get_public_function_definitions(&expressions)?;
+                    let public_definitions = get_public_function_definitions(&expressions);
                     return Some(Location {
                         range: *public_definitions.get(function_name)?,
                         uri: Url::parse(&definition_contract_location.to_string()).ok()?,
@@ -611,29 +615,17 @@ impl ProtocolState {
         }
     }
 
-    pub fn get_completion_items_for_contract(
+    pub fn get_contract_calls_for_contract(
         &self,
         contract_uri: &FileLocation,
     ) -> Vec<CompletionItem> {
-        let mut keywords = vec![];
-
-        let (mut contract_keywords, mut contract_calls) = {
-            let contract_keywords = match self.contracts.get(&contract_uri) {
-                Some(entry) => entry.intellisense.intra_contract.clone(),
-                _ => vec![],
-            };
-            let mut contract_calls = vec![];
-            for (url, contract_state) in self.contracts.iter() {
-                if !contract_uri.eq(url) {
-                    contract_calls.append(&mut contract_state.intellisense.inter_contract.clone());
-                }
+        let mut contract_calls = vec![];
+        for (url, contract_state) in self.contracts.iter() {
+            if !contract_uri.eq(url) {
+                contract_calls.append(&mut contract_state.contract_calls.clone());
             }
-            (contract_keywords, contract_calls)
-        };
-
-        keywords.append(&mut contract_keywords);
-        keywords.append(&mut contract_calls);
-        keywords
+        }
+        contract_calls
     }
 }
 
@@ -691,11 +683,10 @@ pub async fn build_state(
                 match execution_result.result {
                     EvaluationResult::Contract(contract_result) => {
                         if let Some(ast) = artifacts.asts.get(&contract_id) {
-                            if let Some(public_definitions) =
-                                get_public_function_definitions(&ast.expressions)
-                            {
-                                definitions.insert(contract_id.clone(), public_definitions);
-                            }
+                            definitions.insert(
+                                contract_id.clone(),
+                                get_public_function_definitions(&ast.expressions),
+                            );
                         }
                         analyses
                             .insert(contract_id.clone(), Some(contract_result.contract.analysis));

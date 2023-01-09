@@ -1,14 +1,12 @@
-use super::types::*;
 use clarinet_files::FileLocation;
-use clarity_repl::clarity::vm::analysis::ContractAnalysis;
 use clarity_repl::clarity::vm::diagnostic::{
     Diagnostic as ClarityDiagnostic, Level as ClarityLevel,
 };
-use clarity_repl::clarity::vm::types::FunctionType;
-use lsp_types::{CompletionItem, CompletionItemKind, Diagnostic as LspDiagnostic};
+use lsp_types::Diagnostic as LspDiagnostic;
+use lsp_types::Url;
 use lsp_types::{DiagnosticSeverity, Position, Range};
-use lsp_types::{InsertTextFormat, Url};
 
+#[allow(unused_macros)]
 #[cfg(feature = "wasm")]
 macro_rules! log {
     ( $( $t:tt )* ) => {
@@ -56,102 +54,6 @@ pub fn clarity_diagnostic_to_lsp_type(diagnostic: &ClarityDiagnostic) -> LspDiag
         related_information: None,
         tags: None,
         data: None,
-    }
-}
-
-fn build_intellisense_args(signature: &FunctionType) -> Vec<String> {
-    let mut args = vec![];
-    match signature {
-        FunctionType::Fixed(function) => {
-            for (i, arg) in function.args.iter().enumerate() {
-                args.push(format!("${{{}:{}:{}}}", i + 1, arg.name, arg.signature));
-            }
-        }
-        _ => {}
-    }
-    args
-}
-
-pub fn build_intellisense(analysis: &ContractAnalysis) -> CompletionMaps {
-    let mut intra_contract = vec![];
-    let mut inter_contract = vec![];
-
-    for (name, signature) in analysis.public_function_types.iter() {
-        let insert_text = format!("{} {}", name, build_intellisense_args(signature).join(" "));
-        intra_contract.push(CompletionItem {
-            label: name.to_string(),
-            kind: Some(CompletionItemKind::MODULE),
-            insert_text: Some(insert_text),
-            insert_text_format: Some(InsertTextFormat::SNIPPET),
-            ..Default::default()
-        });
-
-        let label = format!(
-            "contract-call::{}::{}",
-            analysis.contract_identifier.name.to_string(),
-            name.to_string()
-        );
-        let _insert = format!("{} {}", name, build_intellisense_args(signature).join(" "));
-        let insert_text = format!(
-            "contract-call? .{} {} {}",
-            analysis.contract_identifier.name.to_string(),
-            name.to_string(),
-            build_intellisense_args(signature).join(" ")
-        );
-        inter_contract.push(CompletionItem {
-            label,
-            kind: Some(CompletionItemKind::EVENT),
-            insert_text: Some(insert_text),
-            insert_text_format: Some(InsertTextFormat::SNIPPET),
-            ..Default::default()
-        });
-    }
-
-    for (name, signature) in analysis.read_only_function_types.iter() {
-        let insert_text = format!("{} {}", name, build_intellisense_args(signature).join(" "));
-        intra_contract.push(CompletionItem {
-            label: name.to_string(),
-            kind: Some(CompletionItemKind::MODULE),
-            insert_text: Some(insert_text),
-            insert_text_format: Some(InsertTextFormat::SNIPPET),
-            ..Default::default()
-        });
-
-        let label = format!(
-            "contract-call::{}::{}",
-            analysis.contract_identifier.name.to_string(),
-            name.to_string()
-        );
-        let insert_text = format!(
-            "contract-call? .{} {} {}",
-            analysis.contract_identifier.name.to_string(),
-            name.to_string(),
-            build_intellisense_args(signature).join(" ")
-        );
-        inter_contract.push(CompletionItem {
-            label,
-            kind: Some(CompletionItemKind::EVENT),
-            insert_text: Some(insert_text),
-            insert_text_format: Some(InsertTextFormat::SNIPPET),
-            ..Default::default()
-        });
-    }
-
-    for (name, signature) in analysis.private_function_types.iter() {
-        let insert_text = format!("{} {}", name, build_intellisense_args(signature).join(" "));
-        intra_contract.push(CompletionItem {
-            label: name.to_string(),
-            kind: Some(CompletionItemKind::MODULE),
-            insert_text: Some(insert_text),
-            insert_text_format: Some(InsertTextFormat::SNIPPET),
-            ..Default::default()
-        });
-    }
-
-    CompletionMaps {
-        inter_contract,
-        intra_contract,
-        data_fields: vec![],
     }
 }
 

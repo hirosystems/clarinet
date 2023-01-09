@@ -4,9 +4,7 @@ use crate::backend::{
     LspRequestResponse,
 };
 use crate::state::EditorState;
-use crate::utils::{
-    clarity_diagnostics_to_lsp_type, get_contract_location, get_manifest_location, log,
-};
+use crate::utils::{clarity_diagnostics_to_lsp_type, get_contract_location, get_manifest_location};
 use clarinet_files::{FileAccessor, WASMFileSystemAccessor};
 use js_sys::{Function as JsFunction, Promise};
 use lsp_types::notification::{
@@ -27,6 +25,9 @@ use std::panic;
 use std::sync::{Arc, RwLock};
 use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::future_to_promise;
+
+#[cfg(debug_assertions)]
+use crate::utils::log;
 
 #[wasm_bindgen]
 pub struct LspVscodeBridge {

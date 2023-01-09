@@ -80,7 +80,7 @@ pub fn get_signatures(
             SignatureInformation {
                 active_parameter,
                 documentation: None,
-                label: format!("{:} -> {:}", &signature, &output_type),
+                label: format!("{} -> {}", &signature, &output_type),
                 parameters: Some(
                     parameters
                         .iter()
@@ -160,7 +160,7 @@ mod definitions_visitor_tests {
                 continue;
             }
 
-            let src = format!("({:} )", &method);
+            let src = format!("({} )", &method);
             let signatures = get_source_signature(
                 src.as_str(),
                 &Position {

@@ -1,5 +1,4 @@
 mod common;
-pub mod types;
 pub mod utils;
 #[cfg(feature = "wasm")]
 pub mod vscode_bridge;
