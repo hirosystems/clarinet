@@ -239,14 +239,16 @@ impl<'a> ASTVisitor<'a> for ContractDefinedData {
     }
 }
 
-fn build_contract_calls_args(signature: &FunctionType) -> Vec<String> {
-    let mut args = vec![];
+fn build_contract_calls_args(signature: &FunctionType) -> (Vec<String>, Vec<String>) {
+    let mut snippet_args = vec![];
+    let mut doc_args = vec![];
     if let FunctionType::Fixed(function) = signature {
         for (i, arg) in function.args.iter().enumerate() {
-            args.push(format!("${{{}:{}:{}}}", i + 1, arg.name, arg.signature));
+            snippet_args.push(format!("${{{}:{}:{}}}", i + 1, arg.name, arg.signature));
+            doc_args.push(format!("{} `{}`", arg.name, arg.signature));
         }
     }
-    args
+    (snippet_args, doc_args)
 }
 
 pub fn get_contract_calls(analysis: &ContractAnalysis) -> Vec<CompletionItem> {
@@ -256,19 +258,29 @@ pub fn get_contract_calls(analysis: &ContractAnalysis) -> Vec<CompletionItem> {
         .iter()
         .chain(analysis.read_only_function_types.iter())
     {
+        let (snippet_args, doc_args) = build_contract_calls_args(signature);
         let label = format!(
             "contract-call? .{} {}",
             analysis.contract_identifier.name.to_string(),
             name.to_string()
         );
+        let documentation = MarkupContent {
+            kind: MarkupKind::Markdown,
+            value: [vec![format!("**{}**", name.to_string())], doc_args]
+                .concat()
+                .join("\n\n"),
+        };
         let insert_text = format!(
             "contract-call? .{} {} {}",
             analysis.contract_identifier.name.to_string(),
             name.to_string(),
-            build_contract_calls_args(signature).join(" ")
+            snippet_args.join(" ")
         );
+
         inter_contract.push(CompletionItem {
             label,
+            detail: Some(analysis.contract_identifier.name.to_string()),
+            documentation: Some(Documentation::MarkupContent(documentation)),
             kind: Some(CompletionItemKind::EVENT),
             insert_text: Some(insert_text),
             insert_text_format: Some(InsertTextFormat::SNIPPET),
