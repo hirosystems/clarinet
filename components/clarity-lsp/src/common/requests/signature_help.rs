@@ -43,8 +43,9 @@ pub fn get_signatures(
     let (function_name, mut active_parameter) =
         get_function_at_position(position, contract.expressions.as_ref()?)?;
 
-    if ["let", "begin"].contains(&function_name.as_str()) {
+    if ["let", "begin", "tuple"].contains(&function_name.as_str()) {
         // showing signature help for let and begin adds to much noise
+        // it's doesn't make sense for the tuple {} notation
         return None;
     }
 
