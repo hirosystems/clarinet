@@ -846,7 +846,7 @@ impl Session {
         ));
         output.push(format!(
             "{}",
-            help_colour.paint("::decode <expr>\t\t\t\tDecode a Clarity Value")
+            help_colour.paint("::decode <bytes>\t\t\tDecode a Clarity Value bytes representation")
         ));
     }
 
