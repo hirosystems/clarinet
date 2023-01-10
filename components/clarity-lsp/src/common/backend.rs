@@ -260,80 +260,66 @@ pub async fn process_notification(
 
 #[derive(Debug, Serialize, Deserialize)]
 pub enum LspRequest {
-    Initialize(InitializeParams),
     Completion(CompletionParams),
     SignatureHelp(SignatureHelpParams),
     Definition(GotoDefinitionParams),
     Hover(HoverParams),
     DocumentSymbol(DocumentSymbolParams),
+    Initialize(InitializeParams),
 }
 
 #[derive(Debug, PartialEq, Deserialize, Serialize)]
 pub enum LspRequestResponse {
-    Initialize(InitializeResult),
     CompletionItems(Vec<CompletionItem>),
     SignatureHelp(Option<SignatureHelp>),
     Definition(Option<Location>),
     DocumentSymbol(Vec<DocumentSymbol>),
     Hover(Option<Hover>),
+    Initialize(InitializeResult),
 }
 
 pub fn process_request(
     command: LspRequest,
-    editor_state: &mut EditorStateInput,
-) -> LspRequestResponse {
+    editor_state: &EditorStateInput,
+) -> Result<LspRequestResponse, String> {
     match command {
-        LspRequest::Initialize(params) => {
-            let initialization_options: InitializationOptions = params
-                .initialization_options
-                .and_then(|o| serde_json::from_str(o.as_str()?).ok())
-                .expect("failed to parse initialization options");
-
-            let _ = editor_state.try_write(|es| es.settings = initialization_options.clone());
-
-            LspRequestResponse::Initialize(InitializeResult {
-                server_info: None,
-                capabilities: get_capabilities(&initialization_options),
-            })
-        }
-
         LspRequest::Completion(params) => {
             let file_url = params.text_document_position.text_document.uri;
             let position = params.text_document_position.position;
 
             let contract_location = match get_contract_location(&file_url) {
                 Some(contract_location) => contract_location,
-                None => return LspRequestResponse::CompletionItems(vec![]),
+                None => return Ok(LspRequestResponse::CompletionItems(vec![])),
             };
 
             let completion_items = match editor_state
                 .try_read(|es| es.get_completion_items_for_contract(&contract_location, &position))
             {
                 Ok(result) => result,
-                Err(_) => return LspRequestResponse::CompletionItems(vec![]),
+                Err(_) => return Ok(LspRequestResponse::CompletionItems(vec![])),
             };
 
-            LspRequestResponse::CompletionItems(completion_items)
+            Ok(LspRequestResponse::CompletionItems(completion_items))
         }
 
         LspRequest::Definition(params) => {
             let file_url = params.text_document_position_params.text_document.uri;
             let contract_location = match get_contract_location(&file_url) {
                 Some(contract_location) => contract_location,
-                None => return LspRequestResponse::Definition(None),
+                None => return Ok(LspRequestResponse::Definition(None)),
             };
             let position = params.text_document_position_params.position;
             let location = editor_state
                 .try_read(|es| es.get_definition_location(&contract_location, &position))
                 .unwrap_or_default();
-            LspRequestResponse::Definition(location)
+            Ok(LspRequestResponse::Definition(location))
         }
 
         LspRequest::SignatureHelp(params) => {
             let file_url = params.text_document_position_params.text_document.uri;
             let contract_location = match get_contract_location(&file_url) {
                 Some(contract_location) => contract_location,
-                None => return LspRequestResponse::SignatureHelp(None),
+                None => return Ok(LspRequestResponse::SignatureHelp(None)),
             };
             let position = params.text_document_position_params.position;
 
@@ -349,32 +335,64 @@ pub fn process_request(
                     es.get_signature_help(&contract_location, &position, active_signature)
                 })
                 .unwrap_or_default();
-            LspRequestResponse::SignatureHelp(signature)
+            Ok(LspRequestResponse::SignatureHelp(signature))
         }
 
         LspRequest::DocumentSymbol(params) => {
             let file_url = params.text_document.uri;
             let contract_location = match get_contract_location(&file_url) {
                 Some(contract_location) => contract_location,
-                None => return LspRequestResponse::DocumentSymbol(vec![]),
+                None => return Ok(LspRequestResponse::DocumentSymbol(vec![])),
             };
             let document_symbols = editor_state
                 .try_read(|es| es.get_document_symbols_for_contract(&contract_location))
                 .unwrap_or_default();
-            LspRequestResponse::DocumentSymbol(document_symbols)
+            Ok(LspRequestResponse::DocumentSymbol(document_symbols))
         }
 
         LspRequest::Hover(params) => {
             let file_url = params.text_document_position_params.text_document.uri;
             let contract_location = match get_contract_location(&file_url) {
                 Some(contract_location) => contract_location,
-                None => return LspRequestResponse::Hover(None),
+                None => return Ok(LspRequestResponse::Hover(None)),
             };
             let position = params.text_document_position_params.position;
             let hover_data = editor_state
                 .try_read(|es| es.get_hover_data(&contract_location, &position))
                 .unwrap_or_default();
-            LspRequestResponse::Hover(hover_data)
+            Ok(LspRequestResponse::Hover(hover_data))
         }
+        _ => Err(format!("Unexpected command: {:?}", &command)),
+    }
+}
+
+// lsp requests are not supposed to mut the editor_state (only the notifications do)
+// this is to ensure there is no concurrency between notifications and requests to
+// acquire write lock on the editor state in a wasm context
+// except for the Initialize request, which is the first interaction between the client and the server
+// and can therefore safely acquire write lock on the editor state
+pub fn process_mutating_request(
+    command: LspRequest,
+    editor_state: &mut EditorStateInput,
+) -> Result<LspRequestResponse, String> {
+    match command {
+        LspRequest::Initialize(params) => {
+            let initialization_options: InitializationOptions = params
+                .initialization_options
+                .and_then(|o| serde_json::from_str(o.as_str()?).ok())
+                .expect("failed to parse initialization options");
+
+            match editor_state.try_write(|es| es.settings = initialization_options.clone()) {
+                Ok(_) => Ok(LspRequestResponse::Initialize(InitializeResult {
+                    server_info: None,
+                    capabilities: get_capabilities(&initialization_options),
+                })),
+                Err(err) => Err(err),
+            }
+        }
+        _ => Err(format!(
+            "Unexpected command: {:?}, should not not mutate state",
+            &command
+        )),
     }
 }

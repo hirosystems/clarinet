@@ -1,7 +1,7 @@
 extern crate console_error_panic_hook;
 use crate::backend::{
-    process_notification, process_request, EditorStateInput, LspNotification, LspRequest,
-    LspRequestResponse,
+    process_mutating_request, process_notification, process_request, EditorStateInput,
+    LspNotification, LspRequest, LspRequestResponse,
 };
 use crate::state::EditorState;
 use crate::utils::{clarity_diagnostics_to_lsp_type, get_contract_location, get_manifest_location};
@@ -168,12 +168,15 @@ impl LspVscodeBridge {
         let serializer = Serializer::json_compatible();
         match method.as_str() {
             Initialize::METHOD => {
-                let lsp_response = process_request(
+                let lsp_response = process_mutating_request(
                     LspRequest::Initialize(decode_from_js(js_params)?),
                     &mut EditorStateInput::RwLock(self.editor_state_lock.clone()),
                 );
-                if let LspRequestResponse::Initialize(response) = lsp_response {
-                    return response.serialize(&serializer).map_err(|_| JsValue::NULL);
+                match lsp_response {
+                    Ok(LspRequestResponse::Initialize(response)) => {
+                        return response.serialize(&serializer).map_err(|_| JsValue::NULL)
+                    }
+                    _ => return Err(JsValue::NULL),
                 }
             }
 
@@ -182,7 +185,7 @@ impl LspVscodeBridge {
                     LspRequest::Completion(decode_from_js(js_params)?),
                     &mut EditorStateInput::RwLock(self.editor_state_lock.clone()),
                 );
-                if let LspRequestResponse::CompletionItems(response) = lsp_response {
+                if let Ok(LspRequestResponse::CompletionItems(response)) = lsp_response {
                     return response.serialize(&serializer).map_err(|_| JsValue::NULL);
                 }
             }
@@ -192,7 +195,7 @@ impl LspVscodeBridge {
                     LspRequest::SignatureHelp(decode_from_js(js_params)?),
                     &mut EditorStateInput::RwLock(self.editor_state_lock.clone()),
                 );
-                if let LspRequestResponse::SignatureHelp(response) = lsp_response {
+                if let Ok(LspRequestResponse::SignatureHelp(response)) = lsp_response {
                     return response.serialize(&serializer).map_err(|_| JsValue::NULL);
                 }
             }
@@ -202,7 +205,7 @@ impl LspVscodeBridge {
                     LspRequest::Definition(decode_from_js(js_params)?),
                     &mut EditorStateInput::RwLock(self.editor_state_lock.clone()),
                 );
-                if let LspRequestResponse::Definition(response) = lsp_response {
+                if let Ok(LspRequestResponse::Definition(response)) = lsp_response {
                     return response.serialize(&serializer).map_err(|_| JsValue::NULL);
                 }
             }
@@ -212,7 +215,7 @@ impl LspVscodeBridge {
                     LspRequest::DocumentSymbol(decode_from_js(js_params)?),
                     &mut EditorStateInput::RwLock(self.editor_state_lock.clone()),
                 );
-                if let LspRequestResponse::DocumentSymbol(response) = lsp_response {
+                if let Ok(LspRequestResponse::DocumentSymbol(response)) = lsp_response {
                     return response.serialize(&serializer).map_err(|_| JsValue::NULL);
                 }
             }
@@ -222,7 +225,7 @@ impl LspVscodeBridge {
                     LspRequest::Hover(decode_from_js(js_params)?),
                     &mut EditorStateInput::RwLock(self.editor_state_lock.clone()),
                 );
-                if let LspRequestResponse::Hover(response) = lsp_response {
+                if let Ok(LspRequestResponse::Hover(response)) = lsp_response {
                     return response.serialize(&serializer).map_err(|_| JsValue::NULL);
                 }
             }
@@ -231,8 +234,9 @@ impl LspVscodeBridge {
                 #[cfg(debug_assertions)]
                 log!("unexpected request ({})", method);
             }
-        }
+        };
 
-        return Err(JsValue::NULL);
+        // expect for Initialize, the failing requests can be ignored
+        return Ok(JsValue::NULL);
     }
 }
