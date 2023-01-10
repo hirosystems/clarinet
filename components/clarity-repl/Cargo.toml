@@ -41,7 +41,7 @@ clarity = { git = "https://github.com/stacks-network/stacks-blockchain.git", rev
 # clarity = { package = "clarity", path = "../../../stacks-blockchain/clarity", default-features = false, optional = true }
 
 # DAP Debugger
-tokio = { version = "=1.17.0", features = ["full"], optional = true }
+tokio = { version = "1.24", features = ["full"], optional = true }
 tokio-util = { version = "0.7.1", features = ["codec"], optional = true }
 futures = { version = "0.3.12", optional = true }
 debug_types = { version = "1.0.0", optional = true }
