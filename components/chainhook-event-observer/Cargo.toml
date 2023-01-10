@@ -7,7 +7,7 @@ edition = "2021"
 
 [dependencies]
 serde = "1"
-serde_json = { version = "1", features = ["arbitrary_precision"]}
+serde_json = { version = "1", features = ["arbitrary_precision"] }
 serde_derive = "1"
 stacks_rpc_client = { package = "stacks-rpc-client", path = "../../components/stacks-rpc-client" }
 clarinet_utils = { package = "clarinet-utils", path = "../../components/clarinet-utils" }
@@ -24,7 +24,7 @@ reqwest = { version = "0.11", default-features = false, features = [
     "json",
     "rustls-tls",
 ] }
-tokio = { version = "=1.17.0", features = ["full"] }
+tokio = { version = "1.24", features = ["full"] }
 base58 = "0.2.0"
 clap = { version = "3.1.6", features = ["derive"], optional = true }
 clap_generate = { version = "3.0.3", optional = true }
