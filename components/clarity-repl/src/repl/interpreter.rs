@@ -239,7 +239,7 @@ impl ClarityInterpreter {
             return Err("error parsing source".to_string());
         }
 
-        let mut contract_map = HashMap::new();
+        let mut contract_map = BTreeMap::new();
         contract_map.insert(contract_id.clone(), ast);
         let mut all_dependencies =
             match ASTDependencyDetector::detect_dependencies(&contract_map, &BTreeMap::new()) {
@@ -255,10 +255,12 @@ impl ClarityInterpreter {
                     ));
                 }
             };
-        let dependencies = match all_dependencies.remove(&contract_id) {
-            Some(mut dependencies_set) => dependencies_set.drain().collect(),
-            None => vec![],
-        };
+        let mut dependencies = vec![];
+        if let Some(dependencies_set) = all_dependencies.remove(&contract_id) {
+            for dep in dependencies_set.set.into_iter() {
+                dependencies.push(dep);
+            }
+        }
         Ok(dependencies)
     }
 

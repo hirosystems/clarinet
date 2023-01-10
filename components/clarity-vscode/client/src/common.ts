@@ -12,6 +12,16 @@ function isValidInsight(data: InsightsData): data is InsightsData {
   return !!data && !!data.fnName && !!data.fnType && Array.isArray(data.fnArgs);
 }
 
+declare const __DEV_MODE__: boolean | undefined;
+
+function getConfig() {
+  let config = workspace.getConfiguration("clarity-lsp");
+  if (__DEV_MODE__) {
+    config.update("debug.logRequestsTimings", true);
+  }
+  return config;
+}
+
 export const clientOpts: LanguageClientOptions = {
   documentSelector: [{ language: "clarity" }, { language: "toml" }],
   diagnosticCollectionName: "Clarity LSP",
@@ -19,9 +29,8 @@ export const clientOpts: LanguageClientOptions = {
   traceOutputChannel: vscode.window.createOutputChannel(
     "Clarity Language Server Trace",
   ),
+  initializationOptions: JSON.stringify(getConfig()),
 };
-
-declare const __DEV_MODE__: boolean | undefined;
 
 export async function initClient(
   context: ExtensionContext,
@@ -37,7 +46,7 @@ export async function initClient(
     }
   }
 
-  let config = workspace.getConfiguration("clarity-lsp");
+  let config = getConfig();
 
   /* clarity insight webview */
   const insightsViewProvider = new InsightsViewProvider(context.extensionUri);
@@ -49,8 +58,28 @@ export async function initClient(
     ),
   );
 
-  workspace.onDidChangeConfiguration((e) => {
-    config = workspace.getConfiguration("clarity-lsp");
+  workspace.onDidChangeConfiguration(async () => {
+    let requireReload = false;
+    let newConfig = getConfig();
+    ["completion", "hover", "documentSymbols", "goToDefinition"].forEach(
+      (k) => {
+        if (newConfig[k] !== config[k]) requireReload = true;
+      },
+    );
+
+    config = newConfig;
+
+    if (requireReload) {
+      const userResponse = await vscode.window.showInformationMessage(
+        "Changing Clarity configuration requires to reload VSCode",
+        "Reload VSCode",
+      );
+
+      if (userResponse) {
+        const command = "workbench.action.reloadWindow";
+        await vscode.commands.executeCommand(command);
+      }
+    }
   });
 
   /* clariy lsp */

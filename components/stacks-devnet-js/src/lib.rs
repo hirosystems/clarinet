@@ -14,7 +14,7 @@ use clarinet_files::{
     compute_addresses, AccountConfig, DevnetConfigFile, FileLocation, PoxStackingOrder,
     ProjectManifest, DEFAULT_DERIVATION_PATH,
 };
-// use ::deployments;
+use stacks_network::chains_coordinator::BitcoinMiningCommand;
 use stacks_network::{self, DevnetEvent, DevnetOrchestrator};
 
 use core::panic;
@@ -27,35 +27,8 @@ use std::{env, process};
 
 type DevnetCallback = Box<dyn FnOnce(&Channel) + Send>;
 
-use std::sync::mpsc::Sender;
-
 use clarinet_deployments::types::{DeploymentGenerationArtifacts, DeploymentSpecification};
-use stacks_network::{do_run_devnet, ChainsCoordinatorCommand, LogData};
-
-pub fn run_devnet(
-    devnet: DevnetOrchestrator,
-    deployment: DeploymentSpecification,
-    log_tx: Option<Sender<LogData>>,
-    display_dashboard: bool,
-) -> Result<
-    (
-        Option<mpsc::Receiver<DevnetEvent>>,
-        Option<mpsc::Sender<bool>>,
-        Option<mpsc::Sender<ChainsCoordinatorCommand>>,
-    ),
-    String,
-> {
-    match hiro_system_kit::nestable_block_on(do_run_devnet(
-        devnet,
-        deployment,
-        &mut None,
-        log_tx,
-        display_dashboard,
-    )) {
-        Err(_e) => std::process::exit(1),
-        Ok(res) => Ok(res),
-    }
-}
+use stacks_network::{do_run_devnet, ChainsCoordinatorCommand};
 
 pub fn read_deployment_or_generate_default(
     manifest: &ProjectManifest,
@@ -83,11 +56,19 @@ pub fn read_deployment_or_generate_default(
     Ok((deployment, artifacts))
 }
 
+#[allow(dead_code)]
 struct StacksDevnet {
     tx: mpsc::Sender<DevnetCommand>,
+    termination_rx: mpsc::Receiver<bool>,
+    devnet_ready_rx: mpsc::Receiver<Result<(), String>>,
+    mining_tx: mpsc::Sender<BitcoinMiningCommand>,
     bitcoin_block_rx: mpsc::Receiver<BitcoinChainUpdatedWithBlocksData>,
     stacks_block_rx: mpsc::Receiver<StacksChainUpdatedWithBlocksData>,
-    node_url: String,
+    bitcoin_node_url: String,
+    stacks_node_url: String,
+    stacks_api_url: String,
+    stacks_explorer_url: String,
+    bitcoin_explorer_url: String,
 }
 
 enum DevnetCommand {
@@ -108,8 +89,15 @@ impl StacksDevnet {
     where
         C: Context<'a>,
     {
+        let network_id = devnet_overrides.network_id.clone();
         let (tx, rx) = mpsc::channel::<DevnetCommand>();
-        let (meta_tx, meta_rx) = mpsc::channel();
+        let (devnet_ready_tx, devnet_ready_rx) = mpsc::channel::<_>();
+        let (meta_devnet_command_tx, meta_devnet_command_rx) = mpsc::channel();
+        let (termination_tx, termination_rx) = mpsc::channel();
+
+        let (relaying_mining_tx, relaying_mining_rx) = mpsc::channel::<BitcoinMiningCommand>();
+        let (meta_mining_command_tx, meta_mining_command_rx) = mpsc::channel();
+
         let (log_tx, _log_rx) = mpsc::channel();
         let (bitcoin_block_tx, bitcoin_block_rx) = mpsc::channel();
         let (stacks_block_tx, stacks_block_rx) = mpsc::channel();
@@ -125,51 +113,113 @@ impl StacksDevnet {
         let devnet = match DevnetOrchestrator::new(manifest, Some(devnet_overrides)) {
             Ok(devnet) => devnet,
             Err(message) => {
-                println!("{}", message);
+                if logs_enabled {
+                    println!("Fatal error: {}", message);
+                }
                 std::process::exit(1);
             }
         };
 
-        let node_url = devnet.get_stacks_node_url();
+        let (
+            bitcoin_node_url,
+            stacks_node_url,
+            stacks_api_url,
+            stacks_explorer_url,
+            bitcoin_explorer_url,
+        ) = devnet
+            .network_config
+            .as_ref()
+            .and_then(|config| config.devnet.as_ref())
+            .and_then(|devnet| {
+                Some((
+                    format!("http://localhost:{}", devnet.bitcoin_node_p2p_port),
+                    format!("http://localhost:{}", devnet.stacks_node_rpc_port),
+                    format!("http://localhost:{}", devnet.stacks_api_port),
+                    format!("http://localhost:{}", devnet.stacks_explorer_port),
+                    format!("http://localhost:{}", devnet.bitcoin_explorer_port),
+                ))
+            })
+            .expect("unable to read config");
 
         thread::spawn(move || {
-            if let Ok(DevnetCommand::Start(callback)) = rx.recv() {
-                // Start devnet
-                let (devnet_events_rx, terminator_tx) =
-                    match run_devnet(devnet, deployment, Some(log_tx), false) {
-                        Ok((Some(devnet_events_rx), Some(terminator_tx), _)) => {
-                            (devnet_events_rx, terminator_tx)
-                        }
-                        _ => std::process::exit(1),
-                    };
-                meta_tx
-                    .send(devnet_events_rx)
-                    .expect("Unable to transmit event receiver");
+            let chains_coordinator_command_tx = loop {
+                match rx.recv() {
+                    Ok(DevnetCommand::Start(callback)) => {
+                        // Start devnet
+                        let res = hiro_system_kit::nestable_block_on(do_run_devnet(
+                            devnet,
+                            deployment,
+                            &mut None,
+                            Some(log_tx),
+                            false,
+                            stacks_network::Context::empty(),
+                            termination_tx,
+                            None,
+                        ));
 
-                if let Some(c) = callback {
-                    c(&channel);
-                }
-
-                // Start run loop
-                while let Ok(message) = rx.recv() {
-                    match message {
-                        DevnetCommand::Stop(callback) => {
-                            terminator_tx
-                                .send(true)
-                                .expect("Unable to terminate Devnet");
-                            if let Some(c) = callback {
-                                c(&channel);
+                        let (devnet_events_rx, chains_coordinator_command_tx) = match res {
+                            Ok((
+                                Some(devnet_events_rx),
+                                _,
+                                Some(chains_coordinator_command_tx),
+                            )) => (devnet_events_rx, chains_coordinator_command_tx),
+                            Err(e) => {
+                                if logs_enabled {
+                                    println!("Fatal error: {}", e);
+                                }
+                                return;
                             }
-                            break;
+                            _ => unreachable!(),
+                        };
+                        meta_devnet_command_tx
+                            .send(devnet_events_rx)
+                            .expect("Unable to transmit event receiver");
+
+                        if let Some(c) = callback {
+                            c(&channel);
                         }
-                        DevnetCommand::Start(_) => break,
+                        break chains_coordinator_command_tx;
+                    }
+                    Ok(DevnetCommand::Stop(callback)) => {
+                        if let Some(c) = callback {
+                            c(&channel);
+                        }
+                        return;
+                    }
+                    Err(e) => {
+                        if logs_enabled {
+                            println!("Fatal error: {}", e.to_string());
+                        }
+                        return;
+                    }
+                }
+            };
+
+            // Start run loop
+            loop {
+                let event = rx.recv();
+                match event {
+                    Ok(DevnetCommand::Stop(callback)) => {
+                        let _ =
+                            chains_coordinator_command_tx.send(ChainsCoordinatorCommand::Terminate);
+                        if let Some(c) = callback {
+                            c(&channel);
+                        }
+                        break;
+                    }
+                    Ok(DevnetCommand::Start(_)) => {}
+                    Err(e) => {
+                        if logs_enabled {
+                            println!("Fatal error: {}", e.to_string());
+                        }
+                        return;
                     }
                 }
             }
         });
 
         thread::spawn(move || {
-            if let Ok(ref devnet_rx) = meta_rx.recv() {
+            if let Ok(ref devnet_rx) = meta_devnet_command_rx.recv() {
                 while let Ok(event) = devnet_rx.recv() {
                     match event {
                         DevnetEvent::BitcoinChainEvent(
@@ -188,8 +238,26 @@ impl StacksDevnet {
                         }
                         DevnetEvent::Log(log) => {
                             if logs_enabled {
-                                println!("{:?}", log);
+                                println!(
+                                    "{} {}",
+                                    log,
+                                    match network_id {
+                                        Some(network_id) => format!("(network #{})", network_id),
+                                        None => "".into(),
+                                    }
+                                );
                             }
+                        }
+                        DevnetEvent::BootCompleted(mining_tx) => {
+                            let _ = meta_mining_command_tx.send(mining_tx);
+                            let _ = devnet_ready_tx.send(Ok(()));
+                        }
+                        DevnetEvent::FatalError(error) => {
+                            let _ = devnet_ready_tx.send(Err(error.clone()));
+                            if logs_enabled {
+                                println!("[erro] {}", error);
+                            }
+                            break;
                         }
                         _ => {}
                     }
@@ -197,23 +265,43 @@ impl StacksDevnet {
             }
         });
 
+        // Bitcoin mining command relaying - threading model 2
+        thread::spawn(move || {
+            let mut relayer_tx = None;
+            while let Ok(command) = relaying_mining_rx.recv() {
+                if relayer_tx.is_none() {
+                    if let Ok(mining_tx) = meta_mining_command_rx.recv() {
+                        relayer_tx = Some(mining_tx);
+                    }
+                }
+                if let Some(ref tx) = relayer_tx {
+                    let _ = tx.send(command);
+                }
+            }
+        });
+
         Self {
             tx,
+            termination_rx,
+            devnet_ready_rx,
+            mining_tx: relaying_mining_tx,
             bitcoin_block_rx,
             stacks_block_rx,
-            node_url,
+            bitcoin_node_url,
+            stacks_node_url,
+            stacks_api_url,
+            stacks_explorer_url,
+            bitcoin_explorer_url,
         }
     }
 
-    fn start(
-        &self,
-        callback: Option<DevnetCallback>,
-    ) -> Result<(), mpsc::SendError<DevnetCommand>> {
-        self.tx.send(DevnetCommand::Start(callback))
-    }
-
-    fn stop(&self, callback: Option<DevnetCallback>) -> Result<(), mpsc::SendError<DevnetCommand>> {
-        self.tx.send(DevnetCommand::Stop(callback))
+    fn start(&self, timeout: u64, _empty_buffer: bool) -> Result<bool, String> {
+        let _ = self.tx.send(DevnetCommand::Start(None));
+        let _ = self
+            .devnet_ready_rx
+            .recv_timeout(std::time::Duration::from_secs(timeout))
+            .map_err(|e| format!("broken channel: {}", e.to_string()))??;
+        Ok(true)
     }
 }
 
@@ -233,11 +321,6 @@ impl StacksDevnet {
             let account_settings = account.downcast_or_throw::<JsObject, _>(&mut cx)?;
             let label = account_settings
                 .get(&mut cx, "label")?
-                .downcast_or_throw::<JsString, _>(&mut cx)?
-                .value(&mut cx);
-
-            let id = account_settings
-                .get(&mut cx, "id")?
                 .downcast_or_throw::<JsString, _>(&mut cx)?
                 .value(&mut cx);
 
@@ -281,7 +364,7 @@ impl StacksDevnet {
             );
 
             let account = AccountConfig {
-                label,
+                label: label.clone(),
                 mnemonic: mnemonic.to_string(),
                 stx_address,
                 btc_address,
@@ -289,16 +372,37 @@ impl StacksDevnet {
                 is_mainnet,
                 balance: balance as u64,
             };
-            genesis_accounts.insert(id, account);
+            genesis_accounts.insert(label, account);
         }
 
         let mut overrides = DevnetConfigFile::default();
+
+        if let Ok(res) = devnet_settings
+            .get(&mut cx, "name")?
+            .downcast::<JsString, _>(&mut cx)
+        {
+            overrides.name = Some(res.value(&mut cx));
+        }
+
+        if let Ok(res) = devnet_settings
+            .get(&mut cx, "network_id")?
+            .downcast::<JsNumber, _>(&mut cx)
+        {
+            overrides.network_id = Some(res.value(&mut cx) as u16);
+        }
 
         if let Ok(res) = devnet_settings
             .get(&mut cx, "orchestrator_port")?
             .downcast::<JsNumber, _>(&mut cx)
         {
             overrides.orchestrator_port = Some(res.value(&mut cx) as u16);
+        }
+
+        if let Ok(res) = devnet_settings
+            .get(&mut cx, "orchestrator_control_port")?
+            .downcast::<JsNumber, _>(&mut cx)
+        {
+            overrides.orchestrator_control_port = Some(res.value(&mut cx) as u16);
         }
 
         if let Ok(res) = devnet_settings
@@ -478,6 +582,48 @@ impl StacksDevnet {
             overrides.bind_containers_volumes = Some(false);
         }
 
+        if let Ok(res) = devnet_settings
+            .get(&mut cx, "enable_next_features")?
+            .downcast::<JsBoolean, _>(&mut cx)
+        {
+            overrides.enable_next_features = Some(res.value(&mut cx));
+        }
+
+        if let Ok(res) = devnet_settings
+            .get(&mut cx, "use_docker_gateway_routing")?
+            .downcast::<JsBoolean, _>(&mut cx)
+        {
+            overrides.use_docker_gateway_routing = Some(res.value(&mut cx));
+        }
+
+        if let Ok(res) = devnet_settings
+            .get(&mut cx, "epoch_2_0")?
+            .downcast::<JsNumber, _>(&mut cx)
+        {
+            overrides.epoch_2_0 = Some(res.value(&mut cx) as u64);
+        }
+
+        if let Ok(res) = devnet_settings
+            .get(&mut cx, "epoch_2_05")?
+            .downcast::<JsNumber, _>(&mut cx)
+        {
+            overrides.epoch_2_05 = Some(res.value(&mut cx) as u64);
+        }
+
+        if let Ok(res) = devnet_settings
+            .get(&mut cx, "epoch_2_1")?
+            .downcast::<JsNumber, _>(&mut cx)
+        {
+            overrides.epoch_2_1 = Some(res.value(&mut cx) as u64);
+        }
+
+        if let Ok(res) = devnet_settings
+            .get(&mut cx, "pox_2_activation")?
+            .downcast::<JsNumber, _>(&mut cx)
+        {
+            overrides.pox_2_activation = Some(res.value(&mut cx) as u64);
+        }
+
         // Disable scripts
         overrides.execute_script = Some(vec![]);
 
@@ -507,6 +653,16 @@ impl StacksDevnet {
             overrides.disable_stacks_api = Some(res.value(&mut cx));
         } else {
             overrides.disable_stacks_api = Some(true);
+        }
+
+        // Disable bitcoin automining default:
+        if let Ok(res) = devnet_settings
+            .get(&mut cx, "bitcoin_controller_automining_disabled")?
+            .downcast::<JsBoolean, _>(&mut cx)
+        {
+            overrides.bitcoin_controller_automining_disabled = Some(res.value(&mut cx));
+        } else {
+            overrides.bitcoin_controller_automining_disabled = Some(true);
         }
 
         // Retrieve stacks_node_events_observers
@@ -585,35 +741,47 @@ impl StacksDevnet {
     }
 
     fn js_start(mut cx: FunctionContext) -> JsResult<JsUndefined> {
-        // Get the first argument as a `JsFunction`
-        // let callback = cx.argument::<JsFunction>(0)?.root(&mut cx);
-        // let callback = callback.into_inner(&mut cx);
+        let timeout = cx.argument::<JsNumber>(0)?.value(&mut cx) as u64;
+        let empty_buffer = cx.argument::<JsBoolean>(1)?.value(&mut cx);
 
         cx.this()
             .downcast_or_throw::<JsBox<StacksDevnet>, _>(&mut cx)?
-            .start(None)
+            .start(timeout, empty_buffer)
             .or_else(|err| cx.throw_error(err.to_string()))?;
 
         Ok(cx.undefined())
     }
 
-    fn js_stop(mut cx: FunctionContext) -> JsResult<JsUndefined> {
-        cx.this()
-            .downcast_or_throw::<JsBox<StacksDevnet>, _>(&mut cx)?
-            .stop(None)
-            .or_else(|err| cx.throw_error(err.to_string()))?;
+    fn js_terminate(mut cx: FunctionContext) -> JsResult<JsBoolean> {
+        let devnet = cx
+            .this()
+            .downcast_or_throw::<JsBox<StacksDevnet>, _>(&mut cx)?;
 
-        Ok(cx.undefined())
+        if let Err(err) = devnet.tx.send(DevnetCommand::Stop(None)) {
+            panic!("{}", err.to_string());
+        };
+
+        let gratecefully_terminated = match devnet.termination_rx.recv() {
+            Ok(res) => res,
+            Err(_) => false,
+        };
+        Ok(cx.boolean(gratecefully_terminated))
     }
 
     fn js_on_stacks_block(mut cx: FunctionContext) -> JsResult<JsValue> {
         let devnet = cx
             .this()
             .downcast_or_throw::<JsBox<StacksDevnet>, _>(&mut cx)?;
+        let timeout = cx.argument::<JsNumber>(0)?.value(&mut cx) as u64;
 
-        let blocks = match devnet.stacks_block_rx.recv() {
+        let _ = devnet.mining_tx.send(BitcoinMiningCommand::Mine);
+
+        let blocks = match devnet
+            .stacks_block_rx
+            .recv_timeout(std::time::Duration::from_secs(timeout))
+        {
             Ok(obj) => obj,
-            Err(err) => panic!("{:?}", err),
+            Err(_) => return Ok(cx.undefined().as_value(&mut cx)),
         };
 
         let js_blocks = serde::to_value(&mut cx, &blocks).expect("Unable to serialize block");
@@ -626,9 +794,14 @@ impl StacksDevnet {
             .this()
             .downcast_or_throw::<JsBox<StacksDevnet>, _>(&mut cx)?;
 
-        let block = match devnet.bitcoin_block_rx.recv() {
+        let _ = devnet.mining_tx.send(BitcoinMiningCommand::Mine);
+
+        let block = match devnet
+            .bitcoin_block_rx
+            .recv_timeout(std::time::Duration::from_secs(10))
+        {
             Ok(obj) => obj,
-            Err(err) => panic!("{:?}", err),
+            Err(_) => return Ok(cx.undefined().as_value(&mut cx)),
         };
 
         let js_block = serde::to_value(&mut cx, &block).expect("Unable to serialize block");
@@ -636,12 +809,48 @@ impl StacksDevnet {
         Ok(js_block)
     }
 
+    fn js_get_bitcoin_node_url(mut cx: FunctionContext) -> JsResult<JsString> {
+        let devnet = cx
+            .this()
+            .downcast_or_throw::<JsBox<StacksDevnet>, _>(&mut cx)?;
+
+        let val = JsString::new(&mut cx, devnet.bitcoin_node_url.to_string());
+        Ok(val)
+    }
+
     fn js_get_stacks_node_url(mut cx: FunctionContext) -> JsResult<JsString> {
         let devnet = cx
             .this()
             .downcast_or_throw::<JsBox<StacksDevnet>, _>(&mut cx)?;
 
-        let val = JsString::new(&mut cx, devnet.node_url.to_string());
+        let val = JsString::new(&mut cx, devnet.stacks_node_url.to_string());
+        Ok(val)
+    }
+
+    fn js_get_bitcoin_explorer_url(mut cx: FunctionContext) -> JsResult<JsString> {
+        let devnet = cx
+            .this()
+            .downcast_or_throw::<JsBox<StacksDevnet>, _>(&mut cx)?;
+
+        let val = JsString::new(&mut cx, devnet.bitcoin_explorer_url.to_string());
+        Ok(val)
+    }
+
+    fn js_get_stacks_explorer_url(mut cx: FunctionContext) -> JsResult<JsString> {
+        let devnet = cx
+            .this()
+            .downcast_or_throw::<JsBox<StacksDevnet>, _>(&mut cx)?;
+
+        let val = JsString::new(&mut cx, devnet.stacks_explorer_url.to_string());
+        Ok(val)
+    }
+
+    fn js_get_stacks_api_url(mut cx: FunctionContext) -> JsResult<JsString> {
+        let devnet = cx
+            .this()
+            .downcast_or_throw::<JsBox<StacksDevnet>, _>(&mut cx)?;
+
+        let val = JsString::new(&mut cx, devnet.stacks_api_url.to_string());
         Ok(val)
     }
 }
@@ -650,7 +859,8 @@ impl StacksDevnet {
 fn main(mut cx: ModuleContext) -> NeonResult<()> {
     cx.export_function("stacksDevnetNew", StacksDevnet::js_new)?;
     cx.export_function("stacksDevnetStart", StacksDevnet::js_start)?;
-    cx.export_function("stacksDevnetStop", StacksDevnet::js_stop)?;
+    cx.export_function("stacksDevnetTerminate", StacksDevnet::js_terminate)?;
+    cx.export_function("stacksDevnetStop", StacksDevnet::js_terminate)?;
     cx.export_function(
         "stacksDevnetWaitForStacksBlock",
         StacksDevnet::js_on_stacks_block,
@@ -660,10 +870,25 @@ fn main(mut cx: ModuleContext) -> NeonResult<()> {
         StacksDevnet::js_on_bitcoin_block,
     )?;
     cx.export_function(
+        "stacksDevnetGetBitcoinNodeUrl",
+        StacksDevnet::js_get_bitcoin_node_url,
+    )?;
+    cx.export_function(
         "stacksDevnetGetStacksNodeUrl",
         StacksDevnet::js_get_stacks_node_url,
     )?;
-
+    cx.export_function(
+        "stacksDevnetGetBitcoinExplorerUrl",
+        StacksDevnet::js_get_bitcoin_explorer_url,
+    )?;
+    cx.export_function(
+        "stacksDevnetGetStacksExplorerUrl",
+        StacksDevnet::js_get_stacks_explorer_url,
+    )?;
+    cx.export_function(
+        "stacksDevnetGetStacksApiUrl",
+        StacksDevnet::js_get_stacks_api_url,
+    )?;
     Ok(())
 }
 

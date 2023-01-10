@@ -1,17 +1,19 @@
 use crate::analysis::annotation::Annotation;
 use crate::analysis::ast_visitor::{traverse, ASTVisitor};
 use crate::analysis::{AnalysisPass, AnalysisResult, Settings};
+use crate::repl::DEFAULT_CLARITY_VERSION;
 use clarity::vm::analysis::analysis_db::AnalysisDatabase;
 pub use clarity::vm::analysis::types::ContractAnalysis;
 use clarity::vm::analysis::{CheckErrors, CheckResult};
 use clarity::vm::ast::ContractAST;
 use clarity::vm::representations::{SymbolicExpression, TraitDefinition};
+use clarity::vm::types::signatures::CallableSubtype;
 use clarity::vm::types::{
     FixedFunction, FunctionSignature, FunctionType, PrincipalData, QualifiedContractIdentifier,
     TraitIdentifier, TypeSignature, Value,
 };
 use clarity::vm::{ClarityName, SymbolicExpressionType};
-use std::collections::{BTreeMap, HashMap, HashSet};
+use std::collections::{BTreeMap, BTreeSet, HashSet};
 use std::convert::TryFrom;
 use std::hash::{Hash, Hasher};
 use std::iter::FromIterator;
@@ -25,22 +27,22 @@ lazy_static! {
 }
 
 pub struct ASTDependencyDetector<'a> {
-    dependencies: HashMap<QualifiedContractIdentifier, DependencySet>,
+    dependencies: BTreeMap<QualifiedContractIdentifier, DependencySet>,
     current_contract: Option<&'a QualifiedContractIdentifier>,
     defined_functions:
-        HashMap<(&'a QualifiedContractIdentifier, &'a ClarityName), Vec<TypeSignature>>,
-    defined_traits: HashMap<
+        BTreeMap<(&'a QualifiedContractIdentifier, &'a ClarityName), Vec<TypeSignature>>,
+    defined_traits: BTreeMap<
         (&'a QualifiedContractIdentifier, &'a ClarityName),
         BTreeMap<ClarityName, FunctionSignature>,
     >,
-    pending_function_checks: HashMap<
+    pending_function_checks: BTreeMap<
         // function identifier whose type is not yet defined
         (&'a QualifiedContractIdentifier, &'a ClarityName),
         // list of contracts that need to be checked once this function is
         // defined, together with the associated args
         Vec<(&'a QualifiedContractIdentifier, &'a [SymbolicExpression])>,
     >,
-    pending_trait_checks: HashMap<
+    pending_trait_checks: BTreeMap<
         // trait that is not yet defined
         &'a TraitIdentifier,
         // list of contracts that need to be checked once this trait is
@@ -68,27 +70,27 @@ impl PartialEq for Dependency {
     }
 }
 
-impl Hash for Dependency {
-    fn hash<H: Hasher>(&self, state: &mut H) {
-        self.contract_id.hash(state)
-    }
-}
-
 impl PartialOrd for Dependency {
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
         self.contract_id.partial_cmp(&other.contract_id)
     }
 }
 
+impl Ord for Dependency {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        self.contract_id.cmp(&other.contract_id)
+    }
+}
+
 #[derive(Debug)]
 pub struct DependencySet {
-    set: HashSet<Dependency>,
+    pub set: BTreeSet<Dependency>,
 }
 
 impl DependencySet {
     pub fn new() -> DependencySet {
         DependencySet {
-            set: HashSet::new(),
+            set: BTreeSet::new(),
         }
     }
 
@@ -125,7 +127,7 @@ impl DependencySet {
 }
 
 impl Deref for DependencySet {
-    type Target = HashSet<Dependency>;
+    type Target = BTreeSet<Dependency>;
 
     fn deref(&self) -> &Self::Target {
         &self.set
@@ -140,24 +142,24 @@ impl DerefMut for DependencySet {
 
 impl<'a> ASTDependencyDetector<'a> {
     pub fn detect_dependencies(
-        contract_asts: &'a HashMap<QualifiedContractIdentifier, ContractAST>,
+        contract_asts: &'a BTreeMap<QualifiedContractIdentifier, ContractAST>,
         preloaded: &'a BTreeMap<QualifiedContractIdentifier, ContractAST>,
     ) -> Result<
-        HashMap<QualifiedContractIdentifier, DependencySet>,
+        BTreeMap<QualifiedContractIdentifier, DependencySet>,
         (
             // Dependencies detected
-            HashMap<QualifiedContractIdentifier, DependencySet>,
+            BTreeMap<QualifiedContractIdentifier, DependencySet>,
             // Unresolved dependencies detected
             Vec<QualifiedContractIdentifier>,
         ),
     > {
         let mut detector = Self {
-            dependencies: HashMap::new(),
+            dependencies: BTreeMap::new(),
             current_contract: None,
-            defined_functions: HashMap::new(),
-            defined_traits: HashMap::new(),
-            pending_function_checks: HashMap::new(),
-            pending_trait_checks: HashMap::new(),
+            defined_functions: BTreeMap::new(),
+            defined_traits: BTreeMap::new(),
+            pending_function_checks: BTreeMap::new(),
+            pending_trait_checks: BTreeMap::new(),
             params: None,
             top_level: true,
             preloaded,
@@ -202,7 +204,7 @@ impl<'a> ASTDependencyDetector<'a> {
     }
 
     pub fn order_contracts(
-        dependencies: &HashMap<QualifiedContractIdentifier, DependencySet>,
+        dependencies: &BTreeMap<QualifiedContractIdentifier, DependencySet>,
     ) -> CheckResult<Vec<&QualifiedContractIdentifier>> {
         let mut lookup = BTreeMap::new();
         let mut reverse_lookup = Vec::new();
@@ -357,7 +359,7 @@ impl<'a> ASTDependencyDetector<'a> {
     ) -> Vec<QualifiedContractIdentifier> {
         let mut dependencies = Vec::new();
         for (i, arg) in arg_types.iter().enumerate() {
-            if matches!(arg, TypeSignature::TraitReferenceType(_)) {
+            if matches!(arg, TypeSignature::CallableType(CallableSubtype::Trait(_))) {
                 if args.len() > i {
                     if let Some(Value::Principal(PrincipalData::Contract(contract))) =
                         args[i].match_literal_value()
@@ -534,7 +536,9 @@ impl<'a> ASTVisitor<'a> for ASTDependencyDetector<'a> {
         name: &'a ClarityName,
         functions: &'a [SymbolicExpression],
     ) -> bool {
-        if let Ok(trait_definition) = TypeSignature::parse_trait_type_repr(functions, &mut ()) {
+        if let Ok(trait_definition) =
+            TypeSignature::parse_trait_type_repr(functions, &mut (), DEFAULT_CLARITY_VERSION)
+        {
             self.add_defined_trait(self.current_contract.unwrap(), name, trait_definition);
         }
         true
@@ -612,7 +616,7 @@ impl<'a> ASTVisitor<'a> for ASTDependencyDetector<'a> {
             .get(&(&self.current_contract.unwrap(), name))
         {
             for (i, arg) in arg_types.iter().enumerate() {
-                if matches!(arg, TypeSignature::TraitReferenceType(_)) {
+                if matches!(arg, TypeSignature::CallableType(CallableSubtype::Trait(_))) {
                     if args.len() > i {
                         if let Some(Value::Principal(PrincipalData::Contract(contract))) =
                             args[i].match_literal_value()
@@ -715,7 +719,9 @@ impl<'a, 'b> ASTVisitor<'a> for PreloadedVisitor<'a, 'b> {
         name: &'a ClarityName,
         functions: &'a [SymbolicExpression],
     ) -> bool {
-        if let Ok(trait_definition) = TypeSignature::parse_trait_type_repr(functions, &mut ()) {
+        if let Ok(trait_definition) =
+            TypeSignature::parse_trait_type_repr(functions, &mut (), DEFAULT_CLARITY_VERSION)
+        {
             self.detector
                 .add_defined_trait(self.current_contract.unwrap(), name, trait_definition);
         }
@@ -868,7 +874,7 @@ mod tests {
         .to_string();
         match build_ast(&session, &snippet, None) {
             Ok((contract_identifier, ast, _)) => {
-                let mut contracts = HashMap::new();
+                let mut contracts = BTreeMap::new();
                 contracts.insert(contract_identifier.clone(), ast);
                 let dependencies =
                     ASTDependencyDetector::detect_dependencies(&contracts, &BTreeMap::new())
@@ -882,7 +888,7 @@ mod tests {
     #[test]
     fn contract_call() {
         let session = Session::new(SessionSettings::default());
-        let mut contracts = HashMap::new();
+        let mut contracts = BTreeMap::new();
         let snippet1 = "
 (define-public (hello (a int))
     (ok u0)
@@ -922,7 +928,7 @@ mod tests {
     // #[test]
     fn dynamic_contract_call_local_trait() {
         let session = Session::new(SessionSettings::default());
-        let mut contracts = HashMap::new();
+        let mut contracts = BTreeMap::new();
         let snippet1 = "
 (define-public (hello (a int))
     (ok u0)
@@ -965,7 +971,7 @@ mod tests {
     #[test]
     fn dynamic_contract_call_remote_trait() {
         let session = Session::new(SessionSettings::default());
-        let mut contracts = HashMap::new();
+        let mut contracts = BTreeMap::new();
         let snippet1 = "
 (define-trait my-trait
     ((hello (int) (response uint uint)))
@@ -1010,7 +1016,7 @@ mod tests {
     #[test]
     fn pass_contract_local() {
         let session = Session::new(SessionSettings::default());
-        let mut contracts = HashMap::new();
+        let mut contracts = BTreeMap::new();
         let snippet1 = "
 (define-public (hello (a int))
     (ok u0)
@@ -1067,7 +1073,7 @@ mod tests {
     #[test]
     fn impl_trait() {
         let session = Session::new(SessionSettings::default());
-        let mut contracts = HashMap::new();
+        let mut contracts = BTreeMap::new();
         let snippet1 = "
 (define-trait something
     ((hello (int) (response uint uint)))
@@ -1107,7 +1113,7 @@ mod tests {
     #[test]
     fn use_trait() {
         let session = Session::new(SessionSettings::default());
-        let mut contracts = HashMap::new();
+        let mut contracts = BTreeMap::new();
         let snippet1 = "
 (define-trait something
     ((hello (int) (response uint uint)))
@@ -1147,7 +1153,7 @@ mod tests {
     #[test]
     fn unresolved_contract_call() {
         let session = Session::new(SessionSettings::default());
-        let mut contracts = HashMap::new();
+        let mut contracts = BTreeMap::new();
         let snippet = "
 (define-public (call-foo)
     (contract-call? .foo hello 4)
@@ -1171,7 +1177,7 @@ mod tests {
     #[test]
     fn dynamic_contract_call_unresolved_trait() {
         let session = Session::new(SessionSettings::default());
-        let mut contracts = HashMap::new();
+        let mut contracts = BTreeMap::new();
         let snippet = "
 (use-trait my-trait .bar.my-trait)
 
@@ -1197,7 +1203,7 @@ mod tests {
     #[test]
     fn contract_call_top_level() {
         let session = Session::new(SessionSettings::default());
-        let mut contracts = HashMap::new();
+        let mut contracts = BTreeMap::new();
         let snippet1 = "
 (define-public (hello (a int))
     (ok u0)
@@ -1229,7 +1235,7 @@ mod tests {
     #[test]
     fn avoid_bad_type() {
         let session = Session::new(SessionSettings::default());
-        let mut contracts = HashMap::new();
+        let mut contracts = BTreeMap::new();
         let snippet1 = "
 (define-public (hello (a (list principal)))
     (ok u0)

@@ -8,8 +8,8 @@ edition = "2021"
 [dependencies]
 bollard = "0.11.0"
 crossterm = { version = "0.22.1", optional = true }
-bitcoin = "0.28.1"
-bitcoincore-rpc = "0.14.0"
+bitcoin = "0.29.2"
+bitcoincore-rpc = "0.16.0"
 serde = { version = "1.0.136", features = ["derive"] }
 serde_json = { version = "1.0.79", features = ["preserve_order"] }
 serde_derive = "1"
@@ -25,12 +25,13 @@ reqwest = { version = "0.11", default-features = false, features = [
 tui = { version = "0.18.0", default-features = false, features = [
     "crossterm",
 ] }
+crossbeam-channel = "0.5.6"
 
 chrono = "0.4.20"
 futures = "0.3.12"
 base58 = "0.2.0"
 
-chainhook_event_observer = { package = "chainhook-event-observer", default-features = false, path = "../chainhook-event-observer" }
+chainhook_event_observer = { package = "chainhook-event-observer", default-features = false, features = ["log"], path = "../chainhook-event-observer" }
 chainhook_types = { package = "chainhook-types", path = "../chainhook-types-rs" }
 stacks_rpc_client = { package = "stacks-rpc-client", path = "../stacks-rpc-client" }
 clarinet_files = { package = "clarinet-files", path = "../clarinet-files", features = ["cli"]  }

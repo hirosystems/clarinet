@@ -4,14 +4,16 @@ use crate::types::{CompletionItemKind, InsertTextFormat};
 use crate::utils::get_contract_location;
 use clarinet_files::{FileAccessor, FileLocation, ProjectManifest};
 use clarity_repl::clarity::diagnostic::Diagnostic;
+use clarity_repl::repl::ContractDeployer;
 use lsp_types::{
-    CompletionItem, CompletionOptions, CompletionParams, DocumentSymbol, DocumentSymbolParams,
-    Documentation, Hover, HoverParams, HoverProviderCapability, InitializeParams, InitializeResult,
-    MarkupContent, MarkupKind, ServerCapabilities, TextDocumentSyncCapability,
-    TextDocumentSyncKind, TextDocumentSyncOptions, TextDocumentSyncSaveOptions,
+    CompletionItem, CompletionParams, DocumentSymbol, DocumentSymbolParams, Documentation,
+    GotoDefinitionParams, Hover, HoverParams, InitializeParams, InitializeResult, Location,
+    MarkupContent, MarkupKind, SignatureHelp, SignatureHelpParams,
 };
 use serde::{Deserialize, Serialize};
 use std::sync::{Arc, RwLock};
+
+use super::requests::capabilities::{get_capabilities, InitializationOptions};
 
 #[derive(Debug, Clone)]
 pub enum EditorStateInput {
@@ -140,17 +142,19 @@ pub async fn process_notification(
                     }
                 }?;
 
-                let lookup_clarity_version = editor_state.try_read(|es| {
+                let metadata = editor_state.try_read(|es| {
                     match es.contracts_lookup.get(&contract_location) {
-                        Some(metadata) => Some(metadata.clarity_version),
+                        Some(metadata) => {
+                            Some((metadata.clarity_version, metadata.deployer.clone()))
+                        }
                         None => None,
                     }
                 })?;
 
-                let clarity_version = match lookup_clarity_version {
-                    Some(clarity_version) => clarity_version,
+                // if the contract isn't in lookup yet, fallback on manifest, to be improved in #668
+                let clarity_version = match metadata {
+                    Some((clarity_version, _)) => clarity_version,
                     None => {
-                        // if the contract isn't in loopkup yet, get version directly from manifest
                         match file_accessor {
                             None => ProjectManifest::from_location(&manifest_location),
                             Some(file_accessor) => {
@@ -164,14 +168,21 @@ pub async fn process_notification(
                         .contracts_settings
                         .get(&contract_location)
                         .ok_or("contract not found in manifest")?
+                        .clone()
                         .clarity_version
                     }
                 };
+
+                let issuer = metadata.and_then(|(_, deployer)| match deployer {
+                    ContractDeployer::ContractIdentifier(id) => Some(id.issuer.to_owned()),
+                    _ => None,
+                });
 
                 editor_state.try_write(|es| {
                     es.insert_active_contract(
                         contract_location.clone(),
                         clarity_version,
+                        issuer,
                         contract_source.as_str(),
                     )
                 })?;
@@ -210,13 +221,16 @@ pub async fn process_notification(
                 }
             };
 
-            // TODO(lgalabru): introduce partial analysis #604
-            // We will rebuild the entire state, without trying any optimizations for now
+            // TODO(): introduce partial analysis #604
             let mut protocol_state = ProtocolState::new();
             match build_state(&manifest_location, &mut protocol_state, file_accessor).await {
-                Ok(_contracts_updates) => {
-                    editor_state
-                        .try_write(|es| es.index_protocol(manifest_location, protocol_state))?;
+                Ok(_) => {
+                    editor_state.try_write(|es| {
+                        es.index_protocol(manifest_location, protocol_state);
+                        if let Some(contract) = es.active_contracts.get_mut(&contract_location) {
+                            contract.update_definitions();
+                        };
+                    })?;
 
                     let (aggregated_diagnostics, notification) =
                         editor_state.try_read(|es| es.get_aggregated_diagnostics())?;
@@ -230,16 +244,10 @@ pub async fn process_notification(
         }
 
         LspNotification::ContractChanged(contract_location, contract_source) => {
-            match editor_state
-                .try_write(|es| es.update_active_contract(&contract_location, &contract_source))?
-            {
-                Ok(_result) => {
-                    // In case the source can not be parsed, the diagnostic could be sent but it would
-                    // remove the other diagnostic errors (types, check-checker, etc).
-                    // Let's address it as part of #604
-                    // let aggregated_diagnostics = vec![(contract_location, vec![diagnostic.unwrap()])],
-                    return Ok(LspNotificationResponse::default());
-                }
+            match editor_state.try_write(|es| {
+                es.update_active_contract(&contract_location, &contract_source, false)
+            })? {
+                Ok(_result) => Ok(LspNotificationResponse::default()),
                 Err(err) => Ok(LspNotificationResponse::error(&err)),
             }
         }
@@ -255,6 +263,8 @@ pub async fn process_notification(
 pub enum LspRequest {
     Initialize(InitializeParams),
     Completion(CompletionParams),
+    SignatureHelp(SignatureHelpParams),
+    Definition(GotoDefinitionParams),
     Hover(HoverParams),
     DocumentSymbol(DocumentSymbolParams),
 }
@@ -263,35 +273,25 @@ pub enum LspRequest {
 pub enum LspRequestResponse {
     Initialize(InitializeResult),
     CompletionItems(Vec<CompletionItem>),
+    SignatureHelp(Option<SignatureHelp>),
+    Definition(Option<Location>),
     DocumentSymbol(Vec<DocumentSymbol>),
     Hover(Option<Hover>),
 }
 
 pub fn process_request(command: LspRequest, editor_state: &EditorStateInput) -> LspRequestResponse {
     match command {
-        LspRequest::Initialize(_params) => LspRequestResponse::Initialize(InitializeResult {
-            server_info: None,
-            capabilities: ServerCapabilities {
-                text_document_sync: Some(TextDocumentSyncCapability::Options(
-                    TextDocumentSyncOptions {
-                        open_close: Some(true),
-                        change: Some(TextDocumentSyncKind::FULL),
-                        will_save: Some(false),
-                        will_save_wait_until: Some(false),
-                        save: Some(TextDocumentSyncSaveOptions::Supported(true)),
-                    },
-                )),
-                completion_provider: Some(CompletionOptions {
-                    resolve_provider: Some(false),
-                    trigger_characters: None,
-                    all_commit_characters: None,
-                    work_done_progress_options: Default::default(),
-                }),
-                hover_provider: Some(HoverProviderCapability::Simple(true)),
-                document_symbol_provider: Some(lsp_types::OneOf::Left(true)),
-                ..ServerCapabilities::default()
-            },
-        }),
+        LspRequest::Initialize(params) => {
+            let initialization_options: InitializationOptions = params
+                .initialization_options
+                .and_then(|o| serde_json::from_str(o.as_str()?).ok())
+                .expect("failed to parse initialization options");
+
+            LspRequestResponse::Initialize(InitializeResult {
+                server_info: None,
+                capabilities: get_capabilities(&initialization_options),
+            })
+        }
 
         LspRequest::Completion(params) => {
             let file_url = params.text_document_position.text_document.uri;
@@ -368,7 +368,11 @@ pub fn process_request(command: LspRequest, editor_state: &EditorStateInput) -> 
                         insert_text_mode: None,
                         text_edit: None,
                         additional_text_edits: None,
-                        command: None,
+                        command: Some(lsp_types::Command {
+                            title: "triggerParameterHints".into(),
+                            command: "editor.action.triggerParameterHints".into(),
+                            arguments: None,
+                        }),
                         commit_characters: None,
                         data: None,
                         tags: None,
@@ -380,21 +384,52 @@ pub fn process_request(command: LspRequest, editor_state: &EditorStateInput) -> 
             LspRequestResponse::CompletionItems(completion_items)
         }
 
+        LspRequest::Definition(params) => {
+            let file_url = params.text_document_position_params.text_document.uri;
+            let contract_location = match get_contract_location(&file_url) {
+                Some(contract_location) => contract_location,
+                None => return LspRequestResponse::Definition(None),
+            };
+            let position = params.text_document_position_params.position;
+            let location = editor_state
+                .try_read(|es| es.get_definition_location(&contract_location, &position))
+                .unwrap_or_default();
+            LspRequestResponse::Definition(location)
+        }
+
+        LspRequest::SignatureHelp(params) => {
+            let file_url = params.text_document_position_params.text_document.uri;
+            let contract_location = match get_contract_location(&file_url) {
+                Some(contract_location) => contract_location,
+                None => return LspRequestResponse::Definition(None),
+            };
+            let position = params.text_document_position_params.position;
+
+            // if the developer selects a specific signature
+            // it can be retrieved in the context and kept selected
+            let active_signature = params
+                .context
+                .and_then(|c| c.active_signature_help)
+                .and_then(|s| s.active_signature);
+
+            let signature = editor_state
+                .try_read(|es| {
+                    es.get_signature_help(&contract_location, &position, active_signature)
+                })
+                .unwrap_or_default();
+            LspRequestResponse::SignatureHelp(signature)
+        }
+
         LspRequest::DocumentSymbol(params) => {
             let file_url = params.text_document.uri;
             let contract_location = match get_contract_location(&file_url) {
                 Some(contract_location) => contract_location,
-                None => return LspRequestResponse::Hover(None),
+                None => return LspRequestResponse::DocumentSymbol(vec![]),
             };
-
-            LspRequestResponse::DocumentSymbol(
-                match editor_state
-                    .try_read(|es| es.get_document_symbols_for_contract(&contract_location))
-                {
-                    Ok(symbols) => symbols,
-                    Err(_) => vec![],
-                },
-            )
+            let document_symbols = editor_state
+                .try_read(|es| es.get_document_symbols_for_contract(&contract_location))
+                .unwrap_or_default();
+            LspRequestResponse::DocumentSymbol(document_symbols)
         }
 
         LspRequest::Hover(params) => {
@@ -404,12 +439,9 @@ pub fn process_request(command: LspRequest, editor_state: &EditorStateInput) -> 
                 None => return LspRequestResponse::Hover(None),
             };
             let position = params.text_document_position_params.position;
-            let hover_data = match editor_state
+            let hover_data = editor_state
                 .try_read(|es| es.get_hover_data(&contract_location, &position))
-            {
-                Ok(result) => result,
-                Err(_) => return LspRequestResponse::Hover(None),
-            };
+                .unwrap_or_default();
             LspRequestResponse::Hover(hover_data)
         }
     }

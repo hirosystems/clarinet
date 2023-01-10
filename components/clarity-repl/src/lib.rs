@@ -60,7 +60,8 @@ pub async fn init_session() -> String {
             Some(session) => (session, "".to_string()),
             None => {
                 let mut settings = SessionSettings::default();
-                settings.include_boot_contracts = vec!["costs".into(), "costs-2".into()];
+                settings.include_boot_contracts =
+                    vec!["costs".into(), "costs-2".into(), "costs-3".into()];
                 let mut session = Session::new(settings);
                 let output = session.start_wasm().await;
                 (session, output)

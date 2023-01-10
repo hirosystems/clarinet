@@ -170,6 +170,7 @@ pub struct StacksTransactionMetadata {
     pub raw_tx: String,
     pub result: String,
     pub sender: String,
+    pub nonce: u64,
     pub fee: u64,
     pub kind: StacksTransactionKind,
     pub receipt: StacksTransactionReceipt,
@@ -186,8 +187,35 @@ pub struct StacksTransactionMetadata {
 #[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
 #[serde(untagged)]
 pub enum StacksTransactionPosition {
-    Index(usize),
-    Microblock(BlockIdentifier, usize),
+    AnchorBlock(AnchorBlockPosition),
+    MicroBlock(MicroBlockPosition),
+}
+
+impl StacksTransactionPosition {
+    pub fn anchor_block(index: usize) -> StacksTransactionPosition {
+        StacksTransactionPosition::AnchorBlock(AnchorBlockPosition { index })
+    }
+
+    pub fn micro_block(
+        micro_block_identifier: BlockIdentifier,
+        index: usize,
+    ) -> StacksTransactionPosition {
+        StacksTransactionPosition::MicroBlock(MicroBlockPosition {
+            micro_block_identifier,
+            index,
+        })
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
+pub struct AnchorBlockPosition {
+    index: usize,
+}
+
+#[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
+pub struct MicroBlockPosition {
+    micro_block_identifier: BlockIdentifier,
+    index: usize,
 }
 
 #[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
@@ -548,6 +576,15 @@ impl StacksChainEvent {
             _ => vec![],
         }
     }
+
+    pub fn new_block(&self) -> Option<&StacksBlockData> {
+        match self {
+            StacksChainEvent::ChainUpdatedWithBlocks(event) => {
+                event.new_blocks.first().and_then(|b| Some(&b.block))
+            }
+            _ => None,
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize)]
@@ -604,6 +641,13 @@ impl StacksNetwork {
     pub fn is_simnet(&self) -> bool {
         match self {
             StacksNetwork::Simnet => true,
+            _ => false,
+        }
+    }
+
+    pub fn is_testnet(&self) -> bool {
+        match self {
+            StacksNetwork::Testnet => true,
             _ => false,
         }
     }

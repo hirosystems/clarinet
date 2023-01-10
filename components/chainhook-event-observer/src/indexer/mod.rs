@@ -1,10 +1,12 @@
 pub mod bitcoin;
 pub mod stacks;
 
-use crate::utils::AbstractBlock;
+use crate::utils::{AbstractBlock, Context};
+use bitcoincore_rpc::bitcoin::Block;
 use chainhook_types::{
     BitcoinChainEvent, BitcoinNetwork, BlockIdentifier, StacksChainEvent, StacksNetwork,
 };
+use hiro_system_kit::slog;
 use rocket::serde::json::Value as JsonValue;
 use stacks::StacksBlockPool;
 use stacks_rpc_client::PoxInfo;
@@ -64,59 +66,57 @@ impl Indexer {
 
     pub fn handle_bitcoin_block(
         &mut self,
-        marshalled_block: JsonValue,
+        block_height: u64,
+        block: Block,
+        ctx: &Context,
     ) -> Result<Option<BitcoinChainEvent>, String> {
-        let block = bitcoin::standardize_bitcoin_block(&self.config, marshalled_block)?;
-        let event = self.bitcoin_blocks_pool.process_block(block);
+        let block = bitcoin::standardize_bitcoin_block(&self.config, block_height, block, ctx)?;
+        let event = self.bitcoin_blocks_pool.process_block(block, ctx);
         event
-    }
-
-    pub fn handle_stacks_serialized_block(
-        &mut self,
-        serialized_block: &str,
-    ) -> Result<Option<StacksChainEvent>, String> {
-        let block = stacks::standardize_stacks_serialized_block(
-            &self.config,
-            serialized_block,
-            &mut self.stacks_context,
-        )?;
-        self.stacks_blocks_pool.process_block(block)
     }
 
     pub fn handle_stacks_marshalled_block(
         &mut self,
         marshalled_block: JsonValue,
+        ctx: &Context,
     ) -> Result<Option<StacksChainEvent>, String> {
         let block = stacks::standardize_stacks_marshalled_block(
             &self.config,
             marshalled_block,
             &mut self.stacks_context,
+            ctx,
         )?;
-        self.stacks_blocks_pool.process_block(block)
+        self.stacks_blocks_pool.process_block(block, ctx)
     }
 
     pub fn handle_stacks_serialized_microblock_trail(
         &mut self,
         serialized_microblock_trail: &str,
+        ctx: &Context,
     ) -> Result<Option<StacksChainEvent>, String> {
         let microblocks = stacks::standardize_stacks_serialized_microblock_trail(
             &self.config,
             serialized_microblock_trail,
             &mut self.stacks_context,
+            ctx,
         )?;
-        self.stacks_blocks_pool.process_microblocks(microblocks)
+        self.stacks_blocks_pool
+            .process_microblocks(microblocks, ctx)
     }
 
     pub fn handle_stacks_marshalled_microblock_trail(
         &mut self,
         marshalled_microblock_trail: JsonValue,
+        ctx: &Context,
     ) -> Result<Option<StacksChainEvent>, String> {
         let microblocks = stacks::standardize_stacks_marshalled_microblock_trail(
             &self.config,
             marshalled_microblock_trail,
             &mut self.stacks_context,
+            ctx,
         )?;
-        self.stacks_blocks_pool.process_microblocks(microblocks)
+        self.stacks_blocks_pool
+            .process_microblocks(microblocks, ctx)
     }
 
     pub fn get_pox_info(&mut self) -> PoxInfo {
@@ -185,6 +185,7 @@ impl ChainSegment {
     fn can_append_block(
         &self,
         block: &dyn AbstractBlock,
+        ctx: &Context,
     ) -> Result<(), ChainSegmentIncompatibility> {
         if self.is_block_id_older_than_segment(&block.get_identifier()) {
             // Could be facing a deep fork...
@@ -198,14 +199,16 @@ impl ChainSegment {
             Some(tip) => tip,
             None => return Ok(()),
         };
-        info!("Comparing {} with {}", tip, block.get_identifier());
+        ctx.try_log(|logger| {
+            slog::info!(logger, "Comparing {} with {}", tip, block.get_identifier())
+        });
         if tip.index == block.get_parent_identifier().index {
             match tip.hash == block.get_parent_identifier().hash {
                 true => return Ok(()),
                 false => return Err(ChainSegmentIncompatibility::ParentBlockUnknown),
             }
         }
-        if let Some(colliding_block) = self.get_block_id(&block.get_identifier()) {
+        if let Some(colliding_block) = self.get_block_id(&block.get_identifier(), ctx) {
             match colliding_block.eq(&block.get_identifier()) {
                 true => return Err(ChainSegmentIncompatibility::AlreadyPresent),
                 false => return Err(ChainSegmentIncompatibility::BlockCollision),
@@ -214,8 +217,8 @@ impl ChainSegment {
         Err(ChainSegmentIncompatibility::Unknown)
     }
 
-    fn get_block_id(&self, block_id: &BlockIdentifier) -> Option<&BlockIdentifier> {
-        info!("=> {}", self.get_relative_index(block_id));
+    fn get_block_id(&self, block_id: &BlockIdentifier, ctx: &Context) -> Option<&BlockIdentifier> {
+        ctx.try_log(|logger| slog::info!(logger, "=> {}", self.get_relative_index(block_id)));
         match self.block_ids.get(self.get_relative_index(block_id)) {
             Some(res) => Some(res),
             None => None,
@@ -275,6 +278,7 @@ impl ChainSegment {
         &self,
         other_segment: &ChainSegment,
         allow_reset: bool,
+        ctx: &Context,
     ) -> Result<ChainSegmentDivergence, ChainSegmentIncompatibility> {
         let mut common_root = None;
         let mut blocks_to_rollback = vec![];
@@ -293,8 +297,8 @@ impl ChainSegment {
             }
             blocks_to_rollback.push(cursor_segment_1.clone());
         }
-        debug!("Blocks to rollback: {:?}", blocks_to_rollback);
-        debug!("Blocks to apply: {:?}", blocks_to_apply);
+        ctx.try_log(|logger| slog::debug!(logger, "Blocks to rollback: {:?}", blocks_to_rollback));
+        ctx.try_log(|logger| slog::debug!(logger, "Blocks to apply: {:?}", blocks_to_apply));
         blocks_to_rollback.reverse();
         blocks_to_apply.reverse();
         match common_root.take() {
@@ -310,17 +314,30 @@ impl ChainSegment {
         }
     }
 
-    fn try_append_block(&mut self, block: &dyn AbstractBlock) -> (bool, Option<ChainSegment>) {
+    fn try_append_block(
+        &mut self,
+        block: &dyn AbstractBlock,
+        ctx: &Context,
+    ) -> (bool, Option<ChainSegment>) {
         let mut block_appended = false;
         let mut fork = None;
-        info!("Trying to append {} to {}", block.get_identifier(), self);
-        match self.can_append_block(block) {
+        ctx.try_log(|logger| {
+            slog::info!(
+                logger,
+                "Trying to append {} to {}",
+                block.get_identifier(),
+                self
+            )
+        });
+        match self.can_append_block(block, ctx) {
             Ok(()) => {
                 self.append_block_identifier(&block.get_identifier());
                 block_appended = true;
             }
             Err(incompatibility) => {
-                info!("Will have to fork: {:?}", incompatibility);
+                ctx.try_log(|logger| {
+                    slog::info!(logger, "Will have to fork: {:?}", incompatibility)
+                });
                 match incompatibility {
                     ChainSegmentIncompatibility::BlockCollision => {
                         let mut new_fork = self.clone();
@@ -329,7 +346,7 @@ impl ChainSegment {
                                 &block.get_parent_identifier(),
                             );
                         if parent_found {
-                            info!("Success");
+                            ctx.try_log(|logger| slog::info!(logger, "Success"));
                             new_fork.append_block_identifier(&block.get_identifier());
                             fork = Some(new_fork);
                             block_appended = true;

@@ -1,6 +1,8 @@
 use super::util::{StatefulList, TabsState};
 use crate::{LogData, MempoolAdmissionData, ServiceStatusData};
+use chainhook_event_observer::utils::Context;
 use chainhook_types::{StacksBlockData, StacksMicroblockData, StacksTransactionData};
+use hiro_system_kit::slog;
 use tui::style::{Color, Style};
 use tui::text::{Span, Spans};
 
@@ -83,14 +85,15 @@ impl<'a> App<'a> {
         }
     }
 
-    pub fn display_log(&mut self, log: LogData) {
+    pub fn display_log(&mut self, log: LogData, ctx: &Context) {
         use crate::LogLevel;
-        use tracing::{debug, error, info, warn};
         match &log.level {
-            LogLevel::Error => error!("{}", log.message),
-            LogLevel::Warning => warn!("{}", log.message),
-            LogLevel::Debug => debug!("{}", log.message),
-            LogLevel::Info | &LogLevel::Success => info!("{}", log.message),
+            LogLevel::Error => ctx.try_log(|logger| slog::error!(logger, "{}", log.message)),
+            LogLevel::Warning => ctx.try_log(|logger| slog::warn!(logger, "{}", log.message)),
+            LogLevel::Debug => ctx.try_log(|logger| slog::debug!(logger, "{}", log.message)),
+            LogLevel::Info | &LogLevel::Success => {
+                ctx.try_log(|logger| slog::info!(logger, "{}", log.message))
+            }
         }
         self.logs.items.push(log);
     }

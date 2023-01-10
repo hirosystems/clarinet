@@ -8,29 +8,10 @@ plan:
   batches:
     - id: 0
       transactions:
-        - requirement-publish:
-            contract-id: STXMJXCJDCT4WPF2X1HE42T6ZCCK3TPMBRZ51JEG.nft-trait-standard
-            remap-sender: ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM
-            remap-principals:
-              STXMJXCJDCT4WPF2X1HE42T6ZCCK3TPMBRZ51JEG: ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM
-            cost: 4680
-            path: "./.cache/requirements/STXMJXCJDCT4WPF2X1HE42T6ZCCK3TPMBRZ51JEG.nft-trait-standard.clar"
-        - requirement-publish:
-            contract-id: STXMJXCJDCT4WPF2X1HE42T6ZCCK3TPMBRZ51JEG.ft-trait-standard
-            remap-sender: ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM
-            remap-principals:
-              STXMJXCJDCT4WPF2X1HE42T6ZCCK3TPMBRZ51JEG: ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM
-            cost: 8340
-            path: "./.cache/requirements/STXMJXCJDCT4WPF2X1HE42T6ZCCK3TPMBRZ51JEG.ft-trait-standard.clar"
-        - requirement-publish:
-            contract-id: STXMJXCJDCT4WPF2X1HE42T6ZCCK3TPMBRZ51JEG.hc
-            remap-sender: ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM
-            remap-principals:
-              STXMJXCJDCT4WPF2X1HE42T6ZCCK3TPMBRZ51JEG: ST3NBRSFKX28FQ2ZJ1MAKX58HKHSDGNV5N7R21XCP
-            cost: 191170
-            path: "./.cache/requirements/STXMJXCJDCT4WPF2X1HE42T6ZCCK3TPMBRZ51JEG.hc.clar"
         - contract-publish:
             contract-name: counter
             expected-sender: ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM
             cost: 5960
             path: contracts/counter.clar
+            anchor-block-only: true
+            clarity-version: 1

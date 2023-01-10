@@ -511,6 +511,10 @@ impl BurnStateDB for BurnDatastore {
             .and_then(|id| self.store.get(id))
             .and_then(|block_info| Some(block_info.pox_payout_addrs.clone()))
     }
+
+    fn get_ast_rules(&self, height: u32) -> clarity::vm::ast::ASTRules {
+        clarity::vm::ast::ASTRules::PrecheckSize
+    }
 }
 
 impl Datastore {

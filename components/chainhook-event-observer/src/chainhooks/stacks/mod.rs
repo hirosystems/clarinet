@@ -1,4 +1,4 @@
-use crate::utils::AbstractStacksBlock;
+use crate::utils::{AbstractStacksBlock, Context};
 
 use super::types::{
     HookAction, StacksChainhookSpecification, StacksContractDeploymentPredicate,
@@ -11,6 +11,7 @@ use chainhook_types::{
 use clarity_repl::clarity::codec::StacksMessageCodec;
 use clarity_repl::clarity::util::hash::hex_bytes;
 use clarity_repl::clarity::vm::types::{CharType, SequenceData, Value as ClarityValue};
+use hiro_system_kit::slog;
 use reqwest::{Client, Method};
 use serde_json::Value as JsonValue;
 use std::collections::HashMap;
@@ -62,6 +63,7 @@ impl<'a> StacksTriggerChainhook<'a> {
 pub fn evaluate_stacks_chainhooks_on_chain_event<'a>(
     chain_event: &'a StacksChainEvent,
     active_chainhooks: Vec<&'a StacksChainhookSpecification>,
+    ctx: &Context,
 ) -> Vec<StacksTriggerChainhook<'a>> {
     let mut triggered_chainhooks = vec![];
     match chain_event {
@@ -76,6 +78,7 @@ pub fn evaluate_stacks_chainhooks_on_chain_event<'a>(
                         apply.append(&mut evaluate_stacks_chainhook_on_blocks(
                             vec![parents_microblock_to_apply],
                             chainhook,
+                            ctx,
                         ));
                     }
                     for parents_microblock_to_rolllback in
@@ -84,11 +87,13 @@ pub fn evaluate_stacks_chainhooks_on_chain_event<'a>(
                         rollback.append(&mut evaluate_stacks_chainhook_on_blocks(
                             vec![parents_microblock_to_rolllback],
                             chainhook,
+                            ctx,
                         ));
                     }
                     apply.append(&mut evaluate_stacks_chainhook_on_blocks(
                         vec![&block_update.block],
                         chainhook,
+                        ctx,
                     ));
                 }
                 if !apply.is_empty() || !rollback.is_empty() {
@@ -109,6 +114,7 @@ pub fn evaluate_stacks_chainhooks_on_chain_event<'a>(
                     apply.append(&mut evaluate_stacks_chainhook_on_blocks(
                         vec![microblock_to_apply],
                         chainhook,
+                        ctx,
                     ));
                 }
                 if !apply.is_empty() || !rollback.is_empty() {
@@ -129,12 +135,14 @@ pub fn evaluate_stacks_chainhooks_on_chain_event<'a>(
                     apply.append(&mut evaluate_stacks_chainhook_on_blocks(
                         vec![microblock_to_apply],
                         chainhook,
+                        ctx,
                     ));
                 }
                 for microblock_to_rollback in update.microblocks_to_rollback.iter() {
                     rollback.append(&mut evaluate_stacks_chainhook_on_blocks(
                         vec![microblock_to_rollback],
                         chainhook,
+                        ctx,
                     ));
                 }
                 if !apply.is_empty() || !rollback.is_empty() {
@@ -158,11 +166,13 @@ pub fn evaluate_stacks_chainhooks_on_chain_event<'a>(
                         apply.append(&mut evaluate_stacks_chainhook_on_blocks(
                             vec![parents_microblock_to_apply],
                             chainhook,
+                            ctx,
                         ));
                     }
                     apply.append(&mut evaluate_stacks_chainhook_on_blocks(
                         vec![&block_update.block],
                         chainhook,
+                        ctx,
                     ));
                 }
                 for block_update in update.blocks_to_rollback.iter() {
@@ -172,11 +182,13 @@ pub fn evaluate_stacks_chainhooks_on_chain_event<'a>(
                         rollback.append(&mut evaluate_stacks_chainhook_on_blocks(
                             vec![parents_microblock_to_rollback],
                             chainhook,
+                            ctx,
                         ));
                     }
                     rollback.append(&mut evaluate_stacks_chainhook_on_blocks(
                         vec![&block_update.block],
                         chainhook,
+                        ctx,
                     ));
                 }
                 if !apply.is_empty() || !rollback.is_empty() {
@@ -195,12 +207,13 @@ pub fn evaluate_stacks_chainhooks_on_chain_event<'a>(
 fn evaluate_stacks_chainhook_on_blocks<'a>(
     blocks: Vec<&'a dyn AbstractStacksBlock>,
     chainhook: &'a StacksChainhookSpecification,
+    ctx: &Context,
 ) -> Vec<(Vec<&'a StacksTransactionData>, &'a dyn AbstractStacksBlock)> {
     let mut occurrences = vec![];
     for block in blocks {
         let mut hits = vec![];
         for tx in block.get_transactions().iter() {
-            if evaluate_stacks_transaction_predicate_on_transaction(tx, chainhook) {
+            if evaluate_stacks_transaction_predicate_on_transaction(tx, chainhook, ctx) {
                 hits.push(tx);
             }
         }
@@ -214,6 +227,7 @@ fn evaluate_stacks_chainhook_on_blocks<'a>(
 pub fn evaluate_stacks_transaction_predicate_on_transaction<'a>(
     transaction: &'a StacksTransactionData,
     chainhook: &'a StacksChainhookSpecification,
+    ctx: &Context,
 ) -> bool {
     match &chainhook.transaction_predicate {
         StacksTransactionFilterPredicate::ContractDeployment(
@@ -228,7 +242,12 @@ pub fn evaluate_stacks_transaction_predicate_on_transaction<'a>(
             StacksContractDeploymentPredicate::Trait(_expected_trait),
         ) => match &transaction.metadata.kind {
             StacksTransactionKind::ContractDeployment(_actual_deployment) => {
-                warn!("StacksContractDeploymentPredicate::Trait uninmplemented");
+                ctx.try_log(|logger| {
+                    slog::warn!(
+                        logger,
+                        "StacksContractDeploymentPredicate::Trait uninmplemented"
+                    )
+                });
                 false
             }
             _ => false,
@@ -316,6 +335,7 @@ pub fn evaluate_stacks_transaction_predicate_on_transaction<'a>(
 
 fn encode_transaction_including_with_clarity_decoding(
     transaction: &StacksTransactionData,
+    ctx: &Context,
 ) -> serde_json::Value {
     json!({
         "transaction_identifier": transaction.transaction_identifier,
@@ -323,7 +343,7 @@ fn encode_transaction_including_with_clarity_decoding(
         "metadata": {
             "success": transaction.metadata.success,
             "raw_tx": transaction.metadata.raw_tx,
-            "result": serialized_decoded_clarity_value(&transaction.metadata.result),
+            "result": serialized_decoded_clarity_value(&transaction.metadata.result, ctx),
             "sender": transaction.metadata.sender,
             "fee": transaction.metadata.fee,
             "kind": transaction.metadata.kind,
@@ -332,7 +352,7 @@ fn encode_transaction_including_with_clarity_decoding(
                 "mutated_assets_radius": transaction.metadata.receipt.mutated_assets_radius,
                 "contract_calls_stack": transaction.metadata.receipt.contract_calls_stack,
                 "events": transaction.metadata.receipt.events.iter().map(|event| {
-                    serialized_event_with_decoded_clarity_value(event)
+                    serialized_event_with_decoded_clarity_value(event, ctx)
                 }).collect::<Vec<serde_json::Value>>(),
             },
             "description": transaction.metadata.description,
@@ -345,6 +365,7 @@ fn encode_transaction_including_with_clarity_decoding(
 
 pub fn serialized_event_with_decoded_clarity_value(
     event: &StacksTransactionEvent,
+    ctx: &Context,
 ) -> serde_json::Value {
     match event {
         StacksTransactionEvent::STXTransferEvent(payload) => {
@@ -376,7 +397,7 @@ pub fn serialized_event_with_decoded_clarity_value(
                 "type": "NFTTransferEvent",
                 "data": {
                     "asset_class_identifier": payload.asset_class_identifier,
-                    "asset_identifier": serialized_decoded_clarity_value(&payload.hex_asset_identifier),
+                    "asset_identifier": serialized_decoded_clarity_value(&payload.hex_asset_identifier, ctx),
                     "sender": payload.sender,
                     "recipient": payload.recipient,
                 }
@@ -387,7 +408,7 @@ pub fn serialized_event_with_decoded_clarity_value(
                 "type": "NFTMintEvent",
                 "data": {
                     "asset_class_identifier": payload.asset_class_identifier,
-                    "asset_identifier": serialized_decoded_clarity_value(&payload.hex_asset_identifier),
+                    "asset_identifier": serialized_decoded_clarity_value(&payload.hex_asset_identifier, ctx),
                     "recipient": payload.recipient,
                 }
             })
@@ -397,7 +418,7 @@ pub fn serialized_event_with_decoded_clarity_value(
                 "type": "NFTBurnEvent",
                 "data": {
                     "asset_class_identifier": payload.asset_class_identifier,
-                    "asset_identifier": serialized_decoded_clarity_value(&payload.hex_asset_identifier),
+                    "asset_identifier": serialized_decoded_clarity_value(&payload.hex_asset_identifier, ctx),
                     "sender": payload.sender,
                 }
             })
@@ -426,7 +447,7 @@ pub fn serialized_event_with_decoded_clarity_value(
                 "data": {
                     "contract_identifier": payload.contract_identifier,
                     "var": payload.var,
-                    "new_value": serialized_decoded_clarity_value(&payload.hex_new_value),
+                    "new_value": serialized_decoded_clarity_value(&payload.hex_new_value, ctx),
                 }
             })
         }
@@ -436,8 +457,8 @@ pub fn serialized_event_with_decoded_clarity_value(
                 "data": {
                     "contract_identifier": payload.contract_identifier,
                     "map": payload.map,
-                    "inserted_key": serialized_decoded_clarity_value(&payload.hex_inserted_key),
-                    "inserted_value": serialized_decoded_clarity_value(&payload.hex_inserted_value),
+                    "inserted_key": serialized_decoded_clarity_value(&payload.hex_inserted_key, ctx),
+                    "inserted_value": serialized_decoded_clarity_value(&payload.hex_inserted_value, ctx),
                 }
             })
         }
@@ -447,8 +468,8 @@ pub fn serialized_event_with_decoded_clarity_value(
                 "data": {
                     "contract_identifier": payload.contract_identifier,
                     "map": payload.map,
-                    "key": serialized_decoded_clarity_value(&payload.hex_key),
-                    "new_value": serialized_decoded_clarity_value(&payload.hex_new_value),
+                    "key": serialized_decoded_clarity_value(&payload.hex_key, ctx),
+                    "new_value": serialized_decoded_clarity_value(&payload.hex_new_value, ctx),
                 }
             })
         }
@@ -458,7 +479,7 @@ pub fn serialized_event_with_decoded_clarity_value(
                 "data": {
                     "contract_identifier": payload.contract_identifier,
                     "map": payload.map,
-                    "deleted_key": serialized_decoded_clarity_value(&payload.hex_deleted_key),
+                    "deleted_key": serialized_decoded_clarity_value(&payload.hex_deleted_key, ctx),
                 }
             })
         }
@@ -468,7 +489,7 @@ pub fn serialized_event_with_decoded_clarity_value(
                 "data": {
                     "contract_identifier": payload.contract_identifier,
                     "topic": payload.topic,
-                    "value": serialized_decoded_clarity_value(&payload.hex_value),
+                    "value": serialized_decoded_clarity_value(&payload.hex_value, ctx),
                 }
             })
         }
@@ -485,7 +506,7 @@ pub fn expect_decoded_clarity_value(hex_value: &str) -> ClarityValue {
         .expect("unable to decode clarity value emitted by stacks-node")
 }
 
-pub fn serialized_decoded_clarity_value(hex_value: &str) -> serde_json::Value {
+pub fn serialized_decoded_clarity_value(hex_value: &str, ctx: &Context) -> serde_json::Value {
     let hex_value = match hex_value.strip_prefix("0x") {
         Some(hex_value) => hex_value,
         _ => return json!(hex_value.to_string()),
@@ -497,7 +518,9 @@ pub fn serialized_decoded_clarity_value(hex_value: &str) -> serde_json::Value {
     let value = match ClarityValue::consensus_deserialize(&mut Cursor::new(&value_bytes)) {
         Ok(value) => serialize_to_json(&value),
         Err(e) => {
-            error!("unable to deserialize clarity value {:?}", e);
+            ctx.try_log(|logger| {
+                slog::error!(logger, "unable to deserialize clarity value {:?}", e)
+            });
             return json!(hex_value.to_string());
         }
     };
@@ -553,12 +576,16 @@ pub fn serialize_to_json(value: &ClarityValue) -> serde_json::Value {
             }
             json!(list)
         }
+        ClarityValue::CallableContract(callable) => {
+            json!(format!("{}", callable.contract_identifier))
+        }
     }
 }
 
 pub fn serialize_stacks_payload_to_json<'a>(
     trigger: StacksTriggerChainhook<'a>,
     _proofs: &HashMap<&'a TransactionIdentifier, String>,
+    ctx: &Context,
 ) -> JsonValue {
     let decode_clarity_values = trigger.should_decode_clarity_value();
     json!({
@@ -569,7 +596,7 @@ pub fn serialize_stacks_payload_to_json<'a>(
                 "timestamp": block.get_timestamp(),
                 "transactions": transactions.iter().map(|transaction| {
                     if decode_clarity_values {
-                        encode_transaction_including_with_clarity_decoding(transaction)
+                        encode_transaction_including_with_clarity_decoding(transaction, ctx)
                     } else {
                         json!(transaction)
                     }
@@ -584,7 +611,7 @@ pub fn serialize_stacks_payload_to_json<'a>(
                 "timestamp": block.get_timestamp(),
                 "transactions": transactions.iter().map(|transaction| {
                     if decode_clarity_values {
-                        encode_transaction_including_with_clarity_decoding(transaction)
+                        encode_transaction_including_with_clarity_decoding(transaction, ctx)
                     } else {
                         json!(transaction)
                     }
@@ -604,14 +631,15 @@ pub fn serialize_stacks_payload_to_json<'a>(
 pub fn handle_stacks_hook_action<'a>(
     trigger: StacksTriggerChainhook<'a>,
     proofs: &HashMap<&'a TransactionIdentifier, String>,
+    ctx: &Context,
 ) -> Option<StacksChainhookOccurrence> {
     match &trigger.chainhook.action {
         HookAction::Http(http) => {
             let client = Client::builder().build().unwrap();
             let host = format!("{}", http.url);
             let method = Method::from_bytes(http.method.as_bytes()).unwrap();
-            let body =
-                serde_json::to_vec(&serialize_stacks_payload_to_json(trigger, proofs)).unwrap();
+            let body = serde_json::to_vec(&serialize_stacks_payload_to_json(trigger, proofs, ctx))
+                .unwrap();
             Some(StacksChainhookOccurrence::Http(
                 client
                     .request(method, &host)
@@ -620,8 +648,8 @@ pub fn handle_stacks_hook_action<'a>(
             ))
         }
         HookAction::File(disk) => {
-            let bytes =
-                serde_json::to_vec(&serialize_stacks_payload_to_json(trigger, proofs)).unwrap();
+            let bytes = serde_json::to_vec(&serialize_stacks_payload_to_json(trigger, proofs, ctx))
+                .unwrap();
             Some(StacksChainhookOccurrence::File(
                 disk.path.to_string(),
                 bytes,

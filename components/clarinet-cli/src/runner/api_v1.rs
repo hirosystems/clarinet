@@ -16,6 +16,7 @@ use chainhook_event_observer::chainhooks::stacks::StacksChainhookOccurrence;
 use chainhook_event_observer::chainhooks::stacks::StacksTriggerChainhook;
 use chainhook_event_observer::chainhooks::types::StacksChainhookSpecification;
 use chainhook_event_observer::indexer::stacks::get_standardized_stacks_receipt;
+use chainhook_event_observer::utils::Context;
 use chainhook_types::BlockIdentifier;
 use chainhook_types::StacksBlockData;
 use chainhook_types::StacksBlockMetadata;
@@ -27,6 +28,7 @@ use chainhook_types::StacksTransactionMetadata;
 use chainhook_types::TransactionIdentifier;
 use chrono::{DateTime, NaiveDateTime, Utc};
 use clarinet_deployments::update_session_with_contracts_executions;
+use clarity_repl::clarity::stacks_common::types::StacksEpochId;
 use clarity_repl::clarity::stacks_common::util::hash::MerkleTree;
 use clarity_repl::clarity::util::hash::hex_bytes;
 use clarity_repl::clarity::util::hash::to_hex;
@@ -89,6 +91,8 @@ pub async fn run_bridge(
     call_read_only_fn_decl.name = "api/v1/call_read_only_fn";
     let mut get_assets_maps_decl = get_assets_maps::decl();
     get_assets_maps_decl.name = "api/v1/get_assets_maps";
+    let mut switch_epoch_decl = switch_epoch::decl();
+    switch_epoch_decl.name = "api/v1/switch_epoch";
     let mut deprecation_notice_decl = deprecation_notice::decl();
     deprecation_notice_decl.name = "api/v1/mine_empty_blocks";
 
@@ -101,6 +105,7 @@ pub async fn run_bridge(
             mine_empty_blocks_decl,
             call_read_only_fn_decl,
             get_assets_maps_decl,
+            switch_epoch_decl,
         ])
         .build();
     custom_extensions.push(clarinet);
@@ -592,6 +597,7 @@ struct DeployContractArgs {
     name: String,
     code: String,
     clarity_version: Option<u8>,
+    epoch: Option<String>,
 }
 
 #[derive(Deserialize)]
@@ -653,7 +659,10 @@ fn mine_block(state: &mut OpState, args: MineBlockArgs) -> Result<String, AnyErr
                             Some(version) if version == 2 => ClarityVersion::Clarity2,
                             _ => DEFAULT_CLARITY_VERSION,
                         },
-                        epoch: DEFAULT_EPOCH,
+                        epoch: match &args.epoch {
+                            Some(epoch) if epoch == "2.1" => StacksEpochId::Epoch21,
+                            _ => DEFAULT_EPOCH,
+                        },
                     };
                     let execution = match session.deploy_contract(
                         &contract,
@@ -736,7 +745,11 @@ fn mine_block(state: &mut OpState, args: MineBlockArgs) -> Result<String, AnyErr
         for chainhook in chainhooks.iter() {
             let mut hits = vec![];
             for (tx, _) in transactions.iter() {
-                if evaluate_stacks_transaction_predicate_on_transaction(tx, chainhook) {
+                if evaluate_stacks_transaction_predicate_on_transaction(
+                    tx,
+                    chainhook,
+                    &Context::empty(),
+                ) {
                     hits.push(tx);
                 }
             }
@@ -770,6 +783,7 @@ fn mine_block(state: &mut OpState, args: MineBlockArgs) -> Result<String, AnyErr
                         rollback: vec![],
                     },
                     &HashMap::new(),
+                    &Context::empty(),
                 );
                 match result {
                     Some(StacksChainhookOccurrence::Http(action)) => {
@@ -824,6 +838,27 @@ fn mine_block(state: &mut OpState, args: MineBlockArgs) -> Result<String, AnyErr
     Ok(payload.to_string())
 }
 
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct SwitchEpochArgs {
+    session_id: u32,
+    epoch: String,
+}
+
+#[op]
+fn switch_epoch(state: &mut OpState, args: SwitchEpochArgs) -> Result<bool, AnyError> {
+    perform_block(state, args.session_id, |_name, session| {
+        let epoch = match args.epoch {
+            epoch if epoch.eq("2.0") => StacksEpochId::Epoch20,
+            epoch if epoch.eq("2.05") => StacksEpochId::Epoch2_05,
+            epoch if epoch.eq("2.1") => StacksEpochId::Epoch21,
+            _ => return Ok(false),
+        };
+        session.update_epoch(epoch);
+        Ok(true)
+    })
+}
+
 fn perform_block<F, R>(state: &mut OpState, session_id: u32, handler: F) -> Result<R, AnyError>
 where
     F: FnOnce(&str, &mut Session) -> Result<R, AnyError>,
@@ -850,10 +885,14 @@ fn wrap_result_in_simulated_transaction(
 ) -> StacksTransactionData {
     let result = match execution.result {
         EvaluationResult::Snippet(ref result) => utils::value_to_string(&result.result),
-        _ => unreachable!("Contract result from snippet"),
+        EvaluationResult::Contract(ref contract) => match contract.result {
+            Some(ref result) => utils::value_to_string(result),
+            _ => (&"(ok true)").to_string(),
+        },
     };
     let (txid, _timestamp) = {
-        let timestamp = DateTime::<Utc>::from_utc(NaiveDateTime::from_timestamp(61, 0), Utc);
+        let timestamp =
+            DateTime::<Utc>::from_utc(NaiveDateTime::from_timestamp_opt(61, 0).unwrap(), Utc);
         let bytes = Sha256::digest(timestamp.timestamp_micros().to_be_bytes()).to_vec();
         (format!("0x{}", to_hex(&bytes)), timestamp)
     };
@@ -874,12 +913,13 @@ fn wrap_result_in_simulated_transaction(
             result,
             sender: sender.to_string(),
             fee: 0,
+            nonce: 0,
             kind,
             receipt,
             description: String::new(),
             sponsor: None,
             execution_cost: None,
-            position: chainhook_types::StacksTransactionPosition::Index(index),
+            position: chainhook_types::StacksTransactionPosition::anchor_block(index),
             proof: None,
         },
     };

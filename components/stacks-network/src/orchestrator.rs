@@ -8,18 +8,21 @@ use bollard::errors::Error as DockerError;
 use bollard::exec::CreateExecOptions;
 use bollard::image::CreateImageOptions;
 use bollard::models::{HostConfig, PortBinding};
-use bollard::network::{ConnectNetworkOptions, CreateNetworkOptions, PruneNetworksOptions};
+use bollard::network::{CreateNetworkOptions, PruneNetworksOptions};
+use bollard::service::Ipam;
 use bollard::Docker;
+use chainhook_event_observer::utils::Context;
 use chainhook_types::StacksNetwork;
 use clarinet_files::{DevnetConfigFile, NetworkManifest, ProjectManifest, DEFAULT_DEVNET_BALANCE};
-use crossterm::terminal::disable_raw_mode;
 use futures::stream::TryStreamExt;
+use hiro_system_kit::slog;
+use reqwest::RequestBuilder;
 use std::collections::HashMap;
 use std::fs::{self, File};
 use std::io::Write;
 use std::path::PathBuf;
 use std::sync::mpsc::{Receiver, Sender};
-use tracing::info;
+use std::time::Duration;
 
 #[derive(Debug)]
 pub struct DevnetOrchestrator {
@@ -38,6 +41,29 @@ pub struct DevnetOrchestrator {
     subnet_node_container_id: Option<String>,
     subnet_api_container_id: Option<String>,
     docker_client: Option<Docker>,
+    services_map_hosts: Option<ServicesMapHosts>,
+}
+
+// pub enum DevnetServices {
+//     BitcoinNode,
+//     StacksNode,
+//     StacksApi,
+//     StacksExplorer,
+//     BitcoinExplorer,
+//     SubnetNode,
+//     SubnetApi,
+// }
+
+#[derive(Clone, Debug)]
+pub struct ServicesMapHosts {
+    pub bitcoin_node_host: String,
+    pub stacks_node_host: String,
+    pub stacks_api_host: String,
+    pub postgres_host: String,
+    pub stacks_explorer_host: String,
+    pub bitcoin_explorer_host: String,
+    pub subnet_node_host: String,
+    pub subnet_api_host: String,
 }
 
 impl DevnetOrchestrator {
@@ -49,218 +75,57 @@ impl DevnetOrchestrator {
             &manifest.location,
             &StacksNetwork::Devnet.get_networks(),
             Some(&manifest.project.cache_location),
+            devnet_override,
         )?;
 
-        let name = manifest.project.name.clone();
-        let network_name = format!("{}.devnet", name);
+        if let Some(ref mut devnet) = network_config.devnet {
+            let working_dir = PathBuf::from(&devnet.working_dir);
+            let devnet_path = if working_dir.is_absolute() {
+                working_dir
+            } else {
+                let mut cwd = std::env::current_dir()
+                    .map_err(|e| format!("unable to retrieve current dir ({})", e.to_string()))?;
+                cwd.push(&working_dir);
+                let _ = fs::create_dir(&cwd);
+                cwd.canonicalize().map_err(|e| {
+                    format!(
+                        "unable to canonicalize working_dir {} ({})",
+                        working_dir.display(),
+                        e.to_string()
+                    )
+                })?
+            };
+            devnet.working_dir = format!("{}", devnet_path.display());
+        }
 
-        match (&mut network_config.devnet, devnet_override) {
-            (Some(ref mut devnet_config), Some(ref devnet_override)) => {
-                if let Some(val) = devnet_override.orchestrator_port {
-                    devnet_config.orchestrator_ingestion_port = val;
-                }
-
-                if let Some(val) = devnet_override.bitcoin_node_p2p_port {
-                    devnet_config.bitcoin_node_p2p_port = val;
-                }
-
-                if let Some(val) = devnet_override.bitcoin_node_rpc_port {
-                    devnet_config.bitcoin_node_rpc_port = val;
-                }
-
-                if let Some(val) = devnet_override.stacks_node_p2p_port {
-                    devnet_config.stacks_node_p2p_port = val;
-                }
-
-                if let Some(val) = devnet_override.stacks_node_rpc_port {
-                    devnet_config.stacks_node_rpc_port = val;
-                }
-
-                if let Some(ref val) = devnet_override.stacks_node_events_observers {
-                    devnet_config.stacks_node_events_observers = val.clone();
-                }
-
-                if let Some(val) = devnet_override.stacks_api_port {
-                    devnet_config.stacks_api_port = val;
-                }
-
-                if let Some(val) = devnet_override.stacks_api_events_port {
-                    devnet_config.stacks_api_events_port = val;
-                }
-
-                if let Some(val) = devnet_override.bitcoin_explorer_port {
-                    devnet_config.bitcoin_explorer_port = val;
-                }
-
-                if let Some(val) = devnet_override.stacks_explorer_port {
-                    devnet_config.stacks_explorer_port = val;
-                }
-
-                if let Some(ref val) = devnet_override.bitcoin_node_username {
-                    devnet_config.bitcoin_node_username = val.clone();
-                }
-
-                if let Some(ref val) = devnet_override.bitcoin_node_password {
-                    devnet_config.bitcoin_node_password = val.clone();
-                }
-
-                if let Some(ref val) = devnet_override.miner_mnemonic {
-                    devnet_config.miner_mnemonic = val.clone();
-                }
-
-                if let Some(ref val) = devnet_override.miner_derivation_path {
-                    devnet_config.miner_derivation_path = val.clone();
-                }
-
-                if let Some(val) = devnet_override.bitcoin_controller_block_time {
-                    devnet_config.bitcoin_controller_block_time = val;
-                }
-
-                if let Some(ref val) = devnet_override.working_dir {
-                    devnet_config.working_dir = val.clone();
-                }
-
-                if let Some(val) = devnet_override.postgres_port {
-                    devnet_config.postgres_port = val;
-                }
-
-                if let Some(ref val) = devnet_override.postgres_username {
-                    devnet_config.postgres_username = val.clone();
-                }
-
-                if let Some(ref val) = devnet_override.postgres_password {
-                    devnet_config.postgres_password = val.clone();
-                }
-
-                if let Some(ref val) = devnet_override.stacks_api_postgres_database {
-                    devnet_config.stacks_api_postgres_database = val.clone();
-                }
-
-                if let Some(ref val) = devnet_override.subnet_api_postgres_database {
-                    devnet_config.subnet_api_postgres_database = val.clone();
-                }
-
-                if let Some(ref val) = devnet_override.pox_stacking_orders {
-                    devnet_config.pox_stacking_orders = val.clone();
-                }
-
-                if let Some(ref val) = devnet_override.execute_script {
-                    devnet_config.execute_script = val.clone();
-                }
-
-                if let Some(ref val) = devnet_override.bitcoin_node_image_url {
-                    devnet_config.bitcoin_node_image_url = val.clone();
-                }
-
-                if let Some(ref val) = devnet_override.bitcoin_explorer_image_url {
-                    devnet_config.bitcoin_explorer_image_url = val.clone();
-                }
-
-                if let Some(ref val) = devnet_override.stacks_node_image_url {
-                    devnet_config.stacks_node_image_url = val.clone();
-                }
-
-                if let Some(ref val) = devnet_override.stacks_api_image_url {
-                    devnet_config.stacks_api_image_url = val.clone();
-                }
-
-                if let Some(ref val) = devnet_override.stacks_explorer_image_url {
-                    devnet_config.stacks_explorer_image_url = val.clone();
-                }
-
-                if let Some(ref val) = devnet_override.postgres_image_url {
-                    devnet_config.postgres_image_url = val.clone();
-                }
-
-                if let Some(val) = devnet_override.disable_bitcoin_explorer {
-                    devnet_config.disable_bitcoin_explorer = val;
-                }
-
-                if let Some(val) = devnet_override.disable_stacks_explorer {
-                    devnet_config.disable_stacks_explorer = val;
-                }
-
-                if let Some(val) = devnet_override.disable_stacks_api {
-                    devnet_config.disable_stacks_api = val;
-                }
-
-                if let Some(val) = devnet_override.bitcoin_controller_automining_disabled {
-                    devnet_config.bitcoin_controller_automining_disabled = val;
-                }
-
-                if let Some(val) = devnet_override.enable_subnet_node {
-                    devnet_config.enable_subnet_node = val;
-                }
-
-                if let Some(val) = devnet_override.subnet_node_p2p_port {
-                    devnet_config.subnet_node_p2p_port = val;
-                }
-
-                if let Some(val) = devnet_override.subnet_node_rpc_port {
-                    devnet_config.subnet_node_rpc_port = val;
-                }
-
-                if let Some(val) = devnet_override.subnet_events_ingestion_port {
-                    devnet_config.subnet_events_ingestion_port = val;
-                }
-
-                if let Some(ref val) = devnet_override.subnet_node_events_observers {
-                    devnet_config.subnet_node_events_observers = val.clone();
-                }
-
-                if let Some(ref val) = devnet_override.subnet_node_image_url {
-                    devnet_config.subnet_node_image_url = val.clone();
-                }
-
-                if let Some(ref val) = devnet_override.subnet_leader_derivation_path {
-                    devnet_config.subnet_leader_derivation_path = val.clone();
-                }
-
-                if let Some(ref val) = devnet_override.subnet_leader_mnemonic {
-                    devnet_config.subnet_leader_mnemonic = val.clone();
-                }
-
-                if let Some(ref val) = devnet_override.subnet_leader_mnemonic {
-                    devnet_config.subnet_leader_mnemonic = val.clone();
-                }
+        let name = manifest.project.name.to_string();
+        let mut network_name = name.clone();
+        if let Some(ref devnet) = network_config.devnet {
+            if let Some(ref network_id) = devnet.network_id {
+                network_name.push_str(&format!(".{}", network_id));
             }
-            _ => {}
-        };
+            network_name.push_str(&format!(".{}", devnet.name));
+        } else {
+            network_name.push_str(".net");
+        }
 
         let docker_client = match network_config.devnet {
-            Some(ref _devnet) => {
-                #[cfg(target_os = "unix")]
-                let res = if _devnet.docker_host.starts_with("unix://") {
-                    Docker::connect_with_unix(
-                        &_devnet.docker_host,
-                        120,
-                        bollard::API_DEFAULT_VERSION,
-                    )
-                } else {
-                    // By default, when docker is being setup, the installer creates the following symlink
-                    // sudo ln -s /Users/<username>/.docker/run/docker.sock /var/run/docker.sock
-                    // However it looks like users can opt out from this. As such, we try to fallback on
-                    // the home location.
-                    let res = match Docker::connect_with_socket_defaults() {
-                        Ok(client) => Ok(client),
-                        Err(_) => {
-                            let mut user_space_docker_socket =
-                                dirs::home_dir().expect("unable to retrieve homedir");
-                            user_space_docker_socket.push(".docker");
-                            user_space_docker_socket.push("run");
-                            user_space_docker_socket.push("docker.sock");
-                            Docker::connect_with_unix(
-                                &user_space_docker_socket.to_str().unwrap(),
-                                120,
-                                bollard::API_DEFAULT_VERSION,
-                            )
-                        }
-                    };
-                };
-                #[cfg(not(target_os = "unix"))]
-                let res = Docker::connect_with_socket_defaults();
-
-                res.map_err(|e| format!("unable to connect to docker: {:?}", e))?
+            Some(ref devnet) => {
+                Docker::connect_with_socket(&devnet.docker_host, 120, bollard::API_DEFAULT_VERSION)
+                    .or_else(|_| Docker::connect_with_socket_defaults())
+                    .or_else(|_| {
+                        let mut user_space_docker_socket =
+                            dirs::home_dir().expect("unable to retrieve homedir");
+                        user_space_docker_socket.push(".docker");
+                        user_space_docker_socket.push("run");
+                        user_space_docker_socket.push("docker.sock");
+                        Docker::connect_with_socket(
+                            &user_space_docker_socket.to_str().unwrap(),
+                            120,
+                            bollard::API_DEFAULT_VERSION,
+                        )
+                    })
+                    .map_err(|e| format!("unable to connect to docker: {:?}", e))?
             }
             None => unreachable!(),
         };
@@ -281,25 +146,11 @@ impl DevnetOrchestrator {
             postgres_container_id: None,
             subnet_node_container_id: None,
             subnet_api_container_id: None,
+            services_map_hosts: None,
         })
     }
 
-    #[allow(dead_code)]
-    pub fn get_stacks_node_url(&self) -> String {
-        match self.network_config {
-            Some(ref config) => match config.devnet {
-                Some(ref devnet) => format!("http://localhost:{}", devnet.stacks_node_rpc_port),
-                _ => unreachable!(),
-            },
-            _ => unreachable!(),
-        }
-    }
-
-    pub async fn start(
-        &mut self,
-        event_tx: Sender<DevnetEvent>,
-        terminator_rx: Receiver<bool>,
-    ) -> Result<(), String> {
+    pub async fn prepare_network(&mut self) -> Result<ServicesMapHosts, String> {
         let (docker, devnet_config) = match (&self.docker_client, &self.network_config) {
             (Some(ref docker), Some(ref network_config)) => match network_config.devnet {
                 Some(ref devnet_config) => (docker, devnet_config),
@@ -309,7 +160,99 @@ impl DevnetOrchestrator {
         };
 
         // First, let's make sure that we pruned staled resources correctly
-        self.clean_previous_session().await;
+        // self.clean_previous_session().await?;
+
+        let mut labels = HashMap::new();
+        labels.insert("project", self.network_name.as_str());
+
+        let mut options = HashMap::new();
+        options.insert("enable_ip_masquerade".into(), "true".into());
+        options.insert("enable_icc".into(), "true".into());
+        options.insert("host_binding_ipv4".into(), "0.0.0.0".into());
+        options.insert("com.docker.network.bridge.enable_icc".into(), "true".into());
+        options.insert(
+            "com.docker.network.bridge.enable_ip_masquerade".into(),
+            "true".into(),
+        );
+        options.insert(
+            "com.docker.network.bridge.host_binding_ipv4".into(),
+            "0.0.0.0".into(),
+        );
+
+        let network_id = docker
+            .create_network::<&str>(CreateNetworkOptions {
+                name: &self.network_name,
+                driver: "bridge",
+                ipam: Ipam {
+                    ..Default::default()
+                },
+                labels,
+                options: options,
+                ..Default::default()
+            })
+            .await
+            .map_err(|e| format!("unable to create network: {}", e.to_string()))?
+            .id
+            .ok_or("unable to retrieve network_id")?;
+
+        let res = docker
+            .inspect_network::<&str>(&network_id, None)
+            .await
+            .map_err(|e| format!("unable to retrieve network: {}", e.to_string()))?;
+
+        let gateway = res
+            .ipam
+            .as_ref()
+            .and_then(|ipam| ipam.config.as_ref())
+            .and_then(|config| config.first())
+            .and_then(|map| map.get("Gateway"))
+            .ok_or("unable to retrieve gateway")?;
+
+        let services_map_hosts = if devnet_config.use_docker_gateway_routing {
+            ServicesMapHosts {
+                bitcoin_node_host: format!("{}:{}", gateway, devnet_config.bitcoin_node_rpc_port),
+                stacks_node_host: format!("{}:{}", gateway, devnet_config.stacks_node_rpc_port),
+                postgres_host: format!("{}:{}", gateway, devnet_config.postgres_port),
+                stacks_api_host: format!("{}:{}", gateway, devnet_config.stacks_api_port),
+                stacks_explorer_host: format!("{}:{}", gateway, devnet_config.stacks_explorer_port),
+                bitcoin_explorer_host: format!(
+                    "{}:{}",
+                    gateway, devnet_config.bitcoin_explorer_port
+                ),
+                subnet_node_host: format!("{}:{}", gateway, devnet_config.subnet_node_rpc_port),
+                subnet_api_host: format!("{}:{}", gateway, devnet_config.subnet_api_port),
+            }
+        } else {
+            ServicesMapHosts {
+                bitcoin_node_host: format!("localhost:{}", devnet_config.bitcoin_node_rpc_port),
+                stacks_node_host: format!("localhost:{}", devnet_config.stacks_node_rpc_port),
+                postgres_host: format!("localhost:{}", devnet_config.postgres_port),
+                stacks_api_host: format!("localhost:{}", devnet_config.stacks_api_port),
+                stacks_explorer_host: format!("localhost:{}", devnet_config.stacks_explorer_port),
+                bitcoin_explorer_host: format!("localhost:{}", devnet_config.bitcoin_explorer_port),
+                subnet_node_host: format!("localhost:{}", devnet_config.subnet_node_rpc_port),
+                subnet_api_host: format!("localhost:{}", devnet_config.subnet_api_port),
+            }
+        };
+
+        self.services_map_hosts = Some(services_map_hosts.clone());
+
+        Ok(services_map_hosts)
+    }
+
+    pub async fn start(
+        &mut self,
+        event_tx: Sender<DevnetEvent>,
+        terminator_rx: Receiver<bool>,
+        ctx: &Context,
+    ) -> Result<(), String> {
+        let (_docker, devnet_config) = match (&self.docker_client, &self.network_config) {
+            (Some(ref docker), Some(ref network_config)) => match network_config.devnet {
+                Some(ref devnet_config) => (docker, devnet_config),
+                _ => return Err(format!("unable to get devnet config")),
+            },
+            _ => return Err(format!("unable to get devnet config")),
+        };
 
         let mut boot_index = 1;
 
@@ -317,7 +260,6 @@ impl DevnetOrchestrator {
             "Initiating Devnet boot sequence (working_dir: {})",
             devnet_config.working_dir
         )));
-
         let mut devnet_path = PathBuf::from(&devnet_config.working_dir);
         devnet_path.push("data");
 
@@ -407,18 +349,6 @@ impl DevnetOrchestrator {
             "Creating network {}",
             self.network_name
         )));
-        let mut labels = HashMap::new();
-        labels.insert("project".to_string(), self.network_name.to_string());
-
-        let _network = docker
-            .create_network(CreateNetworkOptions {
-                name: self.network_name.clone(),
-                driver: "bridge".to_string(),
-                labels,
-                ..Default::default()
-            })
-            .await
-            .map_err(|e| format!("unable to create network: {:?}", e))?;
 
         // Start bitcoind
         let _ = event_tx.send(DevnetEvent::info(format!("Starting bitcoin-node")));
@@ -428,11 +358,11 @@ impl DevnetOrchestrator {
             name: "bitcoin-node".into(),
             comment: "preparing container".into(),
         }));
-        match self.prepare_bitcoin_node_container().await {
+        match self.prepare_bitcoin_node_container(&ctx).await {
             Ok(_) => {}
             Err(message) => {
                 let _ = event_tx.send(DevnetEvent::FatalError(message.clone()));
-                self.kill(Some(&message)).await;
+                self.kill(ctx, Some(&message)).await;
                 return Err(message);
             }
         };
@@ -444,11 +374,11 @@ impl DevnetOrchestrator {
         }));
         match self.boot_bitcoin_node_container().await {
             Ok(_) => {
-                self.initialize_bitcoin_node(&event_tx)?;
+                self.initialize_bitcoin_node(&event_tx).await?;
             }
             Err(message) => {
                 let _ = event_tx.send(DevnetEvent::FatalError(message.clone()));
-                self.kill(Some(&message)).await;
+                self.kill(ctx, Some(&message)).await;
                 return Err(message);
             }
         };
@@ -463,19 +393,19 @@ impl DevnetOrchestrator {
                 comment: "preparing postgres container".into(),
             }));
             let _ = event_tx.send(DevnetEvent::info(format!("Starting postgres")));
-            match self.prepare_postgres_container().await {
+            match self.prepare_postgres_container(ctx).await {
                 Ok(_) => {}
                 Err(message) => {
                     let _ = event_tx.send(DevnetEvent::FatalError(message.clone()));
-                    self.kill(Some(&message)).await;
+                    self.kill(ctx, Some(&message)).await;
                     return Err(message);
                 }
             };
-            match self.boot_postgres_container().await {
+            match self.boot_postgres_container(ctx).await {
                 Ok(_) => {}
                 Err(message) => {
                     let _ = event_tx.send(DevnetEvent::FatalError(message.clone()));
-                    self.kill(Some(&message)).await;
+                    self.kill(ctx, Some(&message)).await;
                     return Err(message);
                 }
             };
@@ -487,11 +417,11 @@ impl DevnetOrchestrator {
             }));
 
             let _ = event_tx.send(DevnetEvent::info(format!("Starting stacks-api")));
-            match self.prepare_stacks_api_container().await {
+            match self.prepare_stacks_api_container(ctx).await {
                 Ok(_) => {}
                 Err(message) => {
                     let _ = event_tx.send(DevnetEvent::FatalError(message.clone()));
-                    self.kill(Some(&message)).await;
+                    self.kill(ctx, Some(&message)).await;
                     return Err(message);
                 }
             };
@@ -501,11 +431,11 @@ impl DevnetOrchestrator {
                 name: "stacks-api".into(),
                 comment: format!("http://localhost:{}/doc", stacks_api_port),
             }));
-            match self.boot_stacks_api_container().await {
+            match self.boot_stacks_api_container(ctx).await {
                 Ok(_) => {}
                 Err(message) => {
                     let _ = event_tx.send(DevnetEvent::FatalError(message.clone()));
-                    self.kill(Some(&message)).await;
+                    self.kill(ctx, Some(&message)).await;
                     return Err(message);
                 }
             };
@@ -514,11 +444,11 @@ impl DevnetOrchestrator {
         // Start Hyperchain node
         if enable_subnet_node {
             let _ = event_tx.send(DevnetEvent::info(format!("Starting subnet-node")));
-            match self.prepare_subnet_node_container(boot_index).await {
+            match self.prepare_subnet_node_container(boot_index, ctx).await {
                 Ok(_) => {}
                 Err(message) => {
                     let _ = event_tx.send(DevnetEvent::FatalError(message.clone()));
-                    self.kill(Some(&message)).await;
+                    self.kill(ctx, Some(&message)).await;
                     return Err(message);
                 }
             };
@@ -532,18 +462,18 @@ impl DevnetOrchestrator {
                 Ok(_) => {}
                 Err(message) => {
                     let _ = event_tx.send(DevnetEvent::FatalError(message.clone()));
-                    self.kill(Some(&message)).await;
+                    self.kill(ctx, Some(&message)).await;
                     return Err(message);
                 }
             };
 
             if !disable_subnet_api {
                 let _ = event_tx.send(DevnetEvent::info(format!("Starting subnet-api")));
-                match self.prepare_subnet_api_container().await {
+                match self.prepare_subnet_api_container(ctx).await {
                     Ok(_) => {}
                     Err(message) => {
                         let _ = event_tx.send(DevnetEvent::FatalError(message.clone()));
-                        self.kill(Some(&message)).await;
+                        self.kill(ctx, Some(&message)).await;
                         return Err(message);
                     }
                 };
@@ -557,7 +487,7 @@ impl DevnetOrchestrator {
                     Ok(_) => {}
                     Err(message) => {
                         let _ = event_tx.send(DevnetEvent::FatalError(message.clone()));
-                        self.kill(Some(&message)).await;
+                        self.kill(ctx, Some(&message)).await;
                         return Err(message);
                     }
                 };
@@ -572,11 +502,11 @@ impl DevnetOrchestrator {
             name: "stacks-node".into(),
             comment: "updating image".into(),
         }));
-        match self.prepare_stacks_node_container(boot_index).await {
+        match self.prepare_stacks_node_container(boot_index, ctx).await {
             Ok(_) => {}
             Err(message) => {
                 let _ = event_tx.send(DevnetEvent::FatalError(message.clone()));
-                self.kill(Some(&message)).await;
+                self.kill(ctx, Some(&message)).await;
                 return Err(message);
             }
         };
@@ -590,7 +520,7 @@ impl DevnetOrchestrator {
             Ok(_) => {}
             Err(message) => {
                 let _ = event_tx.send(DevnetEvent::FatalError(message.clone()));
-                self.kill(Some(&message)).await;
+                self.kill(ctx, Some(&message)).await;
                 return Err(message);
             }
         };
@@ -603,20 +533,20 @@ impl DevnetOrchestrator {
                 name: "stacks-explorer".into(),
                 comment: "preparing container".into(),
             }));
-            match self.prepare_stacks_explorer_container().await {
+            match self.prepare_stacks_explorer_container(ctx).await {
                 Ok(_) => {}
                 Err(message) => {
                     let _ = event_tx.send(DevnetEvent::FatalError(message.clone()));
-                    self.kill(Some(&message)).await;
+                    self.kill(ctx, Some(&message)).await;
                     return Err(message);
                 }
             };
             let _ = event_tx.send(DevnetEvent::info(format!("Starting stacks-explorer")));
-            match self.boot_stacks_explorer_container().await {
+            match self.boot_stacks_explorer_container(ctx).await {
                 Ok(_) => {}
                 Err(message) => {
                     let _ = event_tx.send(DevnetEvent::FatalError(message.clone()));
-                    self.kill(Some(&message)).await;
+                    self.kill(ctx, Some(&message)).await;
                     return Err(message);
                 }
             };
@@ -636,20 +566,20 @@ impl DevnetOrchestrator {
                 name: "bitcoin-explorer".into(),
                 comment: "preparing container".into(),
             }));
-            match self.prepare_bitcoin_explorer_container().await {
+            match self.prepare_bitcoin_explorer_container(ctx).await {
                 Ok(_) => {}
                 Err(message) => {
                     let _ = event_tx.send(DevnetEvent::FatalError(message.clone()));
-                    self.kill(Some(&message)).await;
+                    self.kill(ctx, Some(&message)).await;
                     return Err(message);
                 }
             };
             let _ = event_tx.send(DevnetEvent::info(format!("Starting bitcoin-explorer")));
-            match self.boot_bitcoin_explorer_container().await {
+            match self.boot_bitcoin_explorer_container(ctx).await {
                 Ok(_) => {}
                 Err(message) => {
                     let _ = event_tx.send(DevnetEvent::FatalError(message.clone()));
-                    self.kill(Some(&message)).await;
+                    self.kill(ctx, Some(&message)).await;
                     return Err(message);
                 }
             };
@@ -665,7 +595,7 @@ impl DevnetOrchestrator {
             boot_index += 1;
             match terminator_rx.recv() {
                 Ok(true) => {
-                    self.kill(None).await;
+                    self.kill(ctx, None).await;
                     break;
                 }
                 Ok(false) => {
@@ -801,14 +731,16 @@ rpcport={bitcoin_node_rpc_port}
         let config = Config {
             labels: Some(labels),
             image: Some(devnet_config.bitcoin_node_image_url.clone()),
-            domainname: Some(self.network_name.to_string()),
+            // domainname: Some(self.network_name.to_string()),
             tty: None,
             exposed_ports: Some(exposed_ports),
             entrypoint: Some(vec![]),
             env: Some(env),
             host_config: Some(HostConfig {
-                port_bindings: Some(port_bindings),
+                auto_remove: Some(true),
                 binds: Some(binds),
+                network_mode: Some(self.network_name.clone()),
+                port_bindings: Some(port_bindings),
                 extra_hosts: Some(vec!["host.docker.internal:host-gateway".into()]),
                 ..Default::default()
             }),
@@ -818,7 +750,7 @@ rpcport={bitcoin_node_rpc_port}
         Ok(config)
     }
 
-    pub async fn prepare_bitcoin_node_container(&mut self) -> Result<(), String> {
+    pub async fn prepare_bitcoin_node_container(&mut self, ctx: &Context) -> Result<(), String> {
         let (docker, devnet_config) = match (&self.docker_client, &self.network_config) {
             (Some(ref docker), Some(ref network_config)) => match network_config.devnet {
                 Some(ref devnet_config) => (docker, devnet_config),
@@ -841,22 +773,34 @@ rpcport={bitcoin_node_rpc_port}
             .map_err(|e| formatted_docker_error("unable to create bitcoind image", e))?;
 
         let config = self.prepare_bitcoin_node_config(1)?;
+        let container_name = format!("bitcoin-node.{}", self.network_name);
         let options = CreateContainerOptions {
-            name: format!("bitcoin-node.{}", self.network_name),
+            name: container_name.as_str(),
         };
 
-        let container = docker
-            .create_container::<String, String>(Some(options), config)
+        let container = match docker
+            .create_container::<&str, String>(Some(options.clone()), config.clone())
             .await
-            .map_err(|e| formatted_docker_error("unable to create bitcoind container", e))?
-            .id;
-        info!("Created container bitcoin-node: {}", container);
+            .map_err(|e| formatted_docker_error("unable to create bitcoind container", e))
+        {
+            Ok(container) => container.id,
+            Err(_e) => {
+                // Attempt to clean eventual subsequent artifacts
+                let _ = docker.kill_container::<String>(&container_name, None).await;
+                docker
+                    .create_container::<&str, String>(Some(options), config)
+                    .await
+                    .map_err(|e| formatted_docker_error("unable to create bitcoind container", e))?
+                    .id
+            }
+        };
+        ctx.try_log(|logger| slog::info!(logger, "Created container bitcoin-node: {}", container));
         self.bitcoin_node_container_id = Some(container);
 
         Ok(())
     }
 
-    pub async fn clean_previous_session(&self) {
+    pub async fn clean_previous_session(&self) -> Result<(), String> {
         let mut filters = HashMap::new();
         filters.insert(
             "label".to_string(),
@@ -875,9 +819,9 @@ rpcport={bitcoin_node_rpc_port}
         let res = docker.list_containers(options).await;
         let containers = match res {
             Ok(containers) => containers,
-            Err(_) => {
-                println!("unable to start Devnet: make sure that Docker is installed on this machine and running.");
-                return process_exit();
+            Err(e) => {
+                let err = format!("unable to communicate with Docker: {}\nvisit https://docs.hiro.so/clarinet/troubleshooting#i-am-unable-to-start-devnet-though-my-docker-is-running to resolve this issue.", e.to_string());
+                return Err(err);
             }
         };
         let options = KillContainerOptions { signal: "SIGKILL" };
@@ -897,9 +841,10 @@ rpcport={bitcoin_node_rpc_port}
                 .await;
         }
         self.prune().await;
+        Ok(())
     }
 
-    pub async fn boot_bitcoin_node_container(&self) -> Result<(), String> {
+    pub async fn boot_bitcoin_node_container(&mut self) -> Result<(), String> {
         let container = match &self.bitcoin_node_container_id {
             Some(container) => container.clone(),
             _ => return Err(format!("unable to boot container")),
@@ -914,22 +859,6 @@ rpcport={bitcoin_node_rpc_port}
             .start_container::<String>(&container, None)
             .await
             .map_err(|e| formatted_docker_error("unable to start bitcoind container", e))?;
-
-        let res = docker
-            .connect_network(
-                &self.network_name,
-                ConnectNetworkOptions {
-                    container,
-                    ..Default::default()
-                },
-            )
-            .await;
-
-        if let Err(e) = res {
-            let err = format!("Error connecting container: {}", e);
-            println!("{}", err);
-            return Err(err);
-        }
 
         Ok(())
     }
@@ -968,14 +897,23 @@ p2p_bind = "0.0.0.0:{stacks_node_p2p_port}"
 miner = true
 seed = "{miner_secret_key_hex}"
 local_peer_seed = "{miner_secret_key_hex}"
-wait_time_for_microblocks = 5000
+pox_sync_sample_secs = 0
 wait_time_for_blocks = 0
-pox_sync_sample_secs = 10
-microblock_frequency = 15000
+wait_time_for_microblocks = 50
+microblock_frequency = 1000
+
+[connection_options]
+# inv_sync_interval = 10
+# download_interval = 10
+# walk_interval = 10
+disable_block_download = true
+disable_inbound_handshakes = true
+disable_inbound_walks = true
+public_ip_address = "1.1.1.1:1234"
 
 [miner]
-first_attempt_time_ms = 10000
-subsequent_attempt_time_ms = 10000
+first_attempt_time_ms = 500
+subsequent_attempt_time_ms = 1000
 # microblock_attempt_time_ms = 15000
 "#,
             stacks_node_rpc_port = devnet_config.stacks_node_rpc_port,
@@ -1041,7 +979,10 @@ events_keys = ["*"]
 chain = "bitcoin"
 mode = "krypton"
 poll_time_secs = 1
+timeout = 30
 peer_host = "host.docker.internal"
+rpc_ssl = false
+wallet_name = "devnet"
 username = "{bitcoin_node_username}"
 password = "{bitcoin_node_password}"
 rpc_port = {orchestrator_ingestion_port}
@@ -1055,7 +996,7 @@ peer_port = {bitcoin_node_p2p_port}
 
         if devnet_config.enable_next_features {
             stacks_conf.push_str(&format!(
-                r#"pox_2_activation = {epoch_2_1}
+                r#"pox_2_activation = {pox_2_activation}
 
 [[burnchain.epochs]]
 epoch_name = "1.0"
@@ -1076,6 +1017,7 @@ start_height = {epoch_2_1}
                 epoch_2_0 = devnet_config.epoch_2_0,
                 epoch_2_05 = devnet_config.epoch_2_05,
                 epoch_2_1 = devnet_config.epoch_2_1,
+                pox_2_activation = devnet_config.pox_2_activation,
             ));
         }
 
@@ -1128,7 +1070,7 @@ start_height = {epoch_2_1}
         let config = Config {
             labels: Some(labels),
             image: Some(devnet_config.stacks_node_image_url.clone()),
-            domainname: Some(self.network_name.to_string()),
+            // domainname: Some(self.network_name.to_string()),
             tty: None,
             exposed_ports: Some(exposed_ports),
             entrypoint: Some(vec![
@@ -1138,8 +1080,10 @@ start_height = {epoch_2_1}
             ]),
             env: Some(env),
             host_config: Some(HostConfig {
-                port_bindings: Some(port_bindings),
+                auto_remove: Some(true),
                 binds: Some(binds),
+                network_mode: Some(self.network_name.clone()),
+                port_bindings: Some(port_bindings),
                 extra_hosts: Some(vec!["host.docker.internal:host-gateway".into()]),
                 ..Default::default()
             }),
@@ -1149,7 +1093,11 @@ start_height = {epoch_2_1}
         Ok(config)
     }
 
-    pub async fn prepare_stacks_node_container(&mut self, boot_index: u32) -> Result<(), String> {
+    pub async fn prepare_stacks_node_container(
+        &mut self,
+        boot_index: u32,
+        ctx: &Context,
+    ) -> Result<(), String> {
         let (docker, devnet_config) = match (&self.docker_client, &self.network_config) {
             (Some(ref docker), Some(ref network_config)) => match network_config.devnet {
                 Some(ref devnet_config) => (docker, devnet_config),
@@ -1183,13 +1131,13 @@ start_height = {epoch_2_1}
             .map_err(|e| format!("unable to create container: {}", e))?
             .id;
 
-        info!("Created container stacks-node: {}", container);
+        ctx.try_log(|logger| slog::info!(logger, "Created container stacks-node: {}", container));
         self.stacks_node_container_id = Some(container.clone());
 
         Ok(())
     }
 
-    pub async fn boot_stacks_node_container(&self) -> Result<(), String> {
+    pub async fn boot_stacks_node_container(&mut self) -> Result<(), String> {
         let container = match &self.stacks_node_container_id {
             Some(container) => container.clone(),
             _ => return Err(format!("unable to boot container")),
@@ -1204,22 +1152,6 @@ start_height = {epoch_2_1}
             .start_container::<String>(&container, None)
             .await
             .map_err(|e| formatted_docker_error("unable to start stacks-node container", e))?;
-
-        let res = docker
-            .connect_network(
-                &self.network_name,
-                ConnectNetworkOptions {
-                    container,
-                    ..Default::default()
-                },
-            )
-            .await;
-
-        if let Err(e) = res {
-            let err = format!("Error connecting container: {}", e);
-            println!("{}", err);
-            return Err(err);
-        }
 
         Ok(())
     }
@@ -1403,7 +1335,7 @@ events_keys = ["*"]
         let config = Config {
             labels: Some(labels),
             image: Some(devnet_config.subnet_node_image_url.clone()),
-            domainname: Some(self.network_name.to_string()),
+            // domainname: Some(self.network_name.to_string()),
             tty: None,
             exposed_ports: Some(exposed_ports),
             entrypoint: Some(vec![
@@ -1417,8 +1349,10 @@ events_keys = ["*"]
                 // "BLOCKSTACK_USE_TEST_GENESIS_CHAINSTATE=1".to_string(),
             ]),
             host_config: Some(HostConfig {
-                port_bindings: Some(port_bindings),
+                auto_remove: Some(true),
                 binds: Some(binds),
+                network_mode: Some(self.network_name.clone()),
+                port_bindings: Some(port_bindings),
                 extra_hosts: Some(vec!["host.docker.internal:host-gateway".into()]),
                 ..Default::default()
             }),
@@ -1428,7 +1362,11 @@ events_keys = ["*"]
         Ok(config)
     }
 
-    pub async fn prepare_subnet_node_container(&mut self, boot_index: u32) -> Result<(), String> {
+    pub async fn prepare_subnet_node_container(
+        &mut self,
+        boot_index: u32,
+        ctx: &Context,
+    ) -> Result<(), String> {
         let (docker, devnet_config) = match (&self.docker_client, &self.network_config) {
             (Some(ref docker), Some(ref network_config)) => match network_config.devnet {
                 Some(ref devnet_config) => (docker, devnet_config),
@@ -1462,7 +1400,7 @@ events_keys = ["*"]
             .map_err(|e| format!("unable to create container: {}", e))?
             .id;
 
-        info!("Created container subnet-node: {}", container);
+        ctx.try_log(|logger| slog::info!(logger, "Created container subnet-node: {}", container));
         self.subnet_node_container_id = Some(container.clone());
 
         Ok(())
@@ -1484,26 +1422,10 @@ events_keys = ["*"]
             .await
             .map_err(|e| format!("unable to start container - {}", e))?;
 
-        let res = docker
-            .connect_network(
-                &self.network_name,
-                ConnectNetworkOptions {
-                    container,
-                    ..Default::default()
-                },
-            )
-            .await;
-
-        if let Err(e) = res {
-            let err = format!("Error connecting container: {}", e);
-            println!("{}", err);
-            return Err(err);
-        }
-
         Ok(())
     }
 
-    pub async fn prepare_stacks_api_container(&mut self) -> Result<(), String> {
+    pub async fn prepare_stacks_api_container(&mut self, ctx: &Context) -> Result<(), String> {
         let (docker, _, devnet_config) = match (&self.docker_client, &self.network_config) {
             (Some(ref docker), Some(ref network_config)) => match network_config.devnet {
                 Some(ref devnet_config) => (docker, network_config, devnet_config),
@@ -1575,11 +1497,13 @@ events_keys = ["*"]
         let config = Config {
             labels: Some(labels),
             image: Some(devnet_config.stacks_api_image_url.clone()),
-            domainname: Some(self.network_name.to_string()),
+            // domainname: Some(self.network_name.to_string()),
             tty: None,
             exposed_ports: Some(exposed_ports),
             env: Some(env),
             host_config: Some(HostConfig {
+                auto_remove: Some(true),
+                network_mode: Some(self.network_name.clone()),
                 port_bindings: Some(port_bindings),
                 extra_hosts: Some(vec!["host.docker.internal:host-gateway".into()]),
                 ..Default::default()
@@ -1597,13 +1521,13 @@ events_keys = ["*"]
             .map_err(|e| format!("unable to create container: {}", e))?
             .id;
 
-        info!("Created container stacks-api: {}", container);
+        ctx.try_log(|logger| slog::info!(logger, "Created container stacks-api: {}", container));
         self.stacks_api_container_id = Some(container);
 
         Ok(())
     }
 
-    pub async fn boot_stacks_api_container(&self) -> Result<(), String> {
+    pub async fn boot_stacks_api_container(&self, _ctx: &Context) -> Result<(), String> {
         let container = match &self.stacks_api_container_id {
             Some(container) => container.clone(),
             _ => return Err(format!("unable to boot container")),
@@ -1619,26 +1543,10 @@ events_keys = ["*"]
             .await
             .map_err(|e| formatted_docker_error("unable to start stacks-api container", e))?;
 
-        let res = docker
-            .connect_network(
-                &self.network_name,
-                ConnectNetworkOptions {
-                    container,
-                    ..Default::default()
-                },
-            )
-            .await;
-
-        if let Err(e) = res {
-            let err = format!("Error connecting container: {}", e);
-            println!("{}", err);
-            return Err(err);
-        }
-
         Ok(())
     }
 
-    pub async fn prepare_subnet_api_container(&mut self) -> Result<(), String> {
+    pub async fn prepare_subnet_api_container(&mut self, ctx: &Context) -> Result<(), String> {
         let (docker, _, devnet_config) = match (&self.docker_client, &self.network_config) {
             (Some(ref docker), Some(ref network_config)) => match network_config.devnet {
                 Some(ref devnet_config) => (docker, network_config, devnet_config),
@@ -1681,7 +1589,7 @@ events_keys = ["*"]
         let config = Config {
             labels: Some(labels),
             image: Some(devnet_config.subnet_api_image_url.clone()),
-            domainname: Some(self.network_name.to_string()),
+            // domainname: Some(self.network_name.to_string()),
             tty: None,
             exposed_ports: Some(exposed_ports),
             env: Some(vec![
@@ -1712,6 +1620,8 @@ events_keys = ["*"]
                 "NODE_ENV=development".to_string(),
             ]),
             host_config: Some(HostConfig {
+                auto_remove: Some(true),
+                network_mode: Some(self.network_name.clone()),
                 port_bindings: Some(port_bindings),
                 extra_hosts: Some(vec!["host.docker.internal:host-gateway".into()]),
                 ..Default::default()
@@ -1729,7 +1639,7 @@ events_keys = ["*"]
             .map_err(|e| format!("unable to create container: {}", e))?
             .id;
 
-        info!("Created container subnet-api: {}", container);
+        ctx.try_log(|logger| slog::info!(logger, "Created container subnet-api: {}", container));
         self.subnet_api_container_id = Some(container);
 
         Ok(())
@@ -1787,26 +1697,10 @@ events_keys = ["*"]
             .await
             .map_err(|e| formatted_docker_error("unable to start stacks-api container", e))?;
 
-        let res = docker
-            .connect_network(
-                &self.network_name,
-                ConnectNetworkOptions {
-                    container,
-                    ..Default::default()
-                },
-            )
-            .await;
-
-        if let Err(e) = res {
-            let err = format!("Error connecting container: {}", e);
-            println!("{}", err);
-            return Err(err);
-        }
-
         Ok(())
     }
 
-    pub async fn prepare_postgres_container(&mut self) -> Result<(), String> {
+    pub async fn prepare_postgres_container(&mut self, ctx: &Context) -> Result<(), String> {
         let (docker, _, devnet_config) = match (&self.docker_client, &self.network_config) {
             (Some(ref docker), Some(ref network_config)) => match network_config.devnet {
                 Some(ref devnet_config) => (docker, network_config, devnet_config),
@@ -1845,7 +1739,7 @@ events_keys = ["*"]
         let config = Config {
             labels: Some(labels),
             image: Some(devnet_config.postgres_image_url.clone()),
-            domainname: Some(self.network_name.to_string()),
+            // domainname: Some(self.network_name.to_string()),
             tty: None,
             exposed_ports: Some(exposed_ports),
             env: Some(vec![
@@ -1853,6 +1747,8 @@ events_keys = ["*"]
                 format!("POSTGRES_DB={}", devnet_config.stacks_api_postgres_database),
             ]),
             host_config: Some(HostConfig {
+                auto_remove: Some(true),
+                network_mode: Some(self.network_name.clone()),
                 port_bindings: Some(port_bindings),
                 extra_hosts: Some(vec!["host.docker.internal:host-gateway".into()]),
                 ..Default::default()
@@ -1870,13 +1766,13 @@ events_keys = ["*"]
             .map_err(|e| format!("unable to create container: {}", e))?
             .id;
 
-        info!("Created container postgres: {}", container);
+        ctx.try_log(|logger| slog::info!(logger, "Created container postgres: {}", container));
         self.postgres_container_id = Some(container);
 
         Ok(())
     }
 
-    pub async fn boot_postgres_container(&self) -> Result<(), String> {
+    pub async fn boot_postgres_container(&self, _ctx: &Context) -> Result<(), String> {
         let container = match &self.postgres_container_id {
             Some(container) => container.clone(),
             _ => return Err(format!("unable to boot container")),
@@ -1892,26 +1788,10 @@ events_keys = ["*"]
             .await
             .map_err(|e| formatted_docker_error("unable to start postgres container", e))?;
 
-        let res = docker
-            .connect_network(
-                &self.network_name,
-                ConnectNetworkOptions {
-                    container,
-                    ..Default::default()
-                },
-            )
-            .await;
-
-        if let Err(e) = res {
-            let err = format!("Error connecting container: {}", e);
-            println!("{}", err);
-            return Err(err);
-        }
-
         Ok(())
     }
 
-    pub async fn prepare_stacks_explorer_container(&mut self) -> Result<(), String> {
+    pub async fn prepare_stacks_explorer_container(&mut self, ctx: &Context) -> Result<(), String> {
         let (docker, _, devnet_config) = match (&self.docker_client, &self.network_config) {
             (Some(ref docker), Some(ref network_config)) => match network_config.devnet {
                 Some(ref devnet_config) => (docker, network_config, devnet_config),
@@ -1969,11 +1849,13 @@ events_keys = ["*"]
         let config = Config {
             labels: Some(labels),
             image: Some(devnet_config.stacks_explorer_image_url.clone()),
-            domainname: Some(self.network_name.to_string()),
+            // domainname: Some(self.network_name.to_string()),
             tty: None,
             exposed_ports: Some(exposed_ports),
             env: Some(env),
             host_config: Some(HostConfig {
+                auto_remove: Some(true),
+                network_mode: Some(self.network_name.clone()),
                 port_bindings: Some(port_bindings),
                 extra_hosts: Some(vec!["host.docker.internal:host-gateway".into()]),
                 ..Default::default()
@@ -1991,13 +1873,15 @@ events_keys = ["*"]
             .map_err(|e| format!("unable to create container: {}", e))?
             .id;
 
-        info!("Created container stacks-explorer: {}", container);
+        ctx.try_log(|logger| {
+            slog::info!(logger, "Created container stacks-explorer: {}", container)
+        });
         self.stacks_explorer_container_id = Some(container);
 
         Ok(())
     }
 
-    pub async fn boot_stacks_explorer_container(&self) -> Result<(), String> {
+    pub async fn boot_stacks_explorer_container(&self, _ctx: &Context) -> Result<(), String> {
         let container = match &self.stacks_explorer_container_id {
             Some(container) => container.clone(),
             _ => return Err(format!("unable to boot container")),
@@ -2013,26 +1897,13 @@ events_keys = ["*"]
             .await
             .map_err(|e| format!("unable to create container: {}", e))?;
 
-        let res = docker
-            .connect_network(
-                &self.network_name,
-                ConnectNetworkOptions {
-                    container,
-                    ..Default::default()
-                },
-            )
-            .await;
-
-        if let Err(e) = res {
-            let err = format!("Error connecting container: {}", e);
-            println!("{}", err);
-            return Err(err);
-        }
-
         Ok(())
     }
 
-    pub async fn prepare_bitcoin_explorer_container(&mut self) -> Result<(), String> {
+    pub async fn prepare_bitcoin_explorer_container(
+        &mut self,
+        ctx: &Context,
+    ) -> Result<(), String> {
         let (docker, _, devnet_config) = match (&self.docker_client, &self.network_config) {
             (Some(ref docker), Some(ref network_config)) => match network_config.devnet {
                 Some(ref devnet_config) => (docker, network_config, devnet_config),
@@ -2075,7 +1946,7 @@ events_keys = ["*"]
         let config = Config {
             labels: Some(labels),
             image: Some(devnet_config.bitcoin_explorer_image_url.clone()),
-            domainname: Some(self.network_name.to_string()),
+            // domainname: Some(self.network_name.to_string()),
             tty: None,
             exposed_ports: Some(exposed_ports),
             env: Some(vec![
@@ -2101,6 +1972,8 @@ events_keys = ["*"]
                 format!("BTCEXP_RPC_ALLOWALL=true",),
             ]),
             host_config: Some(HostConfig {
+                auto_remove: Some(true),
+                network_mode: Some(self.network_name.clone()),
                 port_bindings: Some(port_bindings),
                 extra_hosts: Some(vec!["host.docker.internal:host-gateway".into()]),
                 ..Default::default()
@@ -2118,13 +1991,15 @@ events_keys = ["*"]
             .map_err(|e| format!("unable to create container: {}", e))?
             .id;
 
-        info!("Created container bitcoin-explorer: {}", container);
+        ctx.try_log(|logger| {
+            slog::info!(logger, "Created container bitcoin-explorer: {}", container)
+        });
         self.bitcoin_explorer_container_id = Some(container);
 
         Ok(())
     }
 
-    pub async fn boot_bitcoin_explorer_container(&self) -> Result<(), String> {
+    pub async fn boot_bitcoin_explorer_container(&self, _ctx: &Context) -> Result<(), String> {
         let container = match &self.bitcoin_explorer_container_id {
             Some(container) => container.clone(),
             _ => return Err(format!("unable to boot container")),
@@ -2139,22 +2014,6 @@ events_keys = ["*"]
             .start_container::<String>(&container, None)
             .await
             .map_err(|e| format!("unable to create container: {}", e))?;
-
-        let res = docker
-            .connect_network(
-                &self.network_name,
-                ConnectNetworkOptions {
-                    container,
-                    ..Default::default()
-                },
-            )
-            .await;
-
-        if let Err(e) = res {
-            let err = format!("Error connecting container: {}", e);
-            println!("{}", err);
-            return Err(err);
-        }
 
         Ok(())
     }
@@ -2280,15 +2139,6 @@ events_keys = ["*"]
         let _ = docker
             .start_container::<String>(&bitcoin_node_c_id, None)
             .await;
-        let _ = docker
-            .connect_network(
-                &self.network_name,
-                ConnectNetworkOptions {
-                    container: bitcoin_node_c_id.clone(),
-                    ..Default::default()
-                },
-            )
-            .await;
 
         let _ = docker
             .start_container::<String>(bitcoin_explorer_c_id, None)
@@ -2307,20 +2157,11 @@ events_keys = ["*"]
         let _ = docker
             .start_container::<String>(&stacks_node_c_id, None)
             .await;
-        let _ = docker
-            .connect_network(
-                &self.network_name,
-                ConnectNetworkOptions {
-                    container: stacks_node_c_id.clone(),
-                    ..Default::default()
-                },
-            )
-            .await;
 
         Ok((bitcoin_node_c_id, stacks_node_c_id))
     }
 
-    pub async fn kill(&self, fatal_message: Option<&str>) {
+    pub async fn kill(&self, ctx: &Context, fatal_message: Option<&str>) {
         let (docker, devnet_config) = match (&self.docker_client, &self.network_config) {
             (Some(ref docker), Some(ref network_config)) => match network_config.devnet {
                 Some(ref devnet_config) => (docker, devnet_config),
@@ -2335,7 +2176,7 @@ events_keys = ["*"]
             let _ = docker
                 .kill_container(bitcoin_explorer_container_id, options.clone())
                 .await;
-            println!("Terminating bitcoin-explorer");
+            ctx.try_log(|logger| slog::info!(logger, "Terminating bitcoin-explorer"));
             let _ = docker.remove_container(bitcoin_explorer_container_id, None);
         }
 
@@ -2343,7 +2184,7 @@ events_keys = ["*"]
             let _ = docker
                 .kill_container(stacks_explorer_container_id, options.clone())
                 .await;
-            println!("Terminating stacks-explorer");
+            ctx.try_log(|logger| slog::info!(logger, "Terminating stacks-explorer"));
             let _ = docker.remove_container(stacks_explorer_container_id, None);
         }
 
@@ -2351,7 +2192,7 @@ events_keys = ["*"]
             let _ = docker
                 .kill_container(bitcoin_node_container_id, options.clone())
                 .await;
-            println!("Terminating bitcoin-node");
+            ctx.try_log(|logger| slog::info!(logger, "Terminating bitcoin-node"));
             let _ = docker.remove_container(bitcoin_node_container_id, None);
         }
 
@@ -2359,7 +2200,7 @@ events_keys = ["*"]
             let _ = docker
                 .kill_container(stacks_api_container_id, options.clone())
                 .await;
-            println!("Terminating stacks-api");
+            ctx.try_log(|logger| slog::info!(logger, "Terminating stacks-api"));
             let _ = docker.remove_container(stacks_api_container_id, None);
         }
 
@@ -2367,7 +2208,7 @@ events_keys = ["*"]
             let _ = docker
                 .kill_container(postgres_container_id, options.clone())
                 .await;
-            println!("Terminating postgres");
+            ctx.try_log(|logger| slog::info!(logger, "Terminating postgres"));
             let _ = docker.remove_container(postgres_container_id, None);
         }
 
@@ -2375,7 +2216,7 @@ events_keys = ["*"]
             let _ = docker
                 .kill_container(stacks_node_container_id, options.clone())
                 .await;
-            println!("Terminating stacks-node");
+            ctx.try_log(|logger| slog::info!(logger, "Terminating stacks-node"));
             let _ = docker.remove_container(stacks_node_container_id, None);
         }
 
@@ -2383,7 +2224,7 @@ events_keys = ["*"]
             let _ = docker
                 .kill_container(subnet_node_container_id, options.clone())
                 .await;
-            println!("Terminating subnet-node");
+            ctx.try_log(|logger| slog::info!(logger, "Terminating subnet-node"));
             let _ = docker.remove_container(subnet_node_container_id, None);
         }
 
@@ -2391,26 +2232,32 @@ events_keys = ["*"]
             let _ = docker
                 .kill_container(subnet_api_container_id, options)
                 .await;
-            println!("Terminating subnet-api");
+            ctx.try_log(|logger| slog::info!(logger, "Terminating subnet-api"));
             let _ = docker.remove_container(subnet_api_container_id, None);
         }
 
-        // Prune network
-        println!("Pruning network and containers");
+        // Delete network
+        let _ = docker.remove_network(&self.network_name).await;
+
+        ctx.try_log(|logger| slog::info!(logger, "Pruning network and containers"));
+
         self.prune().await;
         if let Some(ref tx) = self.termination_success_tx {
             let _ = tx.send(true);
         }
 
-        println!(
-            "Artifacts (logs, conf, chainstates) available here: {}",
-            devnet_config.working_dir
-        );
+        ctx.try_log(|logger| {
+            slog::info!(
+                logger,
+                "Artifacts (logs, conf, chainstates) available here: {}",
+                devnet_config.working_dir
+            )
+        });
 
         if let Some(message) = fatal_message {
-            println!("⚠️  fatal error - {}", message);
+            ctx.try_log(|logger| slog::info!(logger, "⚠️  fatal error - {}", message));
         } else {
-            println!("✌️");
+            ctx.try_log(|logger| slog::info!(logger, "✌️"));
         }
     }
 
@@ -2436,12 +2283,13 @@ events_keys = ["*"]
             .await;
     }
 
-    pub fn initialize_bitcoin_node(
+    pub async fn initialize_bitcoin_node(
         &self,
         devnet_event_tx: &Sender<DevnetEvent>,
     ) -> Result<(), String> {
         use bitcoincore_rpc::bitcoin::Address;
-        use bitcoincore_rpc::{Auth, Client, RpcApi};
+        use reqwest::Client as HttpClient;
+        use serde_json::json;
         use std::str::FromStr;
 
         let (devnet_config, accounts) = match &self.network_config {
@@ -2452,43 +2300,295 @@ events_keys = ["*"]
             _ => return Err(format!("unable to initialize bitcoin node")),
         };
 
-        let rpc = Client::new(
-            &format!("http://localhost:{}/", devnet_config.bitcoin_node_rpc_port),
-            Auth::UserPass(
-                devnet_config.bitcoin_node_username.to_string(),
-                devnet_config.bitcoin_node_password.to_string(),
-            ),
-        )
-        .map_err(|e| format!("unable to create RPC client: {:?}", e))?;
-
-        let _ = devnet_event_tx.send(DevnetEvent::info(format!("Configuring bitcoin-node",)));
-
-        loop {
-            match rpc.get_network_info() {
-                Ok(_r) => break,
-                Err(_e) => {}
-            }
-            std::thread::sleep(std::time::Duration::from_secs(1));
-            let _ = devnet_event_tx.send(DevnetEvent::info(format!("Waiting for bitcoin-node",)));
-        }
-
         let miner_address = Address::from_str(&devnet_config.miner_btc_address)
             .map_err(|e| format!("unable to create miner address: {:?}", e))?;
 
         let faucet_address = Address::from_str(&devnet_config.faucet_btc_address)
             .map_err(|e| format!("unable to create faucet address: {:?}", e))?;
 
-        let _ = rpc.generate_to_address(3, &miner_address);
-        let _ = rpc.generate_to_address(97, &faucet_address);
-        let _ = rpc.generate_to_address(1, &miner_address);
-        let _ = rpc.create_wallet("", None, None, None, None);
-        let _ = rpc.import_address(&miner_address, None, None);
-        let _ = rpc.import_address(&faucet_address, None, None);
+        let bitcoin_node_url = format!(
+            "http://{}/",
+            self.services_map_hosts.as_ref().unwrap().bitcoin_node_host
+        );
+
+        fn base_builder(node_url: &str, username: &str, password: &str) -> RequestBuilder {
+            let http_client = HttpClient::builder()
+                .timeout(Duration::from_secs(30))
+                .build()
+                .expect("Unable to build http client");
+            http_client
+                .post(node_url.clone())
+                .timeout(Duration::from_secs(3))
+                .basic_auth(&username, Some(&password))
+                .header("Content-Type", "application/json")
+                .header("Host", &node_url[7..])
+        }
+
+        let _ = devnet_event_tx.send(DevnetEvent::info(format!("Configuring bitcoin-node",)));
+
+        let max_errors = 30;
+
+        let mut error_count = 0;
+        loop {
+            let network_info = base_builder(
+                &bitcoin_node_url,
+                &devnet_config.bitcoin_node_username,
+                &devnet_config.bitcoin_node_password,
+            )
+            .json(&json!({
+                "jsonrpc": "1.0",
+                "id": "stacks-network",
+                "method": "getnetworkinfo",
+                "params": []
+            }))
+            .send()
+            .await
+            .map_err(|e| format!("unable to send 'getnetworkinfo' request ({})", e));
+
+            match network_info {
+                Ok(_r) => break,
+                Err(e) => {
+                    error_count += 1;
+                    if error_count > max_errors {
+                        return Err(e);
+                    } else if error_count > 1 {
+                        let _ = devnet_event_tx.send(DevnetEvent::error(e));
+                    }
+                }
+            }
+            std::thread::sleep(std::time::Duration::from_secs(1));
+            let _ = devnet_event_tx.send(DevnetEvent::info(format!("Waiting for bitcoin-node",)));
+        }
+
+        let mut error_count = 0;
+        loop {
+            let rpc_call = base_builder(
+                &bitcoin_node_url,
+                &devnet_config.bitcoin_node_username,
+                &devnet_config.bitcoin_node_password,
+            )
+            .json(&json!({
+                "jsonrpc": "1.0",
+                "id": "stacks-network",
+                "method": "generatetoaddress",
+                "params": [json!(3), json!(miner_address)]
+            }))
+            .send()
+            .await
+            .map_err(|e| format!("unable to send 'generatetoaddress' request ({})", e));
+
+            match rpc_call {
+                Ok(_r) => break,
+                Err(e) => {
+                    error_count += 1;
+                    if error_count > max_errors {
+                        return Err(e);
+                    } else if error_count > 1 {
+                        let _ = devnet_event_tx.send(DevnetEvent::error(e));
+                    }
+                }
+            }
+            std::thread::sleep(std::time::Duration::from_secs(1));
+            let _ = devnet_event_tx.send(DevnetEvent::info(format!("Waiting for bitcoin-node",)));
+        }
+
+        let mut error_count = 0;
+        loop {
+            let rpc_call = base_builder(
+                &bitcoin_node_url,
+                &devnet_config.bitcoin_node_username,
+                &devnet_config.bitcoin_node_password,
+            )
+            .json(&json!({
+                "jsonrpc": "1.0",
+                "id": "stacks-network",
+                "method": "generatetoaddress",
+                "params": [json!(97), json!(faucet_address)]
+            }))
+            .send()
+            .await
+            .map_err(|e| format!("unable to send 'generatetoaddress' request ({})", e));
+
+            match rpc_call {
+                Ok(_r) => break,
+                Err(e) => {
+                    error_count += 1;
+                    if error_count > max_errors {
+                        return Err(e);
+                    } else if error_count > 1 {
+                        let _ = devnet_event_tx.send(DevnetEvent::error(e));
+                    }
+                }
+            }
+            std::thread::sleep(std::time::Duration::from_secs(1));
+            let _ = devnet_event_tx.send(DevnetEvent::info(format!("Waiting for bitcoin-node",)));
+        }
+
+        let mut error_count = 0;
+        loop {
+            let rpc_call = base_builder(
+                &bitcoin_node_url,
+                &devnet_config.bitcoin_node_username,
+                &devnet_config.bitcoin_node_password,
+            )
+            .json(&json!({
+            "jsonrpc": "1.0",
+            "id": "stacks-network",
+            "method": "generatetoaddress",
+            "params": [json!(1), json!(miner_address)]
+            }))
+            .send()
+            .await
+            .map_err(|e| format!("unable to send 'generatetoaddress' request ({})", e));
+
+            match rpc_call {
+                Ok(_r) => break,
+                Err(e) => {
+                    error_count += 1;
+                    if error_count > max_errors {
+                        return Err(e);
+                    } else if error_count > 1 {
+                        let _ = devnet_event_tx.send(DevnetEvent::error(e));
+                    }
+                }
+            }
+            std::thread::sleep(std::time::Duration::from_secs(1));
+            let _ = devnet_event_tx.send(DevnetEvent::info(format!("Waiting for bitcoin-node",)));
+        }
+
+        let mut error_count = 0;
+        loop {
+            let rpc_call = base_builder(
+                &bitcoin_node_url,
+                &devnet_config.bitcoin_node_username,
+                &devnet_config.bitcoin_node_password,
+            )
+            .json(&json!({
+                "jsonrpc": "1.0",
+                "id": "stacks-network",
+                "method": "createwallet",
+                "params": [json!("")]
+            }))
+            .send()
+            .await
+            .map_err(|e| format!("unable to send 'createwallet' request ({})", e));
+
+            match rpc_call {
+                Ok(_r) => break,
+                Err(e) => {
+                    error_count += 1;
+                    if error_count > max_errors {
+                        return Err(e);
+                    } else if error_count > 1 {
+                        let _ = devnet_event_tx.send(DevnetEvent::error(e));
+                    }
+                }
+            }
+            std::thread::sleep(std::time::Duration::from_secs(1));
+            let _ = devnet_event_tx.send(DevnetEvent::info(format!("Waiting for bitcoin-node",)));
+        }
+
+        let mut error_count = 0;
+        loop {
+            let rpc_call = base_builder(
+                &bitcoin_node_url,
+                &devnet_config.bitcoin_node_username,
+                &devnet_config.bitcoin_node_password,
+            )
+            .json(&json!({
+                "jsonrpc": "1.0",
+                "id": "stacks-network",
+                "method": "importaddress",
+                "params": [json!(miner_address)]
+
+            }))
+            .send()
+            .await
+            .map_err(|e| format!("unable to send 'importaddress' request ({})", e));
+
+            match rpc_call {
+                Ok(_r) => break,
+                Err(e) => {
+                    error_count += 1;
+                    if error_count > max_errors {
+                        return Err(e);
+                    } else if error_count > 1 {
+                        let _ = devnet_event_tx.send(DevnetEvent::error(e));
+                    }
+                }
+            }
+            std::thread::sleep(std::time::Duration::from_secs(1));
+            let _ = devnet_event_tx.send(DevnetEvent::info(format!("Waiting for bitcoin-node",)));
+        }
+
+        let mut error_count = 0;
+        loop {
+            let rpc_call = base_builder(
+                &bitcoin_node_url,
+                &devnet_config.bitcoin_node_username,
+                &devnet_config.bitcoin_node_password,
+            )
+            .json(&json!({
+            "jsonrpc": "1.0",
+            "id": "stacks-network",
+            "method": "importaddress",
+            "params": [json!(faucet_address)]
+            }))
+            .send()
+            .await
+            .map_err(|e| format!("unable to send 'importaddress' request ({})", e));
+
+            match rpc_call {
+                Ok(_r) => break,
+                Err(e) => {
+                    error_count += 1;
+                    if error_count > max_errors {
+                        return Err(e);
+                    } else if error_count > 1 {
+                        let _ = devnet_event_tx.send(DevnetEvent::error(e));
+                    }
+                }
+            }
+            std::thread::sleep(std::time::Duration::from_secs(1));
+            let _ = devnet_event_tx.send(DevnetEvent::info(format!("Waiting for bitcoin-node",)));
+        }
         // Index devnet's wallets by default
         for (_, account) in accounts.iter() {
             let address = Address::from_str(&account.btc_address)
                 .map_err(|e| format!("unable to create address: {:?}", e))?;
-            let _ = rpc.import_address(&address, None, None);
+
+            let mut error_count = 0;
+            loop {
+                let rpc_call = base_builder(
+                    &bitcoin_node_url,
+                    &devnet_config.bitcoin_node_username,
+                    &devnet_config.bitcoin_node_password,
+                )
+                .json(&json!({
+                "jsonrpc": "1.0",
+                "id": "stacks-network",
+                "method": "importaddress",
+                "params": [json!(address)]
+                    }))
+                .send()
+                .await
+                .map_err(|e| format!("unable to send 'importaddress' request ({})", e));
+
+                match rpc_call {
+                    Ok(_r) => break,
+                    Err(e) => {
+                        error_count += 1;
+                        if error_count > max_errors {
+                            return Err(e);
+                        } else if error_count > 1 {
+                            let _ = devnet_event_tx.send(DevnetEvent::error(e));
+                        }
+                    }
+                }
+                std::thread::sleep(std::time::Duration::from_secs(1));
+                let _ =
+                    devnet_event_tx.send(DevnetEvent::info(format!("Waiting for bitcoin-node",)));
+            }
         }
         Ok(())
     }
@@ -2503,9 +2603,4 @@ fn formatted_docker_error(message: &str, error: DockerError) -> String {
         _ => format!("{:?}", error),
     };
     format!("{}: {}", message, error)
-}
-
-fn process_exit() {
-    let _ = disable_raw_mode();
-    std::process::exit(1);
 }

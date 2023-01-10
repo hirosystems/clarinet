@@ -7,15 +7,17 @@ use chainhook_types::{BitcoinNetwork, StacksNetwork};
 
 use schemars::JsonSchema;
 
+use crate::observer::ApiKey;
+
 #[derive(Clone, Debug, JsonSchema)]
-pub struct HookFormation {
+pub struct ChainhookConfig {
     pub stacks_chainhooks: Vec<StacksChainhookSpecification>,
     pub bitcoin_chainhooks: Vec<BitcoinChainhookSpecification>,
 }
 
-impl HookFormation {
-    pub fn new() -> HookFormation {
-        HookFormation {
+impl ChainhookConfig {
+    pub fn new() -> ChainhookConfig {
+        ChainhookConfig {
             stacks_chainhooks: vec![],
             bitcoin_chainhooks: vec![],
         }
@@ -85,7 +87,7 @@ impl HookFormation {
     }
 }
 
-impl Serialize for HookFormation {
+impl Serialize for ChainhookConfig {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: Serializer,
@@ -118,6 +120,41 @@ impl ChainhookSpecification {
         }
     }
 
+    pub fn set_owner_uuid(&mut self, api_key: &ApiKey) {
+        match self {
+            Self::Bitcoin(ref mut data) => {
+                data.owner_uuid = api_key.0.clone();
+            }
+            Self::Stacks(ref mut data) => {
+                data.owner_uuid = api_key.0.clone();
+            }
+        }
+    }
+
+    pub fn key(&self) -> String {
+        match &self {
+            Self::Bitcoin(data) => format!(
+                "chainhook:btc:{}:{}",
+                data.owner_uuid.as_deref().unwrap_or("0".into()),
+                data.uuid
+            ),
+            Self::Stacks(data) => format!(
+                "chainhook:stx:{}:{}",
+                data.owner_uuid.as_deref().unwrap_or("0".into()),
+                data.uuid
+            ),
+        }
+    }
+
+    pub fn deserialize_specification(
+        spec: &str,
+        _key: &str,
+    ) -> Result<ChainhookSpecification, String> {
+        let spec: ChainhookSpecification = serde_json::from_str(spec)
+            .map_err(|e| format!("unable to deserialize Stacks chainhook {}", e.to_string()))?;
+        Ok(spec)
+    }
+
     pub fn uuid(&self) -> &str {
         match &self {
             Self::Bitcoin(data) => &data.uuid,
@@ -141,6 +178,8 @@ impl ChainhookSpecification {
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, JsonSchema)]
 pub struct BitcoinChainhookSpecification {
     pub uuid: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub owner_uuid: Option<String>,
     pub name: String,
     pub network: BitcoinNetwork,
     pub version: u32,
@@ -308,7 +347,7 @@ const POX_CONFIG_TESTNET: PoxConfig = PoxConfig {
 const POX_CONFIG_DEVNET: PoxConfig = PoxConfig {
     genesis_block_height: 100,
     prepare_phase_len: 10,
-    reward_phase_len: 5,
+    reward_phase_len: 4,
     rewarded_addresses_per_block: 2,
 };
 
@@ -416,6 +455,8 @@ pub enum BlockIdentifierHashRule {
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, JsonSchema)]
 pub struct StacksChainhookSpecification {
     pub uuid: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub owner_uuid: Option<String>,
     pub name: String,
     pub network: StacksNetwork,
     pub version: u32,

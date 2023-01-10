@@ -25,46 +25,54 @@ import {
   AnchorMode,
 } from '@stacks/transactions';
 import { StacksTestnet }from '@stacks/network';
-import { StacksDevnetOrchestrator } from "stacks-devnet-js";
+import { DevnetNetworkOrchestrator } from "@hirosystems/stacks-devnet-js";
+import { describe, expect, it, beforeAll, afterAll } from 'vitest'
 import BigNum from 'bn.js';
 
-const orchestrator = new StacksDevnetOrchestrator({
-  path: "../protocol/Clarinet.toml",
-  logs: false,
-});
+describe('Full end to end integration tests made simple', () => {
+    let orchestrator: DevnetNetworkOrchestrator;
 
-beforeAll(() => orchestrator.start())
-afterAll(() => orchestrator.stop())
+    beforeAll(async (ctx) => {
+        orchestrator = buildDevnetNetworkOrchestrator(getNetworkIdFromCtx(ctx.id));
+        orchestrator.start()
+    });
 
-test('Block height changes when blocks are mined', async () => {
-    const network = new StacksTestnet({ url: orchestrator.getStacksNodeUrl() });
+    afterAll(() => {
+        orchestrator.terminate();
+    });
 
-    // Let's wait for our Genesis block
-    var block = orchestrator.waitForStacksBlock();
+    it('submitting stacks-stx through pox-1 contract during epoch 2.0 should succeed', async () => {
+      // Let's wait for our Genesis block
+      var block = orchestrator.waitForNextStacksBlock();
 
-    // Build a transaction
-    const txOptions = {
-      recipient: 'ST1SJ3DTE5DN7X54YDH5D64R3BCB6A2AG2ZQ8YPD5',
-      amount: new BigNum(12345),
-      senderKey: '753b7cc01a1a2e86221266a154af739463fce51219d97e4f856cd7200c3bd2a601',
-      network,
-      memo: 'test memo',
-      nonce: new BigNum(0), // set a nonce manually if you don't want builder to fetch from a Stacks node
-      fee: new BigNum(200), // set a tx fee if you don't want the builder to estimate
-      anchorMode: AnchorMode.OnChainOnly
-    };
-    const transaction = await makeSTXTokenTransfer(txOptions);
+      // Build a transaction
+      const txOptions = {
+        recipient: 'ST1SJ3DTE5DN7X54YDH5D64R3BCB6A2AG2ZQ8YPD5',
+        amount: new BigNum(12345),
+        senderKey: '753b7cc01a1a2e86221266a154af739463fce51219d97e4f856cd7200c3bd2a601',
+        network,
+        memo: 'test memo',
+        nonce: new BigNum(0), // set a nonce manually if you don't want builder to fetch from a Stacks node
+        fee: new BigNum(200), // set a tx fee if you don't want the builder to estimate
+        anchorMode: AnchorMode.OnChainOnly
+      };
+      const transaction = await makeSTXTokenTransfer(txOptions);
 
-    // Broadcast transaction to our Devnet stacks node
-    await broadcastTransaction(transaction, network);
+      // Broadcast transaction to our Devnet stacks node
+      await broadcastTransaction(transaction, network);
 
-    // Wait for the next block
-    block = orchestrator.waitForStacksBlock();
+      // Wait for the next block
+      block = orchestrator.waitForNextStacksBlock();
 
-    // Ensure that the transaction was included in the block
-    console.log(`Next Block: ${JSON.stringify(block)}`);
+      // Ensure that the transaction was included in the block
+      console.log(`Next Block: ${JSON.stringify(block)}`);
+    }
 })
 ```
+
+### Case Study
+
+The repo [stacks-2-1-testing](http://github.com/hirosystems/stacks-2-1-testing) is using this library for testing, end to end, the Stacks 2.1 Proof of Transfer contract along with all the new Clarity 2 functions.
 
 ### Screencasts
 

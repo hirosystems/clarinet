@@ -32,7 +32,9 @@ toml = { version = "0.5.6", features = ["preserve_order"], optional = true }
 ctrlc = { version = "3.2.2", optional = true }
 schemars = { version = "0.8.10" }
 rocket_okapi = "0.8.0-rc.1"
+crossbeam-channel = "0.5.6"
 
 [features]
 default = ["cli"]
-cli = ["clap", "clap_generate", "toml", "ctrlc", "hiro_system_kit/log"]
+log = ["hiro_system_kit/log"]
+cli = ["clap", "clap_generate", "toml", "ctrlc", "log"]

@@ -9,6 +9,7 @@ import {
   ExpectNonFungibleTokenTransferEvent,
   ExpectPrintEvent,
   ExpectSTXTransferEvent,
+  ExpectSTXBurnEvent,
 } from "./types.ts";
 
 export * from "./types.ts";
@@ -201,6 +202,17 @@ export class Chain {
       assets: result.assets,
     };
     return assetsMaps;
+  }
+
+  switchEpoch(epoch: string): boolean {
+    const result = JSON.parse(
+      // @ts-ignore
+      Deno.core.opSync("api/v1/switch_epoch", {
+        sessionId: this.sessionId,
+        epoch: epoch
+      })
+    );
+    return result;
   }
 }
 
@@ -441,6 +453,10 @@ declare global {
       sender: string,
       recipient: string
     ): ExpectSTXTransferEvent;
+    expectSTXBurnEvent(
+      amount: number | bigint,
+      sender: String
+    ): ExpectSTXBurnEvent;
     expectFungibleTokenTransferEvent(
       amount: number | bigint,
       sender: string,
@@ -692,6 +708,21 @@ Array.prototype.expectSTXTransferEvent = function (amount, sender, recipient) {
     }
   }
   throw new Error("Unable to retrieve expected STXTransferEvent");
+};
+
+Array.prototype.expectSTXBurnEvent = function (amount, sender) {
+  for (const event of this) {
+    try {
+      const { stx_burn_event } = event;
+      return {
+        amount: stx_burn_event.amount.expectInt(amount),
+        sender: stx_burn_event.sender.expectPrincipal(sender),
+      };
+    } catch (_error) {
+      continue;
+    }
+  }
+  throw new Error("Unable to retrieve expected STXBurnEvent");
 };
 
 Array.prototype.expectFungibleTokenTransferEvent = function (

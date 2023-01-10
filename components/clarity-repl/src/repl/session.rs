@@ -25,7 +25,9 @@ use clarity::vm::types::{
 use clarity::vm::variables::NativeVariables;
 use clarity::vm::{
     ClarityVersion, ContractName, CostSynthesis, EvalHook, EvaluationResult, ExecutionResult,
+    StacksEpoch,
 };
+use reqwest;
 use std::collections::{BTreeMap, BTreeSet, HashMap, VecDeque};
 use std::convert::TryFrom;
 use std::fmt;
@@ -43,7 +45,7 @@ use super::SessionSettings;
 static BOOT_TESTNET_ADDRESS: &str = "ST000000000000000000002AMW42H";
 static BOOT_MAINNET_ADDRESS: &str = "SP000000000000000000002Q6VF78";
 
-static V2_BOOT_CONTRACTS: &[&str] = &["pox-2"];
+static V2_BOOT_CONTRACTS: &[&str] = &["pox-2", "costs-3"];
 
 lazy_static! {
     static ref BOOT_TESTNET_PRINCIPAL: StandardPrincipalData =
@@ -55,7 +57,7 @@ lazy_static! {
 lazy_static! {
     pub static ref BOOT_CONTRACTS_DATA: BTreeMap<QualifiedContractIdentifier, (ClarityContract, ContractAST)> = {
         let mut result = BTreeMap::new();
-        let deploy: [(&StandardPrincipalData, [(&str, &str); 9]); 2] = [
+        let deploy: [(&StandardPrincipalData, [(&str, &str); 10]); 2] = [
             (&*BOOT_TESTNET_PRINCIPAL, *STACKS_BOOT_CODE_TESTNET),
             (&*BOOT_MAINNET_PRINCIPAL, *STACKS_BOOT_CODE_MAINNET),
         ];
@@ -64,17 +66,19 @@ lazy_static! {
             ClarityInterpreter::new(StandardPrincipalData::transient(), Settings::default());
         for (deployer, boot_code) in deploy.iter() {
             for (name, code) in boot_code.iter() {
-                let clarity_version = if V2_BOOT_CONTRACTS.contains(name) {
-                    ClarityVersion::Clarity2
+                let (epoch, clarity_version) = if (*name).eq("pox-2") || (*name).eq("costs-3") {
+                    (StacksEpochId::Epoch21, ClarityVersion::Clarity2)
+                } else if (*name).eq("cost-2") {
+                    (StacksEpochId::Epoch2_05, ClarityVersion::Clarity1)
                 } else {
-                    ClarityVersion::Clarity1
+                    (StacksEpochId::Epoch20, ClarityVersion::Clarity1)
                 };
 
                 let boot_contract = ClarityContract {
                     code_source: ClarityCodeSource::ContractInMemory(code.to_string()),
                     deployer: ContractDeployer::Address(deployer.to_address()),
                     name: name.to_string(),
-                    epoch: StacksEpochId::Epoch20,
+                    epoch,
                     clarity_version,
                 };
                 let (ast, _, _) = interpreter.build_ast(&boot_contract);
@@ -121,6 +125,8 @@ pub struct Session {
     pub initial_contracts_analysis: Vec<(ContractAnalysis, String, String)>,
     pub show_costs: bool,
     pub executed: Vec<String>,
+    pub current_epoch: StacksEpochId,
+    keywords_reference: HashMap<String, String>,
 }
 
 impl Session {
@@ -148,6 +154,8 @@ impl Session {
             show_costs: false,
             settings,
             executed: Vec::new(),
+            current_epoch: StacksEpochId::Epoch2_05,
+            keywords_reference: clarity_keywords(),
         }
     }
 
@@ -177,7 +185,7 @@ impl Session {
                 .include_boot_contracts
                 .contains(&name.to_string())
             {
-                let (epoch, clarity_version) = if (*name).eq("pox-2") || (*name).eq("cost-3") {
+                let (epoch, clarity_version) = if (*name).eq("pox-2") || (*name).eq("costs-3") {
                     (StacksEpochId::Epoch21, ClarityVersion::Clarity2)
                 } else if (*name).eq("cost-2") {
                     (StacksEpochId::Epoch2_05, ClarityVersion::Clarity1)
@@ -239,8 +247,9 @@ impl Session {
         let mut reload = false;
         match command {
             "::help" => self.display_help(&mut output),
-            cmd if cmd.starts_with("::list_functions") => self.display_functions(&mut output),
-            cmd if cmd.starts_with("::describe_function") => self.display_doc(&mut output, cmd),
+            "/-/" => self.easter_egg(&mut output),
+            cmd if cmd.starts_with("::functions") => self.display_functions(&mut output),
+            cmd if cmd.starts_with("::describe") => self.display_doc(&mut output, cmd),
             cmd if cmd.starts_with("::mint_stx") => self.mint_stx(&mut output, cmd),
             cmd if cmd.starts_with("::set_tx_sender") => {
                 self.parse_and_set_tx_sender(&mut output, cmd)
@@ -253,6 +262,8 @@ impl Session {
                 self.parse_and_advance_chain_tip(&mut output, cmd)
             }
             cmd if cmd.starts_with("::toggle_costs") => self.toggle_costs(&mut output),
+            cmd if cmd.starts_with("::get_epoch") => self.get_epoch(&mut output),
+            cmd if cmd.starts_with("::set_epoch") => self.set_epoch(&mut output, cmd),
             cmd if cmd.starts_with("::encode") => self.encode(&mut output, cmd),
             cmd if cmd.starts_with("::decode") => self.decode(&mut output, cmd),
             #[cfg(feature = "cli")]
@@ -263,6 +274,7 @@ impl Session {
             cmd if cmd.starts_with("::reload") => reload = true,
             #[cfg(feature = "cli")]
             cmd if cmd.starts_with("::read") => self.read(&mut output, cmd),
+            cmd if cmd.starts_with("::keywords") => self.keywords(&mut output),
 
             snippet => self.run_snippet(&mut output, self.show_costs, snippet),
         }
@@ -293,7 +305,12 @@ impl Session {
         };
 
         if let Some(cost) = cost {
-            let headers = vec!["".to_string(), "Consumed".to_string(), "Limit".to_string()];
+            let headers = vec![
+                "".to_string(),
+                "Consumed".to_string(),
+                "Limit".to_string(),
+                "Percentage".to_string(),
+            ];
             let mut headers_cells = vec![];
             for header in headers.iter() {
                 headers_cells.push(Cell::new(&header));
@@ -304,30 +321,52 @@ impl Session {
                 Cell::new("Runtime"),
                 Cell::new(&cost.total.runtime.to_string()),
                 Cell::new(&cost.limit.runtime.to_string()),
+                Cell::new(&(Self::get_costs_percentage(&cost.total.runtime, &cost.limit.runtime))),
             ]));
             table.add_row(Row::new(vec![
                 Cell::new("Read count"),
                 Cell::new(&cost.total.read_count.to_string()),
                 Cell::new(&cost.limit.read_count.to_string()),
+                Cell::new(
+                    &(Self::get_costs_percentage(&cost.total.read_count, &cost.limit.read_count)),
+                ),
             ]));
             table.add_row(Row::new(vec![
                 Cell::new("Read length (bytes)"),
                 Cell::new(&cost.total.read_length.to_string()),
                 Cell::new(&cost.limit.read_length.to_string()),
+                Cell::new(
+                    &(Self::get_costs_percentage(&cost.total.read_length, &cost.limit.read_length)),
+                ),
             ]));
             table.add_row(Row::new(vec![
                 Cell::new("Write count"),
                 Cell::new(&cost.total.write_count.to_string()),
                 Cell::new(&cost.limit.write_count.to_string()),
+                Cell::new(
+                    &(Self::get_costs_percentage(&cost.total.write_count, &cost.limit.write_count)),
+                ),
             ]));
             table.add_row(Row::new(vec![
                 Cell::new("Write length (bytes)"),
                 Cell::new(&cost.total.write_length.to_string()),
                 Cell::new(&cost.limit.write_length.to_string()),
+                Cell::new(
+                    &(Self::get_costs_percentage(
+                        &cost.total.write_length,
+                        &cost.limit.write_length,
+                    )),
+                ),
             ]));
             output.push(format!("{}", table));
         }
         output.append(&mut result);
+    }
+
+    fn get_costs_percentage(consumed: &u64, limit: &u64) -> String {
+        let calc = (*consumed as f64 / *limit as f64) * 100_f64;
+
+        format!("{calc:.2} %")
     }
 
     pub fn formatted_interpretation<'a, 'hooks>(
@@ -586,8 +625,8 @@ impl Session {
             code_source: ClarityCodeSource::ContractInMemory(contract_call),
             name: "contract-call".to_string(),
             deployer: ContractDeployer::Address(sender.to_string()),
-            epoch: StacksEpochId::Epoch20,
-            clarity_version: ClarityVersion::Clarity1,
+            epoch: self.current_epoch.clone(),
+            clarity_version: ClarityVersion::default_for_epoch(self.current_epoch),
         };
 
         self.set_tx_sender(sender.into());
@@ -659,8 +698,8 @@ impl Session {
             code_source: ClarityCodeSource::ContractInMemory(snippet),
             name: format!("contract-{}", self.contracts.len()),
             deployer: ContractDeployer::DefaultDeployer,
-            clarity_version: ClarityVersion::default_for_epoch(DEFAULT_EPOCH),
-            epoch: DEFAULT_EPOCH,
+            clarity_version: ClarityVersion::default_for_epoch(self.current_epoch),
+            epoch: self.current_epoch,
         };
         let contract_identifier =
             contract.expect_resolved_contract_identifier(Some(&self.interpreter.get_tx_sender()));
@@ -688,13 +727,31 @@ impl Session {
         }
     }
 
-    pub fn lookup_api_reference(&self, keyword: &str) -> Option<&String> {
-        self.api_reference.get(keyword)
+    pub fn lookup_functions_or_keywords_docs(&self, exp: &str) -> Option<&String> {
+        if let Some(function_doc) = self.api_reference.get(exp) {
+            return Some(function_doc);
+        }
+
+        if let Some(keyword_doc) = self.keywords_reference.get(exp) {
+            return Some(keyword_doc);
+        }
+
+        None
     }
 
     pub fn get_api_reference_index(&self) -> Vec<String> {
         let mut keys = self
             .api_reference
+            .iter()
+            .map(|(k, _)| k.to_string())
+            .collect::<Vec<String>>();
+        keys.sort();
+        keys
+    }
+
+    pub fn get_clarity_keywords(&self) -> Vec<String> {
+        let mut keys = self
+            .keywords_reference
             .iter()
             .map(|(k, _)| k.to_string())
             .collect::<Vec<String>>();
@@ -711,14 +768,18 @@ impl Session {
         ));
         output.push(format!(
             "{}",
-            help_colour.paint(
-                "::list_functions\t\t\tDisplay all the native functions available in clarity"
-            )
+            help_colour
+                .paint("::functions\t\t\t\tDisplay all the native functions available in clarity")
+        ));
+        output.push(format!(
+            "{}",
+            help_colour
+                .paint("::keywords\t\t\t\tDisplay all the native keywords available in clarity")
         ));
         output.push(format!(
             "{}",
             help_colour.paint(
-                "::describe_function <function>\t\tDisplay documentation for a given native function fn-name"
+                "::describe <function> | <keyword>\tDisplay documentation for a given native function or keyword"
             )
         ));
         output.push(format!(
@@ -752,6 +813,10 @@ impl Session {
         ));
         output.push(format!(
             "{}",
+            help_colour.paint("::set_epoch <2.0> | <2.05> | <2.1>\tUpdate the current epoch")
+        ));
+        output.push(format!(
+            "{}",
             help_colour.paint("::toggle_costs\t\t\t\tDisplay cost analysis after every expression")
         ));
         output.push(format!(
@@ -772,6 +837,16 @@ impl Session {
             help_colour.paint("::read <filename>\t\t\tRead expressions from a file")
         ));
     }
+
+    #[cfg(not(feature = "wasm"))]
+    fn easter_egg(&self, output: &mut Vec<String>) {
+        let result = hiro_system_kit::nestable_block_on(fetch_message());
+        let message = result.unwrap_or("You found it!".to_string());
+        println!("{}", message);
+    }
+
+    #[cfg(feature = "wasm")]
+    fn easter_egg(&self, output: &mut Vec<String>) {}
 
     fn parse_and_advance_chain_tip(&mut self, output: &mut Vec<String>, command: &str) {
         let args: Vec<_> = command.split(' ').collect();
@@ -853,6 +928,25 @@ impl Session {
         output.push(green!(format!("Always show costs: {}", self.show_costs)))
     }
 
+    pub fn get_epoch(&mut self, output: &mut Vec<String>) {
+        output.push(format!("Current epoch: {}", self.current_epoch))
+    }
+
+    pub fn set_epoch(&mut self, output: &mut Vec<String>, cmd: &str) {
+        let epoch = match cmd.split_once(" ") {
+            Some((_, epoch)) if epoch.eq("2.0") => StacksEpochId::Epoch20,
+            Some((_, epoch)) if epoch.eq("2.05") => StacksEpochId::Epoch2_05,
+            Some((_, epoch)) if epoch.eq("2.1") => StacksEpochId::Epoch21,
+            _ => return output.push(red!("Usage: ::set_epoch 2.0 | 2.05 | 2.1")),
+        };
+        self.update_epoch(epoch);
+        output.push(green!(format!("Epoch updated to: {epoch}")))
+    }
+
+    pub fn update_epoch(&mut self, epoch: StacksEpochId) {
+        self.current_epoch = epoch;
+    }
+
     pub fn encode(&mut self, output: &mut Vec<String>, cmd: &str) {
         let snippet = match cmd.split_once(" ") {
             Some((_, snippet)) => snippet,
@@ -912,8 +1006,14 @@ impl Session {
     }
 
     pub fn get_costs(&mut self, output: &mut Vec<String>, cmd: &str) {
-        let snippet = cmd.to_string().split_off("::get_costs ".len());
-        self.run_snippet(output, true, &snippet.to_string());
+        let command: String = cmd.to_owned();
+        let v: Vec<&str> = command.split_whitespace().collect();
+
+        if v.len() != 2 {
+            output.push(red!(format!("::get_costs command needs an argument")));
+        } else {
+            self.run_snippet(output, true, &v[1].to_string());
+        }
     }
 
     #[cfg(feature = "cli")]
@@ -922,7 +1022,14 @@ impl Session {
         if accounts.len() > 0 {
             let tokens = self.interpreter.get_tokens();
             let mut headers = vec!["Address".to_string()];
-            headers.append(&mut tokens.clone());
+            for token in tokens.iter() {
+                if token == "STX" {
+                    headers.push(String::from("uSTX"));
+                } else {
+                    headers.push(String::from(token));
+                }
+            }
+
             let mut headers_cells = vec![];
             for header in headers.iter() {
                 headers_cells.push(Cell::new(&header));
@@ -1066,13 +1173,17 @@ impl Session {
         let help_accent_colour = Colour::Yellow.bold();
         let keyword = {
             let mut s = command.to_string();
-            s = s.replace("::describe_function", "");
+            s = s.replace("::describe", "");
             s = s.replace(" ", "");
             s
         };
-        let result = match self.lookup_api_reference(&keyword) {
+
+        let result = match self.lookup_functions_or_keywords_docs(&keyword) {
             Some(doc) => format!("{}", help_colour.paint(doc)),
-            None => format!("{}", help_colour.paint("Function unknown")),
+            None => format!(
+                "{}",
+                Colour::Red.paint("It looks like there aren't matches for your search")
+            ),
         };
         output.push(result);
     }
@@ -1082,6 +1193,12 @@ impl Session {
         self.get_contracts(&mut output);
         self.get_accounts(&mut output);
         Ok(output.join("\n"))
+    }
+
+    fn keywords(&self, output: &mut Vec<String>) {
+        let help_colour = Colour::Yellow;
+        let keywords = self.get_clarity_keywords();
+        output.push(format!("{}", help_colour.paint(keywords.join("\n"))));
     }
 }
 
@@ -1156,18 +1273,25 @@ fn build_api_reference() -> HashMap<String, String> {
         api_reference.insert(api.name, doc);
     }
 
+    api_reference
+}
+
+fn clarity_keywords() -> HashMap<String, String> {
+    let mut keywords = HashMap::new();
+
     for func in NativeVariables::ALL.iter() {
-        if let Some(api) = make_keyword_reference(&func) {
+        if let Some(key) = make_keyword_reference(&func) {
             let description = {
-                let mut s = api.description.to_string();
+                let mut s = key.description.to_string();
                 s = s.replace("\n", " ");
                 s
             };
-            let doc = format!("Description\n{}\n\nExamples\n{}", description, api.example);
-            api_reference.insert(api.name.to_string(), doc);
+            let doc = format!("Description\n{}\n\nExamples\n{}", description, key.example);
+            keywords.insert(key.name.to_string(), doc);
         }
     }
-    api_reference
+
+    keywords
 }
 
 #[cfg(test)]
@@ -1192,6 +1316,32 @@ mod tests {
         assert_eq!(
             output[0],
             green!("0c00000002036261720403666f6f0d0000000568656c6c6f")
+        );
+    }
+
+    #[test]
+    fn epoch_switch() {
+        let mut session = Session::new(SessionSettings::default());
+        session.update_epoch(StacksEpochId::Epoch20);
+        let diags = session
+            .eval("(slice? \"blockstack\" u5 u10)".into(), None, false)
+            .unwrap_err();
+        assert_eq!(
+            diags[0].message,
+            format!("use of unresolved function 'slice?'",)
+        );
+        session.update_epoch(StacksEpochId::Epoch21);
+        let res = session
+            .eval("(slice? \"blockstack\" u5 u10)".into(), None, false)
+            .unwrap();
+        let res = match res.result {
+            EvaluationResult::Contract(_) => unreachable!(),
+            EvaluationResult::Snippet(res) => res,
+        };
+        assert_eq!(
+            res.result,
+            Value::some(Value::string_ascii_from_bytes("stack".as_bytes().to_vec()).unwrap())
+                .unwrap()
         );
     }
 
@@ -1258,7 +1408,7 @@ mod tests {
     #[test]
     fn evaluate_at_block() {
         let mut settings = SessionSettings::default();
-        settings.include_boot_contracts = vec!["costs".into(), "costs-2".into()];
+        settings.include_boot_contracts = vec!["costs".into(), "costs-2".into(), "costs-3".into()];
 
         let mut session = Session::new(settings);
         session.start().expect("session could not start");
@@ -1321,4 +1471,11 @@ mod tests {
         );
         assert_eq!(session.handle_command("(at-block (unwrap-panic (get-block-info? id-header-hash u10000)) (contract-call? .contract get-x))").1[0], green!("u1"));
     }
+}
+
+async fn fetch_message() -> Result<String, reqwest::Error> {
+    const gist: &str = "https://storage.googleapis.com/hiro-public/assets/clarinet-egg.txt";
+    let response = reqwest::get(gist).await?;
+    let message = response.text().await?;
+    Ok(message)
 }

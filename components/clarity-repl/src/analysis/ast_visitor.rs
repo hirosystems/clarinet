@@ -53,59 +53,33 @@ pub trait ASTVisitor<'a> {
                                 .unwrap_or(&DEFAULT_NAME),
                             args.get(1).unwrap_or(&DEFAULT_EXPR),
                         ),
-                        DefineFunctions::PrivateFunction => {
+                        DefineFunctions::PrivateFunction
+                        | DefineFunctions::ReadOnlyFunction
+                        | DefineFunctions::PublicFunction => {
                             match args.get(0).unwrap_or(&DEFAULT_EXPR).match_list() {
                                 Some(signature) => {
-                                    let name = signature[0].match_atom().unwrap_or(&DEFAULT_NAME);
+                                    let name = signature
+                                        .get(0)
+                                        .and_then(|n| n.match_atom())
+                                        .unwrap_or(&DEFAULT_NAME);
                                     let params = match signature.len() {
-                                        1 => None,
+                                        0 | 1 => None,
                                         _ => match_pairs_list(&signature[1..]),
                                     };
-                                    self.traverse_define_private(
-                                        expr,
-                                        name,
-                                        params,
-                                        args.get(1).unwrap_or(&DEFAULT_EXPR),
-                                    );
-                                }
-                                _ => {
-                                    false;
-                                }
-                            }
-                            true
-                        }
-                        DefineFunctions::ReadOnlyFunction => {
-                            match args.get(0).unwrap_or(&DEFAULT_EXPR).match_list() {
-                                Some(signature) => {
-                                    let name = signature[0].match_atom().unwrap_or(&DEFAULT_NAME);
-                                    let params = match signature.len() {
-                                        1 => None,
-                                        _ => match_pairs_list(&signature[1..]),
-                                    };
-                                    self.traverse_define_read_only(
-                                        expr,
-                                        name,
-                                        params,
-                                        args.get(1).unwrap_or(&DEFAULT_EXPR),
-                                    )
-                                }
-                                _ => false,
-                            }
-                        }
-                        DefineFunctions::PublicFunction => {
-                            match args.get(0).unwrap_or(&DEFAULT_EXPR).match_list() {
-                                Some(signature) => {
-                                    let name = signature[0].match_atom().unwrap_or(&DEFAULT_NAME);
-                                    let params = match signature.len() {
-                                        1 => None,
-                                        _ => match_pairs_list(&signature[1..]),
-                                    };
-                                    self.traverse_define_public(
-                                        expr,
-                                        name,
-                                        params,
-                                        args.get(1).unwrap_or(&DEFAULT_EXPR),
-                                    )
+                                    let body = args.get(1).unwrap_or(&DEFAULT_EXPR);
+
+                                    match define_function {
+                                        DefineFunctions::PrivateFunction => {
+                                            self.traverse_define_private(expr, name, params, body)
+                                        }
+                                        DefineFunctions::ReadOnlyFunction => {
+                                            self.traverse_define_read_only(expr, name, params, body)
+                                        }
+                                        DefineFunctions::PublicFunction => {
+                                            self.traverse_define_public(expr, name, params, body)
+                                        }
+                                        _ => unreachable!(),
+                                    }
                                 }
                                 _ => false,
                             }
@@ -144,14 +118,17 @@ pub trait ASTVisitor<'a> {
                             args.get(1).unwrap_or(&DEFAULT_EXPR),
                             args.get(2).unwrap_or(&DEFAULT_EXPR),
                         ),
-                        DefineFunctions::Trait => self.traverse_define_trait(
-                            expr,
-                            args.get(0)
-                                .unwrap_or(&DEFAULT_EXPR)
-                                .match_atom()
-                                .unwrap_or(&DEFAULT_NAME),
-                            &args[1..],
-                        ),
+                        DefineFunctions::Trait => {
+                            let params = if args.len() >= 1 { &args[1..] } else { &[] };
+                            self.traverse_define_trait(
+                                expr,
+                                args.get(0)
+                                    .unwrap_or(&DEFAULT_EXPR)
+                                    .match_atom()
+                                    .unwrap_or(&DEFAULT_NAME),
+                                params,
+                            )
+                        }
                         DefineFunctions::UseTrait => self.traverse_use_trait(
                             expr,
                             args.get(0)
@@ -186,7 +163,7 @@ pub trait ASTVisitor<'a> {
                         Add | Subtract | Multiply | Divide | Modulo | Power | Sqrti | Log2 => {
                             self.traverse_arithmetic(expr, native_function, &args)
                         }
-                        BitwiseXOR => self.traverse_binary_bitwise(
+                        BitwiseXor => self.traverse_binary_bitwise(
                             expr,
                             native_function,
                             args.get(0).unwrap_or(&DEFAULT_EXPR),
@@ -209,14 +186,15 @@ pub trait ASTVisitor<'a> {
                         Let => {
                             let bindings = match_pairs(args.get(0).unwrap_or(&DEFAULT_EXPR))
                                 .unwrap_or_default();
-                            self.traverse_let(expr, &bindings, &args[1..])
+                            let params = if args.len() >= 1 { &args[1..] } else { &[] };
+                            self.traverse_let(expr, &bindings, params)
                         }
-                        ElementAt => self.traverse_element_at(
+                        ElementAt | ElementAtAlias => self.traverse_element_at(
                             expr,
                             args.get(0).unwrap_or(&DEFAULT_EXPR),
                             args.get(1).unwrap_or(&DEFAULT_EXPR),
                         ),
-                        IndexOf => self.traverse_index_of(
+                        IndexOf | IndexOfAlias => self.traverse_index_of(
                             expr,
                             args.get(0).unwrap_or(&DEFAULT_EXPR),
                             args.get(1).unwrap_or(&DEFAULT_EXPR),
@@ -227,7 +205,8 @@ pub trait ASTVisitor<'a> {
                                 .unwrap_or(&DEFAULT_EXPR)
                                 .match_atom()
                                 .unwrap_or(&DEFAULT_NAME);
-                            self.traverse_map(expr, name, &args[1..])
+                            let params = if args.len() >= 1 { &args[1..] } else { &[] };
+                            self.traverse_map(expr, name, params)
                         }
                         Fold => {
                             let name = args
@@ -388,6 +367,7 @@ pub trait ASTVisitor<'a> {
                                 .unwrap_or(&DEFAULT_EXPR)
                                 .match_atom()
                                 .unwrap_or(&DEFAULT_NAME);
+                            let params = if args.len() >= 2 { &args[2..] } else { &[] };
                             if let SymbolicExpressionType::LiteralValue(Value::Principal(
                                 PrincipalData::Contract(ref contract_identifier),
                             )) = args.get(0).unwrap_or(&DEFAULT_EXPR).expr
@@ -396,14 +376,14 @@ pub trait ASTVisitor<'a> {
                                     expr,
                                     contract_identifier,
                                     function_name,
-                                    &args[2..],
+                                    params,
                                 )
                             } else {
                                 self.traverse_dynamic_contract_call(
                                     expr,
                                     args.get(0).unwrap_or(&DEFAULT_EXPR),
                                     function_name,
-                                    &args[2..],
+                                    params,
                                 )
                             }
                         }
@@ -637,6 +617,21 @@ pub trait ASTVisitor<'a> {
                             .traverse_to_consensus_buff(expr, args.get(0).unwrap_or(&DEFAULT_EXPR)),
                         FromConsensusBuff => self.traverse_from_consensus_buff(
                             expr,
+                            args.get(0).unwrap_or(&DEFAULT_EXPR),
+                            args.get(1).unwrap_or(&DEFAULT_EXPR),
+                        ),
+                        ReplaceAt => self.traverse_replace_at(
+                            expr,
+                            args.get(0).unwrap_or(&DEFAULT_EXPR),
+                            args.get(1).unwrap_or(&DEFAULT_EXPR),
+                            args.get(2).unwrap_or(&DEFAULT_EXPR),
+                        ),
+                        BitwiseAnd | BitwiseOr | BitwiseNot | BitwiseXor2 => {
+                            self.traverse_bitwise(expr, native_function, &args)
+                        }
+                        BitwiseLShift | BitwiseRShift => self.traverse_bit_shift(
+                            expr,
+                            native_function,
                             args.get(0).unwrap_or(&DEFAULT_EXPR),
                             args.get(1).unwrap_or(&DEFAULT_EXPR),
                         ),
@@ -2426,6 +2421,74 @@ pub trait ASTVisitor<'a> {
         expr: &'a SymbolicExpression,
         type_expr: &'a SymbolicExpression,
         input: &'a SymbolicExpression,
+    ) -> bool {
+        true
+    }
+
+    fn traverse_bitwise(
+        &mut self,
+        expr: &'a SymbolicExpression,
+        func: NativeFunctions,
+        operands: &'a [SymbolicExpression],
+    ) -> bool {
+        for operand in operands {
+            if !self.traverse_expr(operand) {
+                return false;
+            }
+        }
+        self.visit_bitwise(expr, func, operands)
+    }
+
+    fn visit_bitwise(
+        &mut self,
+        expr: &'a SymbolicExpression,
+        func: NativeFunctions,
+        operands: &'a [SymbolicExpression],
+    ) -> bool {
+        true
+    }
+
+    fn traverse_replace_at(
+        &mut self,
+        expr: &'a SymbolicExpression,
+        sequence: &'a SymbolicExpression,
+        index: &'a SymbolicExpression,
+        element: &'a SymbolicExpression,
+    ) -> bool {
+        self.traverse_expr(sequence)
+            && self.traverse_expr(index)
+            && self.traverse_expr(element)
+            && self.visit_replace_at(expr, sequence, element, index)
+    }
+
+    fn visit_replace_at(
+        &mut self,
+        expr: &'a SymbolicExpression,
+        sequence: &'a SymbolicExpression,
+        index: &'a SymbolicExpression,
+        element: &'a SymbolicExpression,
+    ) -> bool {
+        true
+    }
+
+    fn traverse_bit_shift(
+        &mut self,
+        expr: &'a SymbolicExpression,
+        func: NativeFunctions,
+        input: &'a SymbolicExpression,
+        shamt: &'a SymbolicExpression,
+    ) -> bool {
+        self.traverse_expr(input)
+            && self.traverse_expr(shamt)
+            && self.visit_bit_shift(expr, func, input, shamt)
+    }
+
+    fn visit_bit_shift(
+        &mut self,
+        expr: &'a SymbolicExpression,
+        func: NativeFunctions,
+        input: &'a SymbolicExpression,
+        shamt: &'a SymbolicExpression,
     ) -> bool {
         true
     }

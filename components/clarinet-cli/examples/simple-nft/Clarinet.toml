@@ -5,12 +5,14 @@ cache_dir = "./.cache"
 
 [contracts.simple-nft]
 path = "contracts/simple-nft.clar"
-depends_on = ["sip-009-trait-ft-standard"]
+clarity = 1
+epoch = "2.05"
 
 # EXTERNAL CONTRACTS
 [contracts.sip-009-trait-ft-standard]
 path = "contracts/external/sip-009-nft-trait-standard.clar"
-depends_on = []
+clarity = 1
+epoch = "2.05"
 
 [repl.analysis]
 passes = ["check_checker"]

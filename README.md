@@ -484,8 +484,6 @@ In this code snippet, there is a dependency on the `nft-trait` *(line:001)* depl
 
 - Dependencies from **external** contracts should be set in `[[project.requirements]]`
 
-- Dependencies from **internal** contracts no longer need to be set in `depends_on`; however, this is still present in many contracts, tutorials and documentations. 
-
 ```toml
 [project]
 name = "my-project"
@@ -498,7 +496,6 @@ path = ".cache"
 
 [contracts.bitcoin-whales]
 path = "contracts/bitcoin-whales.clar"
-# depends_on = ["conversion","conversion-v2"] # no longer needed, ignored if provided
 
 [contracts.conversion]
 path = "contracts/conversion.clar"

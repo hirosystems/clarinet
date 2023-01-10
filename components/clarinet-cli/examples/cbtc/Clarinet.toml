@@ -6,8 +6,11 @@ telemetry = false
 
 [[project.requirements]]
 contract_id = "SP3FBR2AGK5H9QBDH3EEN6DF8EK8JY7RX8QJ5SVTE.sip-010-trait-ft-standard"
+
 [contracts.cbtc-token]
 path = "contracts/cbtc-token.clar"
+clarity = 1
+epoch = "2.05"
 
 [repl]
 costs_version = 2

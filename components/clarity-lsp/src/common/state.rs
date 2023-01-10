@@ -1,5 +1,5 @@
 use crate::types::{CompletionItem, CompletionMaps};
-use crate::utils::{self};
+use crate::utils;
 use chainhook_types::StacksNetwork;
 use clarinet_deployments::{
     generate_default_deployment, initiate_session_from_deployment,
@@ -9,69 +9,91 @@ use clarinet_files::ProjectManifest;
 use clarinet_files::{FileAccessor, FileLocation};
 use clarity_repl::analysis::ast_dependency_detector::DependencySet;
 use clarity_repl::clarity::analysis::ContractAnalysis;
-use clarity_repl::clarity::ast::build_ast;
+use clarity_repl::clarity::ast::{build_ast_with_rules, ASTRules};
 use clarity_repl::clarity::diagnostic::{Diagnostic as ClarityDiagnostic, Level as ClarityLevel};
 use clarity_repl::clarity::stacks_common::types::StacksEpochId;
 use clarity_repl::clarity::vm::ast::ContractAST;
-use clarity_repl::clarity::vm::types::QualifiedContractIdentifier;
+use clarity_repl::clarity::vm::types::{QualifiedContractIdentifier, StandardPrincipalData};
 use clarity_repl::clarity::vm::EvaluationResult;
-use clarity_repl::clarity::{ClarityVersion, SymbolicExpression};
-use clarity_repl::repl::DEFAULT_CLARITY_VERSION;
-use lsp_types::{DocumentSymbol, Hover, MessageType};
+use clarity_repl::clarity::{ClarityName, ClarityVersion, SymbolicExpression};
+use clarity_repl::repl::{ContractDeployer, DEFAULT_CLARITY_VERSION};
+use lsp_types::{
+    DocumentSymbol, Hover, Location, MessageType, Position, Range, SignatureHelp, Url,
+};
 use std::borrow::BorrowMut;
-use std::collections::{HashMap, HashSet};
+use std::collections::{BTreeMap, HashMap, HashSet};
 use std::vec;
 
+use super::requests::definitions::{get_definitions, DefinitionLocation};
 use super::requests::document_symbols::ASTSymbols;
+use super::requests::helpers::{get_atom_start_at_position, get_public_function_definitions};
 use super::requests::hover::get_expression_documentation;
+use super::requests::signature_help::get_signatures;
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct ActiveContractData {
     pub clarity_version: ClarityVersion,
     pub epoch: StacksEpochId,
+    pub issuer: Option<StandardPrincipalData>,
     pub expressions: Option<Vec<SymbolicExpression>>,
+    pub definitions: Option<HashMap<(u32, u32), DefinitionLocation>>,
     pub diagnostic: Option<ClarityDiagnostic>,
     source: String,
 }
 
 impl ActiveContractData {
-    pub fn new(clarity_version: ClarityVersion, epoch: StacksEpochId, source: &str) -> Self {
-        match build_ast(
+    pub fn new(
+        clarity_version: ClarityVersion,
+        epoch: StacksEpochId,
+        issuer: Option<StandardPrincipalData>,
+        source: &str,
+    ) -> Self {
+        match build_ast_with_rules(
             &QualifiedContractIdentifier::transient(),
             source,
             &mut (),
             clarity_version,
             epoch,
+            ASTRules::PrecheckSize,
         ) {
             Ok(ast) => ActiveContractData {
                 clarity_version,
                 epoch,
-                expressions: Some(ast.expressions),
+                issuer: issuer.clone(),
+                expressions: Some(ast.expressions.clone()),
+                definitions: Some(get_definitions(&ast.expressions, issuer)),
                 diagnostic: None,
                 source: source.to_string(),
             },
             Err(err) => ActiveContractData {
                 clarity_version,
                 epoch,
+                issuer,
                 expressions: None,
+                definitions: None,
                 diagnostic: Some(err.diagnostic),
                 source: source.to_string(),
             },
         }
     }
 
-    pub fn update(&mut self, source: &str) {
+    pub fn update_sources(&mut self, source: &str, with_definitions: bool) {
         self.source = source.to_string();
-        match build_ast(
+        self.definitions = None;
+        match build_ast_with_rules(
             &QualifiedContractIdentifier::transient(),
             source,
             &mut (),
             self.clarity_version,
             self.epoch,
+            ASTRules::PrecheckSize,
         ) {
             Ok(ast) => {
                 self.expressions = Some(ast.expressions);
                 self.diagnostic = None;
+                if with_definitions {
+                    self.update_definitions();
+                }
             }
             Err(err) => {
                 self.expressions = None;
@@ -80,9 +102,20 @@ impl ActiveContractData {
         };
     }
 
+    pub fn update_definitions(&mut self) {
+        if let Some(expressions) = &self.expressions {
+            self.definitions = Some(get_definitions(&expressions, self.issuer.clone()));
+        }
+    }
+
     pub fn update_clarity_version(&mut self, clarity_version: ClarityVersion) {
         self.clarity_version = clarity_version;
-        self.update(&self.source.clone());
+        self.update_sources(&self.source.clone(), true);
+    }
+
+    pub fn update_issuer(&mut self, issuer: Option<StandardPrincipalData>) {
+        self.issuer = issuer;
+        self.update_definitions();
     }
 }
 
@@ -94,6 +127,7 @@ pub struct ContractState {
     notes: Vec<ClarityDiagnostic>,
     contract_id: QualifiedContractIdentifier,
     analysis: Option<ContractAnalysis>,
+    definitions: HashMap<ClarityName, Range>,
     location: FileLocation,
     clarity_version: ClarityVersion,
 }
@@ -105,6 +139,7 @@ impl ContractState {
         _deps: DependencySet,
         mut diags: Vec<ClarityDiagnostic>,
         analysis: Option<ContractAnalysis>,
+        definitions: HashMap<ClarityName, Range>,
         location: FileLocation,
         clarity_version: ClarityVersion,
     ) -> ContractState {
@@ -138,6 +173,7 @@ impl ContractState {
             warnings,
             notes,
             analysis,
+            definitions,
             location,
             clarity_version,
         }
@@ -150,6 +186,7 @@ pub struct ContractMetadata {
     pub manifest_location: FileLocation,
     pub relative_path: String,
     pub clarity_version: ClarityVersion,
+    pub deployer: ContractDeployer,
 }
 
 #[derive(Clone, Default, Debug)]
@@ -193,6 +230,27 @@ impl EditorState {
                 .get_relative_path_from_base(&base_location)
                 .expect("could not find relative location");
 
+            let deployer = match &contract_state.analysis {
+                Some(analysis) => {
+                    ContractDeployer::ContractIdentifier(analysis.contract_identifier.clone())
+                }
+                None => ContractDeployer::DefaultDeployer,
+            };
+
+            if let Some(active_contract) = self.active_contracts.get_mut(contract_location) {
+                if active_contract.clarity_version != contract_state.clarity_version {
+                    active_contract.update_clarity_version(contract_state.clarity_version)
+                }
+
+                let issuer = match &deployer {
+                    ContractDeployer::ContractIdentifier(id) => Some(id.issuer.to_owned()),
+                    _ => None,
+                };
+                if active_contract.issuer.is_none() || active_contract.issuer != issuer {
+                    active_contract.update_issuer(issuer)
+                }
+            }
+
             self.contracts_lookup.insert(
                 contract_location.clone(),
                 ContractMetadata {
@@ -200,14 +258,9 @@ impl EditorState {
                     manifest_location: manifest_location.clone(),
                     relative_path,
                     clarity_version: contract_state.clarity_version,
+                    deployer,
                 },
             );
-
-            if let Some(active_contract) = self.active_contracts.get_mut(contract_location) {
-                if active_contract.clarity_version != contract_state.clarity_version {
-                    active_contract.update_clarity_version(contract_state.clarity_version)
-                }
-            }
         }
         self.protocols.insert(manifest_location, protocol);
     }
@@ -262,23 +315,68 @@ impl EditorState {
                 Some(expressions) => expressions,
                 None => return vec![],
             },
-            None => {
-                let analysis = self
-                    .contracts_lookup
-                    .get(contract_location)
-                    .and_then(|c| self.protocols.get(&c.manifest_location))
-                    .and_then(|p| p.contracts.get(contract_location))
-                    .and_then(|c| c.analysis.as_ref());
-
-                match analysis {
-                    Some(analysis) => &analysis.expressions,
-                    None => return vec![],
-                }
-            }
+            None => return vec![],
         };
 
         let ast_symbols = ASTSymbols::new();
         ast_symbols.get_symbols(&expressions)
+    }
+
+    pub fn get_definition_location(
+        &self,
+        contract_location: &FileLocation,
+        position: &Position,
+    ) -> Option<lsp_types::Location> {
+        let contract = self.active_contracts.get(&contract_location)?;
+        let position = Position {
+            line: position.line + 1,
+            character: position.character + 1,
+        };
+
+        let position_hash = get_atom_start_at_position(&position, contract.expressions.as_ref()?)?;
+        let definitions = match &contract.definitions {
+            Some(definitions) => definitions.to_owned(),
+            None => get_definitions(contract.expressions.as_ref()?, contract.issuer.clone()),
+        };
+
+        match definitions.get(&position_hash)? {
+            DefinitionLocation::Internal(range) => {
+                return Some(Location {
+                    uri: Url::parse(&contract_location.to_string()).ok()?,
+                    range: range.clone(),
+                });
+            }
+            DefinitionLocation::External(contract_identifier, function_name) => {
+                let metadata = self.contracts_lookup.get(contract_location)?;
+                let protocol = self.protocols.get(&metadata.manifest_location)?;
+
+                let definition_contract_location =
+                    protocol.locations_lookup.get(contract_identifier)?;
+
+                // if the contract is opened and eventually contains unsaved changes,
+                // its public definitions are computed on the fly, which is fairly fast
+                if let Some(expressions) = self
+                    .active_contracts
+                    .get(definition_contract_location)
+                    .and_then(|c| c.expressions.as_ref())
+                {
+                    let public_definitions = get_public_function_definitions(&expressions)?;
+                    return Some(Location {
+                        range: *public_definitions.get(function_name)?,
+                        uri: Url::parse(&definition_contract_location.to_string()).ok()?,
+                    });
+                };
+
+                return Some(Location {
+                    range: *protocol
+                        .contracts
+                        .get(definition_contract_location)?
+                        .definitions
+                        .get(function_name)?,
+                    uri: Url::parse(&definition_contract_location.to_string()).ok()?,
+                });
+            }
+        };
     }
 
     pub fn get_hover_data(
@@ -287,9 +385,12 @@ impl EditorState {
         position: &lsp_types::Position,
     ) -> Option<Hover> {
         let contract = self.active_contracts.get(&contract_location)?;
+        let position = Position {
+            line: position.line + 1,
+            character: position.character + 1,
+        };
         let documentation = get_expression_documentation(
-            position.line + 1,
-            position.character + 1,
+            &position,
             contract.clarity_version,
             contract.expressions.as_ref()?,
         )?;
@@ -300,6 +401,27 @@ impl EditorState {
                 value: documentation.to_string(),
             }),
             range: None,
+        })
+    }
+
+    pub fn get_signature_help(
+        &self,
+        contract_location: &FileLocation,
+        position: &lsp_types::Position,
+        active_signature: Option<u32>,
+    ) -> Option<SignatureHelp> {
+        let contract = self.active_contracts.get(&contract_location)?;
+        let position = Position {
+            line: position.line + 1,
+            character: position.character + 1,
+        };
+
+        let signatures = get_signatures(contract, &position)?;
+
+        Some(SignatureHelp {
+            signatures,
+            active_signature,
+            active_parameter: None,
         })
     }
 
@@ -378,10 +500,11 @@ impl EditorState {
         &mut self,
         contract_location: FileLocation,
         clarity_version: ClarityVersion,
+        issuer: Option<StandardPrincipalData>,
         source: &str,
     ) {
         let epoch = StacksEpochId::Epoch21;
-        let contract = ActiveContractData::new(clarity_version, epoch, source);
+        let contract = ActiveContractData::new(clarity_version, epoch, issuer, source);
         self.active_contracts.insert(contract_location, contract);
     }
 
@@ -389,34 +512,35 @@ impl EditorState {
         &mut self,
         contract_location: &FileLocation,
         source: &str,
-    ) -> Result<ActiveContractData, String> {
+        with_definitions: bool,
+    ) -> Result<(), String> {
         let contract_state = self
             .active_contracts
             .get_mut(contract_location)
             .ok_or("contract not in active_contracts")?;
-        contract_state.update(source);
-        Ok(contract_state.to_owned())
+        contract_state.update_sources(source, with_definitions);
+        Ok(())
     }
 }
 
 #[derive(Clone, Default, Debug)]
 pub struct ProtocolState {
     contracts: HashMap<FileLocation, ContractState>,
+    locations_lookup: HashMap<QualifiedContractIdentifier, FileLocation>,
 }
 
 impl ProtocolState {
-    pub fn new() -> ProtocolState {
-        ProtocolState {
-            contracts: HashMap::new(),
-        }
+    pub fn new() -> Self {
+        ProtocolState::default()
     }
 
     pub fn consolidate(
         &mut self,
         locations: &mut HashMap<QualifiedContractIdentifier, FileLocation>,
-        asts: &mut HashMap<QualifiedContractIdentifier, ContractAST>,
-        deps: &mut HashMap<QualifiedContractIdentifier, DependencySet>,
+        asts: &mut BTreeMap<QualifiedContractIdentifier, ContractAST>,
+        deps: &mut BTreeMap<QualifiedContractIdentifier, DependencySet>,
         diags: &mut HashMap<QualifiedContractIdentifier, Vec<ClarityDiagnostic>>,
+        definitions: &mut HashMap<QualifiedContractIdentifier, HashMap<ClarityName, Range>>,
         analyses: &mut HashMap<QualifiedContractIdentifier, Option<ContractAnalysis>>,
     ) {
         // Remove old paths
@@ -444,18 +568,26 @@ impl ProtocolState {
                 Some(analysis) => analysis.clarity_version,
                 None => DEFAULT_CLARITY_VERSION,
             };
+            let definitions = match definitions.remove(&contract_id) {
+                Some(definitions) => definitions,
+                None => HashMap::new(),
+            };
 
             let contract_state = ContractState::new(
-                contract_id,
+                contract_id.clone(),
                 ast,
                 deps,
                 diags,
                 analysis,
+                definitions,
                 contract_location.clone(),
                 clarity_version,
             );
             self.contracts
                 .insert(contract_location.clone(), contract_state);
+
+            self.locations_lookup
+                .insert(contract_id, contract_location.clone());
         }
     }
 
@@ -492,6 +624,7 @@ pub async fn build_state(
 ) -> Result<(), String> {
     let mut locations = HashMap::new();
     let mut analyses = HashMap::new();
+    let mut definitions = HashMap::new();
 
     // In the LSP use case, trying to load an existing deployment
     // might not be suitable, in an edition context, we should
@@ -534,8 +667,16 @@ pub async fn build_state(
                 if let Some(entry) = artifacts.diags.get_mut(&contract_id) {
                     entry.append(&mut execution_result.diagnostics);
                 }
+
                 match execution_result.result {
                     EvaluationResult::Contract(contract_result) => {
+                        if let Some(ast) = artifacts.asts.get(&contract_id) {
+                            if let Some(public_definitions) =
+                                get_public_function_definitions(&ast.expressions)
+                            {
+                                definitions.insert(contract_id.clone(), public_definitions);
+                            }
+                        }
                         analyses
                             .insert(contract_id.clone(), Some(contract_result.contract.analysis));
                     }
@@ -556,6 +697,7 @@ pub async fn build_state(
         &mut artifacts.asts,
         &mut artifacts.deps,
         &mut artifacts.diags,
+        &mut definitions,
         &mut analyses,
     );
 
