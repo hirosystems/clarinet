@@ -30,7 +30,7 @@ lazy_static! {
                     "**Example**",
                     &code(&reference.example),
                 ])
-                .join("\n"), None),
+                .join("\n"), Some(reference)),
             );
         }
 

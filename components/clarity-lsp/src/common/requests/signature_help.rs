@@ -43,9 +43,19 @@ pub fn get_signatures(
     let (function_name, mut active_parameter) =
         get_function_at_position(position, contract.expressions.as_ref()?)?;
 
-    if ["let", "begin", "tuple"].contains(&function_name.as_str()) {
-        // showing signature help for let and begin adds to much noise
-        // it's doesn't make sense for the tuple {} notation
+    if [
+        "define-read-only",
+        "define-public",
+        "define-readonly",
+        "define-trait,",
+        "let",
+        "begin",
+        "tuple",
+    ]
+    .contains(&function_name.as_str())
+    {
+        // showing signature help for define-<function>, define-trait, let and bug adds to much noise
+        // it doesn't make sense for the tuple {} notation
         return None;
     }
 
@@ -78,10 +88,16 @@ pub fn get_signatures(
                     active_parameter = Some(variadic_index.try_into().unwrap());
                 }
             }
+            let label = if output_type.eq("Not applicable") {
+                format!("{} -> {}", &signature, &output_type)
+            } else {
+                String::from(signature)
+            };
+
             SignatureInformation {
                 active_parameter,
                 documentation: None,
-                label: format!("{} -> {}", &signature, &output_type),
+                label,
                 parameters: Some(
                     parameters
                         .iter()
