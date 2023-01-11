@@ -16,6 +16,7 @@ use lsp_types::{
     CompletionItem, CompletionItemKind, Documentation, InsertTextFormat, MarkupContent, MarkupKind,
     Position,
 };
+use regex::Regex;
 
 use super::helpers::is_position_within_span;
 
@@ -301,6 +302,8 @@ pub fn build_completion_item_list(
         ClarityVersion::Clarity1 => COMPLETION_ITEMS_CLARITY_1.to_vec(),
         ClarityVersion::Clarity2 => COMPLETION_ITEMS_CLARITY_2.to_vec(),
     };
+    let placeholder_pattern = Regex::new(r" \$\{\d+:[\w-]+\}").unwrap();
+
     let mut completion_items = vec![];
     completion_items.append(&mut active_contract_defined_data.get_contract_completion_items());
     for mut item in [
@@ -330,39 +333,50 @@ pub fn build_completion_item_list(
                         snippet = populated_snippet;
                     }
                 }
-                if !include_native_placeholders
-                    && !snippet_has_choices
-                    && (item.kind == Some(CompletionItemKind::FUNCTION)
-                        || item.kind == Some(CompletionItemKind::CLASS))
-                {
-                    match item.label.as_str() {
-                        "+ (add)" => {
-                            snippet = "+".to_string();
+
+                if !include_native_placeholders {
+                    if snippet_has_choices {
+                        // for var-*, map-*, ft-* and nft-* methods
+                        // the variable name is kept
+                        // but the other placeholders are removed
+                        let updated_snippet =
+                            placeholder_pattern.replace_all(&snippet, "").to_string();
+                        if updated_snippet.ne(&snippet) {
+                            snippet = updated_snippet;
+                            snippet.push_str(" $0");
                         }
-                        "- (subtract)" => {
-                            snippet = "-".to_string();
+                    } else if item.kind == Some(CompletionItemKind::FUNCTION)
+                        || item.kind == Some(CompletionItemKind::CLASS)
+                    {
+                        match item.label.as_str() {
+                            "+ (add)" => {
+                                snippet = "+".to_string();
+                            }
+                            "- (subtract)" => {
+                                snippet = "-".to_string();
+                            }
+                            "/ (divide)" => {
+                                snippet = "/".to_string();
+                            }
+                            "* (multiply)" => {
+                                snippet = "*".to_string();
+                            }
+                            "< (less than)" => {
+                                snippet = "<".to_string();
+                            }
+                            "<= (less than or equal)" => {
+                                snippet = "<=".to_string();
+                            }
+                            "> (greater than)" => {
+                                snippet = ">".to_string();
+                            }
+                            ">= (greater than or equal)" => {
+                                snippet = ">=".to_string();
+                            }
+                            _ => snippet = item.label.clone(),
                         }
-                        "/ (divide)" => {
-                            snippet = "/".to_string();
-                        }
-                        "* (multiply)" => {
-                            snippet = "*".to_string();
-                        }
-                        "< (less than)" => {
-                            snippet = "<".to_string();
-                        }
-                        "<= (less than or equal)" => {
-                            snippet = "<=".to_string();
-                        }
-                        "> (greater than)" => {
-                            snippet = ">".to_string();
-                        }
-                        ">= (greater than or equal)" => {
-                            snippet = ">=".to_string();
-                        }
-                        _ => snippet = item.label.clone(),
+                        snippet.push_str(" $0");
                     }
-                    snippet.push_str(" $0");
                 }
 
                 item.insert_text = if should_wrap {

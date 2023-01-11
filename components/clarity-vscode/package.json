@@ -93,7 +93,7 @@
             "type": "boolean",
             "default": true,
             "order": 0,
-            "description": "If set to true, the auto-completion of native functions will include arguments placeholder. If set to false, it will only do so for functions interacting with variables, maps, FTs, and NFTs."
+            "description": "If set to true, the auto-completion of native functions will include placeholders for the arguments."
           },
           "clarity-lsp.hover": {
             "type": "boolean",
