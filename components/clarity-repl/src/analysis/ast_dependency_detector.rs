@@ -537,9 +537,12 @@ impl<'a> ASTVisitor<'a> for ASTDependencyDetector<'a> {
         name: &'a ClarityName,
         functions: &'a [SymbolicExpression],
     ) -> bool {
-        if let Ok(trait_definition) =
-            TypeSignature::parse_trait_type_repr(functions, &mut (), DEFAULT_EPOCH, DEFAULT_CLARITY_VERSION)
-        {
+        if let Ok(trait_definition) = TypeSignature::parse_trait_type_repr(
+            functions,
+            &mut (),
+            DEFAULT_EPOCH,
+            DEFAULT_CLARITY_VERSION,
+        ) {
             self.add_defined_trait(self.current_contract.unwrap(), name, trait_definition);
         }
         true
@@ -720,9 +723,12 @@ impl<'a, 'b> ASTVisitor<'a> for PreloadedVisitor<'a, 'b> {
         name: &'a ClarityName,
         functions: &'a [SymbolicExpression],
     ) -> bool {
-        if let Ok(trait_definition) =
-            TypeSignature::parse_trait_type_repr(functions, &mut (), DEFAULT_EPOCH, DEFAULT_CLARITY_VERSION)
-        {
+        if let Ok(trait_definition) = TypeSignature::parse_trait_type_repr(
+            functions,
+            &mut (),
+            DEFAULT_EPOCH,
+            DEFAULT_CLARITY_VERSION,
+        ) {
             self.detector
                 .add_defined_trait(self.current_contract.unwrap(), name, trait_definition);
         }
