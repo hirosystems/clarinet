@@ -1,7 +1,8 @@
 use crate::analysis::annotation::Annotation;
 use crate::analysis::ast_visitor::{traverse, ASTVisitor};
 use crate::analysis::{AnalysisPass, AnalysisResult, Settings};
-use crate::repl::DEFAULT_CLARITY_VERSION;
+use crate::repl::{DEFAULT_CLARITY_VERSION, DEFAULT_EPOCH};
+use clarity::types::StacksEpochId;
 use clarity::vm::analysis::analysis_db::AnalysisDatabase;
 pub use clarity::vm::analysis::types::ContractAnalysis;
 use clarity::vm::analysis::{CheckErrors, CheckResult};
@@ -443,7 +444,7 @@ impl<'a> ASTVisitor<'a> for ASTDependencyDetector<'a> {
             Some(parameters) => parameters
                 .iter()
                 .map(|typed_var| {
-                    TypeSignature::parse_type_repr(typed_var.type_expr, &mut ())
+                    TypeSignature::parse_type_repr(DEFAULT_EPOCH, typed_var.type_expr, &mut ())
                         .unwrap_or(TypeSignature::BoolType)
                 })
                 .collect(),
@@ -481,7 +482,7 @@ impl<'a> ASTVisitor<'a> for ASTDependencyDetector<'a> {
             Some(parameters) => parameters
                 .iter()
                 .map(|typed_var| {
-                    TypeSignature::parse_type_repr(typed_var.type_expr, &mut ())
+                    TypeSignature::parse_type_repr(DEFAULT_EPOCH, typed_var.type_expr, &mut ())
                         .unwrap_or(TypeSignature::BoolType)
                 })
                 .collect(),
@@ -519,7 +520,7 @@ impl<'a> ASTVisitor<'a> for ASTDependencyDetector<'a> {
             Some(parameters) => parameters
                 .iter()
                 .map(|typed_var| {
-                    TypeSignature::parse_type_repr(typed_var.type_expr, &mut ())
+                    TypeSignature::parse_type_repr(DEFAULT_EPOCH, typed_var.type_expr, &mut ())
                         .unwrap_or(TypeSignature::BoolType)
                 })
                 .collect(),
@@ -537,7 +538,7 @@ impl<'a> ASTVisitor<'a> for ASTDependencyDetector<'a> {
         functions: &'a [SymbolicExpression],
     ) -> bool {
         if let Ok(trait_definition) =
-            TypeSignature::parse_trait_type_repr(functions, &mut (), DEFAULT_CLARITY_VERSION)
+            TypeSignature::parse_trait_type_repr(functions, &mut (), DEFAULT_EPOCH, DEFAULT_CLARITY_VERSION)
         {
             self.add_defined_trait(self.current_contract.unwrap(), name, trait_definition);
         }
@@ -678,7 +679,7 @@ impl<'a, 'b> ASTVisitor<'a> for PreloadedVisitor<'a, 'b> {
             Some(parameters) => parameters
                 .iter()
                 .map(|typed_var| {
-                    TypeSignature::parse_type_repr(typed_var.type_expr, &mut ())
+                    TypeSignature::parse_type_repr(DEFAULT_EPOCH, typed_var.type_expr, &mut ())
                         .unwrap_or(TypeSignature::BoolType)
                 })
                 .collect(),
@@ -701,7 +702,7 @@ impl<'a, 'b> ASTVisitor<'a> for PreloadedVisitor<'a, 'b> {
             Some(parameters) => parameters
                 .iter()
                 .map(|typed_var| {
-                    TypeSignature::parse_type_repr(typed_var.type_expr, &mut ())
+                    TypeSignature::parse_type_repr(DEFAULT_EPOCH, typed_var.type_expr, &mut ())
                         .unwrap_or(TypeSignature::BoolType)
                 })
                 .collect(),
@@ -720,7 +721,7 @@ impl<'a, 'b> ASTVisitor<'a> for PreloadedVisitor<'a, 'b> {
         functions: &'a [SymbolicExpression],
     ) -> bool {
         if let Ok(trait_definition) =
-            TypeSignature::parse_trait_type_repr(functions, &mut (), DEFAULT_CLARITY_VERSION)
+            TypeSignature::parse_trait_type_repr(functions, &mut (), DEFAULT_EPOCH, DEFAULT_CLARITY_VERSION)
         {
             self.detector
                 .add_defined_trait(self.current_contract.unwrap(), name, trait_definition);

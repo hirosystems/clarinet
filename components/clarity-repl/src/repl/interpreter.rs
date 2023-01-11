@@ -338,6 +338,7 @@ impl ClarityInterpreter {
             &mut analysis_db,
             false,
             LimitedCostTracker::new_free(),
+            contract.epoch.clone(),
             contract.clarity_version.clone(),
         ) {
             Ok(res) => res,
