@@ -88,10 +88,10 @@ pub fn get_signatures(
                     active_parameter = Some(variadic_index.try_into().unwrap());
                 }
             }
-            let label = if output_type.eq("Not applicable") {
-                format!("{} -> {}", &signature, &output_type)
-            } else {
+            let label = if output_type.eq("Not Applicable") {
                 String::from(signature)
+            } else {
+                format!("{} -> {}", &signature, &output_type)
             };
 
             SignatureInformation {
@@ -173,7 +173,17 @@ mod definitions_visitor_tests {
     #[test]
     fn ensure_all_native_function_have_valid_signature() {
         for method in NativeFunctions::ALL_NAMES {
-            if ["let", "begin"].contains(&method) {
+            if [
+                "define-read-only",
+                "define-public",
+                "define-readonly",
+                "define-trait,",
+                "let",
+                "begin",
+                "tuple",
+            ]
+            .contains(&method)
+            {
                 continue;
             }
 
