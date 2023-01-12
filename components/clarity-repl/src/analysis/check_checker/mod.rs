@@ -1,6 +1,7 @@
 use crate::analysis::annotation::{Annotation, AnnotationKind, WarningKind};
 use crate::analysis::ast_visitor::{traverse, ASTVisitor, TypedVar};
 use crate::analysis::{self, AnalysisPass, AnalysisResult};
+use crate::repl::DEFAULT_EPOCH;
 use clarity::vm::analysis::analysis_db::AnalysisDatabase;
 use clarity::vm::analysis::types::ContractAnalysis;
 use clarity::vm::diagnostic::{DiagnosableError, Diagnostic, Level};
@@ -853,7 +854,7 @@ impl<'a> ASTVisitor<'a> for CheckChecker<'a, '_> {
 }
 
 fn is_param_type_excluded_from_checked_requirement(param: &TypedVar) -> bool {
-    match TypeSignature::parse_type_repr(param.type_expr, &mut ()) {
+    match TypeSignature::parse_type_repr(DEFAULT_EPOCH, param.type_expr, &mut ()) {
         Ok(TypeSignature::BoolType) => true,
         _ => false,
     }

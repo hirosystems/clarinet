@@ -10,6 +10,7 @@ use clarity_repl::{
         vm::types::{BlockInfoProperty, FunctionType, TypeSignature},
         ClarityName, ClarityVersion, SymbolicExpression,
     },
+    repl::DEFAULT_EPOCH,
 };
 use lazy_static::lazy_static;
 use lsp_types::{
@@ -83,7 +84,9 @@ impl<'a> ContractDefinedData {
     ) {
         let mut completion_args: Vec<String> = vec![];
         for (i, typed_var) in parameters.iter().enumerate() {
-            if let Ok(signature) = TypeSignature::parse_type_repr(typed_var.type_expr, &mut ()) {
+            if let Ok(signature) =
+                TypeSignature::parse_type_repr(DEFAULT_EPOCH, typed_var.type_expr, &mut ())
+            {
                 completion_args.push(format!("${{{}:{}:{}}}", i + 1, typed_var.name, signature));
 
                 if is_position_within_span(&self.position, &expr.span, 0) {

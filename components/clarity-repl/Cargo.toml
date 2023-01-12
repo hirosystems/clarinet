@@ -37,7 +37,7 @@ getrandom = { version = "0.2.3", features = ["js"] }
 rand_pcg = "0.3.1"
 rand_seeder = "0.2.2"
 atty = "0.2.14"
-clarity = { git = "https://github.com/stacks-network/stacks-blockchain.git", rev = "601ac7a0b4ed3de027382a33560d079aaa337b4d", default-features = false, optional = true }
+clarity = { git = "https://github.com/stacks-network/stacks-blockchain.git", rev = "82942d9d4984fecbfe73408bd0ca1b54a20d5de3", default-features = false, optional = true }
 # clarity = { package = "clarity", path = "../../../stacks-blockchain/clarity", default-features = false, optional = true }
 
 # DAP Debugger
