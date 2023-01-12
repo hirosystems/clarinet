@@ -119,7 +119,6 @@ impl DependencySet {
             contract_id: contract_id.clone(),
             required_before_publish: false,
         }) {
-            println!("FOUND DEP: {}", dep.required_before_publish);
             Some(dep.required_before_publish)
         } else {
             None
@@ -1070,11 +1069,16 @@ mod tests {
 
         let dependencies =
             ASTDependencyDetector::detect_dependencies(&contracts, &BTreeMap::new()).unwrap();
+
+        assert_eq!(
+            dependencies[&test_identifier].has_dependency(&my_trait),
+            Some(true)
+        );
+        assert_eq!(
+            dependencies[&test_identifier].has_dependency(&bar),
+            Some(false)
+        );
         assert_eq!(dependencies[&test_identifier].len(), 2);
-        assert!(!dependencies[&test_identifier].has_dependency(&bar).unwrap());
-        assert!(dependencies[&test_identifier]
-            .has_dependency(&my_trait)
-            .unwrap());
     }
 
     #[test]
