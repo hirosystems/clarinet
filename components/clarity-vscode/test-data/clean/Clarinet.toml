@@ -11,6 +11,7 @@ path = "contracts/contract.clar"
 
 [contracts.counter]
 path = "contracts/counter.clar"
+clarity_version = 2
 
 [contracts.bns]
 path = "contracts/bns.clar"
