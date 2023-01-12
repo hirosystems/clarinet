@@ -359,7 +359,9 @@ impl<'a> ASTDependencyDetector<'a> {
     ) -> Vec<QualifiedContractIdentifier> {
         let mut dependencies = Vec::new();
         for (i, arg) in arg_types.iter().enumerate() {
-            if matches!(arg, TypeSignature::CallableType(CallableSubtype::Trait(_))) {
+            if matches!(arg, TypeSignature::CallableType(CallableSubtype::Trait(_)))
+                | matches!(arg, TypeSignature::TraitReferenceType(_))
+            {
                 if args.len() > i {
                     if let Some(Value::Principal(PrincipalData::Contract(contract))) =
                         args[i].match_literal_value()
@@ -613,26 +615,13 @@ impl<'a> ASTVisitor<'a> for ASTDependencyDetector<'a> {
         name: &'a ClarityName,
         args: &'a [SymbolicExpression],
     ) -> bool {
-        let mut dependencies = Vec::new();
         if let Some(arg_types) = self
             .defined_functions
             .get(&(&self.current_contract.unwrap(), name))
         {
-            for (i, arg) in arg_types.iter().enumerate() {
-                if matches!(arg, TypeSignature::CallableType(CallableSubtype::Trait(_))) {
-                    if args.len() > i {
-                        if let Some(Value::Principal(PrincipalData::Contract(contract))) =
-                            args[i].match_literal_value()
-                        {
-                            dependencies.push(contract);
-                        }
-                    }
-                }
+            for dependency in self.check_callee_type(arg_types, args) {
+                self.add_dependency(self.current_contract.unwrap(), &dependency);
             }
-        }
-
-        for dependency in dependencies {
-            self.add_dependency(self.current_contract.unwrap(), dependency);
         }
 
         true
