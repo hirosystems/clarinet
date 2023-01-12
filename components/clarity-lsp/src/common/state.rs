@@ -1,5 +1,4 @@
-use crate::types::{CompletionItem, CompletionMaps};
-use crate::utils;
+use crate::common::requests::completion::check_if_should_wrap;
 use chainhook_types::StacksNetwork;
 use clarinet_deployments::{
     generate_default_deployment, initiate_session_from_deployment,
@@ -18,15 +17,22 @@ use clarity_repl::clarity::vm::EvaluationResult;
 use clarity_repl::clarity::{ClarityName, ClarityVersion, SymbolicExpression};
 use clarity_repl::repl::{ContractDeployer, DEFAULT_CLARITY_VERSION};
 use lsp_types::{
-    DocumentSymbol, Hover, Location, MessageType, Position, Range, SignatureHelp, Url,
+    CompletionItem, DocumentSymbol, Hover, Location, MessageType, Position, Range, SignatureHelp,
+    Url,
 };
 use std::borrow::BorrowMut;
 use std::collections::{BTreeMap, HashMap, HashSet};
 use std::vec;
 
-use super::requests::definitions::{get_definitions, DefinitionLocation};
+use super::requests::capabilities::InitializationOptions;
+use super::requests::completion::{
+    build_completion_item_list, get_contract_calls, ContractDefinedData,
+};
+use super::requests::definitions::{
+    get_definitions, get_public_function_definitions, DefinitionLocation,
+};
 use super::requests::document_symbols::ASTSymbols;
-use super::requests::helpers::{get_atom_start_at_position, get_public_function_definitions};
+use super::requests::helpers::get_atom_start_at_position;
 use super::requests::hover::get_expression_documentation;
 use super::requests::signature_help::get_signatures;
 
@@ -121,7 +127,7 @@ impl ActiveContractData {
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct ContractState {
-    intellisense: CompletionMaps,
+    contract_calls: Vec<CompletionItem>,
     errors: Vec<ClarityDiagnostic>,
     warnings: Vec<ClarityDiagnostic>,
     notes: Vec<ClarityDiagnostic>,
@@ -161,14 +167,14 @@ impl ContractState {
             }
         }
 
-        let intellisense = match analysis {
-            Some(ref analysis) => utils::build_intellisense(&analysis),
-            None => CompletionMaps::default(),
+        let contract_calls = match analysis {
+            Some(ref analysis) => get_contract_calls(analysis),
+            None => vec![],
         };
 
         ContractState {
             contract_id,
-            intellisense,
+            contract_calls,
             errors,
             warnings,
             notes,
@@ -194,7 +200,7 @@ pub struct EditorState {
     pub protocols: HashMap<FileLocation, ProtocolState>,
     pub contracts_lookup: HashMap<FileLocation, ContractMetadata>,
     pub active_contracts: HashMap<FileLocation, ActiveContractData>,
-    pub native_functions: Vec<CompletionItem>,
+    pub settings: InitializationOptions,
 }
 
 impl EditorState {
@@ -203,7 +209,7 @@ impl EditorState {
             protocols: HashMap::new(),
             contracts_lookup: HashMap::new(),
             active_contracts: HashMap::new(),
-            native_functions: utils::build_default_native_keywords_list(),
+            settings: InitializationOptions::default(),
         }
     }
 
@@ -290,31 +296,50 @@ impl EditorState {
     pub fn get_completion_items_for_contract(
         &self,
         contract_location: &FileLocation,
-    ) -> Vec<CompletionItem> {
-        let mut keywords = self.native_functions.clone();
+        position: &Position,
+    ) -> Vec<lsp_types::CompletionItem> {
+        let active_contract = match self.active_contracts.get(&contract_location) {
+            Some(contract) => contract,
+            None => return vec![],
+        };
 
-        let mut user_defined_keywords = self
+        let contract_calls = self
             .contracts_lookup
             .get(contract_location)
             .and_then(|d| self.protocols.get(&d.manifest_location))
-            .and_then(|p| Some(p.get_completion_items_for_contract(contract_location)))
+            .and_then(|p| Some(p.get_contract_calls_for_contract(contract_location)))
             .unwrap_or_default();
 
-        keywords.append(&mut user_defined_keywords);
-        keywords
+        let active_contract_defined_data = ContractDefinedData::new(
+            &active_contract.expressions.as_ref().unwrap_or(&vec![]),
+            position,
+        );
+
+        let should_wrap = match self.settings.completion_smart_parenthesis_wrap {
+            true => check_if_should_wrap(&active_contract.source, position),
+            false => true,
+        };
+
+        build_completion_item_list(
+            &active_contract.clarity_version,
+            &active_contract_defined_data,
+            contract_calls,
+            should_wrap,
+            self.settings.completion_include_native_placeholders,
+        )
     }
 
     pub fn get_document_symbols_for_contract(
         &self,
         contract_location: &FileLocation,
     ) -> Vec<DocumentSymbol> {
-        let active_contract = self.active_contracts.get(contract_location);
+        let active_contract = match self.active_contracts.get(&contract_location) {
+            Some(contract) => contract,
+            None => return vec![],
+        };
 
-        let expressions = match active_contract {
-            Some(active_contract) => match &active_contract.expressions {
-                Some(expressions) => expressions,
-                None => return vec![],
-            },
+        let expressions = match &active_contract.expressions {
+            Some(expressions) => expressions,
             None => return vec![],
         };
 
@@ -349,7 +374,6 @@ impl EditorState {
             DefinitionLocation::External(contract_identifier, function_name) => {
                 let metadata = self.contracts_lookup.get(contract_location)?;
                 let protocol = self.protocols.get(&metadata.manifest_location)?;
-
                 let definition_contract_location =
                     protocol.locations_lookup.get(contract_identifier)?;
 
@@ -360,7 +384,7 @@ impl EditorState {
                     .get(definition_contract_location)
                     .and_then(|c| c.expressions.as_ref())
                 {
-                    let public_definitions = get_public_function_definitions(&expressions)?;
+                    let public_definitions = get_public_function_definitions(&expressions);
                     return Some(Location {
                         range: *public_definitions.get(function_name)?,
                         uri: Url::parse(&definition_contract_location.to_string()).ok()?,
@@ -591,29 +615,17 @@ impl ProtocolState {
         }
     }
 
-    pub fn get_completion_items_for_contract(
+    pub fn get_contract_calls_for_contract(
         &self,
         contract_uri: &FileLocation,
     ) -> Vec<CompletionItem> {
-        let mut keywords = vec![];
-
-        let (mut contract_keywords, mut contract_calls) = {
-            let contract_keywords = match self.contracts.get(&contract_uri) {
-                Some(entry) => entry.intellisense.intra_contract.clone(),
-                _ => vec![],
-            };
-            let mut contract_calls = vec![];
-            for (url, contract_state) in self.contracts.iter() {
-                if !contract_uri.eq(url) {
-                    contract_calls.append(&mut contract_state.intellisense.inter_contract.clone());
-                }
+        let mut contract_calls = vec![];
+        for (url, contract_state) in self.contracts.iter() {
+            if !contract_uri.eq(url) {
+                contract_calls.append(&mut contract_state.contract_calls.clone());
             }
-            (contract_keywords, contract_calls)
-        };
-
-        keywords.append(&mut contract_keywords);
-        keywords.append(&mut contract_calls);
-        keywords
+        }
+        contract_calls
     }
 }
 
@@ -671,11 +683,10 @@ pub async fn build_state(
                 match execution_result.result {
                     EvaluationResult::Contract(contract_result) => {
                         if let Some(ast) = artifacts.asts.get(&contract_id) {
-                            if let Some(public_definitions) =
-                                get_public_function_definitions(&ast.expressions)
-                            {
-                                definitions.insert(contract_id.clone(), public_definitions);
-                            }
+                            definitions.insert(
+                                contract_id.clone(),
+                                get_public_function_definitions(&ast.expressions),
+                            );
                         }
                         analyses
                             .insert(contract_id.clone(), Some(contract_result.contract.analysis));

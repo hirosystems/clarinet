@@ -43,8 +43,19 @@ pub fn get_signatures(
     let (function_name, mut active_parameter) =
         get_function_at_position(position, contract.expressions.as_ref()?)?;
 
-    if ["let", "begin"].contains(&function_name.as_str()) {
-        // showing signature help for let and begin adds to much noise
+    if [
+        "define-read-only",
+        "define-public",
+        "define-readonly",
+        "define-trait,",
+        "let",
+        "begin",
+        "tuple",
+    ]
+    .contains(&function_name.as_str())
+    {
+        // showing signature help for define-<function>, define-trait, let and bug adds to much noise
+        // it doesn't make sense for the tuple {} notation
         return None;
     }
 
@@ -77,11 +88,16 @@ pub fn get_signatures(
                     active_parameter = Some(variadic_index.try_into().unwrap());
                 }
             }
+            let label = if output_type.eq("Not Applicable") {
+                String::from(signature)
+            } else {
+                format!("{} -> {}", &signature, &output_type)
+            };
 
             SignatureInformation {
                 active_parameter,
                 documentation: None,
-                label: format!("{:} -> {:}", &signature, &output_type),
+                label,
                 parameters: Some(
                     parameters
                         .iter()
@@ -100,7 +116,6 @@ pub fn get_signatures(
 
 #[cfg(test)]
 mod definitions_visitor_tests {
-
     use clarity_repl::clarity::ClarityVersion::Clarity2;
     use clarity_repl::clarity::{
         functions::NativeFunctions, stacks_common::types::StacksEpochId::Epoch21,
@@ -157,14 +172,22 @@ mod definitions_visitor_tests {
 
     #[test]
     fn ensure_all_native_function_have_valid_signature() {
-        let native_methods = NativeFunctions::ALL_NAMES;
-
-        for method in native_methods {
-            if ["let", "begin"].contains(&method) {
+        for method in NativeFunctions::ALL_NAMES {
+            if [
+                "define-read-only",
+                "define-public",
+                "define-readonly",
+                "define-trait,",
+                "let",
+                "begin",
+                "tuple",
+            ]
+            .contains(&method)
+            {
                 continue;
             }
 
-            let src = format!("({:} )", &method);
+            let src = format!("({} )", &method);
             let signatures = get_source_signature(
                 src.as_str(),
                 &Position {

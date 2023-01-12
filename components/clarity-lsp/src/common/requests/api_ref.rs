@@ -22,7 +22,7 @@ lazy_static! {
             api_references.insert(
                 define_function.to_string(),
                 (reference.version, Vec::from([
-                    &code(format!("{:} -> {:}", &reference.signature, &reference.output_type).as_str()),
+                    &code(&reference.signature),
                     separator,
                     "**Description**",
                     &reference.description,
@@ -30,7 +30,7 @@ lazy_static! {
                     "**Example**",
                     &code(&reference.example),
                 ])
-                .join("\n"), None),
+                .join("\n"), Some(reference)),
             );
         }
 
@@ -39,7 +39,7 @@ lazy_static! {
             api_references.insert(
                 native_function.to_string(),
                 (reference.version, Vec::from([
-                    &code(format!("{:} -> {:}", &reference.signature, &reference.output_type).as_str()),
+                    &code(format!("{} -> {}", &reference.signature, &reference.output_type).as_str()),
                     separator,
                     "**Description**",
                     &reference.description,

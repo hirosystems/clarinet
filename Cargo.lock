@@ -1077,6 +1077,7 @@ dependencies = [
  "js-sys",
  "lazy_static",
  "lsp-types",
+ "regex",
  "serde",
  "serde-wasm-bindgen",
  "serde_json",
@@ -4945,9 +4946,9 @@ dependencies = [
 
 [[package]]
 name = "regex"
-version = "1.5.6"
+version = "1.7.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d83f127d94bdbcda4c8cc2e50f6f84f4b611f69c902699ca385a39c3a75f9ff1"
+checksum = "48aaa5748ba571fb95cd2c85c09f629215d3a6ece942baa100950af03a34f733"
 dependencies = [
  "aho-corasick",
  "memchr",
