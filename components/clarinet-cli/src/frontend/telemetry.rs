@@ -53,6 +53,7 @@ async fn send_event(event: DeveloperUsageEvent) {
         .expect("Unable to detect version")
         .to_string();
     let ci_mode = option_env!("CLARINET_MODE_CI").unwrap_or("0").to_string();
+    let os = std::env::consts::OS;
 
     let (event_name, properties) = match event {
         DeveloperUsageEvent::NewProject(digest) => (
@@ -62,6 +63,7 @@ async fn send_event(event: DeveloperUsageEvent) {
                 "team_id": digest.team_id,
                 "clarinet_version": clarinet_version,
                 "ci_mode": ci_mode,
+                "operating_system": os,
             }),
         ),
         DeveloperUsageEvent::TestSuiteExecuted(digest, success, count) => (
@@ -71,6 +73,7 @@ async fn send_event(event: DeveloperUsageEvent) {
                 "team_id": digest.team_id,
                 "clarinet_version": clarinet_version,
                 "ci_mode": ci_mode,
+                "operating_system": os,
                 "success": success,
                 "count": count,
             }),
@@ -82,6 +85,7 @@ async fn send_event(event: DeveloperUsageEvent) {
                 "team_id": digest.team_id,
                 "clarinet_version": clarinet_version,
                 "ci_mode": ci_mode,
+                "operating_system": os,
             }),
         ),
         DeveloperUsageEvent::ProtocolPublished(digest, network) => (
@@ -91,6 +95,7 @@ async fn send_event(event: DeveloperUsageEvent) {
                 "team_id": digest.team_id,
                 "clarinet_version": clarinet_version,
                 "ci_mode": ci_mode,
+                "operating_system": os,
                 "network": format!("{:?}", network),
             }),
         ),
@@ -101,6 +106,7 @@ async fn send_event(event: DeveloperUsageEvent) {
                 "team_id": digest.team_id,
                 "clarinet_version": clarinet_version,
                 "ci_mode": ci_mode,
+                "operating_system": os,
             }),
         ),
         DeveloperUsageEvent::PokeExecuted(digest) => (
@@ -110,6 +116,7 @@ async fn send_event(event: DeveloperUsageEvent) {
                 "team_id": digest.team_id,
                 "clarinet_version": clarinet_version,
                 "ci_mode": ci_mode,
+                "operating_system": os,
             }),
         ),
         DeveloperUsageEvent::DebugStarted(digest, num_sessions) => (
@@ -119,6 +126,7 @@ async fn send_event(event: DeveloperUsageEvent) {
                 "team_id": digest.team_id,
                 "clarinet_version": clarinet_version,
                 "ci_mode": ci_mode,
+                "operating_system": os,
                 "sessions": num_sessions,
             }),
         ),
@@ -129,6 +137,7 @@ async fn send_event(event: DeveloperUsageEvent) {
                 "team_id": digest.team_id,
                 "clarinet_version": clarinet_version,
                 "ci_mode": ci_mode,
+                "operating_system": os,
             }),
         ),
         DeveloperUsageEvent::UnknownCommand(digest, command) => (
@@ -138,6 +147,7 @@ async fn send_event(event: DeveloperUsageEvent) {
                 "team_id": digest.team_id,
                 "clarinet_version": clarinet_version,
                 "ci_mode": ci_mode,
+                "operating_system": os,
                 "command": command,
             }),
         ),
