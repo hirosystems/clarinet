@@ -17,7 +17,7 @@ use lsp_types::request::{
 };
 use lsp_types::{
     DidChangeTextDocumentParams, DidCloseTextDocumentParams, DidOpenTextDocumentParams,
-    DidSaveTextDocumentParams, PublishDiagnosticsParams, Url,
+    DidSaveTextDocumentParams, MessageType, PublishDiagnosticsParams, Url,
 };
 use serde::Serialize;
 use serde_wasm_bindgen::{from_value as decode_from_js, to_value as encode_to_js, Serializer};
@@ -32,7 +32,7 @@ use crate::utils::log;
 #[wasm_bindgen]
 pub struct LspVscodeBridge {
     client_diagnostic_tx: JsFunction,
-    _client_notification_tx: JsFunction,
+    client_notification_tx: JsFunction,
     backend_to_client_tx: JsFunction,
     editor_state_lock: Arc<RwLock<EditorState>>,
 }
@@ -42,14 +42,14 @@ impl LspVscodeBridge {
     #[wasm_bindgen(constructor)]
     pub fn new(
         client_diagnostic_tx: JsFunction,
-        _client_notification_tx: JsFunction,
+        client_notification_tx: JsFunction,
         backend_to_client_tx: JsFunction,
     ) -> LspVscodeBridge {
         panic::set_hook(Box::new(console_error_panic_hook::hook));
 
         LspVscodeBridge {
             client_diagnostic_tx,
-            _client_notification_tx,
+            client_notification_tx,
             backend_to_client_tx: backend_to_client_tx.clone(),
             editor_state_lock: Arc::new(RwLock::new(EditorState::new())),
         }
@@ -133,6 +133,7 @@ impl LspVscodeBridge {
 
         let mut editor_state_lock = EditorStateInput::RwLock(self.editor_state_lock.clone());
         let send_diagnostic = self.client_diagnostic_tx.clone();
+        let send_notification = self.client_notification_tx.clone();
         let file_accessor: Box<dyn FileAccessor> = Box::new(WASMFileSystemAccessor::new(
             self.backend_to_client_tx.clone(),
         ));
@@ -142,6 +143,20 @@ impl LspVscodeBridge {
                 process_notification(command, &mut editor_state_lock, Some(&file_accessor)).await;
 
             let mut aggregated_diagnostics = vec![];
+            if let Err(err) = result {
+                if err.starts_with("No Clarinet.toml is associated to the contract") {
+                    let _ = send_notification.call2(
+                        &JsValue::NULL,
+                        &encode_to_js(&lsp_types::notification::ShowMessage::METHOD).unwrap(),
+                        &encode_to_js(&lsp_types::ShowMessageParams {
+                            typ: MessageType::WARNING,
+                            message: String::from(&err),
+                        })
+                        .unwrap(),
+                    );
+                }
+                return Err(JsValue::from(err));
+            }
             if let Ok(ref mut response) = result {
                 aggregated_diagnostics.append(&mut response.aggregated_diagnostics);
             }
