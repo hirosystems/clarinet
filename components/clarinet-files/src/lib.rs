@@ -203,8 +203,8 @@ impl FileLocation {
                 match manifest_location {
                     Some(manifest_location) => Ok(manifest_location),
                     None => Err(format!(
-                        "unable to find manifest location from {}",
-                        self.to_string()
+                        "No Clarinet.toml is associated to the contract {}",
+                        self.get_file_name().unwrap_or_default()
                     )),
                 }
             }
@@ -289,6 +289,17 @@ impl FileLocation {
             .and_then(|l| Ok(l.to_string()))?;
         let file = self.to_string();
         Ok(file[(base.len() + 1)..].to_string())
+    }
+
+    pub fn get_file_name(&self) -> Option<String> {
+        match self {
+            FileLocation::FileSystem { path } => {
+                path.file_name().and_then(|f| Some(f.to_str()?.to_string()))
+            }
+            FileLocation::Url { url } => url
+                .path_segments()
+                .and_then(|p| Some(p.last()?.to_string())),
+        }
     }
 }
 
