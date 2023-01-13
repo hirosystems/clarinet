@@ -3,10 +3,12 @@ import {
   Uri,
   Range,
   workspace,
-  window,
+  window as vsWindow,
   languages,
   commands,
   DiagnosticSeverity,
+  Position,
+  Selection,
 } from "vscode";
 import type { Diagnostic } from "vscode";
 
@@ -14,6 +16,16 @@ const { workspaceFolders } = workspace;
 const { uri: workspaceUri } = workspaceFolders![0];
 
 const delay = (ms: number) => new Promise((r) => setTimeout(() => r(1), ms));
+
+// beforeEach(() => {
+//   const config = workspace.getConfiguration("clarity-lsp");
+//   Object.entries(config).forEach(([k, v]) => {
+//     const setting = config.inspect(k);
+//     if (setting && setting.defaultValue !== undefined) {
+//       config.update(k, setting.defaultValue);
+//     }
+//   });
+// });
 
 function getDiagnostics(uri: Uri) {
   let diagnosticPromise: (value: Diagnostic[]) => void;
@@ -43,7 +55,7 @@ describe("get diagnostics", () => {
 
   const contractUri: Uri = Uri.joinPath(
     workspaceUri,
-    "with-errors/contracts/contract.clar",
+    "test-cases/contracts/contract.clar",
   );
 
   it("get diagnostics on contract open", async () => {
@@ -58,16 +70,46 @@ describe("get diagnostics", () => {
 
   it("get diagnostics on contract change", async () => {
     const document = await workspace.openTextDocument(contractUri);
-    const editor = await window.showTextDocument(document, 1, false);
+    const editor = await vsWindow.showTextDocument(document, 1, false);
 
     const diagnosticsListener = getDiagnostics(contractUri);
 
-    editor.edit((editable) => {
+    await editor.edit((editable) => {
       // uncomment line 9 of the contract
       editable.replace(new Range(8, 4, 8, 7), "");
     });
 
     const diagnostics = await diagnosticsListener;
     assert.strictEqual(diagnostics.length, 0);
+  });
+});
+
+describe.only("get completion", function () {
+  this.timeout(20000);
+  afterEach(async () => {
+    commands.executeCommand("workbench.action.closeActiveEditor");
+  });
+
+  const contractUri: Uri = Uri.joinPath(
+    workspaceUri,
+    "test-cases/contracts/contract.clar",
+  );
+
+  it("show completion for native function", async () => {
+    const document = await workspace.openTextDocument(contractUri);
+    const editor = await vsWindow.showTextDocument(document, 1, false);
+
+    // waiting for the extension to be active
+    await getDiagnostics(contractUri);
+
+    await editor.edit(async (editable) => {
+      editable.insert(new Position(14, 0), "var-\n");
+    });
+
+    const position = editor.selection.active;
+    const newPosition = position.with(13, 4);
+    editor.selection = new Selection(newPosition, newPosition);
+    await commands.executeCommand("editor.action.triggerSuggest");
+    // todo
   });
 });

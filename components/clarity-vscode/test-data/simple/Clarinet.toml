@@ -1,19 +1,17 @@
 [project]
-name = "missing-contract"
+name = "test-data"
 authors = []
 description = ""
 telemetry = false
 requirements = []
-boot_contracts = ["pox", "costs-v2", "bns"]
+cache_dir = "./.cache"
 
-[project.cache_location]
-path = "./.requirements"
+[contracts.contract]
+path = "contracts/contract.clar"
+
 [contracts.counter]
 path = "contracts/counter.clar"
-
-[repl]
-costs_version = 2
-parser_version = 2
+clarity_version = 2
 
 [repl.analysis]
 passes = ["check_checker"]

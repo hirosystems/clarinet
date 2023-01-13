@@ -13,8 +13,8 @@ export async function activate(context: ExtensionContext) {
 
   const worker = new Worker(serverMain.toString(true));
 
-  let serverWorkerReady: (value: unknown) => void = null;
-  let workerTimeout: ReturnType<typeof setTimeout> = null;
+  let serverWorkerReady: ((value: unknown) => void) | null = null;
+  let workerTimeout: ReturnType<typeof setTimeout> | null = null;
   const serverWorkerPromise = new Promise((resolve, reject) => {
     serverWorkerReady = resolve;
     workerTimeout = setTimeout(() => {
@@ -27,8 +27,8 @@ export async function activate(context: ExtensionContext) {
     function onServerWorkerReady(e: MessageEvent) {
       if (e.data.method !== "serverWorkerReady") return;
       worker.removeEventListener("message", onServerWorkerReady);
-      serverWorkerReady(true);
-      clearTimeout(workerTimeout);
+      serverWorkerReady!(true);
+      clearTimeout(workerTimeout!);
     },
   );
 
