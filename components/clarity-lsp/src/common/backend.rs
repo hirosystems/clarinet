@@ -166,7 +166,10 @@ pub async fn process_notification(
                         }?
                         .contracts_settings
                         .get(&contract_location)
-                        .ok_or("contract not found in manifest")?
+                        .ok_or(format!(
+                            "No Clarinet.toml is associated to the contract {}",
+                            &contract_location.get_file_name().unwrap_or_default()
+                        ))?
                         .clone()
                         .clarity_version
                     }
