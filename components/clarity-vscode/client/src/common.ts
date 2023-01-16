@@ -15,7 +15,7 @@ function isValidInsight(data: InsightsData): data is InsightsData {
 declare const __DEV_MODE__: boolean | undefined;
 
 function getConfig() {
-  let config = workspace.getConfiguration("clarity-lsp");
+  const config = workspace.getConfiguration("clarity-lsp");
   if (__DEV_MODE__) {
     config.update("debug.logRequestsTimings", true);
   }
@@ -60,7 +60,7 @@ export async function initClient(
 
   workspace.onDidChangeConfiguration(async () => {
     let requireReload = false;
-    let newConfig = getConfig();
+    const newConfig = getConfig();
     [
       "completion",
       "completionSmartParenthesisWrap",
@@ -129,7 +129,7 @@ export async function initClient(
       );
     }
   } catch (err) {
-    if (err.message === "worker timeout") {
+    if (err instanceof Error && err.message === "worker timeout") {
       vscode.window.showWarningMessage(
         "Clarity Language Server failed to start",
       );
