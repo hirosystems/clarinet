@@ -44,6 +44,21 @@ This command creates a new `my-contract.clar` file in the `contracts` directory,
 path = "contracts/my-contract.clar"
 ```
 
+### Set clarity version of contract
+
+You can specify the clarity version of your contract in the `Clarinet.toml` configuration file by updating it as shown below.
+
+```
+[contracts.cbtc-token]
+path = "contracts/cbtc-token.clar"
+clarity = 1
+```
+```
+[contracts.cbtc-token]
+path = "contracts/cbtc-token.clar"
+clarity = 2
+```
+
 At this point, you can begin editing your smart contract in the `contracts` directory. At any point while you are developing, you can use the command `clarinet check` to check the syntax of your smart contract.
 
 For a more in-depth overview of developing with Clarinet, review this comprehensive walkthrough video.
@@ -166,5 +181,3 @@ For more information on assertions, review [asserts](https://deno.land/std@0.90.
 - [Clarity language reference](https://docs.stacks.co/references/language-functions)
 - [Deno standard library - asserts](https://deno.land/std@0.90.0/testing/asserts.ts)
 - [Clarity visual studio code plugin](https://marketplace.visualstudio.com/items?itemName=HiroSystems.clarity-lsp)
-
-
