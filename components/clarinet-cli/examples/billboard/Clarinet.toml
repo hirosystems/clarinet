@@ -4,5 +4,5 @@ requirements = []
 
 [contracts.billboard]
 path = "contracts/billboard.clar"
-clarity = 1
+clarity_version = 1
 epoch = "2.05"

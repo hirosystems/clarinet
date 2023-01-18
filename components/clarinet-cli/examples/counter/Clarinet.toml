@@ -6,7 +6,7 @@ telemetry = false
 
 [contracts.counter]
 path = "contracts/counter.clar"
-clarity = 1
+clarity_version = 1
 epoch = "2.05"
 
 [repl.analysis]
