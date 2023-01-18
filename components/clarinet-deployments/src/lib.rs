@@ -130,9 +130,14 @@ pub fn update_session_with_contracts_executions(
 
     let mut results = BTreeMap::new();
     for batch in deployment.plan.batches.iter() {
-        if let Some(spec) = batch.epoch {
-            session.update_epoch(spec.into());
-        }
+        let epoch: StacksEpochId = match (batch.epoch, forced_epoch) {
+            (Some(epoch), _) => {
+                epoch.into()
+            },
+            (None, Some(forced_epoch)) => forced_epoch,
+            _ =>  DEFAULT_EPOCH
+        };
+        session.update_epoch(epoch.clone());
         for transaction in batch.transactions.iter() {
             match transaction {
                 TransactionSpecification::RequirementPublish(_)
@@ -164,7 +169,7 @@ pub fn update_session_with_contracts_executions(
                         deployer: ContractDeployer::Address(tx.emulated_sender.to_string()),
                         name: tx.contract_name.to_string(),
                         clarity_version: tx.clarity_version,
-                        epoch: forced_epoch.unwrap_or(DEFAULT_EPOCH),
+                        epoch,
                     };
 
                     let result = session.deploy_contract(
