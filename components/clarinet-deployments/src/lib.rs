@@ -131,11 +131,9 @@ pub fn update_session_with_contracts_executions(
     let mut results = BTreeMap::new();
     for batch in deployment.plan.batches.iter() {
         let epoch: StacksEpochId = match (batch.epoch, forced_epoch) {
-            (Some(epoch), _) => {
-                epoch.into()
-            },
+            (Some(epoch), _) => epoch.into(),
             (None, Some(forced_epoch)) => forced_epoch,
-            _ =>  DEFAULT_EPOCH
+            _ => DEFAULT_EPOCH,
         };
         session.update_epoch(epoch.clone());
         for transaction in batch.transactions.iter() {
