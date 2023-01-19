@@ -464,7 +464,7 @@ pub fn standardize_stacks_microblock_trail(
             },
         })
     }
-    microblocks.sort_by(|a, b| a.block_identifier.cmp(&b.block_identifier));
+    microblocks.sort_by(|a, b| b.block_identifier.cmp(&a.block_identifier));
 
     Ok(microblocks)
 }

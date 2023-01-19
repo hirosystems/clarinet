@@ -129,7 +129,7 @@ fn test_opening_counter_contract_should_return_fresh_analysis() {
     };
 
     // the counter project should emit 2 warnings and 2 notes coming from counter.clar
-    assert_eq!(response.aggregated_diagnostics.len(), 1);
+    assert_eq!(response.aggregated_diagnostics.len(), 2);
     let (_url, diags) = &response.aggregated_diagnostics[0];
     assert_eq!(diags.len(), 4);
 
@@ -181,7 +181,7 @@ fn test_opening_counter_manifest_should_return_fresh_analysis() {
     };
 
     // the counter project should emit 2 warnings and 2 notes coming from counter.clar
-    assert_eq!(response.aggregated_diagnostics.len(), 1);
+    assert_eq!(response.aggregated_diagnostics.len(), 2);
     let (_url, diags) = &response.aggregated_diagnostics[0];
     assert_eq!(diags.len(), 4);
 
