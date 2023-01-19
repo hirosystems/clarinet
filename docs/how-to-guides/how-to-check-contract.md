@@ -8,8 +8,8 @@ Clarinet provides syntax and semantics checkers for Clarity. You can verify if t
 $ clarinet check
 ```
 
-This command uses the `Clarinet.toml` file to locate and analyze all of the contracts in the project.
-If the Clarity code is valid, then the command will indicate success with the response below.
+This command uses the `Clarinet.toml` file to locate and analyze all the contracts in the project.
+If the Clarity code is valid, the command will indicate success with the response below.
 
 ```
 ✔ 2 contracts checked
@@ -23,12 +23,12 @@ You may also perform a syntax-check on a single file by using the command below.
 $ clarinet check <path/to/file.clar>
 ```
 
-If there are no syntax errors, the output of the command will be a success message.
+The command output will be a success message if there are no syntax errors.
 
 ```
 ✔ Syntax of contract successfully checked
 ```
 
 Any syntactical errors in the Clarity code will be reported, but type-checking and other semantic checks are not performed.
-This is because Clarinet is only looking at this one contract, and does not have the full context to perform a complete check.
+This is because Clarinet is only looking at this one contract and needs the full context to perform a complete check.
 

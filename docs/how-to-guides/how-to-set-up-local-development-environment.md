@@ -11,8 +11,8 @@ clarinet new my-project && cd my-project
 ```
 
 This command creates a new directory and populates it with boilerplate configuration and testing files. The `toml` files
-located in the `settings` directory control the Clarinet environment. For example, the `Devnet.toml` file contains
-definitions for wallets in the local REPL environment, and their starting balances (in STX).
+in the `settings` directory control the Clarinet environment. For example, the `Devnet.toml` file contains
+definitions for wallets in the local REPL environment and their starting balances (in STX).
 
 ```toml
 ...
@@ -36,7 +36,7 @@ You can create a new contract in the project with the command:
 clarinet contract new my-contract
 ```
 
-This command creates a new `my-contract.clar` file in the `contracts` directory, and a `my-contract_test.ts` in the
+This command creates a new `my-contract.clar` file in the `contracts` directory and a `my-contract_test.ts` in the
 `tests` directory. Additionally, it adds the contract to the `Clarinet.toml` configuration file.
 
 ```toml
@@ -44,9 +44,9 @@ This command creates a new `my-contract.clar` file in the `contracts` directory,
 path = "contracts/my-contract.clar"
 ```
 
-At this point, you can begin editing your smart contract in the `contracts` directory. At any point while you are developing, you can use the command `clarinet check` to check the syntax of your smart contract.
+At this point, you can begin editing your smart contract in the `contracts` directory. At any point, while you are developing, you can use the command `clarinet check` to check the syntax of your smart contract.
 
-For a more in-depth overview of developing with Clarinet, review this comprehensive walkthrough video.
+Review this comprehensive walkthrough video for a more in-depth overview of developing with Clarinet.
 
 <br /><iframe width="560" height="315" src="https://www.youtube.com/embed/zERDftjl6k8" title="YouTube video player" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
 
@@ -56,12 +56,12 @@ Clarinet provides several powerful methods to test and interact with your smart 
 section, you can always check your Clarity syntax using the `clarinet check` command. This validates any smart contracts
 you are currently developing in the active project.
 
-There are two tools in Clarinet you can use to test smart contracts: the console, an interactive Clarity REPL, and the test harness, a testing framework written in Typescript.
-When developing a new smart contract using local Clarity REPL, you can exercise a contract without the need to wait for block times in a live blockchain.
+You can use two tools in Clarinet to test smart contracts: the console, an interactive Clarity REPL, and the test harness, a testing framework written in Typescript.
+When developing a new smart contract using local Clarity REPL, you can exercise a contract without waiting for block times in a live blockchain.
 
 ### Testing with the console
 
-The Clarinet console is an interactive Clarity REPL that runs in-memory. Any contracts configured in the current project are automatically loaded into memory. Additionally, wallets defined in the `settings/Devnet.toml` file are initialized with STX tokens for testing purposes. When the console runs, it provides a summary of the deployed contracts, their public functions, as well as wallet addresses and balances.
+The Clarinet console is an interactive Clarity REPL that runs in memory. Any contracts configured in the current project are automatically loaded into memory. Additionally, wallets defined in the `settings/Devnet.toml` file are initialized with STX tokens for testing purposes. When the console runs, it provides a summary of the deployed contracts, their public functions, wallet addresses, and balances.
 
 ```
 clarity-repl v0.11.0
@@ -102,7 +102,7 @@ You can use the `::help` command for valid console commands.
 ::advance_chain_tip <count>       Simulate mining of <count> blocks
 ```
 
-The console commands control the state of the REPL chain, and let you get information about it and advance the chain
+The console commands control the REPL chain's state, letting you get information about it and advance the chain
 tip. Additionally, you can enter Clarity commands into the console and observe the result of the command. The
 `::list_functions` console command prints a cheat sheet of Clarity commands. For example, in the example contract,
 you could use the REPL to call the `echo-number` function in the contract with the following command:
@@ -112,7 +112,7 @@ you could use the REPL to call the `echo-number` function in the contract with t
 (ok 42)
 ```
 
-Note that by default commands are always executed as the `deployer` address, which means you can use the shorthand
+Note that by default, commands are always executed as the `deployer` address, which means you can use the shorthand
 `.my-contract` without specifying a full address to the contract. If you changed the transaction address with the
 `::set_tx_sender` command, you would need to provide the full address to the contract in the contract call
 (`ST1HTBVD3JG9C05J7HBJTHGR0GGW7KXW28M5JS8QE.my-contract`).
@@ -166,5 +166,3 @@ For more information on assertions, review [asserts](https://deno.land/std@0.90.
 - [Clarity language reference](https://docs.stacks.co/references/language-functions)
 - [Deno standard library - asserts](https://deno.land/std@0.90.0/testing/asserts.ts)
 - [Clarity visual studio code plugin](https://marketplace.visualstudio.com/items?itemName=HiroSystems.clarity-lsp)
-
-
