@@ -767,7 +767,7 @@ pub fn apply_on_chain_deployment(
 
                 current_block_height = stacks_block_tip;
 
-                if current_bitcoin_block_height >= after_bitcoin_block {
+                if current_bitcoin_block_height > after_bitcoin_block {
                     epoch_transition_successful = true;
                 } else {
                     std::thread::sleep(std::time::Duration::from_secs(delay_between_checks.into()));
