@@ -345,7 +345,7 @@ pub async fn start_chains_coordinator(
                         known_tip.block.block_identifier.index
                     ),
                 }));
-                let message = if known_tip.block.block_identifier.index == 1 {
+                let message = if known_tip.block.block_identifier.index == 0 {
                     format!(
                         "Genesis Stacks block anchored in Bitcoin block #{} includes {} transactions",
                         known_tip
