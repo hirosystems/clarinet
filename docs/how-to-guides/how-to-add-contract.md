@@ -8,7 +8,7 @@ Clarinet can handle adding a new contract and its configuration to your project 
 $ clarinet contract new bbtc
 ```
 
-Clarinet will add 2 files to your project:
+Clarinet will add two files to your project:
 - the contract file in the `contracts` directory
 - the contract test file in the `tests` directory
 
@@ -25,13 +25,13 @@ Clarinet will add 2 files to your project:
     └── bbtc_test.ts
 ```
 
-Clarinet will also add a configuration to the `Clarinet.toml` file for your contract.
+Clarinet will also add your contract configuration in the `Clarinet.toml`.
 
 ```toml
 [contracts.my-contract]
 path = "contracts/my-contract.clar"
 ```
 
-You can add contracts to your project by adding the files manually, however, you must make sure to add the appropriate configuration
+You can add contracts to your project by adding the files manually; however, you must make sure to add the appropriate configuration
 to `Clarinet.toml` for Clarinet to recognize the contracts.
 

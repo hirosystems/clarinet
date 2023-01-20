@@ -1,28 +1,26 @@
 ---
-title: "Run a local Integration Environment"
+title: "Run local Integration Environment"
 ---
 
-Once you have reached a point where your Clarity smart contract is functional, you may want to develop a web frontend against your contract. This can be challenging, as the contract must be deployed to a live blockchain to fully
-interact with it from a web app. Clarinet provides an easy method to deploy your contract to a blockchain that
-runs locally on your machine that is configurable and controllable. This integration feature is called DevNet.
+Once you have reached a point where your Clarity smart contract is functional, you can develop a web frontend against your contract. This can be challenging, as the contract must be deployed to a live blockchain to interact with it from a web app fully. Clarinet provides an easy method to deploy your contract to a blockchain that is configurable and controllable locally on your machine. This integration feature is called DevNet.
 
-DevNet allows you to perform frontend development and integration testing without the need to deploy your contract to public testnet. This is valuable if you are in the early stages of developing a product, or if you are developing a contract and app in stealth. DevNet uses Docker to launch local instances of Bitcoin, Stacks, Stacks API, Explorer, and Bitcoin Explorer, and provides total configuration control over all those instances. Once running, DevNet automatically deploys your contracts and creates Stacks accounts with pre-defined balances.
+DevNet allows you to perform frontend development and integration testing without the need to deploy your contract to public testnet. This is valuable if you are in the early stages of developing a product, contract, or app in stealth. DevNet uses Docker to launch local instances of Bitcoin, Stacks, Stacks API, Explorer, and Bitcoin Explorer and provides total configuration control over all those instances. Once running, DevNet automatically deploys your contracts and creates Stacks accounts with pre-defined balances.
 
-The services launched by DevNet represent a full instance of the Stacks blockchain with the Proof of Transfer consensus mechanism running against a locally running Bitcoin testnet. DevNet allows you to control block times, PoX transactions, and contract deployments. Because DevNet is running locally, it can be reset or re-configured at any time. This allows for rapid frontend development without the need to interact with the public blockchain.
+The services launched by DevNet represent a full instance of the Stacks blockchain with the Proof of Transfer consensus mechanism running against a locally running Bitcoin testnet. DevNet allows you to control block times, PoX transactions, and contract deployments. Because DevNet is running locally, it can be reset or reconfigured anytime. This allows for rapid frontend development without interacting with the public blockchain.
 
 ## Prerequisites
 
-In order to run DevNet, you must have [Clarinet installed](../getting-started.md), and you also should have Docker installed locally. Refer to the [Docker documentation](https://docs.docker.com/get-docker/) for instructions on installing Docker on your development machine.
+To run DevNet, you must have [Clarinet installed](../getting-started.md), and you also should have Docker installed locally. Refer to the [Docker documentation](https://docs.docker.com/get-docker/) for instructions on installing Docker on your development machine.
 
 ## Launching DevNet
 
-Clarinet provides sensible a sensible default configuration for DevNet. If you wish to use the default configuration, you can launch DevNet from the root of your Clarinet project with the command:
+Clarinet provides a sensible default configuration for DevNet. If you wish to use the default configuration, you can launch DevNet from the root of your Clarinet project with the command:
 
 ```sh
 clarinet integrate
 ```
 
-Clarinet fetches the appropriate Docker images for the Bitcoin node, Stacks node, Stacks API node, and the Bitcoin and Explorers. This can take several minutes on first launch. Once the images are launched, the DevNet interface is displayed in your terminal window. The contracts in your project are deployed to the DevNet blockchain in the second block of the chain, so you may need to wait for the third block before launching your frontend development environment.
+Clarinet fetches the appropriate Docker images for the Bitcoin node, Stacks node, Stacks API node, and the Bitcoin and Explorers. This can take several minutes on the first launch. Once the images are launched, the DevNet interface is displayed in your terminal window. The contracts in your project are deployed to the DevNet blockchain in the second block of the chain, so you may need to wait for the third block before launching your frontend development environment.
 
 Review the following sections for information about the DevNet interface and configuration options for DevNet.
 
@@ -34,7 +32,7 @@ The DevNet interface is displayed as a terminal GUI and consists of four primary
 
 The system log provides a log of events happening throughout the DevNet stack. You can use this log to monitor the health of the local blockchain and review any events that occur. For services that provide a web interface, the URL for the local service is displayed next to the container name. You can connect to these URLs using a web browser to access the service.
 
-The service status provides a status summary for the Docker containers that make up the DevNet stack. A green icon next to the container indicates that it is in a healthy state, a yellow icon indicates that the container is booting, and a red icon indicates that there is a problem with the service.
+The service status provides a status summary for the Docker containers that make up the DevNet stack. A green icon next to the container indicates that it is in a healthy state, a yellow icon indicates that the container is booting, and a red icon indicates a problem with the service.
 
 The mempool summary displays a list of transactions in the mempool. These include historical transactions from the beginning of the blockchain.
 
@@ -47,7 +45,7 @@ containers.
 
 ## Configuring DevNet
 
-By default, DevNet launches a local Stacks 2.0 testnet with a fixed block time of 30 seconds. It runs Docker images that host a Bitcoin node, a Stacks Node, the Stacks API, the Explorer, and the Bitcoin Explorer. The default settings should be adequate for most developers, but you can change many of the settings to customize your development environment.
+By default, DevNet launches a local Stacks 2.0 testnet with a fixed block time of 30 seconds. It runs Docker images that host a Bitcoin node, a Stacks Node, the Stacks API, the Explorer, and the Bitcoin Explorer. The default settings should be adequate for most developers, but you can change many settings to customize your development environment.
 
 DevNet settings are located in the `settings/Devnet.toml` file. The file defines the wallets that are created in the
 DevNet blockchain, the Stacks miner configuration, Proof of Transfer activity, and many other options.
@@ -71,7 +69,7 @@ the latest development images for each of the Stacks and Bitcoin nodes. These pa
 
 >  **_NOTE:_**
 > 
-> If any of the parameters are not supplied in the configuration file, the default value is used.
+> The default value is used if any of the parameters are not supplied in the configuration file.
 
 
 - `pox_stacking_orders`: defined by [stacking orders](../../smart-contracts/devnet.md#stacking-orders) headings later in the file
@@ -112,7 +110,7 @@ You can configure any of the wallets in the DevNet to participate in stacking to
 
 Each [stacking order](../../smart-contracts/devnet.md#stacking-orders) is defined under the heading `[devnet.pox_stacking_orders]`. This heading is repeated for as many stacking orders that are necessary for your configuration.
 
-- `start_at_cycle`: the stacking cycle that the wallet should start particiating in. The wallet's stacking order occurs at the block preceding the beginning of that cycle.
+- `start_at_cycle`: the stacking cycle that the wallet should start participating in. The wallet's stacking order occurs at the block preceding the beginning of that cycle.
 - `duration`: the stacking duration for the stacking cycle
 - `wallet`: the alias of the wallet participating
 - `slots`: the number of stacking slots that the wallet will participate in
