@@ -217,7 +217,7 @@ impl ChainSegment {
         Err(ChainSegmentIncompatibility::Unknown)
     }
 
-    fn get_block_id(&self, block_id: &BlockIdentifier, ctx: &Context) -> Option<&BlockIdentifier> {
+    fn get_block_id(&self, block_id: &BlockIdentifier, _ctx: &Context) -> Option<&BlockIdentifier> {
         match self.block_ids.get(self.get_relative_index(block_id)) {
             Some(res) => Some(res),
             None => None,
