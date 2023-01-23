@@ -8,7 +8,7 @@
   "homepage": "https://github.com/hirosystems/clarinet",
   "bugs": "https://github.com/hirosystems/clarinet/issues",
   "license": "GPL-3.0-only",
-  "version": "1.3.1",
+  "version": "1.4.0",
   "workspaces": [
     "client",
     "server",
@@ -20,7 +20,7 @@
   },
   "scripts": {
     "clean": "rimraf .vscode-test-web ./debug/dist ./client/dist ./server/dist ./server/src/clarity-lsp-*",
-    "pretest": "NODE_ENV=test concurrently \"webpack\" \"swc --config-file .runTests.swcrc ./client/tests/runTests.ts -o ./client/dist/tests/runTests.js\"",
+    "pretest": "NODE_ENV=test concurrently \"webpack -c ./webpack.config.test.js\" \"swc --config-file .runTests.swcrc ./client/tests/runTests.ts -o ./client/dist/tests/runTests.js\"",
     "test": "node client/dist/tests/runTests.js",
     "lint": "eslint ./client/src ./server/src --ext .ts,.tsx",
     "dev:watch": "webpack -c ./webpack.config.dev.js -w",
@@ -81,36 +81,48 @@
             "type": "boolean",
             "default": true,
             "order": 0,
-            "description": "Allow auto completion for native and user-defined functions"
+            "description": "Allow auto-completion for native and user-defined functions."
+          },
+          "clarity-lsp.completionSmartParenthesisWrap": {
+            "type": "boolean",
+            "default": true,
+            "order": 0,
+            "description": "If set to true, the auto-completion won't wrap a function with a parenthesis if an opening parenthesis is already there."
+          },
+          "clarity-lsp.completionIncludeNativePlaceholders": {
+            "type": "boolean",
+            "default": true,
+            "order": 0,
+            "description": "If set to true, the auto-completion of native functions will include placeholders for the arguments."
           },
           "clarity-lsp.hover": {
             "type": "boolean",
             "default": true,
             "order": 0,
-            "description": "Show documentation for native function and keywords on hover"
+            "description": "Show documentation for native function and keywords on hover."
           },
           "clarity-lsp.documentSymbols": {
             "type": "boolean",
             "default": false,
             "order": 0,
-            "description": "Show contract symbols in breadcrumb (beta)"
+            "description": "Show contract symbols in breadcrumb (beta)."
           },
           "clarity-lsp.goToDefinition": {
             "type": "boolean",
             "default": true,
             "order": 0,
-            "description": "Enable go to definition"
+            "description": "Enable go to definition."
           },
           "clarity-lsp.signatureHelp": {
             "type": "boolean",
             "default": true,
             "order": 0,
-            "description": "Show function signature help"
+            "description": "Show function signature help."
           },
           "clarity-lsp.debug.logRequestsTimings": {
             "type": "boolean",
             "default": false,
-            "description": "Log LSP requests performances"
+            "description": "Log LSP requests performances."
           }
         }
       }
@@ -230,7 +242,7 @@
     "@types/webpack-env": "^1.17.0",
     "@typescript-eslint/eslint-plugin": "^5.19.0",
     "@typescript-eslint/parser": "^5.19.0",
-    "@vscode/test-web": "^0.0.33",
+    "@vscode/test-web": "^0.0.34",
     "@vscode/vsce": "^2.15.0",
     "@wasm-tool/wasm-pack-plugin": "^1.6.0",
     "chai": "^4.3.6",
@@ -240,7 +252,7 @@
     "mocha": "^10.0.0",
     "path-browserify": "^1.0.1",
     "regenerator-runtime": "^0.13.9",
-    "rimraf": "^3.0.2",
+    "rimraf": "^4.0.4",
     "swc-loader": "^0.2.3",
     "typescript": "^4.7.2",
     "webpack": "^5.74.0",

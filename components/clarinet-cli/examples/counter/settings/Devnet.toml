@@ -106,8 +106,7 @@ disable_stacks_api = true
 # bind_containers_volumes = true
 # stacks_node_env_vars = ["STACKS_LOG_DEBUG=1"]
 enable_subnet_node = false
-# subnet_contract_id = "STXMJXCJDCT4WPF2X1HE42T6ZCCK3TPMBRZ51JEG.hc-alpha"
-# subnet_contract_id = "ST3A7S7GFKR8E3TVZ41Z2N441265CKXS0QPZ94N6B.hc"
+# subnet_contract_id = "STXMJXCJDCT4WPF2X1HE42T6ZCCK3TPMBRZ51JEG.subnet"
 # subnet_leader_mnemonic = "female adjust gallery certain visit token during great side clown fitness like hurt clip knife warm bench start reunion globe detail dream depend fortune"
 # disable_subnet_api = true
 enable_next_features = true

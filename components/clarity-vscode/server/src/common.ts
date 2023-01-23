@@ -70,10 +70,10 @@ export function initConnection(
       return bridge.onRequest(method, params);
     }
 
-    let id = Math.random().toString(16).slice(2, 18);
-    let label = `${method} (${id})`;
+    const id = Math.random().toString(16).slice(2, 18);
+    const label = `${method} (${id})`;
     console.time(label);
-    let r = bridge.onRequest(method, params);
+    const r = bridge.onRequest(method, params);
     console.timeEnd(label);
     return r;
   });

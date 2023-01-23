@@ -8,9 +8,11 @@ function getArgv(name) {
   return arg.split("=")[1];
 }
 
-function isValidBrowserType(browserType): browserType is BrowserType {
+function isValidBrowserType(browserType: unknown): browserType is BrowserType {
   return (
-    !!browserType && ["chromium", "firefox", "webkit"].includes(browserType)
+    !!browserType &&
+    typeof browserType === "string" &&
+    ["chromium", "firefox", "webkit"].includes(browserType)
   );
 }
 
@@ -31,9 +33,8 @@ async function main() {
       folderPath,
       browserType,
       waitForDebugger,
-      port: 3001,
       devTools: false,
-      headless: true,
+      headless: false,
     });
   } catch (err) {
     console.error(err);

@@ -817,6 +817,10 @@ impl Session {
         ));
         output.push(format!(
             "{}",
+            help_colour.paint("::get_epoch\t\t\t\tGet current epoch")
+        ));
+        output.push(format!(
+            "{}",
             help_colour.paint("::toggle_costs\t\t\t\tDisplay cost analysis after every expression")
         ));
         output.push(format!(
@@ -835,6 +839,14 @@ impl Session {
         output.push(format!(
             "{}",
             help_colour.paint("::read <filename>\t\t\tRead expressions from a file")
+        ));
+        output.push(format!(
+            "{}",
+            help_colour.paint("::encode <expr>\t\t\t\tEncode an expression to a Clarity Value bytes representation")
+        ));
+        output.push(format!(
+            "{}",
+            help_colour.paint("::decode <bytes>\t\t\tDecode a Clarity Value bytes representation")
         ));
     }
 

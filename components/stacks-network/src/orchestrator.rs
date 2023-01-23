@@ -441,7 +441,7 @@ impl DevnetOrchestrator {
             };
         }
 
-        // Start Hyperchain node
+        // Start subnet node
         if enable_subnet_node {
             let _ = event_tx.send(DevnetEvent::info(format!("Starting subnet-node")));
             match self.prepare_subnet_node_container(boot_index, ctx).await {
@@ -899,7 +899,7 @@ seed = "{miner_secret_key_hex}"
 local_peer_seed = "{miner_secret_key_hex}"
 pox_sync_sample_secs = 0
 wait_time_for_blocks = 0
-wait_time_for_microblocks = 50
+wait_time_for_microblocks = {wait_time_for_microblocks}
 microblock_frequency = 1000
 
 [connection_options]
@@ -912,13 +912,16 @@ disable_inbound_walks = true
 public_ip_address = "1.1.1.1:1234"
 
 [miner]
-first_attempt_time_ms = 500
-subsequent_attempt_time_ms = 1000
+first_attempt_time_ms = {first_attempt_time_ms}
+subsequent_attempt_time_ms = {subsequent_attempt_time_ms}
 # microblock_attempt_time_ms = 15000
 "#,
             stacks_node_rpc_port = devnet_config.stacks_node_rpc_port,
             stacks_node_p2p_port = devnet_config.stacks_node_p2p_port,
             miner_secret_key_hex = devnet_config.miner_secret_key_hex,
+            wait_time_for_microblocks = devnet_config.stacks_node_wait_time_for_microblocks,
+            first_attempt_time_ms = devnet_config.stacks_node_first_attempt_time_ms,
+            subsequent_attempt_time_ms = devnet_config.stacks_node_subsequent_attempt_time_ms,
         );
 
         for (_, account) in network_config.accounts.iter() {
@@ -1201,12 +1204,12 @@ miner = true
 seed = "{subnet_leader_secret_key_hex}"
 mining_key = "{subnet_leader_secret_key_hex}"
 local_peer_seed = "{subnet_leader_secret_key_hex}"
-wait_time_for_microblocks = 3_000
+wait_time_for_microblocks = {wait_time_for_microblocks}
 wait_before_first_anchored_block = 0
 
 [miner]
-first_attempt_time_ms = 5_000
-subsequent_attempt_time_ms = 5_000
+first_attempt_time_ms = {first_attempt_time_ms}
+subsequent_attempt_time_ms = {subsequent_attempt_time_ms}
 # microblock_attempt_time_ms = 15_000
 
 [burnchain]
@@ -1235,6 +1238,9 @@ observer_port = {subnet_events_ingestion_port}
             subnet_events_ingestion_port = devnet_config.subnet_events_ingestion_port,
             first_burn_header_height = 0,
             subnet_contract_id = devnet_config.remapped_subnet_contract_id,
+            wait_time_for_microblocks = devnet_config.stacks_node_wait_time_for_microblocks,
+            first_attempt_time_ms = devnet_config.stacks_node_first_attempt_time_ms,
+            subsequent_attempt_time_ms = devnet_config.stacks_node_subsequent_attempt_time_ms,
         );
 
         subnet_conf.push_str(&format!(
@@ -1339,7 +1345,7 @@ events_keys = ["*"]
             tty: None,
             exposed_ports: Some(exposed_ports),
             entrypoint: Some(vec![
-                "hyperchain-node".into(),
+                "subnet-node".into(),
                 "start".into(),
                 "--config=/src/subnet-node/Subnet.toml".into(),
             ]),

@@ -11,9 +11,7 @@ path = "contracts/contract.clar"
 
 [contracts.counter]
 path = "contracts/counter.clar"
-
-[contracts.bns]
-path = "contracts/bns.clar"
+clarity_version = 2
 
 [repl.analysis]
 passes = ["check_checker"]
