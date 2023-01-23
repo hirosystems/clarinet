@@ -748,9 +748,15 @@ impl NetworkManifest {
                 stacks_node_p2p_port: devnet_config.stacks_node_p2p_port.unwrap_or(20444),
                 stacks_node_rpc_port: devnet_config.stacks_node_rpc_port.unwrap_or(20443),
                 stacks_node_events_observers,
-                stacks_node_wait_time_for_microblocks: devnet_config.stacks_node_wait_time_for_microblocks.unwrap_or(50),
-                stacks_node_first_attempt_time_ms: devnet_config.stacks_node_first_attempt_time_ms.unwrap_or(500),
-                stacks_node_subsequent_attempt_time_ms: devnet_config.stacks_node_subsequent_attempt_time_ms.unwrap_or(1_000),
+                stacks_node_wait_time_for_microblocks: devnet_config
+                    .stacks_node_wait_time_for_microblocks
+                    .unwrap_or(50),
+                stacks_node_first_attempt_time_ms: devnet_config
+                    .stacks_node_first_attempt_time_ms
+                    .unwrap_or(500),
+                stacks_node_subsequent_attempt_time_ms: devnet_config
+                    .stacks_node_subsequent_attempt_time_ms
+                    .unwrap_or(1_000),
                 stacks_api_port: devnet_config.stacks_api_port.unwrap_or(3999),
                 stacks_api_events_port: devnet_config.stacks_api_events_port.unwrap_or(3700),
                 stacks_explorer_port: devnet_config.stacks_explorer_port.unwrap_or(8000),
