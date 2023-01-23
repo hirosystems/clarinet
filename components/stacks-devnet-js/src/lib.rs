@@ -787,7 +787,7 @@ impl StacksDevnet {
 
         let blocks = match devnet
             .stacks_block_rx
-            .recv_timeout(std::time::Duration::from_secs(timeout))
+            .recv_timeout(std::time::Duration::from_millis(timeout))
         {
             Ok(obj) => obj,
             Err(_) => return Ok(cx.undefined().as_value(&mut cx)),

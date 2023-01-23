@@ -553,7 +553,6 @@ export class DevnetNetworkOrchestrator {
     return wait(cooldown)
       .then(() => {
         this.lastCooldownEndedAt = new Date();
-        console.log(emptyQueuedBlocks);
         return stacksDevnetWaitForStacksBlock.call(this.handle, this.currentCooldown, emptyQueuedBlocks)
       })
       .catch(e => {
@@ -586,12 +585,10 @@ export class DevnetNetworkOrchestrator {
    */
   async waitForStacksBlockAnchoredOnBitcoinBlockOfHeight(minBitcoinBlockHeight: number, maxErrors = 5, emptyQueuedBlocks = false): Promise<StacksChainUpdate> {
     while (true) {
-      console.log(`tick ${emptyQueuedBlocks}`);
       try {
         let chainUpdate = await this.waitForNextStacksBlock(maxErrors, emptyQueuedBlocks);
         let metadata = chainUpdate.new_blocks[0].block.metadata! as StacksBlockMetadata;
         let currentBitcoinBlockHeight = metadata.bitcoin_anchor_block_identifier.index;
-        console.log(currentBitcoinBlockHeight);
         if (currentBitcoinBlockHeight >= minBitcoinBlockHeight) {
           return chainUpdate;
         }
