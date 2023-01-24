@@ -181,6 +181,7 @@ pub async fn process_notification(
                 });
 
                 editor_state.try_write(|es| {
+                    es.get_costs(&contract_location);
                     es.insert_active_contract(
                         contract_location.clone(),
                         clarity_version,
@@ -234,8 +235,10 @@ pub async fn process_notification(
                         };
                     })?;
 
-                    let (aggregated_diagnostics, notification) =
-                        editor_state.try_read(|es| es.get_aggregated_diagnostics())?;
+                    let (aggregated_diagnostics, notification) = editor_state.try_read(|es| {
+                        es.get_costs(&contract_location);
+                        es.get_aggregated_diagnostics()
+                    })?;
                     return Ok(LspNotificationResponse {
                         aggregated_diagnostics,
                         notification,

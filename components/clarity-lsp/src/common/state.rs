@@ -1,4 +1,5 @@
 use crate::common::requests::completion::check_if_should_wrap;
+use crate::utils::log;
 use chainhook_types::StacksNetwork;
 use clarinet_deployments::{
     generate_default_deployment, initiate_session_from_deployment,
@@ -7,15 +8,19 @@ use clarinet_deployments::{
 use clarinet_files::ProjectManifest;
 use clarinet_files::{FileAccessor, FileLocation};
 use clarity_repl::analysis::ast_dependency_detector::DependencySet;
-use clarity_repl::clarity::analysis::ContractAnalysis;
+use clarity_repl::clarity::analysis::{run_analysis, AnalysisDatabase, ContractAnalysis};
 use clarity_repl::clarity::ast::{build_ast_with_rules, ASTRules};
+use clarity_repl::clarity::consts::CHAIN_ID_TESTNET;
+use clarity_repl::clarity::costs::LimitedCostTracker;
+use clarity_repl::clarity::database::ClarityDatabase;
 use clarity_repl::clarity::diagnostic::{Diagnostic as ClarityDiagnostic, Level as ClarityLevel};
 use clarity_repl::clarity::stacks_common::types::StacksEpochId;
 use clarity_repl::clarity::vm::ast::ContractAST;
 use clarity_repl::clarity::vm::types::{QualifiedContractIdentifier, StandardPrincipalData};
 use clarity_repl::clarity::vm::EvaluationResult;
 use clarity_repl::clarity::{ClarityName, ClarityVersion, SymbolicExpression};
-use clarity_repl::repl::{ContractDeployer, DEFAULT_CLARITY_VERSION};
+use clarity_repl::repl::interpreter::BLOCK_LIMIT_MAINNET;
+use clarity_repl::repl::{ContractDeployer, Session, DEFAULT_CLARITY_VERSION, DEFAULT_EPOCH};
 use lsp_types::{
     CompletionItem, DocumentSymbol, Hover, Location, MessageType, Position, Range, SignatureHelp,
     Url,
@@ -545,12 +550,158 @@ impl EditorState {
         contract_state.update_sources(source, with_definitions);
         Ok(())
     }
+
+    pub fn get_costs(&self, contract_location: &FileLocation) {
+        let some_protocol = self
+            .contracts_lookup
+            .get(&contract_location)
+            .and_then(|c| self.protocols.get(&c.manifest_location))
+            .and_then(|p| Some((p.contracts.get(contract_location)?, p.session.clone()?)));
+        if let Some((contract, mut session)) = some_protocol {
+            let mut ds = session.interpreter.datastore.clone();
+            let mut analysis_db = AnalysisDatabase::new(&mut ds);
+
+            let mut conn = ClarityDatabase::new(
+                &mut session.interpreter.datastore,
+                &session.interpreter.burn_datastore,
+                &session.interpreter.burn_datastore,
+            );
+
+            let cost_tracker = LimitedCostTracker::new(
+                false,
+                CHAIN_ID_TESTNET,
+                BLOCK_LIMIT_MAINNET.clone(),
+                &mut conn,
+                DEFAULT_EPOCH,
+            )
+            .expect("failed to initialize cost tracker");
+
+            if let Some(analysis) = &contract.analysis {
+                let mut expression = analysis.expressions.clone();
+
+                // let mut last_expr = [expression.last().unwrap().clone()];
+                // log!("> last_expr: {:?}", &last_expr);
+                let result = run_analysis(
+                    &contract.contract_id,
+                    &mut expression,
+                    &mut analysis_db,
+                    false,
+                    cost_tracker,
+                    DEFAULT_EPOCH,
+                    contract.clarity_version,
+                );
+                if let Ok(r) = result {
+                    if let Some(cost_track) = r.cost_track {
+                        log!("> cost_track: {:#?}", &cost_track.get_total());
+                    }
+                }
+            }
+        };
+    }
+}
+
+#[cfg(test)]
+mod costs_tests {
+    use clarity_repl::clarity::analysis::run_analysis;
+    use clarity_repl::clarity::analysis::type_checker::v2_1::TypeChecker;
+    use clarity_repl::clarity::analysis::AnalysisPass;
+    use clarity_repl::clarity::stacks_common::types::StacksEpochId;
+    use clarity_repl::{
+        clarity::{
+            analysis::AnalysisDatabase,
+            ast::{build_ast_with_rules, ASTRules},
+            consts::CHAIN_ID_TESTNET,
+            costs::LimitedCostTracker,
+            database::ClarityDatabase,
+            vm::types::QualifiedContractIdentifier,
+            ClarityVersion, SymbolicExpression,
+        },
+        repl::{interpreter::BLOCK_LIMIT_MAINNET, Session, SessionSettings},
+    };
+
+    use crate::utils::log;
+
+    fn get_ast(source: &str) -> Vec<SymbolicExpression> {
+        let contract_ast = build_ast_with_rules(
+            &QualifiedContractIdentifier::transient(),
+            source,
+            &mut (),
+            ClarityVersion::Clarity2,
+            StacksEpochId::Epoch21,
+            ASTRules::PrecheckSize,
+        )
+        .unwrap();
+
+        return contract_ast.expressions;
+    }
+
+    #[test]
+    fn test_cost() {
+        let mut settings = SessionSettings::default();
+        settings.include_boot_contracts = vec![
+            "costs".into(),
+            "costs-2".into(),
+            "costs-3".into(),
+            "cost-voting".into(),
+        ];
+        let mut session = Session::new(settings);
+        session.load_boot_contracts();
+
+        let mut ds = session.interpreter.datastore.clone();
+        let mut analysis_db = AnalysisDatabase::new(&mut ds);
+
+        let mut conn = ClarityDatabase::new(
+            &mut session.interpreter.datastore,
+            &session.interpreter.burn_datastore,
+            &session.interpreter.burn_datastore,
+        );
+
+        let pristine_cost_tracker = LimitedCostTracker::new(
+            false,
+            CHAIN_ID_TESTNET,
+            BLOCK_LIMIT_MAINNET.clone(),
+            &mut conn,
+            StacksEpochId::Epoch21,
+        )
+        .expect("failed to initialize cost tracker");
+
+        let mut expressions = get_ast("(define-data-var counter uint u0) (define-public (get-counter) (ok (var-get counter))) (begin (var-get counter))");
+
+        // Analysis 1 will build the context
+        let mut contract_analysis = run_analysis(
+            &QualifiedContractIdentifier::transient(),
+            &mut expressions,
+            &mut analysis_db,
+            false,
+            pristine_cost_tracker.clone(),
+            StacksEpochId::Epoch21,
+            ClarityVersion::Clarity2,
+        )
+        .unwrap();
+
+        let costs_from_initial_analysis = contract_analysis.cost_track.take().unwrap();
+        log!("Initial costs - {:#?}", costs_from_initial_analysis);
+
+        // Subsequent "micro" analysis, reusing the prior ContractAnalysis
+        contract_analysis.replace_contract_cost_tracker(pristine_cost_tracker);
+        contract_analysis.expressions = vec![expressions.last().unwrap().clone()];
+
+        log!("{:?}", contract_analysis.expressions);
+
+        let _ = analysis_db.execute(|db| {
+            TypeChecker::run_pass(&StacksEpochId::Epoch21, &mut contract_analysis, db)
+        });
+
+        let costs_from_initial_analysis = contract_analysis.cost_track.take().unwrap();
+        log!("New costs: {:#?}", costs_from_initial_analysis);
+    }
 }
 
 #[derive(Clone, Default, Debug)]
 pub struct ProtocolState {
     contracts: HashMap<FileLocation, ContractState>,
     locations_lookup: HashMap<QualifiedContractIdentifier, FileLocation>,
+    session: Option<Session>,
 }
 
 impl ProtocolState {
@@ -566,7 +717,9 @@ impl ProtocolState {
         diags: &mut HashMap<QualifiedContractIdentifier, Vec<ClarityDiagnostic>>,
         definitions: &mut HashMap<QualifiedContractIdentifier, HashMap<ClarityName, Range>>,
         analyses: &mut HashMap<QualifiedContractIdentifier, Option<ContractAnalysis>>,
+        session: Session,
     ) {
+        self.session = Some(session);
         // Remove old paths
         // TODO(lgalabru)
 
@@ -679,7 +832,6 @@ pub async fn build_state(
                 if let Some(entry) = artifacts.diags.get_mut(&contract_id) {
                     entry.append(&mut execution_result.diagnostics);
                 }
-
                 match execution_result.result {
                     EvaluationResult::Contract(contract_result) => {
                         if let Some(ast) = artifacts.asts.get(&contract_id) {
@@ -710,6 +862,7 @@ pub async fn build_state(
         &mut artifacts.diags,
         &mut definitions,
         &mut analyses,
+        session,
     );
 
     Ok(())
