@@ -922,11 +922,9 @@ pub fn start_node(mut config: Config, ctx: Context) {
                 match chainhook {
                     ChainhookSpecification::Stacks(stacks_hook) => {
                         // Retrieve highest block height stored
-                        let tip_height: u64 = redis_con
-                            .get(&format!("stx:tip"))
-                            .expect("unable to retrieve tip height");
+                        let tip_height: u64 = redis_con.get(&format!("stx:tip")).unwrap_or(1);
 
-                        let start_block = stacks_hook.start_block.unwrap_or(2); // TODO(lgalabru): handle STX hooks and genesis block :s
+                        let start_block = stacks_hook.start_block.unwrap_or(1); // TODO(lgalabru): handle STX hooks and genesis block :s
                         let end_block = stacks_hook.end_block.unwrap_or(tip_height); // TODO(lgalabru): handle STX hooks and genesis block :s
 
                         info!(
