@@ -13,6 +13,8 @@ on:
      - develop
     paths:
      - components/clarity-vscode
+     - components/clarinet-cli
+     - components/chainhook-event-observer
 
   workflow_dispatch:
 
