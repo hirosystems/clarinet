@@ -1,17 +1,18 @@
 [workspace]
 members = [
+    "components/chainhook-event-observer",
+    "components/chainhook-node",
+    "components/chainhook-types-rs",
     "components/clarinet-cli",
     "components/clarinet-deployments",
     "components/clarinet-files",
     "components/clarinet-utils",
-    "components/clarity-lsp",
     "components/clarity-jupyter-kernel",
-    "components/stacks-rpc-client",
+    "components/clarity-lsp",
+    "components/clarity-repl",
+    "components/hiro-system-kit",
     "components/stacks-devnet-js",
     "components/stacks-network",
-    "components/chainhook-types-rs",
-    "components/chainhook-event-observer",
-    "components/chainhook-node",
-    "components/hiro-system-kit",
+    "components/stacks-rpc-client",
 ]
 default-members = ["components/clarinet-cli", "components/chainhook-event-observer"]

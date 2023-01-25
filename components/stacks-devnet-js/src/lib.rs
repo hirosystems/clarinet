@@ -773,12 +773,21 @@ impl StacksDevnet {
             .this()
             .downcast_or_throw::<JsBox<StacksDevnet>, _>(&mut cx)?;
         let timeout = cx.argument::<JsNumber>(0)?.value(&mut cx) as u64;
+        let empty_queued_blocks = cx.argument::<JsBoolean>(1)?.value(&mut cx) as bool;
+
+        if empty_queued_blocks {
+            loop {
+                if devnet.stacks_block_rx.try_recv().is_err() {
+                    break;
+                }
+            }
+        }
 
         let _ = devnet.mining_tx.send(BitcoinMiningCommand::Mine);
 
         let blocks = match devnet
             .stacks_block_rx
-            .recv_timeout(std::time::Duration::from_secs(timeout))
+            .recv_timeout(std::time::Duration::from_millis(timeout))
         {
             Ok(obj) => obj,
             Err(_) => return Ok(cx.undefined().as_value(&mut cx)),

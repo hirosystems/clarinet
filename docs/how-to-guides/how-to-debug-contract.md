@@ -4,9 +4,9 @@ title: Debug Contract
 
 ## VS Code Debugger
 
-Clarinet supports the [Debug Adapter Protocol](https://microsoft.github.io/debug-adapter-protocol/) (DAP), which enables you to debug your smart contracts inside of Visual Studio Code (VS Code), or any code editor supporting the DAP protocol.
+Clarinet supports the [Debug Adapter Protocol](https://microsoft.github.io/debug-adapter-protocol/) (DAP), which enables you to debug your smart contracts inside of Visual Studio Code (VS Code) or any code editor supporting the DAP protocol.
 
-To set up a debug session, you will first need to create a `launch.json` file to tell VS Code what you want to debug.
+To set up a debug session, you will need to create a `launch.json` file to tell VS Code what you want to debug.
 The easiest way to accomplish this is to let VS Code generate the template for you by opening the "Run and Debug" view and clicking "create a launch.json file".
 
 ![Run and Debug View](../images/run-and-debug.png)
@@ -31,7 +31,7 @@ This will create the file `.vscode/launch.json` with the default template:
 }
 ```
 
-Depending on your needs, you will want to set the `name` field to whatever makes sense for your project, then set the `expression` to the Clarity expression that you would like to debug. In the case of the default example shown in the template above, the debugger would start executing the `bar` function of the `foo`  contract, passing the argument `42`. Once this file is configured, the debugger works as expected for any [VS Code debugging](https://code.visualstudio.com/docs/editor/debugging).
+Depending on your needs, you will want to set the `name` field to whatever makes sense for your project, then set the `expression` to the Clarity expression you would like to debug. In the case of the default example shown in the template above, the debugger would start executing the `bar` function of the `foo` contract, passing the argument `42`. Once this file is configured, the debugger works as expected for any [VS Code debugging](https://code.visualstudio.com/docs/editor/debugging).
 
 Execution begins paused at the first expression. The debug toolbar includes buttons to continue, 
 step over, step into, step out, restart, and stop, in that order.
@@ -42,11 +42,11 @@ Breakpoints can be set by clicking in the left gutter next to the code or using 
 
 ![breakpoint](../images/breakpoint.png)
 
-Data watchpoints may also be set, by clicking the "+" in the Watch section of the Debug sidebar and typing the contract variable to watch in the format `<principal>.<contract>.<name>`, or using the shortcut for a local contract, `.<contract>.<name>`. When a watchpoint is set on a contract variable, execution will pause when its value will change.
+Data watchpoints may also be set by clicking the  "+" in the Watch section of the Debug sidebar and typing the contract variable to watch in the format `<principal>.<contract>.<name>`, or using the shortcut for a local contract, `.<contract>.<name>`. When a watchpoint is set on a contract variable, execution will pause when its value changes.
 
 ![watchpoint](../images/watchpoint.png)
 
-During execution, the values of the current contract's variables, the current function's arguments, and any local variables (i.e. from a `let` expression) are shown in the sidebar. The current watchpoints are also shown with their current values. In both cases, the contents of a map are not shown but can be queried in the Debug Console. The call stack is also updated to show the call stack of the current execution.
+During execution, the values of the current contract's variables, the current function's arguments, and any local variables (i.e., from a `let` expression) are shown in the sidebar. The current watchpoints are also shown with their current values. In both cases, the contents of a map are not shown but can be queried in the Debug Console. The call stack is also updated to show the call stack of the current execution.
 
 ![view of the sidebar, showing variables, watchpoints, and call stack](../images/sidebar.png)
 

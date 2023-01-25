@@ -2,21 +2,18 @@
 title: Deploy Clarinet with Subnets
 ---
 
-Clarinet may be used for facilitating experimentation with [subnets](https://www.youtube.com/watch?v=PFPwuVCGGuI).
-To get started with subnets, in your `Devnet.toml`, enable the flag
+Clarinet may facilitate experimentation with [subnets](https://www.youtube.com/watch?v=PFPwuVCGGuI).
+To get started with subnets, enable the flag in your `Devnet.toml` by adding the configuration below.
 
 ```toml
 [devnet]
 # ...
 enable_subnet_node = true
 ```
-
-This same file can be used for customizing the subnet-node (miner, etc).
-
-When running the command below, Clarinet will spin up a subnet node.
+You can use the `Devnet.toml` to customize the subnet-node (miner, etc). 
+Spin up your subnet node with the command below.
 
 ```bash
 $ clarinet integrate
 ```
-
-More information on how to use and interact with this incoming L2 can be found on the [subnet repository](https://github.com/hirosystems/stacks-subnets).
+You can find more information on using and interacting with Subnets in the [subnets repository](https://github.com/hirosystems/stacks-subnets).

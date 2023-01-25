@@ -12,7 +12,7 @@ Clarinet.test({
             Tx.contractCall("counter", "increment", [types.uint(4)], wallet_1.address),
             Tx.contractCall("counter", "increment", [types.uint(10)], wallet_1.address)
         ]);
-        assertEquals(block.height, 2);
+        assertEquals(block.height, 3);
         block.receipts[0].result
             .expectOk()
             .expectUint(2);
@@ -30,7 +30,7 @@ Clarinet.test({
             Tx.transferSTX(1, wallet_2.address, wallet_1.address),
         ]);
 
-        assertEquals(block.height, 3);
+        assertEquals(block.height, 4);
         block.receipts[0].result
             .expectOk()
             .expectUint(17);
@@ -68,7 +68,7 @@ Clarinet.test({
             Tx.contractCall("counter", "increment", [types.uint(4)], wallet_1.address),
             Tx.contractCall("counter", "increment", [types.uint(10)], wallet_1.address)
         ]);
-        assertEquals(block.height, 102);
+        assertEquals(block.height, 103);
         block.receipts[0].result
             .expectOk()
             .expectUint(2);
