@@ -14,7 +14,13 @@ const {
 } = require("../native/index.node");
 import {
   BitcoinChainUpdate,
+  Block,
+  StacksBlockMetadata,
+  StacksBlockUpdate,
   StacksChainUpdate,
+  StacksTransaction,
+  StacksTransactionMetadata,
+  Transaction,
 } from "@hirosystems/chainhook-types";
 export * from "@hirosystems/chainhook-types";
 
@@ -101,6 +107,12 @@ export interface PoxStackingOrder {
  */
 export interface DevnetConfig {
   /**
+   * Optional name
+   * @type {string}
+   * @memberof DevnetConfig
+   */
+  name?: string;
+  /**
    * Optional network id
    * @type {number}
    * @memberof DevnetConfig
@@ -174,13 +186,19 @@ export interface DevnetConfig {
   stacks_explorer_port?: number;
   /**
    * Bind bitcoind and stacks-node data volumes (false by default)
-   * @type {number}
+   * @type {boolean}
    * @memberof DevnetConfig
    */
   bind_containers_volumes?: boolean;
   /**
+   * Have the containers communicating through the gateway (false by default, required for certain docker setup)
+   * @type {boolean}
+   * @memberof DevnetConfig
+   */
+  use_docker_gateway_routing?: boolean;
+  /**
    * Disable Bitcoin automining
-   * @type {number}
+   * @type {boolean}
    * @memberof DevnetConfig
    */
   bitcoin_controller_automining_disabled?: boolean;
@@ -426,13 +444,14 @@ export class DevnetNetworkOrchestrator {
   handle: any;
   lastCooldownEndedAt: Date;
   defaultCooldown: number;
+  currentCooldown: number;
 
   /**
    * @summary Construct a new DevnetNetworkOrchestrator
    * @param {NetworkConfig} manifest
    * @memberof DevnetNetworkOrchestrator
    */
-  constructor(config: NetworkConfig, defaultCooldown = 3000) {
+  constructor(config: NetworkConfig, defaultCooldown = 4000) {
     let manifestPath = config.clarinetManifestPath!;
     var logs = config.logs;
     logs ||= false;
@@ -443,13 +462,14 @@ export class DevnetNetworkOrchestrator {
     this.handle = stacksDevnetNew(manifestPath, logs, accounts, devnet);
     this.lastCooldownEndedAt = new Date();
     this.defaultCooldown = defaultCooldown;
+    this.currentCooldown = defaultCooldown;
   }
 
   /**
    * @summary Start orchestrating containers
    * @memberof DevnetNetworkOrchestrator
    */
-  start(timeout: number = 600, emptyBuffer: boolean = true) {
+  start(timeout: number = 60, emptyBuffer: boolean = true) {
     return stacksDevnetStart.call(this.handle, timeout, emptyBuffer);
   }
 
@@ -493,39 +513,131 @@ export class DevnetNetworkOrchestrator {
     return stacksDevnetGetBitcoinExplorerUrl.call(this.handle);
   }
 
+  /**
+   * @summary Wait for the next Stacks block
+   * @memberof DevnetNetworkOrchestrator
+   */
+  async waitForNextStacksBlock(maxErrors = 5, emptyQueuedBlocks = false): Promise<StacksChainUpdate> {
+    let errorCount = 0;
+    while (true) {
+      try {
+        let chainUpdate = await this.mineBitcoinBlockAndHopeForStacksBlock(emptyQueuedBlocks);
+        if (chainUpdate == undefined) {
+          this.currentCooldown += this.defaultCooldown;
+          errorCount += 1;
+          if (errorCount >= maxErrors) {
+            throw 'waitForNextStacksBlock maxErrors reached'
+          }
+          continue;
+        }
+        this.currentCooldown = this.defaultCooldown;
+        return chainUpdate;
+      } catch (error) {
+        errorCount += 1;
+        if (errorCount >= maxErrors) {
+          throw error;
+        }
+      }
+    }
+  }
 
   /**
    * @summary Wait for the next Stacks block
    * @memberof DevnetNetworkOrchestrator
    */
-  async waitForStacksBlock(): Promise<StacksChainUpdate> {
+  async mineBitcoinBlockAndHopeForStacksBlock(emptyQueuedBlocks = false): Promise<StacksChainUpdate | undefined> {
     let now = new Date();
     let ms_elapsed = (now.getTime() - this.lastCooldownEndedAt.getTime());
-    let cooldown = Math.max(0, this.defaultCooldown - ms_elapsed);
+    let cooldown = Math.max(0, this.currentCooldown - ms_elapsed);
     let wait = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
-    this.lastCooldownEndedAt = now
     return wait(cooldown)
       .then(() => {
         this.lastCooldownEndedAt = new Date();
-        return stacksDevnetWaitForStacksBlock.call(this.handle)
+        return stacksDevnetWaitForStacksBlock.call(this.handle, this.currentCooldown, emptyQueuedBlocks)
+      })
+      .catch(e => {
+        this.lastCooldownEndedAt = new Date();
+        throw e
       });
+  }
+
+  /**
+   * @summary Wait for the next Stacks block
+   * @memberof DevnetNetworkOrchestrator
+   */
+  async waitForStacksBlockOfHeight(targetBlockHeight: number, maxErrors = 5, emptyQueuedBlocks = false): Promise<StacksChainUpdate> {
+    while (true) {
+      try {
+        let chainUpdate = await this.waitForNextStacksBlock(maxErrors, emptyQueuedBlocks);
+        let currentBlockHeight = chainUpdate.new_blocks[0].block.block_identifier.index;
+        if (currentBlockHeight >= targetBlockHeight) {
+          return chainUpdate;
+        }
+      } catch (error) {
+        throw error;
+      }
+    }
+  }
+
+  /**
+   * @summary Wait for the next Stacks block
+   * @memberof DevnetNetworkOrchestrator
+   */
+  async waitForStacksBlockAnchoredOnBitcoinBlockOfHeight(minBitcoinBlockHeight: number, maxErrors = 5, emptyQueuedBlocks = false): Promise<StacksChainUpdate> {
+    while (true) {
+      try {
+        let chainUpdate = await this.waitForNextStacksBlock(maxErrors, emptyQueuedBlocks);
+        let metadata = chainUpdate.new_blocks[0].block.metadata! as StacksBlockMetadata;
+        let currentBitcoinBlockHeight = metadata.bitcoin_anchor_block_identifier.index;
+        if (currentBitcoinBlockHeight >= minBitcoinBlockHeight) {
+          return chainUpdate;
+        }
+      } catch (error) {
+        throw error;
+      }
+    }
   }
 
   /**
    * @summary Wait for the next Bitcoin block
    * @memberof DevnetNetworkOrchestrator
    */
-  async waitForBitcoinBlock(): Promise<BitcoinChainUpdate> {
+  async waitForNextBitcoinBlock(): Promise<BitcoinChainUpdate> {
     let now = new Date();
     let ms_elapsed = (now.getTime() - this.lastCooldownEndedAt.getTime());
-    let cooldown = Math.max(0, this.defaultCooldown - ms_elapsed);
+    let cooldown = Math.max(0, this.currentCooldown - ms_elapsed);
     let wait = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
     return wait(cooldown)
       .then(() => {
         this.lastCooldownEndedAt = new Date();
         return stacksDevnetWaitForBitcoinBlock.call(this.handle)
+      })     
+      .catch(e => {
+        this.lastCooldownEndedAt = new Date();
+        throw e
       });
   }
+
+
+  /**
+   * @summary Wait for the next Bitcoin block
+   * @memberof DevnetNetworkOrchestrator
+   */
+  async waitForStacksBlockIncludingTransaction(txid: string, ttl = 5): Promise<{ chainUpdate: StacksChainUpdate, transaction: Transaction }> {
+    while (ttl > 0) {
+      let chainUpdate = await this.waitForNextStacksBlock();
+      for (const transaction of chainUpdate.new_blocks[0].block.transactions) {
+        if (transaction.transaction_identifier.hash.endsWith(txid)) {
+          return {
+            chainUpdate,
+            transaction,
+          };
+        }
+      }
+      ttl -= 1;
+    }
+    throw 'waitForStacksBlockIncludingTransaction TTL expired'
+  };
 
   /**
    * @summary Terminates the containers

@@ -60,7 +60,7 @@ pub fn read_deployment_or_generate_default(
 struct StacksDevnet {
     tx: mpsc::Sender<DevnetCommand>,
     termination_rx: mpsc::Receiver<bool>,
-    devnet_ready_rx: mpsc::Receiver<bool>,
+    devnet_ready_rx: mpsc::Receiver<Result<(), String>>,
     mining_tx: mpsc::Sender<BitcoinMiningCommand>,
     bitcoin_block_rx: mpsc::Receiver<BitcoinChainUpdatedWithBlocksData>,
     stacks_block_rx: mpsc::Receiver<StacksChainUpdatedWithBlocksData>,
@@ -89,8 +89,9 @@ impl StacksDevnet {
     where
         C: Context<'a>,
     {
+        let network_id = devnet_overrides.network_id.clone();
         let (tx, rx) = mpsc::channel::<DevnetCommand>();
-        let (devnet_ready_tx, devnet_ready_rx) = mpsc::channel::<bool>();
+        let (devnet_ready_tx, devnet_ready_rx) = mpsc::channel::<_>();
         let (meta_devnet_command_tx, meta_devnet_command_rx) = mpsc::channel();
         let (termination_tx, termination_rx) = mpsc::channel();
 
@@ -237,16 +238,24 @@ impl StacksDevnet {
                         }
                         DevnetEvent::Log(log) => {
                             if logs_enabled {
-                                println!("{:?}", log);
+                                println!(
+                                    "{} {}",
+                                    log,
+                                    match network_id {
+                                        Some(network_id) => format!("(network #{})", network_id),
+                                        None => "".into(),
+                                    }
+                                );
                             }
                         }
                         DevnetEvent::BootCompleted(mining_tx) => {
                             let _ = meta_mining_command_tx.send(mining_tx);
-                            let _ = devnet_ready_tx.send(true);
+                            let _ = devnet_ready_tx.send(Ok(()));
                         }
                         DevnetEvent::FatalError(error) => {
+                            let _ = devnet_ready_tx.send(Err(error.clone()));
                             if logs_enabled {
-                                println!("{:?}", error);
+                                println!("[erro] {}", error);
                             }
                             break;
                         }
@@ -255,16 +264,6 @@ impl StacksDevnet {
                 }
             }
         });
-
-        // Bitcoin mining command relaying - threading model 1
-        // Keeping this model around, for eventual future usage
-        // thread::spawn(move || {
-        //     if let Ok(ref mining_tx) = meta_mining_command_rx.recv() {
-        //         while let Ok(command) = relaying_mining_rx.recv() {
-        //             let _ = mining_tx.send(command);
-        //         }
-        //     }
-        // });
 
         // Bitcoin mining command relaying - threading model 2
         thread::spawn(move || {
@@ -296,16 +295,13 @@ impl StacksDevnet {
         }
     }
 
-    fn start(&self, timeout: u64, empty_buffer: bool) -> Result<bool, mpsc::RecvTimeoutError> {
+    fn start(&self, timeout: u64, _empty_buffer: bool) -> Result<bool, String> {
         let _ = self.tx.send(DevnetCommand::Start(None));
-        let res = self
+        let _ = self
             .devnet_ready_rx
-            .recv_timeout(std::time::Duration::from_secs(timeout));
-        if empty_buffer && res.is_ok() {
-            while let Ok(_) = self.stacks_block_rx.try_recv() {}
-            while let Ok(_) = self.bitcoin_block_rx.try_recv() {}
-        }
-        res
+            .recv_timeout(std::time::Duration::from_secs(timeout))
+            .map_err(|e| format!("broken channel: {}", e.to_string()))??;
+        Ok(true)
     }
 }
 
@@ -380,6 +376,13 @@ impl StacksDevnet {
         }
 
         let mut overrides = DevnetConfigFile::default();
+
+        if let Ok(res) = devnet_settings
+            .get(&mut cx, "name")?
+            .downcast::<JsString, _>(&mut cx)
+        {
+            overrides.name = Some(res.value(&mut cx));
+        }
 
         if let Ok(res) = devnet_settings
             .get(&mut cx, "network_id")?
@@ -587,6 +590,13 @@ impl StacksDevnet {
         }
 
         if let Ok(res) = devnet_settings
+            .get(&mut cx, "use_docker_gateway_routing")?
+            .downcast::<JsBoolean, _>(&mut cx)
+        {
+            overrides.use_docker_gateway_routing = Some(res.value(&mut cx));
+        }
+
+        if let Ok(res) = devnet_settings
             .get(&mut cx, "epoch_2_0")?
             .downcast::<JsNumber, _>(&mut cx)
         {
@@ -762,12 +772,22 @@ impl StacksDevnet {
         let devnet = cx
             .this()
             .downcast_or_throw::<JsBox<StacksDevnet>, _>(&mut cx)?;
+        let timeout = cx.argument::<JsNumber>(0)?.value(&mut cx) as u64;
+        let empty_queued_blocks = cx.argument::<JsBoolean>(1)?.value(&mut cx) as bool;
+
+        if empty_queued_blocks {
+            loop {
+                if devnet.stacks_block_rx.try_recv().is_err() {
+                    break;
+                }
+            }
+        }
 
         let _ = devnet.mining_tx.send(BitcoinMiningCommand::Mine);
 
         let blocks = match devnet
             .stacks_block_rx
-            .recv_timeout(std::time::Duration::from_secs(5))
+            .recv_timeout(std::time::Duration::from_millis(timeout))
         {
             Ok(obj) => obj,
             Err(_) => return Ok(cx.undefined().as_value(&mut cx)),
@@ -787,7 +807,7 @@ impl StacksDevnet {
 
         let block = match devnet
             .bitcoin_block_rx
-            .recv_timeout(std::time::Duration::from_secs(5))
+            .recv_timeout(std::time::Duration::from_secs(10))
         {
             Ok(obj) => obj,
             Err(_) => return Ok(cx.undefined().as_value(&mut cx)),

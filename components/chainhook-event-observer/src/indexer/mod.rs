@@ -2,6 +2,7 @@ pub mod bitcoin;
 pub mod stacks;
 
 use crate::utils::{AbstractBlock, Context};
+use bitcoincore_rpc::bitcoin::Block;
 use chainhook_types::{
     BitcoinChainEvent, BitcoinNetwork, BlockIdentifier, StacksChainEvent, StacksNetwork,
 };
@@ -65,26 +66,13 @@ impl Indexer {
 
     pub fn handle_bitcoin_block(
         &mut self,
-        marshalled_block: JsonValue,
+        block_height: u64,
+        block: Block,
         ctx: &Context,
     ) -> Result<Option<BitcoinChainEvent>, String> {
-        let block = bitcoin::standardize_bitcoin_block(&self.config, marshalled_block, ctx)?;
+        let block = bitcoin::standardize_bitcoin_block(&self.config, block_height, block, ctx)?;
         let event = self.bitcoin_blocks_pool.process_block(block, ctx);
         event
-    }
-
-    pub fn handle_stacks_serialized_block(
-        &mut self,
-        serialized_block: &str,
-        ctx: &Context,
-    ) -> Result<Option<StacksChainEvent>, String> {
-        let block = stacks::standardize_stacks_serialized_block(
-            &self.config,
-            serialized_block,
-            &mut self.stacks_context,
-            ctx,
-        )?;
-        self.stacks_blocks_pool.process_block(block, ctx)
     }
 
     pub fn handle_stacks_marshalled_block(
@@ -229,8 +217,7 @@ impl ChainSegment {
         Err(ChainSegmentIncompatibility::Unknown)
     }
 
-    fn get_block_id(&self, block_id: &BlockIdentifier, ctx: &Context) -> Option<&BlockIdentifier> {
-        ctx.try_log(|logger| slog::info!(logger, "=> {}", self.get_relative_index(block_id)));
+    fn get_block_id(&self, block_id: &BlockIdentifier, _ctx: &Context) -> Option<&BlockIdentifier> {
         match self.block_ids.get(self.get_relative_index(block_id)) {
             Some(res) => Some(res),
             None => None,

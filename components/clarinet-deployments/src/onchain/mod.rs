@@ -717,17 +717,20 @@ pub fn apply_on_chain_deployment(
     // Phase 2: we submit all the transactions previously encoded,
     // and wait for their inclusion in a block before moving to the next batch.
     let mut current_block_height = 0;
+    let mut current_bitcoin_block_height = 0;
     for (epoch, batch) in batches.into_iter() {
         if network == StacksNetwork::Devnet {
             // Devnet only: ensure we've reached the appropriate epoch for this batch
-            let after_block = match epoch {
+            let after_bitcoin_block = match epoch {
                 EpochSpec::Epoch2_0 => network_manifest.devnet.as_ref().unwrap().epoch_2_0,
                 EpochSpec::Epoch2_05 => network_manifest.devnet.as_ref().unwrap().epoch_2_05,
                 EpochSpec::Epoch2_1 => network_manifest.devnet.as_ref().unwrap().epoch_2_1,
             };
+            let mut epoch_transition_successful =
+                current_bitcoin_block_height > after_bitcoin_block;
 
-            while current_block_height < after_block {
-                let new_block_height = match stacks_rpc.get_info() {
+            while !epoch_transition_successful {
+                let (bitcoin_block_tip, stacks_block_tip) = match stacks_rpc.get_info() {
                     Ok(info) => {
                         if info.stacks_tip_height == 0 {
                             // Always loop if we have not yet seen the genesis block.
@@ -736,9 +739,9 @@ pub fn apply_on_chain_deployment(
                             ));
                             continue;
                         }
-                        info.burn_block_height
+                        (info.burn_block_height, info.stacks_tip_height)
                     }
-                    Err(e) => {
+                    Err(_e) => {
                         std::thread::sleep(std::time::Duration::from_secs(
                             delay_between_checks.into(),
                         ));
@@ -746,14 +749,29 @@ pub fn apply_on_chain_deployment(
                     }
                 };
 
-                // If no block has been mined since `delay_between_checks`,
+                // If no bitcoin block has been mined since `delay_between_checks`,
                 // avoid flooding the stacks-node with status update requests.
-                if new_block_height <= current_block_height {
+                if bitcoin_block_tip <= current_bitcoin_block_height {
                     std::thread::sleep(std::time::Duration::from_secs(delay_between_checks.into()));
                     continue;
                 }
 
-                current_block_height = new_block_height;
+                current_bitcoin_block_height = bitcoin_block_tip;
+
+                // If no stacks block has been mined despite the new bitcoin block,
+                // avoid flooding the stacks-node with status update requests.
+                if stacks_block_tip <= current_block_height {
+                    std::thread::sleep(std::time::Duration::from_secs(delay_between_checks.into()));
+                    continue;
+                }
+
+                current_block_height = stacks_block_tip;
+
+                if current_bitcoin_block_height > after_bitcoin_block {
+                    epoch_transition_successful = true;
+                } else {
+                    std::thread::sleep(std::time::Duration::from_secs(delay_between_checks.into()));
+                }
             }
         }
 
@@ -784,8 +802,8 @@ pub fn apply_on_chain_deployment(
         }
 
         loop {
-            let new_block_height = match stacks_rpc.get_info() {
-                Ok(info) => info.burn_block_height,
+            let (burn_block_height, stacks_tip_height) = match stacks_rpc.get_info() {
+                Ok(info) => (info.burn_block_height, info.stacks_tip_height),
                 _ => {
                     std::thread::sleep(std::time::Duration::from_secs(delay_between_checks.into()));
                     continue;
@@ -794,12 +812,13 @@ pub fn apply_on_chain_deployment(
 
             // If no block has been mined since `delay_between_checks`,
             // avoid flooding the stacks-node with status update requests.
-            if new_block_height <= current_block_height {
+            if burn_block_height <= current_bitcoin_block_height {
                 std::thread::sleep(std::time::Duration::from_secs(delay_between_checks.into()));
                 continue;
             }
 
-            current_block_height = new_block_height;
+            current_bitcoin_block_height = burn_block_height;
+            current_block_height = stacks_tip_height;
 
             let mut keep_looping = false;
 

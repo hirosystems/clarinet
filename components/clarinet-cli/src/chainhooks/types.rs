@@ -151,6 +151,7 @@ impl ChainhookSpecificationFile {
 
         Ok(BitcoinChainhookSpecification {
             uuid: format!("{}", self.id.unwrap_or(1)),
+            owner_uuid: None,
             version: self.version.unwrap_or(1),
             name: self.name.to_string(),
             network: network.clone(),
@@ -179,6 +180,7 @@ impl ChainhookSpecificationFile {
 
         Ok(StacksChainhookSpecification {
             uuid: format!("{}", self.id.unwrap_or(1)),
+            owner_uuid: None,
             version: self.version.unwrap_or(1),
             name: self.name.to_string(),
             network: network.clone(),

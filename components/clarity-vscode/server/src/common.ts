@@ -1,5 +1,4 @@
 import {
-  CompletionRequest,
   DidOpenTextDocumentParams,
   DidCloseTextDocumentNotification,
   DidOpenTextDocumentNotification,
@@ -7,8 +6,8 @@ import {
 } from "vscode-languageserver";
 import type { Connection } from "vscode-languageserver";
 
-// this type is the same for the browser and node but node isn't alwasy built in dev
-import type { LspVscodeBridge } from "./clarity-lsp-browser/lsp-browser";
+// this type is the same for the browser and node but node isn't always built in dev
+import { LspVscodeBridge } from "./clarity-lsp-browser/lsp-browser";
 
 const VALID_PROTOCOLS = ["file", "vscode-vfs", "vscode-test-web"];
 
@@ -16,9 +15,17 @@ export function initConnection(
   connection: Connection,
   bridge: LspVscodeBridge,
 ) {
-  connection.onInitialize((params) =>
-    bridge.onRequest(InitializeRequest.method, params),
-  );
+  let initializationOptions: { [key: string]: any } = {};
+  connection.onInitialize((params) => {
+    try {
+      initializationOptions = JSON.parse(params.initializationOptions);
+    } catch (err) {
+      console.error("Invalid initialization options");
+      throw err;
+    }
+
+    return bridge.onRequest(InitializeRequest.method, params);
+  });
 
   const notifications: [string, unknown][] = [];
   async function consumeNotification() {
@@ -51,16 +58,24 @@ export function initConnection(
     if (notifications.length === 1) consumeNotification();
   });
 
-  connection.onRequest(async (method: string, params: unknown) => {
-    return bridge.onRequest(method, params);
-  });
+  const ignoreMethodsLog = ["textDocument/documentSymbol"];
 
-  connection.onCompletion(async (params: unknown) => {
-    // notifications and requests are competing to get access to the editor_state_lock
-    // in the (occasional) event of a completion request happening while the server has
-    // notifications to handle, let's ignore the completion request
+  connection.onRequest((method: string, params: unknown) => {
     if (notifications.length > 0) return null;
-    return bridge.onRequest(CompletionRequest.method, params);
+
+    if (
+      !initializationOptions.debug?.logRequestsTimings ||
+      ignoreMethodsLog.includes(method)
+    ) {
+      return bridge.onRequest(method, params);
+    }
+
+    const id = Math.random().toString(16).slice(2, 18);
+    const label = `${method} (${id})`;
+    console.time(label);
+    const r = bridge.onRequest(method, params);
+    console.timeEnd(label);
+    return r;
   });
 
   connection.listen();

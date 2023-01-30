@@ -406,7 +406,7 @@ checksum = "0694ea59225b0c5f3cb405ff3f670e4828358ed26aec49dc352f730f0cb1a8a3"
 dependencies = [
  "bech32",
  "bitcoin_hashes 0.11.0",
- "secp256k1 0.24.2",
+ "secp256k1",
  "serde",
 ]
 
@@ -856,7 +856,7 @@ dependencies = [
 
 [[package]]
 name = "clarinet-cli"
-version = "1.2.0"
+version = "1.4.0"
 dependencies = [
  "aes 0.7.5",
  "ansi_term",
@@ -921,7 +921,7 @@ dependencies = [
  "log",
  "lzzzz",
  "mac_address",
- "mio 0.8.2",
+ "mio 0.8.5",
  "mitata",
  "netif",
  "nix 0.24.2",
@@ -1024,8 +1024,8 @@ dependencies = [
 
 [[package]]
 name = "clarity"
-version = "0.0.1"
-source = "git+https://github.com/stacks-network/stacks-blockchain.git?rev=601ac7a0b4ed3de027382a33560d079aaa337b4d#601ac7a0b4ed3de027382a33560d079aaa337b4d"
+version = "2.0.0"
+source = "git+https://github.com/stacks-network/stacks-blockchain.git?rev=eedba787a36d68213501337ba50d1856f41b869a#eedba787a36d68213501337ba50d1856f41b869a"
 dependencies = [
  "integer-sqrt",
  "lazy_static",
@@ -1088,6 +1088,7 @@ dependencies = [
  "js-sys",
  "lazy_static",
  "lsp-types",
+ "regex",
  "serde",
  "serde-wasm-bindgen",
  "serde_json",
@@ -1098,7 +1099,7 @@ dependencies = [
 
 [[package]]
 name = "clarity-repl"
-version = "1.2.0"
+version = "1.4.0"
 dependencies = [
  "ansi_term",
  "atty",
@@ -1399,7 +1400,7 @@ dependencies = [
  "bitflags",
  "crossterm_winapi",
  "libc",
- "mio 0.8.2",
+ "mio 0.8.5",
  "parking_lot 0.12.1",
  "signal-hook",
  "signal-hook-mio",
@@ -3720,16 +3721,14 @@ dependencies = [
 
 [[package]]
 name = "mio"
-version = "0.8.2"
+version = "0.8.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "52da4364ffb0e4fe33a9841a98a3f3014fb964045ce4f7a45a398243c8d6b0c9"
+checksum = "e5d732bc30207a6423068df043e3d02e0735b155ad7ce1a6f76fe2baa5b158de"
 dependencies = [
  "libc",
  "log",
- "miow",
- "ntapi",
  "wasi 0.11.0+wasi-snapshot-preview1",
- "winapi",
+ "windows-sys 0.42.0",
 ]
 
 [[package]]
@@ -4110,9 +4109,9 @@ checksum = "624a8340c38c1b80fd549087862da4ba43e08858af025b236e509b6649fc13d5"
 
 [[package]]
 name = "openssl"
-version = "0.10.44"
+version = "0.10.45"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "29d971fd5722fec23977260f6e81aa67d2f22cadbdc2aa049f1022d9a3be1566"
+checksum = "b102428fd03bc5edf97f62620f7298614c45cedf287c271e7ed450bbaf83f2e1"
 dependencies = [
  "bitflags",
  "cfg-if",
@@ -4142,9 +4141,9 @@ checksum = "ff011a302c396a5197692431fc1948019154afc178baf7d8e37367442a4601cf"
 
 [[package]]
 name = "openssl-sys"
-version = "0.9.79"
+version = "0.9.80"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5454462c0eced1e97f2ec09036abc8da362e66802f66fd20f86854d9d8cbcbc4"
+checksum = "23bbbf7854cd45b83958ebe919f0e8e516793727652e27fda10a8384cfc790b7"
 dependencies = [
  "autocfg 1.1.0",
  "cc",
@@ -4958,9 +4957,9 @@ dependencies = [
 
 [[package]]
 name = "regex"
-version = "1.5.6"
+version = "1.7.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d83f127d94bdbcda4c8cc2e50f6f84f4b611f69c902699ca385a39c3a75f9ff1"
+checksum = "48aaa5748ba571fb95cd2c85c09f629215d3a6ece942baa100950af03a34f733"
 dependencies = [
  "aho-corasick",
  "memchr",
@@ -5507,32 +5506,13 @@ dependencies = [
 
 [[package]]
 name = "secp256k1"
-version = "0.21.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9c42e6f1735c5f00f51e43e28d6634141f2bcad10931b2609ddd74a86d751260"
-dependencies = [
- "secp256k1-sys 0.4.2",
- "serde",
-]
-
-[[package]]
-name = "secp256k1"
 version = "0.24.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d9512ffd81e3a3503ed401f79c33168b9148c75038956039166cd750eaa037c3"
 dependencies = [
  "bitcoin_hashes 0.11.0",
- "secp256k1-sys 0.6.1",
+ "secp256k1-sys",
  "serde",
-]
-
-[[package]]
-name = "secp256k1-sys"
-version = "0.4.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "957da2573cde917463ece3570eab4a0b3f19de6f1646cde62e6fd3868f566036"
-dependencies = [
- "cc",
 ]
 
 [[package]]
@@ -5936,7 +5916,7 @@ checksum = "29ad2e15f37ec9a6cc544097b78a1ec90001e9f71b81338ca39f430adaca99af"
 dependencies = [
  "libc",
  "mio 0.7.14",
- "mio 0.8.2",
+ "mio 0.8.5",
  "signal-hook",
 ]
 
@@ -6132,7 +6112,7 @@ dependencies = [
 [[package]]
 name = "stacks-common"
 version = "0.0.1"
-source = "git+https://github.com/stacks-network/stacks-blockchain.git?rev=601ac7a0b4ed3de027382a33560d079aaa337b4d#601ac7a0b4ed3de027382a33560d079aaa337b4d"
+source = "git+https://github.com/stacks-network/stacks-blockchain.git?rev=eedba787a36d68213501337ba50d1856f41b869a#eedba787a36d68213501337ba50d1856f41b869a"
 dependencies = [
  "chrono",
  "curve25519-dalek",
@@ -6144,7 +6124,7 @@ dependencies = [
  "rand 0.7.3",
  "ripemd",
  "rusqlite",
- "secp256k1 0.21.3",
+ "secp256k1",
  "serde",
  "serde_derive",
  "serde_json",
@@ -6155,7 +6135,7 @@ dependencies = [
 
 [[package]]
 name = "stacks-devnet-js"
-version = "1.2.0"
+version = "1.4.0"
 dependencies = [
  "chainhook-types",
  "clarinet-deployments",
@@ -6172,7 +6152,7 @@ dependencies = [
 
 [[package]]
 name = "stacks-network"
-version = "0.1.0"
+version = "1.4.0"
 dependencies = [
  "base58 0.2.0",
  "bitcoin",
@@ -7077,22 +7057,22 @@ checksum = "cda74da7e1a664f795bb1f8a87ec406fb89a02522cf6e50620d016add6dbbf5c"
 
 [[package]]
 name = "tokio"
-version = "1.17.0"
+version = "1.24.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2af73ac49756f3f7c01172e34a23e5d0216f6c32333757c2c61feb2bbff5a5ee"
+checksum = "1d9f76183f91ecfb55e1d7d5602bd1d979e38a3a522fe900241cf195624d67ae"
 dependencies = [
+ "autocfg 1.1.0",
  "bytes",
  "libc",
  "memchr",
- "mio 0.8.2",
+ "mio 0.8.5",
  "num_cpus",
- "once_cell",
  "parking_lot 0.12.1",
  "pin-project-lite",
  "signal-hook-registry",
  "socket2",
  "tokio-macros",
- "winapi",
+ "windows-sys 0.42.0",
 ]
 
 [[package]]

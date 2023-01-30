@@ -12,6 +12,16 @@ function isValidInsight(data: InsightsData): data is InsightsData {
   return !!data && !!data.fnName && !!data.fnType && Array.isArray(data.fnArgs);
 }
 
+declare const __DEV_MODE__: boolean | undefined;
+
+function getConfig() {
+  const config = workspace.getConfiguration("clarity-lsp");
+  if (__DEV_MODE__) {
+    config.update("debug.logRequestsTimings", true);
+  }
+  return config;
+}
+
 export const clientOpts: LanguageClientOptions = {
   documentSelector: [{ language: "clarity" }, { language: "toml" }],
   diagnosticCollectionName: "Clarity LSP",
@@ -19,12 +29,8 @@ export const clientOpts: LanguageClientOptions = {
   traceOutputChannel: vscode.window.createOutputChannel(
     "Clarity Language Server Trace",
   ),
-  initializationOptions: JSON.stringify(
-    workspace.getConfiguration("clarity-lsp"),
-  ),
+  initializationOptions: JSON.stringify(getConfig()),
 };
-
-declare const __DEV_MODE__: boolean | undefined;
 
 export async function initClient(
   context: ExtensionContext,
@@ -40,7 +46,7 @@ export async function initClient(
     }
   }
 
-  let config = workspace.getConfiguration("clarity-lsp");
+  let config = getConfig();
 
   /* clarity insight webview */
   const insightsViewProvider = new InsightsViewProvider(context.extensionUri);
@@ -54,12 +60,17 @@ export async function initClient(
 
   workspace.onDidChangeConfiguration(async () => {
     let requireReload = false;
-    let newConfig = workspace.getConfiguration("clarity-lsp");
-    ["completion", "hover", "documentSymbols", "goToDefinition"].forEach(
-      (k) => {
-        if (newConfig[k] !== config[k]) requireReload = true;
-      },
-    );
+    const newConfig = getConfig();
+    [
+      "completion",
+      "completionSmartParenthesisWrap",
+      "completionIncludeNativePlaceholders",
+      "hover",
+      "documentSymbols",
+      "goToDefinition",
+    ].forEach((k) => {
+      if (newConfig[k] !== config[k]) requireReload = true;
+    });
 
     config = newConfig;
 
@@ -118,7 +129,7 @@ export async function initClient(
       );
     }
   } catch (err) {
-    if (err.message === "worker timeout") {
+    if (err instanceof Error && err.message === "worker timeout") {
       vscode.window.showWarningMessage(
         "Clarity Language Server failed to start",
       );

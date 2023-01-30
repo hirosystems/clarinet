@@ -203,6 +203,17 @@ export class Chain {
     };
     return assetsMaps;
   }
+
+  switchEpoch(epoch: string): boolean {
+    const result = JSON.parse(
+      // @ts-ignore
+      Deno.core.opSync("api/v1/switch_epoch", {
+        sessionId: this.sessionId,
+        epoch: epoch,
+      })
+    );
+    return result;
+  }
 }
 
 type PreDeploymentFunction = (
@@ -790,6 +801,7 @@ Array.prototype.expectPrintEvent = function (contractIdentifier, value) {
   for (const event of this) {
     try {
       const { contract_event } = event;
+      if (!contract_event) continue;
       if (!contract_event.topic.endsWith("print")) continue;
       if (!contract_event.value.endsWith(value)) continue;
 
@@ -801,8 +813,7 @@ Array.prototype.expectPrintEvent = function (contractIdentifier, value) {
         topic: contract_event.topic,
         value: contract_event.value,
       };
-    } catch (error) {
-      console.warn(error);
+    } catch (_error) {
       continue;
     }
   }

@@ -16,15 +16,15 @@ use toml::value::Value;
 pub const DEFAULT_DERIVATION_PATH: &str = "m/44'/5757'/0'/0/0";
 pub const DEFAULT_BITCOIN_NODE_IMAGE: &str = "quay.io/hirosystems/bitcoind:devnet-v2";
 pub const DEFAULT_STACKS_NODE_IMAGE: &str = "quay.io/hirosystems/stacks-node:devnet-v2";
-pub const DEFAULT_STACKS_NODE_NEXT_IMAGE: &str = "quay.io/hirosystems/stacks-node:devnet-v3-beta2";
+pub const DEFAULT_STACKS_NODE_NEXT_IMAGE: &str = "quay.io/hirosystems/stacks-node:devnet-v3-beta4";
 pub const DEFAULT_BITCOIN_EXPLORER_IMAGE: &str = "quay.io/hirosystems/bitcoin-explorer:devnet";
 pub const DEFAULT_STACKS_API_IMAGE: &str = "hirosystems/stacks-blockchain-api:latest";
 pub const DEFAULT_STACKS_API_NEXT_IMAGE: &str = "hirosystems/stacks-blockchain-api:stacks-2.1";
 pub const DEFAULT_STACKS_EXPLORER_IMAGE: &str = "hirosystems/explorer:latest";
 pub const DEFAULT_STACKS_EXPLORER_NEXT_IMAGE: &str = "hirosystems/explorer:feat-stacks-2.1";
 pub const DEFAULT_POSTGRES_IMAGE: &str = "postgres:14";
-pub const DEFAULT_SUBNET_NODE_IMAGE: &str = "hirosystems/hyperchains:0.0.4-stretch";
-pub const DEFAULT_SUBNET_CONTRACT_ID: &str = "STXMJXCJDCT4WPF2X1HE42T6ZCCK3TPMBRZ51JEG.hc-alpha";
+pub const DEFAULT_SUBNET_NODE_IMAGE: &str = "hirosystems/subnet:0.1";
+pub const DEFAULT_SUBNET_CONTRACT_ID: &str = "STXMJXCJDCT4WPF2X1HE42T6ZCCK3TPMBRZ51JEG.subnet";
 pub const DEFAULT_STACKS_MINER_MNEMONIC: &str = "fragile loan twenty basic net assault jazz absorb diet talk art shock innocent float punch travel gadget embrace caught blossom hockey surround initial reduce";
 pub const DEFAULT_FAUCET_MNEMONIC: &str = "shadow private easily thought say logic fault paddle word top book during ignore notable orange flight clock image wealth health outside kitten belt reform";
 pub const DEFAULT_SUBNET_MNEMONIC: &str = "female adjust gallery certain visit token during great side clown fitness like hurt clip knife warm bench start reunion globe detail dream depend fortune";
@@ -59,6 +59,7 @@ pub struct NetworkConfigFile {
 
 #[derive(Serialize, Deserialize, Debug, Default)]
 pub struct DevnetConfigFile {
+    pub name: Option<String>,
     pub network_id: Option<u16>,
     pub orchestrator_port: Option<u16>,
     pub orchestrator_control_port: Option<u16>,
@@ -67,6 +68,9 @@ pub struct DevnetConfigFile {
     pub stacks_node_p2p_port: Option<u16>,
     pub stacks_node_rpc_port: Option<u16>,
     pub stacks_node_events_observers: Option<Vec<String>>,
+    pub stacks_node_wait_time_for_microblocks: Option<u32>,
+    pub stacks_node_first_attempt_time_ms: Option<u32>,
+    pub stacks_node_subsequent_attempt_time_ms: Option<u32>,
     pub stacks_node_env_vars: Option<Vec<String>>,
     pub stacks_api_env_vars: Option<Vec<String>>,
     pub stacks_explorer_env_vars: Option<Vec<String>>,
@@ -120,6 +124,7 @@ pub struct DevnetConfigFile {
     pub epoch_2_05: Option<u64>,
     pub epoch_2_1: Option<u64>,
     pub pox_2_activation: Option<u64>,
+    pub use_docker_gateway_routing: Option<bool>,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -164,6 +169,7 @@ pub struct NetworkConfig {
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct DevnetConfig {
+    pub name: String,
     pub network_id: Option<u16>,
     pub orchestrator_ingestion_port: u16,
     pub orchestrator_control_port: u16,
@@ -173,6 +179,9 @@ pub struct DevnetConfig {
     pub bitcoin_node_password: String,
     pub stacks_node_p2p_port: u16,
     pub stacks_node_rpc_port: u16,
+    pub stacks_node_wait_time_for_microblocks: u32,
+    pub stacks_node_first_attempt_time_ms: u32,
+    pub stacks_node_subsequent_attempt_time_ms: u32,
     pub stacks_node_events_observers: Vec<String>,
     pub stacks_node_env_vars: Vec<String>,
     pub stacks_api_port: u16,
@@ -235,6 +244,7 @@ pub struct DevnetConfig {
     pub epoch_2_05: u64,
     pub epoch_2_1: u64,
     pub pox_2_activation: u64,
+    pub use_docker_gateway_routing: bool,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -409,6 +419,10 @@ impl NetworkManifest {
             };
 
             if let Some(ref devnet_override) = devnet_override {
+                if let Some(ref val) = devnet_override.name {
+                    devnet_config.name = Some(val.clone());
+                }
+
                 if let Some(val) = devnet_override.orchestrator_port {
                     devnet_config.orchestrator_port = Some(val);
                 }
@@ -604,6 +618,10 @@ impl NetworkManifest {
                 if let Some(val) = devnet_override.network_id {
                     devnet_config.network_id = Some(val);
                 }
+
+                if let Some(val) = devnet_override.use_docker_gateway_routing {
+                    devnet_config.use_docker_gateway_routing = Some(val);
+                }
             };
 
             let now = clarity_repl::clarity::util::get_epoch_time_secs();
@@ -707,6 +725,7 @@ impl NetworkManifest {
             let enable_next_features = devnet_config.enable_next_features.unwrap_or(false);
 
             let mut config = DevnetConfig {
+                name: devnet_config.name.take().unwrap_or("devnet".into()),
                 network_id: devnet_config.network_id,
                 orchestrator_ingestion_port: devnet_config.orchestrator_port.unwrap_or(20445),
                 orchestrator_control_port: devnet_config.orchestrator_control_port.unwrap_or(20446),
@@ -729,6 +748,15 @@ impl NetworkManifest {
                 stacks_node_p2p_port: devnet_config.stacks_node_p2p_port.unwrap_or(20444),
                 stacks_node_rpc_port: devnet_config.stacks_node_rpc_port.unwrap_or(20443),
                 stacks_node_events_observers,
+                stacks_node_wait_time_for_microblocks: devnet_config
+                    .stacks_node_wait_time_for_microblocks
+                    .unwrap_or(50),
+                stacks_node_first_attempt_time_ms: devnet_config
+                    .stacks_node_first_attempt_time_ms
+                    .unwrap_or(500),
+                stacks_node_subsequent_attempt_time_ms: devnet_config
+                    .stacks_node_subsequent_attempt_time_ms
+                    .unwrap_or(1_000),
                 stacks_api_port: devnet_config.stacks_api_port.unwrap_or(3999),
                 stacks_api_events_port: devnet_config.stacks_api_events_port.unwrap_or(3700),
                 stacks_explorer_port: devnet_config.stacks_explorer_port.unwrap_or(8000),
@@ -849,6 +877,9 @@ impl NetworkManifest {
                     .take()
                     .unwrap_or(vec![]),
                 enable_next_features,
+                use_docker_gateway_routing: devnet_config
+                    .use_docker_gateway_routing
+                    .unwrap_or(false),
             };
             if !config.disable_stacks_api && config.disable_stacks_api {
                 config.disable_stacks_api = false;

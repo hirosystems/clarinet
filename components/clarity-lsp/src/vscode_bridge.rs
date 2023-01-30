@@ -1,12 +1,10 @@
 extern crate console_error_panic_hook;
 use crate::backend::{
-    process_notification, process_request, EditorStateInput, LspNotification, LspRequest,
-    LspRequestResponse,
+    process_mutating_request, process_notification, process_request, EditorStateInput,
+    LspNotification, LspRequest, LspRequestResponse,
 };
 use crate::state::EditorState;
-use crate::utils::{
-    clarity_diagnostics_to_lsp_type, get_contract_location, get_manifest_location, log,
-};
+use crate::utils::{clarity_diagnostics_to_lsp_type, get_contract_location, get_manifest_location};
 use clarinet_files::{FileAccessor, WASMFileSystemAccessor};
 use js_sys::{Function as JsFunction, Promise};
 use lsp_types::notification::{
@@ -15,21 +13,26 @@ use lsp_types::notification::{
 };
 use lsp_types::request::{
     Completion, DocumentSymbolRequest, GotoDefinition, HoverRequest, Initialize, Request,
+    SignatureHelpRequest,
 };
 use lsp_types::{
     DidChangeTextDocumentParams, DidCloseTextDocumentParams, DidOpenTextDocumentParams,
-    DidSaveTextDocumentParams, PublishDiagnosticsParams, Url,
+    DidSaveTextDocumentParams, MessageType, PublishDiagnosticsParams, Url,
 };
-use serde_wasm_bindgen::{from_value as decode_from_js, to_value as encode_to_js};
+use serde::Serialize;
+use serde_wasm_bindgen::{from_value as decode_from_js, to_value as encode_to_js, Serializer};
 use std::panic;
 use std::sync::{Arc, RwLock};
 use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::future_to_promise;
 
+#[cfg(debug_assertions)]
+use crate::utils::log;
+
 #[wasm_bindgen]
 pub struct LspVscodeBridge {
     client_diagnostic_tx: JsFunction,
-    _client_notification_tx: JsFunction,
+    client_notification_tx: JsFunction,
     backend_to_client_tx: JsFunction,
     editor_state_lock: Arc<RwLock<EditorState>>,
 }
@@ -39,14 +42,14 @@ impl LspVscodeBridge {
     #[wasm_bindgen(constructor)]
     pub fn new(
         client_diagnostic_tx: JsFunction,
-        _client_notification_tx: JsFunction,
+        client_notification_tx: JsFunction,
         backend_to_client_tx: JsFunction,
     ) -> LspVscodeBridge {
         panic::set_hook(Box::new(console_error_panic_hook::hook));
 
         LspVscodeBridge {
             client_diagnostic_tx,
-            _client_notification_tx,
+            client_notification_tx,
             backend_to_client_tx: backend_to_client_tx.clone(),
             editor_state_lock: Arc::new(RwLock::new(EditorState::new())),
         }
@@ -56,8 +59,7 @@ impl LspVscodeBridge {
     pub fn notification_handler(&self, method: String, js_params: JsValue) -> Promise {
         let command = match method.as_str() {
             Initialized::METHOD => {
-                log!("clarity extension initialized");
-                return Promise::resolve(&JsValue::FALSE);
+                return Promise::resolve(&JsValue::TRUE);
             }
 
             DidOpenTextDocument::METHOD => {
@@ -66,7 +68,6 @@ impl LspVscodeBridge {
                     Err(err) => return Promise::reject(&JsValue::from(format!("error: {}", err))),
                 };
                 let uri = &params.text_document.uri;
-
                 if let Some(contract_location) = get_contract_location(uri) {
                     LspNotification::ContractOpened(contract_location.clone())
                 } else if let Some(manifest_location) = get_manifest_location(uri) {
@@ -132,6 +133,7 @@ impl LspVscodeBridge {
 
         let mut editor_state_lock = EditorStateInput::RwLock(self.editor_state_lock.clone());
         let send_diagnostic = self.client_diagnostic_tx.clone();
+        let send_notification = self.client_notification_tx.clone();
         let file_accessor: Box<dyn FileAccessor> = Box::new(WASMFileSystemAccessor::new(
             self.backend_to_client_tx.clone(),
         ));
@@ -141,6 +143,20 @@ impl LspVscodeBridge {
                 process_notification(command, &mut editor_state_lock, Some(&file_accessor)).await;
 
             let mut aggregated_diagnostics = vec![];
+            if let Err(err) = result {
+                if err.starts_with("No Clarinet.toml is associated to the contract") {
+                    let _ = send_notification.call2(
+                        &JsValue::NULL,
+                        &encode_to_js(&lsp_types::notification::ShowMessage::METHOD).unwrap(),
+                        &encode_to_js(&lsp_types::ShowMessageParams {
+                            typ: MessageType::WARNING,
+                            message: String::from(&err),
+                        })
+                        .unwrap(),
+                    );
+                }
+                return Err(JsValue::from(err));
+            }
             if let Ok(ref mut response) = result {
                 aggregated_diagnostics.append(&mut response.aggregated_diagnostics);
             }
@@ -164,54 +180,68 @@ impl LspVscodeBridge {
 
     #[wasm_bindgen(js_name=onRequest)]
     pub fn request_handler(&self, method: String, js_params: JsValue) -> Result<JsValue, JsValue> {
+        let serializer = Serializer::json_compatible();
         match method.as_str() {
             Initialize::METHOD => {
-                let lsp_response = process_request(
+                let lsp_response = process_mutating_request(
                     LspRequest::Initialize(decode_from_js(js_params)?),
-                    &EditorStateInput::RwLock(self.editor_state_lock.clone()),
+                    &mut EditorStateInput::RwLock(self.editor_state_lock.clone()),
                 );
-                if let LspRequestResponse::Initialize(response) = lsp_response {
-                    return encode_to_js(&response).map_err(|_| JsValue::NULL);
+                match lsp_response {
+                    Ok(LspRequestResponse::Initialize(response)) => {
+                        return response.serialize(&serializer).map_err(|_| JsValue::NULL)
+                    }
+                    _ => return Err(JsValue::NULL),
                 }
             }
 
             Completion::METHOD => {
                 let lsp_response = process_request(
                     LspRequest::Completion(decode_from_js(js_params)?),
-                    &EditorStateInput::RwLock(self.editor_state_lock.clone()),
+                    &mut EditorStateInput::RwLock(self.editor_state_lock.clone()),
                 );
-                if let LspRequestResponse::CompletionItems(response) = lsp_response {
-                    return encode_to_js(&response).map_err(|_| JsValue::NULL);
+                if let Ok(LspRequestResponse::CompletionItems(response)) = lsp_response {
+                    return response.serialize(&serializer).map_err(|_| JsValue::NULL);
+                }
+            }
+
+            SignatureHelpRequest::METHOD => {
+                let lsp_response = process_request(
+                    LspRequest::SignatureHelp(decode_from_js(js_params)?),
+                    &mut EditorStateInput::RwLock(self.editor_state_lock.clone()),
+                );
+                if let Ok(LspRequestResponse::SignatureHelp(response)) = lsp_response {
+                    return response.serialize(&serializer).map_err(|_| JsValue::NULL);
                 }
             }
 
             GotoDefinition::METHOD => {
                 let lsp_response = process_request(
                     LspRequest::Definition(decode_from_js(js_params)?),
-                    &EditorStateInput::RwLock(self.editor_state_lock.clone()),
+                    &mut EditorStateInput::RwLock(self.editor_state_lock.clone()),
                 );
-                if let LspRequestResponse::Definition(response) = lsp_response {
-                    return encode_to_js(&response).map_err(|_| JsValue::NULL);
+                if let Ok(LspRequestResponse::Definition(response)) = lsp_response {
+                    return response.serialize(&serializer).map_err(|_| JsValue::NULL);
                 }
             }
 
             DocumentSymbolRequest::METHOD => {
                 let lsp_response = process_request(
                     LspRequest::DocumentSymbol(decode_from_js(js_params)?),
-                    &EditorStateInput::RwLock(self.editor_state_lock.clone()),
+                    &mut EditorStateInput::RwLock(self.editor_state_lock.clone()),
                 );
-                if let LspRequestResponse::DocumentSymbol(response) = lsp_response {
-                    return encode_to_js(&response).map_err(|_| JsValue::NULL);
+                if let Ok(LspRequestResponse::DocumentSymbol(response)) = lsp_response {
+                    return response.serialize(&serializer).map_err(|_| JsValue::NULL);
                 }
             }
 
             HoverRequest::METHOD => {
                 let lsp_response = process_request(
                     LspRequest::Hover(decode_from_js(js_params)?),
-                    &EditorStateInput::RwLock(self.editor_state_lock.clone()),
+                    &mut EditorStateInput::RwLock(self.editor_state_lock.clone()),
                 );
-                if let LspRequestResponse::Hover(response) = lsp_response {
-                    return encode_to_js(&response).map_err(|_| JsValue::NULL);
+                if let Ok(LspRequestResponse::Hover(response)) = lsp_response {
+                    return response.serialize(&serializer).map_err(|_| JsValue::NULL);
                 }
             }
 
@@ -219,8 +249,9 @@ impl LspVscodeBridge {
                 #[cfg(debug_assertions)]
                 log!("unexpected request ({})", method);
             }
-        }
+        };
 
-        return Err(JsValue::NULL);
+        // expect for Initialize, the failing requests can be ignored
+        return Ok(JsValue::NULL);
     }
 }

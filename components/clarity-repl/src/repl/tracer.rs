@@ -24,7 +24,7 @@ impl Tracer {
         println!("{}  {}", snippet, black!("<console>"));
         Tracer {
             snippet,
-            stack: vec![0],
+            stack: vec![u64::MAX],
             pending_call_string: Vec::new(),
             pending_args: Vec::new(),
             emitted_events: 0,

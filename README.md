@@ -1,9 +1,9 @@
 # Clarinet
 
 Clarinet is a Clarity runtime packaged as a command line tool, designed to facilitate smart contract understanding,
-development, testing and deployment. Clarinet consists of a Clarity Read-Evaluate-Print-Loop (REPL) environment and a testing harness. When used together, Clarity and the REPL environment enables you to rapidly develop and test a Clarity smart contract, allowing you to deploy the contract to a:
+development, testing and deployment. Clarinet consists of a Clarity Read-Evaluate-Print-Loop (REPL) environment and a testing harness. When used together, Clarity and the REPL environment enable you to rapidly develop and test a Clarity smart contract, allowing you to deploy the contract to a:
 
-- devnet - a local a standalone development environment that simulates Bitcoin, Stacks node and other helpful components, similar to a staging environment.
+- devnet - a local standalone development environment that simulates Bitcoin, Stacks node and other helpful components, similar to a staging environment.
 - [testnet](https://docs.stacks.co/docs/understand-stacks/testnet) - a testing environment not running in production.
 - [mainnet](https://stacks.org/stacks2mainnet) - a production environment where you can deploy smart contracts.
 
@@ -13,9 +13,9 @@ Clarity is a **decidable** smart contract language that optimizes for predictabi
 
 ### Clarinet 101
 
-Hiro has created an introductory video tutorial series that guides you through some of the fundamentals of of Clarinet, and how it can help develop, test, and deploy Clarity smart contracts.
+Hiro has created an introductory video tutorial series that guides you through some of the fundamentals of Clarinet, and how it can help develop, test, and deploy Clarity smart contracts.
 
-Please revew and watch the YouTube playlist on [Hiro's Youtube](https://www.youtube.com/c/HiroSystems):
+Please review and watch the YouTube playlist on [Hiro's Youtube](https://www.youtube.com/c/HiroSystems):
 [<img src="docs/images/clarinet101.png">](https://youtube.com/playlist?list=PL5Ujm489LoJaAz9kUJm8lYUWdGJ2AnQTb) channel for information on how to use Clarinet for smart contracts.
 
 ## Installation
@@ -53,7 +53,7 @@ mv ./clarinet /usr/local/bin
 ```
 
 On MacOS, you may get security errors when trying to run the pre-compiled binary. You can resolve the security warning
-with with command
+with command
 
 ```sh
 xattr -d com.apple.quarantine /path/to/downloaded/clarinet/binary
@@ -484,8 +484,6 @@ In this code snippet, there is a dependency on the `nft-trait` *(line:001)* depl
 
 - Dependencies from **external** contracts should be set in `[[project.requirements]]`
 
-- Dependencies from **internal** contracts no longer need to be set in `depends_on`; however, this is still present in many contracts, tutorials and documentations. 
-
 ```toml
 [project]
 name = "my-project"
@@ -498,7 +496,6 @@ path = ".cache"
 
 [contracts.bitcoin-whales]
 path = "contracts/bitcoin-whales.clar"
-# depends_on = ["conversion","conversion-v2"] # no longer needed, ignored if provided
 
 [contracts.conversion]
 path = "contracts/conversion.clar"
@@ -568,7 +565,7 @@ The first step to deploy a contract is to generate a deployment plan, with the f
 $ clarinet deployment generate --mainnet
 ```
 
-After **cautiously** reviewing (and updating if needed) the generated plan, you can use the command to handle the deployments of youe contract, acording to your deployment plan:
+After **cautiously** reviewing (and updating if needed) the generated plan, you can use the command to handle the deployments of your contract, according to your deployment plan:
 
 ```bash
 $ clarinet deployment apply -p <path-to-plan.yaml>
@@ -750,7 +747,7 @@ Clarinet will spin-up a subnet node. More documentation on how to use and intera
 
 ## Contributing to Clarinet
 
-Contribtions are welcome and appreciated. The following sections provide information on how you can contribute to Clarinet.
+Contributions are welcome and appreciated. The following sections provide information on how you can contribute to Clarinet.
 
 ### Prerequisites
 

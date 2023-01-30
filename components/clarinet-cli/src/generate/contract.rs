@@ -41,20 +41,35 @@ impl GetChangesForNewContract {
         } else {
             format!(
                 r#"
-;; {}
-;; <add a description here>
+;; title: {}
+;; version:
+;; summary:
+;; description:
+
+;; traits
+;;
+
+;; token definitions
+;; 
 
 ;; constants
 ;;
 
-;; data maps and vars
+;; data vars
+;;
+
+;; data maps
+;;
+
+;; public functions
+;;
+
+;; read only functions
 ;;
 
 ;; private functions
 ;;
 
-;; public functions
-;;
 "#,
                 self.contract_name
             )
@@ -80,7 +95,7 @@ impl GetChangesForNewContract {
         let content = format!(
             r#"
 import {{ Clarinet, Tx, Chain, Account, types }} from 'https://deno.land/x/clarinet@v{}/index.ts';
-import {{ assertEquals }} from 'https://deno.land/std@0.90.0/testing/asserts.ts';
+import {{ assertEquals }} from 'https://deno.land/std@0.170.0/testing/asserts.ts';
 
 Clarinet.test({{
     name: "Ensure that <...>",

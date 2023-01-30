@@ -1,11 +1,12 @@
 use super::utils;
 use crate::lsp::clarity_diagnostics_to_tower_lsp_type;
 use clarity_lsp::backend::{
-    process_notification, process_request, EditorStateInput, LspNotification,
-    LspNotificationResponse, LspRequest, LspRequestResponse,
+    process_mutating_request, process_notification, process_request, EditorStateInput,
+    LspNotification, LspNotificationResponse, LspRequest, LspRequestResponse,
 };
 use clarity_lsp::lsp_types::{
     DocumentSymbolParams, DocumentSymbolResponse, GotoDefinitionParams, GotoDefinitionResponse,
+    SignatureHelp, SignatureHelpParams,
 };
 use clarity_lsp::state::EditorState;
 use crossbeam_channel::{Receiver as MultiplexableReceiver, Select, Sender as MultiplexableSender};
@@ -53,8 +54,15 @@ pub async fn start_language_server(
             },
             i if i == requests_oper => match oper.recv(&request_rx) {
                 Ok(request) => {
-                    let request_response = process_request(request, &editor_state);
-                    let _ = response_tx.send(LspResponse::Request(request_response));
+                    let request_result = match request {
+                        LspRequest::Initialize(_) => {
+                            process_mutating_request(request, &mut editor_state)
+                        }
+                        _ => process_request(request, &editor_state),
+                    };
+                    if let Ok(response) = request_result {
+                        let _ = response_tx.send(LspResponse::Request(response));
+                    }
                 }
                 Err(_e) => {
                     continue;
@@ -175,6 +183,21 @@ impl LanguageServer for LspNativeBridge {
         let response_rx = self.response_rx.lock().expect("failed to lock response_rx");
         let ref response = response_rx.recv().expect("failed to get value from recv");
         if let LspResponse::Request(LspRequestResponse::Hover(data)) = response {
+            return Ok(data.to_owned());
+        }
+
+        Ok(None)
+    }
+
+    async fn signature_help(&self, params: SignatureHelpParams) -> Result<Option<SignatureHelp>> {
+        let _ = match self.request_tx.lock() {
+            Ok(tx) => tx.send(LspRequest::SignatureHelp(params)),
+            Err(_) => return Ok(None),
+        };
+
+        let response_rx = self.response_rx.lock().expect("failed to lock response_rx");
+        let ref response = response_rx.recv().expect("failed to get value from recv");
+        if let LspResponse::Request(LspRequestResponse::SignatureHelp(data)) = response {
             return Ok(data.to_owned());
         }
 

@@ -10,6 +10,6 @@ Clarinet.test({
             Tx.contractCall("cbtc-token", "burn", [types.uint(500)], "ST2CY5V39NHDPWSXMW9QDT3HC3GD6Q6XX4CFRK9AG")
         ]);
         assertEquals(block.receipts.length, 2);
-        assertEquals(block.height, 2);
+        assertEquals(block.height, 3);
     },
 });

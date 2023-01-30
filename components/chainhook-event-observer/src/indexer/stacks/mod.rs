@@ -464,7 +464,7 @@ pub fn standardize_stacks_microblock_trail(
             },
         })
     }
-    microblocks.sort_by(|a, b| a.block_identifier.cmp(&b.block_identifier));
+    microblocks.sort_by(|a, b| b.block_identifier.cmp(&a.block_identifier));
 
     Ok(microblocks)
 }
@@ -516,34 +516,36 @@ pub fn get_tx_description(
 
     // Handle Stacks transitions operated through Bitcoin transactions
     if tx_bytes.eq(&[0]) {
-        let event = match tx_events.first() {
-            Some(event) => event,
-            None => {
-                return Err(format!(
-                    "received block with transaction '0x00' and no events"
-                ));
-            }
+        if tx_events.is_empty() {
+            return Err(format!(
+                "received block with transaction '0x00' and no events"
+            ));
         };
-        if let Some(ref event_data) = event.stx_transfer_event {
-            let data: STXTransferEventData = serde_json::from_value(event_data.clone())
-                .map_err(|e| format!("unable to decode event_data {}", e.to_string()))?;
-            let description = format!(
-                "transfered: {} µSTX from {} to {} through Bitcoin transaction",
-                data.amount, data.sender, data.recipient
-            );
-            let tx_type = StacksTransactionKind::NativeTokenTransfer;
-            return Ok((description, tx_type, 0, 0, data.sender, None));
-        } else if let Some(ref event_data) = event.stx_lock_event {
-            let data: STXLockEventData = serde_json::from_value(event_data.clone())
-                .map_err(|e| format!("unable to decode event_data {}", e.to_string()))?;
-            let description = format!(
-                "stacked: {} µSTX by {} through Bitcoin transaction",
-                data.locked_amount, data.locked_address,
-            );
-            let tx_type = StacksTransactionKind::Other;
-            return Ok((description, tx_type, 0, 0, data.locked_address, None));
+        for event in tx_events.iter() {
+            if let Some(ref event_data) = event.stx_transfer_event {
+                let data: STXTransferEventData = serde_json::from_value(event_data.clone())
+                    .map_err(|e| format!("unable to decode event_data {}", e.to_string()))?;
+                let description = format!(
+                    "transfered: {} µSTX from {} to {} through Bitcoin transaction",
+                    data.amount, data.sender, data.recipient
+                );
+                let tx_type = StacksTransactionKind::NativeTokenTransfer;
+                return Ok((description, tx_type, 0, 0, data.sender, None));
+            } else if let Some(ref event_data) = event.stx_lock_event {
+                let data: STXLockEventData = serde_json::from_value(event_data.clone())
+                    .map_err(|e| format!("unable to decode event_data {}", e.to_string()))?;
+                let description = format!(
+                    "stacked: {} µSTX by {} through Bitcoin transaction",
+                    data.locked_amount, data.locked_address,
+                );
+                let tx_type = StacksTransactionKind::Other;
+                return Ok((description, tx_type, 0, 0, data.locked_address, None));
+            }
         }
-        return Err(format!("unable to parse transaction {raw_tx}"));
+        return Err(format!(
+            "unable to parse transaction {raw_tx} with events {:?}",
+            tx_events
+        ));
     }
 
     let tx = StacksTransaction::consensus_deserialize(&mut Cursor::new(&tx_bytes))

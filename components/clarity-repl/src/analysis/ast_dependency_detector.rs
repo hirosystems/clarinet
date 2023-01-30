@@ -1,7 +1,8 @@
 use crate::analysis::annotation::Annotation;
 use crate::analysis::ast_visitor::{traverse, ASTVisitor};
 use crate::analysis::{AnalysisPass, AnalysisResult, Settings};
-use crate::repl::DEFAULT_CLARITY_VERSION;
+use crate::repl::{DEFAULT_CLARITY_VERSION, DEFAULT_EPOCH};
+use clarity::types::StacksEpochId;
 use clarity::vm::analysis::analysis_db::AnalysisDatabase;
 pub use clarity::vm::analysis::types::ContractAnalysis;
 use clarity::vm::analysis::{CheckErrors, CheckResult};
@@ -118,7 +119,6 @@ impl DependencySet {
             contract_id: contract_id.clone(),
             required_before_publish: false,
         }) {
-            println!("FOUND DEP: {}", dep.required_before_publish);
             Some(dep.required_before_publish)
         } else {
             None
@@ -359,7 +359,9 @@ impl<'a> ASTDependencyDetector<'a> {
     ) -> Vec<QualifiedContractIdentifier> {
         let mut dependencies = Vec::new();
         for (i, arg) in arg_types.iter().enumerate() {
-            if matches!(arg, TypeSignature::CallableType(CallableSubtype::Trait(_))) {
+            if matches!(arg, TypeSignature::CallableType(CallableSubtype::Trait(_)))
+                | matches!(arg, TypeSignature::TraitReferenceType(_))
+            {
                 if args.len() > i {
                     if let Some(Value::Principal(PrincipalData::Contract(contract))) =
                         args[i].match_literal_value()
@@ -443,7 +445,7 @@ impl<'a> ASTVisitor<'a> for ASTDependencyDetector<'a> {
             Some(parameters) => parameters
                 .iter()
                 .map(|typed_var| {
-                    TypeSignature::parse_type_repr(typed_var.type_expr, &mut ())
+                    TypeSignature::parse_type_repr(DEFAULT_EPOCH, typed_var.type_expr, &mut ())
                         .unwrap_or(TypeSignature::BoolType)
                 })
                 .collect(),
@@ -481,7 +483,7 @@ impl<'a> ASTVisitor<'a> for ASTDependencyDetector<'a> {
             Some(parameters) => parameters
                 .iter()
                 .map(|typed_var| {
-                    TypeSignature::parse_type_repr(typed_var.type_expr, &mut ())
+                    TypeSignature::parse_type_repr(DEFAULT_EPOCH, typed_var.type_expr, &mut ())
                         .unwrap_or(TypeSignature::BoolType)
                 })
                 .collect(),
@@ -519,7 +521,7 @@ impl<'a> ASTVisitor<'a> for ASTDependencyDetector<'a> {
             Some(parameters) => parameters
                 .iter()
                 .map(|typed_var| {
-                    TypeSignature::parse_type_repr(typed_var.type_expr, &mut ())
+                    TypeSignature::parse_type_repr(DEFAULT_EPOCH, typed_var.type_expr, &mut ())
                         .unwrap_or(TypeSignature::BoolType)
                 })
                 .collect(),
@@ -536,9 +538,12 @@ impl<'a> ASTVisitor<'a> for ASTDependencyDetector<'a> {
         name: &'a ClarityName,
         functions: &'a [SymbolicExpression],
     ) -> bool {
-        if let Ok(trait_definition) =
-            TypeSignature::parse_trait_type_repr(functions, &mut (), DEFAULT_CLARITY_VERSION)
-        {
+        if let Ok(trait_definition) = TypeSignature::parse_trait_type_repr(
+            functions,
+            &mut (),
+            DEFAULT_EPOCH,
+            DEFAULT_CLARITY_VERSION,
+        ) {
             self.add_defined_trait(self.current_contract.unwrap(), name, trait_definition);
         }
         true
@@ -610,26 +615,13 @@ impl<'a> ASTVisitor<'a> for ASTDependencyDetector<'a> {
         name: &'a ClarityName,
         args: &'a [SymbolicExpression],
     ) -> bool {
-        let mut dependencies = Vec::new();
         if let Some(arg_types) = self
             .defined_functions
             .get(&(&self.current_contract.unwrap(), name))
         {
-            for (i, arg) in arg_types.iter().enumerate() {
-                if matches!(arg, TypeSignature::CallableType(CallableSubtype::Trait(_))) {
-                    if args.len() > i {
-                        if let Some(Value::Principal(PrincipalData::Contract(contract))) =
-                            args[i].match_literal_value()
-                        {
-                            dependencies.push(contract);
-                        }
-                    }
-                }
+            for dependency in self.check_callee_type(arg_types, args) {
+                self.add_dependency(self.current_contract.unwrap(), &dependency);
             }
-        }
-
-        for dependency in dependencies {
-            self.add_dependency(self.current_contract.unwrap(), dependency);
         }
 
         true
@@ -678,7 +670,7 @@ impl<'a, 'b> ASTVisitor<'a> for PreloadedVisitor<'a, 'b> {
             Some(parameters) => parameters
                 .iter()
                 .map(|typed_var| {
-                    TypeSignature::parse_type_repr(typed_var.type_expr, &mut ())
+                    TypeSignature::parse_type_repr(DEFAULT_EPOCH, typed_var.type_expr, &mut ())
                         .unwrap_or(TypeSignature::BoolType)
                 })
                 .collect(),
@@ -701,7 +693,7 @@ impl<'a, 'b> ASTVisitor<'a> for PreloadedVisitor<'a, 'b> {
             Some(parameters) => parameters
                 .iter()
                 .map(|typed_var| {
-                    TypeSignature::parse_type_repr(typed_var.type_expr, &mut ())
+                    TypeSignature::parse_type_repr(DEFAULT_EPOCH, typed_var.type_expr, &mut ())
                         .unwrap_or(TypeSignature::BoolType)
                 })
                 .collect(),
@@ -719,9 +711,12 @@ impl<'a, 'b> ASTVisitor<'a> for PreloadedVisitor<'a, 'b> {
         name: &'a ClarityName,
         functions: &'a [SymbolicExpression],
     ) -> bool {
-        if let Ok(trait_definition) =
-            TypeSignature::parse_trait_type_repr(functions, &mut (), DEFAULT_CLARITY_VERSION)
-        {
+        if let Ok(trait_definition) = TypeSignature::parse_trait_type_repr(
+            functions,
+            &mut (),
+            DEFAULT_EPOCH,
+            DEFAULT_CLARITY_VERSION,
+        ) {
             self.detector
                 .add_defined_trait(self.current_contract.unwrap(), name, trait_definition);
         }
@@ -1063,11 +1058,16 @@ mod tests {
 
         let dependencies =
             ASTDependencyDetector::detect_dependencies(&contracts, &BTreeMap::new()).unwrap();
+
+        assert_eq!(
+            dependencies[&test_identifier].has_dependency(&my_trait),
+            Some(true)
+        );
+        assert_eq!(
+            dependencies[&test_identifier].has_dependency(&bar),
+            Some(false)
+        );
         assert_eq!(dependencies[&test_identifier].len(), 2);
-        assert!(!dependencies[&test_identifier].has_dependency(&bar).unwrap());
-        assert!(dependencies[&test_identifier]
-            .has_dependency(&my_trait)
-            .unwrap());
     }
 
     #[test]
