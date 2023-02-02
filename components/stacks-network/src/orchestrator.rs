@@ -763,6 +763,7 @@ rpcport={bitcoin_node_rpc_port}
             .create_image(
                 Some(CreateImageOptions {
                     from_image: devnet_config.bitcoin_node_image_url.clone(),
+                    platform: devnet_config.docker_platform.clone(),
                     ..Default::default()
                 }),
                 None,
@@ -1113,6 +1114,7 @@ start_height = {epoch_2_1}
             .create_image(
                 Some(CreateImageOptions {
                     from_image: devnet_config.stacks_node_image_url.clone(),
+                    platform: devnet_config.docker_platform.clone(),
                     ..Default::default()
                 }),
                 None,
@@ -1385,6 +1387,7 @@ events_keys = ["*"]
             .create_image(
                 Some(CreateImageOptions {
                     from_image: devnet_config.subnet_node_image_url.clone(),
+                    platform: devnet_config.docker_platform.clone(),
                     ..Default::default()
                 }),
                 None,
@@ -1444,6 +1447,7 @@ events_keys = ["*"]
             .create_image(
                 Some(CreateImageOptions {
                     from_image: devnet_config.stacks_api_image_url.clone(),
+                    platform: devnet_config.docker_platform.clone(),
                     ..Default::default()
                 }),
                 None,
@@ -1565,6 +1569,7 @@ events_keys = ["*"]
             .create_image(
                 Some(CreateImageOptions {
                     from_image: devnet_config.subnet_api_image_url.clone(),
+                    platform: devnet_config.docker_platform.clone(),
                     ..Default::default()
                 }),
                 None,
@@ -1719,6 +1724,7 @@ events_keys = ["*"]
             .create_image(
                 Some(CreateImageOptions {
                     from_image: devnet_config.postgres_image_url.clone(),
+                    platform: devnet_config.docker_platform.clone(),
                     ..Default::default()
                 }),
                 None,
@@ -1810,6 +1816,7 @@ events_keys = ["*"]
             .create_image(
                 Some(CreateImageOptions {
                     from_image: devnet_config.stacks_explorer_image_url.clone(),
+                    platform: devnet_config.docker_platform.clone(),
                     ..Default::default()
                 }),
                 None,
@@ -1922,6 +1929,7 @@ events_keys = ["*"]
             .create_image(
                 Some(CreateImageOptions {
                     from_image: devnet_config.bitcoin_explorer_image_url.clone(),
+                    platform: devnet_config.docker_platform.clone(),
                     ..Default::default()
                 }),
                 None,
