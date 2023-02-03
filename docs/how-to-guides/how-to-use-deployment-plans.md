@@ -66,7 +66,7 @@ Recall that a default deployment plan is used for every deployment, comprising y
 
 The plan is generated upon each `clarinet deployments generate --<network>` shell command to your `deployments/` folder.
 
-However, you can also manually edit this default deployment `.yaml` file directly—programmatically orchestrating your contract publication and interaction beyond your plan's defaults—with these `transaction` types and their fields available: 
+However, you can also manually edit this default deployment `.yaml` file directly—programmatically orchestrating your contract publication and behavior beyond your plan's defaults. 
 
 :::note
 When deploying, Clarinet prompts you to overwrite any manually added or edited changes that differ from the specifications laid out in your project's `.toml` files. Type `no` to proceed with your manually configured deployment plan.
