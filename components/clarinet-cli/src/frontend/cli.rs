@@ -1056,6 +1056,7 @@ pub fn main() {
                 contract_id,
                 ast.expressions,
                 LimitedCostTracker::new_free(),
+                contract.epoch,
                 contract.clarity_version,
             );
             let mut analysis_db = AnalysisDatabase::new(&mut session.interpreter.datastore);

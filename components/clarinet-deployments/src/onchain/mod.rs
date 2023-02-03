@@ -480,7 +480,7 @@ pub fn apply_on_chain_deployment(
                     for value in tx.parameters.iter() {
                         let execution = match session.eval(value.to_string(), None, false) {
                             Ok(res) => res,
-                            Err(e) => {
+                            Err(_e) => {
                                 let _ = deployment_event_tx.send(DeploymentEvent::Interrupted(
                                     format!(
                                     "unable to process contract-call {}::{}: argument {} invalid",
