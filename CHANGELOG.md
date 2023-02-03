@@ -1,3 +1,9 @@
+#### 1.4.1 (2023-02-03)
+
+##### Bug Fixes
+
+*  Introduce new docker_platform setting ([86c8edbc](https://github.com/hirosystems/clarinet/commit/86c8edbcb1807f888096eb1b97efe75f45c15e71))
+
 #### 1.4.0 (2023-01-23)
 
 ##### New Features
