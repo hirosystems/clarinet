@@ -235,7 +235,7 @@
     ]
   },
   "devDependencies": {
-    "@swc/cli": "^0.1.57",
+    "@swc/cli": "^0.1.61",
     "@swc/core": "^1.2.218",
     "@types/chai": "^4.3.1",
     "@types/mocha": "^10.0.0",
