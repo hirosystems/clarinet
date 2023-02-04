@@ -262,7 +262,7 @@ checksum = "0694ea59225b0c5f3cb405ff3f670e4828358ed26aec49dc352f730f0cb1a8a3"
 dependencies = [
  "bech32",
  "bitcoin_hashes 0.11.0",
- "secp256k1 0.24.2",
+ "secp256k1",
  "serde",
 ]
 
@@ -575,8 +575,8 @@ dependencies = [
 
 [[package]]
 name = "clarity"
-version = "0.0.1"
-source = "git+https://github.com/stacks-network/stacks-blockchain.git?rev=601ac7a0b4ed3de027382a33560d079aaa337b4d#601ac7a0b4ed3de027382a33560d079aaa337b4d"
+version = "2.0.0"
+source = "git+https://github.com/stacks-network/stacks-blockchain.git?rev=eedba787a36d68213501337ba50d1856f41b869a#eedba787a36d68213501337ba50d1856f41b869a"
 dependencies = [
  "integer-sqrt",
  "lazy_static",
@@ -597,7 +597,7 @@ dependencies = [
 
 [[package]]
 name = "clarity-repl"
-version = "1.3.1"
+version = "1.4.0"
 dependencies = [
  "ansi_term",
  "atty",
@@ -2676,9 +2676,9 @@ dependencies = [
 
 [[package]]
 name = "regex"
-version = "1.6.0"
+version = "1.7.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4c4eb3267174b8c6c2f654116623910a0fef09c4753f8dd83db29c48a0df988b"
+checksum = "48aaa5748ba571fb95cd2c85c09f629215d3a6ece942baa100950af03a34f733"
 dependencies = [
  "aho-corasick",
  "memchr",
@@ -3094,32 +3094,13 @@ dependencies = [
 
 [[package]]
 name = "secp256k1"
-version = "0.21.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9c42e6f1735c5f00f51e43e28d6634141f2bcad10931b2609ddd74a86d751260"
-dependencies = [
- "secp256k1-sys 0.4.2",
- "serde",
-]
-
-[[package]]
-name = "secp256k1"
 version = "0.24.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d9512ffd81e3a3503ed401f79c33168b9148c75038956039166cd750eaa037c3"
 dependencies = [
  "bitcoin_hashes 0.11.0",
- "secp256k1-sys 0.6.1",
+ "secp256k1-sys",
  "serde",
-]
-
-[[package]]
-name = "secp256k1-sys"
-version = "0.4.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "957da2573cde917463ece3570eab4a0b3f19de6f1646cde62e6fd3868f566036"
-dependencies = [
- "cc",
 ]
 
 [[package]]
@@ -3505,7 +3486,7 @@ dependencies = [
 [[package]]
 name = "stacks-common"
 version = "0.0.1"
-source = "git+https://github.com/stacks-network/stacks-blockchain.git?rev=601ac7a0b4ed3de027382a33560d079aaa337b4d#601ac7a0b4ed3de027382a33560d079aaa337b4d"
+source = "git+https://github.com/stacks-network/stacks-blockchain.git?rev=eedba787a36d68213501337ba50d1856f41b869a#eedba787a36d68213501337ba50d1856f41b869a"
 dependencies = [
  "chrono",
  "curve25519-dalek",
@@ -3516,7 +3497,7 @@ dependencies = [
  "rand 0.7.3",
  "ripemd",
  "rusqlite",
- "secp256k1 0.21.3",
+ "secp256k1",
  "serde",
  "serde_derive",
  "serde_json",
@@ -3527,7 +3508,7 @@ dependencies = [
 
 [[package]]
 name = "stacks-devnet-js"
-version = "1.3.1"
+version = "1.4.0"
 dependencies = [
  "chainhook-types",
  "clarinet-deployments",
@@ -3544,7 +3525,7 @@ dependencies = [
 
 [[package]]
 name = "stacks-network"
-version = "0.1.0"
+version = "1.4.0"
 dependencies = [
  "base58 0.2.0",
  "bitcoin",
@@ -3887,9 +3868,9 @@ checksum = "cda74da7e1a664f795bb1f8a87ec406fb89a02522cf6e50620d016add6dbbf5c"
 
 [[package]]
 name = "tokio"
-version = "1.24.1"
+version = "1.25.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1d9f76183f91ecfb55e1d7d5602bd1d979e38a3a522fe900241cf195624d67ae"
+checksum = "c8e00990ebabbe4c14c08aca901caed183ecd5c09562a12c824bb53d3c3fd3af"
 dependencies = [
  "autocfg",
  "bytes",
