@@ -34,6 +34,7 @@ pub const DEFAULT_DOCKER_SOCKET: &str = "unix:///var/run/docker.sock";
 pub const DEFAULT_DOCKER_SOCKET: &str = "npipe:////./pipe/docker_engine";
 #[cfg(target_family = "wasm")]
 pub const DEFAULT_DOCKER_SOCKET: &str = "/var/run/docker.sock";
+pub const DEFAULT_DOCKER_PLATFORM: &str = "linux/amd64";
 
 pub const DEFAULT_EPOCH_2_0: u64 = 100;
 pub const DEFAULT_EPOCH_2_05: u64 = 102;
@@ -125,6 +126,7 @@ pub struct DevnetConfigFile {
     pub epoch_2_1: Option<u64>,
     pub pox_2_activation: Option<u64>,
     pub use_docker_gateway_routing: Option<bool>,
+    pub docker_platform: Option<String>,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -245,6 +247,7 @@ pub struct DevnetConfig {
     pub epoch_2_1: u64,
     pub pox_2_activation: u64,
     pub use_docker_gateway_routing: bool,
+    pub docker_platform: String,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -880,6 +883,9 @@ impl NetworkManifest {
                 use_docker_gateway_routing: devnet_config
                     .use_docker_gateway_routing
                     .unwrap_or(false),
+                docker_platform: devnet_config
+                    .docker_platform
+                    .unwrap_or(DEFAULT_DOCKER_PLATFORM.to_string()),
             };
             if !config.disable_stacks_api && config.disable_stacks_api {
                 config.disable_stacks_api = false;
