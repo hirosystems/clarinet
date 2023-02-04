@@ -476,17 +476,25 @@ pub fn apply_on_chain_deployment(
                     };
                     let account = stx_accounts_lookup.get(&issuer_address).unwrap();
 
-                    let function_args = tx
-                        .parameters
-                        .iter()
-                        .map(|value| {
-                            let execution = session.eval(value.to_string(), None, false).unwrap();
-                            match execution.result {
-                                EvaluationResult::Snippet(result) => result.result,
-                                _ => unreachable!("Contract result from snippet"),
+                    let mut function_args = vec![];
+                    for value in tx.parameters.iter() {
+                        let execution = match session.eval(value.to_string(), None, false) {
+                            Ok(res) => res,
+                            Err(_e) => {
+                                let _ = deployment_event_tx.send(DeploymentEvent::Interrupted(
+                                    format!(
+                                    "unable to process contract-call {}::{}: argument {} invalid",
+                                    tx.contract_id, tx.method, value
+                                ),
+                                ));
+                                return;
                             }
-                        })
-                        .collect::<Vec<_>>();
+                        };
+                        match execution.result {
+                            EvaluationResult::Snippet(result) => function_args.push(result.result),
+                            _ => unreachable!("Contract result from snippet"),
+                        };
+                    }
 
                     let anchor_mode = match tx.anchor_block_only {
                         true => TransactionAnchorMode::OnChainOnly,
