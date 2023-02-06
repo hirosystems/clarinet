@@ -24,7 +24,9 @@ use clarinet_deployments::types::{DeploymentGenerationArtifacts, DeploymentSpeci
 use clarinet_deployments::{
     get_default_deployment_path, load_deployment, setup_session_with_deployment,
 };
-use clarinet_files::{FileLocation, ProjectManifest, ProjectManifestFile, RequirementConfig, get_manifest_location};
+use clarinet_files::{
+    get_manifest_location, FileLocation, ProjectManifest, ProjectManifestFile, RequirementConfig,
+};
 use clarity_repl::analysis::call_checker::ContractAnalysis;
 use clarity_repl::clarity::vm::analysis::AnalysisDatabase;
 use clarity_repl::clarity::vm::costs::LimitedCostTracker;

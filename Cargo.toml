@@ -1,8 +1,5 @@
 [workspace]
 members = [
-    "components/chainhook-event-observer",
-    "components/chainhook-node",
-    "components/chainhook-types-rs",
     "components/clarinet-cli",
     "components/clarinet-deployments",
     "components/clarinet-files",
@@ -15,4 +12,4 @@ members = [
     "components/stacks-network",
     "components/stacks-rpc-client",
 ]
-default-members = ["components/clarinet-cli", "components/chainhook-event-observer"]
+default-members = ["components/clarinet-cli"]
