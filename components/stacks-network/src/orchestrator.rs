@@ -1,8 +1,8 @@
 use super::DevnetEvent;
 use crate::{ServiceStatusData, Status};
 use bollard::container::{
-    Config, CreateContainerOptions, KillContainerOptions, ListContainersOptions,
-    PruneContainersOptions, WaitContainerOptions,
+    Config, CreateContainerOptions, DownloadFromContainerOptions, KillContainerOptions,
+    ListContainersOptions, PruneContainersOptions, WaitContainerOptions,
 };
 use bollard::errors::Error as DockerError;
 use bollard::exec::CreateExecOptions;
@@ -11,16 +11,23 @@ use bollard::models::{HostConfig, PortBinding};
 use bollard::network::{CreateNetworkOptions, PruneNetworksOptions};
 use bollard::service::Ipam;
 use bollard::Docker;
+use bytes::BytesMut;
 use chainhook_event_observer::utils::Context;
 use chainhook_types::StacksNetwork;
-use clarinet_files::{DevnetConfigFile, NetworkManifest, ProjectManifest, DEFAULT_DEVNET_BALANCE};
+use clarinet_deployments::requirements::ContractMetadata;
+use clarinet_files::{
+    DevnetConfigFile, FileLocation, NetworkManifest, ProjectManifest, DEFAULT_DEVNET_BALANCE,
+};
+use clarity_repl::clarity::stacks_common::types::StacksEpochId;
+use clarity_repl::clarity::vm::types::StandardPrincipalData;
+use clarity_repl::clarity::ClarityVersion;
 use futures::stream::TryStreamExt;
 use hiro_system_kit::slog;
 use reqwest::RequestBuilder;
 use serde_json::Value;
 use std::collections::HashMap;
 use std::fs::{self, File};
-use std::io::Write;
+use std::io::{Cursor, Write};
 use std::path::PathBuf;
 use std::sync::mpsc::{Receiver, Sender};
 use std::time::Duration;
@@ -270,10 +277,6 @@ impl DevnetOrchestrator {
         let enable_subnet_node = devnet_config.enable_subnet_node;
         let disable_subnet_api = devnet_config.disable_subnet_api;
 
-        let _ = fs::create_dir(format!("{}", devnet_config.working_dir));
-        let _ = fs::create_dir(format!("{}/conf", devnet_config.working_dir));
-        let _ = fs::create_dir(format!("{}/data", devnet_config.working_dir));
-
         let bitcoin_explorer_port = devnet_config.bitcoin_explorer_port;
         let stacks_explorer_port = devnet_config.stacks_explorer_port;
         let stacks_api_port = devnet_config.stacks_api_port;
@@ -445,14 +448,6 @@ impl DevnetOrchestrator {
         // Start subnet node
         if enable_subnet_node {
             let _ = event_tx.send(DevnetEvent::info(format!("Starting subnet-node")));
-            match self.prepare_subnet_node_container(boot_index, ctx).await {
-                Ok(_) => {}
-                Err(message) => {
-                    let _ = event_tx.send(DevnetEvent::FatalError(message.clone()));
-                    self.kill(ctx, Some(&message)).await;
-                    return Err(message);
-                }
-            };
             let _ = event_tx.send(DevnetEvent::ServiceStatus(ServiceStatusData {
                 order: 5,
                 status: Status::Yellow,
@@ -1306,8 +1301,13 @@ events_keys = ["*"]
 
         let mut subnet_conf_path = PathBuf::from(&devnet_config.working_dir);
         subnet_conf_path.push("conf/Subnet.toml");
-        let mut file = File::create(subnet_conf_path)
-            .map_err(|e| format!("unable to create Subnet.toml: {:?}", e))?;
+        let mut file = File::create(subnet_conf_path.clone()).map_err(|e| {
+            format!(
+                "unable to create Subnet.toml ({}): {:?}",
+                subnet_conf_path.to_str().unwrap(),
+                e
+            )
+        })?;
         file.write_all(subnet_conf.as_bytes())
             .map_err(|e| format!("unable to write Subnet.toml: {:?}", e))?;
 
@@ -1316,8 +1316,6 @@ events_keys = ["*"]
         stacks_node_data_path.push(format!("{}", boot_index));
         let _ = fs::create_dir(stacks_node_data_path.clone());
         stacks_node_data_path.push("subnet");
-        fs::create_dir(stacks_node_data_path)
-            .map_err(|e| format!("to create working dir: {:?}", e))?;
 
         let mut exposed_ports = HashMap::new();
         exposed_ports.insert(
@@ -1383,6 +1381,8 @@ events_keys = ["*"]
         &mut self,
         boot_index: u32,
         ctx: &Context,
+        cache_dir: PathBuf,
+        deployer: &StandardPrincipalData,
     ) -> Result<(), String> {
         let (docker, devnet_config) = match (&self.docker_client, &self.network_config) {
             (Some(ref docker), Some(ref network_config)) => match network_config.devnet {
@@ -1408,8 +1408,9 @@ events_keys = ["*"]
 
         let config = self.prepare_subnet_node_config(boot_index)?;
 
+        let container_name = format!("subnet-node.{}", self.network_name);
         let options = CreateContainerOptions {
-            name: format!("subnet-node.{}", self.network_name),
+            name: container_name.clone(),
         };
 
         let container = docker
@@ -1421,6 +1422,63 @@ events_keys = ["*"]
         ctx.try_log(|logger| slog::info!(logger, "Created container subnet-node: {}", container));
         self.subnet_node_container_id = Some(container.clone());
 
+        // Download the subnet contract(s) from the container and return them on success
+        let output = docker
+            .download_from_container(
+                &container_name,
+                Some(DownloadFromContainerOptions {
+                    path: "/contracts/",
+                }),
+            )
+            .try_fold(BytesMut::with_capacity(8192), |mut acc, b| async {
+                acc.extend(b);
+                return Ok(acc);
+            })
+            .await
+            .map_err(|e| e.to_string())?;
+        let mut tar = tar::Archive::new(Cursor::new(output));
+        let mut prefix = cache_dir;
+        prefix.push("requirements");
+        for entry in tar.entries().map_err(|e| e.to_string())? {
+            let mut entry = entry.map_err(|e| e.to_string())?;
+
+            let entry_path = entry.path().map_err(|e| e.to_string())?;
+            if entry_path.is_dir() {
+                continue;
+            }
+
+            let filename = entry_path
+                .strip_prefix("contracts/")
+                .map_err(|e| e.to_string())?;
+
+            let filename_str = match filename.to_str() {
+                Some(s) => format!("{}.{}", deployer.to_string(), s),
+                None => {
+                    return Err(format!(
+                        "invalid filename in tarball: {:?}",
+                        filename.to_string_lossy()
+                    ))
+                }
+            };
+            let contract_path = prefix.join(filename_str);
+
+            entry
+                .unpack(contract_path.clone())
+                .map_err(|e| e.to_string())?;
+
+            // Write the metadata file
+            let metadata_path = contract_path.with_extension("json");
+            let fl = FileLocation::from_path(metadata_path.clone());
+            fl.write_content(
+                serde_json::to_string_pretty(&ContractMetadata {
+                    epoch: StacksEpochId::Epoch21,
+                    clarity_version: ClarityVersion::Clarity2,
+                })
+                .unwrap()
+                .as_bytes(),
+            )
+            .map_err(|e| e.to_string())?;
+        }
         Ok(())
     }
 

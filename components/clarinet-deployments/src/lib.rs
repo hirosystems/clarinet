@@ -1,7 +1,7 @@
 use clarity_repl::clarity::stacks_common::types::StacksEpochId;
 use clarity_repl::clarity::ClarityVersion;
-use clarity_repl::repl::DEFAULT_EPOCH;
 use clarity_repl::repl::{ClarityCodeSource, ClarityContract, ContractDeployer};
+use clarity_repl::repl::{DEFAULT_CLARITY_VERSION, DEFAULT_EPOCH};
 
 extern crate serde;
 
@@ -322,7 +322,11 @@ pub async fn generate_default_deployment(
                     ))
                 }
             };
-            queue.push_front(contract_id)
+            queue.push_front((
+                contract_id,
+                StacksEpochId::Epoch21,
+                ClarityVersion::Clarity2,
+            ));
         }
     }
 
@@ -331,9 +335,11 @@ pub async fn generate_default_deployment(
         let cache_location = &manifest.project.cache_location;
         let mut emulated_contracts_publish = HashMap::new();
         let mut requirements_publish = HashMap::new();
+        let mut contract_epochs = HashMap::new();
         // TODO: This is fine for now, but will need to be changed after 2.1 is live and
         //       there are requirements that need to be deployed in epoch 2.1.
-        let requirements_epoch = EpochSpec::Epoch2_0;
+        let requirements_epoch = DEFAULT_EPOCH;
+        let clarity_version = DEFAULT_CLARITY_VERSION;
 
         // Load all the requirements
         // Some requirements are explicitly listed, some are discovered as we compute the ASTs.
@@ -348,10 +354,14 @@ pub async fn generate_default_deployment(
                     ))
                 }
             };
-            queue.push_front(contract_id);
+            queue.push_front((
+                contract_id,
+                requirements_epoch.clone(),
+                clarity_version.clone(),
+            ));
         }
 
-        while let Some(contract_id) = queue.pop_front() {
+        while let Some((contract_id, epoch, clarity_version)) = queue.pop_front() {
             // Extract principal from contract_id
             if requirements_deps.contains_key(&contract_id) {
                 continue;
@@ -362,7 +372,7 @@ pub async fn generate_default_deployment(
                 Some(ast) => ast,
                 None => {
                     // Download the code
-                    let (source, clarity_version, contract_location) =
+                    let (source, epoch, clarity_version, contract_location) =
                         requirements::retrieve_contract(
                             &contract_id,
                             &cache_location,
@@ -377,7 +387,7 @@ pub async fn generate_default_deployment(
                             emulated_sender: contract_id.issuer.clone(),
                             source: source.clone(),
                             location: contract_location,
-                            clarity_version: ClarityVersion::Clarity1,
+                            clarity_version: clarity_version.clone(),
                         };
                         emulated_contracts_publish.insert(contract_id.clone(), data);
                     } else if network.either_devnet_or_testnet() {
@@ -408,6 +418,7 @@ pub async fn generate_default_deployment(
                             clarity_version,
                         };
                         requirements_publish.insert(contract_id.clone(), data);
+                        contract_epochs.insert(contract_id.clone(), epoch);
                     }
 
                     // Compute the AST
@@ -415,8 +426,8 @@ pub async fn generate_default_deployment(
                         code_source: ClarityCodeSource::ContractInMemory(source),
                         name: contract_id.name.to_string(),
                         deployer: ContractDeployer::ContractIdentifier(contract_id.clone()),
-                        clarity_version: ClarityVersion::Clarity1,
-                        epoch: forced_epoch.unwrap_or(DEFAULT_EPOCH),
+                        clarity_version: clarity_version,
+                        epoch: forced_epoch.unwrap_or(epoch),
                     };
                     let (ast, _, _) = session.interpreter.build_ast(&contract);
                     ast
@@ -439,7 +450,11 @@ pub async fn generate_default_deployment(
                     // result in the `inferable_dependencies` map. We will just extract and keep the associated data (source, ast, deps).
                     for (contract_id, dependencies) in inferable_dependencies.into_iter() {
                         for dependency in dependencies.iter() {
-                            queue.push_back(dependency.contract_id.clone());
+                            queue.push_back((
+                                dependency.contract_id.clone(),
+                                epoch.clone(),
+                                clarity_version.clone(),
+                            ));
                         }
                         requirements_deps.insert(contract_id.clone(), dependencies);
                         requirements_asts.insert(contract_id.clone(), ast);
@@ -452,14 +467,18 @@ pub async fn generate_default_deployment(
                     // and we will keep the source in memory to avoid useless disk access.
                     for (_, dependencies) in inferable_dependencies.iter() {
                         for dependency in dependencies.iter() {
-                            queue.push_back(dependency.contract_id.clone());
+                            queue.push_back((
+                                dependency.contract_id.clone(),
+                                epoch.clone(),
+                                clarity_version.clone(),
+                            ));
                         }
                     }
                     requirements_asts.insert(contract_id.clone(), ast);
-                    queue.push_front(contract_id);
+                    queue.push_front((contract_id, epoch, clarity_version));
 
                     for non_inferable_contract_id in non_inferable_dependencies.into_iter() {
-                        queue.push_front(non_inferable_contract_id);
+                        queue.push_front((non_inferable_contract_id, epoch, clarity_version));
                     }
                 }
             };
@@ -482,7 +501,11 @@ pub async fn generate_default_deployment(
                         .remove(contract_id)
                         .expect("unable to retrieve contract");
                     let tx = TransactionSpecification::EmulatedContractPublish(data);
-                    add_transaction_to_epoch(&mut transactions, tx, &requirements_epoch);
+                    add_transaction_to_epoch(
+                        &mut transactions,
+                        tx,
+                        &contract_epochs[contract_id].into(),
+                    );
                 }
             } else if network.either_devnet_or_testnet() {
                 for contract_id in ordered_contracts_ids.iter() {
@@ -490,7 +513,11 @@ pub async fn generate_default_deployment(
                         .remove(contract_id)
                         .expect("unable to retrieve contract");
                     let tx = TransactionSpecification::RequirementPublish(data);
-                    add_transaction_to_epoch(&mut transactions, tx, &requirements_epoch);
+                    add_transaction_to_epoch(
+                        &mut transactions,
+                        tx,
+                        &contract_epochs[contract_id].into(),
+                    );
                 }
             }
         }
