@@ -666,9 +666,18 @@ pub fn apply_on_chain_deployment(
 
                     // Remapping principals - This is happening
                     let mut source = tx.source.clone();
-                    for (src_principal, dst_principal) in tx.remap_principals.iter() {
-                        let src = src_principal.to_address();
-                        let dst = dst_principal.to_address();
+                    for (src_principal, dst_principal) in tx
+                        .remap_principals
+                        .iter()
+                        .map(|(src, dst)| (src.to_address(), dst.to_address()))
+                        .chain(
+                            contracts_ids_to_remap
+                                .iter()
+                                .map(|(k, v)| (k.clone(), v.clone())),
+                        )
+                    {
+                        let src = src_principal;
+                        let dst = dst_principal;
                         let mut matched_indices = source
                             .match_indices(&src)
                             .map(|(i, _)| i)

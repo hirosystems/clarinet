@@ -1,18 +1,36 @@
 use clarinet_files::{FileAccessor, FileLocation};
+use clarity_repl::clarity::stacks_common::types::StacksEpochId;
 use clarity_repl::clarity::{vm::types::QualifiedContractIdentifier, ClarityVersion};
 use reqwest;
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ContractMetadata {
+    pub epoch: StacksEpochId,
+    pub clarity_version: ClarityVersion,
+}
+
+impl Default for ContractMetadata {
+    fn default() -> Self {
+        ContractMetadata {
+            epoch: StacksEpochId::latest(),
+            clarity_version: ClarityVersion::latest(),
+        }
+    }
+}
 
 pub async fn retrieve_contract(
     contract_id: &QualifiedContractIdentifier,
     cache_location: &FileLocation,
     file_accessor: &Option<&Box<dyn FileAccessor>>,
-) -> Result<(String, ClarityVersion, FileLocation), String> {
+) -> Result<(String, StacksEpochId, ClarityVersion, FileLocation), String> {
     let contract_deployer = contract_id.issuer.to_address();
     let contract_name = contract_id.name.to_string();
 
     let mut contract_location = cache_location.clone();
     contract_location.append_path("requirements")?;
+    let mut metadata_location = contract_location.clone();
     contract_location.append_path(&format!("{}.{}.clar", contract_deployer, contract_name))?;
+    metadata_location.append_path(&format!("{}.{}.json", contract_deployer, contract_name))?;
 
     let contract_source = match file_accessor {
         None => contract_location.read_content_as_utf8(),
@@ -20,9 +38,17 @@ pub async fn retrieve_contract(
     };
 
     if contract_source.is_ok() {
+        let metadata_json = match file_accessor {
+            None => metadata_location.read_content_as_utf8(),
+            Some(file_accessor) => file_accessor.read_file(metadata_location.to_string()).await,
+        }
+        .map_err(|e| format!("Unable to read metadata file: {}", e))?;
+        let metadata: ContractMetadata = serde_json::from_str(&metadata_json).unwrap_or_default();
+
         return Ok((
             contract_source.unwrap(),
-            ClarityVersion::Clarity1,
+            metadata.epoch,
+            metadata.clarity_version,
             contract_location,
         ));
     }
@@ -42,16 +68,9 @@ pub async fn retrieve_contract(
 
     let contract = fetch_contract(request_url).await?;
 
-    let result = match file_accessor {
-        None => contract_location.write_content(contract.source.as_bytes()),
-        Some(file_accessor) => {
-            file_accessor
-                .write_file(contract_location.to_string(), contract.source.as_bytes())
-                .await
-        }
-    };
-
     let clarity_version = {
+        // `version` defaults to 1 because before 2.1, no version is specified
+        // since Clarity 1 was the only version available.
         let version = contract.clarity_version.unwrap_or(1);
         if version.eq(&1) {
             ClarityVersion::Clarity1
@@ -63,11 +82,40 @@ pub async fn retrieve_contract(
             ));
         }
     };
+    // TODO: retrieve the epoch from `contract.publish_height`
+    let epoch = StacksEpochId::latest();
 
-    match result {
-        Ok(_) => Ok((contract.source, clarity_version, contract_location)),
-        Err(err) => Err(err),
-    }
+    match file_accessor {
+        None => {
+            contract_location.write_content(contract.source.as_bytes())?;
+            metadata_location.write_content(
+                serde_json::to_string_pretty(&ContractMetadata {
+                    epoch,
+                    clarity_version,
+                })
+                .unwrap()
+                .as_bytes(),
+            )?;
+        }
+        Some(file_accessor) => {
+            file_accessor
+                .write_file(contract_location.to_string(), contract.source.as_bytes())
+                .await?;
+            file_accessor
+                .write_file(
+                    metadata_location.to_string(),
+                    serde_json::to_string_pretty(&ContractMetadata {
+                        epoch,
+                        clarity_version,
+                    })
+                    .unwrap()
+                    .as_bytes(),
+                )
+                .await?;
+        }
+    };
+
+    Ok((contract.source, epoch, clarity_version, contract_location))
 }
 
 #[allow(dead_code)]
