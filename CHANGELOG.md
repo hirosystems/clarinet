@@ -1,3 +1,10 @@
+#### 1.4.2 (2024-02-03)
+
+##### Bug Fixes
+
+*  Update prettytable ([PR 867](https://github.com/hirosystems/clarinet/pull/867))
+
+
 #### 1.4.1 (2023-02-03)
 
 ##### Bug Fixes
