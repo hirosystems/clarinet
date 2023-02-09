@@ -24,7 +24,9 @@ use clarinet_deployments::types::{DeploymentGenerationArtifacts, DeploymentSpeci
 use clarinet_deployments::{
     get_default_deployment_path, load_deployment, setup_session_with_deployment,
 };
-use clarinet_files::{FileLocation, ProjectManifest, ProjectManifestFile, RequirementConfig};
+use clarinet_files::{
+    get_manifest_location, FileLocation, ProjectManifest, ProjectManifestFile, RequirementConfig,
+};
 use clarity_repl::analysis::call_checker::ContractAnalysis;
 use clarity_repl::clarity::vm::analysis::AnalysisDatabase;
 use clarity_repl::clarity::vm::costs::LimitedCostTracker;
@@ -1378,30 +1380,6 @@ pub fn main() {
             println!("Check your shell's documentation for details about using this file to enable completions for clarinet");
         }
     };
-}
-
-fn get_manifest_location(path: Option<String>) -> Option<FileLocation> {
-    if let Some(path) = path {
-        let manifest_path = PathBuf::from(path);
-        if !manifest_path.exists() {
-            return None;
-        }
-        Some(FileLocation::from_path(manifest_path))
-    } else {
-        let mut current_dir = env::current_dir().unwrap();
-        loop {
-            current_dir.push("Clarinet.toml");
-
-            if current_dir.exists() {
-                return Some(FileLocation::from_path(current_dir));
-            }
-            current_dir.pop();
-
-            if !current_dir.pop() {
-                return None;
-            }
-        }
-    }
 }
 
 fn get_manifest_location_or_exit(path: Option<String>) -> FileLocation {
