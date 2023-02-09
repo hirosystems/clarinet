@@ -7,7 +7,8 @@ edition = "2021"
 serde = "1"
 serde_derive = "1"
 clarinet_utils = { package = "clarinet-utils", path = "../clarinet-utils" }
-chainhook_types = { package = "chainhook-types", path = "../../../chainhook/components/chainhook-types-rs" }
+chainhook-types = "=1.0.0"
+#  chainhook_types = { package = "chainhook-types", path = "../../../chainhook/components/chainhook-types-rs" }
 bip39 = { version = "1.0.1", default-features = false }
 clarity_repl = { package = "clarity-repl", path = "../clarity-repl", default-features = false, optional = true }
 libsecp256k1 = "0.7.0"
