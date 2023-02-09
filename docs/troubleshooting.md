@@ -41,7 +41,7 @@ Now, run the command `clarinet integrate` to see the Devnet up and running.
 
 If you have trouble setting up docker on your Linux machine, follow the steps below:
 
-1. You can remove the current installation by following the steps below:
+1. To remove the current installation, follow the steps below:
 
     ```
     sudo apt-get purge -y docker-engine docker docker.io docker-ce
