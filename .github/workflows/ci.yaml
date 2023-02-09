@@ -101,8 +101,6 @@ jobs:
   #           working-directory: components/clarinet-cli
   #         - name: clarity-repl
   #           working-directory: components/clarity-repl
-  #         - name: chainhook-node
-  #           working-directory: components/chainhook-event-observer
   #   steps:
   #     - name: Checkout repository
   #       uses: actions/checkout@v3
@@ -496,59 +494,6 @@ jobs:
           greater-version-only: true
           token: ${{ secrets.NPM_TOKEN }}
 
-  dist_chainhook_node:
-    name: Build Chainhook node Distribution
-    runs-on: ubuntu-latest
-    needs: pre_run
-
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v3
-        with:
-          submodules: recursive
-
-      - name: Install Rust toolchain
-        uses: actions-rs/toolchain@v1
-        with:
-          toolchain: stable
-          target: x86_64-unknown-linux-gnu
-          profile: minimal
-          components: llvm-tools-preview
-          override: true
-
-      - name: Cache cargo
-        uses: actions/cache@v2
-        with:
-          path: |
-            ~/.cargo/bin/
-            ~/.cargo/registry/index/
-            ~/.cargo/registry/cache/
-            ~/.cargo/git/db/
-            target/x86_64-unknown-linux-gnu/release/
-          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
-
-      - name: Configure artifact names
-        shell: bash
-        run: |
-          echo "SHORT_TARGET_NAME=linux-x64-glibc" >> $GITHUB_ENV
-          echo "PRE_GYP_TARGET_NAME=linux-x64-glibc" >> $GITHUB_ENV
-
-      - name: Build - Cargo
-        working-directory: components/chainhook-node
-        run: cargo build --release --locked --target x86_64-unknown-linux-gnu
-
-      - name: Compress cargo artifact
-        run: tar -C target/x86_64-unknown-linux-gnu/release -zcvf chainhook-node-${{ env.SHORT_TARGET_NAME }}.tar.gz chainhook-node
-
-      - name: Upload cargo artifacts
-        uses: actions/upload-artifact@v2
-        with:
-          name: chainhook-node-${{ env.SHORT_TARGET_NAME }}
-          path: chainhook-node-${{ env.SHORT_TARGET_NAME }}.tar.gz
-
-      - name: Unit Tests - Cargo
-        run: cargo test --release --locked --target x86_64-unknown-linux-gnu
-
   dist_clarity_repl:
     name: Build Clarity REPL Distribution
     runs-on: ubuntu-latest
@@ -632,7 +577,6 @@ jobs:
     needs:
       - get_release_info
       - dist_clarinet
-      - dist_chainhook_node
     outputs:
       version: ${{ steps.docker_meta.outputs.version }}
     strategy:
@@ -644,11 +588,6 @@ jobs:
             image: ${{ github.repository }}
             artifact: clarinet-linux-x64-glibc
             dockerfile: dockerfiles/components/clarinet.dockerfile
-          - name: Chainhook Node
-            description: A Stacks event observer.
-            image: ${{ github.repository_owner }}/chainhook-node
-            artifact: chainhook-node-linux-x64-glibc
-            dockerfile: dockerfiles/components/chainhook-node.dockerfile
     steps:
       - name: Checkout
         uses: actions/checkout@v3
