@@ -9,7 +9,8 @@ lsp-types = "0.93.0"
 regex = "1.7"
 serde = { version = "1.0.136", features = ["derive"] }
 serde_json = "1.0"
-chainhook_types = { package = "chainhook-types", path = "../chainhook-types-rs" }
+chainhook-types = "=1.0.0"
+#  chainhook_types = { package = "chainhook-types", path = "../../../chainhook/components/chainhook-types-rs" }
 clarinet_files = { package = "clarinet-files", path = "../clarinet-files", default-features = false }
 clarity_repl = { package = "clarity-repl", path = "../clarity-repl", default-features = false, optional = true }
 clarinet_deployments = { package = "clarinet-deployments", path = "../clarinet-deployments", default-features = false }
