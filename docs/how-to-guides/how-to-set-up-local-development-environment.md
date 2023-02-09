@@ -132,7 +132,7 @@ Note that by default, commands are always executed as the `deployer` address, wh
 `::set_tx_sender` command, you would need to provide the full address to the contract in the contract call
 (`ST1HTBVD3JG9C05J7HBJTHGR0GGW7KXW28M5JS8QE.my-contract`).
 
-You can refer to the [Clarity language reference](https://docs.stacks.co/docs/write-smart-contracts/clarity-language/) for a complete overview of all Clarity functions.
+You can refer to the [Clarity language reference](https://docs.stacks.co/docs/clarity/language-functions) for a complete overview of all Clarity functions.
 
 ### Testing with the test harness
 
