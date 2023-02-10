@@ -11,9 +11,9 @@ Furthermore, many details of the blockchain environment you want to deploy to ar
 
 | Network | Features | Limitations |
 | ------- | -------- | ----------- |
-| `simnet` | - Widely configurable Stacks simnet <br> - No private keys needed (for contacts, transactions) <br> - Stored entirely in memory | - No Bitcoin emulation |
-| `devnet` | - Widely configurable Stacks and Bitcoin devnets <br> - Publish contracts, transactions across multiple Stacks and/or Bitcoin blocks <br> - Control chainstate for tests | - Accounts need private keys (see `Devnet.toml`) |
-| `testnet`/`mainnet` | - Public networks with other users and contracts <br> | - Time-consuming and expensive environment for testing |
+| `simnet` | - Widely configurable Stacks simnet <br/> - No private keys needed (for contacts, transactions) <br/> - Stored entirely in memory | - No Bitcoin emulation |
+| `devnet` | - Widely configurable Stacks and Bitcoin devnets <br/> - Publish contracts, transactions across multiple Stacks and/or Bitcoin blocks <br/> - Control chainstate for tests | - Accounts need private keys (see `Devnet.toml`) |
+| `testnet`/`mainnet` | - Public networks with other users and contracts <br/> | - Time-consuming and expensive environment for testing |
 
 ## View your deployment plan
 
