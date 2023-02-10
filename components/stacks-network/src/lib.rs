@@ -7,7 +7,7 @@ pub mod chains_coordinator;
 mod orchestrator;
 mod ui;
 
-pub use chainhook_event_observer::utils::Context;
+pub use chainhook_event_observer::{self, utils::Context};
 pub use orchestrator::DevnetOrchestrator;
 
 use std::{
