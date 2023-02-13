@@ -4,6 +4,19 @@ title: Test Contract
 
 Clarinet supports automatic testing, where your blockchain application requirements can be converted to test cases. Clarinet comes with a testing harness based on Deno that applies the unit tests you write in TypeScript to your smart contracts.
 
+Topics:
+- [Clarity contracts and unit tests](#clarity-contracts-and-unit-tests)
+  - [Unit tests for `counter` example](#unit-tests-for-counter-example)
+  - [Comprehensive unit tests for `counter`](#comprehensive-unit-tests-for-counter)
+- [Measure and increase code coverage](#measure-and-increase-code-coverage)
+- [Cost optimization](#cost-optimization)
+- [Load contracts in a console](#load-contracts-in-a-console)
+- [Spawn a local Devnet](#spawn-a-local-devnet)
+- [Interacting with contracts deployed on Mainnet](#interacting-with-contracts-deployed-on-mainnet)
+- [Same Project](#same-project)
+- [External Deployer](#external-deployer)
+- [Use Clarinet in your CI workflow as a GitHub Action](#use-clarinet-in-your-ci-workflow-as-a-github-action)
+
 ## Clarity contracts and unit tests
 
 Let us consider a `counter` smart contract to understand how to write unit tests for our application requirements.
