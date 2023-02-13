@@ -56,7 +56,7 @@ If you have trouble setting up docker on your Linux machine, follow the steps be
 
 2. Install docker-desktop by following the steps [here](https://docs.docker.com/desktop/install/ubuntu/#install-docker-desktop).
    
-3. You will need to update the settings in the Clarinet project. You can do this by navigating to the Clarinet/components/clarinet-cli/examples/simple-nft/settings/Devnet.toml file. In the [Devnet] settings, add the following setting and replace `<username>` with your username:
+3. You will need to update the settings in the Clarinet project. You can do this by navigating to the Clarinet/components/clarinet-cli/examples/simple-nft/settings/Devnet.toml file. In the `[Devnet]` settings, add the following setting and replace `username` with your username:
    
         `docker_host = "/home/<username>/.docker/desktop/docker.sock"`
 4. Save the `Devnet.toml` and run docker now.
