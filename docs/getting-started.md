@@ -6,9 +6,13 @@ title: Getting Started
 Follow this guide to install and build Clarinet. 
 
 Topics:
-[Install and Build Clarinet](#install-and-build-clarinet)
-[Build Clarinet from source using Cargo](#build-clarinet)
-[Use Clarinet to generate shell completion scripts](#setup-shell-completions)
+- [Install and Build Clarinet](#install-and-build-clarinet)
+  - [Install on macOS (Homebrew)](#install-on-macos-homebrew)
+  - [Install on Windows](#install-on-windows)
+  - [Install from a pre-built binary](#install-from-a-pre-built-binary)
+  - [Install from source using Cargo](#install-from-source-using-cargo)
+  - [Build Clarinet](#build-clarinet)
+- [Setup shell completions](#setup-shell-completions)
 
 ## Install and Build Clarinet
 
