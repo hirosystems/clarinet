@@ -6,6 +6,7 @@ Deployment Plans are reproducible deployment steps that publish a collection of 
 <img src="../images/deployment-plan-blocks.png" alt="dpb" width="400"/ >
 </center>
 
+![Deployment Plans](../images/deployment-plan-blocks.png)
 
 Furthermore, many details of the blockchain environment you want to deploy to are configurable in a deployment plan's specifications.
 
