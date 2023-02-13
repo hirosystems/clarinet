@@ -5,6 +5,11 @@ title: Getting Started
 
 Follow this guide to install and build Clarinet. 
 
+Topics:
+[Install and Build Clarinet](#install-and-build-clarinet)
+[Build Clarinet from source using Cargo](#build-clarinet)
+[Use Clarinet to generate shell completion scripts](#setup-shell-completions)
+
 ## Install and Build Clarinet
 
 Hiro has developed Clarinet to be environment-agnostic.
