@@ -4,8 +4,8 @@ name = "clarity-events"
 version = "1.0.0"
 
 [dependencies]
-clarinet_files =  { package = "clarinet-files", path = "../clarinet-files", default-features = false, optional = true }
-clarity_repl = { package = "clarity-repl", path = "../clarity-repl", default-features = false }
+clarinet-files =  { path = "../clarinet-files", default-features = false, optional = true }
+clarity-repl = { path = "../clarity-repl", default-features = false }
 clap = { version = "3.2.23", features = ["derive"], optional = true }
 clap_generate = { version = "3.0.3", optional = true }
 toml = { version = "0.5.6", features = ["preserve_order"], optional = true  }
@@ -16,13 +16,13 @@ serde_derive = "1"
 [features]
 default = ["cli"]
 cli = [
-  "clarity_repl/cli",
-  "clarinet_files/cli",
+  "clarity-repl/cli",
+  "clarinet-files/cli",
   "clap",
   "clap_generate",
   "toml"
 ]
-lib = ["clarity_repl/cli"]
+lib = ["clarity-repl/cli"]
 
 [lib]
 crate-type = ["cdylib", "rlib"]

@@ -127,6 +127,7 @@ pub fn sign_transaction(
 
 pub fn send_transaction_spec(
     bitcoin_rpc: &Client,
+    bitcoin_wallet_rpc: &Client,
     tx_spec: &BtcTransferSpecification,
     signer: &SecretKey,
 ) -> Result<bitcoincore_rpc::bitcoin::Txid, String> {
@@ -135,7 +136,7 @@ pub fn send_transaction_spec(
         Address::from_str(&tx_spec.expected_sender).expect("Unable to parse address");
     let addresses = vec![&sender_address];
 
-    let mut utxos = bitcoin_rpc
+    let mut utxos = bitcoin_wallet_rpc
         .list_unspent(None, None, Some(&addresses), None, None)
         .expect("Unable to retrieve UTXOs");
 

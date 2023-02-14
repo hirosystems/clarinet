@@ -14,12 +14,6 @@ npm-debug.log*
 **/.build
 components/stacks-devnet-js/dist
 components/stacks-devnet-js/build
-components/chainhook-types-js/dist
 *.tar.gz
 *.zip
 *.rdb
-
-components/chainhook-db/examples/arkadiko-data-indexing/vault-monitor/bin
-components/chainhook-db/examples/arkadiko-data-indexing/vault-monitor/tmp
-components/chainhook-db/examples/arkadiko-data-indexing/vault-monitor/vendor
-components/chainhook-node/cache

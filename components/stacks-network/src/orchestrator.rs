@@ -17,6 +17,7 @@ use clarinet_files::{DevnetConfigFile, NetworkManifest, ProjectManifest, DEFAULT
 use futures::stream::TryStreamExt;
 use hiro_system_kit::slog;
 use reqwest::RequestBuilder;
+use serde_json::Value;
 use std::collections::HashMap;
 use std::fs::{self, File};
 use std::io::Write;
@@ -744,6 +745,14 @@ rpcport={bitcoin_node_rpc_port}
                 extra_hosts: Some(vec!["host.docker.internal:host-gateway".into()]),
                 ..Default::default()
             }),
+            cmd: Some(vec![
+                "/bin/bitcoind".into(),
+                "-conf=/etc/bitcoin/bitcoin.conf".into(),
+                "-nodebuglogfile".into(),
+                "-pid=/run/bitcoind.pid".into(),
+                // "-datadir=/root/.bitcoin".into(),
+            ]),
+            // cmd: Some(vec!["/bin/bitcoind -conf=/etc/bitcoin/bitcoin.conf -nodebuglogfile -pid=/run/bitcoind.pid".into()]),
             ..Default::default()
         };
 
@@ -2481,14 +2490,22 @@ events_keys = ["*"]
                 "jsonrpc": "1.0",
                 "id": "stacks-network",
                 "method": "createwallet",
-                "params": [json!("")]
+                "params": json!({ "wallet_name": "", "disable_private_keys": true })
             }))
             .send()
             .await
             .map_err(|e| format!("unable to send 'createwallet' request ({})", e));
 
             match rpc_call {
-                Ok(_r) => break,
+                Ok(r) => {
+                    if r.status().is_success() {
+                        break;
+                    } else {
+                        let err = r.text().await;
+                        let msg = format!("{:?}", err);
+                        let _ = devnet_event_tx.send(DevnetEvent::error(msg));
+                    }
+                }
                 Err(e) => {
                     error_count += 1;
                     if error_count > max_errors {
@@ -2504,6 +2521,7 @@ events_keys = ["*"]
 
         let mut error_count = 0;
         loop {
+            let descriptor = format!("addr({})", miner_address);
             let rpc_call = base_builder(
                 &bitcoin_node_url,
                 &devnet_config.bitcoin_node_username,
@@ -2512,16 +2530,69 @@ events_keys = ["*"]
             .json(&json!({
                 "jsonrpc": "1.0",
                 "id": "stacks-network",
-                "method": "importaddress",
-                "params": [json!(miner_address)]
+                "method": "getdescriptorinfo",
+                "params": [json!(descriptor)]
 
             }))
             .send()
             .await
-            .map_err(|e| format!("unable to send 'importaddress' request ({})", e));
+            .map_err(|e| format!("unable to send 'getdescriptorinfo' request ({})", e));
+
+            let checksum = match rpc_call {
+                Ok(r) => {
+                    let res: Value = r.json().await.unwrap();
+                    // let _ = devnet_event_tx.send(DevnetEvent::info(format!(
+                    //     "getdescriptorinfo {:?}",
+                    //     res
+                    // )));
+
+                    let checksum = res
+                        .as_object()
+                        .unwrap()
+                        .get("result")
+                        .unwrap()
+                        .as_object()
+                        .unwrap()
+                        .get("checksum")
+                        .unwrap()
+                        .as_str()
+                        .unwrap()
+                        .to_string();
+                    checksum
+                }
+                Err(e) => {
+                    panic!()
+                }
+            };
+
+            let _ = devnet_event_tx.send(DevnetEvent::info(format!(
+                "Registering {descriptor}#{checksum}"
+            )));
+            let payload = json!({
+                "jsonrpc": "1.0",
+                "id": "stacks-network",
+                "method": "importdescriptors",
+                "params": {
+                    "requests": [{
+                        "desc": format!("{}#{}", descriptor, checksum),
+                        "timestamp": 0,
+                    }]
+                }
+            });
+            let rpc_call = base_builder(
+                &bitcoin_node_url,
+                &devnet_config.bitcoin_node_username,
+                &devnet_config.bitcoin_node_password,
+            )
+            .json(&payload)
+            .send()
+            .await
+            .map_err(|e| format!("unable to send 'importdescriptors' request ({})", e));
 
             match rpc_call {
-                Ok(_r) => break,
+                Ok(r) => {
+                    break;
+                }
                 Err(e) => {
                     error_count += 1;
                     if error_count > max_errors {
@@ -2537,23 +2608,78 @@ events_keys = ["*"]
 
         let mut error_count = 0;
         loop {
+            let descriptor = format!("addr({})", faucet_address);
             let rpc_call = base_builder(
                 &bitcoin_node_url,
                 &devnet_config.bitcoin_node_username,
                 &devnet_config.bitcoin_node_password,
             )
             .json(&json!({
-            "jsonrpc": "1.0",
-            "id": "stacks-network",
-            "method": "importaddress",
-            "params": [json!(faucet_address)]
+                "jsonrpc": "1.0",
+                "id": "stacks-network",
+                "method": "getdescriptorinfo",
+                "params": [json!(descriptor)]
+
             }))
             .send()
             .await
-            .map_err(|e| format!("unable to send 'importaddress' request ({})", e));
+            .map_err(|e| format!("unable to send 'getdescriptorinfo' request ({})", e));
+
+            let checksum = match rpc_call {
+                Ok(r) => {
+                    let res: Value = r.json().await.unwrap();
+                    // let _ = devnet_event_tx.send(DevnetEvent::info(format!(
+                    //     "getdescriptorinfo {:?}",
+                    //     res
+                    // )));
+
+                    let checksum = res
+                        .as_object()
+                        .unwrap()
+                        .get("result")
+                        .unwrap()
+                        .as_object()
+                        .unwrap()
+                        .get("checksum")
+                        .unwrap()
+                        .as_str()
+                        .unwrap()
+                        .to_string();
+                    checksum
+                }
+                Err(e) => {
+                    panic!()
+                }
+            };
+
+            let _ = devnet_event_tx.send(DevnetEvent::info(format!(
+                "Registering {descriptor}#{checksum}"
+            )));
+            let payload = json!({
+                "jsonrpc": "1.0",
+                "id": "stacks-network",
+                "method": "importdescriptors",
+                "params": {
+                    "requests": [{
+                        "desc": format!("{}#{}", descriptor, checksum),
+                        "timestamp": 0,
+                    }]
+                }
+            });
+            let rpc_call = base_builder(
+                &bitcoin_node_url,
+                &devnet_config.bitcoin_node_username,
+                &devnet_config.bitcoin_node_password,
+            )
+            .json(&payload)
+            .send()
+            .await
+            .map_err(|e| format!("unable to send 'importdescriptors' request ({})", e));
 
             match rpc_call {
-                Ok(_r) => break,
+                Ok(r) => {
+                    break;
+                }
                 Err(e) => {
                     error_count += 1;
                     if error_count > max_errors {
@@ -2573,23 +2699,78 @@ events_keys = ["*"]
 
             let mut error_count = 0;
             loop {
+                let descriptor = format!("addr({})", address);
                 let rpc_call = base_builder(
                     &bitcoin_node_url,
                     &devnet_config.bitcoin_node_username,
                     &devnet_config.bitcoin_node_password,
                 )
                 .json(&json!({
-                "jsonrpc": "1.0",
-                "id": "stacks-network",
-                "method": "importaddress",
-                "params": [json!(address)]
-                    }))
+                    "jsonrpc": "1.0",
+                    "id": "stacks-network",
+                    "method": "getdescriptorinfo",
+                    "params": [json!(descriptor)]
+
+                }))
                 .send()
                 .await
-                .map_err(|e| format!("unable to send 'importaddress' request ({})", e));
+                .map_err(|e| format!("unable to send 'getdescriptorinfo' request ({})", e));
+
+                let checksum = match rpc_call {
+                    Ok(r) => {
+                        let res: Value = r.json().await.unwrap();
+                        // let _ = devnet_event_tx.send(DevnetEvent::info(format!(
+                        //     "getdescriptorinfo {:?}",
+                        //     res
+                        // )));
+
+                        let checksum = res
+                            .as_object()
+                            .unwrap()
+                            .get("result")
+                            .unwrap()
+                            .as_object()
+                            .unwrap()
+                            .get("checksum")
+                            .unwrap()
+                            .as_str()
+                            .unwrap()
+                            .to_string();
+                        checksum
+                    }
+                    Err(e) => {
+                        panic!()
+                    }
+                };
+
+                let _ = devnet_event_tx.send(DevnetEvent::info(format!(
+                    "Registering {descriptor}#{checksum}"
+                )));
+                let payload = json!({
+                    "jsonrpc": "1.0",
+                    "id": "stacks-network",
+                    "method": "importdescriptors",
+                    "params": {
+                        "requests": [{
+                            "desc": format!("{}#{}", descriptor, checksum),
+                            "timestamp": 0,
+                        }]
+                    }
+                });
+                let rpc_call = base_builder(
+                    &bitcoin_node_url,
+                    &devnet_config.bitcoin_node_username,
+                    &devnet_config.bitcoin_node_password,
+                )
+                .json(&payload)
+                .send()
+                .await
+                .map_err(|e| format!("unable to send 'importdescriptors' request ({})", e));
 
                 match rpc_call {
-                    Ok(_r) => break,
+                    Ok(r) => {
+                        break;
+                    }
                     Err(e) => {
                         error_count += 1;
                         if error_count > max_errors {

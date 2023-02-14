@@ -1,6 +1,6 @@
-use chainhook_event_observer::chainhooks::types::*;
 use chainhook_types::{BitcoinNetwork, StacksNetwork};
 use serde::{Deserialize, Serialize};
+use stacks_network::chainhook_event_observer::chainhooks::types::*;
 use std::collections::BTreeMap;
 use std::fs::File;
 use std::io::{BufReader, Read};
@@ -42,6 +42,8 @@ pub struct ChainhookPredicateFile {
     p2wsh: Option<BTreeMap<String, String>>,
     script: Option<BTreeMap<String, String>>,
     scope: Option<String>,
+    protocol: Option<String>,
+    operation: Option<String>,
 }
 
 #[derive(Debug, PartialEq, Serialize, Deserialize)]
@@ -229,27 +231,37 @@ impl HookActionFile {
 }
 
 impl ChainhookPredicateFile {
-    pub fn to_bitcoin_predicate(&self) -> Result<BitcoinTransactionFilterPredicate, String> {
+    pub fn to_bitcoin_predicate(&self) -> Result<BitcoinPredicateType, String> {
         if let Some(ref specs) = self.op_return {
-            let rule = BitcoinPredicateType::OpReturn(self.extract_matching_rule(specs)?);
-            let scope = self.extract_scope()?;
-            return Ok(BitcoinTransactionFilterPredicate::new(scope, rule));
+            let predicate = BitcoinPredicateType::Scope(Scopes::Outputs(
+                OutputPredicate::OpReturn(self.extract_matching_rule(specs)?),
+            ));
+            return Ok(predicate);
         } else if let Some(ref specs) = self.p2pkh {
-            let rule = BitcoinPredicateType::P2pkh(self.extract_exact_matching_rule(specs)?);
-            let scope = self.extract_scope()?;
-            return Ok(BitcoinTransactionFilterPredicate::new(scope, rule));
+            let predicate = BitcoinPredicateType::Scope(Scopes::Outputs(OutputPredicate::P2pkh(
+                self.extract_exact_matching_rule(specs)?,
+            )));
+            return Ok(predicate);
         } else if let Some(ref specs) = self.p2sh {
-            let rule = BitcoinPredicateType::P2sh(self.extract_exact_matching_rule(specs)?);
-            let scope = self.extract_scope()?;
-            return Ok(BitcoinTransactionFilterPredicate::new(scope, rule));
+            let predicate = BitcoinPredicateType::Scope(Scopes::Outputs(OutputPredicate::P2sh(
+                self.extract_exact_matching_rule(specs)?,
+            )));
+            return Ok(predicate);
         } else if let Some(ref specs) = self.p2wpkh {
-            let rule = BitcoinPredicateType::P2wpkh(self.extract_exact_matching_rule(specs)?);
-            let scope = self.extract_scope()?;
-            return Ok(BitcoinTransactionFilterPredicate::new(scope, rule));
+            let predicate = BitcoinPredicateType::Scope(Scopes::Outputs(OutputPredicate::P2wpkh(
+                self.extract_exact_matching_rule(specs)?,
+            )));
+            return Ok(predicate);
         } else if let Some(ref specs) = self.p2wsh {
-            let rule = BitcoinPredicateType::P2wsh(self.extract_exact_matching_rule(specs)?);
-            let scope = self.extract_scope()?;
-            return Ok(BitcoinTransactionFilterPredicate::new(scope, rule));
+            let predicate = BitcoinPredicateType::Scope(Scopes::Outputs(OutputPredicate::P2wsh(
+                self.extract_exact_matching_rule(specs)?,
+            )));
+            return Ok(predicate);
+        } else if let Some(ref specs) = self.protocol {
+            let predicate = BitcoinPredicateType::Protocol(Protocols::Ordinal(
+                OrdinalOperations::InscriptionRevealed,
+            ));
+            return Ok(predicate);
         }
         return Err(format!(
             "trigger not specified (op-return, p2pkh, p2sh, p2wpkh, p2wsh)"
