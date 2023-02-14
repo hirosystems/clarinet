@@ -27,6 +27,7 @@
 (define-public (transfer (id uint) (sender principal) (recipient principal))
   (begin
     (asserts! (is-eq tx-sender sender) ERR_NOT_AUTHORIZED)
+    ;; #[allow(unchecked_data)]
     (nft-transfer? nft id sender recipient)
   )
 )
@@ -48,6 +49,7 @@
     ((newId (+ (var-get lastId) u1)))
     (asserts! (is-eq DEPLOYED_AT u0) ERR_NOT_AUTHORIZED)
     (var-set lastId newId)
+    ;; #[allow(unchecked_data)]
     (nft-mint? nft newId recipient)
   )
 )
@@ -55,6 +57,7 @@
 (define-public (test-burn (id uint) (sender principal))
   (begin
     (asserts! (is-eq tx-sender sender) ERR_NOT_AUTHORIZED)
+    ;; #[allow(unchecked_data)]
     (nft-burn? nft id sender)
   )
 )
