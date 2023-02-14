@@ -46,7 +46,7 @@ pub fn get_signatures(
     if [
         "define-read-only",
         "define-public",
-        "define-readonly",
+        "define-private",
         "define-trait,",
         "let",
         "begin",
