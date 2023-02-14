@@ -2,7 +2,7 @@
 
 Deployment Plans are reproducible deployment steps that publish a collection of on-chain transactions and one or more contracts to a network, whether a local developer network, the public testnet, or into production on mainnet. Deployment plans minimize the inherent complexity of deployments, such as smart contract dependencies and interactions, transaction chaining limits, deployment costs, and more, while ensuring reproducible deployments critical for testing purposes.
 
-![Deployment Plan Blocks](../images/deployment-plan-blocks.png)
+![deployment-plans](../images/deployment-plans.png)
 
 Furthermore, many details of the blockchain environment you want to deploy to are configurable in a deployment plan's specifications.
 
