@@ -34,6 +34,7 @@ pub fn get_capabilities(initialization_options: &InitializationOptions) -> Serve
                 trigger_characters: None,
                 all_commit_characters: None,
                 work_done_progress_options: Default::default(),
+                completion_item: None,
             }),
             false => None,
         },
