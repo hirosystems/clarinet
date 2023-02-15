@@ -9,7 +9,7 @@ Deployment Plans are reproducible deployment steps that publish a collection of 
 *Topics*:
 
 - [x] Deployment plan design
-- [x] Plan primities
+- [x] Plan primitives
 - [x] References
 
 

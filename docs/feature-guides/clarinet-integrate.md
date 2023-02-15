@@ -8,7 +8,7 @@ The Clarinet Integrate feature enables you to easily integrate your existing sma
 
 *Topics*:
 
-- [x] Understand Clarinet integration
+- [x] What is clarinet integrate?
 - [x] Configure your devnet
 - [x] References
 

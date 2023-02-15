@@ -37,4 +37,3 @@ The command output will be a success message if there are no syntax errors.
 
 Any syntactical errors in the Clarity code will be reported, but type-checking and other semantic checks are not performed.
 This is because Clarinet is only looking at this one contract and needs the full context to perform a complete check.
-
