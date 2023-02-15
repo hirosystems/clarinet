@@ -4,6 +4,11 @@ title: Deploy Contracts
 
 You can use Clarinet to publish your contracts to Devnet / Testnet / Mainnet environment for testing and evaluation on a blockchain.
 
+*Topics*:
+
+- [x] Generate deplayment plan
+- [x] Deploy your contract
+
 The first step is to generate a deployment plan with the command below.
 
 ```bash
@@ -15,7 +20,3 @@ After **cautiously** reviewing (and updating if needed) the generated plan, you 
 ```bash
 $ clarinet deployment apply -p <path-to-plan.yaml>
 ```
-
-
-
-

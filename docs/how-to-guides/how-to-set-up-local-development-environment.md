@@ -1,15 +1,15 @@
 ---
 title: Set up local Development Environment
 ---
-Topics
-- [Developing a Clarity smart contract](#developing-a-clarity-smart-contract)
-  - [Set clarity version of contract](#set-clarity-version-of-contract)
-- [Testing with Clarinet](#testing-with-clarinet)
-  - [Testing with the console](#testing-with-the-console)
-  - [Testing with the test harness](#testing-with-the-test-harness)
-- [Additional reading](#additional-reading)
 
 ## Developing a Clarity smart contract
+
+This article helps you with creating a new project and develop a clarity smart contract.
+
+*Topics*:
+
+- [x] Develop a clarity smart contract
+- [x] Test and interact with smart contracts
 
 Once you have installed Clarinet, you can begin a new Clarinet project with the command:
 

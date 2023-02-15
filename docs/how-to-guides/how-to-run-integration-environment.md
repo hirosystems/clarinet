@@ -8,6 +8,13 @@ DevNet allows you to perform frontend development and integration testing withou
 
 The services launched by DevNet represent a full instance of the Stacks blockchain with the Proof of Transfer consensus mechanism running against a locally running Bitcoin testnet. DevNet allows you to control block times, PoX transactions, and contract deployments. Because DevNet is running locally, it can be reset or reconfigured anytime. This allows for rapid frontend development without interacting with the public blockchain.
 
+*Topics*:
+
+- [x] Launch Devnet interface and configuration
+- [x] Configure accounts
+- [x] Configure blockchain
+- [x] Participate in stacking
+
 ## Prerequisites
 
 To run DevNet, you must have [Clarinet installed](../getting-started.md), and you also should have Docker installed locally. Refer to the [Docker documentation](https://docs.docker.com/get-docker/) for instructions on installing Docker on your development machine.
