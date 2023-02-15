@@ -139,22 +139,20 @@ mac_address = { version = "1.1.2", optional = true }
 tower-lsp = { version = "0.17.0", optional = true }
 hex = "0.4.3"
 serde_yaml = "0.8.23"
-chainhook-event-observer = { version = "1", default-features = false }
-# chainhook_event_observer = { package = "chainhook-event-observer", default-features = false, path = "../../../chainhook/components/chainhook-event-observer" }
-chainhook-types = "=1.0.0"
-#  chainhook_types = { package = "chainhook-types", path = "../../../chainhook/components/chainhook-types-rs" }
-clarinet_files = { package = "clarinet-files", path = "../clarinet-files", features = [
+chainhook-types = "=1.0.1"
+# chainhook-types = { version = "=1.0.1", path = "../../../chainhook/components/chainhook-types-rs" }
+clarinet-files = { path = "../clarinet-files", features = [
     "cli",
 ] }
-clarity_lsp = { package = "clarity-lsp", path = "../clarity-lsp", features = [
+clarity-lsp = { path = "../clarity-lsp", features = [
     "cli",
 ] }
-clarinet_deployments = { package = "clarinet-deployments", path = "../clarinet-deployments", features = [
+clarinet-deployments = { path = "../clarinet-deployments", features = [
     "cli",
 ] }
-hiro_system_kit = { package = "hiro-system-kit", path = "../hiro-system-kit" }
-clarinet_utils = { package = "clarinet-utils", path = "../clarinet-utils" }
-stacks_network = { package = "stacks-network", path = "../stacks-network" }
+hiro-system-kit = { path = "../hiro-system-kit" }
+clarinet-utils = { path = "../clarinet-utils" }
+stacks-network = { path = "../stacks-network" }
 num_cpus = "1.13.1"
 mio = "0.8"
 similar = "2.1.0"

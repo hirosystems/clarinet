@@ -22,7 +22,6 @@ use super::vendor::deno_cli::tools::test::{
 use super::vendor::deno_runtime::permissions::Permissions;
 use super::vendor::deno_runtime::tokio_util::run_local;
 use super::{api_v1, costs, ChainhookEvent, DeploymentCache, SessionArtifacts};
-use chainhook_event_observer::chainhooks::types::StacksChainhookSpecification;
 use clarinet_files::{FileLocation, ProjectManifest};
 use clarity_repl::analysis::coverage::CoverageReporter;
 use deno_ast::swc::common::comments::CommentKind;
@@ -43,6 +42,7 @@ use rand::rngs::SmallRng;
 use rand::seq::SliceRandom;
 use rand::SeedableRng;
 use regex::Regex;
+use stacks_network::chainhook_event_observer::chainhooks::types::StacksChainhookSpecification;
 use std::collections::HashSet;
 use std::fmt::Write as _;
 use std::num::NonZeroUsize;
