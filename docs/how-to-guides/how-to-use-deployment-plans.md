@@ -66,7 +66,9 @@ The plan is generated upon each `clarinet deployments generate --<network>` shel
 However, you can also manually edit this default deployment `.yaml` file directly—programmatically orchestrating your contract publication and behavior beyond your plan's defaults. 
 
 :::note
+
 When deploying, Clarinet prompts you to overwrite any manually added or edited changes that differ from the specifications laid out in your project's `.toml` files. Type `no` to proceed with your manually configured deployment plan.
+
 :::
 
 Here are some of the relevant transactions and configurations available to developers manually configuring their deployment plans:
@@ -78,8 +80,6 @@ Here are some of the relevant transactions and configurations available to devel
 - `stx-transfer`: Transfer STX between specified accounts.
 - `btc-transfer`: Simple bitcoin transfer from a p2pkh address to a p2pkh address (experimental, `regtest`/`testnet`/`mainnet`).
 - Waiting between blocks to make transactions is done by specifying transaction directives in a different batch in the deployment plan (see the `batches` field)
-
-
 
 ### `emulated-contract-publish`
 

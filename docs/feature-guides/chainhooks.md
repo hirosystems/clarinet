@@ -6,6 +6,13 @@ title: Chainhooks
 
 Chainhooks are a powerful feature that enables you to automatically trigger an action based upon a predicate event occurring. Adhering to an event-based architecture, chainhooks allow you to pre-determine an underlying set of events that, when triggered, set into motion a logical series of follow-on steps and actions to address the specific event that was triggered. 
 
+*Topics*:
+
+- [x] Chainhooks design
+- [x] Use chainhooks
+- [x] References
+
+
 ## Design
 
 Chainhooks were designed with a very specific set of requirements and limitations to make them easy to work with in a development environment. These constraints include portability and performance.

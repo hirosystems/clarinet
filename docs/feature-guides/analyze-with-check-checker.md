@@ -3,7 +3,14 @@ title: Analyze with Check-Checker
 ---
 
 The check-checker is a static analysis pass you can use to help find potential vulnerabilities in your contracts.
-To enable this pass, add the following lines to your Clarinet.toml file:
+
+*Topics*:
+
+- [x] Enable static analysis pass
+- [x] Check checker options
+- [x] Annotations
+
+To enable the static analysis pass, add the following lines to your Clarinet.toml file:
 
 ```toml
 [repl.analysis]

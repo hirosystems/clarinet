@@ -8,6 +8,13 @@ Deployment plans allow teams to work together when deploying smart contracts. Hi
 
 By using Deployment Plans, you can simplify the smart contract deployment process to stacks or bitcoin environment.
 
+*Topics*:
+
+- [x] Deployment plan design
+- [x] Plan primities
+- [x] References
+
+
 ## Design
 
 Deployment Plans are reproducible deployment steps that publish a “protocol”; a collection of on-chain transactions and contracts—to a network, whether it is on a local developer network, the public testnet, or into production on mainnet.

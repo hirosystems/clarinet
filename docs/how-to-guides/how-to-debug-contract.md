@@ -115,5 +115,3 @@ This trace shows all function calls, both internal calls to private functions an
 For each call, the parameters and return value are shown in the trace. Any events that are emitted are also shown in the trace.
 
 ![execution trace](../images/trace.png)
-
-
