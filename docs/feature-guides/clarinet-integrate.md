@@ -4,7 +4,7 @@ title: Clarinet Integrate
 
 ## Overview
 
-The Clarinet Integrate feature enables you to easily integrate your existing smart contracts with the blockchain in a local testing environment, providing you a way to validate and verify your smart contract on an actual blockchain. While unit testing (the process of testing your code to make sure it works correctly) is a valuable way to test your code before implementation, there are certain features that cannot be verified during unit testing, such as how your smart contract interacts with proof of transfer or the bitcoin chain. Clarinet Integrate provides these additional tests.
+The Clarinet Integrate feature enables you to easily integrate your existing smart contracts with the blockchain in a local testing environment, providing you a way to validate and verify your smart contract on an actual blockchain. While unit testing (the process of testing your code to make sure it works correctly) is a valuable way to test your code before implementation, there are certain features that cannot be verified during unit testing, such as how your smart contract interacts with proof of transfer or the bitcoin chain. Clarinet integrate provides these additional tests.
 
 *Topics*:
 
