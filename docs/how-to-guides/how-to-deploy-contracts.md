@@ -6,7 +6,7 @@ You can use Clarinet to publish your contracts to the public testnet or mainnet 
 
 *Topics*:
 
-- [x] Generate deplayment plan
+- [x] Generate deployment plan
 - [x] Deploy your contract
 
 The first step is to generate a deployment plan with the command below (note: replace `--mainnet` with `--testnet` to deploy to the latter). Please specify a cost strategy to incentivize miners to carry your transaction (either `--low-cost`, `--medium-cost`, `--high-cost`, or `--manual-cost`). The final command might look like:
