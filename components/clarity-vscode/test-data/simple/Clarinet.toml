@@ -8,6 +8,7 @@ cache_dir = "./.cache"
 
 [contracts.contract]
 path = "contracts/contract.clar"
+clarity_version = 1
 
 [contracts.counter]
 path = "contracts/counter.clar"

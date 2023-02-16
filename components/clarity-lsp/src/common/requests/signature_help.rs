@@ -1,40 +1,9 @@
-use clarity_repl::clarity::{docs::FunctionAPI, ClarityName, SymbolicExpression};
+use clarity_repl::clarity::docs::FunctionAPI;
 use lsp_types::{ParameterInformation, ParameterLabel, Position, SignatureInformation};
 
 use crate::state::ActiveContractData;
 
-use super::{api_ref::API_REF, helpers::is_position_within_span};
-
-fn get_function_at_position(
-    position: &Position,
-    expressions: &Vec<SymbolicExpression>,
-) -> Option<(ClarityName, Option<u32>)> {
-    for expr in expressions {
-        if is_position_within_span(position, &expr.span, 0) {
-            if let Some(expressions) = expr.match_list() {
-                return get_function_at_position(position, &expressions.to_vec());
-            }
-        }
-    }
-
-    let mut position_in_parameters: i32 = -1;
-    for parameter in expressions {
-        if position.line == parameter.span.end_line {
-            if position.character > parameter.span.end_column + 1 {
-                position_in_parameters += 1
-            }
-        } else if position.line > parameter.span.end_line {
-            position_in_parameters += 1
-        }
-    }
-
-    let (function_name, _) = expressions.split_first()?;
-
-    return Some((
-        function_name.match_atom()?.to_owned(),
-        position_in_parameters.try_into().ok(),
-    ));
-}
+use super::{api_ref::API_REF, helpers::get_function_at_position};
 
 pub fn get_signatures(
     contract: &ActiveContractData,
