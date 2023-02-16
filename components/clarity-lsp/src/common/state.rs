@@ -310,11 +310,9 @@ impl EditorState {
             .and_then(|p| Some(p.get_contract_calls_for_contract(contract_location)))
             .unwrap_or_default();
 
-        let active_contract_defined_data = ContractDefinedData::new(
-            &active_contract.expressions.as_ref().unwrap_or(&vec![]),
-            position,
-        );
-
+        let expressions = active_contract.expressions.as_ref();
+        let active_contract_defined_data =
+            ContractDefinedData::new(expressions.unwrap_or(&vec![]), position);
         let should_wrap = match self.settings.completion_smart_parenthesis_wrap {
             true => check_if_should_wrap(&active_contract.source, position),
             false => true,
@@ -322,6 +320,11 @@ impl EditorState {
 
         build_completion_item_list(
             &active_contract.clarity_version,
+            &expressions.unwrap_or(&vec![]),
+            &Position {
+                line: position.line + 1,
+                character: position.character + 1,
+            },
             &active_contract_defined_data,
             contract_calls,
             should_wrap,
