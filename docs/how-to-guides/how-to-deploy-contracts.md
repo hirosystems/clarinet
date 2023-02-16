@@ -2,7 +2,7 @@
 title: Deploy Contracts
 ---
 
-You can use Clarinet to publish your contracts to the pulic testnet or mainnet for testing or production.
+You can use Clarinet to publish your contracts to the public testnet or mainnet for testing or production.
 
 The first step is to generate a deployment plan with the command below (note: replace `--mainnet` with `--testnet` to deploy to the latter). Please specify a cost strategy to incentivize miners to carry your transaction (either `--low-cost`, `--medium-cost`, `--high-cost`, or `--manual-cost`). The final command might look like:
 
