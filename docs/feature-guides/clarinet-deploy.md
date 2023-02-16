@@ -14,22 +14,14 @@ You can commit, audit, and test contracts without including any secrets in the D
 
 ## Deployment plan primitives
 
-Deployment plans consist of the following transaction primitives:
+| Transaction primitive | Typical usage |
+|---|---|
+| publish contracts | - deploy a contract to an in-memory simulated Stacks chain or an integrate Stacks-Bitcoin environment <br> - deploy to a public testnet or mainnet <br> - deploy an external contract to your local network for testing |
+| call contract functions | - call a contract deployed to any of your local devnets or public networks, chain transactions |
+| send BTC | - Perform a simple bitcoin transfer from a p2pkh address to a p2pkh address (devnet/testnet/mainnet)  |
+| wait for block | - Test or automate contract deployment across multiple Stacks or Bitcoin blocks  |
+| send STX | - send stacks to an address or contract |
 
-- publish contracts
-- call contracts
-- send bitcoin transactions
-- wait for block
-- send stacks to an address or contract
-
-With these transaction primitives, you can then:
-
-- Deploy a contract in an in-memory simulated chain (simnet only)
-- Call a contract that has been deployed in an in-memory simulated chain (simnet only)
-- Deploy an external contract on another testnet/devnet network using another wallet, then search and replace all references to this contract in the local contracts to deploy (devnet/testnet only)
-- Deploy a contract (devnet/testnet/mainnet)
-- Call a contract (devnet/testnet/mainnet)
-- Perform a simple bitcoin transfer from a p2pkh address to a p2pkh address (experimental, regtest/testnet/mainnet)
 
 ## References
 
