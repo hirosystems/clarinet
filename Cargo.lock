@@ -656,15 +656,13 @@ checksum = "baf1de4339761588bc0619e3cbc0120ee582ebb74b53b4efbf79117bd2da40fd"
 
 [[package]]
 name = "chainhook-event-observer"
-version = "1.0.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5ec0764099c4e378471d312bf5152f09374730b2b8e8b2cfd8abbe3756193f55"
+version = "1.0.3"
 dependencies = [
  "base58 0.2.0",
  "base64 0.13.1",
  "bitcoincore-rpc",
  "bitcoincore-rpc-json",
- "chainhook-types",
+ "chainhook-types 1.0.1",
  "clarinet-utils 1.0.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "clarity-repl 1.4.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "crossbeam-channel",
@@ -678,6 +676,17 @@ dependencies = [
  "serde_json",
  "stacks-rpc-client 1.0.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "tokio",
+]
+
+[[package]]
+name = "chainhook-types"
+version = "1.0.1"
+dependencies = [
+ "schemars",
+ "serde",
+ "serde_derive",
+ "serde_json",
+ "strum",
 ]
 
 [[package]]
@@ -798,7 +807,7 @@ dependencies = [
  "bitcoin",
  "block-modes 0.8.1",
  "cache_control",
- "chainhook-types",
+ "chainhook-types 1.0.1",
  "chrono",
  "clap",
  "clap_generate",
@@ -908,7 +917,7 @@ dependencies = [
  "bitcoin",
  "bitcoincore-rpc",
  "bitcoincore-rpc-json",
- "chainhook-types",
+ "chainhook-types 1.0.1",
  "clarinet-files",
  "clarinet-utils 1.0.0",
  "clarity-repl 1.4.1",
@@ -928,7 +937,7 @@ version = "1.0.0"
 dependencies = [
  "bip39",
  "bitcoin",
- "chainhook-types",
+ "chainhook-types 1.0.1",
  "clarinet-utils 1.0.0",
  "clarity-repl 1.4.1",
  "js-sys",
@@ -1004,7 +1013,7 @@ dependencies = [
 name = "clarity-lsp"
 version = "1.0.0"
 dependencies = [
- "chainhook-types",
+ "chainhook-types 1.0.1",
  "clarinet-deployments",
  "clarinet-files",
  "clarity-repl 1.4.1",
@@ -5834,7 +5843,7 @@ dependencies = [
 name = "stacks-devnet-js"
 version = "1.4.2"
 dependencies = [
- "chainhook-types",
+ "chainhook-types 1.0.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "clarinet-deployments",
  "clarinet-files",
  "clarinet-utils 1.0.0",
@@ -5856,7 +5865,7 @@ dependencies = [
  "bitcoincore-rpc",
  "bollard",
  "chainhook-event-observer",
- "chainhook-types",
+ "chainhook-types 1.0.1",
  "chrono",
  "clarinet-deployments",
  "clarinet-files",

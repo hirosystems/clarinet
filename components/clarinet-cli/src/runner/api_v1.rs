@@ -43,7 +43,7 @@ use deno_core::serde_json::{json, Value};
 use deno_core::{op, Extension};
 use deno_core::{ModuleSpecifier, OpState};
 use sha2::{Digest, Sha256};
-use stacks_network::chainhook_event_observer::chainhooks::stacks::evaluate_stacks_transaction_predicate_on_transaction;
+use stacks_network::chainhook_event_observer::chainhooks::stacks::evaluate_stacks_predicate_on_transaction;
 use stacks_network::chainhook_event_observer::chainhooks::stacks::handle_stacks_hook_action;
 use stacks_network::chainhook_event_observer::chainhooks::stacks::StacksChainhookOccurrence;
 use stacks_network::chainhook_event_observer::chainhooks::stacks::StacksTriggerChainhook;
@@ -745,11 +745,7 @@ fn mine_block(state: &mut OpState, args: MineBlockArgs) -> Result<String, AnyErr
         for chainhook in chainhooks.iter() {
             let mut hits = vec![];
             for (tx, _) in transactions.iter() {
-                if evaluate_stacks_transaction_predicate_on_transaction(
-                    tx,
-                    chainhook,
-                    &Context::empty(),
-                ) {
+                if evaluate_stacks_predicate_on_transaction(tx, chainhook, &Context::empty()) {
                     hits.push(tx);
                 }
             }

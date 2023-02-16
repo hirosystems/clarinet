@@ -35,12 +35,11 @@ use clarity_repl::clarity::ClarityVersion;
 use clarity_repl::repl::diagnostic::{output_code, output_diagnostic};
 use clarity_repl::repl::{ClarityCodeSource, ClarityContract, ContractDeployer, DEFAULT_EPOCH};
 use clarity_repl::{analysis, repl, Terminal};
-use stacks_network::chainhook_event_observer::chainhooks::types::ChainhookSpecification;
+use stacks_network::chainhook_event_observer::chainhooks::types::ChainhookFullSpecification;
 use stacks_network::{self, DevnetOrchestrator};
 use std::collections::HashMap;
 use std::fs::{self, File};
 use std::io::prelude::*;
-use std::path::PathBuf;
 use std::{env, process};
 
 use clap::{IntoApp, Parser, Subcommand};
@@ -1175,7 +1174,7 @@ pub fn main() {
                         &(BitcoinNetwork::Regtest, StacksNetwork::Devnet),
                     ) {
                         Ok(hook) => match hook {
-                            ChainhookSpecification::Bitcoin(_) => {
+                            ChainhookFullSpecification::Bitcoin(_) => {
                                 println!(
                                     "{}",
                                     format_err!(
@@ -1184,7 +1183,22 @@ pub fn main() {
                                 );
                                 std::process::exit(1);
                             }
-                            ChainhookSpecification::Stacks(hook) => stacks_chainhooks.push(hook),
+                            ChainhookFullSpecification::Stacks(hook) => {
+                                let spec = match hook
+                                    .into_selected_network_specification(&StacksNetwork::Devnet)
+                                {
+                                    Ok(spec) => spec,
+                                    Err(e) => {
+                                        println!(
+                                            "{} unable to load chainhooks ({})",
+                                            red!("error:"),
+                                            e
+                                        );
+                                        std::process::exit(1);
+                                    }
+                                };
+                                stacks_chainhooks.push(spec)
+                            }
                         },
                         Err(msg) => {
                             println!("{} unable to load chainhooks ({})", red!("error:"), msg);
