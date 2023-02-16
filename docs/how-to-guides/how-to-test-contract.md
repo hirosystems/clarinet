@@ -6,12 +6,12 @@ Clarinet supports automatic testing, where your blockchain application requireme
 
 *Topics*:
 
-- [x]  Instructions to write unit tests
-- [x] About lcov report to increase test coverage
+- [x] Instructions to write unit tests
+- [x] Increase test coverage
 - [x] Clarinet usage to optimize costs
 - [x] Clarity REPL console
-- [x]  Interact with contracts on mainnet
-- [x]  Clarinet usage in Github actions
+- [x] Interact with contracts on mainnet
+- [x] Clarinet usage in Github actions
 
 ## Clarity contracts and unit tests
 

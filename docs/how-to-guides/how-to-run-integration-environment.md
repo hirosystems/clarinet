@@ -13,7 +13,7 @@ The services launched by DevNet represent a full instance of the Stacks blockcha
 - [x] Launch Devnet interface and configuration
 - [x] Configure accounts
 - [x] Configure blockchain
-- [x] Participate in stacking
+- [x] Stacking on Devnet
 
 ## Prerequisites
 
@@ -127,4 +127,3 @@ For more information, you can refer to the following links:
 
 - [clarinet installed](/smart-contracts/clarinet#installing-clarinet)
 - [docker documentation](https://docs.docker.com/get-docker/)
-

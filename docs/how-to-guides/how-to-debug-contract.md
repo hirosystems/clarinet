@@ -8,7 +8,7 @@ Clarinet supports the [Debug Adapter Protocol](https://microsoft.github.io/debug
 
 *Topics*:
 
-- [x] Enable smart-contract to debug in Visual Studio code
+- [x] Enable smart-contract debugging in Visual Studio code
 - [x] Identify command-line debugger inside the console
 - [x] Explore execution trace command
 

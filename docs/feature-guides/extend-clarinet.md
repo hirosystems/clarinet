@@ -7,7 +7,7 @@ Extend Clarinet to integrate clarity contracts with your own tooling and workflo
 
 *Topics*:
 
-- [x] Use clanet run command
+- [x] Use clarinet run command
 - [x] Standalone plugin deployment
 
 

@@ -9,8 +9,8 @@ Hiro has developed Clarinet to be environment-agnostic. Follow this guide to ins
 
 *Topics*:
 
-- [x] Install clarinet
-- [x] Build clarinet from source using Cargo
+- [x] Install Clarinet
+- [x] Build Clarinet from source using Cargo
 - [x] Use Clarinet to generate shell completion scripts
 
 You may choose to install Clarinet in any of the following operating systems:
