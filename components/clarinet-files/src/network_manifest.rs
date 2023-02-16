@@ -696,12 +696,7 @@ impl NetworkManifest {
                 .unwrap_or(vec![]);
 
             if enable_subnet_node {
-                // add subnet node to stacks-node observers
                 let label = "subnet-leader";
-                stacks_node_events_observers.push(format!(
-                    "host.docker.internal:{}",
-                    subnet_events_ingestion_port
-                ));
                 accounts.insert(
                     label.to_string(),
                     AccountConfig {
