@@ -343,7 +343,6 @@ pub async fn generate_default_deployment(
 
         // Load all the requirements
         // Some requirements are explicitly listed, some are discovered as we compute the ASTs.
-
         for requirement in requirements.iter() {
             let contract_id = match QualifiedContractIdentifier::parse(&requirement.contract_id) {
                 Ok(contract_id) => contract_id,
@@ -379,6 +378,7 @@ pub async fn generate_default_deployment(
                             &file_accessor,
                         )
                         .await?;
+                    contract_epochs.insert(contract_id.clone(), epoch.clone());
 
                     // Build the struct representing the requirement in the deployment
                     if network.is_simnet() {
@@ -418,7 +418,6 @@ pub async fn generate_default_deployment(
                             clarity_version,
                         };
                         requirements_publish.insert(contract_id.clone(), data);
-                        contract_epochs.insert(contract_id.clone(), epoch);
                     }
 
                     // Compute the AST
@@ -426,7 +425,7 @@ pub async fn generate_default_deployment(
                         code_source: ClarityCodeSource::ContractInMemory(source),
                         name: contract_id.name.to_string(),
                         deployer: ContractDeployer::ContractIdentifier(contract_id.clone()),
-                        clarity_version: clarity_version,
+                        clarity_version,
                         epoch: forced_epoch.unwrap_or(epoch),
                     };
                     let (ast, _, _) = session.interpreter.build_ast(&contract);
