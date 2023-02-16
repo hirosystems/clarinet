@@ -60,8 +60,12 @@ macro_rules! pluralize {
 #[cfg(feature = "telemetry")]
 use super::telemetry::{telemetry_report_event, DeveloperUsageDigest, DeveloperUsageEvent};
 
+/// For Clarinet documentation, refer to https://docs.hiro.so/clarinet/introduction.
+///
+/// Report any issues here https://github.com/hirosystems/clarinet/issues/new.
+
 #[derive(Parser, PartialEq, Clone, Debug)]
-#[clap(version = option_env!("CARGO_PKG_VERSION").expect("Unable to detect version"), bin_name = "clarinet")]
+#[clap(version = option_env!("CARGO_PKG_VERSION").expect("Unable to detect version"), name = "clarinet")]
 struct Opts {
     #[clap(subcommand)]
     command: Command,
