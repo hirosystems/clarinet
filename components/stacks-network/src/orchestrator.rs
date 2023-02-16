@@ -969,6 +969,22 @@ events_keys = ["*"]
             ));
         }
 
+        if devnet_config.enable_subnet_node {
+            stacks_conf.push_str(&format!(
+                r#"
+# Add subnet-node as an event observer
+[[events_observer]]
+endpoint = "{}"
+retry_count = 255
+events_keys = ["*"]
+"#,
+                format!(
+                    "subnet-node.{}:{}",
+                    self.network_name, devnet_config.subnet_events_ingestion_port
+                ),
+            ));
+        }
+
         for chains_coordinator in devnet_config.stacks_node_events_observers.iter() {
             stacks_conf.push_str(&format!(
                 r#"
