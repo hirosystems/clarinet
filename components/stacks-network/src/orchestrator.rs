@@ -17,7 +17,7 @@ use clarinet_files::{DevnetConfigFile, NetworkManifest, ProjectManifest, DEFAULT
 use futures::stream::TryStreamExt;
 use hiro_system_kit::slog;
 use reqwest::RequestBuilder;
-use serde_json::Value;
+use serde_json::Value as JsonValue;
 use std::collections::HashMap;
 use std::fs::{self, File};
 use std::io::Write;
@@ -2522,7 +2522,7 @@ events_keys = ["*"]
         let mut error_count = 0;
         loop {
             let descriptor = format!("addr({})", miner_address);
-            let rpc_call = base_builder(
+            let rpc_result: JsonValue = base_builder(
                 &bitcoin_node_url,
                 &devnet_config.bitcoin_node_username,
                 &devnet_config.bitcoin_node_password,
@@ -2536,34 +2536,24 @@ events_keys = ["*"]
             }))
             .send()
             .await
-            .map_err(|e| format!("unable to send 'getdescriptorinfo' request ({})", e));
+            .map_err(|e| format!("unable to send 'getdescriptorinfo' request ({})", e))
+            .map_err(|e| format!("unable to receive 'getdescriptorinfo' response: {}", e))?
+            .json()
+            .await
+            .map_err(|e| format!("unable to parse 'getdescriptorinfo' result: {}", e))?;
 
-            let checksum = match rpc_call {
-                Ok(r) => {
-                    let res: Value = r.json().await.unwrap();
-                    // let _ = devnet_event_tx.send(DevnetEvent::info(format!(
-                    //     "getdescriptorinfo {:?}",
-                    //     res
-                    // )));
-
-                    let checksum = res
-                        .as_object()
-                        .unwrap()
-                        .get("result")
-                        .unwrap()
-                        .as_object()
-                        .unwrap()
-                        .get("checksum")
-                        .unwrap()
-                        .as_str()
-                        .unwrap()
-                        .to_string();
-                    checksum
-                }
-                Err(e) => {
-                    panic!()
-                }
-            };
+            let checksum = rpc_result
+                .as_object()
+                .ok_or(format!("unable to parse 'getdescriptorinfo'"))?
+                .get("result")
+                .ok_or(format!("unable to parse 'getdescriptorinfo'"))?
+                .as_object()
+                .ok_or(format!("unable to parse 'getdescriptorinfo'"))?
+                .get("checksum")
+                .ok_or(format!("unable to parse 'getdescriptorinfo'"))?
+                .as_str()
+                .ok_or(format!("unable to parse 'getdescriptorinfo'"))?
+                .to_string();
 
             let _ = devnet_event_tx.send(DevnetEvent::info(format!(
                 "Registering {descriptor}#{checksum}"
@@ -2590,7 +2580,7 @@ events_keys = ["*"]
             .map_err(|e| format!("unable to send 'importdescriptors' request ({})", e));
 
             match rpc_call {
-                Ok(r) => {
+                Ok(_r) => {
                     break;
                 }
                 Err(e) => {
@@ -2609,7 +2599,7 @@ events_keys = ["*"]
         let mut error_count = 0;
         loop {
             let descriptor = format!("addr({})", faucet_address);
-            let rpc_call = base_builder(
+            let rpc_result: JsonValue = base_builder(
                 &bitcoin_node_url,
                 &devnet_config.bitcoin_node_username,
                 &devnet_config.bitcoin_node_password,
@@ -2623,34 +2613,24 @@ events_keys = ["*"]
             }))
             .send()
             .await
-            .map_err(|e| format!("unable to send 'getdescriptorinfo' request ({})", e));
+            .map_err(|e| format!("unable to send 'getdescriptorinfo' request ({})", e))
+            .map_err(|e| format!("unable to receive 'getdescriptorinfo' response: {}", e))?
+            .json()
+            .await
+            .map_err(|e| format!("unable to parse 'getdescriptorinfo' result: {}", e))?;
 
-            let checksum = match rpc_call {
-                Ok(r) => {
-                    let res: Value = r.json().await.unwrap();
-                    // let _ = devnet_event_tx.send(DevnetEvent::info(format!(
-                    //     "getdescriptorinfo {:?}",
-                    //     res
-                    // )));
-
-                    let checksum = res
-                        .as_object()
-                        .unwrap()
-                        .get("result")
-                        .unwrap()
-                        .as_object()
-                        .unwrap()
-                        .get("checksum")
-                        .unwrap()
-                        .as_str()
-                        .unwrap()
-                        .to_string();
-                    checksum
-                }
-                Err(e) => {
-                    panic!()
-                }
-            };
+            let checksum = rpc_result
+                .as_object()
+                .ok_or(format!("unable to parse 'getdescriptorinfo'"))?
+                .get("result")
+                .ok_or(format!("unable to parse 'getdescriptorinfo'"))?
+                .as_object()
+                .ok_or(format!("unable to parse 'getdescriptorinfo'"))?
+                .get("checksum")
+                .ok_or(format!("unable to parse 'getdescriptorinfo'"))?
+                .as_str()
+                .ok_or(format!("unable to parse 'getdescriptorinfo'"))?
+                .to_string();
 
             let _ = devnet_event_tx.send(DevnetEvent::info(format!(
                 "Registering {descriptor}#{checksum}"
@@ -2677,7 +2657,7 @@ events_keys = ["*"]
             .map_err(|e| format!("unable to send 'importdescriptors' request ({})", e));
 
             match rpc_call {
-                Ok(r) => {
+                Ok(_r) => {
                     break;
                 }
                 Err(e) => {
@@ -2700,7 +2680,7 @@ events_keys = ["*"]
             let mut error_count = 0;
             loop {
                 let descriptor = format!("addr({})", address);
-                let rpc_call = base_builder(
+                let rpc_result: JsonValue = base_builder(
                     &bitcoin_node_url,
                     &devnet_config.bitcoin_node_username,
                     &devnet_config.bitcoin_node_password,
@@ -2714,34 +2694,24 @@ events_keys = ["*"]
                 }))
                 .send()
                 .await
-                .map_err(|e| format!("unable to send 'getdescriptorinfo' request ({})", e));
+                .map_err(|e| format!("unable to send 'getdescriptorinfo' request ({})", e))
+                .map_err(|e| format!("unable to receive 'getdescriptorinfo' response: {}", e))?
+                .json()
+                .await
+                .map_err(|e| format!("unable to parse 'getdescriptorinfo' result: {}", e))?;
 
-                let checksum = match rpc_call {
-                    Ok(r) => {
-                        let res: Value = r.json().await.unwrap();
-                        // let _ = devnet_event_tx.send(DevnetEvent::info(format!(
-                        //     "getdescriptorinfo {:?}",
-                        //     res
-                        // )));
-
-                        let checksum = res
-                            .as_object()
-                            .unwrap()
-                            .get("result")
-                            .unwrap()
-                            .as_object()
-                            .unwrap()
-                            .get("checksum")
-                            .unwrap()
-                            .as_str()
-                            .unwrap()
-                            .to_string();
-                        checksum
-                    }
-                    Err(e) => {
-                        panic!()
-                    }
-                };
+                let checksum = rpc_result
+                    .as_object()
+                    .ok_or(format!("unable to parse 'getdescriptorinfo'"))?
+                    .get("result")
+                    .ok_or(format!("unable to parse 'getdescriptorinfo'"))?
+                    .as_object()
+                    .ok_or(format!("unable to parse 'getdescriptorinfo'"))?
+                    .get("checksum")
+                    .ok_or(format!("unable to parse 'getdescriptorinfo'"))?
+                    .as_str()
+                    .ok_or(format!("unable to parse 'getdescriptorinfo'"))?
+                    .to_string();
 
                 let _ = devnet_event_tx.send(DevnetEvent::info(format!(
                     "Registering {descriptor}#{checksum}"
@@ -2768,7 +2738,7 @@ events_keys = ["*"]
                 .map_err(|e| format!("unable to send 'importdescriptors' request ({})", e));
 
                 match rpc_call {
-                    Ok(r) => {
+                    Ok(_r) => {
                         break;
                     }
                     Err(e) => {
