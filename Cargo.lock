@@ -657,12 +657,14 @@ checksum = "baf1de4339761588bc0619e3cbc0120ee582ebb74b53b4efbf79117bd2da40fd"
 [[package]]
 name = "chainhook-event-observer"
 version = "1.0.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d9002e9ebd1f66bc0fcca003a5d87a672077b2139c50efa0628a845fce8706e6"
 dependencies = [
  "base58 0.2.0",
  "base64 0.13.1",
  "bitcoincore-rpc",
  "bitcoincore-rpc-json",
- "chainhook-types 1.0.1",
+ "chainhook-types",
  "clarinet-utils 1.0.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "clarity-repl 1.4.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "crossbeam-channel",
@@ -680,20 +682,9 @@ dependencies = [
 
 [[package]]
 name = "chainhook-types"
-version = "1.0.1"
-dependencies = [
- "schemars",
- "serde",
- "serde_derive",
- "serde_json",
- "strum",
-]
-
-[[package]]
-name = "chainhook-types"
-version = "1.0.1"
+version = "1.0.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "fe083f0dd830eb487602a3f1ebc56c1245d9cdb25cc83adb8f35e977bb477dc2"
+checksum = "2fef6a17d9cd36d4bc8c11b5fd64bd491ee16180209180ccf996960623379cad"
 dependencies = [
  "schemars",
  "serde",
@@ -807,7 +798,7 @@ dependencies = [
  "bitcoin",
  "block-modes 0.8.1",
  "cache_control",
- "chainhook-types 1.0.1",
+ "chainhook-types",
  "chrono",
  "clap",
  "clap_generate",
@@ -911,13 +902,13 @@ dependencies = [
 
 [[package]]
 name = "clarinet-deployments"
-version = "1.0.0"
+version = "1.0.1"
 dependencies = [
  "base58 0.2.0",
  "bitcoin",
  "bitcoincore-rpc",
  "bitcoincore-rpc-json",
- "chainhook-types 1.0.1",
+ "chainhook-types",
  "clarinet-files",
  "clarinet-utils 1.0.0",
  "clarity-repl 1.4.1",
@@ -937,7 +928,7 @@ version = "1.0.0"
 dependencies = [
  "bip39",
  "bitcoin",
- "chainhook-types 1.0.1",
+ "chainhook-types",
  "clarinet-utils 1.0.0",
  "clarity-repl 1.4.1",
  "js-sys",
@@ -1013,7 +1004,7 @@ dependencies = [
 name = "clarity-lsp"
 version = "1.0.0"
 dependencies = [
- "chainhook-types 1.0.1",
+ "chainhook-types",
  "clarinet-deployments",
  "clarinet-files",
  "clarity-repl 1.4.1",
@@ -5843,7 +5834,7 @@ dependencies = [
 name = "stacks-devnet-js"
 version = "1.4.2"
 dependencies = [
- "chainhook-types 1.0.1 (registry+https://github.com/rust-lang/crates.io-index)",
+ "chainhook-types",
  "clarinet-deployments",
  "clarinet-files",
  "clarinet-utils 1.0.0",
@@ -5865,7 +5856,7 @@ dependencies = [
  "bitcoincore-rpc",
  "bollard",
  "chainhook-event-observer",
- "chainhook-types 1.0.1",
+ "chainhook-types",
  "chrono",
  "clarinet-deployments",
  "clarinet-files",
