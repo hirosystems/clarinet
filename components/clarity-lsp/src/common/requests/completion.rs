@@ -97,27 +97,20 @@ impl<'a> ContractDefinedData {
         &mut self,
         expr: &SymbolicExpression,
         name: &ClarityName,
-        parameters: &Option<Vec<TypedVar<'a>>>,
+        parameters: &Vec<TypedVar<'a>>,
     ) {
         let mut completion_args: Vec<String> = vec![];
-        if let Some(parameters) = parameters {
-            for (i, typed_var) in parameters.iter().enumerate() {
-                if let Ok(signature) =
-                    TypeSignature::parse_type_repr(DEFAULT_EPOCH, typed_var.type_expr, &mut ())
-                {
-                    completion_args.push(format!(
-                        "${{{}:{}:{}}}",
-                        i + 1,
-                        typed_var.name,
-                        signature
-                    ));
+        for (i, typed_var) in parameters.iter().enumerate() {
+            if let Ok(signature) =
+                TypeSignature::parse_type_repr(DEFAULT_EPOCH, typed_var.type_expr, &mut ())
+            {
+                completion_args.push(format!("${{{}:{}:{}}}", i + 1, typed_var.name, signature));
 
-                    if is_position_within_span(&self.position, &expr.span, 0) {
-                        self.locals
-                            .push((typed_var.name.to_string(), signature.to_string()));
-                    }
-                };
-            }
+                if is_position_within_span(&self.position, &expr.span, 0) {
+                    self.locals
+                        .push((typed_var.name.to_string(), signature.to_string()));
+                }
+            };
         }
 
         self.functions_completion_items.push(CompletionItem {
@@ -242,7 +235,7 @@ impl<'a> ASTVisitor<'a> for ContractDefinedData {
         parameters: Option<Vec<clarity_repl::analysis::ast_visitor::TypedVar<'a>>>,
         _body: &'a SymbolicExpression,
     ) -> bool {
-        self.set_function_completion_with_bindings(expr, name, &parameters);
+        self.set_function_completion_with_bindings(expr, name, &parameters.unwrap_or(vec![]));
         true
     }
 
@@ -253,7 +246,7 @@ impl<'a> ASTVisitor<'a> for ContractDefinedData {
         parameters: Option<Vec<clarity_repl::analysis::ast_visitor::TypedVar<'a>>>,
         _body: &'a SymbolicExpression,
     ) -> bool {
-        self.set_function_completion_with_bindings(expr, name, &parameters);
+        self.set_function_completion_with_bindings(expr, name, &parameters.unwrap_or(vec![]));
         true
     }
 
@@ -264,7 +257,7 @@ impl<'a> ASTVisitor<'a> for ContractDefinedData {
         parameters: Option<Vec<clarity_repl::analysis::ast_visitor::TypedVar<'a>>>,
         _body: &'a SymbolicExpression,
     ) -> bool {
-        self.set_function_completion_with_bindings(expr, name, &parameters);
+        self.set_function_completion_with_bindings(expr, name, &parameters.unwrap_or(vec![]));
         true
     }
 
