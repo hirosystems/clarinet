@@ -417,11 +417,13 @@
       (< block-height (+ (get created-at preorder) NAMESPACE_PREORDER_CLAIMABILITY_TTL))
       (err ERR_NAMESPACE_PREORDER_CLAIMABILITY_EXPIRED))
     ;; The preorder record for this namespace will be marked as "claimed"
+    ;; #[allow(unchecked_data)]
     (map-set namespace-preorders
       { hashed-salted-namespace: hashed-salted-namespace, buyer: tx-sender }
       { created-at: (get created-at preorder), claimed: true, stx-burned: (get stx-burned preorder) })
     ;; The namespace will be set as "revealed" but not "launched", its price function, its renewal rules, its version,
     ;; and its import principal will be written to the  `namespaces` table.
+    ;; #[allow(unchecked_data)]
     (map-set namespaces
       namespace
       { namespace-import: namespace-import,
@@ -460,8 +462,10 @@
         (< block-height (+ (get revealed-at namespace-props) NAMESPACE_LAUNCHABILITY_TTL))
         (err ERR_NAMESPACE_PREORDER_LAUNCHABILITY_EXPIRED))
       ;; Mint the new name
+      ;; #[allow(unchecked_data)]
       (try! (mint-or-transfer-name? namespace name beneficiary))
       ;; Update zonefile and props
+      ;; #[allow(unchecked_data)]
       (update-zonefile-and-props
         namespace
         name
@@ -640,6 +644,7 @@
       ;; Mint the name if new, transfer the name otherwise.
       (try! (mint-or-transfer-name? namespace name tx-sender))
       ;; Update name's metadata / properties
+      ;; #[allow(unchecked_data)]
       (update-zonefile-and-props
         namespace
         name
@@ -660,6 +665,7 @@
   (let (
     (data (try! (check-name-ops-preconditions namespace name))))
     ;; Update the zonefile
+    ;; #[allow(unchecked_data)]
     (update-zonefile-and-props
       namespace
       name
@@ -688,10 +694,12 @@
       can-new-owner-get-name
       (err ERR_PRINCIPAL_ALREADY_ASSOCIATED))
     ;; Transfer the name
+    ;; #[allow(unchecked_data)]
     (unwrap!
       (update-name-ownership? namespace name tx-sender new-owner)
       (err ERR_NAME_TRANSFER_FAILED))
     ;; Update or clear the zonefile
+    ;; #[allow(unchecked_data)]
     (update-zonefile-and-props
         namespace
         name
@@ -714,6 +722,7 @@
   (let (
     (data (try! (check-name-ops-preconditions namespace name))))
     ;; Clear the zonefile
+    ;; #[allow(unchecked_data)]
     (update-zonefile-and-props
         namespace
         name
