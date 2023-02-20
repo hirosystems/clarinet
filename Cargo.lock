@@ -266,6 +266,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "auto_impl"
+version = "1.0.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8a8c1df849285fbacd587de7818cc7d13be6cd2cbcd47a04fb1801b0e2706e33"
+dependencies = [
+ "proc-macro-error",
+ "proc-macro2 1.0.51",
+ "quote 1.0.23",
+ "syn 1.0.107",
+]
+
+[[package]]
 name = "autocfg"
 version = "0.1.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1005,7 +1017,7 @@ dependencies = [
  "console_error_panic_hook",
  "js-sys",
  "lazy_static",
- "lsp-types 0.94.0",
+ "lsp-types",
  "regex",
  "serde",
  "serde-wasm-bindgen",
@@ -3477,19 +3489,6 @@ name = "lsp-types"
 version = "0.93.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9be6e9c7e2d18f651974370d7aff703f9513e0df6e464fd795660edc77e6ca51"
-dependencies = [
- "bitflags",
- "serde",
- "serde_json",
- "serde_repr",
- "url",
-]
-
-[[package]]
-name = "lsp-types"
-version = "0.94.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0b63735a13a1f9cd4f4835223d828ed9c2e35c8c5e61837774399f558b6a1237"
 dependencies = [
  "bitflags",
  "serde",
@@ -6447,7 +6446,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a9b192a3b556cf0a81b4dcb8fa35374d306cd46f806dce937599b40e2d945e51"
 dependencies = [
  "ahash",
- "auto_impl",
+ "auto_impl 0.5.0",
  "petgraph",
  "swc_fast_graph",
  "tracing",
@@ -6876,18 +6875,17 @@ checksum = "c20c8dbed6283a09604c3e69b4b7eeb54e298b8a600d4d5ecb5ad39de609f1d0"
 
 [[package]]
 name = "tower-lsp"
-version = "0.17.0"
+version = "0.18.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "43e094780b4447366c59f79acfd65b1375ecaa84e61dddbde1421aa506334024"
+checksum = "7d0ad391e4e58fccec398abd3da22d5e59fbcbae8d036df0d00dfd9703c7ee96"
 dependencies = [
  "async-trait",
- "auto_impl",
+ "auto_impl 1.0.1",
  "bytes",
  "dashmap",
  "futures",
  "httparse",
- "log",
- "lsp-types 0.93.2",
+ "lsp-types",
  "memchr",
  "serde",
  "serde_json",
@@ -6895,13 +6893,14 @@ dependencies = [
  "tokio-util 0.7.7",
  "tower",
  "tower-lsp-macros",
+ "tracing",
 ]
 
 [[package]]
 name = "tower-lsp-macros"
-version = "0.6.0"
+version = "0.7.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7ebd99eec668d0a450c177acbc4d05e0d0d13b1f8d3db13cd706c52cbec4ac04"
+checksum = "74697a0324a76eedfc784ffef1cc4de2300af19720de3c3fd99cd7ec484479da"
 dependencies = [
  "proc-macro2 1.0.51",
  "quote 1.0.23",
