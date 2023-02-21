@@ -746,7 +746,7 @@ rpcport={bitcoin_node_rpc_port}
                 ..Default::default()
             }),
             cmd: Some(vec![
-                "/bin/bitcoind".into(),
+                "/usr/local/bin/bitcoind".into(),
                 "-conf=/etc/bitcoin/bitcoin.conf".into(),
                 "-nodebuglogfile".into(),
                 "-pid=/run/bitcoind.pid".into(),
