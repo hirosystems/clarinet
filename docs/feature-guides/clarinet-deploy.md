@@ -23,7 +23,7 @@ You can commit, audit, and test contracts without including any secrets in the D
 
 | Transaction primitive | Typical usage |
 |---|---|
-| publish contracts | - deploy a contract to an in-memory simulated Stacks chain or an integrate Stacks-Bitcoin environment <br> - deploy to a public testnet or mainnet <br> - deploy an external contract to your local network for testing |
+| publish contracts | - deploy a contract to an in-memory simulated Stacks chain or an integrate Stacks-Bitcoin environment <br /> - deploy to a public testnet or mainnet <br /> - deploy an external contract to your local network for testing |
 | call contract functions | - call a contract deployed to any of your local devnets or public networks, chain transactions |
 | send BTC | - Perform a simple bitcoin transfer from a p2pkh address to a p2pkh address (devnet/testnet/mainnet)  |
 | wait for block | - Test or automate contract deployment across multiple Stacks or Bitcoin blocks  |
