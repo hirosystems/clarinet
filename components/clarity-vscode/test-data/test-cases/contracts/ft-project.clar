@@ -11,6 +11,7 @@
 ;; No maximum supply!
 (define-fungible-token clarity-coin)
 
+
 (define-public (transfer
   (amount uint)
   (sender principal)
@@ -19,6 +20,7 @@
 )
   (begin
     (asserts! (is-eq tx-sender sender) err-not-token-owner)
+    ;; #[allow(unchecked_data)]
     (try! (ft-transfer? clarity-coin amount sender recipient))
     (match memo to-print (print to-print) 0x)
     (ok true)
@@ -52,6 +54,7 @@
 (define-public (mint (amount uint) (recipient principal))
   (begin
     (asserts! (is-eq tx-sender contract-owner) err-owner-only)
+    ;; #[allow(unchecked_data)]
     (ft-mint? clarity-coin amount recipient)
   )
 )
