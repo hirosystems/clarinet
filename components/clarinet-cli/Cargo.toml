@@ -134,6 +134,7 @@ base58 = "0.2.0"
 ctrlc = "3.1.9"
 strum = { version = "0.23.0", features = ["derive"] }
 bitcoin = "0.29.2"
+tiny-hderive = "0.3.0"
 segment = { version = "0.1.2", optional = true }
 mac_address = { version = "1.1.2", optional = true }
 tower-lsp = { version = "0.18.0", optional = true }
