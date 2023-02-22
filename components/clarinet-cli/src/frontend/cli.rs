@@ -1298,6 +1298,7 @@ pub fn main() {
             let _ = fs::create_dir(devnet_config.working_dir.clone());
             let _ = fs::create_dir(format!("{}/conf", devnet_config.working_dir));
             let _ = fs::create_dir(format!("{}/data", devnet_config.working_dir));
+            let _ = fs::create_dir(format!("{}/requirements", cache_location.display()));
 
             if devnet_config.enable_subnet_node {
                 let subnet_deployer =
@@ -1312,9 +1313,7 @@ pub fn main() {
                 let subnet_leader = compute_stx_address(
                     &devnet_config.subnet_leader_mnemonic,
                     &devnet_config.subnet_leader_derivation_path,
-                    &StacksNetwork::Devnet,
                 );
-                let _ = fs::create_dir(format!("{}/requirements", cache_location.display()));
 
                 let ctx = Context {
                     logger: None,
@@ -1963,11 +1962,7 @@ impl DiagnosticsDigest {
     }
 }
 
-pub fn compute_stx_address(
-    mnemonic: &str,
-    derivation_path: &str,
-    network: &StacksNetwork,
-) -> StacksAddress {
+pub fn compute_stx_address(mnemonic: &str, derivation_path: &str) -> StacksAddress {
     let bip39_seed = match get_bip39_seed_from_mnemonic(&mnemonic, "") {
         Ok(bip39_seed) => bip39_seed,
         Err(_) => panic!(),
@@ -1976,12 +1971,6 @@ pub fn compute_stx_address(
     let ext = ExtendedPrivKey::derive(&bip39_seed[..], derivation_path).unwrap();
 
     let secret_key = SecretKey::parse_slice(&ext.secret()).unwrap();
-
-    // Enforce a 33 bytes secret key format, expected by Stacks
-    let mut secret_key_bytes = secret_key.serialize().to_vec();
-    secret_key_bytes.push(1);
-    let miner_secret_key_hex = bytes_to_hex(&secret_key_bytes);
-
     let public_key = PublicKey::from_secret_key(&secret_key);
     let pub_key = Secp256k1PublicKey::from_slice(&public_key.serialize_compressed()).unwrap();
     let version = clarity_repl::clarity::address::C32_ADDRESS_VERSION_TESTNET_SINGLESIG;
