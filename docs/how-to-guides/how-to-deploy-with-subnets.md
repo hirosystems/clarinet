@@ -6,8 +6,8 @@ Clarinet may facilitate experimentation with [subnets](https://www.youtube.com/w
 
 *Topic*:
 
-- [x] Enable subnet node
-- [x] Spin up your subnet node
+- [x] Enable subnets node
+- [x] Spin up your subnets node
 
 To get started with subnets, enable the flag in your `Devnet.toml` by adding the configuration below.
 
