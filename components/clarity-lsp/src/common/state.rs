@@ -569,6 +569,7 @@ impl ProtocolState {
         diags: &mut HashMap<QualifiedContractIdentifier, Vec<ClarityDiagnostic>>,
         definitions: &mut HashMap<QualifiedContractIdentifier, HashMap<ClarityName, Range>>,
         analyses: &mut HashMap<QualifiedContractIdentifier, Option<ContractAnalysis>>,
+        clarity_versions: &mut HashMap<QualifiedContractIdentifier, ClarityVersion>,
     ) {
         // Remove old paths
         // TODO(lgalabru)
@@ -591,8 +592,8 @@ impl ProtocolState {
                 Some(analysis) => analysis,
                 None => None,
             };
-            let clarity_version = match &analysis {
-                Some(analysis) => analysis.clarity_version,
+            let clarity_version = match clarity_versions.remove(&contract_id) {
+                Some(analysis) => analysis,
                 None => DEFAULT_CLARITY_VERSION,
             };
             let definitions = match definitions.remove(&contract_id) {
@@ -640,6 +641,7 @@ pub async fn build_state(
     let mut locations = HashMap::new();
     let mut analyses = HashMap::new();
     let mut definitions = HashMap::new();
+    let mut clarity_versions = HashMap::new();
 
     // In the LSP use case, trying to load an existing deployment
     // might not be suitable, in an edition context, we should
@@ -676,6 +678,9 @@ pub async fn build_state(
             None => continue,
         };
         locations.insert(contract_id.clone(), contract_location.clone());
+        if let Some(contract_metadata) = manifest.contracts_settings.get(contract_location) {
+            clarity_versions.insert(contract_id.clone(), contract_metadata.clarity_version);
+        }
 
         match result {
             Ok(mut execution_result) => {
@@ -713,6 +718,7 @@ pub async fn build_state(
         &mut artifacts.diags,
         &mut definitions,
         &mut analyses,
+        &mut clarity_versions,
     );
 
     Ok(())

@@ -38,7 +38,7 @@ rand_pcg = "0.3.1"
 rand_seeder = "0.2.2"
 atty = "0.2.14"
 clarity-vm = { version = "=2.0.1", default-features = false, optional = true }
-# clarity = { path = "../../../stacks-blockchain/clarity", default-features = false, optional = true }
+# clarity-vm = { path = "../../../stacks-blockchain/clarity", default-features = false, optional = true }
 
 # DAP Debugger
 tokio = { version = "1.24", features = ["full"], optional = true }
