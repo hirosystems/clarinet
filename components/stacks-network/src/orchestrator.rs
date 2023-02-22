@@ -27,10 +27,11 @@ use reqwest::RequestBuilder;
 use serde_json::Value;
 use std::collections::HashMap;
 use std::fs::{self, File};
-use std::io::{Cursor, Write};
+use std::io::{Cursor, Read, Write};
 use std::path::PathBuf;
 use std::sync::mpsc::{Receiver, Sender};
 use std::time::Duration;
+use tar::EntryType;
 
 #[derive(Debug)]
 pub struct DevnetOrchestrator {
@@ -1399,6 +1400,7 @@ events_keys = ["*"]
         ctx: &Context,
         cache_dir: PathBuf,
         deployer: &StandardPrincipalData,
+        miner: &StandardPrincipalData,
     ) -> Result<(), String> {
         let (docker, devnet_config) = match (&self.docker_client, &self.network_config) {
             (Some(ref docker), Some(ref network_config)) => match network_config.devnet {
@@ -1478,9 +1480,21 @@ events_keys = ["*"]
             };
             let contract_path = prefix.join(filename_str);
 
-            entry
-                .unpack(contract_path.clone())
-                .map_err(|e| e.to_string())?;
+            // Write the contract file, replacing the miner address
+            if entry.header().entry_type() == EntryType::Regular {
+                let mut buffer = String::new();
+                entry
+                    .read_to_string(&mut buffer)
+                    .map_err(|e| e.to_string())?;
+                let contract_content = buffer.replace(
+                    "(define-data-var miner principal tx-sender)",
+                    &format!("(define-data-var miner principal '{})", &miner),
+                );
+                let contract_file = FileLocation::from_path(contract_path.clone());
+                contract_file
+                    .write_content(contract_content.as_bytes())
+                    .map_err(|e| e.to_string())?;
+            }
 
             // Write the metadata file
             let metadata_path = contract_path.with_extension("json");

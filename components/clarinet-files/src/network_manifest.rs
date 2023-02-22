@@ -690,7 +690,7 @@ impl NetworkManifest {
             let subnet_events_ingestion_port =
                 devnet_config.subnet_events_ingestion_port.unwrap_or(30445);
 
-            let mut stacks_node_events_observers = devnet_config
+            let stacks_node_events_observers = devnet_config
                 .stacks_node_events_observers
                 .take()
                 .unwrap_or(vec![]);
