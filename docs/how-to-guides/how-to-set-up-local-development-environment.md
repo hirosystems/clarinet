@@ -4,6 +4,13 @@ title: Set up local Development Environment
 
 ## Developing a Clarity smart contract
 
+This article helps you with creating a new project and develop a clarity smart contract.
+
+*Topics*:
+
+- [x] Develop a clarity smart contract
+- [x] Test and interact with smart contracts
+
 Once you have installed Clarinet, you can begin a new Clarinet project with the command:
 
 ```sh
@@ -181,3 +188,4 @@ For more information on assertions, review [asserts](https://deno.land/std@0.90.
 - [Clarity language reference](https://docs.stacks.co/references/language-functions)
 - [Deno standard library - asserts](https://deno.land/std@0.90.0/testing/asserts.ts)
 - [Clarity visual studio code plugin](https://marketplace.visualstudio.com/items?itemName=HiroSystems.clarity-lsp)
+

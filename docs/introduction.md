@@ -24,8 +24,3 @@ To view these video tutorials, please see [Hiro's Youtube channel](https://www.y
 For more latest information on Clarinet product, refer to [blog posts on Clarinet](https://www.hiro.so/search?query=Clarinet).
 
 When developing smart contracts, you can also use the [Clarity Visual Studio Code plugin](https://marketplace.visualstudio.com/items?itemName=HiroSystems.clarity-lsp).
-
-
-
-
-

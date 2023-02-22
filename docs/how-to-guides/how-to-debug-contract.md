@@ -6,6 +6,12 @@ title: Debug Contract
 
 Clarinet supports the [Debug Adapter Protocol](https://microsoft.github.io/debug-adapter-protocol/) (DAP), which enables you to debug your smart contracts inside of Visual Studio Code (VS Code) or any code editor supporting the DAP protocol.
 
+*Topics*:
+
+- [x] Enable smart-contract debugging in Visual Studio code
+- [x] Use command-line debugger inside the `clarinet console`
+- [x] Learn how to use `trace` command
+
 To set up a debug session, you will need to create a `launch.json` file to tell VS Code what you want to debug.
 The easiest way to accomplish this is to let VS Code generate the template for you by opening the "Run and Debug" view and clicking "create a launch.json file".
 
@@ -109,5 +115,3 @@ This trace shows all function calls, both internal calls to private functions an
 For each call, the parameters and return value are shown in the trace. Any events that are emitted are also shown in the trace.
 
 ![execution trace](../images/trace.png)
-
-

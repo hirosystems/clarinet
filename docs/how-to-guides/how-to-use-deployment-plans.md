@@ -92,7 +92,6 @@ Here are some of the relevant transactions and configurations available to devel
 - `btc-transfer`: Simple bitcoin transfer from a p2pkh address to a p2pkh address (experimental, `regtest`/`testnet`/`mainnet`).
 - Waiting between blocks to make transactions is done by specifying transaction directives in a different batch in the deployment plan (see the `batches` field)
 
-
 ### `emulated-contract-publish`
 
 This default transaction is included in every generated deployment for a `simnet` deployment. The institutional lending protocol [Zest has a code audit](https://github.com/Trust-Machines/Zest-Audit/blob/1c35ea49fff7d990aa58d045f1e3bcac5e65406c/deployments/default.simnet-plan.yaml) that includes a simnet environment

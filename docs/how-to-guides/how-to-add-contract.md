@@ -2,7 +2,14 @@
 title: Add new Contract
 ---
 
-Clarinet can handle adding a new contract and its configuration to your project when you use the command listed below.
+Clarinet can handle adding a new contract and its configuration to your project.
+
+*Topics*:
+
+- [x] Add a new contract
+- [x] Verify contract configuration
+
+You can use the command below to add a new contract.
 
 ```bash
 $ clarinet contract new bbtc
