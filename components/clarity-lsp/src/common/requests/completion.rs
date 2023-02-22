@@ -113,10 +113,15 @@ impl<'a> ContractDefinedData {
             };
         }
 
+        let insert_text = match completion_args.len() {
+            0 => Some(name.to_string()),
+            _ => Some(format!("{} {}", name, completion_args.join(" "))),
+        };
+
         self.functions_completion_items.push(CompletionItem {
             label: name.to_string(),
             kind: Some(CompletionItemKind::MODULE),
-            insert_text: Some(format!("{} {}", name, completion_args.join(" "))),
+            insert_text,
             insert_text_format: Some(InsertTextFormat::SNIPPET),
             ..Default::default()
         });
