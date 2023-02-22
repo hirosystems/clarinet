@@ -59,9 +59,9 @@ macro_rules! pluralize {
 
 #[cfg(feature = "telemetry")]
 use super::telemetry::{telemetry_report_event, DeveloperUsageDigest, DeveloperUsageEvent};
-
-/// For Clarinet documentation, refer to https://docs.hiro.so/clarinet/introduction.
+/// Clarinet is a command line tool for Clarity smart contract development.
 ///
+/// For Clarinet documentation, refer to https://docs.hiro.so/clarinet/introduction.
 /// Report any issues here https://github.com/hirosystems/clarinet/issues/new.
 
 #[derive(Parser, PartialEq, Clone, Debug)]
