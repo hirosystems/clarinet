@@ -13,6 +13,12 @@ clarity_version = 1
 [contracts.counter]
 path = "contracts/counter.clar"
 clarity_version = 2
+epoch = 2.1
+
+[contracts.empty]
+path = "contracts/empty.clar"
+clarity_version = 2
+epoch = 2.1
 
 [repl.analysis]
 passes = ["check_checker"]

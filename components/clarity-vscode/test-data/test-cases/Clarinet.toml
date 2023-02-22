@@ -13,17 +13,17 @@ contract_id = 'SP3FBR2AGK5H9QBDH3EEN6DF8EK8JY7RX8QJ5SVTE.sip-010-trait-ft-standa
 [contracts.bns]
 path = 'contracts/bns.clar'
 clarity_version = 2
-epoch = 2.0
+epoch = 2.1
 
 [contracts.contract]
 path = 'contracts/contract.clar'
 clarity_version = 2
-epoch = 2.0
+epoch = 2.1
 
 [contracts.ft-project]
 path = 'contracts/ft-project.clar'
 clarity_version = 2
-epoch = 2.0
+epoch = 2.1
 
 [contracts.iterators]
 path = 'contracts/iterators.clar'
@@ -33,7 +33,8 @@ epoch = 2.0
 [contracts.nft-project]
 path = 'contracts/nft-project.clar'
 clarity_version = 2
-epoch = 2.0
+epoch = 2.1
+
 [repl.analysis]
 passes = ['check_checker']
 
