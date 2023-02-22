@@ -53,7 +53,7 @@ To define a Clarinet test, you need to register it with a call to `Clarinet.test
 2. Instantiating and passing common Clarinet objects to our `Clarinet.test()` API call
 3. Defining a user `wallet_1`, calling `increment`, and asserting its results
 
-```TypeScript
+```javascript
 // counter_test.ts - A unit test file
 import { Clarinet, Tx, Chain, Account, types } from 'https://deno.land/x/clarinet@v1.0.5/index.ts';
 
@@ -88,7 +88,7 @@ You can watch a step-by-step walkthrough of using `clarinet test` and watch [Exe
 Let us now write a higher coverage test suite.
 
 
-```TypeScript
+```javascript
 // counter_test.ts - a comprehensive unit test file
 import { Clarinet, Tx, Chain, Account, Contract, types } from 'https://deno.land/x/clarinet@v1.0.2/index.ts';
 import { assertEquals } from "https://deno.land/std@0.90.0/testing/asserts.ts";

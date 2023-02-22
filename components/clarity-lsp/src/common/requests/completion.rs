@@ -19,7 +19,7 @@ use lsp_types::{
 };
 use regex::Regex;
 
-use super::helpers::is_position_within_span;
+use super::helpers::{get_function_at_position, is_position_within_span};
 
 lazy_static! {
     static ref COMPLETION_ITEMS_CLARITY_1: Vec<CompletionItem> =
@@ -49,6 +49,23 @@ lazy_static! {
         NativeFunctions::MintAsset.to_string(),
         NativeFunctions::TransferAsset.to_string(),
     ];
+    static ref ITERATOR_FUNCTIONS: Vec<String> = vec![
+        NativeFunctions::Map.to_string(),
+        NativeFunctions::Filter.to_string(),
+        NativeFunctions::Fold.to_string(),
+    ];
+    static ref VALID_MAP_FUNCTIONS_CLARITY_1: Vec<CompletionItem> =
+        build_map_valid_cb_completion_items(ClarityVersion::Clarity1);
+    static ref VALID_MAP_FUNCTIONS_CLARITY_2: Vec<CompletionItem> =
+        build_map_valid_cb_completion_items(ClarityVersion::Clarity2);
+    static ref VALID_FILTER_FUNCTIONS_CLARITY_1: Vec<CompletionItem> =
+        build_filter_valid_cb_completion_items(ClarityVersion::Clarity1);
+    static ref VALID_FILTER_FUNCTIONS_CLARITY_2: Vec<CompletionItem> =
+        build_filter_valid_cb_completion_items(ClarityVersion::Clarity2);
+    static ref VALID_FOLD_FUNCTIONS_CLARITY_1: Vec<CompletionItem> =
+        build_fold_valid_cb_completion_items(ClarityVersion::Clarity1);
+    static ref VALID_FOLD_FUNCTIONS_CLARITY_2: Vec<CompletionItem> =
+        build_fold_valid_cb_completion_items(ClarityVersion::Clarity2);
 }
 
 #[derive(Clone, Debug, Default)]
@@ -105,7 +122,12 @@ impl<'a> ContractDefinedData {
         });
     }
 
-    pub fn populate_snippet_with_options(&self, name: &String, snippet: &String) -> Option<String> {
+    pub fn populate_snippet_with_options(
+        &self,
+        version: &ClarityVersion,
+        name: &String,
+        snippet: &String,
+    ) -> Option<String> {
         if VAR_FUNCTIONS.contains(name) && self.vars.len() > 0 {
             let choices = self.vars.join(",");
             return Some(snippet.replace("${1:var}", &format!("${{1|{}|}}", choices)));
@@ -121,6 +143,23 @@ impl<'a> ContractDefinedData {
         if NFT_FUNCTIONS.contains(name) && self.nfts.len() > 0 {
             let choices = self.nfts.join(",");
             return Some(snippet.replace("${1:asset-name}", &format!("${{1|{}|}}", choices)));
+        }
+        if ITERATOR_FUNCTIONS.contains(name) && self.functions_completion_items.len() > 0 {
+            let mut choices = self
+                .functions_completion_items
+                .iter()
+                .map(|f| f.label.to_string())
+                .collect::<Vec<String>>()
+                .join(",");
+            choices.push_str(",");
+            choices.push_str(
+                &get_iterator_cb_completion_item(version, name)
+                    .iter()
+                    .map(|i| i.insert_text.clone().unwrap())
+                    .collect::<Vec<String>>()
+                    .join(","),
+            );
+            return Some(snippet.replace("${1:func}", &format!("${{1|{}|}}", choices)));
         }
         None
     }
@@ -196,9 +235,7 @@ impl<'a> ASTVisitor<'a> for ContractDefinedData {
         parameters: Option<Vec<clarity_repl::analysis::ast_visitor::TypedVar<'a>>>,
         _body: &'a SymbolicExpression,
     ) -> bool {
-        if let Some(parameters) = parameters {
-            self.set_function_completion_with_bindings(expr, name, &parameters);
-        }
+        self.set_function_completion_with_bindings(expr, name, &parameters.unwrap_or(vec![]));
         true
     }
 
@@ -209,9 +246,7 @@ impl<'a> ASTVisitor<'a> for ContractDefinedData {
         parameters: Option<Vec<clarity_repl::analysis::ast_visitor::TypedVar<'a>>>,
         _body: &'a SymbolicExpression,
     ) -> bool {
-        if let Some(parameters) = parameters {
-            self.set_function_completion_with_bindings(expr, name, &parameters);
-        }
+        self.set_function_completion_with_bindings(expr, name, &parameters.unwrap_or(vec![]));
         true
     }
 
@@ -222,9 +257,7 @@ impl<'a> ASTVisitor<'a> for ContractDefinedData {
         parameters: Option<Vec<clarity_repl::analysis::ast_visitor::TypedVar<'a>>>,
         _body: &'a SymbolicExpression,
     ) -> bool {
-        if let Some(parameters) = parameters {
-            self.set_function_completion_with_bindings(expr, name, &parameters);
-        }
+        self.set_function_completion_with_bindings(expr, name, &parameters.unwrap_or(vec![]));
         true
     }
 
@@ -296,11 +329,53 @@ pub fn get_contract_calls(analysis: &ContractAnalysis) -> Vec<CompletionItem> {
 
 pub fn build_completion_item_list(
     clarity_version: &ClarityVersion,
+    expressions: &Vec<SymbolicExpression>,
+    position: &Position,
     active_contract_defined_data: &ContractDefinedData,
     contract_calls: Vec<CompletionItem>,
     should_wrap: bool,
     include_native_placeholders: bool,
 ) -> Vec<CompletionItem> {
+    if let Some((function_name, param)) = get_function_at_position(position, expressions.as_ref()) {
+        // - for var-*, map-*, ft-* or nft-* methods, return the corresponding data names
+        let mut completion_strings: Option<Vec<String>> = None;
+        if VAR_FUNCTIONS.contains(&function_name.to_string()) && param == Some(0) {
+            completion_strings = Some(active_contract_defined_data.vars.clone());
+        } else if MAP_FUNCTIONS.contains(&function_name.to_string()) && param == Some(0) {
+            completion_strings = Some(active_contract_defined_data.maps.clone());
+        } else if FT_FUNCTIONS.contains(&function_name.to_string()) && param == Some(0) {
+            completion_strings = Some(active_contract_defined_data.fts.clone());
+        } else if NFT_FUNCTIONS.contains(&function_name.to_string()) && param == Some(0) {
+            completion_strings = Some(active_contract_defined_data.nfts.clone());
+        }
+
+        if let Some(completion_strings) = completion_strings {
+            return completion_strings
+                .iter()
+                .map(|s| CompletionItem::new_simple(String::from(s), String::from("")))
+                .collect();
+        }
+
+        // - for iterator methods (filter, fold, map) return the list of available and valid functions
+        if ITERATOR_FUNCTIONS.contains(&function_name.to_string()) && param == Some(0) {
+            let mut completion_items: Vec<CompletionItem> = vec![];
+            completion_items.append(
+                &mut active_contract_defined_data
+                    .functions_completion_items
+                    .iter()
+                    .map(|f| {
+                        CompletionItem::new_simple(String::from(f.label.clone()), String::from(""))
+                    })
+                    .collect::<Vec<CompletionItem>>(),
+            );
+            completion_items.append(&mut get_iterator_cb_completion_item(
+                clarity_version,
+                &function_name.to_string(),
+            ));
+            return completion_items;
+        }
+    }
+
     let native_keywords = match clarity_version {
         ClarityVersion::Clarity1 => COMPLETION_ITEMS_CLARITY_1.to_vec(),
         ClarityVersion::Clarity2 => COMPLETION_ITEMS_CLARITY_2.to_vec(),
@@ -330,7 +405,7 @@ pub fn build_completion_item_list(
                 let mut snippet_has_choices = false;
                 if item.kind == Some(CompletionItemKind::FUNCTION) {
                     if let Some(populated_snippet) = active_contract_defined_data
-                        .populate_snippet_with_options(&item.label, &snippet)
+                        .populate_snippet_with_options(clarity_version, &item.label, &snippet)
                     {
                         snippet_has_choices = true;
                         snippet = populated_snippet;
@@ -340,8 +415,7 @@ pub fn build_completion_item_list(
                 if !include_native_placeholders {
                     if snippet_has_choices {
                         // for var-*, map-*, ft-* and nft-* methods
-                        // the variable name is kept
-                        // but the other placeholders are removed
+                        // the variable name is kept but the other placeholders are removed
                         let updated_snippet =
                             placeholder_pattern.replace_all(&snippet, "").to_string();
                         if updated_snippet.ne(&snippet) {
@@ -352,29 +426,15 @@ pub fn build_completion_item_list(
                         || item.kind == Some(CompletionItemKind::CLASS)
                     {
                         match item.label.as_str() {
-                            "+ (add)" => {
-                                snippet = "+".to_string();
-                            }
-                            "- (subtract)" => {
-                                snippet = "-".to_string();
-                            }
-                            "/ (divide)" => {
-                                snippet = "/".to_string();
-                            }
-                            "* (multiply)" => {
-                                snippet = "*".to_string();
-                            }
-                            "< (less than)" => {
-                                snippet = "<".to_string();
-                            }
-                            "<= (less than or equal)" => {
-                                snippet = "<=".to_string();
-                            }
-                            "> (greater than)" => {
-                                snippet = ">".to_string();
-                            }
-                            ">= (greater than or equal)" => {
-                                snippet = ">=".to_string();
+                            "+ (add)"
+                            | "- (subtract)"
+                            | "/ (divide)"
+                            | "* (multiply)"
+                            | "< (less than)"
+                            | "<= (less than or equal)"
+                            | "> (greater than)"
+                            | ">= (greater than or equal)" => {
+                                snippet = item.label.split_whitespace().next().unwrap().to_string()
                             }
                             _ => snippet = item.label.clone(),
                         }
@@ -412,7 +472,7 @@ pub fn check_if_should_wrap(source: &str, position: &Position) -> bool {
         .collect::<Vec<&str>>()
         .get(position.line as usize)
     {
-        let mut chars = line.chars();
+        let mut chars = line[..position.character as usize].chars();
         while let Some(char) = chars.next_back() {
             match char {
                 '(' => return false,
@@ -428,8 +488,11 @@ pub fn check_if_should_wrap(source: &str, position: &Position) -> bool {
 }
 
 pub fn build_default_native_keywords_list(version: ClarityVersion) -> Vec<CompletionItem> {
-    let clarity2_aliased_functions: Vec<NativeFunctions> =
-        vec![NativeFunctions::ElementAt, NativeFunctions::IndexOf];
+    let clarity2_aliased_functions: Vec<NativeFunctions> = vec![
+        NativeFunctions::ElementAt,
+        NativeFunctions::IndexOf,
+        NativeFunctions::BitwiseXor,
+    ];
 
     let command = lsp_types::Command {
         title: "triggerParameterHints".into(),
@@ -448,6 +511,7 @@ pub fn build_default_native_keywords_list(version: ClarityVersion) -> Vec<Comple
                 if version >= ClarityVersion::Clarity2 {
                     return None;
                 } else if api.version == ClarityVersion::Clarity1 {
+                    // only for element-at? and index-of?
                     api.snippet = api.snippet.replace("?", "");
                 }
             }
@@ -565,6 +629,142 @@ pub fn build_default_native_keywords_list(version: ClarityVersion) -> Vec<Comple
     .into_iter()
     .flatten()
     .collect::<Vec<CompletionItem>>()
+}
+
+pub fn build_map_valid_cb_completion_items(version: ClarityVersion) -> Vec<CompletionItem> {
+    vec![
+        NativeFunctions::Add,
+        NativeFunctions::Subtract,
+        NativeFunctions::Multiply,
+        NativeFunctions::Divide,
+        NativeFunctions::CmpGeq,
+        NativeFunctions::CmpLeq,
+        NativeFunctions::CmpLess,
+        NativeFunctions::CmpGreater,
+        NativeFunctions::ToInt,
+        NativeFunctions::ToUInt,
+        NativeFunctions::Modulo,
+        NativeFunctions::Power,
+        NativeFunctions::Sqrti,
+        NativeFunctions::Log2,
+        NativeFunctions::BitwiseXor,
+        NativeFunctions::And,
+        NativeFunctions::Or,
+        NativeFunctions::Not,
+        NativeFunctions::BuffToIntLe,
+        NativeFunctions::BuffToUIntLe,
+        NativeFunctions::BuffToIntBe,
+        NativeFunctions::BuffToUIntBe,
+        NativeFunctions::IsStandard,
+        NativeFunctions::PrincipalDestruct,
+        NativeFunctions::PrincipalConstruct,
+        NativeFunctions::StringToInt,
+        NativeFunctions::StringToUInt,
+        NativeFunctions::IntToAscii,
+        NativeFunctions::IntToUtf8,
+        NativeFunctions::Hash160,
+        NativeFunctions::Sha256,
+        NativeFunctions::Sha512,
+        NativeFunctions::Sha512Trunc256,
+        NativeFunctions::Keccak256,
+        NativeFunctions::BitwiseAnd,
+        NativeFunctions::BitwiseOr,
+        NativeFunctions::BitwiseNot,
+        NativeFunctions::BitwiseLShift,
+        NativeFunctions::BitwiseRShift,
+        NativeFunctions::BitwiseXor2,
+    ]
+    .iter()
+    .filter_map(|func| build_iterator_cb_completion_item(func, version))
+    .collect()
+}
+
+pub fn build_filter_valid_cb_completion_items(version: ClarityVersion) -> Vec<CompletionItem> {
+    vec![
+        NativeFunctions::And,
+        NativeFunctions::Or,
+        NativeFunctions::Not,
+    ]
+    .iter()
+    .filter_map(|func| build_iterator_cb_completion_item(func, version))
+    .collect()
+}
+
+pub fn build_fold_valid_cb_completion_items(version: ClarityVersion) -> Vec<CompletionItem> {
+    vec![
+        NativeFunctions::Add,
+        NativeFunctions::Subtract,
+        NativeFunctions::Multiply,
+        NativeFunctions::Divide,
+        NativeFunctions::CmpGeq,
+        NativeFunctions::CmpLeq,
+        NativeFunctions::CmpLess,
+        NativeFunctions::CmpGreater,
+        NativeFunctions::ToInt,
+        NativeFunctions::ToUInt,
+        NativeFunctions::Modulo,
+        NativeFunctions::Power,
+        NativeFunctions::Sqrti,
+        NativeFunctions::Log2,
+        NativeFunctions::BitwiseXor,
+        NativeFunctions::And,
+        NativeFunctions::Or,
+        NativeFunctions::Not,
+        NativeFunctions::IsStandard,
+        NativeFunctions::BitwiseAnd,
+        NativeFunctions::BitwiseOr,
+        NativeFunctions::BitwiseNot,
+        NativeFunctions::BitwiseLShift,
+        NativeFunctions::BitwiseRShift,
+        NativeFunctions::BitwiseXor2,
+    ]
+    .iter()
+    .filter_map(|func| build_iterator_cb_completion_item(func, version))
+    .collect()
+}
+
+fn build_iterator_cb_completion_item(
+    func: &NativeFunctions,
+    version: ClarityVersion,
+) -> Option<CompletionItem> {
+    let api = make_api_reference(&func);
+    if api.version > version {
+        return None;
+    }
+
+    let insert_text = Some(api.snippet.split_whitespace().next().unwrap().to_string());
+
+    Some(CompletionItem {
+        label: api.name.clone(),
+        kind: Some(CompletionItemKind::FUNCTION),
+        detail: Some(api.name.clone()),
+        documentation: Some(Documentation::MarkupContent(MarkupContent {
+            kind: MarkupKind::Markdown,
+            value: api.description,
+        })),
+        insert_text,
+        insert_text_format: Some(InsertTextFormat::PLAIN_TEXT),
+        ..Default::default()
+    })
+}
+
+fn get_iterator_cb_completion_item(version: &ClarityVersion, func: &str) -> Vec<CompletionItem> {
+    if func.to_string().eq(&NativeFunctions::Map.to_string()) {
+        return match version {
+            ClarityVersion::Clarity1 => VALID_MAP_FUNCTIONS_CLARITY_1.to_vec(),
+            ClarityVersion::Clarity2 => VALID_MAP_FUNCTIONS_CLARITY_1.to_vec(),
+        };
+    }
+    if func.to_string().eq(&NativeFunctions::Filter.to_string()) {
+        return match version {
+            ClarityVersion::Clarity1 => VALID_FILTER_FUNCTIONS_CLARITY_1.to_vec(),
+            ClarityVersion::Clarity2 => VALID_FILTER_FUNCTIONS_CLARITY_1.to_vec(),
+        };
+    }
+    return match version {
+        ClarityVersion::Clarity1 => VALID_FOLD_FUNCTIONS_CLARITY_1.to_vec(),
+        ClarityVersion::Clarity2 => VALID_FOLD_FUNCTIONS_CLARITY_1.to_vec(),
+    };
 }
 
 #[cfg(test)]
@@ -698,8 +898,11 @@ mod populate_snippet_with_options_tests {
         let data = get_defined_data(
             "(define-data-var counter uint u1) (define-data-var is-active bool true)",
         );
-        let snippet = data
-            .populate_snippet_with_options(&"var-get".to_string(), &"var-get ${1:var}".to_string());
+        let snippet = data.populate_snippet_with_options(
+            &ClarityVersion::Clarity2,
+            &"var-get".to_string(),
+            &"var-get ${1:var}".to_string(),
+        );
         assert_eq!(snippet, Some("var-get ${1|counter,is-active|}".to_string()));
     }
 
@@ -707,6 +910,7 @@ mod populate_snippet_with_options_tests {
     fn get_map_snippet() {
         let data = get_defined_data("(define-map names principal { name: (buff 48) })");
         let snippet = data.populate_snippet_with_options(
+            &ClarityVersion::Clarity2,
             &"map-get?".to_string(),
             &"map-get? ${1:map-name} ${2:key-tuple}".to_string(),
         );
@@ -720,6 +924,7 @@ mod populate_snippet_with_options_tests {
     fn get_fts_snippet() {
         let data = get_defined_data("(define-fungible-token btc u21)");
         let snippet = data.populate_snippet_with_options(
+            &ClarityVersion::Clarity2,
             &"ft-mint?".to_string(),
             &"ft-mint? ${1:token-name} ${2:amount} ${3:recipient}".to_string(),
         );
@@ -733,6 +938,7 @@ mod populate_snippet_with_options_tests {
     fn get_nfts_snippet() {
         let data = get_defined_data("(define-non-fungible-token bitcoin-nft uint)");
         let snippet = data.populate_snippet_with_options(
+            &ClarityVersion::Clarity2,
             &"nft-mint?".to_string(),
             &"nft-mint? ${1:asset-name} ${2:asset-identifier} ${3:recipient}".to_string(),
         );
