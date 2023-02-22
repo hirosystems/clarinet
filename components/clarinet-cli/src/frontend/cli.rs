@@ -63,7 +63,6 @@ use super::telemetry::{telemetry_report_event, DeveloperUsageDigest, DeveloperUs
 ///
 /// For Clarinet documentation, refer to https://docs.hiro.so/clarinet/introduction.
 /// Report any issues here https://github.com/hirosystems/clarinet/issues/new.
-
 #[derive(Parser, PartialEq, Clone, Debug)]
 #[clap(version = option_env!("CARGO_PKG_VERSION").expect("Unable to detect version"), name = "clarinet")]
 struct Opts {
