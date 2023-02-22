@@ -1440,7 +1440,7 @@ events_keys = ["*"]
         ctx.try_log(|logger| slog::info!(logger, "Created container subnet-node: {}", container));
         self.subnet_node_container_id = Some(container.clone());
 
-        // Download the subnet contract(s) from the container and return them on success
+        // Download the subnet contract(s) from the container and write them to Clarinet's cache directory.
         let output = docker
             .download_from_container(
                 &container_name,
