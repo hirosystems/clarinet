@@ -892,6 +892,7 @@ dependencies = [
  "termcolor",
  "text-size",
  "text_lines 0.6.0",
+ "tiny-hderive",
  "tokio",
  "tokio-util 0.7.7",
  "toml 0.5.11",
