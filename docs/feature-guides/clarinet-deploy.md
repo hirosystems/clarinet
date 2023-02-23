@@ -4,49 +4,28 @@ title: Clarinet Deployment Plans
 
 ## Overview
 
-Deployment plans allow teams to work together when deploying smart contracts. Hiro has created a set of primitives that enables teams collaborate more effectively, ensuring teams can create smart contracts faster and easier.
-
-By using Deployment Plans, you can simplify the smart contract deployment process to stacks or bitcoin environment.
+Deployment Plans are reproducible deployment steps that publish a collection of on-chain transactions and one or more contracts to a network, whether a local developer network, the public testnet, or into production on mainnet. Deployment plans minimize the inherent complexity of deployments, such as smart contract dependencies and interactions, transaction chaining limits, deployment costs, and more, while ensuring reproducible deployments critical for testing and automation purposes.
 
 ## Design
 
-Deployment Plans are reproducible deployment steps that publish a “protocol”; a collection of on-chain transactions and contracts—to a network, whether it is on a local developer network, the public testnet, or into production on mainnet.
-
-Using a Deployment Plan can minimize the inherent complexity with deployments, thereby making it much easier to deploy a contract without errors. Some of these complexities can include dependencies, chaining limits, the process to initialize a smart contract, and underlying deployment costs.
-
-A deployment plan is made up of:
-
-- smart contracts
-- accounts with their token balances, and
-- content and sequence of transactions (across a single or multiple Stacks or Bitcoin blocks)
-
-A Deployment Plan’s specifications exist on two files within a Clarinet project: the `Clarinet.toml` and network’s `.toml` file (for example, `devnet.toml`) under the “deployments” folder.
+The default deployment plan of every Clarinet project is contained within specifications set inside certain files. In addition to this default deployment plan, the user can manually configure each plan, adding additional transactions or contract calls, across multiple Stacks or Bitcoin blocks.
 
 You can commit, audit, and test contracts without including any secrets in the Deployment Plan, and share these contracts without exposing any sensitive information.
 
 ## Deployment plan primitives
 
-Deployment plans consist of the following primitives:
+| Transaction primitive | Typical usage |
+|---|---|
+| publish contracts | - deploy a contract to an in-memory simulated Stacks chain or an integrate Stacks-Bitcoin environment <br /> - deploy to a public testnet or mainnet <br /> - deploy an external contract to your local network for testing |
+| call contract functions | - call a contract deployed to any of your local devnets or public networks, chain transactions |
+| send BTC | - Perform a simple bitcoin transfer from a p2pkh address to a p2pkh address (devnet/testnet/mainnet)  |
+| wait for block | - Test or automate contract deployment across multiple Stacks or Bitcoin blocks  |
+| send STX | - send stacks to an address or contract |
 
-- deploy contracts
-- call contracts
-- send bitcoin transactions
-- wait for block
-- send stacks to an address or contract
-
-With these four individual primitives, you can then:
-
-- Deploy a contract in an in-memory simulated chain (simnet only). 
-- Call a contract that has been deployed in an in-memory simulated chain (simnet only).
-- Deploy an external contract on another testnet / devnet network using another wallet + search, and replace all references to this contract in the local contracts to deploy (devnet / testnet only).
-- Deploy a contract (devnet / testnet / mainnet).
-- Call a contract (devnet / testnet / mainnet).
-- Perform a simple bitcoin transfer from a p2pkh address to a p2pkh address (experimental, regtest / testnet / mainnet).
 
 ## References
 
-For a more detailed discussion of how to use Deployment Plans, please see the following resources:
+For a more detailed discussion, visit the [How To Guide for deployment plans](../how-to-guides/how-to-use-deployment-plans.md) section of our documentation for deployment plans, or please see the following resources:
 
-- [Meet 4 New Features in Clarinet](https://www.hiro.so/blog/meet-4-new-features-in-clarinet) blog post.
-
-- [Technical Deep Dive On Clarinet](https://www.youtube.com/watch?v=ciHxOGBBS18) YouTube video.
+- [Meet 4 New Features in Clarinet](https://www.hiro.so/blog/meet-4-new-features-in-clarinet) blog post
+- [Technical Deep Dive On Clarinet](https://www.youtube.com/watch?v=ciHxOGBBS18) YouTube video

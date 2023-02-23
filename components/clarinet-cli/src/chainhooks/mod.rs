@@ -4,7 +4,9 @@ use std::path::PathBuf;
 pub mod types;
 use crate::chainhooks::types::ChainhookSpecificationFile;
 
-use chainhook_event_observer::chainhooks::types::{ChainhookConfig, ChainhookSpecification};
+use stacks_network::chainhook_event_observer::chainhooks::types::{
+    ChainhookConfig, ChainhookSpecification,
+};
 
 use chainhook_types::{BitcoinNetwork, StacksNetwork};
 

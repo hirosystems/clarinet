@@ -13,7 +13,6 @@ use crate::integrate;
 use crate::lsp::run_lsp;
 use crate::runner::run_scripts;
 use crate::runner::DeploymentCache;
-use chainhook_event_observer::chainhooks::types::ChainhookSpecification;
 use chainhook_types::StacksNetwork;
 use chainhook_types::{BitcoinNetwork, Chain};
 use clarinet_deployments::onchain::{
@@ -24,7 +23,9 @@ use clarinet_deployments::types::{DeploymentGenerationArtifacts, DeploymentSpeci
 use clarinet_deployments::{
     get_default_deployment_path, load_deployment, setup_session_with_deployment,
 };
-use clarinet_files::{FileLocation, ProjectManifest, ProjectManifestFile, RequirementConfig};
+use clarinet_files::{
+    get_manifest_location, FileLocation, ProjectManifest, ProjectManifestFile, RequirementConfig,
+};
 use clarity_repl::analysis::call_checker::ContractAnalysis;
 use clarity_repl::clarity::vm::analysis::AnalysisDatabase;
 use clarity_repl::clarity::vm::costs::LimitedCostTracker;
@@ -34,6 +35,7 @@ use clarity_repl::clarity::ClarityVersion;
 use clarity_repl::repl::diagnostic::{output_code, output_diagnostic};
 use clarity_repl::repl::{ClarityCodeSource, ClarityContract, ContractDeployer, DEFAULT_EPOCH};
 use clarity_repl::{analysis, repl, Terminal};
+use stacks_network::chainhook_event_observer::chainhooks::types::ChainhookSpecification;
 use stacks_network::{self, DevnetOrchestrator};
 use std::collections::HashMap;
 use std::fs::{self, File};
@@ -57,9 +59,12 @@ macro_rules! pluralize {
 
 #[cfg(feature = "telemetry")]
 use super::telemetry::{telemetry_report_event, DeveloperUsageDigest, DeveloperUsageEvent};
-
+/// Clarinet is a command line tool for Clarity smart contract development.
+///
+/// For Clarinet documentation, refer to https://docs.hiro.so/clarinet/introduction.
+/// Report any issues here https://github.com/hirosystems/clarinet/issues/new.
 #[derive(Parser, PartialEq, Clone, Debug)]
-#[clap(version = option_env!("CARGO_PKG_VERSION").expect("Unable to detect version"), bin_name = "clarinet")]
+#[clap(version = option_env!("CARGO_PKG_VERSION").expect("Unable to detect version"), name = "clarinet")]
 struct Opts {
     #[clap(subcommand)]
     command: Command,
@@ -1378,30 +1383,6 @@ pub fn main() {
             println!("Check your shell's documentation for details about using this file to enable completions for clarinet");
         }
     };
-}
-
-fn get_manifest_location(path: Option<String>) -> Option<FileLocation> {
-    if let Some(path) = path {
-        let manifest_path = PathBuf::from(path);
-        if !manifest_path.exists() {
-            return None;
-        }
-        Some(FileLocation::from_path(manifest_path))
-    } else {
-        let mut current_dir = env::current_dir().unwrap();
-        loop {
-            current_dir.push("Clarinet.toml");
-
-            if current_dir.exists() {
-                return Some(FileLocation::from_path(current_dir));
-            }
-            current_dir.pop();
-
-            if !current_dir.pop() {
-                return None;
-            }
-        }
-    }
 }
 
 fn get_manifest_location_or_exit(path: Option<String>) -> FileLocation {

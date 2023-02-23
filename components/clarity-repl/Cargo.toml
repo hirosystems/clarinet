@@ -1,6 +1,6 @@
 [package]
 name = "clarity-repl"
-version = "1.4.2"
+version = "1.4.1"
 description = "Clarity REPL"
 authors = [
     "Ludo Galabru <ludo@hiro.so>",
@@ -37,8 +37,8 @@ getrandom = { version = "0.2.3", features = ["js"] }
 rand_pcg = "0.3.1"
 rand_seeder = "0.2.2"
 atty = "0.2.14"
-clarity = { git = "https://github.com/stacks-network/stacks-blockchain.git", rev = "918652d14b743a189d3c8d979bff47b3501de957", default-features = false, optional = true }
-# clarity = { package = "clarity", path = "../../../stacks-blockchain/clarity", default-features = false, optional = true }
+clarity-vm = { version = "=2.0.1", default-features = false, optional = true }
+# clarity-vm = { path = "../../../stacks-blockchain/clarity", default-features = false, optional = true }
 
 # DAP Debugger
 tokio = { version = "1.24", features = ["full"], optional = true }
@@ -54,7 +54,7 @@ memchr = { version = "2.4.1", optional = true }
 pico-args = { version = "0.4.0", optional = true }
 rustyline = { version = "9.1.1", optional = true }
 prettytable-rs = { version = "0.10.0", optional = true }
-hiro_system_kit = { package = "hiro-system-kit", path = "../hiro-system-kit", default-features = false }
+hiro_system_kit = { version = "0.1.0", package = "hiro-system-kit", path = "../hiro-system-kit", default-features = false }
 reqwest = { version = "0.11", default-features = false, features = [
     "json",
     "rustls-tls",
@@ -63,7 +63,7 @@ reqwest = { version = "0.11", default-features = false, features = [
 
 # WASM
 wasm-bindgen = { version = "0.2", optional = true }
-wasm-bindgen-futures = { version = "0.4.24", optional = true }
+wasm-bindgen-futures = { version = "0.4", optional = true }
 
 [lib]
 name = "clarity_repl"
@@ -83,8 +83,8 @@ cli = [
     "pico-args",
     "rustyline",
     "prettytable-rs",
-    "clarity/canonical",
-    "clarity/developer-mode",
+    "clarity-vm/canonical",
+    "clarity-vm/developer-mode",
     "hiro_system_kit/tokio_helpers",
 ]
 dap = [
@@ -97,7 +97,7 @@ dap = [
     "memchr",
     "log",
 ]
-wasm = ["wasm-bindgen", "wasm-bindgen-futures", "clarity/wasm"]
+wasm = ["wasm-bindgen", "wasm-bindgen-futures", "clarity-vm/wasm"]
 
 [package.metadata.wasm-pack.profile.release.wasm-bindgen]
 debug-js-glue = false

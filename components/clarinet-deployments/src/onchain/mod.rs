@@ -459,11 +459,25 @@ pub fn apply_on_chain_deployment(
                         url.host().expect("Host unknown"),
                         url.port_or_known_default().expect("Protocol unknown")
                     );
-                    let bitcoin_rpc = Client::new(&bitcoin_node_rpc_url, auth).unwrap();
+                    let bitcoin_rpc = Client::new(&bitcoin_node_rpc_url, auth.clone()).unwrap();
+
+                    let bitcoin_node_wallet_rpc_url = format!(
+                        "{}://{}:{}/wallet/",
+                        url.scheme(),
+                        url.host().expect("Host unknown"),
+                        url.port_or_known_default().expect("Protocol unknown")
+                    );
+                    let bitcoin_node_wallet_rpc =
+                        Client::new(&bitcoin_node_wallet_rpc_url, auth).unwrap();
+
                     let account = btc_accounts_lookup.get(&tx.expected_sender).unwrap();
                     let (secret_key, _public_key) = get_btc_keypair(account);
-                    let _ =
-                        bitcoin_deployment::send_transaction_spec(&bitcoin_rpc, tx, &secret_key);
+                    let _ = bitcoin_deployment::send_transaction_spec(
+                        &bitcoin_rpc,
+                        &bitcoin_node_wallet_rpc,
+                        tx,
+                        &secret_key,
+                    );
                     continue;
                 }
                 TransactionSpecification::ContractCall(tx) => {

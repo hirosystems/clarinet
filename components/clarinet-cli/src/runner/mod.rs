@@ -1,4 +1,3 @@
-use chainhook_event_observer::chainhooks::types::StacksChainhookSpecification;
 use clarinet_deployments::types::DeploymentGenerationArtifacts;
 use clarinet_deployments::{
     initiate_session_from_deployment, update_session_with_contracts_executions,
@@ -14,6 +13,7 @@ use clarity_repl::clarity::vm::types::QualifiedContractIdentifier;
 use clarity_repl::clarity::vm::EvaluationResult;
 use clarity_repl::repl::{session::CostsReport, Session};
 use deno_core::error::AnyError;
+use stacks_network::chainhook_event_observer::chainhooks::types::StacksChainhookSpecification;
 use std::collections::HashMap;
 
 use clarinet_deployments::types::DeploymentSpecification;
