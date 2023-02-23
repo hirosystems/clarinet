@@ -2648,7 +2648,7 @@ events_keys = ["*"]
                         .to_string();
                     checksum
                 }
-                Err(e) => {
+                Err(_e) => {
                     panic!()
                 }
             };
@@ -2678,7 +2678,7 @@ events_keys = ["*"]
             .map_err(|e| format!("unable to send 'importdescriptors' request ({})", e));
 
             match rpc_call {
-                Ok(r) => {
+                Ok(_r) => {
                     break;
                 }
                 Err(e) => {
@@ -2735,7 +2735,7 @@ events_keys = ["*"]
                         .to_string();
                     checksum
                 }
-                Err(e) => {
+                Err(_e) => {
                     panic!()
                 }
             };
@@ -2765,7 +2765,7 @@ events_keys = ["*"]
             .map_err(|e| format!("unable to send 'importdescriptors' request ({})", e));
 
             match rpc_call {
-                Ok(r) => {
+                Ok(_r) => {
                     break;
                 }
                 Err(e) => {
@@ -2826,7 +2826,7 @@ events_keys = ["*"]
                             .to_string();
                         checksum
                     }
-                    Err(e) => {
+                    Err(_e) => {
                         panic!()
                     }
                 };
@@ -2856,7 +2856,7 @@ events_keys = ["*"]
                 .map_err(|e| format!("unable to send 'importdescriptors' request ({})", e));
 
                 match rpc_call {
-                    Ok(r) => {
+                    Ok(_r) => {
                         break;
                     }
                     Err(e) => {

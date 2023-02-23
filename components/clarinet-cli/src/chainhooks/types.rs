@@ -257,7 +257,7 @@ impl ChainhookPredicateFile {
                 self.extract_exact_matching_rule(specs)?,
             )));
             return Ok(predicate);
-        } else if let Some(ref specs) = self.protocol {
+        } else if let Some(ref _specs) = self.protocol {
             let predicate = BitcoinPredicateType::Protocol(Protocols::Ordinal(
                 OrdinalOperations::InscriptionRevealed,
             ));
@@ -300,6 +300,7 @@ impl ChainhookPredicateFile {
         return Err(format!("predicate rule not specified (equals)"));
     }
 
+    #[allow(dead_code)]
     pub fn extract_scope(&self) -> Result<Scope, String> {
         if let Some(ref scope) = self.scope {
             let scope = match scope.as_str() {

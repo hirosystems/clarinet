@@ -29,7 +29,6 @@ use clarinet_utils::get_bip39_seed_from_mnemonic;
 use clarity_repl::analysis::call_checker::ContractAnalysis;
 use clarity_repl::clarity::address::AddressHashMode;
 use clarity_repl::clarity::stacks_common::types::chainstate::StacksAddress;
-use clarity_repl::clarity::util::hash::bytes_to_hex;
 use clarity_repl::clarity::util::secp256k1::Secp256k1PublicKey;
 use clarity_repl::clarity::vm::analysis::AnalysisDatabase;
 use clarity_repl::clarity::vm::costs::LimitedCostTracker;
@@ -1328,6 +1327,7 @@ pub fn main() {
                 )) {
                     Ok(_) => {}
                     Err(e) => {
+                        println!("prepare subnet node: {}", e);
                         process::exit(1);
                     }
                 };
