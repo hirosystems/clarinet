@@ -214,7 +214,7 @@ dependencies = [
 
 [[package]]
 name = "clarity-repl"
-version = "1.4.2"
+version = "1.5.0"
 dependencies = [
  "ansi_term",
  "atty",

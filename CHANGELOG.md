@@ -1,3 +1,22 @@
+#### 1.5.0 (2023-02-23)
+
+##### New Features
+
+*  Improved support for launching a subnet in `clarinet integrate` ([6fc2c540](https://github.com/hirosystems/clarinet/commit/6fc2c540))
+*  Add bitcoin v24 support ([b1264e61](https://github.com/hirosystems/clarinet/commit/b1264e61))
+*  Update chainhooks predicate schemas, in support of ordinals ([038ff1f](https://github.com/hirosystems/clarinet/commit/038ff1f))
+*  Handle Clarity version and epoch for requirements ([b667a1c1](https://github.com/hirosystems/clarinet/commit/b667a1c1))
+
+##### Bug Fixes
+
+*  Various improvements in auto-completion ([2e90ace](https://github.com/hirosystems/clarinet/commit/2e90ace), [17752be](https://github.com/hirosystems/clarinet/commit/17752be), [8e9bcc9](https://github.com/hirosystems/clarinet/commit/8e9bcc9))
+
+##### Documentation Changes
+
+*  Added deployment plans documentation ([dabf1fd](https://github.com/hirosystems/clarinet/commit/dabf1fd))
+*  Added links to documentation and issues ([10a597b](https://github.com/hirosystems/clarinet/commit/10a597b))
+*  Fixed various other minor documentation issues ([2b6d301](https://github.com/hirosystems/clarinet/commit/2b6d301), [d0f5c47](https://github.com/hirosystems/clarinet/commit/d0f5c47))
+
 #### 1.4.2 (2024-02-03)
 
 ##### Bug Fixes
