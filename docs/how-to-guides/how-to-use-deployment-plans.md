@@ -6,7 +6,8 @@ Deployment Plans are reproducible deployment steps that publish a collection of 
 
 ![deployment-plans](../images/deployment-plans.png)
 
-Furthermore, many details of your deployment are configurable in a deployment plan's specifications. However, every Clarinet project comes with a default deployment plan, so customization is not required.
+Furthermore, many details of your deployment are configurable in a deployment plan's specifications. However, every Clarinet project comes with a default deployment plan, so customization is not required. For a video walkthrough of how to customize deployment plans, [watch this video](https://www.youtube.com/watch?v=YcIg5VCO98s).
+
 
 | Network | Features | Limitations |
 | ------- | -------- | ----------- |
