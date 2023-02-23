@@ -7,7 +7,7 @@ Deployment Plans are reproducible deployment steps that publish a collection of 
 </center>
 
 
-Furthermore, many details of the blockchain environment you want to deploy to are configurable in a deployment plan's specifications.
+Furthermore, many details of the blockchain environment you want to deploy to are configurable in a deployment plan's specifications. For a video walkthrough of how to customize deployment plans, [watch this video](https://www.youtube.com/watch?v=YcIg5VCO98s).
 
 | Network | Features | Limitations |
 | ------- | -------- | ----------- |
