@@ -53,7 +53,8 @@ pub async fn retrieve_contract(
         ));
     }
 
-    let stacks_node_addr = if contract_deployer.starts_with("SP") {
+    let is_mainnet = contract_deployer.starts_with("SP");
+    let stacks_node_addr = if is_mainnet {
         "https://stacks-node-api.mainnet.stacks.co".to_string()
     } else {
         "https://stacks-node-api.testnet.stacks.co".to_string()
@@ -82,8 +83,7 @@ pub async fn retrieve_contract(
             ));
         }
     };
-    // TODO: retrieve the epoch from `contract.publish_height`
-    let epoch = StacksEpochId::latest();
+    let epoch = epoch_for_height(is_mainnet, contract.publish_height);
 
     match file_accessor {
         None => {
@@ -116,6 +116,44 @@ pub async fn retrieve_contract(
     };
 
     Ok((contract.source, epoch, clarity_version, contract_location))
+}
+
+pub const MAINNET_20_START_HEIGHT: u32 = 1;
+pub const MAINNET_2_05_START_HEIGHT: u32 = 40_607;
+// TODO: This is estimated. Replace with exact height once 2.1 is activated.
+pub const MAINNET_21_START_HEIGHT: u32 = 99_564;
+pub const TESTNET_20_START_HEIGHT: u32 = 1;
+
+pub const TESTNET_2_05_START_HEIGHT: u32 = 20_216;
+// TODO: This is estimated. Replace with exact height once 2.1 is activated.
+pub const TESTNET_21_START_HEIGHT: u32 = 99_253;
+
+fn epoch_for_height(is_mainnet: bool, height: u32) -> StacksEpochId {
+    if is_mainnet {
+        epoch_for_mainnet_height(height)
+    } else {
+        epoch_for_testnet_height(height)
+    }
+}
+
+fn epoch_for_mainnet_height(height: u32) -> StacksEpochId {
+    if height < MAINNET_2_05_START_HEIGHT {
+        StacksEpochId::Epoch20
+    } else if height < MAINNET_21_START_HEIGHT {
+        StacksEpochId::Epoch2_05
+    } else {
+        StacksEpochId::Epoch21
+    }
+}
+
+fn epoch_for_testnet_height(height: u32) -> StacksEpochId {
+    if height < TESTNET_2_05_START_HEIGHT {
+        StacksEpochId::Epoch20
+    } else if height < TESTNET_21_START_HEIGHT {
+        StacksEpochId::Epoch2_05
+    } else {
+        StacksEpochId::Epoch21
+    }
 }
 
 #[allow(dead_code)]
