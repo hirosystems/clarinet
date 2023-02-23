@@ -8,7 +8,7 @@ DevNet allows you to perform frontend development and integration testing withou
 
 The services launched by DevNet represent a full instance of the Stacks blockchain with the Proof of Transfer consensus mechanism running against a locally running Bitcoin testnet. DevNet allows you to control block times, PoX transactions, and contract deployments. Because DevNet is running locally, it can be reset or reconfigured anytime. This allows for rapid frontend development without interacting with the public blockchain.
 
-*Topics*:
+*Topics covered in this guide*:
 
 - [x] Launch Clarinet with Devnet
 - [x] Configure accounts

@@ -6,7 +6,7 @@ title: Clarinet Deployment Plans
 
 Deployment Plans are reproducible deployment steps that publish a collection of on-chain transactions and one or more contracts to a network, whether a local developer network, the public testnet, or into production on mainnet. Deployment plans minimize the inherent complexity of deployments, such as smart contract dependencies and interactions, transaction chaining limits, deployment costs, and more, while ensuring reproducible deployments critical for testing and automation purposes.
 
-*Topics*:
+*Topics covered in this guide*:
 
 - [x] Deployment plan design
 - [x] Plan primitives

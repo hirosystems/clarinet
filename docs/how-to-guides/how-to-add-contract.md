@@ -4,7 +4,7 @@ title: Add new Contract
 
 Clarinet can handle adding a new contract and its configuration to your project.
 
-*Topics*:
+*Topics covered in this guide*:
 
 - [x] Add a new contract
 - [x] Verify contract configuration

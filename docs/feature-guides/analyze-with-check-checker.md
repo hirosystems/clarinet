@@ -4,7 +4,7 @@ title: Analyze with Check-Checker
 
 The check-checker is a static analysis pass you can use to help find potential vulnerabilities in your contracts.
 
-*Topics*:
+*Topics covered in this guide*:
 
 - [x] Enable static analysis pass
 - [x] Check checker options

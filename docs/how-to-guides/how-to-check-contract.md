@@ -4,7 +4,7 @@ title: Check Contracts
 
 Clarinet provides syntax and semantics checkers for Clarity. 
 
-*Topic*:
+*Topic covered in this guide*:
 
 - [x] Check your contracts
 

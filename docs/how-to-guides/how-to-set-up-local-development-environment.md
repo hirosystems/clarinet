@@ -6,7 +6,7 @@ title: Set up local Development Environment
 
 This article helps you with creating a new project and develop a clarity smart contract.
 
-*Topics*:
+*Topics covered in this guide*:
 
 - [x] Develop a clarity smart contract
 - [x] Test and interact with smart contracts

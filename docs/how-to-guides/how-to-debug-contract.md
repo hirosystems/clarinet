@@ -6,7 +6,7 @@ title: Debug Contract
 
 Clarinet supports the [Debug Adapter Protocol](https://microsoft.github.io/debug-adapter-protocol/) (DAP), which enables you to debug your smart contracts inside of Visual Studio Code (VS Code) or any code editor supporting the DAP protocol.
 
-*Topics*:
+*Topics covered in this guide*:
 
 - [x] Enable smart-contract debugging in Visual Studio code
 - [x] Use command-line debugger inside the `clarinet console`

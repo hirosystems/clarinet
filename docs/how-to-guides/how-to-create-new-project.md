@@ -4,7 +4,7 @@ title: Create new Project
 
 Once you have installed Clarinet, you may then use Clarinet to create a new project. 
 
-*Topic*:
+*Topic covered in this guide*:
 
 - [x] Create new project
 
