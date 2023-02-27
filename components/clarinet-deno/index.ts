@@ -368,6 +368,10 @@ declare global {
     expectBool(value: boolean): boolean;
     expectUint(value: number | bigint): bigint;
     expectInt(value: number | bigint): bigint;
+    expectBuff(value: Uint8Array): ArrayBuffer;
+    /**
+     * @deprecated `value`should be a Uint8Array
+     */
     expectBuff(value: ArrayBuffer): ArrayBuffer;
     expectAscii(value: string): string;
     expectUtf8(value: string): string;
@@ -462,23 +466,23 @@ function consume(src: String, expectation: string, wrapped: boolean) {
   return remainder;
 }
 
-String.prototype.expectOk = function () {
+String.prototype.expectOk = function expectOk() {
   return consume(this, "ok", true);
 };
 
-String.prototype.expectErr = function () {
+String.prototype.expectErr = function expectErr() {
   return consume(this, "err", true);
 };
 
-String.prototype.expectSome = function () {
+String.prototype.expectSome = function expectSome() {
   return consume(this, "some", true);
 };
 
-String.prototype.expectNone = function () {
+String.prototype.expectNone = function expectNone() {
   return consume(this, "none", false);
 };
 
-String.prototype.expectBool = function (value: boolean) {
+String.prototype.expectBool = function expectBool(value: boolean) {
   try {
     consume(this, `${value}`, false);
   } catch (error) {
@@ -487,7 +491,9 @@ String.prototype.expectBool = function (value: boolean) {
   return value;
 };
 
-String.prototype.expectUint = function (value: number | bigint): bigint {
+String.prototype.expectUint = function expectUint(
+  value: number | bigint
+): bigint {
   try {
     consume(this, `u${value}`, false);
   } catch (error) {
@@ -496,7 +502,9 @@ String.prototype.expectUint = function (value: number | bigint): bigint {
   return BigInt(value);
 };
 
-String.prototype.expectInt = function (value: number | bigint): bigint {
+String.prototype.expectInt = function expectInt(
+  value: number | bigint
+): bigint {
   try {
     consume(this, `${value}`, false);
   } catch (error) {
@@ -505,15 +513,15 @@ String.prototype.expectInt = function (value: number | bigint): bigint {
   return BigInt(value);
 };
 
-String.prototype.expectBuff = function (value: ArrayBuffer) {
-  const buffer = types.buff(value);
+String.prototype.expectBuff = function expectBuff(value: ArrayBuffer) {
+  const buffer = types.buff(new Uint8Array(value));
   if (this !== buffer) {
     throw new Error(`Expected ${green(buffer)}, got ${red(this.toString())}`);
   }
   return value;
 };
 
-String.prototype.expectAscii = function (value: string) {
+String.prototype.expectAscii = function expectAscii(value: string) {
   try {
     consume(this, `"${value}"`, false);
   } catch (error) {
@@ -522,7 +530,7 @@ String.prototype.expectAscii = function (value: string) {
   return value;
 };
 
-String.prototype.expectUtf8 = function (value: string) {
+String.prototype.expectUtf8 = function expectUtf8(value: string) {
   try {
     consume(this, `u"${value}"`, false);
   } catch (error) {
@@ -531,7 +539,7 @@ String.prototype.expectUtf8 = function (value: string) {
   return value;
 };
 
-String.prototype.expectPrincipal = function (value: string) {
+String.prototype.expectPrincipal = function expectPrincicipal(value: string) {
   try {
     consume(this, `${value}`, false);
   } catch (error) {
@@ -540,8 +548,8 @@ String.prototype.expectPrincipal = function (value: string) {
   return value;
 };
 
-String.prototype.expectList = function () {
-  if (this.charAt(0) !== "[" || this.charAt(this.length - 1) !== "]") {
+String.prototype.expectList = function expectList() {
+  if (!this.startsWith("[") || !this.endsWith("]")) {
     throw new Error(
       `Expected ${green("(list ...)")}, got ${red(this.toString())}`
     );
@@ -575,8 +583,8 @@ String.prototype.expectList = function () {
   return elements;
 };
 
-String.prototype.expectTuple = function () {
-  if (this.charAt(0) !== "{" || this.charAt(this.length - 1) !== "}") {
+String.prototype.expectTuple = function expectTuple() {
+  if (!this.startsWith("{") || !this.endsWith("}")) {
     throw new Error(
       `Expected ${green("(tuple ...)")}, got ${red(this.toString())}`
     );
