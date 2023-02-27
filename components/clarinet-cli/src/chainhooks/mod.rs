@@ -5,7 +5,7 @@ pub mod types;
 use crate::chainhooks::types::ChainhookSpecificationFile;
 
 use stacks_network::chainhook_event_observer::chainhooks::types::{
-    ChainhookConfig, ChainhookSpecification,
+    ChainhookConfig, ChainhookFullSpecification,
 };
 
 use chainhook_types::{BitcoinNetwork, StacksNetwork};
@@ -21,10 +21,14 @@ pub fn load_chainhooks(
     let mut bitcoin_chainhooks = vec![];
     for (path, relative_path) in hook_files.into_iter() {
         match ChainhookSpecificationFile::parse(&path, networks) {
-            Ok(hook) => match hook {
-                ChainhookSpecification::Bitcoin(hook) => bitcoin_chainhooks.push(hook),
-                ChainhookSpecification::Stacks(hook) => stacks_chainhooks.push(hook),
-            },
+            Ok(hook) => {
+                match hook {
+                    ChainhookFullSpecification::Bitcoin(hook) => bitcoin_chainhooks
+                        .push(hook.into_selected_network_specification(&networks.0)?),
+                    ChainhookFullSpecification::Stacks(hook) => stacks_chainhooks
+                        .push(hook.into_selected_network_specification(&networks.1)?),
+                }
+            }
             Err(msg) => return Err(format!("{} syntax incorrect: {}", relative_path, msg)),
         };
     }

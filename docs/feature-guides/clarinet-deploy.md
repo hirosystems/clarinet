@@ -25,7 +25,12 @@ You can commit, audit, and test contracts without including any secrets in the D
 
 ## References
 
-For a more detailed discussion, visit the [How To Guide for deployment plans](../how-to-guides/how-to-use-deployment-plans.md) section of our documentation for deployment plans, or please see the following resources:
+For a more detailed discussion of how to use Deployment Plans, please see the following resources:
 
-- [Meet 4 New Features in Clarinet](https://www.hiro.so/blog/meet-4-new-features-in-clarinet) blog post
-- [Technical Deep Dive On Clarinet](https://www.youtube.com/watch?v=ciHxOGBBS18) YouTube video
+- [How To Guide for deployment plans](../how-to-guides/how-to-use-deployment-plans.md).
+
+- [How to Set Up Custom Deployment Plans](https://www.youtube.com/watch?v=YcIg5VCO98s) YouTube video.
+
+- [Meet 4 New Features in Clarinet](https://www.hiro.so/blog/meet-4-new-features-in-clarinet) blog post.
+
+- [Technical Deep Dive On Clarinet](https://www.youtube.com/watch?v=ciHxOGBBS18) YouTube video.

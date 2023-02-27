@@ -662,9 +662,9 @@ checksum = "baf1de4339761588bc0619e3cbc0120ee582ebb74b53b4efbf79117bd2da40fd"
 
 [[package]]
 name = "chainhook-event-observer"
-version = "1.0.2"
+version = "1.0.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5ec0764099c4e378471d312bf5152f09374730b2b8e8b2cfd8abbe3756193f55"
+checksum = "d9002e9ebd1f66bc0fcca003a5d87a672077b2139c50efa0628a845fce8706e6"
 dependencies = [
  "base58 0.2.0",
  "base64 0.13.1",
@@ -688,9 +688,9 @@ dependencies = [
 
 [[package]]
 name = "chainhook-types"
-version = "1.0.1"
+version = "1.0.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "fe083f0dd830eb487602a3f1ebc56c1245d9cdb25cc83adb8f35e977bb477dc2"
+checksum = "2fef6a17d9cd36d4bc8c11b5fd64bd491ee16180209180ccf996960623379cad"
 dependencies = [
  "schemars",
  "serde",
@@ -909,7 +909,7 @@ dependencies = [
 
 [[package]]
 name = "clarinet-deployments"
-version = "1.0.0"
+version = "1.0.1"
 dependencies = [
  "base58 0.2.0",
  "bitcoin",
