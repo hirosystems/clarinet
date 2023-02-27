@@ -29,7 +29,6 @@ use clarinet_utils::get_bip39_seed_from_mnemonic;
 use clarity_repl::analysis::call_checker::ContractAnalysis;
 use clarity_repl::clarity::address::AddressHashMode;
 use clarity_repl::clarity::stacks_common::types::chainstate::StacksAddress;
-use clarity_repl::clarity::util::hash::bytes_to_hex;
 use clarity_repl::clarity::util::secp256k1::Secp256k1PublicKey;
 use clarity_repl::clarity::vm::analysis::AnalysisDatabase;
 use clarity_repl::clarity::vm::costs::LimitedCostTracker;
@@ -39,8 +38,8 @@ use clarity_repl::clarity::ClarityVersion;
 use clarity_repl::repl::diagnostic::{output_code, output_diagnostic};
 use clarity_repl::repl::{ClarityCodeSource, ClarityContract, ContractDeployer, DEFAULT_EPOCH};
 use clarity_repl::{analysis, repl, Terminal};
-use stacks_network::chainhook_event_observer::chainhooks::types::ChainhookFullSpecification;
 use libsecp256k1::{PublicKey, SecretKey};
+use stacks_network::chainhook_event_observer::chainhooks::types::ChainhookFullSpecification;
 use stacks_network::chainhook_event_observer::utils::Context;
 use stacks_network::{self, DevnetOrchestrator};
 use std::collections::HashMap;
@@ -1343,6 +1342,7 @@ pub fn main() {
                 )) {
                     Ok(_) => {}
                     Err(e) => {
+                        println!("unable to prepare subnet container: {}", e);
                         process::exit(1);
                     }
                 };
