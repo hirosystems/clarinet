@@ -347,6 +347,7 @@ balance = 100_000_000_000_000
 [devnet]
 disable_stacks_explorer = false
 disable_stacks_api = false
+# disable_subnet_api = false
 # disable_bitcoin_explorer = true
 # working_dir = "tmp/devnet"
 # stacks_node_events_observers = ["host.docker.internal:8002"]
@@ -385,6 +386,8 @@ disable_stacks_api = false
 # subnet_node_p2p_port = 30444
 # subnet_events_ingestion_port = 30445
 # subnet_node_events_observers = ["host.docker.internal:8002"]
+# subnet_api_image_url = "hirosystems/stacks-blockchain-api:latest"
+# subnet_api_postgres_database = "subnet_api"
 
 # For testing in epoch 2.1 / using Clarity2
 # enable_next_features = true

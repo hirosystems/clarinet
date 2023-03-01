@@ -857,7 +857,9 @@ impl NetworkManifest {
                     .unwrap_or(DEFAULT_STACKS_API_IMAGE.to_string()),
                 subnet_api_port: devnet_config.subnet_api_port.unwrap_or(13999),
                 subnet_api_events_port: devnet_config.stacks_api_events_port.unwrap_or(13700),
-                disable_subnet_api: devnet_config.disable_subnet_api.unwrap_or(true),
+                disable_subnet_api: devnet_config
+                    .disable_subnet_api
+                    .unwrap_or(!enable_subnet_node),
                 docker_host: devnet_config
                     .docker_host
                     .unwrap_or(DEFAULT_DOCKER_SOCKET.into()),
