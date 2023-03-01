@@ -1,0 +1,23 @@
+[package]
+edition = "2021"
+name = "clarity-format"
+version = "1.0.0"
+
+[dependencies]
+clarinet_files = { package = "clarinet-files", path = "../clarinet-files", default-features = false, optional = true }
+clarity_repl = { package = "clarity-repl", path = "../clarity-repl", default-features = false }
+regex = "1.7.1"
+
+[features]
+default = ["cli"]
+cli = ["clarity_repl/cli", "clarinet_files/cli"]
+lib = ["clarity_repl/cli"]
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+name = "clarity_format"
+path = "src/lib.rs"
+
+[[bin]]
+name = "clarity-format"
+path = "src/bin.rs"

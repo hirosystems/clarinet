@@ -987,6 +987,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "clarity-format"
+version = "1.0.0"
+dependencies = [
+ "clarinet-files",
+ "clarity-repl 1.4.1",
+ "regex",
+]
+
+[[package]]
 name = "clarity-jupyter-kernel"
 version = "1.0.0"
 dependencies = [
