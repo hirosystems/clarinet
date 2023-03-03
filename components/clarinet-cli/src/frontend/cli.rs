@@ -1342,7 +1342,7 @@ pub fn main() {
                 )) {
                     Ok(_) => {}
                     Err(e) => {
-                        println!("unable to prepare subnet container: {}", e);
+                        println!("unable to prepare subnet node container: {}", e);
                         process::exit(1);
                     }
                 };
