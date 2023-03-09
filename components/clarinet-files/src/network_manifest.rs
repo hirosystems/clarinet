@@ -24,6 +24,7 @@ pub const DEFAULT_STACKS_EXPLORER_IMAGE: &str = "hirosystems/explorer:latest";
 pub const DEFAULT_STACKS_EXPLORER_NEXT_IMAGE: &str = "hirosystems/explorer:feat-stacks-2.1";
 pub const DEFAULT_POSTGRES_IMAGE: &str = "postgres:14";
 pub const DEFAULT_SUBNET_NODE_IMAGE: &str = "hirosystems/stacks-subnets:0.3.0";
+pub const DEFAULT_SUBNET_API_IMAGE: &str = "hirosystems/stacks-blockchain-api:7.1.0-beta.1";
 pub const DEFAULT_SUBNET_CONTRACT_ID: &str = "STXMJXCJDCT4WPF2X1HE42T6ZCCK3TPMBRZ51JEG.subnet";
 pub const DEFAULT_STACKS_MINER_MNEMONIC: &str = "fragile loan twenty basic net assault jazz absorb diet talk art shock innocent float punch travel gadget embrace caught blossom hockey surround initial reduce";
 pub const DEFAULT_FAUCET_MNEMONIC: &str = "shadow private easily thought say logic fault paddle word top book during ignore notable orange flight clock image wealth health outside kitten belt reform";
@@ -854,7 +855,7 @@ impl NetworkManifest {
                 subnet_api_image_url: devnet_config
                     .subnet_api_image_url
                     .take()
-                    .unwrap_or(DEFAULT_STACKS_API_IMAGE.to_string()),
+                    .unwrap_or(DEFAULT_SUBNET_API_IMAGE.to_string()),
                 subnet_api_port: devnet_config.subnet_api_port.unwrap_or(13999),
                 subnet_api_events_port: devnet_config.stacks_api_events_port.unwrap_or(13700),
                 disable_subnet_api: devnet_config

@@ -386,7 +386,7 @@ disable_stacks_api = false
 # subnet_node_p2p_port = 30444
 # subnet_events_ingestion_port = 30445
 # subnet_node_events_observers = ["host.docker.internal:8002"]
-# subnet_api_image_url = "hirosystems/stacks-blockchain-api:latest"
+# subnet_api_image_url = "hirosystems/stacks-blockchain-api:7.1.0-beta.1"
 # subnet_api_postgres_database = "subnet_api"
 
 # For testing in epoch 2.1 / using Clarity2
