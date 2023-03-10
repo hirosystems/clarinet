@@ -19,7 +19,6 @@ pub const DEFAULT_STACKS_NODE_IMAGE: &str = "quay.io/hirosystems/stacks-node:dev
 pub const DEFAULT_STACKS_NODE_NEXT_IMAGE: &str = "quay.io/hirosystems/stacks-node:devnet-v3-beta4";
 pub const DEFAULT_BITCOIN_EXPLORER_IMAGE: &str = "quay.io/hirosystems/bitcoin-explorer:devnet";
 pub const DEFAULT_STACKS_API_IMAGE: &str = "hirosystems/stacks-blockchain-api:latest";
-pub const DEFAULT_STACKS_API_NEXT_IMAGE: &str = "hirosystems/stacks-blockchain-api:stacks-2.1";
 pub const DEFAULT_STACKS_EXPLORER_IMAGE: &str = "hirosystems/explorer:latest";
 pub const DEFAULT_STACKS_EXPLORER_NEXT_IMAGE: &str = "hirosystems/explorer:feat-stacks-2.1";
 pub const DEFAULT_POSTGRES_IMAGE: &str = "postgres:14";
@@ -803,13 +802,10 @@ impl NetworkManifest {
                     }
                     .to_string(),
                 ),
-                stacks_api_image_url: devnet_config.stacks_api_image_url.take().unwrap_or(
-                    match enable_next_features {
-                        true => DEFAULT_STACKS_API_NEXT_IMAGE,
-                        false => DEFAULT_STACKS_API_IMAGE,
-                    }
-                    .to_string(),
-                ),
+                stacks_api_image_url: devnet_config
+                    .stacks_api_image_url
+                    .take()
+                    .unwrap_or(DEFAULT_STACKS_API_IMAGE.to_string()),
                 postgres_image_url: devnet_config
                     .postgres_image_url
                     .take()
