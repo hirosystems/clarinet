@@ -9,7 +9,6 @@ Clarinet may facilitate experimentation with [subnets](https://www.youtube.com/w
 * [Enable subnet node](#subnet)
 * [Spin up your subnet node](#spin-subnet-node)
 
-
 ## Subnet
 
 To get started with subnets, enable the flag in your `Devnet.toml` by adding the configuration below.

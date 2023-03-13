@@ -17,11 +17,8 @@ The first step is to generate a deployment plan with the command below (note: re
 $ clarinet deployment generate --mainnet --medium-cost
 ```
 
-<<<<<<< HEAD
 # Deploy
 
-=======
->>>>>>> 5d1464f7 (docs: add topics)
 After **carefully** reviewing (and updating if needed) the generated deployment plan, you can use the command below to handle the deployments of your contracts.
 
 ```bash
