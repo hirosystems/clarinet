@@ -584,13 +584,6 @@ impl StacksDevnet {
         }
 
         if let Ok(res) = devnet_settings
-            .get(&mut cx, "enable_next_features")?
-            .downcast::<JsBoolean, _>(&mut cx)
-        {
-            overrides.enable_next_features = Some(res.value(&mut cx));
-        }
-
-        if let Ok(res) = devnet_settings
             .get(&mut cx, "use_docker_gateway_routing")?
             .downcast::<JsBoolean, _>(&mut cx)
         {

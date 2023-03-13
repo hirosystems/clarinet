@@ -348,10 +348,8 @@ pub fn apply_on_chain_deployment(
         for (_, account) in network_manifest.accounts.iter() {
             accounts_cached_nonces.insert(account.stx_address.clone(), 0);
         }
-        if let Some(ref devnet) = network_manifest.devnet {
-            if devnet.enable_next_features {
-                default_epoch = EpochSpec::Epoch2_1;
-            }
+        if network_manifest.devnet.is_some() {
+            default_epoch = EpochSpec::Epoch2_1;
         };
     }
 

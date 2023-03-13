@@ -323,12 +323,6 @@ export interface DevnetConfig {
    */
   disable_stacks_api?: boolean;
   /**
-   * Enable support for Stacks 2.1 (false by default)
-   * @type {boolean}
-   * @memberof DevnetConfig
-   */
-  enable_next_features?: boolean;
-  /**
    * Bitcoin block height starting the epoch 2.0
    * @type {number}
    * @memberof DevnetConfig
