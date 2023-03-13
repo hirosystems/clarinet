@@ -8,9 +8,11 @@ Clarinet supports the [Debug Adapter Protocol](https://microsoft.github.io/debug
 
 *Topics covered in this guide*:
 
-- [x] Enable smart-contract debugging in Visual Studio code
-- [x] Use command-line debugger inside the `clarinet console`
-- [x] Learn how to use `trace` command
+* [Enable smart-contract debugging in Visual Studio code](#debug-contract)
+* [Use command-line debugger inside the `clarinet console`](#command-line-debugger)
+* [Learn how to use `trace` command](#execution-trace)
+
+## Debug Contract
 
 To set up a debug session, you will need to create a `launch.json` file to tell VS Code what you want to debug.
 The easiest way to accomplish this is to let VS Code generate the template for you by opening the "Run and Debug" view and clicking "create a launch.json file".

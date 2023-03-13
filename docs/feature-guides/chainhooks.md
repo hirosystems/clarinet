@@ -8,9 +8,10 @@ Chainhooks are a powerful feature that enables you to automatically trigger an a
 
 *Topics covered in this guide*:
 
-- [x] Chainhooks design
-- [x] Use chainhooks
-- [x] References
+* [Chainhooks design](#design)
+* [Use chainhooks](#using-chainhooks)
+* [References](#references)
+
 
 ## Design
 

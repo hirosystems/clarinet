@@ -8,9 +8,10 @@ This article helps you with creating a new project and develop a clarity smart c
 
 *Topics covered in this guide*:
 
-- [x] Develop a clarity smart contract
-- [x] Test and interact with smart contracts
+* [Develop a clarity smart contract](#develop-a-smart-contract)
+* [Test and interact with smart contracts](#testing-with-clarinet)
 
+## Develop a smart contract
 Once you have installed Clarinet, you can begin a new Clarinet project with the command:
 
 ```sh

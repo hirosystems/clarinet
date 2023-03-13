@@ -10,10 +10,10 @@ The services launched by DevNet represent a full instance of the Stacks blockcha
 
 *Topics covered in this guide*:
 
-- [x] Launch Clarinet with Devnet
-- [x] Configure accounts
-- [x] Configure blockchain
-- [x] Stacking on Devnet
+* [Launch Clarinet with Devnet](#launching-devnet)
+* [Configure accounts](#accounts-configuration)
+* [Configure blockchain](#blockchain-configuration)
+* [Stacking on Devnet](#stacking-orders)
 
 ## Prerequisites
 

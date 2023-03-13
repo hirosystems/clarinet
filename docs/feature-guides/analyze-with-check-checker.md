@@ -6,10 +6,11 @@ The check-checker is a static analysis pass you can use to help find potential v
 
 *Topics covered in this guide*:
 
-- [x] Enable static analysis pass
-- [x] Check checker options
-- [x] Annotations
+* [Enable static analysis pass](#enable-static-analysis-pass)
+* [Check checker options](#options)
+* [Annotations](#annotations)
 
+## Enable static analysis pass
 To enable the static analysis pass, add the following lines to your Clarinet.toml file:
 
 ```toml
