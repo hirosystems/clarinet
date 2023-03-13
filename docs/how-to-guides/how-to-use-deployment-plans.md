@@ -4,6 +4,14 @@ title: Customize Deployment
 
 Deployment Plans are reproducible deployment steps that publish a collection of on-chain transactions and one or more contracts to a network, whether a local developer network, the public testnet, or into production on mainnet. Deployment plans minimize the inherent complexity of deployments, such as smart contract dependencies and interactions, transaction chaining limits, deployment costs, and more, while ensuring reproducible deployments critical for testing purposes.
 
+*Topics covered in this guide*:
+
+- [x] Understand deployment plans
+- [x] View sample deployment plan
+- [x] Set deployment plan specifications
+- [x] Add project contract requirements
+- [x] Customize your deployment plan
+
 ![deployment-plans](../images/deployment-plans.png)
 
 Furthermore, many details of your deployment are configurable in a deployment plan's specifications. However, every Clarinet project comes with a default deployment plan, so customization is not required. For a video walkthrough of how to customize deployment plans, [watch this video](https://www.youtube.com/watch?v=YcIg5VCO98s).
@@ -91,7 +99,6 @@ Here are some of the relevant transactions and configurations available to devel
 - `stx-transfer`: Transfer STX between specified accounts.
 - `btc-transfer`: Simple bitcoin transfer from a p2pkh address to a p2pkh address (experimental, `regtest`/`testnet`/`mainnet`).
 - Waiting between blocks to make transactions is done by specifying transaction directives in a different batch in the deployment plan (see the `batches` field)
-
 
 ### `emulated-contract-publish`
 

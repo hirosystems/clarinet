@@ -37,7 +37,7 @@ You can resolve the issue by creating a symlink of the docker.sock file. To do t
 
 Now, run the command `clarinet integrate` to see the Devnet up and running.
 
-## I am unable to set up docker on my Linux machine
+## I am unable to set up docker on my Linux machine.
 
 If you have trouble setting up docker on your Linux machine, follow the steps below:
 
