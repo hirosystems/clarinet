@@ -782,14 +782,14 @@ fn mine_block(state: &mut OpState, args: MineBlockArgs) -> Result<String, AnyErr
                     &Context::empty(),
                 );
                 match result {
-                    Some(StacksChainhookOccurrence::Http(action)) => {
+                    Ok(StacksChainhookOccurrence::Http(action)) => {
                         let chainhook_tx = match state.try_borrow::<Sender<ChainhookEvent>>() {
                             Some(chainhook_tx) => chainhook_tx,
                             None => panic!(),
                         };
                         let _ = chainhook_tx.send(ChainhookEvent::PerformRequest(action));
                     }
-                    Some(StacksChainhookOccurrence::File(path, bytes)) => {
+                    Ok(StacksChainhookOccurrence::File(path, bytes)) => {
                         let mut file_path = std::env::current_dir().unwrap();
                         file_path.push(path);
                         if !file_path.exists() {
