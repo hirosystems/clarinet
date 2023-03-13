@@ -748,7 +748,6 @@ rpcport={bitcoin_node_rpc_port}
                 "-pid=/run/bitcoind.pid".into(),
                 // "-datadir=/root/.bitcoin".into(),
             ]),
-            // cmd: Some(vec!["/bin/bitcoind -conf=/etc/bitcoin/bitcoin.conf -nodebuglogfile -pid=/run/bitcoind.pid".into()]),
             ..Default::default()
         };
 
@@ -1784,9 +1783,10 @@ events_keys = ["*"]
             .map_err(|e| formatted_docker_error("unable to create exec command", e))?;
 
         // Pause to ensure the postgres container is ready.
+        // TODO
         std::thread::sleep(std::time::Duration::from_secs(10));
 
-        let res = docker
+        let _res = docker
             .start_exec(&exec.id, None)
             .await
             .map_err(|e| formatted_docker_error("unable to start exec command", e))?;

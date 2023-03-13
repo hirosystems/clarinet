@@ -33,10 +33,8 @@ chrono = "0.4.20"
 futures = "0.3.12"
 base58 = "0.2.0"
 
-chainhook-event-observer = { version = "=1.0.3", default-features = false, features = ["log"] }
-chainhook-types = "=1.0.2"
-# chainhook-event-observer = { version = "=1.0.3", default-features = false, features = ["log"], path = "../../../chainhook/components/chainhook-event-observer" }
-# chainhook-types = { version = "=1.0.2",   path = "../../../chainhook/components/chainhook-types-rs" }
+# chainhook-event-observer = { version = "=1.0.4", default-features = false, features = ["log", "ordinals"], path = "../../../chainhook/components/chainhook-event-observer" }
+chainhook-event-observer = { version = "=1.0.5", default-features = false, features = ["log", "ordinals"] }
 stacks-rpc-client = { path = "../stacks-rpc-client" }
 clarinet-files = { path = "../clarinet-files", features = ["cli"]  }
 clarinet-deployments = { path = "../clarinet-deployments", features = ["cli"]  }
