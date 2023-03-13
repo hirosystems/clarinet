@@ -3,11 +3,16 @@
 title: Getting Started
 ---
 
-Follow this guide to install and build Clarinet. 
-
 ## Install and Build Clarinet
 
-Hiro has developed Clarinet to be environment-agnostic.
+Hiro has developed Clarinet to be environment-agnostic. Follow this guide to install and build Clarinet. 
+
+*Topics covered in this guide*:
+
+- [x] Install Clarinet
+- [x] Build Clarinet from source
+- [x] Use Clarinet to generate shell completion scripts
+
 You may choose to install Clarinet in any of the following operating systems:
 
 - macOS
