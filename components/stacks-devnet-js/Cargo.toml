@@ -11,8 +11,8 @@ crate-type = ["cdylib"]
 [dependencies]
 serde = "1"
 error-chain = "0.12"
-chainhook-types = "=1.0.2"
-#  chainhook_types = { package = "chainhook-types", path = "../../../chainhook/components/chainhook-types-rs" }
+# chainhook-types = "=1.0.3"
+ chainhook_types = { package = "chainhook-types", path = "../../../chainhook/components/chainhook-types-rs" }
 clarinet-files = { path = "../clarinet-files" }
 clarinet-utils = { path = "../clarinet-utils" }
 clarinet-deployments = { path = "../clarinet-deployments" }

@@ -3,9 +3,9 @@ use super::DevnetEvent;
 use crate::orchestrator::ServicesMapHosts;
 use crate::{ServiceStatusData, Status};
 use base58::FromBase58;
+use chainhook_event_observer::chainhook_types::BitcoinNetwork;
 use chainhook_event_observer::chainhooks::types::ChainhookConfig;
 use chainhook_event_observer::utils::Context;
-use chainhook_types::BitcoinNetwork;
 use clarinet_deployments::onchain::TransactionStatus;
 use clarinet_deployments::onchain::{
     apply_on_chain_deployment, DeploymentCommand, DeploymentEvent,
@@ -15,11 +15,13 @@ use clarinet_files::{self, AccountConfig, DevnetConfig, NetworkManifest, Project
 use hiro_system_kit;
 use hiro_system_kit::slog;
 
+use chainhook_event_observer::chainhook_types::{BitcoinChainEvent, StacksChainEvent};
 use chainhook_event_observer::observer::{
     start_event_observer, EventObserverConfig, ObserverCommand, ObserverEvent,
     StacksChainMempoolEvent,
 };
-use chainhook_types::{BitcoinChainEvent, StacksChainEvent, StacksNetwork};
+use clarinet_files::chainhook_types::StacksNetwork;
+
 use clarity_repl::clarity::address::AddressHashMode;
 use clarity_repl::clarity::util::hash::{hex_bytes, Hash160};
 use clarity_repl::clarity::vm::types::{BuffData, SequenceData, TupleData};
@@ -335,14 +337,7 @@ pub async fn start_chains_coordinator(
                 let _ = devnet_event_tx.send(DevnetEvent::ServiceStatus(ServiceStatusData {
                     order: 1,
                     status: Status::Green,
-                    name: format!(
-                        "stacks-node {}",
-                        if config.devnet_config.enable_next_features {
-                            "🚧"
-                        } else {
-                            ""
-                        }
-                    ),
+                    name: format!("stacks-node 2.1",),
                     comment: format!(
                         "mining blocks (chaintip = #{})",
                         known_tip.block.block_identifier.index

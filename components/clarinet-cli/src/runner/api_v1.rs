@@ -10,15 +10,6 @@ use super::ChainhookEvent;
 use super::DeploymentCache;
 use super::SessionArtifacts;
 use crate::runner::api_v1::utils::serialize_event;
-use chainhook_types::BlockIdentifier;
-use chainhook_types::StacksBlockData;
-use chainhook_types::StacksBlockMetadata;
-use chainhook_types::StacksContractCallData;
-use chainhook_types::StacksContractDeploymentData;
-use chainhook_types::StacksTransactionData;
-use chainhook_types::StacksTransactionKind;
-use chainhook_types::StacksTransactionMetadata;
-use chainhook_types::TransactionIdentifier;
 use chrono::{DateTime, NaiveDateTime, Utc};
 use clarinet_deployments::update_session_with_contracts_executions;
 use clarity_repl::clarity::stacks_common::types::StacksEpochId;
@@ -43,6 +34,7 @@ use deno_core::serde_json::{json, Value};
 use deno_core::{op, Extension};
 use deno_core::{ModuleSpecifier, OpState};
 use sha2::{Digest, Sha256};
+use stacks_network::chainhook_event_observer::chainhook_types::*;
 use stacks_network::chainhook_event_observer::chainhooks::stacks::evaluate_stacks_predicate_on_transaction;
 use stacks_network::chainhook_event_observer::chainhooks::stacks::handle_stacks_hook_action;
 use stacks_network::chainhook_event_observer::chainhooks::stacks::StacksChainhookOccurrence;
@@ -915,7 +907,7 @@ fn wrap_result_in_simulated_transaction(
             description: String::new(),
             sponsor: None,
             execution_cost: None,
-            position: chainhook_types::StacksTransactionPosition::anchor_block(index),
+            position: stacks_network::chainhook_event_observer::chainhook_types::StacksTransactionPosition::anchor_block(index),
             proof: None,
         },
     };
@@ -924,18 +916,13 @@ fn wrap_result_in_simulated_transaction(
 
 fn convert_clarity_event_to_chainhook_event(
     source: &clarity_repl::clarity::events::StacksTransactionEvent,
-) -> chainhook_types::StacksTransactionEvent {
-    use chainhook_types::StacksTransactionEvent as DestinationEvent;
-    use chainhook_types::{
-        FTBurnEventData, FTMintEventData, FTTransferEventData, NFTBurnEventData, NFTMintEventData,
-        NFTTransferEventData, STXBurnEventData, STXLockEventData, STXMintEventData,
-        STXTransferEventData, SmartContractEventData,
-    };
+) -> StacksTransactionEvent {
     use clarity_repl::clarity::codec::StacksMessageCodec;
     use clarity_repl::clarity::events::{
         FTEventType as SFT, NFTEventType as SNFT, STXEventType as SSTX,
         StacksTransactionEvent as SourceEvent,
     };
+    use stacks_network::chainhook_event_observer::chainhook_types::StacksTransactionEvent as DestinationEvent;
 
     match source {
         SourceEvent::FTEvent(SFT::FTMintEvent(data)) => {

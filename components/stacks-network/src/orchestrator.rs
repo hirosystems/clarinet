@@ -13,8 +13,8 @@ use bollard::service::Ipam;
 use bollard::Docker;
 use bytes::BytesMut;
 use chainhook_event_observer::utils::Context;
-use chainhook_types::StacksNetwork;
 use clarinet_deployments::requirements::ContractMetadata;
+use clarinet_files::chainhook_types::StacksNetwork;
 use clarinet_files::{
     DevnetConfigFile, FileLocation, NetworkManifest, ProjectManifest, DEFAULT_DEVNET_BALANCE,
 };

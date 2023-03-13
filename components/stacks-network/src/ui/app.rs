@@ -1,7 +1,9 @@
 use super::util::{StatefulList, TabsState};
 use crate::{LogData, MempoolAdmissionData, ServiceStatusData};
+use chainhook_event_observer::chainhook_types::{
+    StacksBlockData, StacksMicroblockData, StacksTransactionData,
+};
 use chainhook_event_observer::utils::Context;
-use chainhook_types::{StacksBlockData, StacksMicroblockData, StacksTransactionData};
 use hiro_system_kit::slog;
 use tui::style::{Color, Style};
 use tui::text::{Span, Spans};

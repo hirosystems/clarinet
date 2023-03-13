@@ -8,7 +8,7 @@ use stacks_network::chainhook_event_observer::chainhooks::types::{
     ChainhookConfig, ChainhookFullSpecification,
 };
 
-use chainhook_types::{BitcoinNetwork, StacksNetwork};
+use stacks_network::chainhook_event_observer::chainhook_types::{BitcoinNetwork, StacksNetwork};
 
 use std::fs;
 

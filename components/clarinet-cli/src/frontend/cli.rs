@@ -12,8 +12,6 @@ use crate::generate::{
 use crate::integrate;
 use crate::lsp::run_lsp;
 use crate::runner::{block_on, run_scripts, DeploymentCache};
-use chainhook_types::StacksNetwork;
-use chainhook_types::{BitcoinNetwork, Chain};
 use clarinet_deployments::onchain::{
     apply_on_chain_deployment, get_initial_transactions_trackers, update_deployment_costs,
     DeploymentCommand, DeploymentEvent,
@@ -22,6 +20,8 @@ use clarinet_deployments::types::{DeploymentGenerationArtifacts, DeploymentSpeci
 use clarinet_deployments::{
     get_default_deployment_path, load_deployment, setup_session_with_deployment,
 };
+use clarinet_files::chainhook_types::Chain;
+use clarinet_files::chainhook_types::StacksNetwork;
 use clarinet_files::{
     get_manifest_location, FileLocation, ProjectManifest, ProjectManifestFile, RequirementConfig,
 };
@@ -1158,6 +1158,7 @@ pub fn main() {
             let mine_block_delay = cmd.mine_block_delay.unwrap_or(0);
 
             if cmd.chainhooks.contains(&"*".to_string()) {
+                use stacks_network::chainhook_event_observer::chainhook_types::BitcoinNetwork;
                 match load_chainhooks(
                     &manifest.location,
                     &(BitcoinNetwork::Regtest, StacksNetwork::Devnet),
@@ -1171,6 +1172,7 @@ pub fn main() {
                 };
             } else {
                 for chainhook_relative_path in cmd.chainhooks.iter() {
+                    use stacks_network::chainhook_event_observer::chainhook_types::BitcoinNetwork;
                     let mut chainhook_location = manifest
                         .location
                         .get_project_root_location()
@@ -1194,7 +1196,7 @@ pub fn main() {
                             }
                             ChainhookFullSpecification::Stacks(hook) => {
                                 let spec = match hook
-                                    .into_selected_network_specification(&StacksNetwork::Devnet)
+                                    .into_selected_network_specification(&stacks_network::chainhook_event_observer::chainhook_types::StacksNetwork::Devnet)
                                 {
                                     Ok(spec) => spec,
                                     Err(e) => {

@@ -21,3 +21,9 @@ pub fn nestable_block_on<F: Future>(future: F) -> F::Output {
     let response = handle.block_on(async { future.await });
     response
 }
+
+// pub fn spawn_async_thread_named<F: Future>(name: &str, f: F) -> io::Result<JoinHandle<F::Output>> {
+//     thread_named(name).spawn(move || {
+//         nestable_block_on(f)
+//     })
+// }

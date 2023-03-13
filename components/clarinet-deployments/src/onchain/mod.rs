@@ -1,5 +1,5 @@
 use bitcoincore_rpc::{Auth, Client};
-use chainhook_types::StacksNetwork;
+use clarinet_files::chainhook_types::StacksNetwork;
 use clarinet_files::{AccountConfig, NetworkManifest, ProjectManifest};
 use clarinet_utils::get_bip39_seed_from_mnemonic;
 use clarity_repl::clarity::codec::StacksMessageCodec;

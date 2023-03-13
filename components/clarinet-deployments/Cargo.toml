@@ -11,8 +11,6 @@ serde_yaml = "0.8.23"
 
 clarity-repl = { path = "../clarity-repl", default-features = false, optional = true }
 clarinet-files = { path = "../clarinet-files", default-features = false }
-chainhook-types = "=1.0.2"
-# chainhook-types = { version = "=1.0.2", path = "../../../chainhook/components/chainhook-types-rs" }
 stacks-rpc-client = { path = "../stacks-rpc-client", optional = true }
 
 # CLI
