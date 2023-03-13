@@ -5,6 +5,7 @@ use crate::{ServiceStatusData, Status};
 use base58::FromBase58;
 use chainhook_event_observer::chainhooks::types::ChainhookConfig;
 use chainhook_event_observer::utils::Context;
+use chainhook_types::BitcoinNetwork;
 use clarinet_deployments::onchain::TransactionStatus;
 use clarinet_deployments::onchain::{
     apply_on_chain_deployment, DeploymentCommand, DeploymentEvent,
@@ -116,6 +117,8 @@ impl DevnetEventObserverConfig {
             stacks_node_rpc_url: format!("http://{}", services_map_hosts.stacks_node_host),
             operators: HashSet::new(),
             display_logs: true,
+            cache_path: devnet_config.working_dir.to_string(),
+            bitcoin_network: BitcoinNetwork::Regtest,
         };
 
         DevnetEventObserverConfig {

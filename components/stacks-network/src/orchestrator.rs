@@ -667,8 +667,8 @@ discover=0
 dns=0
 dnsseed=0
 listenonion=0
-rpcserialversion=0
 rpcworkqueue=100
+rpcserialversion=1
 disablewallet=0
 fallbackfee=0.00001
 
