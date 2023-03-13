@@ -19,6 +19,9 @@ use clarity_repl::codec::{
     TransactionSpendingCondition, TransactionVersion,
 };
 use clarity_repl::codec::{StacksTransaction, TransactionAnchorMode};
+use clarity_repl::repl::session::{
+    BOOT_MAINNET_ADDRESS, BOOT_TESTNET_ADDRESS, V1_BOOT_CONTRACTS, V2_BOOT_CONTRACTS,
+};
 use clarity_repl::repl::{Session, SessionSettings};
 use reqwest::Url;
 use stacks_rpc_client::StacksRpc;
@@ -382,6 +385,20 @@ pub fn apply_on_chain_deployment(
     let mut session = Session::new(SessionSettings::default());
     let mut index = 0;
     let mut contracts_ids_to_remap: HashSet<(String, String)> = HashSet::new();
+
+    for contract in V1_BOOT_CONTRACTS {
+        contracts_ids_to_remap.insert((
+            format!("{}:{}", BOOT_MAINNET_ADDRESS, contract),
+            format!("{}:{}", BOOT_TESTNET_ADDRESS, contract),
+        ));
+    }
+    for contract in V2_BOOT_CONTRACTS {
+        contracts_ids_to_remap.insert((
+            format!("{}:{}", BOOT_MAINNET_ADDRESS, contract),
+            format!("{}:{}", BOOT_TESTNET_ADDRESS, contract),
+        ));
+    }
+
     for batch_spec in deployment.plan.batches.iter() {
         let epoch = match batch_spec.epoch {
             Some(epoch) => {
