@@ -3,15 +3,15 @@
 title: Getting Started
 ---
 
-## Install and Build Clarinet
+## Install Clarinet
 
 Hiro has developed Clarinet to be environment-agnostic. Follow this guide to install and build Clarinet. 
 
 *Topics covered in this guide*:
 
-- [x] Install Clarinet
-- [x] Build Clarinet from source
-- [x] Use Clarinet to generate shell completion scripts
+* [Install Clarinet](#install-clarinet)
+* [Build Clarinet from source](#build-clarinet)
+* [Use Clarinet to generate shell completion scripts](#setup-shell-completions)
 
 You may choose to install Clarinet in any of the following operating systems:
 
@@ -127,4 +127,3 @@ clarinet completions (bash|elvish|fish|powershell|zsh)
 ```
 
 After generating the file, you can refer to the documentation for your shell to determine where this file should be moved to, and what other steps may be necessary to enable tab-completion for `clarinet`.
-

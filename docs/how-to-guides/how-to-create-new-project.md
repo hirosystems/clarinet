@@ -6,7 +6,9 @@ Once you have installed Clarinet, you may then use Clarinet to create a new proj
 
 *Topic covered in this guide*:
 
-- [x] Create new project
+* [Create new project](#new-project)
+
+## New project
 
 To create a new project, enter the command shown below.
 
