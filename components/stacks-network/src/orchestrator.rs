@@ -1719,7 +1719,7 @@ events_keys = ["*"]
                 format!("STACKS_CORE_EVENT_HOST=0.0.0.0"),
                 format!("STACKS_API_ENABLE_FT_METADATA=1"),
                 format!("PG_HOST=postgres.{}", self.network_name),
-                format!("PG_PORT=5432"),
+                format!("PG_PORT={}", devnet_config.postgres_port),
                 format!("PG_USER={}", devnet_config.postgres_username),
                 format!("PG_PASSWORD={}", devnet_config.postgres_password),
                 format!("PG_DATABASE={}", devnet_config.subnet_api_postgres_database),
@@ -1785,7 +1785,10 @@ events_keys = ["*"]
             .await
             .map_err(|e| formatted_docker_error("unable to create exec command", e))?;
 
-        let _ = docker
+        // Pause to ensure the postgres container is ready.
+        std::thread::sleep(std::time::Duration::from_secs(10));
+
+        let res = docker
             .start_exec(&exec.id, None)
             .await
             .map_err(|e| formatted_docker_error("unable to start exec command", e))?;
