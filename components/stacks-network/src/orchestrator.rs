@@ -200,7 +200,12 @@ impl DevnetOrchestrator {
                 ..Default::default()
             })
             .await
-            .map_err(|e| format!("unable to create network: {}", e.to_string()))?
+            .map_err(|e| {
+                format!(
+                    "clarinet was unable to create network. Is docker running locally? (error: {})",
+                    e.to_string()
+                )
+            })?
             .id
             .ok_or("unable to retrieve network_id")?;
 
@@ -1549,7 +1554,7 @@ events_keys = ["*"]
             )
             .try_collect::<Vec<_>>()
             .await
-            .map_err(|_| "unable to create image".to_string())?;
+            .map_err(|e| format!("unable to create image: {}", e))?;
 
         let mut port_bindings = HashMap::new();
         port_bindings.insert(
@@ -1671,7 +1676,7 @@ events_keys = ["*"]
             )
             .try_collect::<Vec<_>>()
             .await
-            .map_err(|_| "unable to create image".to_string())?;
+            .map_err(|e| format!("unable to create image: {}", e))?;
 
         let mut port_bindings = HashMap::new();
         port_bindings.insert(
@@ -1830,7 +1835,7 @@ events_keys = ["*"]
             )
             .try_collect::<Vec<_>>()
             .await
-            .map_err(|_| "unable to create image".to_string())?;
+            .map_err(|e| format!("unable to create image: {}", e))?;
 
         let mut port_bindings = HashMap::new();
         port_bindings.insert(

@@ -1,5 +1,4 @@
-use crate::chainhooks::types::ChainhookSpecificationFile;
-use crate::chainhooks::{check_chainhooks, load_chainhooks};
+use crate::chainhooks::{check_chainhooks, load_chainhooks, parse_chainhook_full_specification};
 use crate::deployments::types::DeploymentSynthesis;
 use crate::deployments::{
     self, check_deployments, generate_default_deployment, get_absolute_deployment_path,
@@ -1158,7 +1157,9 @@ pub fn main() {
             let mine_block_delay = cmd.mine_block_delay.unwrap_or(0);
 
             if cmd.chainhooks.contains(&"*".to_string()) {
-                use stacks_network::chainhook_event_observer::chainhook_types::BitcoinNetwork;
+                use stacks_network::chainhook_event_observer::chainhook_types::{
+                    BitcoinNetwork, StacksNetwork,
+                };
                 match load_chainhooks(
                     &manifest.location,
                     &(BitcoinNetwork::Regtest, StacksNetwork::Devnet),
@@ -1172,7 +1173,6 @@ pub fn main() {
                 };
             } else {
                 for chainhook_relative_path in cmd.chainhooks.iter() {
-                    use stacks_network::chainhook_event_observer::chainhook_types::BitcoinNetwork;
                     let mut chainhook_location = manifest
                         .location
                         .get_project_root_location()
@@ -1180,10 +1180,8 @@ pub fn main() {
                     chainhook_location
                         .append_path(chainhook_relative_path)
                         .expect("unable to build path");
-                    match ChainhookSpecificationFile::parse(
-                        &chainhook_location.to_string().into(),
-                        &(BitcoinNetwork::Regtest, StacksNetwork::Devnet),
-                    ) {
+                    match parse_chainhook_full_specification(&chainhook_location.to_string().into())
+                    {
                         Ok(hook) => match hook {
                             ChainhookFullSpecification::Bitcoin(_) => {
                                 println!(

@@ -121,6 +121,7 @@ impl DevnetEventObserverConfig {
             display_logs: true,
             cache_path: devnet_config.working_dir.to_string(),
             bitcoin_network: BitcoinNetwork::Regtest,
+            stacks_network: chainhook_event_observer::chainhook_types::StacksNetwork::Devnet,
         };
 
         DevnetEventObserverConfig {
