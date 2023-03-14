@@ -1157,9 +1157,7 @@ pub fn main() {
             let mine_block_delay = cmd.mine_block_delay.unwrap_or(0);
 
             if cmd.chainhooks.contains(&"*".to_string()) {
-                use stacks_network::chainhook_event_observer::chainhook_types::{
-                    BitcoinNetwork,
-                };
+                use stacks_network::chainhook_event_observer::chainhook_types::BitcoinNetwork;
                 match load_chainhooks(
                     &manifest.location,
                     &(BitcoinNetwork::Regtest, StacksNetwork::Devnet),
