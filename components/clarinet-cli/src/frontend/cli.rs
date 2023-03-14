@@ -1158,7 +1158,7 @@ pub fn main() {
 
             if cmd.chainhooks.contains(&"*".to_string()) {
                 use stacks_network::chainhook_event_observer::chainhook_types::{
-                    BitcoinNetwork, StacksNetwork,
+                    BitcoinNetwork,
                 };
                 match load_chainhooks(
                     &manifest.location,
