@@ -25,3 +25,11 @@ Below are some screenshots to help with this:
 #### **The command `clarinet integrate` is not working. How can I fix it?**
 
 Clarinet integrate uses Docker to run Bitcoin, Stacks nodes, and other services. To run the `clarinet integrate` feature,  you'll need to [install Docker](https://docs.docker.com/get-docker/). If you're on Linux, ensure you are set up in [rootless mode](https://docs.docker.com/engine/security/rootless/).
+
+#### **Where can I find the logs for Clarinet Integrate?**
+
+If you're using Docker desktop, you can open the UI and select `stacks-node` container to see its logs. 
+
+If you are not using the Docker desktop, use the following command in your terminal:
+
+`docker logs -f stacks-node.<project-name>.devnet`.

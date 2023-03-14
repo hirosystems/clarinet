@@ -1,5 +1,4 @@
-use crate::chainhooks::types::ChainhookSpecificationFile;
-use crate::chainhooks::{check_chainhooks, load_chainhooks};
+use crate::chainhooks::{check_chainhooks, load_chainhooks, parse_chainhook_full_specification};
 use crate::deployments::types::DeploymentSynthesis;
 use crate::deployments::{
     self, check_deployments, generate_default_deployment, get_absolute_deployment_path,
@@ -11,11 +10,7 @@ use crate::generate::{
 };
 use crate::integrate;
 use crate::lsp::run_lsp;
-use crate::runner::run_scripts;
-use crate::runner::DeploymentCache;
-use chainhook_event_observer::chainhooks::types::ChainhookSpecification;
-use chainhook_types::StacksNetwork;
-use chainhook_types::{BitcoinNetwork, Chain};
+use crate::runner::{block_on, run_scripts, DeploymentCache};
 use clarinet_deployments::onchain::{
     apply_on_chain_deployment, get_initial_transactions_trackers, update_deployment_costs,
     DeploymentCommand, DeploymentEvent,
@@ -24,8 +19,16 @@ use clarinet_deployments::types::{DeploymentGenerationArtifacts, DeploymentSpeci
 use clarinet_deployments::{
     get_default_deployment_path, load_deployment, setup_session_with_deployment,
 };
-use clarinet_files::{FileLocation, ProjectManifest, ProjectManifestFile, RequirementConfig};
+use clarinet_files::chainhook_types::Chain;
+use clarinet_files::chainhook_types::StacksNetwork;
+use clarinet_files::{
+    get_manifest_location, FileLocation, ProjectManifest, ProjectManifestFile, RequirementConfig,
+};
+use clarinet_utils::get_bip39_seed_from_mnemonic;
 use clarity_repl::analysis::call_checker::ContractAnalysis;
+use clarity_repl::clarity::address::AddressHashMode;
+use clarity_repl::clarity::stacks_common::types::chainstate::StacksAddress;
+use clarity_repl::clarity::util::secp256k1::Secp256k1PublicKey;
 use clarity_repl::clarity::vm::analysis::AnalysisDatabase;
 use clarity_repl::clarity::vm::costs::LimitedCostTracker;
 use clarity_repl::clarity::vm::diagnostic::{Diagnostic, Level};
@@ -34,12 +37,15 @@ use clarity_repl::clarity::ClarityVersion;
 use clarity_repl::repl::diagnostic::{output_code, output_diagnostic};
 use clarity_repl::repl::{ClarityCodeSource, ClarityContract, ContractDeployer, DEFAULT_EPOCH};
 use clarity_repl::{analysis, repl, Terminal};
+use libsecp256k1::{PublicKey, SecretKey};
+use stacks_network::chainhook_event_observer::chainhooks::types::ChainhookFullSpecification;
+use stacks_network::chainhook_event_observer::utils::Context;
 use stacks_network::{self, DevnetOrchestrator};
 use std::collections::HashMap;
 use std::fs::{self, File};
 use std::io::prelude::*;
-use std::path::PathBuf;
 use std::{env, process};
+use tiny_hderive::bip32::ExtendedPrivKey;
 
 use clap::{IntoApp, Parser, Subcommand};
 use clap_generate::{Generator, Shell};
@@ -57,9 +63,12 @@ macro_rules! pluralize {
 
 #[cfg(feature = "telemetry")]
 use super::telemetry::{telemetry_report_event, DeveloperUsageDigest, DeveloperUsageEvent};
-
+/// Clarinet is a command line tool for Clarity smart contract development.
+///
+/// For Clarinet documentation, refer to https://docs.hiro.so/clarinet/introduction.
+/// Report any issues here https://github.com/hirosystems/clarinet/issues/new.
 #[derive(Parser, PartialEq, Clone, Debug)]
-#[clap(version = option_env!("CARGO_PKG_VERSION").expect("Unable to detect version"), bin_name = "clarinet")]
+#[clap(version = option_env!("CARGO_PKG_VERSION").expect("Unable to detect version"), name = "clarinet")]
 struct Opts {
     #[clap(subcommand)]
     command: Command,
@@ -1148,6 +1157,7 @@ pub fn main() {
             let mine_block_delay = cmd.mine_block_delay.unwrap_or(0);
 
             if cmd.chainhooks.contains(&"*".to_string()) {
+                use stacks_network::chainhook_event_observer::chainhook_types::BitcoinNetwork;
                 match load_chainhooks(
                     &manifest.location,
                     &(BitcoinNetwork::Regtest, StacksNetwork::Devnet),
@@ -1168,12 +1178,10 @@ pub fn main() {
                     chainhook_location
                         .append_path(chainhook_relative_path)
                         .expect("unable to build path");
-                    match ChainhookSpecificationFile::parse(
-                        &chainhook_location.to_string().into(),
-                        &(BitcoinNetwork::Regtest, StacksNetwork::Devnet),
-                    ) {
+                    match parse_chainhook_full_specification(&chainhook_location.to_string().into())
+                    {
                         Ok(hook) => match hook {
-                            ChainhookSpecification::Bitcoin(_) => {
+                            ChainhookFullSpecification::Bitcoin(_) => {
                                 println!(
                                     "{}",
                                     format_err!(
@@ -1182,7 +1190,22 @@ pub fn main() {
                                 );
                                 std::process::exit(1);
                             }
-                            ChainhookSpecification::Stacks(hook) => stacks_chainhooks.push(hook),
+                            ChainhookFullSpecification::Stacks(hook) => {
+                                let spec = match hook
+                                    .into_selected_network_specification(&stacks_network::chainhook_event_observer::chainhook_types::StacksNetwork::Devnet)
+                                {
+                                    Ok(spec) => spec,
+                                    Err(e) => {
+                                        println!(
+                                            "{} unable to load chainhooks ({})",
+                                            red!("error:"),
+                                            e
+                                        );
+                                        std::process::exit(1);
+                                    }
+                                };
+                                stacks_chainhooks.push(spec)
+                            }
                         },
                         Err(msg) => {
                             println!("{} unable to load chainhooks ({})", red!("error:"), msg);
@@ -1260,6 +1283,69 @@ pub fn main() {
         Command::Integrate(cmd) => {
             let manifest = load_manifest_or_exit(cmd.manifest_path);
             println!("Computing deployment plan");
+
+            let mut orchestrator = match DevnetOrchestrator::new(manifest.clone(), None) {
+                Ok(orchestrator) => orchestrator,
+                Err(e) => {
+                    println!("{}", format_err!(e));
+                    process::exit(1);
+                }
+            };
+
+            let cache_location =
+                if let FileLocation::FileSystem { path } = &manifest.project.cache_location {
+                    path.clone()
+                } else {
+                    println!("cache location must be a file system path");
+                    process::exit(1);
+                };
+
+            let devnet_config = orchestrator
+                .network_config
+                .as_ref()
+                .and_then(|c| c.devnet.as_ref())
+                .expect("devnet configuration not found");
+
+            let _ = fs::create_dir(cache_location.clone());
+            let _ = fs::create_dir(devnet_config.working_dir.clone());
+            let _ = fs::create_dir(format!("{}/conf", devnet_config.working_dir));
+            let _ = fs::create_dir(format!("{}/data", devnet_config.working_dir));
+            let _ = fs::create_dir(format!("{}/requirements", cache_location.display()));
+
+            if devnet_config.enable_subnet_node {
+                let subnet_deployer =
+                    match QualifiedContractIdentifier::parse(&devnet_config.subnet_contract_id) {
+                        Ok(contract) => contract,
+                        Err(e) => {
+                            println!("invalid subnet contract id: {}", e);
+                            process::exit(1);
+                        }
+                    }
+                    .issuer;
+                let subnet_leader = compute_stx_address(
+                    &devnet_config.subnet_leader_mnemonic,
+                    &devnet_config.subnet_leader_derivation_path,
+                );
+
+                let ctx = Context {
+                    logger: None,
+                    tracer: false,
+                };
+                match block_on(orchestrator.prepare_subnet_node_container(
+                    1,
+                    &ctx,
+                    cache_location,
+                    &subnet_deployer,
+                    &subnet_leader.into(),
+                )) {
+                    Ok(_) => {}
+                    Err(e) => {
+                        println!("unable to prepare subnet node container: {}", e);
+                        process::exit(1);
+                    }
+                };
+            }
+
             let result = match cmd.deployment_plan_path {
                 None => {
                     let res = load_deployment_if_exists(
@@ -1324,14 +1410,6 @@ pub fn main() {
                 }
             };
 
-            let orchestrator = match DevnetOrchestrator::new(manifest, None) {
-                Ok(orchestrator) => orchestrator,
-                Err(e) => {
-                    println!("{}", format_err!(e));
-                    process::exit(1);
-                }
-            };
-
             if orchestrator.manifest.project.telemetry {
                 #[cfg(feature = "telemetry")]
                 telemetry_report_event(DeveloperUsageEvent::DevnetExecuted(
@@ -1378,30 +1456,6 @@ pub fn main() {
             println!("Check your shell's documentation for details about using this file to enable completions for clarinet");
         }
     };
-}
-
-fn get_manifest_location(path: Option<String>) -> Option<FileLocation> {
-    if let Some(path) = path {
-        let manifest_path = PathBuf::from(path);
-        if !manifest_path.exists() {
-            return None;
-        }
-        Some(FileLocation::from_path(manifest_path))
-    } else {
-        let mut current_dir = env::current_dir().unwrap();
-        loop {
-            current_dir.push("Clarinet.toml");
-
-            if current_dir.exists() {
-                return Some(FileLocation::from_path(current_dir));
-            }
-            current_dir.pop();
-
-            if !current_dir.pop() {
-                return None;
-            }
-        }
-    }
 }
 
 fn get_manifest_location_or_exit(path: Option<String>) -> FileLocation {
@@ -1919,6 +1973,30 @@ impl DiagnosticsDigest {
     pub fn has_feedbacks(&self) -> bool {
         self.errors > 0 || self.warnings > 0
     }
+}
+
+pub fn compute_stx_address(mnemonic: &str, derivation_path: &str) -> StacksAddress {
+    let bip39_seed = match get_bip39_seed_from_mnemonic(&mnemonic, "") {
+        Ok(bip39_seed) => bip39_seed,
+        Err(_) => panic!(),
+    };
+
+    let ext = ExtendedPrivKey::derive(&bip39_seed[..], derivation_path).unwrap();
+
+    let secret_key = SecretKey::parse_slice(&ext.secret()).unwrap();
+    let public_key = PublicKey::from_secret_key(&secret_key);
+    let pub_key = Secp256k1PublicKey::from_slice(&public_key.serialize_compressed()).unwrap();
+    let version = clarity_repl::clarity::address::C32_ADDRESS_VERSION_TESTNET_SINGLESIG;
+
+    let stx_address = StacksAddress::from_public_keys(
+        version,
+        &AddressHashMode::SerializeP2PKH,
+        1,
+        &vec![pub_key],
+    )
+    .unwrap();
+
+    stx_address
 }
 
 fn display_separator() {

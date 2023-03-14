@@ -8,8 +8,8 @@ mod util;
 use super::DevnetEvent;
 use crate::{chains_coordinator::BitcoinMiningCommand, ChainsCoordinatorCommand};
 use app::App;
+use chainhook_event_observer::chainhook_types::StacksChainEvent;
 use chainhook_event_observer::utils::Context;
-use chainhook_types::StacksChainEvent;
 use crossterm::{
     event::{self, Event, KeyCode, KeyModifiers},
     execute,

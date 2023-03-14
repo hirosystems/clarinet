@@ -14,6 +14,8 @@ mod wasm_fs_accessor;
 #[cfg(feature = "wasm")]
 pub use wasm_fs_accessor::WASMFileSystemAccessor;
 
+pub use chainhook_types;
+
 use chainhook_types::StacksNetwork;
 pub use network_manifest::{
     compute_addresses, AccountConfig, DevnetConfig, DevnetConfigFile, NetworkManifest,
@@ -384,5 +386,29 @@ impl Serialize for FileLocation {
             }
         }
         map.end()
+    }
+}
+
+pub fn get_manifest_location(path: Option<String>) -> Option<FileLocation> {
+    if let Some(path) = path {
+        let manifest_path = PathBuf::from(path);
+        if !manifest_path.exists() {
+            return None;
+        }
+        Some(FileLocation::from_path(manifest_path))
+    } else {
+        let mut current_dir = std::env::current_dir().unwrap();
+        loop {
+            current_dir.push("Clarinet.toml");
+
+            if current_dir.exists() {
+                return Some(FileLocation::from_path(current_dir));
+            }
+            current_dir.pop();
+
+            if !current_dir.pop() {
+                return None;
+            }
+        }
     }
 }

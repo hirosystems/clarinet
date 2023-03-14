@@ -1,6 +1,6 @@
-use chainhook_event_observer::chainhooks::types::*;
-use chainhook_types::{BitcoinNetwork, StacksNetwork};
 use serde::{Deserialize, Serialize};
+use stacks_network::chainhook_event_observer::chainhook_types::{BitcoinNetwork, StacksNetwork};
+use stacks_network::chainhook_event_observer::chainhooks::types::*;
 use std::collections::BTreeMap;
 use std::fs::File;
 use std::io::{BufReader, Read};
@@ -42,6 +42,8 @@ pub struct ChainhookPredicateFile {
     p2wsh: Option<BTreeMap<String, String>>,
     script: Option<BTreeMap<String, String>>,
     scope: Option<String>,
+    protocol: Option<String>,
+    operation: Option<String>,
 }
 
 #[derive(Debug, PartialEq, Serialize, Deserialize)]
@@ -88,7 +90,7 @@ impl ChainhookSpecificationFile {
     pub fn parse(
         path: &PathBuf,
         networks: &(BitcoinNetwork, StacksNetwork),
-    ) -> Result<ChainhookSpecification, String> {
+    ) -> Result<ChainhookFullSpecification, String> {
         let file = ChainhookSpecificationFile::new(path)?;
         file.to_specification(networks)
     }
@@ -118,13 +120,13 @@ impl ChainhookSpecificationFile {
     pub fn to_specification(
         &self,
         networks: &(BitcoinNetwork, StacksNetwork),
-    ) -> Result<ChainhookSpecification, String> {
+    ) -> Result<ChainhookFullSpecification, String> {
         let res = if self.chain.to_lowercase() == "stacks" {
             let res = self.to_stacks_specification(&networks.1)?;
-            ChainhookSpecification::Stacks(res)
+            ChainhookFullSpecification::Stacks(res)
         } else if self.chain.to_lowercase() == "bitcoin" {
             let res = self.to_bitcoin_specification(&networks.0)?;
-            ChainhookSpecification::Bitcoin(res)
+            ChainhookFullSpecification::Bitcoin(res)
         } else {
             return Err(format!(
                 "chain '{}' not supported (stacks, bitcoin)",
@@ -137,7 +139,7 @@ impl ChainhookSpecificationFile {
     pub fn to_bitcoin_specification(
         &self,
         network: &BitcoinNetwork,
-    ) -> Result<BitcoinChainhookSpecification, String> {
+    ) -> Result<BitcoinChainhookFullSpecification, String> {
         let network_ser = format!("{:?}", network).to_lowercase();
         let network_spec = match self.networks.get(&network_ser) {
             Some(entry) => entry,
@@ -149,24 +151,30 @@ impl ChainhookSpecificationFile {
             }
         };
 
-        Ok(BitcoinChainhookSpecification {
+        let mut networks = BTreeMap::new();
+        networks.insert(
+            network.clone(),
+            BitcoinChainhookNetworkSpecification {
+                start_block: network_spec.start_block,
+                end_block: network_spec.end_block,
+                expire_after_occurrence: network_spec.expire_after_occurrence,
+                predicate: network_spec.predicate.to_bitcoin_predicate()?,
+                action: network_spec.action.to_specifications()?,
+            },
+        );
+        Ok(BitcoinChainhookFullSpecification {
             uuid: format!("{}", self.id.unwrap_or(1)),
             owner_uuid: None,
             version: self.version.unwrap_or(1),
             name: self.name.to_string(),
-            network: network.clone(),
-            start_block: network_spec.start_block,
-            end_block: network_spec.end_block,
-            expire_after_occurrence: network_spec.expire_after_occurrence,
-            predicate: network_spec.predicate.to_bitcoin_predicate()?,
-            action: network_spec.action.to_specifications()?,
+            networks,
         })
     }
 
     pub fn to_stacks_specification(
         &self,
         network: &StacksNetwork,
-    ) -> Result<StacksChainhookSpecification, String> {
+    ) -> Result<StacksChainhookFullSpecification, String> {
         let network_ser = format!("{:?}", network).to_lowercase();
         let network_spec = match self.networks.get(&network_ser) {
             Some(entry) => entry,
@@ -178,20 +186,25 @@ impl ChainhookSpecificationFile {
             }
         };
 
-        Ok(StacksChainhookSpecification {
+        let mut networks = BTreeMap::new();
+        networks.insert(
+            network.clone(),
+            StacksChainhookNetworkSpecification {
+                capture_all_events: None,
+                decode_clarity_values: None,
+                start_block: network_spec.start_block,
+                end_block: network_spec.end_block,
+                expire_after_occurrence: network_spec.expire_after_occurrence,
+                predicate: network_spec.predicate.to_stacks_predicate()?,
+                action: network_spec.action.to_specifications()?,
+            },
+        );
+        Ok(StacksChainhookFullSpecification {
             uuid: format!("{}", self.id.unwrap_or(1)),
             owner_uuid: None,
             version: self.version.unwrap_or(1),
             name: self.name.to_string(),
-            network: network.clone(),
-            capture_all_events: None,
-            decode_clarity_values: None,
-            start_block: network_spec.start_block,
-            end_block: network_spec.end_block,
-            expire_after_occurrence: network_spec.expire_after_occurrence,
-            block_predicate: None,
-            transaction_predicate: network_spec.predicate.to_stacks_predicate()?,
-            action: network_spec.action.to_specifications()?,
+            networks,
         })
     }
 }
@@ -203,17 +216,12 @@ impl HookActionFile {
                 Some(url) => Ok(url.to_string()),
                 None => Err(format!("url missing for http")),
             }?;
-            let method = match specs.get("method") {
-                Some(method) => Ok(method.to_string()),
-                None => Err(format!("method missing for http")),
-            }?;
             let authorization_header = match specs.get("authorization-header") {
                 Some(authorization_header) => Ok(authorization_header.to_string()),
                 None => Err(format!("authorization-header missing for http")),
             }?;
-            Ok(HookAction::Http(HttpHook {
+            Ok(HookAction::HttpPost(HttpHook {
                 url,
-                method,
                 authorization_header,
             }))
         } else if let Some(ref specs) = self.file {
@@ -221,7 +229,7 @@ impl HookActionFile {
                 Some(path) => Ok(path.to_string()),
                 None => Err(format!("path missing for file")),
             }?;
-            Ok(HookAction::File(FileHook { path }))
+            Ok(HookAction::FileAppend(FileHook { path }))
         } else {
             Err(format!("action not supported (http, file)"))
         }
@@ -229,27 +237,37 @@ impl HookActionFile {
 }
 
 impl ChainhookPredicateFile {
-    pub fn to_bitcoin_predicate(&self) -> Result<BitcoinTransactionFilterPredicate, String> {
+    pub fn to_bitcoin_predicate(&self) -> Result<BitcoinPredicateType, String> {
         if let Some(ref specs) = self.op_return {
-            let rule = BitcoinPredicateType::OpReturn(self.extract_matching_rule(specs)?);
-            let scope = self.extract_scope()?;
-            return Ok(BitcoinTransactionFilterPredicate::new(scope, rule));
+            let predicate = BitcoinPredicateType::Outputs(OutputPredicate::OpReturn(
+                self.extract_matching_rule(specs)?,
+            ));
+            return Ok(predicate);
         } else if let Some(ref specs) = self.p2pkh {
-            let rule = BitcoinPredicateType::P2pkh(self.extract_exact_matching_rule(specs)?);
-            let scope = self.extract_scope()?;
-            return Ok(BitcoinTransactionFilterPredicate::new(scope, rule));
+            let predicate = BitcoinPredicateType::Outputs(OutputPredicate::P2pkh(
+                self.extract_exact_matching_rule(specs)?,
+            ));
+            return Ok(predicate);
         } else if let Some(ref specs) = self.p2sh {
-            let rule = BitcoinPredicateType::P2sh(self.extract_exact_matching_rule(specs)?);
-            let scope = self.extract_scope()?;
-            return Ok(BitcoinTransactionFilterPredicate::new(scope, rule));
+            let predicate = BitcoinPredicateType::Outputs(OutputPredicate::P2sh(
+                self.extract_exact_matching_rule(specs)?,
+            ));
+            return Ok(predicate);
         } else if let Some(ref specs) = self.p2wpkh {
-            let rule = BitcoinPredicateType::P2wpkh(self.extract_exact_matching_rule(specs)?);
-            let scope = self.extract_scope()?;
-            return Ok(BitcoinTransactionFilterPredicate::new(scope, rule));
+            let predicate = BitcoinPredicateType::Outputs(OutputPredicate::P2wpkh(
+                self.extract_exact_matching_rule(specs)?,
+            ));
+            return Ok(predicate);
         } else if let Some(ref specs) = self.p2wsh {
-            let rule = BitcoinPredicateType::P2wsh(self.extract_exact_matching_rule(specs)?);
-            let scope = self.extract_scope()?;
-            return Ok(BitcoinTransactionFilterPredicate::new(scope, rule));
+            let predicate = BitcoinPredicateType::Outputs(OutputPredicate::P2wsh(
+                self.extract_exact_matching_rule(specs)?,
+            ));
+            return Ok(predicate);
+        } else if let Some(ref _specs) = self.protocol {
+            let predicate = BitcoinPredicateType::Protocol(Protocols::Ordinal(
+                OrdinalOperations::InscriptionRevealed,
+            ));
+            return Ok(predicate);
         }
         return Err(format!(
             "trigger not specified (op-return, p2pkh, p2sh, p2wpkh, p2wsh)"
@@ -288,43 +306,27 @@ impl ChainhookPredicateFile {
         return Err(format!("predicate rule not specified (equals)"));
     }
 
-    pub fn extract_scope(&self) -> Result<Scope, String> {
-        if let Some(ref scope) = self.scope {
-            let scope = match scope.as_str() {
-                "inputs" => Scope::Inputs,
-                "outputs" => Scope::Outputs,
-                _ => return Err(format!("predicate scope not specified (inputs, outputs)")),
-            };
-            return Ok(scope);
-        };
-        return Err(format!("predicate scope not specified (inputs, outputs)"));
-    }
-
-    pub fn to_stacks_predicate(&self) -> Result<StacksTransactionFilterPredicate, String> {
+    pub fn to_stacks_predicate(&self) -> Result<StacksPredicate, String> {
         if let Some(ref specs) = self.contract_call {
             let predicate = self.extract_contract_call_predicate(specs)?;
-            return Ok(StacksTransactionFilterPredicate::ContractCall(predicate));
+            return Ok(StacksPredicate::ContractCall(predicate));
         } else if let Some(ref specs) = self.print_event {
             let predicate = self.extract_print_event_predicate(specs)?;
-            return Ok(StacksTransactionFilterPredicate::PrintEvent(predicate));
+            return Ok(StacksPredicate::PrintEvent(predicate));
         } else if let Some(ref specs) = self.ft_event {
             let predicate = self.extract_ft_event_predicate(specs)?;
-            return Ok(StacksTransactionFilterPredicate::FtEvent(predicate));
+            return Ok(StacksPredicate::FtEvent(predicate));
         } else if let Some(ref specs) = self.nft_event {
             let predicate = self.extract_nft_event_predicate(specs)?;
-            return Ok(StacksTransactionFilterPredicate::NftEvent(predicate));
+            return Ok(StacksPredicate::NftEvent(predicate));
         } else if let Some(ref specs) = self.stx_event {
             let predicate = self.extract_stx_event_predicate(specs)?;
-            return Ok(StacksTransactionFilterPredicate::StxEvent(predicate));
+            return Ok(StacksPredicate::StxEvent(predicate));
         } else if let Some(ref specs) = self.txid {
-            return Ok(StacksTransactionFilterPredicate::TransactionIdentifierHash(
-                specs.clone(),
-            ));
+            return Ok(StacksPredicate::Txid(specs.clone()));
         } else if let Some(ref specs) = self.contract_deploy {
             let predicate = self.extract_contract_deploy_predicate(specs)?;
-            return Ok(StacksTransactionFilterPredicate::ContractDeployment(
-                predicate,
-            ));
+            return Ok(StacksPredicate::ContractDeployment(predicate));
         }
         return Err(format!("trigger not specified (print-event, ft-event, nft-event, stx-event, contract-deploy, txid)"));
     }
@@ -354,7 +356,7 @@ impl ChainhookPredicateFile {
         specs: &ContractDeploymentPredicateFile,
     ) -> Result<StacksContractDeploymentPredicate, String> {
         if let Some(ref deployer) = specs.deployer {
-            return Ok(StacksContractDeploymentPredicate::Principal(
+            return Ok(StacksContractDeploymentPredicate::Deployer(
                 deployer.clone(),
             ));
         }

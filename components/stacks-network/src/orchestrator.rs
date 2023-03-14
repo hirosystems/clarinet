@@ -1,8 +1,8 @@
 use super::DevnetEvent;
 use crate::{ServiceStatusData, Status};
 use bollard::container::{
-    Config, CreateContainerOptions, KillContainerOptions, ListContainersOptions,
-    PruneContainersOptions, WaitContainerOptions,
+    Config, CreateContainerOptions, DownloadFromContainerOptions, KillContainerOptions,
+    ListContainersOptions, PruneContainersOptions, WaitContainerOptions,
 };
 use bollard::errors::Error as DockerError;
 use bollard::exec::CreateExecOptions;
@@ -11,18 +11,27 @@ use bollard::models::{HostConfig, PortBinding};
 use bollard::network::{CreateNetworkOptions, PruneNetworksOptions};
 use bollard::service::Ipam;
 use bollard::Docker;
+use bytes::BytesMut;
 use chainhook_event_observer::utils::Context;
-use chainhook_types::StacksNetwork;
-use clarinet_files::{DevnetConfigFile, NetworkManifest, ProjectManifest, DEFAULT_DEVNET_BALANCE};
+use clarinet_deployments::requirements::ContractMetadata;
+use clarinet_files::chainhook_types::StacksNetwork;
+use clarinet_files::{
+    DevnetConfigFile, FileLocation, NetworkManifest, ProjectManifest, DEFAULT_DEVNET_BALANCE,
+};
+use clarity_repl::clarity::stacks_common::types::StacksEpochId;
+use clarity_repl::clarity::vm::types::StandardPrincipalData;
+use clarity_repl::clarity::ClarityVersion;
 use futures::stream::TryStreamExt;
 use hiro_system_kit::slog;
 use reqwest::RequestBuilder;
+use serde_json::Value as JsonValue;
 use std::collections::HashMap;
 use std::fs::{self, File};
-use std::io::Write;
+use std::io::{Cursor, Read, Write};
 use std::path::PathBuf;
 use std::sync::mpsc::{Receiver, Sender};
 use std::time::Duration;
+use tar::EntryType;
 
 #[derive(Debug)]
 pub struct DevnetOrchestrator {
@@ -191,7 +200,12 @@ impl DevnetOrchestrator {
                 ..Default::default()
             })
             .await
-            .map_err(|e| format!("unable to create network: {}", e.to_string()))?
+            .map_err(|e| {
+                format!(
+                    "clarinet was unable to create network. Is docker running locally? (error: {})",
+                    e.to_string()
+                )
+            })?
             .id
             .ok_or("unable to retrieve network_id")?;
 
@@ -268,10 +282,6 @@ impl DevnetOrchestrator {
         let disable_bitcoin_explorer = devnet_config.disable_bitcoin_explorer;
         let enable_subnet_node = devnet_config.enable_subnet_node;
         let disable_subnet_api = devnet_config.disable_subnet_api;
-
-        let _ = fs::create_dir(format!("{}", devnet_config.working_dir));
-        let _ = fs::create_dir(format!("{}/conf", devnet_config.working_dir));
-        let _ = fs::create_dir(format!("{}/data", devnet_config.working_dir));
 
         let bitcoin_explorer_port = devnet_config.bitcoin_explorer_port;
         let stacks_explorer_port = devnet_config.stacks_explorer_port;
@@ -444,14 +454,6 @@ impl DevnetOrchestrator {
         // Start subnet node
         if enable_subnet_node {
             let _ = event_tx.send(DevnetEvent::info(format!("Starting subnet-node")));
-            match self.prepare_subnet_node_container(boot_index, ctx).await {
-                Ok(_) => {}
-                Err(message) => {
-                    let _ = event_tx.send(DevnetEvent::FatalError(message.clone()));
-                    self.kill(ctx, Some(&message)).await;
-                    return Err(message);
-                }
-            };
             let _ = event_tx.send(DevnetEvent::ServiceStatus(ServiceStatusData {
                 order: 5,
                 status: Status::Yellow,
@@ -670,8 +672,8 @@ discover=0
 dns=0
 dnsseed=0
 listenonion=0
-rpcserialversion=0
 rpcworkqueue=100
+rpcserialversion=1
 disablewallet=0
 fallbackfee=0.00001
 
@@ -744,6 +746,13 @@ rpcport={bitcoin_node_rpc_port}
                 extra_hosts: Some(vec!["host.docker.internal:host-gateway".into()]),
                 ..Default::default()
             }),
+            cmd: Some(vec![
+                "/usr/local/bin/bitcoind".into(),
+                "-conf=/etc/bitcoin/bitcoin.conf".into(),
+                "-nodebuglogfile".into(),
+                "-pid=/run/bitcoind.pid".into(),
+                // "-datadir=/root/.bitcoin".into(),
+            ]),
             ..Default::default()
         };
 
@@ -965,6 +974,22 @@ events_keys = ["*"]
             ));
         }
 
+        if devnet_config.enable_subnet_node {
+            stacks_conf.push_str(&format!(
+                r#"
+# Add subnet-node as an event observer
+[[events_observer]]
+endpoint = "{}"
+retry_count = 255
+events_keys = ["*"]
+"#,
+                format!(
+                    "subnet-node.{}:{}",
+                    self.network_name, devnet_config.subnet_events_ingestion_port
+                ),
+            ));
+        }
+
         for chains_coordinator in devnet_config.stacks_node_events_observers.iter() {
             stacks_conf.push_str(&format!(
                 r#"
@@ -998,9 +1023,8 @@ peer_port = {bitcoin_node_p2p_port}
             orchestrator_ingestion_port = devnet_config.orchestrator_ingestion_port,
         ));
 
-        if devnet_config.enable_next_features {
-            stacks_conf.push_str(&format!(
-                r#"pox_2_activation = {pox_2_activation}
+        stacks_conf.push_str(&format!(
+            r#"pox_2_activation = {pox_2_activation}
 
 [[burnchain.epochs]]
 epoch_name = "1.0"
@@ -1018,12 +1042,11 @@ start_height = {epoch_2_05}
 epoch_name = "2.1"
 start_height = {epoch_2_1}
                     "#,
-                epoch_2_0 = devnet_config.epoch_2_0,
-                epoch_2_05 = devnet_config.epoch_2_05,
-                epoch_2_1 = devnet_config.epoch_2_1,
-                pox_2_activation = devnet_config.pox_2_activation,
-            ));
-        }
+            epoch_2_0 = devnet_config.epoch_2_0,
+            epoch_2_05 = devnet_config.epoch_2_05,
+            epoch_2_1 = devnet_config.epoch_2_1,
+            pox_2_activation = devnet_config.pox_2_activation,
+        ));
 
         let mut stacks_conf_path = PathBuf::from(&devnet_config.working_dir);
         stacks_conf_path.push("conf/Stacks.toml");
@@ -1297,8 +1320,13 @@ events_keys = ["*"]
 
         let mut subnet_conf_path = PathBuf::from(&devnet_config.working_dir);
         subnet_conf_path.push("conf/Subnet.toml");
-        let mut file = File::create(subnet_conf_path)
-            .map_err(|e| format!("unable to create Subnet.toml: {:?}", e))?;
+        let mut file = File::create(subnet_conf_path.clone()).map_err(|e| {
+            format!(
+                "unable to create Subnet.toml ({}): {:?}",
+                subnet_conf_path.to_str().unwrap(),
+                e
+            )
+        })?;
         file.write_all(subnet_conf.as_bytes())
             .map_err(|e| format!("unable to write Subnet.toml: {:?}", e))?;
 
@@ -1307,8 +1335,6 @@ events_keys = ["*"]
         stacks_node_data_path.push(format!("{}", boot_index));
         let _ = fs::create_dir(stacks_node_data_path.clone());
         stacks_node_data_path.push("subnet");
-        fs::create_dir(stacks_node_data_path)
-            .map_err(|e| format!("to create working dir: {:?}", e))?;
 
         let mut exposed_ports = HashMap::new();
         exposed_ports.insert(
@@ -1374,6 +1400,9 @@ events_keys = ["*"]
         &mut self,
         boot_index: u32,
         ctx: &Context,
+        cache_dir: PathBuf,
+        deployer: &StandardPrincipalData,
+        miner: &StandardPrincipalData,
     ) -> Result<(), String> {
         let (docker, devnet_config) = match (&self.docker_client, &self.network_config) {
             (Some(ref docker), Some(ref network_config)) => match network_config.devnet {
@@ -1399,8 +1428,9 @@ events_keys = ["*"]
 
         let config = self.prepare_subnet_node_config(boot_index)?;
 
+        let container_name = format!("subnet-node.{}", self.network_name);
         let options = CreateContainerOptions {
-            name: format!("subnet-node.{}", self.network_name),
+            name: container_name.clone(),
         };
 
         let container = docker
@@ -1412,6 +1442,75 @@ events_keys = ["*"]
         ctx.try_log(|logger| slog::info!(logger, "Created container subnet-node: {}", container));
         self.subnet_node_container_id = Some(container.clone());
 
+        // Download the subnet contract(s) from the container and write them to Clarinet's cache directory.
+        let output = docker
+            .download_from_container(
+                &container_name,
+                Some(DownloadFromContainerOptions {
+                    path: "/contracts/",
+                }),
+            )
+            .try_fold(BytesMut::with_capacity(8192), |mut acc, b| async {
+                acc.extend(b);
+                return Ok(acc);
+            })
+            .await
+            .map_err(|e| e.to_string())?;
+        let mut tar = tar::Archive::new(Cursor::new(output));
+        let mut prefix = cache_dir;
+        prefix.push("requirements");
+        for entry in tar.entries().map_err(|e| e.to_string())? {
+            let mut entry = entry.map_err(|e| e.to_string())?;
+
+            let entry_path = entry.path().map_err(|e| e.to_string())?;
+            if entry_path.is_dir() {
+                continue;
+            }
+
+            let filename = entry_path
+                .strip_prefix("contracts/")
+                .map_err(|e| e.to_string())?;
+
+            let filename_str = match filename.to_str() {
+                Some(s) => format!("{}.{}", deployer.to_string(), s),
+                None => {
+                    return Err(format!(
+                        "invalid filename in tarball: {:?}",
+                        filename.to_string_lossy()
+                    ))
+                }
+            };
+            let contract_path = prefix.join(filename_str);
+
+            // Write the contract file, replacing the miner address
+            if entry.header().entry_type() == EntryType::Regular {
+                let mut buffer = String::new();
+                entry
+                    .read_to_string(&mut buffer)
+                    .map_err(|e| e.to_string())?;
+                let contract_content = buffer.replace(
+                    "(define-data-var miner principal tx-sender)",
+                    &format!("(define-data-var miner principal '{})", &miner),
+                );
+                let contract_file = FileLocation::from_path(contract_path.clone());
+                contract_file
+                    .write_content(contract_content.as_bytes())
+                    .map_err(|e| e.to_string())?;
+            }
+
+            // Write the metadata file
+            let metadata_path = contract_path.with_extension("json");
+            let fl = FileLocation::from_path(metadata_path.clone());
+            fl.write_content(
+                serde_json::to_string_pretty(&ContractMetadata {
+                    epoch: StacksEpochId::Epoch21,
+                    clarity_version: ClarityVersion::Clarity2,
+                })
+                .unwrap()
+                .as_bytes(),
+            )
+            .map_err(|e| e.to_string())?;
+        }
         Ok(())
     }
 
@@ -1455,7 +1554,7 @@ events_keys = ["*"]
             )
             .try_collect::<Vec<_>>()
             .await
-            .map_err(|_| "unable to create image".to_string())?;
+            .map_err(|e| format!("unable to create image: {}", e))?;
 
         let mut port_bindings = HashMap::new();
         port_bindings.insert(
@@ -1577,7 +1676,7 @@ events_keys = ["*"]
             )
             .try_collect::<Vec<_>>()
             .await
-            .map_err(|_| "unable to create image".to_string())?;
+            .map_err(|e| format!("unable to create image: {}", e))?;
 
         let mut port_bindings = HashMap::new();
         port_bindings.insert(
@@ -1622,7 +1721,7 @@ events_keys = ["*"]
                 format!("STACKS_CORE_EVENT_HOST=0.0.0.0"),
                 format!("STACKS_API_ENABLE_FT_METADATA=1"),
                 format!("PG_HOST=postgres.{}", self.network_name),
-                format!("PG_PORT=5432"),
+                format!("PG_PORT={}", devnet_config.postgres_port),
                 format!("PG_USER={}", devnet_config.postgres_username),
                 format!("PG_PASSWORD={}", devnet_config.postgres_password),
                 format!("PG_DATABASE={}", devnet_config.subnet_api_postgres_database),
@@ -1688,7 +1787,11 @@ events_keys = ["*"]
             .await
             .map_err(|e| formatted_docker_error("unable to create exec command", e))?;
 
-        let _ = docker
+        // Pause to ensure the postgres container is ready.
+        // TODO
+        std::thread::sleep(std::time::Duration::from_secs(10));
+
+        let _res = docker
             .start_exec(&exec.id, None)
             .await
             .map_err(|e| formatted_docker_error("unable to start exec command", e))?;
@@ -1732,7 +1835,7 @@ events_keys = ["*"]
             )
             .try_collect::<Vec<_>>()
             .await
-            .map_err(|_| "unable to create image".to_string())?;
+            .map_err(|e| format!("unable to create image: {}", e))?;
 
         let mut port_bindings = HashMap::new();
         port_bindings.insert(
@@ -2481,14 +2584,22 @@ events_keys = ["*"]
                 "jsonrpc": "1.0",
                 "id": "stacks-network",
                 "method": "createwallet",
-                "params": [json!("")]
+                "params": json!({ "wallet_name": "", "disable_private_keys": true })
             }))
             .send()
             .await
             .map_err(|e| format!("unable to send 'createwallet' request ({})", e));
 
             match rpc_call {
-                Ok(_r) => break,
+                Ok(r) => {
+                    if r.status().is_success() {
+                        break;
+                    } else {
+                        let err = r.text().await;
+                        let msg = format!("{:?}", err);
+                        let _ = devnet_event_tx.send(DevnetEvent::error(msg));
+                    }
+                }
                 Err(e) => {
                     error_count += 1;
                     if error_count > max_errors {
@@ -2504,7 +2615,8 @@ events_keys = ["*"]
 
         let mut error_count = 0;
         loop {
-            let rpc_call = base_builder(
+            let descriptor = format!("addr({})", miner_address);
+            let rpc_result: JsonValue = base_builder(
                 &bitcoin_node_url,
                 &devnet_config.bitcoin_node_username,
                 &devnet_config.bitcoin_node_password,
@@ -2512,16 +2624,59 @@ events_keys = ["*"]
             .json(&json!({
                 "jsonrpc": "1.0",
                 "id": "stacks-network",
-                "method": "importaddress",
-                "params": [json!(miner_address)]
+                "method": "getdescriptorinfo",
+                "params": [json!(descriptor)]
 
             }))
             .send()
             .await
-            .map_err(|e| format!("unable to send 'importaddress' request ({})", e));
+            .map_err(|e| format!("unable to send 'getdescriptorinfo' request ({})", e))
+            .map_err(|e| format!("unable to receive 'getdescriptorinfo' response: {}", e))?
+            .json()
+            .await
+            .map_err(|e| format!("unable to parse 'getdescriptorinfo' result: {}", e))?;
+
+            let checksum = rpc_result
+                .as_object()
+                .ok_or(format!("unable to parse 'getdescriptorinfo'"))?
+                .get("result")
+                .ok_or(format!("unable to parse 'getdescriptorinfo'"))?
+                .as_object()
+                .ok_or(format!("unable to parse 'getdescriptorinfo'"))?
+                .get("checksum")
+                .ok_or(format!("unable to parse 'getdescriptorinfo'"))?
+                .as_str()
+                .ok_or(format!("unable to parse 'getdescriptorinfo'"))?
+                .to_string();
+
+            let _ = devnet_event_tx.send(DevnetEvent::info(format!(
+                "Registering {descriptor}#{checksum}"
+            )));
+            let payload = json!({
+                "jsonrpc": "1.0",
+                "id": "stacks-network",
+                "method": "importdescriptors",
+                "params": {
+                    "requests": [{
+                        "desc": format!("{}#{}", descriptor, checksum),
+                        "timestamp": 0,
+                    }]
+                }
+            });
+            let rpc_call = base_builder(
+                &bitcoin_node_url,
+                &devnet_config.bitcoin_node_username,
+                &devnet_config.bitcoin_node_password,
+            )
+            .json(&payload)
+            .send()
+            .await
+            .map_err(|e| format!("unable to send 'importdescriptors' request ({})", e));
 
             match rpc_call {
-                Ok(_r) => break,
+                Ok(_r) => {
+                    break;
+                }
                 Err(e) => {
                     error_count += 1;
                     if error_count > max_errors {
@@ -2537,23 +2692,68 @@ events_keys = ["*"]
 
         let mut error_count = 0;
         loop {
-            let rpc_call = base_builder(
+            let descriptor = format!("addr({})", faucet_address);
+            let rpc_result: JsonValue = base_builder(
                 &bitcoin_node_url,
                 &devnet_config.bitcoin_node_username,
                 &devnet_config.bitcoin_node_password,
             )
             .json(&json!({
-            "jsonrpc": "1.0",
-            "id": "stacks-network",
-            "method": "importaddress",
-            "params": [json!(faucet_address)]
+                "jsonrpc": "1.0",
+                "id": "stacks-network",
+                "method": "getdescriptorinfo",
+                "params": [json!(descriptor)]
+
             }))
             .send()
             .await
-            .map_err(|e| format!("unable to send 'importaddress' request ({})", e));
+            .map_err(|e| format!("unable to send 'getdescriptorinfo' request ({})", e))
+            .map_err(|e| format!("unable to receive 'getdescriptorinfo' response: {}", e))?
+            .json()
+            .await
+            .map_err(|e| format!("unable to parse 'getdescriptorinfo' result: {}", e))?;
+
+            let checksum = rpc_result
+                .as_object()
+                .ok_or(format!("unable to parse 'getdescriptorinfo'"))?
+                .get("result")
+                .ok_or(format!("unable to parse 'getdescriptorinfo'"))?
+                .as_object()
+                .ok_or(format!("unable to parse 'getdescriptorinfo'"))?
+                .get("checksum")
+                .ok_or(format!("unable to parse 'getdescriptorinfo'"))?
+                .as_str()
+                .ok_or(format!("unable to parse 'getdescriptorinfo'"))?
+                .to_string();
+
+            let _ = devnet_event_tx.send(DevnetEvent::info(format!(
+                "Registering {descriptor}#{checksum}"
+            )));
+            let payload = json!({
+                "jsonrpc": "1.0",
+                "id": "stacks-network",
+                "method": "importdescriptors",
+                "params": {
+                    "requests": [{
+                        "desc": format!("{}#{}", descriptor, checksum),
+                        "timestamp": 0,
+                    }]
+                }
+            });
+            let rpc_call = base_builder(
+                &bitcoin_node_url,
+                &devnet_config.bitcoin_node_username,
+                &devnet_config.bitcoin_node_password,
+            )
+            .json(&payload)
+            .send()
+            .await
+            .map_err(|e| format!("unable to send 'importdescriptors' request ({})", e));
 
             match rpc_call {
-                Ok(_r) => break,
+                Ok(_r) => {
+                    break;
+                }
                 Err(e) => {
                     error_count += 1;
                     if error_count > max_errors {
@@ -2573,23 +2773,68 @@ events_keys = ["*"]
 
             let mut error_count = 0;
             loop {
-                let rpc_call = base_builder(
+                let descriptor = format!("addr({})", address);
+                let rpc_result: JsonValue = base_builder(
                     &bitcoin_node_url,
                     &devnet_config.bitcoin_node_username,
                     &devnet_config.bitcoin_node_password,
                 )
                 .json(&json!({
-                "jsonrpc": "1.0",
-                "id": "stacks-network",
-                "method": "importaddress",
-                "params": [json!(address)]
-                    }))
+                    "jsonrpc": "1.0",
+                    "id": "stacks-network",
+                    "method": "getdescriptorinfo",
+                    "params": [json!(descriptor)]
+
+                }))
                 .send()
                 .await
-                .map_err(|e| format!("unable to send 'importaddress' request ({})", e));
+                .map_err(|e| format!("unable to send 'getdescriptorinfo' request ({})", e))
+                .map_err(|e| format!("unable to receive 'getdescriptorinfo' response: {}", e))?
+                .json()
+                .await
+                .map_err(|e| format!("unable to parse 'getdescriptorinfo' result: {}", e))?;
+
+                let checksum = rpc_result
+                    .as_object()
+                    .ok_or(format!("unable to parse 'getdescriptorinfo'"))?
+                    .get("result")
+                    .ok_or(format!("unable to parse 'getdescriptorinfo'"))?
+                    .as_object()
+                    .ok_or(format!("unable to parse 'getdescriptorinfo'"))?
+                    .get("checksum")
+                    .ok_or(format!("unable to parse 'getdescriptorinfo'"))?
+                    .as_str()
+                    .ok_or(format!("unable to parse 'getdescriptorinfo'"))?
+                    .to_string();
+
+                let _ = devnet_event_tx.send(DevnetEvent::info(format!(
+                    "Registering {descriptor}#{checksum}"
+                )));
+                let payload = json!({
+                    "jsonrpc": "1.0",
+                    "id": "stacks-network",
+                    "method": "importdescriptors",
+                    "params": {
+                        "requests": [{
+                            "desc": format!("{}#{}", descriptor, checksum),
+                            "timestamp": 0,
+                        }]
+                    }
+                });
+                let rpc_call = base_builder(
+                    &bitcoin_node_url,
+                    &devnet_config.bitcoin_node_username,
+                    &devnet_config.bitcoin_node_password,
+                )
+                .json(&payload)
+                .send()
+                .await
+                .map_err(|e| format!("unable to send 'importdescriptors' request ({})", e));
 
                 match rpc_call {
-                    Ok(_r) => break,
+                    Ok(_r) => {
+                        break;
+                    }
                     Err(e) => {
                         error_count += 1;
                         if error_count > max_errors {

@@ -9,7 +9,7 @@ use clarinet_deployments::types::{DeploymentGenerationArtifacts, DeploymentSpeci
 
 use clarinet_files::{FileLocation, ProjectManifest};
 
-use chainhook_types::StacksNetwork;
+use clarinet_files::chainhook_types::StacksNetwork;
 
 use serde_yaml;
 

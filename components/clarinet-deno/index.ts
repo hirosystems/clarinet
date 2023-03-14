@@ -1,5 +1,4 @@
-// deno-lint-ignore-file ban-ts-comment no-namespace
-
+// deno-lint-ignore-file ban-ts-comment
 import {
   ExpectFungibleTokenBurnEvent,
   ExpectFungibleTokenMintEvent,
@@ -10,9 +9,11 @@ import {
   ExpectPrintEvent,
   ExpectSTXTransferEvent,
   ExpectSTXBurnEvent,
-} from "./types.ts";
+} from "./eventTypes.ts";
+import * as types from "./clarityTypes.ts";
 
-export * from "./types.ts";
+export * from "./eventTypes.ts";
+export * as types from "./clarityTypes.ts";
 
 export class Tx {
   type: number;
@@ -133,11 +134,10 @@ export class Chain {
       })
     );
     this.blockHeight = result.block_height;
-    const block: Block = {
+    return {
       height: result.block_height,
       receipts: result.receipts,
     };
-    return block;
   }
 
   mineEmptyBlock(count: number): EmptyBlock {
@@ -145,15 +145,14 @@ export class Chain {
       // @ts-ignore
       Deno.core.opSync("api/v1/mine_empty_blocks", {
         sessionId: this.sessionId,
-        count: count,
+        count,
       })
     );
     this.blockHeight = result.block_height;
-    const emptyBlock: EmptyBlock = {
+    return {
       session_id: result.session_id,
       block_height: result.block_height,
     };
-    return emptyBlock;
   }
 
   mineEmptyBlockUntil(targetBlockHeight: number): EmptyBlock {
@@ -166,28 +165,35 @@ export class Chain {
     return this.mineEmptyBlock(count);
   }
 
+  /**
+   * Call a read-only function
+   * @param contract Address of the contract implementing the function
+   * @param method The read-only function to call
+   * @param args Arguments to pass as clarity values
+   * @param sender Address of the caller
+   * @returns The result of th
+   */
   callReadOnlyFn(
     contract: string,
     method: string,
-    args: Array<unknown>,
+    args: Array<string>,
     sender: string
   ): ReadOnlyFn {
     const result = JSON.parse(
       // @ts-ignore
       Deno.core.opSync("api/v1/call_read_only_fn", {
         sessionId: this.sessionId,
-        contract: contract,
-        method: method,
-        args: args,
-        sender: sender,
+        contract,
+        method,
+        args,
+        sender,
       })
     );
-    const readOnlyFn: ReadOnlyFn = {
+    return {
       session_id: result.session_id,
       result: result.result,
       events: result.events,
     };
-    return readOnlyFn;
   }
 
   getAssetsMaps(): AssetsMaps {
@@ -197,11 +203,10 @@ export class Chain {
         sessionId: this.sessionId,
       })
     );
-    const assetsMaps: AssetsMaps = {
+    return {
       session_id: result.session_id,
       assets: result.assets,
     };
-    return assetsMaps;
   }
 
   switchEpoch(epoch: string): boolean {
@@ -209,7 +214,7 @@ export class Chain {
       // @ts-ignore
       Deno.core.opSync("api/v1/switch_epoch", {
         sessionId: this.sessionId,
-        epoch: epoch,
+        epoch,
       })
     );
     return result;
@@ -236,10 +241,21 @@ interface UnitTestOptions {
   fn: TestFunction;
 }
 
+interface FunctionInterface {
+  name: string;
+  access: "read_only" | "public" | "private";
+  args: {
+    name: string;
+    type: string;
+  }[];
+}
+
 export interface Contract {
   contract_id: string;
   source: string;
-  contract_interface: unknown;
+  contract_interface: {
+    functions: FunctionInterface[];
+  };
 }
 
 export interface StacksNode {
@@ -343,93 +359,6 @@ export class Clarinet {
   }
 }
 
-export namespace types {
-  const byteToHex: string[] = [];
-  for (let n = 0; n <= 0xff; ++n) {
-    const hexOctet = n.toString(16).padStart(2, "0");
-    byteToHex.push(hexOctet);
-  }
-
-  function serializeTuple(input: Record<string, unknown>) {
-    const items: Array<string> = [];
-    for (const [key, value] of Object.entries(input)) {
-      if (Array.isArray(value)) {
-        throw new Error("Tuple value can't be an array");
-      } else if (!!value && typeof value === "object") {
-        items.push(
-          `${key}: { ${serializeTuple(value as Record<string, unknown>)} }`
-        );
-      } else {
-        items.push(`${key}: ${value}`);
-      }
-    }
-    return items.join(", ");
-  }
-
-  export function ok(val: string) {
-    return `(ok ${val})`;
-  }
-
-  export function err(val: string) {
-    return `(err ${val})`;
-  }
-
-  export function some(val: string) {
-    return `(some ${val})`;
-  }
-
-  export function none() {
-    return `none`;
-  }
-
-  export function bool(val: boolean) {
-    return `${val}`;
-  }
-
-  export function int(val: number | bigint) {
-    return `${val}`;
-  }
-
-  export function uint(val: number | bigint) {
-    return `u${val}`;
-  }
-
-  export function ascii(val: string) {
-    return JSON.stringify(val);
-  }
-
-  export function utf8(val: string) {
-    return `u${JSON.stringify(val)}`;
-  }
-
-  export function buff(val: ArrayBuffer | string) {
-    const buff =
-      typeof val == "string"
-        ? new TextEncoder().encode(val)
-        : new Uint8Array(val);
-
-    const hexOctets = new Array(buff.length);
-
-    for (let i = 0; i < buff.length; ++i) {
-      hexOctets[i] = byteToHex[buff[i]];
-    }
-
-    return `0x${hexOctets.join("")}`;
-  }
-
-  export function list(val: Array<unknown>) {
-    return `(list ${val.join(" ")})`;
-  }
-
-  export function principal(val: string) {
-    return `'${val}`;
-  }
-
-  export function tuple(val: Record<string, unknown>) {
-    return `{ ${serializeTuple(val)} }`;
-  }
-}
-
 declare global {
   interface String {
     expectOk(): string;
@@ -439,6 +368,10 @@ declare global {
     expectBool(value: boolean): boolean;
     expectUint(value: number | bigint): bigint;
     expectInt(value: number | bigint): bigint;
+    expectBuff(value: Uint8Array): ArrayBuffer;
+    /**
+     * @deprecated `value`should be a Uint8Array
+     */
     expectBuff(value: ArrayBuffer): ArrayBuffer;
     expectAscii(value: string): string;
     expectUtf8(value: string): string;
@@ -533,23 +466,23 @@ function consume(src: String, expectation: string, wrapped: boolean) {
   return remainder;
 }
 
-String.prototype.expectOk = function () {
+String.prototype.expectOk = function expectOk() {
   return consume(this, "ok", true);
 };
 
-String.prototype.expectErr = function () {
+String.prototype.expectErr = function expectErr() {
   return consume(this, "err", true);
 };
 
-String.prototype.expectSome = function () {
+String.prototype.expectSome = function expectSome() {
   return consume(this, "some", true);
 };
 
-String.prototype.expectNone = function () {
+String.prototype.expectNone = function expectNone() {
   return consume(this, "none", false);
 };
 
-String.prototype.expectBool = function (value: boolean) {
+String.prototype.expectBool = function expectBool(value: boolean) {
   try {
     consume(this, `${value}`, false);
   } catch (error) {
@@ -558,7 +491,9 @@ String.prototype.expectBool = function (value: boolean) {
   return value;
 };
 
-String.prototype.expectUint = function (value: number | bigint): bigint {
+String.prototype.expectUint = function expectUint(
+  value: number | bigint
+): bigint {
   try {
     consume(this, `u${value}`, false);
   } catch (error) {
@@ -567,7 +502,9 @@ String.prototype.expectUint = function (value: number | bigint): bigint {
   return BigInt(value);
 };
 
-String.prototype.expectInt = function (value: number | bigint): bigint {
+String.prototype.expectInt = function expectInt(
+  value: number | bigint
+): bigint {
   try {
     consume(this, `${value}`, false);
   } catch (error) {
@@ -576,15 +513,15 @@ String.prototype.expectInt = function (value: number | bigint): bigint {
   return BigInt(value);
 };
 
-String.prototype.expectBuff = function (value: ArrayBuffer) {
-  const buffer = types.buff(value);
+String.prototype.expectBuff = function expectBuff(value: ArrayBuffer) {
+  const buffer = types.buff(new Uint8Array(value));
   if (this !== buffer) {
     throw new Error(`Expected ${green(buffer)}, got ${red(this.toString())}`);
   }
   return value;
 };
 
-String.prototype.expectAscii = function (value: string) {
+String.prototype.expectAscii = function expectAscii(value: string) {
   try {
     consume(this, `"${value}"`, false);
   } catch (error) {
@@ -593,7 +530,7 @@ String.prototype.expectAscii = function (value: string) {
   return value;
 };
 
-String.prototype.expectUtf8 = function (value: string) {
+String.prototype.expectUtf8 = function expectUtf8(value: string) {
   try {
     consume(this, `u"${value}"`, false);
   } catch (error) {
@@ -602,7 +539,7 @@ String.prototype.expectUtf8 = function (value: string) {
   return value;
 };
 
-String.prototype.expectPrincipal = function (value: string) {
+String.prototype.expectPrincipal = function expectPrincicipal(value: string) {
   try {
     consume(this, `${value}`, false);
   } catch (error) {
@@ -611,8 +548,8 @@ String.prototype.expectPrincipal = function (value: string) {
   return value;
 };
 
-String.prototype.expectList = function () {
-  if (this.charAt(0) !== "[" || this.charAt(this.length - 1) !== "]") {
+String.prototype.expectList = function expectList() {
+  if (!this.startsWith("[") || !this.endsWith("]")) {
     throw new Error(
       `Expected ${green("(list ...)")}, got ${red(this.toString())}`
     );
@@ -646,8 +583,8 @@ String.prototype.expectList = function () {
   return elements;
 };
 
-String.prototype.expectTuple = function () {
-  if (this.charAt(0) !== "{" || this.charAt(this.length - 1) !== "}") {
+String.prototype.expectTuple = function expectTuple() {
+  if (!this.startsWith("{") || !this.endsWith("}")) {
     throw new Error(
       `Expected ${green("(tuple ...)")}, got ${red(this.toString())}`
     );
@@ -921,10 +858,10 @@ function run(str: string, code: Code): string {
     : str;
 }
 
-export function red(str: string): string {
+function red(str: string): string {
   return run(str, code([31], 39));
 }
 
-export function green(str: string): string {
+function green(str: string): string {
   return run(str, code([32], 39));
 }

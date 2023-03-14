@@ -1,6 +1,8 @@
 [package]
 name = "clarinet-utils"
 version = "1.0.0"
+description = "Clarinet helpers"
+license = "MIT"
 edition = "2021"
 
 [dependencies]

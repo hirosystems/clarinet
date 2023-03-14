@@ -1,5 +1,5 @@
 use bitcoincore_rpc::{Auth, Client};
-use chainhook_types::StacksNetwork;
+use clarinet_files::chainhook_types::StacksNetwork;
 use clarinet_files::{AccountConfig, NetworkManifest, ProjectManifest};
 use clarinet_utils::get_bip39_seed_from_mnemonic;
 use clarity_repl::clarity::codec::StacksMessageCodec;
@@ -19,6 +19,9 @@ use clarity_repl::codec::{
     TransactionSpendingCondition, TransactionVersion,
 };
 use clarity_repl::codec::{StacksTransaction, TransactionAnchorMode};
+use clarity_repl::repl::session::{
+    BOOT_MAINNET_ADDRESS, BOOT_TESTNET_ADDRESS, V1_BOOT_CONTRACTS, V2_BOOT_CONTRACTS,
+};
 use clarity_repl::repl::{Session, SessionSettings};
 use reqwest::Url;
 use stacks_rpc_client::StacksRpc;
@@ -348,10 +351,8 @@ pub fn apply_on_chain_deployment(
         for (_, account) in network_manifest.accounts.iter() {
             accounts_cached_nonces.insert(account.stx_address.clone(), 0);
         }
-        if let Some(ref devnet) = network_manifest.devnet {
-            if devnet.enable_next_features {
-                default_epoch = EpochSpec::Epoch2_1;
-            }
+        if network_manifest.devnet.is_some() {
+            default_epoch = EpochSpec::Epoch2_1;
         };
     }
 
@@ -384,6 +385,20 @@ pub fn apply_on_chain_deployment(
     let mut session = Session::new(SessionSettings::default());
     let mut index = 0;
     let mut contracts_ids_to_remap: HashSet<(String, String)> = HashSet::new();
+
+    for contract in V1_BOOT_CONTRACTS {
+        contracts_ids_to_remap.insert((
+            format!("{}:{}", BOOT_MAINNET_ADDRESS, contract),
+            format!("{}:{}", BOOT_TESTNET_ADDRESS, contract),
+        ));
+    }
+    for contract in V2_BOOT_CONTRACTS {
+        contracts_ids_to_remap.insert((
+            format!("{}:{}", BOOT_MAINNET_ADDRESS, contract),
+            format!("{}:{}", BOOT_TESTNET_ADDRESS, contract),
+        ));
+    }
+
     for batch_spec in deployment.plan.batches.iter() {
         let epoch = match batch_spec.epoch {
             Some(epoch) => {
@@ -459,11 +474,25 @@ pub fn apply_on_chain_deployment(
                         url.host().expect("Host unknown"),
                         url.port_or_known_default().expect("Protocol unknown")
                     );
-                    let bitcoin_rpc = Client::new(&bitcoin_node_rpc_url, auth).unwrap();
+                    let bitcoin_rpc = Client::new(&bitcoin_node_rpc_url, auth.clone()).unwrap();
+
+                    let bitcoin_node_wallet_rpc_url = format!(
+                        "{}://{}:{}/wallet/",
+                        url.scheme(),
+                        url.host().expect("Host unknown"),
+                        url.port_or_known_default().expect("Protocol unknown")
+                    );
+                    let bitcoin_node_wallet_rpc =
+                        Client::new(&bitcoin_node_wallet_rpc_url, auth).unwrap();
+
                     let account = btc_accounts_lookup.get(&tx.expected_sender).unwrap();
                     let (secret_key, _public_key) = get_btc_keypair(account);
-                    let _ =
-                        bitcoin_deployment::send_transaction_spec(&bitcoin_rpc, tx, &secret_key);
+                    let _ = bitcoin_deployment::send_transaction_spec(
+                        &bitcoin_rpc,
+                        &bitcoin_node_wallet_rpc,
+                        tx,
+                        &secret_key,
+                    );
                     continue;
                 }
                 TransactionSpecification::ContractCall(tx) => {
@@ -652,9 +681,18 @@ pub fn apply_on_chain_deployment(
 
                     // Remapping principals - This is happening
                     let mut source = tx.source.clone();
-                    for (src_principal, dst_principal) in tx.remap_principals.iter() {
-                        let src = src_principal.to_address();
-                        let dst = dst_principal.to_address();
+                    for (src_principal, dst_principal) in tx
+                        .remap_principals
+                        .iter()
+                        .map(|(src, dst)| (src.to_address(), dst.to_address()))
+                        .chain(
+                            contracts_ids_to_remap
+                                .iter()
+                                .map(|(k, v)| (k.clone(), v.clone())),
+                        )
+                    {
+                        let src = src_principal;
+                        let dst = dst_principal;
                         let mut matched_indices = source
                             .match_indices(&src)
                             .map(|(i, _)| i)

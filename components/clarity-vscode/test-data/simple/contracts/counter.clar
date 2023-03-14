@@ -23,3 +23,5 @@
     (ok (var-get counter))
   )
 )
+
+(contract-call? .contract get-counter)

@@ -1,18 +1,20 @@
 [package]
 name = "stacks-network"
-version = "1.4.2"
+version = "1.5.0"
 edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
 bollard = "0.11.0"
+bytes = "1.4.0"
 crossterm = { version = "0.22.1", optional = true }
 bitcoin = "0.29.2"
 bitcoincore-rpc = "0.16.0"
 serde = { version = "1.0.136", features = ["derive"] }
 serde_json = { version = "1.0.79", features = ["preserve_order"] }
 serde_derive = "1"
+tar = "0.4.26"
 tracing = "0.1"
 tracing-subscriber = "0.3.3"
 tracing-appender = "0.2.0"
@@ -31,14 +33,14 @@ chrono = "0.4.20"
 futures = "0.3.12"
 base58 = "0.2.0"
 
-chainhook_event_observer = { package = "chainhook-event-observer", default-features = false, features = ["log"], path = "../chainhook-event-observer" }
-chainhook_types = { package = "chainhook-types", path = "../chainhook-types-rs" }
-stacks_rpc_client = { package = "stacks-rpc-client", path = "../stacks-rpc-client" }
-clarinet_files = { package = "clarinet-files", path = "../clarinet-files", features = ["cli"]  }
-clarinet_deployments = { package = "clarinet-deployments", path = "../clarinet-deployments", features = ["cli"]  }
-clarinet_utils = { package = "clarinet-utils", path = "../clarinet-utils"  }
-hiro_system_kit = { package = "hiro-system-kit", path = "../hiro-system-kit" }
-clarity_repl = { package = "clarity-repl", path = "../clarity-repl", features = ["cli"] }
+# chainhook-event-observer = { version = "=1.0.6", default-features = false, features = ["log", "ordinals"], path = "../../../chainhook/components/chainhook-event-observer" }
+chainhook-event-observer = { version = "=1.0.6", default-features = false, features = ["log", "ordinals"] }
+stacks-rpc-client = { path = "../stacks-rpc-client" }
+clarinet-files = { path = "../clarinet-files", features = ["cli"]  }
+clarinet-deployments = { path = "../clarinet-deployments", features = ["cli"]  }
+clarinet-utils = { path = "../clarinet-utils"  }
+hiro-system-kit = { path = "../hiro-system-kit", features = ["log"] }
+clarity-repl = { path = "../clarity-repl", features = ["cli"] }
 dirs = { version = "4.0.0" }
 
 [features]

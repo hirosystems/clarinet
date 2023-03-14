@@ -1,0 +1,22 @@
+{
+  "chain": "bitcoin",
+  "uuid": "1",
+  "name": "Wrap BTC",
+  "version": 1,
+  "networks": {
+    "regtest": {
+      "if_this": {
+        "scope": "outputs",
+        "p2pkh": {
+          "equals": "mr1iPkD9N3RJZZxXRk7xF9d36gffa6exNC"
+        }
+      },
+      "then_that": {
+        "http_post": {
+          "url": "http://localhost:3000/api/v1/wrapBtc",
+          "authorization_header": "Bearer cn389ncoiwuencr"
+        }
+      }
+    }
+  }
+}

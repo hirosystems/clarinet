@@ -1,0 +1,23 @@
+{
+  "chain": "stacks",
+  "uuid": "1",
+  "name": "Unwrap BTC",
+  "version": 1,
+  "networks": {
+    "devnet": {
+      "if_this": {
+        "scope": "ft_event",
+        "asset_identifier": "ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM.cbtc-token::cbtc",
+        "actions": [
+          "burn"
+        ]
+      },
+      "then_that": {
+        "http_post": {
+          "url": "http://localhost:3000/api/v1/unwrapBtc",
+          "authorization_header": "Bearer cn389ncoiwuencr"
+        }
+      }
+    }
+  }
+}

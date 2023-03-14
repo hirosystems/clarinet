@@ -5,7 +5,7 @@ use segment::{
     Client, HttpClient,
 };
 
-use chainhook_types::StacksNetwork;
+use clarinet_files::chainhook_types::StacksNetwork;
 
 pub enum DeveloperUsageEvent {
     NewProject(DeveloperUsageDigest),

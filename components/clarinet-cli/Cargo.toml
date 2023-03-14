@@ -1,6 +1,6 @@
 [package]
 name = "clarinet-cli"
-version = "1.4.2"
+version = "1.5.0"
 authors = ["Ludo Galabru <ludo@hiro.so>", "Brice Dobry <brice@hiro.so>"]
 edition = "2021"
 description = "Clarinet is a simple, modern and opinionated runtime for testing, integrating and deploying Clarity smart contracts."
@@ -134,25 +134,24 @@ base58 = "0.2.0"
 ctrlc = "3.1.9"
 strum = { version = "0.23.0", features = ["derive"] }
 bitcoin = "0.29.2"
+tiny-hderive = "0.3.0"
 segment = { version = "0.1.2", optional = true }
 mac_address = { version = "1.1.2", optional = true }
-tower-lsp = { version = "0.17.0", optional = true }
+tower-lsp = { version = "0.18.0", optional = true }
 hex = "0.4.3"
 serde_yaml = "0.8.23"
-chainhook_event_observer = { package = "chainhook-event-observer", default-features = false, path = "../chainhook-event-observer" }
-chainhook_types = { package = "chainhook-types", path = "../chainhook-types-rs" }
-clarinet_files = { package = "clarinet-files", path = "../clarinet-files", features = [
+clarinet-files = { path = "../clarinet-files", features = [
     "cli",
 ] }
-clarity_lsp = { package = "clarity-lsp", path = "../clarity-lsp", features = [
+clarity-lsp = { path = "../clarity-lsp", features = [
     "cli",
 ] }
-clarinet_deployments = { package = "clarinet-deployments", path = "../clarinet-deployments", features = [
+clarinet-deployments = { path = "../clarinet-deployments", features = [
     "cli",
 ] }
-hiro_system_kit = { package = "hiro-system-kit", path = "../hiro-system-kit" }
-clarinet_utils = { package = "clarinet-utils", path = "../clarinet-utils" }
-stacks_network = { package = "stacks-network", path = "../stacks-network" }
+hiro-system-kit = { path = "../hiro-system-kit" }
+clarinet-utils = { path = "../clarinet-utils" }
+stacks-network = { path = "../stacks-network" }
 num_cpus = "1.13.1"
 mio = "0.8"
 similar = "2.1.0"

@@ -2,7 +2,16 @@
 title: Add new Contract
 ---
 
-Clarinet can handle adding a new contract and its configuration to your project when you use the command listed below.
+Clarinet can handle adding a new contract and its configuration to your project.
+
+*Topics covered in this guide*:
+
+* [Add a new contract](#new-contract)
+* [Verify contract configuration](#contract-configuration)
+
+## New Contract
+
+You can use the command below to add a new contract.
 
 ```bash
 $ clarinet contract new bbtc
@@ -24,6 +33,8 @@ Clarinet will add two files to your project:
 └── tests
     └── bbtc_test.ts
 ```
+
+## Contract Configuration
 
 Clarinet will also add your contract configuration in the `Clarinet.toml`.
 

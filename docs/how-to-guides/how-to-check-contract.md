@@ -2,7 +2,15 @@
 title: Check Contracts
 ---
 
-Clarinet provides syntax and semantics checkers for Clarity. You can verify if the Clarity code in your project is valid with the command listed below.
+Clarinet provides syntax and semantics checkers for Clarity. 
+
+*Topic covered in this guide*:
+
+* [Check your contracts](#contracts)
+
+## Contracts
+
+You can verify if the Clarity code in your project is valid with the command listed below.
 
 ```bash
 $ clarinet check

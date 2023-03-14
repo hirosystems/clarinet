@@ -33,7 +33,7 @@ use self::codec::{DebugAdapterCodec, ParseError};
 
 use super::DebugState;
 
-mod codec;
+pub mod codec;
 
 /*
  * DAP Session:

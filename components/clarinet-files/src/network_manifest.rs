@@ -14,16 +14,14 @@ use tiny_hderive::bip32::ExtendedPrivKey;
 use toml::value::Value;
 
 pub const DEFAULT_DERIVATION_PATH: &str = "m/44'/5757'/0'/0/0";
-pub const DEFAULT_BITCOIN_NODE_IMAGE: &str = "quay.io/hirosystems/bitcoind:devnet-v2";
-pub const DEFAULT_STACKS_NODE_IMAGE: &str = "quay.io/hirosystems/stacks-node:devnet-v2";
-pub const DEFAULT_STACKS_NODE_NEXT_IMAGE: &str = "quay.io/hirosystems/stacks-node:devnet-v3-beta4";
+pub const DEFAULT_BITCOIN_NODE_IMAGE: &str = "quay.io/hirosystems/bitcoind:devnet-v3";
+pub const DEFAULT_STACKS_NODE_IMAGE: &str = "quay.io/hirosystems/stacks-node:devnet-v3";
 pub const DEFAULT_BITCOIN_EXPLORER_IMAGE: &str = "quay.io/hirosystems/bitcoin-explorer:devnet";
 pub const DEFAULT_STACKS_API_IMAGE: &str = "hirosystems/stacks-blockchain-api:latest";
-pub const DEFAULT_STACKS_API_NEXT_IMAGE: &str = "hirosystems/stacks-blockchain-api:stacks-2.1";
 pub const DEFAULT_STACKS_EXPLORER_IMAGE: &str = "hirosystems/explorer:latest";
-pub const DEFAULT_STACKS_EXPLORER_NEXT_IMAGE: &str = "hirosystems/explorer:feat-stacks-2.1";
 pub const DEFAULT_POSTGRES_IMAGE: &str = "postgres:14";
-pub const DEFAULT_SUBNET_NODE_IMAGE: &str = "hirosystems/subnet:0.1";
+pub const DEFAULT_SUBNET_NODE_IMAGE: &str = "hirosystems/stacks-subnets:0.3.0";
+pub const DEFAULT_SUBNET_API_IMAGE: &str = "hirosystems/stacks-blockchain-api:7.1.0-beta.1";
 pub const DEFAULT_SUBNET_CONTRACT_ID: &str = "STXMJXCJDCT4WPF2X1HE42T6ZCCK3TPMBRZ51JEG.subnet";
 pub const DEFAULT_STACKS_MINER_MNEMONIC: &str = "fragile loan twenty basic net assault jazz absorb diet talk art shock innocent float punch travel gadget embrace caught blossom hockey surround initial reduce";
 pub const DEFAULT_FAUCET_MNEMONIC: &str = "shadow private easily thought say logic fault paddle word top book during ignore notable orange flight clock image wealth health outside kitten belt reform";
@@ -120,7 +118,6 @@ pub struct DevnetConfigFile {
     pub disable_subnet_api: Option<bool>,
     pub docker_host: Option<String>,
     pub components_host: Option<String>,
-    pub enable_next_features: Option<bool>,
     pub epoch_2_0: Option<u64>,
     pub epoch_2_05: Option<u64>,
     pub epoch_2_1: Option<u64>,
@@ -241,7 +238,6 @@ pub struct DevnetConfig {
     pub disable_subnet_api: bool,
     pub docker_host: String,
     pub components_host: String,
-    pub enable_next_features: bool,
     pub epoch_2_0: u64,
     pub epoch_2_05: u64,
     pub epoch_2_1: u64,
@@ -598,10 +594,6 @@ impl NetworkManifest {
                     devnet_config.subnet_leader_mnemonic = Some(val.clone());
                 }
 
-                if let Some(ref val) = devnet_override.enable_next_features {
-                    devnet_config.enable_next_features = Some(val.clone());
-                }
-
                 if let Some(ref val) = devnet_override.epoch_2_0 {
                     devnet_config.epoch_2_0 = Some(val.clone());
                 }
@@ -690,18 +682,13 @@ impl NetworkManifest {
             let subnet_events_ingestion_port =
                 devnet_config.subnet_events_ingestion_port.unwrap_or(30445);
 
-            let mut stacks_node_events_observers = devnet_config
+            let stacks_node_events_observers = devnet_config
                 .stacks_node_events_observers
                 .take()
                 .unwrap_or(vec![]);
 
             if enable_subnet_node {
-                // add subnet node to stacks-node observers
                 let label = "subnet-leader";
-                stacks_node_events_observers.push(format!(
-                    "host.docker.internal:{}",
-                    subnet_events_ingestion_port
-                ));
                 accounts.insert(
                     label.to_string(),
                     AccountConfig {
@@ -725,7 +712,6 @@ impl NetworkManifest {
                 .expect("default deployer account unavailable");
             let remapped_subnet_contract_id =
                 format!("{}.{}", default_deployer.stx_address, contract_id.name);
-            let enable_next_features = devnet_config.enable_next_features.unwrap_or(false);
 
             let mut config = DevnetConfig {
                 name: devnet_config.name.take().unwrap_or("devnet".into()),
@@ -800,20 +786,14 @@ impl NetworkManifest {
                     .bitcoin_node_image_url
                     .take()
                     .unwrap_or(DEFAULT_BITCOIN_NODE_IMAGE.to_string()),
-                stacks_node_image_url: devnet_config.stacks_node_image_url.take().unwrap_or(
-                    match enable_next_features {
-                        true => DEFAULT_STACKS_NODE_NEXT_IMAGE,
-                        false => DEFAULT_STACKS_NODE_IMAGE,
-                    }
-                    .to_string(),
-                ),
-                stacks_api_image_url: devnet_config.stacks_api_image_url.take().unwrap_or(
-                    match enable_next_features {
-                        true => DEFAULT_STACKS_API_NEXT_IMAGE,
-                        false => DEFAULT_STACKS_API_IMAGE,
-                    }
-                    .to_string(),
-                ),
+                stacks_node_image_url: devnet_config
+                    .stacks_node_image_url
+                    .take()
+                    .unwrap_or(DEFAULT_STACKS_NODE_IMAGE.to_string()),
+                stacks_api_image_url: devnet_config
+                    .stacks_api_image_url
+                    .take()
+                    .unwrap_or(DEFAULT_STACKS_API_IMAGE.to_string()),
                 postgres_image_url: devnet_config
                     .postgres_image_url
                     .take()
@@ -821,13 +801,7 @@ impl NetworkManifest {
                 stacks_explorer_image_url: devnet_config
                     .stacks_explorer_image_url
                     .take()
-                    .unwrap_or(
-                        match enable_next_features {
-                            true => DEFAULT_STACKS_EXPLORER_NEXT_IMAGE,
-                            false => DEFAULT_STACKS_EXPLORER_IMAGE,
-                        }
-                        .to_string(),
-                    ),
+                    .unwrap_or(DEFAULT_STACKS_EXPLORER_IMAGE.to_string()),
                 bitcoin_explorer_image_url: devnet_config
                     .bitcoin_explorer_image_url
                     .take()
@@ -859,10 +833,12 @@ impl NetworkManifest {
                 subnet_api_image_url: devnet_config
                     .subnet_api_image_url
                     .take()
-                    .unwrap_or(DEFAULT_STACKS_API_IMAGE.to_string()),
+                    .unwrap_or(DEFAULT_SUBNET_API_IMAGE.to_string()),
                 subnet_api_port: devnet_config.subnet_api_port.unwrap_or(13999),
                 subnet_api_events_port: devnet_config.stacks_api_events_port.unwrap_or(13700),
-                disable_subnet_api: devnet_config.disable_subnet_api.unwrap_or(true),
+                disable_subnet_api: devnet_config
+                    .disable_subnet_api
+                    .unwrap_or(!enable_subnet_node),
                 docker_host: devnet_config
                     .docker_host
                     .unwrap_or(DEFAULT_DOCKER_SOCKET.into()),
@@ -879,7 +855,6 @@ impl NetworkManifest {
                     .stacks_explorer_env_vars
                     .take()
                     .unwrap_or(vec![]),
-                enable_next_features,
                 use_docker_gateway_routing: devnet_config
                     .use_docker_gateway_routing
                     .unwrap_or(false),

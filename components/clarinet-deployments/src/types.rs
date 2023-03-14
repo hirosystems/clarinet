@@ -10,7 +10,7 @@ use clarity_repl::clarity::vm::types::{
 
 use clarity_repl::clarity::{ClarityName, ClarityVersion, ContractName};
 
-use chainhook_types::StacksNetwork;
+use clarinet_files::chainhook_types::StacksNetwork;
 use serde::{Deserialize, Serialize};
 use serde_yaml;
 use std::collections::BTreeMap;

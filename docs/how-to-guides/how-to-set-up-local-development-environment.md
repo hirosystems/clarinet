@@ -4,6 +4,14 @@ title: Set up local Development Environment
 
 ## Developing a Clarity smart contract
 
+This article helps you with creating a new project and develop a clarity smart contract.
+
+*Topics covered in this guide*:
+
+* [Develop a clarity smart contract](#develop-a-smart-contract)
+* [Test and interact with smart contracts](#testing-with-clarinet)
+
+## Develop a smart contract
 Once you have installed Clarinet, you can begin a new Clarinet project with the command:
 
 ```sh
@@ -132,7 +140,7 @@ Note that by default, commands are always executed as the `deployer` address, wh
 `::set_tx_sender` command, you would need to provide the full address to the contract in the contract call
 (`ST1HTBVD3JG9C05J7HBJTHGR0GGW7KXW28M5JS8QE.my-contract`).
 
-You can refer to the [Clarity language reference](https://docs.stacks.co/docs/write-smart-contracts/clarity-language/) for a complete overview of all Clarity functions.
+You can refer to the [Clarity language reference](https://docs.stacks.co/docs/clarity/language-functions) for a complete overview of all Clarity functions.
 
 ### Testing with the test harness
 
@@ -181,3 +189,4 @@ For more information on assertions, review [asserts](https://deno.land/std@0.90.
 - [Clarity language reference](https://docs.stacks.co/references/language-functions)
 - [Deno standard library - asserts](https://deno.land/std@0.90.0/testing/asserts.ts)
 - [Clarity visual studio code plugin](https://marketplace.visualstudio.com/items?itemName=HiroSystems.clarity-lsp)
+

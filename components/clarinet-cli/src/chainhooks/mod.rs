@@ -1,14 +1,33 @@
 use clarinet_files::FileLocation;
+use std::fs::File;
+use std::io::BufReader;
 use std::path::PathBuf;
 
-pub mod types;
-use crate::chainhooks::types::ChainhookSpecificationFile;
+use stacks_network::chainhook_event_observer::chainhooks::types::{
+    ChainhookConfig, ChainhookFullSpecification,
+};
 
-use chainhook_event_observer::chainhooks::types::{ChainhookConfig, ChainhookSpecification};
-
-use chainhook_types::{BitcoinNetwork, StacksNetwork};
+use stacks_network::chainhook_event_observer::chainhook_types::{BitcoinNetwork, StacksNetwork};
 
 use std::fs;
+
+pub fn parse_chainhook_full_specification(
+    path: &PathBuf,
+) -> Result<ChainhookFullSpecification, String> {
+    let path = match File::open(path) {
+        Ok(path) => path,
+        Err(_e) => {
+            return Err(format!("unable to locate {}", path.display()));
+        }
+    };
+
+    let mut hook_spec_file_reader = BufReader::new(path);
+    let specification: ChainhookFullSpecification =
+        serde_json::from_reader(&mut hook_spec_file_reader)
+            .map_err(|e| format!("unable to parse chainhook spec: {}", e.to_string()))?;
+
+    Ok(specification)
+}
 
 pub fn load_chainhooks(
     manifest_location: &FileLocation,
@@ -18,11 +37,15 @@ pub fn load_chainhooks(
     let mut stacks_chainhooks = vec![];
     let mut bitcoin_chainhooks = vec![];
     for (path, relative_path) in hook_files.into_iter() {
-        match ChainhookSpecificationFile::parse(&path, networks) {
-            Ok(hook) => match hook {
-                ChainhookSpecification::Bitcoin(hook) => bitcoin_chainhooks.push(hook),
-                ChainhookSpecification::Stacks(hook) => stacks_chainhooks.push(hook),
-            },
+        match parse_chainhook_full_specification(&path) {
+            Ok(hook) => {
+                match hook {
+                    ChainhookFullSpecification::Bitcoin(hook) => bitcoin_chainhooks
+                        .push(hook.into_selected_network_specification(&networks.0)?),
+                    ChainhookFullSpecification::Stacks(hook) => stacks_chainhooks
+                        .push(hook.into_selected_network_specification(&networks.1)?),
+                }
+            }
             Err(msg) => return Err(format!("{} syntax incorrect: {}", relative_path, msg)),
         };
     }
@@ -35,10 +58,7 @@ pub fn load_chainhooks(
 pub fn check_chainhooks(manifest_location: &FileLocation, output_json: bool) -> Result<(), String> {
     let hook_files = get_chainhooks_files(manifest_location)?;
     for (path, relative_path) in hook_files.into_iter() {
-        let _hook = match ChainhookSpecificationFile::parse(
-            &path,
-            &(BitcoinNetwork::Regtest, StacksNetwork::Devnet),
-        ) {
+        let _hook = match parse_chainhook_full_specification(&path) {
             Ok(hook) => hook,
             Err(msg) => {
                 println!("{} {} syntax incorrect\n{}", red!("x"), relative_path, msg);
@@ -70,7 +90,7 @@ fn get_chainhooks_files(
         let is_extension_valid = file
             .extension()
             .and_then(|ext| ext.to_str())
-            .and_then(|ext| Some(ext == "yml" || ext == "yaml"));
+            .and_then(|ext| Some(ext == "json"));
 
         if let Some(true) = is_extension_valid {
             let relative_path = file.clone();

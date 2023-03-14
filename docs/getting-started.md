@@ -3,11 +3,19 @@
 title: Getting Started
 ---
 
-Follow this guide to install and build Clarinet. 
+## Install Clarinet
 
-## Install and Build Clarinet
+Hiro has developed Clarinet to be environment-agnostic. Follow this guide to install and build Clarinet. 
 
-Hiro has developed Clarinet to be environment-agnostic.
+*Topics covered in this guide*:
+
+* [Install Clarinet](#install-clarinet)
+  * [Install on MacOS](#install-on-macos-homebrew)
+  * [Install on Windows](#install-on-windows)
+  * [Install from Pre-built library](#install-from-pre-built-binary)
+* [Build Clarinet from source using Cargo](#build-clarinet)
+* [Use Clarinet to generate shell completion scripts](#setup-shell-completions)
+
 You may choose to install Clarinet in any of the following operating systems:
 
 - macOS
@@ -49,7 +57,7 @@ winget install clarinet
 
 For more information on how to install Clarinet on Windows, please see the [Setting Up Your Clarity Environment (Windows)](https://www.youtube.com/watch?v=r5LY1J5oACs) video walkthrough.
 
-### Install from a pre-built binary
+### Install from pre-built binary
 
 If you would like to install Clarinet from pre-built binaries, you must first download the latest release from the 
 [Hiro releases page](https://github.com/hirosystems/clarinet/releases). When you have downloaded the latest release,
@@ -122,4 +130,3 @@ clarinet completions (bash|elvish|fish|powershell|zsh)
 ```
 
 After generating the file, you can refer to the documentation for your shell to determine where this file should be moved to, and what other steps may be necessary to enable tab-completion for `clarinet`.
-

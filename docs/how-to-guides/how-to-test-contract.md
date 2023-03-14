@@ -4,6 +4,15 @@ title: Test Contract
 
 Clarinet supports automatic testing, where your blockchain application requirements can be converted to test cases. Clarinet comes with a testing harness based on Deno that applies the unit tests you write in TypeScript to your smart contracts.
 
+*Topics covered in this guide*:
+
+* [Instructions to write unit tests](#clarity-contracts-and-unit-tests)
+* [Increase test coverage](#measure-and-increase-code-coverage)
+* [Clarinet usage to optimize costs](#cost-optimization)
+* [Clarity REPL console](#load-contracts-in-a-console)
+* [Interact with contracts on mainnet](#interacting-with-contracts-deployed-on-mainnet)
+* [Clarinet usage in Github actions](#use-clarinet-in-your-ci-workflow-as-a-github-action)
+
 ## Clarity contracts and unit tests
 
 Let us consider a `counter` smart contract to understand how to write unit tests for our application requirements.
@@ -53,7 +62,7 @@ To define a Clarinet test, you need to register it with a call to `Clarinet.test
 2. Instantiating and passing common Clarinet objects to our `Clarinet.test()` API call
 3. Defining a user `wallet_1`, calling `increment`, and asserting its results
 
-```TypeScript
+```javascript
 // counter_test.ts - A unit test file
 import { Clarinet, Tx, Chain, Account, types } from 'https://deno.land/x/clarinet@v1.0.5/index.ts';
 
@@ -88,7 +97,7 @@ You can watch a step-by-step walkthrough of using `clarinet test` and watch [Exe
 Let us now write a higher coverage test suite.
 
 
-```TypeScript
+```javascript
 // counter_test.ts - a comprehensive unit test file
 import { Clarinet, Tx, Chain, Account, Contract, types } from 'https://deno.land/x/clarinet@v1.0.2/index.ts';
 import { assertEquals } from "https://deno.land/std@0.90.0/testing/asserts.ts";
@@ -362,3 +371,4 @@ jobs:
 
 Or add the steps above in your existing workflows. The generated code coverage output can then be 
 used as is with GitHub Apps like https://codecov.io.
+
