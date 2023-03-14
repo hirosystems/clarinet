@@ -390,7 +390,6 @@ disable_stacks_api = false
 # subnet_api_postgres_database = "subnet_api"
 
 # For testing in epoch 2.1 / using Clarity2
-# enable_next_features = true
 # epoch_2_0 = 103
 # epoch_2_05 = 104
 # epoch_2_1 = 106

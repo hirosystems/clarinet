@@ -14,6 +14,8 @@ mod wasm_fs_accessor;
 #[cfg(feature = "wasm")]
 pub use wasm_fs_accessor::WASMFileSystemAccessor;
 
+pub use chainhook_types;
+
 use chainhook_types::StacksNetwork;
 pub use network_manifest::{
     compute_addresses, AccountConfig, DevnetConfig, DevnetConfigFile, NetworkManifest,

@@ -1,5 +1,5 @@
 use bitcoincore_rpc::{Auth, Client};
-use chainhook_types::StacksNetwork;
+use clarinet_files::chainhook_types::StacksNetwork;
 use clarinet_files::{AccountConfig, NetworkManifest, ProjectManifest};
 use clarinet_utils::get_bip39_seed_from_mnemonic;
 use clarity_repl::clarity::codec::StacksMessageCodec;
@@ -19,6 +19,9 @@ use clarity_repl::codec::{
     TransactionSpendingCondition, TransactionVersion,
 };
 use clarity_repl::codec::{StacksTransaction, TransactionAnchorMode};
+use clarity_repl::repl::session::{
+    BOOT_MAINNET_ADDRESS, BOOT_TESTNET_ADDRESS, V1_BOOT_CONTRACTS, V2_BOOT_CONTRACTS,
+};
 use clarity_repl::repl::{Session, SessionSettings};
 use reqwest::Url;
 use stacks_rpc_client::StacksRpc;
@@ -348,10 +351,8 @@ pub fn apply_on_chain_deployment(
         for (_, account) in network_manifest.accounts.iter() {
             accounts_cached_nonces.insert(account.stx_address.clone(), 0);
         }
-        if let Some(ref devnet) = network_manifest.devnet {
-            if devnet.enable_next_features {
-                default_epoch = EpochSpec::Epoch2_1;
-            }
+        if network_manifest.devnet.is_some() {
+            default_epoch = EpochSpec::Epoch2_1;
         };
     }
 
@@ -384,6 +385,20 @@ pub fn apply_on_chain_deployment(
     let mut session = Session::new(SessionSettings::default());
     let mut index = 0;
     let mut contracts_ids_to_remap: HashSet<(String, String)> = HashSet::new();
+
+    for contract in V1_BOOT_CONTRACTS {
+        contracts_ids_to_remap.insert((
+            format!("{}:{}", BOOT_MAINNET_ADDRESS, contract),
+            format!("{}:{}", BOOT_TESTNET_ADDRESS, contract),
+        ));
+    }
+    for contract in V2_BOOT_CONTRACTS {
+        contracts_ids_to_remap.insert((
+            format!("{}:{}", BOOT_MAINNET_ADDRESS, contract),
+            format!("{}:{}", BOOT_TESTNET_ADDRESS, contract),
+        ));
+    }
+
     for batch_spec in deployment.plan.batches.iter() {
         let epoch = match batch_spec.epoch {
             Some(epoch) => {

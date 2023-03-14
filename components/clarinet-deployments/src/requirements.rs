@@ -32,25 +32,32 @@ pub async fn retrieve_contract(
     contract_location.append_path(&format!("{}.{}.clar", contract_deployer, contract_name))?;
     metadata_location.append_path(&format!("{}.{}.json", contract_deployer, contract_name))?;
 
-    let contract_source = match file_accessor {
-        None => contract_location.read_content_as_utf8(),
-        Some(file_accessor) => file_accessor.read_file(contract_location.to_string()).await,
+    let (contract_source, metadata_json) = match file_accessor {
+        None => (
+            contract_location.read_content_as_utf8(),
+            metadata_location.read_content_as_utf8(),
+        ),
+        Some(file_accessor) => (
+            file_accessor.read_file(contract_location.to_string()).await,
+            file_accessor.read_file(metadata_location.to_string()).await,
+        ),
     };
 
-    if contract_source.is_ok() {
-        let metadata_json = match file_accessor {
-            None => metadata_location.read_content_as_utf8(),
-            Some(file_accessor) => file_accessor.read_file(metadata_location.to_string()).await,
-        }
-        .map_err(|e| format!("Unable to read metadata file: {}", e))?;
-        let metadata: ContractMetadata = serde_json::from_str(&metadata_json).unwrap_or_default();
+    match (contract_source, metadata_json) {
+        // If both files are present in the cache, return the contract source and metadata.
+        (Ok(contract_source), Ok(metadata_json)) => {
+            let metadata: ContractMetadata = serde_json::from_str(&metadata_json)
+                .map_err(|e| format!("Unable to parse metadata file: {}", e))?;
 
-        return Ok((
-            contract_source.unwrap(),
-            metadata.epoch,
-            metadata.clarity_version,
-            contract_location,
-        ));
+            return Ok((
+                contract_source,
+                metadata.epoch,
+                metadata.clarity_version,
+                contract_location,
+            ));
+        }
+        // Else, we'll fetch the contract source from the Stacks node.
+        _ => {}
     }
 
     let is_mainnet = contract_deployer.starts_with("SP");

@@ -69,7 +69,7 @@ module.exports.wrapBtc = async (event: HttpEvent) => {
   let metadata: BitcoinTransactionMetadata = transaction
     .metadata as BitcoinTransactionMetadata;
   let satsAmount = metadata.outputs[0].value;
-  let recipientPubkey = metadata.outputs[1].script_pubkey;
+  let recipientPubkey = metadata.outputs[1].script_pubkey.substring(2); // strip (`0x`)
 
   // Build Stack address
   let script = Script.fromBuffer(Buffer.from(recipientPubkey, "hex"));

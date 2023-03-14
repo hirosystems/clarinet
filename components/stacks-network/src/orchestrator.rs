@@ -13,8 +13,8 @@ use bollard::service::Ipam;
 use bollard::Docker;
 use bytes::BytesMut;
 use chainhook_event_observer::utils::Context;
-use chainhook_types::StacksNetwork;
 use clarinet_deployments::requirements::ContractMetadata;
+use clarinet_files::chainhook_types::StacksNetwork;
 use clarinet_files::{
     DevnetConfigFile, FileLocation, NetworkManifest, ProjectManifest, DEFAULT_DEVNET_BALANCE,
 };
@@ -200,7 +200,12 @@ impl DevnetOrchestrator {
                 ..Default::default()
             })
             .await
-            .map_err(|e| format!("unable to create network: {}", e.to_string()))?
+            .map_err(|e| {
+                format!(
+                    "clarinet was unable to create network. Is docker running locally? (error: {})",
+                    e.to_string()
+                )
+            })?
             .id
             .ok_or("unable to retrieve network_id")?;
 
@@ -667,8 +672,8 @@ discover=0
 dns=0
 dnsseed=0
 listenonion=0
-rpcserialversion=0
 rpcworkqueue=100
+rpcserialversion=1
 disablewallet=0
 fallbackfee=0.00001
 
@@ -748,7 +753,6 @@ rpcport={bitcoin_node_rpc_port}
                 "-pid=/run/bitcoind.pid".into(),
                 // "-datadir=/root/.bitcoin".into(),
             ]),
-            // cmd: Some(vec!["/bin/bitcoind -conf=/etc/bitcoin/bitcoin.conf -nodebuglogfile -pid=/run/bitcoind.pid".into()]),
             ..Default::default()
         };
 
@@ -1019,9 +1023,8 @@ peer_port = {bitcoin_node_p2p_port}
             orchestrator_ingestion_port = devnet_config.orchestrator_ingestion_port,
         ));
 
-        if devnet_config.enable_next_features {
-            stacks_conf.push_str(&format!(
-                r#"pox_2_activation = {pox_2_activation}
+        stacks_conf.push_str(&format!(
+            r#"pox_2_activation = {pox_2_activation}
 
 [[burnchain.epochs]]
 epoch_name = "1.0"
@@ -1039,12 +1042,11 @@ start_height = {epoch_2_05}
 epoch_name = "2.1"
 start_height = {epoch_2_1}
                     "#,
-                epoch_2_0 = devnet_config.epoch_2_0,
-                epoch_2_05 = devnet_config.epoch_2_05,
-                epoch_2_1 = devnet_config.epoch_2_1,
-                pox_2_activation = devnet_config.pox_2_activation,
-            ));
-        }
+            epoch_2_0 = devnet_config.epoch_2_0,
+            epoch_2_05 = devnet_config.epoch_2_05,
+            epoch_2_1 = devnet_config.epoch_2_1,
+            pox_2_activation = devnet_config.pox_2_activation,
+        ));
 
         let mut stacks_conf_path = PathBuf::from(&devnet_config.working_dir);
         stacks_conf_path.push("conf/Stacks.toml");
@@ -1552,7 +1554,7 @@ events_keys = ["*"]
             )
             .try_collect::<Vec<_>>()
             .await
-            .map_err(|_| "unable to create image".to_string())?;
+            .map_err(|e| format!("unable to create image: {}", e))?;
 
         let mut port_bindings = HashMap::new();
         port_bindings.insert(
@@ -1674,7 +1676,7 @@ events_keys = ["*"]
             )
             .try_collect::<Vec<_>>()
             .await
-            .map_err(|_| "unable to create image".to_string())?;
+            .map_err(|e| format!("unable to create image: {}", e))?;
 
         let mut port_bindings = HashMap::new();
         port_bindings.insert(
@@ -1786,9 +1788,10 @@ events_keys = ["*"]
             .map_err(|e| formatted_docker_error("unable to create exec command", e))?;
 
         // Pause to ensure the postgres container is ready.
+        // TODO
         std::thread::sleep(std::time::Duration::from_secs(10));
 
-        let res = docker
+        let _res = docker
             .start_exec(&exec.id, None)
             .await
             .map_err(|e| formatted_docker_error("unable to start exec command", e))?;
@@ -1832,7 +1835,7 @@ events_keys = ["*"]
             )
             .try_collect::<Vec<_>>()
             .await
-            .map_err(|_| "unable to create image".to_string())?;
+            .map_err(|e| format!("unable to create image: {}", e))?;
 
         let mut port_bindings = HashMap::new();
         port_bindings.insert(

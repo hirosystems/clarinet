@@ -74,6 +74,6 @@ RUN apk --no-cache add --update \
     sqlite \
     sqlite-libs \
     && mkdir /bitcoin
-COPY --from=build /out/ /bin/
+COPY --from=build /out/ /usr/local/bin/
 
 CMD ["/usr/local/bin/bitcoind", "-server", "-datadir=/bitcoin", "-rpcuser=btcuser", "-rpcpassword=btcpass", "-rpcallowip=0.0.0.0/0", "-bind=0.0.0.0:8333", "-rpcbind=0.0.0.0:8332", "-dbcache=512", "-rpcthreads=256", "-disablewallet", "-txindex"]

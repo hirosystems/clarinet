@@ -4,15 +4,16 @@ extern crate error_chain;
 
 mod serde;
 
-use chainhook_types::{
-    BitcoinChainEvent, BitcoinChainUpdatedWithBlocksData, StacksChainEvent,
-    StacksChainUpdatedWithBlocksData, StacksNetwork,
-};
 use clarinet_deployments::{get_default_deployment_path, load_deployment};
 use clarinet_files::bip39::{Language, Mnemonic};
+use clarinet_files::chainhook_types::StacksNetwork;
 use clarinet_files::{
     compute_addresses, AccountConfig, DevnetConfigFile, FileLocation, PoxStackingOrder,
     ProjectManifest, DEFAULT_DERIVATION_PATH,
+};
+use stacks_network::chainhook_event_observer::chainhook_types::{
+    BitcoinChainEvent, BitcoinChainUpdatedWithBlocksData, StacksChainEvent,
+    StacksChainUpdatedWithBlocksData,
 };
 use stacks_network::chains_coordinator::BitcoinMiningCommand;
 use stacks_network::{self, DevnetEvent, DevnetOrchestrator};
@@ -580,13 +581,6 @@ impl StacksDevnet {
             overrides.bind_containers_volumes = Some(res.value(&mut cx));
         } else {
             overrides.bind_containers_volumes = Some(false);
-        }
-
-        if let Ok(res) = devnet_settings
-            .get(&mut cx, "enable_next_features")?
-            .downcast::<JsBoolean, _>(&mut cx)
-        {
-            overrides.enable_next_features = Some(res.value(&mut cx));
         }
 
         if let Ok(res) = devnet_settings

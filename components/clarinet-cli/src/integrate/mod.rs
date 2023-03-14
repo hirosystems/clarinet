@@ -5,10 +5,10 @@ use std::{
 };
 
 use crate::chainhooks::load_chainhooks;
-use chainhook_types::{BitcoinNetwork, StacksNetwork};
 use clarinet_deployments::types::DeploymentSpecification;
 use hiro_system_kit::Drain;
 use hiro_system_kit::{slog, slog_async, slog_term};
+use stacks_network::chainhook_event_observer::chainhook_types::{BitcoinNetwork, StacksNetwork};
 use stacks_network::chainhook_event_observer::utils::Context;
 use stacks_network::{
     do_run_devnet, ChainsCoordinatorCommand, DevnetEvent, DevnetOrchestrator, LogData,

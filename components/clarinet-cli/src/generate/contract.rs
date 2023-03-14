@@ -101,7 +101,7 @@ Clarinet.test({{
     name: "Ensure that <...>",
     async fn(chain: Chain, accounts: Map<string, Account>) {{
         // arrange: set up the chain, state, and other required elements
-        let wallet_1 = accounts.get("wallet_1").unwrap();
+        let wallet_1 = accounts.get("wallet_1")!;
 
         // act: perform actions related to the current test
         let block = chain.mineBlock([

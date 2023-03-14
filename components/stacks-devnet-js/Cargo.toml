@@ -1,6 +1,6 @@
 [package]
 name = "stacks-devnet-js"
-version = "1.4.2"
+version = "1.5.0"
 license = "ISC"
 edition = "2018"
 exclude = ["index.node"]
@@ -11,8 +11,6 @@ crate-type = ["cdylib"]
 [dependencies]
 serde = "1"
 error-chain = "0.12"
-chainhook-types = "=1.0.2"
-#  chainhook_types = { package = "chainhook-types", path = "../../../chainhook/components/chainhook-types-rs" }
 clarinet-files = { path = "../clarinet-files" }
 clarinet-utils = { path = "../clarinet-utils" }
 clarinet-deployments = { path = "../clarinet-deployments" }

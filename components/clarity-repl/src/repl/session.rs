@@ -42,10 +42,11 @@ use prettytable::{Cell, Row, Table};
 
 use super::SessionSettings;
 
-static BOOT_TESTNET_ADDRESS: &str = "ST000000000000000000002AMW42H";
-static BOOT_MAINNET_ADDRESS: &str = "SP000000000000000000002Q6VF78";
+pub static BOOT_TESTNET_ADDRESS: &str = "ST000000000000000000002AMW42H";
+pub static BOOT_MAINNET_ADDRESS: &str = "SP000000000000000000002Q6VF78";
 
-static V2_BOOT_CONTRACTS: &[&str] = &["pox-2", "costs-3"];
+pub static V1_BOOT_CONTRACTS: &[&str] = &["bns"];
+pub static V2_BOOT_CONTRACTS: &[&str] = &["pox-2", "costs-3"];
 
 lazy_static! {
     static ref BOOT_TESTNET_PRINCIPAL: StandardPrincipalData =

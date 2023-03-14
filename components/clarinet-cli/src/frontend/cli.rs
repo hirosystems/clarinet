@@ -1,5 +1,4 @@
-use crate::chainhooks::types::ChainhookSpecificationFile;
-use crate::chainhooks::{check_chainhooks, load_chainhooks};
+use crate::chainhooks::{check_chainhooks, load_chainhooks, parse_chainhook_full_specification};
 use crate::deployments::types::DeploymentSynthesis;
 use crate::deployments::{
     self, check_deployments, generate_default_deployment, get_absolute_deployment_path,
@@ -12,8 +11,6 @@ use crate::generate::{
 use crate::integrate;
 use crate::lsp::run_lsp;
 use crate::runner::{block_on, run_scripts, DeploymentCache};
-use chainhook_types::StacksNetwork;
-use chainhook_types::{BitcoinNetwork, Chain};
 use clarinet_deployments::onchain::{
     apply_on_chain_deployment, get_initial_transactions_trackers, update_deployment_costs,
     DeploymentCommand, DeploymentEvent,
@@ -22,6 +19,8 @@ use clarinet_deployments::types::{DeploymentGenerationArtifacts, DeploymentSpeci
 use clarinet_deployments::{
     get_default_deployment_path, load_deployment, setup_session_with_deployment,
 };
+use clarinet_files::chainhook_types::Chain;
+use clarinet_files::chainhook_types::StacksNetwork;
 use clarinet_files::{
     get_manifest_location, FileLocation, ProjectManifest, ProjectManifestFile, RequirementConfig,
 };
@@ -1158,6 +1157,7 @@ pub fn main() {
             let mine_block_delay = cmd.mine_block_delay.unwrap_or(0);
 
             if cmd.chainhooks.contains(&"*".to_string()) {
+                use stacks_network::chainhook_event_observer::chainhook_types::BitcoinNetwork;
                 match load_chainhooks(
                     &manifest.location,
                     &(BitcoinNetwork::Regtest, StacksNetwork::Devnet),
@@ -1178,10 +1178,8 @@ pub fn main() {
                     chainhook_location
                         .append_path(chainhook_relative_path)
                         .expect("unable to build path");
-                    match ChainhookSpecificationFile::parse(
-                        &chainhook_location.to_string().into(),
-                        &(BitcoinNetwork::Regtest, StacksNetwork::Devnet),
-                    ) {
+                    match parse_chainhook_full_specification(&chainhook_location.to_string().into())
+                    {
                         Ok(hook) => match hook {
                             ChainhookFullSpecification::Bitcoin(_) => {
                                 println!(
@@ -1194,7 +1192,7 @@ pub fn main() {
                             }
                             ChainhookFullSpecification::Stacks(hook) => {
                                 let spec = match hook
-                                    .into_selected_network_specification(&StacksNetwork::Devnet)
+                                    .into_selected_network_specification(&stacks_network::chainhook_event_observer::chainhook_types::StacksNetwork::Devnet)
                                 {
                                     Ok(spec) => spec,
                                     Err(e) => {
