@@ -675,9 +675,9 @@ checksum = "baf1de4339761588bc0619e3cbc0120ee582ebb74b53b4efbf79117bd2da40fd"
 
 [[package]]
 name = "chainhook-event-observer"
-version = "1.0.5"
+version = "1.0.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3f6a45e01cf12f4693218145a5d3607c9001e9583270560b841493645aa929a8"
+checksum = "e1f6c932815e8c2de43040ec6eeb0729621e1abc1e929f6a19ae2efed621f908"
 dependencies = [
  "anyhow",
  "base58 0.2.0",
