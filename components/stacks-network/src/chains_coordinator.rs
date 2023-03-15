@@ -368,6 +368,9 @@ pub async fn start_chains_coordinator(
                 };
                 let _ = devnet_event_tx.send(DevnetEvent::info(message));
 
+                let stacks_rpc = StacksRpc::new(&config.consolidated_stacks_rpc_url());
+                let _ = stacks_rpc.get_pox_info();
+
                 let should_submit_pox_orders = known_tip.block.metadata.pox_cycle_position
                     == (known_tip.block.metadata.pox_cycle_length - 2);
                 if should_submit_pox_orders {

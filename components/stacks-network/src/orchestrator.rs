@@ -688,9 +688,12 @@ rpcport={bitcoin_node_rpc_port}
             bitcoin_node_rpc_port = devnet_config.bitcoin_node_rpc_port,
         );
         let mut bitcoind_conf_path = PathBuf::from(&devnet_config.working_dir);
-        bitcoind_conf_path.push("conf/bitcoin.conf");
+        bitcoind_conf_path.push("conf");
+        fs::create_dir_all(&bitcoind_conf_path)
+            .map_err(|e| format!("unable to create bitcoin conf directory: {}", e.to_string()))?;
+        bitcoind_conf_path.push("bitcoin.conf");
         let mut file = File::create(bitcoind_conf_path)
-            .map_err(|e| format!("unable to create bitcoin.conf: {:?}", e))?;
+            .map_err(|e| format!("unable to create bitcoin.conf: {}", e.to_string()))?;
 
         file.write_all(bitcoind_conf.as_bytes())
             .map_err(|e| format!("unable to write bitcoin.conf: {:?}", e))?;
