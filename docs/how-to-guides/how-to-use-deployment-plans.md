@@ -6,13 +6,15 @@ Deployment Plans are reproducible deployment steps that publish a collection of 
 
 *Topics covered in this guide*:
 
-- [x] Understand deployment plans
-- [x] View sample deployment plan
-- [x] Set deployment plan specifications
-- [x] Add project contract requirements
-- [x] Customize your deployment plan
+* [Understand deployment plans](#deployment-plans)
+* [View sample deployment plan](#view-your-deployment-plan)
+* [Set deployment plan specifications](#deployment-plans-specifications-files)
+* [Add project contract requirements](#adding-project-contract-requirements)
+* [Customize your deployment plan](#edit-your-deployment-plan-directly)
 
 ![deployment-plans](../images/deployment-plans.png)
+
+## Deployment plans
 
 Furthermore, many details of your deployment are configurable in a deployment plan's specifications. However, every Clarinet project comes with a default deployment plan, so customization is not required. For a video walkthrough of how to customize deployment plans, [watch this video](https://www.youtube.com/watch?v=YcIg5VCO98s).
 
