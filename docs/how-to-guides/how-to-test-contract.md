@@ -245,7 +245,7 @@ From there, Clarinet will be able to resolve the `contract-call?` statements inv
 
 When deploying your protocol to Devnet / Testnet, for the contracts involving requirements, the setting `remap_requirements` in your deployment plans must be set.
 
-As a step-by-step example, we use here the following contract, [**bitcoin-whales**](https://explorer.stacks.co/txid/SP2KAF9RF86PVX3NEE27DFV1CQX0T4WGR41X3S45C.bitcoin-whales?chain=mainnet)
+As a step-by-step example, we use here the following contract, [**bitcoin-whales**](https://explorer.hiro.so/txid/SP2KAF9RF86PVX3NEE27DFV1CQX0T4WGR41X3S45C.bitcoin-whales?chain=mainnet)
 
 If you examine this contract, you will see that there are 3 different dependencies: two from the **same** project (included in the same `Clarinet.toml` file), and one referring to a contract deployed outside of the current project.
 
