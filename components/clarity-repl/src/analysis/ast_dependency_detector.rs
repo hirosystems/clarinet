@@ -14,7 +14,7 @@ use clarity::vm::types::{
     TraitIdentifier, TypeSignature, Value,
 };
 use clarity::vm::{ClarityName, SymbolicExpressionType};
-use std::collections::{BTreeMap, BTreeSet, HashSet};
+use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 use std::convert::TryFrom;
 use std::hash::{Hash, Hasher};
 use std::iter::FromIterator;
@@ -203,9 +203,10 @@ impl<'a> ASTDependencyDetector<'a> {
         }
     }
 
-    pub fn order_contracts(
-        dependencies: &BTreeMap<QualifiedContractIdentifier, DependencySet>,
-    ) -> CheckResult<Vec<&QualifiedContractIdentifier>> {
+    pub fn order_contracts<'deps>(
+        dependencies: &'deps BTreeMap<QualifiedContractIdentifier, DependencySet>,
+        contract_epochs: &HashMap<QualifiedContractIdentifier, StacksEpochId>,
+    ) -> CheckResult<Vec<&'deps QualifiedContractIdentifier>> {
         let mut lookup = BTreeMap::new();
         let mut reverse_lookup = Vec::new();
 
@@ -224,8 +225,18 @@ impl<'a> ASTDependencyDetector<'a> {
         let mut graph = Graph::new();
         for (contract, contract_dependencies) in dependencies {
             let contract_id = lookup.get(contract).unwrap();
+            // Boot contracts will not be in the contract_epochs map, so default to Epoch20
+            let contract_epoch = contract_epochs
+                .get(contract)
+                .unwrap_or(&StacksEpochId::Epoch20);
             graph.add_node(*contract_id);
             for dep in contract_dependencies.iter() {
+                let dep_epoch = contract_epochs
+                    .get(&dep.contract_id)
+                    .unwrap_or(&StacksEpochId::Epoch20);
+                if contract_epoch < dep_epoch {
+                    return Err(CheckErrors::NoSuchContract(dep.contract_id.to_string()).into());
+                }
                 let dep_id = match lookup.get(&dep.contract_id) {
                     Some(id) => id,
                     None => {

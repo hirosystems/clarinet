@@ -10,7 +10,7 @@ use crate::generate::{
 };
 use crate::integrate;
 use crate::lsp::run_lsp;
-use crate::runner::{block_on, run_scripts, DeploymentCache};
+use crate::runner::{run_scripts, DeploymentCache};
 use clarinet_deployments::onchain::{
     apply_on_chain_deployment, get_initial_transactions_trackers, update_deployment_costs,
     DeploymentCommand, DeploymentEvent,
@@ -24,11 +24,7 @@ use clarinet_files::chainhook_types::StacksNetwork;
 use clarinet_files::{
     get_manifest_location, FileLocation, ProjectManifest, ProjectManifestFile, RequirementConfig,
 };
-use clarinet_utils::get_bip39_seed_from_mnemonic;
 use clarity_repl::analysis::call_checker::ContractAnalysis;
-use clarity_repl::clarity::address::AddressHashMode;
-use clarity_repl::clarity::stacks_common::types::chainstate::StacksAddress;
-use clarity_repl::clarity::util::secp256k1::Secp256k1PublicKey;
 use clarity_repl::clarity::vm::analysis::AnalysisDatabase;
 use clarity_repl::clarity::vm::costs::LimitedCostTracker;
 use clarity_repl::clarity::vm::diagnostic::{Diagnostic, Level};
@@ -37,15 +33,12 @@ use clarity_repl::clarity::ClarityVersion;
 use clarity_repl::repl::diagnostic::{output_code, output_diagnostic};
 use clarity_repl::repl::{ClarityCodeSource, ClarityContract, ContractDeployer, DEFAULT_EPOCH};
 use clarity_repl::{analysis, repl, Terminal};
-use libsecp256k1::{PublicKey, SecretKey};
 use stacks_network::chainhook_event_observer::chainhooks::types::ChainhookFullSpecification;
-use stacks_network::chainhook_event_observer::utils::Context;
 use stacks_network::{self, DevnetOrchestrator};
 use std::collections::HashMap;
 use std::fs::{self, File};
 use std::io::prelude::*;
 use std::{env, process};
-use tiny_hderive::bip32::ExtendedPrivKey;
 
 use clap::{IntoApp, Parser, Subcommand};
 use clap_generate::{Generator, Shell};
@@ -1283,69 +1276,6 @@ pub fn main() {
         Command::Integrate(cmd) => {
             let manifest = load_manifest_or_exit(cmd.manifest_path);
             println!("Computing deployment plan");
-
-            let mut orchestrator = match DevnetOrchestrator::new(manifest.clone(), None) {
-                Ok(orchestrator) => orchestrator,
-                Err(e) => {
-                    println!("{}", format_err!(e));
-                    process::exit(1);
-                }
-            };
-
-            let cache_location =
-                if let FileLocation::FileSystem { path } = &manifest.project.cache_location {
-                    path.clone()
-                } else {
-                    println!("cache location must be a file system path");
-                    process::exit(1);
-                };
-
-            let devnet_config = orchestrator
-                .network_config
-                .as_ref()
-                .and_then(|c| c.devnet.as_ref())
-                .expect("devnet configuration not found");
-
-            let _ = fs::create_dir(cache_location.clone());
-            let _ = fs::create_dir(devnet_config.working_dir.clone());
-            let _ = fs::create_dir(format!("{}/conf", devnet_config.working_dir));
-            let _ = fs::create_dir(format!("{}/data", devnet_config.working_dir));
-            let _ = fs::create_dir(format!("{}/requirements", cache_location.display()));
-
-            if devnet_config.enable_subnet_node {
-                let subnet_deployer =
-                    match QualifiedContractIdentifier::parse(&devnet_config.subnet_contract_id) {
-                        Ok(contract) => contract,
-                        Err(e) => {
-                            println!("invalid subnet contract id: {}", e);
-                            process::exit(1);
-                        }
-                    }
-                    .issuer;
-                let subnet_leader = compute_stx_address(
-                    &devnet_config.subnet_leader_mnemonic,
-                    &devnet_config.subnet_leader_derivation_path,
-                );
-
-                let ctx = Context {
-                    logger: None,
-                    tracer: false,
-                };
-                match block_on(orchestrator.prepare_subnet_node_container(
-                    1,
-                    &ctx,
-                    cache_location,
-                    &subnet_deployer,
-                    &subnet_leader.into(),
-                )) {
-                    Ok(_) => {}
-                    Err(e) => {
-                        println!("unable to prepare subnet node container: {}", e);
-                        process::exit(1);
-                    }
-                };
-            }
-
             let result = match cmd.deployment_plan_path {
                 None => {
                     let res = load_deployment_if_exists(
@@ -1407,6 +1337,14 @@ pub fn main() {
                 Err(e) => {
                     println!("{}", format_err!(e));
                     std::process::exit(1);
+                }
+            };
+
+            let orchestrator = match DevnetOrchestrator::new(manifest, None) {
+                Ok(orchestrator) => orchestrator,
+                Err(e) => {
+                    println!("{}", format_err!(e));
+                    process::exit(1);
                 }
             };
 
@@ -1973,30 +1911,6 @@ impl DiagnosticsDigest {
     pub fn has_feedbacks(&self) -> bool {
         self.errors > 0 || self.warnings > 0
     }
-}
-
-pub fn compute_stx_address(mnemonic: &str, derivation_path: &str) -> StacksAddress {
-    let bip39_seed = match get_bip39_seed_from_mnemonic(&mnemonic, "") {
-        Ok(bip39_seed) => bip39_seed,
-        Err(_) => panic!(),
-    };
-
-    let ext = ExtendedPrivKey::derive(&bip39_seed[..], derivation_path).unwrap();
-
-    let secret_key = SecretKey::parse_slice(&ext.secret()).unwrap();
-    let public_key = PublicKey::from_secret_key(&secret_key);
-    let pub_key = Secp256k1PublicKey::from_slice(&public_key.serialize_compressed()).unwrap();
-    let version = clarity_repl::clarity::address::C32_ADDRESS_VERSION_TESTNET_SINGLESIG;
-
-    let stx_address = StacksAddress::from_public_keys(
-        version,
-        &AddressHashMode::SerializeP2PKH,
-        1,
-        &vec![pub_key],
-    )
-    .unwrap();
-
-    stx_address
 }
 
 fn display_separator() {

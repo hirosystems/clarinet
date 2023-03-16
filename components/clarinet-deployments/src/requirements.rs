@@ -75,22 +75,17 @@ pub async fn retrieve_contract(
     );
 
     let contract = fetch_contract(request_url).await?;
-
-    let clarity_version = {
-        // `version` defaults to 1 because before 2.1, no version is specified
-        // since Clarity 1 was the only version available.
-        let version = contract.clarity_version.unwrap_or(1);
-        if version.eq(&1) {
-            ClarityVersion::Clarity1
-        } else if version.eq(&2) {
-            ClarityVersion::Clarity2
-        } else {
+    let epoch = epoch_for_height(is_mainnet, contract.publish_height);
+    let clarity_version = match contract.clarity_version {
+        Some(1) => ClarityVersion::Clarity1,
+        Some(2) => ClarityVersion::Clarity2,
+        Some(_) => {
             return Err(format!(
                 "unable to parse clarity_version (can either be '1' or '2'",
-            ));
+            ))
         }
+        None => ClarityVersion::default_for_epoch(epoch),
     };
-    let epoch = epoch_for_height(is_mainnet, contract.publish_height);
 
     match file_accessor {
         None => {
@@ -132,8 +127,7 @@ pub const MAINNET_21_START_HEIGHT: u32 = 99_564;
 pub const TESTNET_20_START_HEIGHT: u32 = 1;
 
 pub const TESTNET_2_05_START_HEIGHT: u32 = 20_216;
-// TODO: This is estimated. Replace with exact height once 2.1 is activated.
-pub const TESTNET_21_START_HEIGHT: u32 = 99_253;
+pub const TESTNET_21_START_HEIGHT: u32 = 99_120;
 
 fn epoch_for_height(is_mainnet: bool, height: u32) -> StacksEpochId {
     if is_mainnet {
