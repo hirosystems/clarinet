@@ -1,3 +1,11 @@
+#### 1.5.2 (2023-03-16)
+
+##### Bug Fixes
+
+* Fix bug in dependency ordering causing a problem with subnet deployment via `clarinet integrate` ([2e18c63](https://github.com/hirosystems/clarinet/commit/2e18c63e462c316bf89d8ba516ef98e9edf655c4), [556a12f](https://github.com/hirosystems/clarinet/commit/556a12fefcc0809f4a687f817fb76cf8c9634459))
+* Simplify subnet deployment ([e1a4ab7](https://github.com/hirosystems/clarinet/commit/e1a4ab76c43bbed056500725f0d39cad69470f0f), [fb3af87](https://github.com/hirosystems/clarinet/commit/fb3af8799845d1df90102c5b84708a0491508156))
+* Resolve panic when generating completions ([11b6094](https://github.com/hirosystems/clarinet/commit/11b6094a1c71d22959aae28031251695f472d24b))
+
 #### 1.5.0 (2023-02-23)
 
 ##### New Features
