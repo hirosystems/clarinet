@@ -381,12 +381,12 @@ disable_stacks_api = false
 # subnet_node_image_url = "hirosystems/stacks-subnets:0.3.0"
 # subnet_leader_mnemonic = "female adjust gallery certain visit token during great side clown fitness like hurt clip knife warm bench start reunion globe detail dream depend fortune"
 # subnet_leader_derivation_path = "m/44'/5757'/0'/0/0"
-# subnet_contract_id = "STXMJXCJDCT4WPF2X1HE42T6ZCCK3TPMBRZ51JEG.subnet"
+# subnet_contract_id = "ST13F481SBR0R7Z6NMMH8YV2FJJYXA5JPA0AD3HP9.subnet-v1"
 # subnet_node_rpc_port = 30443
 # subnet_node_p2p_port = 30444
 # subnet_events_ingestion_port = 30445
 # subnet_node_events_observers = ["host.docker.internal:8002"]
-# subnet_api_image_url = "hirosystems/stacks-blockchain-api:7.1.0-beta.1"
+# subnet_api_image_url = "hirosystems/stacks-blockchain-api:7.1.0-beta.2"
 # subnet_api_postgres_database = "subnet_api"
 
 # For testing in epoch 2.1 / using Clarity2
