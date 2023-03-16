@@ -1,7 +1,7 @@
 use clarity_repl::clarity::stacks_common::types::StacksEpochId;
 use clarity_repl::clarity::ClarityVersion;
+use clarity_repl::repl::DEFAULT_EPOCH;
 use clarity_repl::repl::{ClarityCodeSource, ClarityContract, ContractDeployer};
-use clarity_repl::repl::{DEFAULT_CLARITY_VERSION, DEFAULT_EPOCH};
 
 extern crate serde;
 
@@ -337,10 +337,6 @@ pub async fn generate_default_deployment(
         let cache_location = &manifest.project.cache_location;
         let mut emulated_contracts_publish = HashMap::new();
         let mut requirements_publish = HashMap::new();
-        // TODO: This is fine for now, but will need to be changed after 2.1 is live and
-        //       there are requirements that need to be deployed in epoch 2.1.
-        let requirements_epoch = DEFAULT_EPOCH;
-        let clarity_version = DEFAULT_CLARITY_VERSION;
 
         // Load all the requirements
         // Some requirements are explicitly listed, some are discovered as we compute the ASTs.
@@ -354,11 +350,11 @@ pub async fn generate_default_deployment(
                     ))
                 }
             };
-            queue.push_front((
-                contract_id,
-                requirements_epoch.clone(),
-                clarity_version.clone(),
-            ));
+            // Download the code
+            let (_source, epoch, clarity_version, _contract_location) =
+                requirements::retrieve_contract(&contract_id, &cache_location, &file_accessor)
+                    .await?;
+            queue.push_front((contract_id, epoch, clarity_version));
         }
 
         while let Some((contract_id, epoch, clarity_version)) = queue.pop_front() {
@@ -486,31 +482,28 @@ pub async fn generate_default_deployment(
 
         // Avoid listing requirements as deployment transactions to the deployment specification on Mainnet
         if !network.is_mainnet() {
-            let mut ordered_contracts_ids =
-                match ASTDependencyDetector::order_contracts(&requirements_deps) {
-                    Ok(ordered_contracts) => ordered_contracts,
-                    Err(e) => return Err(format!("unable to order requirements {}", e)),
-                };
+            let mut ordered_contracts_ids = match ASTDependencyDetector::order_contracts(
+                &requirements_deps,
+                &contract_epochs,
+            ) {
+                Ok(ordered_contracts) => ordered_contracts,
+                Err(e) => return Err(format!("unable to order requirements {}", e)),
+            };
 
             // Filter out boot contracts from requirement dependencies
             ordered_contracts_ids.retain(|contract_id| !boot_contracts_ids.contains(contract_id));
 
-            let mut latest_epoch = StacksEpochId::Epoch10;
             if network.is_simnet() {
                 for contract_id in ordered_contracts_ids.iter() {
                     let data = emulated_contracts_publish
                         .remove(contract_id)
                         .expect("unable to retrieve contract");
                     let tx = TransactionSpecification::EmulatedContractPublish(data);
-                    let epoch = contract_epochs[contract_id].clone();
-                    if epoch < latest_epoch {
-                        return Err(format!("contract {} is annotated to deploy in epoch {}, but due to its dependencies, it must be deployed in epoch {}",
-                            contract_id,
-                            epoch,
-                            latest_epoch));
-                    }
-                    latest_epoch = epoch;
-                    add_transaction_to_epoch(&mut transactions, tx, &epoch.into());
+                    add_transaction_to_epoch(
+                        &mut transactions,
+                        tx,
+                        &contract_epochs[contract_id].into(),
+                    );
                 }
             } else if network.either_devnet_or_testnet() {
                 for contract_id in ordered_contracts_ids.iter() {
@@ -518,15 +511,11 @@ pub async fn generate_default_deployment(
                         .remove(contract_id)
                         .expect("unable to retrieve contract");
                     let tx = TransactionSpecification::RequirementPublish(data);
-                    let epoch = contract_epochs[contract_id].clone();
-                    if epoch < latest_epoch {
-                        return Err(format!("contract {} is annotated to deploy in epoch {}, but due to its dependencies, it must be deployed in epoch {}",
-                            contract_id,
-                            epoch,
-                            latest_epoch));
-                    }
-                    latest_epoch = epoch;
-                    add_transaction_to_epoch(&mut transactions, tx, &epoch.into());
+                    add_transaction_to_epoch(
+                        &mut transactions,
+                        tx,
+                        &contract_epochs[contract_id].into(),
+                    );
                 }
             }
         }
@@ -691,27 +680,15 @@ pub async fn generate_default_deployment(
 
     dependencies.extend(requirements_deps);
 
-    let ordered_contracts_ids = match ASTDependencyDetector::order_contracts(&dependencies) {
-        Ok(ordered_contracts_ids) => ordered_contracts_ids,
-        Err(e) => return Err(e.err.to_string()),
-    };
+    let ordered_contracts_ids =
+        match ASTDependencyDetector::order_contracts(&dependencies, &contract_epochs) {
+            Ok(ordered_contracts_ids) => ordered_contracts_ids,
+            Err(e) => return Err(e.err.to_string()),
+        };
 
     // Track the latest epoch that a contract is deployed in, so that we can
     // ensure that all contracts are deployed after their dependencies.
-    let mut latest_epoch = StacksEpochId::Epoch10;
     for contract_id in ordered_contracts_ids.into_iter() {
-        let epoch = contract_epochs
-            .get(contract_id)
-            .unwrap_or(&latest_epoch)
-            .clone();
-        if epoch < latest_epoch {
-            return Err(format!("contract {} is annotated to deploy in epoch {}, but due to its dependencies, it must be deployed in epoch {}",
-                            contract_id,
-                            epoch,
-                            latest_epoch));
-        }
-        latest_epoch = epoch;
-
         if requirements_asts.contains_key(&contract_id) {
             continue;
         }
@@ -734,7 +711,7 @@ pub async fn generate_default_deployment(
             }
             _ => unreachable!(),
         }
-        add_transaction_to_epoch(&mut transactions, tx, &epoch.into());
+        add_transaction_to_epoch(&mut transactions, tx, &contract_epochs[contract_id].into());
     }
 
     let tx_chain_limit = match no_batch {
