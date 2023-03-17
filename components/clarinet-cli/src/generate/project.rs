@@ -1,3 +1,12 @@
+use clarinet_files::{
+    DEFAULT_BITCOIN_EXPLORER_IMAGE, DEFAULT_BITCOIN_NODE_IMAGE, DEFAULT_DERIVATION_PATH,
+    DEFAULT_EPOCH_2_0, DEFAULT_EPOCH_2_05, DEFAULT_EPOCH_2_1, DEFAULT_FAUCET_MNEMONIC,
+    DEFAULT_POSTGRES_IMAGE, DEFAULT_POX2_ACTIVATION, DEFAULT_STACKS_API_IMAGE,
+    DEFAULT_STACKS_EXPLORER_IMAGE, DEFAULT_STACKS_MINER_MNEMONIC, DEFAULT_STACKS_NODE_IMAGE,
+    DEFAULT_SUBNET_API_IMAGE, DEFAULT_SUBNET_CONTRACT_ID, DEFAULT_SUBNET_MNEMONIC,
+    DEFAULT_SUBNET_NODE_IMAGE,
+};
+
 use super::changes::{Changes, DirectoryCreation, FileCreation};
 
 pub struct GetChangesForNewProject {
@@ -351,10 +360,10 @@ disable_stacks_api = false
 # disable_bitcoin_explorer = true
 # working_dir = "tmp/devnet"
 # stacks_node_events_observers = ["host.docker.internal:8002"]
-# miner_mnemonic = "twice kind fence tip hidden tilt action fragile skin nothing glory cousin green tomorrow spring wrist shed math olympic multiply hip blue scout claw"
-# miner_derivation_path = "m/44'/5757'/0'/0/0"
-# faucet_mnemonic = "shadow private easily thought say logic fault paddle word top book during ignore notable orange flight clock image wealth health outside kitten belt reform"
-# faucet_derivation_path = "m/44'/5757'/0'/0/0"
+# miner_mnemonic = "{default_stacks_miner_mnemonic}"
+# miner_derivation_path = "{default_derivation_path}"
+# faucet_mnemonic = "{default_stacks_faucet_mnemonic}"
+# faucet_derivation_path = "{default_derivation_path}"
 # orchestrator_port = 20445
 # bitcoin_node_p2p_port = 18444
 # bitcoin_node_rpc_port = 18443
@@ -371,29 +380,29 @@ disable_stacks_api = false
 # postgres_username = "postgres"
 # postgres_password = "postgres"
 # postgres_database = "postgres"
-# bitcoin_node_image_url = "quay.io/hirosystems/bitcoind:devnet-v2"
-# stacks_node_image_url = "localhost:5000/stacks-node:devnet-v2"
-# stacks_api_image_url = "hirosystems/stacks-blockchain-api:latest"
-# stacks_explorer_image_url = "hirosystems/explorer:latest"
-# bitcoin_explorer_image_url = "quay.io/hirosystems/bitcoin-explorer:devnet"
-# postgres_image_url = "postgres:14"
+# bitcoin_node_image_url = "{default_bitcoin_node_image}"
+# stacks_node_image_url = "{default_stacks_node_image}"
+# stacks_api_image_url = "{default_stacks_api_image}"
+# stacks_explorer_image_url = "{default_stacks_explorer_image}"
+# bitcoin_explorer_image_url = "{default_bitcoin_explorer_image}"
+# postgres_image_url = "{default_postgres_image}"
 # enable_subnet_node = true
-# subnet_node_image_url = "hirosystems/stacks-subnets:0.3.0"
-# subnet_leader_mnemonic = "twice kind fence tip hidden tilt action fragile skin nothing glory cousin green tomorrow spring wrist shed math olympic multiply hip blue scout claw"
-# subnet_leader_derivation_path = "m/44'/5757'/0'/0/0"
-# subnet_contract_id = "ST13F481SBR0R7Z6NMMH8YV2FJJYXA5JPA0AD3HP9.subnet-v1"
+# subnet_node_image_url = "{default_subnet_node_image}"
+# subnet_leader_mnemonic = "{default_subnet_mnemonic}"
+# subnet_leader_derivation_path = "{default_derivation_path}"
+# subnet_contract_id = "{default_subnet_contract_id}"
 # subnet_node_rpc_port = 30443
 # subnet_node_p2p_port = 30444
 # subnet_events_ingestion_port = 30445
 # subnet_node_events_observers = ["host.docker.internal:8002"]
-# subnet_api_image_url = "hirosystems/stacks-blockchain-api:7.1.0-beta.2"
+# subnet_api_image_url = "{default_subnet_api_image}"
 # subnet_api_postgres_database = "subnet_api"
 
 # For testing in epoch 2.1 / using Clarity2
-# epoch_2_0 = 103
-# epoch_2_05 = 104
-# epoch_2_1 = 106
-# pox_2_activation = 109
+# epoch_2_0 = {default_epoch_2_0}
+# epoch_2_05 = {default_epoch_2_05}
+# epoch_2_1 = {default_epoch_2_1}
+# pox_2_activation = {default_pox2_activation}
 
 
 # Send some stacking orders
@@ -417,7 +426,24 @@ duration = 12
 wallet = "wallet_3"
 slots = 1
 btc_address = "mvZtbibDAAA3WLpY7zXXFqRa3T4XSknBX7"
-"#
+"#,
+            default_derivation_path = DEFAULT_DERIVATION_PATH,
+            default_bitcoin_node_image = DEFAULT_BITCOIN_NODE_IMAGE,
+            default_stacks_node_image = DEFAULT_STACKS_NODE_IMAGE,
+            default_bitcoin_explorer_image = DEFAULT_BITCOIN_EXPLORER_IMAGE,
+            default_stacks_api_image = DEFAULT_STACKS_API_IMAGE,
+            default_stacks_explorer_image = DEFAULT_STACKS_EXPLORER_IMAGE,
+            default_postgres_image = DEFAULT_POSTGRES_IMAGE,
+            default_subnet_node_image = DEFAULT_SUBNET_NODE_IMAGE,
+            default_subnet_mnemonic = DEFAULT_SUBNET_MNEMONIC,
+            default_subnet_contract_id = DEFAULT_SUBNET_CONTRACT_ID,
+            default_subnet_api_image = DEFAULT_SUBNET_API_IMAGE,
+            default_stacks_miner_mnemonic = DEFAULT_STACKS_MINER_MNEMONIC,
+            default_stacks_faucet_mnemonic = DEFAULT_FAUCET_MNEMONIC,
+            default_epoch_2_0 = DEFAULT_EPOCH_2_0,
+            default_epoch_2_05 = DEFAULT_EPOCH_2_05,
+            default_epoch_2_1 = DEFAULT_EPOCH_2_1,
+            default_pox2_activation = DEFAULT_POX2_ACTIVATION,
         );
         let name = format!("Devnet.toml");
         let path = format!(
