@@ -931,6 +931,7 @@ public_ip_address = "1.1.1.1:1234"
 [miner]
 first_attempt_time_ms = {first_attempt_time_ms}
 subsequent_attempt_time_ms = {subsequent_attempt_time_ms}
+block_reward_recipient = {miner_coinbase_recipient}
 # microblock_attempt_time_ms = 15000
 "#,
             stacks_node_rpc_port = devnet_config.stacks_node_rpc_port,
@@ -939,6 +940,7 @@ subsequent_attempt_time_ms = {subsequent_attempt_time_ms}
             wait_time_for_microblocks = devnet_config.stacks_node_wait_time_for_microblocks,
             first_attempt_time_ms = devnet_config.stacks_node_first_attempt_time_ms,
             subsequent_attempt_time_ms = devnet_config.stacks_node_subsequent_attempt_time_ms,
+            miner_coinbase_recipient = devnet_config.miner_coinbase_recipient,
         );
 
         for (_, account) in network_config.accounts.iter() {
