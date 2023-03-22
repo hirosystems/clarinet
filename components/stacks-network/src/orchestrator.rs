@@ -931,7 +931,7 @@ public_ip_address = "1.1.1.1:1234"
 [miner]
 first_attempt_time_ms = {first_attempt_time_ms}
 subsequent_attempt_time_ms = {subsequent_attempt_time_ms}
-block_reward_recipient = {miner_coinbase_recipient}
+block_reward_recipient = "{miner_coinbase_recipient}"
 # microblock_attempt_time_ms = 15000
 "#,
             stacks_node_rpc_port = devnet_config.stacks_node_rpc_port,
