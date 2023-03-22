@@ -758,7 +758,9 @@ impl NetworkManifest {
                 miner_mnemonic,
                 miner_secret_key_hex,
                 miner_derivation_path,
-                miner_coinbase_recipient: devnet_config.miner_coinbase_recipient.unwrap_or(miner_stx_address),
+                miner_coinbase_recipient: devnet_config
+                    .miner_coinbase_recipient
+                    .unwrap_or(miner_stx_address),
                 faucet_btc_address,
                 faucet_stx_address,
                 faucet_mnemonic,
