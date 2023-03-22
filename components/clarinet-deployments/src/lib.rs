@@ -249,7 +249,7 @@ pub async fn generate_default_deployment(
             let stacks_node = network_manifest
                 .network
                 .stacks_node_rpc_address
-                .unwrap_or("http://stacks-node-api.testnet.stacks.co".to_string());
+                .unwrap_or("https://api.testnet.hiro.so".to_string());
             let bitcoin_node =
                 network_manifest
                     .network
@@ -263,7 +263,7 @@ pub async fn generate_default_deployment(
             let stacks_node = network_manifest
                 .network
                 .stacks_node_rpc_address
-                .unwrap_or("http://stacks-node-api.mainnet.stacks.co".to_string());
+                .unwrap_or("https://api.hiro.so".to_string());
             let bitcoin_node = network_manifest.network.bitcoin_node_rpc_address.unwrap_or(
                 "http://blockstack:blockstacksystem@bitcoin.blockstack.com:8332".to_string(),
             );
