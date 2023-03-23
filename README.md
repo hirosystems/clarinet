@@ -634,7 +634,7 @@ To setup a debug session, you will first need to create a `launch.json` file to 
 
 This will create the file `.vscode/launch.json` with the default template:
 
-```json
+```json5
 {
   // Use IntelliSense to learn about possible attributes.
   // Hover to view descriptions of existing attributes.
