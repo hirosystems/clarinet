@@ -1,6 +1,6 @@
 [package]
 name = "clarinet-cli"
-version = "1.5.3"
+version = "1.5.4"
 authors = ["Ludo Galabru <ludo@hiro.so>", "Brice Dobry <brice@hiro.so>"]
 edition = "2021"
 description = "Clarinet is a simple, modern and opinionated runtime for testing, integrating and deploying Clarity smart contracts."
@@ -140,15 +140,9 @@ mac_address = { version = "1.1.2", optional = true }
 tower-lsp = { version = "0.18.0", optional = true }
 hex = "0.4.3"
 serde_yaml = "0.8.23"
-clarinet-files = { path = "../clarinet-files", features = [
-    "cli",
-] }
-clarity-lsp = { path = "../clarity-lsp", features = [
-    "cli",
-] }
-clarinet-deployments = { path = "../clarinet-deployments", features = [
-    "cli",
-] }
+clarinet-files = { path = "../clarinet-files", features = ["cli"] }
+clarity-lsp = { path = "../clarity-lsp", features = ["cli"] }
+clarinet-deployments = { path = "../clarinet-deployments", features = ["cli"] }
 hiro-system-kit = { path = "../hiro-system-kit" }
 clarinet-utils = { path = "../clarinet-utils" }
 stacks-network = { path = "../stacks-network" }

@@ -221,7 +221,7 @@ check_checker = {{ trusted_sender = false, trusted_caller = false, callee_filter
         let content = format!(
             r#"[network]
 name = "testnet"
-stacks_node_rpc_address = "https://stacks-node-api.testnet.stacks.co"
+stacks_node_rpc_address = "https://api.testnet.hiro.so"
 deployment_fee_rate = 10
 
 [accounts.deployer]
@@ -251,7 +251,7 @@ mnemonic = "<YOUR PRIVATE TESTNET MNEMONIC HERE>"
         let content = format!(
             r#"[network]
 name = "mainnet"
-stacks_node_rpc_address = "https://stacks-node-api.mainnet.stacks.co"
+stacks_node_rpc_address = "https://api.hiro.so"
 deployment_fee_rate = 10
 
 [accounts.deployer]

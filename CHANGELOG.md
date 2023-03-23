@@ -1,3 +1,11 @@
+#### 2023-03-22
+
+##### Other Changes
+
+*  Adjust 2.1 start height ([2e1e44c8](https://github.com/hirosystems/clarinet/commit/2e1e44c8)
+*  Set Clarity2 and epoch 2.1 as default ([6cb1e21d](https://github.com/hirosystems/clarinet/commit/6cb1e21d)
+*  Update api urls to use hiro.so ([4e23a7ed](https://github.com/hirosystems/clarinet/commit/4e23a7ed)
+
 #### 1.5.2 (2023-03-16)
 
 ##### Bug Fixes

@@ -62,9 +62,9 @@ pub async fn retrieve_contract(
 
     let is_mainnet = contract_deployer.starts_with("SP");
     let stacks_node_addr = if is_mainnet {
-        "https://stacks-node-api.mainnet.stacks.co".to_string()
+        "https://api.hiro.so".to_string()
     } else {
-        "https://stacks-node-api.testnet.stacks.co".to_string()
+        "https://api.testnet.hiro.so".to_string()
     };
 
     let request_url = format!(
@@ -127,7 +127,7 @@ pub const MAINNET_21_START_HEIGHT: u32 = 99_564;
 pub const TESTNET_20_START_HEIGHT: u32 = 1;
 
 pub const TESTNET_2_05_START_HEIGHT: u32 = 20_216;
-pub const TESTNET_21_START_HEIGHT: u32 = 99_120;
+pub const TESTNET_21_START_HEIGHT: u32 = 99_113;
 
 fn epoch_for_height(is_mainnet: bool, height: u32) -> StacksEpochId {
     if is_mainnet {
