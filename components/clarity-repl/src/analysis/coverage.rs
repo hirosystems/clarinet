@@ -1,8 +1,9 @@
 use std::{
     collections::{BTreeMap, BTreeSet, HashMap, HashSet},
-    fs::File,
-    io::Write,
+    fs::{create_dir_all, File},
+    io::{Error, ErrorKind, Write},
     mem,
+    path::{Path, PathBuf},
 };
 
 use clarity::vm::ast::ContractAST;
@@ -30,6 +31,15 @@ pub struct ContractCoverageReport {
     functions_coverage: HashMap<String, u64>,
     execution_counts: HashMap<u32, u64>,
     executed_statements: BTreeSet<u64>,
+}
+
+pub fn parse_coverage_str(path: &str) -> Result<PathBuf, Error> {
+    let filepath = Path::new(path);
+    let path_buf = filepath.to_path_buf();
+    match path_buf.extension() {
+        None => Ok(path_buf.join(Path::new("coverage.lcov"))),
+        Some(_) => Ok(path_buf),
+    }
 }
 
 impl CoverageReporter {
@@ -77,6 +87,12 @@ impl CoverageReporter {
             test_names.insert(report.test_name.to_string());
         }
 
+        let filepath = filename.as_ref().to_path_buf();
+        let filepath = filepath.parent().ok_or(Error::new(
+            ErrorKind::NotFound,
+            "could not get directory to create coverage file",
+        ))?;
+        create_dir_all(filepath)?;
         let mut out = File::create(filename)?;
 
         for (index, test_name) in test_names.iter().enumerate() {

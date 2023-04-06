@@ -25,6 +25,7 @@ use clarinet_files::{
     get_manifest_location, FileLocation, ProjectManifest, ProjectManifestFile, RequirementConfig,
 };
 use clarity_repl::analysis::call_checker::ContractAnalysis;
+use clarity_repl::analysis::coverage::parse_coverage_str;
 use clarity_repl::clarity::vm::analysis::AnalysisDatabase;
 use clarity_repl::clarity::vm::costs::LimitedCostTracker;
 use clarity_repl::clarity::vm::diagnostic::{Diagnostic, Level};
@@ -38,8 +39,10 @@ use stacks_network::{self, DevnetOrchestrator};
 use std::collections::HashMap;
 use std::fs::{self, File};
 use std::io::prelude::*;
+use std::path::PathBuf;
 use std::{env, process};
 
+use clap::builder::ValueParser;
 use clap::{IntoApp, Parser, Subcommand};
 use clap_generate::{Generator, Shell};
 use toml;
@@ -395,9 +398,13 @@ struct Integrate {
 
 #[derive(Parser, PartialEq, Clone, Debug)]
 struct Test {
-    /// Generate coverage file (coverage.lcov)
-    #[clap(long = "coverage")]
-    pub coverage: bool,
+    /// Generate coverage file, and optionally provide name of generated file (defaults to "coverage.lcov")
+    #[clap(
+        long = "coverage",
+        default_missing_value("coverage.lcov"),
+        value_parser(ValueParser::new(parse_coverage_str))
+    )]
+    pub coverage: Option<PathBuf>,
     /// Generate costs report
     #[clap(long = "costs")]
     pub costs_report: bool,
@@ -1255,7 +1262,7 @@ pub fn main() {
             let cache_location = manifest.project.cache_location.clone();
             let _ = run_scripts(
                 vec![cmd.script],
-                false,
+                None,
                 false,
                 false,
                 cmd.allow_wallets,
