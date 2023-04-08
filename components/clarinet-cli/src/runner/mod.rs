@@ -15,6 +15,7 @@ use clarity_repl::repl::{session::CostsReport, Session};
 use deno_core::error::AnyError;
 use stacks_network::chainhook_event_observer::chainhooks::types::StacksChainhookSpecification;
 use std::collections::HashMap;
+use std::path::PathBuf;
 
 use clarinet_deployments::types::DeploymentSpecification;
 
@@ -101,7 +102,7 @@ pub enum ChainhookEvent {
 
 pub fn run_scripts(
     include: Vec<String>,
-    include_coverage: bool,
+    coverage_report: Option<PathBuf>,
     include_costs_report: bool,
     watch: bool,
     allow_wallets: bool,
@@ -120,7 +121,7 @@ pub fn run_scripts(
 ) -> Result<usize, (AnyError, usize)> {
     block_on(deno::do_run_scripts(
         include,
-        include_coverage,
+        coverage_report,
         include_costs_report,
         watch,
         allow_wallets,
