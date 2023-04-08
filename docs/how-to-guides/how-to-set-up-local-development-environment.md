@@ -180,7 +180,7 @@ Clarinet.test({
 });
 ```
 
-For more information on assertions, review [asserts](https://deno.land/std@0.90.0/testing/asserts.ts) in the Deno standard library. For more information on the available Clarity calls in Deno, review the [Deno Clarinet library](https://github.com/hirosystems/clarinet/blob/develop/components/clarinet-deno/index.ts).
+For more information on assertions, review [asserts](https://deno.land/std@0.90.0/testing/asserts.ts) in the Deno standard library. For more information on the available Clarity calls in Deno, review the [Deno Clarinet library](https://github.com/hirosystems/clarinet/blob/develop/components/clarinet-deno/index.ts). For more information on testing Clarity contracts, review the [Test Contract How-to Guide](how-to-test-contract.md).
 
 ## Additional reading
 
