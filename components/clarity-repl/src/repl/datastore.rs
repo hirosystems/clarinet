@@ -21,6 +21,7 @@ use clarity::vm::EvalHook;
 use clarity::vm::StacksEpoch;
 use std::collections::HashMap;
 use std::hash::Hash;
+use std::time::{SystemTime, UNIX_EPOCH};
 
 #[derive(Clone, Debug)]
 pub struct Datastore {
@@ -68,6 +69,7 @@ pub struct BurnDatastore {
     chain_height: u32,
     height_at_chain_tip: HashMap<StacksBlockId, u32>,
     constants: StacksConstants,
+    genesis_time: u64,
 }
 
 fn height_to_hashed_bytes(height: u32) -> [u8; 32] {
@@ -82,8 +84,9 @@ fn height_to_id(height: u32) -> StacksBlockId {
     StacksBlockId(height_to_hashed_bytes(height))
 }
 
-fn height_to_block(height: u32) -> BlockInfo {
+fn height_to_block(height: u32, genesis_time: Option<u64>) -> BlockInfo {
     let bytes = height_to_hashed_bytes(height);
+    let genesis_time = genesis_time.unwrap_or(0);
 
     let block_header_hash = {
         let mut buffer = bytes.clone();
@@ -105,7 +108,8 @@ fn height_to_block(height: u32) -> BlockInfo {
         buffer[0] = 4;
         VRFSeed(buffer)
     };
-    let burn_block_time: u64 = (height * 1800).into();
+    let time_since_genesis: u64 = (height * 1800).into();
+    let burn_block_time: u64 = genesis_time + time_since_genesis;
     let burn_block_height = height;
     let miner = StacksAddress::burn_address(true);
     let burnchain_tokens_spent_for_block = 2000;
@@ -290,13 +294,17 @@ impl BurnDatastore {
         let bytes = height_to_hashed_bytes(0);
         let id = StacksBlockId(bytes.clone());
         let sortition_id = SortitionId(bytes);
+        let genesis_time = match SystemTime::now().duration_since(UNIX_EPOCH) {
+            Ok(now) => now.as_secs(),
+            Err(_) => 0,
+        };
 
         let genesis_block = BlockInfo {
             block_header_hash: BlockHeaderHash([0x00; 32]),
             burn_block_header_hash: BurnchainHeaderHash([0x00; 32]),
             consensus_hash: ConsensusHash([0x00; 20]),
             vrf_seed: VRFSeed([0x00; 32]),
-            burn_block_time: 0,
+            burn_block_time: genesis_time,
             burn_block_height: 0,
             miner: StacksAddress::burn_address(false),
             burnchain_tokens_spent_for_block: 0,
@@ -333,6 +341,7 @@ impl BurnDatastore {
             chain_height: 0,
             height_at_chain_tip,
             constants,
+            genesis_time,
         }
     }
 
@@ -343,13 +352,14 @@ impl BurnDatastore {
             .get(&self.open_chain_tip)
             .expect("Open chain tip missing in block id lookup table")
             .clone();
+        let genesis_time = self.genesis_time;
 
         for i in 1..=count {
             let height = cur_height + i;
             let bytes = height_to_hashed_bytes(height);
             let id = StacksBlockId(bytes.clone());
             let sortition_id = SortitionId(bytes.clone());
-            let block_info = height_to_block(height);
+            let block_info = height_to_block(height, Some(genesis_time));
             self.block_id_lookup.insert(id, current_lookup_id);
             self.height_at_chain_tip.insert(id, height);
             self.sortition_lookup.insert(sortition_id, id);
