@@ -690,21 +690,6 @@ impl NetworkManifest {
                 .take()
                 .unwrap_or(vec![]);
 
-            if enable_subnet_node {
-                let label = "subnet-leader";
-                accounts.insert(
-                    label.to_string(),
-                    AccountConfig {
-                        label: label.to_string(),
-                        mnemonic: subnet_leader_mnemonic.clone(),
-                        derivation: subnet_leader_derivation_path.clone(),
-                        balance: super::DEFAULT_DEVNET_BALANCE,
-                        stx_address: subnet_leader_stx_address.clone(),
-                        btc_address: subnet_leader_btc_address.clone(),
-                        is_mainnet,
-                    },
-                );
-            }
             let subnet_contract_id = devnet_config
                 .subnet_contract_id
                 .unwrap_or(DEFAULT_SUBNET_CONTRACT_ID.to_string());

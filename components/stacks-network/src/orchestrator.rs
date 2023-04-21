@@ -13,7 +13,7 @@ use bollard::service::Ipam;
 use bollard::Docker;
 use chainhook_event_observer::utils::Context;
 use clarinet_files::chainhook_types::StacksNetwork;
-use clarinet_files::{DevnetConfigFile, NetworkManifest, ProjectManifest, DEFAULT_DEVNET_BALANCE};
+use clarinet_files::{DevnetConfigFile, NetworkManifest, ProjectManifest};
 use futures::stream::TryStreamExt;
 use hiro_system_kit::slog;
 use reqwest::RequestBuilder;
@@ -1194,9 +1194,9 @@ start_height = {epoch_2_1}
     }
 
     pub fn prepare_subnet_node_config(&self, boot_index: u32) -> Result<Config<String>, String> {
-        let (network_config, devnet_config) = match &self.network_config {
-            Some(ref network_config) => match network_config.devnet {
-                Some(ref devnet_config) => (network_config, devnet_config),
+        let devnet_config = match &self.network_config {
+            Some(network_config) => match &network_config.devnet {
+                Some(devnet_config) => devnet_config,
                 _ => return Err("unable to get devnet configuration".into()),
             },
             _ => return Err("unable to get Docker client".into()),
@@ -1276,27 +1276,6 @@ observer_port = {subnet_events_ingestion_port}
             first_attempt_time_ms = devnet_config.stacks_node_first_attempt_time_ms,
             subsequent_attempt_time_ms = devnet_config.stacks_node_subsequent_attempt_time_ms,
         );
-
-        subnet_conf.push_str(&format!(
-            r#"
-[[ustx_balance]]
-address = "{subnet_leader_stx_address}"
-amount = {default_balance}
-"#,
-            subnet_leader_stx_address = devnet_config.subnet_leader_stx_address,
-            default_balance = DEFAULT_DEVNET_BALANCE
-        ));
-
-        for (_, account) in network_config.accounts.iter() {
-            subnet_conf.push_str(&format!(
-                r#"
-[[ustx_balance]]
-address = "{}"
-amount = {}
-"#,
-                account.stx_address, account.balance
-            ));
-        }
 
         for events_observer in devnet_config.subnet_node_events_observers.iter() {
             subnet_conf.push_str(&format!(
