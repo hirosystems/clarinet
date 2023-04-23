@@ -341,6 +341,12 @@ export interface DevnetConfig {
    */
   epoch_2_1?: number;
   /**
+   * Bitcoin block height starting the epoch 2.2
+   * @type {number}
+   * @memberof DevnetConfig
+   */
+  epoch_2_2?: number;
+  /**
    * Bitcoin block height activating switch to POX 2.0
    * @type {number}
    * @memberof DevnetConfig
