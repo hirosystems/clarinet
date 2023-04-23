@@ -39,6 +39,7 @@ pub const DEFAULT_EPOCH_2_0: u64 = 100;
 pub const DEFAULT_EPOCH_2_05: u64 = 102;
 pub const DEFAULT_EPOCH_2_1: u64 = 106;
 pub const DEFAULT_POX2_ACTIVATION: u64 = 109;
+pub const DEFAULT_EPOCH_2_2: u64 = 114;
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct NetworkManifestFile {
@@ -123,6 +124,7 @@ pub struct DevnetConfigFile {
     pub epoch_2_0: Option<u64>,
     pub epoch_2_05: Option<u64>,
     pub epoch_2_1: Option<u64>,
+    pub epoch_2_2: Option<u64>,
     pub pox_2_activation: Option<u64>,
     pub use_docker_gateway_routing: Option<bool>,
     pub docker_platform: Option<String>,
@@ -244,6 +246,7 @@ pub struct DevnetConfig {
     pub epoch_2_0: u64,
     pub epoch_2_05: u64,
     pub epoch_2_1: u64,
+    pub epoch_2_2: u64,
     pub pox_2_activation: u64,
     pub use_docker_gateway_routing: bool,
     pub docker_platform: String,
@@ -609,6 +612,10 @@ impl NetworkManifest {
                     devnet_config.epoch_2_1 = Some(val.clone());
                 }
 
+                if let Some(ref val) = devnet_override.epoch_2_2 {
+                    devnet_config.epoch_2_2 = Some(val.clone());
+                }
+
                 if let Some(ref val) = devnet_override.pox_2_activation {
                     devnet_config.pox_2_activation = Some(val.clone());
                 }
@@ -852,6 +859,7 @@ impl NetworkManifest {
                 epoch_2_0: devnet_config.epoch_2_0.unwrap_or(DEFAULT_EPOCH_2_0),
                 epoch_2_05: devnet_config.epoch_2_05.unwrap_or(DEFAULT_EPOCH_2_05),
                 epoch_2_1: devnet_config.epoch_2_1.unwrap_or(DEFAULT_EPOCH_2_1),
+                epoch_2_2: devnet_config.epoch_2_2.unwrap_or(DEFAULT_EPOCH_2_2),
                 pox_2_activation: devnet_config
                     .pox_2_activation
                     .unwrap_or(DEFAULT_POX2_ACTIVATION),
