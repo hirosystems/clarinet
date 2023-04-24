@@ -105,6 +105,10 @@ impl PoxInfo {
             ..Default::default()
         }
     }
+
+    pub fn default() -> PoxInfo {
+        PoxInfo::devnet_default()
+    }
 }
 
 #[derive(Deserialize, Debug, Clone, Default)]
