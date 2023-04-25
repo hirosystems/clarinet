@@ -40,6 +40,7 @@ pub const DEFAULT_EPOCH_2_05: u64 = 102;
 pub const DEFAULT_EPOCH_2_1: u64 = 106;
 pub const DEFAULT_POX2_ACTIVATION: u64 = 109;
 pub const DEFAULT_EPOCH_2_2: u64 = 114;
+pub const DEFAULT_POX2_UNLOCK_HEIGHT: u64 = 122;
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct NetworkManifestFile {
@@ -126,6 +127,7 @@ pub struct DevnetConfigFile {
     pub epoch_2_1: Option<u64>,
     pub epoch_2_2: Option<u64>,
     pub pox_2_activation: Option<u64>,
+    pub pox_2_unlock_height: Option<u64>,
     pub use_docker_gateway_routing: Option<bool>,
     pub docker_platform: Option<String>,
 }
@@ -248,6 +250,7 @@ pub struct DevnetConfig {
     pub epoch_2_1: u64,
     pub epoch_2_2: u64,
     pub pox_2_activation: u64,
+    pub pox_2_unlock_height: u64,
     pub use_docker_gateway_routing: bool,
     pub docker_platform: String,
 }
@@ -620,6 +623,10 @@ impl NetworkManifest {
                     devnet_config.pox_2_activation = Some(val.clone());
                 }
 
+                if let Some(ref val) = devnet_override.pox_2_unlock_height {
+                    devnet_config.pox_2_unlock_height = Some(val.clone());
+                }
+
                 if let Some(val) = devnet_override.network_id {
                     devnet_config.network_id = Some(val);
                 }
@@ -848,6 +855,9 @@ impl NetworkManifest {
                 pox_2_activation: devnet_config
                     .pox_2_activation
                     .unwrap_or(DEFAULT_POX2_ACTIVATION),
+                pox_2_unlock_height: devnet_config
+                    .pox_2_unlock_height
+                    .unwrap_or(DEFAULT_POX2_UNLOCK_HEIGHT),
                 stacks_node_env_vars: devnet_config.stacks_node_env_vars.take().unwrap_or(vec![]),
                 stacks_api_env_vars: devnet_config.stacks_api_env_vars.take().unwrap_or(vec![]),
                 stacks_explorer_env_vars: devnet_config
