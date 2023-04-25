@@ -59,7 +59,7 @@ pub async fn do_run_scripts(
     display_costs_report: bool,
     watch: bool,
     allow_wallets: bool,
-    _allow_disk_write: bool,
+    allow_disk_write: bool,
     manifest: &ProjectManifest,
     cache: DeploymentCache,
     _deployment_plan_path: Option<String>,
@@ -95,6 +95,10 @@ pub async fn do_run_scripts(
     } else {
         None
     };
+    let allow_write_path = match allow_disk_write {
+        true => Some(vec![cwd.clone()]),
+        false => None,
+    };
     let test_flags = TestFlags {
         ignore: vec![],    // todo(lgalabru)
         trace_ops: true,   // todo(lgalabru)
@@ -125,7 +129,7 @@ pub async fn do_run_scripts(
         allow_ffi: None,
         allow_read: None,                     // todo(lgalabru)
         allow_run: None,                      // todo(lgalabru)
-        allow_write: None,                    // todo(lgalabru)
+        allow_write: allow_write_path,
         cache_blocklist: vec![],              // todo(lgalabru)
         cached_only: false,                   // todo(lgalabru)
         ignore: vec![],                       // todo(lgalabru)
