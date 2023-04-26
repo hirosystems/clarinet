@@ -132,7 +132,7 @@ pub async fn do_run_scripts(
         cache_path: Some(cache_location.to_string().into()),
         watch: watched,
         import_map_path: import_map,
-        allow_ffi: None,                      // todo(lgalabru)
+        allow_ffi: None,
         allow_read: allow_read_path,
         allow_run: None,                      // todo(lgalabru)
         allow_write: allow_write_path,
