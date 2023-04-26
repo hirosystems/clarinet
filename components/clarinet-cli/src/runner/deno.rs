@@ -61,6 +61,8 @@ pub async fn do_run_scripts(
     allow_wallets: bool,
     allow_disk_read: bool,
     allow_disk_write: bool,
+    allow_run: Option<Vec<String>>,
+    allow_env: Option<Vec<String>>,
     manifest: &ProjectManifest,
     cache: DeploymentCache,
     _deployment_plan_path: Option<String>,
@@ -122,7 +124,7 @@ pub async fn do_run_scripts(
         argv: vec![],
         subcommand: DenoSubcommand::Test(test_flags.clone()),
         allow_all: false,
-        allow_env: None,
+        allow_env,
         allow_hrtime: false,
         allow_net: if allow_net {
             Some(vec!["deno.land".into()])
@@ -135,7 +137,7 @@ pub async fn do_run_scripts(
         allow_ffi: None,
         allow_read: allow_read_path,
         allow_write: allow_write_path,
-        allow_run: None,                      // todo(lgalabru)
+        allow_run,
         cache_blocklist: vec![],              // todo(lgalabru)
         cached_only: false,                   // todo(lgalabru)
         ignore: vec![],                       // todo(lgalabru)
