@@ -466,12 +466,11 @@ struct Run {
     /// Allow access to wallets
     #[clap(long = "allow-wallets")]
     pub allow_wallets: bool,
-    /// Allow write access to disk
+    /// Allow write access to project directory
     #[clap(long = "allow-write")]
     pub allow_disk_write: bool,
-    /// Allow read access to disk
+    /// Allow read access to project directory
     #[clap(long = "allow-read")]
-    #[allow(dead_code)]
     pub allow_disk_read: bool,
     /// If specified, use this deployment file
     #[clap(long = "deployment-plan-path", short = 'p')]
@@ -1222,6 +1221,7 @@ pub fn main() {
                 cmd.watch,
                 true,
                 false,
+                false,
                 &manifest,
                 cache,
                 deployment_plan_path,
@@ -1266,6 +1266,7 @@ pub fn main() {
                 false,
                 false,
                 cmd.allow_wallets,
+                cmd.allow_disk_read,
                 cmd.allow_disk_write,
                 &manifest,
                 cache,
