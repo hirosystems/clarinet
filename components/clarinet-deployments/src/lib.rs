@@ -838,3 +838,162 @@ pub fn load_deployment(
     };
     Ok(spec)
 }
+
+#[cfg(test)]
+mod tests {
+
+    use super::*;
+    use test_case::test_case;
+
+    fn get_test_manifest() -> ProjectManifest {
+        let manifest_location = {
+            let mut path = std::env::current_dir().expect("Unable to get current dir");
+            path.push("src");
+            path.push("test-data");
+            path.push("Clarinet.toml");
+            FileLocation::from_path(path)
+        };
+        ProjectManifest::from_location(&manifest_location)
+            .unwrap_or_else(|e| panic!("failed to get manifest {}", e))
+    }
+    #[test_case(StacksNetwork::Mainnet ; "for mainnet deployments")]
+    #[test_case(StacksNetwork::Testnet ; "for testnet deployments")]
+    #[test_case(StacksNetwork::Devnet ; "for devnet deployments")]
+    #[test_case(StacksNetwork::Simnet ; "for simnet deployments")]
+    fn it_creates_deployment_plan(network: StacksNetwork) {
+        let manifest = get_test_manifest();
+
+        let deployment_path = get_default_deployment_path(&manifest, &network)
+            .expect("failed to get deployment path");
+
+        let expected_path = format!(
+            "{}/deployments/default.{}-plan.yaml",
+            manifest.location.get_parent_location().unwrap().to_string(),
+            format!("{:?}", network).to_ascii_lowercase()
+        );
+        assert_eq!(deployment_path.to_string(), expected_path);
+    }
+
+    #[test_case(StacksNetwork::Devnet, "http://devnet:devnet@localhost:18443"; "for devnet deployments")]
+    fn it_loads_deployments(network: StacksNetwork, expected_bitcoin_node: &str) {
+        let network_str = format!("{:?}", network).to_ascii_lowercase();
+        let deployment_plan_name = format!("default.{}-plan.yaml", network_str);
+
+        let manifest: ProjectManifest = get_test_manifest();
+        let deployment_plan_location: FileLocation = {
+            let mut parent_path = manifest.location.get_parent_location().unwrap();
+            parent_path.append_path("deployments").unwrap();
+            parent_path
+                .append_path(deployment_plan_name.as_str())
+                .unwrap();
+            parent_path
+        };
+        let spec = load_deployment(&manifest, &deployment_plan_location).unwrap();
+        assert_eq!(spec.network, network);
+        assert_eq!(spec.plan.batches.len(), 1);
+        let transactions = &spec.plan.batches[0].transactions;
+        assert_eq!(transactions.len(), 1);
+        assert_eq!(spec.bitcoin_node.unwrap(), expected_bitcoin_node);
+    }
+
+    fn get_invalid_deployments_location(
+        manifest: &ProjectManifest,
+        deployment_plan_name: &str,
+    ) -> FileLocation {
+        let mut parent_path = manifest.location.get_parent_location().unwrap();
+        parent_path.append_path("deployments").unwrap();
+        parent_path.append_path("invalid").unwrap();
+        parent_path.append_path(deployment_plan_name).unwrap();
+        parent_path
+    }
+
+    #[test]
+    fn it_rejects_deployments_with_invalid_networks() {
+        let deployment_plan_name = "invalid.network.yaml";
+        let manifest: ProjectManifest = get_test_manifest();
+        let deployment_plan_location =
+            get_invalid_deployments_location(&manifest, deployment_plan_name);
+
+        match load_deployment(&manifest, &deployment_plan_location) {
+            Err(e) => {
+                let network_err =
+                    "network 'unsupported' not supported (simnet, devnet, testnet, mainnet)";
+                let err = format!(
+                    "error: {} syntax incorrect\n{}",
+                    &deployment_plan_location.to_string(),
+                    network_err
+                );
+                assert_eq!(e, err)
+            }
+            Ok(_) => {
+                panic!(
+                    "load_deployment should have failed for plan {}",
+                    deployment_plan_name
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn it_rejects_deployments_with_invalid_transaction_types() {
+        let deployment_plan_name = "invalid.transaction-type.yaml";
+        let manifest: ProjectManifest = get_test_manifest();
+        let deployment_plan_location =
+            get_invalid_deployments_location(&manifest, deployment_plan_name);
+
+        match load_deployment(&manifest, &deployment_plan_location) {
+            Err(e) => {
+                assert!(e.contains("unknown variant `invalid-transaction-type`"));
+            }
+            Ok(_) => {
+                panic!(
+                    "load_deployment should have failed for plan {}",
+                    deployment_plan_name
+                );
+            }
+        }
+    }
+
+    const SIMNET_EXPECTED_EMULATED_ERR: &str =
+        "simnet only supports transactions of type 'emulated-contract-call' and 'emulated-contract-publish'";
+    const DEVNET_EXPECTED_CALL_PUBLISH_ERR: &str =
+        "devnet only supports transactions of type 'contract-call' and 'contract-publish'";
+    const TESTNET_EXPECTED_CALL_PUBLISH_ERR: &str =
+        "testnet only supports transactions of type 'contract-call' and 'contract-publish'";
+    const MAINNET_EXPECTED_CALL_PUBLISH_ERR: &str =
+        "mainnet only supports transactions of type 'contract-call' and 'contract-publish'";
+    #[test_case("invalid.simnet-contract-call.yaml", SIMNET_EXPECTED_EMULATED_ERR; "for simnet deployments with non-emulated contract calls")]
+    #[test_case("invalid.simnet-contract-publish.yaml", SIMNET_EXPECTED_EMULATED_ERR ; "for simnet deployments with non-emulated contract publish")]
+    #[test_case("invalid.devnet-emulated-contract-call.yaml", DEVNET_EXPECTED_CALL_PUBLISH_ERR; "for devnet deployments with emulated contract calls")]
+    #[test_case("invalid.devnet-emulated-contract-publish.yaml", DEVNET_EXPECTED_CALL_PUBLISH_ERR ; "for devnet deployments with emulated contract publish")]
+    #[test_case("invalid.testnet-emulated-contract-publish.yaml", TESTNET_EXPECTED_CALL_PUBLISH_ERR ; "for testnet deployments with emulated contract publish")]
+    #[test_case("invalid.testnet-emulated-contract-call.yaml", TESTNET_EXPECTED_CALL_PUBLISH_ERR ; "for testnet deployments with emulated contract calls")]
+    #[test_case("invalid.mainnet-emulated-contract-publish.yaml", MAINNET_EXPECTED_CALL_PUBLISH_ERR ; "for mainnet deployments with emulated contract publish")]
+    #[test_case("invalid.mainnet-emulated-contract-call.yaml", MAINNET_EXPECTED_CALL_PUBLISH_ERR ; "for mainnet deployments with emulated contract calls")]
+    #[test_case("invalid.mainnet-requirement-publish.yaml", MAINNET_EXPECTED_CALL_PUBLISH_ERR ; "for mainnet deployments with requirements publish")]
+    fn it_rejects_deployments_with_mismatched_transaction_types(
+        deployment_plan_name: &str,
+        expected_err: &str,
+    ) {
+        let manifest: ProjectManifest = get_test_manifest();
+        let deployment_plan_location =
+            get_invalid_deployments_location(&manifest, deployment_plan_name);
+
+        match load_deployment(&manifest, &deployment_plan_location) {
+            Err(e) => {
+                let err = format!(
+                    "error: {} syntax incorrect\n{}",
+                    deployment_plan_location.to_string(),
+                    expected_err
+                );
+                assert_eq!(e, err);
+            }
+            Ok(_) => {
+                panic!(
+                    "load_deployment should have failed for plan {}",
+                    deployment_plan_name
+                );
+            }
+        }
+    }
+}
