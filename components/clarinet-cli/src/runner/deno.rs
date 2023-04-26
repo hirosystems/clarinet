@@ -134,8 +134,8 @@ pub async fn do_run_scripts(
         import_map_path: import_map,
         allow_ffi: None,
         allow_read: allow_read_path,
-        allow_run: None,                      // todo(lgalabru)
         allow_write: allow_write_path,
+        allow_run: None,                      // todo(lgalabru)
         cache_blocklist: vec![],              // todo(lgalabru)
         cached_only: false,                   // todo(lgalabru)
         ignore: vec![],                       // todo(lgalabru)
