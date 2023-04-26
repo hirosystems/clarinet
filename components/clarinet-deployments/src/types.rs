@@ -719,7 +719,7 @@ impl DeploymentSpecification {
                                     TransactionSpecification::StxTransfer(spec)
                                 }
                                 TransactionSpecificationFile::BtcTransfer(_) | TransactionSpecificationFile::ContractCall(_) | TransactionSpecificationFile::ContractPublish(_) | TransactionSpecificationFile::RequirementPublish(_) => {
-                                    return Err(format!("{} only supports transactions of type 'emulated-contract-call' and 'emulated-contract-publish", specs.network.to_lowercase()))
+                                    return Err(format!("{} only supports transactions of type 'emulated-contract-call' and 'emulated-contract-publish'", specs.network.to_lowercase()))
                                 }
                             };
                             transactions.push(transaction);
@@ -749,7 +749,7 @@ impl DeploymentSpecification {
                                 }
                                 TransactionSpecificationFile::RequirementPublish(spec) => {
                                     if network.is_mainnet() {
-                                        return Err(format!("{} only supports transactions of type 'contract-call' and 'contract-publish", specs.network.to_lowercase()))
+                                        return Err(format!("{} only supports transactions of type 'contract-call' and 'contract-publish'", specs.network.to_lowercase()))
                                     }
                                     let spec = RequirementPublishSpecification::from_specifications(spec, project_root_location)?;
                                     TransactionSpecification::RequirementPublish(spec)
