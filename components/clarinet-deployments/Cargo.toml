@@ -26,6 +26,9 @@ tiny-hderive = { version = "0.3.0", optional = true }
 libsecp256k1 = { version = "0.7.0", optional = true }
 clarinet_utils = { package = "clarinet-utils", path = "../clarinet-utils", optional = true }
 
+[dev-dependencies]
+test-case = "=3.1.0"
+
 [features]
 default = ["cli"]
 cli = ["clarity-repl/cli", "clarinet-files/cli", "onchain"]
