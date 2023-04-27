@@ -625,6 +625,13 @@ impl StacksDevnet {
             overrides.pox_2_activation = Some(res.value(&mut cx) as u64);
         }
 
+        if let Ok(res) = devnet_settings
+            .get(&mut cx, "pox_2_unlock_height")?
+            .downcast::<JsNumber, _>(&mut cx)
+        {
+            overrides.pox_2_unlock_height = Some(res.value(&mut cx) as u64);
+        }
+
         // Disable scripts
         overrides.execute_script = Some(vec![]);
 
