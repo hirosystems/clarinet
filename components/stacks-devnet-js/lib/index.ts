@@ -25,6 +25,14 @@ import {
 export * from "@hirosystems/chainhook-types";
 
 /**
+ * Returns the stacks-node version supported by this library
+ * @returns {string}
+ */
+export function stacksNodeVersion(): string {
+  return "2.2";
+}
+
+/**
  * Account to include in the genesis accounts
  * @export
  * @interface Account
