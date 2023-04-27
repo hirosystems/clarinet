@@ -466,13 +466,18 @@ struct Run {
     /// Allow access to wallets
     #[clap(long = "allow-wallets")]
     pub allow_wallets: bool,
-    /// Allow write access to disk
+    /// Allow write access to project directory
     #[clap(long = "allow-write")]
     pub allow_disk_write: bool,
-    /// Allow read access to disk
+    /// Allow read access to project directory
     #[clap(long = "allow-read")]
-    #[allow(dead_code)]
     pub allow_disk_read: bool,
+    /// Allows running a specified list of subprocesses. Use the flag multiple times to allow multiple subprocesses
+    #[clap(long = "allow-run")]
+    pub allow_run: Option<Vec<String>>,
+    /// Allows access to a specified list of environment variables. Use the flag multiple times to allow access to multiple variables
+    #[clap(long = "allow-env")]
+    pub allow_env: Option<Vec<String>>,
     /// If specified, use this deployment file
     #[clap(long = "deployment-plan-path", short = 'p')]
     pub deployment_plan_path: Option<String>,
@@ -1222,6 +1227,9 @@ pub fn main() {
                 cmd.watch,
                 true,
                 false,
+                false,
+                None,
+                None,
                 &manifest,
                 cache,
                 deployment_plan_path,
@@ -1266,7 +1274,10 @@ pub fn main() {
                 false,
                 false,
                 cmd.allow_wallets,
+                cmd.allow_disk_read,
                 cmd.allow_disk_write,
+                cmd.allow_run,
+                cmd.allow_env,
                 &manifest,
                 cache,
                 cmd.deployment_plan_path,
