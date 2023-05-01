@@ -1055,11 +1055,16 @@ start_height = {epoch_2_1}
 [[burnchain.epochs]]
 epoch_name = "2.2"
 start_height = {epoch_2_2}
+
+[[burnchain.epochs]]
+epoch_name = "2.3"
+start_height = {epoch_2_3}
 "#,
             epoch_2_0 = devnet_config.epoch_2_0,
             epoch_2_05 = devnet_config.epoch_2_05,
             epoch_2_1 = devnet_config.epoch_2_1,
             epoch_2_2 = devnet_config.epoch_2_2,
+            epoch_2_3 = devnet_config.epoch_2_3,
             pox_2_activation = devnet_config.pox_2_activation,
             pox_2_unlock_height = devnet_config.pox_2_unlock_height,
         ));

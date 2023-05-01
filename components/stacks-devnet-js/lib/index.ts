@@ -29,7 +29,7 @@ export * from "@hirosystems/chainhook-types";
  * @returns {string}
  */
 export function stacksNodeVersion(): string {
-  return "2.2";
+  return "2.3";
 }
 
 /**
@@ -355,11 +355,23 @@ export interface DevnetConfig {
    */
   epoch_2_2?: number;
   /**
+   * Bitcoin block height starting the epoch 2.3
+   * @type {number}
+   * @memberof DevnetConfig
+   */
+  epoch_2_3?: number;
+  /**
    * Bitcoin block height activating switch to POX 2.0
    * @type {number}
    * @memberof DevnetConfig
    */
   pox_2_activation?: number;
+  /**
+   * Bitcoin block height unlocking pox-2 stacking
+   * @type {number}
+   * @memberof DevnetConfig
+   */
+  pox_2_unlock_height?: number;
 }
 
 /**
