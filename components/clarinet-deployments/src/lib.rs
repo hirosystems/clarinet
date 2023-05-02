@@ -357,9 +357,10 @@ pub async fn generate_default_deployment(
             queue.push_front((contract_id, epoch, clarity_version));
         }
 
+        let mut already_added_contracts: Vec<QualifiedContractIdentifier> = vec![];
+
         while let Some((contract_id, epoch, clarity_version)) = queue.pop_front() {
-            // Extract principal from contract_id
-            if requirements_deps.contains_key(&contract_id) {
+            if already_added_contracts.contains(&contract_id) {
                 continue;
             }
 
@@ -452,6 +453,7 @@ pub async fn generate_default_deployment(
                                 clarity_version.clone(),
                             ));
                         }
+                        already_added_contracts.push(contract_id.clone());
                         requirements_deps.insert(contract_id.clone(), dependencies);
                         requirements_asts.insert(contract_id.clone(), ast);
                         break;
@@ -470,6 +472,7 @@ pub async fn generate_default_deployment(
                             ));
                         }
                     }
+                    already_added_contracts.push(contract_id.clone());
                     requirements_asts.insert(contract_id.clone(), ast);
                     queue.push_front((contract_id, epoch, clarity_version));
 
