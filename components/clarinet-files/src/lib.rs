@@ -35,8 +35,6 @@ use std::pin::Pin;
 use std::{borrow::BorrowMut, path::PathBuf, str::FromStr};
 use url::Url;
 
-pub const DEFAULT_DEVNET_BALANCE: u64 = 100_000_000_000_000;
-
 pub type FileAccessorResult<T> = Pin<Box<dyn Future<Output = Result<T, String>>>>;
 
 pub trait FileAccessor {
