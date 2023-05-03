@@ -31,7 +31,7 @@ use clarity_repl::clarity::vm::ExecutionResult;
 use clarity_repl::repl::session::BOOT_CONTRACTS_DATA;
 use clarity_repl::repl::Session;
 use clarity_repl::repl::SessionSettings;
-use std::collections::{BTreeMap, BTreeSet, HashMap, VecDeque};
+use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet, VecDeque};
 use types::DeploymentGenerationArtifacts;
 use types::RequirementPublishSpecification;
 use types::TransactionSpecification;
@@ -357,10 +357,10 @@ pub async fn generate_default_deployment(
             queue.push_front((contract_id, epoch, clarity_version));
         }
 
-        let mut already_added_contracts: Vec<QualifiedContractIdentifier> = vec![];
+        let mut already_added_contracts = HashSet::new();
 
         while let Some((contract_id, epoch, clarity_version)) = queue.pop_front() {
-            if already_added_contracts.contains(&contract_id) {
+            if already_added_contracts.contains(&contract_id.to_string()) {
                 continue;
             }
 
@@ -453,7 +453,7 @@ pub async fn generate_default_deployment(
                                 clarity_version.clone(),
                             ));
                         }
-                        already_added_contracts.push(contract_id.clone());
+                        already_added_contracts.insert(contract_id.to_string());
                         requirements_deps.insert(contract_id.clone(), dependencies);
                         requirements_asts.insert(contract_id.clone(), ast);
                         break;
@@ -472,7 +472,7 @@ pub async fn generate_default_deployment(
                             ));
                         }
                     }
-                    already_added_contracts.push(contract_id.clone());
+                    already_added_contracts.insert(contract_id.to_string());
                     requirements_asts.insert(contract_id.clone(), ast);
                     queue.push_front((contract_id, epoch, clarity_version));
 
