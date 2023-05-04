@@ -380,10 +380,10 @@ pub fn process_mutating_request(
 ) -> Result<LspRequestResponse, String> {
     match command {
         LspRequest::Initialize(params) => {
-            let initialization_options: InitializationOptions = params
+            let initialization_options = params
                 .initialization_options
                 .and_then(|o| serde_json::from_str(o.as_str()?).ok())
-                .expect("failed to parse initialization options");
+                .unwrap_or(InitializationOptions::default());
 
             match editor_state.try_write(|es| es.settings = initialization_options.clone()) {
                 Ok(_) => Ok(LspRequestResponse::Initialize(InitializeResult {
