@@ -21,7 +21,6 @@ use clarity::vm::EvalHook;
 use clarity::vm::StacksEpoch;
 use std::collections::HashMap;
 use std::hash::Hash;
-use std::time::{SystemTime, UNIX_EPOCH};
 
 #[derive(Clone, Debug)]
 pub struct Datastore {
@@ -294,10 +293,7 @@ impl BurnDatastore {
         let bytes = height_to_hashed_bytes(0);
         let id = StacksBlockId(bytes.clone());
         let sortition_id = SortitionId(bytes);
-        let genesis_time = match SystemTime::now().duration_since(UNIX_EPOCH) {
-            Ok(now) => now.as_secs(),
-            Err(_) => 0,
-        };
+        let genesis_time = chrono::Utc::now().timestamp() as u64;
 
         let genesis_block = BlockInfo {
             block_header_hash: BlockHeaderHash([0x00; 32]),
