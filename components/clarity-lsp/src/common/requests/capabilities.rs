@@ -17,6 +17,20 @@ pub struct InitializationOptions {
     signature_help: bool,
 }
 
+impl InitializationOptions {
+    pub fn default() -> Self {
+        InitializationOptions {
+            completion: true,
+            completion_smart_parenthesis_wrap: true,
+            completion_include_native_placeholders: true,
+            document_symbols: false,
+            go_to_definition: true,
+            hover: true,
+            signature_help: true,
+        }
+    }
+}
+
 pub fn get_capabilities(initialization_options: &InitializationOptions) -> ServerCapabilities {
     ServerCapabilities {
         text_document_sync: Some(TextDocumentSyncCapability::Options(
