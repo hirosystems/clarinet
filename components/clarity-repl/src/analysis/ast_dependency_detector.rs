@@ -1,7 +1,7 @@
 use crate::analysis::annotation::Annotation;
 use crate::analysis::ast_visitor::{traverse, ASTVisitor};
 use crate::analysis::{AnalysisPass, AnalysisResult, Settings};
-use crate::repl::{DEFAULT_CLARITY_VERSION, DEFAULT_EPOCH};
+use crate::repl::DEFAULT_EPOCH;
 use clarity::types::StacksEpochId;
 use clarity::vm::analysis::analysis_db::AnalysisDatabase;
 pub use clarity::vm::analysis::types::ContractAnalysis;
@@ -13,7 +13,7 @@ use clarity::vm::types::{
     FixedFunction, FunctionSignature, FunctionType, PrincipalData, QualifiedContractIdentifier,
     TraitIdentifier, TypeSignature, Value,
 };
-use clarity::vm::{ClarityName, SymbolicExpressionType};
+use clarity::vm::{ClarityName, ClarityVersion, SymbolicExpressionType};
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 use std::convert::TryFrom;
 use std::hash::{Hash, Hasher};
@@ -29,6 +29,7 @@ lazy_static! {
 
 pub struct ASTDependencyDetector<'a> {
     dependencies: BTreeMap<QualifiedContractIdentifier, DependencySet>,
+    current_clarity_version: Option<&'a ClarityVersion>,
     current_contract: Option<&'a QualifiedContractIdentifier>,
     defined_functions:
         BTreeMap<(&'a QualifiedContractIdentifier, &'a ClarityName), Vec<TypeSignature>>,
@@ -56,7 +57,7 @@ pub struct ASTDependencyDetector<'a> {
     >,
     params: Option<Vec<TypedVar<'a>>>,
     top_level: bool,
-    preloaded: &'a BTreeMap<QualifiedContractIdentifier, ContractAST>,
+    preloaded: &'a BTreeMap<QualifiedContractIdentifier, (ClarityVersion, ContractAST)>,
 }
 
 #[derive(Clone, Debug, Eq)]
@@ -142,8 +143,8 @@ impl DerefMut for DependencySet {
 
 impl<'a> ASTDependencyDetector<'a> {
     pub fn detect_dependencies(
-        contract_asts: &'a BTreeMap<QualifiedContractIdentifier, ContractAST>,
-        preloaded: &'a BTreeMap<QualifiedContractIdentifier, ContractAST>,
+        contract_asts: &'a BTreeMap<QualifiedContractIdentifier, (ClarityVersion, ContractAST)>,
+        preloaded: &'a BTreeMap<QualifiedContractIdentifier, (ClarityVersion, ContractAST)>,
     ) -> Result<
         BTreeMap<QualifiedContractIdentifier, DependencySet>,
         (
@@ -155,6 +156,7 @@ impl<'a> ASTDependencyDetector<'a> {
     > {
         let mut detector = Self {
             dependencies: BTreeMap::new(),
+            current_clarity_version: None,
             current_contract: None,
             defined_functions: BTreeMap::new(),
             defined_traits: BTreeMap::new(),
@@ -167,18 +169,21 @@ impl<'a> ASTDependencyDetector<'a> {
 
         let mut preloaded_visitor = PreloadedVisitor {
             detector: &mut detector,
+            current_clarity_version: None,
             current_contract: None,
         };
 
-        for (contract_identifier, ast) in preloaded {
+        for (contract_identifier, (clarity_version, ast)) in preloaded {
+            preloaded_visitor.current_clarity_version = Some(clarity_version);
             preloaded_visitor.current_contract = Some(contract_identifier);
             traverse(&mut preloaded_visitor, &ast.expressions);
         }
 
-        for (contract_identifier, ast) in contract_asts {
+        for (contract_identifier, (clarity_version, ast)) in contract_asts {
             detector
                 .dependencies
                 .insert(contract_identifier.clone(), DependencySet::new());
+            detector.current_clarity_version = Some(clarity_version);
             detector.current_contract = Some(contract_identifier);
             traverse(&mut detector, &ast.expressions);
         }
@@ -553,7 +558,7 @@ impl<'a> ASTVisitor<'a> for ASTDependencyDetector<'a> {
             functions,
             &mut (),
             DEFAULT_EPOCH,
-            DEFAULT_CLARITY_VERSION,
+            *self.current_clarity_version.unwrap(),
         ) {
             self.add_defined_trait(self.current_contract.unwrap(), name, trait_definition);
         }
@@ -665,8 +670,10 @@ impl<'a> ASTVisitor<'a> for ASTDependencyDetector<'a> {
 }
 
 // Traverses the preloaded contracts and saves function signatures only
+
 struct PreloadedVisitor<'a, 'b> {
     detector: &'b mut ASTDependencyDetector<'a>,
+    current_clarity_version: Option<&'a ClarityVersion>,
     current_contract: Option<&'a QualifiedContractIdentifier>,
 }
 impl<'a, 'b> ASTVisitor<'a> for PreloadedVisitor<'a, 'b> {
@@ -726,7 +733,7 @@ impl<'a, 'b> ASTVisitor<'a> for PreloadedVisitor<'a, 'b> {
             functions,
             &mut (),
             DEFAULT_EPOCH,
-            DEFAULT_CLARITY_VERSION,
+            *self.current_clarity_version.unwrap(),
         ) {
             self.detector
                 .add_defined_trait(self.current_contract.unwrap(), name, trait_definition);
@@ -881,7 +888,7 @@ mod tests {
         match build_ast(&session, &snippet, None) {
             Ok((contract_identifier, ast, _)) => {
                 let mut contracts = BTreeMap::new();
-                contracts.insert(contract_identifier.clone(), ast);
+                contracts.insert(contract_identifier.clone(), (DEFAULT_CLARITY_VERSION, ast));
                 let dependencies =
                     ASTDependencyDetector::detect_dependencies(&contracts, &BTreeMap::new())
                         .unwrap();
@@ -902,7 +909,7 @@ mod tests {
         .to_string();
         let foo = match build_ast(&session, &snippet1, Some("foo")) {
             Ok((contract_identifier, ast, _)) => {
-                contracts.insert(contract_identifier.clone(), ast);
+                contracts.insert(contract_identifier.clone(), (DEFAULT_CLARITY_VERSION, ast));
                 contract_identifier
             }
             Err(_) => panic!("expected success"),
@@ -916,7 +923,7 @@ mod tests {
         .to_string();
         let test_identifier = match build_ast(&session, &snippet, Some("test")) {
             Ok((contract_identifier, ast, _)) => {
-                contracts.insert(contract_identifier.clone(), ast);
+                contracts.insert(contract_identifier.clone(), (DEFAULT_CLARITY_VERSION, ast));
                 contract_identifier
             }
             Err(_) => panic!("expected success"),
@@ -942,7 +949,7 @@ mod tests {
         .to_string();
         let bar = match build_ast(&session, &snippet1, Some("bar")) {
             Ok((contract_identifier, ast, _)) => {
-                contracts.insert(contract_identifier.clone(), ast);
+                contracts.insert(contract_identifier.clone(), (DEFAULT_CLARITY_VERSION, ast));
                 contract_identifier
             }
             Err(_) => panic!("expected success"),
@@ -962,7 +969,7 @@ mod tests {
         .to_string();
         let test_identifier = match build_ast(&session, &snippet, Some("test")) {
             Ok((contract_identifier, ast, _)) => {
-                contracts.insert(contract_identifier.clone(), ast);
+                contracts.insert(contract_identifier.clone(), (DEFAULT_CLARITY_VERSION, ast));
                 contract_identifier
             }
             Err(_) => panic!("expected success"),
@@ -988,7 +995,7 @@ mod tests {
         .to_string();
         let bar = match build_ast(&session, &snippet1, Some("bar")) {
             Ok((contract_identifier, ast, _)) => {
-                contracts.insert(contract_identifier.clone(), ast);
+                contracts.insert(contract_identifier.clone(), (DEFAULT_CLARITY_VERSION, ast));
                 contract_identifier
             }
             Err(_) => panic!("expected success"),
@@ -1006,7 +1013,7 @@ mod tests {
         .to_string();
         let test_identifier = match build_ast(&session, &snippet, Some("test")) {
             Ok((contract_identifier, ast, _)) => {
-                contracts.insert(contract_identifier.clone(), ast);
+                contracts.insert(contract_identifier.clone(), (DEFAULT_CLARITY_VERSION, ast));
                 contract_identifier
             }
             Err(_) => panic!("expected success"),
@@ -1030,7 +1037,7 @@ mod tests {
         .to_string();
         let bar = match build_ast(&session, &snippet1, Some("bar")) {
             Ok((contract_identifier, ast, _)) => {
-                contracts.insert(contract_identifier.clone(), ast);
+                contracts.insert(contract_identifier.clone(), (DEFAULT_CLARITY_VERSION, ast));
                 contract_identifier
             }
             Err(_) => panic!("expected success"),
@@ -1043,7 +1050,7 @@ mod tests {
         .to_string();
         let my_trait = match build_ast(&session, &snippet2, Some("my-trait")) {
             Ok((contract_identifier, ast, _)) => {
-                contracts.insert(contract_identifier.clone(), ast);
+                contracts.insert(contract_identifier.clone(), (DEFAULT_CLARITY_VERSION, ast));
                 contract_identifier
             }
             Err(_) => panic!("expected success"),
@@ -1061,7 +1068,7 @@ mod tests {
         .to_string();
         let test_identifier = match build_ast(&session, &snippet, Some("test")) {
             Ok((contract_identifier, ast, _)) => {
-                contracts.insert(contract_identifier.clone(), ast);
+                contracts.insert(contract_identifier.clone(), (DEFAULT_CLARITY_VERSION, ast));
                 contract_identifier
             }
             Err(_) => panic!("expected success"),
@@ -1092,7 +1099,7 @@ mod tests {
         .to_string();
         let other = match build_ast(&session, &snippet1, Some("other")) {
             Ok((contract_identifier, ast, _)) => {
-                contracts.insert(contract_identifier.clone(), ast);
+                contracts.insert(contract_identifier.clone(), (DEFAULT_CLARITY_VERSION, ast));
                 contract_identifier
             }
             Err(_) => panic!("expected success"),
@@ -1107,7 +1114,7 @@ mod tests {
         .to_string();
         let test_identifier = match build_ast(&session, &snippet, Some("test")) {
             Ok((contract_identifier, ast, _)) => {
-                contracts.insert(contract_identifier.clone(), ast);
+                contracts.insert(contract_identifier.clone(), (DEFAULT_CLARITY_VERSION, ast));
                 contract_identifier
             }
             Err(_) => panic!("expected success"),
@@ -1132,7 +1139,7 @@ mod tests {
         .to_string();
         let other = match build_ast(&session, &snippet1, Some("other")) {
             Ok((contract_identifier, ast, _)) => {
-                contracts.insert(contract_identifier.clone(), ast);
+                contracts.insert(contract_identifier.clone(), (DEFAULT_CLARITY_VERSION, ast));
                 contract_identifier
             }
             Err(_) => panic!("expected success"),
@@ -1147,7 +1154,7 @@ mod tests {
         .to_string();
         let test_identifier = match build_ast(&session, &snippet, Some("test")) {
             Ok((contract_identifier, ast, _)) => {
-                contracts.insert(contract_identifier.clone(), ast);
+                contracts.insert(contract_identifier.clone(), (DEFAULT_CLARITY_VERSION, ast));
                 contract_identifier
             }
             Err(_) => panic!("expected success"),
@@ -1173,7 +1180,7 @@ mod tests {
         .to_string();
         let test_identifier = match build_ast(&session, &snippet, Some("test")) {
             Ok((contract_identifier, ast, _)) => {
-                contracts.insert(contract_identifier.clone(), ast);
+                contracts.insert(contract_identifier.clone(), (DEFAULT_CLARITY_VERSION, ast));
                 contract_identifier
             }
             Err(_) => panic!("expected success"),
@@ -1199,7 +1206,7 @@ mod tests {
         .to_string();
         let test_identifier = match build_ast(&session, &snippet, Some("test")) {
             Ok((contract_identifier, ast, _)) => {
-                contracts.insert(contract_identifier.clone(), ast);
+                contracts.insert(contract_identifier.clone(), (DEFAULT_CLARITY_VERSION, ast));
                 contract_identifier
             }
             Err(_) => panic!("expected success"),
@@ -1222,7 +1229,7 @@ mod tests {
         .to_string();
         let foo = match build_ast(&session, &snippet1, Some("foo")) {
             Ok((contract_identifier, ast, _)) => {
-                contracts.insert(contract_identifier.clone(), ast);
+                contracts.insert(contract_identifier.clone(), (DEFAULT_CLARITY_VERSION, ast));
                 contract_identifier
             }
             Err(_) => panic!("expected success"),
@@ -1231,7 +1238,7 @@ mod tests {
         let snippet = "(contract-call? .foo hello 4)".to_string();
         let test_identifier = match build_ast(&session, &snippet, Some("test")) {
             Ok((contract_identifier, ast, _)) => {
-                contracts.insert(contract_identifier.clone(), ast);
+                contracts.insert(contract_identifier.clone(), (DEFAULT_CLARITY_VERSION, ast));
                 contract_identifier
             }
             Err(_) => panic!("expected success"),
@@ -1254,7 +1261,7 @@ mod tests {
         .to_string();
         let foo = match build_ast(&session, &snippet1, Some("foo")) {
             Ok((contract_identifier, ast, _)) => {
-                contracts.insert(contract_identifier.clone(), ast);
+                contracts.insert(contract_identifier.clone(), (DEFAULT_CLARITY_VERSION, ast));
                 contract_identifier
             }
             Err(_) => panic!("expected success"),
@@ -1263,7 +1270,7 @@ mod tests {
         let snippet = "(contract-call? .foo hello 4)".to_string();
         let test_identifier = match build_ast(&session, &snippet, Some("test")) {
             Ok((contract_identifier, ast, _)) => {
-                contracts.insert(contract_identifier.clone(), ast);
+                contracts.insert(contract_identifier.clone(), (DEFAULT_CLARITY_VERSION, ast));
                 contract_identifier
             }
             Err(_) => panic!("expected success"),
