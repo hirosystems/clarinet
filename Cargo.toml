@@ -1,16 +1,11 @@
 [workspace]
 members = [
-    "components/clarinet-cli",
     "components/clarinet-deployments",
     "components/clarinet-files",
     "components/clarinet-utils",
-    "components/clarity-jupyter-kernel",
-    "components/clarity-lsp",
     "components/clarity-repl",
-    "components/clarity-events",
     "components/hiro-system-kit",
-    "components/stacks-devnet-js",
     "components/stacks-network",
     "components/stacks-rpc-client",
 ]
-default-members = ["components/clarinet-cli"]
+default-members = ["components/stacks-network"]
