@@ -1,6 +1,6 @@
 [package]
 name = "clarinet-cli"
-version = "1.5.4"
+version = "1.6.0"
 authors = ["Ludo Galabru <ludo@hiro.so>", "Brice Dobry <brice@hiro.so>"]
 edition = "2021"
 description = "Clarinet is a simple, modern and opinionated runtime for testing, integrating and deploying Clarity smart contracts."
