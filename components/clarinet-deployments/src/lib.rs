@@ -31,7 +31,7 @@ use clarity_repl::clarity::vm::ExecutionResult;
 use clarity_repl::repl::session::BOOT_CONTRACTS_DATA;
 use clarity_repl::repl::Session;
 use clarity_repl::repl::SessionSettings;
-use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet, VecDeque};
+use std::collections::{BTreeMap, BTreeSet, HashMap, VecDeque};
 use types::DeploymentGenerationArtifacts;
 use types::RequirementPublishSpecification;
 use types::TransactionSpecification;
@@ -292,7 +292,7 @@ pub async fn generate_default_deployment(
 
     let mut transactions = BTreeMap::new();
     let mut contracts_map = BTreeMap::new();
-    let mut requirements_asts = BTreeMap::new();
+    let mut requirements_data = BTreeMap::new();
     let mut requirements_deps = BTreeMap::new();
 
     let mut settings = SessionSettings::default();
@@ -303,11 +303,11 @@ pub async fn generate_default_deployment(
     let boot_contracts_data = BOOT_CONTRACTS_DATA.clone();
     let mut boot_contracts_ids = BTreeSet::new();
     let mut boot_contracts_asts = BTreeMap::new();
-    for (id, (_, ast)) in boot_contracts_data {
+    for (id, (contract, ast)) in boot_contracts_data {
         boot_contracts_ids.insert(id.clone());
-        boot_contracts_asts.insert(id, ast);
+        boot_contracts_asts.insert(id, (contract.clarity_version, ast));
     }
-    requirements_asts.append(&mut boot_contracts_asts);
+    requirements_data.append(&mut boot_contracts_asts);
 
     let mut queue = VecDeque::new();
 
@@ -357,16 +357,14 @@ pub async fn generate_default_deployment(
             queue.push_front((contract_id, epoch, clarity_version));
         }
 
-        let mut already_added_contracts = HashSet::new();
-
         while let Some((contract_id, epoch, clarity_version)) = queue.pop_front() {
-            if already_added_contracts.contains(&contract_id.to_string()) {
+            if requirements_deps.contains_key(&contract_id) {
                 continue;
             }
 
             // Did we already get the source in a prior cycle?
-            let ast = match requirements_asts.remove(&contract_id) {
-                Some(ast) => ast,
+            let requirement_data = match requirements_data.remove(&contract_id) {
+                Some(requirement_data) => requirement_data,
                 None => {
                     // Download the code
                     let (source, epoch, clarity_version, contract_location) =
@@ -427,16 +425,17 @@ pub async fn generate_default_deployment(
                         epoch: forced_epoch.unwrap_or(epoch),
                     };
                     let (ast, _, _) = session.interpreter.build_ast(&contract);
-                    ast
+                    (clarity_version, ast)
                 }
             };
 
             // Detect the eventual dependencies for this AST
-            let mut contract_ast = BTreeMap::new();
-            contract_ast.insert(contract_id.clone(), ast);
+            let mut contract_data = BTreeMap::new();
+            let (_, ast) = requirement_data;
+            contract_data.insert(contract_id.clone(), (clarity_version, ast));
             let dependencies =
-                ASTDependencyDetector::detect_dependencies(&contract_ast, &requirements_asts);
-            let ast = contract_ast
+                ASTDependencyDetector::detect_dependencies(&contract_data, &requirements_data);
+            let (_, ast) = contract_data
                 .remove(&contract_id)
                 .expect("unable to retrieve ast");
 
@@ -453,9 +452,8 @@ pub async fn generate_default_deployment(
                                 clarity_version.clone(),
                             ));
                         }
-                        already_added_contracts.insert(contract_id.to_string());
                         requirements_deps.insert(contract_id.clone(), dependencies);
-                        requirements_asts.insert(contract_id.clone(), ast);
+                        requirements_data.insert(contract_id.clone(), (clarity_version, ast));
                         break;
                     }
                 }
@@ -472,8 +470,7 @@ pub async fn generate_default_deployment(
                             ));
                         }
                     }
-                    already_added_contracts.insert(contract_id.to_string());
-                    requirements_asts.insert(contract_id.clone(), ast);
+                    requirements_data.insert(contract_id.clone(), (clarity_version, ast));
                     queue.push_front((contract_id, epoch, clarity_version));
 
                     for non_inferable_contract_id in non_inferable_dependencies.into_iter() {
@@ -653,20 +650,22 @@ pub async fn generate_default_deployment(
     let session = Session::new(settings);
 
     let mut contract_asts = BTreeMap::new();
+    let mut contract_data = BTreeMap::new();
     let mut contract_diags = HashMap::new();
 
     let mut asts_success = true;
 
     for (contract_id, contract) in contracts_sources.into_iter() {
         let (ast, diags, ast_success) = session.interpreter.build_ast(&contract);
-        contract_asts.insert(contract_id.clone(), ast);
+        contract_asts.insert(contract_id.clone(), ast.clone());
+        contract_data.insert(contract_id.clone(), (contract.clarity_version, ast));
         contract_diags.insert(contract_id.clone(), diags);
         contract_epochs.insert(contract_id, contract.epoch);
         asts_success = asts_success && ast_success;
     }
 
     let dependencies =
-        ASTDependencyDetector::detect_dependencies(&contract_asts, &requirements_asts);
+        ASTDependencyDetector::detect_dependencies(&contract_data, &requirements_data);
 
     let mut dependencies = match dependencies {
         Ok(dependencies) => dependencies,
@@ -692,7 +691,7 @@ pub async fn generate_default_deployment(
     // Track the latest epoch that a contract is deployed in, so that we can
     // ensure that all contracts are deployed after their dependencies.
     for contract_id in ordered_contracts_ids.into_iter() {
-        if requirements_asts.contains_key(&contract_id) {
+        if requirements_data.contains_key(&contract_id) {
             continue;
         }
         let tx = contracts

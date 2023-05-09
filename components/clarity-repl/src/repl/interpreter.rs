@@ -240,7 +240,7 @@ impl ClarityInterpreter {
         }
 
         let mut contract_map = BTreeMap::new();
-        contract_map.insert(contract_id.clone(), ast);
+        contract_map.insert(contract_id.clone(), (contract.clarity_version, ast));
         let mut all_dependencies =
             match ASTDependencyDetector::detect_dependencies(&contract_map, &BTreeMap::new()) {
                 Ok(dependencies) => dependencies,
