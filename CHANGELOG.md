@@ -1,4 +1,29 @@
-#### 2023-03-22
+#### 1.6.0 (2023-05-09)
+
+##### Chores
+
+*  Update subnet images and contract (775b662e)
+*  Set genesis block time to current system time (6d89401)
+
+*Note* Previously whenever a simnet was started, the genesis block’s time (the `burn_block_time` field) was set to 0. Subsequent blocks were assigned a time of `1800 * block_height`, because they were based off of a genesis block with a time of 0.
+
+Because this isn’t a very realistic genesis block time, we’ve updated the genesis block to use the current system time. Subsequent blocks are still given times at an interval of 1800ms, but they are based off of the genesis block’s time, so they are calculated as `genesis.burn_block_time + (1800 * block_height)`.
+
+While this is unlikely to be a breaking change in most places, any code that relies on a specific block time could be impacted by this change.
+
+##### New Features
+
+*  Allow specifying filename with test coverage (5977ec18)
+
+##### Bug Fixes
+
+*  Handle clarity-version in the dependency detector (f91f8f8e)
+*  Handle lsp default configuration (61792b65)
+*  Use chrono to get genesis time (504b4fd6)
+*  Don't prompt to write files to project dir when using `--allow-write` flag (#981) (d5c654eb)
+*  Remove `[[ustx_balance]]` from subnet config to work with subnets v0.5.0 (7f0e2355)
+
+#### 1.5.3 (2023-03-22)
 
 ##### Other Changes
 

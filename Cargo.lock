@@ -814,7 +814,7 @@ dependencies = [
 
 [[package]]
 name = "clarinet-cli"
-version = "1.5.4"
+version = "1.6.0"
 dependencies = [
  "aes 0.7.5",
  "ansi_term",
@@ -831,7 +831,7 @@ dependencies = [
  "clarinet-files",
  "clarinet-utils 1.0.0",
  "clarity-lsp",
- "clarity-repl 1.5.4",
+ "clarity-repl 1.6.0",
  "crossbeam-channel",
  "crossterm 0.22.1",
  "ctrlc",
@@ -936,7 +936,7 @@ dependencies = [
  "bitcoincore-rpc-json",
  "clarinet-files",
  "clarinet-utils 1.0.0",
- "clarity-repl 1.5.4",
+ "clarity-repl 1.6.0",
  "libsecp256k1 0.7.1",
  "reqwest",
  "serde",
@@ -955,7 +955,7 @@ dependencies = [
  "bitcoin",
  "chainhook-types",
  "clarinet-utils 1.0.0",
- "clarity-repl 1.5.4",
+ "clarity-repl 1.6.0",
  "js-sys",
  "libsecp256k1 0.7.1",
  "serde",
@@ -997,7 +997,7 @@ dependencies = [
  "clap",
  "clap_generate",
  "clarinet-files",
- "clarity-repl 1.5.4",
+ "clarity-repl 1.6.0",
  "serde",
  "serde_derive",
  "serde_json",
@@ -1009,7 +1009,7 @@ name = "clarity-jupyter-kernel"
 version = "1.0.0"
 dependencies = [
  "chrono",
- "clarity-repl 1.5.4",
+ "clarity-repl 1.6.0",
  "colored",
  "dirs",
  "failure",
@@ -1031,7 +1031,7 @@ version = "1.0.0"
 dependencies = [
  "clarinet-deployments",
  "clarinet-files",
- "clarity-repl 1.5.4",
+ "clarity-repl 1.6.0",
  "console_error_panic_hook",
  "js-sys",
  "lazy_static",
@@ -1085,7 +1085,7 @@ dependencies = [
 
 [[package]]
 name = "clarity-repl"
-version = "1.5.4"
+version = "1.6.0"
 dependencies = [
  "ansi_term",
  "atty",
@@ -5891,7 +5891,7 @@ dependencies = [
 
 [[package]]
 name = "stacks-devnet-js"
-version = "1.5.4"
+version = "1.6.0"
 dependencies = [
  "clarinet-deployments",
  "clarinet-files",
@@ -5919,7 +5919,7 @@ dependencies = [
  "clarinet-deployments",
  "clarinet-files",
  "clarinet-utils 1.0.0",
- "clarity-repl 1.5.4",
+ "clarity-repl 1.6.0",
  "crossbeam-channel",
  "crossterm 0.22.1",
  "ctrlc",
@@ -5943,7 +5943,7 @@ name = "stacks-rpc-client"
 version = "1.0.0"
 dependencies = [
  "clarinet-utils 1.0.0",
- "clarity-repl 1.5.4",
+ "clarity-repl 1.6.0",
  "reqwest",
  "serde",
  "serde_derive",
@@ -7159,7 +7159,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "97fee6b57c6a41524a810daee9286c02d7752c4253064d0b05472833a438f675"
 dependencies = [
  "cfg-if",
- "rand 0.8.5",
+ "rand 0.6.5",
  "static_assertions",
 ]
 
