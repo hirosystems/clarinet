@@ -46,4 +46,29 @@
 (define-read-only (test-err) (ok (err u1)))
 (test-err)
 
+(define-read-only (test-func?) (ok true))
 
+(define-read-only (test-func!) (ok true))
+
+(define-fungible-token my-token!)
+(define-fungible-token my-token?)
+(define-fungible-token my-token)
+
+(define-data-var accounts! uint u0)
+(var-set accounts! u1)
+(var-get accounts!)
+(define-data-var accounts? uint u0)
+(var-set accounts? u1)
+(var-get accounts?)
+
+
+(define-trait ccd006-citycoin-mining-trait
+  (
+    (mine ((string-ascii 10) (list 200 uint))
+      (response bool uint)
+    )
+    (claim-mining-reward ((string-ascii 10) uint)
+      (response bool uint)
+    )
+  )
+)
