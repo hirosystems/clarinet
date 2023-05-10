@@ -35,6 +35,11 @@ path = 'contracts/nft-project.clar'
 clarity_version = 2
 epoch = 2.1
 
+[contracts.syntax-highlighting-test]
+path = 'contracts/syntax-highlighting-test.clar'
+clarity_version = 2
+epoch = 2.1
+
 [repl.analysis]
 passes = ['check_checker']
 
