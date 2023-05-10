@@ -46,7 +46,6 @@
       "name": "meta.define-function",
       "patterns": [
         { "include": "#expression" },
-        { "include": "#user-func" },
         {
           "begin": "(?x) (\\() \\s* ([a-zA-Z][\\w\\?\\!\\-]*) \\s*",
           "end": "(\\))",
@@ -73,7 +72,8 @@
               "patterns": [{ "include": "#data-type" }]
             }
           ]
-        }
+        },
+        { "include": "#user-func" }
       ]
     },
     "define-fungible-token": {
