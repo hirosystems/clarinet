@@ -31,7 +31,7 @@
     },
     "keyword": {
       "name": "constant.language.clarity",
-      "match": "\\b(?:block-height|burn-block-height|chain-id|contract-caller|is-in-regtest|stx-liquid-supply|tx-sender|tx-sponsor?)\\b"
+      "match": "(?<!\\S)(?!-)\\b(?:block-height|burn-block-height|chain-id|contract-caller|is-in-regtest|stx-liquid-supply|tx-sender|tx-sponsor?)\\b(?!\\s*-)"
     },
     "define-function": {
       "begin": "(?x) (\\() \\s* (define-(?:public|private|read-only)) \\s+",
@@ -247,23 +247,23 @@
             {
               "comment": "unsigned integers",
               "name": "constant.numeric.uint.clarity",
-              "match": "\\bu\\d+\\b"
+              "match": "(?<!\\S)(?!-)\\bu\\d+\\b(?!\\s*-)"
             },
             {
               "comment": "signed integers",
               "name": "constant.numeric.int.clarity",
-              "match": "\\b\\d+\\b"
+              "match": "(?<!\\S)(?!-)\\b\\d+\\b(?!\\s*-)"
             },
             {
               "comment": "hexadecimals",
               "name": "constant.numeric.hex.clarity",
-              "match": "\\b0x[0-9a-f]*\\b"
+              "match": "(?<!\\S)(?!-)\\b0x[0-9a-f]*\\b(?!\\s*-)"
             }
           ]
         },
         "bool-literal": {
           "name": "constant.language.bool.clarity",
-          "match": "\\b(true|false)\\b"
+          "match": "(?<!\\S)(?!-)\\b(true|false)\\b(?!\\s*-)"
         },
         "string-literal": {
           "patterns": [
@@ -329,7 +329,7 @@
         "optional-literal": {
           "patterns": [
             {
-              "match": "\\b(none)\\b",
+              "match": "(?<!\\S)(?!-)\\b(none)\\b(?!\\s*-)",
               "name": "constant.language.none.clarity"
             },
             {
