@@ -17,15 +17,19 @@ const { uri: workspaceUri } = workspaceFolders![0];
 
 const delay = (ms: number) => new Promise((r) => setTimeout(() => r(1), ms));
 
-// beforeEach(() => {
-//   const config = workspace.getConfiguration("clarity-lsp");
-//   Object.entries(config).forEach(([k, v]) => {
-//     const setting = config.inspect(k);
-//     if (setting && setting.defaultValue !== undefined) {
-//       config.update(k, setting.defaultValue);
-//     }
-//   });
-// });
+beforeEach(() => {
+  const config = workspace.getConfiguration("clarity-lsp");
+  Object.keys(config).forEach((k) => {
+    const setting = config.inspect(k);
+    if (
+      setting &&
+      typeof setting.defaultValue !== "object" &&
+      setting.defaultValue !== undefined
+    ) {
+      config.update(k, setting.defaultValue);
+    }
+  });
+});
 
 function getDiagnostics(uri: Uri) {
   let diagnosticPromise: (value: Diagnostic[]) => void;
@@ -84,32 +88,32 @@ describe("get diagnostics", () => {
   });
 });
 
-describe.only("get completion", function () {
-  this.timeout(20000);
-  afterEach(async () => {
-    commands.executeCommand("workbench.action.closeActiveEditor");
-  });
+// describe.only("get completion", function () {
+//   this.timeout(20000);
+//   afterEach(async () => {
+//     commands.executeCommand("workbench.action.closeActiveEditor");
+//   });
 
-  const contractUri: Uri = Uri.joinPath(
-    workspaceUri,
-    "test-cases/contracts/contract.clar",
-  );
+//   const contractUri: Uri = Uri.joinPath(
+//     workspaceUri,
+//     "test-cases/contracts/contract.clar",
+//   );
 
-  it("show completion for native function", async () => {
-    const document = await workspace.openTextDocument(contractUri);
-    const editor = await vsWindow.showTextDocument(document, 1, false);
+//   it("show completion for native function", async () => {
+//     const document = await workspace.openTextDocument(contractUri);
+//     const editor = await vsWindow.showTextDocument(document, 1, false);
 
-    // waiting for the extension to be active
-    await getDiagnostics(contractUri);
+//     // waiting for the extension to be active
+//     await getDiagnostics(contractUri);
 
-    await editor.edit(async (editable) => {
-      editable.insert(new Position(14, 0), "var-\n");
-    });
+//     await editor.edit(async (editable) => {
+//       editable.insert(new Position(14, 0), "var-\n");
+//     });
 
-    const position = editor.selection.active;
-    const newPosition = position.with(13, 4);
-    editor.selection = new Selection(newPosition, newPosition);
-    await commands.executeCommand("editor.action.triggerSuggest");
-    // todo
-  });
-});
+//     const position = editor.selection.active;
+//     const newPosition = position.with(13, 4);
+//     editor.selection = new Selection(newPosition, newPosition);
+//     await commands.executeCommand("editor.action.triggerSuggest");
+//     // todo
+//   });
+// });
