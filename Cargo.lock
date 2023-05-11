@@ -965,6 +965,27 @@ dependencies = [
 ]
 
 [[package]]
+name = "clarity"
+version = "2.0.0"
+dependencies = [
+ "integer-sqrt",
+ "lazy_static",
+ "rand 0.7.3",
+ "rand_chacha 0.2.2",
+ "regex",
+ "rstest",
+ "rstest_reuse",
+ "rusqlite",
+ "serde",
+ "serde_derive",
+ "serde_json",
+ "serde_stacker",
+ "sha2-asm",
+ "stacks-common 0.0.1",
+ "time 0.2.27",
+]
+
+[[package]]
 name = "clarity-events"
 version = "1.0.0"
 dependencies = [
@@ -1064,7 +1085,7 @@ dependencies = [
  "atty",
  "bytes",
  "chrono",
- "clarity-vm",
+ "clarity",
  "debug_types",
  "futures",
  "getrandom 0.2.8",
@@ -1110,7 +1131,7 @@ dependencies = [
  "serde_json",
  "serde_stacker",
  "sha2-asm",
- "stacks-common",
+ "stacks-common 0.0.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "time 0.2.27",
 ]
 
@@ -5716,6 +5737,29 @@ dependencies = [
 [[package]]
 name = "stacks-common"
 version = "0.0.1"
+dependencies = [
+ "chrono",
+ "curve25519-dalek",
+ "ed25519-dalek",
+ "lazy_static",
+ "libc",
+ "libsecp256k1 0.5.0",
+ "percent-encoding",
+ "rand 0.7.3",
+ "ripemd",
+ "rusqlite",
+ "secp256k1",
+ "serde",
+ "serde_derive",
+ "serde_json",
+ "sha2 0.10.6",
+ "sha3 0.10.6",
+ "time 0.2.27",
+]
+
+[[package]]
+name = "stacks-common"
+version = "0.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "bbe3cb43f95b8604323c93444665182acf4c6b46261c50e1179c14b9c86b312d"
 dependencies = [
@@ -5724,7 +5768,6 @@ dependencies = [
  "ed25519-dalek",
  "lazy_static",
  "libc",
- "libsecp256k1 0.5.0",
  "percent-encoding",
  "rand 0.7.3",
  "ripemd",
