@@ -122,6 +122,11 @@
             "type": "boolean",
             "default": false,
             "description": "Log LSP requests performances."
+          },
+          "clarity-lsp.misc.showDevSurveyQ2-23-1": {
+            "type": "boolean",
+            "default": true,
+            "description": "Show link to https://survey.hiro.so"
           }
         }
       }
