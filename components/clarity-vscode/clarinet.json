@@ -1,0 +1,137 @@
+{
+  "$schema": "http://json-schema.org/draft-04/schema#",
+  "title": "Clarinet manifest",
+  "definitions": {
+    "Project": {
+      "title": "Project",
+      "type": "object",
+      "required": ["name"],
+      "properties": {
+        "name": {
+          "description": "Project name, for information purpose.",
+          "type": "string"
+        },
+        "description": {
+          "description": "Project description, for information purpose",
+          "type": "string"
+        },
+        "authors": {
+          "description": "Project authors, for information purpose",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "requirements": {
+          "description": "Require contracts from mainnet or testnet",
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/Requirement"
+          }
+        },
+        "telemetry": {
+          "type": "boolean",
+          "defaultValue": true
+        },
+        "cache_dir": {
+          "description": "Directory used to save contracts requirements",
+          "type": "string",
+          "default": "./.cache"
+        }
+      }
+    },
+    "Contract": {
+      "title": "Contract",
+      "type": "object",
+      "required": ["path"],
+      "properties": {
+        "path": {
+          "type": "string"
+        },
+        "deployer": {
+          "type": "string"
+        },
+        "clarity_version": {
+          "description": "The Clarity version to use for this contract. Clarity 2 is only available from Epoch 2.1. Clarinet will default to 1 if not set.",
+          "enum": [1, 2]
+        },
+        "epoch": {
+          "description": "The Stacks Epoch ID to use for this contract. Clarinet will default to 2.0 if not set.",
+          "enum": [2.0, 2.05, 2.1]
+        }
+      }
+    },
+    "Requirement": {
+      "title": "Requirement",
+      "description": "Require contracts from mainnet or testnet",
+      "type": "object",
+      "required": ["contract_id"],
+      "properties": {
+        "contract_id": {
+          "description": "Mainnet or Testnet contract principal: <address>.<contract_name>",
+          "type": "string"
+        }
+      }
+    },
+    "Repl": {
+      "title": "Repl",
+      "type": "object",
+      "properties": {
+        "analysis": {
+          "$ref": "#/definitions/Analysis"
+        }
+      }
+    },
+    "Analysis": {
+      "title": "Analysis",
+      "description": "Analysis passes to run",
+      "type": "object",
+      "properties": {
+        "passes": {
+          "type": ["array", "string"],
+          "items": {
+            "description": "Valid analysis passes",
+            "type": "string",
+            "enum": ["check_checker"]
+          }
+        },
+        "check_checker": {
+          "$ref": "#/definitions/CheckChecker"
+        }
+      }
+    },
+    "CheckChecker": {
+      "title": "CheckChecker",
+      "description": "Check checker options",
+      "type": "object",
+      "properties": {
+        "strict": {
+          "type": "boolean"
+        },
+        "trusted_sender": {
+          "type": "boolean"
+        },
+        "trusted_caller": {
+          "type": "boolean"
+        },
+        "callee_filter": {
+          "type": "boolean"
+        }
+      }
+    }
+  },
+  "properties": {
+    "project": {
+      "$ref": "#/definitions/Project"
+    },
+    "contracts": {
+      "type": "object",
+      "additionalProperties": {
+        "$ref": "#/definitions/Contract"
+      }
+    },
+    "repl": {
+      "$ref": "#/definitions/Repl"
+    }
+  }
+}
