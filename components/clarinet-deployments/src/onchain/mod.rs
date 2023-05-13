@@ -21,6 +21,7 @@ use clarity_repl::codec::{
 use clarity_repl::codec::{StacksTransaction, TransactionAnchorMode};
 use clarity_repl::repl::session::{
     BOOT_MAINNET_ADDRESS, BOOT_TESTNET_ADDRESS, V1_BOOT_CONTRACTS, V2_BOOT_CONTRACTS,
+    V3_BOOT_CONTRACTS,
 };
 use clarity_repl::repl::{Session, SessionSettings};
 use reqwest::Url;
@@ -393,6 +394,12 @@ pub fn apply_on_chain_deployment(
         ));
     }
     for contract in V2_BOOT_CONTRACTS {
+        contracts_ids_to_remap.insert((
+            format!("{}:{}", BOOT_MAINNET_ADDRESS, contract),
+            format!("{}:{}", BOOT_TESTNET_ADDRESS, contract),
+        ));
+    }
+    for contract in V3_BOOT_CONTRACTS {
         contracts_ids_to_remap.insert((
             format!("{}:{}", BOOT_MAINNET_ADDRESS, contract),
             format!("{}:{}", BOOT_TESTNET_ADDRESS, contract),
