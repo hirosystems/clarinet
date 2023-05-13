@@ -122,12 +122,18 @@ pub async fn retrieve_contract(
 
 pub const MAINNET_20_START_HEIGHT: u32 = 1;
 pub const MAINNET_2_05_START_HEIGHT: u32 = 40_607;
-// TODO: This is estimated. Replace with exact height once 2.1 is activated.
-pub const MAINNET_21_START_HEIGHT: u32 = 99_564;
-pub const TESTNET_20_START_HEIGHT: u32 = 1;
+pub const MAINNET_21_START_HEIGHT: u32 = 99_113;
+pub const MAINNET_22_START_HEIGHT: u32 = 103_900;
+pub const MAINNET_23_START_HEIGHT: u32 = 104_359;
+// TODO: This is estimated. Replace with exact height once 2.4 is activated.
+pub const MAINNET_24_START_HEIGHT: u32 = 105_643;
 
+pub const TESTNET_20_START_HEIGHT: u32 = 1;
 pub const TESTNET_2_05_START_HEIGHT: u32 = 20_216;
 pub const TESTNET_21_START_HEIGHT: u32 = 99_113;
+pub const TESTNET_22_START_HEIGHT: u32 = 105_923;
+pub const TESTNET_23_START_HEIGHT: u32 = 106_196;
+pub const TESTNET_24_START_HEIGHT: u32 = 106_979;
 
 fn epoch_for_height(is_mainnet: bool, height: u32) -> StacksEpochId {
     if is_mainnet {
@@ -142,8 +148,14 @@ fn epoch_for_mainnet_height(height: u32) -> StacksEpochId {
         StacksEpochId::Epoch20
     } else if height < MAINNET_21_START_HEIGHT {
         StacksEpochId::Epoch2_05
-    } else {
+    } else if height < MAINNET_22_START_HEIGHT {
         StacksEpochId::Epoch21
+    } else if height < MAINNET_23_START_HEIGHT {
+        StacksEpochId::Epoch22
+    } else if height < MAINNET_24_START_HEIGHT {
+        StacksEpochId::Epoch23
+    } else {
+        StacksEpochId::Epoch24
     }
 }
 
@@ -152,8 +164,14 @@ fn epoch_for_testnet_height(height: u32) -> StacksEpochId {
         StacksEpochId::Epoch20
     } else if height < TESTNET_21_START_HEIGHT {
         StacksEpochId::Epoch2_05
-    } else {
+    } else if height < TESTNET_22_START_HEIGHT {
         StacksEpochId::Epoch21
+    } else if height < TESTNET_23_START_HEIGHT {
+        StacksEpochId::Epoch22
+    } else if height < TESTNET_24_START_HEIGHT {
+        StacksEpochId::Epoch23
+    } else {
+        StacksEpochId::Epoch24
     }
 }
 
