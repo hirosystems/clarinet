@@ -950,7 +950,14 @@ impl Session {
             Some((_, epoch)) if epoch.eq("2.0") => StacksEpochId::Epoch20,
             Some((_, epoch)) if epoch.eq("2.05") => StacksEpochId::Epoch2_05,
             Some((_, epoch)) if epoch.eq("2.1") => StacksEpochId::Epoch21,
-            _ => return output.push(red!("Usage: ::set_epoch 2.0 | 2.05 | 2.1")),
+            Some((_, epoch)) if epoch.eq("2.2") => StacksEpochId::Epoch22,
+            Some((_, epoch)) if epoch.eq("2.3") => StacksEpochId::Epoch23,
+            Some((_, epoch)) if epoch.eq("2.4") => StacksEpochId::Epoch24,
+            _ => {
+                return output.push(red!(
+                    "Usage: ::set_epoch 2.0 | 2.05 | 2.1 | 2.2 | 2.3 | 2.4"
+                ))
+            }
         };
         self.update_epoch(epoch);
         output.push(green!(format!("Epoch updated to: {epoch}")))
