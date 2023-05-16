@@ -1,3 +1,18 @@
+#### 1.6.1 (2023-05-16)
+
+*Note* This release fixes the build of v1.6.0
+
+##### Chores
+
+*  upgrade uuid crate (5b9b4015)
+*  upgrade lsp dependencies (be8d2ceb)
+
+##### Bug Fixes
+
+* **lsp:**
+*  functions first parameter highlighting (9a28a9a1)
+*  clarity keywords syntax highlighting (724379dc)
+
 #### 1.6.0 (2023-05-09)
 
 ##### Chores
