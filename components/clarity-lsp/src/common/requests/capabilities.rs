@@ -43,12 +43,7 @@ pub fn get_capabilities(initialization_options: &InitializationOptions) -> Serve
             },
         )),
         completion_provider: match initialization_options.completion {
-            true => Some(CompletionOptions {
-                resolve_provider: Some(false),
-                trigger_characters: None,
-                all_commit_characters: None,
-                work_done_progress_options: Default::default(),
-            }),
+            true => Some(CompletionOptions::default()),
             false => None,
         },
         hover_provider: match initialization_options.hover {
