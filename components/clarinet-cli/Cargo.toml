@@ -137,7 +137,7 @@ bitcoin = "0.29.2"
 tiny-hderive = "0.3.0"
 segment = { version = "0.1.2", optional = true }
 mac_address = { version = "1.1.2", optional = true }
-tower-lsp = { version = "0.18.0", optional = true }
+tower-lsp = { version = "0.19.0", optional = true }
 hex = "0.4.3"
 serde_yaml = "0.8.23"
 clarinet-files = { path = "../clarinet-files", features = ["cli"] }
