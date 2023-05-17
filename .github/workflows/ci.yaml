@@ -190,6 +190,10 @@ jobs:
             platform: darwin
             target: x86_64-apple-darwin
             architecture: x64
+          - os: macos-12
+            platform: darwin
+            target: aarch64-apple-darwin
+            architecture: arm64
           - os: macos-latest
             platform: darwin
             target: aarch64-apple-darwin
