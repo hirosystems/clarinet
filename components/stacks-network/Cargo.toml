@@ -11,6 +11,7 @@ bytes = "1.4.0"
 crossterm = { version = "0.22.1", optional = true }
 bitcoin = "0.29.2"
 bitcoincore-rpc = "0.16.0"
+clap_generate = { version = "3.0.3", optional = true }
 serde = { version = "1.0.136", features = ["derive"] }
 serde_json = { version = "1.0.79", features = ["preserve_order"] }
 serde_derive = "1"
@@ -33,8 +34,8 @@ chrono = "0.4.20"
 futures = "0.3.12"
 base58 = "0.2.0"
 
-# chainhook-event-observer = { version = "=1.0.6", default-features = false, features = ["log", "ordinals"], path = "../../../chainhook/components/chainhook-event-observer" }
-chainhook-event-observer = { version = "=1.0.6", default-features = false, features = ["log", "ordinals"] }
+chainhook-event-observer = { version = "=1.0.6", default-features = false, features = ["log", "ordinals"], path = "../../../chainhook/components/chainhook-event-observer" }
+# chainhook-event-observer = { version = "=1.0.6", default-features = false, features = ["log", "ordinals"] }
 stacks-rpc-client = { path = "../stacks-rpc-client" }
 clarinet-files = { path = "../clarinet-files", features = ["cli"]  }
 clarinet-deployments = { path = "../clarinet-deployments", features = ["cli"]  }
@@ -42,6 +43,21 @@ clarinet-utils = { path = "../clarinet-utils"  }
 hiro-system-kit = { path = "../hiro-system-kit", features = ["log"] }
 clarity-repl = { path = "../clarity-repl", features = ["cli"] }
 dirs = { version = "4.0.0" }
+clap = {version = "4.2.7", features = [ "derive" ] }
+serde_yaml = "0.9.21"
+
+[lib]
+name = "stacks_network"
+path = "src/lib.rs"
+# Default type
+# crate-type = ["lib"]
+# Use this instead for WASM builds
+crate-type = ["cdylib", "rlib"]
+
+[[bin]]
+name = "stacks-network"
+path = "src/main.rs"
 
 [features]
 default = ["crossterm"]
+

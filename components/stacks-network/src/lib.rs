@@ -9,6 +9,7 @@ mod ui;
 
 pub use chainhook_event_observer::{self, utils::Context};
 pub use orchestrator::DevnetOrchestrator;
+use orchestrator::ServicesMapHosts;
 
 use std::{
     fmt,
@@ -27,8 +28,8 @@ use chainhook_event_observer::{
 use chains_coordinator::{start_chains_coordinator, BitcoinMiningCommand};
 use chrono::prelude::*;
 use clarinet_deployments::types::DeploymentSpecification;
-use hiro_system_kit;
 use hiro_system_kit::slog;
+use hiro_system_kit::{self};
 use std::sync::atomic::{AtomicBool, Ordering};
 use tracing_appender;
 
@@ -48,7 +49,17 @@ where
     rt.block_on(future)
 }
 
+const BITCOIND_CHAIN_COORDINATOR_SERVICE: &str = "bitcoind-chain-coordinator-service";
+const STACKS_NODE_SERVICE: &str = "stacks-node-service";
+const STACKS_API_SERVICE: &str = "stacks-api-service";
+
+const BITCOIND_RPC_PORT: &str = "18443";
+const STACKS_NODE_RPC_PORT: &str = "20443";
+const STACKS_API_PORT: &str = "3999";
+const STACKS_API_POSTGRES_PORT: &str = "5432";
+
 pub async fn do_run_devnet(
+    use_orchestrator: bool,
     mut devnet: DevnetOrchestrator,
     deployment: DeploymentSpecification,
     chainhooks: &mut Option<ChainhookConfig>,
@@ -57,6 +68,7 @@ pub async fn do_run_devnet(
     ctx: Context,
     orchestrator_terminated_tx: Sender<bool>,
     orchestrator_terminated_rx: Option<Receiver<bool>>,
+    namespace: &str,
 ) -> Result<
     (
         Option<mpsc::Receiver<DevnetEvent>>,
@@ -86,8 +98,25 @@ pub async fn do_run_devnet(
         .with_writer(non_blocking)
         .try_init();
 
-    let ip_address_setup = devnet.prepare_network().await?;
-
+    let ip_address_setup = if use_orchestrator {
+        devnet.prepare_network().await?
+    } else {
+        let hosts = ServicesMapHosts {
+            bitcoin_node_host: format!(
+                "{BITCOIND_CHAIN_COORDINATOR_SERVICE}.{namespace}.svc.cluster.local:{BITCOIND_RPC_PORT}"
+            ),
+            stacks_node_host: format!("{STACKS_NODE_SERVICE}.{namespace}.svc.cluster.local:{STACKS_NODE_RPC_PORT}"),
+            postgres_host: format!("{STACKS_API_SERVICE}.{namespace}.svc.cluster.local:{STACKS_API_POSTGRES_PORT}"),
+            stacks_api_host: format!("{STACKS_API_SERVICE}.{namespace}.svc.cluster.local:{STACKS_API_PORT}"),
+            stacks_explorer_host: "localhost".into(),
+            bitcoin_explorer_host: "localhost".into(),
+            subnet_node_host: "localhost".into(),
+            subnet_api_host: "localhost".into(),
+        };
+        devnet.set_services_map_hosts(hosts.clone());
+        hosts
+    };
+    println!("bitcoind host {}", ip_address_setup.bitcoin_node_host);
     // The event observer should be able to send some events to the UI thread,
     // and should be able to be terminated
     let hooks = match chainhooks.take() {
@@ -136,19 +165,36 @@ pub async fn do_run_devnet(
     let orchestrator_event_tx = devnet_events_tx.clone();
     let chains_coordinator_commands_tx_moved = chains_coordinator_commands_tx.clone();
     let ctx_moved = ctx.clone();
-    let orchestrator_handle = hiro_system_kit::thread_named("Devnet orchestrator")
-        .spawn(move || {
-            let future = devnet.start(orchestrator_event_tx.clone(), terminator_rx, &ctx_moved);
-            let rt = hiro_system_kit::create_basic_runtime();
-            let res = rt.block_on(future);
-            if let Err(ref e) = res {
-                let _ = orchestrator_event_tx.send(DevnetEvent::FatalError(e.clone()));
-                let _ =
-                    chains_coordinator_commands_tx_moved.send(ChainsCoordinatorCommand::Terminate);
-            }
-            res
-        })
-        .expect("unable to retrieve join handle");
+    let orchestrator_handle = if use_orchestrator {
+        hiro_system_kit::thread_named("Devnet orchestrator")
+            .spawn(move || {
+                let future = devnet.start(orchestrator_event_tx.clone(), terminator_rx, &ctx_moved);
+                let rt = hiro_system_kit::create_basic_runtime();
+                let res = rt.block_on(future);
+                if let Err(ref e) = res {
+                    let _ = orchestrator_event_tx.send(DevnetEvent::FatalError(e.clone()));
+                    let _ = chains_coordinator_commands_tx_moved
+                        .send(ChainsCoordinatorCommand::Terminate);
+                }
+                res
+            })
+            .expect("unable to retrieve join handle")
+    } else {
+        hiro_system_kit::thread_named("Initializing bitcoin node")
+            .spawn(move || {
+                let moved_orchestrator_event_tx = orchestrator_event_tx.clone();
+                let future = devnet.initialize_bitcoin_node(&moved_orchestrator_event_tx);
+                let rt = hiro_system_kit::create_basic_runtime();
+                let res = rt.block_on(future);
+                if let Err(ref e) = res {
+                    let _ = orchestrator_event_tx.send(DevnetEvent::FatalError(e.clone()));
+                    let _ = chains_coordinator_commands_tx_moved
+                        .send(ChainsCoordinatorCommand::Terminate);
+                }
+                res
+            })
+            .expect("unable to retrieve join handle")
+    };
 
     if display_dashboard {
         ctx.try_log(|logger| slog::info!(logger, "Starting Devnet"));

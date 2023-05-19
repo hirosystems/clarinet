@@ -45,7 +45,7 @@ pub struct ProjectConfigFile {
     cache_dir: Option<String>,
 }
 
-#[derive(Serialize, Debug, Clone)]
+#[derive(Serialize, Debug, Clone, Deserialize)]
 pub struct ProjectManifest {
     pub project: ProjectConfig,
     #[serde(serialize_with = "toml::ser::tables_last")]
@@ -58,7 +58,7 @@ pub struct ProjectManifest {
     pub contracts_settings: HashMap<FileLocation, ClarityContractMetadata>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Deserialize)]
 pub struct ProjectConfig {
     pub name: String,
     pub authors: Vec<String>,

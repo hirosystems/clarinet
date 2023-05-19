@@ -71,6 +71,7 @@ impl DevnetOrchestrator {
     pub fn new(
         manifest: ProjectManifest,
         devnet_override: Option<DevnetConfigFile>,
+        use_docker: bool,
     ) -> Result<DevnetOrchestrator, String> {
         let mut network_config = NetworkManifest::from_project_manifest_location(
             &manifest.location,
@@ -109,26 +110,34 @@ impl DevnetOrchestrator {
         } else {
             network_name.push_str(".net");
         }
+        network_name = network_name.replace(".", "-");
 
-        let docker_client = match network_config.devnet {
-            Some(ref devnet) => {
-                Docker::connect_with_socket(&devnet.docker_host, 120, bollard::API_DEFAULT_VERSION)
-                    .or_else(|_| Docker::connect_with_socket_defaults())
-                    .or_else(|_| {
-                        let mut user_space_docker_socket =
-                            dirs::home_dir().expect("unable to retrieve homedir");
-                        user_space_docker_socket.push(".docker");
-                        user_space_docker_socket.push("run");
-                        user_space_docker_socket.push("docker.sock");
-                        Docker::connect_with_socket(
-                            &user_space_docker_socket.to_str().unwrap(),
-                            120,
-                            bollard::API_DEFAULT_VERSION,
-                        )
-                    })
-                    .map_err(|e| format!("unable to connect to docker: {:?}", e))?
-            }
-            None => unreachable!(),
+        let docker_client = if use_docker {
+            let client = match network_config.devnet {
+                Some(ref devnet) => Docker::connect_with_socket(
+                    &devnet.docker_host,
+                    120,
+                    bollard::API_DEFAULT_VERSION,
+                )
+                .or_else(|_| Docker::connect_with_socket_defaults())
+                .or_else(|_| {
+                    let mut user_space_docker_socket =
+                        dirs::home_dir().expect("unable to retrieve homedir");
+                    user_space_docker_socket.push(".docker");
+                    user_space_docker_socket.push("run");
+                    user_space_docker_socket.push("docker.sock");
+                    Docker::connect_with_socket(
+                        &user_space_docker_socket.to_str().unwrap(),
+                        120,
+                        bollard::API_DEFAULT_VERSION,
+                    )
+                })
+                .map_err(|e| format!("unable to connect to docker: {:?}", e))?,
+                None => unreachable!(),
+            };
+            Some(client)
+        } else {
+            None
         };
 
         Ok(DevnetOrchestrator {
@@ -136,7 +145,7 @@ impl DevnetOrchestrator {
             network_name,
             manifest,
             network_config: Some(network_config),
-            docker_client: Some(docker_client),
+            docker_client: docker_client,
             can_exit: true,
             termination_success_tx: None,
             stacks_node_container_id: None,
@@ -149,6 +158,10 @@ impl DevnetOrchestrator {
             subnet_api_container_id: None,
             services_map_hosts: None,
         })
+    }
+
+    pub fn set_services_map_hosts(&mut self, hosts: ServicesMapHosts) {
+        self.services_map_hosts = Some(hosts);
     }
 
     pub async fn prepare_network(&mut self) -> Result<ServicesMapHosts, String> {
