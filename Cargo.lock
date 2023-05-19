@@ -805,7 +805,7 @@ dependencies = [
 
 [[package]]
 name = "clarinet-cli"
-version = "1.6.1"
+version = "1.6.2"
 dependencies = [
  "aes 0.7.5",
  "ansi_term",
@@ -822,7 +822,7 @@ dependencies = [
  "clarinet-files",
  "clarinet-utils 1.0.0",
  "clarity-lsp",
- "clarity-repl 1.6.1",
+ "clarity-repl 1.6.2",
  "crossbeam-channel",
  "crossterm 0.22.1",
  "ctrlc",
@@ -927,7 +927,7 @@ dependencies = [
  "bitcoincore-rpc-json",
  "clarinet-files",
  "clarinet-utils 1.0.0",
- "clarity-repl 1.6.1",
+ "clarity-repl 1.6.2",
  "libsecp256k1 0.7.1",
  "reqwest",
  "serde",
@@ -946,7 +946,7 @@ dependencies = [
  "bitcoin",
  "chainhook-types",
  "clarinet-utils 1.0.0",
- "clarity-repl 1.6.1",
+ "clarity-repl 1.6.2",
  "js-sys",
  "libsecp256k1 0.7.1",
  "serde",
@@ -988,7 +988,7 @@ dependencies = [
  "clap",
  "clap_generate",
  "clarinet-files",
- "clarity-repl 1.6.1",
+ "clarity-repl 1.6.2",
  "serde",
  "serde_derive",
  "serde_json",
@@ -1000,7 +1000,7 @@ name = "clarity-jupyter-kernel"
 version = "1.0.0"
 dependencies = [
  "chrono",
- "clarity-repl 1.6.1",
+ "clarity-repl 1.6.2",
  "colored",
  "dirs",
  "failure",
@@ -1022,7 +1022,7 @@ version = "1.0.0"
 dependencies = [
  "clarinet-deployments",
  "clarinet-files",
- "clarity-repl 1.6.1",
+ "clarity-repl 1.6.2",
  "console_error_panic_hook",
  "js-sys",
  "lazy_static",
@@ -1076,7 +1076,7 @@ dependencies = [
 
 [[package]]
 name = "clarity-repl"
-version = "1.6.1"
+version = "1.6.2"
 dependencies = [
  "ansi_term",
  "atty",
@@ -5758,7 +5758,7 @@ dependencies = [
 
 [[package]]
 name = "stacks-devnet-js"
-version = "1.6.1"
+version = "1.6.2"
 dependencies = [
  "clarinet-deployments",
  "clarinet-files",
@@ -5786,7 +5786,7 @@ dependencies = [
  "clarinet-deployments",
  "clarinet-files",
  "clarinet-utils 1.0.0",
- "clarity-repl 1.6.1",
+ "clarity-repl 1.6.2",
  "crossbeam-channel",
  "crossterm 0.22.1",
  "ctrlc",
@@ -5810,7 +5810,7 @@ name = "stacks-rpc-client"
 version = "1.0.0"
 dependencies = [
  "clarinet-utils 1.0.0",
- "clarity-repl 1.6.1",
+ "clarity-repl 1.6.2",
  "reqwest",
  "serde",
  "serde_derive",

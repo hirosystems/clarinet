@@ -8,7 +8,7 @@
   "homepage": "https://github.com/hirosystems/clarinet",
   "bugs": "https://github.com/hirosystems/clarinet/issues",
   "license": "GPL-3.0-only",
-  "version": "1.6.1",
+  "version": "1.6.2",
   "workspaces": [
     "client",
     "server",
