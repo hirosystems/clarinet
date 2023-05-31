@@ -88,19 +88,7 @@ fn get_config_location_from_path_or_exit(path: &Option<String>) -> FileLocation 
         }
         FileLocation::from_path(path_buf)
     } else {
-        let mut current_dir = std::env::current_dir().unwrap();
-        loop {
-            current_dir.push("Chain_Coordinator.toml");
-
-            if current_dir.exists() {
-                break FileLocation::from_path(current_dir);
-            }
-            current_dir.pop();
-
-            if !current_dir.pop() {
-                std::process::exit(1);
-            }
-        }
+        std::process::exit(1);
     }
 }
 
