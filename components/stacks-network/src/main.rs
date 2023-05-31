@@ -46,7 +46,6 @@ fn main() {
             working_dir: Some("./".into()),
             ..Default::default()
         }),
-        false,
     )
     .unwrap();
 
@@ -68,17 +67,14 @@ fn main() {
         logger: Some(logger),
         tracer: false,
     };
-    let (orchestrator_terminated_tx, orchestrator_terminated_rx) = channel();
+    let (orchestrator_terminated_tx, _) = channel();
     let res = hiro_system_kit::nestable_block_on(do_run_devnet(
-        false,
         orchestrator,
         deployment,
         &mut Some(chainhooks),
         None,
-        false,
         ctx,
         orchestrator_terminated_tx,
-        Some(orchestrator_terminated_rx),
         &args.namespace,
     ));
     println!("{:?}", res.unwrap());

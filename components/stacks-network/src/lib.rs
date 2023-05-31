@@ -5,7 +5,6 @@ extern crate serde_derive;
 
 pub mod chains_coordinator;
 mod orchestrator;
-mod ui;
 
 pub use chainhook_event_observer::{self, utils::Context};
 pub use orchestrator::DevnetOrchestrator;
@@ -14,7 +13,7 @@ use orchestrator::ServicesMapHosts;
 use std::{
     fmt,
     sync::{
-        mpsc::{self, channel, Receiver, Sender},
+        mpsc::{self, channel, Sender},
         Arc,
     },
     thread::sleep,
@@ -59,15 +58,12 @@ const STACKS_API_PORT: &str = "3999";
 const STACKS_API_POSTGRES_PORT: &str = "5432";
 
 pub async fn do_run_devnet(
-    use_orchestrator: bool,
     mut devnet: DevnetOrchestrator,
     deployment: DeploymentSpecification,
     chainhooks: &mut Option<ChainhookConfig>,
     log_tx: Option<Sender<LogData>>,
-    display_dashboard: bool,
     ctx: Context,
     orchestrator_terminated_tx: Sender<bool>,
-    orchestrator_terminated_rx: Option<Receiver<bool>>,
     namespace: &str,
 ) -> Result<
     (
@@ -98,9 +94,7 @@ pub async fn do_run_devnet(
         .with_writer(non_blocking)
         .try_init();
 
-    let ip_address_setup = if use_orchestrator {
-        devnet.prepare_network().await?
-    } else {
+    let ip_address_setup = {
         let hosts = ServicesMapHosts {
             bitcoin_node_host: format!(
                 "{BITCOIND_CHAIN_COORDINATOR_SERVICE}.{namespace}.svc.cluster.local:{BITCOIND_RPC_PORT}"
@@ -116,6 +110,7 @@ pub async fn do_run_devnet(
         devnet.set_services_map_hosts(hosts.clone());
         hosts
     };
+
     println!("bitcoind host {}", ip_address_setup.bitcoin_node_host);
     // The event observer should be able to send some events to the UI thread,
     // and should be able to be terminated
@@ -123,7 +118,6 @@ pub async fn do_run_devnet(
         Some(hooks) => hooks,
         _ => ChainhookConfig::new(),
     };
-    let devnet_path = devnet_config.working_dir.clone();
     let config = DevnetEventObserverConfig::new(
         devnet_config.clone(),
         devnet.manifest.clone(),
@@ -135,13 +129,13 @@ pub async fn do_run_devnet(
     let chains_coordinator_tx = devnet_events_tx.clone();
     let (chains_coordinator_commands_tx, chains_coordinator_commands_rx) =
         crossbeam_channel::unbounded();
-    let (orchestrator_terminator_tx, terminator_rx) = channel();
+    let (orchestrator_terminator_tx, _) = channel();
     let (observer_command_tx, observer_command_rx) = channel();
     let moved_orchestrator_terminator_tx = orchestrator_terminator_tx.clone();
     let moved_chains_coordinator_commands_tx = chains_coordinator_commands_tx.clone();
 
     let ctx_moved = ctx.clone();
-    let chains_coordinator_handle = hiro_system_kit::thread_named("Chains coordinator")
+    let _ = hiro_system_kit::thread_named("Chains coordinator")
         .spawn(move || {
             let future = start_chains_coordinator(
                 config,
@@ -164,22 +158,7 @@ pub async fn do_run_devnet(
     // and should be able to be restarted/terminated
     let orchestrator_event_tx = devnet_events_tx.clone();
     let chains_coordinator_commands_tx_moved = chains_coordinator_commands_tx.clone();
-    let ctx_moved = ctx.clone();
-    let orchestrator_handle = if use_orchestrator {
-        hiro_system_kit::thread_named("Devnet orchestrator")
-            .spawn(move || {
-                let future = devnet.start(orchestrator_event_tx.clone(), terminator_rx, &ctx_moved);
-                let rt = hiro_system_kit::create_basic_runtime();
-                let res = rt.block_on(future);
-                if let Err(ref e) = res {
-                    let _ = orchestrator_event_tx.send(DevnetEvent::FatalError(e.clone()));
-                    let _ = chains_coordinator_commands_tx_moved
-                        .send(ChainsCoordinatorCommand::Terminate);
-                }
-                res
-            })
-            .expect("unable to retrieve join handle")
-    } else {
+    let _ = {
         hiro_system_kit::thread_named("Initializing bitcoin node")
             .spawn(move || {
                 let moved_orchestrator_event_tx = orchestrator_event_tx.clone();
@@ -196,90 +175,59 @@ pub async fn do_run_devnet(
             .expect("unable to retrieve join handle")
     };
 
-    if display_dashboard {
-        ctx.try_log(|logger| slog::info!(logger, "Starting Devnet"));
-        let moved_chains_coordinator_commands_tx = chains_coordinator_commands_tx.clone();
-        let _ = ui::start_ui(
-            devnet_events_tx,
-            devnet_events_rx,
-            moved_chains_coordinator_commands_tx,
-            orchestrator_terminated_rx.expect(
-                "orchestrator_terminated_rx should be provided when display_dashboard set to true",
-            ),
-            &devnet_path,
-            devnet_config.enable_subnet_node,
-            !devnet_config.bitcoin_controller_automining_disabled,
-            &ctx,
-        )?;
+    let termination_reader = Arc::new(AtomicBool::new(false));
+    let termination_writer = termination_reader.clone();
+    let moved_orchestrator_terminator_tx = orchestrator_terminator_tx.clone();
+    let moved_events_observer_commands_tx = chains_coordinator_commands_tx.clone();
+    let _ = ctrlc::set_handler(move || {
+        let _ = moved_events_observer_commands_tx.send(ChainsCoordinatorCommand::Terminate);
+        let _ = moved_orchestrator_terminator_tx.send(true);
+        termination_writer.store(true, Ordering::SeqCst);
+    });
 
-        if let Err(e) = chains_coordinator_handle.join() {
-            if let Ok(message) = e.downcast::<String>() {
-                return Err(*message);
-            }
-        }
-
-        if let Err(e) = orchestrator_handle.join() {
-            if let Ok(message) = e.downcast::<String>() {
-                return Err(*message);
-            }
-        }
-    } else {
-        let termination_reader = Arc::new(AtomicBool::new(false));
-        let termination_writer = termination_reader.clone();
-        let moved_orchestrator_terminator_tx = orchestrator_terminator_tx.clone();
-        let moved_events_observer_commands_tx = chains_coordinator_commands_tx.clone();
-        let _ = ctrlc::set_handler(move || {
-            let _ = moved_events_observer_commands_tx.send(ChainsCoordinatorCommand::Terminate);
-            let _ = moved_orchestrator_terminator_tx.send(true);
-            termination_writer.store(true, Ordering::SeqCst);
-        });
-
-        if log_tx.is_none() {
-            loop {
-                match devnet_events_rx.recv() {
-                    Ok(DevnetEvent::Log(log)) => {
-                        if let Some(ref log_tx) = log_tx {
-                            let _ = log_tx.send(log.clone());
-                        } else {
-                            println!("{}", log.message);
-                            match log.level {
-                                LogLevel::Debug => {
-                                    ctx.try_log(|logger| slog::debug!(logger, "{}", log.message))
-                                }
-                                LogLevel::Info | LogLevel::Success => {
-                                    ctx.try_log(|logger| slog::info!(logger, "{}", log.message))
-                                }
-                                LogLevel::Warning => {
-                                    ctx.try_log(|logger| slog::warn!(logger, "{}", log.message))
-                                }
-                                LogLevel::Error => {
-                                    ctx.try_log(|logger| slog::error!(logger, "{}", log.message))
-                                }
+    if log_tx.is_none() {
+        loop {
+            match devnet_events_rx.recv() {
+                Ok(DevnetEvent::Log(log)) => {
+                    if let Some(ref log_tx) = log_tx {
+                        let _ = log_tx.send(log.clone());
+                    } else {
+                        println!("{}", log.message);
+                        match log.level {
+                            LogLevel::Debug => {
+                                ctx.try_log(|logger| slog::debug!(logger, "{}", log.message))
+                            }
+                            LogLevel::Info | LogLevel::Success => {
+                                ctx.try_log(|logger| slog::info!(logger, "{}", log.message))
+                            }
+                            LogLevel::Warning => {
+                                ctx.try_log(|logger| slog::warn!(logger, "{}", log.message))
+                            }
+                            LogLevel::Error => {
+                                ctx.try_log(|logger| slog::error!(logger, "{}", log.message))
                             }
                         }
                     }
-                    Ok(DevnetEvent::BootCompleted(bitcoin_mining_tx)) => {
-                        if !devnet_config.bitcoin_controller_automining_disabled {
-                            let _ = bitcoin_mining_tx.send(BitcoinMiningCommand::Start);
-                        }
+                }
+                Ok(DevnetEvent::BootCompleted(bitcoin_mining_tx)) => {
+                    if !devnet_config.bitcoin_controller_automining_disabled {
+                        let _ = bitcoin_mining_tx.send(BitcoinMiningCommand::Start);
                     }
-                    _ => {}
                 }
-                if termination_reader.load(Ordering::SeqCst) {
-                    sleep(Duration::from_secs(3));
-                    std::process::exit(0);
-                }
+                _ => {}
             }
-        } else {
-            return Ok((
-                Some(devnet_events_rx),
-                Some(orchestrator_terminator_tx),
-                Some(chains_coordinator_commands_tx),
-            ));
+            if termination_reader.load(Ordering::SeqCst) {
+                sleep(Duration::from_secs(3));
+                std::process::exit(0);
+            }
         }
+    } else {
+        return Ok((
+            Some(devnet_events_rx),
+            Some(orchestrator_terminator_tx),
+            Some(chains_coordinator_commands_tx),
+        ));
     }
-
-    Ok((None, None, Some(chains_coordinator_commands_tx)))
 }
 
 #[allow(dead_code)]
