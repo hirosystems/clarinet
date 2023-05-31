@@ -102,10 +102,10 @@ pub async fn do_run_devnet(
             stacks_node_host: format!("{STACKS_NODE_SERVICE}.{namespace}.svc.cluster.local:{STACKS_NODE_RPC_PORT}"),
             postgres_host: format!("{STACKS_API_SERVICE}.{namespace}.svc.cluster.local:{STACKS_API_POSTGRES_PORT}"),
             stacks_api_host: format!("{STACKS_API_SERVICE}.{namespace}.svc.cluster.local:{STACKS_API_PORT}"),
-            stacks_explorer_host: "localhost".into(),
-            bitcoin_explorer_host: "localhost".into(),
-            subnet_node_host: "localhost".into(),
-            subnet_api_host: "localhost".into(),
+            stacks_explorer_host: "localhost".into(), // todo (micaiah)
+            bitcoin_explorer_host: "localhost".into(), // todo (micaiah)
+            subnet_node_host: "localhost".into(), // todo (micaiah)
+            subnet_api_host: "localhost".into(), // todo (micaiah)
         };
         devnet.set_services_map_hosts(hosts.clone());
         hosts
