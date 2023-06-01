@@ -111,7 +111,6 @@ pub async fn do_run_devnet(
         hosts
     };
 
-    println!("bitcoind host {}", ip_address_setup.bitcoin_node_host);
     // The event observer should be able to send some events to the UI thread,
     // and should be able to be terminated
     let hooks = match chainhooks.take() {
@@ -192,7 +191,6 @@ pub async fn do_run_devnet(
                     if let Some(ref log_tx) = log_tx {
                         let _ = log_tx.send(log.clone());
                     } else {
-                        println!("{}", log.message);
                         match log.level {
                             LogLevel::Debug => {
                                 ctx.try_log(|logger| slog::debug!(logger, "{}", log.message))
