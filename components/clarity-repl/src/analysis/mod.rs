@@ -4,6 +4,8 @@ pub mod ast_visitor;
 pub mod call_checker;
 pub mod check_checker;
 pub mod coverage;
+#[cfg(test)]
+mod coverage_tests;
 
 use serde::de::Deserialize;
 use serde::Serialize;

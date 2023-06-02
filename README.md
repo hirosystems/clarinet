@@ -385,8 +385,8 @@ From there, you can use the `lcov` tooling suite to produce HTML reports:
 
 ```bash
 $ brew install lcov
-$ genhtml coverage.lcov
-$ open index.html
+$ genhtml --branch-coverage -o coverage coverage.lcov
+$ open coverage/index.html
 ```
 
 ![lcov](docs/images/lcov.png)

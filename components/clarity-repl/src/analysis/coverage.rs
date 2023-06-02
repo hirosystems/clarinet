@@ -1,16 +1,18 @@
 use std::{
     collections::{BTreeMap, BTreeSet, HashMap, HashSet},
+    convert::{TryFrom, TryInto},
     fs::{create_dir_all, File},
     io::{Error, ErrorKind, Write},
     mem,
     path::{Path, PathBuf},
 };
 
-use clarity::vm::ast::ContractAST;
-use clarity::vm::functions::define::DefineFunctionsParsed;
-use clarity::vm::representations::SymbolicExpression;
-use clarity::vm::types::QualifiedContractIdentifier;
-use clarity::vm::EvalHook;
+use clarity::vm::{
+    ast::ContractAST,
+    functions::{define::DefineFunctionsParsed, NativeFunctions},
+    types::QualifiedContractIdentifier,
+    EvalHook, SymbolicExpression,
+};
 use serde_json::Value as JsonValue;
 
 #[derive(Serialize, Deserialize, Debug, Default, Clone)]
@@ -20,17 +22,15 @@ pub struct CoverageReporter {
     pub contract_paths: BTreeMap<String, String>,
 }
 
+type ExprCoverage = HashMap<u64, u64>;
+type ExecutableLines = HashMap<u32, Vec<u64>>;
+type ExecutableBranches = HashMap<u64, Vec<(u32, u64)>>;
+
+/// One `TestCoverageReport` per test file.
 #[derive(Serialize, Deserialize, Debug, Default, Clone)]
 pub struct TestCoverageReport {
     pub test_name: String,
-    pub contracts_coverage: HashMap<QualifiedContractIdentifier, ContractCoverageReport>,
-}
-
-#[derive(Serialize, Deserialize, Debug, Default, Clone)]
-pub struct ContractCoverageReport {
-    functions_coverage: HashMap<String, u64>,
-    execution_counts: HashMap<u32, u64>,
-    executed_statements: BTreeSet<u64>,
+    pub contracts_coverage: HashMap<QualifiedContractIdentifier, ExprCoverage>,
 }
 
 pub fn parse_coverage_str(path: &str) -> Result<PathBuf, Error> {
@@ -42,6 +42,17 @@ pub fn parse_coverage_str(path: &str) -> Result<PathBuf, Error> {
     }
 }
 
+// LCOV format:
+// TN: test name
+// SF: source file path
+// FN: line number,function name
+// FNF: number functions found
+// FNH: number functions hit
+// DA: line data: line number, hit count
+// BRF: number branches found
+// BRH: number branches hit
+// BRDA: branch data: line number, expr_id, branch_nb, hit count
+
 impl CoverageReporter {
     pub fn new() -> CoverageReporter {
         CoverageReporter {
@@ -49,18 +60,6 @@ impl CoverageReporter {
             asts: BTreeMap::new(),
             contract_paths: BTreeMap::new(),
         }
-    }
-
-    pub fn register_contract(&mut self, contract_name: String, contract_path: String) {
-        self.contract_paths.insert(contract_name, contract_path);
-    }
-
-    pub fn add_asts(&mut self, asts: &BTreeMap<QualifiedContractIdentifier, ContractAST>) {
-        self.asts.append(&mut asts.clone());
-    }
-
-    pub fn add_reports(&mut self, reports: &Vec<TestCoverageReport>) {
-        self.reports.append(&mut reports.clone());
     }
 
     pub fn write_lcov_file<P: AsRef<std::path::Path> + Copy>(
@@ -76,7 +75,7 @@ impl CoverageReporter {
                     (
                         contract_id,
                         self.retrieve_functions(&ast.expressions),
-                        self.filter_executable_lines(&ast.expressions),
+                        self.retrieve_executable_lines_and_branches(&ast.expressions),
                     ),
                 );
             }
@@ -100,30 +99,39 @@ impl CoverageReporter {
                 writeln!(out, "TN:{}", test_name)?;
                 writeln!(out, "SF:{}", contract_path)?;
 
-                if let Some((contract_id, functions, executable_lines)) =
-                    filtered_asts.get(contract_name)
+                if let Some((contract_id, functions, executable)) = filtered_asts.get(contract_name)
                 {
                     for (function, line_start, line_end) in functions.iter() {
                         writeln!(out, "FN:{},{}", line_start, function)?;
                     }
+                    let (executable_lines, executables_branches) = executable;
 
                     let mut function_hits = BTreeMap::new();
-                    let mut consolidated_execution_counts = BTreeMap::new();
+                    let mut line_execution_counts = BTreeMap::new();
+
+                    let mut branches = HashSet::new();
+                    let mut branches_hits = HashSet::new();
+                    let mut branch_execution_counts = BTreeMap::new();
+
                     for report in self.reports.iter() {
                         if &report.test_name == test_name {
-                            if let Some(contract) = report.contracts_coverage.get(contract_id) {
+                            if let Some(coverage) = report.contracts_coverage.get(contract_id) {
                                 let mut local_function_hits = BTreeSet::new();
 
-                                for line in executable_lines.iter() {
-                                    let count = contract.execution_counts.get(line).unwrap_or(&0);
-
-                                    if let Some(line_count) =
-                                        consolidated_execution_counts.get_mut(line)
-                                    {
-                                        *line_count += *count;
-                                    } else {
-                                        consolidated_execution_counts.insert(*line, *count);
+                                for (line, expr_ids) in executable_lines.iter() {
+                                    // in case of code branches on the line
+                                    // retrieve the expression with the most hits
+                                    let mut counts = vec![];
+                                    for id in expr_ids {
+                                        if let Some(c) = coverage.get(id) {
+                                            counts.push(c.clone());
+                                        }
                                     }
+                                    let count = counts.iter().max().unwrap_or(&0);
+
+                                    let total_count =
+                                        line_execution_counts.entry(line).or_insert(0);
+                                    *total_count += count;
 
                                     if count == &0 {
                                         continue;
@@ -136,12 +144,25 @@ impl CoverageReporter {
                                     }
                                 }
 
-                                for function in local_function_hits.into_iter() {
-                                    if let Some(total_hit) = function_hits.get_mut(function) {
-                                        *total_hit += 1;
-                                    } else {
-                                        function_hits.insert(function, 1);
+                                for (expr_id, args) in executables_branches.iter() {
+                                    for (i, (line, arg_expr_id)) in args.iter().enumerate() {
+                                        let count = coverage.get(arg_expr_id).unwrap_or(&0);
+
+                                        branches.insert(arg_expr_id);
+                                        if count > &0 {
+                                            branches_hits.insert(arg_expr_id);
+                                        }
+
+                                        let total_count = branch_execution_counts
+                                            .entry((line, expr_id, i))
+                                            .or_insert(0);
+                                        *total_count += count;
                                     }
+                                }
+
+                                for function in local_function_hits.into_iter() {
+                                    let hits = function_hits.entry(function).or_insert(0);
+                                    *hits += 1
                                 }
                             }
                         }
@@ -153,8 +174,15 @@ impl CoverageReporter {
                     writeln!(out, "FNF:{}", functions.len())?;
                     writeln!(out, "FNH:{}", function_hits.len())?;
 
-                    for (line_number, count) in consolidated_execution_counts.iter() {
+                    for (line_number, count) in line_execution_counts.iter() {
                         writeln!(out, "DA:{},{}", line_number, count)?;
+                    }
+
+                    writeln!(out, "BRF:{}", branches.len())?;
+                    writeln!(out, "BRH:{}", branches_hits.len())?;
+
+                    for ((line, block_id, branch_nb), count) in branch_execution_counts.iter() {
+                        writeln!(out, "BRDA:{},{},{},{}", line, block_id, branch_nb, count)?;
                     }
                 }
                 writeln!(out, "end_of_record")?;
@@ -189,11 +217,16 @@ impl CoverageReporter {
         functions
     }
 
-    fn filter_executable_lines(&self, exprs: &Vec<SymbolicExpression>) -> Vec<u32> {
-        let mut lines = vec![];
-        let mut lines_seen = HashSet::new();
+    fn retrieve_executable_lines_and_branches(
+        &self,
+        exprs: &Vec<SymbolicExpression>,
+    ) -> (ExecutableLines, ExecutableBranches) {
+        let mut lines: ExecutableLines = HashMap::new();
+        let mut branches: ExecutableBranches = HashMap::new();
+
         for expression in exprs.iter() {
             let mut frontier = vec![expression];
+
             while let Some(cur_expr) = frontier.pop() {
                 // Only consider body functions
                 if let Some(define_expr) = DefineFunctionsParsed::try_parse(cur_expr).ok().flatten()
@@ -204,35 +237,81 @@ impl CoverageReporter {
                         | DefineFunctionsParsed::ReadOnlyFunction { signature: _, body } => {
                             frontier.push(body);
                         }
-                        DefineFunctionsParsed::BoundedFungibleToken { .. } => {}
-                        DefineFunctionsParsed::Constant { .. } => {}
-                        DefineFunctionsParsed::PersistedVariable { .. } => {}
-                        DefineFunctionsParsed::NonFungibleToken { .. } => {}
-                        DefineFunctionsParsed::UnboundedFungibleToken { .. } => {}
-                        DefineFunctionsParsed::Map { .. } => {}
-                        DefineFunctionsParsed::Trait { .. } => {}
-                        DefineFunctionsParsed::UseTrait { .. } => {}
-                        DefineFunctionsParsed::ImplTrait { .. } => {}
+                        _ => {}
                     }
 
                     continue;
                 }
 
                 if let Some(children) = cur_expr.match_list() {
+                    if let Some((func, args)) = try_parse_native_func(children) {
+                        // handle codes branches
+                        // (if, asserts!, and, or, match)
+                        match func {
+                            NativeFunctions::If | NativeFunctions::Asserts => {
+                                let (_cond, args) = args.split_first().unwrap();
+                                branches.insert(
+                                    cur_expr.id,
+                                    args.iter()
+                                        .map(|a| {
+                                            let expr = extract_expr_from_list(a);
+                                            (expr.span.start_line, expr.id)
+                                        })
+                                        .collect(),
+                                );
+                            }
+                            NativeFunctions::And | NativeFunctions::Or => {
+                                branches.insert(
+                                    cur_expr.id,
+                                    args.iter()
+                                        .map(|a| {
+                                            let expr = extract_expr_from_list(a);
+                                            (expr.span.start_line, expr.id)
+                                        })
+                                        .collect(),
+                                );
+                            }
+                            NativeFunctions::Match => {
+                                // for match ignore bindings children - some, ok, err
+                                if args.len() == 4 || args.len() == 5 {
+                                    let input = args.first().unwrap();
+                                    let left_branch = args.get(2).unwrap();
+                                    let right_branch = args.last().unwrap();
+
+                                    let match_branches = [left_branch, right_branch];
+                                    branches.insert(
+                                        cur_expr.id,
+                                        match_branches
+                                            .iter()
+                                            .map(|a| {
+                                                let expr = extract_expr_from_list(a);
+                                                (expr.span.start_line, expr.id)
+                                            })
+                                            .collect(),
+                                    );
+
+                                    frontier.extend([input]);
+                                    frontier.extend(match_branches);
+                                }
+                                continue;
+                            }
+                            _ => {}
+                        };
+                    };
+
                     // don't count list expressions as a whole, just their children
                     frontier.extend(children);
                 } else {
                     let line = cur_expr.span.start_line;
-                    if !lines_seen.contains(&line) {
-                        lines_seen.insert(line);
-                        lines.push(line);
+                    if let Some(line) = lines.get_mut(&line) {
+                        line.push(cur_expr.id);
+                    } else {
+                        lines.insert(line, vec![cur_expr.id]);
                     }
                 }
             }
         }
-
-        lines.sort();
-        lines
+        (lines, branches)
     }
 }
 
@@ -248,16 +327,16 @@ impl TestCoverageReport {
 impl EvalHook for TestCoverageReport {
     fn will_begin_eval(
         &mut self,
-        env: &mut clarity::vm::contexts::Environment,
-        context: &clarity::vm::contexts::LocalContext,
+        env: &mut clarity::vm::Environment,
+        context: &clarity::vm::LocalContext,
         expr: &SymbolicExpression,
     ) {
         let contract = &env.contract_context.contract_identifier;
         let mut contract_report = match self.contracts_coverage.remove(contract) {
             Some(e) => e,
-            _ => ContractCoverageReport::new(),
+            _ => HashMap::new(),
         };
-        contract_report.report_eval(expr);
+        report_eval(&mut contract_report, expr);
         self.contracts_coverage
             .insert(contract.clone(), contract_report);
     }
@@ -267,43 +346,39 @@ impl EvalHook for TestCoverageReport {
         _env: &mut clarity::vm::Environment,
         _context: &clarity::vm::LocalContext,
         _expr: &SymbolicExpression,
-        _res: &core::result::Result<clarity::vm::Value, clarity::vm::errors::Error>,
+        _res: &Result<clarity::vm::Value, clarity::vm::errors::Error>,
     ) {
     }
 
-    fn did_complete(
-        &mut self,
-        _result: core::result::Result<&mut clarity::vm::ExecutionResult, String>,
-    ) {
-    }
+    fn did_complete(&mut self, _result: Result<&mut clarity::vm::ExecutionResult, String>) {}
 }
 
-impl ContractCoverageReport {
-    pub fn new() -> ContractCoverageReport {
-        ContractCoverageReport {
-            functions_coverage: HashMap::new(),
-            execution_counts: HashMap::new(),
-            executed_statements: BTreeSet::new(),
+fn try_parse_native_func(
+    expr: &[SymbolicExpression],
+) -> Option<(NativeFunctions, &[SymbolicExpression])> {
+    let (name, args) = expr.split_first()?;
+    let atom = name.match_atom()?;
+    let func = NativeFunctions::lookup_by_name(atom)?;
+    Some((func, args))
+}
+
+fn report_eval(expr_coverage: &mut ExprCoverage, expr: &SymbolicExpression) {
+    if let Some(children) = expr.match_list() {
+        if let Some((function_variable, rest)) = children.split_first() {
+            report_eval(expr_coverage, function_variable);
         }
+        return;
     }
 
-    pub fn report_eval(&mut self, expr: &SymbolicExpression) {
-        if let Some(children) = expr.match_list() {
-            // Handle the function variable, then the rest of the list will be
-            // eval'ed later.
-            if let Some((function_variable, rest)) = children.split_first() {
-                self.report_eval(function_variable);
-            }
-            return;
-        }
+    let count = expr_coverage.entry(expr.id).or_insert(0);
+    *count += 1;
+}
 
-        // other sexps can only span 1 line
-        let line_executed = expr.span.start_line;
-        if let Some(execution_count) = self.execution_counts.get_mut(&line_executed) {
-            *execution_count += 1;
-        } else {
-            self.execution_counts.insert(line_executed, 1);
-        }
-        self.executed_statements.insert(expr.id);
+// because list expressions are not considered as evaluated
+// this helpers returns evaluatable expr from list
+fn extract_expr_from_list(expr: &SymbolicExpression) -> SymbolicExpression {
+    if let Some(first) = expr.match_list().and_then(|l| l.first()) {
+        return extract_expr_from_list(first);
     }
+    return expr.to_owned();
 }
