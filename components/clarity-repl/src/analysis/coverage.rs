@@ -66,6 +66,23 @@ impl CoverageReporter {
         &self,
         filename: P,
     ) -> std::io::Result<()> {
+        let filepath = filename.as_ref().to_path_buf();
+        let filepath = filepath.parent().ok_or(Error::new(
+            ErrorKind::NotFound,
+            "could not get directory to create coverage file",
+        ))?;
+        create_dir_all(filepath)?;
+        let mut out = File::create(filename)?;
+        let content = self.build_lcov_file();
+
+        write!(out, "{}", content)?;
+
+        Ok(())
+    }
+
+    pub fn build_lcov_file(&self) -> String {
+        let mut file_content = String::new();
+
         let mut filtered_asts = HashMap::new();
         for (contract_id, ast) in self.asts.iter() {
             let contract_name = contract_id.name.to_string();
@@ -86,23 +103,15 @@ impl CoverageReporter {
             test_names.insert(report.test_name.to_string());
         }
 
-        let filepath = filename.as_ref().to_path_buf();
-        let filepath = filepath.parent().ok_or(Error::new(
-            ErrorKind::NotFound,
-            "could not get directory to create coverage file",
-        ))?;
-        create_dir_all(filepath)?;
-        let mut out = File::create(filename)?;
-
         for (index, test_name) in test_names.iter().enumerate() {
             for (contract_name, contract_path) in self.contract_paths.iter() {
-                writeln!(out, "TN:{}", test_name)?;
-                writeln!(out, "SF:{}", contract_path)?;
+                file_content.push_str(&format!("TN:{}\n", test_name));
+                file_content.push_str(&format!("SF:{}\n", contract_path));
 
                 if let Some((contract_id, functions, executable)) = filtered_asts.get(contract_name)
                 {
                     for (function, line_start, line_end) in functions.iter() {
-                        writeln!(out, "FN:{},{}", line_start, function)?;
+                        file_content.push_str(&format!("FN:{},{}\n", line_start, function));
                     }
                     let (executable_lines, executables_branches) = executable;
 
@@ -169,27 +178,30 @@ impl CoverageReporter {
                     }
 
                     for (function, hits) in function_hits.iter() {
-                        writeln!(out, "FNDA:{},{}", hits, function)?;
+                        file_content.push_str(&format!("FNDA:{},{}\n", hits, function));
                     }
-                    writeln!(out, "FNF:{}", functions.len())?;
-                    writeln!(out, "FNH:{}", function_hits.len())?;
+                    file_content.push_str(&format!("FNF:{}\n", functions.len()));
+                    file_content.push_str(&format!("FNH:{}\n", function_hits.len()));
 
                     for (line_number, count) in line_execution_counts.iter() {
-                        writeln!(out, "DA:{},{}", line_number, count)?;
+                        file_content.push_str(&format!("DA:{},{}\n", line_number, count));
                     }
 
-                    writeln!(out, "BRF:{}", branches.len())?;
-                    writeln!(out, "BRH:{}", branches_hits.len())?;
+                    file_content.push_str(&format!("BRF:{}\n", branches.len()));
+                    file_content.push_str(&format!("BRH:{}\n", branches_hits.len()));
 
                     for ((line, block_id, branch_nb), count) in branch_execution_counts.iter() {
-                        writeln!(out, "BRDA:{},{},{},{}", line, block_id, branch_nb, count)?;
+                        file_content.push_str(&format!(
+                            "BRDA:{},{},{},{}\n",
+                            line, block_id, branch_nb, count
+                        ));
                     }
                 }
-                writeln!(out, "end_of_record")?;
+                file_content.push_str("end_of_record\n");
             }
         }
 
-        Ok(())
+        file_content
     }
 
     fn retrieve_functions(&self, exprs: &Vec<SymbolicExpression>) -> Vec<(String, u32, u32)> {

@@ -1,8 +1,5 @@
-use rand::Rng;
 use std::convert::TryInto;
 use std::fmt::format;
-use std::fs;
-use std::iter;
 
 use super::coverage::{CoverageReporter, TestCoverageReport};
 use crate::repl::session::{self, Session};
@@ -10,13 +7,6 @@ use crate::repl::{
     ClarityCodeSource, ClarityContract, ContractDeployer, SessionSettings, DEFAULT_CLARITY_VERSION,
     DEFAULT_EPOCH,
 };
-
-fn generate(len: usize) -> String {
-    const CHARSET: &[u8] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
-    let mut rng = rand::thread_rng();
-    let one_char = || CHARSET[rng.gen_range(0, CHARSET.len())] as char;
-    iter::repeat_with(one_char).take(len).collect()
-}
 
 fn get_coverage_report(contract: &str, snippets: Vec<String>) -> (TestCoverageReport, String) {
     let mut session = Session::new(SessionSettings::default());
@@ -39,10 +29,7 @@ fn get_coverage_report(contract: &str, snippets: Vec<String>) -> (TestCoverageRe
         .insert(contract_id.name.to_string(), "/contract-0.clar".into());
     coverage_reporter.reports.append(&mut vec![report.clone()]);
 
-    let temp_file_path = format!("./test_coverate-{}.temp.lcov", generate(10));
-    coverage_reporter.write_lcov_file(&temp_file_path).unwrap();
-    let lcov_content = fs::read_to_string(&temp_file_path).unwrap();
-    let _ = fs::remove_file(&temp_file_path);
+    let lcov_content = coverage_reporter.build_lcov_file();
 
     (report, lcov_content)
 }
