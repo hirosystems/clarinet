@@ -151,9 +151,9 @@ dependencies = [
 
 [[package]]
 name = "anyhow"
-version = "1.0.69"
+version = "1.0.71"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "224afbd727c3d6e4b90103ece64b8d1b67fbb1973b1046c2281eed3f3803f800"
+checksum = "9c7d0618f0e0b7e8ff11427422b64564d5fb0be1940354bfe2e0529b18a9d9b8"
 dependencies = [
  "backtrace",
 ]
@@ -504,16 +504,6 @@ dependencies = [
 
 [[package]]
 name = "block-modes"
-version = "0.8.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2cb03d1bed155d89dce0f845b7899b18a9a163e148fd004e1c28421a783e2d8e"
-dependencies = [
- "block-padding 0.2.1",
- "cipher 0.3.0",
-]
-
-[[package]]
-name = "block-modes"
 version = "0.9.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9e2211b0817f061502a8dd9f11a37e879e79763e3c698d2418cf824d8cb2f21e"
@@ -813,7 +803,6 @@ dependencies = [
  "base58 0.2.0",
  "base64 0.13.1",
  "bitcoin",
- "block-modes 0.8.1",
  "cache_control",
  "chrono",
  "clap",
@@ -869,7 +858,6 @@ dependencies = [
  "lzzzz",
  "mac_address",
  "mio 0.8.6",
- "mitata",
  "netif",
  "nix 0.24.2",
  "node_resolver",
@@ -886,13 +874,11 @@ dependencies = [
  "ring",
  "rsa",
  "segment",
- "semver-parser 0.10.2",
  "serde",
  "serde_derive",
  "serde_json",
  "serde_yaml",
  "sha2 0.10.6",
- "shell-escape",
  "signal-hook-registry",
  "similar",
  "stacks-network",
@@ -900,7 +886,6 @@ dependencies = [
  "sys-info",
  "tempfile",
  "termcolor",
- "text-size",
  "text_lines 0.6.0",
  "tiny-hderive",
  "tokio",
@@ -914,7 +899,6 @@ dependencies = [
  "walkdir",
  "winapi",
  "winres",
- "zstd",
 ]
 
 [[package]]
@@ -965,7 +949,6 @@ version = "1.0.0"
 dependencies = [
  "hmac 0.12.1",
  "pbkdf2",
- "serde",
  "sha2 0.10.6",
 ]
 
@@ -986,7 +969,6 @@ name = "clarity-events"
 version = "1.0.0"
 dependencies = [
  "clap",
- "clap_generate",
  "clarinet-files",
  "clarity-repl 1.6.2",
  "serde",
@@ -1090,17 +1072,13 @@ dependencies = [
  "httparse",
  "integer-sqrt",
  "lazy_static",
- "libsecp256k1 0.5.0",
  "log",
  "memchr",
  "pico-args",
  "prettytable-rs",
  "rand 0.7.3",
- "rand_pcg",
- "rand_seeder",
  "regex",
  "reqwest",
- "ripemd160 0.9.1",
  "rustyline",
  "serde",
  "serde_derive",
@@ -1662,7 +1640,7 @@ dependencies = [
  "aes-gcm 0.10.0-pre",
  "aes-kw",
  "base64 0.13.1",
- "block-modes 0.9.1",
+ "block-modes",
  "cbc",
  "const-oid",
  "ctr 0.9.2",
@@ -2753,7 +2731,6 @@ version = "0.1.0"
 dependencies = [
  "ansi_term",
  "atty",
- "futures",
  "lazy_static",
  "slog",
  "slog-async",
@@ -3143,9 +3120,9 @@ dependencies = [
 
 [[package]]
 name = "itoa"
-version = "1.0.5"
+version = "1.0.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "fad582f4b9e86b6caa621cabeb0963332d92eea04729ab12892c2533951e6440"
+checksum = "453ad9f582a441959e5f0d088b02ce04cfe8d51a8eaf077f12ac6d3e94164ca6"
 
 [[package]]
 name = "jobserver"
@@ -3637,15 +3614,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b9f1c5b025cda876f66ef43a113f91ebc9f4ccef34843000e0adf6ebbab84e21"
 dependencies = [
  "winapi",
-]
-
-[[package]]
-name = "mitata"
-version = "0.0.7"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "21fd49a3bd69c5be5d2c21899e2995ed99193b48e2c9f3ac09596a0d69f7fa79"
-dependencies = [
- "clap",
 ]
 
 [[package]]
@@ -5529,12 +5497,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "shell-escape"
-version = "0.1.5"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "45bb67a18fa91266cc7807181f62f9178a6873bfad7dc788c42e6430db40184f"
-
-[[package]]
 name = "signal-hook"
 version = "0.3.15"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5818,7 +5780,6 @@ dependencies = [
  "serde_derive",
  "serde_json",
  "stacks-rpc-client 1.0.0",
- "tar",
  "tracing",
  "tracing-appender",
  "tracing-subscriber",
@@ -5829,7 +5790,6 @@ dependencies = [
 name = "stacks-rpc-client"
 version = "1.0.0"
 dependencies = [
- "clarinet-utils 1.0.0",
  "clarity-repl 1.6.2",
  "reqwest",
  "serde",
@@ -6476,17 +6436,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f764005d11ee5f36500a149ace24e00e3da98b0158b3e2d53a7495660d3f4d60"
 
 [[package]]
-name = "tar"
-version = "0.4.38"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4b55807c0344e1e6c04d7c965f5289c39a8d94ae23ed5c0b57aabac549f871c6"
-dependencies = [
- "filetime",
- "libc",
- "xattr",
-]
-
-[[package]]
 name = "target-lexicon"
 version = "0.12.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -6525,12 +6474,6 @@ checksum = "be55cf8942feac5c765c2c993422806843c9a9a45d4d5c407ad6dd2ea95eb9b6"
 dependencies = [
  "winapi-util",
 ]
-
-[[package]]
-name = "text-size"
-version = "1.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "288cb548dbe72b652243ea797201f3d481a0609a967980fcc5b2315ea811560a"
 
 [[package]]
 name = "text_lines"
@@ -7610,15 +7553,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "xattr"
-version = "0.2.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6d1526bbe5aaeb5eb06885f4d987bcdfa5e23187055de9b83fe00156a821fabc"
-dependencies = [
- "libc",
-]
-
-[[package]]
 name = "yaml-rust"
 version = "0.4.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -7659,33 +7593,4 @@ checksum = "d33a2c51dde24d5b451a2ed4b488266df221a5eaee2ee519933dc46b9a9b3648"
 dependencies = [
  "libc",
  "metadeps",
-]
-
-[[package]]
-name = "zstd"
-version = "0.11.1+zstd.1.5.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "77a16b8414fde0414e90c612eba70985577451c4c504b99885ebed24762cb81a"
-dependencies = [
- "zstd-safe",
-]
-
-[[package]]
-name = "zstd-safe"
-version = "5.0.1+zstd.1.5.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7c12659121420dd6365c5c3de4901f97145b79651fb1d25814020ed2ed0585ae"
-dependencies = [
- "libc",
- "zstd-sys",
-]
-
-[[package]]
-name = "zstd-sys"
-version = "2.0.1+zstd.1.5.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9fd07cbbc53846d9145dbffdf6dd09a7a0aa52be46741825f5c97bdd4f73f12b"
-dependencies = [
- "cc",
- "libc",
 ]
