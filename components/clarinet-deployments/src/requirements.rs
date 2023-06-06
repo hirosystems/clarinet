@@ -125,8 +125,7 @@ pub const MAINNET_2_05_START_HEIGHT: u32 = 40_607;
 pub const MAINNET_21_START_HEIGHT: u32 = 99_113;
 pub const MAINNET_22_START_HEIGHT: u32 = 103_900;
 pub const MAINNET_23_START_HEIGHT: u32 = 104_359;
-// TODO: This is estimated. Replace with exact height once 2.4 is activated.
-pub const MAINNET_24_START_HEIGHT: u32 = 105_643;
+pub const MAINNET_24_START_HEIGHT: u32 = 107_055;
 
 pub const TESTNET_20_START_HEIGHT: u32 = 1;
 pub const TESTNET_2_05_START_HEIGHT: u32 = 20_216;
