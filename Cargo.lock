@@ -606,9 +606,9 @@ dependencies = [
 
 [[package]]
 name = "bumpalo"
-version = "3.12.0"
+version = "3.13.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0d261e256854913907f67ed06efbc3338dfe6179796deefc1ff763fc1aee5535"
+checksum = "a3e2c3daef883ecc1b5d58c15adae93470a91d425f3532ba1695849656af3fc1"
 
 [[package]]
 name = "byte-tools"
@@ -861,7 +861,7 @@ dependencies = [
  "hyper",
  "import_map",
  "indexmap",
- "jsonc-parser",
+ "jsonc-parser 0.20.0",
  "lazy_static",
  "libc",
  "libsecp256k1 0.7.1",
@@ -2047,16 +2047,30 @@ dependencies = [
 ]
 
 [[package]]
-name = "dprint-plugin-json"
-version = "0.15.4"
+name = "dprint-core"
+version = "0.62.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "db127f7ccb9b497b5b32e5e8eca4b19a7f191e38a3505195f029d5fbb728e51a"
+checksum = "d966e6047321db5f011567c1819b89972a457ab49c2f4b56f074e67a59214112"
 dependencies = [
  "anyhow",
- "dprint-core",
- "jsonc-parser",
+ "bumpalo",
+ "indexmap",
+ "rustc-hash",
  "serde",
- "text_lines 0.4.1",
+ "unicode-width",
+]
+
+[[package]]
+name = "dprint-plugin-json"
+version = "0.17.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "00905c12671f1be023a8e12915b97a701a6561bacf39221ad314884c99f55c74"
+dependencies = [
+ "anyhow",
+ "dprint-core 0.62.0",
+ "jsonc-parser 0.21.1",
+ "serde",
+ "text_lines 0.6.0",
 ]
 
 [[package]]
@@ -2066,7 +2080,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "749753ef284b5eea8ab11e8baf01a735351c83747cdd72c5913e2351e6b8a309"
 dependencies = [
  "anyhow",
- "dprint-core",
+ "dprint-core 0.58.3",
  "pulldown-cmark",
  "regex",
  "serde",
@@ -2080,7 +2094,7 @@ checksum = "e3a4ce966b327d5eba1df51bd9b0e373a741317f35a00abe7a71b01cfd582261"
 dependencies = [
  "anyhow",
  "deno_ast",
- "dprint-core",
+ "dprint-core 0.58.3",
  "rustc-hash",
  "serde",
 ]
@@ -3165,6 +3179,12 @@ checksum = "ccff81ff106af12c93c06935c50ee0723325095e8cbb8c0b41ed276b9469c4cb"
 dependencies = [
  "serde_json",
 ]
+
+[[package]]
+name = "jsonc-parser"
+version = "0.21.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7b56a20e76235284255a09fcd1f45cf55d3c524ea657ebd3854735925c57743d"
 
 [[package]]
 name = "jsonrpc"
