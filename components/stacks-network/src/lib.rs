@@ -5,15 +5,15 @@ extern crate serde_derive;
 
 pub mod chains_coordinator;
 mod orchestrator;
-mod ui;
 
 pub use chainhook_event_observer::{self, utils::Context};
 pub use orchestrator::DevnetOrchestrator;
+use orchestrator::ServicesMapHosts;
 
 use std::{
     fmt,
     sync::{
-        mpsc::{self, channel, Receiver, Sender},
+        mpsc::{self, channel, Sender},
         Arc,
     },
     thread::sleep,
@@ -27,8 +27,8 @@ use chainhook_event_observer::{
 use chains_coordinator::{start_chains_coordinator, BitcoinMiningCommand};
 use chrono::prelude::*;
 use clarinet_deployments::types::DeploymentSpecification;
-use hiro_system_kit;
 use hiro_system_kit::slog;
+use hiro_system_kit::{self};
 use std::sync::atomic::{AtomicBool, Ordering};
 use tracing_appender;
 
@@ -48,15 +48,23 @@ where
     rt.block_on(future)
 }
 
+const BITCOIND_CHAIN_COORDINATOR_SERVICE: &str = "bitcoind-chain-coordinator-service";
+const STACKS_NODE_SERVICE: &str = "stacks-node-service";
+const STACKS_API_SERVICE: &str = "stacks-api-service";
+
+const BITCOIND_RPC_PORT: &str = "18443";
+const STACKS_NODE_RPC_PORT: &str = "20443";
+const STACKS_API_PORT: &str = "3999";
+const STACKS_API_POSTGRES_PORT: &str = "5432";
+
 pub async fn do_run_devnet(
     mut devnet: DevnetOrchestrator,
     deployment: DeploymentSpecification,
     chainhooks: &mut Option<ChainhookConfig>,
     log_tx: Option<Sender<LogData>>,
-    display_dashboard: bool,
     ctx: Context,
     orchestrator_terminated_tx: Sender<bool>,
-    orchestrator_terminated_rx: Option<Receiver<bool>>,
+    namespace: &str,
 ) -> Result<
     (
         Option<mpsc::Receiver<DevnetEvent>>,
@@ -86,7 +94,22 @@ pub async fn do_run_devnet(
         .with_writer(non_blocking)
         .try_init();
 
-    let ip_address_setup = devnet.prepare_network().await?;
+    let ip_address_setup = {
+        let hosts = ServicesMapHosts {
+            bitcoin_node_host: format!(
+                "{BITCOIND_CHAIN_COORDINATOR_SERVICE}.{namespace}.svc.cluster.local:{BITCOIND_RPC_PORT}"
+            ),
+            stacks_node_host: format!("{STACKS_NODE_SERVICE}.{namespace}.svc.cluster.local:{STACKS_NODE_RPC_PORT}"),
+            postgres_host: format!("{STACKS_API_SERVICE}.{namespace}.svc.cluster.local:{STACKS_API_POSTGRES_PORT}"),
+            stacks_api_host: format!("{STACKS_API_SERVICE}.{namespace}.svc.cluster.local:{STACKS_API_PORT}"),
+            stacks_explorer_host: "localhost".into(), // todo (micaiah)
+            bitcoin_explorer_host: "localhost".into(), // todo (micaiah)
+            subnet_node_host: "localhost".into(), // todo (micaiah)
+            subnet_api_host: "localhost".into(), // todo (micaiah)
+        };
+        devnet.set_services_map_hosts(hosts.clone());
+        hosts
+    };
 
     // The event observer should be able to send some events to the UI thread,
     // and should be able to be terminated
@@ -94,7 +117,6 @@ pub async fn do_run_devnet(
         Some(hooks) => hooks,
         _ => ChainhookConfig::new(),
     };
-    let devnet_path = devnet_config.working_dir.clone();
     let config = DevnetEventObserverConfig::new(
         devnet_config.clone(),
         devnet.manifest.clone(),
@@ -106,13 +128,13 @@ pub async fn do_run_devnet(
     let chains_coordinator_tx = devnet_events_tx.clone();
     let (chains_coordinator_commands_tx, chains_coordinator_commands_rx) =
         crossbeam_channel::unbounded();
-    let (orchestrator_terminator_tx, terminator_rx) = channel();
+    let (orchestrator_terminator_tx, _) = channel();
     let (observer_command_tx, observer_command_rx) = channel();
     let moved_orchestrator_terminator_tx = orchestrator_terminator_tx.clone();
     let moved_chains_coordinator_commands_tx = chains_coordinator_commands_tx.clone();
 
     let ctx_moved = ctx.clone();
-    let chains_coordinator_handle = hiro_system_kit::thread_named("Chains coordinator")
+    let _ = hiro_system_kit::thread_named("Chains coordinator")
         .spawn(move || {
             let future = start_chains_coordinator(
                 config,
@@ -135,105 +157,75 @@ pub async fn do_run_devnet(
     // and should be able to be restarted/terminated
     let orchestrator_event_tx = devnet_events_tx.clone();
     let chains_coordinator_commands_tx_moved = chains_coordinator_commands_tx.clone();
-    let ctx_moved = ctx.clone();
-    let orchestrator_handle = hiro_system_kit::thread_named("Devnet orchestrator")
-        .spawn(move || {
-            let future = devnet.start(orchestrator_event_tx.clone(), terminator_rx, &ctx_moved);
-            let rt = hiro_system_kit::create_basic_runtime();
-            let res = rt.block_on(future);
-            if let Err(ref e) = res {
-                let _ = orchestrator_event_tx.send(DevnetEvent::FatalError(e.clone()));
-                let _ =
-                    chains_coordinator_commands_tx_moved.send(ChainsCoordinatorCommand::Terminate);
-            }
-            res
-        })
-        .expect("unable to retrieve join handle");
+    let _ = {
+        hiro_system_kit::thread_named("Initializing bitcoin node")
+            .spawn(move || {
+                let moved_orchestrator_event_tx = orchestrator_event_tx.clone();
+                let future = devnet.initialize_bitcoin_node(&moved_orchestrator_event_tx);
+                let rt = hiro_system_kit::create_basic_runtime();
+                let res = rt.block_on(future);
+                if let Err(ref e) = res {
+                    let _ = orchestrator_event_tx.send(DevnetEvent::FatalError(e.clone()));
+                    let _ = chains_coordinator_commands_tx_moved
+                        .send(ChainsCoordinatorCommand::Terminate);
+                }
+                res
+            })
+            .expect("unable to retrieve join handle")
+    };
 
-    if display_dashboard {
-        ctx.try_log(|logger| slog::info!(logger, "Starting Devnet"));
-        let moved_chains_coordinator_commands_tx = chains_coordinator_commands_tx.clone();
-        let _ = ui::start_ui(
-            devnet_events_tx,
-            devnet_events_rx,
-            moved_chains_coordinator_commands_tx,
-            orchestrator_terminated_rx.expect(
-                "orchestrator_terminated_rx should be provided when display_dashboard set to true",
-            ),
-            &devnet_path,
-            devnet_config.enable_subnet_node,
-            !devnet_config.bitcoin_controller_automining_disabled,
-            &ctx,
-        )?;
+    let termination_reader = Arc::new(AtomicBool::new(false));
+    let termination_writer = termination_reader.clone();
+    let moved_orchestrator_terminator_tx = orchestrator_terminator_tx.clone();
+    let moved_events_observer_commands_tx = chains_coordinator_commands_tx.clone();
+    let _ = ctrlc::set_handler(move || {
+        let _ = moved_events_observer_commands_tx.send(ChainsCoordinatorCommand::Terminate);
+        let _ = moved_orchestrator_terminator_tx.send(true);
+        termination_writer.store(true, Ordering::SeqCst);
+    });
 
-        if let Err(e) = chains_coordinator_handle.join() {
-            if let Ok(message) = e.downcast::<String>() {
-                return Err(*message);
-            }
-        }
-
-        if let Err(e) = orchestrator_handle.join() {
-            if let Ok(message) = e.downcast::<String>() {
-                return Err(*message);
-            }
-        }
-    } else {
-        let termination_reader = Arc::new(AtomicBool::new(false));
-        let termination_writer = termination_reader.clone();
-        let moved_orchestrator_terminator_tx = orchestrator_terminator_tx.clone();
-        let moved_events_observer_commands_tx = chains_coordinator_commands_tx.clone();
-        let _ = ctrlc::set_handler(move || {
-            let _ = moved_events_observer_commands_tx.send(ChainsCoordinatorCommand::Terminate);
-            let _ = moved_orchestrator_terminator_tx.send(true);
-            termination_writer.store(true, Ordering::SeqCst);
-        });
-
-        if log_tx.is_none() {
-            loop {
-                match devnet_events_rx.recv() {
-                    Ok(DevnetEvent::Log(log)) => {
-                        if let Some(ref log_tx) = log_tx {
-                            let _ = log_tx.send(log.clone());
-                        } else {
-                            println!("{}", log.message);
-                            match log.level {
-                                LogLevel::Debug => {
-                                    ctx.try_log(|logger| slog::debug!(logger, "{}", log.message))
-                                }
-                                LogLevel::Info | LogLevel::Success => {
-                                    ctx.try_log(|logger| slog::info!(logger, "{}", log.message))
-                                }
-                                LogLevel::Warning => {
-                                    ctx.try_log(|logger| slog::warn!(logger, "{}", log.message))
-                                }
-                                LogLevel::Error => {
-                                    ctx.try_log(|logger| slog::error!(logger, "{}", log.message))
-                                }
+    if log_tx.is_none() {
+        loop {
+            match devnet_events_rx.recv() {
+                Ok(DevnetEvent::Log(log)) => {
+                    if let Some(ref log_tx) = log_tx {
+                        let _ = log_tx.send(log.clone());
+                    } else {
+                        match log.level {
+                            LogLevel::Debug => {
+                                ctx.try_log(|logger| slog::debug!(logger, "{}", log.message))
+                            }
+                            LogLevel::Info | LogLevel::Success => {
+                                ctx.try_log(|logger| slog::info!(logger, "{}", log.message))
+                            }
+                            LogLevel::Warning => {
+                                ctx.try_log(|logger| slog::warn!(logger, "{}", log.message))
+                            }
+                            LogLevel::Error => {
+                                ctx.try_log(|logger| slog::error!(logger, "{}", log.message))
                             }
                         }
                     }
-                    Ok(DevnetEvent::BootCompleted(bitcoin_mining_tx)) => {
-                        if !devnet_config.bitcoin_controller_automining_disabled {
-                            let _ = bitcoin_mining_tx.send(BitcoinMiningCommand::Start);
-                        }
+                }
+                Ok(DevnetEvent::BootCompleted(bitcoin_mining_tx)) => {
+                    if !devnet_config.bitcoin_controller_automining_disabled {
+                        let _ = bitcoin_mining_tx.send(BitcoinMiningCommand::Start);
                     }
-                    _ => {}
                 }
-                if termination_reader.load(Ordering::SeqCst) {
-                    sleep(Duration::from_secs(3));
-                    std::process::exit(0);
-                }
+                _ => {}
             }
-        } else {
-            return Ok((
-                Some(devnet_events_rx),
-                Some(orchestrator_terminator_tx),
-                Some(chains_coordinator_commands_tx),
-            ));
+            if termination_reader.load(Ordering::SeqCst) {
+                sleep(Duration::from_secs(3));
+                std::process::exit(0);
+            }
         }
+    } else {
+        return Ok((
+            Some(devnet_events_rx),
+            Some(orchestrator_terminator_tx),
+            Some(chains_coordinator_commands_tx),
+        ));
     }
-
-    Ok((None, None, Some(chains_coordinator_commands_tx)))
 }
 
 #[allow(dead_code)]

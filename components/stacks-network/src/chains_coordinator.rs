@@ -382,6 +382,7 @@ pub async fn start_chains_coordinator(
                     let res = publish_stacking_orders(
                         &config.devnet_config,
                         &config.accounts,
+                        &config.services_map_hosts,
                         config.deployment_fee_rate,
                         bitcoin_block_height as u32,
                     )
@@ -519,6 +520,7 @@ pub fn relay_devnet_protocol_deployment(
 pub async fn publish_stacking_orders(
     devnet_config: &DevnetConfig,
     accounts: &Vec<AccountConfig>,
+    services_map_hosts: &ServicesMapHosts,
     fee_rate: u64,
     bitcoin_block_height: u32,
 ) -> Option<usize> {
@@ -526,7 +528,7 @@ pub async fn publish_stacking_orders(
         return None;
     }
 
-    let stacks_node_rpc_url = format!("http://localhost:{}", devnet_config.stacks_node_rpc_port);
+    let stacks_node_rpc_url = &services_map_hosts.stacks_api_host;
 
     let mut transactions = 0;
     let pox_info: PoxInfo = reqwest::get(format!("{}/v2/pox", stacks_node_rpc_url))
