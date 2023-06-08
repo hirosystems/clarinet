@@ -762,7 +762,7 @@ fn mine_block(state: &mut OpState, args: MineBlockArgs) -> Result<String, AnyErr
                         pox_cycle_position: 0,
                         pox_cycle_length: 0,
                         confirm_microblock_identifier: None,
-                        stacks_block_hash: format!(""),
+                        stacks_block_hash: String::new(),
                     },
                 };
                 let result = handle_stacks_hook_action(
