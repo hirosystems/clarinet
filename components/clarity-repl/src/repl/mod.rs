@@ -73,15 +73,6 @@ impl Serialize for ClarityContract {
             StacksEpochId::Epoch21 => {
                 map.serialize_entry("epoch", &2.1)?;
             }
-            StacksEpochId::Epoch22 => {
-                map.serialize_entry("epoch", &2.2)?;
-            }
-            StacksEpochId::Epoch23 => {
-                map.serialize_entry("epoch", &2.3)?;
-            }
-            StacksEpochId::Epoch24 => {
-                map.serialize_entry("epoch", &2.4)?;
-            }
         }
         map.end()
     }

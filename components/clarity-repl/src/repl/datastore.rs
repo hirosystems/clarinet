@@ -445,14 +445,6 @@ impl BurnStateDB for BurnDatastore {
         0
     }
 
-    fn get_v2_unlock_height(&self) -> u32 {
-        0
-    }
-
-    fn get_pox_3_activation_height(&self) -> u32 {
-        0
-    }
-
     /// Returns the *burnchain block height* for the `sortition_id` is associated with.
     fn get_burn_block_height(&self, sortition_id: &SortitionId) -> Option<u32> {
         self.sortition_lookup
