@@ -80,8 +80,8 @@ cli = [
     "pico-args",
     "rustyline",
     "prettytable-rs",
-    "clarity/canonical",
-    "clarity/developer-mode",
+    "clarity-vm/canonical",
+    "clarity-vm/developer-mode",
     "hiro_system_kit/tokio_helpers",
 ]
 dap = [
@@ -94,7 +94,7 @@ dap = [
     "memchr",
     "log",
 ]
-wasm = ["wasm-bindgen", "wasm-bindgen-futures", "clarity/wasm"]
+wasm = ["wasm-bindgen", "wasm-bindgen-futures", "clarity-vm/wasm"]
 
 [package.metadata.wasm-pack.profile.release.wasm-bindgen]
 debug-js-glue = false
