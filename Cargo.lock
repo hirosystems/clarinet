@@ -683,7 +683,7 @@ dependencies = [
  "serde-hex",
  "serde_derive",
  "serde_json",
- "stacks-rpc-client 1.0.1",
+ "stacks-rpc-client 1.0.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "tokio",
 ]
 
@@ -811,7 +811,7 @@ dependencies = [
  "clarinet-files",
  "clarinet-utils 1.0.0",
  "clarity-lsp",
- "clarity-repl 1.6.4",
+ "clarity-repl 1.6.3",
  "crossbeam-channel",
  "crossterm 0.22.1",
  "ctrlc",
@@ -911,7 +911,7 @@ dependencies = [
  "bitcoincore-rpc-json",
  "clarinet-files",
  "clarinet-utils 1.0.0",
- "clarity-repl 1.6.4",
+ "clarity-repl 1.6.3",
  "libsecp256k1 0.7.1",
  "reqwest",
  "serde",
@@ -930,7 +930,7 @@ dependencies = [
  "bitcoin",
  "chainhook-types",
  "clarinet-utils 1.0.0",
- "clarity-repl 1.6.4",
+ "clarity-repl 1.6.3",
  "js-sys",
  "libsecp256k1 0.7.1",
  "serde",
@@ -970,7 +970,7 @@ version = "1.0.0"
 dependencies = [
  "clap",
  "clarinet-files",
- "clarity-repl 1.6.4",
+ "clarity-repl 1.6.3",
  "serde",
  "serde_derive",
  "serde_json",
@@ -982,7 +982,7 @@ name = "clarity-jupyter-kernel"
 version = "1.0.0"
 dependencies = [
  "chrono",
- "clarity-repl 1.6.4",
+ "clarity-repl 1.6.3",
  "colored",
  "dirs",
  "failure",
@@ -1004,7 +1004,7 @@ version = "1.0.0"
 dependencies = [
  "clarinet-deployments",
  "clarinet-files",
- "clarity-repl 1.6.4",
+ "clarity-repl 1.6.3",
  "console_error_panic_hook",
  "js-sys",
  "lazy_static",
@@ -1058,7 +1058,7 @@ dependencies = [
 
 [[package]]
 name = "clarity-repl"
-version = "1.6.4"
+version = "1.6.3"
 dependencies = [
  "ansi_term",
  "atty",
@@ -4390,9 +4390,9 @@ dependencies = [
 
 [[package]]
 name = "pyo3-build-config"
-version = "0.18.3"
+version = "0.18.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9cb946f5ac61bb61a5014924910d936ebd2b23b705f7a4a3c40b05c720b079a3"
+checksum = "75439f995d07ddfad42b192dfcf3bc66a7ecfd8b4a1f5f6f046aa5c2c5d7677d"
 dependencies = [
  "once_cell",
  "target-lexicon",
@@ -5768,7 +5768,7 @@ dependencies = [
  "clarinet-deployments",
  "clarinet-files",
  "clarinet-utils 1.0.0",
- "clarity-repl 1.6.4",
+ "clarity-repl 1.6.3",
  "crossbeam-channel",
  "crossterm 0.22.1",
  "ctrlc",
@@ -5790,7 +5790,7 @@ dependencies = [
 name = "stacks-rpc-client"
 version = "1.0.0"
 dependencies = [
- "clarity-repl 1.6.4",
+ "clarity-repl 1.6.3",
  "reqwest",
  "serde",
  "serde_derive",
@@ -5799,9 +5799,9 @@ dependencies = [
 
 [[package]]
 name = "stacks-rpc-client"
-version = "1.0.1"
+version = "1.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f3160c1225d52bd81f588ad39a7382385e47018990893466b98e5420b0e56b48"
+checksum = "aca7b97b09d835c932c1ee24335adcb4a85225aaf6eb566aa36fe6f9f18958cd"
 dependencies = [
  "clarinet-utils 1.0.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "clarity-repl 1.5.0",
@@ -6437,9 +6437,9 @@ checksum = "f764005d11ee5f36500a149ace24e00e3da98b0158b3e2d53a7495660d3f4d60"
 
 [[package]]
 name = "target-lexicon"
-version = "0.12.7"
+version = "0.12.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "fd1ba337640d60c3e96bc6f0638a939b9c9a7f2c316a1598c279828b3d1dc8c5"
+checksum = "8ae9980cab1db3fceee2f6c6f643d5d8de2997c58ee8d25fb0cc8a9e9e7348e5"
 
 [[package]]
 name = "tempfile"
