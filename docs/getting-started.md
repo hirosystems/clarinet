@@ -60,7 +60,7 @@ winget install clarinet
 
 For more information on how to install Clarinet on Windows, please see the [Setting Up Your Clarity Environment (Windows)](https://www.youtube.com/watch?v=r5LY1J5oACs) video walkthrough.
 
-### Install from pre-built binary
+### Install from a pre-built binary
 
 If you would like to install Clarinet from pre-built binaries, you must first download the latest release from the 
 [Hiro releases page](https://github.com/hirosystems/clarinet/releases). When you have downloaded the latest release,
