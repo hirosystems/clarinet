@@ -32,6 +32,9 @@ To install Clarinet, you may choose from the following:
 
 ### Install on macOS (Homebrew)
 
+**Note:** We are currently experiencing issues to release Clarinet on Homebrew. The latest version on Homebrew is stuck at clarinet v1.5.x, while clarinet v1.6.0 and above bring significant changes (Subnets, Epoch 2.4, POX-3, etc).
+We are working on fix to release new versions on Homebrew. In the meantime, you can install pre-built binaries by following these instructions: [Install from a pre-built binary](#install-from-a-pre-built-binary).
+
 To install Clarinet using macOs, you must first have Homebrew installed on your system. If you do not already have Homebrew already installed, 
 please refer to the [Homebrew](https://brew.sh/)documentation for detailed information on how to install Homebrew.
 
