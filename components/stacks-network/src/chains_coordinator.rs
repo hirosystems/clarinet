@@ -105,25 +105,6 @@ impl DevnetEventObserverConfig {
         )
         .expect("unable to load network manifest");
 
-        // pub hooks_enabled: bool,
-        // pub chainhook_config: Option<ChainhookConfig>,
-        // pub bitcoin_rpc_proxy_enabled: bool,
-        // pub event_handlers: Vec<EventHandler>,
-        // pub ingestion_port: u16,
-        // pub control_port: u16,
-        // pub control_api_enabled: bool,
-        // pub bitcoind_rpc_username: String,
-        // pub bitcoind_rpc_password: String,
-        // pub bitcoind_rpc_url: String,
-        // pub bitcoin_block_signaling: BitcoinBlockSignaling,
-        // pub stacks_node_rpc_url: String,
-        // pub operators: HashSet<String>,
-        // pub display_logs: bool,
-        // pub cache_path: String,
-        // pub bitcoin_network: BitcoinNetwork,
-        // pub stacks_network: StacksNetwork,
-        // pub ordinals_enabled: bool,
-
         let event_observer_config = EventObserverConfig {
             hooks_enabled: true,
             bitcoin_rpc_proxy_enabled: true,
