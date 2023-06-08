@@ -1,6 +1,5 @@
-use std::fs::{self, OpenOptions};
+use std::fs::{self};
 use std::io::BufReader;
-use std::str::FromStr;
 use std::{fs::File, path::PathBuf};
 
 use chainhook_event_observer::chainhook_types::{BitcoinNetwork, StacksNetwork};
@@ -62,7 +61,7 @@ fn main() {
         }
     };
 
-    let logger = create_log(&orchestrator).unwrap();
+    let logger = create_log().unwrap();
     let ctx = Context {
         logger: Some(logger),
         tracer: false,
@@ -164,27 +163,8 @@ pub fn parse_chainhook_full_specification(
     Ok(specification)
 }
 
-fn create_log(devnet: &DevnetOrchestrator) -> Result<Logger, String> {
-    let working_dir = devnet
-        .network_config
-        .as_ref()
-        .and_then(|c| c.devnet.as_ref())
-        .and_then(|d| Some(d.working_dir.to_string()))
-        .ok_or("unable to read settings/Devnet.toml")?;
-    fs::create_dir_all(&working_dir)
-        .map_err(|_| format!("unable to create dir {}", working_dir))?;
-    let mut log_path = PathBuf::from_str(&working_dir)
-        .map_err(|e| format!("unable to working_dir {}\n{}", working_dir, e.to_string()))?;
-    log_path.push("devnet.log");
-
-    let file = OpenOptions::new()
-        .create(true)
-        .write(true)
-        .truncate(true)
-        .open(log_path)
-        .map_err(|e| format!("unable to create log file {}", e.to_string()))?;
-
-    let decorator = slog_term::PlainDecorator::new(file);
+fn create_log() -> Result<Logger, String> {
+    let decorator = slog_term::PlainDecorator::new(std::io::stdout());
     let drain = slog_term::FullFormat::new(decorator).build().fuse();
     let drain = slog_async::Async::new(drain).build().fuse();
     let logger = slog::Logger::root(drain, o!());
