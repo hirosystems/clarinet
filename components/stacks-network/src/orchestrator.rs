@@ -1529,6 +1529,7 @@ events_keys = ["*"]
             format!("PG_DATABASE={}", devnet_config.stacks_api_postgres_database),
             format!("STACKS_CHAIN_ID=2147483648"),
             format!("V2_POX_MIN_AMOUNT_USTX=90000000260"),
+            format!("CUSTOM_CHAIN_IDS=testnet=0x55005500"),
             "NODE_ENV=development".to_string(),
         ];
         env.append(&mut devnet_config.stacks_api_env_vars.clone());
