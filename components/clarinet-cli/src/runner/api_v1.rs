@@ -34,14 +34,14 @@ use deno_core::serde_json::{json, Value};
 use deno_core::{op, Extension};
 use deno_core::{ModuleSpecifier, OpState};
 use sha2::{Digest, Sha256};
-use stacks_network::chainhook_event_observer::chainhook_types::*;
-use stacks_network::chainhook_event_observer::chainhooks::stacks::evaluate_stacks_predicate_on_transaction;
-use stacks_network::chainhook_event_observer::chainhooks::stacks::handle_stacks_hook_action;
-use stacks_network::chainhook_event_observer::chainhooks::stacks::StacksChainhookOccurrence;
-use stacks_network::chainhook_event_observer::chainhooks::stacks::StacksTriggerChainhook;
-use stacks_network::chainhook_event_observer::chainhooks::types::StacksChainhookSpecification;
-use stacks_network::chainhook_event_observer::indexer::stacks::get_standardized_stacks_receipt;
-use stacks_network::chainhook_event_observer::utils::Context;
+use stacks_network::chainhook_sdk::chainhook_types::*;
+use stacks_network::chainhook_sdk::chainhooks::stacks::evaluate_stacks_predicate_on_transaction;
+use stacks_network::chainhook_sdk::chainhooks::stacks::handle_stacks_hook_action;
+use stacks_network::chainhook_sdk::chainhooks::stacks::StacksChainhookOccurrence;
+use stacks_network::chainhook_sdk::chainhooks::stacks::StacksTriggerChainhook;
+use stacks_network::chainhook_sdk::chainhooks::types::StacksChainhookSpecification;
+use stacks_network::chainhook_sdk::indexer::stacks::get_standardized_stacks_receipt;
+use stacks_network::chainhook_sdk::utils::Context;
 use std::collections::{BTreeMap, HashMap};
 use std::fs::OpenOptions;
 use std::io::Write;
@@ -908,7 +908,7 @@ fn wrap_result_in_simulated_transaction(
             description: String::new(),
             sponsor: None,
             execution_cost: None,
-            position: stacks_network::chainhook_event_observer::chainhook_types::StacksTransactionPosition::anchor_block(index),
+            position: stacks_network::chainhook_sdk::chainhook_types::StacksTransactionPosition::anchor_block(index),
             proof: None,
         },
     };
@@ -923,7 +923,7 @@ fn convert_clarity_event_to_chainhook_event(
         FTEventType as SFT, NFTEventType as SNFT, STXEventType as SSTX,
         StacksTransactionEvent as SourceEvent,
     };
-    use stacks_network::chainhook_event_observer::chainhook_types::StacksTransactionEvent as DestinationEvent;
+    use stacks_network::chainhook_sdk::chainhook_types::StacksTransactionEvent as DestinationEvent;
 
     match source {
         SourceEvent::FTEvent(SFT::FTMintEvent(data)) => {

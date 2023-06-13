@@ -11,7 +11,7 @@ use clarinet_files::{
     compute_addresses, AccountConfig, DevnetConfigFile, FileLocation, PoxStackingOrder,
     ProjectManifest, DEFAULT_DERIVATION_PATH,
 };
-use stacks_network::chainhook_event_observer::chainhook_types::{
+use stacks_network::chainhook_sdk::chainhook_types::{
     BitcoinChainEvent, BitcoinChainUpdatedWithBlocksData, StacksChainEvent,
     StacksChainUpdatedWithBlocksData,
 };

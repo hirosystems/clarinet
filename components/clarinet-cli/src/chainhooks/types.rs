@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
-use stacks_network::chainhook_event_observer::chainhook_types::{BitcoinNetwork, StacksNetwork};
-use stacks_network::chainhook_event_observer::chainhooks::types::*;
+use stacks_network::chainhook_sdk::chainhook_types::{BitcoinNetwork, StacksNetwork};
+use stacks_network::chainhook_sdk::chainhooks::types::*;
 use std::collections::BTreeMap;
 use std::fs::File;
 use std::io::{BufReader, Read};

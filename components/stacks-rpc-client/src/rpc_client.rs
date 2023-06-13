@@ -53,7 +53,7 @@ pub struct NodeInfo {
     pub genesis_chainstate_hash: String,
 }
 
-#[derive(Deserialize, Debug, Clone, Default)]
+#[derive(Deserialize, Debug, Clone)]
 pub struct PoxInfo {
     pub contract_id: String,
     pub pox_activation_threshold_ustx: u64,
@@ -64,6 +64,54 @@ pub struct PoxInfo {
     pub reward_cycle_id: u32,
     pub total_liquid_supply_ustx: u64,
     pub next_cycle: PoxCycle,
+}
+
+impl PoxInfo {
+    pub fn mainnet_default() -> PoxInfo {
+        PoxInfo {
+            contract_id: "SP000000000000000000002Q6VF78.pox-3".into(),
+            pox_activation_threshold_ustx: 0,
+            first_burnchain_block_height: 666050,
+            prepare_phase_block_length: 100,
+            reward_phase_block_length: 2000,
+            reward_slots: 4000,
+            total_liquid_supply_ustx: 1368787887756275,
+            ..Default::default()
+        }
+    }
+
+    pub fn testnet_default() -> PoxInfo {
+        PoxInfo {
+            contract_id: "ST000000000000000000002AMW42H.pox-3".into(),
+            pox_activation_threshold_ustx: 0,
+            first_burnchain_block_height: 2000000,
+            prepare_phase_block_length: 50,
+            reward_phase_block_length: 1000,
+            reward_slots: 2000,
+            total_liquid_supply_ustx: 41412139686144074,
+            ..Default::default()
+        }
+    }
+
+    pub fn devnet_default() -> PoxInfo {
+        Self::default()
+    }
+}
+
+impl Default for PoxInfo {
+    fn default() -> PoxInfo {
+        PoxInfo {
+            contract_id: "ST000000000000000000002AMW42H.pox".into(),
+            pox_activation_threshold_ustx: 0,
+            first_burnchain_block_height: 100,
+            prepare_phase_block_length: 4,
+            reward_phase_block_length: 6,
+            reward_slots: 12,
+            total_liquid_supply_ustx: 1000000000000000,
+            reward_cycle_id: 0,
+            next_cycle: PoxCycle::default(),
+        }
+    }
 }
 
 #[derive(Deserialize, Debug, Clone, Default)]

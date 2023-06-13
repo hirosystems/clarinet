@@ -11,7 +11,7 @@ use bollard::models::{HostConfig, PortBinding};
 use bollard::network::{CreateNetworkOptions, PruneNetworksOptions};
 use bollard::service::Ipam;
 use bollard::Docker;
-use chainhook_event_observer::utils::Context;
+use chainhook_sdk::utils::Context;
 use clarinet_files::chainhook_types::StacksNetwork;
 use clarinet_files::{DevnetConfigFile, NetworkManifest, ProjectManifest};
 use futures::stream::TryStreamExt;
