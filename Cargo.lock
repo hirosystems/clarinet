@@ -140,9 +140,6 @@ name = "anyhow"
 version = "1.0.71"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9c7d0618f0e0b7e8ff11427422b64564d5fb0be1940354bfe2e0529b18a9d9b8"
-dependencies = [
- "backtrace",
-]
 
 [[package]]
 name = "anymap"
@@ -391,26 +388,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "383d29d513d8764dcdc42ea295d979eb99c3c9f00607b3692cf68a431f7dca72"
 
 [[package]]
-name = "bindgen"
-version = "0.64.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c4243e6031260db77ede97ad86c27e501d646a27ab57b59a574f725d98ab1fb4"
-dependencies = [
- "bitflags 1.3.2",
- "cexpr",
- "clang-sys",
- "lazy_static",
- "lazycell",
- "peeking_take_while",
- "proc-macro2 1.0.59",
- "quote 1.0.28",
- "regex",
- "rustc-hash",
- "shlex",
- "syn 1.0.107",
-]
-
-[[package]]
 name = "bip39"
 version = "1.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -631,17 +608,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "89b2fd2a0dcf38d7971e2194b6b6eebab45ae01067456a7fd93d5547a61b70be"
 
 [[package]]
-name = "bzip2-sys"
-version = "0.1.11+1.0.8"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "736a955f3fa7875102d57c82b8cac37ec45224a07fd32d58f9f7a186b6cd4cdc"
-dependencies = [
- "cc",
- "libc",
- "pkg-config",
-]
-
-[[package]]
 name = "cache_control"
 version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -672,35 +638,21 @@ dependencies = [
 ]
 
 [[package]]
-name = "cexpr"
-version = "0.6.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6fac387a98bb7c37292057cffc56d62ecb629900026402633ae9160df93a8766"
-dependencies = [
- "nom",
-]
-
-[[package]]
 name = "cfg-if"
 version = "1.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "baf1de4339761588bc0619e3cbc0120ee582ebb74b53b4efbf79117bd2da40fd"
 
 [[package]]
-name = "chainhook-event-observer"
-version = "1.0.10"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ad11a9ffe7b473a9d446e0c0ebcc2c897aa2352adb0c998657c9b65d0801e119"
+name = "chainhook-sdk"
+version = "0.1.0"
 dependencies = [
- "anyhow",
  "base58 0.2.0",
  "base64 0.13.1",
  "bitcoincore-rpc",
  "bitcoincore-rpc-json",
- "chainhook-types",
- "chrono",
+ "chainhook-types 1.0.3",
  "clarinet-utils 1.0.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "clarity-repl 1.6.4 (registry+https://github.com/rust-lang/crates.io-index)",
  "crossbeam-channel",
  "dashmap",
  "futures",
@@ -712,18 +664,27 @@ dependencies = [
  "rand 0.8.5",
  "reqwest",
  "rocket",
- "rocket_okapi",
- "rocksdb",
- "rusqlite",
  "schemars",
  "serde",
  "serde-hex",
  "serde_cbor",
  "serde_derive",
  "serde_json",
- "stacks-rpc-client 1.0.1 (registry+https://github.com/rust-lang/crates.io-index)",
+ "stacks-rpc-client 1.0.5 (registry+https://github.com/rust-lang/crates.io-index)",
  "threadpool",
  "tokio",
+]
+
+[[package]]
+name = "chainhook-types"
+version = "1.0.3"
+dependencies = [
+ "hex 0.4.3",
+ "schemars",
+ "serde",
+ "serde_derive",
+ "serde_json",
+ "strum",
 ]
 
 [[package]]
@@ -773,17 +734,6 @@ checksum = "773f3b9af64447d2ce9850330c473515014aa235e6a783b02db81ff39e4a3dad"
 dependencies = [
  "crypto-common",
  "inout",
-]
-
-[[package]]
-name = "clang-sys"
-version = "1.6.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c688fc74432808e3eb684cae8830a86be1d66a2bd58e1f248ed0960a590baf6f"
-dependencies = [
- "glob",
- "libc",
- "libloading 0.7.4",
 ]
 
 [[package]]
@@ -969,7 +919,7 @@ dependencies = [
  "serde_derive",
  "serde_json",
  "serde_yaml",
- "stacks-rpc-client 1.0.1",
+ "stacks-rpc-client 1.0.5",
  "tiny-hderive",
 ]
 
@@ -979,7 +929,7 @@ version = "1.0.0"
 dependencies = [
  "bip39",
  "bitcoin",
- "chainhook-types",
+ "chainhook-types 1.0.5",
  "clarinet-utils 1.0.0",
  "clarity-repl 1.6.4",
  "js-sys",
@@ -3251,12 +3201,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "lazycell"
-version = "1.3.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "830d08ce1d1d941e6b30645f1a0eb5643013d835ce3779a5fc208261dbe10f55"
-
-[[package]]
 name = "lexical"
 version = "6.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3346,35 +3290,10 @@ dependencies = [
 ]
 
 [[package]]
-name = "libloading"
-version = "0.7.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b67380fd3b2fbe7527a606e18729d21c6f3951633d0500574c4dc22d2d638b9f"
-dependencies = [
- "cfg-if",
- "winapi",
-]
-
-[[package]]
 name = "libm"
 version = "0.2.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "348108ab3fba42ec82ff6e9564fc4ca0247bdccdc68dd8af9764bbc79c3c8ffb"
-
-[[package]]
-name = "librocksdb-sys"
-version = "0.10.0+7.9.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0fe4d5874f5ff2bc616e55e8c6086d478fcda13faf9495768a4aa1c22042d30b"
-dependencies = [
- "bindgen",
- "bzip2-sys",
- "cc",
- "glob",
- "libc",
- "libz-sys",
- "lz4-sys",
-]
 
 [[package]]
 name = "libsecp256k1"
@@ -3500,17 +3419,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "libz-sys"
-version = "1.1.9"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "56ee889ecc9568871456d42f603d6a0ce59ff328d291063a45cbdf0036baf6db"
-dependencies = [
- "cc",
- "pkg-config",
- "vcpkg",
-]
-
-[[package]]
 name = "link-cplusplus"
 version = "1.0.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3586,16 +3494,6 @@ dependencies = [
  "serde_json",
  "serde_repr",
  "url",
-]
-
-[[package]]
-name = "lz4-sys"
-version = "1.9.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "57d27b317e207b10f69f5e75494119e391a96f48861ae870d1da6edac98ca900"
-dependencies = [
- "cc",
- "libc",
 ]
 
 [[package]]
@@ -3681,12 +3579,6 @@ name = "mime"
 version = "0.3.16"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2a60c7ce501c71e03a9c9c0d35b861413ae925bd979cc7a4e30d060069aaac8d"
-
-[[package]]
-name = "minimal-lexical"
-version = "0.2.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "68354c5c6bd36d73ff3feceb05efa59b6acb7626617f4962be322a825e61f79a"
 
 [[package]]
 name = "miniz_oxide"
@@ -3788,7 +3680,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "02662cd2e62b131937bdef85d0918b05bc3c204daf4c64af62845403eccb60f3"
 dependencies = [
  "cfg-if",
- "libloading 0.6.7",
+ "libloading",
  "smallvec 1.10.0",
 ]
 
@@ -3871,16 +3763,6 @@ name = "nodrop"
 version = "0.1.14"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "72ef4a56884ca558e5ddb05a1d1e7e1bfd9a68d9ed024c21704cc98872dae1bb"
-
-[[package]]
-name = "nom"
-version = "7.1.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d273983c5a657a70a3e8f2a01329822f3b8c8172b73826411a55751e404a0a4a"
-dependencies = [
- "memchr",
- "minimal-lexical",
-]
 
 [[package]]
 name = "notify"
@@ -4040,18 +3922,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ea86265d3d3dcb6a27fc51bd29a4bf387fae9d2986b823079d4986af253eb439"
 dependencies = [
  "memchr",
-]
-
-[[package]]
-name = "okapi"
-version = "0.7.0-rc.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ce66b6366e049880a35c378123fddb630b1a1a3c37fa1ca70caaf4a09f6e2893"
-dependencies = [
- "log",
- "schemars",
- "serde",
- "serde_json",
 ]
 
 [[package]]
@@ -4233,12 +4103,6 @@ dependencies = [
  "quote 1.0.28",
  "syn 1.0.107",
 ]
-
-[[package]]
-name = "peeking_take_while"
-version = "0.1.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "19b17cddbe7ec3f8bc800887bab5e717348c95ea2ca0b1bf0837fb964dc67099"
 
 [[package]]
 name = "pem-rfc7468"
@@ -4923,45 +4787,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "rocket_okapi"
-version = "0.8.0-rc.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "742098674565c8f0c35c77444f90344aafedebb71cfee9cdbf0185acc6b9cdb7"
-dependencies = [
- "either",
- "log",
- "okapi",
- "rocket",
- "rocket_okapi_codegen",
- "schemars",
- "serde",
- "serde_json",
-]
-
-[[package]]
-name = "rocket_okapi_codegen"
-version = "0.8.0-rc.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8c43f8edc57d88750a220b0ec1870a36c1106204ec99cc35131b49de3b954a4a"
-dependencies = [
- "darling",
- "proc-macro2 1.0.59",
- "quote 1.0.28",
- "rocket_http",
- "syn 1.0.107",
-]
-
-[[package]]
-name = "rocksdb"
-version = "0.20.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "015439787fce1e75d55f279078d33ff14b4af5d93d995e8838ee4631301c8a99"
-dependencies = [
- "libc",
- "librocksdb-sys",
-]
-
-[[package]]
 name = "rsa"
 version = "0.7.0-pre"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5168,7 +4993,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2a5fb6c61f29e723026dc8e923d94c694313212abbecbbe5f55a7748eec5b307"
 dependencies = [
  "dyn-clone",
- "indexmap",
  "schemars_derive",
  "serde",
  "serde_json",
@@ -5618,12 +5442,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "shlex"
-version = "1.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "43b2853a4d09f215c24cc5489c992ce46052d359b5109343cbafbf26bc62f8a3"
-
-[[package]]
 name = "signal-hook"
 version = "0.3.15"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5890,7 +5708,7 @@ dependencies = [
  "bitcoincore-rpc",
  "bollard",
  "bytes",
- "chainhook-event-observer",
+ "chainhook-sdk",
  "chrono",
  "clarinet-deployments",
  "clarinet-files",
@@ -5906,7 +5724,7 @@ dependencies = [
  "serde",
  "serde_derive",
  "serde_json",
- "stacks-rpc-client 1.0.1",
+ "stacks-rpc-client 1.0.5",
  "tracing",
  "tracing-appender",
  "tracing-subscriber",
@@ -5915,7 +5733,7 @@ dependencies = [
 
 [[package]]
 name = "stacks-rpc-client"
-version = "1.0.1"
+version = "1.0.5"
 dependencies = [
  "clarity-repl 1.6.4",
  "reqwest",
@@ -5926,11 +5744,10 @@ dependencies = [
 
 [[package]]
 name = "stacks-rpc-client"
-version = "1.0.1"
+version = "1.0.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f3160c1225d52bd81f588ad39a7382385e47018990893466b98e5420b0e56b48"
+checksum = "d37303e34a7b81da7c285cd88b95e380481f211749ed7eab5ee53fae0476b111"
 dependencies = [
- "clarinet-utils 1.0.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "clarity-repl 1.6.4 (registry+https://github.com/rust-lang/crates.io-index)",
  "reqwest",
  "serde",
