@@ -13,7 +13,7 @@ use clarity_repl::clarity::vm::types::QualifiedContractIdentifier;
 use clarity_repl::clarity::vm::EvaluationResult;
 use clarity_repl::repl::{session::CostsReport, Session};
 use deno_core::error::AnyError;
-use stacks_network::chainhook_event_observer::chainhooks::types::StacksChainhookSpecification;
+use stacks_network::chainhook_sdk::chainhooks::types::StacksChainhookSpecification;
 use std::collections::HashMap;
 use std::path::PathBuf;
 

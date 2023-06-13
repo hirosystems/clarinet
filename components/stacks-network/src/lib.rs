@@ -7,7 +7,7 @@ pub mod chains_coordinator;
 mod orchestrator;
 mod ui;
 
-pub use chainhook_event_observer::{self, utils::Context};
+pub use chainhook_sdk::{self, utils::Context};
 pub use orchestrator::DevnetOrchestrator;
 
 use std::{
@@ -20,8 +20,8 @@ use std::{
     time::Duration,
 };
 
-use chainhook_event_observer::chainhook_types::{BitcoinChainEvent, StacksChainEvent};
-use chainhook_event_observer::{
+use chainhook_sdk::chainhook_types::{BitcoinChainEvent, StacksChainEvent};
+use chainhook_sdk::{
     chainhooks::types::ChainhookConfig, observer::MempoolAdmissionData,
 };
 use chains_coordinator::{start_chains_coordinator, BitcoinMiningCommand};

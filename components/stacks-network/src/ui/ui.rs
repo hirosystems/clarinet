@@ -1,5 +1,5 @@
 use crate::{LogLevel, Status};
-use chainhook_event_observer::chainhook_types::{
+use chainhook_sdk::chainhook_types::{
     StacksBlockData, StacksMicroblockData, StacksTransactionData,
 };
 
