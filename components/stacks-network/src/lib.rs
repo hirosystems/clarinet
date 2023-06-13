@@ -21,9 +21,7 @@ use std::{
 };
 
 use chainhook_sdk::chainhook_types::{BitcoinChainEvent, StacksChainEvent};
-use chainhook_sdk::{
-    chainhooks::types::ChainhookConfig, observer::MempoolAdmissionData,
-};
+use chainhook_sdk::{chainhooks::types::ChainhookConfig, observer::MempoolAdmissionData};
 use chains_coordinator::{start_chains_coordinator, BitcoinMiningCommand};
 use chrono::prelude::*;
 use clarinet_deployments::types::DeploymentSpecification;

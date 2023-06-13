@@ -645,13 +645,15 @@ checksum = "baf1de4339761588bc0619e3cbc0120ee582ebb74b53b4efbf79117bd2da40fd"
 
 [[package]]
 name = "chainhook-sdk"
-version = "0.1.0"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5cb4918f5ddcbb0ff0f060cdb0f1f313445aa7e5f3ff867ac080515bbc8ac794"
 dependencies = [
  "base58 0.2.0",
  "base64 0.13.1",
  "bitcoincore-rpc",
  "bitcoincore-rpc-json",
- "chainhook-types 1.0.3",
+ "chainhook-types",
  "clarinet-utils 1.0.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "crossbeam-channel",
  "dashmap",
@@ -677,21 +679,9 @@ dependencies = [
 
 [[package]]
 name = "chainhook-types"
-version = "1.0.3"
-dependencies = [
- "hex 0.4.3",
- "schemars",
- "serde",
- "serde_derive",
- "serde_json",
- "strum",
-]
-
-[[package]]
-name = "chainhook-types"
-version = "1.0.5"
+version = "1.0.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5289e04a84aaff380f5295d2b2770b7df8db0759a1ba0c00823ee4852f755044"
+checksum = "65268eb9aad0d567865cd13c5a5c7a9a301d99f6301f8f5cac1654744eda0a7c"
 dependencies = [
  "hex 0.4.3",
  "schemars",
@@ -929,7 +919,7 @@ version = "1.0.0"
 dependencies = [
  "bip39",
  "bitcoin",
- "chainhook-types 1.0.5",
+ "chainhook-types",
  "clarinet-utils 1.0.0",
  "clarity-repl 1.6.4",
  "js-sys",
