@@ -5726,10 +5726,15 @@ name = "stacks-rpc-client"
 version = "1.0.6"
 dependencies = [
  "clarity-repl 1.6.4",
+ "hmac 0.12.1",
+ "libsecp256k1 0.7.1",
+ "pbkdf2",
  "reqwest",
  "serde",
  "serde_derive",
  "serde_json",
+ "sha2 0.10.6",
+ "tiny-hderive",
 ]
 
 [[package]]

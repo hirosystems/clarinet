@@ -16,4 +16,6 @@ pub mod clarity {
 
 pub mod rpc_client;
 
+pub mod crypto;
+
 pub use rpc_client::{PoxInfo, StacksRpc};
