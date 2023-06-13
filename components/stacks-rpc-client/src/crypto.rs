@@ -31,13 +31,10 @@ impl Wallet {
 
 pub struct Keypair {
     pub secret_key: Secp256k1PrivateKey,
-    pub public_key: PublicKey
+    pub public_key: PublicKey,
 }
 
-pub fn compute_stacks_address(
-    public_key: &PublicKey,
-    mainnet: bool,
-) -> StacksAddress {
+pub fn compute_stacks_address(public_key: &PublicKey, mainnet: bool) -> StacksAddress {
     let wrapped_public_key =
         Secp256k1PublicKey::from_slice(&public_key.serialize_compressed()).unwrap();
 
@@ -66,7 +63,7 @@ pub fn compute_keypair(wallet: &Wallet) -> Keypair {
     let public_key = PublicKey::from_secret_key(&secret_key);
     Keypair {
         secret_key: wrapped_secret_key,
-        public_key
+        public_key,
     }
 }
 

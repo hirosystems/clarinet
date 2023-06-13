@@ -672,7 +672,7 @@ dependencies = [
  "serde_cbor",
  "serde_derive",
  "serde_json",
- "stacks-rpc-client 1.0.6 (registry+https://github.com/rust-lang/crates.io-index)",
+ "stacks-rpc-client 1.0.6",
  "threadpool",
  "tokio",
 ]
@@ -909,7 +909,7 @@ dependencies = [
  "serde_derive",
  "serde_json",
  "serde_yaml",
- "stacks-rpc-client 1.0.6",
+ "stacks-rpc-client 1.0.7",
  "tiny-hderive",
 ]
 
@@ -5714,27 +5714,11 @@ dependencies = [
  "serde",
  "serde_derive",
  "serde_json",
- "stacks-rpc-client 1.0.6",
+ "stacks-rpc-client 1.0.7",
  "tracing",
  "tracing-appender",
  "tracing-subscriber",
  "tui",
-]
-
-[[package]]
-name = "stacks-rpc-client"
-version = "1.0.6"
-dependencies = [
- "clarity-repl 1.6.4",
- "hmac 0.12.1",
- "libsecp256k1 0.7.1",
- "pbkdf2",
- "reqwest",
- "serde",
- "serde_derive",
- "serde_json",
- "sha2 0.10.6",
- "tiny-hderive",
 ]
 
 [[package]]
@@ -5748,6 +5732,22 @@ dependencies = [
  "serde",
  "serde_derive",
  "serde_json",
+]
+
+[[package]]
+name = "stacks-rpc-client"
+version = "1.0.7"
+dependencies = [
+ "clarity-repl 1.6.4",
+ "hmac 0.12.1",
+ "libsecp256k1 0.7.1",
+ "pbkdf2",
+ "reqwest",
+ "serde",
+ "serde_derive",
+ "serde_json",
+ "sha2 0.10.6",
+ "tiny-hderive",
 ]
 
 [[package]]
