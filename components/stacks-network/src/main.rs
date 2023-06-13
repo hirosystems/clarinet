@@ -9,7 +9,7 @@ use clarinet_deployments::types::DeploymentSpecification;
 
 use clap::Parser;
 use clarinet_files::{DevnetConfigFile, FileLocation, ProjectManifest};
-use hiro_system_kit::{o, slog, slog_async, slog_term, Drain, Logger};
+use hiro_system_kit::slog;
 
 use std::sync::mpsc::channel;
 
@@ -61,11 +61,14 @@ fn main() {
         }
     };
 
-    let logger = create_log().unwrap();
+    let logger = hiro_system_kit::log::setup_logger();
+    let _guard = hiro_system_kit::log::setup_global_logger(logger.clone());
     let ctx = Context {
         logger: Some(logger),
         tracer: false,
     };
+    ctx.try_log(|logger| slog::info!(logger, "startin devnet coordinator"));
+
     let (orchestrator_terminated_tx, _) = channel();
     let res = hiro_system_kit::nestable_block_on(do_run_devnet(
         orchestrator,
@@ -161,12 +164,4 @@ pub fn parse_chainhook_full_specification(
             .map_err(|e| format!("unable to parse chainhook spec: {}", e.to_string()))?;
 
     Ok(specification)
-}
-
-fn create_log() -> Result<Logger, String> {
-    let decorator = slog_term::PlainDecorator::new(std::io::stdout());
-    let drain = slog_term::FullFormat::new(decorator).build().fuse();
-    let drain = slog_async::Async::new(drain).build().fuse();
-    let logger = slog::Logger::root(drain, o!());
-    Ok(logger)
 }
