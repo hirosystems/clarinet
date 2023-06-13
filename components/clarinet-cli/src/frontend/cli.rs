@@ -1162,6 +1162,7 @@ pub fn main() {
             let mine_block_delay = cmd.mine_block_delay.unwrap_or(0);
 
             if cmd.chainhooks.contains(&"*".to_string()) {
+                #[allow(unused_imports)]
                 use stacks_network::chainhook_sdk::chainhook_types::{
                     BitcoinNetwork, StacksNetwork,
                 };

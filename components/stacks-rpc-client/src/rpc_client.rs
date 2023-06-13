@@ -94,6 +94,12 @@ impl PoxInfo {
     }
 
     pub fn devnet_default() -> PoxInfo {
+        Self::default()
+    }
+}
+
+impl Default for PoxInfo {
+    fn default() -> PoxInfo {
         PoxInfo {
             contract_id: "ST000000000000000000002AMW42H.pox".into(),
             pox_activation_threshold_ustx: 0,
@@ -102,14 +108,9 @@ impl PoxInfo {
             reward_phase_block_length: 6,
             reward_slots: 12,
             total_liquid_supply_ustx: 1000000000000000,
-            ..Default::default()
+            reward_cycle_id: 0,
+            next_cycle: PoxCycle::default(),
         }
-    }
-}
-
-impl Default for PoxInfo {
-    fn default() -> PoxInfo {
-        PoxInfo::devnet_default()
     }
 }
 
