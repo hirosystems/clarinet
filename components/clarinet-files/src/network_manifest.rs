@@ -15,7 +15,7 @@ use toml::value::Value;
 
 pub const DEFAULT_DERIVATION_PATH: &str = "m/44'/5757'/0'/0/0";
 pub const DEFAULT_BITCOIN_NODE_IMAGE: &str = "quay.io/hirosystems/bitcoind:devnet-v3";
-pub const DEFAULT_STACKS_NODE_IMAGE: &str = "quay.io/hirosystems/stacks-node:devnet-v3";
+pub const DEFAULT_STACKS_NODE_IMAGE: &str = "quay.io/hirosystems/stacks-node:devnet-2.4.0.0.0";
 pub const DEFAULT_BITCOIN_EXPLORER_IMAGE: &str = "quay.io/hirosystems/bitcoin-explorer:devnet";
 pub const DEFAULT_STACKS_API_IMAGE: &str = "hirosystems/stacks-blockchain-api:latest";
 pub const DEFAULT_STACKS_EXPLORER_IMAGE: &str = "hirosystems/explorer:latest";
@@ -39,6 +39,9 @@ pub const DEFAULT_EPOCH_2_0: u64 = 100;
 pub const DEFAULT_EPOCH_2_05: u64 = 102;
 pub const DEFAULT_EPOCH_2_1: u64 = 106;
 pub const DEFAULT_POX2_ACTIVATION: u64 = 109;
+pub const DEFAULT_EPOCH_2_2: u64 = 122;
+pub const DEFAULT_EPOCH_2_3: u64 = 128;
+pub const DEFAULT_EPOCH_2_4: u64 = 134;
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct NetworkManifestFile {
@@ -123,6 +126,9 @@ pub struct DevnetConfigFile {
     pub epoch_2_0: Option<u64>,
     pub epoch_2_05: Option<u64>,
     pub epoch_2_1: Option<u64>,
+    pub epoch_2_2: Option<u64>,
+    pub epoch_2_3: Option<u64>,
+    pub epoch_2_4: Option<u64>,
     pub pox_2_activation: Option<u64>,
     pub use_docker_gateway_routing: Option<bool>,
     pub docker_platform: Option<String>,
@@ -244,6 +250,9 @@ pub struct DevnetConfig {
     pub epoch_2_0: u64,
     pub epoch_2_05: u64,
     pub epoch_2_1: u64,
+    pub epoch_2_2: u64,
+    pub epoch_2_3: u64,
+    pub epoch_2_4: u64,
     pub pox_2_activation: u64,
     pub use_docker_gateway_routing: bool,
     pub docker_platform: String,
@@ -609,6 +618,18 @@ impl NetworkManifest {
                     devnet_config.epoch_2_1 = Some(val.clone());
                 }
 
+                if let Some(ref val) = devnet_override.epoch_2_2 {
+                    devnet_config.epoch_2_2 = Some(val.clone());
+                }
+
+                if let Some(ref val) = devnet_override.epoch_2_3 {
+                    devnet_config.epoch_2_3 = Some(val.clone());
+                }
+
+                if let Some(ref val) = devnet_override.epoch_2_4 {
+                    devnet_config.epoch_2_4 = Some(val.clone());
+                }
+
                 if let Some(ref val) = devnet_override.pox_2_activation {
                     devnet_config.pox_2_activation = Some(val.clone());
                 }
@@ -837,6 +858,9 @@ impl NetworkManifest {
                 epoch_2_0: devnet_config.epoch_2_0.unwrap_or(DEFAULT_EPOCH_2_0),
                 epoch_2_05: devnet_config.epoch_2_05.unwrap_or(DEFAULT_EPOCH_2_05),
                 epoch_2_1: devnet_config.epoch_2_1.unwrap_or(DEFAULT_EPOCH_2_1),
+                epoch_2_2: devnet_config.epoch_2_2.unwrap_or(DEFAULT_EPOCH_2_2),
+                epoch_2_3: devnet_config.epoch_2_3.unwrap_or(DEFAULT_EPOCH_2_3),
+                epoch_2_4: devnet_config.epoch_2_4.unwrap_or(DEFAULT_EPOCH_2_4),
                 pox_2_activation: devnet_config
                     .pox_2_activation
                     .unwrap_or(DEFAULT_POX2_ACTIVATION),

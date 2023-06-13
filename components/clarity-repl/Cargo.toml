@@ -1,6 +1,6 @@
 [package]
 name = "clarity-repl"
-version = "1.6.2"
+version = "1.6.4"
 description = "Clarity REPL"
 authors = [
     "Ludo Galabru <ludo@hiro.so>",
@@ -34,8 +34,7 @@ integer-sqrt = "0.1.3"
 rand = "=0.7.3"
 getrandom = { version = "0.2.3", features = ["js"] }
 atty = "0.2.14"
-clarity-vm = { version = "=2.0.2", default-features = false, optional = true }
-# clarity-vm = { path = "../../../stacks-blockchain/clarity", default-features = false, optional = true }
+clarity-vm = { version = "2", default-features = false, optional = true }
 
 # DAP Debugger
 tokio = { version = "1.24", features = ["full"], optional = true }
