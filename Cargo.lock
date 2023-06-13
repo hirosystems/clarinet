@@ -645,9 +645,9 @@ checksum = "baf1de4339761588bc0619e3cbc0120ee582ebb74b53b4efbf79117bd2da40fd"
 
 [[package]]
 name = "chainhook-sdk"
-version = "0.2.0"
+version = "0.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5cb4918f5ddcbb0ff0f060cdb0f1f313445aa7e5f3ff867ac080515bbc8ac794"
+checksum = "478fdaec92fb5ce5bc685b02f3648f00ed74cbcb05fc234c783c49f772b90f22"
 dependencies = [
  "base58 0.2.0",
  "base64 0.13.1",
@@ -672,7 +672,7 @@ dependencies = [
  "serde_cbor",
  "serde_derive",
  "serde_json",
- "stacks-rpc-client 1.0.5",
+ "stacks-rpc-client 1.0.6 (registry+https://github.com/rust-lang/crates.io-index)",
  "threadpool",
  "tokio",
 ]
@@ -5723,11 +5723,9 @@ dependencies = [
 
 [[package]]
 name = "stacks-rpc-client"
-version = "1.0.5"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d37303e34a7b81da7c285cd88b95e380481f211749ed7eab5ee53fae0476b111"
+version = "1.0.6"
 dependencies = [
- "clarity-repl 1.6.4 (registry+https://github.com/rust-lang/crates.io-index)",
+ "clarity-repl 1.6.4",
  "reqwest",
  "serde",
  "serde_derive",
@@ -5737,8 +5735,10 @@ dependencies = [
 [[package]]
 name = "stacks-rpc-client"
 version = "1.0.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b2cf5e7c501af0ccfbd24059ec0617574f06be4eb94e8492221d8e77a9a9b881"
 dependencies = [
- "clarity-repl 1.6.4",
+ "clarity-repl 1.6.4 (registry+https://github.com/rust-lang/crates.io-index)",
  "reqwest",
  "serde",
  "serde_derive",
