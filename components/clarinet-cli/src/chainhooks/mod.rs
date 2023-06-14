@@ -3,11 +3,11 @@ use std::fs::File;
 use std::io::BufReader;
 use std::path::PathBuf;
 
-use stacks_network::chainhook_event_observer::chainhooks::types::{
+use stacks_network::chainhook_sdk::chainhooks::types::{
     ChainhookConfig, ChainhookFullSpecification,
 };
 
-use stacks_network::chainhook_event_observer::chainhook_types::{BitcoinNetwork, StacksNetwork};
+use stacks_network::chainhook_sdk::chainhook_types::{BitcoinNetwork, StacksNetwork};
 
 use std::fs;
 
@@ -38,14 +38,18 @@ pub fn load_chainhooks(
     let mut bitcoin_chainhooks = vec![];
     for (path, relative_path) in hook_files.into_iter() {
         match parse_chainhook_full_specification(&path) {
-            Ok(hook) => {
-                match hook {
-                    ChainhookFullSpecification::Bitcoin(hook) => bitcoin_chainhooks
-                        .push(hook.into_selected_network_specification(&networks.0)?),
-                    ChainhookFullSpecification::Stacks(hook) => stacks_chainhooks
-                        .push(hook.into_selected_network_specification(&networks.1)?),
+            Ok(hook) => match hook {
+                ChainhookFullSpecification::Bitcoin(predicate) => {
+                    let mut spec = predicate.into_selected_network_specification(&networks.0)?;
+                    spec.enabled = true;
+                    bitcoin_chainhooks.push(spec)
                 }
-            }
+                ChainhookFullSpecification::Stacks(predicate) => {
+                    let mut spec = predicate.into_selected_network_specification(&networks.1)?;
+                    spec.enabled = true;
+                    stacks_chainhooks.push(spec)
+                }
+            },
             Err(msg) => return Err(format!("{} syntax incorrect: {}", relative_path, msg)),
         };
     }

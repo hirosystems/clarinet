@@ -14,3 +14,6 @@ members = [
     "components/stacks-rpc-client",
 ]
 default-members = ["components/clarinet-cli"]
+
+# [patch.crates-io]
+# "clarity-vm" = { path = "../stacks-blockchain/clarity" }

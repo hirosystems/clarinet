@@ -42,7 +42,7 @@ use rand::rngs::SmallRng;
 use rand::seq::SliceRandom;
 use rand::SeedableRng;
 use regex::Regex;
-use stacks_network::chainhook_event_observer::chainhooks::types::StacksChainhookSpecification;
+use stacks_network::chainhook_sdk::chainhooks::types::StacksChainhookSpecification;
 use std::collections::HashSet;
 use std::fmt::Write as _;
 use std::num::NonZeroUsize;

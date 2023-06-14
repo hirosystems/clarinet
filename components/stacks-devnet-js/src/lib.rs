@@ -11,7 +11,7 @@ use clarinet_files::{
     compute_addresses, AccountConfig, DevnetConfigFile, FileLocation, PoxStackingOrder,
     ProjectManifest, DEFAULT_DERIVATION_PATH,
 };
-use stacks_network::chainhook_event_observer::chainhook_types::{
+use stacks_network::chainhook_sdk::chainhook_types::{
     BitcoinChainEvent, BitcoinChainUpdatedWithBlocksData, StacksChainEvent,
     StacksChainUpdatedWithBlocksData,
 };
@@ -609,6 +609,27 @@ impl StacksDevnet {
             .downcast::<JsNumber, _>(&mut cx)
         {
             overrides.epoch_2_1 = Some(res.value(&mut cx) as u64);
+        }
+
+        if let Ok(res) = devnet_settings
+            .get(&mut cx, "epoch_2_2")?
+            .downcast::<JsNumber, _>(&mut cx)
+        {
+            overrides.epoch_2_2 = Some(res.value(&mut cx) as u64);
+        }
+
+        if let Ok(res) = devnet_settings
+            .get(&mut cx, "epoch_2_3")?
+            .downcast::<JsNumber, _>(&mut cx)
+        {
+            overrides.epoch_2_3 = Some(res.value(&mut cx) as u64);
+        }
+
+        if let Ok(res) = devnet_settings
+            .get(&mut cx, "epoch_2_4")?
+            .downcast::<JsNumber, _>(&mut cx)
+        {
+            overrides.epoch_2_4 = Some(res.value(&mut cx) as u64);
         }
 
         if let Ok(res) = devnet_settings

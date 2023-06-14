@@ -21,6 +21,7 @@ use clarity_repl::codec::{
 use clarity_repl::codec::{StacksTransaction, TransactionAnchorMode};
 use clarity_repl::repl::session::{
     BOOT_MAINNET_ADDRESS, BOOT_TESTNET_ADDRESS, V1_BOOT_CONTRACTS, V2_BOOT_CONTRACTS,
+    V3_BOOT_CONTRACTS,
 };
 use clarity_repl::repl::{Session, SessionSettings};
 use reqwest::Url;
@@ -393,6 +394,12 @@ pub fn apply_on_chain_deployment(
         ));
     }
     for contract in V2_BOOT_CONTRACTS {
+        contracts_ids_to_remap.insert((
+            format!("{}:{}", BOOT_MAINNET_ADDRESS, contract),
+            format!("{}:{}", BOOT_TESTNET_ADDRESS, contract),
+        ));
+    }
+    for contract in V3_BOOT_CONTRACTS {
         contracts_ids_to_remap.insert((
             format!("{}:{}", BOOT_MAINNET_ADDRESS, contract),
             format!("{}:{}", BOOT_TESTNET_ADDRESS, contract),
@@ -771,6 +778,9 @@ pub fn apply_on_chain_deployment(
                 EpochSpec::Epoch2_0 => network_manifest.devnet.as_ref().unwrap().epoch_2_0,
                 EpochSpec::Epoch2_05 => network_manifest.devnet.as_ref().unwrap().epoch_2_05,
                 EpochSpec::Epoch2_1 => network_manifest.devnet.as_ref().unwrap().epoch_2_1,
+                EpochSpec::Epoch2_2 => network_manifest.devnet.as_ref().unwrap().epoch_2_2,
+                EpochSpec::Epoch2_3 => network_manifest.devnet.as_ref().unwrap().epoch_2_3,
+                EpochSpec::Epoch2_4 => network_manifest.devnet.as_ref().unwrap().epoch_2_4,
             };
             let mut epoch_transition_successful =
                 current_bitcoin_block_height > after_bitcoin_block;

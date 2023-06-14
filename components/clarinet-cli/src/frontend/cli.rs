@@ -34,7 +34,7 @@ use clarity_repl::clarity::ClarityVersion;
 use clarity_repl::repl::diagnostic::{output_code, output_diagnostic};
 use clarity_repl::repl::{ClarityCodeSource, ClarityContract, ContractDeployer, DEFAULT_EPOCH};
 use clarity_repl::{analysis, repl, Terminal};
-use stacks_network::chainhook_event_observer::chainhooks::types::ChainhookFullSpecification;
+use stacks_network::chainhook_sdk::chainhooks::types::ChainhookFullSpecification;
 use stacks_network::{self, DevnetOrchestrator};
 use std::collections::HashMap;
 use std::fs::{self, File};
@@ -1162,7 +1162,10 @@ pub fn main() {
             let mine_block_delay = cmd.mine_block_delay.unwrap_or(0);
 
             if cmd.chainhooks.contains(&"*".to_string()) {
-                use stacks_network::chainhook_event_observer::chainhook_types::BitcoinNetwork;
+                #[allow(unused_imports)]
+                use stacks_network::chainhook_sdk::chainhook_types::{
+                    BitcoinNetwork, StacksNetwork,
+                };
                 match load_chainhooks(
                     &manifest.location,
                     &(BitcoinNetwork::Regtest, StacksNetwork::Devnet),
@@ -1197,7 +1200,7 @@ pub fn main() {
                             }
                             ChainhookFullSpecification::Stacks(hook) => {
                                 let spec = match hook
-                                    .into_selected_network_specification(&stacks_network::chainhook_event_observer::chainhook_types::StacksNetwork::Devnet)
+                                    .into_selected_network_specification(&stacks_network::chainhook_sdk::chainhook_types::StacksNetwork::Devnet)
                                 {
                                     Ok(spec) => spec,
                                     Err(e) => {

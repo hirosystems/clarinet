@@ -1,3 +1,17 @@
+#### 1.7.0 (2023-06-14)
+##### New Features
+
+*  Upgrade clarity-vm and handle epoch 2.4 (0c8de5b4)
+*  Improve clarity test code coverage and handle code branches (#1030) (13d45025)
+
+##### Chores
+
+*  update chainhook-sdk (5eed0bf6)
+*  update chainhook-types (57a7957d)
+*  handle clarity-vm 2.1 (#1037) (7fe94b80)
+*  bump clarity repl to 1.6.4 (#1036) (3bad4177)
+*  remove unused deps (#1032) (c30af614)
+
 #### 1.6.1 (2023-05-16)
 
 *Note* This release fixes the build of v1.6.0
