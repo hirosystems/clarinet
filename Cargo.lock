@@ -786,7 +786,7 @@ dependencies = [
 
 [[package]]
 name = "clarinet-cli"
-version = "1.6.2"
+version = "1.7.0"
 dependencies = [
  "aes 0.7.5",
  "ansi_term",
@@ -802,7 +802,7 @@ dependencies = [
  "clarinet-files",
  "clarinet-utils 1.0.0",
  "clarity-lsp",
- "clarity-repl 1.6.4",
+ "clarity-repl 1.7.0",
  "crossbeam-channel",
  "crossterm 0.22.1",
  "ctrlc",
@@ -902,7 +902,7 @@ dependencies = [
  "bitcoincore-rpc-json",
  "clarinet-files",
  "clarinet-utils 1.0.0",
- "clarity-repl 1.6.4",
+ "clarity-repl 1.7.0",
  "libsecp256k1 0.7.1",
  "reqwest",
  "serde",
@@ -921,7 +921,7 @@ dependencies = [
  "bitcoin",
  "chainhook-types",
  "clarinet-utils 1.0.0",
- "clarity-repl 1.6.4",
+ "clarity-repl 1.7.0",
  "js-sys",
  "libsecp256k1 0.7.1",
  "serde",
@@ -961,7 +961,7 @@ version = "1.0.0"
 dependencies = [
  "clap",
  "clarinet-files",
- "clarity-repl 1.6.4",
+ "clarity-repl 1.7.0",
  "serde",
  "serde_derive",
  "serde_json",
@@ -973,7 +973,7 @@ name = "clarity-jupyter-kernel"
 version = "1.0.0"
 dependencies = [
  "chrono",
- "clarity-repl 1.6.4",
+ "clarity-repl 1.7.0",
  "colored",
  "dirs",
  "failure",
@@ -995,7 +995,7 @@ version = "1.0.0"
 dependencies = [
  "clarinet-deployments",
  "clarinet-files",
- "clarity-repl 1.6.4",
+ "clarity-repl 1.7.0",
  "console_error_panic_hook",
  "js-sys",
  "lazy_static",
@@ -1007,41 +1007,6 @@ dependencies = [
  "wasm-bindgen",
  "wasm-bindgen-futures",
  "web-sys",
-]
-
-[[package]]
-name = "clarity-repl"
-version = "1.6.4"
-dependencies = [
- "ansi_term",
- "atty",
- "bytes",
- "chrono",
- "clarity-vm",
- "debug_types",
- "futures",
- "getrandom 0.2.8",
- "hiro-system-kit 0.1.0",
- "httparse",
- "integer-sqrt",
- "lazy_static",
- "log",
- "memchr",
- "pico-args",
- "prettytable-rs",
- "rand 0.7.3",
- "regex",
- "reqwest",
- "rustyline",
- "serde",
- "serde_derive",
- "serde_json",
- "sha2 0.10.6",
- "sha3 0.9.1",
- "tokio",
- "tokio-util 0.7.7",
- "wasm-bindgen",
- "wasm-bindgen-futures",
 ]
 
 [[package]]
@@ -1077,6 +1042,41 @@ dependencies = [
  "sha3 0.9.1",
  "tokio",
  "tokio-util 0.7.7",
+]
+
+[[package]]
+name = "clarity-repl"
+version = "1.7.0"
+dependencies = [
+ "ansi_term",
+ "atty",
+ "bytes",
+ "chrono",
+ "clarity-vm",
+ "debug_types",
+ "futures",
+ "getrandom 0.2.8",
+ "hiro-system-kit 0.1.0",
+ "httparse",
+ "integer-sqrt",
+ "lazy_static",
+ "log",
+ "memchr",
+ "pico-args",
+ "prettytable-rs",
+ "rand 0.7.3",
+ "regex",
+ "reqwest",
+ "rustyline",
+ "serde",
+ "serde_derive",
+ "serde_json",
+ "sha2 0.10.6",
+ "sha3 0.9.1",
+ "tokio",
+ "tokio-util 0.7.7",
+ "wasm-bindgen",
+ "wasm-bindgen-futures",
 ]
 
 [[package]]
@@ -5675,7 +5675,7 @@ dependencies = [
 
 [[package]]
 name = "stacks-devnet-js"
-version = "1.6.2"
+version = "1.7.0"
 dependencies = [
  "clarinet-deployments",
  "clarinet-files",
@@ -5691,7 +5691,7 @@ dependencies = [
 
 [[package]]
 name = "stacks-network"
-version = "1.5.1"
+version = "1.7.0"
 dependencies = [
  "base58 0.2.0",
  "bitcoin",
@@ -5703,7 +5703,7 @@ dependencies = [
  "clarinet-deployments",
  "clarinet-files",
  "clarinet-utils 1.0.0",
- "clarity-repl 1.6.4",
+ "clarity-repl 1.7.0",
  "crossbeam-channel",
  "crossterm 0.22.1",
  "ctrlc",
@@ -5724,10 +5724,21 @@ dependencies = [
 [[package]]
 name = "stacks-rpc-client"
 version = "1.0.6"
+dependencies = [
+ "clarity-repl 1.7.0",
+ "reqwest",
+ "serde",
+ "serde_derive",
+ "serde_json",
+]
+
+[[package]]
+name = "stacks-rpc-client"
+version = "1.0.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b2cf5e7c501af0ccfbd24059ec0617574f06be4eb94e8492221d8e77a9a9b881"
 dependencies = [
- "clarity-repl 1.6.4 (registry+https://github.com/rust-lang/crates.io-index)",
+ "clarity-repl 1.6.4",
  "reqwest",
  "serde",
  "serde_derive",
