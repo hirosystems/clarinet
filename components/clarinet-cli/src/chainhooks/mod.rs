@@ -40,10 +40,16 @@ pub fn load_chainhooks(
         match parse_chainhook_full_specification(&path) {
             Ok(hook) => {
                 match hook {
-                    ChainhookFullSpecification::Bitcoin(hook) => bitcoin_chainhooks
-                        .push(hook.into_selected_network_specification(&networks.0)?),
-                    ChainhookFullSpecification::Stacks(hook) => stacks_chainhooks
-                        .push(hook.into_selected_network_specification(&networks.1)?),
+                    ChainhookFullSpecification::Bitcoin(predicate) => {
+                        let mut spec = predicate.into_selected_network_specification(&networks.0)?;
+                        spec.enabled = true;
+                        bitcoin_chainhooks.push(spec)
+                    }
+                    ChainhookFullSpecification::Stacks(predicate) => {
+                        let mut spec = predicate.into_selected_network_specification(&networks.1)?;
+                        spec.enabled = true;
+                        stacks_chainhooks.push(spec)
+                    }
                 }
             }
             Err(msg) => return Err(format!("{} syntax incorrect: {}", relative_path, msg)),
