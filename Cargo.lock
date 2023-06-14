@@ -5724,17 +5724,6 @@ dependencies = [
 [[package]]
 name = "stacks-rpc-client"
 version = "1.0.6"
-dependencies = [
- "clarity-repl 1.7.0",
- "reqwest",
- "serde",
- "serde_derive",
- "serde_json",
-]
-
-[[package]]
-name = "stacks-rpc-client"
-version = "1.0.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b2cf5e7c501af0ccfbd24059ec0617574f06be4eb94e8492221d8e77a9a9b881"
 dependencies = [
@@ -5749,7 +5738,7 @@ dependencies = [
 name = "stacks-rpc-client"
 version = "1.0.7"
 dependencies = [
- "clarity-repl 1.6.4",
+ "clarity-repl 1.7.0",
  "hmac 0.12.1",
  "libsecp256k1 0.7.1",
  "pbkdf2",
