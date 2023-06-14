@@ -32,6 +32,12 @@ To install Clarinet, you may choose from the following:
 
 ### Install on macOS (Homebrew)
 
+> **_NOTE:_**
+> 
+> We are experiencing issues with releasing Clarinet on Homebrew. The latest version of Homebrew is at clarinet v1.5.x, while clarinet v1.6.0 and above bring significant changes (Subnets, Epoch 2.4, POX-3, etc.). We are working on a fix to release new versions on Homebrew. In the meantime, you can install pre-built binaries by following these instructions: [Install from a pre-built binary](#install-from-a-pre-built-binary).
+
+We are working on fix to release new versions on Homebrew. In the meantime, you can install pre-built binaries by following these instructions: [Install from a pre-built binary](#install-from-a-pre-built-binary).
+
 To install Clarinet using macOs, you must first have Homebrew installed on your system. If you do not already have Homebrew already installed, 
 please refer to the [Homebrew](https://brew.sh/)documentation for detailed information on how to install Homebrew.
 
@@ -57,7 +63,7 @@ winget install clarinet
 
 For more information on how to install Clarinet on Windows, please see the [Setting Up Your Clarity Environment (Windows)](https://www.youtube.com/watch?v=r5LY1J5oACs) video walkthrough.
 
-### Install from pre-built binary
+### Install from a pre-built binary
 
 If you would like to install Clarinet from pre-built binaries, you must first download the latest release from the 
 [Hiro releases page](https://github.com/hirosystems/clarinet/releases). When you have downloaded the latest release,
