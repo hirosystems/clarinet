@@ -1656,7 +1656,7 @@ events_keys = ["*"]
                 format!("PG_USER={}", devnet_config.postgres_username),
                 format!("PG_PASSWORD={}", devnet_config.postgres_password),
                 format!("PG_DATABASE={}", devnet_config.subnet_api_postgres_database),
-                format!("STACKS_CHAIN_ID=2147483648"),
+                format!("STACKS_CHAIN_ID=0x55005500"),
                 format!("V2_POX_MIN_AMOUNT_USTX=90000000260"),
                 "NODE_ENV=development".to_string(),
             ]),
