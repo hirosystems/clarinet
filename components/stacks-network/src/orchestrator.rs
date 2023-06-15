@@ -1894,7 +1894,7 @@ events_keys = ["*"]
             format!("NEXT_PUBLIC_DEFAULT_POLLING_INTERVAL={}", 5000),
             "NODE_ENV=development".to_string(),
         ];
-        env.append(&mut devnet_config.stacks_node_env_vars.clone());
+        env.append(&mut devnet_config.stacks_explorer_env_vars.clone());
 
         let config = Config {
             labels: Some(labels),
