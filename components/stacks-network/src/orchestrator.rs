@@ -1369,6 +1369,13 @@ events_keys = ["*"]
             ))
         }
 
+        let mut env = vec![
+            "STACKS_LOG_PP=1".to_string(),
+            "STACKS_LOG_DEBUG=1".to_string(),
+            // "BLOCKSTACK_USE_TEST_GENESIS_CHAINSTATE=1".to_string(),
+        ];
+        env.append(&mut devnet_config.subnet_node_env_vars.clone());
+
         let config = Config {
             labels: Some(labels),
             image: Some(devnet_config.subnet_node_image_url.clone()),
@@ -1380,11 +1387,7 @@ events_keys = ["*"]
                 "start".into(),
                 "--config=/src/subnet-node/Subnet.toml".into(),
             ]),
-            env: Some(vec![
-                "STACKS_LOG_PP=1".to_string(),
-                "STACKS_LOG_DEBUG=1".to_string(),
-                // "BLOCKSTACK_USE_TEST_GENESIS_CHAINSTATE=1".to_string(),
-            ]),
+            env: Some(env),
             host_config: Some(HostConfig {
                 auto_remove: Some(true),
                 binds: Some(binds),
