@@ -1,4 +1,18 @@
-#### 1.6.1 (2023-05-16)
+# [1.7.0](https://github.com/hirosystems/clarinet/compare/v1.6.1...v1.7.0) (2023-06-14)
+##### New Features
+
+*  Upgrade clarity-vm and handle epoch 2.4 (0c8de5b4)
+*  Improve clarity test code coverage and handle code branches (#1030) (13d45025)
+
+##### Chores
+
+*  update chainhook-sdk (5eed0bf6)
+*  update chainhook-types (57a7957d)
+*  handle clarity-vm 2.1 (#1037) (7fe94b80)
+*  bump clarity repl to 1.6.4 (#1036) (3bad4177)
+*  remove unused deps (#1032) (c30af614)
+
+# [1.6.1](https://github.com/hirosystems/clarinet/compare/v1.6.0...v1.6.1) (2023-05-16)
 
 *Note* This release fixes the build of v1.6.0
 
@@ -13,7 +27,7 @@
 *  functions first parameter highlighting (9a28a9a1)
 *  clarity keywords syntax highlighting (724379dc)
 
-#### 1.6.0 (2023-05-09)
+# [1.6.0](https://github.com/hirosystems/clarinet/compare/v1.5.3...v1.6.0) (2023-05-09)
 
 ##### Chores
 
@@ -38,7 +52,7 @@ While this is unlikely to be a breaking change in most places, any code that rel
 *  Don't prompt to write files to project dir when using `--allow-write` flag (#981) (d5c654eb)
 *  Remove `[[ustx_balance]]` from subnet config to work with subnets v0.5.0 (7f0e2355)
 
-#### 1.5.3 (2023-03-22)
+# [1.5.3](https://github.com/hirosystems/clarinet/compare/v1.5.2...v1.5.3) (2023-03-22)
 
 ##### Other Changes
 
@@ -46,7 +60,7 @@ While this is unlikely to be a breaking change in most places, any code that rel
 *  Set Clarity2 and epoch 2.1 as default ([6cb1e21d](https://github.com/hirosystems/clarinet/commit/6cb1e21d)
 *  Update api urls to use hiro.so ([4e23a7ed](https://github.com/hirosystems/clarinet/commit/4e23a7ed)
 
-#### 1.5.2 (2023-03-16)
+# [1.5.2](https://github.com/hirosystems/clarinet/compare/v1.5.0...v1.5.2) (2023-03-16)
 
 ##### Bug Fixes
 
@@ -54,7 +68,7 @@ While this is unlikely to be a breaking change in most places, any code that rel
 * Simplify subnet deployment ([e1a4ab7](https://github.com/hirosystems/clarinet/commit/e1a4ab76c43bbed056500725f0d39cad69470f0f), [fb3af87](https://github.com/hirosystems/clarinet/commit/fb3af8799845d1df90102c5b84708a0491508156))
 * Resolve panic when generating completions ([11b6094](https://github.com/hirosystems/clarinet/commit/11b6094a1c71d22959aae28031251695f472d24b))
 
-#### 1.5.0 (2023-02-23)
+# [1.5.0](https://github.com/hirosystems/clarinet/compare/v1.4.2...v1.5.0) (2023-02-23)
 
 ##### New Features
 
@@ -73,20 +87,20 @@ While this is unlikely to be a breaking change in most places, any code that rel
 *  Added links to documentation and issues ([10a597b](https://github.com/hirosystems/clarinet/commit/10a597b))
 *  Fixed various other minor documentation issues ([2b6d301](https://github.com/hirosystems/clarinet/commit/2b6d301), [d0f5c47](https://github.com/hirosystems/clarinet/commit/d0f5c47))
 
-#### 1.4.2 (2024-02-03)
+# [1.4.2](https://github.com/hirosystems/clarinet/compare/v1.4.1...v1.4.2) (2024-02-03)
 
 ##### Bug Fixes
 
 *  Update prettytable ([PR 867](https://github.com/hirosystems/clarinet/pull/867))
 
 
-#### 1.4.1 (2023-02-03)
+# [1.4.1](https://github.com/hirosystems/clarinet/compare/v1.4.0...v1.4.1) (2023-02-03)
 
 ##### Bug Fixes
 
 *  Introduce new docker_platform setting ([86c8edbc](https://github.com/hirosystems/clarinet/commit/86c8edbcb1807f888096eb1b97efe75f45c15e71))
 
-#### 1.4.0 (2023-01-23)
+## [1.4.0](https://github.com/hirosystems/clarinet/compare/v1.3.1...v1.4.0) (2023-01-23)
 
 ##### New Features
 

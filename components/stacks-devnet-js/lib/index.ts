@@ -25,6 +25,14 @@ import {
 export * from "@hirosystems/chainhook-types";
 
 /**
+ * Returns the stacks-node version supported by this library
+ * @returns {string}
+ */
+export function stacksNodeVersion(): string {
+  return "2.4";
+}
+
+/**
  * Account to include in the genesis accounts
  * @export
  * @interface Account
@@ -340,6 +348,24 @@ export interface DevnetConfig {
    * @memberof DevnetConfig
    */
   epoch_2_1?: number;
+  /**
+   * Bitcoin block height starting the epoch 2.2
+   * @type {number}
+   * @memberof DevnetConfig
+   */
+  epoch_2_2?: number;
+  /**
+   * Bitcoin block height starting the epoch 2.3
+   * @type {number}
+   * @memberof DevnetConfig
+   */
+  epoch_2_3?: number;
+  /**
+   * Bitcoin block height starting the epoch 2.4
+   * @type {number}
+   * @memberof DevnetConfig
+   */
+  epoch_2_4?: number;
   /**
    * Bitcoin block height activating switch to POX 2.0
    * @type {number}

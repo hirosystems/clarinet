@@ -47,6 +47,7 @@ pub static BOOT_MAINNET_ADDRESS: &str = "SP000000000000000000002Q6VF78";
 
 pub static V1_BOOT_CONTRACTS: &[&str] = &["bns"];
 pub static V2_BOOT_CONTRACTS: &[&str] = &["pox-2", "costs-3"];
+pub static V3_BOOT_CONTRACTS: &[&str] = &["pox-3"];
 
 lazy_static! {
     static ref BOOT_TESTNET_PRINCIPAL: StandardPrincipalData =
@@ -58,7 +59,7 @@ lazy_static! {
 lazy_static! {
     pub static ref BOOT_CONTRACTS_DATA: BTreeMap<QualifiedContractIdentifier, (ClarityContract, ContractAST)> = {
         let mut result = BTreeMap::new();
-        let deploy: [(&StandardPrincipalData, [(&str, &str); 10]); 2] = [
+        let deploy: [(&StandardPrincipalData, [(&str, &str); 11]); 2] = [
             (&*BOOT_TESTNET_PRINCIPAL, *STACKS_BOOT_CODE_TESTNET),
             (&*BOOT_MAINNET_PRINCIPAL, *STACKS_BOOT_CODE_MAINNET),
         ];
@@ -67,7 +68,9 @@ lazy_static! {
             ClarityInterpreter::new(StandardPrincipalData::transient(), Settings::default());
         for (deployer, boot_code) in deploy.iter() {
             for (name, code) in boot_code.iter() {
-                let (epoch, clarity_version) = if (*name).eq("pox-2") || (*name).eq("costs-3") {
+                let (epoch, clarity_version) = if (*name).eq("pox-3") {
+                    (StacksEpochId::Epoch24, ClarityVersion::Clarity2)
+                } else if (*name).eq("pox-2") || (*name).eq("costs-3") {
                     (StacksEpochId::Epoch21, ClarityVersion::Clarity2)
                 } else if (*name).eq("cost-2") {
                     (StacksEpochId::Epoch2_05, ClarityVersion::Clarity1)
@@ -186,7 +189,9 @@ impl Session {
                 .include_boot_contracts
                 .contains(&name.to_string())
             {
-                let (epoch, clarity_version) = if (*name).eq("pox-2") || (*name).eq("costs-3") {
+                let (epoch, clarity_version) = if (*name).eq("pox-3") {
+                    (StacksEpochId::Epoch24, ClarityVersion::Clarity2)
+                } else if (*name).eq("pox-2") || (*name).eq("costs-3") {
                     (StacksEpochId::Epoch21, ClarityVersion::Clarity2)
                 } else if (*name).eq("cost-2") {
                     (StacksEpochId::Epoch2_05, ClarityVersion::Clarity1)
@@ -950,7 +955,14 @@ impl Session {
             Some((_, epoch)) if epoch.eq("2.0") => StacksEpochId::Epoch20,
             Some((_, epoch)) if epoch.eq("2.05") => StacksEpochId::Epoch2_05,
             Some((_, epoch)) if epoch.eq("2.1") => StacksEpochId::Epoch21,
-            _ => return output.push(red!("Usage: ::set_epoch 2.0 | 2.05 | 2.1")),
+            Some((_, epoch)) if epoch.eq("2.2") => StacksEpochId::Epoch22,
+            Some((_, epoch)) if epoch.eq("2.3") => StacksEpochId::Epoch23,
+            Some((_, epoch)) if epoch.eq("2.4") => StacksEpochId::Epoch24,
+            _ => {
+                return output.push(red!(
+                    "Usage: ::set_epoch 2.0 | 2.05 | 2.1 | 2.2 | 2.3 | 2.4"
+                ))
+            }
         };
         self.update_epoch(epoch);
         output.push(green!(format!("Epoch updated to: {epoch}")))

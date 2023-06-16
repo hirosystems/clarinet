@@ -13,7 +13,7 @@ use std::str::FromStr;
 use toml::value::Value;
 
 const INVALID_CLARITY_VERSION: &str = "clarity_version field invalid (value supported: 1, 2)";
-const INVALID_EPOCH: &str = "epoch field invalid (value supported: 2.0, 2.05, 2.1)";
+const INVALID_EPOCH: &str = "epoch field invalid (value supported: 2.0, 2.05, 2.1, 2.2, 2.3, 2.4)";
 
 #[derive(Deserialize, Debug, Clone)]
 pub struct ClarityContractMetadata {
@@ -169,6 +169,7 @@ impl ProjectManifest {
                 "costs".to_string(),
                 "pox".to_string(),
                 "pox-2".to_string(),
+                "pox-3".to_string(),
                 "lockup".to_string(),
                 "costs-2".to_string(),
                 "costs-3".to_string(),
@@ -287,6 +288,12 @@ fn get_epoch_and_clarity_version(
                 StacksEpochId::Epoch2_05
             } else if epoch.eq("2.1") {
                 StacksEpochId::Epoch21
+            } else if epoch.eq("2.2") {
+                StacksEpochId::Epoch22
+            } else if epoch.eq("2.3") {
+                StacksEpochId::Epoch23
+            } else if epoch.eq("2.4") {
+                StacksEpochId::Epoch24
             } else {
                 return Err(INVALID_EPOCH.into());
             }
@@ -298,6 +305,12 @@ fn get_epoch_and_clarity_version(
                 StacksEpochId::Epoch2_05
             } else if epoch.eq(&2.1) {
                 StacksEpochId::Epoch21
+            } else if epoch.eq(&2.2) {
+                StacksEpochId::Epoch22
+            } else if epoch.eq(&2.3) {
+                StacksEpochId::Epoch23
+            } else if epoch.eq(&2.4) {
+                StacksEpochId::Epoch24
             } else {
                 return Err(INVALID_EPOCH.into());
             }

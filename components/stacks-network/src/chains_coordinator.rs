@@ -3,9 +3,10 @@ use super::DevnetEvent;
 use crate::orchestrator::ServicesMapHosts;
 use crate::{ServiceStatusData, Status};
 use base58::FromBase58;
-use chainhook_event_observer::chainhook_types::BitcoinNetwork;
-use chainhook_event_observer::chainhooks::types::ChainhookConfig;
-use chainhook_event_observer::utils::Context;
+use chainhook_sdk::chainhook_types::BitcoinBlockSignaling;
+use chainhook_sdk::chainhook_types::BitcoinNetwork;
+use chainhook_sdk::chainhooks::types::ChainhookConfig;
+use chainhook_sdk::utils::Context;
 use clarinet_deployments::onchain::TransactionStatus;
 use clarinet_deployments::onchain::{
     apply_on_chain_deployment, DeploymentCommand, DeploymentEvent,
@@ -15,8 +16,8 @@ use clarinet_files::{self, AccountConfig, DevnetConfig, NetworkManifest, Project
 use hiro_system_kit;
 use hiro_system_kit::slog;
 
-use chainhook_event_observer::chainhook_types::{BitcoinChainEvent, StacksChainEvent};
-use chainhook_event_observer::observer::{
+use chainhook_sdk::chainhook_types::{BitcoinChainEvent, StacksChainEvent};
+use chainhook_sdk::observer::{
     start_event_observer, EventObserverConfig, ObserverCommand, ObserverEvent,
     StacksChainMempoolEvent,
 };
@@ -29,7 +30,6 @@ use clarity_repl::clarity::vm::ClarityName;
 use clarity_repl::clarity::vm::Value as ClarityValue;
 use clarity_repl::codec;
 use stacks_rpc_client::{PoxInfo, StacksRpc};
-use std::collections::HashSet;
 use std::convert::TryFrom;
 
 use std::str;
@@ -105,23 +105,19 @@ impl DevnetEventObserverConfig {
         .expect("unable to load network manifest");
 
         let event_observer_config = EventObserverConfig {
-            normalization_enabled: true,
-            grpc_server_enabled: false,
-            hooks_enabled: true,
             bitcoin_rpc_proxy_enabled: true,
             event_handlers: vec![],
             chainhook_config: Some(chainhooks),
             ingestion_port: devnet_config.orchestrator_ingestion_port,
-            control_port: devnet_config.orchestrator_control_port,
-            bitcoin_node_username: devnet_config.bitcoin_node_username.clone(),
-            bitcoin_node_password: devnet_config.bitcoin_node_password.clone(),
-            bitcoin_node_rpc_url: format!("http://{}", services_map_hosts.bitcoin_node_host),
+            bitcoind_rpc_username: devnet_config.bitcoin_node_username.clone(),
+            bitcoind_rpc_password: devnet_config.bitcoin_node_password.clone(),
+            bitcoind_rpc_url: format!("http://{}", services_map_hosts.bitcoin_node_host),
+            bitcoin_block_signaling: BitcoinBlockSignaling::Stacks("http://0.0.0.0:20443".into()),
             stacks_node_rpc_url: format!("http://{}", services_map_hosts.stacks_node_host),
-            operators: HashSet::new(),
             display_logs: true,
             cache_path: devnet_config.working_dir.to_string(),
             bitcoin_network: BitcoinNetwork::Regtest,
-            stacks_network: chainhook_event_observer::chainhook_types::StacksNetwork::Devnet,
+            stacks_network: chainhook_sdk::chainhook_types::StacksNetwork::Devnet,
         };
 
         DevnetEventObserverConfig {
@@ -264,7 +260,7 @@ pub async fn start_chains_coordinator(
                     .send(DevnetEvent::info(msg))
                     .expect("Unable to terminate event observer");
             }
-            ObserverEvent::BitcoinChainEvent(chain_update) => {
+            ObserverEvent::BitcoinChainEvent((chain_update, _)) => {
                 // Contextual shortcut: Devnet is an environment under control,
                 // with 1 miner. As such we will ignore Reorgs handling.
                 let (log, status) = match &chain_update {
@@ -297,10 +293,10 @@ pub async fn start_chains_coordinator(
                 }));
                 let _ = devnet_event_tx.send(DevnetEvent::BitcoinChainEvent(chain_update.clone()));
             }
-            ObserverEvent::StacksChainEvent(chain_event) => {
+            ObserverEvent::StacksChainEvent((chain_event, _)) => {
                 if should_deploy_protocol {
-                    if let Some(block) = chain_event.new_block() {
-                        if block.block_identifier.index == 1 {
+                    if let Some(block_identifier) = chain_event.get_latest_block_identifier() {
+                        if block_identifier.index == 1 {
                             should_deploy_protocol = false;
                             if let Some(deployment_commands_tx) = deployment_commands_tx.take() {
                                 deployment_commands_tx
@@ -409,12 +405,12 @@ pub async fn start_chains_coordinator(
                     }
                 }
             }
-            ObserverEvent::HookRegistered(hook) => {
+            ObserverEvent::PredicateRegistered(hook) => {
                 let message = format!("New hook \"{}\" registered", hook.name());
                 let _ = devnet_event_tx.send(DevnetEvent::info(message));
             }
-            ObserverEvent::HookDeregistered(_hook) => {}
-            ObserverEvent::HooksTriggered(count) => {
+            ObserverEvent::PredicateDeregistered(_hook) => {}
+            ObserverEvent::PredicatesTriggered(count) => {
                 if count > 0 {
                     let _ = devnet_event_tx
                         .send(DevnetEvent::info(format!("{} hooks triggered", count)));
@@ -448,8 +444,9 @@ pub async fn start_chains_coordinator(
                 }
                 StacksChainMempoolEvent::TransactionDropped(ref _transactions) => {}
             },
-            ObserverEvent::BitcoinChainhookTriggered(_) => {}
-            ObserverEvent::StacksChainhookTriggered(_) => {}
+            ObserverEvent::BitcoinPredicateTriggered(_) => {}
+            ObserverEvent::StacksPredicateTriggered(_) => {}
+            ObserverEvent::PredicateEnabled(_) => {}
         }
     }
     Ok(())

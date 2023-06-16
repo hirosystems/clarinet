@@ -11,7 +11,7 @@ use bollard::models::{HostConfig, PortBinding};
 use bollard::network::{CreateNetworkOptions, PruneNetworksOptions};
 use bollard::service::Ipam;
 use bollard::Docker;
-use chainhook_event_observer::utils::Context;
+use chainhook_sdk::utils::Context;
 use clarinet_files::chainhook_types::StacksNetwork;
 use clarinet_files::{DevnetConfigFile, NetworkManifest, ProjectManifest};
 use futures::stream::TryStreamExt;
@@ -1050,10 +1050,25 @@ start_height = {epoch_2_05}
 [[burnchain.epochs]]
 epoch_name = "2.1"
 start_height = {epoch_2_1}
-                    "#,
+
+[[burnchain.epochs]]
+epoch_name = "2.2"
+start_height = {epoch_2_2}
+
+[[burnchain.epochs]]
+epoch_name = "2.3"
+start_height = {epoch_2_3}
+
+[[burnchain.epochs]]
+epoch_name = "2.4"
+start_height = {epoch_2_4}
+"#,
             epoch_2_0 = devnet_config.epoch_2_0,
             epoch_2_05 = devnet_config.epoch_2_05,
             epoch_2_1 = devnet_config.epoch_2_1,
+            epoch_2_2 = devnet_config.epoch_2_2,
+            epoch_2_3 = devnet_config.epoch_2_3,
+            epoch_2_4 = devnet_config.epoch_2_4,
             pox_2_activation = devnet_config.pox_2_activation,
         ));
 

@@ -27,6 +27,12 @@ pub enum EpochSpec {
     Epoch2_05,
     #[serde(rename = "2.1")]
     Epoch2_1,
+    #[serde(rename = "2.2")]
+    Epoch2_2,
+    #[serde(rename = "2.3")]
+    Epoch2_3,
+    #[serde(rename = "2.4")]
+    Epoch2_4,
 }
 
 impl From<StacksEpochId> for EpochSpec {
@@ -35,6 +41,9 @@ impl From<StacksEpochId> for EpochSpec {
             StacksEpochId::Epoch20 => EpochSpec::Epoch2_0,
             StacksEpochId::Epoch2_05 => EpochSpec::Epoch2_05,
             StacksEpochId::Epoch21 => EpochSpec::Epoch2_1,
+            StacksEpochId::Epoch22 => EpochSpec::Epoch2_2,
+            StacksEpochId::Epoch23 => EpochSpec::Epoch2_3,
+            StacksEpochId::Epoch24 => EpochSpec::Epoch2_4,
             StacksEpochId::Epoch10 => unreachable!("epoch 1.0 is not supported"),
         }
     }
@@ -46,6 +55,9 @@ impl Into<StacksEpochId> for EpochSpec {
             EpochSpec::Epoch2_0 => StacksEpochId::Epoch20,
             EpochSpec::Epoch2_05 => StacksEpochId::Epoch2_05,
             EpochSpec::Epoch2_1 => StacksEpochId::Epoch21,
+            EpochSpec::Epoch2_2 => StacksEpochId::Epoch22,
+            EpochSpec::Epoch2_3 => StacksEpochId::Epoch23,
+            EpochSpec::Epoch2_4 => StacksEpochId::Epoch24,
         }
     }
 }

@@ -17,3 +17,4 @@ components/stacks-devnet-js/build
 *.tar.gz
 *.zip
 *.rdb
+*.lcov
