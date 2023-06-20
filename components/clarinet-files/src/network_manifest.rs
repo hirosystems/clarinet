@@ -121,6 +121,7 @@ pub struct DevnetConfigFile {
     pub subnet_api_image_url: Option<String>,
     pub subnet_api_port: Option<u16>,
     pub subnet_api_events_port: Option<u16>,
+    pub subnet_api_env_vars: Option<Vec<String>>,
     pub disable_subnet_api: Option<bool>,
     pub docker_host: Option<String>,
     pub components_host: Option<String>,
@@ -246,6 +247,7 @@ pub struct DevnetConfig {
     pub subnet_api_image_url: String,
     pub subnet_api_port: u16,
     pub subnet_api_events_port: u16,
+    pub subnet_api_env_vars: Vec<String>,
     pub disable_subnet_api: bool,
     pub docker_host: String,
     pub components_host: String,
@@ -873,6 +875,7 @@ impl NetworkManifest {
                     .take()
                     .unwrap_or(vec![]),
                 subnet_node_env_vars: devnet_config.subnet_node_env_vars.take().unwrap_or(vec![]),
+                subnet_api_env_vars: devnet_config.subnet_api_env_vars.take().unwrap_or(vec![]),
                 use_docker_gateway_routing: devnet_config
                     .use_docker_gateway_routing
                     .unwrap_or(false),
