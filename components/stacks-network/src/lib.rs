@@ -133,9 +133,25 @@ pub async fn do_run_devnet(
     let moved_orchestrator_terminator_tx = orchestrator_terminator_tx.clone();
     let moved_chains_coordinator_commands_tx = chains_coordinator_commands_tx.clone();
 
+    // The devnet orchestrator should be able to send some events to the UI thread,
+    // and should be able to be restarted/terminated
+    let orchestrator_event_tx = devnet_events_tx.clone();
+    let chains_coordinator_commands_tx_moved = chains_coordinator_commands_tx.clone();
+
     let ctx_moved = ctx.clone();
-    let _ = hiro_system_kit::thread_named("Chains coordinator")
+    let _ = hiro_system_kit::thread_named("Initialize bitcoin node and start chains coordinator")
         .spawn(move || {
+            let moved_orchestrator_event_tx = orchestrator_event_tx.clone();
+            let future = devnet.initialize_bitcoin_node(&moved_orchestrator_event_tx);
+            let rt = hiro_system_kit::create_basic_runtime();
+            let res = rt.block_on(future);
+            if let Err(ref e) = res {
+                let _ = orchestrator_event_tx.send(DevnetEvent::FatalError(e.clone()));
+                let _ =
+                    chains_coordinator_commands_tx_moved.send(ChainsCoordinatorCommand::Terminate);
+                return Err(e.to_string());
+            }
+
             let future = start_chains_coordinator(
                 config,
                 chains_coordinator_tx,
@@ -152,27 +168,6 @@ pub async fn do_run_devnet(
         .expect("unable to retrieve join handle");
 
     // Let's start the orchestration
-
-    // The devnet orchestrator should be able to send some events to the UI thread,
-    // and should be able to be restarted/terminated
-    let orchestrator_event_tx = devnet_events_tx.clone();
-    let chains_coordinator_commands_tx_moved = chains_coordinator_commands_tx.clone();
-    let _ = {
-        hiro_system_kit::thread_named("Initializing bitcoin node")
-            .spawn(move || {
-                let moved_orchestrator_event_tx = orchestrator_event_tx.clone();
-                let future = devnet.initialize_bitcoin_node(&moved_orchestrator_event_tx);
-                let rt = hiro_system_kit::create_basic_runtime();
-                let res = rt.block_on(future);
-                if let Err(ref e) = res {
-                    let _ = orchestrator_event_tx.send(DevnetEvent::FatalError(e.clone()));
-                    let _ = chains_coordinator_commands_tx_moved
-                        .send(ChainsCoordinatorCommand::Terminate);
-                }
-                res
-            })
-            .expect("unable to retrieve join handle")
-    };
 
     let termination_reader = Arc::new(AtomicBool::new(false));
     let termination_writer = termination_reader.clone();
