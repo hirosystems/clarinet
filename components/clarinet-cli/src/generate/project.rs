@@ -1,10 +1,10 @@
 use clarinet_files::{
     DEFAULT_BITCOIN_EXPLORER_IMAGE, DEFAULT_BITCOIN_NODE_IMAGE, DEFAULT_DERIVATION_PATH,
-    DEFAULT_EPOCH_2_0, DEFAULT_EPOCH_2_05, DEFAULT_EPOCH_2_1, DEFAULT_FAUCET_MNEMONIC,
-    DEFAULT_POSTGRES_IMAGE, DEFAULT_POX2_ACTIVATION, DEFAULT_STACKS_API_IMAGE,
-    DEFAULT_STACKS_EXPLORER_IMAGE, DEFAULT_STACKS_MINER_MNEMONIC, DEFAULT_STACKS_NODE_IMAGE,
-    DEFAULT_SUBNET_API_IMAGE, DEFAULT_SUBNET_CONTRACT_ID, DEFAULT_SUBNET_MNEMONIC,
-    DEFAULT_SUBNET_NODE_IMAGE,
+    DEFAULT_EPOCH_2_0, DEFAULT_EPOCH_2_05, DEFAULT_EPOCH_2_1, DEFAULT_EPOCH_2_2, DEFAULT_EPOCH_2_3,
+    DEFAULT_EPOCH_2_4, DEFAULT_FAUCET_MNEMONIC, DEFAULT_POSTGRES_IMAGE, DEFAULT_POX2_ACTIVATION,
+    DEFAULT_STACKS_API_IMAGE, DEFAULT_STACKS_EXPLORER_IMAGE, DEFAULT_STACKS_MINER_MNEMONIC,
+    DEFAULT_STACKS_NODE_IMAGE, DEFAULT_SUBNET_API_IMAGE, DEFAULT_SUBNET_CONTRACT_ID,
+    DEFAULT_SUBNET_MNEMONIC, DEFAULT_SUBNET_NODE_IMAGE,
 };
 
 use super::changes::{Changes, DirectoryCreation, FileCreation};
@@ -403,6 +403,9 @@ disable_stacks_api = false
 # epoch_2_05 = {default_epoch_2_05}
 # epoch_2_1 = {default_epoch_2_1}
 # pox_2_activation = {default_pox2_activation}
+# epoch_2_2 = {default_epoch_2_2}
+# epoch_2_3 = {default_epoch_2_3}
+# epoch_2_4 = {default_epoch_2_4}
 
 
 # Send some stacking orders
@@ -444,6 +447,9 @@ btc_address = "mvZtbibDAAA3WLpY7zXXFqRa3T4XSknBX7"
             default_epoch_2_05 = DEFAULT_EPOCH_2_05,
             default_epoch_2_1 = DEFAULT_EPOCH_2_1,
             default_pox2_activation = DEFAULT_POX2_ACTIVATION,
+            default_epoch_2_2 = DEFAULT_EPOCH_2_2,
+            default_epoch_2_3 = DEFAULT_EPOCH_2_3,
+            default_epoch_2_4 = DEFAULT_EPOCH_2_4,
         );
         let name = format!("Devnet.toml");
         let path = format!(
