@@ -119,6 +119,47 @@ impl DevnetOrchestrator {
                 .header("Host", &node_url[7..])
         }
 
+        async fn get_checksum_for_descriptor(
+            bitcoin_node_url: &str,
+            bitcoin_node_username: &str,
+            bitcoin_node_password: &str,
+            descriptor: &str,
+        ) -> Result<String, String> {
+            let rpc_result: JsonValue = base_builder(
+                bitcoin_node_url,
+                &bitcoin_node_username,
+                &bitcoin_node_password,
+            )
+            .json(&json!({
+                "jsonrpc": "1.0",
+                "id": "stacks-network",
+                "method": "getdescriptorinfo",
+                "params": [json!(descriptor)]
+
+            }))
+            .send()
+            .await
+            .map_err(|e| format!("unable to send 'getdescriptorinfo' request ({})", e))
+            .map_err(|e| format!("unable to receive 'getdescriptorinfo' response: {}", e))?
+            .json()
+            .await
+            .map_err(|e| format!("unable to parse 'getdescriptorinfo' result: {}", e))?;
+
+            let checksum = rpc_result
+                .as_object()
+                .ok_or(format!("unable to parse 'getdescriptorinfo'"))?
+                .get("result")
+                .ok_or(format!("unable to parse 'getdescriptorinfo'"))?
+                .as_object()
+                .ok_or(format!("unable to parse 'getdescriptorinfo'"))?
+                .get("checksum")
+                .ok_or(format!("unable to parse 'getdescriptorinfo'"))?
+                .as_str()
+                .ok_or(format!("unable to parse 'getdescriptorinfo'"))?
+                .to_string();
+            Ok(checksum)
+        }
+
         let _ = devnet_event_tx.send(DevnetEvent::info(format!("Configuring bitcoin-node",)));
 
         let max_errors = 30;
