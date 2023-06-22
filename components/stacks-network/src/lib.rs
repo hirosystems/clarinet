@@ -152,6 +152,13 @@ pub async fn do_run_devnet(
                 return Err(e.to_string());
             }
 
+            ctx_moved.try_log(|logger| {
+                slog::info!(
+                    logger,
+                    "Bitcoin node initialization complete; starting chain coordinator."
+                )
+            });
+
             let future = start_chains_coordinator(
                 config,
                 chains_coordinator_tx,
