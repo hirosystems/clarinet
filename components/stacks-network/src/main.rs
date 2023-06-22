@@ -67,7 +67,7 @@ fn main() {
         logger: Some(logger),
         tracer: false,
     };
-    ctx.try_log(|logger| slog::info!(logger, "startin devnet coordinator"));
+    ctx.try_log(|logger| slog::info!(logger, "Starting devnet coordinator"));
 
     let (orchestrator_terminated_tx, _) = channel();
     let res = hiro_system_kit::nestable_block_on(do_run_devnet(
