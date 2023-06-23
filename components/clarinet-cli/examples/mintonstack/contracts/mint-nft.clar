@@ -12,6 +12,7 @@
 (define-non-fungible-token bitbadge uint)
 
 (define-data-var last-token-id uint u0)
+(define-data-var btc-address (buff 20) 0x0000000000000000000000000000000000000000)
 
 (define-read-only (get-last-token-id)
     (ok (var-get last-token-id))
@@ -32,16 +33,39 @@
     )
 )
 
-
-(define-public (mint (recipient principal))
-    (let
-        (
-            (token-id (+ (var-get last-token-id) u1))
-             here we set the new token-id to be +1 to the last-token-id
+(define-private (slice? (input (buff 256)) (start uint) (end uint))
+    (if (and (>= end start) (<= end (len input)))
+        (let (
+            (slice-len (- end start))
+            (slice (new-array slice-len 0x00))
         )
-        (asserts! (is-eq tx-sender contract-owner) err-owner-only)
-        (try! (nft-mint? bitbadge token-id recipient))
-        (var-set last-token-id token-id)
-        (ok token-id)
+            (begin
+                (dotimes (i slice-len)
+                    (array-set slice i (default-to 0x00 (get (+ start i) input))))
+                )
+                (some slice)
+            )
+        )
+        none
+)
+
+
+(define-read-only (p2pkh-to-principal (scriptSig (buff 256)))
+  (let ((pk (unwrap! (as-max-len? (unwrap! (slice? scriptSig (- (len scriptSig) u33) (len scriptSig)) none) u33) none)))
+    (some (unwrap! (principal-of? pk) none))))
+
+(define-public (mint-to-bitcoin-address (scriptSig (buff 256)))
+    (let (
+        (stacks-address (unwrap-panic (p2pkh-to-principal scriptSig)))
+    )
+        (let
+            (
+                (token-id (+ (var-get last-token-id) u1))
+            )
+            (asserts! (is-eq tx-sender contract-owner) err-owner-only)
+            (try! (nft-mint? bitbadge token-id stacks-address))
+            (var-set last-token-id token-id)
+            (ok token-id)
+        )
     )
 )
