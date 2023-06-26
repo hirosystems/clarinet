@@ -445,6 +445,9 @@ struct Test {
     /// Allow network access
     #[clap(long = "allow-net")]
     pub allow_net: bool,
+    /// Allow read access to project directory
+    #[clap(long = "allow-read")]
+    pub allow_disk_read: bool,
     /// Specify optional Typescript config file
     #[clap(long = "ts-config")]
     pub ts_config: Option<String>,
@@ -1229,7 +1232,7 @@ pub fn main() {
                 cmd.costs_report,
                 cmd.watch,
                 true,
-                false,
+                cmd.allow_disk_read,
                 false,
                 None,
                 None,
