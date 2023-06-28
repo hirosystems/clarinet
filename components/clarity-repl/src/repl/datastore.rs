@@ -1,3 +1,4 @@
+use crate::repl::special;
 use sha2::{Digest, Sha512_256};
 
 use clarity::types::chainstate::BlockHeaderHash;
@@ -285,6 +286,10 @@ impl ClarityBackingStore for Datastore {
     #[cfg(not(feature = "wasm"))]
     fn get_side_store(&mut self) -> &::clarity::rusqlite::Connection {
         panic!("Datastore cannot get_side_store")
+    }
+
+    fn get_cc_special_cases_handler(&self) -> Option<::clarity::vm::database::SpecialCaseHandler> {
+        Some(&special::handle_contract_call_special_cases)
     }
 }
 

@@ -5,6 +5,7 @@ pub mod diagnostic;
 pub mod interpreter;
 pub mod session;
 pub mod settings;
+pub mod special;
 pub mod tracer;
 
 use serde::ser::{Serialize, SerializeMap, Serializer};
