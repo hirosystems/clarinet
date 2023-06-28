@@ -222,7 +222,7 @@ impl ClarityBackingStore for Datastore {
     fn get_current_block_height(&mut self) -> u32 {
         self.height_at_chain_tip
             .get(self.get_chain_tip())
-            .expect("No height stored for current chain tip")
+            .unwrap_or(&u32::MAX)
             .clone()
     }
 
