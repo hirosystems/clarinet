@@ -1,5 +1,3 @@
-use super::DevnetEvent;
-use crate::{ServiceStatusData, Status};
 use bollard::container::{
     Config, CreateContainerOptions, KillContainerOptions, ListContainersOptions,
     PruneContainersOptions, WaitContainerOptions,
@@ -24,6 +22,8 @@ use std::io::Write;
 use std::path::PathBuf;
 use std::sync::mpsc::{Receiver, Sender};
 use std::time::Duration;
+
+use crate::event::{DevnetEvent, ServiceStatusData, Status};
 
 #[derive(Debug)]
 pub struct DevnetOrchestrator {
@@ -71,6 +71,7 @@ impl DevnetOrchestrator {
     pub fn new(
         manifest: ProjectManifest,
         devnet_override: Option<DevnetConfigFile>,
+        should_use_docker: bool,
     ) -> Result<DevnetOrchestrator, String> {
         let mut network_config = NetworkManifest::from_project_manifest_location(
             &manifest.location,
@@ -110,9 +111,14 @@ impl DevnetOrchestrator {
             network_name.push_str(".net");
         }
 
-        let docker_client = match network_config.devnet {
-            Some(ref devnet) => {
-                Docker::connect_with_socket(&devnet.docker_host, 120, bollard::API_DEFAULT_VERSION)
+        let docker_client = match should_use_docker {
+            true => match network_config.devnet {
+                Some(ref devnet) => {
+                    let client = Docker::connect_with_socket(
+                        &devnet.docker_host,
+                        120,
+                        bollard::API_DEFAULT_VERSION,
+                    )
                     .or_else(|_| Docker::connect_with_socket_defaults())
                     .or_else(|_| {
                         let mut user_space_docker_socket =
@@ -126,9 +132,12 @@ impl DevnetOrchestrator {
                             bollard::API_DEFAULT_VERSION,
                         )
                     })
-                    .map_err(|e| format!("unable to connect to docker: {:?}", e))?
-            }
-            None => unreachable!(),
+                    .map_err(|e| format!("unable to connect to docker: {:?}", e))?;
+                    Some(client)
+                }
+                None => unreachable!(),
+            },
+            false => None,
         };
 
         Ok(DevnetOrchestrator {
@@ -136,7 +145,7 @@ impl DevnetOrchestrator {
             network_name,
             manifest,
             network_config: Some(network_config),
-            docker_client: Some(docker_client),
+            docker_client: docker_client,
             can_exit: true,
             termination_success_tx: None,
             stacks_node_container_id: None,
@@ -151,7 +160,25 @@ impl DevnetOrchestrator {
         })
     }
 
-    pub async fn prepare_network(&mut self) -> Result<ServicesMapHosts, String> {
+    pub fn prepare_service_network(&mut self, namespace: &str) -> Result<ServicesMapHosts, String> {
+        let services_map_hosts = ServicesMapHosts {
+            bitcoin_node_host: format!(
+                "bitcoind-chain-coordinator-service.{namespace}.svc.cluster.local:18443"
+            ),
+            stacks_node_host: format!("stacks-node-service.{namespace}.svc.cluster.local:20443"),
+            postgres_host: format!("stacks-api-service.{namespace}.svc.cluster.local:5432"),
+            stacks_api_host: format!("stacks-api-service.{namespace}.svc.cluster.local:3999"),
+            stacks_explorer_host: "localhost".into(), // todo (micaiah)
+            bitcoin_explorer_host: "localhost".into(), // todo (micaiah)
+            subnet_node_host: "localhost".into(),     // todo (micaiah)
+            subnet_api_host: "localhost".into(),      // todo (micaiah)
+        };
+
+        self.services_map_hosts = Some(services_map_hosts.clone());
+
+        Ok(services_map_hosts)
+    }
+    pub async fn prepare_local_network(&mut self) -> Result<ServicesMapHosts, String> {
         let (docker, devnet_config) = match (&self.docker_client, &self.network_config) {
             (Some(ref docker), Some(ref network_config)) => match network_config.devnet {
                 Some(ref devnet_config) => (docker, devnet_config),
