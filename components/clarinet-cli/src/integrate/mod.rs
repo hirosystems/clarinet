@@ -5,14 +5,14 @@ use std::{
     sync::mpsc::{self, channel, Sender},
 };
 
-use crate::chainhooks::load_chainhooks;
 use clarinet_deployments::types::DeploymentSpecification;
 use hiro_system_kit::Drain;
 use hiro_system_kit::{slog, slog_async, slog_term};
-use stacks_network::chainhook_sdk::chainhook_types::{BitcoinNetwork, StacksNetwork};
-use stacks_network::chainhook_sdk::utils::Context;
 use stacks_network::{
-    do_run_devnet, ChainsCoordinatorCommand, DevnetEvent, DevnetOrchestrator, LogData,
+    chainhook_sdk::chainhook_types::{BitcoinNetwork, StacksNetwork},
+    chainhook_sdk::utils::Context,
+    do_run_devnet, load_chainhooks, ChainsCoordinatorCommand, DevnetEvent, DevnetOrchestrator,
+    LogData,
 };
 use std::fs::OpenOptions;
 

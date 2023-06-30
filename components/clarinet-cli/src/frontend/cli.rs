@@ -1,4 +1,3 @@
-use crate::chainhooks::{check_chainhooks, load_chainhooks, parse_chainhook_full_specification};
 use crate::deployments::types::DeploymentSynthesis;
 use crate::deployments::{
     self, check_deployments, generate_default_deployment, get_absolute_deployment_path,
@@ -37,7 +36,9 @@ use clarity_repl::repl::diagnostic::{output_code, output_diagnostic};
 use clarity_repl::repl::{ClarityCodeSource, ClarityContract, ContractDeployer, DEFAULT_EPOCH};
 use clarity_repl::{analysis, repl, Terminal};
 use stacks_network::chainhook_sdk::chainhooks::types::ChainhookFullSpecification;
-use stacks_network::{self, DevnetOrchestrator};
+use stacks_network::{
+    self, check_chainhooks, load_chainhooks, parse_chainhook_full_specification, DevnetOrchestrator,
+};
 use std::collections::HashMap;
 use std::fs::{self, File};
 use std::io::prelude::*;
@@ -1386,7 +1387,7 @@ pub fn main() {
                 }
             };
 
-            let orchestrator = match DevnetOrchestrator::new(manifest, None) {
+            let orchestrator = match DevnetOrchestrator::new(manifest, None, true) {
                 Ok(orchestrator) => orchestrator,
                 Err(e) => {
                     println!("{}", format_err!(e));
