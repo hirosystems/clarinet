@@ -6,6 +6,8 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+atty = "0.2.14"
+ansi_term = "0.12.1"
 bollard = "0.11.0"
 bytes = "1.4.0"
 crossterm = { version = "0.22.1", optional = true }
@@ -41,6 +43,20 @@ clarinet-utils = { path = "../clarinet-utils" }
 hiro-system-kit = { path = "../hiro-system-kit", features = ["log"] }
 clarity-repl = { path = "../clarity-repl", features = ["cli"] }
 dirs = { version = "4.0.0" }
+clap = {version = "4.2.7", features = [ "derive" ] }
+serde_yaml = "0.9.21"
+
+[lib]
+name = "stacks_network"
+path = "src/lib.rs"
+# Default type
+# crate-type = ["lib"]
+# Use this instead for WASM builds
+crate-type = ["cdylib", "rlib"]
+
+[[bin]]
+name = "stacks-network"
+path = "src/main.rs"
 
 [features]
 default = ["crossterm"]
