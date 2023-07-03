@@ -8,7 +8,7 @@ use hiro_system_kit::slog;
 use std::path::PathBuf;
 use std::sync::mpsc::channel;
 
-use stacks_network::{load_chainhooks, manage_devnet_for_service};
+use stacks_network::{do_run_chain_coordinator, load_chainhooks};
 use stacks_network::{Context, DevnetOrchestrator};
 
 #[derive(Parser, Debug)]
@@ -67,7 +67,7 @@ fn main() {
     ctx.try_log(|logger| slog::info!(logger, "starting devnet coordinator"));
 
     let (orchestrator_terminated_tx, _) = channel();
-    let res = hiro_system_kit::nestable_block_on(manage_devnet_for_service(
+    let res = hiro_system_kit::nestable_block_on(do_run_chain_coordinator(
         orchestrator,
         deployment,
         &mut Some(chainhooks),

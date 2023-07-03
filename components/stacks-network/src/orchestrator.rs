@@ -160,7 +160,10 @@ impl DevnetOrchestrator {
         })
     }
 
-    pub fn prepare_service_network(&mut self, namespace: &str) -> Result<ServicesMapHosts, String> {
+    pub fn prepare_network_k8s_coordinator(
+        &mut self,
+        namespace: &str,
+    ) -> Result<ServicesMapHosts, String> {
         let services_map_hosts = ServicesMapHosts {
             bitcoin_node_host: format!(
                 "bitcoind-chain-coordinator-service.{namespace}.svc.cluster.local:18443"
@@ -178,6 +181,7 @@ impl DevnetOrchestrator {
 
         Ok(services_map_hosts)
     }
+
     pub async fn prepare_local_network(&mut self) -> Result<ServicesMapHosts, String> {
         let (docker, devnet_config) = match (&self.docker_client, &self.network_config) {
             (Some(ref docker), Some(ref network_config)) => match network_config.devnet {

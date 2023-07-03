@@ -248,7 +248,7 @@ async fn do_run_devnet(
     Ok((None, None, Some(chains_coordinator_commands_tx)))
 }
 
-pub async fn manage_devnet_for_service(
+pub async fn do_run_chain_coordinator(
     mut devnet: DevnetOrchestrator,
     deployment: DeploymentSpecification,
     chainhooks: &mut Option<ChainhookConfig>,
@@ -264,7 +264,7 @@ pub async fn manage_devnet_for_service(
     ),
     String,
 > {
-    let ip_address_setup = devnet.prepare_service_network(namespace)?;
+    let ip_address_setup = devnet.prepare_network_k8s_coordinator(namespace)?;
     do_run_devnet(
         devnet,
         deployment,
