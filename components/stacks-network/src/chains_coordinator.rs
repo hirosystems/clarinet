@@ -526,7 +526,7 @@ pub async fn publish_stacking_orders(
         return None;
     }
 
-    let stacks_node_rpc_url = &services_map_hosts.stacks_api_host;
+    let stacks_node_rpc_url = format!("http://{}", &services_map_hosts.stacks_node_host);
 
     let mut transactions = 0;
     let pox_info: PoxInfo = reqwest::get(format!("{}/v2/pox", stacks_node_rpc_url))
