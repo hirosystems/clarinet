@@ -35,15 +35,7 @@ fn main() {
     let project_location = get_config_location_from_path_or_exit(&args.project_root_path);
 
     let manifest = ProjectManifest::from_location(&manifest_location).unwrap();
-    let orchestrator = DevnetOrchestrator::new(
-        manifest,
-        Some(DevnetConfigFile {
-            working_dir: Some("./".into()),
-            ..Default::default()
-        }),
-        false,
-    )
-    .unwrap();
+    let orchestrator = DevnetOrchestrator::new(manifest, None, false).unwrap();
 
     let deployment =
         DeploymentSpecification::from_config_file(&deployment_location, &project_location).unwrap();
