@@ -70,7 +70,7 @@ You must first [Install Rust](https://www.rust-lang.org/tools/install) to use th
 If you are using Debian and Ubuntu-based distributions, make sure to run the following command to install required packages before building Clarinet.
 
 ```bash
-sudo apt install build-essential pkg-config libssl-dev
+sudo apt install build-essential pkg-config libssl-dev curl
 ```
 
 #### Build Clarinet
