@@ -2,7 +2,7 @@ use chainhook_sdk::chainhook_types::{BitcoinNetwork, StacksNetwork};
 use clarinet_deployments::types::DeploymentSpecification;
 
 use clap::Parser;
-use clarinet_files::{DevnetConfigFile, FileLocation, ProjectManifest};
+use clarinet_files::{FileLocation, ProjectManifest};
 use hiro_system_kit::slog;
 
 use std::path::PathBuf;
