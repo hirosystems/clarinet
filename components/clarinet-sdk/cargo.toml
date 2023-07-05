@@ -1,0 +1,65 @@
+[package]
+edition = "2021"
+name = "clarinet-sdk"
+version = "0.0.1"
+
+[lib]
+crate-type = ["cdylib"]
+name = "clarinet_sdk"
+path = "src/lib.rs"
+
+[dependencies]
+serde = { version = "1.0.136", features = ["derive"] }
+serde_json = "1.0"
+clarinet-files = { path = "../clarinet-files", default-features = false }
+clarity-repl = { path = "../clarity-repl", default-features = false, optional = true }
+clarinet-deployments = { path = "../clarinet-deployments", default-features = false }
+
+# WASM
+console_error_panic_hook = { version = "0.1", optional = true }
+js-sys = { version = "0.3", optional = true }
+serde-wasm-bindgen = { version = "0.5", optional = true }
+wasm-bindgen = { version = "0.2", optional = true }
+wasm-bindgen-futures = { version = "0.4", optional = true }
+web-sys = { version = "0.3", features = ["console"], optional = true }
+
+[features]
+default = ["wasm"]
+wasm = [
+  "wasm-bindgen",
+  "wasm-bindgen-futures",
+  "serde-wasm-bindgen",
+  "js-sys",
+  "web-sys",
+  "console_error_panic_hook",
+  "clarinet-deployments/wasm",
+  "clarity-repl/wasm",
+  "clarinet-files/wasm",
+]
+
+[package.metadata.wasm-pack.profile.dev]
+wasm-opt = ['-O1']
+
+[package.metadata.wasm-pack.profile.dev.wasm-bindgen]
+debug-js-glue = true
+demangle-name-section = true
+dwarf-debug-info = false
+
+[package.metadata.wasm-pack.profile.profiling]
+wasm-opt = ['-O']
+
+[package.metadata.wasm-pack.profile.profiling.wasm-bindgen]
+debug-js-glue = false
+demangle-name-section = true
+dwarf-debug-info = false
+
+[package.metadata.wasm-pack.profile.release]
+# -04  aggressively optimizes for speed
+wasm-opt = false
+# -0z aggressively optimizes for size
+# wasm-opt = ['-Oz']
+
+[package.metadata.wasm-pack.profile.release.wasm-bindgen]
+debug-js-glue = false
+demangle-name-section = true
+dwarf-debug-info = false

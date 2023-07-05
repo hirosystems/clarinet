@@ -1,0 +1,13 @@
+{
+  "folders": [{ "path": "../../" }],
+  "settings": {
+    "rust-analyzer.check.overrideCommand": [
+      "cargo",
+      "check",
+      "--no-default-features",
+      "--package=clarinet-sdk",
+      "--features=wasm",
+      "--message-format=json"
+    ]
+  }
+}
