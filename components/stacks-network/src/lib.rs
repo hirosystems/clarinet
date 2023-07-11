@@ -81,15 +81,23 @@ async fn do_run_devnet(
         },
         _ => Err("Unable to retrieve config"),
     }?;
+    // if we're starting all services, all trace logs go to networking.log
+    if start_local_devnet_services {
+        let file_appender =
+            tracing_appender::rolling::never(&devnet_config.working_dir, "networking.log");
+        let (non_blocking, _guard) = tracing_appender::non_blocking(file_appender);
 
-    let file_appender =
-        tracing_appender::rolling::never(&devnet_config.working_dir, "networking.log");
-    let (non_blocking, _guard) = tracing_appender::non_blocking(file_appender);
-
-    let _ = tracing_subscriber::fmt()
-        .with_max_level(tracing::Level::INFO)
-        .with_writer(non_blocking)
-        .try_init();
+        let _ = tracing_subscriber::fmt()
+            .with_max_level(tracing::Level::INFO)
+            .with_writer(non_blocking)
+            .try_init();
+    } else {
+        // for the devnet, we can't write to a file, so we log everything to stdout, but we still want to set
+        // the max trace level so we don't get too much information in the logs
+        let _ = tracing_subscriber::fmt()
+            .with_max_level(tracing::Level::INFO)
+            .try_init();
+    }
 
     // The event observer should be able to send some events to the UI thread,
     // and should be able to be terminated
