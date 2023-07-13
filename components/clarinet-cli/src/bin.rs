@@ -15,7 +15,6 @@ mod frontend;
 mod generate;
 pub mod integrate;
 mod lsp;
-mod runner;
 
 use frontend::cli;
 
