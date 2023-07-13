@@ -24,10 +24,10 @@ A clear and concise description of what you expected to happen.
 **Screenshots**
 If applicable, add screenshots or consol.log to help explain your problem.
 
-**Desktop (please complete the following information):**
- - OS: [e.g. iOS]
- - Browser [e.g. chrome, safari]
- - Version [e.g. 22]
+**Environment (please complete the following information):**
+ - OS (version): [e.g. macOS (13.4.1)]
+ - Docker version [e.g. 24.0.4]
+ - Clarinet version [e.g. 1.7.0] - Please use the latest version
 
 
 **Additional context**
