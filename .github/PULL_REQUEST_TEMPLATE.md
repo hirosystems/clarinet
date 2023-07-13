@@ -14,6 +14,5 @@
 
 ### Checklist
 
-- [ ] All tests pass
 - [ ] Tests added in this PR (if applicable)
 
