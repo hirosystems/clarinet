@@ -18,7 +18,7 @@ use std::{panic, path::PathBuf};
 use wasm_bindgen::prelude::*;
 use wasm_bindgen::JsValue;
 
-use crate::utils::{self, raw_value_to_string, serialize_event};
+use crate::utils::{self, serialize_event, uint8_value_to_string};
 
 macro_rules! log {
     ( $( $t:tt )* ) => {
@@ -176,7 +176,7 @@ impl TestSession {
         test_name: &str,
     ) -> CallContractRes {
         let session = self.session.as_mut().unwrap();
-        let args: Vec<String> = js_args.iter().map(|a| raw_value_to_string(a)).collect();
+        let args: Vec<String> = js_args.iter().map(|a| uint8_value_to_string(a)).collect();
 
         let (execution, _) =
             match session.invoke_contract_call(contract, method, &args, sender, test_name.into()) {
@@ -184,7 +184,7 @@ impl TestSession {
                 Err(diagnostics) => {
                     let mut message = format!(
                         "{}: {}::{}({})",
-                        "Contract call runtime error",
+                        "Contract call error",
                         contract,
                         method,
                         args.join(", ")
@@ -273,7 +273,7 @@ impl TestSession {
         for string in output {
             output_as_array.push(&JsValue::from_str(&string));
         }
-        // @todo: can actualyl return raw value like contract calls
+        // @todo: can actually return raw value like contract calls
         output_as_array.into()
     }
 }
