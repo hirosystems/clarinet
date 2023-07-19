@@ -1369,6 +1369,13 @@ events_keys = ["*"]
             ))
         }
 
+        let mut env = vec![
+            "STACKS_LOG_PP=1".to_string(),
+            "STACKS_LOG_DEBUG=1".to_string(),
+            // "BLOCKSTACK_USE_TEST_GENESIS_CHAINSTATE=1".to_string(),
+        ];
+        env.append(&mut devnet_config.subnet_node_env_vars.clone());
+
         let config = Config {
             labels: Some(labels),
             image: Some(devnet_config.subnet_node_image_url.clone()),
@@ -1380,11 +1387,7 @@ events_keys = ["*"]
                 "start".into(),
                 "--config=/src/subnet-node/Subnet.toml".into(),
             ]),
-            env: Some(vec![
-                "STACKS_LOG_PP=1".to_string(),
-                "STACKS_LOG_DEBUG=1".to_string(),
-                // "BLOCKSTACK_USE_TEST_GENESIS_CHAINSTATE=1".to_string(),
-            ]),
+            env: Some(env),
             host_config: Some(HostConfig {
                 auto_remove: Some(true),
                 binds: Some(binds),
@@ -1529,6 +1532,7 @@ events_keys = ["*"]
             format!("PG_DATABASE={}", devnet_config.stacks_api_postgres_database),
             format!("STACKS_CHAIN_ID=2147483648"),
             format!("V2_POX_MIN_AMOUNT_USTX=90000000260"),
+            format!("FAUCET_PRIVATE_KEY={}", devnet_config.faucet_secret_key_hex),
             "NODE_ENV=development".to_string(),
         ];
         env.append(&mut devnet_config.stacks_api_env_vars.clone());
@@ -1626,39 +1630,43 @@ events_keys = ["*"]
         let mut labels = HashMap::new();
         labels.insert("project".to_string(), self.network_name.to_string());
 
+        let mut env = vec![
+            format!("STACKS_CORE_RPC_HOST=subnet-node.{}", self.network_name),
+            format!("STACKS_BLOCKCHAIN_API_DB=pg"),
+            format!(
+                "STACKS_CORE_RPC_PORT={}",
+                devnet_config.subnet_node_rpc_port
+            ),
+            format!(
+                "STACKS_BLOCKCHAIN_API_PORT={}",
+                devnet_config.subnet_api_port
+            ),
+            format!("STACKS_BLOCKCHAIN_API_HOST=0.0.0.0"),
+            format!(
+                "STACKS_CORE_EVENT_PORT={}",
+                devnet_config.subnet_api_events_port
+            ),
+            format!("STACKS_CORE_EVENT_HOST=0.0.0.0"),
+            format!("STACKS_API_ENABLE_FT_METADATA=1"),
+            format!("PG_HOST=postgres.{}", self.network_name),
+            format!("PG_PORT={}", devnet_config.postgres_port),
+            format!("PG_USER={}", devnet_config.postgres_username),
+            format!("PG_PASSWORD={}", devnet_config.postgres_password),
+            format!("PG_DATABASE={}", devnet_config.subnet_api_postgres_database),
+            format!("STACKS_CHAIN_ID=0x55005500"),
+            format!("CUSTOM_CHAIN_IDS=testnet=0x55005500"),
+            format!("V2_POX_MIN_AMOUNT_USTX=90000000260"),
+            "NODE_ENV=development".to_string(),
+        ];
+        env.append(&mut devnet_config.subnet_api_env_vars.clone());
+
         let config = Config {
             labels: Some(labels),
             image: Some(devnet_config.subnet_api_image_url.clone()),
             // domainname: Some(self.network_name.to_string()),
             tty: None,
             exposed_ports: Some(exposed_ports),
-            env: Some(vec![
-                format!("STACKS_CORE_RPC_HOST=subnet-node.{}", self.network_name),
-                format!("STACKS_BLOCKCHAIN_API_DB=pg"),
-                format!(
-                    "STACKS_CORE_RPC_PORT={}",
-                    devnet_config.subnet_node_rpc_port
-                ),
-                format!(
-                    "STACKS_BLOCKCHAIN_API_PORT={}",
-                    devnet_config.subnet_api_port
-                ),
-                format!("STACKS_BLOCKCHAIN_API_HOST=0.0.0.0"),
-                format!(
-                    "STACKS_CORE_EVENT_PORT={}",
-                    devnet_config.subnet_api_events_port
-                ),
-                format!("STACKS_CORE_EVENT_HOST=0.0.0.0"),
-                format!("STACKS_API_ENABLE_FT_METADATA=1"),
-                format!("PG_HOST=postgres.{}", self.network_name),
-                format!("PG_PORT={}", devnet_config.postgres_port),
-                format!("PG_USER={}", devnet_config.postgres_username),
-                format!("PG_PASSWORD={}", devnet_config.postgres_password),
-                format!("PG_DATABASE={}", devnet_config.subnet_api_postgres_database),
-                format!("STACKS_CHAIN_ID=2147483648"),
-                format!("V2_POX_MIN_AMOUNT_USTX=90000000260"),
-                "NODE_ENV=development".to_string(),
-            ]),
+            env: Some(env),
             host_config: Some(HostConfig {
                 auto_remove: Some(true),
                 network_mode: Some(self.network_name.clone()),
@@ -1890,7 +1898,7 @@ events_keys = ["*"]
             format!("NEXT_PUBLIC_DEFAULT_POLLING_INTERVAL={}", 5000),
             "NODE_ENV=development".to_string(),
         ];
-        env.append(&mut devnet_config.stacks_node_env_vars.clone());
+        env.append(&mut devnet_config.stacks_explorer_env_vars.clone());
 
         let config = Config {
             labels: Some(labels),

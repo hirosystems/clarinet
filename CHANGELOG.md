@@ -1,3 +1,19 @@
+#### [1.7.1](https://github.com/hirosystems/clarinet/compare/v1.7.0...v1.7.1) (2023-07-19)
+
+##### Chores
+
+*  Update default epoch to 2.4 (#1082) (fcabffac)
+*  Update subnet node to 0.8.1 (#1081) (db547ce8)
+*  Update subnet image and contract version (4dd02518)
+
+##### Bug Fixes
+
+*  Fix clarity version of nested requirements (#1080) (ced0faab)
+*  Safety check on invalid line number in coverage (#1085) (29eb81b9)
+*  Add FAUCET_PRIVATE_KEY to stacks-blockchain-api env (#1071) (ab121210)
+*  Add `--allow-read` flag to allow filesystem read access in `clarinet test` (#1060) (4de49fde)
+*  Fix Panic at get_current_block_height for unexisting block (#1061) (edb77595)
+
 # [1.7.0](https://github.com/hirosystems/clarinet/compare/v1.6.1...v1.7.0) (2023-06-14)
 ##### New Features
 
@@ -6,11 +22,11 @@
 
 ##### Chores
 
-*  update chainhook-sdk (5eed0bf6)
-*  update chainhook-types (57a7957d)
-*  handle clarity-vm 2.1 (#1037) (7fe94b80)
-*  bump clarity repl to 1.6.4 (#1036) (3bad4177)
-*  remove unused deps (#1032) (c30af614)
+*  Update chainhook-sdk (5eed0bf6)
+*  Update chainhook-types (57a7957d)
+*  Handle clarity-vm 2.1 (#1037) (7fe94b80)
+*  Bump clarity repl to 1.6.4 (#1036) (3bad4177)
+*  Remove unused deps (#1032) (c30af614)
 
 # [1.6.1](https://github.com/hirosystems/clarinet/compare/v1.6.0...v1.6.1) (2023-05-16)
 
@@ -18,14 +34,14 @@
 
 ##### Chores
 
-*  upgrade uuid crate (5b9b4015)
-*  upgrade lsp dependencies (be8d2ceb)
+*  Upgrade uuid crate (5b9b4015)
+*  Upgrade lsp dependencies (be8d2ceb)
 
 ##### Bug Fixes
 
 * **lsp:**
-*  functions first parameter highlighting (9a28a9a1)
-*  clarity keywords syntax highlighting (724379dc)
+*  Functions first parameter highlighting (9a28a9a1)
+*  Clarity keywords syntax highlighting (724379dc)
 
 # [1.6.0](https://github.com/hirosystems/clarinet/compare/v1.5.3...v1.6.0) (2023-05-09)
 

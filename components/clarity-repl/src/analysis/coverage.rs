@@ -183,18 +183,24 @@ impl CoverageReporter {
                     file_content.push_str(&format!("FNF:{}\n", functions.len()));
                     file_content.push_str(&format!("FNH:{}\n", function_hits.len()));
 
-                    for (line_number, count) in line_execution_counts.iter() {
-                        file_content.push_str(&format!("DA:{},{}\n", line_number, count));
+                    for (line, count) in line_execution_counts.iter() {
+                        // the ast can contain elements with a span starting at line 0 that we want to ignore
+                        if line > &&0 {
+                            file_content.push_str(&format!("DA:{},{}\n", line, count));
+                        }
                     }
 
                     file_content.push_str(&format!("BRF:{}\n", branches.len()));
                     file_content.push_str(&format!("BRH:{}\n", branches_hits.len()));
 
                     for ((line, block_id, branch_nb), count) in branch_execution_counts.iter() {
-                        file_content.push_str(&format!(
-                            "BRDA:{},{},{},{}\n",
-                            line, block_id, branch_nb, count
-                        ));
+                        // the ast can contain elements with a span starting at line 0 that we want to ignore
+                        if line > &&0 {
+                            file_content.push_str(&format!(
+                                "BRDA:{},{},{},{}\n",
+                                line, block_id, branch_nb, count
+                            ));
+                        }
                     }
                 }
                 file_content.push_str("end_of_record\n");

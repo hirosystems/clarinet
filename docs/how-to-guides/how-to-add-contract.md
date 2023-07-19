@@ -41,6 +41,8 @@ Clarinet will also add your contract configuration in the `Clarinet.toml`.
 ```toml
 [contracts.my-contract]
 path = "contracts/my-contract.clar"
+clarity_version = 2
+epoch = 2.4
 ```
 
 You can add contracts to your project by adding the files manually; however, you must make sure to add the appropriate configuration

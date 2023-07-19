@@ -20,10 +20,10 @@ pub const DEFAULT_BITCOIN_EXPLORER_IMAGE: &str = "quay.io/hirosystems/bitcoin-ex
 pub const DEFAULT_STACKS_API_IMAGE: &str = "hirosystems/stacks-blockchain-api:latest";
 pub const DEFAULT_STACKS_EXPLORER_IMAGE: &str = "hirosystems/explorer:latest";
 pub const DEFAULT_POSTGRES_IMAGE: &str = "postgres:14";
-pub const DEFAULT_SUBNET_NODE_IMAGE: &str = "hirosystems/stacks-subnets:0.5.0";
-pub const DEFAULT_SUBNET_API_IMAGE: &str = "hirosystems/stacks-blockchain-api:7.1.0-subnets.1";
+pub const DEFAULT_SUBNET_NODE_IMAGE: &str = "hirosystems/stacks-subnets:0.8.1";
+pub const DEFAULT_SUBNET_API_IMAGE: &str = "hirosystems/stacks-blockchain-api:latest";
 pub const DEFAULT_SUBNET_CONTRACT_ID: &str =
-    "ST13F481SBR0R7Z6NMMH8YV2FJJYXA5JPA0AD3HP9.subnet-v1-2";
+    "ST173JK7NZBA4BS05ZRATQH1K89YJMTGEH1Z5J52E.subnet-v3-0-1";
 pub const DEFAULT_STACKS_MINER_MNEMONIC: &str = "fragile loan twenty basic net assault jazz absorb diet talk art shock innocent float punch travel gadget embrace caught blossom hockey surround initial reduce";
 pub const DEFAULT_FAUCET_MNEMONIC: &str = "shadow private easily thought say logic fault paddle word top book during ignore notable orange flight clock image wealth health outside kitten belt reform";
 pub const DEFAULT_SUBNET_MNEMONIC: &str = "twice kind fence tip hidden tilt action fragile skin nothing glory cousin green tomorrow spring wrist shed math olympic multiply hip blue scout claw";
@@ -36,12 +36,12 @@ pub const DEFAULT_DOCKER_SOCKET: &str = "/var/run/docker.sock";
 pub const DEFAULT_DOCKER_PLATFORM: &str = "linux/amd64";
 
 pub const DEFAULT_EPOCH_2_0: u64 = 100;
-pub const DEFAULT_EPOCH_2_05: u64 = 102;
-pub const DEFAULT_EPOCH_2_1: u64 = 106;
-pub const DEFAULT_POX2_ACTIVATION: u64 = 109;
-pub const DEFAULT_EPOCH_2_2: u64 = 122;
-pub const DEFAULT_EPOCH_2_3: u64 = 128;
-pub const DEFAULT_EPOCH_2_4: u64 = 134;
+pub const DEFAULT_EPOCH_2_05: u64 = 100;
+pub const DEFAULT_EPOCH_2_1: u64 = 101;
+pub const DEFAULT_POX2_ACTIVATION: u64 = 102;
+pub const DEFAULT_EPOCH_2_2: u64 = 103;
+pub const DEFAULT_EPOCH_2_3: u64 = 104;
+pub const DEFAULT_EPOCH_2_4: u64 = 105;
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct NetworkManifestFile {
@@ -77,6 +77,7 @@ pub struct DevnetConfigFile {
     pub stacks_node_env_vars: Option<Vec<String>>,
     pub stacks_api_env_vars: Option<Vec<String>>,
     pub stacks_explorer_env_vars: Option<Vec<String>>,
+    pub subnet_node_env_vars: Option<Vec<String>>,
     pub stacks_api_port: Option<u16>,
     pub stacks_api_events_port: Option<u16>,
     pub bitcoin_explorer_port: Option<u16>,
@@ -120,6 +121,7 @@ pub struct DevnetConfigFile {
     pub subnet_api_image_url: Option<String>,
     pub subnet_api_port: Option<u16>,
     pub subnet_api_events_port: Option<u16>,
+    pub subnet_api_env_vars: Option<Vec<String>>,
     pub disable_subnet_api: Option<bool>,
     pub docker_host: Option<String>,
     pub components_host: Option<String>,
@@ -241,9 +243,11 @@ pub struct DevnetConfig {
     pub subnet_node_events_observers: Vec<String>,
     pub subnet_contract_id: String,
     pub remapped_subnet_contract_id: String,
+    pub subnet_node_env_vars: Vec<String>,
     pub subnet_api_image_url: String,
     pub subnet_api_port: u16,
     pub subnet_api_events_port: u16,
+    pub subnet_api_env_vars: Vec<String>,
     pub disable_subnet_api: bool,
     pub docker_host: String,
     pub components_host: String,
@@ -870,6 +874,8 @@ impl NetworkManifest {
                     .stacks_explorer_env_vars
                     .take()
                     .unwrap_or(vec![]),
+                subnet_node_env_vars: devnet_config.subnet_node_env_vars.take().unwrap_or(vec![]),
+                subnet_api_env_vars: devnet_config.subnet_api_env_vars.take().unwrap_or(vec![]),
                 use_docker_gateway_routing: devnet_config
                     .use_docker_gateway_routing
                     .unwrap_or(false),
