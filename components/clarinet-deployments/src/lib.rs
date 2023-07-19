@@ -1,7 +1,6 @@
 use clarity_repl::clarity::stacks_common::types::StacksEpochId;
-use clarity_repl::clarity::ClarityVersion;
-use clarity_repl::repl::DEFAULT_EPOCH;
 use clarity_repl::repl::{ClarityCodeSource, ClarityContract, ContractDeployer};
+use clarity_repl::repl::{DEFAULT_CLARITY_VERSION, DEFAULT_EPOCH};
 
 extern crate serde;
 
@@ -322,11 +321,7 @@ pub async fn generate_default_deployment(
                     ))
                 }
             };
-            queue.push_front((
-                contract_id,
-                StacksEpochId::Epoch21,
-                ClarityVersion::Clarity2,
-            ));
+            queue.push_front((contract_id, Some(DEFAULT_CLARITY_VERSION)));
         }
     }
 
@@ -350,14 +345,10 @@ pub async fn generate_default_deployment(
                     ))
                 }
             };
-            // Download the code
-            let (_source, epoch, clarity_version, _contract_location) =
-                requirements::retrieve_contract(&contract_id, &cache_location, &file_accessor)
-                    .await?;
-            queue.push_front((contract_id, epoch, clarity_version));
+            queue.push_front((contract_id, None));
         }
 
-        while let Some((contract_id, epoch, clarity_version)) = queue.pop_front() {
+        while let Some((contract_id, forced_clarity_version)) = queue.pop_front() {
             if requirements_deps.contains_key(&contract_id) {
                 continue;
             }
@@ -432,6 +423,18 @@ pub async fn generate_default_deployment(
             // Detect the eventual dependencies for this AST
             let mut contract_data = BTreeMap::new();
             let (_, ast) = requirement_data;
+            let clarity_version = match forced_clarity_version {
+                Some(clarity_version) => clarity_version,
+                None => {
+                    let (_, _, clarity_version, _) = requirements::retrieve_contract(
+                        &contract_id,
+                        &cache_location,
+                        &file_accessor,
+                    )
+                    .await?;
+                    clarity_version
+                }
+            };
             contract_data.insert(contract_id.clone(), (clarity_version, ast));
             let dependencies =
                 ASTDependencyDetector::detect_dependencies(&contract_data, &requirements_data);
@@ -446,11 +449,7 @@ pub async fn generate_default_deployment(
                     // result in the `inferable_dependencies` map. We will just extract and keep the associated data (source, ast, deps).
                     for (contract_id, dependencies) in inferable_dependencies.into_iter() {
                         for dependency in dependencies.iter() {
-                            queue.push_back((
-                                dependency.contract_id.clone(),
-                                epoch.clone(),
-                                clarity_version.clone(),
-                            ));
+                            queue.push_back((dependency.contract_id.clone(), None));
                         }
                         requirements_deps.insert(contract_id.clone(), dependencies);
                         requirements_data.insert(contract_id.clone(), (clarity_version, ast));
@@ -463,18 +462,14 @@ pub async fn generate_default_deployment(
                     // and we will keep the source in memory to avoid useless disk access.
                     for (_, dependencies) in inferable_dependencies.iter() {
                         for dependency in dependencies.iter() {
-                            queue.push_back((
-                                dependency.contract_id.clone(),
-                                epoch.clone(),
-                                clarity_version.clone(),
-                            ));
+                            queue.push_back((dependency.contract_id.clone(), None));
                         }
                     }
                     requirements_data.insert(contract_id.clone(), (clarity_version, ast));
-                    queue.push_front((contract_id, epoch, clarity_version));
+                    queue.push_front((contract_id, None));
 
                     for non_inferable_contract_id in non_inferable_dependencies.into_iter() {
-                        queue.push_front((non_inferable_contract_id, epoch, clarity_version));
+                        queue.push_front((non_inferable_contract_id, None));
                     }
                 }
             };
