@@ -786,7 +786,7 @@ dependencies = [
 
 [[package]]
 name = "clarinet-cli"
-version = "1.7.0"
+version = "1.7.1"
 dependencies = [
  "aes 0.7.5",
  "ansi_term",
@@ -802,7 +802,7 @@ dependencies = [
  "clarinet-files",
  "clarinet-utils 1.0.0",
  "clarity-lsp",
- "clarity-repl 1.7.0",
+ "clarity-repl 1.7.1",
  "crossbeam-channel",
  "crossterm 0.22.1",
  "ctrlc",
@@ -902,7 +902,7 @@ dependencies = [
  "bitcoincore-rpc-json",
  "clarinet-files",
  "clarinet-utils 1.0.0",
- "clarity-repl 1.7.0",
+ "clarity-repl 1.7.1",
  "libsecp256k1 0.7.1",
  "reqwest",
  "serde",
@@ -921,7 +921,7 @@ dependencies = [
  "bitcoin",
  "chainhook-types",
  "clarinet-utils 1.0.0",
- "clarity-repl 1.7.0",
+ "clarity-repl 1.7.1",
  "js-sys",
  "libsecp256k1 0.7.1",
  "serde",
@@ -961,7 +961,7 @@ version = "1.0.0"
 dependencies = [
  "clap",
  "clarinet-files",
- "clarity-repl 1.7.0",
+ "clarity-repl 1.7.1",
  "serde",
  "serde_derive",
  "serde_json",
@@ -973,7 +973,7 @@ name = "clarity-jupyter-kernel"
 version = "1.0.0"
 dependencies = [
  "chrono",
- "clarity-repl 1.7.0",
+ "clarity-repl 1.7.1",
  "colored",
  "dirs",
  "failure",
@@ -995,7 +995,7 @@ version = "1.0.0"
 dependencies = [
  "clarinet-deployments",
  "clarinet-files",
- "clarity-repl 1.7.0",
+ "clarity-repl 1.7.1",
  "console_error_panic_hook",
  "js-sys",
  "lazy_static",
@@ -1046,7 +1046,7 @@ dependencies = [
 
 [[package]]
 name = "clarity-repl"
-version = "1.7.0"
+version = "1.7.1"
 dependencies = [
  "ansi_term",
  "atty",
@@ -5675,7 +5675,7 @@ dependencies = [
 
 [[package]]
 name = "stacks-devnet-js"
-version = "1.7.0"
+version = "1.7.1"
 dependencies = [
  "clarinet-deployments",
  "clarinet-files",
@@ -5691,7 +5691,7 @@ dependencies = [
 
 [[package]]
 name = "stacks-network"
-version = "1.7.0"
+version = "1.7.1"
 dependencies = [
  "base58 0.2.0",
  "bitcoin",
@@ -5703,7 +5703,7 @@ dependencies = [
  "clarinet-deployments",
  "clarinet-files",
  "clarinet-utils 1.0.0",
- "clarity-repl 1.7.0",
+ "clarity-repl 1.7.1",
  "crossbeam-channel",
  "crossterm 0.22.1",
  "ctrlc",
@@ -5738,7 +5738,7 @@ dependencies = [
 name = "stacks-rpc-client"
 version = "1.0.7"
 dependencies = [
- "clarity-repl 1.7.0",
+ "clarity-repl 1.7.1",
  "hmac 0.12.1",
  "libsecp256k1 0.7.1",
  "pbkdf2",
