@@ -6,6 +6,10 @@ on:
       - main
       - develop
       - rc/next
+    paths-ignore:
+      - '**/CHANGELOG.md'
+      - 'docs/**'
+
   workflow_dispatch:
 
 jobs:
