@@ -11,6 +11,7 @@ The check-checker is a static analysis pass you can use to help find potential v
 * [Annotations](#annotations)
 
 ## Enable static analysis pass
+
 To enable the static analysis pass, add the following lines to your Clarinet.toml file:
 
 ```toml

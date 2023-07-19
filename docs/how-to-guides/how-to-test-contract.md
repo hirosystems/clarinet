@@ -41,7 +41,7 @@ Our `counter` application keeps track of an initialized value, allows for increm
 
 ### Unit tests for `counter` example
 
-When you created your Clarity contract with `$ clarinet contract new <my-project>`, Clarinet automatically created a test file for the contract within the tests directory:  `tests/my-projects_test.ts`. Other files under the `tests/` directory following the Deno test naming convention will also be included:
+When you created your Clarity contract with `clarinet contract new <my-project>`, Clarinet automatically created a test file for the contract within the tests directory:  `tests/my-projects_test.ts`. Other files under the `tests/` directory following the Deno test naming convention will also be included:
 
 - named test.{ts, tsx, mts, js, mjs, jsx, cjs, cts},
 - or ending with .test.{ts, tsx, mts, js, mjs, jsx, cjs, cts},
@@ -84,7 +84,7 @@ Clarinet.test({
 
 We run this test with
 ```zsh
-$ clarinet test
+clarinet test
 ```
 
 For a complete list of classes, objects, and interfaces available, see [Deno's Clarinet module index](https://deno.land/x/clarinet/index.ts).
@@ -168,15 +168,15 @@ Here, variously, we:
 To help developers maximizing their test coverage, Clarinet can produce a `lcov` report, using the following option:
 
 ```bash
-$ clarinet test --coverage
+clarinet test --coverage
 ```
 
 From there, you can use the `lcov` tooling suite to produce HTML reports.
 
 ```bash
-$ brew install lcov
-$ genhtml --branch-coverage -o coverage coverage.lcov
-$ open coverage/index.html
+brew install lcov
+genhtml --branch-coverage -o coverage coverage.lcov
+open coverage/index.html
 ```
 
 ![lcov](../images/lcov.png)
@@ -186,7 +186,7 @@ $ open coverage/index.html
 Clarinet can also be used for optimizing costs. When you execute a test suite, Clarinet keeps track of all costs being computed when executing the `contract-call`, and display the most expensive ones in a table:
 
 ```bash
-$ clarinet test --cost
+clarinet test --cost
 ```
 
 The `--cost` option can be used in conjunction with `--watch` and filters to maximize productivity, as illustrated here:
@@ -199,7 +199,7 @@ The Clarinet console is an interactive Clarity Read, Evaluate, Print, Loop (REPL
 automatically loaded into memory.
 
 ```bash
-$ clarinet console
+clarinet console
 ```
 
 You can use the `::help` command in the console for a list of valid commands, which can control the state of the REPL chain, and let you advance the chain tip. Additionally, you may enter Clarity commands into the console and observe
@@ -216,7 +216,7 @@ You can use Clarinet to deploy your contracts to your own local offline environm
 Use the following command:
 
 ```bash
-$ clarinet integrate
+clarinet integrate
 ```
 
 Make sure that you have a working installation of Docker running locally.
@@ -300,9 +300,9 @@ callee_filter = false
 
 As a next step, we may generate a deployment plan for this project.
 
-If running `$ clarinet integrate` for the first time, this file should be created by Clarinet.
+If running `clarinet integrate` for the first time, this file should be created by Clarinet.
 
-In addition, you may run `$ clarinet deployment generate --devnet` to create or overwrite.
+In addition, you may run `clarinet deployment generate --devnet` to create or overwrite.
 
 ```yaml
 ---

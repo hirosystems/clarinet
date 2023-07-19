@@ -139,7 +139,7 @@ For a detailed video description on how you can create a new project, please see
 Clarinet can handle adding a new contract and its configuration to your project with the following command:
 
 ```bash
-$ clarinet contract new bbtc
+clarinet contract new bbtc
 ```
 
 Clarinet will add 2 files to your project: the contract file in the `contracts` directory, and the contract test file
@@ -175,7 +175,7 @@ to `Clarinet.toml` in order for Clarinet to recognize the contracts.
 Clarinet provides syntax and semantics checkers for Clarity, which enable you to check if the Clarity code in your project is valid by using the following command:
 
 ```bash
-$ clarinet check
+clarinet check
 ```
 
 This command uses the `Clarinet.toml` file to locate and analyze all of the contracts in the project. If the Clarity code is valid, the command will indicate success with the following message:
@@ -189,7 +189,7 @@ The checker may also report warnings that indicate the code is valid; however, y
 You may also perform syntax-check on a single file by using the following command.
 
 ```bash
-$ clarinet check <path/to/file.clar>
+clarinet check <path/to/file.clar>
 ```
 
 If there are no syntax errors, the output of the command will be a success message similar to the example below.
@@ -354,7 +354,7 @@ This annotation tells the check-checker to consider the specified variables to b
 Clarinet provides a testing harness based on Deno that can enable you to create automated unit tests or pseudo-integration tests using Typescript.
 
 ```bash
-$ clarinet test
+clarinet test
 ```
 
 For more information on how to create unit tests using Typescript, see the [Writing Unit Tests Using Typescript](https://www.youtube.com/watch?v=Z4YEHUxHWuE&list=PL5Ujm489LoJaAz9kUJm8lYUWdGJ2AnQTb&index=7) YouTube video.
@@ -378,15 +378,15 @@ See the [billboard example](examples/billboard/tests/billboard_test.ts) for samp
 To help maximize a smart contract's test coverage, Clarinet can produce a `lcov` report, using the following option:
 
 ```bash
-$ clarinet test --coverage
+clarinet test --coverage
 ```
 
 From there, you can use the `lcov` tooling suite to produce HTML reports:
 
 ```bash
-$ brew install lcov
-$ genhtml --branch-coverage -o coverage coverage.lcov
-$ open coverage/index.html
+brew install lcov
+genhtml --branch-coverage -o coverage coverage.lcov
+open coverage/index.html
 ```
 
 ![lcov](docs/images/lcov.png)
@@ -396,7 +396,7 @@ $ open coverage/index.html
 Clarinet can also be used to optimize costs. When executing a test suite, Clarinet will keep track of all the costs being computed when executing the `contract-call`, and display the most expensive ones in a table:
 
 ```bash
-$ clarinet test --cost
+clarinet test --cost
 ```
 
 The `--cost` option can be used in conjunction with `--watch` and filters to maximize productivity, as illustrated here:
@@ -409,7 +409,7 @@ The Clarinet console is an interactive Clarity REPL environment that runs in-mem
 automatically loaded into memory.
 
 ```bash
-$ clarinet console
+clarinet console
 ```
 
 You can use the `::help` command in the console for a list of valid commands, which can control the state of the
@@ -427,7 +427,7 @@ You can use Clarinet to deploy your contracts to your own local offline environm
 evaluation on a blockchain by using the following command:
 
 ```bash
-$ clarinet integrate
+clarinet integrate
 ```
 
 **Note** Make sure you have a working installation of Docker running locally.
@@ -513,7 +513,7 @@ trusted_caller = false
 callee_filter = false
 ```
 
-As a next step we can generate a deployment plan for this project. If you are running `$ clarinet integrate` for the first time, this file should be created by Clarinet. In addition, you can run `$ clarinet deployment generate --devnet` to create or overwrite the file.
+As a next step we can generate a deployment plan for this project. If you are running `clarinet integrate` for the first time, this file should be created by Clarinet. In addition, you can run `clarinet deployment generate --devnet` to create or overwrite the file.
 
 ```yaml
 ---
@@ -562,13 +562,13 @@ You can use Clarinet to publish your contracts to Devnet / Testnet / Mainnet env
 The first step to deploy a contract is to generate a deployment plan, with the following command:
 
 ```bash
-$ clarinet deployment generate --mainnet
+clarinet deployment generate --mainnet
 ```
 
 After **cautiously** reviewing (and updating if needed) the generated plan, you can use the command to handle the deployments of your contract, according to your deployment plan:
 
 ```bash
-$ clarinet deployment apply -p <path-to-plan.yaml>
+clarinet deployment apply -p <path-to-plan.yaml>
 ```
 
 ### Use Clarinet in your CI workflow as a GitHub Action
@@ -615,7 +615,7 @@ Clarinet can easily be extended by community members: open source contributions 
 Extensions are run with the following syntax:
 
 ```
-$ clarinet run --allow-write https://deno.land/x/clarinet@v0.29.0/ext/stacksjs-helper-generator.ts
+clarinet run --allow-write https://deno.land/x/clarinet@v0.29.0/ext/stacksjs-helper-generator.ts
 ```
 
 An extension can be deployed as a standalone plugin on Deno, or may also be a local file if it includes sensitive / private setup informations.
@@ -740,7 +740,7 @@ This same file may also be used for customizing the subnet-node (miner, etc).
 When running the command:
 
 ```bash
-$ clarinet integrate
+clarinet integrate
 ```
 
 Clarinet will spin-up a subnet node. More documentation on how to use and interact with this incoming L2 can be found on the [Hyperchain repository](https://github.com/hirosystems/stacks-subnets).
@@ -792,23 +792,23 @@ To start contributing:
       Here is an example of a bad message response:
 
       ```bash
-      $ git commit -m "bad message"
-      $ ⧗   input: bad message
-      $ ✖   subject may not be empty [subject-empty]
-      $ ✖   type may not be empty [type-empty]
-      $
-      $ ✖   found 2 problems, 0 warnings
-      $ ⓘ   Get help: https://github.com/conventional-changelog/commitlint/#what-is-commitlint
-      $
-      $ husky - commit-msg hook exited with code 1 (error)
+      git commit -m "bad message"
+      ⧗   input: bad message
+      ✖   subject may not be empty [subject-empty]
+      ✖   type may not be empty [type-empty]
+      
+      ✖   found 2 problems, 0 warnings
+      ⓘ   Get help: https://github.com/conventional-changelog/commitlint/#what-is-commitlint
+      
+      husky - commit-msg hook exited with code 1 (error)
       ```
 
       Here is an example of a good message response:
 
       ```bash
-      $ git commit -m "fix: added missing dependency"
-      $ [my-branch 4c028af] fix: added missing dependency
-      $ 1 file changed, 50 insertions(+)
+      git commit -m "fix: added missing dependency"
+      [my-branch 4c028af] fix: added missing dependency
+      1 file changed, 50 insertions(+)
       ```
 
 5. After making your changes, ensure the following:

@@ -12,7 +12,6 @@ Deployment Plans are reproducible deployment steps that publish a collection of 
 * [Plan primitives](#deployment-plan-primitives)
 * [References](#references)
 
-
 ## Design
 
 The default deployment plan of every Clarinet project is contained within specifications set inside certain files. In addition to this default deployment plan, the user can manually configure each plan, adding additional transactions or contract calls, across multiple Stacks or Bitcoin blocks.
@@ -28,7 +27,6 @@ You can commit, audit, and test contracts without including any secrets in the D
 | send BTC | - Perform a simple bitcoin transfer from a p2pkh address to a p2pkh address (devnet/testnet/mainnet)  |
 | wait for block | - Test or automate contract deployment across multiple Stacks or Bitcoin blocks  |
 | send STX | - send stacks to an address or contract |
-
 
 ## References
 
