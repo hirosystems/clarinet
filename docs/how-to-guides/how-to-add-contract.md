@@ -14,7 +14,7 @@ Clarinet can handle adding a new contract and its configuration to your project.
 You can use the command below to add a new contract.
 
 ```bash
-$ clarinet contract new bbtc
+clarinet contract new bbtc
 ```
 
 Clarinet will add two files to your project:
@@ -45,4 +45,3 @@ path = "contracts/my-contract.clar"
 
 You can add contracts to your project by adding the files manually; however, you must make sure to add the appropriate configuration
 to `Clarinet.toml` for Clarinet to recognize the contracts.
-

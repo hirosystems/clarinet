@@ -5,7 +5,7 @@
 // can use in their frontend code.
 //
 // When running:
-// $ clarinet run --allow-write scripts/stacksjs-helper-generator.ts
+// clarinet run --allow-write scripts/stacksjs-helper-generator.ts
 //
 // This script will write a file at the path artifacts/contracts.ts:
 //

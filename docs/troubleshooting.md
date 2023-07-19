@@ -5,7 +5,7 @@ title: Troubleshooting
 
 This page answers some common issues you may encounter when using Clarinet. Updates will be made to this page regularly as we receive feedback and comments from our developer community.
 
-## I am unable to run Clarinet after installation. 
+## I am unable to run Clarinet after installation.
 
 > **_NOTE:_**
 >
@@ -20,7 +20,7 @@ To manually add the directory to your path:
 
 1. Open "System Properties."
 2. Click the "Environment Variables" button under "System variables."
-3. Select "Path" and then click "Edit." 
+3. Select "Path" and then click "Edit."
 4. Click the "New" button and add "C:\Program Files\clarinet\bin."
 5. Follow the on-screen prompts and click "OK" after each prompt.
 6. Restart your shell/VSCode.
@@ -55,8 +55,6 @@ If you have trouble setting up docker on your Linux machine, follow the steps be
     ```
 
 2. Install docker-desktop by following the steps [here](https://docs.docker.com/desktop/install/ubuntu/#install-docker-desktop).
-   
 3. You will need to update the settings in the Clarinet project. You can do this by navigating to the Clarinet/components/clarinet-cli/examples/simple-nft/settings/Devnet.toml file. In the `[Devnet]` settings, add the following setting and replace `username` with your username:
-   
         `docker_host = "/home/<username>/.docker/desktop/docker.sock"`
 4. Save the `Devnet.toml` and run docker now.
