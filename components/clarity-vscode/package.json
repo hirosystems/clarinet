@@ -1,7 +1,7 @@
 {
   "name": "clarity-lsp",
   "displayName": "Clarity",
-  "description": "Provides validation, syntax highlighting, code completion, and debugging for Clarity smart contracts",
+  "description": "Syntax highlighting, code completion, documentation, and debugging for Clarity smart contracts. Build decentralized applications on Stacks.",
   "author": "Hiro Systems",
   "publisher": "hirosystems",
   "icon": "assets/images/clarity-logo.png",
@@ -37,14 +37,12 @@
     "Debuggers"
   ],
   "keywords": [
-    "blockchain",
     "clarity",
-    "bitcoin",
     "stacks",
     "smart contract",
     "lsp",
-    "stx",
-    "btc"
+    "bitcoin",
+    "blockchain"
   ],
   "galleryBanner": {
     "color": "#242424",
