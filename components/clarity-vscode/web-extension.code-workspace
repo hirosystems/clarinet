@@ -10,7 +10,7 @@
   "settings": {
     "rust-analyzer.cargo.noDefaultFeatures": true,
     "rust-analyzer.cargo.features": ["clarity-lsp/wasm"],
-    "rust-analyzer.checkOnSave.overrideCommand": [
+    "rust-analyzer.check.overrideCommand": [
       "cargo",
       "check",
       "--no-default-features",

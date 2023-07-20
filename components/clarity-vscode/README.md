@@ -1,6 +1,8 @@
 # Clarity for Visual Studio Code
 
-Clarity is a **decidable** Smart Contract language that optimizes for predictability and security. This VS Code extension brings essential features to write safe and clean Clarity code: auto-completion, linting, safety checks, debugger and more.
+Clarity is a **decidable** Smart Contract language that optimizes for predictability and security. It's used on the Stacks blockchain to build decentralized applications on Bitcoin.
+
+This VS Code extension brings essential features to write safe and clean Clarity code: auto-completion, documentation, go-to definition, linting, safety checks, debugger and more.
 
 ![screenshot](https://raw.githubusercontent.com/hirosystems/clarinet/develop/components/clarity-vscode/docs/images/screenshot.png)
 
@@ -10,12 +12,24 @@ You can install the latest release of the extension directly from VS Code or fro
 
 ## Features
 
+### Documentation on hover
+
+Access all of Clarity documentation right in your editor by hovering functions and keywords.
+
+![documentation screenshot](https://raw.githubusercontent.com/hirosystems/clarinet/develop/components/clarity-vscode/docs/images/documentation.png)
+
 ### Auto Complete Functions
 
 This feature enables you to start typing a function name, and then have the editor automatically suggest auto-completion with the documentation related to the suggestion.  
 When you select a function, the extension adds the necessary parentheses around it and puts placeholders in the arguments of the function.
 
 ![autocomplete gif](https://raw.githubusercontent.com/hirosystems/clarinet/develop/components/clarity-vscode/docs/images/autocomplete.gif)
+
+### Go-to definition
+
+Easily find functions, constants and variables declarations in the same contract or in contract calls.
+
+![go-to definition screenshot](https://raw.githubusercontent.com/hirosystems/clarinet/develop/components/clarity-vscode/docs/images/documentation.png)
 
 ### Resolve contract-call targeting local contracts
 
