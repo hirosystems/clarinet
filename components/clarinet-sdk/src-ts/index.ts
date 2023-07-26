@@ -1,8 +1,9 @@
 import { Cl, ClarityValue } from "@stacks/transactions";
 
-import init, { TestSession } from "../pkg/clarinet_sdk";
+import init, { CallContractArgs, TestVM } from "../pkg/clarinet_sdk";
 import wasm from "../pkg/clarinet_sdk_bg.wasm";
 import { callVFS } from "./vfs";
+import { ContractInterface } from "./contractInterface";
 
 type CallFn = (
   contract: string,
@@ -14,51 +15,48 @@ type CallFn = (
   events: { event: string; data: { [key: string]: any } }[];
 };
 
-/**
- * @example
- * const assets = session.getAssetsMap();
- * assert.equal(assets.get("STX")?.get(wallet.address), expectedAmountInUSTX);
- */
 export type GetAssetsMap = () => Map<string, Map<string, bigint>>;
-
 export type GetAccounts = () => Map<string, string>;
 
 // because we use a proxy around the test session,
 // the type need to be hardcoded
 // @todo: is there a better way than this nested ternary?
-export type Session = {
-  [K in keyof TestSession]: K extends "callReadOnlyFn" | "callPublicFn"
+export type ClarityVM = {
+  [K in keyof TestVM]: K extends "callReadOnlyFn" | "callPublicFn"
     ? CallFn
     : K extends "getAccounts"
     ? GetAccounts
     : K extends "getAssetsMap"
     ? GetAssetsMap
-    : TestSession[K];
+    : K extends "getContractsInterfaces"
+    ? () => Map<string, ContractInterface>
+    : TestVM[K];
 };
 
 const sessionProxy = {
-  get(session: TestSession, prop: keyof TestSession, receiver: any) {
+  get(session: TestVM, prop: keyof TestVM, receiver: any) {
     if (prop === "callReadOnlyFn" || prop === "callPublicFn") {
       const callFn: CallFn = (contract, method, args, sender) => {
         const response = session[prop](
-          contract,
-          method,
-          args.map((a) => Cl.serialize(a)),
+          new CallContractArgs(
+            contract,
+            method,
+            args.map((a) => Cl.serialize(a))
+          ),
           sender
         );
         const result = Cl.deserialize(response.result);
 
-        const events = response.events.map(
-          (e: { event: string; data: Map<string, any> }) => {
-            return {
-              event: e.event,
-              data: Object.fromEntries(e.data.entries()),
-            };
-          }
-        );
+        const events = response.events.map((e: { event: string; data: Map<string, any> }) => {
+          return {
+            event: e.event,
+            data: Object.fromEntries(e.data.entries()),
+          };
+        });
 
         return { result, events };
       };
+
       return callFn;
     }
 
@@ -66,12 +64,20 @@ const sessionProxy = {
   },
 };
 
-export async function main(): Promise<Session> {
+async function initWASM(): Promise<ClarityVM> {
   // @ts-ignore
   await init(wasm());
-
-  return new Proxy(
-    new TestSession(callVFS),
-    sessionProxy
-  ) as unknown as Session;
+  return new Proxy(new TestVM(callVFS), sessionProxy) as unknown as ClarityVM;
 }
+
+function memoizedInit() {
+  let vm: null | ClarityVM = null;
+  return async () => {
+    if (!vm) {
+      vm = await initWASM();
+    }
+    return vm;
+  };
+}
+
+export default memoizedInit();

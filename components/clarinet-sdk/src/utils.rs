@@ -8,7 +8,6 @@ use clarity_repl::clarity::{
     },
     Value,
 };
-use js_sys::Uint8Array;
 use serde::{Deserialize, Serialize};
 
 #[derive(Deserialize, Serialize)]
@@ -25,6 +24,7 @@ pub struct StacksEvent {
     pub data: serde_json::Value,
 }
 
+#[allow(unused_macros)]
 macro_rules! log {
     ( $( $t:tt )* ) => {
         web_sys::console::log_1(&format!( $( $t )* ).into());
@@ -91,9 +91,8 @@ pub fn to_raw_value(value: &Value) -> String {
     format!("0x{}", raw_value.join(""))
 }
 
-pub fn uint8_value_to_string(value: &Uint8Array) -> String {
-    let value = Value::consensus_deserialize(&mut &value.to_vec()[..])
-        .expect("failed to parse clarity value");
+pub fn uint8_value_to_string(mut value: &[u8]) -> String {
+    let value = Value::consensus_deserialize(&mut value).expect("failed to parse clarity value");
 
     value_to_string(&value)
 }
