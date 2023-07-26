@@ -7,12 +7,12 @@ telemetry = false
 [contracts.counter]
 path = "contracts/counter.clar"
 clarity_version = 1
-epoch = "2.05"
+epoch = "2.4"
 
 [contracts.counter-2]
 path = "contracts/counter-v2.clar"
 clarity_version = 2
-epoch = "2.1"
+epoch = "2.4"
 
 [repl.analysis]
 passes = ["check_checker"]

@@ -10,7 +10,7 @@ contract_id = "SP3FBR2AGK5H9QBDH3EEN6DF8EK8JY7RX8QJ5SVTE.sip-010-trait-ft-standa
 [contracts.cbtc-token]
 path = "contracts/cbtc-token.clar"
 clarity_version = 1
-epoch = "2.05"
+epoch = "2.4"
 
 [repl]
 costs_version = 2
