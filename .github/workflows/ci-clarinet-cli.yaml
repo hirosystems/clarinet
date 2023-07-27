@@ -20,13 +20,10 @@ on:
       - "components/hiro-system-kit/**"
       - "components/clarinet-utils/**"
       - "components/stacks-network/**"
-      - ".github/workflows/**"
-      - "dockerfiles/**"
     branches:
       - main
       - develop
       - rc/next
-      - ci/revamp
   workflow_dispatch:
 
 ### THIS MUST BE SCOPED TO THE CORRECT COMPONENT ###
