@@ -63,7 +63,7 @@ jobs:
           prerelease: false
           draft: false
           doNotFailIfNotFound: true
-          releaseNameRegEx: "clarinet-cli-.*"
+          releaseNameRegEx: "${{ env.COMPONENT }}-.*"
           searchLimit: 1
 
       - name: Determine if release build
