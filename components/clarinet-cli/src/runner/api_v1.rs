@@ -656,6 +656,7 @@ fn mine_block(state: &mut OpState, args: MineBlockArgs) -> Result<String, AnyErr
                             _ => DEFAULT_EPOCH,
                         },
                     };
+                    // Any changes in the above section to use epoch 2.4 instead?
                     let execution = match session.deploy_contract(
                         &contract,
                         None,
@@ -847,6 +848,7 @@ fn switch_epoch(state: &mut OpState, args: SwitchEpochArgs) -> Result<bool, AnyE
         Ok(true)
     })
 }
+// May be add switching to epoch 2.4 in the above section?
 
 fn perform_block<F, R>(state: &mut OpState, session_id: u32, handler: F) -> Result<R, AnyError>
 where

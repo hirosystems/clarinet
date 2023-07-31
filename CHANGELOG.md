@@ -73,7 +73,7 @@ While this is unlikely to be a breaking change in most places, any code that rel
 ##### Other Changes
 
 *  Adjust 2.1 start height ([2e1e44c8](https://github.com/hirosystems/clarinet/commit/2e1e44c8)
-*  Set Clarity2 and epoch 2.1 as default ([6cb1e21d](https://github.com/hirosystems/clarinet/commit/6cb1e21d)
+*  Set Clarity2 and epoch 2.4 as default ([6cb1e21d](https://github.com/hirosystems/clarinet/commit/6cb1e21d)
 *  Update api urls to use hiro.so ([4e23a7ed](https://github.com/hirosystems/clarinet/commit/4e23a7ed)
 
 # [1.5.2](https://github.com/hirosystems/clarinet/compare/v1.5.0...v1.5.2) (2023-03-16)
@@ -124,7 +124,7 @@ While this is unlikely to be a breaking change in most places, any code that rel
 *  Upgrade clarity vm ([fefdd1e0](https://github.com/hirosystems/clarinet/commit/fefdd1e092dad8e546e2db7683202d81dd91407a))
 *  Upgrade stacks-node next image ([492804bb](https://github.com/hirosystems/clarinet/commit/492804bb472a950dded1b1d0c8a951b434a141ac))
 *  Expose stacks-node settings wait_time_for_microblocks, first_attempt_time_ms, subsequent_attempt_time_ms in Devnet config file
-*  Improve Epoch 2.1 deployments handling
+*  Improve Epoch 2.4 deployments handling
 *  Improve `stacks-devnet-js` stability
 
 ##### Documentation

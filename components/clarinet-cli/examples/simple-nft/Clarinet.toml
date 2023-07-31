@@ -6,13 +6,13 @@ cache_dir = "./.cache"
 [contracts.simple-nft]
 path = "contracts/simple-nft.clar"
 clarity_version = 1
-epoch = "2.05"
+epoch = "2.4"
 
 # EXTERNAL CONTRACTS
 [contracts.sip-009-trait-ft-standard]
 path = "contracts/external/sip-009-nft-trait-standard.clar"
 clarity_version = 1
-epoch = "2.05"
+epoch = "2.4"
 
 [repl.analysis]
 passes = ["check_checker"]
