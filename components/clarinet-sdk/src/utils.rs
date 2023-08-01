@@ -91,10 +91,14 @@ pub fn to_raw_value(value: &Value) -> String {
     format!("0x{}", raw_value.join(""))
 }
 
-pub fn uint8_value_to_string(mut value: &[u8]) -> String {
+pub fn uint8_to_string(mut value: &[u8]) -> String {
     let value = Value::consensus_deserialize(&mut value).expect("failed to parse clarity value");
-
     value_to_string(&value)
+}
+
+pub fn uint8_to_value(mut value: &[u8]) -> Value {
+    let value = Value::consensus_deserialize(&mut value).expect("failed to parse clarity value");
+    value
 }
 
 fn value_to_string(value: &Value) -> String {

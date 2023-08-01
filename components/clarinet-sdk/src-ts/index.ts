@@ -14,9 +14,10 @@ type CallFn = (
   result: ClarityValue;
   events: { event: string; data: { [key: string]: any } }[];
 };
-
-export type GetAssetsMap = () => Map<string, Map<string, bigint>>;
-export type GetAccounts = () => Map<string, string>;
+type GetDataVar = (contract: string, dataVar: string) => ClarityValue;
+type GetMapEntry = (contract: string, mapName: string, mapKey: ClarityValue) => ClarityValue;
+type GetAssetsMap = () => Map<string, Map<string, bigint>>;
+type GetAccounts = () => Map<string, string>;
 
 // because we use a proxy around the test session,
 // the type need to be hardcoded
@@ -24,6 +25,10 @@ export type GetAccounts = () => Map<string, string>;
 export type ClarityVM = {
   [K in keyof TestVM]: K extends "callReadOnlyFn" | "callPublicFn"
     ? CallFn
+    : K extends "getDataVar"
+    ? GetDataVar
+    : K extends "getMapEntry"
+    ? GetMapEntry
     : K extends "getAccounts"
     ? GetAccounts
     : K extends "getAssetsMap"
@@ -58,6 +63,22 @@ const sessionProxy = {
       };
 
       return callFn;
+    }
+    if (prop === "getDataVar") {
+      const getDataVar: GetDataVar = (...args) => {
+        const response = session.getDataVar(...args);
+        const result = Cl.deserialize(response);
+        return result;
+      };
+      return getDataVar;
+    }
+    if (prop === "getMapEntry") {
+      const getMapEntry: GetMapEntry = (contract, mapName, mapKey) => {
+        const response = session.getMapEntry(contract, mapName, Cl.serialize(mapKey));
+        const result = Cl.deserialize(response);
+        return result;
+      };
+      return getMapEntry;
     }
 
     return Reflect.get(session, prop, receiver);

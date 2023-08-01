@@ -24,7 +24,7 @@ use std::{panic, path::PathBuf};
 use wasm_bindgen::prelude::*;
 use wasm_bindgen::JsValue;
 
-use crate::utils::{self, serialize_event, uint8_value_to_string};
+use crate::utils::{self, serialize_event, uint8_to_string, uint8_to_value};
 
 #[derive(Debug, Deserialize)]
 #[wasm_bindgen]
@@ -227,6 +227,33 @@ impl TestVM {
         Ok(encode_to_js(&self.accounts)?)
     }
 
+    #[wasm_bindgen(js_name=getDataVar)]
+    pub fn get_data_var(&mut self, contract_id: &str, var_name: &str) -> Result<String, String> {
+        let session = self.session.as_mut().unwrap();
+        let contract_id =
+            QualifiedContractIdentifier::parse(contract_id).map_err(|e| e.to_string())?;
+        session
+            .interpreter
+            .get_data_var(&contract_id, var_name)
+            .ok_or("value not found".into())
+    }
+
+    #[wasm_bindgen(js_name=getMapEntry)]
+    pub fn get_map_entry(
+        &mut self,
+        contract_id: &str,
+        map_name: &str,
+        map_key: Vec<u8>,
+    ) -> Result<String, String> {
+        let session = self.session.as_mut().unwrap();
+        let contract_id =
+            QualifiedContractIdentifier::parse(contract_id).map_err(|e| e.to_string())?;
+        session
+            .interpreter
+            .get_map_entry(&contract_id, map_name, &uint8_to_value(&map_key))
+            .ok_or("value not found".into())
+    }
+
     fn get_function_interface(
         &self,
         contract: &str,
@@ -257,7 +284,7 @@ impl TestVM {
         } = call_contract_args;
 
         let session = self.session.as_mut().unwrap();
-        let clarity_args: Vec<String> = args.iter().map(|a| uint8_value_to_string(a)).collect();
+        let clarity_args: Vec<String> = args.iter().map(|a| uint8_to_string(a)).collect();
 
         let (execution, _) = match session.invoke_contract_call(
             contract,
@@ -422,7 +449,6 @@ impl TestVM {
                 Ok(tx) => tx,
                 Err(err) => return Err(format!("error: {}", err)),
             };
-            log!("{:#?}", tx);
             if let Some(contract_call_args) = tx.call_contract {
                 let _ = self.call_public_fn_private(&contract_call_args, &tx.sender, false);
             } else if let Some(transfer_stx_args) = tx.transfer_stx {
