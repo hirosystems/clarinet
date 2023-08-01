@@ -1,12 +1,11 @@
-# build stage
-FROM arm64v8/rust:1.67 as builder
+FROM rust:bullseye as build
 
 COPY . ./
 
 RUN cargo build --release --manifest-path ./components/stacks-network/Cargo.toml
 
 # prod stage
-FROM gcr.io/distroless/cc
-COPY --from=builder target/release/stacks-network /
+FROM debian:bullseye-slim
+COPY --from=build target/release/stacks-network /
 
 ENTRYPOINT ["./stacks-network"]
