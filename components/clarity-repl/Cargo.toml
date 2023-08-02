@@ -83,6 +83,11 @@ cli = [
     "clarity-vm/developer-mode",
     "hiro_system_kit/tokio_helpers",
 ]
+sdk = [
+    "clarity-vm/canonical",
+    "clarity-vm/developer-mode",
+    "hiro_system_kit/tokio_helpers",
+]
 dap = [
     "tokio",
     "tokio-util",
