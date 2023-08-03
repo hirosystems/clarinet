@@ -11,6 +11,8 @@ use crate::generate::{
 use crate::integrate;
 use crate::lsp::run_lsp;
 use crate::runner::{run_scripts, DeploymentCache};
+use crate::devnet::package as Package;
+
 use clarinet_deployments::onchain::{
     apply_on_chain_deployment, get_initial_transactions_trackers, update_deployment_costs,
     DeploymentCommand, DeploymentEvent,
@@ -111,6 +113,9 @@ enum Command {
     /// Generate shell completions scripts
     #[clap(name = "completions", bin_name = "completions")]
     Completions(Completions),
+    /// Subcommands for Devnet usage
+    #[clap(subcommand, name = "devnet")]
+    Devnet(Devnet)
 }
 
 #[derive(Subcommand, PartialEq, Clone, Debug)]
@@ -155,6 +160,21 @@ enum Chainhooks {
     /// Publish contracts on chain
     #[clap(name = "deploy", bin_name = "deploy")]
     DeployChainhook(DeployChainhook),
+}
+
+#[derive(Subcommand, PartialEq, Clone, Debug)]
+#[clap(bin_name = "devnet")]
+enum Devnet {
+    /// Generate packaged deployment plan
+    #[clap(name = "package", bin_name = "package")]
+    Package(DevnetPackage)
+}
+
+#[derive(Parser, PartialEq, Clone, Debug)]
+struct DevnetPackage {
+    /// Path to Clarinet.toml
+    #[clap(long = "name", short = 'n')]
+    pub package_file_name: Option<String>,
 }
 
 #[derive(Parser, PartialEq, Clone, Debug)]
@@ -1416,6 +1436,12 @@ pub fn main() {
             cmd.shell.generate(&mut app, &mut file);
             println!("{} {}", green!("Created file"), file_name.clone());
             println!("Check your shell's documentation for details about using this file to enable completions for clarinet");
+        },
+
+        Command::Devnet(subcommand) => match subcommand {
+            Devnet::Package(cmd) => {
+                Package::pack(cmd.package_file_name).expect("Could not execute the package command.")
+            }
         }
     };
 }
