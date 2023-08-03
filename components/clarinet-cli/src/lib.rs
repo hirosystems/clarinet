@@ -24,3 +24,4 @@ pub mod frontend;
 pub mod lsp;
 #[cfg(feature = "cli")]
 pub mod runner;
+pub mod devnet;
