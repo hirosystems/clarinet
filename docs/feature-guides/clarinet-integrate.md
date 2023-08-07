@@ -4,11 +4,11 @@ title: Clarinet Integrate
 
 ## Overview
 
-The Clarinet Integrate feature enables you to easily integrate your existing smart contracts with the blockchain in a local testing environment, providing you a way to validate and verify your smart contract on an actual blockchain. While unit testing (the process of testing your code to make sure it works correctly) is a valuable way to test your code before implementation, there are certain features that cannot be verified during unit testing, such as how your smart contract interacts with proof of transfer or the bitcoin chain. Clarinet integrate provides these additional tests.
+The Clarinet Integrate feature enables you to easily integrate your existing smart contracts with the blockchain in a local testing environment,allowing you to to validate and verify your smart contract on an actual blockchain. While unit testing (the process of testing your code to make sure it works correctly) is a valuable way to test your code before implementation, certain features cannot be verified during unit testing, such as how your smart contract interacts with proof of transfer or the bitcoin chain. Clarinet Integrate provides these additional tests.
 
 *Topics covered in this guide*:
 
-* [What is clarinet integrate?](#key-concepts)
+* [What is Clarinet Integrate?](#key-concepts)
 * [Configure your devnet](#devnet)
 * [References](#references)
 
@@ -22,19 +22,19 @@ Mainnet refers to a working, fully operational blockchain that has been deployed
 
 ### Testnet
 
-Testnet refers to a test environment which you can use to validate and verify smart contracts and integrations between your contracts and the blockchain. Any work you perform in testnet is be written to the blockchain and is not deployed into production.
+Testnet refers to a test environment that you can use to validate and verify smart contracts and integrations between your contracts and the blockchain. Any work you perform in testnet is written to the blockchain and is not deployed into production.
 
 ### Devnet
 
-Devnet refers to an environment where you perform development tasks, including the creation of smart contracts and other assets. You should use this space during the development phase of your work whenever possible.
+Devnet refers to an environment where you perform development tasks, including creating smart contracts and other assets. Use this space during the development phase of your work whenever possible.
 
 ## Working with clarinet integrate
 
-Setting up and configuring your own devnet can be time-consuming. Clarinet Integrate speeds up the deployment process with an embedded orchestrator tool that enables you to run your own devnet network, even when you are offline.
+Setting up and configuring your devnet can be time-consuming. Clarinet Integrate speeds up the deployment process with an embedded orchestrator tool that enables you to run your own devnet network even when offline.
 
 ## References
 
-For a more detailed discussion of how to use Clarinet Integrate, please see the following resources:
+For a more detailed discussion on how to use Clarinet Integrate, please see the following resources:
 
 - [Meet 4 New Features in Clarinet](https://www.hiro.so/blog/meet-4-new-features-in-clarinet) blog post.
 
