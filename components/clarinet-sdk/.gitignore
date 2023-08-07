@@ -1,3 +1,3 @@
 dist/
-pkg/
+src-ts/sdk
 node_modules/

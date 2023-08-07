@@ -1,9 +1,9 @@
 import { Cl, ClarityValue } from "@stacks/transactions";
 
-import init, { CallContractArgs, TestVM } from "../pkg/clarinet_sdk";
-import wasm from "../pkg/clarinet_sdk_bg.wasm";
-import { callVFS } from "./vfs";
-import { ContractInterface } from "./contractInterface";
+import init, { CallContractArgs, SDK } from "./sdk/clarinet_sdk";
+import wasm from "./sdk/clarinet_sdk_bg.wasm";
+import { vfs } from "./vfs";
+import type { ContractInterface } from "./contractInterface";
 
 type CallFn = (
   contract: string,
@@ -21,9 +21,9 @@ type GetAccounts = () => Map<string, string>;
 
 // because we use a proxy around the test session,
 // the type need to be hardcoded
-// @todo: is there a better way than this nested ternary?
+// is there a better way than this nested ternary?
 export type ClarityVM = {
-  [K in keyof TestVM]: K extends "callReadOnlyFn" | "callPublicFn"
+  [K in keyof SDK]: K extends "callReadOnlyFn" | "callPublicFn"
     ? CallFn
     : K extends "getDataVar"
     ? GetDataVar
@@ -35,11 +35,15 @@ export type ClarityVM = {
     ? GetAssetsMap
     : K extends "getContractsInterfaces"
     ? () => Map<string, ContractInterface>
-    : TestVM[K];
+    : SDK[K];
 };
 
 const sessionProxy = {
-  get(session: TestVM, prop: keyof TestVM, receiver: any) {
+  get(session: SDK, prop: keyof SDK, receiver: any) {
+    // some of the WASM methods are proxied here to:
+    // - serialize clarity values input argument
+    // - desizeialize output into clarity values
+
     if (prop === "callReadOnlyFn" || prop === "callPublicFn") {
       const callFn: CallFn = (contract, method, args, sender) => {
         const response = session[prop](
@@ -64,6 +68,7 @@ const sessionProxy = {
 
       return callFn;
     }
+
     if (prop === "getDataVar") {
       const getDataVar: GetDataVar = (...args) => {
         const response = session.getDataVar(...args);
@@ -72,6 +77,7 @@ const sessionProxy = {
       };
       return getDataVar;
     }
+
     if (prop === "getMapEntry") {
       const getMapEntry: GetMapEntry = (contract, mapName, mapKey) => {
         const response = session.getMapEntry(contract, mapName, Cl.serialize(mapKey));
@@ -85,18 +91,19 @@ const sessionProxy = {
   },
 };
 
-async function initWASM(): Promise<ClarityVM> {
-  // @ts-ignore
-  await init(wasm());
-  return new Proxy(new TestVM(callVFS), sessionProxy) as unknown as ClarityVM;
-}
-
+// load wasm only once and memoize it
 function memoizedInit() {
-  let vm: null | ClarityVM = null;
-  return async () => {
+  //@ts-ignore
+  let vm = null;
+  return async (manifestPath = "./Clarinet.toml") => {
+    //@ts-ignore
     if (!vm) {
-      vm = await initWASM();
+      // @ts-ignore
+      await init(wasm());
+      vm = new Proxy(new SDK(vfs), sessionProxy) as unknown as ClarityVM;
     }
+    // start a new session
+    await vm.initSession(process.cwd(), manifestPath);
     return vm;
   };
 }

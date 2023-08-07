@@ -1,3 +1,4 @@
+use clarinet_deployments::types::{DeploymentGenerationArtifacts, DeploymentSpecification};
 use clarinet_deployments::{
     generate_default_deployment, initiate_session_from_deployment,
     update_session_with_contracts_executions, update_session_with_genesis_accounts,
@@ -52,6 +53,7 @@ pub struct DeployContractArgs {
     name: String,
     content: String,
 }
+
 #[wasm_bindgen]
 impl DeployContractArgs {
     #[wasm_bindgen(constructor)]
@@ -66,6 +68,7 @@ pub struct TransferSTXArgs {
     amount: u64,
     recipient: String,
 }
+
 #[wasm_bindgen]
 impl TransferSTXArgs {
     #[wasm_bindgen(constructor)]
@@ -96,6 +99,11 @@ pub struct TransactionRes {
     pub events: js_sys::Array,
 }
 
+#[wasm_bindgen(getter_with_clone)]
+pub struct SessionReport {
+    pub coverage: String,
+}
+
 pub fn execution_result_to_transaction_res(execution: &ExecutionResult) -> TransactionRes {
     let result = match &execution.result {
         EvaluationResult::Snippet(result) => utils::to_raw_value(&result.result),
@@ -109,37 +117,33 @@ pub fn execution_result_to_transaction_res(execution: &ExecutionResult) -> Trans
     TransactionRes { result, events }
 }
 
-// #[wasm_bindgen]
 #[wasm_bindgen(getter_with_clone)]
-pub struct TestVM {
+pub struct SDK {
+    pub deployer: String,
     file_accessor: Box<dyn FileAccessor>,
     session: Option<Session>,
     accounts: HashMap<String, String>,
     contracts_locations: HashMap<QualifiedContractIdentifier, FileLocation>,
-    // @todo: contract_interfaces: HashMap<QualifiedContractIdentifier, ContractInterface>,
-    contracts_interfaces: HashMap<String, ContractInterface>,
+    contracts_interfaces: HashMap<QualifiedContractIdentifier, ContractInterface>,
+    cache: Option<(DeploymentSpecification, DeploymentGenerationArtifacts)>,
 }
 
 #[wasm_bindgen]
-impl TestVM {
+impl SDK {
     #[wasm_bindgen(constructor)]
     pub fn new(fs_request: JsFunction) -> Self {
         panic::set_hook(Box::new(console_error_panic_hook::hook));
 
         let fs = Box::new(WASMFileSystemAccessor::new(fs_request));
         Self {
+            deployer: String::new(),
             file_accessor: fs,
             session: None,
             accounts: HashMap::new(),
             contracts_locations: HashMap::new(),
             contracts_interfaces: HashMap::new(),
+            cache: None,
         }
-    }
-
-    #[wasm_bindgen(getter, js_name=blockHeight)]
-    pub fn block_height(&mut self) -> u32 {
-        let session = self.session.as_mut().unwrap();
-        session.interpreter.get_block_height()
     }
 
     #[wasm_bindgen(js_name=initSession)]
@@ -156,25 +160,35 @@ impl TestVM {
         let manifest =
             ProjectManifest::from_file_accessor(&manifest_location, &self.file_accessor).await?;
 
-        let (deployment, artifacts) = generate_default_deployment(
-            &manifest,
-            &StacksNetwork::Simnet,
-            false,
-            Some(&self.file_accessor),
-            Some(StacksEpochId::Epoch21),
-        )
-        .await?;
+        let (deployment, artifacts) = match &self.cache {
+            Some(cache) => cache.clone(),
+            None => {
+                let cache = generate_default_deployment(
+                    &manifest,
+                    &StacksNetwork::Simnet,
+                    false,
+                    Some(&self.file_accessor),
+                    Some(StacksEpochId::Epoch21),
+                )
+                .await?;
+                self.cache = Some(cache.clone());
+                cache
+            }
+        };
 
         let mut session = initiate_session_from_deployment(&manifest);
 
         if let Some(ref spec) = deployment.genesis {
             for wallet in spec.wallets.iter() {
+                if wallet.name == "deployer" {
+                    self.deployer = wallet.address.to_string();
+                }
                 self.accounts
                     .insert(wallet.name.clone(), wallet.address.to_string());
             }
         }
 
-        let _ = update_session_with_genesis_accounts(&mut session, &deployment);
+        update_session_with_genesis_accounts(&mut session, &deployment);
         let results = update_session_with_contracts_executions(
             &mut session,
             &deployment,
@@ -194,8 +208,7 @@ impl TestVM {
                     if let EvaluationResult::Contract(contract_result) = execution.result {
                         let interface =
                             build_contract_interface(&contract_result.contract.analysis);
-                        self.contracts_interfaces
-                            .insert(contract_id.name.to_string(), interface);
+                        self.contracts_interfaces.insert(contract_id, interface);
                     };
                 }
                 Err(e) => {
@@ -206,18 +219,35 @@ impl TestVM {
         }
 
         self.session = Some(session);
-
         Ok(())
     }
 
+    fn get_session(&self) -> &Session {
+        self.session
+            .as_ref()
+            .expect("Session not initialised. Call initSession() first")
+    }
+
+    fn get_session_mut(&mut self) -> &mut Session {
+        self.session
+            .as_mut()
+            .expect("Session not initialised. Call initSession() first")
+    }
+
+    #[wasm_bindgen(getter, js_name=blockHeight)]
+    pub fn block_height(&mut self) -> u32 {
+        let session = self.get_session_mut();
+        session.interpreter.get_block_height()
+    }
+
     #[wasm_bindgen(js_name=getContractsInterfaces)]
-    pub fn get_contracts_interfaces(&self) -> JsValue {
-        encode_to_js(&self.contracts_interfaces).unwrap()
+    pub fn get_contracts_interfaces(&self) -> Result<JsValue, JsValue> {
+        Ok(encode_to_js(&self.contracts_interfaces)?)
     }
 
     #[wasm_bindgen(js_name=getAssetsMap)]
-    pub fn get_assets_maps(&mut self) -> Result<JsValue, JsValue> {
-        let session = &self.session.as_mut().unwrap();
+    pub fn get_assets_maps(&self) -> Result<JsValue, JsValue> {
+        let session = &self.get_session();
         let assets_maps = session.get_assets_maps();
         Ok(encode_to_js(&assets_maps)?)
     }
@@ -228,10 +258,16 @@ impl TestVM {
     }
 
     #[wasm_bindgen(js_name=getDataVar)]
-    pub fn get_data_var(&mut self, contract_id: &str, var_name: &str) -> Result<String, String> {
-        let session = self.session.as_mut().unwrap();
+    pub fn get_data_var(&mut self, contract: &str, var_name: &str) -> Result<String, String> {
+        let contract_id = if contract.starts_with('S') {
+            contract.to_string()
+        } else {
+            format!("{}.{}", self.deployer, contract,)
+        };
         let contract_id =
-            QualifiedContractIdentifier::parse(contract_id).map_err(|e| e.to_string())?;
+            QualifiedContractIdentifier::parse(&contract_id).map_err(|e| e.to_string())?;
+
+        let session = self.get_session_mut();
         session
             .interpreter
             .get_data_var(&contract_id, var_name)
@@ -241,13 +277,19 @@ impl TestVM {
     #[wasm_bindgen(js_name=getMapEntry)]
     pub fn get_map_entry(
         &mut self,
-        contract_id: &str,
+        contract: &str,
         map_name: &str,
         map_key: Vec<u8>,
     ) -> Result<String, String> {
-        let session = self.session.as_mut().unwrap();
+        let contract_id = if contract.starts_with('S') {
+            contract.to_string()
+        } else {
+            format!("{}.{}", self.deployer, contract,)
+        };
         let contract_id =
-            QualifiedContractIdentifier::parse(contract_id).map_err(|e| e.to_string())?;
+            QualifiedContractIdentifier::parse(&contract_id).map_err(|e| e.to_string())?;
+
+        let session = self.get_session_mut();
         session
             .interpreter
             .get_map_entry(&contract_id, map_name, &uint8_to_value(&map_key))
@@ -259,16 +301,19 @@ impl TestVM {
         contract: &str,
         method: &str,
     ) -> Result<&ContractInterfaceFunction, String> {
+        let contract_id =
+            QualifiedContractIdentifier::parse(&format!("{}.{}", self.deployer, contract))
+                .map_err(|e| e.to_string())?;
         let contract_interface = self
             .contracts_interfaces
-            .get(contract)
+            .get(&contract_id)
             .ok_or("unable to get contract interface")?;
 
-        Ok(contract_interface
+        contract_interface
             .functions
             .iter()
             .find(|func| func.name == method)
-            .ok_or(format!("contract {contract} has no function {method}"))?)
+            .ok_or(format!("contract {contract} has no function {method}"))
     }
 
     fn invoke_contract_call(
@@ -283,9 +328,9 @@ impl TestVM {
             args,
         } = call_contract_args;
 
-        let session = self.session.as_mut().unwrap();
         let clarity_args: Vec<String> = args.iter().map(|a| uint8_to_string(a)).collect();
 
+        let session = self.get_session_mut();
         let (execution, _) = match session.invoke_contract_call(
             contract,
             method,
@@ -338,7 +383,7 @@ impl TestVM {
             return Err(format!("{} is not a public function", &args.method));
         }
 
-        let session = self.session.as_mut().unwrap();
+        let session = self.get_session_mut();
         if advance_chain_tip {
             session.advance_chain_tip(1);
         }
@@ -352,7 +397,7 @@ impl TestVM {
         sender: &str,
         advance_chain_tip: bool,
     ) -> Result<TransactionRes, String> {
-        let session = self.session.as_mut().unwrap();
+        let session = self.get_session_mut();
         let initial_tx_sender = session.get_tx_sender();
         session.set_tx_sender(sender.to_string());
 
@@ -380,7 +425,7 @@ impl TestVM {
         sender: &str,
         advance_chain_tip: bool,
     ) -> Result<TransactionRes, String> {
-        let session = self.session.as_mut().unwrap();
+        let session = self.get_session_mut();
         let contract = ClarityContract {
             code_source: ClarityCodeSource::ContractInMemory(args.content.clone()),
             name: args.name.clone(),
@@ -458,26 +503,26 @@ impl TestVM {
             }
         }
 
-        let session = self.session.as_mut().unwrap();
+        let session = self.get_session_mut();
         session.advance_chain_tip(1);
         Ok(())
     }
 
     #[wasm_bindgen(js_name=mineEmptyBlock)]
     pub fn mine_empty_block(&mut self) -> u32 {
-        let session = self.session.as_mut().unwrap();
+        let session = self.get_session_mut();
         session.advance_chain_tip(1)
     }
 
     #[wasm_bindgen(js_name=mineEmptyBlocks)]
     pub fn mine_empty_blocks(&mut self, count: Option<u32>) -> u32 {
-        let session = self.session.as_mut().unwrap();
+        let session = self.get_session_mut();
         session.advance_chain_tip(count.unwrap_or(1))
     }
 
     #[wasm_bindgen(js_name=runSnippet)]
     pub fn run_snippet(&mut self, snippet: String) -> JsValue {
-        let session = self.session.as_mut().unwrap();
+        let session = self.get_session_mut();
         let (_, output) = session.handle_command(&snippet);
         let output_as_array = js_sys::Array::new_with_length(output.len() as u32);
         for string in output {
@@ -487,13 +532,13 @@ impl TestVM {
         output_as_array.into()
     }
 
-    #[wasm_bindgen(js_name=terminate)]
-    pub fn terminate(&mut self) -> Result<String, String> {
-        let session = self.session.as_mut().unwrap();
-
+    #[wasm_bindgen(js_name=getReport)]
+    pub fn get_report(&mut self) -> Result<SessionReport, String> {
+        let contracts_locations = self.contracts_locations.clone();
+        let session = self.get_session_mut();
         let mut coverage_reporter = CoverageReporter::new();
         coverage_reporter.asts.append(&mut session.asts);
-        for (contract_id, contract_location) in self.contracts_locations.iter() {
+        for (contract_id, contract_location) in contracts_locations.iter() {
             coverage_reporter
                 .contract_paths
                 .insert(contract_id.name.to_string(), contract_location.to_string());
@@ -501,8 +546,7 @@ impl TestVM {
         coverage_reporter
             .reports
             .append(&mut session.coverage_reports);
-
-        let content = coverage_reporter.build_lcov_content();
-        Ok(content)
+        let coverage = coverage_reporter.build_lcov_content();
+        Ok(SessionReport { coverage })
     }
 }

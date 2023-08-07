@@ -97,8 +97,7 @@ pub fn uint8_to_string(mut value: &[u8]) -> String {
 }
 
 pub fn uint8_to_value(mut value: &[u8]) -> Value {
-    let value = Value::consensus_deserialize(&mut value).expect("failed to parse clarity value");
-    value
+    Value::consensus_deserialize(&mut value).expect("failed to parse clarity value")
 }
 
 fn value_to_string(value: &Value) -> String {
@@ -111,12 +110,12 @@ fn value_to_string(value: &Value) -> String {
             format!("{{ {} }}", data.join(", "))
         }
         Value::Optional(opt_data) => match opt_data.data {
-            Some(ref x) => format!("(some {})", value_to_string(&**x)),
+            Some(ref x) => format!("(some {})", value_to_string(x)),
             None => "none".to_string(),
         },
         Value::Response(res_data) => match res_data.committed {
-            true => format!("(ok {})", value_to_string(&*res_data.data)),
-            false => format!("(err {})", value_to_string(&*res_data.data)),
+            true => format!("(ok {})", value_to_string(&res_data.data)),
+            false => format!("(err {})", value_to_string(&res_data.data)),
         },
         Value::Sequence(SequenceData::String(CharType::ASCII(data))) => {
             format!("\"{}\"", String::from_utf8(data.data.clone()).unwrap())

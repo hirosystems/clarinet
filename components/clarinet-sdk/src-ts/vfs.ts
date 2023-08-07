@@ -11,10 +11,7 @@ function isValidReadEvent(e: any): e is { path: string } {
 }
 
 function isValidReadManyEvent(e: any): e is { paths: string[] } {
-  return (
-    Array.isArray(e?.paths) &&
-    e.paths.every((s: unknown) => typeof s === "string")
-  );
+  return Array.isArray(e?.paths) && e.paths.every((s: unknown) => typeof s === "string");
 }
 
 function isValidWriteEvent(e: any): e is { path: string; content: number[] } {
@@ -41,8 +38,7 @@ async function readFiles(event: any) {
   const files = await Promise.all(
     event.paths.map(async (p) => {
       try {
-        const contract = await fs.readFile(p);
-        return contract;
+        return fs.readFile(p);
       } catch (err) {
         console.warn(err);
         return null;
@@ -62,7 +58,7 @@ async function writeFile(event: unknown) {
   return fs.writeFile(event.path, Uint8Array.from(event.content));
 }
 
-export function callVFS(action: string, data: unknown) {
+export function vfs(action: string, data: unknown) {
   if (action === "vfs/exists") return exists(data);
   if (action === "vfs/readFile") return readFile(data);
   if (action === "vfs/readFiles") return readFiles(data);

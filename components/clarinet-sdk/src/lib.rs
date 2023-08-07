@@ -1,3 +1,3 @@
-pub mod utils;
+pub mod core;
 
-pub mod unit_tests;
+mod utils;
