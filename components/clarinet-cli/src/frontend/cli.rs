@@ -175,6 +175,8 @@ struct DevnetPackage {
     /// Path to Clarinet.toml
     #[clap(long = "name", short = 'n')]
     pub package_file_name: Option<String>,
+    #[clap(long = "manifest-path", short = 'm')]
+    pub manifest_path: Option<String>,
 }
 
 #[derive(Parser, PartialEq, Clone, Debug)]
@@ -1439,8 +1441,12 @@ pub fn main() {
         }
 
         Command::Devnet(subcommand) => match subcommand {
-            Devnet::Package(cmd) => Package::pack(cmd.package_file_name)
-                .expect("Could not execute the package command."),
+            Devnet::Package(cmd) => {
+                let manifest = load_manifest_or_exit(cmd.manifest_path);
+
+                Package::pack(cmd.package_file_name, manifest.location)
+                    .expect("Could not execute the package command.");
+            }
         },
     };
 }

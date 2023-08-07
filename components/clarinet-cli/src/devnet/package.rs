@@ -3,41 +3,17 @@ use std::io::{self, Write};
 use std::process;
 
 use clarinet_deployments::types::DeploymentSpecificationFile;
-use clarinet_files::NetworkManifestFile;
-
-use toml::value::Value;
-
-#[derive(Serialize, Deserialize, Debug)]
-struct Project {
-    name: String,
-    description: Option<String>,
-    authors: Vec<String>,
-    telemetry: Option<bool>,
-    cache_dir: Option<String>,
-}
-
-#[derive(Serialize, Deserialize, Debug)]
-struct ClarinetSpecificationFile {
-    project: Project,
-    contracts: Option<Value>,
-    repl: Option<Value>,
-}
+use clarinet_files::{FileLocation, NetworkManifestFile, ProjectManifestFile};
 
 #[derive(Serialize, Deserialize, Debug)]
 struct ConfigurationPackage {
     deployment_plan: DeploymentSpecificationFile,
     devnet_config: NetworkManifestFile,
-    clarinet_config: ClarinetSpecificationFile,
+    clarinet_config: ProjectManifestFile,
 }
 
-fn get_devnet_config() -> NetworkManifestFile {
-    let file_content = match read_to_string("./settings/Devnet.toml") {
-        Ok(content) => content,
-        Err(err) => {
-            println!("Could not read Devnet.toml file: {}", err);
-            process::exit(1);
-        }
-    };
+fn get_devnet_config() -> Result<NetworkManifestFile, io::Error> {
+    let file_content = read_to_string("./settings/Devnet.toml")?;
 
     let devnet_config: NetworkManifestFile = match toml::from_str(&file_content) {
         Ok(data) => data,
@@ -47,20 +23,13 @@ fn get_devnet_config() -> NetworkManifestFile {
         }
     };
 
-    devnet_config
+    Ok(devnet_config)
 }
 
-fn get_clarinet_config() -> ClarinetSpecificationFile {
-    let clarinet_config_content = match read_to_string("./Clarinet.toml") {
-        Ok(content) => content,
-        Err(e) => {
-            println!("Could not read Clarinet.toml file: {}", e);
-            process::exit(1);
-        }
-    };
+fn get_clarinet_config(manifest_location: FileLocation) -> Result<ProjectManifestFile, io::Error> {
+    let clarinet_config_content = read_to_string(manifest_location.to_string())?;
 
-    let clarinet_config: ClarinetSpecificationFile = match toml::from_str(&clarinet_config_content)
-    {
+    let clarinet_config: ProjectManifestFile = match toml::from_str(&clarinet_config_content) {
         Ok(data) => data,
         Err(err) => {
             println!("Unable to load data from Clarinet.toml file: {}", err);
@@ -68,18 +37,18 @@ fn get_clarinet_config() -> ClarinetSpecificationFile {
         }
     };
 
-    clarinet_config
+    Ok(clarinet_config)
 }
 
-fn get_deployment_plan() -> DeploymentSpecificationFile {
-    let deployment_spec_file = File::open("./deployments/default.simnet-plan.yaml").unwrap();
+fn get_deployment_plan() -> Result<DeploymentSpecificationFile, io::Error> {
+    let deployment_spec_file = File::open("./deployments/default.simnet-plan.yaml")?;
     let deployment_plan: DeploymentSpecificationFile =
         serde_yaml::from_reader(deployment_spec_file).unwrap();
 
-    deployment_plan
+    Ok(deployment_plan)
 }
 
-fn pack_to_file(file_name: &str) -> Result<(), io::Error> {
+fn pack_to_file(file_name: &str, package: ConfigurationPackage) -> Result<(), io::Error> {
     let file = match File::create(file_name) {
         Ok(file) => file,
         Err(e) => {
@@ -93,12 +62,6 @@ fn pack_to_file(file_name: &str) -> Result<(), io::Error> {
         }
     };
 
-    let package = ConfigurationPackage {
-        deployment_plan: get_deployment_plan(),
-        devnet_config: get_devnet_config(),
-        clarinet_config: get_clarinet_config(),
-    };
-
     match serde_json::to_writer(file, &package) {
         Ok(_) => println!("{} file generated with success", file_name),
         Err(e) => println!("Unable to generate the json file: {}", e),
@@ -107,21 +70,21 @@ fn pack_to_file(file_name: &str) -> Result<(), io::Error> {
     Ok(())
 }
 
-fn pack_to_stdout() {
-    let package = ConfigurationPackage {
-        deployment_plan: get_deployment_plan(),
-        devnet_config: get_devnet_config(),
-        clarinet_config: get_clarinet_config(),
-    };
-
+fn pack_to_stdout(package: ConfigurationPackage) {
     let s = serde_json::to_string(&package).unwrap();
     io::stdout().write(s.as_bytes()).ok();
 }
 
-pub fn pack(file_name: Option<String>) -> Result<(), io::Error> {
+pub fn pack(file_name: Option<String>, manifest_location: FileLocation) -> Result<(), io::Error> {
+    let package = ConfigurationPackage {
+        deployment_plan: get_deployment_plan()?,
+        devnet_config: get_devnet_config()?,
+        clarinet_config: get_clarinet_config(manifest_location)?,
+    };
+
     match file_name {
-        Some(name) => pack_to_file(&name)?,
-        None => pack_to_stdout(),
+        Some(name) => pack_to_file(&name, package)?,
+        None => pack_to_stdout(package),
     }
 
     Ok(())
