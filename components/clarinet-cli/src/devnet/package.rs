@@ -1,7 +1,7 @@
+use serde::{Deserialize, Serialize};
 use std::fs::File;
 use std::io::{self, Write};
 use std::process;
-use serde::{Serialize, Deserialize};
 
 use clarinet_deployments::get_default_deployment_path;
 use clarinet_deployments::types::DeploymentSpecification;
