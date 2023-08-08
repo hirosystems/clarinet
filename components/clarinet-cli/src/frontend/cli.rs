@@ -1443,8 +1443,7 @@ pub fn main() {
         Command::Devnet(subcommand) => match subcommand {
             Devnet::Package(cmd) => {
                 let manifest = load_manifest_or_exit(cmd.manifest_path);
-
-                Package::pack(cmd.package_file_name, manifest.location)
+                Package::pack(cmd.package_file_name, manifest)
                     .expect("Could not execute the package command.");
             }
         },
