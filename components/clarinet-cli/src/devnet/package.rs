@@ -38,8 +38,8 @@ fn pack_to_file(file_name: &str, package: ConfigurationPackage) -> Result<(), io
 }
 
 fn pack_to_stdout(package: ConfigurationPackage) {
-    let s = serde_json::to_string(&package).unwrap();
-    io::stdout().write(s.as_bytes()).ok();
+    let json = serde_json::to_value(package).unwrap();
+    io::stdout().write(json.to_string().as_bytes()).ok();
 }
 
 pub fn pack(file_name: Option<String>, project_manifest: ProjectManifest) -> Result<(), io::Error> {

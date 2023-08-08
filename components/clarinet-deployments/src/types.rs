@@ -661,6 +661,7 @@ impl EmulatedContractPublishSpecification {
     }
 }
 
+#[serde_as]
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct DeploymentSpecification {
     pub id: u32,
@@ -671,6 +672,7 @@ pub struct DeploymentSpecification {
     pub genesis: Option<GenesisSpecification>,
     pub plan: TransactionPlanSpecification,
     // Keep a cache of contract's (source, relative_path)
+    #[serde_as(as = "Vec<(_, _)>")]
     pub contracts: BTreeMap<QualifiedContractIdentifier, (String, FileLocation)>,
 }
 
