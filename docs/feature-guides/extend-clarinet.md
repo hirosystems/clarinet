@@ -24,6 +24,6 @@ clarinet run --allow-write https://deno.land/x/clarinet@v0.29.0/ext/stacksjs-hel
 
 ## Standalone plugin
 
-An extension can be deployed as a standalone plugin on [Deno](https://deno.land/), or can also just be a local file if it includes sensitive / private setup information.
+An extension can be deployed as a standalone plugin on [Deno](https://deno.land/), or it can also just be a local file if it includes sensitive/private setup information.
 
-As illustrated in the example above, permissions (wallet / disk read / disk write) are declared using command flags. If at runtime, the Clarinet extension is trying to write to disk, read disk, or access wallets without permission, the script will end up failing.
+As illustrated in the example above, permissions (wallet / disk read / disk write) are declared using command flags. If, at runtime, the Clarinet extension is trying to write to disk, read from disk, or access wallets without permission, the script will end up failing.
