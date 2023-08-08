@@ -25,6 +25,7 @@ base58 = { version = "0.2.0", optional = true }
 tiny-hderive = { version = "0.3.0", optional = true }
 libsecp256k1 = { version = "0.7.0", optional = true }
 clarinet_utils = { package = "clarinet-utils", path = "../clarinet-utils", optional = true }
+serde_with = "3.2.0"
 
 [features]
 default = ["cli"]
