@@ -12,6 +12,7 @@ use clarity_repl::clarity::{ClarityName, ClarityVersion, ContractName};
 
 use clarinet_files::chainhook_types::StacksNetwork;
 use serde::{Deserialize, Serialize};
+use serde_with::{serde_as, Bytes};
 use serde_yaml;
 use std::collections::BTreeMap;
 
@@ -72,7 +73,7 @@ pub struct DeploymentGenerationArtifacts {
     pub success: bool,
 }
 
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 pub struct TransactionPlanSpecification {
     pub batches: Vec<TransactionsBatchSpecification>,
 }
@@ -197,14 +198,14 @@ pub struct EmulatedContractPublishSpecificationFile {
     pub clarity_version: Option<u8>,
 }
 
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 pub struct TransactionsBatchSpecification {
     pub id: usize,
     pub transactions: Vec<TransactionSpecification>,
     pub epoch: Option<EpochSpec>,
 }
 
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 pub enum TransactionSpecification {
     ContractCall(ContractCallSpecification),
     ContractPublish(ContractPublishSpecification),
@@ -215,12 +216,17 @@ pub enum TransactionSpecification {
     StxTransfer(StxTransferSpecification),
 }
 
-#[derive(Debug, PartialEq, Clone)]
+const MEMO_BYTE_COUNT: usize = 34;
+type MemoArr = [u8; MEMO_BYTE_COUNT];
+
+#[serde_as]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 pub struct StxTransferSpecification {
     pub expected_sender: StandardPrincipalData,
     pub recipient: PrincipalData,
     pub mstx_amount: u64,
-    pub memo: [u8; 34],
+    #[serde_as(as = "Bytes")]
+    pub memo: MemoArr,
     pub cost: u64,
     pub anchor_block_only: bool,
 }
@@ -277,7 +283,7 @@ impl StxTransferSpecification {
     }
 }
 
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 pub struct BtcTransferSpecification {
     pub expected_sender: String,
     pub recipient: String,
@@ -299,7 +305,7 @@ impl BtcTransferSpecification {
     }
 }
 
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 pub struct ContractCallSpecification {
     pub contract_id: QualifiedContractIdentifier,
     pub expected_sender: StandardPrincipalData,
@@ -655,7 +661,7 @@ impl EmulatedContractPublishSpecification {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct DeploymentSpecification {
     pub id: u32,
     pub name: String,
@@ -769,6 +775,7 @@ impl DeploymentSpecification {
                                 }
                                 TransactionSpecificationFile::ContractPublish(spec) => {
                                     let spec = ContractPublishSpecification::from_specifications(spec, project_root_location)?;
+
                                     let contract_id = QualifiedContractIdentifier::new(spec.expected_sender.clone(), spec.contract_name.clone());
                                     contracts.insert(contract_id, (spec.source.clone(), spec.location.clone()));
                                     TransactionSpecification::ContractPublish(spec)
@@ -842,7 +849,6 @@ impl DeploymentSpecification {
 
 #[derive(Debug, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]
-
 pub struct DeploymentSpecificationFile {
     pub id: Option<u32>,
     pub name: String,
@@ -865,7 +871,7 @@ pub struct GenesisSpecificationFile {
     pub contracts: Vec<String>,
 }
 
-#[derive(Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, PartialEq, Deserialize, Serialize)]
 #[serde(rename_all = "kebab-case")]
 pub struct WalletSpecificationFile {
     pub name: String,
@@ -873,7 +879,7 @@ pub struct WalletSpecificationFile {
     pub balance: String,
 }
 
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 pub struct GenesisSpecification {
     pub wallets: Vec<WalletSpecification>,
     pub contracts: Vec<String>,
@@ -911,7 +917,7 @@ impl GenesisSpecification {
     }
 }
 
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 pub struct WalletSpecification {
     pub name: String,
     pub address: StandardPrincipalData,
