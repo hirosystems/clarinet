@@ -1,0 +1,24 @@
+{
+  "compilerOptions": {
+    // outdir, module and target are defined in esm and cjs configs
+
+    "lib": ["es6"],
+
+    "moduleResolution": "Node",
+    "rootDir": "src-ts",
+    "resolveJsonModule": false,
+    "allowJs": false,
+
+    "declaration": true,
+    "esModuleInterop": true,
+    "forceConsistentCasingInFileNames": true,
+    "sourceMap": true,
+
+    /* Type Checking */
+    "strict": true,
+    "noImplicitAny": true,
+    "skipLibCheck": true
+  },
+  "include": ["src-ts"],
+  "exclude": ["node_modules", "dist"]
+}

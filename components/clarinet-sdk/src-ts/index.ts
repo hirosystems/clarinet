@@ -1,9 +1,10 @@
 import { Cl, ClarityValue } from "@stacks/transactions";
 
-import init, { CallContractArgs, SDK } from "./sdk/clarinet_sdk";
-import wasm from "./sdk/clarinet_sdk_bg.wasm";
 import { vfs } from "./vfs";
 import type { ContractInterface } from "./contractInterface";
+import { SDK, CallContractArgs } from "./sdk";
+
+const rustSDK = import("./sdk");
 
 type CallFn = (
   contract: string,
@@ -93,13 +94,11 @@ const sessionProxy = {
 
 // load wasm only once and memoize it
 function memoizedInit() {
-  //@ts-ignore
-  let vm = null;
+  let vm: ClarityVM | null = null;
   return async (manifestPath = "./Clarinet.toml") => {
-    //@ts-ignore
+    await rustSDK;
     if (!vm) {
-      // @ts-ignore
-      await init(wasm());
+      console.log("init clarity vm");
       vm = new Proxy(new SDK(vfs), sessionProxy) as unknown as ClarityVM;
     }
     // start a new session
@@ -108,4 +107,4 @@ function memoizedInit() {
   };
 }
 
-export default memoizedInit();
+export const initVM = memoizedInit();
