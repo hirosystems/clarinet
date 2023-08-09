@@ -30,7 +30,7 @@ where
 
 fn source_code_serialize<S>(x: &str, s: S) -> Result<S::Ok, S::Error>
 where
-    S:Serializer,
+    S: Serializer,
 {
     let enc = encode(&x);
     s.serialize_str(&enc)
@@ -698,7 +698,7 @@ pub mod contract_serde {
     use bitcoincore_rpc::jsonrpc::base64::encode;
     use clarinet_files::FileLocation;
     use clarity_repl::clarity::vm::types::QualifiedContractIdentifier;
-    use serde::{Deserialize, Deserializer, Serializer, ser::SerializeMap};
+    use serde::{ser::SerializeMap, Deserialize, Deserializer, Serializer};
     use std::{collections::BTreeMap, iter::FromIterator};
 
     pub fn serialize<'ser, S>(
@@ -708,7 +708,6 @@ pub mod contract_serde {
     where
         S: Serializer,
     {
-
         let mut map = serializer.serialize_map(Some(target.len()))?;
         for (k, v) in target {
             let mut val = v.clone();
