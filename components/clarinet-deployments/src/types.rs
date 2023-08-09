@@ -1,3 +1,4 @@
+use bitcoincore_rpc::jsonrpc::base64::encode;
 use clarinet_files::FileLocation;
 use clarity_repl::clarity::stacks_common::types::StacksEpochId;
 use clarity_repl::clarity::util::hash::{hex_bytes, to_hex};
@@ -11,7 +12,7 @@ use clarity_repl::clarity::vm::types::{
 use clarity_repl::clarity::{ClarityName, ClarityVersion, ContractName};
 
 use clarinet_files::chainhook_types::StacksNetwork;
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Serialize, Serializer};
 use serde_with::{serde_as, Bytes};
 use serde_yaml;
 use std::collections::BTreeMap;
@@ -19,6 +20,21 @@ use std::collections::BTreeMap;
 use clarity_repl::analysis::ast_dependency_detector::DependencySet;
 use clarity_repl::repl::{Session, DEFAULT_CLARITY_VERSION};
 use std::collections::HashMap;
+
+fn address_serialize<S>(x: &StandardPrincipalData, s: S) -> Result<S::Ok, S::Error>
+where
+    S: Serializer,
+{
+    s.serialize_str(&x.to_address())
+}
+
+fn source_code_serialize<S>(x: &str, s: S) -> Result<S::Ok, S::Error>
+where
+    S:Serializer,
+{
+    let enc = encode(&x);
+    s.serialize_str(&enc)
+}
 
 #[derive(Serialize, Deserialize, PartialEq, Debug, Clone, Copy, Eq, PartialOrd, Ord)]
 pub enum EpochSpec {
@@ -364,8 +380,10 @@ impl ContractCallSpecification {
 #[derive(Debug, PartialEq, Serialize, Deserialize, Clone)]
 pub struct ContractPublishSpecification {
     pub contract_name: ContractName,
+    #[serde(serialize_with = "address_serialize")]
     pub expected_sender: StandardPrincipalData,
     pub location: FileLocation,
+    #[serde(serialize_with = "source_code_serialize")]
     pub source: String,
     pub clarity_version: ClarityVersion,
     pub cost: u64,
@@ -592,6 +610,7 @@ impl EmulatedContractCallSpecification {
 #[derive(Debug, PartialEq, Serialize, Deserialize, Clone)]
 pub struct EmulatedContractPublishSpecification {
     pub contract_name: ContractName,
+    #[serde(serialize_with = "address_serialize")]
     pub emulated_sender: StandardPrincipalData,
     pub source: String,
     pub clarity_version: ClarityVersion,
@@ -661,7 +680,6 @@ impl EmulatedContractPublishSpecification {
     }
 }
 
-#[serde_as]
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct DeploymentSpecification {
     pub id: u32,
@@ -672,8 +690,45 @@ pub struct DeploymentSpecification {
     pub genesis: Option<GenesisSpecification>,
     pub plan: TransactionPlanSpecification,
     // Keep a cache of contract's (source, relative_path)
-    #[serde_as(as = "Vec<(_, _)>")]
+    #[serde(with = "contract_serde")]
     pub contracts: BTreeMap<QualifiedContractIdentifier, (String, FileLocation)>,
+}
+
+pub mod contract_serde {
+    use bitcoincore_rpc::jsonrpc::base64::encode;
+    use clarinet_files::FileLocation;
+    use clarity_repl::clarity::vm::types::QualifiedContractIdentifier;
+    use serde::{Deserialize, Deserializer, Serializer, ser::SerializeMap};
+    use std::{collections::BTreeMap, iter::FromIterator};
+
+    pub fn serialize<'ser, S>(
+        target: &'ser BTreeMap<QualifiedContractIdentifier, (String, FileLocation)>,
+        serializer: S,
+    ) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+
+        let mut map = serializer.serialize_map(Some(target.len()))?;
+        for (k, v) in target {
+            let mut val = v.clone();
+            val.0 = encode(&v.0);
+
+            map.serialize_entry(&k.to_string(), &val)?;
+        }
+        map.end()
+    }
+
+    pub fn deserialize<'de, T, K, V, D>(des: D) -> Result<T, D::Error>
+    where
+        D: Deserializer<'de>,
+        T: FromIterator<(K, V)>,
+        K: Deserialize<'de>,
+        V: Deserialize<'de>,
+    {
+        let container: Vec<_> = serde::Deserialize::deserialize(des)?;
+        Ok(T::from_iter(container.into_iter()))
+    }
 }
 
 impl DeploymentSpecification {
@@ -922,6 +977,7 @@ impl GenesisSpecification {
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 pub struct WalletSpecification {
     pub name: String,
+    #[serde(serialize_with = "address_serialize")]
     pub address: StandardPrincipalData,
     pub balance: u128,
 }
