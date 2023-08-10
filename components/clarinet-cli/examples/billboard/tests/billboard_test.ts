@@ -1,10 +1,4 @@
-import {
-  Clarinet,
-  Tx,
-  Chain,
-  Account,
-  types,
-} from "https://deno.land/x/clarinet@v1.5.4/index.ts";
+import { Clarinet, Tx, Chain, Account, types } from "https://deno.land/x/clarinet@v1.7.1/index.ts";
 import { assertEquals } from "https://deno.land/std@0.191.0/testing/asserts.ts";
 
 Clarinet.test({
@@ -17,19 +11,9 @@ Clarinet.test({
     const balance = assetMaps.assets["STX"][wallet_1.address];
 
     const block = chain.mineBlock([
-      Tx.contractCall(
-        "billboard",
-        "set-message",
-        [types.utf8("testing")],
-        wallet_1.address
-      ),
+      Tx.contractCall("billboard", "set-message", [types.utf8("testing")], wallet_1.address),
       Tx.contractCall("billboard", "get-message", [], wallet_1.address),
-      Tx.contractCall(
-        "billboard",
-        "set-message",
-        [types.utf8("testing...")],
-        wallet_1.address
-      ),
+      Tx.contractCall("billboard", "set-message", [types.utf8("testing...")], wallet_1.address),
       Tx.contractCall("billboard", "get-message", [], wallet_1.address),
     ]);
 

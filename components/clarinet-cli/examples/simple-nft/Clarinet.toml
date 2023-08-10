@@ -1,19 +1,14 @@
-
 [project]
-name = "simple-nft"
-cache_dir = "./.cache"
+name = 'simple-nft'
+description = ''
+authors = []
+telemetry = false
+cache_dir = './.cache'
+
+[[project.requirements]]
+contract_id = 'SP2PABAF9FTAJYNFZH93XENAJ8FVY99RRM50D2JG9.nft-trait'
 
 [contracts.simple-nft]
-path = "contracts/simple-nft.clar"
-clarity_version = 1
-epoch = "2.4"
-
-# EXTERNAL CONTRACTS
-[contracts.sip-009-trait-ft-standard]
-path = "contracts/external/sip-009-nft-trait-standard.clar"
-clarity_version = 1
-epoch = "2.4"
-
-[repl.analysis]
-passes = ["check_checker"]
-check_checker = { trusted_sender = false, trusted_caller = false, callee_filter = false }
+path = 'contracts/simple-nft.clar'
+clarity_version = 2
+epoch = 2.4
