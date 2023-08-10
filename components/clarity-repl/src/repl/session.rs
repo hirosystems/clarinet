@@ -1032,13 +1032,13 @@ impl Session {
 
     pub fn get_costs(&mut self, output: &mut Vec<String>, cmd: &str) {
         let command: String = cmd.to_owned();
-        let v: Vec<&str> = command.split_whitespace().collect();
 
-        if v.len() != 2 {
-            output.push(red!(format!("::get_costs command needs an argument")));
-        } else {
-            self.run_snippet(output, true, &v[1].to_string());
-        }
+        let expr = match cmd.split_once(" ") {
+            Some((_, expr)) => expr,
+            _ => return output.push(red!("Usage: ::get_costs <expr>")),
+        };
+
+        self.run_snippet(output, true, expr);
     }
 
     #[cfg(feature = "cli")]
