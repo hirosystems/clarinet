@@ -1,6 +1,6 @@
 {
   "name": "obscurity-sdk",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "clarity testing lib",
   "repository": {
     "type": "git",
@@ -9,10 +9,12 @@
   "files": [
     "dist"
   ],
+  "main": "dist/cjs/index.js",
   "module": "dist/esm/index.mjs",
   "exports": {
     ".": {
-      "import": "./dist/esm/index.mjs"
+      "import": "./dist/esm/index.mjs",
+      "require": "./dist/cjs/index.js"
     }
   },
   "scripts": {

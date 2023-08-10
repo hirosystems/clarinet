@@ -2,9 +2,10 @@ import { Cl, ClarityValue } from "@stacks/transactions";
 
 import { vfs } from "./vfs";
 import type { ContractInterface } from "./contractInterface";
-import { SDK, CallContractArgs } from "./sdk";
 
-const rustSDK = import("./sdk");
+import type { SDK } from "./sdk";
+type WASMModule = typeof import("./sdk");
+const wasmModule = import("./sdk");
 
 type CallFn = (
   contract: string,
@@ -20,9 +21,7 @@ type GetMapEntry = (contract: string, mapName: string, mapKey: ClarityValue) => 
 type GetAssetsMap = () => Map<string, Map<string, bigint>>;
 type GetAccounts = () => Map<string, string>;
 
-// because we use a proxy around the test session,
-// the type need to be hardcoded
-// is there a better way than this nested ternary?
+// because the session is wrapped in a proxy the types need to be hardcoded
 export type ClarityVM = {
   [K in keyof SDK]: K extends "callReadOnlyFn" | "callPublicFn"
     ? CallFn
@@ -39,7 +38,7 @@ export type ClarityVM = {
     : SDK[K];
 };
 
-const sessionProxy = {
+const getSessionProxy = (wasm: WASMModule) => ({
   get(session: SDK, prop: keyof SDK, receiver: any) {
     // some of the WASM methods are proxied here to:
     // - serialize clarity values input argument
@@ -48,7 +47,7 @@ const sessionProxy = {
     if (prop === "callReadOnlyFn" || prop === "callPublicFn") {
       const callFn: CallFn = (contract, method, args, sender) => {
         const response = session[prop](
-          new CallContractArgs(
+          new wasm.CallContractArgs(
             contract,
             method,
             args.map((a) => Cl.serialize(a))
@@ -90,16 +89,26 @@ const sessionProxy = {
 
     return Reflect.get(session, prop, receiver);
   },
-};
+});
 
 // load wasm only once and memoize it
 function memoizedInit() {
   let vm: ClarityVM | null = null;
   return async (manifestPath = "./Clarinet.toml") => {
-    await rustSDK;
+    const module = await wasmModule;
+
+    // handle both CJS and ESM context
+    // - in CJS: `module.default` is a promise resolving
+    // - in ESM: `module` is directly the
+    // @ts-ignore
+    let wasm: WASMModule =
+      typeof module.default === "undefined"
+        ? (module as unknown as WASMModule)
+        : await module.default;
+
     if (!vm) {
       console.log("init clarity vm");
-      vm = new Proxy(new SDK(vfs), sessionProxy) as unknown as ClarityVM;
+      vm = new Proxy(new wasm.SDK(vfs), getSessionProxy(wasm)) as unknown as ClarityVM;
     }
     // start a new session
     await vm.initSession(process.cwd(), manifestPath);

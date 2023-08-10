@@ -2,7 +2,7 @@
   "compilerOptions": {
     // outdir, module and target are defined in esm and cjs configs
 
-    "lib": ["es6"],
+    "lib": ["es2022"],
 
     "moduleResolution": "Node",
     "rootDir": "src-ts",

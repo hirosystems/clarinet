@@ -75,11 +75,10 @@ const configCJS = {
   plugins: [
     new WasmPackPlugin({
       crateDirectory: path.resolve(__dirname, "./"),
-      extraArgs: "--release --target=web",
+      extraArgs: "--release --target=bundler",
       outDir: path.resolve(__dirname, "./src-ts/sdk"),
     }),
   ],
 };
 
-module.exports = [configESM];
-// module.exports = [configESM, configCJS];
+module.exports = [configESM, configCJS];
