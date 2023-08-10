@@ -21,14 +21,14 @@ use clarity_repl::analysis::ast_dependency_detector::DependencySet;
 use clarity_repl::repl::{Session, DEFAULT_CLARITY_VERSION};
 use std::collections::HashMap;
 
-fn address_serialize<S>(x: &StandardPrincipalData, s: S) -> Result<S::Ok, S::Error>
+fn standard_principal_data_serialize<S>(x: &StandardPrincipalData, s: S) -> Result<S::Ok, S::Error>
 where
     S: Serializer,
 {
     s.serialize_str(&x.to_address())
 }
 
-fn source_code_serialize<S>(x: &str, s: S) -> Result<S::Ok, S::Error>
+fn source_serialize<S>(x: &str, s: S) -> Result<S::Ok, S::Error>
 where
     S: Serializer,
 {
@@ -238,6 +238,7 @@ type MemoArr = [u8; MEMO_BYTE_COUNT];
 #[serde_as]
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 pub struct StxTransferSpecification {
+    #[serde(serialize_with = "standard_principal_data_serialize")]
     pub expected_sender: StandardPrincipalData,
     pub recipient: PrincipalData,
     pub mstx_amount: u64,
@@ -324,6 +325,7 @@ impl BtcTransferSpecification {
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 pub struct ContractCallSpecification {
     pub contract_id: QualifiedContractIdentifier,
+    #[serde(serialize_with = "standard_principal_data_serialize")]
     pub expected_sender: StandardPrincipalData,
     pub method: ClarityName,
     pub parameters: Vec<String>,
@@ -380,10 +382,10 @@ impl ContractCallSpecification {
 #[derive(Debug, PartialEq, Serialize, Deserialize, Clone)]
 pub struct ContractPublishSpecification {
     pub contract_name: ContractName,
-    #[serde(serialize_with = "address_serialize")]
+    #[serde(serialize_with = "standard_principal_data_serialize")]
     pub expected_sender: StandardPrincipalData,
     pub location: FileLocation,
-    #[serde(serialize_with = "source_code_serialize")]
+    #[serde(serialize_with = "source_serialize")]
     pub source: String,
     pub clarity_version: ClarityVersion,
     pub cost: u64,
@@ -458,12 +460,46 @@ impl ContractPublishSpecification {
 #[derive(Debug, PartialEq, Serialize, Deserialize, Clone)]
 pub struct RequirementPublishSpecification {
     pub contract_id: QualifiedContractIdentifier,
+    #[serde(serialize_with = "standard_principal_data_serialize")]
     pub remap_sender: StandardPrincipalData,
+    #[serde(with = "remap_principals_serde")]
     pub remap_principals: BTreeMap<StandardPrincipalData, StandardPrincipalData>,
+    #[serde(serialize_with = "source_serialize")]
     pub source: String,
     pub clarity_version: ClarityVersion,
     pub cost: u64,
     pub location: FileLocation,
+}
+
+pub mod remap_principals_serde {
+    use clarity_repl::clarity::vm::types::StandardPrincipalData;
+    use serde::{ser::SerializeMap, Deserialize, Deserializer, Serializer};
+    use std::{collections::BTreeMap, iter::FromIterator};
+
+    pub fn serialize<'ser, S>(
+        target: &'ser BTreeMap<StandardPrincipalData, StandardPrincipalData>,
+        serializer: S,
+    ) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        let mut map = serializer.serialize_map(Some(target.len()))?;
+        for (k, v) in target {
+            map.serialize_entry(&k.to_address(), &v.to_address())?;
+        }
+        map.end()
+    }
+
+    pub fn deserialize<'de, T, K, V, D>(des: D) -> Result<T, D::Error>
+    where
+        D: Deserializer<'de>,
+        T: FromIterator<(K, V)>,
+        K: Deserialize<'de>,
+        V: Deserialize<'de>,
+    {
+        let container: Vec<_> = serde::Deserialize::deserialize(des)?;
+        Ok(T::from_iter(container.into_iter()))
+    }
 }
 
 impl RequirementPublishSpecification {
@@ -558,6 +594,7 @@ impl RequirementPublishSpecification {
 #[derive(Debug, PartialEq, Serialize, Deserialize, Clone)]
 pub struct EmulatedContractCallSpecification {
     pub contract_id: QualifiedContractIdentifier,
+    #[serde(serialize_with = "standard_principal_data_serialize")]
     pub emulated_sender: StandardPrincipalData,
     pub method: ClarityName,
     pub parameters: Vec<String>,
@@ -610,7 +647,7 @@ impl EmulatedContractCallSpecification {
 #[derive(Debug, PartialEq, Serialize, Deserialize, Clone)]
 pub struct EmulatedContractPublishSpecification {
     pub contract_name: ContractName,
-    #[serde(serialize_with = "address_serialize")]
+    #[serde(serialize_with = "standard_principal_data_serialize")]
     pub emulated_sender: StandardPrincipalData,
     pub source: String,
     pub clarity_version: ClarityVersion,
@@ -976,7 +1013,7 @@ impl GenesisSpecification {
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 pub struct WalletSpecification {
     pub name: String,
-    #[serde(serialize_with = "address_serialize")]
+    #[serde(serialize_with = "standard_principal_data_serialize")]
     pub address: StandardPrincipalData,
     pub balance: u128,
 }
