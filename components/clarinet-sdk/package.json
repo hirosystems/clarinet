@@ -9,8 +9,8 @@
   "files": [
     "dist"
   ],
-  "main": "dist/cjs/index.js",
-  "module": "dist/esm/index.mjs",
+  "main": "./dist/cjs/index.js",
+  "module": "./dist/esm/index.mjs",
   "types": "./dist/esm/index.d.ts",
   "exports": {
     ".": {
@@ -21,6 +21,16 @@
       "require": {
         "types": "./dist/cjs/index.d.ts",
         "default": "./dist/cjs/index.js"
+      }
+    },
+    "./ts-gen": {
+      "import": {
+        "types": "./dist/esm/ts-gen/index.d.ts",
+        "default": "./dist/esm/ts-gen/index.mjs"
+      },
+      "require": {
+        "types": "./dist/cjs/ts-gen/index.d.ts",
+        "default": "./dist/cjs/ts-gen/index.js"
       }
     }
   },
