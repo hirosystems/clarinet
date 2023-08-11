@@ -28,6 +28,13 @@ where
     s.serialize_str(&x.to_address())
 }
 
+fn principal_data_serializer<S>(x: &PrincipalData, s: S) -> Result<S::Ok, S::Error>
+where
+    S: Serializer,
+{
+    s.serialize_str(&x.to_string())
+}
+
 fn source_serializer<S>(x: &str, s: S) -> Result<S::Ok, S::Error>
 where
     S: Serializer,
@@ -36,7 +43,10 @@ where
     s.serialize_str(&enc)
 }
 
-fn qualified_contract_identifier_serializer<S>(x: &QualifiedContractIdentifier, s: S) -> Result<S::Ok, S::Error>
+fn qualified_contract_identifier_serializer<S>(
+    x: &QualifiedContractIdentifier,
+    s: S,
+) -> Result<S::Ok, S::Error>
 where
     S: Serializer,
 {
@@ -251,6 +261,7 @@ type MemoArr = [u8; MEMO_BYTE_COUNT];
 pub struct StxTransferSpecification {
     #[serde(serialize_with = "standard_principal_data_serializer")]
     pub expected_sender: StandardPrincipalData,
+    #[serde(serialize_with = "principal_data_serializer")]
     pub recipient: PrincipalData,
     pub mstx_amount: u64,
     #[serde_as(as = "Bytes")]
@@ -335,6 +346,7 @@ impl BtcTransferSpecification {
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 pub struct ContractCallSpecification {
+    #[serde(serialize_with = "qualified_contract_identifier_serializer")]
     pub contract_id: QualifiedContractIdentifier,
     #[serde(serialize_with = "standard_principal_data_serializer")]
     pub expected_sender: StandardPrincipalData,
