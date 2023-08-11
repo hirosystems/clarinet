@@ -16,7 +16,7 @@ plan:
             cost: 8400
             path: ".cache/requirements/SP3FBR2AGK5H9QBDH3EEN6DF8EK8JY7RX8QJ5SVTE.sip-010-trait-ft-standard.clar"
             clarity-version: 1
-      epoch: "2.0"
+      epoch: "2.4"
     - id: 1
       transactions:
         - contract-publish:
@@ -26,4 +26,4 @@ plan:
             path: contracts/cbtc-token.clar
             anchor-block-only: true
             clarity-version: 1
-      epoch: "2.05"
+      epoch: "2.4"
