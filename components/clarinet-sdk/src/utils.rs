@@ -92,7 +92,8 @@ pub fn to_raw_value(value: &Value) -> String {
 }
 
 pub fn uint8_to_string(mut value: &[u8]) -> String {
-    let value = Value::consensus_deserialize(&mut value).expect("failed to parse clarity value");
+    let value = Value::consensus_deserialize(&mut value)
+        .unwrap_or_else(|e| panic!("failed to parse clarity value: {}", e));
     value_to_string(&value)
 }
 
