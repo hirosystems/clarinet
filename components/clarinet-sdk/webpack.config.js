@@ -1,5 +1,6 @@
 const path = require("path");
 const WasmPackPlugin = require("@wasm-tool/wasm-pack-plugin");
+const CopyPlugin = require("copy-webpack-plugin");
 
 /** @typedef {import('webpack').Configuration} WebpackConfig **/
 
@@ -44,6 +45,9 @@ const configESM = {
       extraArgs: "--release --target=bundler",
       outDir: path.resolve(__dirname, "./src-ts/sdk"),
     }),
+    new CopyPlugin({
+      patterns: [{ from: "./src-ts/sdk/index.d.ts", to: "sdk" }],
+    }),
   ],
 };
 
@@ -77,6 +81,9 @@ const configCJS = {
       crateDirectory: path.resolve(__dirname, "./"),
       extraArgs: "--release --target=bundler",
       outDir: path.resolve(__dirname, "./src-ts/sdk"),
+    }),
+    new CopyPlugin({
+      patterns: [{ from: "./src-ts/sdk/index.d.ts", to: "sdk" }],
     }),
   ],
 };

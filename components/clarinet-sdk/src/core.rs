@@ -533,7 +533,7 @@ impl SDK {
     }
 
     #[wasm_bindgen(js_name=getReport)]
-    pub fn get_report(&mut self) -> Result<SessionReport, String> {
+    pub fn collect_report(&mut self) -> Result<SessionReport, String> {
         let contracts_locations = self.contracts_locations.clone();
         let session = self.get_session_mut();
         let mut coverage_reporter = CoverageReporter::new();

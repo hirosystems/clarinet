@@ -1,6 +1,6 @@
 {
   "name": "obscurity-sdk",
-  "version": "0.3.0",
+  "version": "0.3.5",
   "description": "clarity testing lib",
   "repository": {
     "type": "git",
@@ -11,10 +11,17 @@
   ],
   "main": "dist/cjs/index.js",
   "module": "dist/esm/index.mjs",
+  "types": "./dist/esm/index.d.ts",
   "exports": {
     ".": {
-      "import": "./dist/esm/index.mjs",
-      "require": "./dist/cjs/index.js"
+      "import": {
+        "types": "./dist/esm/index.d.ts",
+        "default": "./dist/esm/index.mjs"
+      },
+      "require": {
+        "types": "./dist/cjs/index.d.ts",
+        "default": "./dist/cjs/index.js"
+      }
     }
   },
   "scripts": {
@@ -33,6 +40,7 @@
   "devDependencies": {
     "@types/node": "^20.4.5",
     "@wasm-tool/wasm-pack-plugin": "^1.7.0",
+    "copy-webpack-plugin": "^11.0.0",
     "rimraf": "^5.0.1",
     "ts-loader": "^9.4.4",
     "typescript": "^5.1.6",

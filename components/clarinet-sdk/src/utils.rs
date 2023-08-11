@@ -82,8 +82,9 @@ pub fn serialize_event(event: &StacksTransactionEvent) -> StacksEvent {
 
 pub fn to_raw_value(value: &Value) -> String {
     let mut bytes = vec![];
-
-    value.consensus_serialize(&mut bytes).unwrap();
+    value
+        .consensus_serialize(&mut bytes)
+        .unwrap_or_else(|e| panic!("failed to parse clarity value: {}", e));
     let raw_value = bytes
         .iter()
         .map(|b| format!("{:02x}", b))
@@ -91,14 +92,13 @@ pub fn to_raw_value(value: &Value) -> String {
     format!("0x{}", raw_value.join(""))
 }
 
-pub fn uint8_to_string(mut value: &[u8]) -> String {
-    let value = Value::consensus_deserialize(&mut value)
-        .unwrap_or_else(|e| panic!("failed to parse clarity value: {}", e));
-    value_to_string(&value)
+pub fn uint8_to_string(value: &[u8]) -> String {
+    value_to_string(&uint8_to_value(value))
 }
 
 pub fn uint8_to_value(mut value: &[u8]) -> Value {
-    Value::consensus_deserialize(&mut value).expect("failed to parse clarity value")
+    Value::consensus_deserialize(&mut value)
+        .unwrap_or_else(|e| panic!("failed to parse clarity value: {}", e))
 }
 
 fn value_to_string(value: &Value) -> String {
