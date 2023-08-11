@@ -6,21 +6,22 @@
 
 ```ts
 import { Cl } from "@stacks/transactions";
-import initVM, { ClarityVM } from "@hirosystems/clarinet-sdk";
-// available under `obscurity-sdk` right now
-// import initVM, { ClarityVM } from "obscurity-sdk";
+import { initVM } from "obscurity-sdk";
 
 async function main() {
-  const vm = await initVM(); // or await initVM("./path/to/Clarinet.toml")
+  const vm = await initVM();
   const accounts = vm.getAccounts();
-  const w1 = accounts.get("wallet_1")!;
+  const w1 = accounts.get("wallet_1");
+  if (!w1) return;
 
-  const result = vm.callPublicFn("counter", "increment", [], w1);
-  console.log(result) // Cl.int(Cl.ok(true))
+  const call = vm.callPublicFn("counter", "increment", [Cl.uint(1)], w1);
+  console.log(call.result); // Cl.int(Cl.ok(true))
 
   const counter = vm.getDataVar("counter", "counter");
-  console.log(counter) // Cl.int(1)
+  console.log(counter); // Cl.int(2)
 }
+
+main();
 ```
 
 ## Contributing
