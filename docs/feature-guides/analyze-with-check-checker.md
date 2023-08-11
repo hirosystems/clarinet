@@ -20,9 +20,9 @@ passes = ["check_checker"]
 ```
 
 The check-checker pass analyzes your contract to identify places where untrusted inputs might be used in a potentially dangerous way. 
-Since public functions can be called by anyone, any arguments passed to these public functions should be considered untrusted. 
-This analysis pass takes the opinion that all untrusted data must be checked before being used to modify state on the blockchain. 
-Modifying state includes any operations that affect wallet balances, or any data stored in your contracts.
+Since anyone can call public functions, any arguments passed to these functions should be considered untrusted. 
+This analysis pass takes the opinion that all untrusted data must be checked before being used to modify the state of a blockchain. 
+Modifying the state includes any operations that affect wallet balances or any data stored in your contracts.
 
 - Actions on Stacks wallets:
   - stx-burn?
@@ -43,15 +43,13 @@ Modifying state includes any operations that affect wallet balances, or any data
   - Variables:
     - var-set
 
-In addition to those operations, the check-checker is also a bit opinionated and prefers that untrusted data be checked near the source,
-making the code more readable and maintainable. For this reason, the check-checker also requires that arguments passed into private functions 
-must be checked and return values must be checked.
+In addition to those operations, the check-checker is opinionated and prefers that untrusted data be checked near the source,
+making the code more readable and maintainable. For this reason,the check-checker also requires that arguments of private functions and the return values be checked.
 
 - Calls to private functions
 - Return values
 
-Finally, another opportunity for exploits appears when contracts call functions from traits. 
-Those traits are untrusted, just like other parameters to public functions, so they are also required to be checked.
+Finally, another opportunity for exploits appears when contracts call functions from traits. Those traits are untrusted, just like other parameters to public functions, so they must also be checked.
 
 - Dynamic contract calls (through traits)
 
@@ -65,9 +63,9 @@ bank:21:36: note: source of untrusted input here
 (define-public (withdrawal-unsafe (amount int))
 ```
 
-In the case where an operation affects only the sender's own wallet (e.g. calling `stx-transfer?` with the sender 
-set to `tx-sender`), then there is no need to generate a warning, because the untrusted input is only affecting the sender, 
-who is the source of that input. To say that another way, the sender should be able to safely specify parameters in an 
+In the case where an operation affects only the sender's wallet (e.g., calling `stx-transfer?` with the sender 
+set to `tx-sender`), there is no need to generate a warning because the untrusted input affects only the sender, 
+who is the source of that input. In other words, the sender should be able to safely specify parameters in an 
 operation that affects only themselves. This sender is also potentially protected by post-conditions.
 
 For a video walkthrough on how to check for smart contract vulnerabilities, please see the [Catch Smart Contract Vulnerabilities With Clarinet's Check-Checker Feature](https://www.youtube.com/watch?v=v2qXFL2owC8) video.
@@ -85,13 +83,13 @@ trusted_caller = true
 callee_filter = true
 ```
 
-If `strict` is set to `true`, all other options are ignored and the analysis proceeds with the most strict interpretation of the rules.
+If `strict` is set to `true`, all other options are ignored, and the analysis proceeds with the most strict interpretation of the rules.
 
 The `trusted_sender` and `trusted_caller` options handle a common practice in smart contracts where there is a concept of a 
 trusted transaction sender (or transaction caller), which is treated like an admin user. Once a check has been performed 
-to validate the sender (or caller), then all inputs should be trusted.
+to validate the sender (or caller), all inputs should be trusted.
 
-In the example below, the `asserts!` on line 3 is verifying the `tx-sender`. Because of that check, all inputs are trusted 
+In the example below, the `asserts!` on line 3 verifies the `tx-sender`. Because of that check, all inputs are trusted 
 (if the `trusted_sender` option is enabled):
 
 ```clarity
@@ -105,12 +103,12 @@ In the example below, the `asserts!` on line 3 is verifying the `tx-sender`. Bec
 ```
 
 The `callee_filter` option loosens the restriction on passing untrusted data to private functions. This option
-enables checks in a called function to propagate up to the caller. This is helpful because it enables developers to 
+enables checks in a called function to propagate to the caller, enabling developers to 
 define input checks in a function that can be reused.
 
 In the example below, the private function `validate` checks its parameter. The public function `save` calls `validate`, 
 and when the `callee_filter` option is enabled, that call to `validate` will count as a check for the untrusted 
-input, `amount`, resulting in no warnings from the check-checker.
+input `amount` resulting in no warnings from the check-checker.
 
 ```clarity
 (define-public (save (amount uint))
@@ -131,10 +129,8 @@ input, `amount`, resulting in no warnings from the check-checker.
 
 ### Annotations
 
-Sometimes, there is code that the check-checker analysis is unable to determine is safe, but as a developer, 
-you know it is safe, and want to pass that information to the check-checker to disable warnings you 
-consider to be false positives. To handle these cases, the check-checker supports several annotations, implemented 
-using "magic comments" in the contract code.
+Sometimes, there is code that the check-checker analysis cannot validate as safe. However, as a developer, 
+you know the code is safe and want to pass that information to the check-checker to turn off such false positive warnings. Check-checker supports several annotations, implemented using "magic comments" in the contract code, to handle such cases.
 
 **`#[allow(unchecked_params)]`**
 
@@ -152,7 +148,7 @@ the parameters are considered unchecked and could generate warnings.
 **`#[allow(unchecked_data)]`**
 
 This annotation tells the check-checker that the following expression is allowed to use unchecked data without warnings.
-It should be used with care, as it will disable all warnings from the associated expression.
+It should be used carefully, as it will turnoff all warnings from the associated expression.
 
 ```clarity
 (define-public (dangerous (amount uint))
