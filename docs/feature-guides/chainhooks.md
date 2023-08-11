@@ -36,4 +36,8 @@ In terms of the deployment lifecycle, you can begin using chainhooks locally, us
 
 For a more detailed discussion of Chainhooks and how you can use them in your workflows, please see the following resources:
 
-- [Meet 4 New Features in Clarinet](https://www.hiro.so/blog/meet-4-new-features-in-clarinet) blog post.
+- [Use Chainhooks with Bitcoin](https://docs.hiro.so/chainhook/how-to-guides/how-to-use-chainhook-with-bitcoin)
+- [Use Chainhooks with Stacks](https://docs.hiro.so/chainhook/how-to-guides/how-to-use-chainhook-with-stacks)
+- [Run Chainhook as a Service using Bitcoind](https://docs.hiro.so/chainhook/how-to-guides/how-to-run-chainhook-as-a-service-using-bitcoind)
+- [Run Chainhook as a Service using Stacks](https://docs.hiro.so/chainhook/how-to-guides/how-to-run-chainhook-as-a-service-using-stacks)
+- [Create Chainhooks using Hiro Platform](https://docs.hiro.so/platform/create-chainhooks)
