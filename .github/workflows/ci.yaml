@@ -1,6 +1,13 @@
 name: CI
 on:
   pull_request:
+    branches:
+      - main
+      - develop
+      - rc/next
+    paths-ignore:
+      - '**/CHANGELOG.md'
+      - 'docs/**'
   push:
     branches:
       - main
