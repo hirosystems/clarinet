@@ -1,10 +1,4 @@
-import {
-  Clarinet,
-  Tx,
-  Chain,
-  Account,
-  types,
-} from "https://deno.land/x/clarinet@v1.5.4/index.ts";
+import { Clarinet, Tx, Chain, Account, types } from "https://deno.land/x/clarinet@v1.7.1/index.ts";
 
 Clarinet.test({
   name: "Ensure that nft can be transferred form one account to another",
@@ -28,11 +22,7 @@ Clarinet.test({
       Tx.contractCall(
         "simple-nft",
         "transfer",
-        [
-          types.uint(1),
-          types.principal(wallet_1.address),
-          types.principal(wallet_2.address),
-        ],
+        [types.uint(1), types.principal(wallet_1.address), types.principal(wallet_2.address)],
         wallet_1.address
       ),
     ]);
