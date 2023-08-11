@@ -4,7 +4,7 @@ title: Chainhooks
 
 ## Overview
 
-Chainhooks are a powerful feature that enables you to automatically trigger an action based upon a predicate event occurring. Adhering to an event-based architecture, chainhooks allow you to pre-determine an underlying set of events that, when triggered, set into motion a logical series of follow-on steps and actions to address the specific event that was triggered.
+Chainhooks are a powerful feature that enables you to trigger an action based upon a predicate event occurring automatically. Adhering to an event-based architecture, chainhooks allow you to pre-determine an underlying set of events that, when triggered, set into motion a logical series of follow-on steps and actions to address the specific event that was triggered.
 
 *Topics covered in this guide*:
 
@@ -14,7 +14,7 @@ Chainhooks are a powerful feature that enables you to automatically trigger an a
 
 ## Design
 
-Chainhooks were designed with a very specific set of requirements and limitations to make them easy to work with in a development environment. These constraints include portability and performance.
+Chainhooks were designed with a very specific set of requirements and limitations to make them easy to work within a development environment. These constraints include portability and performance.
 
 - portability and performance
 
@@ -22,7 +22,7 @@ Hiro designed the event observer as a library, choosing to embed the library in 
 
 - correctness
 
-Due to the fact that blockchains can be forked—and some period of uncertainty may arise as to which chain tip asserts itself as the canonical chain—there are challenges to guaranteeing the validity of a triggered predicate. There are many different ways you can end up with a state slightly differing from the canonical state, which is why correctness is an inherent limitation of chainhooks. 
+Since blockchains can be forked and since some period of uncertainty may arise as to which chain tip asserts itself as the canonical chain, there are challenges to guaranteeing the validity of a triggered predicate. There are many different ways you can end up with a state slightly differing from the canonical state, which is why correctness is an inherent limitation of chainhooks. 
 
 ## Using chainhooks
 
