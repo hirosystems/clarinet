@@ -73,14 +73,14 @@ impl CoverageReporter {
         ))?;
         create_dir_all(filepath)?;
         let mut out = File::create(filename)?;
-        let content = self.build_lcov_file();
+        let content = self.build_lcov_content();
 
         write!(out, "{}", content)?;
 
         Ok(())
     }
 
-    pub fn build_lcov_file(&self) -> String {
+    pub fn build_lcov_content(&self) -> String {
         let mut file_content = String::new();
 
         let mut filtered_asts = HashMap::new();

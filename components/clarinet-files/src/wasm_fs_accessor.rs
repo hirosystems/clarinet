@@ -23,12 +23,12 @@ struct WFSWriteRequest<'a> {
 }
 
 pub struct WASMFileSystemAccessor {
-    client_request_tx: JsFunction,
+    client_request: JsFunction,
 }
 
 impl WASMFileSystemAccessor {
-    pub fn new(client_request_tx: JsFunction) -> WASMFileSystemAccessor {
-        WASMFileSystemAccessor { client_request_tx }
+    pub fn new(client_request: JsFunction) -> WASMFileSystemAccessor {
+        WASMFileSystemAccessor { client_request }
     }
 
     fn get_request_promise<T: Serialize>(
@@ -36,7 +36,7 @@ impl WASMFileSystemAccessor {
         action: String,
         data: &T,
     ) -> FileAccessorResult<JsValue> {
-        let request_promise = self.client_request_tx.call2(
+        let request_promise = self.client_request.call2(
             &JsValue::NULL,
             &JsValue::from(action),
             &encode_to_js(data).unwrap(),

@@ -51,9 +51,15 @@ Within these tests, developers can simulate mining a block containing transactio
 
 >  **_NOTE:_**
 >
-> If you see an error in Visual Studio Code (VS Code) on the imports in the generated test file(s) that says, "An import path cannot end with a '.ts' extension" (example below), installing the [Deno extension](https://marketplace.visualstudio.com/items?itemName=denoland.vscode-deno) will resolve this error.
+> If you see an error in Visual Studio Code (VS Code) on the imports in the generated test file(s) that says, "An import path cannot end with a '.ts' extension" (example below), follow the below steps to resolve the error:
+![VS Code deno error](../images/deno-error.png) 
+> - Install the [Deno extension](https://marketplace.visualstudio.com/items?itemName=denoland.vscode-deno) in VS Code
+> - [Install Deno](https://deno.land/manual@v1.35.3/getting_started/installation) on your computer
+> - In VS Code, open the command palette (`Ctrl+Shift+P` in `Windows`; `Cmd+Shift+P` on `Mac`) and run the `Deno: Initialize Workspace Configuration` and `Deno: Cache Dependencies` commands
+> - Open Command Prompt (Terminal on a Mac); navigate to the tests folder in your project and run `deno run test-file-name.ts` (Make sure to replace `test-file-name` with the actual name of the test file, `counter_test.ts` in the current example )
+> - Quit and restart VS Code
 
-![VS Code deno error](../images/deno-error.png)
+
 
 Clarinet allows you to instantly initialize wallets and populate them with tokens, which helps to interactively or programmatically test the behavior of the smart contract. Blocks are mined instantly, so you can control the number of blocks that are mined between testing transactions.
 

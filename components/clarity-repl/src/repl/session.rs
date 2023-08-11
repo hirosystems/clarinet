@@ -126,7 +126,6 @@ pub struct Session {
     api_reference: HashMap<String, String>,
     pub coverage_reports: Vec<TestCoverageReport>,
     pub costs_reports: Vec<CostsReport>,
-    pub initial_contracts_analysis: Vec<(ContractAnalysis, String, String)>,
     pub show_costs: bool,
     pub executed: Vec<String>,
     pub current_epoch: StacksEpochId,
@@ -154,7 +153,6 @@ impl Session {
             api_reference: build_api_reference(),
             coverage_reports: vec![],
             costs_reports: vec![],
-            initial_contracts_analysis: vec![],
             show_costs: false,
             settings,
             executed: Vec::new(),
@@ -609,9 +607,8 @@ impl Session {
         test_name: String,
     ) -> Result<(ExecutionResult, QualifiedContractIdentifier), Vec<Diagnostic>> {
         let initial_tx_sender = self.get_tx_sender();
-        // Kludge for handling fully qualified contract_id vs sugared syntax
-        let first_char = contract.chars().next().unwrap();
-        let contract_id = if first_char.to_string() == "S" {
+        // Handle fully qualified contract_id and sugared syntax
+        let contract_id = if contract.starts_with("S") {
             contract.to_string()
         } else {
             format!("{}.{}", initial_tx_sender, contract,)
@@ -659,40 +656,6 @@ impl Session {
 
         Ok((execution, contract_identifier))
     }
-
-    // pub fn build_ast(
-    //     &mut self,
-    //     snippet: &str,
-    //     name: Option<&str>,
-    // ) -> Result<(QualifiedContractIdentifier, ContractAST, Vec<String>), Vec<String>> {
-    //     let (contract_name, is_tx) = match name {
-    //         Some(name) => (name.to_string(), false),
-    //         None => (format!("contract-{}", self.contracts.len()), true),
-    //     };
-    //     let tx_sender = self.interpreter.get_tx_sender().to_address();
-    //     let id = format!("{}.{}", tx_sender, contract_name);
-    //     let contract_identifier = QualifiedContractIdentifier::parse(&id).unwrap();
-
-    //     let (ast, diagnostics, success) = self
-    //         .interpreter
-    //         .build_ast(contract_identifier.clone(), snippet.to_string());
-
-    //     let mut output = Vec::<String>::new();
-    //     let lines = snippet.lines();
-    //     let formatted_lines: Vec<String> = lines.map(|l| l.to_string()).collect();
-    //     for diagnostic in &diagnostics {
-    //         output.append(&mut output_diagnostic(
-    //             &diagnostic,
-    //             &contract_name,
-    //             &formatted_lines,
-    //         ));
-    //     }
-    //     if success {
-    //         Ok((contract_identifier, ast, output))
-    //     } else {
-    //         Err(output)
-    //     }
-    // }
 
     pub fn eval<'a>(
         &'a mut self,

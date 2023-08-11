@@ -84,7 +84,7 @@ impl Ord for Dependency {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct DependencySet {
     pub set: BTreeSet<Dependency>,
 }
