@@ -1,0 +1,17 @@
+{
+  "folders": [{ "path": "../../" }],
+  "settings": {
+    // "rust-analyzer.checkOnSave.command": "clippy -p clarinet-sdk -- --no-deps",
+    // "rust-analyzer.check.command": "check",
+    "rust-analyzer.check.overrideCommand": [
+      "cargo",
+      "clippy",
+      "--no-default-features",
+      "--package=clarinet-sdk",
+      "--features=wasm",
+      "--message-format=json",
+      "--",
+      "--no-deps"
+    ]
+  }
+}

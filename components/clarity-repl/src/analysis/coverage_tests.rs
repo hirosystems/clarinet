@@ -29,7 +29,7 @@ fn get_coverage_report(contract: &str, snippets: Vec<String>) -> (TestCoverageRe
         .insert(contract_id.name.to_string(), "/contract-0.clar".into());
     coverage_reporter.reports.append(&mut vec![report.clone()]);
 
-    let lcov_content = coverage_reporter.build_lcov_file();
+    let lcov_content = coverage_reporter.build_lcov_content();
 
     (report, lcov_content)
 }

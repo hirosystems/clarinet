@@ -935,6 +935,23 @@ dependencies = [
 ]
 
 [[package]]
+name = "clarinet-sdk"
+version = "0.0.1"
+dependencies = [
+ "clarinet-deployments",
+ "clarinet-files",
+ "clarity-repl 1.7.1",
+ "console_error_panic_hook",
+ "js-sys",
+ "serde",
+ "serde-wasm-bindgen",
+ "serde_json",
+ "wasm-bindgen",
+ "wasm-bindgen-futures",
+ "web-sys",
+]
+
+[[package]]
 name = "clarinet-utils"
 version = "1.0.0"
 dependencies = [
