@@ -12,8 +12,7 @@ use clarity_repl::clarity::vm::types::{
 use clarity_repl::clarity::{ClarityName, ClarityVersion, ContractName};
 
 use clarinet_files::chainhook_types::StacksNetwork;
-use serde::{Deserialize, Serialize, Serializer};
-use serde_with::{serde_as, Bytes};
+use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use serde_yaml;
 use std::collections::BTreeMap;
 
@@ -253,10 +252,6 @@ pub enum TransactionSpecification {
     StxTransfer(StxTransferSpecification),
 }
 
-const MEMO_BYTE_COUNT: usize = 34;
-type MemoArr = [u8; MEMO_BYTE_COUNT];
-
-#[serde_as]
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 pub struct StxTransferSpecification {
     #[serde(serialize_with = "standard_principal_data_serializer")]
@@ -264,10 +259,29 @@ pub struct StxTransferSpecification {
     #[serde(serialize_with = "principal_data_serializer")]
     pub recipient: PrincipalData,
     pub mstx_amount: u64,
-    #[serde_as(as = "Bytes")]
-    pub memo: MemoArr,
+    #[serde(
+        serialize_with = "memo_serializer",
+        deserialize_with = "memo_deserializer"
+    )]
+    pub memo: [u8; 34],
     pub cost: u64,
     pub anchor_block_only: bool,
+}
+
+fn memo_serializer<S>(x: &[u8; 34], ser: S) -> Result<S::Ok, S::Error>
+where
+    S: Serializer,
+{
+    let s = String::from_utf8_lossy(x);
+    ser.serialize_str(&s)
+}
+
+fn memo_deserializer<'de, D: Deserializer<'de>>(d: D) -> Result<[u8; 34], D::Error> {
+    let s = String::deserialize(d).unwrap();
+    let bytes = String::as_bytes(&s);
+    let array = <&[u8; 34]>::try_from(bytes).unwrap();
+
+    Ok(*array)
 }
 
 impl StxTransferSpecification {
