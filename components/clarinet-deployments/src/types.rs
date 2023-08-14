@@ -420,13 +420,29 @@ impl ContractCallSpecification {
 pub struct ContractPublishSpecification {
     pub contract_name: ContractName,
     #[serde(serialize_with = "standard_principal_data_serializer")]
+    #[serde(deserialize_with = "standard_principal_deserializer")]
     pub expected_sender: StandardPrincipalData,
+    #[serde(deserialize_with = "file_location_deserializer")]
     pub location: FileLocation,
     #[serde(serialize_with = "source_serializer")]
     pub source: String,
     pub clarity_version: ClarityVersion,
     pub cost: u64,
     pub anchor_block_only: bool,
+}
+
+fn file_location_deserializer<'de, D>(deserializer: D) -> Result<FileLocation, D::Error>
+where D: Deserializer<'de> {
+    let s = String::deserialize(deserializer)?;
+    FileLocation::from_path_string(&s).map_err(serde::de::Error::custom)
+}
+
+fn standard_principal_deserializer<'de, D>(deserializer: D) -> Result<StandardPrincipalData, D::Error>
+where
+D: Deserializer<'de>,
+{
+    let s = String::deserialize(deserializer)?;
+    PrincipalData::parse_standard_principal(&s).map_err(serde::de::Error::custom)
 }
 
 impl ContractPublishSpecification {
