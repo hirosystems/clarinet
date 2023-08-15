@@ -41,7 +41,7 @@ Our `counter` application keeps track of an initialized value, allows for increm
 
 ### Unit tests for `counter` example
 
-When you created your Clarity contract with `$ clarinet contract new <my-project>`, Clarinet automatically created a test file for the contract within the tests directory:  `tests/my-projects_test.ts`. Other files under the `tests/` directory following the Deno test naming convention will also be included:
+When you created your Clarity contract with `clarinet contract new <my-project>`, Clarinet automatically created a test file for the contract within the tests directory:  `tests/my-projects_test.ts`. Other files under the `tests/` directory following the Deno test naming convention will also be included:
 
 - named test.{ts, tsx, mts, js, mjs, jsx, cjs, cts},
 - or ending with .test.{ts, tsx, mts, js, mjs, jsx, cjs, cts},
@@ -51,9 +51,15 @@ Within these tests, developers can simulate mining a block containing transactio
 
 >  **_NOTE:_**
 >
-> If you see an error in Visual Studio Code (VS Code) on the imports in the generated test file(s) that says, "An import path cannot end with a '.ts' extension" (example below), installing the [Deno extension](https://marketplace.visualstudio.com/items?itemName=denoland.vscode-deno) will resolve this error.
+> If you see an error in Visual Studio Code (VS Code) on the imports in the generated test file(s) that says, "An import path cannot end with a '.ts' extension" (example below), follow the below steps to resolve the error:
+![VS Code deno error](../images/deno-error.png) 
+> - Install the [Deno extension](https://marketplace.visualstudio.com/items?itemName=denoland.vscode-deno) in VS Code
+> - [Install Deno](https://deno.land/manual@v1.35.3/getting_started/installation) on your computer
+> - In VS Code, open the command palette (`Ctrl+Shift+P` in `Windows`; `Cmd+Shift+P` on `Mac`) and run the `Deno: Initialize Workspace Configuration` and `Deno: Cache Dependencies` commands
+> - Open Command Prompt (Terminal on a Mac); navigate to the tests folder in your project and run `deno run test-file-name.ts` (Make sure to replace `test-file-name` with the actual name of the test file, `counter_test.ts` in the current example )
+> - Quit and restart VS Code
 
-![VS Code deno error](../images/deno-error.png)
+
 
 Clarinet allows you to instantly initialize wallets and populate them with tokens, which helps to interactively or programmatically test the behavior of the smart contract. Blocks are mined instantly, so you can control the number of blocks that are mined between testing transactions.
 
@@ -84,7 +90,7 @@ Clarinet.test({
 
 We run this test with
 ```zsh
-$ clarinet test
+clarinet test
 ```
 
 For a complete list of classes, objects, and interfaces available, see [Deno's Clarinet module index](https://deno.land/x/clarinet/index.ts).
@@ -168,15 +174,15 @@ Here, variously, we:
 To help developers maximizing their test coverage, Clarinet can produce a `lcov` report, using the following option:
 
 ```bash
-$ clarinet test --coverage
+clarinet test --coverage
 ```
 
 From there, you can use the `lcov` tooling suite to produce HTML reports.
 
 ```bash
-$ brew install lcov
-$ genhtml --branch-coverage -o coverage coverage.lcov
-$ open coverage/index.html
+brew install lcov
+genhtml --branch-coverage -o coverage coverage.lcov
+open coverage/index.html
 ```
 
 ![lcov](../images/lcov.png)
@@ -186,7 +192,7 @@ $ open coverage/index.html
 Clarinet can also be used for optimizing costs. When you execute a test suite, Clarinet keeps track of all costs being computed when executing the `contract-call`, and display the most expensive ones in a table:
 
 ```bash
-$ clarinet test --cost
+clarinet test --cost
 ```
 
 The `--cost` option can be used in conjunction with `--watch` and filters to maximize productivity, as illustrated here:
@@ -199,7 +205,7 @@ The Clarinet console is an interactive Clarity Read, Evaluate, Print, Loop (REPL
 automatically loaded into memory.
 
 ```bash
-$ clarinet console
+clarinet console
 ```
 
 You can use the `::help` command in the console for a list of valid commands, which can control the state of the REPL chain, and let you advance the chain tip. Additionally, you may enter Clarity commands into the console and observe
@@ -216,7 +222,7 @@ You can use Clarinet to deploy your contracts to your own local offline environm
 Use the following command:
 
 ```bash
-$ clarinet integrate
+clarinet integrate
 ```
 
 Make sure that you have a working installation of Docker running locally.
@@ -300,9 +306,9 @@ callee_filter = false
 
 As a next step, we may generate a deployment plan for this project.
 
-If running `$ clarinet integrate` for the first time, this file should be created by Clarinet.
+If running `clarinet integrate` for the first time, this file should be created by Clarinet.
 
-In addition, you may run `$ clarinet deployment generate --devnet` to create or overwrite.
+In addition, you may run `clarinet deployment generate --devnet` to create or overwrite.
 
 ```yaml
 ---

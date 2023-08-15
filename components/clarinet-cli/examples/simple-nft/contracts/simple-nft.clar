@@ -4,7 +4,7 @@
 
 (define-constant ERR_NOT_AUTHORIZED (err u1001))
 
-(impl-trait .sip-009-trait-ft-standard.nft-trait)
+(impl-trait 'SP2PABAF9FTAJYNFZH93XENAJ8FVY99RRM50D2JG9.nft-trait.nft-trait)
 
 (define-data-var lastId uint u0)
 (define-map CFG_BASE_URI bool (string-ascii 256))
@@ -45,7 +45,7 @@
 (define-public (test-mint (recipient principal))
   (let
     ((newId (+ (var-get lastId) u1)))
-    (asserts! (is-eq DEPLOYED_AT u0) ERR_NOT_AUTHORIZED)
+    (asserts! (is-eq DEPLOYED_AT u1) ERR_NOT_AUTHORIZED)
     (var-set lastId newId)
     (nft-mint? nft newId recipient)
   )

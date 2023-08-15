@@ -28,7 +28,7 @@ Clarinet integrate uses Docker to run Bitcoin, Stacks nodes, and other services.
 
 #### **Where can I find the logs for Clarinet Integrate?**
 
-If you're using Docker desktop, you can open the UI and select `stacks-node` container to see its logs. 
+If you're using Docker desktop, you can open the UI and select `stacks-node` container to see its logs.
 
 If you are not using the Docker desktop, use the following command in your terminal:
 

@@ -1,10 +1,4 @@
-import {
-  Clarinet,
-  Tx,
-  Chain,
-  Account,
-  types,
-} from "https://deno.land/x/clarinet@v1.5.4/index.ts";
+import { Clarinet, Tx, Chain, Account, types } from "https://deno.land/x/clarinet@v1.7.1/index.ts";
 import { assertEquals } from "https://deno.land/std@0.191.0/testing/asserts.ts";
 
 Clarinet.test({
@@ -14,24 +8,9 @@ Clarinet.test({
     const wallet_2 = accounts.get("wallet_2")!;
 
     let block = chain.mineBlock([
-      Tx.contractCall(
-        "counter",
-        "increment",
-        [types.uint(1)],
-        wallet_1.address
-      ),
-      Tx.contractCall(
-        "counter",
-        "increment",
-        [types.uint(4)],
-        wallet_1.address
-      ),
-      Tx.contractCall(
-        "counter",
-        "increment",
-        [types.uint(10)],
-        wallet_1.address
-      ),
+      Tx.contractCall("counter", "increment", [types.uint(1)], wallet_1.address),
+      Tx.contractCall("counter", "increment", [types.uint(4)], wallet_1.address),
+      Tx.contractCall("counter", "increment", [types.uint(10)], wallet_1.address),
     ]);
     assertEquals(block.height, 3);
     block.receipts[0].result.expectOk().expectUint(2);
@@ -39,24 +18,9 @@ Clarinet.test({
     block.receipts[2].result.expectOk().expectUint(16);
 
     block = chain.mineBlock([
-      Tx.contractCall(
-        "counter",
-        "increment",
-        [types.uint(1)],
-        wallet_1.address
-      ),
-      Tx.contractCall(
-        "counter",
-        "increment",
-        [types.uint(4)],
-        wallet_1.address
-      ),
-      Tx.contractCall(
-        "counter",
-        "increment",
-        [types.uint(10)],
-        wallet_1.address
-      ),
+      Tx.contractCall("counter", "increment", [types.uint(1)], wallet_1.address),
+      Tx.contractCall("counter", "increment", [types.uint(4)], wallet_1.address),
+      Tx.contractCall("counter", "increment", [types.uint(10)], wallet_1.address),
       Tx.transferSTX(1, wallet_2.address, wallet_1.address),
     ]);
 
@@ -68,12 +32,7 @@ Clarinet.test({
     const result = chain.getAssetsMaps();
     assertEquals(result.assets["STX"][wallet_1.address], 99999999999999);
 
-    const call = chain.callReadOnlyFn(
-      "counter",
-      "read-counter",
-      [],
-      wallet_1.address
-    );
+    const call = chain.callReadOnlyFn("counter", "read-counter", [], wallet_1.address);
     call.result.expectOk().expectUint(31);
 
     "0x0001020304".expectBuff(new Uint8Array([0, 1, 2, 3, 4]));
@@ -92,24 +51,9 @@ Clarinet.test({
     const wallet_1 = accounts.get("wallet_1")!;
 
     const block = chain.mineBlock([
-      Tx.contractCall(
-        "counter",
-        "increment",
-        [types.uint(1)],
-        wallet_1.address
-      ),
-      Tx.contractCall(
-        "counter",
-        "increment",
-        [types.uint(4)],
-        wallet_1.address
-      ),
-      Tx.contractCall(
-        "counter",
-        "increment",
-        [types.uint(10)],
-        wallet_1.address
-      ),
+      Tx.contractCall("counter", "increment", [types.uint(1)], wallet_1.address),
+      Tx.contractCall("counter", "increment", [types.uint(4)], wallet_1.address),
+      Tx.contractCall("counter", "increment", [types.uint(10)], wallet_1.address),
     ]);
     assertEquals(block.height, 103);
     block.receipts[0].result.expectOk().expectUint(2);

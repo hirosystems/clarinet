@@ -24,7 +24,7 @@ You can use the `Devnet.toml` to customize the subnet-node (miner, etc).
 Spin up your subnet node with the command below.
 
 ```bash
-$ clarinet integrate
+clarinet integrate
 ```
 You can find more information on using and interacting with Subnets in the [subnets repository](https://github.com/hirosystems/stacks-subnets).
 

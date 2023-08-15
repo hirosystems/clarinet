@@ -230,9 +230,8 @@ fn test_opening_simple_nft_manifest_should_return_fresh_analysis() {
         panic!("Unable to get response")
     };
 
-    // the counter project should emit 2 warnings and 2 notes coming from counter.clar
-    assert_eq!(response.aggregated_diagnostics.len(), 2);
+    assert_eq!(response.aggregated_diagnostics.len(), 1);
     let (_, diags_0) = &response.aggregated_diagnostics[0];
-    let (_, diags_1) = &response.aggregated_diagnostics[1];
-    assert_eq!(diags_0.len().max(diags_1.len()), 8);
+    // the counter project should emit 4 warnings and 4 notes coming from counter.clar
+    assert_eq!(diags_0.len(), 8);
 }

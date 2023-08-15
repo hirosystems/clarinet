@@ -62,6 +62,7 @@ impl Into<StacksEpochId> for EpochSpec {
     }
 }
 
+#[derive(Debug, Clone)]
 pub struct DeploymentGenerationArtifacts {
     pub asts: BTreeMap<QualifiedContractIdentifier, ContractAST>,
     pub deps: BTreeMap<QualifiedContractIdentifier, DependencySet>,
