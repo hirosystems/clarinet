@@ -55,7 +55,7 @@ pub struct ProjectManifest {
     #[serde(rename = "repl")]
     pub repl_settings: repl::Settings,
     //#[serde(skip_serializing)]
-    pub location: FileLocation,
+    pub location: FileLocation, // TODO: need to verify if it's safe for us to remove this `skip_serialization`
     #[serde(skip_serializing, skip_deserializing)]
     pub contracts_settings: HashMap<FileLocation, ClarityContractMetadata>,
 }
