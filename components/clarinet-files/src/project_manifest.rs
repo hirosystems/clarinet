@@ -6,7 +6,7 @@ use clarity_repl::clarity::ClarityVersion;
 use clarity_repl::repl;
 use clarity_repl::repl::{ClarityCodeSource, ClarityContract, ContractDeployer};
 use serde::ser::SerializeMap;
-use serde::{Serialize, Serializer};
+use serde::{Serialize, Serializer, Deserializer};
 use std::collections::{BTreeMap, HashMap};
 use std::path::PathBuf;
 use std::str::FromStr;
@@ -49,6 +49,7 @@ pub struct ProjectConfigFile {
 pub struct ProjectManifest {
     pub project: ProjectConfig,
     #[serde(serialize_with = "toml::ser::tables_last")]
+    #[serde(deserialize_with = "contracts_deserializer")]
     pub contracts: BTreeMap<String, ClarityContract>,
     #[serde(rename = "repl")]
     pub repl_settings: repl::Settings,
@@ -58,6 +59,44 @@ pub struct ProjectManifest {
     pub contracts_settings: HashMap<FileLocation, ClarityContractMetadata>,
 }
 
+fn contracts_deserializer<'de, D>(des: D) -> Result<BTreeMap<String, ClarityContract>, D::Error>
+where
+  D: Deserializer<'de>,
+{
+    let mut map: BTreeMap<String, ClarityContract> = BTreeMap::new();
+    let container: HashMap<String, HashMap<String, String>> = serde::Deserialize::deserialize(des)?;
+    for (k, v) in container {
+        let clar_version = match v.get("clarity_version") {
+            Some(v) => format!("clarity{}", v),
+            None => String::from("Cannot parse clarity version")
+        };
+
+        let e = v.get("epoch").unwrap().as_str();
+
+        let epoch = match e {
+            "1.0" => StacksEpochId::Epoch10,
+            "2.0" => StacksEpochId::Epoch20,
+            "2.05" => StacksEpochId::Epoch2_05,
+            "2.1" => StacksEpochId::Epoch21,
+            "2.2" => StacksEpochId::Epoch22,
+            "2.3" => StacksEpochId::Epoch23,
+            "2.4" => StacksEpochId::Epoch24,
+            _ => panic!("Failed to parse epoch")
+        };
+
+        let cc = ClarityContract {
+            code_source: ClarityCodeSource::Empty,
+            name: k.clone(),
+            deployer: ContractDeployer::Transient,
+            clarity_version: ClarityVersion::from_str(&clar_version).unwrap(),
+            epoch: epoch
+        };
+
+        map.insert(k, cc);
+    }
+    Ok(map)
+}
+
 #[derive(Deserialize, Debug, Clone)]
 pub struct ProjectConfig {
     pub name: String,
@@ -65,8 +104,19 @@ pub struct ProjectConfig {
     pub description: String,
     pub telemetry: bool,
     pub requirements: Option<Vec<RequirementConfig>>,
+    #[serde(rename = "cache_dir")]
+    #[serde(deserialize_with = "cache_location_deserializer")]
     pub cache_location: FileLocation,
+    #[serde(skip_deserializing)]
     pub boot_contracts: Vec<String>,
+}
+
+fn cache_location_deserializer<'de, D>(des: D) -> Result<FileLocation, D::Error>
+where
+  D: Deserializer<'de>,
+{
+    let container: String = serde::Deserialize::deserialize(des)?;
+    FileLocation::from_path_string(&container).map_err(serde::de::Error::custom)
 }
 
 impl Serialize for ProjectConfig {
