@@ -1,4 +1,4 @@
-use bitcoincore_rpc::jsonrpc::base64::encode;
+use bitcoincore_rpc::jsonrpc::base64::{decode, encode};
 use clarinet_files::FileLocation;
 use clarity_repl::clarity::stacks_common::types::StacksEpochId;
 use clarity_repl::clarity::util::hash::{hex_bytes, to_hex};
@@ -15,6 +15,7 @@ use clarinet_files::chainhook_types::StacksNetwork;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use serde_yaml;
 use std::collections::BTreeMap;
+use std::str::from_utf8;
 
 use clarity_repl::analysis::ast_dependency_detector::DependencySet;
 use clarity_repl::repl::{Session, DEFAULT_CLARITY_VERSION};
@@ -36,7 +37,7 @@ where
 
 fn principal_data_deserializer<'de, D>(deserializer: D) -> Result<PrincipalData, D::Error>
 where
-D: Deserializer<'de>,
+    D: Deserializer<'de>,
 {
     let s = String::deserialize(deserializer)?;
     PrincipalData::parse(&s).map_err(serde::de::Error::custom)
@@ -50,6 +51,25 @@ where
     s.serialize_str(&enc)
 }
 
+fn source_deserializer<'de, D>(deserializer: D) -> Result<String, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let s = String::deserialize(deserializer)?;
+    base64_decode(&s).map_err(serde::de::Error::custom)
+}
+
+fn base64_decode(encoded: &str) -> Result<String, String> {
+    let bytes = decode(&encoded)
+        .map_err(|e| format!("unable to decode contract source: {}", e.to_string()))?;
+    let decoded = from_utf8(&bytes).map_err(|e| {
+        format!(
+            "invalid UTF-8 sequence when decoding contract source: {}",
+            e.to_string()
+        )
+    })?;
+    Ok(decoded.to_owned())
+}
 fn qualified_contract_identifier_serializer<S>(
     x: &QualifiedContractIdentifier,
     s: S,
@@ -436,15 +456,18 @@ pub struct ContractPublishSpecification {
     pub expected_sender: StandardPrincipalData,
     pub location: FileLocation,
     #[serde(serialize_with = "source_serializer")]
+    #[serde(deserialize_with = "source_deserializer")]
     pub source: String,
     pub clarity_version: ClarityVersion,
     pub cost: u64,
     pub anchor_block_only: bool,
 }
 
-fn standard_principal_data_deserializer<'de, D>(deserializer: D) -> Result<StandardPrincipalData, D::Error>
+fn standard_principal_data_deserializer<'de, D>(
+    deserializer: D,
+) -> Result<StandardPrincipalData, D::Error>
 where
-D: Deserializer<'de>,
+    D: Deserializer<'de>,
 {
     let s = String::deserialize(deserializer)?;
     PrincipalData::parse_standard_principal(&s).map_err(serde::de::Error::custom)
@@ -526,15 +549,18 @@ pub struct RequirementPublishSpecification {
     #[serde(with = "remap_principals_serde")]
     pub remap_principals: BTreeMap<StandardPrincipalData, StandardPrincipalData>,
     #[serde(serialize_with = "source_serializer")]
+    #[serde(deserialize_with = "source_deserializer")]
     pub source: String,
     pub clarity_version: ClarityVersion,
     pub cost: u64,
     pub location: FileLocation,
 }
 
-fn qualified_contract_identifier_deserializer<'de, D>(des: D) -> Result<QualifiedContractIdentifier, D::Error>
+fn qualified_contract_identifier_deserializer<'de, D>(
+    des: D,
+) -> Result<QualifiedContractIdentifier, D::Error>
 where
-D: Deserializer<'de>,
+    D: Deserializer<'de>,
 {
     let q: HashMap<String, String> = serde::Deserialize::deserialize(des)?;
     let issuer = q.get("issuer").unwrap();
@@ -546,7 +572,7 @@ D: Deserializer<'de>,
 }
 
 pub mod remap_principals_serde {
-    use clarity_repl::clarity::vm::types::{StandardPrincipalData, PrincipalData};
+    use clarity_repl::clarity::vm::types::{PrincipalData, StandardPrincipalData};
     use serde::{ser::SerializeMap, Deserializer, Serializer};
     use std::collections::{BTreeMap, HashMap};
 
@@ -564,15 +590,19 @@ pub mod remap_principals_serde {
         map.end()
     }
 
-    pub fn deserialize<'de, D>(des: D) -> Result<BTreeMap<StandardPrincipalData, StandardPrincipalData>, D::Error>
+    pub fn deserialize<'de, D>(
+        des: D,
+    ) -> Result<BTreeMap<StandardPrincipalData, StandardPrincipalData>, D::Error>
     where
         D: Deserializer<'de>,
     {
         let container: HashMap<String, String> = serde::Deserialize::deserialize(des)?;
         let mut m = BTreeMap::new();
-        for (k,v) in container {
-            m.insert(PrincipalData::parse_standard_principal(&k).unwrap(), PrincipalData::parse_standard_principal(&v).unwrap());
-
+        for (k, v) in container {
+            m.insert(
+                PrincipalData::parse_standard_principal(&k).unwrap(),
+                PrincipalData::parse_standard_principal(&v).unwrap(),
+            );
         }
         Ok(m)
     }
@@ -811,8 +841,10 @@ pub mod contracts_serde {
     use bitcoincore_rpc::jsonrpc::base64::encode;
     use clarinet_files::FileLocation;
     use clarity_repl::clarity::vm::types::QualifiedContractIdentifier;
-    use serde::{ser::SerializeMap, Deserialize, Deserializer, Serializer};
-    use std::{collections::{BTreeMap, HashMap}, iter::FromIterator, fmt::format, fs::File};
+    use serde::{ser::SerializeMap, Deserializer, Serializer};
+    use std::collections::{BTreeMap, HashMap};
+
+    use super::base64_decode;
 
     pub fn serialize<'ser, S>(
         target: &'ser BTreeMap<QualifiedContractIdentifier, (String, FileLocation)>,
@@ -831,26 +863,32 @@ pub mod contracts_serde {
         map.end()
     }
 
-    pub fn deserialize<'de, D>(des: D) -> Result<BTreeMap<QualifiedContractIdentifier, (String, FileLocation)>, D::Error>
+    pub fn deserialize<'de, D>(
+        des: D,
+    ) -> Result<BTreeMap<QualifiedContractIdentifier, (String, FileLocation)>, D::Error>
     where
         D: Deserializer<'de>,
     {
+        let mut res: BTreeMap<QualifiedContractIdentifier, (String, FileLocation)> =
+            BTreeMap::new();
+        let container: HashMap<String, (String, HashMap<String, String>)> =
+            serde::Deserialize::deserialize(des)?;
 
-        let mut res: BTreeMap<QualifiedContractIdentifier, (String, FileLocation)> = BTreeMap::new();
-        let container: HashMap<String, Vec<(String, HashMap<String, String>)>> = serde::Deserialize::deserialize(des)?;
+        for (qci_str, (src, file_location_map)) in container {
+            let qci = QualifiedContractIdentifier::parse(&qci_str).unwrap();
 
-        for (k, vec) in container {
-            let qc = QualifiedContractIdentifier::parse(&k).unwrap();
-            let t = vec.iter().map(|el|
-                (
-                    el.0.clone(),
-                    FileLocation::from_path_string(el.1).unwrap()
-                )
-            ).collect::<Vec<(_,_)>>();
+            let file_location = if let Some(url) = file_location_map.get("url") {
+                FileLocation::from_url_string(url)
+            } else if let Some(path) = file_location_map.get("path") {
+                FileLocation::from_path_string(path)
+            } else {
+                Err("Invalide file location field. Must have key \"url\" or \"path\"".into())
+            }
+            .map_err(serde::de::Error::custom)?;
 
-            let tu = t.into_iter().next().unwrap();
+            let decoded_src = base64_decode(&src).map_err(serde::de::Error::custom)?;
 
-            res.insert(qc.clone(), tu);
+            res.insert(qci, (decoded_src, file_location));
         }
 
         Ok(res)
@@ -1104,6 +1142,7 @@ impl GenesisSpecification {
 pub struct WalletSpecification {
     pub name: String,
     #[serde(serialize_with = "standard_principal_data_serializer")]
+    #[serde(deserialize_with = "standard_principal_data_deserializer")]
     pub address: StandardPrincipalData,
     pub balance: u128,
 }
