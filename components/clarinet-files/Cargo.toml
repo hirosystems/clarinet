@@ -24,17 +24,12 @@ js-sys = { version = "0.3", optional = true }
 serde-wasm-bindgen = { version = "0.5", optional = true }
 wasm-bindgen = { version = "0.2", optional = true }
 wasm-bindgen-futures = { version = "0.4", optional = true }
+serde_json = "1.0.104"
 
 [features]
 default = ["cli"]
 cli = ["bitcoin", "clarity-repl/cli"]
-wasm = [
-  "js-sys",
-  "serde-wasm-bindgen",
-  "wasm-bindgen",
-  "wasm-bindgen-futures",
-  "clarity-repl/wasm",
-]
+wasm = ["js-sys", "serde-wasm-bindgen", "wasm-bindgen", "wasm-bindgen-futures", "clarity-repl/wasm"]
 
 [lib]
 name = "clarinet_files"
