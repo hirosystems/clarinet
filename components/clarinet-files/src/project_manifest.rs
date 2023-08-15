@@ -6,7 +6,8 @@ use clarity_repl::clarity::ClarityVersion;
 use clarity_repl::repl;
 use clarity_repl::repl::{ClarityCodeSource, ClarityContract, ContractDeployer};
 use serde::ser::SerializeMap;
-use serde::{Serialize, Serializer, Deserializer};
+use serde::{Deserializer, Serialize, Serializer};
+use serde_json::Value as JsonValue;
 use std::collections::{BTreeMap, HashMap};
 use std::path::PathBuf;
 use std::str::FromStr;
@@ -53,46 +54,116 @@ pub struct ProjectManifest {
     pub contracts: BTreeMap<String, ClarityContract>,
     #[serde(rename = "repl")]
     pub repl_settings: repl::Settings,
-    #[serde(skip_serializing)]
+    //#[serde(skip_serializing)]
     pub location: FileLocation,
-    #[serde(skip_serializing)]
+    #[serde(skip_serializing, skip_deserializing)]
     pub contracts_settings: HashMap<FileLocation, ClarityContractMetadata>,
 }
 
 fn contracts_deserializer<'de, D>(des: D) -> Result<BTreeMap<String, ClarityContract>, D::Error>
 where
-  D: Deserializer<'de>,
+    D: Deserializer<'de>,
 {
     let mut map: BTreeMap<String, ClarityContract> = BTreeMap::new();
-    let container: HashMap<String, HashMap<String, String>> = serde::Deserialize::deserialize(des)?;
-    for (k, v) in container {
-        let clar_version = match v.get("clarity_version") {
-            Some(v) => format!("clarity{}", v),
-            None => String::from("Cannot parse clarity version")
+    let container: HashMap<String, HashMap<String, JsonValue>> =
+        serde::Deserialize::deserialize(des)?;
+    for (contract_name, contract_settings) in container {
+        let contract_path = match contract_settings.get("path") {
+            Some(JsonValue::String(path)) => path,
+            _ => continue,
+        };
+        let code_source = match PathBuf::from_str(contract_path) {
+            Ok(path) => ClarityCodeSource::ContractOnDisk(path),
+            Err(e) => {
+                return Err(serde::de::Error::custom(format!(
+                    "unable to parse path {} ({})",
+                    contract_path, e
+                )))
+            }
+        };
+        let deployer = match contract_settings.get("deployer") {
+            Some(JsonValue::String(path)) => ContractDeployer::LabeledDeployer(path.clone()),
+            _ => ContractDeployer::DefaultDeployer,
         };
 
-        let e = v.get("epoch").unwrap().as_str();
-
-        let epoch = match e {
-            "1.0" => StacksEpochId::Epoch10,
-            "2.0" => StacksEpochId::Epoch20,
-            "2.05" => StacksEpochId::Epoch2_05,
-            "2.1" => StacksEpochId::Epoch21,
-            "2.2" => StacksEpochId::Epoch22,
-            "2.3" => StacksEpochId::Epoch23,
-            "2.4" => StacksEpochId::Epoch24,
-            _ => panic!("Failed to parse epoch")
+        let settings_epoch = contract_settings.get("epoch");
+        let epoch = match settings_epoch {
+            None => StacksEpochId::Epoch2_05,
+            Some(JsonValue::String(epoch)) => {
+                if epoch.eq("2.0") {
+                    StacksEpochId::Epoch20
+                } else if epoch.eq("2.05") {
+                    StacksEpochId::Epoch2_05
+                } else if epoch.eq("2.1") {
+                    StacksEpochId::Epoch21
+                } else if epoch.eq("2.2") {
+                    StacksEpochId::Epoch22
+                } else if epoch.eq("2.3") {
+                    StacksEpochId::Epoch23
+                } else if epoch.eq("2.4") {
+                    StacksEpochId::Epoch24
+                } else {
+                    return Err(serde::de::Error::custom(INVALID_EPOCH));
+                }
+            }
+            Some(JsonValue::Number(epoch)) => {
+                let epoch = epoch.as_f64().unwrap();
+                if epoch.eq(&2.0) {
+                    StacksEpochId::Epoch20
+                } else if epoch.eq(&2.05) {
+                    StacksEpochId::Epoch2_05
+                } else if epoch.eq(&2.1) {
+                    StacksEpochId::Epoch21
+                } else if epoch.eq(&2.2) {
+                    StacksEpochId::Epoch22
+                } else if epoch.eq(&2.3) {
+                    StacksEpochId::Epoch23
+                } else if epoch.eq(&2.4) {
+                    StacksEpochId::Epoch24
+                } else {
+                    return Err(serde::de::Error::custom(INVALID_EPOCH));
+                }
+            }
+            _ => {
+                return Err(serde::de::Error::custom(INVALID_EPOCH));
+            }
         };
+
+        let clarity_version = match contract_settings.get("clarity_version") {
+            None => match settings_epoch {
+                None => ClarityVersion::Clarity1,
+                Some(_) => ClarityVersion::default_for_epoch(epoch),
+            },
+            Some(JsonValue::Number(version)) => {
+                let version = version.as_i64().unwrap();
+                if version.eq(&1) {
+                    ClarityVersion::Clarity1
+                } else if version.eq(&2) {
+                    ClarityVersion::Clarity2
+                } else {
+                    return Err(serde::de::Error::custom(INVALID_CLARITY_VERSION));
+                }
+            }
+            _ => {
+                return Err(serde::de::Error::custom(INVALID_CLARITY_VERSION));
+            }
+        };
+
+        if clarity_version > ClarityVersion::default_for_epoch(epoch) {
+            return Err(serde::de::Error::custom(format!(
+                "{clarity_version} can not be used with {epoch}"
+            )));
+        }
 
         let cc = ClarityContract {
-            code_source: ClarityCodeSource::Empty,
-            name: k.clone(),
-            deployer: ContractDeployer::Transient,
-            clarity_version: ClarityVersion::from_str(&clar_version).unwrap(),
-            epoch: epoch
+            code_source: code_source,
+            name: contract_name.clone(),
+            deployer,
+            clarity_version,
+            epoch,
         };
 
-        map.insert(k, cc);
+        map.insert(contract_name, cc);
     }
     Ok(map)
 }
@@ -113,7 +184,7 @@ pub struct ProjectConfig {
 
 fn cache_location_deserializer<'de, D>(des: D) -> Result<FileLocation, D::Error>
 where
-  D: Deserializer<'de>,
+    D: Deserializer<'de>,
 {
     let container: String = serde::Deserialize::deserialize(des)?;
     FileLocation::from_path_string(&container).map_err(serde::de::Error::custom)
