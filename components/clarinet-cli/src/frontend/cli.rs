@@ -165,7 +165,7 @@ enum Chainhooks {
 #[derive(Subcommand, PartialEq, Clone, Debug)]
 #[clap(bin_name = "devnet")]
 enum Devnet {
-    /// Generate packaged deployment plan
+    /// Generate package of all required devnet artifacts
     #[clap(name = "package", bin_name = "package")]
     Package(DevnetPackage),
 }
