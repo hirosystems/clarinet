@@ -1,0 +1,400 @@
+name: CI - Clarinet CLI
+on:
+  pull_request:
+    paths:
+      - "components/clarinet-cli/**"
+      - "components/clarity-repl/**"
+      - "components/clarinet-files/**"
+      - "components/clarity-lsp/**"
+      - "components/clarinet-deployments/**"
+      - "components/hiro-system-kit/**"
+      - "components/clarinet-utils/**"
+      - "components/stacks-network/**"
+  push:
+    paths:
+      - "components/clarinet-cli/**"
+      - "components/clarity-repl/**"
+      - "components/clarinet-files/**"
+      - "components/clarity-lsp/**"
+      - "components/clarinet-deployments/**"
+      - "components/hiro-system-kit/**"
+      - "components/clarinet-utils/**"
+      - "components/stacks-network/**"
+    branches:
+      - main
+      - develop
+      - rc/next
+  workflow_dispatch:
+
+### THIS MUST BE SCOPED TO THE CORRECT COMPONENT ###
+env:
+  COMPONENT: clarinet-cli
+  COMPONENT_DIR: components/clarinet-cli
+  COMPONENT_CARGO_LOCK_FILE: ./Cargo.lock
+
+defaults:
+  run:
+    shell: bash
+    # For other components, this should match the COMPONENT_DIR above. This is "." since clarinet-cli is the default workspace member
+    working-directory: "."
+#######################################################
+
+# Cancel previous runs for the same workflow
+concurrency:
+  group: "${{ github.workflow }} @ ${{ github.event.pull_request.head.label || github.head_ref || github.ref }}"
+  cancel-in-progress: true
+
+jobs:
+  get_release_info:
+    name: Get Release Info
+    runs-on: ubuntu-latest
+    outputs:
+      tag: ${{ steps.new_release_tag.outputs.TAG }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - name: Get latest release
+        uses: cardinalby/git-get-release-action@v1
+        id: release
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        with:
+          prerelease: false
+          draft: false
+          doNotFailIfNotFound: true
+          releaseNameRegEx: "${{ env.COMPONENT }}-.*"
+          searchLimit: 1
+
+      - name: Determine if release build
+        if: startsWith(github.ref, 'refs/heads/main')
+        id: new_release_tag
+        env:
+          LATEST_RELEASE: ${{ steps.release.outputs.name }}
+        run: |
+          CARGO_VERSION=${COMPONENT}-v$(grep "version" ${COMPONENT_DIR}/Cargo.toml | head -n 1 | cut -d\" -f2)
+          if [[ "${CARGO_VERSION}" != "${LATEST_RELEASE}" ]]; then
+            echo "::set-output name=TAG::${CARGO_VERSION}"
+            echo "::warning::Will create release for version: ${CARGO_VERSION}"
+          else
+            echo "::warning::Will not create a release"
+          fi
+
+  test_coverage_cargo:
+    name: Generate test coverage
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Install Rust toolchain
+        run: |
+          rustup set profile minimal
+          rustup toolchain install stable --component llvm-tools-preview
+          rustup override set stable
+
+      - name: Cache cargo
+        id: cache-cargo
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            target/
+          key: ${{ runner.os }}-cargo-grcov-${{ env.COMPONENT }}-${{ hashFiles(env.COMPONENT_CARGO_LOCK_FILE) }}
+
+      - name: Install dependencies
+        if: steps.cache-cargo.outputs.cache-hit != 'true'
+        run: RUSTC_BOOTSTRAP=1 cargo install grcov
+
+      - name: Build & Unit Test
+        env:
+          RUSTFLAGS: "-C instrument-coverage"
+          LLVM_PROFILE_FILE: "${{ env.COMPONENT }}-%p-%m.profraw"
+        run: cargo build && cargo test
+
+      - name: Generate coverage
+        run: grcov . --binary-path target/debug/ -s . -t lcov --branch --ignore-not-existing --ignore "/*" -o lcov.info
+
+        # Run functional tests here in addition to the other jobs so we can fail fast
+        # Since these tests are reached much earlier in the pipeline
+      - name: Functional Tests
+        run: |
+          for testdir in $(ls examples); do
+            target/debug/clarinet test --manifest-path examples/${testdir}/Clarinet.toml
+          done
+
+      - name: Upload coverage report
+        uses: codecov/codecov-action@v3
+        with:
+          flags: unittests
+          name: ${{ env.COMPONENT }}
+          verbose: true
+
+  matrix_prep:
+    name: Prepare Dist and Docker Matrices
+    runs-on: ubuntu-latest
+    outputs:
+      dist_matrix: ${{ steps.set-matrix.outputs.dist_matrix }}
+      docker_matrix: ${{ steps.set-matrix.outputs.docker_matrix }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+      - name: Determine dist build matrix
+        id: set-matrix
+        run: |
+          branchName=$(echo '${{ github.ref_name }}')
+          dist_matrix=$(jq --arg branchName "$branchName" 'map(. | select((.runOn | contains($branchName)) or (.runOn=="always")))' .github/workflows/config/ci_clarinet_cli_dist_matrix.json)                
+          docker_matrix=$(jq --arg branchName "$branchName" 'map(. | select((.runOn | contains($branchName)) or (.runOn=="always")))' .github/workflows/config/ci_clarinet_cli_docker_matrix.json)                
+          echo "dist_matrix={\"include\":$(echo $dist_matrix)}" >> $GITHUB_OUTPUT
+          echo "docker_matrix={\"include\":$(echo $docker_matrix)}" >> $GITHUB_OUTPUT
+
+  dist_clarinet:
+    name: Build Clarinet Distributions
+    needs: matrix_prep
+    runs-on: ${{ matrix.os }}
+    # Related upstream issue:
+    # https://github.com/nagisa/rust_libloading/issues/61#issuecomment-607941377
+    #
+    # env:
+    #  CC: deny_c
+
+    strategy:
+      fail-fast: false
+      matrix: ${{fromJson(needs.matrix_prep.outputs.dist_matrix)}}
+
+    steps:
+      - name: Configure git to use LF (Windows)
+        if: matrix.os == 'windows-latest'
+        run: |
+          git config --global core.autocrlf false
+          git config --global core.eol lf
+
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Install Rust toolchain
+        run: |
+          rustup set profile minimal
+          rustup toolchain install stable --component llvm-tools-preview
+          rustup override set stable
+          rustup target add --toolchain stable ${{ matrix.target }}
+
+      - name: Cache cargo
+        id: cache-cargo
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            target/
+          key: ${{ runner.os }}-cargo-dist-${{ env.COMPONENT }}-${{ hashFiles(env.COMPONENT_CARGO_LOCK_FILE) }}
+
+      - name: Install wix (Windows)
+        if: matrix.os == 'windows-latest' && steps.cache-cargo.outputs.cache-hit != 'true'
+        run: cargo install cargo-wix
+
+      # Set environment variables required from cross compiling from macos-x86_64 to macos-arm64
+      - name: Configure macos-arm64 cross compile config
+        if: matrix.target == 'aarch64-apple-darwin'
+        run: |
+          echo "SDKROOT=$(xcrun -sdk macosx --show-sdk-path)" >> $GITHUB_ENV
+          echo "MACOSX_DEPLOYMENT_TARGET=$(xcrun -sdk macosx --show-sdk-platform-version)" >> $GITHUB_ENV
+
+      - name: Configure artifact names (libc)
+        if: ${{ matrix.libc }}
+        run: |
+          echo "SHORT_TARGET_NAME=${{ matrix.platform }}-${{ matrix.architecture }}-${{ matrix.libc }}" >> $GITHUB_ENV
+          echo "PRE_GYP_TARGET_NAME=${{ matrix.platform }}-${{ matrix.architecture }}-${{ matrix.libc }}" >> $GITHUB_ENV
+
+      - name: Configure artifact names (not libc)
+        if: ${{ ! matrix.libc }}
+        run: |
+          echo "SHORT_TARGET_NAME=${{ matrix.platform }}-${{ matrix.architecture }}" >> $GITHUB_ENV
+          echo "PRE_GYP_TARGET_NAME=${{ matrix.platform }}-${{ matrix.architecture }}-unknown" >> $GITHUB_ENV
+
+      - name: Build - Cargo
+        run: cargo build --release --features=telemetry --locked --target ${{ matrix.target }}
+
+      - name: Code sign bin (Windows)
+        if: startsWith(github.ref, 'refs/heads/main') && matrix.os == 'windows-latest'
+        shell: pwsh
+        run: |
+          $certificate_file_name = "${env:TEMP}\certificate.pfx"
+
+          $bytes_cert = [Convert]::FromBase64String('${{ secrets.WINDOWS_CODE_SIGNING_CERTIFICATE }}')
+          [IO.File]::WriteAllBytes(${certificate_file_name}, ${bytes_cert})
+
+          $signtool_path = ((Resolve-Path -Path "${env:ProgramFiles(x86)}/Windows Kits/10/bin/10*/x86").Path[-1]) + "/signtool.exe"
+          $bin_path = (Resolve-Path -Path "target/${{ matrix.target }}/release/clarinet.exe").Path
+          & ${signtool_path} sign `
+            /d "Clarinet is a clarity runtime packaged as a command line tool, designed to facilitate smart contract understanding, development, testing and deployment." `
+            /du "https://github.com/hirosystems/clarinet" `
+            /tr http://timestamp.digicert.com `
+            /td sha256 `
+            /fd sha256 `
+            -f "${certificate_file_name}" `
+            -p "${{ secrets.WINDOWS_CODE_SIGNING_PASSWORD }}" `
+            "${bin_path}"
+
+      - name: Build Installer (Windows)
+        if: matrix.os == 'windows-latest'
+        run: cargo wix -v --no-build --nocapture -p clarinet-cli
+
+      - name: Code sign installer (Windows)
+        if: startsWith(github.ref, 'refs/heads/main') && matrix.os == 'windows-latest'
+        shell: pwsh
+        run: |
+          $certificate_file_name = "${env:TEMP}\certificate.pfx"
+
+          $bytes_cert = [Convert]::FromBase64String('${{ secrets.WINDOWS_CODE_SIGNING_CERTIFICATE }}')
+          [IO.File]::WriteAllBytes(${certificate_file_name}, ${bytes_cert})
+
+          $signtool_path = ((Resolve-Path -Path "${env:ProgramFiles(x86)}/Windows Kits/10/bin/10*/x86").Path[-1]) + "/signtool.exe"
+          $msi_path = (Resolve-Path -Path "target/wix/*.msi").Path
+          & ${signtool_path} sign `
+            /d "Clarinet is a clarity runtime packaged as a command line tool, designed to facilitate smart contract understanding, development, testing and deployment." `
+            /du "https://github.com/hirosystems/clarinet" `
+            /tr http://timestamp.digicert.com `
+            /td sha256 `
+            /fd sha256 `
+            -f "${certificate_file_name}" `
+            -p "${{ secrets.WINDOWS_CODE_SIGNING_PASSWORD }}" `
+            "${msi_path}"
+
+      # Don't compress for Windows because winget can't yet unzip files
+      - name: Compress cargo artifact (Linux)
+        if: matrix.os != 'windows-latest'
+        run: tar -C target/${{ matrix.target }}/release -zcvf clarinet-${{ env.SHORT_TARGET_NAME }}.tar.gz clarinet
+
+      - name: Rename cargo artifact (Windows)
+        if: matrix.os == 'windows-latest'
+        run: mv target/wix/*.msi clarinet-${{ env.SHORT_TARGET_NAME }}.msi
+
+      # Separate uploads to prevent paths from being preserved
+      - name: Upload cargo artifacts (Linux)
+        if: matrix.os != 'windows-latest'
+        uses: actions/upload-artifact@v3
+        with:
+          name: clarinet-${{ env.SHORT_TARGET_NAME }}
+          path: clarinet-${{ env.SHORT_TARGET_NAME }}.tar.gz
+
+      - name: Upload cargo artifact (Windows)
+        if: matrix.os == 'windows-latest'
+        uses: actions/upload-artifact@v3
+        with:
+          name: clarinet-${{ env.SHORT_TARGET_NAME }}
+          path: clarinet-${{ env.SHORT_TARGET_NAME }}.msi
+
+      - name: Unit Tests - Cargo
+        # can't easily run mac-arm64 tests in GH without native runners for that arch
+        # and we already ran tests on x86_64-unknown-linux-gnu in the Code Coverage job, so skip
+        if: matrix.target != 'aarch64-apple-darwin' && matrix.target != 'x86_64-unknown-linux-gnu'
+        run: cargo test --release --locked --target ${{ matrix.target }}
+
+      - name: Functional Tests (Linux)
+        # can't easily run mac-arm64 tests in GH without native runners for that arch
+        if: matrix.target != 'aarch64-apple-darwin'
+        run: |
+          for testdir in $(ls examples); do
+            target/${{ matrix.target }}/release/clarinet test --manifest-path examples/${testdir}/Clarinet.toml
+          done
+
+  docker_images:
+    name: Create Clarinet Docker Image
+    runs-on: ubuntu-latest
+    needs:
+      - get_release_info
+      - dist_clarinet
+      - matrix_prep
+    outputs:
+      version: ${{ steps.docker_meta.outputs.version }}
+    strategy:
+      fail-fast: false
+      matrix: ${{fromJson(needs.matrix_prep.outputs.docker_matrix)}}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - name: Set up QEMU
+        if: matrix.platform == 'linux/arm64'
+        uses: docker/setup-qemu-action@v2
+
+      - name: Set up Docker Buildx
+        if: matrix.platform == 'linux/arm64'
+        uses: docker/setup-buildx-action@v2
+
+      - name: Generate Docker tags/labels
+        id: docker_meta
+        uses: docker/metadata-action@v4
+        with:
+          images: ${{ github.repository }}
+          tags: |
+            type=ref,event=branch
+            type=ref,event=pr
+            type=semver,pattern={{version}},value=${{ needs.get_release_info.outputs.tag }},enable=${{ needs.get_release_info.outputs.tag != '' }}
+            type=semver,pattern={{major}}.{{minor}},value=${{ needs.get_release_info.outputs.tag }},enable=${{ needs.get_release_info.outputs.tag != '' }}
+          labels: |
+            org.opencontainers.image.title=Clarinet
+            org.opencontainers.image.description=Clarinet is a simple, modern and opinionated runtime for testing, integrating and deploying Clarity smart contracts.
+
+      - name: Login to Dockerhub
+        uses: docker/login-action@v2
+        if: github.event_name != 'pull_request'
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_PASSWORD }}
+
+      - name: Download pre-built dist
+        uses: actions/download-artifact@v3
+        with:
+          name: ${{ matrix.artifact }}
+
+      - name: Untar pre-built dist
+        run: tar zxvf *.tar.gz
+
+      - name: Create Image
+        uses: docker/build-push-action@v4
+        with:
+          context: .
+          platforms: ${{ matrix.platform }}
+          file: dockerfiles/components/clarinet.dockerfile
+          push: ${{ github.event_name != 'pull_request' }}
+          tags: ${{ steps.docker_meta.outputs.tags }}
+          labels: ${{ steps.docker_meta.outputs.labels }}
+
+  release:
+    name: Release
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/heads/main') && needs.get_release_info.outputs.tag != ''
+    needs:
+      - get_release_info
+      - test_coverage_cargo
+      - docker_images
+    permissions:
+      actions: write
+      contents: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - name: Download pre-built dists
+        uses: actions/download-artifact@v3
+
+      - name: Tag and Release
+        uses: ncipollo/release-action@v1
+        with:
+          artifacts: "**/*.tar.gz,**/*.msi"
+          tag: ${{ needs.get_release_info.outputs.tag }}
+          commit: ${{ github.sha }}
+
+      - name: Trigger pkg-version-bump workflow
+        uses: peter-evans/repository-dispatch@v2
+        with:
+          token: ${{ github.token }}
+          event-type: released
+          client-payload: '{"tag": "${{ needs.get_release_info.outputs.tag }}"}'
