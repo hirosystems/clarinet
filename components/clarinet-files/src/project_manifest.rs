@@ -65,13 +65,16 @@ where
     D: Deserializer<'de>,
 {
     let mut map: BTreeMap<String, ClarityContract> = BTreeMap::new();
+
     let container: HashMap<String, HashMap<String, JsonValue>> =
         serde::Deserialize::deserialize(des)?;
+
     for (contract_name, contract_settings) in container {
         let contract_path = match contract_settings.get("path") {
             Some(JsonValue::String(path)) => path,
             _ => continue,
         };
+
         let code_source = match PathBuf::from_str(contract_path) {
             Ok(path) => ClarityCodeSource::ContractOnDisk(path),
             Err(e) => {
@@ -81,12 +84,14 @@ where
                 )))
             }
         };
+
         let deployer = match contract_settings.get("deployer") {
             Some(JsonValue::String(path)) => ContractDeployer::LabeledDeployer(path.clone()),
             _ => ContractDeployer::DefaultDeployer,
         };
 
         let settings_epoch = contract_settings.get("epoch");
+
         let epoch = match settings_epoch {
             None => StacksEpochId::Epoch2_05,
             Some(JsonValue::String(epoch)) => {
@@ -156,7 +161,7 @@ where
         }
 
         let cc = ClarityContract {
-            code_source: code_source,
+            code_source,
             name: contract_name.clone(),
             deployer,
             clarity_version,
