@@ -598,7 +598,7 @@ jobs:
             description: Clarinet is a simple, modern and opinionated runtime for testing, integrating and deploying Clarity smart contracts.
             image: ${{ github.repository }}
             artifact: clarinet-linux-x64-glibc
-            dockerfile: dockerfiles/components/clarinet.dockerfile
+            dockerfile: dockerfiles/components/clarinet-dev.dockerfile
     steps:
       - name: Checkout
         uses: actions/checkout@v3
