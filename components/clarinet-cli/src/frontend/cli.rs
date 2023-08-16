@@ -172,7 +172,7 @@ enum Devnet {
 
 #[derive(Parser, PartialEq, Clone, Debug)]
 struct DevnetPackage {
-    /// Path to Clarinet.toml
+    /// Output json file name
     #[clap(long = "name", short = 'n')]
     pub package_file_name: Option<String>,
     #[clap(long = "manifest-path", short = 'm')]
