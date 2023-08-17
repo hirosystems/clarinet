@@ -241,7 +241,7 @@ pub mod principal_data_serde {
     where
         D: Deserializer<'de>,
     {
-        let s = String::deserialize(deserializer)?;
+        let s = String::deserialize(deserializer).map_err(serde::de::Error::custom)?;
         PrincipalData::parse(&s).map_err(serde::de::Error::custom)
     }
 }
@@ -258,9 +258,9 @@ pub mod memo_serde {
     }
 
     pub fn deserialize<'de, D: Deserializer<'de>>(d: D) -> Result<[u8; 34], D::Error> {
-        let s = String::deserialize(d).unwrap();
+        let s = String::deserialize(d).map_err(serde::de::Error::custom)?;
         let bytes = String::as_bytes(&s);
-        let array = <&[u8; 34]>::try_from(bytes).unwrap();
+        let array = <&[u8; 34]>::try_from(bytes).map_err(serde::de::Error::custom)?;
 
         Ok(*array)
     }
@@ -565,9 +565,17 @@ pub mod qualified_contract_identifier_serde {
     where
         D: Deserializer<'de>,
     {
-        let q: HashMap<String, String> = serde::Deserialize::deserialize(des)?;
-        let issuer = q.get("issuer").unwrap();
-        let name = q.get("name").unwrap();
+        let qc: HashMap<String, String> = serde::Deserialize::deserialize(des)?;
+        let issuer = qc.get("issuer").ok_or("'issuer' not found").map_err(|e| {
+            serde::de::Error::custom(format!(
+                "qualified contract identifier deserialization: {e}"
+            ))
+        })?;
+        let name = qc.get("name").ok_or("'name' not found").map_err(|e| {
+            serde::de::Error::custom(format!(
+                "qualified contract identifier deserialization: {e}"
+            ))
+        })?;
 
         let literal = format!("{}.{}", issuer, name);
 
@@ -604,8 +612,8 @@ pub mod remap_principals_serde {
         let mut m = BTreeMap::new();
         for (k, v) in container {
             m.insert(
-                PrincipalData::parse_standard_principal(&k).unwrap(),
-                PrincipalData::parse_standard_principal(&v).unwrap(),
+                PrincipalData::parse_standard_principal(&k).map_err(serde::de::Error::custom)?,
+                PrincipalData::parse_standard_principal(&v).map_err(serde::de::Error::custom)?,
             );
         }
         Ok(m)
