@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 use std::fs::File;
-use std::io::{self, Write};
+use std::io::{self, ErrorKind, Write};
 use std::process;
 
 use clarinet_deployments::get_default_deployment_path;
@@ -43,17 +43,17 @@ fn pack_to_stdout(package: ConfigurationPackage) {
 }
 
 pub fn pack(file_name: Option<String>, project_manifest: ProjectManifest) -> Result<(), io::Error> {
-    let deployment_path =
-        get_default_deployment_path(&project_manifest, &StacksNetwork::Devnet).unwrap();
+    let deployment_path = get_default_deployment_path(&project_manifest, &StacksNetwork::Devnet)
+        .map_err(|e| io::Error::new(ErrorKind::Other, e))?;
 
     let deployment_manifest = DeploymentSpecification::from_config_file(
         &deployment_path,
         &project_manifest
             .location
             .get_project_root_location()
-            .unwrap(),
+            .map_err(|e| io::Error::new(ErrorKind::Other, e))?,
     )
-    .unwrap();
+    .map_err(|e| io::Error::new(ErrorKind::Other, e))?;
 
     let network_manifest = NetworkManifest::from_project_manifest_location(
         &project_manifest.location,
@@ -61,7 +61,7 @@ pub fn pack(file_name: Option<String>, project_manifest: ProjectManifest) -> Res
         None,
         None,
     )
-    .unwrap();
+    .map_err(|e| io::Error::new(ErrorKind::Other, e))?;
 
     let package = ConfigurationPackage {
         deployment_plan: deployment_manifest,
