@@ -56,6 +56,7 @@ pub struct DevnetEventObserverConfig {
     pub manifest: ProjectManifest,
     pub deployment_fee_rate: u64,
     pub services_map_hosts: ServicesMapHosts,
+    pub network_manifest: NetworkManifest,
 }
 
 impl DevnetEventObserverConfig {
@@ -91,20 +92,23 @@ impl DevnetEventObserverConfig {
     pub fn new(
         devnet_config: DevnetConfig,
         manifest: ProjectManifest,
+        network_manifest: Option<NetworkManifest>,
         deployment: DeploymentSpecification,
         chainhooks: ChainhookConfig,
         ctx: &Context,
         services_map_hosts: ServicesMapHosts,
     ) -> Self {
         ctx.try_log(|logger| slog::info!(logger, "Checking contracts"));
-        let network_manifest = NetworkManifest::from_project_manifest_location(
-            &manifest.location,
-            &StacksNetwork::Devnet.get_networks(),
-            Some(&manifest.project.cache_location),
-            None,
-        )
-        .expect("unable to load network manifest");
-
+        let network_manifest = match network_manifest {
+            Some(n) => n,
+            None => NetworkManifest::from_project_manifest_location(
+                &manifest.location,
+                &StacksNetwork::Devnet.get_networks(),
+                Some(&manifest.project.cache_location),
+                None,
+            )
+            .expect("unable to load network manifest"),
+        };
         let event_observer_config = EventObserverConfig {
             bitcoin_rpc_proxy_enabled: true,
             event_handlers: vec![],
@@ -124,11 +128,16 @@ impl DevnetEventObserverConfig {
         DevnetEventObserverConfig {
             devnet_config,
             event_observer_config,
-            accounts: network_manifest.accounts.into_values().collect::<Vec<_>>(),
+            accounts: network_manifest
+                .accounts
+                .clone()
+                .into_values()
+                .collect::<Vec<_>>(),
             manifest,
             deployment,
             deployment_fee_rate: network_manifest.network.deployment_fee_rate,
             services_map_hosts,
+            network_manifest,
         }
     }
 }
@@ -156,7 +165,7 @@ pub async fn start_chains_coordinator(
     // This thread becomes dormant once the encoding is done, and proceed to the actual deployment once
     // the event DeploymentCommand::Start is received.
     perform_protocol_deployment(
-        &config.manifest,
+        &config.network_manifest,
         &config.deployment,
         deployment_events_tx,
         deployments_command_rx,
@@ -455,19 +464,18 @@ pub async fn start_chains_coordinator(
 }
 
 pub fn perform_protocol_deployment(
-    manifest: &ProjectManifest,
+    network_manifest: &NetworkManifest,
     deployment: &DeploymentSpecification,
     deployment_event_tx: Sender<DeploymentEvent>,
     deployment_command_rx: Receiver<DeploymentCommand>,
     override_bitcoin_rpc_url: Option<String>,
     override_stacks_rpc_url: Option<String>,
 ) {
-    let manifest = manifest.clone();
     let deployment = deployment.clone();
-
+    let network_manifest = network_manifest.clone();
     let _ = hiro_system_kit::thread_named("Deployment execution").spawn(move || {
         apply_on_chain_deployment(
-            &manifest,
+            network_manifest,
             deployment,
             deployment_event_tx,
             deployment_command_rx,

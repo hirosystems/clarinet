@@ -14,6 +14,7 @@ pub use chainhook_sdk::observer::MempoolAdmissionData;
 pub use chainhook_sdk::{self, utils::Context};
 pub use chainhooks::{check_chainhooks, load_chainhooks, parse_chainhook_full_specification};
 use chains_coordinator::BitcoinMiningCommand;
+use clarinet_files::NetworkManifest;
 pub use event::DevnetEvent;
 pub use log::{LogData, LogLevel};
 pub use orchestrator::DevnetOrchestrator;
@@ -62,6 +63,7 @@ async fn do_run_devnet(
     orchestrator_terminated_rx: Option<Receiver<bool>>,
     ip_address_setup: ServicesMapHosts,
     start_local_devnet_services: bool,
+    network_manifest: Option<NetworkManifest>,
 ) -> Result<
     (
         Option<mpsc::Receiver<DevnetEvent>>,
@@ -109,11 +111,13 @@ async fn do_run_devnet(
     let config = DevnetEventObserverConfig::new(
         devnet_config.clone(),
         devnet.manifest.clone(),
+        network_manifest,
         deployment,
         hooks,
         &ctx,
         ip_address_setup,
     );
+
     let chains_coordinator_tx = devnet_events_tx.clone();
     let (chains_coordinator_commands_tx, chains_coordinator_commands_rx) =
         crossbeam_channel::unbounded();
@@ -264,6 +268,7 @@ pub async fn do_run_chain_coordinator(
     ctx: Context,
     orchestrator_terminated_tx: Sender<bool>,
     namespace: &str,
+    network_manifest: NetworkManifest,
 ) -> Result<
     (
         Option<mpsc::Receiver<DevnetEvent>>,
@@ -284,6 +289,7 @@ pub async fn do_run_chain_coordinator(
         None,
         ip_address_setup,
         false,
+        Some(network_manifest),
     )
     .await
 }
@@ -317,6 +323,7 @@ pub async fn do_run_local_devnet(
         orchestrator_terminated_rx,
         ip_address_setup,
         true,
+        None,
     )
     .await
 }

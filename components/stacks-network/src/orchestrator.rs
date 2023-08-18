@@ -70,16 +70,19 @@ pub struct ServicesMapHosts {
 impl DevnetOrchestrator {
     pub fn new(
         manifest: ProjectManifest,
+        network_manifest: Option<NetworkManifest>,
         devnet_override: Option<DevnetConfigFile>,
         should_use_docker: bool,
     ) -> Result<DevnetOrchestrator, String> {
-        let mut network_config = NetworkManifest::from_project_manifest_location(
-            &manifest.location,
-            &StacksNetwork::Devnet.get_networks(),
-            Some(&manifest.project.cache_location),
-            devnet_override,
-        )?;
-
+        let mut network_config = match network_manifest {
+            Some(n) => Ok(n),
+            None => NetworkManifest::from_project_manifest_location(
+                &manifest.location,
+                &StacksNetwork::Devnet.get_networks(),
+                Some(&manifest.project.cache_location),
+                devnet_override,
+            ),
+        }?;
         if let Some(ref mut devnet) = network_config.devnet {
             let working_dir = PathBuf::from(&devnet.working_dir);
             let devnet_path = if working_dir.is_absolute() {
