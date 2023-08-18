@@ -54,10 +54,16 @@ pub struct ProjectManifest {
     pub contracts: BTreeMap<String, ClarityContract>,
     #[serde(rename = "repl")]
     pub repl_settings: repl::Settings,
-    //#[serde(skip_serializing)]
-    pub location: FileLocation, // TODO: need to verify if it's safe for us to remove this `skip_serialization`
+    #[serde(skip_serializing)]
+    #[serde(default = "default_location")]
+    pub location: FileLocation,
     #[serde(skip_serializing, skip_deserializing)]
     pub contracts_settings: HashMap<FileLocation, ClarityContractMetadata>,
+}
+
+fn default_location() -> FileLocation {
+    let path = PathBuf::from_str("/tmp").expect("Unable to create a default location");
+    FileLocation::from_path(path)
 }
 
 fn contracts_deserializer<'de, D>(des: D) -> Result<BTreeMap<String, ClarityContract>, D::Error>
