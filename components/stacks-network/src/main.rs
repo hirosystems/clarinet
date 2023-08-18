@@ -1,8 +1,7 @@
 use chainhook_sdk::chainhook_types::{BitcoinNetwork, StacksNetwork};
-use clarinet_deployments::types::DeploymentSpecification;
 
 use clap::Parser;
-use clarinet_files::{FileLocation, ProjectManifest};
+use clarinet_files::{FileLocation, NetworkManifest, ProjectManifest};
 use hiro_system_kit::slog;
 
 use std::path::PathBuf;
@@ -20,6 +19,9 @@ struct Args {
     /// Path of the project manifest to load
     #[clap(short, long)]
     manifest_path: Option<String>,
+    /// Path of the network manifest to load
+    #[clap(short, long)]
+    network_manifest_path: Option<String>,
     /// Path of the deployment plan
     #[clap(short, long)]
     deployment_plan_path: Option<String>,
@@ -31,14 +33,32 @@ struct Args {
 fn main() {
     let args = Args::parse();
     let manifest_location = get_config_location_from_path_or_exit(&args.manifest_path);
+    let network_manifest_path = get_config_location_from_path_or_exit(&args.network_manifest_path);
     let deployment_location = get_config_location_from_path_or_exit(&args.deployment_plan_path);
-    let project_location = get_config_location_from_path_or_exit(&args.project_root_path);
 
-    let manifest = ProjectManifest::from_location(&manifest_location).unwrap();
-    let orchestrator = DevnetOrchestrator::new(manifest, None, false).unwrap();
+    let project_manifest_file_content = manifest_location
+        .read_content()
+        .unwrap_or_else(|e| panic!("failed to read manifest data {:?}", e));
 
-    let deployment =
-        DeploymentSpecification::from_config_file(&deployment_location, &project_location).unwrap();
+    let manifest: ProjectManifest = serde_yaml::from_slice(&project_manifest_file_content[..])
+        .unwrap_or_else(|e| panic!("Clarinet.toml file malformatted {:?}", e));
+
+    let network_manifest_file_content = network_manifest_path
+        .read_content()
+        .unwrap_or_else(|e| panic!("failed to read network manifest data {:?}", e));
+
+    let network_manifest: NetworkManifest =
+        serde_yaml::from_slice(&network_manifest_file_content[..])
+            .unwrap_or_else(|e| panic!("Devnet.toml file malformatted {:?}", e));
+
+    let orchestrator =
+        DevnetOrchestrator::new(manifest, Some(network_manifest.clone()), None, false).unwrap();
+
+    let deployment_specification_file_content = deployment_location
+        .read_content()
+        .unwrap_or_else(|e| panic!("failed to read manifest data {:?}", e));
+    let deployment = serde_yaml::from_slice(&deployment_specification_file_content)
+        .unwrap_or_else(|e| panic!("deployment plan malformatted {:?}", e));
 
     let chainhooks = match load_chainhooks(
         &manifest_location,
@@ -67,6 +87,7 @@ fn main() {
         ctx,
         orchestrator_terminated_tx,
         &args.namespace,
+        network_manifest,
     ));
     println!("{:?}", res.unwrap());
 }
