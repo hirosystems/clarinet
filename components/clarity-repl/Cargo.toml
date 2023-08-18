@@ -35,6 +35,8 @@ rand = "=0.7.3"
 getrandom = { version = "0.2.3", features = ["js"] }
 atty = "0.2.14"
 clarity-vm = { version = "2", default-features = false, optional = true }
+clar2wasm = { path = "../../../clarity-wasm/clar2wasm" }
+wasmtime = "11.0.1"
 
 # DAP Debugger
 tokio = { version = "1.24", features = ["full"], optional = true }

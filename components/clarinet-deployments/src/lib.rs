@@ -1,3 +1,5 @@
+use clarity_repl::clar2wasm;
+use clarity_repl::clarity::costs::LimitedCostTracker;
 use clarity_repl::clarity::stacks_common::types::StacksEpochId;
 use clarity_repl::repl::{ClarityCodeSource, ClarityContract, ContractDeployer};
 use clarity_repl::repl::{DEFAULT_CLARITY_VERSION, DEFAULT_EPOCH};
@@ -297,7 +299,7 @@ pub async fn generate_default_deployment(
     let mut settings = SessionSettings::default();
     settings.repl_settings = manifest.repl_settings.clone();
 
-    let session = Session::new(settings.clone());
+    let mut session = Session::new(settings.clone());
 
     let boot_contracts_data = BOOT_CONTRACTS_DATA.clone();
     let mut boot_contracts_ids = BTreeSet::new();
@@ -563,6 +565,8 @@ pub async fn generate_default_deployment(
         }
     };
 
+    let mut wasm_modules = HashMap::new();
+
     for (name, contract_config) in manifest.contracts.iter() {
         let contract_name = match ContractName::try_from(name.to_string()) {
             Ok(res) => res,
@@ -604,6 +608,23 @@ pub async fn generate_default_deployment(
             .clone();
 
         let contract_id = QualifiedContractIdentifier::new(sender.clone(), contract_name.clone());
+        println!("adding contract_id: {:?}", contract_id);
+
+        let compile_res = clar2wasm::compile(
+            &source,
+            &contract_id,
+            LimitedCostTracker::new_free(),
+            contract_config.clarity_version,
+            forced_epoch.unwrap_or(contract_config.epoch),
+            &mut session.interpreter.datastore,
+        )
+        .map_err(|e| {
+            format!(
+                "Failed to compile {} to wasm. Error: {:?}",
+                contract_name, e
+            )
+        })?;
+        wasm_modules.insert(contract_id.clone(), compile_res);
 
         contracts_sources.insert(
             contract_id.clone(),
@@ -642,7 +663,7 @@ pub async fn generate_default_deployment(
         contracts.insert(contract_id, contract_spec);
     }
 
-    let session = Session::new(settings);
+    let mut session = Session::new(settings);
 
     let mut contract_asts = BTreeMap::new();
     let mut contract_data = BTreeMap::new();
@@ -772,6 +793,8 @@ pub async fn generate_default_deployment(
         plan: TransactionPlanSpecification { batches },
         contracts: contracts_map,
     };
+
+    session.wasm_modules = wasm_modules;
 
     let artifacts = DeploymentGenerationArtifacts {
         asts: contract_asts,

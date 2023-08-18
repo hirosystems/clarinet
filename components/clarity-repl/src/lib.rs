@@ -37,6 +37,9 @@ pub mod clarity {
     pub use ::clarity::vm::*;
     pub use ::clarity::*;
 }
+pub mod clar2wasm {
+    pub use ::clar2wasm::*;
+}
 
 struct GlobalContext {
     session: Option<Session>,

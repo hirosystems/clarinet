@@ -8,6 +8,7 @@ serde = "1"
 serde_json = "1"
 serde_derive = "1"
 serde_yaml = "0.8.23"
+walrus = "0.20.1"
 
 clarity-repl = { path = "../clarity-repl", default-features = false, optional = true }
 clarinet-files = { path = "../clarinet-files", default-features = false }

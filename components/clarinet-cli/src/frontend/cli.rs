@@ -1309,6 +1309,8 @@ fn load_deployment_and_artifacts_or_exit(
                             }
                             artifacts.diags.insert(contract_id, parser_diags);
                         }
+                        // @todo: figure out why we have artifacts and ast_artifact
+                        artifacts.session.wasm_modules = ast_artifacts.session.wasm_modules;
                         Ok((deployment, None, artifacts))
                     }
                     Ok((deployment, ast_artifacts)) => Ok((deployment, None, ast_artifacts)),

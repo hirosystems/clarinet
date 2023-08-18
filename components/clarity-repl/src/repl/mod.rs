@@ -6,6 +6,7 @@ pub mod interpreter;
 pub mod session;
 pub mod settings;
 pub mod tracer;
+pub mod wasm_helper;
 
 use serde::ser::{Serialize, SerializeMap, Serializer};
 use std::convert::TryInto;

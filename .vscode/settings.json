@@ -1,0 +1,10 @@
+{
+  "rust-analyzer.check.overrideCommand": [
+    "cargo",
+    "check",
+    "--no-default-features",
+    "--package=clarinet-cli",
+    "--features=cli,telemetry",
+    "--message-format=json"
+  ]
+}

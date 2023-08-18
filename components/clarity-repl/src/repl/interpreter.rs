@@ -9,6 +9,7 @@ use crate::repl::datastore::BurnDatastore;
 use crate::repl::datastore::Datastore;
 use crate::repl::Settings;
 use crate::utils;
+use clar2wasm::CompileResult;
 use clarity::consts::CHAIN_ID_TESTNET;
 use clarity::types::chainstate::StacksAddress;
 use clarity::types::StacksEpochId;
@@ -38,7 +39,8 @@ use clarity::vm::{ContractEvaluationResult, EvalHook};
 use clarity::vm::{CostSynthesis, ExecutionResult, ParsedContract};
 
 use super::datastore::StacksConstants;
-use super::{ClarityContract, DEFAULT_EPOCH};
+use super::wasm_helper::WasmtimeHelper;
+use super::{ClarityContract, DEFAULT_CLARITY_VERSION, DEFAULT_EPOCH};
 
 pub const BLOCK_LIMIT_MAINNET: ExecutionCost = ExecutionCost {
     write_length: 15_000_000,
@@ -52,7 +54,7 @@ pub const BLOCK_LIMIT_MAINNET: ExecutionCost = ExecutionCost {
 pub struct ClarityInterpreter {
     pub datastore: Datastore,
     pub burn_datastore: BurnDatastore,
-    tx_sender: StandardPrincipalData,
+    pub tx_sender: StandardPrincipalData,
     accounts: BTreeSet<String>,
     tokens: BTreeMap<String, BTreeMap<String, u128>>,
     repl_settings: Settings,
@@ -439,6 +441,47 @@ impl ClarityInterpreter {
         let key = ClarityDatabase::make_key_for_data_map_entry(contract_id, map_name, map_key);
         let value_hex = self.datastore.get(&key)?;
         Some(format!("0x{value_hex}"))
+    }
+
+    pub fn call_function_wasm(
+        &mut self,
+        cost_track: bool,
+        contract_id: QualifiedContractIdentifier,
+        function: &str,
+        compile_result: &mut CompileResult,
+    ) {
+        let mut conn = ClarityDatabase::new(
+            &mut self.datastore,
+            &self.burn_datastore,
+            &self.burn_datastore,
+        );
+        let cost_tracker = if cost_track {
+            LimitedCostTracker::new(
+                false,
+                CHAIN_ID_TESTNET,
+                BLOCK_LIMIT_MAINNET.clone(),
+                &mut conn,
+                DEFAULT_EPOCH,
+            )
+            .expect("failed to initialize cost tracker")
+        } else {
+            LimitedCostTracker::new_free()
+        };
+        let mut global_context =
+            GlobalContext::new(false, CHAIN_ID_TESTNET, conn, cost_tracker, DEFAULT_EPOCH);
+
+        let mut contract_context =
+            ContractContext::new(contract_id.clone(), DEFAULT_CLARITY_VERSION);
+
+        let mut helper = WasmtimeHelper::new(
+            contract_id,
+            &mut global_context,
+            &mut contract_context,
+            compile_result,
+        );
+
+        let result = helper.call_public_function(function, &vec![]);
+        println!("result: {:#?}", result);
     }
 
     #[allow(unused_assignments)]

@@ -161,8 +161,8 @@ impl SDK {
             ProjectManifest::from_file_accessor(&manifest_location, &self.file_accessor).await?;
 
         let (deployment, artifacts) = match &self.cache {
-            Some(cache) => cache.clone(),
-            None => {
+            // Some(cache) => cache.clone(),
+            _ => {
                 let cache = generate_default_deployment(
                     &manifest,
                     &StacksNetwork::Simnet,

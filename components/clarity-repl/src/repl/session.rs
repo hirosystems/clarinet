@@ -6,9 +6,11 @@ use super::{
 use crate::analysis::ast_dependency_detector::{ASTDependencyDetector, Dependency};
 use crate::analysis::coverage::{self, TestCoverageReport};
 use crate::repl::settings::InitialContract;
+use crate::repl::wasm_helper::WasmtimeHelper;
 use crate::repl::Settings;
 use crate::utils;
 use ansi_term::{Colour, Style};
+use clar2wasm::CompileResult;
 use clarity::codec::StacksMessageCodec;
 use clarity::types::chainstate::StacksAddress;
 use clarity::types::StacksEpochId;
@@ -27,6 +29,7 @@ use clarity::vm::{
     ClarityVersion, ContractName, CostSynthesis, EvalHook, EvaluationResult, ExecutionResult,
     StacksEpoch,
 };
+use regex::Regex;
 use reqwest;
 use std::collections::{BTreeMap, BTreeSet, HashMap, VecDeque};
 use std::convert::TryFrom;
@@ -114,7 +117,7 @@ pub struct CostsReport {
     pub cost_result: CostSynthesis,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Debug)]
 pub struct Session {
     session_id: u32,
     started_at: u32,
@@ -122,6 +125,7 @@ pub struct Session {
     pub settings: SessionSettings,
     pub contracts: BTreeMap<String, BTreeMap<String, Vec<String>>>,
     pub asts: BTreeMap<QualifiedContractIdentifier, ContractAST>,
+    pub wasm_modules: HashMap<QualifiedContractIdentifier, CompileResult>,
     pub interpreter: ClarityInterpreter,
     api_reference: HashMap<String, String>,
     pub coverage_reports: Vec<TestCoverageReport>,
@@ -149,6 +153,7 @@ impl Session {
             is_interactive: false,
             interpreter: ClarityInterpreter::new(tx_sender, settings.repl_settings.clone()),
             asts: BTreeMap::new(),
+            wasm_modules: HashMap::new(),
             contracts: BTreeMap::new(),
             api_reference: build_api_reference(),
             coverage_reports: vec![],
@@ -657,6 +662,52 @@ impl Session {
         Ok((execution, contract_identifier))
     }
 
+    fn run_wasm_and_clarity(
+        &mut self,
+        snippet: String,
+        eval_hooks: Option<Vec<&mut dyn EvalHook>>,
+        cost_track: bool,
+    ) -> Result<ExecutionResult, Vec<Diagnostic>> {
+        // @todo: we should take another approach than a regex to parse it
+        let re = Regex::new(r#"\(contract-call\? \.(\S+) (\S+)(?: (.+?))?\)"#).unwrap();
+        if let Some(captures) = re.captures(&snippet) {
+            let contract = captures.get(1).map_or("", |m| m.as_str());
+            let function = captures.get(2).map_or("", |m| m.as_str());
+
+            // @todo: parse clarity value arguments
+            // split_whitespace will only work for very simple arguments
+            let args_string = captures.get(3).map_or("", |m| m.as_str());
+            let args: Vec<&str> = args_string.split_whitespace().collect();
+
+            let contract_id = format!("{}.{}", self.interpreter.tx_sender, contract);
+            let contract_id = QualifiedContractIdentifier::parse(&contract_id)
+                .expect("fail to parse contract_id");
+
+            let mut module = self.wasm_modules.get_mut(&contract_id).unwrap();
+
+            // @todo: pass args
+            self.interpreter
+                .call_function_wasm(false, contract_id, function, &mut module);
+
+            // @todo: pretty print result
+        }
+
+        let contract = ClarityContract {
+            code_source: ClarityCodeSource::ContractInMemory(snippet),
+            name: format!("contract-{}", self.contracts.len()),
+            deployer: ContractDeployer::DefaultDeployer,
+            clarity_version: ClarityVersion::default_for_epoch(self.current_epoch),
+            epoch: self.current_epoch,
+        };
+
+        let result = self.interpreter.run(&contract, cost_track, eval_hooks);
+
+        // @todo: compare wasm and clarity results
+        // @todo: compare wasm and clarity performances
+
+        result
+    }
+
     pub fn eval<'a>(
         &'a mut self,
         snippet: String,
@@ -664,7 +715,7 @@ impl Session {
         cost_track: bool,
     ) -> Result<ExecutionResult, Vec<Diagnostic>> {
         let contract = ClarityContract {
-            code_source: ClarityCodeSource::ContractInMemory(snippet),
+            code_source: ClarityCodeSource::ContractInMemory(snippet.clone()),
             name: format!("contract-{}", self.contracts.len()),
             deployer: ContractDeployer::DefaultDeployer,
             clarity_version: ClarityVersion::default_for_epoch(self.current_epoch),
@@ -673,7 +724,7 @@ impl Session {
         let contract_identifier =
             contract.expect_resolved_contract_identifier(Some(&self.interpreter.get_tx_sender()));
 
-        let result = self.interpreter.run(&contract, cost_track, eval_hooks);
+        let result = self.run_wasm_and_clarity(snippet, eval_hooks, cost_track);
 
         match result {
             Ok(result) => {
