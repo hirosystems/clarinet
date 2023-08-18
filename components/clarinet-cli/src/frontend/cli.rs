@@ -1444,7 +1444,7 @@ pub fn main() {
             Devnet::Package(cmd) => {
                 let manifest = load_manifest_or_exit(cmd.manifest_path);
                 if let Err(e) = Package::pack(cmd.package_file_name, manifest) {
-                    println!("Could not execute the package command: {}", format_err!(e));
+                    println!("Could not execute the package command. {}", format_err!(e));
                     process::exit(1);
                 }
             }

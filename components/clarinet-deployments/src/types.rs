@@ -13,6 +13,7 @@ use clarity_repl::analysis::ast_dependency_detector::DependencySet;
 use clarity_repl::clarity::{ClarityName, ClarityVersion, ContractName};
 use clarity_repl::repl::{Session, DEFAULT_CLARITY_VERSION};
 use serde::{Deserialize, Serialize};
+use serde_with::{serde_as, Bytes};
 use serde_yaml;
 use std::collections::BTreeMap;
 use std::collections::HashMap;
@@ -213,6 +214,9 @@ pub enum TransactionSpecification {
     StxTransfer(StxTransferSpecification),
 }
 
+type Memo = [u8; 34];
+
+#[serde_as]
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 pub struct StxTransferSpecification {
     #[serde(with = "standard_principal_data_serde")]
@@ -220,8 +224,8 @@ pub struct StxTransferSpecification {
     #[serde(with = "principal_data_serde")]
     pub recipient: PrincipalData,
     pub mstx_amount: u64,
-    #[serde(with = "memo_serde")]
-    pub memo: [u8; 34],
+    #[serde_as(as = "Bytes")]
+    pub memo: Memo,
     pub cost: u64,
     pub anchor_block_only: bool,
 }
@@ -243,26 +247,6 @@ pub mod principal_data_serde {
     {
         let s = String::deserialize(deserializer).map_err(serde::de::Error::custom)?;
         PrincipalData::parse(&s).map_err(serde::de::Error::custom)
-    }
-}
-
-pub mod memo_serde {
-    use serde::{Deserialize, Deserializer, Serializer};
-
-    pub fn serialize<S>(x: &[u8; 34], ser: S) -> Result<S::Ok, S::Error>
-    where
-        S: Serializer,
-    {
-        let s = String::from_utf8_lossy(x);
-        ser.serialize_str(&s)
-    }
-
-    pub fn deserialize<'de, D: Deserializer<'de>>(d: D) -> Result<[u8; 34], D::Error> {
-        let s = String::deserialize(d).map_err(serde::de::Error::custom)?;
-        let bytes = String::as_bytes(&s);
-        let array = <&[u8; 34]>::try_from(bytes).map_err(serde::de::Error::custom)?;
-
-        Ok(*array)
     }
 }
 
