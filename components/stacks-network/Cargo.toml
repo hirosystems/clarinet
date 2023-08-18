@@ -44,7 +44,7 @@ hiro-system-kit = { path = "../hiro-system-kit", features = ["log"] }
 clarity-repl = { path = "../clarity-repl", features = ["cli"] }
 dirs = { version = "4.0.0" }
 clap = {version = "4.2.7", features = [ "derive" ] }
-serde_yaml = "0.9.21"
+serde_yaml = "0.8.23"
 
 [lib]
 name = "stacks_network"
