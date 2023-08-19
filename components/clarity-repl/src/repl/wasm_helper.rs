@@ -65,6 +65,32 @@ pub enum ClarityWasmResult {
     NoType,
 }
 
+impl From<ClarityWasmResult> for Value {
+    fn from(result: ClarityWasmResult) -> Self {
+        match result {
+            ClarityWasmResult::Int { high, low } => {
+                Value::Int(((high as i128) << 64) | low as i128)
+            }
+            ClarityWasmResult::UInt { high, low } => {
+                Value::UInt(((high as u128) << 64) | low as u128)
+            }
+            ClarityWasmResult::Bool { value } => Value::Bool(value != 0),
+            ClarityWasmResult::Response {
+                indicator,
+                ok_value,
+                err_value,
+            } => {
+                if indicator == 1 {
+                    Value::okay((*ok_value.unwrap()).into()).unwrap()
+                } else {
+                    Value::error((*err_value.unwrap()).into()).unwrap()
+                }
+            }
+            _ => unimplemented!("type not yet supported: {:?}", result),
+        }
+    }
+}
+
 pub struct ClarityWasmContext<'a, 'b, 'hooks> {
     /// The global context in which to execute.
     pub global_context: &'b mut GlobalContext<'a, 'hooks>,

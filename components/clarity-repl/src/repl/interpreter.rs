@@ -481,7 +481,15 @@ impl ClarityInterpreter {
         );
 
         let result = helper.call_public_function(function, &vec![]);
-        println!("result: {:#?}", result);
+        match result {
+            Ok(wasm_result) => {
+                let value: Value = wasm_result.into();
+                println!("Wasm Result: {}", value);
+            }
+            Err(e) => {
+                println!("Error: {}", e);
+            }
+        }
     }
 
     #[allow(unused_assignments)]
