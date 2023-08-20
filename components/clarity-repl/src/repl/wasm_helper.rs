@@ -18,79 +18,6 @@ use wasmtime::{
     AsContextMut, Caller, Engine, FuncType, Instance, Linker, Module, Store, Val, ValType,
 };
 
-#[derive(Debug, PartialEq)]
-pub enum ClarityWasmResult {
-    Int {
-        high: i64,
-        low: i64,
-    },
-    UInt {
-        high: i64,
-        low: i64,
-    },
-    Bool {
-        value: i32,
-    },
-    Principal {
-        pointer: i32,
-    },
-    Buff {
-        pointer: i32,
-        length: i32,
-    },
-    StringAscii {
-        pointer: i32,
-        length: i32,
-    },
-    StringUtf8 {
-        pointer: i32,
-        length: i32,
-    },
-    List {
-        pointer: i32,
-        length: i32,
-    },
-    Tuple {
-        values: Vec<Self>,
-    },
-    Optional {
-        indicator: i32,
-        value: Option<Box<Self>>,
-    },
-    Response {
-        indicator: i32,
-        ok_value: Option<Box<Self>>,
-        err_value: Option<Box<Self>>,
-    },
-    NoType,
-}
-
-impl From<ClarityWasmResult> for Value {
-    fn from(result: ClarityWasmResult) -> Self {
-        match result {
-            ClarityWasmResult::Int { high, low } => {
-                Value::Int(((high as i128) << 64) | low as i128)
-            }
-            ClarityWasmResult::UInt { high, low } => {
-                Value::UInt(((high as u128) << 64) | low as u128)
-            }
-            ClarityWasmResult::Bool { value } => Value::Bool(value != 0),
-            ClarityWasmResult::Response {
-                indicator,
-                ok_value,
-                err_value,
-            } => {
-                if indicator == 1 {
-                    Value::okay((*ok_value.unwrap()).into()).unwrap()
-                } else {
-                    Value::error((*err_value.unwrap()).into()).unwrap()
-                }
-            }
-            _ => unimplemented!("type not yet supported: {:?}", result),
-        }
-    }
-}
-
 pub struct ClarityWasmContext<'a, 'b, 'hooks> {
     /// The global context in which to execute.
     pub global_context: &'b mut GlobalContext<'a, 'hooks>,
@@ -168,7 +95,7 @@ fn get_wasmtime_arg(type_sig: &TypeSignature) -> Vec<ValType> {
 }
 
 /// Maps the result from a WASM function call given the provided Clarity `FunctionType`.
-fn map_wasm_result(fn_sig: &FunctionType, result: &[Val]) -> ClarityWasmResult {
+fn map_wasm_result(fn_sig: &FunctionType, result: &[Val]) -> Value {
     match fn_sig {
         FunctionType::Fixed(func) => {
             let (result, _) = map_wasm_value(&func.returns, 0, result);
@@ -179,58 +106,109 @@ fn map_wasm_result(fn_sig: &FunctionType, result: &[Val]) -> ClarityWasmResult {
 }
 
 /// Maps an individual value in a WASM function call result.
-fn map_wasm_value(
-    type_sig: &TypeSignature,
-    index: usize,
-    buffer: &[Val],
-) -> (ClarityWasmResult, usize) {
+fn map_wasm_value(type_sig: &TypeSignature, index: usize, buffer: &[Val]) -> (Value, usize) {
     match type_sig {
         TypeSignature::IntType => {
             let upper = buffer[index].unwrap_i64();
             let lower = buffer[index + 1].unwrap_i64();
-            (
-                ClarityWasmResult::Int {
-                    high: upper,
-                    low: lower,
-                },
-                2,
-            )
+            (Value::Int(((upper as i128) << 64) | lower as i128), 2)
         }
         TypeSignature::UIntType => {
             let upper = buffer[index].unwrap_i64();
             let lower = buffer[index + 1].unwrap_i64();
+            (Value::UInt(((upper as u128) << 64) | lower as u128), 2)
+        }
+        TypeSignature::BoolType => (Value::Bool(buffer[index].unwrap_i32() != 0), 1),
+        TypeSignature::OptionalType(optional) => {
+            let (value, increment) = map_wasm_value(optional, index + 1, buffer);
             (
-                ClarityWasmResult::UInt {
-                    high: upper,
-                    low: lower,
+                if buffer[index].unwrap_i32() == 1 {
+                    Value::some(value).unwrap()
+                } else {
+                    Value::none()
                 },
-                2,
+                increment + 1,
             )
         }
-        TypeSignature::NoType => (ClarityWasmResult::NoType, 1),
         TypeSignature::ResponseType(response) => {
             let (ok, increment_ok) = map_wasm_value(&response.0, index + 1, buffer);
             let (err, increment_err) =
                 map_wasm_value(&response.1, index + 1 + increment_ok, buffer);
             (
-                ClarityWasmResult::Response {
-                    indicator: buffer[index].unwrap_i32(),
-                    ok_value: if ok == ClarityWasmResult::NoType {
-                        None
-                    } else {
-                        Some(Box::new(ok))
-                    },
-                    err_value: if err == ClarityWasmResult::NoType {
-                        None
-                    } else {
-                        Some(Box::new(err))
-                    },
+                if buffer[index].unwrap_i32() == 1 {
+                    Value::okay(ok).unwrap()
+                } else {
+                    Value::error(err).unwrap()
                 },
                 index + 1 + increment_ok + increment_err,
             )
         }
+        // A `NoType` will be a dummy value that should not be used.
+        TypeSignature::NoType => (Value::none(), 1),
         _ => panic!("WASM value type not implemented: {:?}", type_sig),
     }
+}
+
+#[test]
+fn test_map_wasm_value() {
+    let mut type_sig = TypeSignature::IntType;
+    let mut buffer = vec![Val::I64(0x123), Val::I64(0x456)];
+    let mut value = map_wasm_value(&type_sig, 0, &buffer);
+    assert_eq!(value.0, Value::Int(0x123_0000_0000_0000_0456));
+    assert_eq!(value.1, 2);
+
+    type_sig = TypeSignature::UIntType;
+    buffer = vec![Val::I64(-8690466096661279831), Val::I64(0x123456789abcdef0)];
+    value = map_wasm_value(&type_sig, 0, &buffer);
+    assert_eq!(
+        value.0,
+        Value::UInt(0x8765_4321_0fed_cba9_1234_5678_9abc_def0)
+    );
+    assert_eq!(value.1, 2);
+
+    type_sig = TypeSignature::BoolType;
+    buffer = vec![Val::I32(1)];
+    value = map_wasm_value(&type_sig, 0, &buffer);
+    assert_eq!(value.0, Value::Bool(true));
+    assert_eq!(value.1, 1);
+
+    type_sig = TypeSignature::BoolType;
+    buffer = vec![Val::I32(0)];
+    value = map_wasm_value(&type_sig, 0, &buffer);
+    assert_eq!(value.0, Value::Bool(false));
+    assert_eq!(value.1, 1);
+
+    type_sig = TypeSignature::OptionalType(Box::new(TypeSignature::IntType));
+    buffer = vec![Val::I32(1), Val::I64(0x123), Val::I64(0x456)];
+    value = map_wasm_value(&type_sig, 0, &buffer);
+    assert_eq!(
+        value.0,
+        Value::some(Value::Int(0x123_0000_0000_0000_0456)).unwrap()
+    );
+    assert_eq!(value.1, 3);
+
+    type_sig = TypeSignature::OptionalType(Box::new(TypeSignature::IntType));
+    buffer = vec![Val::I32(0), Val::I64(0x123), Val::I64(0x456)];
+    value = map_wasm_value(&type_sig, 0, &buffer);
+    assert_eq!(value.0, Value::none());
+    assert_eq!(value.1, 3);
+
+    type_sig =
+        TypeSignature::ResponseType(Box::new((TypeSignature::IntType, TypeSignature::BoolType)));
+    buffer = vec![Val::I32(1), Val::I64(0x123), Val::I64(0x456), Val::I32(0)];
+    value = map_wasm_value(&type_sig, 0, &buffer);
+    assert_eq!(
+        value.0,
+        Value::okay(Value::Int(0x123_0000_0000_0000_0456)).unwrap()
+    );
+    assert_eq!(value.1, 4);
+
+    type_sig =
+        TypeSignature::ResponseType(Box::new((TypeSignature::IntType, TypeSignature::BoolType)));
+    buffer = vec![Val::I32(0), Val::I64(0x123), Val::I64(0x456), Val::I32(1)];
+    value = map_wasm_value(&type_sig, 0, &buffer);
+    assert_eq!(value.0, Value::error(Value::Bool(true)).unwrap());
+    assert_eq!(value.1, 4);
 }
 
 impl<'a, 'b, 'hooks> WasmtimeHelper<'a, 'b, 'hooks> {
@@ -555,11 +533,7 @@ impl<'a, 'b, 'hooks> WasmtimeHelper<'a, 'b, 'hooks> {
         };
     }
     /// Calls the specified public Clarity function in the generated contract WASM binary.
-    pub fn call_public_function(
-        &mut self,
-        name: &str,
-        params: &[Val],
-    ) -> Result<ClarityWasmResult, String> {
+    pub fn call_public_function(&mut self, name: &str, params: &[Val]) -> Result<Value, String> {
         let fn_type = self
             .store
             .data()
