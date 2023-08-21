@@ -11,8 +11,8 @@ use clarinet_files::{NetworkManifest, ProjectManifest};
 #[derive(Serialize, Deserialize, Debug)]
 struct ConfigurationPackage {
     deployment_plan: DeploymentSpecification,
-    devnet_config: NetworkManifest,
-    clarinet_config: ProjectManifest,
+    network_manifest: NetworkManifest,
+    project_manifest: ProjectManifest,
 }
 
 fn pack_to_file(file_name: &str, package: ConfigurationPackage) -> Result<(), io::Error> {
@@ -65,8 +65,8 @@ pub fn pack(file_name: Option<String>, project_manifest: ProjectManifest) -> Res
 
     let package = ConfigurationPackage {
         deployment_plan: deployment_manifest,
-        devnet_config: network_manifest,
-        clarinet_config: project_manifest,
+        network_manifest,
+        project_manifest,
     };
 
     match file_name {
