@@ -111,7 +111,7 @@ impl StacksDevnet {
         let (deployment, _) =
             read_deployment_or_generate_default(&manifest, &StacksNetwork::Devnet)
                 .expect("Unable to generate deployment");
-        let devnet = match DevnetOrchestrator::new(manifest, Some(devnet_overrides), true) {
+        let devnet = match DevnetOrchestrator::new(manifest, None, Some(devnet_overrides), true) {
             Ok(devnet) => devnet,
             Err(message) => {
                 if logs_enabled {
