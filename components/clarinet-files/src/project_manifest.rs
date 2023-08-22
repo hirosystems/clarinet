@@ -62,7 +62,7 @@ pub struct ProjectManifest {
 }
 
 fn default_location() -> FileLocation {
-    let path = PathBuf::from_str("/tmp").expect("Unable to create a default location");
+    let path = std::env::temp_dir();
     FileLocation::from_path(path)
 }
 
