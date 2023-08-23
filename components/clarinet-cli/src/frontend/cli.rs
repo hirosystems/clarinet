@@ -367,6 +367,9 @@ struct ApplyDeployment {
     /// Display streams of logs instead of terminal UI dashboard
     #[clap(long = "no-dashboard")]
     pub no_dashboard: bool,
+    /// Skip the user confirmation prompt before applying
+    #[clap(long = "skip-prompt", short = 's')]
+    pub skip_user_confirmation: bool,
 }
 
 #[derive(Parser, PartialEq, Clone, Debug)]
@@ -814,16 +817,21 @@ pub fn main() {
                 let node_url = deployment.stacks_node.clone().unwrap();
 
                 println!(
-                    "The following deployment plan will be applied:\n{}\n\n{}",
-                    DeploymentSynthesis::from_deployment(&deployment),
-                    yellow!("Continue [Y/n]?")
+                    "The following deployment plan will be applied:\n{}\n\n",
+                    DeploymentSynthesis::from_deployment(&deployment)
                 );
-                let mut buffer = String::new();
-                std::io::stdin().read_line(&mut buffer).unwrap();
-                if !buffer.starts_with("Y") && !buffer.starts_with("y") && !buffer.starts_with("\n")
-                {
-                    println!("Deployment aborted");
-                    std::process::exit(1);
+
+                if !cmd.skip_user_confirmation {
+                    println!("{}", yellow!("Continue [Y/n]?"));
+                    let mut buffer = String::new();
+                    std::io::stdin().read_line(&mut buffer).unwrap();
+                    if !buffer.starts_with("Y")
+                        && !buffer.starts_with("y")
+                        && !buffer.starts_with("\n")
+                    {
+                        println!("Deployment aborted");
+                        std::process::exit(1);
+                    }
                 }
 
                 let (command_tx, command_rx) = std::sync::mpsc::channel();
