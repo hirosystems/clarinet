@@ -13,7 +13,6 @@ use clarity_repl::analysis::ast_dependency_detector::DependencySet;
 use clarity_repl::clarity::{ClarityName, ClarityVersion, ContractName};
 use clarity_repl::repl::{Session, DEFAULT_CLARITY_VERSION};
 use serde::{Deserialize, Serialize};
-use serde_with::{serde_as, Bytes};
 use serde_yaml;
 use std::collections::BTreeMap;
 use std::collections::HashMap;
@@ -204,6 +203,7 @@ pub struct TransactionsBatchSpecification {
 }
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+#[serde(tag = "transaction_type")]
 pub enum TransactionSpecification {
     ContractCall(ContractCallSpecification),
     ContractPublish(ContractPublishSpecification),
@@ -216,7 +216,6 @@ pub enum TransactionSpecification {
 
 type Memo = [u8; 34];
 
-#[serde_as]
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 pub struct StxTransferSpecification {
     #[serde(with = "standard_principal_data_serde")]
@@ -224,12 +223,57 @@ pub struct StxTransferSpecification {
     #[serde(with = "principal_data_serde")]
     pub recipient: PrincipalData,
     pub mstx_amount: u64,
-    #[serde_as(as = "Bytes")]
+    #[serde(with = "memo_serde")]
     pub memo: Memo,
     pub cost: u64,
     pub anchor_block_only: bool,
 }
 
+pub mod memo_serde {
+    use std::fmt::Write;
+
+    use clarity_repl::clarity::util::hash::hex_bytes;
+    use serde::{Deserialize, Deserializer, Serializer};
+
+    use super::Memo;
+    pub fn serialize<S>(bytes: &Memo, s: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        let mut str = String::with_capacity((bytes.len() * 2) + 1);
+        write!(&mut str, "0x").unwrap();
+        for &b in bytes {
+            write!(&mut str, "{:02x}", b).unwrap();
+        }
+        s.serialize_str(&str)
+    }
+    pub fn deserialize<'de, D>(deserializer: D) -> Result<Memo, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let hex_memo = String::deserialize(deserializer).map_err(serde::de::Error::custom)?;
+
+        let mut memo = [0u8; 34];
+
+        if !hex_memo.is_empty() && !hex_memo.starts_with("0x") {
+            return Err(serde::de::Error::custom(
+                "unable to parse memo (up to 34 bytes, starting with '0x')",
+            ));
+        }
+        match hex_bytes(&hex_memo[2..]) {
+            Ok(ref mut bytes) => {
+                bytes.resize(34, 0);
+                memo.copy_from_slice(&bytes);
+            }
+            Err(_) => {
+                return Err(serde::de::Error::custom(
+                    "unable to parse memo (up to 34 bytes)",
+                ))
+            }
+        }
+        Ok(memo)
+    }
+}
 pub mod principal_data_serde {
     use clarity_repl::clarity::vm::types::PrincipalData;
     use serde::{Deserialize, Deserializer, Serializer};
@@ -390,6 +434,7 @@ pub struct ContractPublishSpecification {
     pub location: FileLocation,
     #[serde(with = "source_serde")]
     pub source: String,
+    #[serde(with = "clarity_version_serde")]
     pub clarity_version: ClarityVersion,
     pub cost: u64,
     pub anchor_block_only: bool,
@@ -470,6 +515,7 @@ pub struct RequirementPublishSpecification {
     pub remap_principals: BTreeMap<StandardPrincipalData, StandardPrincipalData>,
     #[serde(with = "source_serde")]
     pub source: String,
+    #[serde(with = "clarity_version_serde")]
     pub clarity_version: ClarityVersion,
     pub cost: u64,
     pub location: FileLocation,
@@ -601,6 +647,34 @@ pub mod remap_principals_serde {
             );
         }
         Ok(m)
+    }
+}
+
+pub mod clarity_version_serde {
+    use clarinet_files::INVALID_CLARITY_VERSION;
+    use clarity_repl::clarity::ClarityVersion;
+    use serde::{Deserialize, Deserializer, Serializer};
+
+    pub fn serialize<S>(clarity_version: &ClarityVersion, s: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        match clarity_version {
+            ClarityVersion::Clarity1 => s.serialize_i64(1),
+            ClarityVersion::Clarity2 => s.serialize_i64(2),
+        }
+    }
+
+    pub fn deserialize<'de, D>(deserializer: D) -> Result<ClarityVersion, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let cv = i64::deserialize(deserializer)?;
+        match cv {
+            1 => Ok(ClarityVersion::Clarity1),
+            2 => Ok(ClarityVersion::Clarity2),
+            _ => Err(serde::de::Error::custom(INVALID_CLARITY_VERSION)),
+        }
     }
 }
 
@@ -752,6 +826,7 @@ pub struct EmulatedContractPublishSpecification {
     #[serde(with = "standard_principal_data_serde")]
     pub emulated_sender: StandardPrincipalData,
     pub source: String,
+    #[serde(with = "clarity_version_serde")]
     pub clarity_version: ClarityVersion,
     pub location: FileLocation,
 }
@@ -827,6 +902,7 @@ pub struct DeploymentSpecification {
     pub stacks_node: Option<String>,
     pub bitcoin_node: Option<String>,
     pub genesis: Option<GenesisSpecification>,
+    #[serde(flatten)]
     pub plan: TransactionPlanSpecification,
     // Keep a cache of contract's (source, relative_path)
     #[serde(with = "contracts_serde")]
@@ -837,7 +913,7 @@ pub mod contracts_serde {
     use bitcoincore_rpc::jsonrpc::base64::encode;
     use clarinet_files::FileLocation;
     use clarity_repl::clarity::vm::types::QualifiedContractIdentifier;
-    use serde::{ser::SerializeMap, Deserializer, Serializer};
+    use serde::{ser::SerializeSeq, Deserializer, Serializer};
     use std::collections::{BTreeMap, HashMap};
 
     use super::source_serde;
@@ -849,14 +925,21 @@ pub mod contracts_serde {
     where
         S: Serializer,
     {
-        let mut map = serializer.serialize_map(Some(target.len()))?;
-        for (k, v) in target {
-            let mut val = v.clone();
-            val.0 = encode(&v.0);
-
-            map.serialize_entry(&k.to_string(), &val)?;
+        let mut out = serializer.serialize_seq(Some(target.len()))?;
+        for (contract_id, (source, file_location)) in target {
+            let encoded = encode(&source);
+            let mut map = BTreeMap::new();
+            map.insert("contract_id", contract_id.to_string());
+            map.insert("source", encoded);
+            match file_location {
+                FileLocation::FileSystem { path } => {
+                    map.insert("path", path.to_str().unwrap().to_string())
+                }
+                FileLocation::Url { url } => map.insert("url", url.to_string()),
+            };
+            out.serialize_element(&map)?;
         }
-        map.end()
+        out.end()
     }
 
     pub fn deserialize<'de, D>(
@@ -867,25 +950,39 @@ pub mod contracts_serde {
     {
         let mut res: BTreeMap<QualifiedContractIdentifier, (String, FileLocation)> =
             BTreeMap::new();
-        let container: HashMap<String, (String, HashMap<String, String>)> =
-            serde::Deserialize::deserialize(des)?;
+        let container: Vec<HashMap<String, String>> = serde::Deserialize::deserialize(des)?;
 
-        for (qci_str, (src, file_location_map)) in container {
-            let qci = QualifiedContractIdentifier::parse(&qci_str).unwrap();
+        for entry in container {
+            let contract_id = match entry.get("contract_id") {
+                Some(contract_id) => {
+                    QualifiedContractIdentifier::parse(&contract_id).map_err(|e| {
+                        serde::de::Error::custom(format!("failed to parse contract id: {}", e))
+                    })
+                }
+                None => Err(serde::de::Error::custom(
+                    "Contract entry must have `contract_id` field",
+                )),
+            }?;
 
-            let file_location = if let Some(url) = file_location_map.get("url") {
+            let file_location = if let Some(url) = entry.get("url") {
                 FileLocation::from_url_string(url)
-            } else if let Some(path) = file_location_map.get("path") {
+            } else if let Some(path) = entry.get("path") {
                 FileLocation::from_path_string(path)
             } else {
-                Err("Invalide file location field. Must have key \"url\" or \"path\"".into())
+                Err("Invalid file location field. Must have key \"url\" or \"path\"".into())
             }
             .map_err(serde::de::Error::custom)?;
 
-            let decoded_src =
-                source_serde::base64_decode(&src).map_err(serde::de::Error::custom)?;
+            let source = match entry.get("source") {
+                Some(source) => {
+                    source_serde::base64_decode(&source).map_err(serde::de::Error::custom)
+                }
+                None => Err(serde::de::Error::custom(
+                    "Contract entry must have `source` field",
+                )),
+            }?;
 
-            res.insert(qci, (decoded_src, file_location));
+            res.insert(contract_id, (source, file_location));
         }
 
         Ok(res)
