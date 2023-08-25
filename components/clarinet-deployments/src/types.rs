@@ -578,36 +578,19 @@ pub mod standard_principal_data_serde {
 pub mod qualified_contract_identifier_serde {
     use clarity_repl::clarity::vm::types::QualifiedContractIdentifier;
     use serde::{Deserializer, Serializer};
-    use std::collections::HashMap;
 
     pub fn serialize<'ser, S>(x: &'ser QualifiedContractIdentifier, s: S) -> Result<S::Ok, S::Error>
     where
         S: Serializer,
     {
-        let mut m = HashMap::new();
-        m.insert("issuer", x.issuer.to_address());
-        m.insert("name", x.name.to_string());
-
-        serde::Serialize::serialize(&m, s)
+        serde::Serialize::serialize(&x.to_string(), s)
     }
 
     pub fn deserialize<'de, D>(des: D) -> Result<QualifiedContractIdentifier, D::Error>
     where
         D: Deserializer<'de>,
     {
-        let qc: HashMap<String, String> = serde::Deserialize::deserialize(des)?;
-        let issuer = qc.get("issuer").ok_or("'issuer' not found").map_err(|e| {
-            serde::de::Error::custom(format!(
-                "qualified contract identifier deserialization: {e}"
-            ))
-        })?;
-        let name = qc.get("name").ok_or("'name' not found").map_err(|e| {
-            serde::de::Error::custom(format!(
-                "qualified contract identifier deserialization: {e}"
-            ))
-        })?;
-
-        let literal = format!("{}.{}", issuer, name);
+        let literal: String = serde::Deserialize::deserialize(des)?;
 
         QualifiedContractIdentifier::parse(&literal).map_err(serde::de::Error::custom)
     }
