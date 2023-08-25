@@ -13,7 +13,7 @@ use std::path::PathBuf;
 use std::str::FromStr;
 use toml::value::Value;
 
-const INVALID_CLARITY_VERSION: &str = "clarity_version field invalid (value supported: 1, 2)";
+pub const INVALID_CLARITY_VERSION: &str = "clarity_version field invalid (value supported: 1, 2)";
 const INVALID_EPOCH: &str = "epoch field invalid (value supported: 2.0, 2.05, 2.1, 2.2, 2.3, 2.4)";
 
 #[derive(Deserialize, Debug, Clone)]
@@ -48,6 +48,7 @@ pub struct ProjectConfigFile {
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 pub struct ProjectManifest {
+    #[serde(rename = "metadata")]
     pub project: ProjectConfig,
     #[serde(serialize_with = "toml::ser::tables_last")]
     #[serde(deserialize_with = "contracts_deserializer")]
