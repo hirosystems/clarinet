@@ -1,6 +1,5 @@
 use serde::{Deserialize, Serialize};
 use std::fs::File;
-use std::io::{self, ErrorKind, Write};
 use std::process;
 
 use clarinet_deployments::get_default_deployment_path;
@@ -15,7 +14,7 @@ struct ConfigurationPackage {
     project_manifest: ProjectManifest,
 }
 
-fn pack_to_file(file_name: &str, package: ConfigurationPackage) -> Result<(), io::Error> {
+fn pack_to_file(file_name: &str, package: ConfigurationPackage) -> Result<(), String> {
     let file = match File::create(file_name) {
         Ok(file) => file,
         Err(e) => {
@@ -29,31 +28,31 @@ fn pack_to_file(file_name: &str, package: ConfigurationPackage) -> Result<(), io
         }
     };
 
-    match serde_json::to_writer(file, &package) {
-        Ok(_) => println!("{} file generated with success", file_name),
-        Err(e) => println!("Unable to generate the json file: {}", e),
-    };
-
+    serde_json::to_writer(file, &package)
+        .map_err(|e| format!("Unable to generate the json file: {}", e))?;
+    println!("{} file generated with success", file_name);
     Ok(())
 }
 
-fn pack_to_stdout(package: ConfigurationPackage) {
-    let json = serde_json::to_value(package).unwrap();
-    io::stdout().write(json.to_string().as_bytes()).ok();
+fn pack_to_stdout(package: ConfigurationPackage) -> Result<(), String> {
+    let json = serde_json::to_string_pretty(&package)
+        .map_err(|e| format!("failed to serialize package: {}", e))?;
+    println!("{}", json);
+    Ok(())
 }
 
-pub fn pack(file_name: Option<String>, project_manifest: ProjectManifest) -> Result<(), io::Error> {
+pub fn pack(file_name: Option<String>, project_manifest: ProjectManifest) -> Result<(), String> {
     let deployment_path = get_default_deployment_path(&project_manifest, &StacksNetwork::Devnet)
-        .map_err(|e| io::Error::new(ErrorKind::Other, e))?;
+        .map_err(|e| format!("failed to get default deployment path: {}", e))?;
 
     let deployment_manifest = DeploymentSpecification::from_config_file(
         &deployment_path,
         &project_manifest
             .location
             .get_project_root_location()
-            .map_err(|e| io::Error::new(ErrorKind::Other, e))?,
+            .map_err(|e| format!("failed to get project root location: {}", e))?,
     )
-    .map_err(|e| io::Error::new(ErrorKind::Other, e))?;
+    .map_err(|e| format!("failed to create deployment plan: {}", e))?;
 
     let network_manifest = NetworkManifest::from_project_manifest_location(
         &project_manifest.location,
@@ -61,7 +60,7 @@ pub fn pack(file_name: Option<String>, project_manifest: ProjectManifest) -> Res
         None,
         None,
     )
-    .map_err(|e| io::Error::new(ErrorKind::Other, e))?;
+    .map_err(|e| format!("failed to get project manifest: {}", e))?;
 
     let package = ConfigurationPackage {
         deployment_plan: deployment_manifest,
@@ -70,9 +69,7 @@ pub fn pack(file_name: Option<String>, project_manifest: ProjectManifest) -> Res
     };
 
     match file_name {
-        Some(name) => pack_to_file(&name, package)?,
+        Some(name) => pack_to_file(&name, package),
         None => pack_to_stdout(package),
     }
-
-    Ok(())
 }
