@@ -11,6 +11,7 @@ extern crate hiro_system_kit;
 
 mod chainhooks;
 mod deployments;
+mod devnet;
 mod frontend;
 mod generate;
 pub mod integrate;
