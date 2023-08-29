@@ -1,5 +1,5 @@
 ---
-# The default id is the same as the one being defined below. so not needed
+# The default id is the same as the one defined below. so not needed
 title: Overview
 ---
 # Clarinet Overview

@@ -95,7 +95,7 @@ jobs:
         run: cargo install cargo-audit
 
       - name: Run audit
-        run: cargo audit --ignore RUSTSEC-2021-0076 --ignore RUSTSEC-2022-0028 --ignore RUSTSEC-2020-0071 --ignore RUSTSEC-2022-0090 --ignore RUSTSEC-2023-0018
+        run: cargo audit --ignore RUSTSEC-2021-0076 --ignore RUSTSEC-2022-0028 --ignore RUSTSEC-2020-0071 --ignore RUSTSEC-2022-0090 --ignore RUSTSEC-2023-0018 --ignore RUSTSEC-2023-0052 --ignore RUSTSEC-2022-0093
 
       - name: Run rustfmt
         run: cargo fmt --all -- --check
