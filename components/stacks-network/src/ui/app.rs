@@ -1,5 +1,6 @@
 use super::util::{StatefulList, TabsState};
-use crate::{LogData, MempoolAdmissionData, ServiceStatusData};
+use crate::event::ServiceStatusData;
+use crate::{LogData, MempoolAdmissionData};
 use chainhook_sdk::chainhook_types::{
     StacksBlockData, StacksMicroblockData, StacksTransactionData,
 };

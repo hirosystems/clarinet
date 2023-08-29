@@ -1,13 +1,10 @@
+use chainhook_sdk::chainhook_types::{BitcoinNetwork, StacksNetwork};
+use chainhook_sdk::chainhooks::types::{ChainhookConfig, ChainhookFullSpecification};
 use clarinet_files::FileLocation;
+use hiro_system_kit::{green, red};
 use std::fs::File;
 use std::io::BufReader;
 use std::path::PathBuf;
-
-use stacks_network::chainhook_sdk::chainhooks::types::{
-    ChainhookConfig, ChainhookFullSpecification,
-};
-
-use stacks_network::chainhook_sdk::chainhook_types::{BitcoinNetwork, StacksNetwork};
 
 use std::fs;
 

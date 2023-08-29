@@ -5,14 +5,14 @@ use std::{
     sync::mpsc::{self, channel, Sender},
 };
 
-use crate::chainhooks::load_chainhooks;
 use clarinet_deployments::types::DeploymentSpecification;
 use hiro_system_kit::Drain;
 use hiro_system_kit::{slog, slog_async, slog_term};
-use stacks_network::chainhook_sdk::chainhook_types::{BitcoinNetwork, StacksNetwork};
-use stacks_network::chainhook_sdk::utils::Context;
 use stacks_network::{
-    do_run_devnet, ChainsCoordinatorCommand, DevnetEvent, DevnetOrchestrator, LogData,
+    chainhook_sdk::chainhook_types::{BitcoinNetwork, StacksNetwork},
+    chainhook_sdk::utils::Context,
+    do_run_local_devnet, load_chainhooks, ChainsCoordinatorCommand, DevnetEvent,
+    DevnetOrchestrator, LogData,
 };
 use std::fs::OpenOptions;
 
@@ -70,7 +70,7 @@ pub fn run_devnet(
     };
 
     let (orchestrator_terminated_tx, orchestrator_terminated_rx) = channel();
-    let res = hiro_system_kit::nestable_block_on(do_run_devnet(
+    let res = hiro_system_kit::nestable_block_on(do_run_local_devnet(
         devnet,
         deployment,
         &mut Some(hooks),

@@ -9,7 +9,6 @@ extern crate serde_json;
 #[macro_use]
 extern crate hiro_system_kit;
 
-mod chainhooks;
 mod deployments;
 mod devnet;
 mod frontend;

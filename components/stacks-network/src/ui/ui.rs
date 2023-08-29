@@ -1,7 +1,8 @@
-use crate::{LogLevel, Status};
 use chainhook_sdk::chainhook_types::{
     StacksBlockData, StacksMicroblockData, StacksTransactionData,
 };
+
+use crate::{event::Status, log::LogLevel};
 
 use super::{app::BlockData, App};
 use tui::{
