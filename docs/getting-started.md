@@ -48,8 +48,7 @@ For more information on how to install Clarinet on macOS, please see the [Settin
 The easiest way to install Clarinet on Windows is to use the MSI installer, 
 which you can download from the [Hiro releases page](https://github.com/hirosystems/clarinet/releases).
 
-You may also install Clarinet on Winget. Microsoft created this package manager, which includes the latest Windows updates.
-
+You may also install Clarinet on Winget. Microsoft created This package manager, which includes the latest Windows updates.
 Enter the command below.
 
 ```PowerShell
