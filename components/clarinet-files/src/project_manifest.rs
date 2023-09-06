@@ -217,7 +217,7 @@ impl Serialize for ProjectConfig {
             &self
                 .cache_location
                 .get_relative_location()
-                .unwrap_or(self.cache_location.to_string()),
+                .expect("invalida cache_dir property"),
         )?;
         if self.requirements.is_some() {
             map.serialize_entry("requirements", &self.requirements)?;

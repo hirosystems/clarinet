@@ -3,26 +3,16 @@ extern crate serde;
 #[macro_use]
 extern crate serde_derive;
 
-mod chainhooks;
 pub mod chains_coordinator;
-mod event;
-mod log;
 mod orchestrator;
 mod ui;
 
-pub use chainhook_sdk::observer::MempoolAdmissionData;
 pub use chainhook_sdk::{self, utils::Context};
-pub use chainhooks::{check_chainhooks, load_chainhooks, parse_chainhook_full_specification};
-use chains_coordinator::BitcoinMiningCommand;
-use clarinet_files::NetworkManifest;
-pub use event::DevnetEvent;
-pub use log::{LogData, LogLevel};
 pub use orchestrator::DevnetOrchestrator;
-use orchestrator::ServicesMapHosts;
 
 use std::{
+    fmt,
     sync::{
-        atomic::{AtomicBool, Ordering},
         mpsc::{self, channel, Receiver, Sender},
         Arc,
     },
@@ -30,14 +20,18 @@ use std::{
     time::Duration,
 };
 
-use chainhook_sdk::chainhooks::types::ChainhookConfig;
-use chains_coordinator::start_chains_coordinator;
+use chainhook_sdk::chainhook_types::{BitcoinChainEvent, StacksChainEvent};
+use chainhook_sdk::{chainhooks::types::ChainhookConfig, observer::MempoolAdmissionData};
+use chains_coordinator::{start_chains_coordinator, BitcoinMiningCommand};
+use chrono::prelude::*;
 use clarinet_deployments::types::DeploymentSpecification;
 use hiro_system_kit;
 use hiro_system_kit::slog;
+use std::sync::atomic::{AtomicBool, Ordering};
 use tracing_appender;
 
 use self::chains_coordinator::DevnetEventObserverConfig;
+
 #[allow(dead_code)]
 #[derive(Debug)]
 pub enum ChainsCoordinatorCommand {
@@ -52,7 +46,7 @@ where
     rt.block_on(future)
 }
 
-async fn do_run_devnet(
+pub async fn do_run_devnet(
     mut devnet: DevnetOrchestrator,
     deployment: DeploymentSpecification,
     chainhooks: &mut Option<ChainhookConfig>,
@@ -61,9 +55,6 @@ async fn do_run_devnet(
     ctx: Context,
     orchestrator_terminated_tx: Sender<bool>,
     orchestrator_terminated_rx: Option<Receiver<bool>>,
-    ip_address_setup: ServicesMapHosts,
-    start_local_devnet_services: bool,
-    network_manifest: Option<NetworkManifest>,
 ) -> Result<
     (
         Option<mpsc::Receiver<DevnetEvent>>,
@@ -83,23 +74,17 @@ async fn do_run_devnet(
         },
         _ => Err("Unable to retrieve config"),
     }?;
-    // if we're starting all services, all trace logs go to networking.log
-    if start_local_devnet_services {
-        let file_appender =
-            tracing_appender::rolling::never(&devnet_config.working_dir, "networking.log");
-        let (non_blocking, _guard) = tracing_appender::non_blocking(file_appender);
 
-        let _ = tracing_subscriber::fmt()
-            .with_max_level(tracing::Level::INFO)
-            .with_writer(non_blocking)
-            .try_init();
-    } else {
-        // for the devnet, we can't write to a file, so we log everything to stdout, but we still want to set
-        // the max trace level so we don't get too much information in the logs
-        let _ = tracing_subscriber::fmt()
-            .with_max_level(tracing::Level::INFO)
-            .try_init();
-    }
+    let file_appender =
+        tracing_appender::rolling::never(&devnet_config.working_dir, "networking.log");
+    let (non_blocking, _guard) = tracing_appender::non_blocking(file_appender);
+
+    let _ = tracing_subscriber::fmt()
+        .with_max_level(tracing::Level::INFO)
+        .with_writer(non_blocking)
+        .try_init();
+
+    let ip_address_setup = devnet.prepare_network().await?;
 
     // The event observer should be able to send some events to the UI thread,
     // and should be able to be terminated
@@ -111,13 +96,11 @@ async fn do_run_devnet(
     let config = DevnetEventObserverConfig::new(
         devnet_config.clone(),
         devnet.manifest.clone(),
-        network_manifest,
         deployment,
         hooks,
         &ctx,
         ip_address_setup,
     );
-
     let chains_coordinator_tx = devnet_events_tx.clone();
     let (chains_coordinator_commands_tx, chains_coordinator_commands_rx) =
         crossbeam_channel::unbounded();
@@ -151,29 +134,19 @@ async fn do_run_devnet(
     let orchestrator_event_tx = devnet_events_tx.clone();
     let chains_coordinator_commands_tx_moved = chains_coordinator_commands_tx.clone();
     let ctx_moved = ctx.clone();
-    let orchestrator_handle = {
-        hiro_system_kit::thread_named("Initializing bitcoin node")
-            .spawn(move || {
-                let moved_orchestrator_event_tx = orchestrator_event_tx.clone();
-                let res = if start_local_devnet_services {
-                    let future =
-                        devnet.start(moved_orchestrator_event_tx, terminator_rx, &ctx_moved);
-                    let rt = hiro_system_kit::create_basic_runtime();
-                    rt.block_on(future)
-                } else {
-                    let future = devnet.initialize_bitcoin_node(&moved_orchestrator_event_tx);
-                    let rt = hiro_system_kit::create_basic_runtime();
-                    rt.block_on(future)
-                };
-                if let Err(ref e) = res {
-                    let _ = orchestrator_event_tx.send(DevnetEvent::FatalError(e.clone()));
-                    let _ = chains_coordinator_commands_tx_moved
-                        .send(ChainsCoordinatorCommand::Terminate);
-                }
-                res
-            })
-            .expect("unable to retrieve join handle")
-    };
+    let orchestrator_handle = hiro_system_kit::thread_named("Devnet orchestrator")
+        .spawn(move || {
+            let future = devnet.start(orchestrator_event_tx.clone(), terminator_rx, &ctx_moved);
+            let rt = hiro_system_kit::create_basic_runtime();
+            let res = rt.block_on(future);
+            if let Err(ref e) = res {
+                let _ = orchestrator_event_tx.send(DevnetEvent::FatalError(e.clone()));
+                let _ =
+                    chains_coordinator_commands_tx_moved.send(ChainsCoordinatorCommand::Terminate);
+            }
+            res
+        })
+        .expect("unable to retrieve join handle");
 
     if display_dashboard {
         ctx.try_log(|logger| slog::info!(logger, "Starting Devnet"));
@@ -220,6 +193,7 @@ async fn do_run_devnet(
                         if let Some(ref log_tx) = log_tx {
                             let _ = log_tx.send(log.clone());
                         } else {
+                            println!("{}", log.message);
                             match log.level {
                                 LogLevel::Debug => {
                                     ctx.try_log(|logger| slog::debug!(logger, "{}", log.message))
@@ -260,70 +234,142 @@ async fn do_run_devnet(
     Ok((None, None, Some(chains_coordinator_commands_tx)))
 }
 
-pub async fn do_run_chain_coordinator(
-    mut devnet: DevnetOrchestrator,
-    deployment: DeploymentSpecification,
-    chainhooks: &mut Option<ChainhookConfig>,
-    log_tx: Option<Sender<LogData>>,
-    ctx: Context,
-    orchestrator_terminated_tx: Sender<bool>,
-    namespace: &str,
-    network_manifest: NetworkManifest,
-) -> Result<
-    (
-        Option<mpsc::Receiver<DevnetEvent>>,
-        Option<mpsc::Sender<bool>>,
-        Option<crossbeam_channel::Sender<ChainsCoordinatorCommand>>,
-    ),
-    String,
-> {
-    let ip_address_setup = devnet.prepare_network_k8s_coordinator(namespace)?;
-    do_run_devnet(
-        devnet,
-        deployment,
-        chainhooks,
-        log_tx,
-        false,
-        ctx,
-        orchestrator_terminated_tx,
-        None,
-        ip_address_setup,
-        false,
-        Some(network_manifest),
-    )
-    .await
+#[allow(dead_code)]
+#[derive(Debug)]
+pub enum DevnetEvent {
+    Log(LogData),
+    KeyEvent(crossterm::event::KeyEvent),
+    Tick,
+    ServiceStatus(ServiceStatusData),
+    ProtocolDeployingProgress(ProtocolDeployingData),
+    BootCompleted(Sender<BitcoinMiningCommand>),
+    StacksChainEvent(StacksChainEvent),
+    BitcoinChainEvent(BitcoinChainEvent),
+    MempoolAdmission(MempoolAdmissionData),
+    FatalError(String),
+    // Restart,
+    // Terminate,
 }
 
-pub async fn do_run_local_devnet(
-    mut devnet: DevnetOrchestrator,
-    deployment: DeploymentSpecification,
-    chainhooks: &mut Option<ChainhookConfig>,
-    log_tx: Option<Sender<LogData>>,
-    display_dashboard: bool,
-    ctx: Context,
-    orchestrator_terminated_tx: Sender<bool>,
-    orchestrator_terminated_rx: Option<Receiver<bool>>,
-) -> Result<
-    (
-        Option<mpsc::Receiver<DevnetEvent>>,
-        Option<mpsc::Sender<bool>>,
-        Option<crossbeam_channel::Sender<ChainsCoordinatorCommand>>,
-    ),
-    String,
-> {
-    let ip_address_setup = devnet.prepare_local_network().await?;
-    do_run_devnet(
-        devnet,
-        deployment,
-        chainhooks,
-        log_tx,
-        display_dashboard,
-        ctx,
-        orchestrator_terminated_tx,
-        orchestrator_terminated_rx,
-        ip_address_setup,
-        true,
-        None,
-    )
-    .await
+#[allow(dead_code)]
+impl DevnetEvent {
+    pub fn error(message: String) -> DevnetEvent {
+        DevnetEvent::Log(Self::log_error(message))
+    }
+
+    #[allow(dead_code)]
+    pub fn warning(message: String) -> DevnetEvent {
+        DevnetEvent::Log(Self::log_warning(message))
+    }
+
+    pub fn info(message: String) -> DevnetEvent {
+        DevnetEvent::Log(Self::log_info(message))
+    }
+
+    pub fn success(message: String) -> DevnetEvent {
+        DevnetEvent::Log(Self::log_success(message))
+    }
+
+    pub fn debug(message: String) -> DevnetEvent {
+        DevnetEvent::Log(Self::log_debug(message))
+    }
+
+    pub fn log_error(message: String) -> LogData {
+        LogData::new(LogLevel::Error, message)
+    }
+
+    pub fn log_warning(message: String) -> LogData {
+        LogData::new(LogLevel::Warning, message)
+    }
+
+    pub fn log_info(message: String) -> LogData {
+        LogData::new(LogLevel::Info, message)
+    }
+
+    pub fn log_success(message: String) -> LogData {
+        LogData::new(LogLevel::Success, message)
+    }
+
+    pub fn log_debug(message: String) -> LogData {
+        LogData::new(LogLevel::Debug, message)
+    }
 }
+
+#[derive(Clone, Debug)]
+pub enum LogLevel {
+    Error,
+    Warning,
+    Info,
+    Success,
+    Debug,
+}
+
+impl fmt::Display for LogLevel {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(
+            f,
+            "{}",
+            match &self {
+                LogLevel::Error => "erro",
+                LogLevel::Warning => "warn",
+                LogLevel::Info => "info",
+                LogLevel::Success => "succ",
+                LogLevel::Debug => "debg",
+            }
+        )
+    }
+}
+
+#[derive(Clone, Debug)]
+pub struct LogData {
+    pub occurred_at: String,
+    pub message: String,
+    pub level: LogLevel,
+}
+
+impl LogData {
+    pub fn new(level: LogLevel, message: String) -> LogData {
+        let now: DateTime<Utc> = Utc::now();
+        LogData {
+            level,
+            message,
+            occurred_at: now.format("%b %e %T%.6f").to_string(),
+        }
+    }
+}
+
+impl fmt::Display for LogData {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{} [{}] {}", self.occurred_at, self.level, self.message)
+    }
+}
+
+#[derive(Clone, Debug)]
+pub enum Status {
+    Red,
+    Yellow,
+    Green,
+}
+
+#[derive(Clone, Debug)]
+pub struct ServiceStatusData {
+    pub order: usize,
+    pub status: Status,
+    pub name: String,
+    pub comment: String,
+}
+
+#[derive(Clone, Debug)]
+pub struct ProtocolDeployingData {
+    pub new_contracts_deployed: Vec<String>,
+}
+
+#[derive(Clone, Debug)]
+pub struct BootCompletedData {
+    pub contracts_deployed: Vec<String>,
+}
+
+// pub struct MicroblockData {
+//     pub seq: u32,
+//     pub transactions: Vec<Transaction>
+// }

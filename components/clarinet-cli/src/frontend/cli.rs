@@ -1,3 +1,4 @@
+use crate::chainhooks::{check_chainhooks, load_chainhooks, parse_chainhook_full_specification};
 use crate::deployments::types::DeploymentSynthesis;
 use crate::deployments::{
     self, check_deployments, generate_default_deployment, get_absolute_deployment_path,
@@ -23,8 +24,7 @@ use clarinet_deployments::{
 use clarinet_files::chainhook_types::Chain;
 use clarinet_files::chainhook_types::StacksNetwork;
 use clarinet_files::{
-    get_manifest_location, FileLocation, NetworkManifest, ProjectManifest, ProjectManifestFile,
-    RequirementConfig,
+    get_manifest_location, FileLocation, ProjectManifest, ProjectManifestFile, RequirementConfig,
 };
 use clarity_repl::analysis::call_checker::ContractAnalysis;
 use clarity_repl::analysis::coverage::parse_coverage_str;
@@ -37,9 +37,7 @@ use clarity_repl::repl::diagnostic::{output_code, output_diagnostic};
 use clarity_repl::repl::{ClarityCodeSource, ClarityContract, ContractDeployer, DEFAULT_EPOCH};
 use clarity_repl::{analysis, repl, Terminal};
 use stacks_network::chainhook_sdk::chainhooks::types::ChainhookFullSpecification;
-use stacks_network::{
-    self, check_chainhooks, load_chainhooks, parse_chainhook_full_specification, DevnetOrchestrator,
-};
+use stacks_network::{self, DevnetOrchestrator};
 use std::collections::HashMap;
 use std::fs::{self, File};
 use std::io::prelude::*;
@@ -846,24 +844,11 @@ pub fn main() {
                 } else {
                     get_initial_transactions_trackers(&deployment)
                 };
-                let network_moved = network.clone();
+
                 std::thread::spawn(move || {
                     let manifest = manifest_moved;
-                    let network_manifest = NetworkManifest::from_project_manifest_location(
-                        &manifest.location,
-                        &network_moved.get_networks(),
-                        Some(&manifest.project.cache_location),
-                        None,
-                    )
-                    .expect("unable to load network manifest");
                     apply_on_chain_deployment(
-                        network_manifest,
-                        deployment,
-                        event_tx,
-                        command_rx,
-                        true,
-                        None,
-                        None,
+                        &manifest, deployment, event_tx, command_rx, true, None, None,
                     );
                 });
 
@@ -1401,7 +1386,7 @@ pub fn main() {
                 }
             };
 
-            let orchestrator = match DevnetOrchestrator::new(manifest, None, None, true) {
+            let orchestrator = match DevnetOrchestrator::new(manifest, None) {
                 Ok(orchestrator) => orchestrator,
                 Err(e) => {
                     println!("{}", format_err!(e));
