@@ -522,7 +522,7 @@ pub struct RequirementPublishSpecification {
 }
 
 pub mod source_serde {
-    use bitcoincore_rpc::jsonrpc::base64::{decode, encode};
+    use base64::{engine::general_purpose::STANDARD as b64, Engine as _};
     use serde::{Deserialize, Deserializer, Serializer};
     use std::str::from_utf8;
 
@@ -530,7 +530,7 @@ pub mod source_serde {
     where
         S: Serializer,
     {
-        let enc = encode(&x);
+        let enc = b64.encode(&x);
         s.serialize_str(&enc)
     }
 
@@ -543,7 +543,8 @@ pub mod source_serde {
     }
 
     pub fn base64_decode(encoded: &str) -> Result<String, String> {
-        let bytes = decode(&encoded)
+        let bytes = b64
+            .decode(&encoded)
             .map_err(|e| format!("unable to decode contract source: {}", e.to_string()))?;
         let decoded = from_utf8(&bytes).map_err(|e| {
             format!(
@@ -893,7 +894,7 @@ pub struct DeploymentSpecification {
 }
 
 pub mod contracts_serde {
-    use bitcoincore_rpc::jsonrpc::base64::encode;
+    use base64::{engine::general_purpose::STANDARD as b64, Engine as _};
     use clarinet_files::FileLocation;
     use clarity_repl::clarity::vm::types::QualifiedContractIdentifier;
     use serde::{ser::SerializeSeq, Deserializer, Serializer};
@@ -910,7 +911,7 @@ pub mod contracts_serde {
     {
         let mut out = serializer.serialize_seq(Some(target.len()))?;
         for (contract_id, (source, file_location)) in target {
-            let encoded = encode(&source);
+            let encoded = b64.encode(&source);
             let mut map = BTreeMap::new();
             map.insert("contract_id", contract_id.to_string());
             map.insert("source", encoded);
