@@ -163,44 +163,8 @@ pub struct AccountConfigFile {
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct NetworkManifest {
     pub network: NetworkConfig,
-    #[serde(with = "accounts_serde")]
     pub accounts: BTreeMap<String, AccountConfig>,
-    #[serde(rename = "devnet_settings")]
     pub devnet: Option<DevnetConfig>,
-}
-
-pub mod accounts_serde {
-    use std::collections::BTreeMap;
-
-    use serde::{ser::SerializeSeq, Deserializer, Serializer};
-
-    use crate::AccountConfig;
-
-    pub fn serialize<S>(
-        target: &BTreeMap<String, AccountConfig>,
-        serializer: S,
-    ) -> Result<S::Ok, S::Error>
-    where
-        S: Serializer,
-    {
-        let mut seq = serializer.serialize_seq(Some(target.len()))?;
-        for (_, account) in target {
-            seq.serialize_element(account)?;
-        }
-        seq.end()
-    }
-
-    pub fn deserialize<'de, D>(deserializer: D) -> Result<BTreeMap<String, AccountConfig>, D::Error>
-    where
-        D: Deserializer<'de>,
-    {
-        let mut res: BTreeMap<String, AccountConfig> = BTreeMap::new();
-        let container: Vec<AccountConfig> = serde::Deserialize::deserialize(deserializer)?;
-        for account in container {
-            res.insert(account.label.clone(), account);
-        }
-        Ok(res)
-    }
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]

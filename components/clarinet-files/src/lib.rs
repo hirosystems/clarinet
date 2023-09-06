@@ -27,9 +27,7 @@ pub use network_manifest::{
     DEFAULT_STACKS_NODE_IMAGE, DEFAULT_SUBNET_API_IMAGE, DEFAULT_SUBNET_CONTRACT_ID,
     DEFAULT_SUBNET_MNEMONIC, DEFAULT_SUBNET_NODE_IMAGE,
 };
-pub use project_manifest::{
-    ProjectManifest, ProjectManifestFile, RequirementConfig, INVALID_CLARITY_VERSION,
-};
+pub use project_manifest::{ProjectManifest, ProjectManifestFile, RequirementConfig};
 use serde::ser::{Serialize, SerializeMap, Serializer};
 use std::collections::HashMap;
 use std::future::Future;

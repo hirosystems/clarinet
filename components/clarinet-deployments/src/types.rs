@@ -8,13 +8,15 @@ use clarity_repl::clarity::vm::types::{
     PrincipalData, QualifiedContractIdentifier, StandardPrincipalData,
 };
 
-use clarinet_files::chainhook_types::StacksNetwork;
-use clarity_repl::analysis::ast_dependency_detector::DependencySet;
 use clarity_repl::clarity::{ClarityName, ClarityVersion, ContractName};
-use clarity_repl::repl::{Session, DEFAULT_CLARITY_VERSION};
+
+use clarinet_files::chainhook_types::StacksNetwork;
 use serde::{Deserialize, Serialize};
 use serde_yaml;
 use std::collections::BTreeMap;
+
+use clarity_repl::analysis::ast_dependency_detector::DependencySet;
+use clarity_repl::repl::{Session, DEFAULT_CLARITY_VERSION};
 use std::collections::HashMap;
 
 #[derive(Serialize, Deserialize, PartialEq, Debug, Clone, Copy, Eq, PartialOrd, Ord)]
@@ -70,7 +72,7 @@ pub struct DeploymentGenerationArtifacts {
     pub success: bool,
 }
 
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct TransactionPlanSpecification {
     pub batches: Vec<TransactionsBatchSpecification>,
 }
@@ -195,15 +197,14 @@ pub struct EmulatedContractPublishSpecificationFile {
     pub clarity_version: Option<u8>,
 }
 
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct TransactionsBatchSpecification {
     pub id: usize,
     pub transactions: Vec<TransactionSpecification>,
     pub epoch: Option<EpochSpec>,
 }
 
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
-#[serde(tag = "transaction_type")]
+#[derive(Debug, PartialEq, Clone)]
 pub enum TransactionSpecification {
     ContractCall(ContractCallSpecification),
     ContractPublish(ContractPublishSpecification),
@@ -214,84 +215,14 @@ pub enum TransactionSpecification {
     StxTransfer(StxTransferSpecification),
 }
 
-type Memo = [u8; 34];
-
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct StxTransferSpecification {
-    #[serde(with = "standard_principal_data_serde")]
     pub expected_sender: StandardPrincipalData,
-    #[serde(with = "principal_data_serde")]
     pub recipient: PrincipalData,
     pub mstx_amount: u64,
-    #[serde(with = "memo_serde")]
-    pub memo: Memo,
+    pub memo: [u8; 34],
     pub cost: u64,
     pub anchor_block_only: bool,
-}
-
-pub mod memo_serde {
-    use std::fmt::Write;
-
-    use clarity_repl::clarity::util::hash::hex_bytes;
-    use serde::{Deserialize, Deserializer, Serializer};
-
-    use super::Memo;
-    pub fn serialize<S>(bytes: &Memo, s: S) -> Result<S::Ok, S::Error>
-    where
-        S: Serializer,
-    {
-        let mut str = String::with_capacity((bytes.len() * 2) + 1);
-        write!(&mut str, "0x").unwrap();
-        for &b in bytes {
-            write!(&mut str, "{:02x}", b).unwrap();
-        }
-        s.serialize_str(&str)
-    }
-    pub fn deserialize<'de, D>(deserializer: D) -> Result<Memo, D::Error>
-    where
-        D: Deserializer<'de>,
-    {
-        let hex_memo = String::deserialize(deserializer).map_err(serde::de::Error::custom)?;
-
-        let mut memo = [0u8; 34];
-
-        if !hex_memo.is_empty() && !hex_memo.starts_with("0x") {
-            return Err(serde::de::Error::custom(
-                "unable to parse memo (up to 34 bytes, starting with '0x')",
-            ));
-        }
-        match hex_bytes(&hex_memo[2..]) {
-            Ok(ref mut bytes) => {
-                bytes.resize(34, 0);
-                memo.copy_from_slice(&bytes);
-            }
-            Err(_) => {
-                return Err(serde::de::Error::custom(
-                    "unable to parse memo (up to 34 bytes)",
-                ))
-            }
-        }
-        Ok(memo)
-    }
-}
-pub mod principal_data_serde {
-    use clarity_repl::clarity::vm::types::PrincipalData;
-    use serde::{Deserialize, Deserializer, Serializer};
-
-    pub fn serialize<S>(x: &PrincipalData, s: S) -> Result<S::Ok, S::Error>
-    where
-        S: Serializer,
-    {
-        s.serialize_str(&x.to_string())
-    }
-
-    pub fn deserialize<'de, D>(deserializer: D) -> Result<PrincipalData, D::Error>
-    where
-        D: Deserializer<'de>,
-    {
-        let s = String::deserialize(deserializer).map_err(serde::de::Error::custom)?;
-        PrincipalData::parse(&s).map_err(serde::de::Error::custom)
-    }
 }
 
 impl StxTransferSpecification {
@@ -346,7 +277,7 @@ impl StxTransferSpecification {
     }
 }
 
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct BtcTransferSpecification {
     pub expected_sender: String,
     pub recipient: String,
@@ -368,11 +299,9 @@ impl BtcTransferSpecification {
     }
 }
 
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct ContractCallSpecification {
-    #[serde(with = "qualified_contract_identifier_serde")]
     pub contract_id: QualifiedContractIdentifier,
-    #[serde(with = "standard_principal_data_serde")]
     pub expected_sender: StandardPrincipalData,
     pub method: ClarityName,
     pub parameters: Vec<String>,
@@ -429,12 +358,9 @@ impl ContractCallSpecification {
 #[derive(Debug, PartialEq, Serialize, Deserialize, Clone)]
 pub struct ContractPublishSpecification {
     pub contract_name: ContractName,
-    #[serde(with = "standard_principal_data_serde")]
     pub expected_sender: StandardPrincipalData,
     pub location: FileLocation,
-    #[serde(with = "source_serde")]
     pub source: String,
-    #[serde(with = "clarity_version_serde")]
     pub clarity_version: ClarityVersion,
     pub cost: u64,
     pub anchor_block_only: bool,
@@ -507,158 +433,13 @@ impl ContractPublishSpecification {
 
 #[derive(Debug, PartialEq, Serialize, Deserialize, Clone)]
 pub struct RequirementPublishSpecification {
-    #[serde(with = "qualified_contract_identifier_serde")]
     pub contract_id: QualifiedContractIdentifier,
-    #[serde(with = "standard_principal_data_serde")]
     pub remap_sender: StandardPrincipalData,
-    #[serde(with = "remap_principals_serde")]
     pub remap_principals: BTreeMap<StandardPrincipalData, StandardPrincipalData>,
-    #[serde(with = "source_serde")]
     pub source: String,
-    #[serde(with = "clarity_version_serde")]
     pub clarity_version: ClarityVersion,
     pub cost: u64,
     pub location: FileLocation,
-}
-
-pub mod source_serde {
-    use bitcoincore_rpc::jsonrpc::base64::{decode, encode};
-    use serde::{Deserialize, Deserializer, Serializer};
-    use std::str::from_utf8;
-
-    pub fn serialize<S>(x: &str, s: S) -> Result<S::Ok, S::Error>
-    where
-        S: Serializer,
-    {
-        let enc = encode(&x);
-        s.serialize_str(&enc)
-    }
-
-    pub fn deserialize<'de, D>(deserializer: D) -> Result<String, D::Error>
-    where
-        D: Deserializer<'de>,
-    {
-        let s = String::deserialize(deserializer)?;
-        base64_decode(&s).map_err(serde::de::Error::custom)
-    }
-
-    pub fn base64_decode(encoded: &str) -> Result<String, String> {
-        let bytes = decode(&encoded)
-            .map_err(|e| format!("unable to decode contract source: {}", e.to_string()))?;
-        let decoded = from_utf8(&bytes).map_err(|e| {
-            format!(
-                "invalid UTF-8 sequence when decoding contract source: {}",
-                e.to_string()
-            )
-        })?;
-        Ok(decoded.to_owned())
-    }
-}
-
-pub mod standard_principal_data_serde {
-    use clarity_repl::clarity::vm::types::{PrincipalData, StandardPrincipalData};
-    use serde::{Deserialize, Deserializer, Serializer};
-
-    pub fn serialize<S>(x: &StandardPrincipalData, s: S) -> Result<S::Ok, S::Error>
-    where
-        S: Serializer,
-    {
-        s.serialize_str(&x.to_address())
-    }
-
-    pub fn deserialize<'de, D>(deserializer: D) -> Result<StandardPrincipalData, D::Error>
-    where
-        D: Deserializer<'de>,
-    {
-        let s = String::deserialize(deserializer)?;
-        PrincipalData::parse_standard_principal(&s).map_err(serde::de::Error::custom)
-    }
-}
-
-pub mod qualified_contract_identifier_serde {
-    use clarity_repl::clarity::vm::types::QualifiedContractIdentifier;
-    use serde::{Deserializer, Serializer};
-
-    pub fn serialize<'ser, S>(x: &'ser QualifiedContractIdentifier, s: S) -> Result<S::Ok, S::Error>
-    where
-        S: Serializer,
-    {
-        serde::Serialize::serialize(&x.to_string(), s)
-    }
-
-    pub fn deserialize<'de, D>(des: D) -> Result<QualifiedContractIdentifier, D::Error>
-    where
-        D: Deserializer<'de>,
-    {
-        let literal: String = serde::Deserialize::deserialize(des)?;
-
-        QualifiedContractIdentifier::parse(&literal).map_err(serde::de::Error::custom)
-    }
-}
-
-pub mod remap_principals_serde {
-    use clarity_repl::clarity::vm::types::{PrincipalData, StandardPrincipalData};
-    use serde::{ser::SerializeMap, Deserializer, Serializer};
-    use std::collections::{BTreeMap, HashMap};
-
-    pub fn serialize<'ser, S>(
-        target: &'ser BTreeMap<StandardPrincipalData, StandardPrincipalData>,
-        serializer: S,
-    ) -> Result<S::Ok, S::Error>
-    where
-        S: Serializer,
-    {
-        let mut map = serializer.serialize_map(Some(target.len()))?;
-        for (k, v) in target {
-            map.serialize_entry(&k.to_address(), &v.to_address())?;
-        }
-        map.end()
-    }
-
-    pub fn deserialize<'de, D>(
-        des: D,
-    ) -> Result<BTreeMap<StandardPrincipalData, StandardPrincipalData>, D::Error>
-    where
-        D: Deserializer<'de>,
-    {
-        let container: HashMap<String, String> = serde::Deserialize::deserialize(des)?;
-        let mut m = BTreeMap::new();
-        for (k, v) in container {
-            m.insert(
-                PrincipalData::parse_standard_principal(&k).map_err(serde::de::Error::custom)?,
-                PrincipalData::parse_standard_principal(&v).map_err(serde::de::Error::custom)?,
-            );
-        }
-        Ok(m)
-    }
-}
-
-pub mod clarity_version_serde {
-    use clarinet_files::INVALID_CLARITY_VERSION;
-    use clarity_repl::clarity::ClarityVersion;
-    use serde::{Deserialize, Deserializer, Serializer};
-
-    pub fn serialize<S>(clarity_version: &ClarityVersion, s: S) -> Result<S::Ok, S::Error>
-    where
-        S: Serializer,
-    {
-        match clarity_version {
-            ClarityVersion::Clarity1 => s.serialize_i64(1),
-            ClarityVersion::Clarity2 => s.serialize_i64(2),
-        }
-    }
-
-    pub fn deserialize<'de, D>(deserializer: D) -> Result<ClarityVersion, D::Error>
-    where
-        D: Deserializer<'de>,
-    {
-        let cv = i64::deserialize(deserializer)?;
-        match cv {
-            1 => Ok(ClarityVersion::Clarity1),
-            2 => Ok(ClarityVersion::Clarity2),
-            _ => Err(serde::de::Error::custom(INVALID_CLARITY_VERSION)),
-        }
-    }
 }
 
 impl RequirementPublishSpecification {
@@ -753,7 +534,6 @@ impl RequirementPublishSpecification {
 #[derive(Debug, PartialEq, Serialize, Deserialize, Clone)]
 pub struct EmulatedContractCallSpecification {
     pub contract_id: QualifiedContractIdentifier,
-    #[serde(with = "standard_principal_data_serde")]
     pub emulated_sender: StandardPrincipalData,
     pub method: ClarityName,
     pub parameters: Vec<String>,
@@ -806,10 +586,8 @@ impl EmulatedContractCallSpecification {
 #[derive(Debug, PartialEq, Serialize, Deserialize, Clone)]
 pub struct EmulatedContractPublishSpecification {
     pub contract_name: ContractName,
-    #[serde(with = "standard_principal_data_serde")]
     pub emulated_sender: StandardPrincipalData,
     pub source: String,
-    #[serde(with = "clarity_version_serde")]
     pub clarity_version: ClarityVersion,
     pub location: FileLocation,
 }
@@ -877,7 +655,7 @@ impl EmulatedContractPublishSpecification {
     }
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Debug, Clone)]
 pub struct DeploymentSpecification {
     pub id: u32,
     pub name: String,
@@ -885,91 +663,9 @@ pub struct DeploymentSpecification {
     pub stacks_node: Option<String>,
     pub bitcoin_node: Option<String>,
     pub genesis: Option<GenesisSpecification>,
-    #[serde(flatten)]
     pub plan: TransactionPlanSpecification,
     // Keep a cache of contract's (source, relative_path)
-    #[serde(with = "contracts_serde")]
     pub contracts: BTreeMap<QualifiedContractIdentifier, (String, FileLocation)>,
-}
-
-pub mod contracts_serde {
-    use bitcoincore_rpc::jsonrpc::base64::encode;
-    use clarinet_files::FileLocation;
-    use clarity_repl::clarity::vm::types::QualifiedContractIdentifier;
-    use serde::{ser::SerializeSeq, Deserializer, Serializer};
-    use std::collections::{BTreeMap, HashMap};
-
-    use super::source_serde;
-
-    pub fn serialize<'ser, S>(
-        target: &'ser BTreeMap<QualifiedContractIdentifier, (String, FileLocation)>,
-        serializer: S,
-    ) -> Result<S::Ok, S::Error>
-    where
-        S: Serializer,
-    {
-        let mut out = serializer.serialize_seq(Some(target.len()))?;
-        for (contract_id, (source, file_location)) in target {
-            let encoded = encode(&source);
-            let mut map = BTreeMap::new();
-            map.insert("contract_id", contract_id.to_string());
-            map.insert("source", encoded);
-            match file_location {
-                FileLocation::FileSystem { path } => {
-                    map.insert("path", path.to_str().unwrap().to_string())
-                }
-                FileLocation::Url { url } => map.insert("url", url.to_string()),
-            };
-            out.serialize_element(&map)?;
-        }
-        out.end()
-    }
-
-    pub fn deserialize<'de, D>(
-        des: D,
-    ) -> Result<BTreeMap<QualifiedContractIdentifier, (String, FileLocation)>, D::Error>
-    where
-        D: Deserializer<'de>,
-    {
-        let mut res: BTreeMap<QualifiedContractIdentifier, (String, FileLocation)> =
-            BTreeMap::new();
-        let container: Vec<HashMap<String, String>> = serde::Deserialize::deserialize(des)?;
-
-        for entry in container {
-            let contract_id = match entry.get("contract_id") {
-                Some(contract_id) => {
-                    QualifiedContractIdentifier::parse(&contract_id).map_err(|e| {
-                        serde::de::Error::custom(format!("failed to parse contract id: {}", e))
-                    })
-                }
-                None => Err(serde::de::Error::custom(
-                    "Contract entry must have `contract_id` field",
-                )),
-            }?;
-
-            let file_location = if let Some(url) = entry.get("url") {
-                FileLocation::from_url_string(url)
-            } else if let Some(path) = entry.get("path") {
-                FileLocation::from_path_string(path)
-            } else {
-                Err("Invalid file location field. Must have key \"url\" or \"path\"".into())
-            }
-            .map_err(serde::de::Error::custom)?;
-
-            let source = match entry.get("source") {
-                Some(source) => {
-                    source_serde::base64_decode(&source).map_err(serde::de::Error::custom)
-                }
-                None => Err(serde::de::Error::custom(
-                    "Contract entry must have `source` field",
-                )),
-            }?;
-
-            res.insert(contract_id, (source, file_location));
-        }
-
-        Ok(res)
-    }
 }
 
 impl DeploymentSpecification {
@@ -1073,7 +769,6 @@ impl DeploymentSpecification {
                                 }
                                 TransactionSpecificationFile::ContractPublish(spec) => {
                                     let spec = ContractPublishSpecification::from_specifications(spec, project_root_location)?;
-
                                     let contract_id = QualifiedContractIdentifier::new(spec.expected_sender.clone(), spec.contract_name.clone());
                                     contracts.insert(contract_id, (spec.source.clone(), spec.location.clone()));
                                     TransactionSpecification::ContractPublish(spec)
@@ -1147,6 +842,7 @@ impl DeploymentSpecification {
 
 #[derive(Debug, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]
+
 pub struct DeploymentSpecificationFile {
     pub id: Option<u32>,
     pub name: String,
@@ -1169,7 +865,7 @@ pub struct GenesisSpecificationFile {
     pub contracts: Vec<String>,
 }
 
-#[derive(Debug, PartialEq, Deserialize, Serialize)]
+#[derive(Debug, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]
 pub struct WalletSpecificationFile {
     pub name: String,
@@ -1177,7 +873,7 @@ pub struct WalletSpecificationFile {
     pub balance: String,
 }
 
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct GenesisSpecification {
     pub wallets: Vec<WalletSpecification>,
     pub contracts: Vec<String>,
@@ -1215,10 +911,9 @@ impl GenesisSpecification {
     }
 }
 
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct WalletSpecification {
     pub name: String,
-    #[serde(with = "standard_principal_data_serde")]
     pub address: StandardPrincipalData,
     pub balance: u128,
 }
