@@ -254,12 +254,6 @@ checksum = "6107fe1be6682a68940da878d9e9f5e90ca5745b3dec9fd1bb393c8777d4f581"
 
 [[package]]
 name = "base64"
-version = "0.12.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3441f0f7b02788e948e47f457ca01f1d7e6d92c693bc132c22b087d3141c03ff"
-
-[[package]]
-name = "base64"
 version = "0.13.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9e1b586273c5702936fe7b7d6896644d8be71e6314cfe09d3167c95f712589e8"
@@ -677,10 +671,9 @@ checksum = "2da6da31387c7e4ef160ffab6d5e7f00c42626fe39aea70a7b0f1773f7dd6c1b"
 [[package]]
 name = "clar2wasm"
 version = "0.1.0"
-source = "git+https://github.com/stacks-network/clarity-wasm.git?tag=v0.1#eea59be49dd89a5472bb2169ebed2a5beda59b0d"
 dependencies = [
  "clap 4.3.22",
- "clarity-vm",
+ "clarity",
  "lazy_static",
  "regex",
  "walrus",
@@ -836,6 +829,28 @@ dependencies = [
 ]
 
 [[package]]
+name = "clarity"
+version = "2.1.1"
+dependencies = [
+ "integer-sqrt",
+ "lazy_static",
+ "rand 0.7.3",
+ "rand_chacha 0.2.2",
+ "regex",
+ "rstest",
+ "rstest_reuse",
+ "rusqlite",
+ "serde",
+ "serde_derive",
+ "serde_json",
+ "serde_stacker",
+ "sha2-asm",
+ "slog",
+ "stacks-common 0.0.2",
+ "time 0.2.27",
+]
+
+[[package]]
 name = "clarity-events"
 version = "1.0.0"
 dependencies = [
@@ -933,7 +948,7 @@ dependencies = [
  "bytes",
  "chrono",
  "clar2wasm",
- "clarity-vm",
+ "clarity",
  "debug_types",
  "futures",
  "getrandom 0.2.8",
@@ -980,8 +995,7 @@ dependencies = [
  "serde_json",
  "serde_stacker",
  "sha2-asm",
- "slog",
- "stacks-common",
+ "stacks-common 0.0.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "time 0.2.27",
 ]
 
@@ -2540,25 +2554,6 @@ dependencies = [
 
 [[package]]
 name = "libsecp256k1"
-version = "0.5.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "bd1137239ab33b41aa9637a88a28249e5e70c40a42ccc92db7f12cc356c1fcd7"
-dependencies = [
- "arrayref",
- "base64 0.12.3",
- "digest 0.9.0",
- "hmac-drbg 0.3.0",
- "libsecp256k1-core 0.2.2",
- "libsecp256k1-gen-ecmult 0.2.1",
- "libsecp256k1-gen-genmult 0.2.1",
- "rand 0.7.3",
- "serde",
- "sha2 0.9.9",
- "typenum",
-]
-
-[[package]]
-name = "libsecp256k1"
 version = "0.7.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "95b09eff1b35ed3b33b877ced3a691fc7a481919c7e29c53c906226fcf55e2a1"
@@ -2567,24 +2562,13 @@ dependencies = [
  "base64 0.13.1",
  "digest 0.9.0",
  "hmac-drbg 0.3.0",
- "libsecp256k1-core 0.3.0",
- "libsecp256k1-gen-ecmult 0.3.0",
- "libsecp256k1-gen-genmult 0.3.0",
+ "libsecp256k1-core",
+ "libsecp256k1-gen-ecmult",
+ "libsecp256k1-gen-genmult",
  "rand 0.8.5",
  "serde",
  "sha2 0.9.9",
  "typenum",
-]
-
-[[package]]
-name = "libsecp256k1-core"
-version = "0.2.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d0f6ab710cec28cef759c5f18671a27dae2a5f952cdaaee1d8e2908cb2478a80"
-dependencies = [
- "crunchy",
- "digest 0.9.0",
- "subtle 2.4.1",
 ]
 
 [[package]]
@@ -2600,29 +2584,11 @@ dependencies = [
 
 [[package]]
 name = "libsecp256k1-gen-ecmult"
-version = "0.2.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ccab96b584d38fac86a83f07e659f0deafd0253dc096dab5a36d53efe653c5c3"
-dependencies = [
- "libsecp256k1-core 0.2.2",
-]
-
-[[package]]
-name = "libsecp256k1-gen-ecmult"
 version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3038c808c55c87e8a172643a7d87187fc6c4174468159cb3090659d55bcb4809"
 dependencies = [
- "libsecp256k1-core 0.3.0",
-]
-
-[[package]]
-name = "libsecp256k1-gen-genmult"
-version = "0.2.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "67abfe149395e3aa1c48a2beb32b068e2334402df8181f818d3aee2b304c4f5d"
-dependencies = [
- "libsecp256k1-core 0.2.2",
+ "libsecp256k1-core",
 ]
 
 [[package]]
@@ -2631,7 +2597,7 @@ version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3db8d6ba2cec9eacc40e6e8ccc98931840301f1006e95647ceb2dd5c3aa06f7c"
 dependencies = [
- "libsecp256k1-core 0.3.0",
+ "libsecp256k1-core",
 ]
 
 [[package]]
@@ -4514,15 +4480,12 @@ dependencies = [
 [[package]]
 name = "stacks-common"
 version = "0.0.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c887baefb047fb7cd1c82d5a62e1deaca4b9ea9c701f965407db6c39a3fc902f"
 dependencies = [
  "chrono",
  "curve25519-dalek",
  "ed25519-dalek",
  "lazy_static",
  "libc",
- "libsecp256k1 0.5.0",
  "percent-encoding",
  "rand 0.7.3",
  "ripemd",
@@ -4536,6 +4499,30 @@ dependencies = [
  "slog",
  "slog-json",
  "slog-term",
+ "time 0.2.27",
+]
+
+[[package]]
+name = "stacks-common"
+version = "0.0.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c887baefb047fb7cd1c82d5a62e1deaca4b9ea9c701f965407db6c39a3fc902f"
+dependencies = [
+ "chrono",
+ "curve25519-dalek",
+ "ed25519-dalek",
+ "lazy_static",
+ "libc",
+ "percent-encoding",
+ "rand 0.7.3",
+ "ripemd",
+ "rusqlite",
+ "secp256k1",
+ "serde",
+ "serde_derive",
+ "serde_json",
+ "sha2 0.10.6",
+ "sha3 0.10.6",
  "time 0.2.27",
 ]
 

@@ -18,9 +18,9 @@ use wasmtime::{
     AsContextMut, Caller, Engine, FuncType, Instance, Linker, Module, Store, Val, ValType,
 };
 
-pub struct ClarityWasmContext<'a, 'b, 'hooks> {
+pub struct ClarityWasmContext<'a, 'b> {
     /// The global context in which to execute.
-    pub global_context: &'b mut GlobalContext<'a, 'hooks>,
+    pub global_context: &'b mut GlobalContext<'a>,
     /// Context for this contract. This will be filled in when running the
     /// top-level expressions, then used when calling functions.
     pub contract_context: &'b mut ContractContext,
@@ -30,9 +30,9 @@ pub struct ClarityWasmContext<'a, 'b, 'hooks> {
     pub identifier_map: HashMap<i32, String>,
 }
 
-impl<'a, 'b, 'hooks> ClarityWasmContext<'a, 'b, 'hooks> {
+impl<'a, 'b> ClarityWasmContext<'a, 'b> {
     pub fn new(
-        global_context: &'b mut GlobalContext<'a, 'hooks>,
+        global_context: &'b mut GlobalContext<'a>,
         contract_context: &'b mut ContractContext,
         contract_analysis: ContractAnalysis,
     ) -> Self {
@@ -48,9 +48,9 @@ impl<'a, 'b, 'hooks> ClarityWasmContext<'a, 'b, 'hooks> {
 /// A simple wrapper for WASMTime to help reduce the amount of boilerplate needed
 /// in test code. The wrapper compiles the specified contract using `clar2wasm` and
 /// stores a copy of its contract analysis for type inferrence when calling functions.
-pub struct WasmtimeHelper<'a, 'b, 'hooks> {
+pub struct WasmtimeHelper<'a, 'b> {
     instance: Instance,
-    store: Box<Store<ClarityWasmContext<'a, 'b, 'hooks>>>,
+    store: Box<Store<ClarityWasmContext<'a, 'b>>>,
 }
 
 /// Generates a WASMTime function signature (both input and return arguments), provided the
@@ -211,10 +211,10 @@ fn test_map_wasm_value() {
     assert_eq!(value.1, 4);
 }
 
-impl<'a, 'b, 'hooks> WasmtimeHelper<'a, 'b, 'hooks> {
+impl<'a, 'b> WasmtimeHelper<'a, 'b> {
     pub fn new(
         contract_id: QualifiedContractIdentifier,
-        global_context: &'b mut GlobalContext<'a, 'hooks>,
+        global_context: &'b mut GlobalContext<'a>,
         contract_context: &'b mut ContractContext,
         compile_result: &mut CompileResult,
     ) -> Self {
