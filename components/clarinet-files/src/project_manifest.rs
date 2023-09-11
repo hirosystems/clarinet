@@ -48,7 +48,6 @@ pub struct ProjectConfigFile {
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 pub struct ProjectManifest {
-    #[serde(rename = "metadata")]
     pub project: ProjectConfig,
     #[serde(serialize_with = "toml::ser::tables_last")]
     #[serde(deserialize_with = "contracts_deserializer")]
