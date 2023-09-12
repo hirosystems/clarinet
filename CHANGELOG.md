@@ -1,37 +1,9 @@
 #### [1.7.1](https://github.com/hirosystems/clarinet/compare/v1.7.1...v1.8.0) (2023-09-12)
 
-##### Chores
-
-* **deps:**
-  *  bump webpki in /components/stacks-rpc-client (#1147) (d7072828)
-  *  bump webpki from 0.22.0 to 0.22.1 (#1148) (5951f5e7)
-*  bump vscode enxtension to 1.7.2 (#1096) (451685e6)
-*  bump vscode enxtension to 1.7.1 (#1095) (4f513bed)
-*  release vscode extension 1.7.1 (#1093) (f0295f68)
-
 ##### Continuous Integration
 
 *  use rust toolchain v1.71.0 (#1146) (b8cedf61)
 *  clarinet cli revamp (#1104) (5b4dfe84)
-
-##### Documentation Changes
-
-*  Typo fixes (#1127) (e2dd4ac8)
-*  edit typos and language fixes in the 'Chainhooks' doc (#1121) (5115a85f)
-*  edit typos and language fixes in the 'Analyze with Check-Checker' doc (#1119) (f23a405a)
-*  update getting-started.md (#1108) (676c9647)
-*  update epoch to 2.4 (#1111) (6f08dfb5)
-*  edit typos and language fixes in the 'Clarinet Integrate' doc (#1123) (2c071534)
-*  grammatical fixes in the Introduction file (#1118) (c5019080)
-*  deleted the Image and added the new youtube playlist link (#1126) (a2591412)
-*  Edit typos and language fixes in the 'Clarinet Deployment Plans' doc (#1122) (0f563ab6)
-*  Edit troubleshooting instructions for imports related error in test files (#1114) (3c75b5f)
-*  Added chainhook docs to references links (#1125) (96d4be9)
-*  Edit typos and language fixes in the 'Extend Clarinet' doc (#1120) (e068a979)
-*  Removed $ from the CLI commands (#1091) (b28d5e94)
-*  Update CI - do not rebuild on doc change (#1087) (8ca42c03)
-*  Added epoch config to the clarinet toml configuration (#1084) (d0695803)
-*  Updated the title of the Overview page to use the product name (#1054) (dd7da9c8)
 
 ##### New Features
 
