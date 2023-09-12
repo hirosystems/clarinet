@@ -1,4 +1,4 @@
-#### [1.7.1](https://github.com/hirosystems/clarinet/compare/v1.7.1...v1.8.0) (2023-09-12)
+#### [1.8.0](https://github.com/hirosystems/clarinet/compare/v1.7.1...v1.8.0) (2023-09-12)
 
 ##### Continuous Integration
 
@@ -8,7 +8,6 @@
 ##### New Features
 
 *  allow stacks-network to be run as standalone chain coordinator (#1064) (55b03bbb)
-*  initialize clarinet-sdk with the core js lib (#1068) (eb7670ed)
 *  add `clarinet devnet package` command(#1116)(0dbf1aa)
 
 ##### Bug Fixes
