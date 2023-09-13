@@ -4,10 +4,16 @@ const CopyPlugin = require("copy-webpack-plugin");
 
 /** @typedef {import('webpack').Configuration} WebpackConfig **/
 
+const target = "node18";
+const entry = {
+  index: "./src-ts/index.ts",
+  "vitest/index": "./src-ts/vitest/index.ts",
+};
+
 /** @type WebpackConfig */
 const configBase = {
   mode: "production",
-  entry: "./src-ts/index.ts",
+  entry,
   resolve: { extensions: [".ts", ".js"] },
   optimization: {
     minimize: false,
@@ -17,9 +23,9 @@ const configBase = {
 /** @type WebpackConfig */
 const configESM = {
   ...configBase,
-  target: "node20",
+  target,
   output: {
-    filename: "index.mjs",
+    filename: "[name].mjs",
     path: path.resolve(__dirname, "dist/esm"),
     library: {
       type: "module",
@@ -54,9 +60,9 @@ const configESM = {
 /** @type WebpackConfig */
 const configCJS = {
   ...configBase,
-  target: "node20",
+  target,
   output: {
-    filename: "index.js",
+    filename: "[name].js",
     path: path.resolve(__dirname, "dist/cjs"),
     library: {
       type: "commonjs",

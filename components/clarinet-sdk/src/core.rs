@@ -126,6 +126,7 @@ pub struct SDK {
     contracts_locations: HashMap<QualifiedContractIdentifier, FileLocation>,
     contracts_interfaces: HashMap<QualifiedContractIdentifier, ContractInterface>,
     cache: Option<(DeploymentSpecification, DeploymentGenerationArtifacts)>,
+    current_test_name: String,
 }
 
 #[wasm_bindgen]
@@ -143,7 +144,18 @@ impl SDK {
             contracts_locations: HashMap::new(),
             contracts_interfaces: HashMap::new(),
             cache: None,
+            current_test_name: String::new(),
         }
+    }
+
+    fn desugar_contract_id(&self, contract: &str) -> Result<QualifiedContractIdentifier, String> {
+        let contract_id = if contract.starts_with('S') {
+            contract.to_string()
+        } else {
+            format!("{}.{}", self.deployer, contract,)
+        };
+
+        QualifiedContractIdentifier::parse(&contract_id).map_err(|e| e.to_string())
     }
 
     #[wasm_bindgen(js_name=initSession)]
@@ -259,14 +271,7 @@ impl SDK {
 
     #[wasm_bindgen(js_name=getDataVar)]
     pub fn get_data_var(&mut self, contract: &str, var_name: &str) -> Result<String, String> {
-        let contract_id = if contract.starts_with('S') {
-            contract.to_string()
-        } else {
-            format!("{}.{}", self.deployer, contract,)
-        };
-        let contract_id =
-            QualifiedContractIdentifier::parse(&contract_id).map_err(|e| e.to_string())?;
-
+        let contract_id = self.desugar_contract_id(contract)?;
         let session = self.get_session_mut();
         session
             .interpreter
@@ -281,14 +286,7 @@ impl SDK {
         map_name: &str,
         map_key: Vec<u8>,
     ) -> Result<String, String> {
-        let contract_id = if contract.starts_with('S') {
-            contract.to_string()
-        } else {
-            format!("{}.{}", self.deployer, contract,)
-        };
-        let contract_id =
-            QualifiedContractIdentifier::parse(&contract_id).map_err(|e| e.to_string())?;
-
+        let contract_id = self.desugar_contract_id(contract)?;
         let session = self.get_session_mut();
         session
             .interpreter
@@ -301,14 +299,11 @@ impl SDK {
         contract: &str,
         method: &str,
     ) -> Result<&ContractInterfaceFunction, String> {
-        let contract_id =
-            QualifiedContractIdentifier::parse(&format!("{}.{}", self.deployer, contract))
-                .map_err(|e| e.to_string())?;
+        let contract_id = self.desugar_contract_id(contract)?;
         let contract_interface = self
             .contracts_interfaces
             .get(&contract_id)
-            .ok_or("unable to get contract interface")?;
-
+            .ok_or(format!("unable to get contract interface for {contract}"))?;
         contract_interface
             .functions
             .iter()
@@ -369,7 +364,7 @@ impl SDK {
             return Err(format!("{} is not a read-only function", &args.method));
         }
 
-        self.invoke_contract_call(args, sender, "read-only call")
+        self.invoke_contract_call(args, sender, &self.current_test_name.clone())
     }
 
     fn call_public_fn_private(
@@ -388,7 +383,7 @@ impl SDK {
             session.advance_chain_tip(1);
         }
 
-        self.invoke_contract_call(args, sender, "public call")
+        self.invoke_contract_call(args, sender, &self.current_test_name.clone())
     }
 
     fn transfer_stx_private(
@@ -530,6 +525,11 @@ impl SDK {
         }
         // @todo: can actually return raw value like contract calls
         output_as_array.into()
+    }
+
+    #[wasm_bindgen(js_name=setCurrentTestName)]
+    pub fn set_current_test_name(&mut self, test_name: String) {
+        self.current_test_name = test_name;
     }
 
     #[wasm_bindgen(js_name=getReport)]
