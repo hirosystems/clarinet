@@ -6,11 +6,17 @@ export function getClarinetVitestsArgv() {
   const topLevel = yargs(argv).argv;
 
   // @ts-ignore
-  return yargs(topLevel._).option("clarity-coverage", {
-    alias: "cov",
-    type: "boolean",
-    default: false,
-  }).argv;
+  return yargs(topLevel._)
+    .option("coverage", {
+      alias: "cov",
+      type: "boolean",
+      default: false,
+    })
+    .option("coverage-filename", {
+      alias: "cov-file",
+      type: "string",
+      default: "lcov.info",
+    }).argv;
 }
 
 export const vitestHelpersPath = "node_modules/obscurity-sdk/vitest-helpers/src/";

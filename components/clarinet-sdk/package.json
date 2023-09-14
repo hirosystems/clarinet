@@ -1,7 +1,7 @@
 {
-  "name": "obscurity-sdk",
-  "version": "1.2.0",
-  "description": "clarity testing lib",
+  "name": "@hirosystems/clarinet-sdk",
+  "version": "1.0.0-rc1",
+  "description": "A SDK to interact with Clarity Smart Contracts",
   "repository": {
     "type": "git",
     "url": "https://github.com/hirosystems/clarinet"
@@ -41,14 +41,17 @@
     "build": "npm run clean; webpack -c webpack.config.js",
     "prepare": "npm run build"
   },
-  "keywords": [],
+  "keywords": [
+    "stacks",
+    "clarity",
+    "clarinet",
+    "tests"
+  ],
   "author": "hirosystems",
   "license": "GPL-3.0",
   "readme": "./README.md",
   "dependencies": {
     "@stacks/transactions": "^6.5.4",
-    "vite": "^4.4.9",
-    "vitest": "^0.34.1",
     "yargs": "^17.7.2"
   },
   "devDependencies": {

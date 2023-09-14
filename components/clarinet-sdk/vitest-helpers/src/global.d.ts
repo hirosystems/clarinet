@@ -6,7 +6,8 @@ declare global {
   var coverageReports: string[];
   var options: {
     clarinet: {
-      clarityCoverage: boolean;
+      coverage: boolean;
+      coverageFilename: string;
     };
   };
 }

@@ -11,8 +11,7 @@ import { initVM } from "obscurity-sdk";
 async function main() {
   const vm = await initVM();
   const accounts = vm.getAccounts();
-  const w1 = accounts.get("wallet_1");
-  if (!w1) return;
+  const w1 = accounts.get("wallet_1")!;
 
   const call = vm.callPublicFn("counter", "increment", [Cl.uint(1)], w1);
   console.log(call.result); // Cl.int(Cl.ok(true))

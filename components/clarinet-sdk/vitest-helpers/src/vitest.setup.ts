@@ -15,7 +15,7 @@ beforeAll(async () => {
 });
 
 beforeEach(async (ctx) => {
-  if (global.options.clarinet.clarityCoverage) {
+  if (global.options.clarinet.coverage) {
     const suiteTestNames = getFullTestName(ctx.task, []);
     const fullName = [ctx.task.file?.name || "", ...suiteTestNames].join("__");
     vm.setCurrentTestName(fullName);
@@ -23,7 +23,7 @@ beforeEach(async (ctx) => {
 });
 
 afterAll(() => {
-  if (global.options.clarinet.clarityCoverage) {
+  if (global.options.clarinet.coverage) {
     coverageReports.push(vm.getReport().coverage);
   }
 });

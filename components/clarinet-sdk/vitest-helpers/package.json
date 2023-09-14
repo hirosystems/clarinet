@@ -2,6 +2,7 @@
   "name": "clarity-matcher-unit-tests",
   "version": "1.0.0",
   "description": "This package is only used to tests the vitest-helpers",
+  "private": true,
   "directories": {
     "tests": "tests"
   },
