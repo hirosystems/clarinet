@@ -1,7 +1,7 @@
 import type { Assertion, AsymmetricMatchersContaining, ExpectStatic } from "vitest";
 import type { ClarityType, ClarityValue } from "@stacks/transactions";
 
-interface CustomMatchers<R = unknown> {
+interface ClarityValuesMatchers<R = unknown> {
   toHaveClarityType(expectedType: ClarityType): R;
 
   toBeOk(expected: ExpectStatic | ClarityValue): R;
@@ -23,6 +23,6 @@ interface CustomMatchers<R = unknown> {
 }
 
 declare module "vitest" {
-  interface Assertion<T = any> extends CustomMatchers<T> {}
-  interface AsymmetricMatchersContaining extends CustomMatchers<ExpectStatic> {}
+  interface Assertion<T = any> extends ClarityValuesMatchers<T> {}
+  interface AsymmetricMatchersContaining extends ClarityValuesMatchers<ExpectStatic> {}
 }

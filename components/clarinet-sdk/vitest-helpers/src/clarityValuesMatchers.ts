@@ -23,6 +23,7 @@ import {
 } from "@stacks/transactions";
 
 import { MatcherState } from "@vitest/expect";
+import { formatCV } from "./formatCV";
 
 // https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/BigInt#use_within_json
 // @ts-ignore
@@ -138,36 +139,63 @@ function errorToAssertionResult(this: MatcherState, err: any) {
   };
 }
 
-function getSimpleCVValue(cv: SimpleCV) {
-  // int | uint
-  if ("value" in cv) return cv.value;
-  // stringAscii | stringUtf8
-  if ("data" in cv) return cv.data;
-  // bool
-  return cv.type === ClarityType.BoolTrue;
-}
-
 function simpleAssertion(
   this: MatcherState,
   cvType: SimpleCVTypes,
-  actual: unknown,
-  expected: SimpleCV
+  actualRaw: unknown,
+  expectedRaw: SimpleCV
 ) {
   try {
-    const isCV = checkCVType(actual, cvType, this.isNot);
+    const isCV = checkCVType(actualRaw, cvType, this.isNot);
     assert(isCV);
   } catch (e: any) {
     return errorToAssertionResult.call(this, e);
   }
 
-  const actualValue = getSimpleCVValue(actual);
-  const expectedValue = getSimpleCVValue(expected);
+  return {
+    pass: this.equals(actualRaw, expectedRaw, undefined, true),
+    message: () =>
+      `expected ${formatCV(actualRaw)} ${notStr(this.isNot)}to be ${formatCV(expectedRaw)}`,
+    actual: formatCV(actualRaw, 2),
+    expected: formatCV(expectedRaw, 2),
+  };
+}
+
+const typeToCvMethod = {
+  [ClarityType.ResponseOk]: Cl.ok,
+  [ClarityType.ResponseErr]: Cl.error,
+  [ClarityType.OptionalSome]: Cl.some,
+};
+
+// simple composite types are `ok`, `err`, `some`
+function simpleCompositeAssertion(
+  this: MatcherState,
+  expectedType: ClarityType.ResponseOk | ClarityType.ResponseErr | ClarityType.OptionalSome,
+  actualRaw: unknown,
+  expectedValue: ClarityValue | ExpectStatic
+) {
+  try {
+    const isCV = checkCVType(actualRaw, expectedType, this.isNot);
+    assert(isCV);
+  } catch (e: any) {
+    return errorToAssertionResult.call(this, e);
+  }
+
+  const clMethod = typeToCvMethod[expectedType];
+
+  const expectedIsCV = isClarityValue(expectedValue);
+  const expectedOneLine = expectedIsCV
+    ? formatCV(clMethod(expectedValue))
+    : JSON.stringify(expectedValue);
+  const expected = expectedIsCV
+    ? formatCV(clMethod(expectedValue), 2)
+    : JSON.stringify(expectedValue);
 
   return {
-    pass: this.equals(actual, expected, undefined, true),
-    message: () => `expected ${actualValue} ${notStr(this.isNot)}to be ${expectedValue}`,
-    actual: actualValue,
-    expected: expectedValue,
+    pass: this.equals(actualRaw.value, expectedValue, undefined, true),
+    message: () => formatMessage.call(this, formatCV(actualRaw), expectedOneLine),
+    actual: formatCV(actualRaw, 2),
+    expected,
   };
 }
 
@@ -208,62 +236,16 @@ expect.extend({
     return simpleAssertion.call(this, ClarityType.StringUTF8, actual, Cl.stringUtf8(expected));
   },
 
-  toBeOk(actual: unknown, expected: ExpectStatic | ClarityValue) {
-    const expectedType = ClarityType.ResponseOk;
-    try {
-      const isCV = checkCVType(actual, expectedType, this.isNot);
-      assert(isCV);
-    } catch (e: any) {
-      return errorToAssertionResult.call(this, e);
-    }
-
-    return {
-      pass: this.equals(actual.value, expected, undefined, true),
-      message: () =>
-        formatMessage.call(this, JSON.stringify(actual.value), JSON.stringify(expected)),
-      actual: actual.value,
-      expected,
-    };
+  toBeOk(actual: unknown, expectedValue: ExpectStatic | ClarityValue) {
+    return simpleCompositeAssertion.call(this, ClarityType.ResponseOk, actual, expectedValue);
   },
 
-  toBeErr(actual: unknown, expected: ExpectStatic | ClarityValue) {
-    const expectedType = ClarityType.ResponseErr;
-    try {
-      const isCV = checkCVType(actual, expectedType, this.isNot);
-      assert(isCV);
-    } catch (e: any) {
-      return errorToAssertionResult.call(this, e);
-    }
-
-    return {
-      pass: this.equals(actual.value, expected, undefined, true),
-      message: () =>
-        formatMessage.call(this, JSON.stringify(actual.value), JSON.stringify(expected)),
-      actual: actual.value,
-      expected,
-    };
+  toBeErr(actual: unknown, expectedValue: ExpectStatic | ClarityValue) {
+    return simpleCompositeAssertion.call(this, ClarityType.ResponseErr, actual, expectedValue);
   },
 
-  toBeSome(actual: unknown, expected: ExpectStatic | ClarityValue) {
-    const expectedType = ClarityType.OptionalSome;
-    try {
-      const isCV = checkCVType(actual, expectedType, this.isNot);
-      assert(isCV);
-    } catch (e: any) {
-      return errorToAssertionResult.call(this, e);
-    }
-
-    return {
-      pass: this.equals(actual.value, expected, undefined, true),
-      message: () =>
-        formatMessage.call(
-          this,
-          JSON.stringify(actual.value),
-          isClarityValue(expected) ? JSON.stringify(expected) : expected.toString()
-        ),
-      actual: actual.value,
-      expected,
-    };
+  toBeSome(actual: unknown, expectedValue: ExpectStatic | ClarityValue) {
+    return simpleCompositeAssertion.call(this, ClarityType.OptionalSome, actual, expectedValue);
   },
 
   toBeNone(actual: unknown) {
@@ -278,9 +260,9 @@ expect.extend({
     const expected = Cl.none();
     return {
       pass: this.equals(actual, expected, undefined, true),
-      message: () => formatMessage.call(this, "None", "None"),
-      actual,
-      expected,
+      message: () => formatMessage.call(this, formatCV(actual), formatCV(actual)),
+      actual: formatCV(actual, 2),
+      expected: formatCV(actual, 2),
     };
   },
 
@@ -314,8 +296,8 @@ expect.extend({
     return {
       pass: this.equals(actual, expected, undefined, true),
       message: () => formatMessage.call(this, actualString, expectedString),
-      actual: actualString,
-      expected: expectedString,
+      actual: formatCV(actual, 2),
+      expected: formatCV(expected, 2),
     };
   },
 
@@ -333,12 +315,12 @@ expect.extend({
       pass: this.equals(actual, expected, undefined, true),
       // note: throw a simple message and rely on `actual` and `expected` to display the diff
       message: () => `the received Buffer does ${this.isNot ? "" : "not "}match the expected one`,
-      actual,
-      expected,
+      actual: formatCV(actual, 2),
+      expected: formatCV(expected, 2),
     };
   },
 
-  toBeList(actual: unknown, expected: ExpectStatic[] | ClarityValue[]) {
+  toBeList(actual: unknown, expectedItems: ExpectStatic[] | ClarityValue[]) {
     const expectedType = ClarityType.List;
     try {
       const isCV = checkCVType(actual, expectedType, this.isNot);
@@ -346,16 +328,20 @@ expect.extend({
     } catch (e: any) {
       return errorToAssertionResult.call(this, e);
     }
+
+    const isListArray = checkIsListArray(expectedItems);
+    const expected = isListArray ? formatCV(Cl.list(expectedItems), 2) : expectedItems;
+
     return {
-      pass: this.equals(actual.list, expected, undefined, true),
+      pass: this.equals(actual.list, expectedItems, undefined, true),
       // note: throw a simple message and rely on `actual` and `expected` to display the diff
       message: () => `the received List does ${this.isNot ? "" : "not "}match the expected one`,
-      actual: actual.list,
+      actual: formatCV(actual, 2),
       expected,
     };
   },
 
-  toBeTuple(actual: unknown, expected: Record<string, ExpectStatic[] | ClarityValue[]>) {
+  toBeTuple(actual: unknown, expectedData: Record<string, ExpectStatic | ClarityValue>) {
     const expectedType = ClarityType.Tuple;
     try {
       const isCV = checkCVType(actual, expectedType, this.isNot);
@@ -364,12 +350,28 @@ expect.extend({
       return errorToAssertionResult.call(this, e);
     }
 
+    const isTupleData = checkIsTupleData(expectedData);
+    const expected = isTupleData ? formatCV(Cl.tuple(expectedData), 2) : expectedData;
+
     return {
-      pass: this.equals(actual.data, expected, undefined, true),
+      pass: this.equals(actual.data, expectedData, undefined, true),
       // note: throw a simple message and rely on `actual` and `expected` to display the diff
       message: () => `the received Tuple does ${this.isNot ? "" : "not "}match the expected one`,
-      actual: actual.data,
+      actual: formatCV(actual, 2),
       expected,
     };
   },
 });
+
+// for composite types, matchers need to narrow the type of the expected value
+// to know if it contains AsymmetricMatchers or if it's only ClarityValues
+
+function checkIsTupleData(
+  expected: Record<string, ExpectStatic | ClarityValue>
+): expected is Record<string, ClarityValue> {
+  return Object.values(expected).every((v) => isClarityValue(v));
+}
+
+function checkIsListArray(expected: ExpectStatic[] | ClarityValue[]): expected is ClarityValue[] {
+  return expected.every((v) => isClarityValue(v));
+}
