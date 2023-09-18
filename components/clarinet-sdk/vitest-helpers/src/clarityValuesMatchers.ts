@@ -35,7 +35,7 @@ function notStr(isNot: boolean) {
   return isNot ? "not " : "";
 }
 
-function formatMessage(this: any, received: string, expected: string) {
+function formatMessage(this: MatcherState, received: string, expected: string) {
   return `expected ${received} ${notStr(this.isNot)}to be ${expected}`;
 }
 
