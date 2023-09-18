@@ -37,24 +37,24 @@ type TransferSTX = (
 
 type Tx =
   | {
-      callContract: { contract: string; method: string; args: ClarityValue[]; sender: string };
+      callPublicFn: { contract: string; method: string; args: ClarityValue[]; sender: string };
       deployContract?: never;
       transferSTX?: never;
     }
   | {
+      callPublicFn?: never;
       deployContract: { name: string; content: string; sender: string };
-      callContract?: never;
       transferSTX?: never;
     }
   | {
-      transferSTX: { amount: number; recipient: string; sender: string };
-      callContract?: never;
+      callPublicFn?: never;
       deployContradct?: never;
+      transferSTX: { amount: number; recipient: string; sender: string };
     };
 
 export const tx = {
-  callContract: (contract: string, method: string, args: ClarityValue[], sender: string): Tx => ({
-    callContract: { contract, method, args, sender },
+  callPublicFn: (contract: string, method: string, args: ClarityValue[], sender: string): Tx => ({
+    callPublicFn: { contract, method, args, sender },
   }),
   deployContract: (name: string, content: string, sender: string): Tx => ({
     deployContract: { name, content, sender },
@@ -157,12 +157,11 @@ const getSessionProxy = () => ({
     if (prop === "mineBlock") {
       const callMineBlock: MineBlock = (txs) => {
         const serializedTxs = txs.map((tx) => {
-          console.log("tx", tx.callContract?.args);
-          if (tx.callContract) {
+          if (tx.callPublicFn) {
             return {
-              callContract: {
-                ...tx.callContract,
-                args_maps: tx.callContract.args.map((a) => Cl.serialize(a)),
+              callPublicFn: {
+                ...tx.callPublicFn,
+                args_maps: tx.callPublicFn.args.map((a) => Cl.serialize(a)),
               },
             };
           }

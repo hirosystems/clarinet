@@ -137,7 +137,7 @@ impl TransferSTXArgs {
 #[serde(rename_all = "camelCase")]
 #[wasm_bindgen]
 pub struct TxArgs {
-    call_contract: Option<CallContractArgsJSON>,
+    call_public_fn: Option<CallContractArgsJSON>,
     deploy_contract: Option<DeployContractArgs>,
     #[serde(rename(serialize = "transfer_stx", deserialize = "transferSTX"))]
     transfer_stx: Option<TransferSTXArgs>,
@@ -505,8 +505,8 @@ impl SDK {
                 Ok(res) => res,
                 Err(diagnostics) => {
                     let mut message = format!(
-                        "{}: {}.{}",
-                        "Contract deployment runtime error", args.sender, args.name
+                        "Contract deployment runtime error: {}.{}",
+                        args.sender, args.name
                     );
                     if let Some(diag) = diagnostics.last() {
                         message = format!("{} -> {}", message, diag.message);
@@ -557,7 +557,7 @@ impl SDK {
             .map_err(|e| format!("Failed to parse js txs: {:}", e))?;
 
         for tx in txs {
-            let result = if let Some(args) = tx.call_contract {
+            let result = if let Some(args) = tx.call_public_fn {
                 self.call_public_fn_private(&CallContractArgs::from_json_args(args), false)
             } else if let Some(transfer_stx) = tx.transfer_stx {
                 self.transfer_stx_private(&transfer_stx, false)
