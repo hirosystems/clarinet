@@ -2,7 +2,6 @@ import { Cl, ClarityValue } from "@stacks/transactions";
 
 import { vfs } from "./vfs";
 import type { ContractInterface } from "./contractInterface";
-
 import { SDK, TransactionRes, CallContractArgs, DeployContractArgs, TransferSTXArgs } from "./sdk";
 
 type WASMModule = typeof import("./sdk");
@@ -65,11 +64,8 @@ export const tx = {
 };
 
 type MineBlock = (txs: Array<Tx>) => ParsedTransactionRes[];
-
 type GetDataVar = (contract: string, dataVar: string) => ClarityValue;
 type GetMapEntry = (contract: string, mapName: string, mapKey: ClarityValue) => ClarityValue;
-type GetAssetsMap = () => Map<string, Map<string, bigint>>;
-type GetAccounts = () => Map<string, string>;
 
 // because the session is wrapped in a proxy the types need to be hardcoded
 export type ClarityVM = {
@@ -85,10 +81,6 @@ export type ClarityVM = {
     ? GetDataVar
     : K extends "getMapEntry"
     ? GetMapEntry
-    : K extends "getAccounts"
-    ? GetAccounts
-    : K extends "getAssetsMap"
-    ? GetAssetsMap
     : K extends "getContractsInterfaces"
     ? () => Map<string, ContractInterface>
     : SDK[K];

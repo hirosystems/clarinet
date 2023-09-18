@@ -29,6 +29,14 @@ use wasm_bindgen::JsValue;
 
 use crate::utils::{self, serialize_event, uint8_to_string, uint8_to_value};
 
+#[wasm_bindgen]
+extern "C" {
+    #[wasm_bindgen(typescript_type = "Map<string, Map<string, bigint>>")]
+    pub type AssetsMap;
+    #[wasm_bindgen(typescript_type = "Map<string, string>")]
+    pub type Accounts;
+}
+
 #[derive(Debug, Deserialize)]
 struct CallContractArgsJSON {
     contract: String,
@@ -326,20 +334,20 @@ impl SDK {
     }
 
     #[wasm_bindgen(js_name=getContractsInterfaces)]
-    pub fn get_contracts_interfaces(&self) -> Result<JsValue, JsValue> {
+    pub fn get_contracts_interfaces(&self) -> Result<JsValue, JsError> {
         Ok(encode_to_js(&self.contracts_interfaces)?)
     }
 
     #[wasm_bindgen(js_name=getAssetsMap)]
-    pub fn get_assets_maps(&self) -> Result<JsValue, JsValue> {
+    pub fn get_assets_maps(&self) -> Result<AssetsMap, JsError> {
         let session = &self.get_session();
         let assets_maps = session.get_assets_maps();
-        Ok(encode_to_js(&assets_maps)?)
+        Ok(encode_to_js(&assets_maps)?.unchecked_into::<AssetsMap>())
     }
 
     #[wasm_bindgen(js_name=getAccounts)]
-    pub fn get_accounts(&mut self) -> Result<JsValue, JsValue> {
-        Ok(encode_to_js(&self.accounts)?)
+    pub fn get_accounts(&mut self) -> Result<Accounts, JsError> {
+        Ok(encode_to_js(&self.accounts)?.unchecked_into::<Accounts>())
     }
 
     #[wasm_bindgen(js_name=getDataVar)]

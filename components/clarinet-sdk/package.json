@@ -1,6 +1,6 @@
 {
   "name": "obscurity-sdk",
-  "version": "1.5.8",
+  "version": "1.5.10",
   "description": "A SDK to interact with Clarity Smart Contracts",
   "repository": {
     "type": "git",
