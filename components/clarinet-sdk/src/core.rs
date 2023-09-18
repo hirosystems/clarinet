@@ -30,6 +30,14 @@ use wasm_bindgen::JsValue;
 use crate::utils::{self, serialize_event, uint8_to_string, uint8_to_value};
 
 #[derive(Debug, Deserialize)]
+struct CallContractArgsJSON {
+    contract: String,
+    method: String,
+    args_maps: Vec<HashMap<usize, u8>>,
+    sender: String,
+}
+
+#[derive(Debug, Deserialize)]
 #[wasm_bindgen]
 pub struct CallContractArgs {
     contract: String,
@@ -51,6 +59,35 @@ impl CallContractArgs {
             contract,
             method,
             args: args.iter().map(|a| a.to_vec()).collect::<Vec<Vec<u8>>>(),
+            sender,
+        }
+    }
+
+    /*
+      The mineBlock method receives an JSON Array of Txs, including ContractCalls.
+      Because it's JSON, the Uint8Array arguments are passed as Map<index, value> instead of Vec<u8>.
+      This method transform the Map back into a Vec.
+    */
+    fn from_json_args(
+        CallContractArgsJSON {
+            contract,
+            method,
+            args_maps,
+            sender,
+        }: CallContractArgsJSON,
+    ) -> Self {
+        let mut args: Vec<Vec<u8>> = vec![];
+        for arg in args_maps {
+            let mut parsed_arg: Vec<u8> = vec![0; arg.len()];
+            for (i, v) in arg.iter() {
+                parsed_arg[*i] = *v;
+            }
+            args.push(parsed_arg);
+        }
+        Self {
+            contract,
+            method,
+            args,
             sender,
         }
     }
@@ -100,7 +137,7 @@ impl TransferSTXArgs {
 #[serde(rename_all = "camelCase")]
 #[wasm_bindgen]
 pub struct TxArgs {
-    call_contract: Option<CallContractArgs>,
+    call_contract: Option<CallContractArgsJSON>,
     deploy_contract: Option<DeployContractArgs>,
     #[serde(rename(serialize = "transfer_stx", deserialize = "transferSTX"))]
     transfer_stx: Option<TransferSTXArgs>,
@@ -204,7 +241,7 @@ impl SDK {
         root_path.push(root);
         let project_root = FileLocation::FileSystem { path: root_path };
         let manifest_location = FileLocation::try_parse(&manifest_path, Some(&project_root))
-            .ok_or("failed to parse manifest location")?;
+            .ok_or("Failed to parse manifest location")?;
         let manifest =
             ProjectManifest::from_file_accessor(&manifest_location, &self.file_accessor).await?;
 
@@ -398,7 +435,7 @@ impl SDK {
         self.invoke_contract_call(args, &self.current_test_name.clone())
     }
 
-    fn call_public_fn_private(
+    pub fn call_public_fn_private(
         &mut self,
         args: &CallContractArgs,
         advance_chain_tip: bool,
@@ -520,8 +557,8 @@ impl SDK {
             .map_err(|e| format!("Failed to parse js txs: {:}", e))?;
 
         for tx in txs {
-            let result = if let Some(contract_call) = tx.call_contract {
-                self.call_public_fn_private(&contract_call, false)
+            let result = if let Some(args) = tx.call_contract {
+                self.call_public_fn_private(&CallContractArgs::from_json_args(args), false)
             } else if let Some(transfer_stx) = tx.transfer_stx {
                 self.transfer_stx_private(&transfer_stx, false)
             } else if let Some(deploy_contract) = tx.deploy_contract {
@@ -529,7 +566,6 @@ impl SDK {
             } else {
                 return Err("Invalid tx arguments".into());
             }?;
-
             results.push(result);
         }
 
@@ -559,7 +595,6 @@ impl SDK {
         for string in output {
             output_as_array.push(&JsValue::from_str(&string));
         }
-        // @todo: can actually return raw value like contract calls
         output_as_array
     }
 

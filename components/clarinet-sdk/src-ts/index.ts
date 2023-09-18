@@ -8,6 +8,12 @@ import { SDK, TransactionRes, CallContractArgs, DeployContractArgs, TransferSTXA
 type WASMModule = typeof import("./sdk");
 const wasmModule = import("./sdk");
 
+// https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/BigInt#use_within_json
+// @ts-ignore
+BigInt.prototype.toJSON = function () {
+  return this.toString();
+};
+
 type ClarityEvent = { event: string; data: { [key: string]: any } };
 export type ParsedTransactionRes = {
   result: ClarityValue;
@@ -32,19 +38,31 @@ type TransferSTX = (
 type Tx =
   | {
       callContract: { contract: string; method: string; args: ClarityValue[]; sender: string };
-      deployContract: never;
-      transferSTX: never;
+      deployContract?: never;
+      transferSTX?: never;
     }
   | {
       deployContract: { name: string; content: string; sender: string };
-      callContract: never;
-      transferSTX: never;
+      callContract?: never;
+      transferSTX?: never;
     }
   | {
       transferSTX: { amount: number; recipient: string; sender: string };
-      callContract: never;
-      deployContradct: never;
+      callContract?: never;
+      deployContradct?: never;
     };
+
+export const tx = {
+  callContract: (contract: string, method: string, args: ClarityValue[], sender: string): Tx => ({
+    callContract: { contract, method, args, sender },
+  }),
+  deployContract: (name: string, content: string, sender: string): Tx => ({
+    deployContract: { name, content, sender },
+  }),
+  transferSTX: (amount: number, recipient: string, sender: string): Tx => ({
+    transferSTX: { amount, recipient, sender },
+  }),
+};
 
 type MineBlock = (txs: Array<Tx>) => ParsedTransactionRes[];
 
@@ -99,7 +117,7 @@ function parseTxResult(response: TransactionRes): ParsedTransactionRes {
   };
 }
 
-const getSessionProxy = (wasm: WASMModule) => ({
+const getSessionProxy = () => ({
   get(session: SDK, prop: keyof SDK, receiver: any) {
     // some of the WASM methods are proxied here to:
     // - serialize clarity values input argument
@@ -139,11 +157,12 @@ const getSessionProxy = (wasm: WASMModule) => ({
     if (prop === "mineBlock") {
       const callMineBlock: MineBlock = (txs) => {
         const serializedTxs = txs.map((tx) => {
+          console.log("tx", tx.callContract?.args);
           if (tx.callContract) {
             return {
               callContract: {
                 ...tx.callContract,
-                args: tx.callContract.args.map((a) => Cl.serialize(a)),
+                args_maps: tx.callContract.args.map((a) => Cl.serialize(a)),
               },
             };
           }
@@ -195,7 +214,7 @@ function memoizedInit() {
 
     if (!vm) {
       console.log("init clarity vm");
-      vm = new Proxy(new wasm.SDK(vfs), getSessionProxy(wasm)) as unknown as ClarityVM;
+      vm = new Proxy(new wasm.SDK(vfs), getSessionProxy()) as unknown as ClarityVM;
     }
     // start a new session
     await vm.initSession(process.cwd(), manifestPath);
