@@ -1,19 +1,33 @@
 # Clarinet SDK
 
+The Clarinet SDK can be used to interact with the simnet from Node.js.
+
+Some of features are:
+- call public and read-only functions from smart contracts
+- get clarity maps or data-var values
+- deploy contracts
+- get contract ABI
+- write unit tests for Clarity smart contracts
+
 ## Core
+
+```
+npm install @hirosystems/clarinet-sdk
+```
 
 ### Usage
 
 ```ts
+import { initVM } from "clarinet-sdk";
 import { Cl } from "@stacks/transactions";
-import { initVM } from "obscurity-sdk";
 
 async function main() {
   const vm = await initVM();
+
   const accounts = vm.getAccounts();
   const w1 = accounts.get("wallet_1")!;
 
-  const call = vm.callPublicFn("counter", "increment", [Cl.uint(1)], w1);
+  const call = vm.callPublicFn("counter", "add", [Cl.uint(1)], w1);
   console.log(call.result); // Cl.int(Cl.ok(true))
 
   const counter = vm.getDataVar("counter", "counter");
@@ -22,6 +36,17 @@ async function main() {
 
 main();
 ```
+
+By default, the SDK will look for a Clarinet.toml file in the current working directory.
+It's also possible to provide the path to the manifest like so:
+```ts
+ const vm = await initVM("./path/to/Clarinet.toml");
+```
+
+## Tests
+
+<!-- wip -->
+
 
 ## Contributing
 
