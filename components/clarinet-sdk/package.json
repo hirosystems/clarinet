@@ -1,6 +1,6 @@
 {
-  "name": "@hirosystems/clarinet-sdk",
-  "version": "1.0.0-rc1",
+  "name": "obscurity-sdk",
+  "version": "1.4.3",
   "description": "A SDK to interact with Clarity Smart Contracts",
   "repository": {
     "type": "git",

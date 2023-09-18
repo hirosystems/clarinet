@@ -3,19 +3,51 @@ import { Cl, ClarityValue } from "@stacks/transactions";
 import { vfs } from "./vfs";
 import type { ContractInterface } from "./contractInterface";
 
-import type { SDK } from "./sdk";
+import { SDK, TransactionRes, CallContractArgs, DeployContractArgs, TransferSTXArgs } from "./sdk";
+
 type WASMModule = typeof import("./sdk");
 const wasmModule = import("./sdk");
+
+type ClarityEvent = { event: string; data: { [key: string]: any } };
+export type ParsedTransactionRes = {
+  result: ClarityValue;
+  events: ClarityEvent[];
+};
 
 type CallFn = (
   contract: string,
   method: string,
   args: ClarityValue[],
   sender: string
-) => {
-  result: ClarityValue;
-  events: { event: string; data: { [key: string]: any } }[];
-};
+) => ParsedTransactionRes;
+
+type DeployContract = (name: string, content: string, sender: string) => ParsedTransactionRes;
+
+type TransferSTX = (
+  amount: number | bigint,
+  content: string,
+  sender: string
+) => ParsedTransactionRes;
+
+type Tx =
+  | {
+      callContract: { contract: string; method: string; args: ClarityValue[]; sender: string };
+      deployContract: never;
+      transferSTX: never;
+    }
+  | {
+      deployContract: { name: string; content: string; sender: string };
+      callContract: never;
+      transferSTX: never;
+    }
+  | {
+      transferSTX: { amount: number; recipient: string; sender: string };
+      callContract: never;
+      deployContradct: never;
+    };
+
+type MineBlock = (txs: Array<Tx>) => ParsedTransactionRes[];
+
 type GetDataVar = (contract: string, dataVar: string) => ClarityValue;
 type GetMapEntry = (contract: string, mapName: string, mapKey: ClarityValue) => ClarityValue;
 type GetAssetsMap = () => Map<string, Map<string, bigint>>;
@@ -25,6 +57,12 @@ type GetAccounts = () => Map<string, string>;
 export type ClarityVM = {
   [K in keyof SDK]: K extends "callReadOnlyFn" | "callPublicFn"
     ? CallFn
+    : K extends "deployContract"
+    ? DeployContract
+    : K extends "transferSTX"
+    ? TransferSTX
+    : K extends "mineBlock"
+    ? MineBlock
     : K extends "getDataVar"
     ? GetDataVar
     : K extends "getMapEntry"
@@ -38,6 +76,29 @@ export type ClarityVM = {
     : SDK[K];
 };
 
+function parseEvents(events: string): ClarityEvent[] {
+  try {
+    // @todo: improve type safety
+    return JSON.parse(events).map((e: string) => {
+      const { event, data } = JSON.parse(e);
+      return {
+        event: event,
+        data: data,
+      };
+    });
+  } catch (e) {
+    console.error(`Fail to parse events: ${e}`);
+    return [];
+  }
+}
+
+function parseTxResult(response: TransactionRes): ParsedTransactionRes {
+  return {
+    result: Cl.deserialize(response.result),
+    events: parseEvents(response.events),
+  };
+}
+
 const getSessionProxy = (wasm: WASMModule) => ({
   get(session: SDK, prop: keyof SDK, receiver: any) {
     // some of the WASM methods are proxied here to:
@@ -47,26 +108,52 @@ const getSessionProxy = (wasm: WASMModule) => ({
     if (prop === "callReadOnlyFn" || prop === "callPublicFn") {
       const callFn: CallFn = (contract, method, args, sender) => {
         const response = session[prop](
-          new wasm.CallContractArgs(
+          new CallContractArgs(
             contract,
             method,
-            args.map((a) => Cl.serialize(a))
-          ),
-          sender
+            args.map((a) => Cl.serialize(a)),
+            sender
+          )
         );
-        const result = Cl.deserialize(response.result);
+        return parseTxResult(response);
+      };
+      return callFn;
+    }
 
-        const events = response.events.map((e: { event: string; data: Map<string, any> }) => {
-          return {
-            event: e.event,
-            data: Object.fromEntries(e.data.entries()),
-          };
+    if (prop === "deployContract") {
+      const callDeployContract: DeployContract = (...args) => {
+        const response = session.deployContract(new DeployContractArgs(...args));
+        return parseTxResult(response);
+      };
+      return callDeployContract;
+    }
+
+    if (prop === "transferSTX") {
+      const callTransferSTX: TransferSTX = (amount, ...args) => {
+        const response = session.transferSTX(new TransferSTXArgs(BigInt(amount), ...args));
+        return parseTxResult(response);
+      };
+      return callTransferSTX;
+    }
+
+    if (prop === "mineBlock") {
+      const callMineBlock: MineBlock = (txs) => {
+        const serializedTxs = txs.map((tx) => {
+          if (tx.callContract) {
+            return {
+              callContract: {
+                ...tx.callContract,
+                args: tx.callContract.args.map((a) => Cl.serialize(a)),
+              },
+            };
+          }
+          return tx;
         });
 
-        return { result, events };
+        const responses: TransactionRes[] = session.mineBlock(serializedTxs);
+        return responses.map(parseTxResult);
       };
-
-      return callFn;
+      return callMineBlock;
     }
 
     if (prop === "getDataVar") {
