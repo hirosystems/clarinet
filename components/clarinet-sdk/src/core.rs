@@ -443,7 +443,7 @@ impl SDK {
         self.invoke_contract_call(args, &self.current_test_name.clone())
     }
 
-    pub fn call_public_fn_private(
+    fn call_public_fn_private(
         &mut self,
         args: &CallContractArgs,
         advance_chain_tip: bool,
