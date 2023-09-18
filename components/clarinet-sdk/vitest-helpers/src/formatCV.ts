@@ -128,24 +128,3 @@ function formatCVPrivate(cv: ClarityValue, space = 0, depth: number): string {
 export function formatCV(cv: ClarityValue, space = 0): string {
   return formatCVPrivate(cv, space, 0);
 }
-
-const validClarityTypes = Object.values(ClarityType).filter((t) => typeof t === "number");
-
-function isClarityValue(value: unknown): value is ClarityValue {
-  if (!value || typeof value !== "object") return false;
-  if (!("type" in value) || typeof value.type !== "number") return false;
-  if (!validClarityTypes.includes(value.type)) return false;
-
-  return true;
-}
-
-export function cvJSONReplacer(_key: string, value: unknown) {
-  const isCV = isClarityValue(value);
-  if (isCV) {
-    if (value.type === ClarityType.Tuple) return value.data;
-    if (value.type === ClarityType.List) return value.list;
-    return formatCV(value);
-  }
-
-  return value;
-}
