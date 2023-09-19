@@ -367,6 +367,20 @@ struct ApplyDeployment {
     /// Display streams of logs instead of terminal UI dashboard
     #[clap(long = "no-dashboard")]
     pub no_dashboard: bool,
+    /// Use on disk deployment plan (prevent updates computing)
+    #[clap(
+        long = "use-on-disk-deployment-plan",
+        short = 'd',
+        conflicts_with = "use-computed-deployment-plan"
+    )]
+    pub use_on_disk_deployment_plan: bool,
+    /// Use computed deployment plan (will overwrite on disk version if any update)
+    #[clap(
+        long = "use-computed-deployment-plan",
+        short = 'c',
+        conflicts_with = "use-on-disk-deployment-plan"
+    )]
+    pub use_computed_deployment_plan: bool,
 }
 
 #[derive(Parser, PartialEq, Clone, Debug)]
@@ -765,7 +779,7 @@ pub fn main() {
                         Err(format!("{}: a flag `--devnet`, `--testnet`, `--mainnet` or `--deployment-plan-path=path/to/yaml` should be provided.", yellow!("Command usage")))
                     }
                     (Some(network), None) => {
-                        let res = load_deployment_if_exists(&manifest, &network, true, false);
+                        let res = load_deployment_if_exists(&manifest, &network, cmd.use_on_disk_deployment_plan, cmd.use_computed_deployment_plan);
                         match res {
                             Some(Ok(deployment)) => {
                                 println!(
@@ -814,16 +828,21 @@ pub fn main() {
                 let node_url = deployment.stacks_node.clone().unwrap();
 
                 println!(
-                    "The following deployment plan will be applied:\n{}\n\n{}",
-                    DeploymentSynthesis::from_deployment(&deployment),
-                    yellow!("Continue [Y/n]?")
+                    "The following deployment plan will be applied:\n{}\n\n",
+                    DeploymentSynthesis::from_deployment(&deployment)
                 );
-                let mut buffer = String::new();
-                std::io::stdin().read_line(&mut buffer).unwrap();
-                if !buffer.starts_with("Y") && !buffer.starts_with("y") && !buffer.starts_with("\n")
-                {
-                    println!("Deployment aborted");
-                    std::process::exit(1);
+
+                if !cmd.use_on_disk_deployment_plan {
+                    println!("{}", yellow!("Continue [Y/n]?"));
+                    let mut buffer = String::new();
+                    std::io::stdin().read_line(&mut buffer).unwrap();
+                    if !buffer.starts_with("Y")
+                        && !buffer.starts_with("y")
+                        && !buffer.starts_with("\n")
+                    {
+                        println!("Deployment aborted");
+                        std::process::exit(1);
+                    }
                 }
 
                 let (command_tx, command_rx) = std::sync::mpsc::channel();
