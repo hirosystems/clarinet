@@ -69,6 +69,16 @@ Update the package.json file scripts to handle tests:
   },
 ```
 
+The `./.gitignore` file also needs to be updated, add the following lines at the end. It is especially important to ignore `node_modules`.
+```
+logs
+*.log
+npm-debug.log*
+coverage
+*.info
+node_modules
+```
+
 A config file is needed for Vitest to use the clarinet-environment.
 Create the file `vitest.config.js` with the following content:
 ```js
