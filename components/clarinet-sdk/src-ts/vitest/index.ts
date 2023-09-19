@@ -19,5 +19,5 @@ export function getClarinetVitestsArgv() {
     }).argv;
 }
 
-export const vitestHelpersPath = "node_modules/obscurity-sdk/vitest-helpers/src/";
+export const vitestHelpersPath = "node_modules/@hirosystems/clarinet-sdk/vitest-helpers/src/";
 export const vitestSetupFilePath = `${vitestHelpersPath}vitest.setup.ts`;
