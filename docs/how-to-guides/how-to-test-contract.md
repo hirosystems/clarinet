@@ -230,7 +230,7 @@ clarinet integrate
 
 Make sure that you have a working installation of Docker running locally.
 
-## Interacting with contracts other contracts
+## Interacting with contracts
 
 ### Deployed on Mainnet <!-- omit from toc -->
 
