@@ -2,16 +2,19 @@
 title: Test Contract
 ---
 
+> Warning: `clarinet test` will soon be deprecated in favor of a new way of testing smart contracts. The new documentation is under construction. In this meantime, learn more [in the clarinet-sdk Readme](https://github.com/hirosystems/clarinet/blob/01da3550670f321a2f19fd3b0f8df0fb4b769b08/components/clarinet-sdk/README.md).
+
 Clarinet supports automatic testing, where your blockchain application requirements can be converted to test cases. Clarinet comes with a testing harness based on Deno that applies the unit tests you write in TypeScript to your smart contracts.
 
 *Topics covered in this guide*:
 
-* [Instructions to write unit tests](#clarity-contracts-and-unit-tests)
-* [Increase test coverage](#measure-and-increase-code-coverage)
-* [Clarinet usage to optimize costs](#cost-optimization)
-* [Clarity REPL console](#load-contracts-in-a-console)
-* [Interact with contracts on mainnet](#interacting-with-contracts-deployed-on-mainnet)
-* [Clarinet usage in Github actions](#use-clarinet-in-your-ci-workflow-as-a-github-action)
+- [Clarity contracts and unit tests](#clarity-contracts-and-unit-tests)
+- [Measure and increase code coverage](#measure-and-increase-code-coverage)
+- [Cost optimization](#cost-optimization)
+- [Load contracts in a console](#load-contracts-in-a-console)
+- [Spawn a local Devnet](#spawn-a-local-devnet)
+- [Interacting with contracts other contracts](#interacting-with-contracts-other-contracts)
+- [Use Clarinet in your CI workflow as a GitHub Action](#use-clarinet-in-your-ci-workflow-as-a-github-action)
 
 ## Clarity contracts and unit tests
 
@@ -39,7 +42,7 @@ Let us consider a `counter` smart contract to understand how to write unit tests
 
 Our `counter` application keeps track of an initialized value, allows for incrementing and decrementing, and prints actions as a log. Let us turn these requirements into unit tests.
 
-### Unit tests for `counter` example
+### Unit tests for `counter` example  <!-- omit from toc -->
 
 When you created your Clarity contract with `clarinet contract new <my-project>`, Clarinet automatically created a test file for the contract within the tests directory:  `tests/my-projects_test.ts`. Other files under the `tests/` directory following the Deno test naming convention will also be included:
 
@@ -98,7 +101,7 @@ For a complete list of classes, objects, and interfaces available, see [Deno's C
 You can watch a step-by-step walkthrough of using `clarinet test` and watch [Executing Tests and Checking Code Coverage](https://www.youtube.com/watch?v=j2TZ560xEPA&list=PL5Ujm489LoJaAz9kUJm8lYUWdGJ2AnQTb&index=10).
 
 
-### Comprehensive unit tests for `counter`
+### Comprehensive unit tests for `counter`  <!-- omit from toc -->
 
 Let us now write a higher coverage test suite.
 
@@ -192,10 +195,10 @@ open coverage/index.html
 Clarinet can also be used for optimizing costs. When you execute a test suite, Clarinet keeps track of all costs being computed when executing the `contract-call`, and display the most expensive ones in a table:
 
 ```bash
-clarinet test --cost
+clarinet test --costs
 ```
 
-The `--cost` option can be used in conjunction with `--watch` and filters to maximize productivity, as illustrated here:
+The `--costs` option can be used in conjunction with `--watch` and filters to maximize productivity, as illustrated here:
 
 ![costs](../images//costs.gif)
 
@@ -227,7 +230,9 @@ clarinet integrate
 
 Make sure that you have a working installation of Docker running locally.
 
-## Interacting with contracts deployed on Mainnet
+## Interacting with contracts other contracts
+
+### Deployed on Mainnet <!-- omit from toc -->
 
 Composition and interactions between protocols and contracts are one of the key innovations in blockchains. 
 Clarinet was designed to handle these types of interactions.
@@ -255,9 +260,9 @@ As a step-by-step example, we use here the following contract, [**bitcoin-whales
 
 If you examine this contract, you will see that there are 3 different dependencies: two from the **same** project (included in the same `Clarinet.toml` file), and one referring to a contract deployed outside of the current project.
 
-## Same Project
+### Same Project <!-- omit from toc -->
 
-In the contract snippet below *(line:260-265)*, there are dependencies on the contracts conversion and conversion-v2 which are included in the same `Clarinet.toml` file.
+In the contract snippet below, there are dependencies on the contracts conversion and conversion-v2 which are included in the same `Clarinet.toml` file.
 
 ```clarity
 (define-read-only (get-token-uri (token-id uint))
@@ -268,9 +273,9 @@ In the contract snippet below *(line:260-265)*, there are dependencies on the co
 )
 ```
 
-## External Deployer 
+### External Deployer <!-- omit from toc -->
 
-In this snippet, there is a dependency on the `nft-trait` *(line:001)* deployed by `'SP2PABAF9FTAJYNFZH93XENAJ8FVY99RRM50D2JG9`.
+In this snippet, there is a dependency on the `nft-trait` deployed by `'SP2PABAF9FTAJYNFZH93XENAJ8FVY99RRM50D2JG9`.
 
 ```clarity
 (impl-trait 'SP2PABAF9FTAJYNFZH93XENAJ8FVY99RRM50D2JG9.nft-trait.nft-trait)
