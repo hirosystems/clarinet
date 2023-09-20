@@ -2,7 +2,7 @@
 title: Extend Clarinet
 ---
 
-> Warning: `clarinet run` will soon be deprecated in favor of a new way of interacting with smart contracts. The new documentation is under construction. In this meantime, learn more [in the clarinet-sdk Readme](https://github.com/hirosystems/clarinet/blob/01da3550670f321a2f19fd3b0f8df0fb4b769b08/components/clarinet-sdk/README.md).
+> Warning: `clarinet run` will soon be deprecated in favor of a new way of interacting with smart contracts. The new documentation is under construction. In the meantime, learn more [in the clarinet-sdk Readme](https://github.com/hirosystems/clarinet/blob/01da3550670f321a2f19fd3b0f8df0fb4b769b08/components/clarinet-sdk/README.md).
 
 Extend Clarinet to integrate clarity contracts with your own tooling and workflow.
 

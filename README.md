@@ -351,7 +351,7 @@ This annotation tells the check-checker to consider the specified variables to b
 
 ### Execute a test suite
 
-> Warning: `clarinet test` will soon be deprecated in favor of a new way of testing smart contracts. The new documentation is under construction. In this meantime, learn more [in the clarinet-sdk Readme](https://github.com/hirosystems/clarinet/blob/01da3550670f321a2f19fd3b0f8df0fb4b769b08/components/clarinet-sdk/README.md).
+> Warning: `clarinet test` will soon be deprecated in favor of a new way of testing smart contracts. The new documentation is under construction. In the meantime, learn more [in the clarinet-sdk Readme](https://github.com/hirosystems/clarinet/blob/01da3550670f321a2f19fd3b0f8df0fb4b769b08/components/clarinet-sdk/README.md).
 
 Clarinet provides a testing harness based on Deno that can enable you to create automated unit tests or pseudo-integration tests using Typescript.
 

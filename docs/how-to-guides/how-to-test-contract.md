@@ -2,7 +2,7 @@
 title: Test Contract
 ---
 
-> Warning: `clarinet test` will soon be deprecated in favor of a new way of testing smart contracts. The new documentation is under construction. In this meantime, learn more [in the clarinet-sdk Readme](https://github.com/hirosystems/clarinet/blob/01da3550670f321a2f19fd3b0f8df0fb4b769b08/components/clarinet-sdk/README.md).
+> Warning: `clarinet test` will soon be deprecated in favor of a new way of testing smart contracts. The new documentation is under construction. In the meantime, learn more [in the clarinet-sdk Readme](https://github.com/hirosystems/clarinet/blob/01da3550670f321a2f19fd3b0f8df0fb4b769b08/components/clarinet-sdk/README.md).
 
 Clarinet supports automatic testing, where your blockchain application requirements can be converted to test cases. Clarinet comes with a testing harness based on Deno that applies the unit tests you write in TypeScript to your smart contracts.
 
