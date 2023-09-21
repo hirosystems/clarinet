@@ -18,7 +18,7 @@ npm install @hirosystems/clarinet-sdk
 ### Usage
 
 ```ts
-import { initVM } from "clarinet-sdk";
+import { initVM } from "@hirosystems/clarinet-sdk";
 import { Cl } from "@stacks/transactions";
 
 async function main() {
