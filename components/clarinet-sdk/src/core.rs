@@ -17,8 +17,10 @@ use clarity_repl::repl::{
     ClarityCodeSource, ClarityContract, ContractDeployer, Session, DEFAULT_CLARITY_VERSION,
     DEFAULT_EPOCH,
 };
+use gloo_utils::format::JsValueSerdeExt;
 use js_sys::Function as JsFunction;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
+use serde_json::json;
 use serde_wasm_bindgen::to_value as encode_to_js;
 use std::collections::HashMap;
 use std::{panic, path::PathBuf};
@@ -27,22 +29,74 @@ use wasm_bindgen::JsValue;
 
 use crate::utils::{self, serialize_event, uint8_to_string, uint8_to_value};
 
+#[wasm_bindgen]
+extern "C" {
+    #[wasm_bindgen(typescript_type = "Map<string, Map<string, bigint>>")]
+    pub type AssetsMap;
+    #[wasm_bindgen(typescript_type = "Map<string, string>")]
+    pub type Accounts;
+}
+
+#[derive(Debug, Deserialize)]
+struct CallContractArgsJSON {
+    contract: String,
+    method: String,
+    args_maps: Vec<HashMap<usize, u8>>,
+    sender: String,
+}
+
 #[derive(Debug, Deserialize)]
 #[wasm_bindgen]
 pub struct CallContractArgs {
     contract: String,
     method: String,
     args: Vec<Vec<u8>>,
+    sender: String,
 }
 
 #[wasm_bindgen]
 impl CallContractArgs {
     #[wasm_bindgen(constructor)]
-    pub fn new(contract: String, method: String, args: Vec<js_sys::Uint8Array>) -> Self {
+    pub fn new(
+        contract: String,
+        method: String,
+        args: Vec<js_sys::Uint8Array>,
+        sender: String,
+    ) -> Self {
         Self {
             contract,
             method,
             args: args.iter().map(|a| a.to_vec()).collect::<Vec<Vec<u8>>>(),
+            sender,
+        }
+    }
+
+    /*
+      The mineBlock method receives an JSON Array of Txs, including ContractCalls.
+      Because it's JSON, the Uint8Array arguments are passed as Map<index, value> instead of Vec<u8>.
+      This method transform the Map back into a Vec.
+    */
+    fn from_json_args(
+        CallContractArgsJSON {
+            contract,
+            method,
+            args_maps,
+            sender,
+        }: CallContractArgsJSON,
+    ) -> Self {
+        let mut args: Vec<Vec<u8>> = vec![];
+        for arg in args_maps {
+            let mut parsed_arg: Vec<u8> = vec![0; arg.len()];
+            for (i, v) in arg.iter() {
+                parsed_arg[*i] = *v;
+            }
+            args.push(parsed_arg);
+        }
+        Self {
+            contract,
+            method,
+            args,
+            sender,
         }
     }
 }
@@ -52,28 +106,38 @@ impl CallContractArgs {
 pub struct DeployContractArgs {
     name: String,
     content: String,
+    sender: String,
 }
 
 #[wasm_bindgen]
 impl DeployContractArgs {
     #[wasm_bindgen(constructor)]
-    pub fn new(name: String, content: String) -> Self {
-        Self { name, content }
+    pub fn new(name: String, content: String, sender: String) -> Self {
+        Self {
+            name,
+            content,
+            sender,
+        }
     }
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Serialize, Deserialize)]
 #[wasm_bindgen]
 pub struct TransferSTXArgs {
     amount: u64,
     recipient: String,
+    sender: String,
 }
 
 #[wasm_bindgen]
 impl TransferSTXArgs {
     #[wasm_bindgen(constructor)]
-    pub fn new(amount: u64, recipient: String) -> Self {
-        Self { amount, recipient }
+    pub fn new(amount: u64, recipient: String, sender: String) -> Self {
+        Self {
+            amount,
+            recipient,
+            sender,
+        }
     }
 }
 
@@ -81,10 +145,10 @@ impl TransferSTXArgs {
 #[serde(rename_all = "camelCase")]
 #[wasm_bindgen]
 pub struct TxArgs {
-    call_contract: Option<CallContractArgs>,
+    call_public_fn: Option<CallContractArgsJSON>,
     deploy_contract: Option<DeployContractArgs>,
+    #[serde(rename(serialize = "transfer_stx", deserialize = "transferSTX"))]
     transfer_stx: Option<TransferSTXArgs>,
-    sender: String,
 }
 
 macro_rules! log {
@@ -94,9 +158,16 @@ macro_rules! log {
 }
 
 #[wasm_bindgen(getter_with_clone)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct TransactionRes {
     pub result: String,
-    pub events: js_sys::Array,
+    pub events: String,
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct TransactionResRaw {
+    pub result: String,
+    pub events: Vec<String>,
 }
 
 #[wasm_bindgen(getter_with_clone)]
@@ -107,14 +178,24 @@ pub struct SessionReport {
 pub fn execution_result_to_transaction_res(execution: &ExecutionResult) -> TransactionRes {
     let result = match &execution.result {
         EvaluationResult::Snippet(result) => utils::to_raw_value(&result.result),
-        _ => unreachable!("Contract value from snippet"),
+        EvaluationResult::Contract(ref contract) => {
+            // contract.;
+            match contract.result {
+                Some(ref result) => utils::to_raw_value(result),
+                _ => "0x03".into(),
+            }
+        }
     };
-    let events = js_sys::Array::new_with_length(execution.events.len() as u32);
-    for (i, event) in execution.events.iter().enumerate() {
-        events.set(i as u32, encode_to_js(&serialize_event(event)).unwrap())
-    }
+    let events_as_strings = execution
+        .events
+        .iter()
+        .map(|e| json!(serialize_event(e)).to_string())
+        .collect::<Vec<String>>();
 
-    TransactionRes { result, events }
+    TransactionRes {
+        result,
+        events: json!(events_as_strings).to_string(),
+    }
 }
 
 #[wasm_bindgen(getter_with_clone)]
@@ -126,6 +207,7 @@ pub struct SDK {
     contracts_locations: HashMap<QualifiedContractIdentifier, FileLocation>,
     contracts_interfaces: HashMap<QualifiedContractIdentifier, ContractInterface>,
     cache: Option<(DeploymentSpecification, DeploymentGenerationArtifacts)>,
+    current_test_name: String,
 }
 
 #[wasm_bindgen]
@@ -143,7 +225,18 @@ impl SDK {
             contracts_locations: HashMap::new(),
             contracts_interfaces: HashMap::new(),
             cache: None,
+            current_test_name: String::new(),
         }
+    }
+
+    fn desugar_contract_id(&self, contract: &str) -> Result<QualifiedContractIdentifier, String> {
+        let contract_id = if contract.starts_with('S') {
+            contract.to_string()
+        } else {
+            format!("{}.{}", self.deployer, contract,)
+        };
+
+        QualifiedContractIdentifier::parse(&contract_id).map_err(|e| e.to_string())
     }
 
     #[wasm_bindgen(js_name=initSession)]
@@ -156,7 +249,7 @@ impl SDK {
         root_path.push(root);
         let project_root = FileLocation::FileSystem { path: root_path };
         let manifest_location = FileLocation::try_parse(&manifest_path, Some(&project_root))
-            .ok_or("failed to parse manifest location")?;
+            .ok_or("Failed to parse manifest location")?;
         let manifest =
             ProjectManifest::from_file_accessor(&manifest_location, &self.file_accessor).await?;
 
@@ -241,32 +334,25 @@ impl SDK {
     }
 
     #[wasm_bindgen(js_name=getContractsInterfaces)]
-    pub fn get_contracts_interfaces(&self) -> Result<JsValue, JsValue> {
+    pub fn get_contracts_interfaces(&self) -> Result<JsValue, JsError> {
         Ok(encode_to_js(&self.contracts_interfaces)?)
     }
 
     #[wasm_bindgen(js_name=getAssetsMap)]
-    pub fn get_assets_maps(&self) -> Result<JsValue, JsValue> {
+    pub fn get_assets_maps(&self) -> Result<AssetsMap, JsError> {
         let session = &self.get_session();
         let assets_maps = session.get_assets_maps();
-        Ok(encode_to_js(&assets_maps)?)
+        Ok(encode_to_js(&assets_maps)?.unchecked_into::<AssetsMap>())
     }
 
     #[wasm_bindgen(js_name=getAccounts)]
-    pub fn get_accounts(&mut self) -> Result<JsValue, JsValue> {
-        Ok(encode_to_js(&self.accounts)?)
+    pub fn get_accounts(&mut self) -> Result<Accounts, JsError> {
+        Ok(encode_to_js(&self.accounts)?.unchecked_into::<Accounts>())
     }
 
     #[wasm_bindgen(js_name=getDataVar)]
     pub fn get_data_var(&mut self, contract: &str, var_name: &str) -> Result<String, String> {
-        let contract_id = if contract.starts_with('S') {
-            contract.to_string()
-        } else {
-            format!("{}.{}", self.deployer, contract,)
-        };
-        let contract_id =
-            QualifiedContractIdentifier::parse(&contract_id).map_err(|e| e.to_string())?;
-
+        let contract_id = self.desugar_contract_id(contract)?;
         let session = self.get_session_mut();
         session
             .interpreter
@@ -281,14 +367,7 @@ impl SDK {
         map_name: &str,
         map_key: Vec<u8>,
     ) -> Result<String, String> {
-        let contract_id = if contract.starts_with('S') {
-            contract.to_string()
-        } else {
-            format!("{}.{}", self.deployer, contract,)
-        };
-        let contract_id =
-            QualifiedContractIdentifier::parse(&contract_id).map_err(|e| e.to_string())?;
-
+        let contract_id = self.desugar_contract_id(contract)?;
         let session = self.get_session_mut();
         session
             .interpreter
@@ -301,14 +380,11 @@ impl SDK {
         contract: &str,
         method: &str,
     ) -> Result<&ContractInterfaceFunction, String> {
-        let contract_id =
-            QualifiedContractIdentifier::parse(&format!("{}.{}", self.deployer, contract))
-                .map_err(|e| e.to_string())?;
+        let contract_id = self.desugar_contract_id(contract)?;
         let contract_interface = self
             .contracts_interfaces
             .get(&contract_id)
-            .ok_or("unable to get contract interface")?;
-
+            .ok_or(format!("unable to get contract interface for {contract}"))?;
         contract_interface
             .functions
             .iter()
@@ -319,13 +395,13 @@ impl SDK {
     fn invoke_contract_call(
         &mut self,
         call_contract_args: &CallContractArgs,
-        sender: &str,
         test_name: &str,
     ) -> Result<TransactionRes, String> {
         let CallContractArgs {
             contract,
             method,
             args,
+            sender,
         } = call_contract_args;
 
         let clarity_args: Vec<String> = args.iter().map(|a| uint8_to_string(a)).collect();
@@ -350,7 +426,6 @@ impl SDK {
                 if let Some(diag) = diagnostics.last() {
                     message = format!("{} -> {}", message, diag.message);
                 }
-                log!("message: {}", message);
                 return Err(message);
             }
         };
@@ -359,23 +434,18 @@ impl SDK {
     }
 
     #[wasm_bindgen(js_name=callReadOnlyFn)]
-    pub fn call_read_only_fn(
-        &mut self,
-        args: &CallContractArgs,
-        sender: &str,
-    ) -> Result<TransactionRes, String> {
+    pub fn call_read_only_fn(&mut self, args: &CallContractArgs) -> Result<TransactionRes, String> {
         let interface = self.get_function_interface(&args.contract, &args.method)?;
         if interface.access != ContractInterfaceFunctionAccess::read_only {
             return Err(format!("{} is not a read-only function", &args.method));
         }
 
-        self.invoke_contract_call(args, sender, "read-only call")
+        self.invoke_contract_call(args, &self.current_test_name.clone())
     }
 
     fn call_public_fn_private(
         &mut self,
         args: &CallContractArgs,
-        sender: &str,
         advance_chain_tip: bool,
     ) -> Result<TransactionRes, String> {
         let interface = self.get_function_interface(&args.contract, &args.method)?;
@@ -388,23 +458,22 @@ impl SDK {
             session.advance_chain_tip(1);
         }
 
-        self.invoke_contract_call(args, sender, "public call")
+        self.invoke_contract_call(args, &self.current_test_name.clone())
     }
 
     fn transfer_stx_private(
         &mut self,
         args: &TransferSTXArgs,
-        sender: &str,
         advance_chain_tip: bool,
     ) -> Result<TransactionRes, String> {
         let session = self.get_session_mut();
         let initial_tx_sender = session.get_tx_sender();
-        session.set_tx_sender(sender.to_string());
+        session.set_tx_sender(args.sender.to_string());
 
         let execution = match session.stx_transfer(args.amount, &args.recipient) {
             Ok(res) => res,
             Err(diagnostics) => {
-                let mut message = format!("{}: {}", "STX transfer error", sender);
+                let mut message = format!("{}: {}", "STX transfer error", args.sender);
                 if let Some(diag) = diagnostics.last() {
                     message = format!("{} -> {}", message, diag.message);
                 }
@@ -422,90 +491,96 @@ impl SDK {
     fn deploy_contract_private(
         &mut self,
         args: &DeployContractArgs,
-        sender: &str,
         advance_chain_tip: bool,
     ) -> Result<TransactionRes, String> {
-        let session = self.get_session_mut();
         let contract = ClarityContract {
             code_source: ClarityCodeSource::ContractInMemory(args.content.clone()),
             name: args.name.clone(),
-            deployer: ContractDeployer::Address(sender.to_string()),
+            deployer: ContractDeployer::Address(args.sender.to_string()),
             clarity_version: DEFAULT_CLARITY_VERSION,
             epoch: DEFAULT_EPOCH,
         };
 
-        let execution = match session.deploy_contract(
-            &contract,
-            None,
-            false,
-            Some(args.name.clone()),
-            &mut None,
-        ) {
-            Ok(res) => res,
-            Err(diagnostics) => {
-                let mut message = format!(
-                    "{}: {}.{}",
-                    "Contract deployment runtime error", sender, args.name
-                );
-                if let Some(diag) = diagnostics.last() {
-                    message = format!("{} -> {}", message, diag.message);
+        let execution = {
+            let session = self.get_session_mut();
+            let execution = match session.deploy_contract(
+                &contract,
+                None,
+                false,
+                Some(args.name.clone()),
+                &mut None,
+            ) {
+                Ok(res) => res,
+                Err(diagnostics) => {
+                    let mut message = format!(
+                        "Contract deployment runtime error: {}.{}",
+                        args.sender, args.name
+                    );
+                    if let Some(diag) = diagnostics.last() {
+                        message = format!("{} -> {}", message, diag.message);
+                    }
+                    return Err(message);
                 }
-                return Err(message);
+            };
+
+            if advance_chain_tip {
+                session.advance_chain_tip(1);
+            }
+            execution
+        };
+
+        if let EvaluationResult::Contract(ref result) = &execution.result {
+            if let Some(contract_interface) = &result.contract.analysis.contract_interface {
+                self.contracts_interfaces.insert(
+                    result.contract.analysis.contract_identifier.clone(),
+                    contract_interface.clone(),
+                );
             }
         };
 
-        if advance_chain_tip {
-            session.advance_chain_tip(1);
-        }
         Ok(execution_result_to_transaction_res(&execution))
     }
 
     #[wasm_bindgen(js_name=deployContract)]
-    pub fn deploy_contract(
-        &mut self,
-        args: &DeployContractArgs,
-        sender: &str,
-    ) -> Result<TransactionRes, String> {
-        self.deploy_contract_private(args, sender, true)
+    pub fn deploy_contract(&mut self, args: &DeployContractArgs) -> Result<TransactionRes, String> {
+        self.deploy_contract_private(args, true)
     }
 
     #[wasm_bindgen(js_name = "transferSTX")]
-    pub fn transfer_stx(
-        &mut self,
-        args: &TransferSTXArgs,
-        sender: &str,
-    ) -> Result<TransactionRes, String> {
-        self.transfer_stx_private(args, sender, true)
+    pub fn transfer_stx(&mut self, args: &TransferSTXArgs) -> Result<TransactionRes, String> {
+        self.transfer_stx_private(args, true)
     }
 
     #[wasm_bindgen(js_name = "callPublicFn")]
-    pub fn call_public_fn(
-        &mut self,
-        args: &CallContractArgs,
-        sender: &str,
-    ) -> Result<TransactionRes, String> {
-        self.call_public_fn_private(args, sender, true)
+    pub fn call_public_fn(&mut self, args: &CallContractArgs) -> Result<TransactionRes, String> {
+        self.call_public_fn_private(args, true)
     }
 
     #[wasm_bindgen(js_name=mineBlock)]
-    pub fn mine_block_js(&mut self, txs: js_sys::Array) -> Result<(), String> {
-        for js_tx in txs.to_vec() {
-            let tx: TxArgs = match serde_wasm_bindgen::from_value(js_tx) {
-                Ok(tx) => tx,
-                Err(err) => return Err(format!("error: {}", err)),
-            };
-            if let Some(contract_call_args) = tx.call_contract {
-                let _ = self.call_public_fn_private(&contract_call_args, &tx.sender, false);
-            } else if let Some(transfer_stx_args) = tx.transfer_stx {
-                let _ = self.transfer_stx_private(&transfer_stx_args, &tx.sender, false);
-            } else if let Some(deploy_contract_args) = tx.deploy_contract {
-                let _ = self.deploy_contract_private(&deploy_contract_args, &tx.sender, false);
-            }
+    pub fn mine_block_js(&mut self, js_txs: js_sys::Array) -> Result<JsValue, String> {
+        let mut results: Vec<TransactionRes> = vec![];
+
+        let txs: Vec<TxArgs> = js_txs
+            .into_serde()
+            .map_err(|e| format!("Failed to parse js txs: {:}", e))?;
+
+        for tx in txs {
+            let result = if let Some(args) = tx.call_public_fn {
+                self.call_public_fn_private(&CallContractArgs::from_json_args(args), false)
+            } else if let Some(transfer_stx) = tx.transfer_stx {
+                self.transfer_stx_private(&transfer_stx, false)
+            } else if let Some(deploy_contract) = tx.deploy_contract {
+                self.deploy_contract_private(&deploy_contract, false)
+            } else {
+                return Err("Invalid tx arguments".into());
+            }?;
+            results.push(result);
         }
 
         let session = self.get_session_mut();
         session.advance_chain_tip(1);
-        Ok(())
+
+        encode_to_js(&results).map_err(|e| format!("error: {}", e))
     }
 
     #[wasm_bindgen(js_name=mineEmptyBlock)]
@@ -521,15 +596,19 @@ impl SDK {
     }
 
     #[wasm_bindgen(js_name=runSnippet)]
-    pub fn run_snippet(&mut self, snippet: String) -> JsValue {
+    pub fn run_snippet(&mut self, snippet: String) -> js_sys::Array {
         let session = self.get_session_mut();
         let (_, output) = session.handle_command(&snippet);
         let output_as_array = js_sys::Array::new_with_length(output.len() as u32);
         for string in output {
             output_as_array.push(&JsValue::from_str(&string));
         }
-        // @todo: can actually return raw value like contract calls
-        output_as_array.into()
+        output_as_array
+    }
+
+    #[wasm_bindgen(js_name=setCurrentTestName)]
+    pub fn set_current_test_name(&mut self, test_name: String) {
+        self.current_test_name = test_name;
     }
 
     #[wasm_bindgen(js_name=getReport)]

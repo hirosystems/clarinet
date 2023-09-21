@@ -1,0 +1,22 @@
+{
+  "name": "clarity-matcher-unit-tests",
+  "version": "1.0.0",
+  "description": "This package is only used to test the vitest-helpers",
+  "private": true,
+  "directories": {
+    "tests": "tests"
+  },
+  "scripts": {
+    "test": "vitest run"
+  },
+  "keywords": [],
+  "author": "hirosystems",
+  "license": "GPL-3.0",
+  "devDependencies": {
+    "@stacks/transactions": "^6.5.4",
+    "@vitest/expect": "^0.34.4",
+    "typescript": "^5.1.6",
+    "vite": "^4.4.9",
+    "vitest": "^0.34.4"
+  }
+}

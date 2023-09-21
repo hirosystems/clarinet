@@ -1,24 +1,25 @@
 const path = require("path");
 
+/** @typedef {import('webpack').Configuration} WebpackConfig **/
+
+const target = "node18";
+const entry = {
+  index: "./src-ts/index.ts",
+  "vitest/index": "./src-ts/vitest/index.ts",
+};
+
 // watch and build src-ts only
 // run npm run build to re-build rust sources
 
-/** @typedef {import('webpack').Configuration} WebpackConfig **/
-
 /** @type WebpackConfig */
-const configBase = {
+const configESM = {
   mode: "production",
-  entry: "./src-ts/index.ts",
+  entry,
   resolve: { extensions: [".ts", ".js"] },
   optimization: {
     minimize: false,
   },
-};
-
-/** @type WebpackConfig */
-const configESM = {
-  ...configBase,
-  target: "node20",
+  target,
   watch: true,
   output: {
     filename: "index.mjs",
@@ -33,7 +34,7 @@ const configESM = {
         test: /\.ts$/,
         loader: "ts-loader",
         exclude: /node_modules/,
-        options: { configFile: "tsconfig.esm.json" },
+        options: { configFile: "tsconfig.json" },
       },
     ],
   },
