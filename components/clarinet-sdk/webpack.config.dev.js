@@ -6,6 +6,7 @@ const target = "node18";
 const entry = {
   index: "./src-ts/index.ts",
   "vitest/index": "./src-ts/vitest/index.ts",
+  "bin/index": "./src-ts/bin/index.ts",
 };
 
 // watch and build src-ts only
