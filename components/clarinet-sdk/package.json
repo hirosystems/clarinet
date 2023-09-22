@@ -1,6 +1,6 @@
 {
   "name": "@hirosystems/clarinet-sdk",
-  "version": "0.1.2",
+  "version": "0.2.3",
   "description": "A SDK to interact with Clarity Smart Contracts",
   "repository": {
     "type": "git",
@@ -38,6 +38,7 @@
       }
     }
   },
+  "bin": "./dist/cjs/bin/index.js",
   "scripts": {
     "clean": "rimraf dist",
     "dev-ts": "npm run build; webpack -c webpack.config.dev.js",
@@ -55,13 +56,16 @@
   "readme": "./README.md",
   "dependencies": {
     "@stacks/transactions": "^6.9.0",
+    "prompts": "^2.4.2",
     "yargs": "^17.7.2"
   },
   "devDependencies": {
     "@types/node": "^20.4.5",
+    "@types/prompts": "^2.4.4",
     "@types/yargs": "^17.0.24",
     "@wasm-tool/wasm-pack-plugin": "^1.7.0",
     "copy-webpack-plugin": "^11.0.0",
+    "kolorist": "^1.8.0",
     "rimraf": "^5.0.1",
     "ts-loader": "^9.4.4",
     "typedoc": "^0.25.1",

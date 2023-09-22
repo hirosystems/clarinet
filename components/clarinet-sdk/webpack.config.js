@@ -1,6 +1,7 @@
 const path = require("path");
 const WasmPackPlugin = require("@wasm-tool/wasm-pack-plugin");
 const CopyPlugin = require("copy-webpack-plugin");
+const webpack = require("webpack");
 
 /** @typedef {import('webpack').Configuration} WebpackConfig **/
 
@@ -13,7 +14,6 @@ const entry = {
 /** @type WebpackConfig */
 const configBase = {
   mode: "production",
-  entry,
   resolve: { extensions: [".ts", ".js"] },
   optimization: {
     minimize: false,
@@ -23,6 +23,7 @@ const configBase = {
 /** @type WebpackConfig */
 const configESM = {
   ...configBase,
+  entry,
   target,
   output: {
     filename: "[name].mjs",
@@ -60,6 +61,10 @@ const configESM = {
 /** @type WebpackConfig */
 const configCJS = {
   ...configBase,
+  entry: {
+    ...entry,
+    "bin/index": "./src-ts/bin/index.ts", // only for CJS
+  },
   target,
   output: {
     filename: "[name].js",
@@ -90,6 +95,14 @@ const configCJS = {
     }),
     new CopyPlugin({
       patterns: [{ from: "./src-ts/sdk/index.d.ts", to: "sdk" }],
+    }),
+    new CopyPlugin({
+      patterns: [{ from: "./src-ts/bin/templates/", to: "bin/templates/" }],
+    }),
+    new webpack.BannerPlugin({
+      banner: "#!/usr/bin/env node",
+      raw: true,
+      include: "bin/index",
     }),
   ],
 };
