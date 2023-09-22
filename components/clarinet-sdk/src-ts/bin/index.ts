@@ -1,5 +1,3 @@
-#!/usr/bin/env node
-
 import fs from "node:fs";
 import path from "node:path";
 import { green, red, yellow } from "kolorist";
@@ -16,11 +14,7 @@ async function main() {
   try {
     await checkIfProjectDirectoryIsValid();
   } catch (e: any) {
-    console.warn(
-      yellow(
-        `Could not initialize Clarinet testing framework:\n${red(e.message)}`
-      )
-    );
+    console.warn(yellow(`Could not initialize Clarinet testing framework:\n${red(e.message)}`));
     process.exit(1);
   }
 
@@ -62,18 +56,14 @@ async function main() {
 
   console.log("\n");
   console.log(
-    green(
-      "You are now ready to tests your smart contracts with Vitest and the Clarinet SDK"
-    )
+    green("You are now ready to tests your smart contracts with Vitest and the Clarinet SDK")
   );
   console.log(green("Open ./tests/contract.test.ts to see an example"));
 }
 
 // check if Clarinet.toml exists and if the Node/NPM boilerplate doesn't
 async function checkIfProjectDirectoryIsValid() {
-  const isClarinetProject = fs.existsSync(
-    path.join(process.cwd(), "Clarinet.toml")
-  );
+  const isClarinetProject = fs.existsSync(path.join(process.cwd(), "Clarinet.toml"));
   if (!isClarinetProject) {
     throw new Error(
       "Clarinet.toml not found in the current directory. Please run this command in a Clarinet project."
@@ -99,9 +89,7 @@ async function checkIfProjectDirectoryIsValid() {
 
 // copy the Node/NPM boilerplate
 function copyTemplateFiles(sdkBinDir: string) {
-  console.log(
-    "Copying package.json, tsconfig.json, vitest.config.js and sample test file"
-  );
+  console.log("Copying package.json, tsconfig.json, vitest.config.js and sample test file");
 
   fs.cpSync(path.join(sdkBinDir, "templates"), path.join(process.cwd(), "."), {
     recursive: true,
@@ -120,34 +108,22 @@ function updatePackageJSONProjectName(projectName: string) {
 // make sure we the current version of `@hirosystems/clarinet-sdk`
 function updateClarinetSDKVersion(sdkBinDir: string) {
   const sdkPackageJSONPath = path.join(sdkBinDir, "../../../package.json");
-  const sdkPackageJSON = JSON.parse(
-    fs.readFileSync(sdkPackageJSONPath, "utf-8")
-  );
+  const sdkPackageJSON = JSON.parse(fs.readFileSync(sdkPackageJSONPath, "utf-8"));
   const version = sdkPackageJSON.version;
 
   const projectPackageJSONPath = path.join(process.cwd(), "package.json");
-  const projectPackageJSON = JSON.parse(
-    fs.readFileSync(projectPackageJSONPath, "utf-8")
-  );
+  const projectPackageJSON = JSON.parse(fs.readFileSync(projectPackageJSONPath, "utf-8"));
   projectPackageJSON.dependencies["@hirosystems/clarinet-sdk"] = `^${version}`;
 
-  fs.writeFileSync(
-    projectPackageJSONPath,
-    JSON.stringify(projectPackageJSON, null, 2)
-  );
+  fs.writeFileSync(projectPackageJSONPath, JSON.stringify(projectPackageJSON, null, 2));
 }
 
 // add node and npm directories to the .gitignore
 function updateGitIgnore() {
   console.log("Updating .gitignore");
-  const newLines = [
-    "logs",
-    "*.log",
-    "npm-debug.log*",
-    "coverage",
-    "*.info",
-    "node_modules",
-  ].join("\n");
+  const newLines = ["logs", "*.log", "npm-debug.log*", "coverage", "*.info", "node_modules"].join(
+    "\n"
+  );
 
   const gitIgnorePath = path.join(process.cwd(), ".gitignore");
   if (fs.existsSync(gitIgnorePath)) {
@@ -159,22 +135,13 @@ function updateGitIgnore() {
 
 // disable the deno extension if it's enabled
 function updateVSCodeWorkspaceSetting() {
-  const vscodeSettingsPath = path.join(
-    process.cwd(),
-    ".vscode",
-    "settings.json"
-  );
+  const vscodeSettingsPath = path.join(process.cwd(), ".vscode", "settings.json");
   if (fs.existsSync(vscodeSettingsPath)) {
-    const vscodeSettings = JSON.parse(
-      fs.readFileSync(vscodeSettingsPath, "utf-8")
-    );
+    const vscodeSettings = JSON.parse(fs.readFileSync(vscodeSettingsPath, "utf-8"));
     if (vscodeSettings["deno.enable"] === true) {
       green("Updating workspace settings");
       vscodeSettings["deno.enable"] = false;
-      fs.writeFileSync(
-        vscodeSettingsPath,
-        JSON.stringify(vscodeSettings, null, 2)
-      );
+      fs.writeFileSync(vscodeSettingsPath, JSON.stringify(vscodeSettings, null, 2));
     }
   }
 }
