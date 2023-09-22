@@ -172,7 +172,7 @@ impl DevnetOrchestrator {
                 "bitcoind-chain-coordinator.{namespace}.svc.cluster.local:18443"
             ),
             stacks_node_host: format!("stacks-blockchain.{namespace}.svc.cluster.local:20443"),
-            postgres_host: format!("stacks-blockchain-api-pg.{namespace}.svc.cluster.local:5432"),
+            postgres_host: format!("stacks-blockchain-api.{namespace}.svc.cluster.local:5432"),
             stacks_api_host: format!("stacks-blockchain-api.{namespace}.svc.cluster.local:3999"),
             stacks_explorer_host: "localhost".into(), // todo (micaiah)
             bitcoin_explorer_host: "localhost".into(), // todo (micaiah)
