@@ -206,6 +206,7 @@ pub struct SDK {
     accounts: HashMap<String, String>,
     contracts_locations: HashMap<QualifiedContractIdentifier, FileLocation>,
     contracts_interfaces: HashMap<QualifiedContractIdentifier, ContractInterface>,
+    contracts_sources: HashMap<QualifiedContractIdentifier, String>,
     cache: Option<(DeploymentSpecification, DeploymentGenerationArtifacts)>,
     current_test_name: String,
 }
@@ -224,6 +225,7 @@ impl SDK {
             accounts: HashMap::new(),
             contracts_locations: HashMap::new(),
             contracts_interfaces: HashMap::new(),
+            contracts_sources: HashMap::new(),
             cache: None,
             current_test_name: String::new(),
         }
@@ -287,7 +289,7 @@ impl SDK {
             &deployment,
             Some(&artifacts.asts),
             false,
-            Some(StacksEpochId::Epoch21),
+            Some(DEFAULT_EPOCH),
         );
 
         for (contract_id, (_, location)) in deployment.contracts {
@@ -301,7 +303,10 @@ impl SDK {
                     if let EvaluationResult::Contract(contract_result) = execution.result {
                         let interface =
                             build_contract_interface(&contract_result.contract.analysis);
-                        self.contracts_interfaces.insert(contract_id, interface);
+                        self.contracts_interfaces
+                            .insert(contract_id.clone(), interface);
+                        self.contracts_sources
+                            .insert(contract_id, contract_result.contract.code);
                     };
                 }
                 Err(e) => {
@@ -335,7 +340,19 @@ impl SDK {
 
     #[wasm_bindgen(js_name=getContractsInterfaces)]
     pub fn get_contracts_interfaces(&self) -> Result<JsValue, JsError> {
-        Ok(encode_to_js(&self.contracts_interfaces)?)
+        let stringified_contracts_interfaces: HashMap<String, ContractInterface> = self
+            .contracts_interfaces
+            .iter()
+            .map(|(k, v)| (k.to_string(), v.clone()))
+            .collect();
+        Ok(encode_to_js(&stringified_contracts_interfaces)?)
+    }
+
+    #[wasm_bindgen(js_name=getContractSource)]
+    pub fn get_contract_source(&self, contract: &str) -> Option<String> {
+        let contract_id = self.desugar_contract_id(contract).ok()?;
+        let source = self.contracts_sources.get(&contract_id);
+        source.cloned()
     }
 
     #[wasm_bindgen(js_name=getAssetsMap)]
@@ -531,10 +548,11 @@ impl SDK {
 
         if let EvaluationResult::Contract(ref result) = &execution.result {
             if let Some(contract_interface) = &result.contract.analysis.contract_interface {
-                self.contracts_interfaces.insert(
-                    result.contract.analysis.contract_identifier.clone(),
-                    contract_interface.clone(),
-                );
+                let contract_identifier = result.contract.analysis.contract_identifier.clone();
+                self.contracts_interfaces
+                    .insert(contract_identifier.clone(), contract_interface.clone());
+                self.contracts_sources
+                    .insert(contract_identifier, result.contract.code.clone());
             }
         };
 

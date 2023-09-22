@@ -43,7 +43,8 @@
     "clean": "rimraf dist",
     "dev-ts": "npm run build; webpack -c webpack.config.dev.js",
     "build": "npm run clean; webpack -c webpack.config.js",
-    "prepare": "npm run build"
+    "prepare": "npm run build",
+    "test": "vitest run"
   },
   "keywords": [
     "stacks",
@@ -57,6 +58,7 @@
   "dependencies": {
     "@stacks/transactions": "^6.9.0",
     "prompts": "^2.4.2",
+    "vitest": "^0.34.5",
     "yargs": "^17.7.2"
   },
   "devDependencies": {
