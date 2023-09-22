@@ -287,7 +287,7 @@ impl SDK {
             &deployment,
             Some(&artifacts.asts),
             false,
-            Some(StacksEpochId::Epoch21),
+            Some(DEFAULT_EPOCH),
         );
 
         for (contract_id, (_, location)) in deployment.contracts {
@@ -335,7 +335,12 @@ impl SDK {
 
     #[wasm_bindgen(js_name=getContractsInterfaces)]
     pub fn get_contracts_interfaces(&self) -> Result<JsValue, JsError> {
-        Ok(encode_to_js(&self.contracts_interfaces)?)
+        let stringified_contracts_interfaces: HashMap<String, ContractInterface> = self
+            .contracts_interfaces
+            .iter()
+            .map(|(k, v)| (k.to_string(), v.clone()))
+            .collect();
+        Ok(encode_to_js(&stringified_contracts_interfaces)?)
     }
 
     #[wasm_bindgen(js_name=getAssetsMap)]

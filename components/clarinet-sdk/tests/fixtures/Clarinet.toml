@@ -1,0 +1,11 @@
+[project]
+name = 'fixtures'
+description = 'sample project to test clarinet-sdk'
+telemetry = false
+cache_dir = './.cache'
+requirements = []
+
+[contracts.counter]
+path = 'contracts/counter.clar'
+clarity_version = 2
+epoch = 2.4
