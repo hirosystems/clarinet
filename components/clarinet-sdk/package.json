@@ -54,7 +54,7 @@
   "license": "GPL-3.0",
   "readme": "./README.md",
   "dependencies": {
-    "@stacks/transactions": "^6.5.4",
+    "@stacks/transactions": "^6.9.0",
     "yargs": "^17.7.2"
   },
   "devDependencies": {

@@ -23,7 +23,6 @@ import {
 } from "@stacks/transactions";
 
 import { MatcherState } from "@vitest/expect";
-import { formatCV } from "./formatCV";
 
 // https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/BigInt#use_within_json
 // @ts-ignore
@@ -155,9 +154,11 @@ function simpleAssertion(
   return {
     pass: this.equals(actualRaw, expectedRaw, undefined, true),
     message: () =>
-      `expected ${formatCV(actualRaw)} ${notStr(this.isNot)}to be ${formatCV(expectedRaw)}`,
-    actual: formatCV(actualRaw, 2),
-    expected: formatCV(expectedRaw, 2),
+      `expected ${Cl.prettyPrint(actualRaw)} ${notStr(this.isNot)}to be ${Cl.prettyPrint(
+        expectedRaw
+      )}`,
+    actual: Cl.prettyPrint(actualRaw, 2),
+    expected: Cl.prettyPrint(expectedRaw, 2),
   };
 }
 
@@ -185,16 +186,16 @@ function simpleCompositeAssertion(
 
   const expectedIsCV = isClarityValue(expectedValue);
   const expectedOneLine = expectedIsCV
-    ? formatCV(clMethod(expectedValue))
+    ? Cl.prettyPrint(clMethod(expectedValue))
     : JSON.stringify(expectedValue);
   const expected = expectedIsCV
-    ? formatCV(clMethod(expectedValue), 2)
+    ? Cl.prettyPrint(clMethod(expectedValue), 2)
     : JSON.stringify(expectedValue);
 
   return {
     pass: this.equals(actualRaw.value, expectedValue, undefined, true),
-    message: () => formatMessage.call(this, formatCV(actualRaw), expectedOneLine),
-    actual: formatCV(actualRaw, 2),
+    message: () => formatMessage.call(this, Cl.prettyPrint(actualRaw), expectedOneLine),
+    actual: Cl.prettyPrint(actualRaw, 2),
     expected,
   };
 }
@@ -260,9 +261,9 @@ expect.extend({
     const expected = Cl.none();
     return {
       pass: this.equals(actual, expected, undefined, true),
-      message: () => formatMessage.call(this, formatCV(actual), formatCV(actual)),
-      actual: formatCV(actual, 2),
-      expected: formatCV(actual, 2),
+      message: () => formatMessage.call(this, Cl.prettyPrint(actual), Cl.prettyPrint(actual)),
+      actual: Cl.prettyPrint(actual, 2),
+      expected: Cl.prettyPrint(actual, 2),
     };
   },
 
@@ -296,8 +297,8 @@ expect.extend({
     return {
       pass: this.equals(actual, expected, undefined, true),
       message: () => formatMessage.call(this, actualString, expectedString),
-      actual: formatCV(actual, 2),
-      expected: formatCV(expected, 2),
+      actual: Cl.prettyPrint(actual, 2),
+      expected: Cl.prettyPrint(expected, 2),
     };
   },
 
@@ -315,8 +316,8 @@ expect.extend({
       pass: this.equals(actual, expected, undefined, true),
       // note: throw a simple message and rely on `actual` and `expected` to display the diff
       message: () => `the received Buffer does ${this.isNot ? "" : "not "}match the expected one`,
-      actual: formatCV(actual, 2),
-      expected: formatCV(expected, 2),
+      actual: Cl.prettyPrint(actual, 2),
+      expected: Cl.prettyPrint(expected, 2),
     };
   },
 
@@ -330,13 +331,13 @@ expect.extend({
     }
 
     const isListArray = checkIsListArray(expectedItems);
-    const expected = isListArray ? formatCV(Cl.list(expectedItems), 2) : expectedItems;
+    const expected = isListArray ? Cl.prettyPrint(Cl.list(expectedItems), 2) : expectedItems;
 
     return {
       pass: this.equals(actual.list, expectedItems, undefined, true),
       // note: throw a simple message and rely on `actual` and `expected` to display the diff
       message: () => `the received List does ${this.isNot ? "" : "not "}match the expected one`,
-      actual: formatCV(actual, 2),
+      actual: Cl.prettyPrint(actual, 2),
       expected,
     };
   },
@@ -351,13 +352,13 @@ expect.extend({
     }
 
     const isTupleData = checkIsTupleData(expectedData);
-    const expected = isTupleData ? formatCV(Cl.tuple(expectedData), 2) : expectedData;
+    const expected = isTupleData ? Cl.prettyPrint(Cl.tuple(expectedData), 2) : expectedData;
 
     return {
       pass: this.equals(actual.data, expectedData, undefined, true),
       // note: throw a simple message and rely on `actual` and `expected` to display the diff
       message: () => `the received Tuple does ${this.isNot ? "" : "not "}match the expected one`,
-      actual: formatCV(actual, 2),
+      actual: Cl.prettyPrint(actual, 2),
       expected,
     };
   },
