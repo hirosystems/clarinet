@@ -156,6 +156,16 @@ describe("vm can get contracts info and deploy contracts", async () => {
     expect(counterInterface?.maps).toHaveLength(1);
   });
 
+  it("can get contract source", async () => {
+    const vm = await initVM(manifestPath);
+
+    let counterSource = vm.getContractSource(`${deployerAddr}.counter`);
+    expect(counterSource?.startsWith("(define-data-var counter")).toBeTruthy();
+
+    let noSource = vm.getContractSource(`${deployerAddr}.not-counter`);
+    expect(noSource).toBeUndefined();
+  });
+
   it("can deploy contracts as snippets", async () => {
     const vm = await initVM(manifestPath);
 
@@ -169,11 +179,8 @@ describe("vm can get contracts info and deploy contracts", async () => {
   it("can deploy contracts", async () => {
     const vm = await initVM(manifestPath);
 
-    const deployRes = vm.deployContract(
-      "op",
-      "(define-public (add (a uint) (b uint)) (ok (+ a b)))",
-      deployerAddr
-    );
+    const source = "(define-public (add (a uint) (b uint)) (ok (+ a b)))\n";
+    const deployRes = vm.deployContract("op", source, deployerAddr);
     expect(deployRes.result).toStrictEqual(Cl.bool(true));
 
     const contractInterfaces = vm.getContractsInterfaces();
@@ -181,5 +188,8 @@ describe("vm can get contracts info and deploy contracts", async () => {
 
     const addRes = vm.callPublicFn("op", "add", [Cl.uint(13), Cl.uint(29)], wallet1Addr);
     expect(addRes.result).toStrictEqual(Cl.ok(Cl.uint(42)));
+
+    const opSource = vm.getContractSource("op");
+    expect(opSource).toBe(source);
   });
 });
