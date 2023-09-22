@@ -56,7 +56,7 @@ async function main() {
 
   console.log("\n");
   console.log(
-    green("You are now ready to tests your smart contracts with Vitest and the Clarinet SDK")
+    green("You are now ready to test your smart contracts with Vitest and the Clarinet SDK")
   );
   console.log(green("Open ./tests/contract.test.ts to see an example"));
 }
@@ -127,6 +127,10 @@ function updateGitIgnore() {
 
   const gitIgnorePath = path.join(process.cwd(), ".gitignore");
   if (fs.existsSync(gitIgnorePath)) {
+    fs.appendFileSync(
+      gitIgnorePath,
+      "\n# Ignore Node and NPM files. Added by the clarinet-sdk migration."
+    );
     fs.appendFileSync(gitIgnorePath, `\n${newLines}`);
   } else {
     fs.writeFileSync(gitIgnorePath, newLines);
