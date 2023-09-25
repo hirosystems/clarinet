@@ -166,6 +166,17 @@ describe("vm can get contracts info and deploy contracts", async () => {
     expect(noSource).toBeUndefined();
   });
 
+  it("can get contract ast", async () => {
+    const vm = await initVM(manifestPath);
+
+    let counterAst = vm.getContractAST(`${deployerAddr}.counter`);
+    expect(counterAst).toBeDefined();
+    expect(counterAst.expressions).toHaveLength(7);
+
+    let getWithShortAddr = vm.getContractAST("counter");
+    expect(getWithShortAddr).toBeDefined();
+  });
+
   it("can deploy contracts as snippets", async () => {
     const vm = await initVM(manifestPath);
 
@@ -191,5 +202,9 @@ describe("vm can get contracts info and deploy contracts", async () => {
 
     const opSource = vm.getContractSource("op");
     expect(opSource).toBe(source);
+
+    let opASt = vm.getContractAST("op");
+    expect(opASt).toBeDefined();
+    expect(opASt.expressions).toHaveLength(1);
   });
 });
