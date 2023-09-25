@@ -7,12 +7,11 @@ use clarinet_files::chainhook_types::StacksNetwork;
 use clarinet_files::{FileAccessor, FileLocation, ProjectManifest, WASMFileSystemAccessor};
 use clarity_repl::analysis::coverage::CoverageReporter;
 use clarity_repl::clarity::analysis::contract_interface_builder::{
-    build_contract_interface, ContractInterface, ContractInterfaceFunction,
-    ContractInterfaceFunctionAccess,
+    ContractInterface, ContractInterfaceFunction, ContractInterfaceFunctionAccess,
 };
 use clarity_repl::clarity::stacks_common::types::StacksEpochId;
 use clarity_repl::clarity::vm::types::QualifiedContractIdentifier;
-use clarity_repl::clarity::{EvaluationResult, ExecutionResult};
+use clarity_repl::clarity::{EvaluationResult, ExecutionResult, ParsedContract};
 use clarity_repl::repl::{
     ClarityCodeSource, ClarityContract, ContractDeployer, Session, DEFAULT_CLARITY_VERSION,
     DEFAULT_EPOCH,
@@ -206,7 +205,7 @@ pub struct SDK {
     accounts: HashMap<String, String>,
     contracts_locations: HashMap<QualifiedContractIdentifier, FileLocation>,
     contracts_interfaces: HashMap<QualifiedContractIdentifier, ContractInterface>,
-    contracts_sources: HashMap<QualifiedContractIdentifier, String>,
+    parsed_contracts: HashMap<QualifiedContractIdentifier, ParsedContract>,
     cache: Option<(DeploymentSpecification, DeploymentGenerationArtifacts)>,
     current_test_name: String,
 }
@@ -225,7 +224,7 @@ impl SDK {
             accounts: HashMap::new(),
             contracts_locations: HashMap::new(),
             contracts_interfaces: HashMap::new(),
-            contracts_sources: HashMap::new(),
+            parsed_contracts: HashMap::new(),
             cache: None,
             current_test_name: String::new(),
         }
@@ -297,17 +296,10 @@ impl SDK {
                 .insert(contract_id, location.clone());
         }
 
-        for (contract_id, result) in results.into_iter() {
+        for (_, result) in results.into_iter() {
             match result {
-                Ok(execution) => {
-                    if let EvaluationResult::Contract(contract_result) = execution.result {
-                        let interface =
-                            build_contract_interface(&contract_result.contract.analysis);
-                        self.contracts_interfaces
-                            .insert(contract_id.clone(), interface);
-                        self.contracts_sources
-                            .insert(contract_id, contract_result.contract.code);
-                    };
+                Ok(execution_result) => {
+                    self.add_contract(&execution_result);
                 }
                 Err(e) => {
                     log!("unable to load deployment: {:}", e[0].message);
@@ -318,6 +310,18 @@ impl SDK {
 
         self.session = Some(session);
         Ok(())
+    }
+
+    fn add_contract(&mut self, execution_result: &ExecutionResult) {
+        if let EvaluationResult::Contract(ref result) = &execution_result.result {
+            let contract_id = result.contract.analysis.contract_identifier.clone();
+            if let Some(contract_interface) = &result.contract.analysis.contract_interface {
+                self.contracts_interfaces
+                    .insert(contract_id.clone(), contract_interface.clone());
+            }
+            self.parsed_contracts
+                .insert(contract_id, result.contract.clone());
+        };
     }
 
     fn get_session(&self) -> &Session {
@@ -351,8 +355,15 @@ impl SDK {
     #[wasm_bindgen(js_name=getContractSource)]
     pub fn get_contract_source(&self, contract: &str) -> Option<String> {
         let contract_id = self.desugar_contract_id(contract).ok()?;
-        let source = self.contracts_sources.get(&contract_id);
-        source.cloned()
+        let contract = self.parsed_contracts.get(&contract_id)?;
+        Some(contract.code.clone())
+    }
+
+    #[wasm_bindgen(js_name=getContractAST)]
+    pub fn get_contract_ast(&self, contract: &str) -> Result<JsValue, String> {
+        let contract_id = self.desugar_contract_id(contract)?;
+        let contract = self.parsed_contracts.get(&contract_id).ok_or("err")?;
+        encode_to_js(&contract.ast).map_err(|e| e.to_string())
     }
 
     #[wasm_bindgen(js_name=getAssetsMap)]
@@ -520,7 +531,10 @@ impl SDK {
 
         let execution = {
             let session = self.get_session_mut();
-            let execution = match session.deploy_contract(
+            if advance_chain_tip {
+                session.advance_chain_tip(1);
+            }
+            match session.deploy_contract(
                 &contract,
                 None,
                 false,
@@ -538,24 +552,9 @@ impl SDK {
                     }
                     return Err(message);
                 }
-            };
-
-            if advance_chain_tip {
-                session.advance_chain_tip(1);
-            }
-            execution
-        };
-
-        if let EvaluationResult::Contract(ref result) = &execution.result {
-            if let Some(contract_interface) = &result.contract.analysis.contract_interface {
-                let contract_identifier = result.contract.analysis.contract_identifier.clone();
-                self.contracts_interfaces
-                    .insert(contract_identifier.clone(), contract_interface.clone());
-                self.contracts_sources
-                    .insert(contract_identifier, result.contract.code.clone());
             }
         };
-
+        self.add_contract(&execution);
         Ok(execution_result_to_transaction_res(&execution))
     }
 

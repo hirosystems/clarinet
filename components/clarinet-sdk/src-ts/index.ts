@@ -2,13 +2,8 @@ import { Cl, ClarityValue } from "@stacks/transactions";
 
 import { vfs } from "./vfs";
 import type { ContractInterface } from "./contractInterface";
-import {
-  SDK,
-  TransactionRes,
-  CallContractArgs,
-  DeployContractArgs,
-  TransferSTXArgs,
-} from "./sdk";
+import { SDK, TransactionRes, CallContractArgs, DeployContractArgs, TransferSTXArgs } from "./sdk";
+import { ContractAST } from "./contractAst";
 
 type WASMModule = typeof import("./sdk");
 const wasmModule = import("./sdk");
@@ -32,11 +27,7 @@ type CallFn = (
   sender: string
 ) => ParsedTransactionRes;
 
-type DeployContract = (
-  name: string,
-  content: string,
-  sender: string
-) => ParsedTransactionRes;
+type DeployContract = (name: string, content: string, sender: string) => ParsedTransactionRes;
 
 type TransferSTX = (
   amount: number | bigint,
@@ -67,12 +58,7 @@ type Tx =
     };
 
 export const tx = {
-  callPublicFn: (
-    contract: string,
-    method: string,
-    args: ClarityValue[],
-    sender: string
-  ): Tx => ({
+  callPublicFn: (contract: string, method: string, args: ClarityValue[], sender: string): Tx => ({
     callPublicFn: { contract, method, args, sender },
   }),
   deployContract: (name: string, content: string, sender: string): Tx => ({
@@ -85,11 +71,9 @@ export const tx = {
 
 type MineBlock = (txs: Array<Tx>) => ParsedTransactionRes[];
 type GetDataVar = (contract: string, dataVar: string) => ClarityValue;
-type GetMapEntry = (
-  contract: string,
-  mapName: string,
-  mapKey: ClarityValue
-) => ClarityValue;
+type GetMapEntry = (contract: string, mapName: string, mapKey: ClarityValue) => ClarityValue;
+type GetContractAST = (contractId: string) => ContractAST;
+type GetContractsInterfaces = () => Map<string, ContractInterface>;
 
 // because the session is wrapped in a proxy the types need to be hardcoded
 export type ClarityVM = {
@@ -105,8 +89,10 @@ export type ClarityVM = {
     ? GetDataVar
     : K extends "getMapEntry"
     ? GetMapEntry
+    : K extends "getContractAST"
+    ? GetContractAST
     : K extends "getContractsInterfaces"
-    ? () => Map<string, ContractInterface>
+    ? GetContractsInterfaces
     : SDK[K];
 };
 
@@ -156,9 +142,7 @@ const getSessionProxy = () => ({
 
     if (prop === "deployContract") {
       const callDeployContract: DeployContract = (...args) => {
-        const response = session.deployContract(
-          new DeployContractArgs(...args)
-        );
+        const response = session.deployContract(new DeployContractArgs(...args));
         return parseTxResult(response);
       };
       return callDeployContract;
@@ -166,9 +150,7 @@ const getSessionProxy = () => ({
 
     if (prop === "transferSTX") {
       const callTransferSTX: TransferSTX = (amount, ...args) => {
-        const response = session.transferSTX(
-          new TransferSTXArgs(BigInt(amount), ...args)
-        );
+        const response = session.transferSTX(new TransferSTXArgs(BigInt(amount), ...args));
         return parseTxResult(response);
       };
       return callTransferSTX;
@@ -205,11 +187,7 @@ const getSessionProxy = () => ({
 
     if (prop === "getMapEntry") {
       const getMapEntry: GetMapEntry = (contract, mapName, mapKey) => {
-        const response = session.getMapEntry(
-          contract,
-          mapName,
-          Cl.serialize(mapKey)
-        );
+        const response = session.getMapEntry(contract, mapName, Cl.serialize(mapKey));
         const result = Cl.deserialize(response);
         return result;
       };
@@ -237,10 +215,7 @@ function memoizedInit() {
 
     if (!vm) {
       console.log("init clarity vm");
-      vm = new Proxy(
-        new wasm.SDK(vfs),
-        getSessionProxy()
-      ) as unknown as ClarityVM;
+      vm = new Proxy(new wasm.SDK(vfs), getSessionProxy()) as unknown as ClarityVM;
     }
     // start a new session
     await vm.initSession(process.cwd(), manifestPath);
