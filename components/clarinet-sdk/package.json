@@ -68,6 +68,7 @@
     "@wasm-tool/wasm-pack-plugin": "^1.7.0",
     "copy-webpack-plugin": "^11.0.0",
     "kolorist": "^1.8.0",
+    "prettier": "^3.0.3",
     "rimraf": "^5.0.1",
     "ts-loader": "^9.4.4",
     "typedoc": "^0.25.1",

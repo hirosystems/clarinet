@@ -24,7 +24,7 @@ type CallFn = (
   contract: string,
   method: string,
   args: ClarityValue[],
-  sender: string
+  sender: string,
 ) => ParsedTransactionRes;
 
 type DeployContract = (name: string, content: string, sender: string) => ParsedTransactionRes;
@@ -32,7 +32,7 @@ type DeployContract = (name: string, content: string, sender: string) => ParsedT
 type TransferSTX = (
   amount: number | bigint,
   content: string,
-  sender: string
+  sender: string,
 ) => ParsedTransactionRes;
 
 type Tx =
@@ -132,8 +132,8 @@ const getSessionProxy = () => ({
             contract,
             method,
             args.map((a) => Cl.serialize(a)),
-            sender
-          )
+            sender,
+          ),
         );
         return parseTxResult(response);
       };

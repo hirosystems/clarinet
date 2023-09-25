@@ -43,13 +43,16 @@ async function readFiles(event: any) {
         console.warn(err);
         return null;
       }
-    })
+    }),
   );
   return Object.fromEntries(
-    files.reduce((acc, f, i) => {
-      if (f === null) return acc;
-      return acc.concat([[event.paths[i], fileArrayToString(f)]]);
-    }, [] as [string, string][])
+    files.reduce(
+      (acc, f, i) => {
+        if (f === null) return acc;
+        return acc.concat([[event.paths[i], fileArrayToString(f)]]);
+      },
+      [] as [string, string][],
+    ),
   );
 }
 

@@ -56,7 +56,7 @@ async function main() {
 
   console.log("\n");
   console.log(
-    green("You are now ready to test your smart contracts with Vitest and the Clarinet SDK")
+    green("You are now ready to test your smart contracts with Vitest and the Clarinet SDK"),
   );
   console.log(green("Open ./tests/contract.test.ts to see an example"));
 }
@@ -66,7 +66,7 @@ async function checkIfProjectDirectoryIsValid() {
   const isClarinetProject = fs.existsSync(path.join(process.cwd(), "Clarinet.toml"));
   if (!isClarinetProject) {
     throw new Error(
-      "Clarinet.toml not found in the current directory. Please run this command in a Clarinet project."
+      "Clarinet.toml not found in the current directory. Please run this command in a Clarinet project.",
     );
   }
 
@@ -122,14 +122,14 @@ function updateClarinetSDKVersion(sdkBinDir: string) {
 function updateGitIgnore() {
   console.log("Updating .gitignore");
   const newLines = ["logs", "*.log", "npm-debug.log*", "coverage", "*.info", "node_modules"].join(
-    "\n"
+    "\n",
   );
 
   const gitIgnorePath = path.join(process.cwd(), ".gitignore");
   if (fs.existsSync(gitIgnorePath)) {
     fs.appendFileSync(
       gitIgnorePath,
-      "\n# Ignore Node and NPM files. Added by the clarinet-sdk migration."
+      "\n# Ignore Node and NPM files. Added by the clarinet-sdk migration.",
     );
     fs.appendFileSync(gitIgnorePath, `\n${newLines}`);
   } else {
