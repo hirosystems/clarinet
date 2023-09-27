@@ -24,6 +24,8 @@ beforeEach(async (ctx) => {
 
 afterAll(() => {
   if (global.options.clarinet.coverage) {
-    coverageReports.push(vm.getReport().coverage);
+    const report = vm.getReport();
+    coverageReports.push(report.coverage);
+    costsReports.push(report.costs);
   }
 });

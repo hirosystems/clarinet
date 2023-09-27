@@ -4,10 +4,12 @@ declare global {
   var vm: ClarityVM;
   var testEnvironment: string;
   var coverageReports: string[];
+  var costsReports: string[];
   var options: {
     clarinet: {
       coverage: boolean;
       coverageFilename: string;
+      costsFilename: string;
     };
   };
 }

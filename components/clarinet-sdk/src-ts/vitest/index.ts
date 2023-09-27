@@ -16,6 +16,11 @@ export function getClarinetVitestsArgv() {
       alias: "cov-file",
       type: "string",
       default: "lcov.info",
+    })
+    .option("costs-filename", {
+      alias: "costs-file",
+      type: "string",
+      default: "costs-reports.json",
     }).argv;
 }
 
