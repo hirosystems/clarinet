@@ -26,7 +26,8 @@ use std::{panic, path::PathBuf};
 use wasm_bindgen::prelude::*;
 use wasm_bindgen::JsValue;
 
-use crate::utils::{self, serialize_event, uint8_to_string, uint8_to_value};
+use crate::utils::costs::SerializableCostsReport;
+use crate::utils::events::{self, serialize_event, uint8_to_string, uint8_to_value};
 
 #[wasm_bindgen(typescript_custom_section)]
 const SET_EPOCH: &'static str = r#"
@@ -213,15 +214,16 @@ pub struct TransactionResRaw {
 #[wasm_bindgen(getter_with_clone)]
 pub struct SessionReport {
     pub coverage: String,
+    pub costs: String,
 }
 
 pub fn execution_result_to_transaction_res(execution: &ExecutionResult) -> TransactionRes {
     let result = match &execution.result {
-        EvaluationResult::Snippet(result) => utils::to_raw_value(&result.result),
+        EvaluationResult::Snippet(result) => events::to_raw_value(&result.result),
         EvaluationResult::Contract(ref contract) => {
             // contract.;
             match contract.result {
-                Some(ref result) => utils::to_raw_value(result),
+                Some(ref result) => events::to_raw_value(result),
                 _ => "0x03".into(),
             }
         }
@@ -711,6 +713,14 @@ impl SDK {
             .reports
             .append(&mut session.coverage_reports);
         let coverage = coverage_reporter.build_lcov_content();
-        Ok(SessionReport { coverage })
+
+        let costs_reports: Vec<SerializableCostsReport> = session
+            .costs_reports
+            .iter()
+            .map(SerializableCostsReport::from_vm_costs_report)
+            .collect();
+        let costs = serde_json::to_string(&costs_reports).map_err(|e| e.to_string())?;
+
+        Ok(SessionReport { coverage, costs })
     }
 }

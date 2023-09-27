@@ -249,3 +249,33 @@ describe("vm can get contracts info and deploy contracts", async () => {
     expect(contract3Interface.clarity_version).toBe("Clarity1");
   });
 });
+
+describe("vm can get session reports", async () => {
+  it("can get line coverage", async () => {
+    const vm = await initVM(manifestPath);
+
+    vm.callPublicFn("counter", "increment", [], address1);
+    vm.callPublicFn("counter", "increment", [], address1);
+
+    const reports = vm.getReport();
+    expect(reports.coverage.startsWith("TN:")).toBe(true);
+    expect(reports.coverage.endsWith("end_of_record\n")).toBe(true);
+  });
+
+  it("can get costs", async () => {
+    const vm = await initVM(manifestPath);
+
+    vm.callPublicFn("counter", "increment", [], address1);
+
+    const reports = vm.getReport();
+    expect(() => JSON.parse(reports.costs)).not.toThrow();
+
+    const parsedReports = JSON.parse(reports.costs);
+    expect(parsedReports).toHaveLength(1);
+
+    const report = parsedReports[0];
+    expect(report.contract_id).toBe(`${vm.deployer}.counter`);
+    expect(report.method).toBe("increment");
+    expect(report.cost_result.total.write_count).toBe(3);
+  });
+});
