@@ -40,6 +40,22 @@ describe("basic vm interactions", async () => {
     expect(assets.get("STX")).toHaveLength(4);
     expect(assets.get("STX")?.get(address1)).toBe(100000000000000n);
   });
+
+  it("can get and set epoch", async () => {
+    const vm = await initVM(manifestPath);
+
+    // should be 2.4 by default
+    expect(vm.currentEpoch).toBe("2.4");
+
+    vm.setEpoch("2.0");
+    expect(vm.currentEpoch).toBe("2.0");
+
+    // @ts-ignore
+    // "0" is an invalid epoch
+    // it logs that 0 is invalid and defaults to 2.4
+    vm.setEpoch("0");
+    expect(vm.currentEpoch).toBe("2.4");
+  });
 });
 
 describe("vm can call contracts function", async () => {
@@ -183,7 +199,7 @@ describe("vm can get contracts info and deploy contracts", async () => {
   it("can deploy contracts as snippets", async () => {
     const vm = await initVM(manifestPath);
 
-    const res = vm.deployContract("temp", "(+ 24 18)", deployerAddr);
+    const res = vm.deployContract("temp", "(+ 24 18)", null, deployerAddr);
     expect(res.result).toStrictEqual(Cl.int(42));
 
     const contractInterfaces = vm.getContractsInterfaces();
@@ -194,7 +210,7 @@ describe("vm can get contracts info and deploy contracts", async () => {
     const vm = await initVM(manifestPath);
 
     const source = "(define-public (add (a uint) (b uint)) (ok (+ a b)))\n";
-    const deployRes = vm.deployContract("op", source, deployerAddr);
+    const deployRes = vm.deployContract("op", source, null, deployerAddr);
     expect(deployRes.result).toStrictEqual(Cl.bool(true));
 
     const contractInterfaces = vm.getContractsInterfaces();
@@ -209,5 +225,27 @@ describe("vm can get contracts info and deploy contracts", async () => {
     const opASt = vm.getContractAST("op");
     expect(opASt).toBeDefined();
     expect(opASt.expressions).toHaveLength(1);
+  });
+
+  it("can deploy contract with a given clarity_version", async () => {
+    const vm = await initVM(manifestPath);
+
+    const source = "(define-public (add (a uint) (b uint)) (ok (+ a b)))\n";
+
+    vm.deployContract("contract1", source, { clarityVersion: 1 }, deployerAddr);
+    const contract1Interface = vm.getContractsInterfaces().get(`${vm.deployer}.contract1`)!;
+    expect(contract1Interface.epoch).toBe("Epoch24");
+    expect(contract1Interface.clarity_version).toBe("Clarity1");
+
+    vm.deployContract("contract2", source, { clarityVersion: 2 }, deployerAddr);
+    const contract2Interface = vm.getContractsInterfaces().get(`${vm.deployer}.contract2`)!;
+    expect(contract2Interface.epoch).toBe("Epoch24");
+    expect(contract2Interface.clarity_version).toBe("Clarity2");
+
+    vm.setEpoch("2.0");
+    vm.deployContract("contract3", source, { clarityVersion: 1 }, deployerAddr);
+    const contract3Interface = vm.getContractsInterfaces().get(`${vm.deployer}.contract3`)!;
+    expect(contract3Interface.epoch).toBe("Epoch20");
+    expect(contract3Interface.clarity_version).toBe("Clarity1");
   });
 });

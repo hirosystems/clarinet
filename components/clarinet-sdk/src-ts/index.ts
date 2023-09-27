@@ -2,7 +2,14 @@ import { Cl, ClarityValue } from "@stacks/transactions";
 
 import { vfs } from "./vfs";
 import type { ContractInterface } from "./contractInterface";
-import { SDK, TransactionRes, CallContractArgs, DeployContractArgs, TransferSTXArgs } from "./sdk";
+import {
+  SDK,
+  TransactionRes,
+  CallContractArgs,
+  DeployContractArgs,
+  TransferSTXArgs,
+  ContractOptions,
+} from "./sdk";
 import { ContractAST } from "./contractAst";
 
 type WASMModule = typeof import("./sdk");
@@ -27,12 +34,20 @@ type CallFn = (
   sender: string,
 ) => ParsedTransactionRes;
 
-type DeployContract = (name: string, content: string, sender: string) => ParsedTransactionRes;
+type DeployContractOptions = {
+  clarityVersion: 1 | 2;
+};
+type DeployContract = (
+  name: string,
+  content: string,
+  options: DeployContractOptions | null,
+  sender: string,
+) => ParsedTransactionRes;
 
 type TransferSTX = (
   amount: number | bigint,
   recipient: string,
-  sender: string
+  sender: string,
 ) => ParsedTransactionRes;
 
 type Tx =
@@ -48,7 +63,12 @@ type Tx =
     }
   | {
       callPublicFn?: never;
-      deployContract: { name: string; content: string; sender: string };
+      deployContract: {
+        name: string;
+        content: string;
+        options: DeployContractOptions | null;
+        sender: string;
+      };
       transferSTX?: never;
     }
   | {
@@ -61,8 +81,13 @@ export const tx = {
   callPublicFn: (contract: string, method: string, args: ClarityValue[], sender: string): Tx => ({
     callPublicFn: { contract, method, args, sender },
   }),
-  deployContract: (name: string, content: string, sender: string): Tx => ({
-    deployContract: { name, content, sender },
+  deployContract: (
+    name: string,
+    content: string,
+    options: DeployContractOptions | null,
+    sender: string,
+  ): Tx => ({
+    deployContract: { name, content, options, sender },
   }),
   transferSTX: (amount: number, recipient: string, sender: string): Tx => ({
     transferSTX: { amount, recipient, sender },
@@ -141,8 +166,14 @@ const getSessionProxy = () => ({
     }
 
     if (prop === "deployContract") {
-      const callDeployContract: DeployContract = (...args) => {
-        const response = session.deployContract(new DeployContractArgs(...args));
+      const callDeployContract: DeployContract = (name, content, options, sender) => {
+        const rustOptions = options
+          ? new ContractOptions(options.clarityVersion)
+          : new ContractOptions();
+
+        const response = session.deployContract(
+          new DeployContractArgs(name, content, rustOptions, sender),
+        );
         return parseTxResult(response);
       };
       return callDeployContract;
