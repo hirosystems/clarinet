@@ -6,7 +6,7 @@ import { describe, expect, it } from "vitest";
 import { initVM, tx } from "../";
 
 const deployerAddr = "ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM";
-const wallet1Addr = "ST1SJ3DTE5DN7X54YDH5D64R3BCB6A2AG2ZQ8YPD5";
+const address1 = "ST1SJ3DTE5DN7X54YDH5D64R3BCB6A2AG2ZQ8YPD5";
 
 const manifestPath = "tests/fixtures/Clarinet.toml";
 
@@ -30,7 +30,7 @@ describe("basic vm interactions", async () => {
 
     expect(accounts).toHaveLength(4);
     expect(accounts.get("deployer")).toBe(deployerAddr);
-    expect(accounts.get("wallet_1")).toBe(wallet1Addr);
+    expect(accounts.get("wallet_1")).toBe(address1);
   });
 
   it("expose assets maps", async () => {
@@ -38,32 +38,32 @@ describe("basic vm interactions", async () => {
 
     const assets = vm.getAssetsMap();
     expect(assets.get("STX")).toHaveLength(4);
-    expect(assets.get("STX")?.get(wallet1Addr)).toBe(100000000000000n);
+    expect(assets.get("STX")?.get(address1)).toBe(100000000000000n);
   });
 });
 
 describe("vm can call contracts function", async () => {
   it("can call read only functions", async () => {
     const vm = await initVM(manifestPath);
-    const res = vm.callReadOnlyFn("counter", "get-counter", [], wallet1Addr);
+    const res = vm.callReadOnlyFn("counter", "get-count", [], address1);
 
     expect(res).toHaveProperty("result");
     expect(res).toHaveProperty("events");
-    expect(res.result).toStrictEqual(Cl.ok(Cl.tuple({ counter: Cl.uint(0) })));
+    expect(res.result).toStrictEqual(Cl.ok(Cl.tuple({ count: Cl.uint(0) })));
   });
 
   it("does not increase block height when calling read-only functions", async () => {
     const vm = await initVM(manifestPath);
     const initalBH = vm.blockHeight;
 
-    vm.callReadOnlyFn("counter", "get-counter", [], wallet1Addr);
-    vm.callReadOnlyFn("counter", "get-counter", [], wallet1Addr);
+    vm.callReadOnlyFn("counter", "get-count", [], address1);
+    vm.callReadOnlyFn("counter", "get-count", [], address1);
     expect(vm.blockHeight).toBe(initalBH);
   });
 
   it("can call public functions", async () => {
     const vm = await initVM(manifestPath);
-    const res = vm.callPublicFn("counter", "increment", [], wallet1Addr);
+    const res = vm.callPublicFn("counter", "increment", [], address1);
 
     expect(res).toHaveProperty("result");
     expect(res).toHaveProperty("events");
@@ -72,7 +72,7 @@ describe("vm can call contracts function", async () => {
 
   it("can call public functions with arguments", async () => {
     const vm = await initVM(manifestPath);
-    const res = vm.callPublicFn("counter", "add", [Cl.uint(2)], wallet1Addr);
+    const res = vm.callPublicFn("counter", "add", [Cl.uint(2)], address1);
 
     expect(res).toHaveProperty("result");
     expect(res).toHaveProperty("events");
@@ -83,8 +83,8 @@ describe("vm can call contracts function", async () => {
     const vm = await initVM(manifestPath);
     const initalBH = vm.blockHeight;
 
-    vm.callPublicFn("counter", "increment", [], wallet1Addr);
-    vm.callPublicFn("counter", "increment", [], wallet1Addr);
+    vm.callPublicFn("counter", "increment", [], address1);
+    vm.callPublicFn("counter", "increment", [], address1);
     expect(vm.blockHeight).toBe(initalBH + 2);
   });
 
@@ -93,8 +93,8 @@ describe("vm can call contracts function", async () => {
     const initalBH = vm.blockHeight;
 
     const res = vm.mineBlock([
-      tx.callPublicFn("counter", "increment", [], wallet1Addr),
-      tx.callPublicFn("counter", "increment", [], wallet1Addr),
+      tx.callPublicFn("counter", "increment", [], address1),
+      tx.callPublicFn("counter", "increment", [], address1),
     ]);
 
     expect(res).toHaveLength(2);
@@ -103,8 +103,8 @@ describe("vm can call contracts function", async () => {
     expect(res[0].result).toStrictEqual(Cl.ok(Cl.bool(true)));
     expect(res[1].result).toStrictEqual(Cl.ok(Cl.bool(true)));
 
-    const counterVal = vm.callReadOnlyFn("counter", "get-counter", [], wallet1Addr);
-    expect(counterVal.result).toStrictEqual(Cl.ok(Cl.tuple({ counter: Cl.uint(2) })));
+    const counterVal = vm.callReadOnlyFn("counter", "get-count", [], address1);
+    expect(counterVal.result).toStrictEqual(Cl.ok(Cl.tuple({ count: Cl.uint(2) })));
 
     expect(vm.blockHeight).toStrictEqual(initalBH + 1);
   });
@@ -112,13 +112,13 @@ describe("vm can call contracts function", async () => {
   it("can get updated assets map", async () => {
     const vm = await initVM(manifestPath);
 
-    vm.callPublicFn("counter", "increment", [], wallet1Addr);
-    vm.callPublicFn("counter", "increment", [], wallet1Addr);
+    vm.callPublicFn("counter", "increment", [], address1);
+    vm.callPublicFn("counter", "increment", [], address1);
 
     const assets = vm.getAssetsMap();
     const STX = assets.get("STX")!;
     expect(STX).toHaveLength(5);
-    expect(STX.get(wallet1Addr)).toStrictEqual(99999998000000n);
+    expect(STX.get(address1)).toStrictEqual(99999998000000n);
     expect(STX.get(`${deployerAddr}.counter`)).toStrictEqual(2000000n);
   });
 });
@@ -127,7 +127,7 @@ describe("vm can read contracts data vars and maps", async () => {
   it("can get data-vars", async () => {
     const vm = await initVM(manifestPath);
 
-    const counter = vm.getDataVar("counter", "counter");
+    const counter = vm.getDataVar("counter", "count");
     expect(counter).toStrictEqual(Cl.uint(0));
   });
 
@@ -135,9 +135,9 @@ describe("vm can read contracts data vars and maps", async () => {
     const vm = await initVM(manifestPath);
 
     // add a participant in the map
-    vm.callPublicFn("counter", "increment", [], wallet1Addr);
+    vm.callPublicFn("counter", "increment", [], address1);
 
-    const p = vm.getMapEntry("counter", "participants", Cl.standardPrincipal(wallet1Addr));
+    const p = vm.getMapEntry("counter", "participants", Cl.standardPrincipal(address1));
     expect(p).toStrictEqual(Cl.some(Cl.bool(true)));
   });
 });
@@ -149,7 +149,7 @@ describe("vm can get contracts info and deploy contracts", async () => {
     const contractInterfaces = vm.getContractsInterfaces();
     expect(contractInterfaces).toHaveLength(1);
 
-    let counterInterface = contractInterfaces.get(`${deployerAddr}.counter`);
+    const counterInterface = contractInterfaces.get(`${deployerAddr}.counter`);
     expect(counterInterface).not.toBeNull();
     expect(counterInterface?.functions).toHaveLength(4);
     expect(counterInterface?.variables).toHaveLength(2);
@@ -159,21 +159,24 @@ describe("vm can get contracts info and deploy contracts", async () => {
   it("can get contract source", async () => {
     const vm = await initVM(manifestPath);
 
-    let counterSource = vm.getContractSource(`${deployerAddr}.counter`);
-    expect(counterSource?.startsWith("(define-data-var counter")).toBeTruthy();
+    const counterSource = vm.getContractSource(`${deployerAddr}.counter`);
+    expect(counterSource?.startsWith("(define-data-var count")).toBe(true);
 
-    let noSource = vm.getContractSource(`${deployerAddr}.not-counter`);
+    const counterSourceShortAddr = vm.getContractSource("counter");
+    expect(counterSourceShortAddr).toBe(counterSource);
+
+    const noSource = vm.getContractSource(`${deployerAddr}.not-counter`);
     expect(noSource).toBeUndefined();
   });
 
   it("can get contract ast", async () => {
     const vm = await initVM(manifestPath);
 
-    let counterAst = vm.getContractAST(`${deployerAddr}.counter`);
+    const counterAst = vm.getContractAST(`${deployerAddr}.counter`);
     expect(counterAst).toBeDefined();
     expect(counterAst.expressions).toHaveLength(7);
 
-    let getWithShortAddr = vm.getContractAST("counter");
+    const getWithShortAddr = vm.getContractAST("counter");
     expect(getWithShortAddr).toBeDefined();
   });
 
@@ -197,13 +200,13 @@ describe("vm can get contracts info and deploy contracts", async () => {
     const contractInterfaces = vm.getContractsInterfaces();
     expect(contractInterfaces).toHaveLength(2);
 
-    const addRes = vm.callPublicFn("op", "add", [Cl.uint(13), Cl.uint(29)], wallet1Addr);
+    const addRes = vm.callPublicFn("op", "add", [Cl.uint(13), Cl.uint(29)], address1);
     expect(addRes.result).toStrictEqual(Cl.ok(Cl.uint(42)));
 
     const opSource = vm.getContractSource("op");
     expect(opSource).toBe(source);
 
-    let opASt = vm.getContractAST("op");
+    const opASt = vm.getContractAST("op");
     expect(opASt).toBeDefined();
     expect(opASt.expressions).toHaveLength(1);
   });

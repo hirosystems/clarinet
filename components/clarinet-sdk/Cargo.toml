@@ -9,9 +9,6 @@ name = "clarinet_sdk"
 path = "src/lib.rs"
 
 [dependencies]
-clarinet-files = { path = "../clarinet-files", default-features = false }
-clarity-repl = { path = "../clarity-repl", default-features = false, optional = true }
-clarinet-deployments = { path = "../clarinet-deployments", default-features = false }
 console_error_panic_hook = { version = "0.1", optional = true }
 gloo-utils = { version = "0.2", features = ["serde"] }
 js-sys = { version = "0.3", optional = true }
@@ -21,11 +18,24 @@ serde-wasm-bindgen = { version = "0.6.0", optional = true }
 wasm-bindgen = { version = "0.2", optional = true }
 wasm-bindgen-futures = { version = "0.4", optional = true }
 web-sys = { version = "0.3", features = ["console"], optional = true }
-typescript-type-def = "0.5.8"
+
+clarinet-files = { path = "../clarinet-files", default-features = false }
+clarity-repl = { path = "../clarity-repl", default-features = false, optional = true }
+clarinet-deployments = { path = "../clarinet-deployments", default-features = false }
 
 [features]
 default = ["wasm"]
-wasm = ["wasm-bindgen", "wasm-bindgen-futures", "serde-wasm-bindgen", "js-sys", "web-sys", "console_error_panic_hook", "clarinet-deployments/wasm", "clarity-repl/wasm", "clarinet-files/wasm"]
+wasm = [
+  "wasm-bindgen",
+  "wasm-bindgen-futures",
+  "serde-wasm-bindgen",
+  "js-sys",
+  "web-sys",
+  "console_error_panic_hook",
+  "clarinet-deployments/wasm",
+  "clarity-repl/wasm",
+  "clarinet-files/wasm",
+]
 
 # DEV
 [profile.dev]

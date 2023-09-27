@@ -31,8 +31,8 @@ type DeployContract = (name: string, content: string, sender: string) => ParsedT
 
 type TransferSTX = (
   amount: number | bigint,
-  content: string,
-  sender: string,
+  recipient: string,
+  sender: string
 ) => ParsedTransactionRes;
 
 type Tx =
