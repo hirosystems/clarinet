@@ -1,3 +1,4 @@
+import { bool } from "@stacks/transactions/dist/cl";
 import yargs from "yargs";
 import { hideBin } from "yargs/helpers";
 
@@ -7,6 +8,16 @@ export function getClarinetVitestsArgv() {
 
   // @ts-ignore
   return yargs(topLevel._)
+    .option("manifest-path", {
+      alias: "manifest",
+      type: "string",
+      default: "./Clarinet.toml",
+    })
+    .option("init-before-each", {
+      description: "Reinitialize the Clarinet state before each test",
+      type: "boolean",
+      default: true,
+    })
     .option("coverage", {
       alias: "cov",
       type: "boolean",

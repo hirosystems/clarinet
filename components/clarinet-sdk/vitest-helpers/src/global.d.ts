@@ -7,6 +7,8 @@ declare global {
   var costsReports: string[];
   var options: {
     clarinet: {
+      manifestPath: string;
+      initBeforeEach: boolean;
       coverage: boolean;
       coverageFilename: string;
       costsFilename: string;
