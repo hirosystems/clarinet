@@ -698,7 +698,9 @@ impl SDK {
         self.current_test_name = test_name;
     }
 
-    #[wasm_bindgen(js_name=getReport)]
+    // this method empty the session costs and coverage reports
+    // and returns this report
+    #[wasm_bindgen(js_name=collectReport)]
     pub fn collect_report(&mut self) -> Result<SessionReport, String> {
         let contracts_locations = self.contracts_locations.clone();
         let session = self.get_session_mut();
@@ -714,8 +716,9 @@ impl SDK {
             .append(&mut session.coverage_reports);
         let coverage = coverage_reporter.build_lcov_content();
 
-        let costs_reports: Vec<SerializableCostsReport> = session
-            .costs_reports
+        let mut costs_reports = Vec::new();
+        costs_reports.append(&mut session.costs_reports);
+        let costs_reports: Vec<SerializableCostsReport> = costs_reports
             .iter()
             .map(SerializableCostsReport::from_vm_costs_report)
             .collect();

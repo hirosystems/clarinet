@@ -257,7 +257,7 @@ describe("vm can get session reports", async () => {
     vm.callPublicFn("counter", "increment", [], address1);
     vm.callPublicFn("counter", "increment", [], address1);
 
-    const reports = vm.getReport();
+    const reports = vm.collectReport();
     expect(reports.coverage.startsWith("TN:")).toBe(true);
     expect(reports.coverage.endsWith("end_of_record\n")).toBe(true);
   });
@@ -267,7 +267,7 @@ describe("vm can get session reports", async () => {
 
     vm.callPublicFn("counter", "increment", [], address1);
 
-    const reports = vm.getReport();
+    const reports = vm.collectReport();
     expect(() => JSON.parse(reports.costs)).not.toThrow();
 
     const parsedReports = JSON.parse(reports.costs);

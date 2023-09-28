@@ -35,7 +35,7 @@ afterEach(async () => {
   const { coverage, initBeforeEach } = global.options.clarinet;
 
   if (coverage && initBeforeEach) {
-    const report = vm.getReport();
+    const report = vm.collectReport();
     coverageReports.push(report.coverage);
     costsReports.push(report.costs);
   }
@@ -53,7 +53,7 @@ afterAll(() => {
   const { coverage, initBeforeEach } = global.options.clarinet;
 
   if (coverage && !initBeforeEach) {
-    const report = vm.getReport();
+    const report = vm.collectReport();
     coverageReports.push(report.coverage);
     costsReports.push(report.costs);
   }
