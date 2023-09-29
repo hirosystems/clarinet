@@ -1,6 +1,6 @@
 {
   "name": "@hirosystems/clarinet-sdk",
-  "version": "0.5.6",
+  "version": "0.6.0",
   "description": "A SDK to interact with Clarity Smart Contracts",
   "repository": {
     "type": "git",
@@ -11,6 +11,7 @@
   },
   "files": [
     "dist",
+    "shared",
     "vitest-helpers/src"
   ],
   "main": "dist/cjs/index.js",

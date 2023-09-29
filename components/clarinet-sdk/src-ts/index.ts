@@ -9,11 +9,11 @@ import {
   DeployContractArgs,
   TransferSTXArgs,
   ContractOptions,
-} from "./sdk";
+} from "../shared/sdk";
 import { ContractAST } from "./contractAst";
 
-type WASMModule = typeof import("./sdk");
-const wasmModule = import("./sdk");
+type WASMModule = typeof import("../shared/sdk");
+const wasmModule = import("../shared/sdk");
 
 // https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/BigInt#use_within_json
 // @ts-ignore

@@ -16,8 +16,24 @@ const configBase = {
   mode: "production",
   resolve: { extensions: [".ts", ".js"] },
   optimization: {
-    minimize: false,
+    minimize: true,
   },
+};
+
+/** @type WebpackConfig */
+const configWASM = {
+  ...configBase,
+  entry: {
+    index: "./src-ts/index.ts",
+  },
+  target,
+  plugins: [
+    new WasmPackPlugin({
+      crateDirectory: path.resolve(__dirname, "./"),
+      extraArgs: "--release --target=bundler",
+      outDir: path.resolve(__dirname, "./shared/sdk"),
+    }),
+  ],
 };
 
 /** @type WebpackConfig */
@@ -46,16 +62,6 @@ const configESM = {
     asyncWebAssembly: true,
     outputModule: true,
   },
-  plugins: [
-    new WasmPackPlugin({
-      crateDirectory: path.resolve(__dirname, "./"),
-      extraArgs: "--release --target=bundler",
-      outDir: path.resolve(__dirname, "./src-ts/sdk"),
-    }),
-    new CopyPlugin({
-      patterns: [{ from: "./src-ts/sdk/index.d.ts", to: "sdk" }],
-    }),
-  ],
 };
 
 /** @type WebpackConfig */
@@ -88,14 +94,6 @@ const configCJS = {
     outputModule: false,
   },
   plugins: [
-    new WasmPackPlugin({
-      crateDirectory: path.resolve(__dirname, "./"),
-      extraArgs: "--release --target=bundler",
-      outDir: path.resolve(__dirname, "./src-ts/sdk"),
-    }),
-    new CopyPlugin({
-      patterns: [{ from: "./src-ts/sdk/index.d.ts", to: "sdk" }],
-    }),
     new CopyPlugin({
       patterns: [{ from: "./src-ts/bin/templates/", to: "bin/templates/" }],
     }),
@@ -107,4 +105,4 @@ const configCJS = {
   ],
 };
 
-module.exports = [configESM, configCJS];
+module.exports = [configWASM, configESM, configCJS];
