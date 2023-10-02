@@ -28,6 +28,7 @@ use clarity::vm::{
     StacksEpoch,
 };
 use reqwest;
+use serde::Serialize;
 use std::collections::{BTreeMap, BTreeSet, HashMap, VecDeque};
 use std::convert::TryFrom;
 use std::fmt;

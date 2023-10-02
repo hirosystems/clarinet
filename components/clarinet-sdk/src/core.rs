@@ -11,7 +11,7 @@ use clarity_repl::clarity::analysis::contract_interface_builder::{
 };
 use clarity_repl::clarity::stacks_common::types::StacksEpochId;
 use clarity_repl::clarity::vm::types::QualifiedContractIdentifier;
-use clarity_repl::clarity::{EvaluationResult, ExecutionResult, ParsedContract};
+use clarity_repl::clarity::{ClarityVersion, EvaluationResult, ExecutionResult, ParsedContract};
 use clarity_repl::repl::{
     ClarityCodeSource, ClarityContract, ContractDeployer, Session, DEFAULT_CLARITY_VERSION,
     DEFAULT_EPOCH,
@@ -26,7 +26,19 @@ use std::{panic, path::PathBuf};
 use wasm_bindgen::prelude::*;
 use wasm_bindgen::JsValue;
 
-use crate::utils::{self, serialize_event, uint8_to_string, uint8_to_value};
+use crate::utils::costs::SerializableCostsReport;
+use crate::utils::events::{self, serialize_event, uint8_to_string, uint8_to_value};
+
+#[wasm_bindgen(typescript_custom_section)]
+const SET_EPOCH: &'static str = r#"
+type EpochString = "2.0" | "2.05" | "2.1" | "2.2" | "2.3" | "2.4"
+"#;
+
+#[wasm_bindgen]
+extern "C" {
+    #[wasm_bindgen(typescript_type = "ITextStyle")]
+    pub type ITextStyle;
+}
 
 #[wasm_bindgen]
 extern "C" {
@@ -34,6 +46,14 @@ extern "C" {
     pub type AssetsMap;
     #[wasm_bindgen(typescript_type = "Map<string, string>")]
     pub type Accounts;
+    #[wasm_bindgen(typescript_type = "EpochString")]
+    pub type EpochString;
+}
+
+macro_rules! log {
+    ( $( $t:tt )* ) => {
+        web_sys::console::log_1(&format!( $( $t )* ).into());
+    }
 }
 
 #[derive(Debug, Deserialize)]
@@ -102,19 +122,47 @@ impl CallContractArgs {
 
 #[derive(Debug, Deserialize)]
 #[wasm_bindgen]
+pub struct ContractOptions {
+    clarity_version: ClarityVersion,
+}
+
+#[wasm_bindgen]
+impl ContractOptions {
+    #[wasm_bindgen(constructor)]
+    pub fn new(clarity_version: Option<u32>) -> Self {
+        let clarity_version = match clarity_version {
+            Some(v) => match v {
+                1 => ClarityVersion::Clarity1,
+                2 => ClarityVersion::Clarity2,
+                _ => {
+                    log!("Invalid clarity version {v}. Using default version.");
+                    DEFAULT_CLARITY_VERSION
+                }
+            },
+            _ => DEFAULT_CLARITY_VERSION,
+        };
+
+        Self { clarity_version }
+    }
+}
+
+#[derive(Debug, Deserialize)]
+#[wasm_bindgen]
 pub struct DeployContractArgs {
     name: String,
     content: String,
+    options: ContractOptions,
     sender: String,
 }
 
 #[wasm_bindgen]
 impl DeployContractArgs {
     #[wasm_bindgen(constructor)]
-    pub fn new(name: String, content: String, sender: String) -> Self {
+    pub fn new(name: String, content: String, options: ContractOptions, sender: String) -> Self {
         Self {
             name,
             content,
+            options,
             sender,
         }
     }
@@ -150,12 +198,6 @@ pub struct TxArgs {
     transfer_stx: Option<TransferSTXArgs>,
 }
 
-macro_rules! log {
-    ( $( $t:tt )* ) => {
-        web_sys::console::log_1(&format!( $( $t )* ).into());
-    }
-}
-
 #[wasm_bindgen(getter_with_clone)]
 #[derive(Debug, Serialize, Deserialize)]
 pub struct TransactionRes {
@@ -172,15 +214,16 @@ pub struct TransactionResRaw {
 #[wasm_bindgen(getter_with_clone)]
 pub struct SessionReport {
     pub coverage: String,
+    pub costs: String,
 }
 
 pub fn execution_result_to_transaction_res(execution: &ExecutionResult) -> TransactionRes {
     let result = match &execution.result {
-        EvaluationResult::Snippet(result) => utils::to_raw_value(&result.result),
+        EvaluationResult::Snippet(result) => events::to_raw_value(&result.result),
         EvaluationResult::Contract(ref contract) => {
             // contract.;
             match contract.result {
-                Some(ref result) => utils::to_raw_value(result),
+                Some(ref result) => events::to_raw_value(result),
                 _ => "0x03".into(),
             }
         }
@@ -262,7 +305,7 @@ impl SDK {
                     &StacksNetwork::Simnet,
                     false,
                     Some(&self.file_accessor),
-                    Some(StacksEpochId::Epoch21),
+                    Some(DEFAULT_EPOCH),
                 )
                 .await?;
                 self.cache = Some(cache.clone());
@@ -340,6 +383,32 @@ impl SDK {
     pub fn block_height(&mut self) -> u32 {
         let session = self.get_session_mut();
         session.interpreter.get_block_height()
+    }
+
+    #[wasm_bindgen(getter, js_name=currentEpoch)]
+    pub fn current_epoch(&mut self) -> String {
+        let session = self.get_session_mut();
+        session.current_epoch.to_string()
+    }
+
+    #[wasm_bindgen(js_name=setEpoch)]
+    pub fn set_epoch(&mut self, epoch: EpochString) {
+        let epoch = epoch.as_string().unwrap_or("2.4".into());
+        let epoch = match epoch.as_str() {
+            "2.0" => StacksEpochId::Epoch20,
+            "2.05" => StacksEpochId::Epoch2_05,
+            "2.1" => StacksEpochId::Epoch21,
+            "2.2" => StacksEpochId::Epoch22,
+            "2.3" => StacksEpochId::Epoch23,
+            "2.4" => StacksEpochId::Epoch24,
+            _ => {
+                log!("Invalid epoch {epoch}. Using default epoch");
+                DEFAULT_EPOCH
+            }
+        };
+
+        let session = self.get_session_mut();
+        session.update_epoch(epoch)
     }
 
     #[wasm_bindgen(js_name=getContractsInterfaces)]
@@ -521,19 +590,20 @@ impl SDK {
         args: &DeployContractArgs,
         advance_chain_tip: bool,
     ) -> Result<TransactionRes, String> {
-        let contract = ClarityContract {
-            code_source: ClarityCodeSource::ContractInMemory(args.content.clone()),
-            name: args.name.clone(),
-            deployer: ContractDeployer::Address(args.sender.to_string()),
-            clarity_version: DEFAULT_CLARITY_VERSION,
-            epoch: DEFAULT_EPOCH,
-        };
-
         let execution = {
             let session = self.get_session_mut();
             if advance_chain_tip {
                 session.advance_chain_tip(1);
             }
+
+            let contract = ClarityContract {
+                code_source: ClarityCodeSource::ContractInMemory(args.content.clone()),
+                name: args.name.clone(),
+                deployer: ContractDeployer::Address(args.sender.to_string()),
+                clarity_version: args.options.clarity_version,
+                epoch: session.current_epoch,
+            };
+
             match session.deploy_contract(
                 &contract,
                 None,
@@ -628,7 +698,9 @@ impl SDK {
         self.current_test_name = test_name;
     }
 
-    #[wasm_bindgen(js_name=getReport)]
+    // this method empty the session costs and coverage reports
+    // and returns this report
+    #[wasm_bindgen(js_name=collectReport)]
     pub fn collect_report(&mut self) -> Result<SessionReport, String> {
         let contracts_locations = self.contracts_locations.clone();
         let session = self.get_session_mut();
@@ -643,6 +715,15 @@ impl SDK {
             .reports
             .append(&mut session.coverage_reports);
         let coverage = coverage_reporter.build_lcov_content();
-        Ok(SessionReport { coverage })
+
+        let mut costs_reports = Vec::new();
+        costs_reports.append(&mut session.costs_reports);
+        let costs_reports: Vec<SerializableCostsReport> = costs_reports
+            .iter()
+            .map(SerializableCostsReport::from_vm_costs_report)
+            .collect();
+        let costs = serde_json::to_string(&costs_reports).map_err(|e| e.to_string())?;
+
+        Ok(SessionReport { coverage, costs })
     }
 }

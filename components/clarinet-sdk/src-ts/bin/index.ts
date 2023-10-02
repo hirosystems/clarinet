@@ -121,9 +121,15 @@ function updateClarinetSDKVersion(sdkBinDir: string) {
 // add node and npm directories to the .gitignore
 function updateGitIgnore() {
   console.log("Updating .gitignore");
-  const newLines = ["logs", "*.log", "npm-debug.log*", "coverage", "*.info", "node_modules"].join(
-    "\n",
-  );
+  const newLines = [
+    "logs",
+    "*.log",
+    "npm-debug.log*",
+    "coverage",
+    "*.info",
+    "costs-reports.json",
+    "node_modules",
+  ].join("\n");
 
   const gitIgnorePath = path.join(process.cwd(), ".gitignore");
   if (fs.existsSync(gitIgnorePath)) {

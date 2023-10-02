@@ -1,10 +1,10 @@
-(define-data-var counter uint u0)
+(define-data-var count uint u0)
 (define-map participants principal bool)
 
 (define-constant OWNER tx-sender)
 
-(define-read-only  (get-counter)
-  (ok { counter: (var-get counter) })
+(define-read-only  (get-count)
+  (ok { count: (var-get count) })
 )
 
 (define-public (increment)
@@ -15,7 +15,7 @@
       (map-set participants tx-sender true)
     )
     (try! (stx-transfer? u1000000 tx-sender (as-contract tx-sender)))
-    (ok (var-set counter (+ (var-get counter) u1)))
+    (ok (var-set count (+ (var-get count) u1)))
   )
 )
 
@@ -27,7 +27,7 @@
       (map-set participants tx-sender true)
     )
     (try! (stx-transfer? u1000000 tx-sender (as-contract tx-sender)))
-    (ok (var-set counter (+ (var-get counter) n)))
+    (ok (var-set count (+ (var-get count) n)))
   )
 )
 
