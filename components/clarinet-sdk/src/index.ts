@@ -20,7 +20,10 @@ BigInt.prototype.toJSON = function () {
   return this.toString();
 };
 
-type ClarityEvent = { event: string; data: { [key: string]: any } };
+type ClarityEvent = {
+  event: string;
+  data: { raw_value?: string; value?: ClarityValue; [key: string]: any };
+};
 export type ParsedTransactionRes = {
   result: ClarityValue;
   events: ClarityEvent[];
@@ -125,6 +128,9 @@ function parseEvents(events: string): ClarityEvent[] {
     // @todo: improve type safety
     return JSON.parse(events).map((e: string) => {
       const { event, data } = JSON.parse(e);
+      if ("raw_value" in data) {
+        data.value = Cl.deserialize(data.raw_value);
+      }
       return {
         event: event,
         data: data,
