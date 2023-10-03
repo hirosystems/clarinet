@@ -5,7 +5,7 @@
       "cargo",
       "clippy",
       "--no-default-features",
-      "--package=clarinet-sdk",
+      "--package=clarinet-sdk-wasm",
       "--features=wasm",
       "--message-format=json",
       "--",

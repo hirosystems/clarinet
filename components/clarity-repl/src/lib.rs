@@ -33,6 +33,7 @@ pub mod repl;
 pub mod utils;
 
 pub mod clarity {
+    #[allow(ambiguous_glob_reexports)]
     pub use ::clarity::stacks_common::*;
     pub use ::clarity::vm::*;
     pub use ::clarity::*;

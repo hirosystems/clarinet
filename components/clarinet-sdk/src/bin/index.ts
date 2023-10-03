@@ -1,3 +1,5 @@
+#!/usr/bin/env node
+
 import fs from "node:fs";
 import path from "node:path";
 import { green, red, yellow } from "kolorist";
@@ -91,7 +93,7 @@ async function checkIfProjectDirectoryIsValid() {
 function copyTemplateFiles(sdkBinDir: string) {
   console.log("Copying package.json, tsconfig.json, vitest.config.js and sample test file");
 
-  fs.cpSync(path.join(sdkBinDir, "templates"), path.join(process.cwd(), "."), {
+  fs.cpSync(path.join(sdkBinDir, "../../../templates"), path.join(process.cwd(), "."), {
     recursive: true,
   });
 }

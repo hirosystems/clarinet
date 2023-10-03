@@ -1,7 +1,7 @@
 import { Cl, ClarityValue } from "@stacks/transactions";
 
-import { vfs } from "./vfs";
-import type { ContractInterface } from "./contractInterface";
+import { vfs } from "./vfs.js";
+import type { ContractInterface } from "./contractInterface.js";
 import {
   SDK,
   TransactionRes,
@@ -9,11 +9,10 @@ import {
   DeployContractArgs,
   TransferSTXArgs,
   ContractOptions,
-} from "./sdk";
-import { ContractAST } from "./contractAst";
+} from "@hirosystems/clarinet-sdk-wasm";
+import { ContractAST } from "./contractAst.js";
 
-type WASMModule = typeof import("./sdk");
-const wasmModule = import("./sdk");
+const wasmModule = import("@hirosystems/clarinet-sdk-wasm");
 
 // https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/BigInt#use_within_json
 // @ts-ignore
@@ -21,7 +20,10 @@ BigInt.prototype.toJSON = function () {
   return this.toString();
 };
 
-type ClarityEvent = { event: string; data: { [key: string]: any } };
+type ClarityEvent = {
+  event: string;
+  data: { raw_value?: string; value?: ClarityValue; [key: string]: any };
+};
 export type ParsedTransactionRes = {
   result: ClarityValue;
   events: ClarityEvent[];
@@ -126,6 +128,9 @@ function parseEvents(events: string): ClarityEvent[] {
     // @todo: improve type safety
     return JSON.parse(events).map((e: string) => {
       const { event, data } = JSON.parse(e);
+      if ("raw_value" in data) {
+        data.value = Cl.deserialize(data.raw_value);
+      }
       return {
         event: event,
         data: data,
@@ -235,18 +240,9 @@ function memoizedInit() {
   return async (manifestPath = "./Clarinet.toml") => {
     const module = await wasmModule;
 
-    // handle both CJS and ESM context
-    // - in CJS: `module.default` is a promise resolving
-    // - in ESM: `module` is directly the
-    // @ts-ignore
-    let wasm: WASMModule =
-      typeof module.default === "undefined"
-        ? (module as unknown as WASMModule)
-        : await module.default;
-
     if (!vm) {
       console.log("init clarity vm");
-      vm = new Proxy(new wasm.SDK(vfs), getSessionProxy()) as unknown as ClarityVM;
+      vm = new Proxy(new module.SDK(vfs), getSessionProxy()) as unknown as ClarityVM;
     }
     // start a new session
     await vm.initSession(process.cwd(), manifestPath);

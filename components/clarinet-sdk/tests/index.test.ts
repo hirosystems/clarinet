@@ -84,6 +84,11 @@ describe("vm can call contracts function", async () => {
     expect(res).toHaveProperty("result");
     expect(res).toHaveProperty("events");
     expect(res.result).toStrictEqual(Cl.ok(Cl.bool(true)));
+
+    expect(res.events).toHaveLength(2);
+    const printEvent = res.events[0];
+    expect(printEvent.event).toBe("print_event");
+    expect(printEvent.data.value).toStrictEqual(Cl.stringAscii("call increment"));
   });
 
   it("can call public functions with arguments", async () => {
