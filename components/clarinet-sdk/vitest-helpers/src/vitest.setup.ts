@@ -32,12 +32,12 @@ beforeEach(async (ctx) => {
 });
 
 afterEach(async () => {
-  const { coverage, initBeforeEach } = global.options.clarinet;
+  const { coverage, costs, initBeforeEach } = global.options.clarinet;
 
-  if (coverage && initBeforeEach) {
+  if (initBeforeEach && (coverage || costs)) {
     const report = vm.collectReport();
-    coverageReports.push(report.coverage);
-    costsReports.push(report.costs);
+    if (coverage) coverageReports.push(report.coverage);
+    if (costs) costsReports.push(report.costs);
   }
 });
 
@@ -50,11 +50,11 @@ beforeAll(async () => {
 });
 
 afterAll(() => {
-  const { coverage, initBeforeEach } = global.options.clarinet;
+  const { coverage, costs, initBeforeEach } = global.options.clarinet;
 
-  if (coverage && !initBeforeEach) {
+  if (!initBeforeEach && (coverage || costs)) {
     const report = vm.collectReport();
-    coverageReports.push(report.coverage);
-    costsReports.push(report.costs);
+    if (coverage) coverageReports.push(report.coverage);
+    if (costs) costsReports.push(report.costs);
   }
 });

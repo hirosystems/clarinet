@@ -22,6 +22,11 @@ export function getClarinetVitestsArgv() {
       type: "boolean",
       default: false,
     })
+    .option("costs", {
+      alias: "cost",
+      type: "boolean",
+      default: false,
+    })
     .option("coverage-filename", {
       alias: "cov-file",
       type: "string",
