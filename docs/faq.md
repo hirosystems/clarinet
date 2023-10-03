@@ -1,5 +1,5 @@
 ---
-title: FAQ's
+title: FAQs
 ---
 
 #### **After installing Clarinet on Windows with the installer, how can I run Clarinet?**
