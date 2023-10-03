@@ -1,7 +1,10 @@
 [package]
 edition = "2021"
-name = "clarinet-sdk"
-version = "0.0.1"
+name = "clarinet-sdk-wasm"
+version = "1.0.0"
+license = "GPL-3.0"
+repository = "https://github.com/hirosystems/clarinet"
+description = "The core lib that powers @hirosystems/clarinet-sdk"
 
 [lib]
 crate-type = ["cdylib"]
@@ -68,8 +71,8 @@ incremental = false
 codegen-units = 16
 
 [package.metadata.wasm-pack.profile.release]
-wasm-opt = false
-# wasm-opt = ['-O1']
+# wasm-opt = false
+wasm-opt = ['-O1']
 
 [package.metadata.wasm-pack.profile.release.wasm-bindgen]
 debug-js-glue = false

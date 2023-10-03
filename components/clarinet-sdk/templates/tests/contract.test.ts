@@ -1,11 +1,7 @@
 import { beforeAll, describe, expect, it } from "vitest";
 
-beforeAll(async () => {
-  await vm.initSession(process.cwd(), "./Clarinet.toml");
-});
-
 const accounts = vm.getAccounts();
-const wallet1 = accounts.get("wallet_1")!;
+const address1 = accounts.get("wallet_1")!;
 
 /*
   The test below is an example. Learn more in the clarinet-sdk readme:

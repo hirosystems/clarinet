@@ -4,7 +4,7 @@ members = [
     "components/clarinet-deployments",
     "components/clarinet-files",
     "components/clarinet-utils",
-    "components/clarinet-sdk",
+    "components/clarinet-sdk-wasm",
     "components/clarity-jupyter-kernel",
     "components/clarity-lsp",
     "components/clarity-repl",
