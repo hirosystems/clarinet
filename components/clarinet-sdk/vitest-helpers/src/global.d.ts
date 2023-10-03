@@ -11,6 +11,7 @@ declare global {
       initBeforeEach: boolean;
       coverage: boolean;
       coverageFilename: string;
+      costs: boolean;
       costsFilename: string;
     };
   };
