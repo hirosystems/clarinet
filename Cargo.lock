@@ -1026,8 +1026,8 @@ dependencies = [
 ]
 
 [[package]]
-name = "clarinet-sdk"
-version = "0.0.1"
+name = "clarinet-sdk-wasm"
+version = "1.0.0"
 dependencies = [
  "clarinet-deployments",
  "clarinet-files",

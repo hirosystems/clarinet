@@ -1,6 +1,6 @@
 {
   "name": "@hirosystems/clarinet-sdk",
-  "version": "0.5.6",
+  "version": "0.6.3",
   "description": "A SDK to interact with Clarity Smart Contracts",
   "repository": {
     "type": "git",
@@ -11,16 +11,17 @@
   },
   "files": [
     "dist",
+    "templates",
     "vitest-helpers/src"
   ],
   "main": "dist/cjs/index.js",
-  "module": "dist/esm/index.mjs",
+  "module": "dist/esm/index.js",
   "types": "./dist/esm/index.d.ts",
   "exports": {
     ".": {
       "import": {
         "types": "./dist/esm/index.d.ts",
-        "default": "./dist/esm/index.mjs"
+        "default": "./dist/esm/index.js"
       },
       "require": {
         "types": "./dist/cjs/index.d.ts",
@@ -30,7 +31,7 @@
     "./vitest": {
       "import": {
         "types": "./dist/esm/vitest/index.d.ts",
-        "default": "./dist/esm/vitest/index.mjs"
+        "default": "./dist/esm/vitest/index.js"
       },
       "require": {
         "types": "./dist/cjs/vitest/index.d.ts",
@@ -41,8 +42,8 @@
   "bin": "./dist/cjs/bin/index.js",
   "scripts": {
     "clean": "rimraf dist",
-    "dev-ts": "npm run build; webpack -c webpack.config.dev.js",
-    "build": "npm run clean; webpack -c webpack.config.js",
+    "compile": "tsc -b ./tsconfig.json ./tsconfig.cjs.json",
+    "build": "npm run clean; npm run compile; node ./scripts/prepare-esm-package.js",
     "prepare": "npm run build",
     "test": "vitest run"
   },
@@ -56,24 +57,20 @@
   "license": "GPL-3.0",
   "readme": "./README.md",
   "dependencies": {
+    "@hirosystems/clarinet-sdk-wasm": "^1.0.0",
     "@stacks/transactions": "^6.9.0",
+    "kolorist": "^1.8.0",
     "prompts": "^2.4.2",
     "vitest": "^0.34.5",
     "yargs": "^17.7.2"
   },
   "devDependencies": {
     "@types/node": "^20.4.5",
-    "@types/prompts": "^2.4.4",
+    "@types/prompts": "^2.4.5",
     "@types/yargs": "^17.0.24",
-    "@wasm-tool/wasm-pack-plugin": "^1.7.0",
-    "copy-webpack-plugin": "^11.0.0",
-    "kolorist": "^1.8.0",
     "prettier": "^3.0.3",
     "rimraf": "^5.0.1",
     "ts-loader": "^9.4.4",
-    "typedoc": "^0.25.1",
-    "typescript": "^5.1.6",
-    "webpack": "^5.88.2",
-    "webpack-cli": "^5.1.4"
+    "typescript": "^5.1.6"
   }
 }
