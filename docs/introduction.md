@@ -4,7 +4,6 @@ title: Overview
 ---
 # Clarinet Overview
 
-## What is Clarinet?
 
 [Clarinet](https://www.hiro.so/clarinet) provides a CLI package with a [clarity](https://clarity-lang.org/) runtime, a REPL, and a testing harness. Clarinet includes a Javascript library, a testing environment, and a browser-based Sandbox. With Clarinet, you can rigorously iterate on your smart contracts locally before moving into production.
 
