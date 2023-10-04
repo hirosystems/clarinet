@@ -96,27 +96,27 @@ Create a file `tests/counter.test.ts` with the following content:
 import { Cl } from "@stacks/transactions";
 import { describe, expect, it } from "vitest";
 
-const accounts = vm.getAccounts();
+const accounts = simnet.getAccounts();
 const address1 = accounts.get("wallet_1")!;
 
 describe("test increment method", () => {
   it("increments the count by the given value", () => {
-    const res1 = vm.callPublicFn("counter", "increment", [Cl.uint(1)], address1);
+    const res1 = simnet.callPublicFn("counter", "increment", [Cl.uint(1)], address1);
 
     console.log(Cl.prettyPrint(res1.result)) // (ok u2)
 
     expect(res1.result).toBeOk(Cl.uint(2));
 
-    const count1 = vm.getDataVar("counter", "count");
+    const count1 = simnet.getDataVar("counter", "count");
     expect(count1).toBeUint(2);
 
-    vm.callPublicFn("counter", "increment", [Cl.uint(40)], address1);
-    const count2 = vm.getDataVar("counter", "count");
+    simnet.callPublicFn("counter", "increment", [Cl.uint(40)], address1);
+    const count2 = simnet.getDataVar("counter", "count");
     expect(count2).toBeUint(42);
   });
 
   it("sends a print event", () => {
-    const res = vm.callPublicFn("counter", "increment", [Cl.uint(1)], address1);
+    const res = simnet.callPublicFn("counter", "increment", [Cl.uint(1)], address1);
 
     expect(res.events).toHaveLength(1);
     const printEvent = res.events[0];
@@ -130,7 +130,7 @@ describe("test increment method", () => {
 });
 ```
 
-There is a very important thing happening under the hood. The `vm` object is available globally in the tests, and is automatically initialized before each test.
+There is a very important thing happening under the hood. The `simnet` object is available globally in the tests, and is automatically initialized before each test.
 
 > You don't need to know much more about that, but if you want to know in details how it works, you can have a look at the `vitest.config.js` file at the root of you project.
 
@@ -159,22 +159,22 @@ These two code blocks can be added at the end of `tests/counter.test.ts`.
 ```ts
 describe("test `decrement` public function", () => {
   it("decrements the count by the given value", () => {
-    const res1 = vm.callPublicFn("counter", "decrement", [Cl.uint(1)], address1);
+    const res1 = simnet.callPublicFn("counter", "decrement", [Cl.uint(1)], address1);
     expect(res1.result).toBeOk(Cl.uint(0));
 
-    const count1 = vm.getDataVar("counter", "count");
+    const count1 = simnet.getDataVar("counter", "count");
     expect(count1).toBeUint(0);
 
     // increase the count so that it can be descreased without going < 0
-    vm.callPublicFn("counter", "increment", [Cl.uint(10)], address1);
+    simnet.callPublicFn("counter", "increment", [Cl.uint(10)], address1);
 
-    vm.callPublicFn("counter", "decrement", [Cl.uint(5)], address1);
-    const count2 = vm.getDataVar("counter", "count");
+    simnet.callPublicFn("counter", "decrement", [Cl.uint(5)], address1);
+    const count2 = simnet.getDataVar("counter", "count");
     expect(count2).toBeUint(5);
   });
 
   it("sends a print event", () => {
-    const res = vm.callPublicFn("counter", "decrement", [Cl.uint(1)], address1);
+    const res = simnet.callPublicFn("counter", "decrement", [Cl.uint(1)], address1);
 
     expect(res.events).toHaveLength(1);
     const printEvent = res.events[0];
@@ -191,7 +191,7 @@ describe("test `decrement` public function", () => {
 ```ts
 describe("test `get-count` read only function", () => {
   it("returns the counter value", () => {
-    const res = vm.callReadOnlyFn("counter", "read-count", [], address1);
+    const res = simnet.callReadOnlyFn("counter", "read-count", [], address1);
     expect(res).toBeUint(1);
   });
 });
@@ -308,10 +308,10 @@ This matcher can be used to make sure that the value has the right Clarity Type,
 import { ClarityType } from "@stacks/transactions";
 import { expect, it } from "vitest";
 
-const address1 = vm.getAccounts().get("wallet_1");
+const address1 = simnet.getAccounts().get("wallet_1");
 
 it("ensures <increment> adds 1", () => {
-  const { result } = vm.callPublicFn("counter", "increment", [], address1);
+  const { result } = simnet.callPublicFn("counter", "increment", [], address1);
 
   // make sure it returns a response ok `(ok ...)`
   expect(result).toHaveClarityType(ClarityType.ResponseOk);
@@ -340,7 +340,7 @@ They are called composite types, meaning that they contain an other Clarity valu
 Check that a response is `ok` and has the expected value. Any Clarity value can be passed.
 
 ```ts
-const decrement = vm.callPublicFn("counter", "decrement", [Cl.uint(1)], address1);
+const decrement = simnet.callPublicFn("counter", "decrement", [Cl.uint(1)], address1);
 
 // decrement.result is `(ok (uint 0))`
 expect(decrement.result).toBeOk(Cl.uint(0));
@@ -354,7 +354,7 @@ Consider that the `counter` contract returns and error code 500 `(err u500)` if 
 
 ```ts
 const tooBig = 100000;
-const increment = vm.callPublicFn("counter", "increment", [Cl.uint(toBig)], address1);
+const increment = simnet.callPublicFn("counter", "increment", [Cl.uint(toBig)], address1);
 
 // increment.result is `(err u500)`
 expect(increment.result).toBeErr(Cl.uint(500));
@@ -371,7 +371,7 @@ Here, `some` is a composite type, meaning that it contains an other Clarity valu
 Consider a billboard smart contract that can contain an optional message:
 
 ```ts
-const getMessage = vm.callPublicFn("billboard", "get-message", [], address1);
+const getMessage = simnet.callPublicFn("billboard", "get-message", [], address1);
 
 // (some u"Hello world")
 expect(getMessage.result).toBeSome(Cl.stringUtf8("Hello world"));
@@ -382,7 +382,7 @@ expect(getMessage.result).toBeSome(Cl.stringUtf8("Hello world"));
 Considering the same billboard smart contract but with no saved message:
 
 ```ts
-const getMessage = vm.callPublicFn("billboard", "get-message", [], address1);
+const getMessage = simnet.callPublicFn("billboard", "get-message", [], address1);
 
 // none
 expect(getMessage.result).toBeNone();
@@ -455,7 +455,7 @@ Your test case will ultimately depends on how the Uint8Array is built. `@stacks/
 
 ```ts
 it.only("can assert buffer values", () => {
-  const { result } = vm.callPublicFn(/* ... */);
+  const { result } = simnet.callPublicFn(/* ... */);
 
   // knowing the expected UintArray
   const value = Uint8Array.from([98, 116, 99]);
@@ -481,10 +481,10 @@ Check that the value is a `list` containing an array of Clarity values.
 Considering a function that return a list of 3 uints:
 
 ```ts
-const address1 = vm.getAccounts().get("wallet_1");
+const address1 = simnet.getAccounts().get("wallet_1");
 
 it("can assert list values", () => {
-  const { result } = vm.callReadOnlyFn("counter", "func-returning-list-of-uints", [], address1);
+  const { result } = simnet.callReadOnlyFn("counter", "func-returning-list-of-uints", [], address1);
 
   expect(result).toBeList([Cl.uint(1), Cl.uint(2), Cl.uint(3)]);
 });
@@ -499,10 +499,10 @@ The snippet below shows that composite types can be nested:
 
 
 ```ts
-const address1 = vm.getAccounts().get("wallet_1");
+const address1 = simnet.getAccounts().get("wallet_1");
 
 it("can assert tuple values", () => {
-  const { result } = vm.callPublicFn("counter", "func-returning-tuple", [], address1);
+  const { result } = simnet.callPublicFn("counter", "func-returning-tuple", [], address1);
 
   expect(result).toBeTuple({
     id: Cl.uint(1),
