@@ -21,13 +21,13 @@ beforeEach(async (ctx) => {
   const { coverage, initBeforeEach, manifestPath } = global.options.clarinet;
 
   if (initBeforeEach) {
-    await vm.initSession(process.cwd(), manifestPath);
+    await simnet.initSession(process.cwd(), manifestPath);
   }
 
   if (coverage) {
     const suiteTestNames = getFullTestName(ctx.task, []);
     const fullName = [ctx.task.file?.name || "", ...suiteTestNames].join("__");
-    vm.setCurrentTestName(fullName);
+    simnet.setCurrentTestName(fullName);
   }
 });
 
@@ -35,7 +35,7 @@ afterEach(async () => {
   const { coverage, costs, initBeforeEach } = global.options.clarinet;
 
   if (initBeforeEach && (coverage || costs)) {
-    const report = vm.collectReport();
+    const report = simnet.collectReport();
     if (coverage) coverageReports.push(report.coverage);
     if (costs) costsReports.push(report.costs);
   }
@@ -45,7 +45,7 @@ beforeAll(async () => {
   const { initBeforeEach, manifestPath } = global.options.clarinet;
 
   if (!initBeforeEach) {
-    await vm.initSession(process.cwd(), manifestPath);
+    await simnet.initSession(process.cwd(), manifestPath);
   }
 });
 
@@ -53,7 +53,7 @@ afterAll(() => {
   const { coverage, costs, initBeforeEach } = global.options.clarinet;
 
   if (!initBeforeEach && (coverage || costs)) {
-    const report = vm.collectReport();
+    const report = simnet.collectReport();
     if (coverage) coverageReports.push(report.coverage);
     if (costs) costsReports.push(report.costs);
   }

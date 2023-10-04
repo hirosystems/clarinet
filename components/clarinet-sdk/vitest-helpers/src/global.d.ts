@@ -1,7 +1,7 @@
-import type { ClarityVM } from "../../dist/esm";
+import type { Simnet } from "../../dist/esm";
 
 declare global {
-  var vm: ClarityVM;
+  var simnet: Simnet;
   var testEnvironment: string;
   var coverageReports: string[];
   var costsReports: string[];
