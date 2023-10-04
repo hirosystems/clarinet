@@ -4,10 +4,14 @@ title: Overview
 ---
 # Clarinet Overview
 
+> Announcement: As part of a simplification and improvement process of the Clarinet project, the commands `clarinet test` and `clarinet run` will be deprecated in Clarinet 2 that will be released in October 2023. The testing features are available now in the Clarinet JS SDK.
+<!-- See the [Clarinet SDK announcement on our blog](link to come). -->
+> See our guide to learn how to [test smart contract](https://docs.hiro.so). The SDK API reference is also available [here](https://docs.hiro.so)
+
 
 [Clarinet](https://www.hiro.so/clarinet) provides a CLI package with a [clarity](https://clarity-lang.org/) runtime, a REPL, and a testing harness. Clarinet includes a Javascript library, a testing environment, and a browser-based Sandbox. With Clarinet, you can rigorously iterate on your smart contracts locally before moving into production.
 
-Clarinet consists of two components:
+Clarinet consists of two main components:
 
 - Clarity REPL (Read, Evaluate, Print, Loop)
 - Testing harness.

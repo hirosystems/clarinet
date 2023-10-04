@@ -428,7 +428,7 @@ const vm = await initVM();
 
 const contractInterfaces = vm.getContractsInterfaces();
 let counterInterface = contractInterfaces.get(`${deployerAddr}.counter`);
-console.log(counterInterface?.functions) // arrray of the functions
+console.log(counterInterface?.functions) // array of the functions
 ```
 
 

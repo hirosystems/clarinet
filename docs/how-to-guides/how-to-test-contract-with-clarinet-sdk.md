@@ -9,6 +9,9 @@ You can theoritically use any JavaScript test framework, but the SDK supports [V
 
 - [Requirements](#requirements)
 - [Set up the Clarity contract and unit tests](#set-up-the-clarity-contract-and-unit-tests)
+  - [Migrating between Clarinet 1 and Clarinet 2](#migrating-between-clarinet-1-and-clarinet-2)
+  - [Unit tests for `counter` example](#unit-tests-for-counter-example)
+  - [Comprehensive unit tests for `counter`](#comprehensive-unit-tests-for-counter)
 - [Measure and increase code coverage](#measure-and-increase-code-coverage)
 - [Costs optimization](#costs-optimization)
 - [Produce both coverage and costs reports.](#produce-both-coverage-and-costs-reports)
@@ -65,7 +68,7 @@ It keeps track of an initialized value, allows for incrementing and decrementing
 )
 ```
 
-### Migrating between Clarinet 1 and Clarinet 2  <!-- omit from toc -->
+### Migrating between Clarinet 1 and Clarinet 2
 
 > Note: Clarinet 2 will be released in October 2023, and will create the right boilerplate files. But if a project has been created with Clarinet 1, this prepare to project to run the SDK and Vitest.
 
@@ -84,7 +87,7 @@ You can have a look at `tests/contract.test.ts`, it's a sample file showing how 
 It can safely be deleted.
 
 
-### Unit tests for `counter` example  <!-- omit from toc -->
+### Unit tests for `counter` example
 
 Create a file `tests/counter.test.ts` with the following content:
 
@@ -98,6 +101,9 @@ const address1 = accounts.get("wallet_1")!;
 describe("test increment method", () => {
   it("increments the count by the given value", () => {
     const res1 = vm.callPublicFn("counter", "increment", [Cl.uint(1)], address1);
+
+    console.log(Cl.prettyPrint(res1.result)) // (ok u2)
+
     expect(res1.result).toBeOk(Cl.uint(2));
 
     const count1 = vm.getDataVar("counter", "count");
@@ -128,8 +134,10 @@ There is a very important thing happening under the hood. The `vm` object is ava
 > You don't need to know much more about that, but if you want to know in details how it works, you can have a look at the `vitest.config.js` file at the root of you project.
 
 We just implement two tests:
-- The first one check that the `increment` function return the new value and saves it to the `count` variable.
-- The second on 
+- The first one checks that the `increment` function returns the new value and saves it to the `count` variable.
+- The second one checks that an `print_event` is emitted when the increment function is called.
+
+> You can use `Cl.prettyPrint(value: ClarityValue)` to format any Clarity value into readable Clarity code. It can be useful to debug functions results or events values.
 
 Note that we are importing `describe`, `expect` and `it` from Vitest.
 - `it` allows us to write a test.
@@ -141,7 +149,7 @@ We also implemented some custom matchers to make assertions on Clarity variables
 The [full list of custom matchers](#custom-vitest-matchers) is available at the end of this guide. 
 
 
-### Comprehensive unit tests for `counter`  <!-- omit from toc -->
+### Comprehensive unit tests for `counter`
 
 Let us now write a higher coverage test suite by testing the `decrement` and `get-counter` functions.
 
@@ -187,7 +195,6 @@ describe("test `get-count` read only function", () => {
   });
 });
 ```
-
 
 ## Measure and increase code coverage
 
@@ -249,9 +256,8 @@ In your package.json, you should already have a script called `test:reports` lik
 Run it to produce both the coverage and the costs reports:
 
 ```sh
-npm run test:coverage
+npm run test:reports
 ```
-
 
 ## Custom Vitest matchers
 
@@ -310,7 +316,7 @@ expect(decrement.result).toBeOk(Cl.uint(0));
 
 Check that a response is `err` and has the expected value. Any Clarity value can be passed.
 
-Let's consider that are `counter` contract returns and error code 500 `(err u500)` if the value passed to increment is too big;
+Consider that the `counter` contract returns and error code 500 `(err u500)` if the value passed to increment is too big:
 
 ```ts
 const tooBig = 100000;
@@ -350,35 +356,86 @@ expect(getMessage.result).toBeNone();
 
 ### Simple clarity types
 
-@todo
+Custom assertion matchers are available for all types of Clarity values. They will check that the value has the right type and value.
 
 #### `toBeBool(expected: boolean)` <!-- omit from toc -->
 
-@todo
+Asserts the value of Clarity boolean (true or false).
 
-#### `toBeInt(rexpected: number | bigint)` <!-- omit from toc -->
+```ts
+expect(trueResult).toBeBool(true);
+expect(falseResult).toBeBool(false);
+```
 
-@todo
+#### `toBeInt(expected: number | bigint)` <!-- omit from toc -->
+
+Asserts the value of a Clarity int.
+
+```ts
+expect(result).toBeInt(1);
+// it accepts JS bigints
+expect(result).toBeInt(1n);
+```
 
 #### `toBeUint(expected: number | bigint)` <!-- omit from toc -->
 
-@todo
+Asserts the value of a Clarity uint.
+
+```ts
+expect(result).toBeUint(1);
+// it accepts JS bigints
+expect(result).toBeUint(1n);
+```
 
 #### `toBeAscii(expected: string)` <!-- omit from toc -->
 
-@todo
+Asserts the value of a Clarity string-ascii.
+
+```ts
+expect(result).toBeAscii("Hello wolrd");
+```
 
 #### `toBeUtf8(expected: string)` <!-- omit from toc -->
 
-@todo
+Asserts the value of a Clarity string-utf8.
+
+```ts
+expect(result).toBeUtf8("STX");
+```
 
 #### `toBePrincipal(expected: string)` <!-- omit from toc -->
 
-@todo
+Asserts the value of a Clarity principal value. The principal can be a standard or a contract principal.
+
+```ts
+expect(standardPrincipal).toBePrincipal("ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM");
+expect(contractPrincipal).toBePrincipal("ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM.counter");
+```
 
 #### `toBeBuff(expected: Uint8Array)` <!-- omit from toc -->
 
-@todo
+Asserts the value of a Clarity buffer.  
+It takes as an input an ArrayBuffer (`Uint8Array`).
+
+Your test case will ultimately depends on how the Uint8Array is built. `@stacks/transaction` can help building these buffers.
+
+```ts
+it.only("can assert buffer values", () => {
+  const { result } = vm.callPublicFn(/* ... */);
+
+  // knowing the expected UintArray
+  const value = Uint8Array.from([98, 116, 99]);
+  expect(result).toBeBuff(value);
+
+  // knowing the expected string
+  const bufferFromAscii = Cl.bufferFromAscii("btc");
+  expect(result).toBeBuff(bufferFromAscii.buffer);
+
+  // knowing the expected hex value
+  const bufferFromHex = Cl.bufferFromHex("627463");
+  console.log(bufferFromHex.buffer);
+});
+```
 
 
 ### Other composite types
@@ -387,9 +444,40 @@ expect(getMessage.result).toBeNone();
 
 #### `toBeList(expected: ClarityValue[])` <!-- omit from toc -->
 
-@todo
+Check that the value is a `list` containing an array of Clarity values.  
+Considering a function that return a list of 3 uints:
+
+```ts
+const address1 = vm.getAccounts().get("wallet_1");
+
+it("can assert list values", () => {
+  const { result } = vm.callReadOnlyFn("counter", "func-returning-list-of-uints", [], address1);
+
+  expect(result).toBeList([Cl.uint(1), Cl.uint(2), Cl.uint(3)]);
+});
+```
 
 #### `toBeTuple(expected: Record<string, ClarityValue>)` <!-- omit from toc -->
 
-@todo
+Check that the value is a `tuple`, it takes a JavaScript object to check the values.  
+It's used in the [tutorial above](#unit-tests-for-counter-example) to check the value of the print event.
+It can also be used to check function call result.
+The snippet below shows that composite types can be nested:
+
+
+```ts
+const address1 = vm.getAccounts().get("wallet_1");
+
+it("can assert tuple values", () => {
+  const { result } = vm.callPublicFn("counter", "func-returning-tuple", [], address1);
+
+  expect(result).toBeTuple({
+    id: Cl.uint(1),
+    data: Cl.tuple({
+      text: Cl.stringUtf8("Hello world"),
+      owner: Cl.standardPrincipal(address1),
+    }),
+  });
+});
+```
 
