@@ -8,4 +8,9 @@ Instead, they are directly loaded by `vitest.config.js`, following the path expo
 
 ### Contributing
 
-This directory is self contained and can be tested by running `npm test` at the root.
+This directory contains its own tests that are run in the parent directory (`clarinet-sdk`).
+
+```sh
+cd clarinet/components/clarinet-sdk
+npm test # will run both sdk and custom matcher unit tests
+```
