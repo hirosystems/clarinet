@@ -18,19 +18,19 @@ npm install @hirosystems/clarinet-sdk
 ### Usage
 
 ```ts
-import { initVM } from "@hirosystems/clarinet-sdk";
+import { initSimnet } from "@hirosystems/clarinet-sdk";
 import { Cl } from "@stacks/transactions";
 
 async function main() {
-  const vm = await initVM();
+  const simnet = await initSimnet();
 
-  const accounts = vm.getAccounts();
+  const accounts = simnet.getAccounts();
   const w1 = accounts.get("wallet_1")!;
 
-  const call = vm.callPublicFn("counter", "add", [Cl.uint(1)], w1);
+  const call = simnet.callPublicFn("counter", "add", [Cl.uint(1)], w1);
   console.log(call.result); // Cl.int(Cl.ok(true))
 
-  const counter = vm.getDataVar("counter", "counter");
+  const counter = simnet.getDataVar("counter", "counter");
   console.log(counter); // Cl.int(2)
 }
 
@@ -40,7 +40,7 @@ main();
 By default, the SDK will look for a Clarinet.toml file in the current working directory.
 It's also possible to provide the path to the manifest like so:
 ```ts
- const vm = await initVM("./path/to/Clarinet.toml");
+ const simnet = await initSimnet("./path/to/Clarinet.toml");
 ```
 
 ## Tests

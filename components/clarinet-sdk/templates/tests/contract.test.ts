@@ -1,6 +1,6 @@
-import { beforeAll, describe, expect, it } from "vitest";
+import { describe, expect, it } from "vitest";
 
-const accounts = vm.getAccounts();
+const accounts = simnet.getAccounts();
 const address1 = accounts.get("wallet_1")!;
 
 /*
@@ -9,12 +9,12 @@ const address1 = accounts.get("wallet_1")!;
 */
 
 describe("example tests", () => {
-  it("ensures vm is well initalise", () => {
-    expect(vm.blockHeight).toBe(1);
+  it("ensures simnet is well initalise", () => {
+    expect(simnet.blockHeight).toBe(1);
   });
 
   // it("shows an example", () => {
-  //   const { result } = vm.callReadOnlyFn("counter", "get-counter", [], w1);
+  //   const { result } = simnet.callReadOnlyFn("counter", "get-counter", [], address1);
   //   expect(result).toBeUint(0);
   // });
 });
