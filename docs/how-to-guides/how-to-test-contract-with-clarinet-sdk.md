@@ -15,6 +15,7 @@ You can theoritically use any JavaScript test framework, but the SDK supports [V
 - [Measure and increase code coverage](#measure-and-increase-code-coverage)
 - [Costs optimization](#costs-optimization)
 - [Produce both coverage and costs reports.](#produce-both-coverage-and-costs-reports)
+- [Run tests in CI](#run-tests-in-ci)
 - [Custom Vitest matchers](#custom-vitest-matchers)
   - [Check clarity type](#check-clarity-type)
   - [Response type](#response-type)
@@ -259,6 +260,39 @@ Run it to produce both the coverage and the costs reports:
 npm run test:reports
 ```
 
+## Run tests in CI
+
+Because the tests only require Node.js and NPM run, it can be ran in GitHub actions and CIs just like any other Node tests.
+
+In GitHub, you can directly set up a Node.js workflow like this one
+
+```yml
+name: Test counter contract
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        node-version: [20.x]
+
+    steps:
+    - uses: actions/checkout@v3
+    - name: Use Node.js ${{ matrix.node-version }}
+      uses: actions/setup-node@v3
+      with:
+        node-version: ${{ matrix.node-version }}
+        cache: 'npm'
+    - run: npm ci
+    - run: npm run test:reports
+```
+
 ## Custom Vitest matchers
 
 A set of Vitest matchers can be used to make assertions on Clarity values.
@@ -436,7 +470,6 @@ it.only("can assert buffer values", () => {
   console.log(bufferFromHex.buffer);
 });
 ```
-
 
 ### Other composite types
 
