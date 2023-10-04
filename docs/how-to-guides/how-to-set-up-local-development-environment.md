@@ -142,51 +142,17 @@ Note that by default, commands are always executed as the `deployer` address, wh
 
 You can refer to the [Clarity language reference](https://docs.stacks.co/docs/clarity/language-functions) for a complete overview of all Clarity functions.
 
-### Testing with the test harness
+### Testing smart contracts
 
-The test harness is a Deno testing library that can simulate the blockchain, exercise functions of the contract, and
-make testing assertions about the state of the contract or chain.
+Smart contracts can best tested with Node.js and Vitest thanks to the clarinet-sdk. See the [testing guide](./how-to-test-contract-with-clarinet-sdk.md) to learn more.
 
-You can run any tests configured in the `tests` directory with the command:
-
-```sh
-clarinet test
-```
-
-When you create a new contract, a test suite is automatically created for it. You can populate the test suite with
-unit tests as you develop the contract.
-
-An example unit test for the `echo-number` function is provided below:
-
-```ts
-...
-Clarinet.test({
-  name: 'the echo-number function returns the input value ok',
-  async fn(chain: Chain, accounts: Map<string, Account>) {
-    const testNum = '42';
-    let deployerWallet = accounts.get('deployer')!;
-    let block = chain.mineBlock([
-      Tx.contractCall(
-        `${deployerWallet.address}.my-contract`,
-        'echo-number',
-        [testNum],
-        deployerWallet.address,
-      ),
-    ]);
-    assertEquals(block.receipts.length, 1); // assert that the block received a single tx
-    assertEquals(block.receipts[0].result, `(ok ${testNum})`); // assert that the result of the tx was ok and the input number
-    assertEquals(block.height, 2); // assert that only a single block was mined
-  },
-});
-```
-
-For more information on assertions, review [asserts](https://deno.land/std@0.90.0/testing/asserts.ts) in the Deno standard library. For more information on the available Clarity calls in Deno, review the [Deno Clarinet library](https://github.com/hirosystems/clarinet/blob/develop/components/clarinet-deno/index.ts). For more information on testing Clarity contracts, review the [Test Contract How-to Guide](how-to-test-contract.md).
+> `clarinet test` is now depracated and the recommended way is to use the JS SDK.
 
 ## Additional reading
 
 - [Clarinet README](https://github.com/hirosystems/clarinet#clarinet)
 - [clarinet repository](https://github.com/hirosystems/clarinet)
 - [Clarity language reference](https://docs.stacks.co/references/language-functions)
-- [Deno standard library - asserts](https://deno.land/std@0.90.0/testing/asserts.ts)
-- [Clarity visual studio code plugin](https://marketplace.visualstudio.com/items?itemName=HiroSystems.clarity-lsp)
+- [Clarinet JS SDK](https://www.npmjs.com/package/@hirosystems/clarinet-sdk)
+- [Clarity VSCode extension](https://marketplace.visualstudio.com/items?itemName=HiroSystems.clarity-lsp)
 
