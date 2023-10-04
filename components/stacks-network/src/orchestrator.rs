@@ -169,11 +169,11 @@ impl DevnetOrchestrator {
     ) -> Result<ServicesMapHosts, String> {
         let services_map_hosts = ServicesMapHosts {
             bitcoin_node_host: format!(
-                "bitcoind-chain-coordinator-service.{namespace}.svc.cluster.local:18443"
+                "bitcoind-chain-coordinator.{namespace}.svc.cluster.local:18443"
             ),
-            stacks_node_host: format!("stacks-node-service.{namespace}.svc.cluster.local:20443"),
-            postgres_host: format!("stacks-api-service.{namespace}.svc.cluster.local:5432"),
-            stacks_api_host: format!("stacks-api-service.{namespace}.svc.cluster.local:3999"),
+            stacks_node_host: format!("stacks-blockchain.{namespace}.svc.cluster.local:20443"),
+            postgres_host: format!("stacks-blockchain-api.{namespace}.svc.cluster.local:5432"),
+            stacks_api_host: format!("stacks-blockchain-api.{namespace}.svc.cluster.local:3999"),
             stacks_explorer_host: "localhost".into(), // todo (micaiah)
             bitcoin_explorer_host: "localhost".into(), // todo (micaiah)
             subnet_node_host: "localhost".into(),     // todo (micaiah)
