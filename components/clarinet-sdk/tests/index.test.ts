@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 
 // test the built package and not the source code
 // makes it simpler to handle wasm build
-import { initVM, tx } from "../";
+import { initSimnet, tx } from "../";
 
 const deployerAddr = "ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM";
 const address1 = "ST1SJ3DTE5DN7X54YDH5D64R3BCB6A2AG2ZQ8YPD5";
@@ -12,12 +12,12 @@ const manifestPath = "tests/fixtures/Clarinet.toml";
 
 describe("basic vm interactions", async () => {
   it("initialize vm", async () => {
-    const vm = await initVM(manifestPath);
+    const vm = await initSimnet(manifestPath);
     expect(vm.blockHeight).toBe(1);
   });
 
   it("can mine empty blocks", async () => {
-    const vm = await initVM(manifestPath);
+    const vm = await initSimnet(manifestPath);
     vm.mineEmptyBlock();
     expect(vm.blockHeight).toBe(2);
     vm.mineEmptyBlocks(4);
@@ -25,7 +25,7 @@ describe("basic vm interactions", async () => {
   });
 
   it("exposes devnet stacks accounts", async () => {
-    const vm = await initVM(manifestPath);
+    const vm = await initSimnet(manifestPath);
     const accounts = vm.getAccounts();
 
     expect(accounts).toHaveLength(4);
@@ -34,7 +34,7 @@ describe("basic vm interactions", async () => {
   });
 
   it("expose assets maps", async () => {
-    const vm = await initVM(manifestPath);
+    const vm = await initSimnet(manifestPath);
 
     const assets = vm.getAssetsMap();
     expect(assets.get("STX")).toHaveLength(4);
@@ -42,7 +42,7 @@ describe("basic vm interactions", async () => {
   });
 
   it("can get and set epoch", async () => {
-    const vm = await initVM(manifestPath);
+    const vm = await initSimnet(manifestPath);
 
     // should be 2.4 by default
     expect(vm.currentEpoch).toBe("2.4");
@@ -60,7 +60,7 @@ describe("basic vm interactions", async () => {
 
 describe("vm can call contracts function", async () => {
   it("can call read only functions", async () => {
-    const vm = await initVM(manifestPath);
+    const vm = await initSimnet(manifestPath);
     const res = vm.callReadOnlyFn("counter", "get-count", [], address1);
 
     expect(res).toHaveProperty("result");
@@ -69,7 +69,7 @@ describe("vm can call contracts function", async () => {
   });
 
   it("does not increase block height when calling read-only functions", async () => {
-    const vm = await initVM(manifestPath);
+    const vm = await initSimnet(manifestPath);
     const initalBH = vm.blockHeight;
 
     vm.callReadOnlyFn("counter", "get-count", [], address1);
@@ -78,7 +78,7 @@ describe("vm can call contracts function", async () => {
   });
 
   it("can call public functions", async () => {
-    const vm = await initVM(manifestPath);
+    const vm = await initSimnet(manifestPath);
     const res = vm.callPublicFn("counter", "increment", [], address1);
 
     expect(res).toHaveProperty("result");
@@ -92,7 +92,7 @@ describe("vm can call contracts function", async () => {
   });
 
   it("can call public functions with arguments", async () => {
-    const vm = await initVM(manifestPath);
+    const vm = await initSimnet(manifestPath);
     const res = vm.callPublicFn("counter", "add", [Cl.uint(2)], address1);
 
     expect(res).toHaveProperty("result");
@@ -101,7 +101,7 @@ describe("vm can call contracts function", async () => {
   });
 
   it("increases block height when calling public functions", async () => {
-    const vm = await initVM(manifestPath);
+    const vm = await initSimnet(manifestPath);
     const initalBH = vm.blockHeight;
 
     vm.callPublicFn("counter", "increment", [], address1);
@@ -110,7 +110,7 @@ describe("vm can call contracts function", async () => {
   });
 
   it("can call public functions in the same block", async () => {
-    const vm = await initVM(manifestPath);
+    const vm = await initSimnet(manifestPath);
     const initalBH = vm.blockHeight;
 
     const res = vm.mineBlock([
@@ -131,7 +131,7 @@ describe("vm can call contracts function", async () => {
   });
 
   it("can get updated assets map", async () => {
-    const vm = await initVM(manifestPath);
+    const vm = await initSimnet(manifestPath);
 
     vm.callPublicFn("counter", "increment", [], address1);
     vm.callPublicFn("counter", "increment", [], address1);
@@ -146,14 +146,14 @@ describe("vm can call contracts function", async () => {
 
 describe("vm can read contracts data vars and maps", async () => {
   it("can get data-vars", async () => {
-    const vm = await initVM(manifestPath);
+    const vm = await initSimnet(manifestPath);
 
     const counter = vm.getDataVar("counter", "count");
     expect(counter).toStrictEqual(Cl.uint(0));
   });
 
   it("can get map entry", async () => {
-    const vm = await initVM(manifestPath);
+    const vm = await initSimnet(manifestPath);
 
     // add a participant in the map
     vm.callPublicFn("counter", "increment", [], address1);
@@ -165,7 +165,7 @@ describe("vm can read contracts data vars and maps", async () => {
 
 describe("vm can get contracts info and deploy contracts", async () => {
   it("can get contract interfaces", async () => {
-    const vm = await initVM(manifestPath);
+    const vm = await initSimnet(manifestPath);
 
     const contractInterfaces = vm.getContractsInterfaces();
     expect(contractInterfaces).toHaveLength(1);
@@ -178,7 +178,7 @@ describe("vm can get contracts info and deploy contracts", async () => {
   });
 
   it("can get contract source", async () => {
-    const vm = await initVM(manifestPath);
+    const vm = await initSimnet(manifestPath);
 
     const counterSource = vm.getContractSource(`${deployerAddr}.counter`);
     expect(counterSource?.startsWith("(define-data-var count")).toBe(true);
@@ -191,7 +191,7 @@ describe("vm can get contracts info and deploy contracts", async () => {
   });
 
   it("can get contract ast", async () => {
-    const vm = await initVM(manifestPath);
+    const vm = await initSimnet(manifestPath);
 
     const counterAst = vm.getContractAST(`${deployerAddr}.counter`);
     expect(counterAst).toBeDefined();
@@ -202,7 +202,7 @@ describe("vm can get contracts info and deploy contracts", async () => {
   });
 
   it("can deploy contracts as snippets", async () => {
-    const vm = await initVM(manifestPath);
+    const vm = await initSimnet(manifestPath);
 
     const res = vm.deployContract("temp", "(+ 24 18)", null, deployerAddr);
     expect(res.result).toStrictEqual(Cl.int(42));
@@ -212,7 +212,7 @@ describe("vm can get contracts info and deploy contracts", async () => {
   });
 
   it("can deploy contracts", async () => {
-    const vm = await initVM(manifestPath);
+    const vm = await initSimnet(manifestPath);
 
     const source = "(define-public (add (a uint) (b uint)) (ok (+ a b)))\n";
     const deployRes = vm.deployContract("op", source, null, deployerAddr);
@@ -233,7 +233,7 @@ describe("vm can get contracts info and deploy contracts", async () => {
   });
 
   it("can deploy contract with a given clarity_version", async () => {
-    const vm = await initVM(manifestPath);
+    const vm = await initSimnet(manifestPath);
 
     const source = "(define-public (add (a uint) (b uint)) (ok (+ a b)))\n";
 
@@ -257,7 +257,7 @@ describe("vm can get contracts info and deploy contracts", async () => {
 
 describe("vm can get session reports", async () => {
   it("can get line coverage", async () => {
-    const vm = await initVM(manifestPath);
+    const vm = await initSimnet(manifestPath);
 
     vm.callPublicFn("counter", "increment", [], address1);
     vm.callPublicFn("counter", "increment", [], address1);
@@ -268,7 +268,7 @@ describe("vm can get session reports", async () => {
   });
 
   it("can get costs", async () => {
-    const vm = await initVM(manifestPath);
+    const vm = await initSimnet(manifestPath);
 
     vm.callPublicFn("counter", "increment", [], address1);
 

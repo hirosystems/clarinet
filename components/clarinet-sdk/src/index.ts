@@ -1,7 +1,4 @@
 import { Cl, ClarityValue } from "@stacks/transactions";
-
-import { vfs } from "./vfs.js";
-import type { ContractInterface } from "./contractInterface.js";
 import {
   SDK,
   TransactionRes,
@@ -10,6 +7,9 @@ import {
   TransferSTXArgs,
   ContractOptions,
 } from "@hirosystems/clarinet-sdk-wasm";
+
+import { vfs } from "./vfs.js";
+import type { ContractInterface } from "./contractInterface.js";
 import { ContractAST } from "./contractAst.js";
 
 const wasmModule = import("@hirosystems/clarinet-sdk-wasm");
@@ -103,7 +103,7 @@ type GetContractAST = (contractId: string) => ContractAST;
 type GetContractsInterfaces = () => Map<string, ContractInterface>;
 
 // because the session is wrapped in a proxy the types need to be hardcoded
-export type ClarityVM = {
+export type Simnet = {
   [K in keyof SDK]: K extends "callReadOnlyFn" | "callPublicFn"
     ? CallFn
     : K extends "deployContract"
@@ -236,18 +236,20 @@ const getSessionProxy = () => ({
 
 // load wasm only once and memoize it
 function memoizedInit() {
-  let vm: ClarityVM | null = null;
-  return async (manifestPath = "./Clarinet.toml") => {
-    const module = await wasmModule;
+  let simnet: Simnet | null = null;
 
-    if (!vm) {
-      console.log("init clarity vm");
-      vm = new Proxy(new module.SDK(vfs), getSessionProxy()) as unknown as ClarityVM;
+  return async (manifestPath = "./Clarinet.toml") => {
+    if (!simnet) {
+      const module = await wasmModule;
+
+      console.log("init stacks simnet");
+      simnet = new Proxy(new module.SDK(vfs), getSessionProxy()) as unknown as Simnet;
     }
-    // start a new session
-    await vm.initSession(process.cwd(), manifestPath);
-    return vm;
+
+    // start a new simnet session
+    await simnet.initSession(process.cwd(), manifestPath);
+    return simnet;
   };
 }
 
-export const initVM = memoizedInit();
+export const initSimnet = memoizedInit();
