@@ -25,7 +25,9 @@ async function main() {
   const simnet = await initSimnet();
 
   const accounts = simnet.getAccounts();
-  const w1 = accounts.get("wallet_1")!;
+  const w1 = accounts.get("wallet_1");
+  if (!address1) throw new Error("invalid wallet name.");
+  
 
   const call = simnet.callPublicFn("counter", "add", [Cl.uint(1)], w1);
   console.log(call.result); // Cl.int(Cl.ok(true))
@@ -36,6 +38,7 @@ async function main() {
 
 main();
 ```
+
 
 By default, the SDK will look for a Clarinet.toml file in the current working directory.
 It's also possible to provide the path to the manifest like so:
