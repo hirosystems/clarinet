@@ -24,7 +24,8 @@ type ClarityEvent = {
   event: string;
   data: { raw_value?: string; value?: ClarityValue; [key: string]: any };
 };
-export type ParsedTransactionRes = {
+
+export type ParsedTransactionResult = {
   result: ClarityValue;
   events: ClarityEvent[];
 };
@@ -34,7 +35,7 @@ type CallFn = (
   method: string,
   args: ClarityValue[],
   sender: string,
-) => ParsedTransactionRes;
+) => ParsedTransactionResult;
 
 type DeployContractOptions = {
   clarityVersion: 1 | 2;
@@ -44,13 +45,13 @@ type DeployContract = (
   content: string,
   options: DeployContractOptions | null,
   sender: string,
-) => ParsedTransactionRes;
+) => ParsedTransactionResult;
 
 type TransferSTX = (
   amount: number | bigint,
   recipient: string,
   sender: string,
-) => ParsedTransactionRes;
+) => ParsedTransactionResult;
 
 type Tx =
   | {
@@ -96,7 +97,7 @@ export const tx = {
   }),
 };
 
-type MineBlock = (txs: Array<Tx>) => ParsedTransactionRes[];
+type MineBlock = (txs: Array<Tx>) => ParsedTransactionResult[];
 type GetDataVar = (contract: string, dataVar: string) => ClarityValue;
 type GetMapEntry = (contract: string, mapName: string, mapKey: ClarityValue) => ClarityValue;
 type GetContractAST = (contractId: string) => ContractAST;
@@ -142,7 +143,7 @@ function parseEvents(events: string): ClarityEvent[] {
   }
 }
 
-function parseTxResult(response: TransactionRes): ParsedTransactionRes {
+function parseTxResponse(response: TransactionRes): ParsedTransactionResult {
   return {
     result: Cl.deserialize(response.result),
     events: parseEvents(response.events),
@@ -165,7 +166,7 @@ const getSessionProxy = () => ({
             sender,
           ),
         );
-        return parseTxResult(response);
+        return parseTxResponse(response);
       };
       return callFn;
     }
@@ -179,7 +180,7 @@ const getSessionProxy = () => ({
         const response = session.deployContract(
           new DeployContractArgs(name, content, rustOptions, sender),
         );
-        return parseTxResult(response);
+        return parseTxResponse(response);
       };
       return callDeployContract;
     }
@@ -187,7 +188,7 @@ const getSessionProxy = () => ({
     if (prop === "transferSTX") {
       const callTransferSTX: TransferSTX = (amount, ...args) => {
         const response = session.transferSTX(new TransferSTXArgs(BigInt(amount), ...args));
-        return parseTxResult(response);
+        return parseTxResponse(response);
       };
       return callTransferSTX;
     }
@@ -207,7 +208,7 @@ const getSessionProxy = () => ({
         });
 
         const responses: TransactionRes[] = session.mineBlock(serializedTxs);
-        return responses.map(parseTxResult);
+        return responses.map(parseTxResponse);
       };
       return callMineBlock;
     }

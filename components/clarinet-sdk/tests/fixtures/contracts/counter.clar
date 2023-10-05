@@ -1,6 +1,8 @@
 (define-data-var count uint u0)
 (define-map participants principal bool)
 
+(use-trait multiplier-trait .multiplier-trait.multiplier)
+
 (define-constant OWNER tx-sender)
 
 (define-read-only  (get-count)
@@ -36,4 +38,13 @@
     (asserts! (is-eq tx-sender OWNER) (err u1))
     (stx-transfer? amount (as-contract tx-sender) OWNER)
   )
+)
+
+(define-public (call-multiply (multiplier-contract <multiplier-trait>))
+  (ok (try! (contract-call? multiplier-contract multiply u2 u2)))
+)
+
+
+(define-public (transfer-100 (to principal))
+  (stx-transfer? u100 tx-sender to)
 )

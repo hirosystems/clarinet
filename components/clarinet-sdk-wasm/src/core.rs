@@ -26,8 +26,9 @@ use std::{panic, path::PathBuf};
 use wasm_bindgen::prelude::*;
 use wasm_bindgen::JsValue;
 
+use crate::utils::clarity_values::{self, uint8_to_string, uint8_to_value};
 use crate::utils::costs::SerializableCostsReport;
-use crate::utils::events::{self, serialize_event, uint8_to_string, uint8_to_value};
+use crate::utils::events::serialize_event;
 
 #[wasm_bindgen(typescript_custom_section)]
 const SET_EPOCH: &'static str = r#"
@@ -219,11 +220,11 @@ pub struct SessionReport {
 
 pub fn execution_result_to_transaction_res(execution: &ExecutionResult) -> TransactionRes {
     let result = match &execution.result {
-        EvaluationResult::Snippet(result) => events::to_raw_value(&result.result),
+        EvaluationResult::Snippet(result) => clarity_values::to_raw_value(&result.result),
         EvaluationResult::Contract(ref contract) => {
             // contract.;
             match contract.result {
-                Some(ref result) => events::to_raw_value(result),
+                Some(ref result) => clarity_values::to_raw_value(result),
                 _ => "0x03".into(),
             }
         }
