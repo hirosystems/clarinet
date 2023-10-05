@@ -2,14 +2,14 @@
 title: Test Contract with clarinet-sdk
 ---
 
-The [Clarinet JS SDK](https://www.npmjs.com/package/@hirosystems/clarinet-sdk) allows to write unit tests for your Clarity smart contract.  
+The [Clarinet SDK](https://www.npmjs.com/package/@hirosystems/clarinet-sdk) allows to write unit tests for your Clarity smart contract.  
 You can theoritically use any JavaScript test framework, but the SDK supports [Vitest](https://vitest.dev/) out of the box.
 
 > Make sure you are using the latest version of Clarinet to follow this guide. See the [getting started](../getting-started.md) guide to know more.
 
 > Take a look at the [API reference guide](../feature-guides/clarinet-js-sdk.md) for more information about the methods and elements of the clarinet-sdk.
 
-*Topics covered in this guide*:
+_Topics covered in this guide_:
 
 - [Requirements](#requirements)
 - [Set up the Clarity contract and unit tests](#set-up-the-clarity-contract-and-unit-tests)
@@ -53,7 +53,7 @@ It keeps track of an initialized value, allows for incrementing and decrementing
 (define-data-var count uint u1)
 
 (define-public (increment (step uint))
-  (let ((new-val (+ step (var-get count)))) 
+  (let ((new-val (+ step (var-get count))))
     (var-set count new-val)
     (print { object: "count", action: "incremented", value: new-val })
     (ok new-val)
@@ -61,7 +61,7 @@ It keeps track of an initialized value, allows for incrementing and decrementing
 )
 
 (define-public (decrement (step uint))
-  (let ((new-val (- step (var-get count)))) 
+  (let ((new-val (- step (var-get count))))
     (var-set count new-val)
     (print { object: "count", action: "decremented", value: new-val })
     (ok new-val)
@@ -86,11 +86,10 @@ npx @hirosystems/clarinet-sdk@latest
 This script will ask you if you want to run npm install now, you can press enter to do so.
 It can take a few seconds.
 
-The file `tests/counter_test.ts` that was created by `clarinet contract new counter` can be deleted.  
+The file `tests/counter_test.ts` that was created by `clarinet contract new counter` can be deleted.
 
 You can have a look at `tests/contract.test.ts`, it's a sample file showing how to use the SDK with Vitest.
 It can safely be deleted.
-
 
 ### Unit tests for `counter` example
 
@@ -105,7 +104,12 @@ const address1 = accounts.get("wallet_1")!;
 
 describe("test `increment` public function", () => {
   it("increments the count by the given value", () => {
-    const incrementResponse = simnet.callPublicFn("counter", "increment", [Cl.uint(1)], address1);
+    const incrementResponse = simnet.callPublicFn(
+      "counter",
+      "increment",
+      [Cl.uint(1)],
+      address1
+    );
     console.log(Cl.prettyPrint(incrementResponse.result)); // (ok u2)
     expect(incrementResponse.result).toBeOk(Cl.uint(2));
 
@@ -118,7 +122,12 @@ describe("test `increment` public function", () => {
   });
 
   it("sends a print event", () => {
-    const incrementResponse = simnet.callPublicFn("counter", "increment", [Cl.uint(1)], address1);
+    const incrementResponse = simnet.callPublicFn(
+      "counter",
+      "increment",
+      [Cl.uint(1)],
+      address1
+    );
 
     expect(incrementResponse.events).toHaveLength(1);
     const printEvent = incrementResponse.events[0];
@@ -133,6 +142,7 @@ describe("test `increment` public function", () => {
 ```
 
 To run the test, go back to your console and run the `npm test` command. It should display a report telling that tests succeeded.
+
 ```sh
 npm test
 ```
@@ -142,20 +152,21 @@ There is a very important thing happening under the hood. The `simnet` object is
 > You don't need to know much more about that, but if you want to know in details how it works, you can have a look at the `vitest.config.js` file at the root of you project.
 
 We just implement two tests:
+
 - The first one checks that the `increment` function returns the new value and saves it to the `count` variable.
 - The second one checks that an `print_event` is emitted when the increment function is called.
 
 > You can use `Cl.prettyPrint(value: ClarityValue)` to format any Clarity value into readable Clarity code. It can be useful to debug functions results or events values.
 
 Note that we are importing `describe`, `expect` and `it` from Vitest.
+
 - `it` allows us to write a test.
 - `describe` is not necessary but allows to organize tests.
 - `expect` is use to make assertions on value.
 
 You can learn more about Vitest on their [website](https://vitest.dev).
 We also implemented some custom matchers to make assertions on Clarity variables (like `toBeUint`).
-The [full list of custom matchers](#custom-vitest-matchers) is available at the end of this guide. 
-
+The [full list of custom matchers](#custom-vitest-matchers) is available at the end of this guide.
 
 ### Comprehensive unit tests for `counter`
 
@@ -166,7 +177,12 @@ These two code blocks can be added at the end of `tests/counter.test.ts`.
 ```ts
 describe("test `decrement` public function", () => {
   it("decrements the count by the given value", () => {
-    const decrementResponse = simnet.callPublicFn("counter", "decrement", [Cl.uint(1)], address1);
+    const decrementResponse = simnet.callPublicFn(
+      "counter",
+      "decrement",
+      [Cl.uint(1)],
+      address1
+    );
     expect(decrementResponse.result).toBeOk(Cl.uint(0));
 
     const count1 = simnet.getDataVar("counter", "count");
@@ -181,7 +197,12 @@ describe("test `decrement` public function", () => {
   });
 
   it("sends a print event", () => {
-    const decrementResponse = simnet.callPublicFn("counter", "decrement", [Cl.uint(1)], address1);
+    const decrementResponse = simnet.callPublicFn(
+      "counter",
+      "decrement",
+      [Cl.uint(1)],
+      address1
+    );
 
     expect(decrementResponse.events).toHaveLength(1);
     const printEvent = decrementResponse.events[0];
@@ -282,9 +303,9 @@ name: Test counter contract
 
 on:
   push:
-    branches: [ "main" ]
+    branches: ["main"]
   pull_request:
-    branches: [ "main" ]
+    branches: ["main"]
 
 jobs:
   build:
@@ -294,14 +315,14 @@ jobs:
         node-version: [20.x]
 
     steps:
-    - uses: actions/checkout@v3
-    - name: Use Node.js ${{ matrix.node-version }}
-      uses: actions/setup-node@v3
-      with:
-        node-version: ${{ matrix.node-version }}
-        cache: 'npm'
-    - run: npm ci
-    - run: npm run test:reports
+      - uses: actions/checkout@v3
+      - name: Use Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v3
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: "npm"
+      - run: npm ci
+      - run: npm run test:reports
 ```
 
 ## Custom Vitest matchers
@@ -330,6 +351,7 @@ it("ensures <increment> adds 1", () => {
 ```
 
 It can be used to check any type
+
 ```ts
 // uint
 expect(result).toHaveClarityType(ClarityType.UInt);
@@ -351,7 +373,12 @@ They are called composite types, meaning that they contain another Clarity value
 Check that a response is `ok` and has the expected value. Any Clarity value can be passed.
 
 ```ts
-const decrement = simnet.callPublicFn("counter", "decrement", [Cl.uint(1)], address1);
+const decrement = simnet.callPublicFn(
+  "counter",
+  "decrement",
+  [Cl.uint(1)],
+  address1
+);
 
 // decrement.result is `(ok (uint 0))`
 expect(decrement.result).toBeOk(Cl.uint(0));
@@ -365,7 +392,12 @@ Consider that the `counter` contract returns and error code 500 `(err u500)` if 
 
 ```ts
 const tooBig = 100000;
-const increment = simnet.callPublicFn("counter", "increment", [Cl.uint(toBig)], address1);
+const increment = simnet.callPublicFn(
+  "counter",
+  "increment",
+  [Cl.uint(toBig)],
+  address1
+);
 
 // increment.result is `(err u500)`
 expect(increment.result).toBeErr(Cl.uint(500));
@@ -382,7 +414,12 @@ Here, `some` is a composite type, meaning that it contains another Clarity value
 Consider a billboard smart contract that can contain an optional message:
 
 ```ts
-const getMessage = simnet.callPublicFn("billboard", "get-message", [], address1);
+const getMessage = simnet.callPublicFn(
+  "billboard",
+  "get-message",
+  [],
+  address1
+);
 
 // (some u"Hello world")
 expect(getMessage.result).toBeSome(Cl.stringUtf8("Hello world"));
@@ -393,7 +430,12 @@ expect(getMessage.result).toBeSome(Cl.stringUtf8("Hello world"));
 Considering the same billboard smart contract but with no saved message:
 
 ```ts
-const getMessage = simnet.callPublicFn("billboard", "get-message", [], address1);
+const getMessage = simnet.callPublicFn(
+  "billboard",
+  "get-message",
+  [],
+  address1
+);
 
 // none
 expect(getMessage.result).toBeNone();
@@ -453,8 +495,12 @@ expect(result).toBeUtf8("STX");
 Asserts the value of a Clarity principal value. The principal can be a standard or a contract principal.
 
 ```ts
-expect(standardPrincipal).toBePrincipal("ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM");
-expect(contractPrincipal).toBePrincipal("ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM.counter");
+expect(standardPrincipal).toBePrincipal(
+  "ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM"
+);
+expect(contractPrincipal).toBePrincipal(
+  "ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM.counter"
+);
 ```
 
 #### `toBeBuff(expected: Uint8Array)` <!-- omit from toc -->
@@ -495,7 +541,12 @@ Considering a function that return a list of 3 uints:
 const address1 = simnet.getAccounts().get("wallet_1");
 
 it("can assert list values", () => {
-  const { result } = simnet.callReadOnlyFn("counter", "func-returning-list-of-uints", [], address1);
+  const { result } = simnet.callReadOnlyFn(
+    "counter",
+    "func-returning-list-of-uints",
+    [],
+    address1
+  );
 
   expect(result).toBeList([Cl.uint(1), Cl.uint(2), Cl.uint(3)]);
 });
@@ -508,12 +559,16 @@ It's used in the [tutorial above](#unit-tests-for-counter-example) to check the 
 It can also be used to check function call result.
 The snippet below shows that composite types can be nested:
 
-
 ```ts
 const address1 = simnet.getAccounts().get("wallet_1");
 
 it("can assert tuple values", () => {
-  const { result } = simnet.callPublicFn("counter", "func-returning-tuple", [], address1);
+  const { result } = simnet.callPublicFn(
+    "counter",
+    "func-returning-tuple",
+    [],
+    address1
+  );
 
   expect(result).toBeTuple({
     id: Cl.uint(1),
@@ -524,4 +579,3 @@ it("can assert tuple values", () => {
   });
 });
 ```
-
