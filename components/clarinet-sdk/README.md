@@ -25,11 +25,11 @@ async function main() {
   const simnet = await initSimnet();
 
   const accounts = simnet.getAccounts();
-  const w1 = accounts.get("wallet_1");
+  const address1 = accounts.get("wallet_1");
   if (!address1) throw new Error("invalid wallet name.");
   
 
-  const call = simnet.callPublicFn("counter", "add", [Cl.uint(1)], w1);
+  const call = simnet.callPublicFn("counter", "add", [Cl.uint(1)], address1);
   console.log(call.result); // Cl.int(Cl.ok(true))
 
   const counter = simnet.getDataVar("counter", "counter");
