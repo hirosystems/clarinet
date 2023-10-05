@@ -455,7 +455,7 @@ clarinet requirements add SP2KAF9RF86PVX3NEE27DFV1CQX0T4WGR41X3S45C.bitcoin-whal
 ```
 
 When adding a contract requirement to your project, the epoch of your contracts listed in the Clarinet.toml must be _greater than or equal_ to the epoch of the required contract. 
-For example, if the contract `SP3K8BC0PPEVCV7NZ6QSRWPQ2JE9E5B6N3PA0KBR9.amm-swap-pool-v1-1` is added as a requirement, the contracts using this requirement would need to have an `epoch` of at least `2.3` in the `Clarinet.toml`:
+For example, if the contract `SP3K8BC0PPEVCV7NZ6QSRWPQ2JE9E5B6N3PA0KBR9.amm-swap-pool-v1-1` is added as a requirement, the contracts using this requirement would need to have an epoch of at least 2.3 in the Clarinet.toml:
 ```toml
 [[project.requirements]]
 contract_id = 'SP3K8BC0PPEVCV7NZ6QSRWPQ2JE9E5B6N3PA0KBR9.amm-swap-pool-v1-1'
