@@ -10,7 +10,7 @@ const address1 = accounts.get("wallet_1")!;
 
 describe("example tests", () => {
   it("ensures simnet is well initalise", () => {
-    expect(simnet.blockHeight).toBe(1);
+    expect(simnet.blockHeight).toBe(0);
   });
 
   // it("shows an example", () => {
