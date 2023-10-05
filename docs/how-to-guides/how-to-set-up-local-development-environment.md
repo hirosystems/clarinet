@@ -56,18 +56,20 @@ path = "contracts/my-contract.clar"
 
 You can specify the clarity version of your contract in the `Clarinet.toml` configuration file by updating it as shown below.
 
-```
+```toml
 [contracts.cbtc-token]
 path = "contracts/cbtc-token.clar"
 clarity_version = 1
 ```
-```
+
+```toml
 [contracts.cbtc-token]
 path = "contracts/cbtc-token.clar"
 clarity_version = 2
 ```
 
 At this point, you can begin editing your smart contract in the `contracts` directory. At any point, while you are developing, you can use the command `clarinet check` to check the syntax of your smart contract.
+If you are using VSCode, the [Clarity extension](https://marketplace.visualstudio.com/items?itemName=HiroSystems.clarity-lsp) does the check for you.
 
 Review this comprehensive walkthrough video for a more in-depth overview of developing with Clarinet.
 
@@ -113,16 +115,26 @@ You can use the `::help` command for valid console commands.
 
 ```
 >> ::help
-::help                            Display help
-::list_functions                  Display all the native functions available in Clarity
-::describe_function <function>    Display documentation for a given native function fn-name
-::mint_stx <principal> <amount>   Mint STX balance for a given principal
-::set_tx_sender <principal>       Set tx-sender variable to principal
-::get_assets_maps                 Get assets maps for active accounts
-::get_costs <expr>                Display the cost analysis
-::get_contracts                   Get contracts
-::get_block_height                Get current block height
-::advance_chain_tip <count>       Simulate mining of <count> blocks
+::help                                  Display help
+::functions                             Display all the native functions available in clarity
+::keywords                              Display all the native keywords available in clarity
+::describe <function> | <keyword>       Display documentation for a given native function or keyword
+::mint_stx <principal> <amount>         Mint STX balance for a given principal
+::set_tx_sender <principal>             Set tx-sender variable to principal
+::get_assets_maps                       Get assets maps for active accounts
+::get_costs <expr>                      Display the cost analysis
+::get_contracts                         Get contracts
+::get_block_height                      Get current block height
+::advance_chain_tip <count>             Simulate mining of <count> blocks
+::set_epoch <2.0> | <2.05> | <2.1>      Update the current epoch
+::get_epoch                             Get current epoch
+::toggle_costs                          Display cost analysis after every expression
+::debug <expr>                          Start an interactive debug session executing <expr>
+::trace <expr>                          Generate an execution trace for <expr>
+::reload                                Reload the existing contract(s) in the session
+::read <filename>                       Read expressions from a file
+::encode <expr>                         Encode an expression to a Clarity Value bytes representation
+::decode <bytes>                        Decode a Clarity Value bytes representation
 ```
 
 The console commands control the REPL chain's state, letting you get information about it and advance the chain

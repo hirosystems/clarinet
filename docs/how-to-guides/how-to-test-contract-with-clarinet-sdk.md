@@ -5,6 +5,10 @@ title: Test Contract with clarinet-sdk
 The [Clarinet JS SDK](https://www.npmjs.com/package/@hirosystems/clarinet-sdk) allows to write unit tests for your Clarity smart contract.  
 You can theoritically use any JavaScript test framework, but the SDK supports [Vitest](https://vitest.dev/) out of the box.
 
+> Make sure you are using the latest version of Clarinet to follow this guide. See the [getting started](../getting-started.md) guide to know more.
+
+> Take a look at the [API reference guide](../feature-guides/clarinet-js-sdk.md) for more information about the methods and elements of the clarinet-sdk.
+
 *Topics covered in this guide*:
 
 - [Requirements](#requirements)
@@ -71,7 +75,7 @@ It keeps track of an initialized value, allows for incrementing and decrementing
 
 ### Migrating between Clarinet 1 and Clarinet 2
 
-> Note: Clarinet 2 will be released in October 2023, and will create the right boilerplate files. But if a project has been created with Clarinet 1, this prepare to project to run the SDK and Vitest.
+> Note: Clarinet 2 will be released in October 2023, and will create the right boilerplate files. But if a project has been created with Clarinet 1, the following script prepares the project to run the SDK and Vitest.
 
 Executing this script in a Clarinet 1 project will initialise NPM and Vitest. It will also create a sample test file.
 
@@ -79,7 +83,7 @@ Executing this script in a Clarinet 1 project will initialise NPM and Vitest. It
 npx @hirosystems/clarinet-sdk@latest
 ```
 
-This script wil lask you if you want to run npm install now, you can press enter to do so.
+This script will ask you if you want to run npm install now, you can press enter to do so.
 It can take a few seconds.
 
 The file `tests/counter_test.ts` that was created by `clarinet contract new counter` can be deleted.  
@@ -99,13 +103,11 @@ import { describe, expect, it } from "vitest";
 const accounts = simnet.getAccounts();
 const address1 = accounts.get("wallet_1")!;
 
-describe("test increment method", () => {
+describe("test `increment` public function", () => {
   it("increments the count by the given value", () => {
-    const res1 = simnet.callPublicFn("counter", "increment", [Cl.uint(1)], address1);
-
-    console.log(Cl.prettyPrint(res1.result)) // (ok u2)
-
-    expect(res1.result).toBeOk(Cl.uint(2));
+    const incrementResponse = simnet.callPublicFn("counter", "increment", [Cl.uint(1)], address1);
+    console.log(Cl.prettyPrint(incrementResponse.result)); // (ok u2)
+    expect(incrementResponse.result).toBeOk(Cl.uint(2));
 
     const count1 = simnet.getDataVar("counter", "count");
     expect(count1).toBeUint(2);
@@ -116,10 +118,10 @@ describe("test increment method", () => {
   });
 
   it("sends a print event", () => {
-    const res = simnet.callPublicFn("counter", "increment", [Cl.uint(1)], address1);
+    const incrementResponse = simnet.callPublicFn("counter", "increment", [Cl.uint(1)], address1);
 
-    expect(res.events).toHaveLength(1);
-    const printEvent = res.events[0];
+    expect(incrementResponse.events).toHaveLength(1);
+    const printEvent = incrementResponse.events[0];
     expect(printEvent.event).toBe("print_event");
     expect(printEvent.data.value).toBeTuple({
       object: Cl.stringAscii("count"),
@@ -128,6 +130,11 @@ describe("test increment method", () => {
     });
   });
 });
+```
+
+To run the test, go back to your console and run the `npm test` command. It should display a report telling that tests succeeded.
+```sh
+npm test
 ```
 
 There is a very important thing happening under the hood. The `simnet` object is available globally in the tests, and is automatically initialized before each test.
@@ -159,8 +166,8 @@ These two code blocks can be added at the end of `tests/counter.test.ts`.
 ```ts
 describe("test `decrement` public function", () => {
   it("decrements the count by the given value", () => {
-    const res1 = simnet.callPublicFn("counter", "decrement", [Cl.uint(1)], address1);
-    expect(res1.result).toBeOk(Cl.uint(0));
+    const decrementResponse = simnet.callPublicFn("counter", "decrement", [Cl.uint(1)], address1);
+    expect(decrementResponse.result).toBeOk(Cl.uint(0));
 
     const count1 = simnet.getDataVar("counter", "count");
     expect(count1).toBeUint(0);
@@ -174,10 +181,10 @@ describe("test `decrement` public function", () => {
   });
 
   it("sends a print event", () => {
-    const res = simnet.callPublicFn("counter", "decrement", [Cl.uint(1)], address1);
+    const decrementResponse = simnet.callPublicFn("counter", "decrement", [Cl.uint(1)], address1);
 
-    expect(res.events).toHaveLength(1);
-    const printEvent = res.events[0];
+    expect(decrementResponse.events).toHaveLength(1);
+    const printEvent = decrementResponse.events[0];
     expect(printEvent.event).toBe("print_event");
     expect(printEvent.data.value).toBeTuple({
       object: Cl.stringAscii("count"),
@@ -191,8 +198,12 @@ describe("test `decrement` public function", () => {
 ```ts
 describe("test `get-count` read only function", () => {
   it("returns the counter value", () => {
-    const res = simnet.callReadOnlyFn("counter", "read-count", [], address1);
-    expect(res).toBeUint(1);
+    const count1 = simnet.callReadOnlyFn("counter", "read-count", [], address1);
+    expect(count1.result).toBeOk(Cl.uint(1));
+
+    simnet.callPublicFn("counter", "increment", [Cl.uint(10)], address1);
+    const count2 = simnet.callReadOnlyFn("counter", "read-count", [], address1);
+    expect(count2.result).toBeOk(Cl.uint(11));
   });
 });
 ```
@@ -333,7 +344,7 @@ expect(result).toHaveClarityType(ClarityType.Tuple);
 
 The response type is noted `(response <ok-type> <error-type>)` in Clarity.
 It can be `(ok <ok-type>)` or `(err <error-type>)`.
-They are called composite types, meaning that they contain an other Clarity value.
+They are called composite types, meaning that they contain another Clarity value.
 
 #### `toBeOk(expected: ClarityValue)` <!-- omit from toc -->
 
@@ -364,7 +375,7 @@ expect(increment.result).toBeErr(Cl.uint(500));
 
 The option type is noted `(optional <some-type>)` in Clarity.
 It can be `(some <some-type>)` or `none`.
-Here, `some` is a composite type, meaning that it contains an other Clarity value.
+Here, `some` is a composite type, meaning that it contains another Clarity value.
 
 #### `toBeSome(expected: ClarityValue)` <!-- omit from toc -->
 
