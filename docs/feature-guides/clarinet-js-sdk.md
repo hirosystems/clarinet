@@ -8,7 +8,7 @@ Here is a non-exhaustive list of some of the use-cass:
 - Call public and read-only functions from smart contracts
 - Get clarity maps or data-var values
 - Get contract ABI
-- [Write unit tests for Clarity smart contracts](../feature-guides/clarinet-js-sdk.md)
+- [Write unit tests for Clarity smart contracts](../feature-guides/test-contract-with-clarinet-sdk.md)
 
 ## Getting started with the SDK
 
