@@ -156,7 +156,7 @@ You can refer to the [Clarity language reference](https://docs.stacks.co/docs/cl
 
 ### Testing smart contracts
 
-Smart contracts can best tested with Node.js and Vitest thanks to the clarinet-sdk. See the [testing guide](./how-to-test-contract-with-clarinet-sdk.md) to learn more.
+Smart contracts can best tested with Node.js and Vitest thanks to the clarinet-sdk. See the [testing guide](../feature-guides/test-contract-with-clarinet-sdk.md) to learn more.
 
 > `clarinet test` is now depracated and the recommended way is to use the JS SDK.
 

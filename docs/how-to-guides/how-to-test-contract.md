@@ -3,7 +3,7 @@ title: Test Contract
 ---
 
 > Warning: **`clarinet test` will soon be deprecated in favor of a new way of testing smart contracts.**
-> Follow [this guide](./how-to-test-contract-with-clarinet-sdk.md) to learn how to test smart contract with Vitest and the Clarinet SDK.
+> Follow [this guide](../feature-guides/test-contract-with-clarinet-sdk.md) to learn how to test smart contract with Vitest and the Clarinet SDK.
 
 ---
 
