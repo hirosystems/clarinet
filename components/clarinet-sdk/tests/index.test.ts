@@ -1,4 +1,4 @@
-import { Cl } from "@stacks/transactions";
+import { Cl, ClarityType } from "@stacks/transactions";
 import { describe, expect, it } from "vitest";
 
 // test the built package and not the source code
@@ -7,6 +7,7 @@ import { initSimnet, tx } from "../";
 
 const deployerAddr = "ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM";
 const address1 = "ST1SJ3DTE5DN7X54YDH5D64R3BCB6A2AG2ZQ8YPD5";
+const address2 = "ST2CY5V39NHDPWSXMW9QDT3HC3GD6Q6XX4CFRK9AG";
 
 const manifestPath = "tests/fixtures/Clarinet.toml";
 
@@ -142,6 +143,22 @@ describe("simnet can call contracts function", async () => {
     expect(STX.get(address1)).toStrictEqual(99999998000000n);
     expect(STX.get(`${deployerAddr}.counter`)).toStrictEqual(2000000n);
   });
+
+  it("can pass principals as arguments", async () => {
+    const simnet = await initSimnet(manifestPath);
+
+    const to = Cl.standardPrincipal(address2);
+    const { result } = simnet.callPublicFn("counter", "transfer-100", [to], address1);
+    expect(result).toStrictEqual(Cl.ok(Cl.bool(true)));
+  });
+
+  it("can pass traits as arguments", async () => {
+    const simnet = await initSimnet(manifestPath);
+
+    const trait = Cl.contractPrincipal(simnet.deployer, "multiplier-contract");
+    const { result } = simnet.callPublicFn("counter", "call-multiply", [trait], address1);
+    expect(result).toStrictEqual(Cl.ok(Cl.uint(4)));
+  });
 });
 
 describe("simnet can read contracts data vars and maps", async () => {
@@ -168,11 +185,11 @@ describe("simnet can get contracts info and deploy contracts", async () => {
     const simnet = await initSimnet(manifestPath);
 
     const contractInterfaces = simnet.getContractsInterfaces();
-    expect(contractInterfaces).toHaveLength(1);
+    expect(contractInterfaces).toHaveLength(3);
 
     const counterInterface = contractInterfaces.get(`${deployerAddr}.counter`);
     expect(counterInterface).not.toBeNull();
-    expect(counterInterface?.functions).toHaveLength(4);
+    expect(counterInterface?.functions).toHaveLength(6);
     expect(counterInterface?.variables).toHaveLength(2);
     expect(counterInterface?.maps).toHaveLength(1);
   });
@@ -195,7 +212,7 @@ describe("simnet can get contracts info and deploy contracts", async () => {
 
     const counterAst = simnet.getContractAST(`${deployerAddr}.counter`);
     expect(counterAst).toBeDefined();
-    expect(counterAst.expressions).toHaveLength(7);
+    expect(counterAst.expressions).toHaveLength(10);
 
     const getWithShortAddr = simnet.getContractAST("counter");
     expect(getWithShortAddr).toBeDefined();
@@ -208,7 +225,7 @@ describe("simnet can get contracts info and deploy contracts", async () => {
     expect(res.result).toStrictEqual(Cl.int(42));
 
     const contractInterfaces = simnet.getContractsInterfaces();
-    expect(contractInterfaces).toHaveLength(1);
+    expect(contractInterfaces).toHaveLength(3);
   });
 
   it("can deploy contracts", async () => {
@@ -219,7 +236,7 @@ describe("simnet can get contracts info and deploy contracts", async () => {
     expect(deployRes.result).toStrictEqual(Cl.bool(true));
 
     const contractInterfaces = simnet.getContractsInterfaces();
-    expect(contractInterfaces).toHaveLength(2);
+    expect(contractInterfaces).toHaveLength(4);
 
     const addRes = simnet.callPublicFn("op", "add", [Cl.uint(13), Cl.uint(29)], address1);
     expect(addRes.result).toStrictEqual(Cl.ok(Cl.uint(42)));
@@ -252,6 +269,19 @@ describe("simnet can get contracts info and deploy contracts", async () => {
     const contract3Interface = simnet.getContractsInterfaces().get(`${simnet.deployer}.contract3`)!;
     expect(contract3Interface.epoch).toBe("Epoch20");
     expect(contract3Interface.clarity_version).toBe("Clarity1");
+  });
+});
+
+describe("simnet can transfer stx", () => {
+  it("can transfer stx", async () => {
+    const simnet = await initSimnet(manifestPath);
+
+    simnet.transferSTX(1000, address2, address1);
+    const stxBalances = simnet.getAssetsMap().get("STX");
+    const stxAddress1 = stxBalances?.get(address1);
+    const stxAddress2 = stxBalances?.get(address2);
+    expect(stxAddress1).toBe(99999999999000n);
+    expect(stxAddress2).toBe(100000000001000n);
   });
 });
 
