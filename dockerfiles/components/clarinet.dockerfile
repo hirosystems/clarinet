@@ -2,7 +2,7 @@ FROM debian:bookworm-slim
 
 RUN apt update && apt install -y libssl-dev
 
-RUN rustup update 1.71.0 && rustup default 1.71.0
+RUN rustup update stable && rustup default stable
 
 COPY clarinet /bin/
 
