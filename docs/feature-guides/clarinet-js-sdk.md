@@ -425,7 +425,7 @@ getContractsInterfaces(): Map<string, ContractInterface>
 
 Returns the interfaces of the project contracts.
 It returns a Map of Contracts, the keys are the contract addresses.
-The interfaces contain information such as the ABI, the available functions, data-vars and maps, NFTs, and the FTs defined in the contract.
+The interfaces contain information such as the available functions, data-vars and maps, NFTs, and the FTs defined in the contract.
 It can be used to get the list of the contracts and iterate of it.
 
 ```ts
