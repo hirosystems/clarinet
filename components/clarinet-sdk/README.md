@@ -2,12 +2,14 @@
 
 The Clarinet SDK can be used to interact with the simnet from Node.js.
 
+Find the API references of the SDK in [our documentation](https://docs.hiro.so/clarinet/feature-guides/clarinet-js-sdk).  
+Learn more about unit testing Clarity smart contracts in [this guide](https://docs.hiro.so/clarinet/feature-guides/test-contract-with-clarinet-sdk).
+
 You can use this SDK to:
-- call public and read-only functions from smart contracts
-- get clarity maps or data-var values
-- deploy contracts
-- get contract ABI
-- write unit tests for Clarity smart contracts
+- Call public and read-only functions from smart contracts
+- Get clarity maps or data-var values
+- Get contract interfaces (available functions and data)
+- Write unit tests for Clarity smart contracts
 
 ## Core
 
