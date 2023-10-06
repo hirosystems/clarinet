@@ -49,10 +49,6 @@ debug-assertions = false
 incremental = false
 codegen-units = 256
 
-[profile.dev.build-override]
-inherits = "release"
-opt-level = 3
-
 [package.metadata.wasm-pack.profile.dev]
 wasm-opt = false
 
@@ -63,7 +59,7 @@ dwarf-debug-info = false
 
 # RELEASE
 [profile.release]
-opt-level = 3
+opt-level = "s"
 debug = false
 debug-assertions = false
 lto = true
@@ -71,8 +67,7 @@ incremental = false
 codegen-units = 16
 
 [package.metadata.wasm-pack.profile.release]
-# wasm-opt = false
-wasm-opt = ['-O1']
+wasm-opt = ['-Oz']
 
 [package.metadata.wasm-pack.profile.release.wasm-bindgen]
 debug-js-glue = false

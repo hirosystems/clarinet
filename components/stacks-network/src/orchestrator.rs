@@ -2406,7 +2406,7 @@ events_keys = ["*"]
                 .build()
                 .expect("Unable to build http client");
             http_client
-                .post(node_url.clone())
+                .post(node_url)
                 .timeout(Duration::from_secs(3))
                 .basic_auth(&username, Some(&password))
                 .header("Content-Type", "application/json")

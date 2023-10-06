@@ -77,7 +77,7 @@ jobs:
       - name: Install Rust toolchain
         uses: actions-rs/toolchain@v1
         with:
-          toolchain: 1.71.0
+          toolchain: stable
           profile: minimal
           components: rustfmt
           override: true
@@ -221,7 +221,7 @@ jobs:
       - name: Install Rust toolchain
         uses: actions-rs/toolchain@v1
         with:
-          toolchain: 1.71.0
+          toolchain: stable
           target: ${{ matrix.target }}
           profile: minimal
           components: llvm-tools-preview
@@ -344,20 +344,22 @@ jobs:
         if: matrix.target != 'aarch64-apple-darwin'
         run: cargo test --release --locked --target ${{ matrix.target }}
 
-      - name: Functional Tests (Linux)
-        # can't easily run mac-arm64 tests in GH without native runners for that arch
-        if: matrix.os != 'windows-latest' && matrix.target != 'aarch64-apple-darwin'
-        run: |
-          for testdir in $(ls components/clarinet-cli/examples); do
-            ./target/${{ matrix.target }}/release/clarinet test --manifest-path components/clarinet-cli/examples/${testdir}/Clarinet.toml
-          done
+      # Todo(@hugocaillard): npm test
+      # - name: Functional Tests (Linux)
+      #   # can't easily run mac-arm64 tests in GH without native runners for that arch
+      #   if: matrix.os != 'windows-latest' && matrix.target != 'aarch64-apple-darwin'
+      #   run: |
+      #     for testdir in $(ls components/clarinet-cli/examples); do
+      #       ./target/${{ matrix.target }}/release/clarinet test --manifest-path components/clarinet-cli/examples/${testdir}/Clarinet.toml
+      #     done
 
-      - name: Functional Tests (Windows)
-        if: matrix.os == 'windows-latest'
-        run: |
-          foreach($testdir in Get-ChildItem components/clarinet-cli/examples) {
-            ./target/${{ matrix.target }}/release/clarinet test --manifest-path ${testdir}/Clarinet.toml
-          }
+      # Todo(@hugocaillard): npm test
+      # - name: Functional Tests (Windows)
+      #   if: matrix.os == 'windows-latest'
+      #   run: |
+      #     foreach($testdir in Get-ChildItem components/clarinet-cli/examples) {
+      #       ./target/${{ matrix.target }}/release/clarinet test --manifest-path ${testdir}/Clarinet.toml
+      #     }
 
   dist_stacks_devnet_js:
     name: Build Stacks Devnet JS Distributions
@@ -410,7 +412,7 @@ jobs:
         if: github.event_name != 'pull_request' || matrix.target == 'x86_64-unknown-linux-gnu'
         uses: actions-rs/toolchain@v1
         with:
-          toolchain: 1.71.0
+          toolchain: stable
           target: ${{ matrix.target }}
           profile: minimal
           components: llvm-tools-preview
@@ -522,7 +524,7 @@ jobs:
       - name: Install Rust toolchain
         uses: actions-rs/toolchain@v1
         with:
-          toolchain: 1.71.0
+          toolchain: stable
           target: x86_64-unknown-linux-gnu
           profile: minimal
           components: llvm-tools-preview

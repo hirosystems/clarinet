@@ -10,7 +10,6 @@ use crate::generate::{
 };
 use crate::integrate;
 use crate::lsp::run_lsp;
-use crate::runner::{run_scripts, DeploymentCache};
 
 use clarinet_deployments::onchain::{
     apply_on_chain_deployment, get_initial_transactions_trackers, update_deployment_costs,
@@ -36,10 +35,7 @@ use clarity_repl::clarity::ClarityVersion;
 use clarity_repl::repl::diagnostic::{output_code, output_diagnostic};
 use clarity_repl::repl::{ClarityCodeSource, ClarityContract, ContractDeployer, DEFAULT_EPOCH};
 use clarity_repl::{analysis, repl, Terminal};
-use stacks_network::chainhook_sdk::chainhooks::types::ChainhookFullSpecification;
-use stacks_network::{
-    self, check_chainhooks, load_chainhooks, parse_chainhook_full_specification, DevnetOrchestrator,
-};
+use stacks_network::{self, check_chainhooks, DevnetOrchestrator};
 use std::collections::HashMap;
 use std::fs::{self, File};
 use std::io::prelude::*;
@@ -1212,147 +1208,6 @@ pub fn main() {
             }
             std::process::exit(exit_code);
         }
-        Command::Test(cmd) => {
-            let manifest = load_manifest_or_exit(cmd.manifest_path);
-            let deployment_plan_path = cmd.deployment_plan_path.clone();
-            let cache = build_deployment_cache_or_exit(&manifest, &deployment_plan_path);
-            let cache_location = manifest.project.cache_location.clone();
-            let mut stacks_chainhooks = vec![];
-            let mine_block_delay = cmd.mine_block_delay.unwrap_or(0);
-
-            if cmd.chainhooks.contains(&"*".to_string()) {
-                #[allow(unused_imports)]
-                use stacks_network::chainhook_sdk::chainhook_types::{
-                    BitcoinNetwork, StacksNetwork,
-                };
-                match load_chainhooks(
-                    &manifest.location,
-                    &(BitcoinNetwork::Regtest, StacksNetwork::Devnet),
-                ) {
-                    Ok(ref mut formation) => {
-                        stacks_chainhooks.append(&mut formation.stacks_chainhooks);
-                    }
-                    Err(e) => {
-                        println!("{} unable to load chainhooks - {}", red!("error:"), e);
-                    }
-                };
-            } else {
-                for chainhook_relative_path in cmd.chainhooks.iter() {
-                    let mut chainhook_location = manifest
-                        .location
-                        .get_project_root_location()
-                        .expect("unable to get root location");
-                    chainhook_location
-                        .append_path(chainhook_relative_path)
-                        .expect("unable to build path");
-                    match parse_chainhook_full_specification(&chainhook_location.to_string().into())
-                    {
-                        Ok(hook) => match hook {
-                            ChainhookFullSpecification::Bitcoin(_) => {
-                                println!(
-                                    "{}",
-                                    format_err!(
-                                        "bitcoin chainhooks not supported in test environments"
-                                    )
-                                );
-                                std::process::exit(1);
-                            }
-                            ChainhookFullSpecification::Stacks(hook) => {
-                                let spec = match hook
-                                    .into_selected_network_specification(&stacks_network::chainhook_sdk::chainhook_types::StacksNetwork::Devnet)
-                                {
-                                    Ok(spec) => spec,
-                                    Err(e) => {
-                                        println!(
-                                            "{} unable to load chainhooks ({})",
-                                            red!("error:"),
-                                            e
-                                        );
-                                        std::process::exit(1);
-                                    }
-                                };
-                                stacks_chainhooks.push(spec)
-                            }
-                        },
-                        Err(msg) => {
-                            println!("{} unable to load chainhooks ({})", red!("error:"), msg);
-                            std::process::exit(1);
-                        }
-                    };
-                }
-            }
-
-            let (success, _count) = match run_scripts(
-                cmd.files,
-                cmd.coverage,
-                cmd.costs_report,
-                cmd.watch,
-                true,
-                cmd.allow_disk_read,
-                false,
-                None,
-                None,
-                &manifest,
-                cache,
-                deployment_plan_path,
-                cmd.fail_fast,
-                cmd.filter,
-                cmd.import_map,
-                cmd.allow_net,
-                cache_location,
-                cmd.ts_config,
-                stacks_chainhooks,
-                mine_block_delay,
-            ) {
-                Ok(count) => (true, count),
-                Err((e, count)) => {
-                    println!("{}", format_err!(e.to_string()));
-                    (false, count)
-                }
-            };
-            if hints_enabled {
-                display_tests_pro_tips_hint();
-            }
-            if manifest.project.telemetry {
-                #[cfg(feature = "telemetry")]
-                telemetry_report_event(DeveloperUsageEvent::TestSuiteExecuted(
-                    DeveloperUsageDigest::new(&manifest.project.name, &manifest.project.authors),
-                    success,
-                    _count,
-                ));
-            }
-            if !success {
-                process::exit(1)
-            }
-        }
-        Command::Run(cmd) => {
-            let manifest = load_manifest_or_exit(cmd.manifest_path);
-
-            let cache = build_deployment_cache_or_exit(&manifest, &cmd.deployment_plan_path);
-            let cache_location = manifest.project.cache_location.clone();
-            let _ = run_scripts(
-                vec![cmd.script],
-                None,
-                false,
-                false,
-                cmd.allow_wallets,
-                cmd.allow_disk_read,
-                cmd.allow_disk_write,
-                cmd.allow_run,
-                cmd.allow_env,
-                &manifest,
-                cache,
-                cmd.deployment_plan_path,
-                None,
-                None,
-                None,
-                false,
-                cache_location,
-                None,
-                vec![],
-                0,
-            );
-        }
         Command::Integrate(cmd) => {
             let manifest = load_manifest_or_exit(cmd.manifest_path);
             println!("Computing deployment plan");
@@ -1483,6 +1338,16 @@ pub fn main() {
                 }
             }
         },
+
+        Command::Test(_) => {
+            println!("{} `clarinet test` has been deprecated. Please check this blog post to see learn more <link>", yellow!("warning:"));
+            std::process::exit(1);
+        }
+
+        Command::Run(_) => {
+            println!("{} `clarinet run` has been deprecated. Please check this blog post to see learn more <link>", yellow!("warning:"));
+            std::process::exit(1);
+        }
     };
 }
 
@@ -1746,18 +1611,6 @@ pub fn load_deployment_if_exists(
     } else {
         Some(load_deployment(manifest, &default_deployment_location))
     }
-}
-
-pub fn build_deployment_cache_or_exit(
-    manifest: &ProjectManifest,
-    deployment_plan_path: &Option<String>,
-) -> DeploymentCache {
-    let (deployment, deployment_path, artifacts) =
-        load_deployment_and_artifacts_or_exit(manifest, deployment_plan_path, true, false);
-
-    let cache = DeploymentCache::new(&manifest, deployment, &deployment_path, artifacts);
-
-    cache
 }
 
 fn execute_changes(changes: Vec<Changes>) -> bool {
@@ -2056,45 +1909,6 @@ fn display_post_console_hint() {
     );
 
     println!("{}", yellow!("Find more information on writing contracts with Clarinet here: https://docs.hiro.so/clarinet/how-to-guides/how-to-set-up-local-development-environment#developing-a-clarity-smart-contract"));
-    display_hint_footer();
-}
-
-fn display_tests_pro_tips_hint() {
-    println!("");
-    display_separator();
-    println!(
-        "{}",
-        yellow!("Check out the pro tips to improve your testing process:\n")
-    );
-
-    println!("{}", blue!("  $ clarinet test --watch"));
-    println!(
-        "{}",
-        yellow!("    Watch for file changes an re-run all tests.\n")
-    );
-
-    println!("{}", blue!("  $ clarinet test --costs"));
-    println!(
-        "{}",
-        yellow!("    Run a cost analysis of the contracts covered by tests.\n")
-    );
-
-    println!("{}", blue!("  $ clarinet test --coverage"));
-    println!(
-        "{}",
-        yellow!("    Measure test coverage with the LCOV tooling suite.\n")
-    );
-
-    println!("{}", yellow!("Once you are ready to test your contracts on a local developer network, run the following:\n"));
-
-    println!("{}", blue!("  $ clarinet integrate"));
-    println!(
-        "{}",
-        yellow!("    Deploy all contracts to a local dockerized blockchain setup (Devnet).\n")
-    );
-
-    println!("{}", yellow!("Find more information on testing with Clarinet here: https://docs.hiro.so/clarinet/how-to-guides/how-to-set-up-local-development-environment#testing-with-clarinet"));
-    println!("{}", yellow!("And learn more about local integration testing here: https://docs.hiro.so/clarinet/how-to-guides/how-to-run-integration-environment"));
     display_hint_footer();
 }
 

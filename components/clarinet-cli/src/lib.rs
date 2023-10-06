@@ -22,5 +22,3 @@ pub mod devnet;
 pub mod frontend;
 #[cfg(feature = "cli")]
 pub mod lsp;
-#[cfg(feature = "cli")]
-pub mod runner;

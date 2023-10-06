@@ -11,7 +11,6 @@ pub enum DeveloperUsageEvent {
     NewProject(DeveloperUsageDigest),
     PokeExecuted(DeveloperUsageDigest),
     CheckExecuted(DeveloperUsageDigest),
-    TestSuiteExecuted(DeveloperUsageDigest, bool, usize),
     DevnetExecuted(DeveloperUsageDigest),
     ProtocolPublished(DeveloperUsageDigest, StacksNetwork),
     DebugStarted(DeveloperUsageDigest, u32),
@@ -64,18 +63,6 @@ async fn send_event(event: DeveloperUsageEvent) {
                 "clarinet_version": clarinet_version,
                 "ci_mode": ci_mode,
                 "operating_system": os,
-            }),
-        ),
-        DeveloperUsageEvent::TestSuiteExecuted(digest, success, count) => (
-            "TestSuiteExecuted",
-            json!({
-                "project_id": digest.project_id,
-                "team_id": digest.team_id,
-                "clarinet_version": clarinet_version,
-                "ci_mode": ci_mode,
-                "operating_system": os,
-                "success": success,
-                "count": count,
             }),
         ),
         DeveloperUsageEvent::DevnetExecuted(digest) => (

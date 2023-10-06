@@ -118,13 +118,14 @@ jobs:
       - name: Generate coverage
         run: grcov . --binary-path target/debug/ -s . -t lcov --branch --ignore-not-existing --ignore "/*" -o lcov.info
 
-        # Run functional tests here in addition to the other jobs so we can fail fast
-        # Since these tests are reached much earlier in the pipeline
-      - name: Functional Tests
-        run: |
-          for testdir in $(ls examples); do
-            target/debug/clarinet test --manifest-path examples/${testdir}/Clarinet.toml
-          done
+      # TODO(@hugocaillard): npm test
+      # Run functional tests here in addition to the other jobs so we can fail fast
+      # Since these tests are reached much earlier in the pipeline
+      # - name: Functional Tests
+      #   run: |
+      #     for testdir in $(ls examples); do
+      #       target/debug/clarinet test --manifest-path examples/${testdir}/Clarinet.toml
+      #     done
 
       - name: Upload coverage report
         uses: codecov/codecov-action@v3
@@ -146,8 +147,8 @@ jobs:
         id: set-matrix
         run: |
           branchName=$(echo '${{ github.ref_name }}')
-          dist_matrix=$(jq --arg branchName "$branchName" 'map(. | select((.runOn | contains($branchName)) or (.runOn=="always")))' .github/workflows/config/ci_clarinet_cli_dist_matrix.json)                
-          docker_matrix=$(jq --arg branchName "$branchName" 'map(. | select((.runOn | contains($branchName)) or (.runOn=="always")))' .github/workflows/config/ci_clarinet_cli_docker_matrix.json)                
+          dist_matrix=$(jq --arg branchName "$branchName" 'map(. | select((.runOn | contains($branchName)) or (.runOn=="always")))' .github/workflows/config/ci_clarinet_cli_dist_matrix.json)
+          docker_matrix=$(jq --arg branchName "$branchName" 'map(. | select((.runOn | contains($branchName)) or (.runOn=="always")))' .github/workflows/config/ci_clarinet_cli_docker_matrix.json)
           echo "dist_matrix={\"include\":$(echo $dist_matrix)}" >> $GITHUB_OUTPUT
           echo "docker_matrix={\"include\":$(echo $docker_matrix)}" >> $GITHUB_OUTPUT
 
