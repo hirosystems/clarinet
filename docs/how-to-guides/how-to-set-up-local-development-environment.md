@@ -6,12 +6,13 @@ title: Set up local Development Environment
 
 This article helps you with creating a new project and develop a clarity smart contract.
 
-*Topics covered in this guide*:
+_Topics covered in this guide_:
 
-* [Develop a clarity smart contract](#develop-a-smart-contract)
-* [Test and interact with smart contracts](#testing-with-clarinet)
+- [Develop a clarity smart contract](#develop-a-smart-contract)
+- [Test and interact with smart contracts](#testing-with-clarinet)
 
 ## Develop a smart contract
+
 Once you have installed Clarinet, you can begin a new Clarinet project with the command:
 
 ```sh
@@ -165,6 +166,5 @@ Smart contracts can best tested with Node.js and Vitest thanks to the clarinet-s
 - [Clarinet README](https://github.com/hirosystems/clarinet#clarinet)
 - [clarinet repository](https://github.com/hirosystems/clarinet)
 - [Clarity language reference](https://docs.stacks.co/references/language-functions)
-- [Clarinet JS SDK](https://www.npmjs.com/package/@hirosystems/clarinet-sdk)
+- [Clarinet SDK](https://www.npmjs.com/package/@hirosystems/clarinet-sdk)
 - [Clarity VSCode extension](https://marketplace.visualstudio.com/items?itemName=HiroSystems.clarity-lsp)
-
