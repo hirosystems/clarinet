@@ -1,0 +1,8 @@
+{
+  "rust-analyzer.check.overrideCommand": [
+    "cargo",
+    "check",
+    "--package=clarinet-cli",
+    "--message-format=json"
+  ]
+}
