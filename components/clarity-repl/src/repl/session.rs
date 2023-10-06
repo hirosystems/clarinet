@@ -384,7 +384,7 @@ impl Session {
     ) -> Result<(Vec<String>, ExecutionResult), Vec<String>> {
         let light_red = Colour::Red.bold();
 
-        let result = self.eval(snippet.to_string(), eval_hooks, cost_track);
+        let result = self.eval(snippet.to_string(), eval_hooks, cost_track, false);
         let mut output = Vec::<String>::new();
         let lines = snippet.lines();
         let formatted_lines: Vec<String> = lines.map(|l| l.to_string()).collect();
@@ -470,7 +470,7 @@ impl Session {
 
         let mut tracer = Tracer::new(snippet.to_string());
 
-        match self.eval(snippet.to_string(), Some(vec![&mut tracer]), false) {
+        match self.eval(snippet.to_string(), Some(vec![&mut tracer]), false, false) {
             Ok(_) => (),
             Err(diagnostics) => {
                 let lines = snippet.lines();
@@ -540,7 +540,7 @@ impl Session {
         recipient: &str,
     ) -> Result<ExecutionResult, Vec<Diagnostic>> {
         let snippet = format!("(stx-transfer? u{} tx-sender '{})", amount, recipient);
-        self.eval(snippet.clone(), None, false)
+        self.eval(snippet.clone(), None, false, false)
     }
 
     pub fn deploy_contract(
@@ -574,7 +574,8 @@ impl Session {
             self.interpreter
                 .run_ast(contract, &mut ast, cost_track, Some(hooks))
         } else {
-            self.interpreter.run(contract, cost_track, Some(hooks))
+            self.interpreter
+                .run(contract, cost_track, false, Some(hooks))
         };
 
         match result {
@@ -605,6 +606,7 @@ impl Session {
         method: &str,
         args: &Vec<String>,
         sender: &str,
+        allow_private: bool,
         test_name: String,
     ) -> Result<(ExecutionResult, QualifiedContractIdentifier), Vec<Diagnostic>> {
         let initial_tx_sender = self.get_tx_sender();
@@ -634,7 +636,10 @@ impl Session {
         };
 
         self.set_tx_sender(sender.into());
-        let execution = match self.interpreter.run(&contract_call, true, Some(hooks)) {
+        let execution = match self
+            .interpreter
+            .run(&contract_call, true, allow_private, Some(hooks))
+        {
             Ok(result) => result,
             Err(e) => {
                 self.set_tx_sender(initial_tx_sender);
@@ -663,6 +668,7 @@ impl Session {
         snippet: String,
         eval_hooks: Option<Vec<&mut dyn EvalHook>>,
         cost_track: bool,
+        allow_private: bool,
     ) -> Result<ExecutionResult, Vec<Diagnostic>> {
         let contract = ClarityContract {
             code_source: ClarityCodeSource::ContractInMemory(snippet),
@@ -674,7 +680,9 @@ impl Session {
         let contract_identifier =
             contract.expect_resolved_contract_identifier(Some(&self.interpreter.get_tx_sender()));
 
-        let result = self.interpreter.run(&contract, cost_track, eval_hooks);
+        let result = self
+            .interpreter
+            .run(&contract, cost_track, allow_private, eval_hooks);
 
         match result {
             Ok(result) => {
@@ -942,7 +950,7 @@ impl Session {
             _ => return output.push(red!("Usage: ::encode <expr>")),
         };
 
-        let result = self.eval(snippet.to_string(), None, false);
+        let result = self.eval(snippet.to_string(), None, false, false);
         let value = match result {
             Ok(result) => {
                 let mut tx_bytes = vec![];
@@ -1313,7 +1321,7 @@ mod tests {
         let mut session = Session::new(SessionSettings::default());
         session.update_epoch(StacksEpochId::Epoch20);
         let diags = session
-            .eval("(slice? \"blockstack\" u5 u10)".into(), None, false)
+            .eval("(slice? \"blockstack\" u5 u10)".into(), None, false, false)
             .unwrap_err();
         assert_eq!(
             diags[0].message,
@@ -1321,7 +1329,7 @@ mod tests {
         );
         session.update_epoch(StacksEpochId::Epoch21);
         let res = session
-            .eval("(slice? \"blockstack\" u5 u10)".into(), None, false)
+            .eval("(slice? \"blockstack\" u5 u10)".into(), None, false, false)
             .unwrap();
         let res = match res.result {
             EvaluationResult::Contract(_) => unreachable!(),

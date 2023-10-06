@@ -270,7 +270,8 @@ pub fn update_deployment_costs(
                         .parameters
                         .iter()
                         .map(|value| {
-                            let execution = session.eval(value.to_string(), None, false).unwrap();
+                            let execution =
+                                session.eval(value.to_string(), None, false, false).unwrap();
                             match execution.result {
                                 EvaluationResult::Snippet(result) => result.result,
                                 _ => unreachable!("Contract result from snippet"),
@@ -511,7 +512,7 @@ pub fn apply_on_chain_deployment(
 
                     let mut function_args = vec![];
                     for value in tx.parameters.iter() {
-                        let execution = match session.eval(value.to_string(), None, false) {
+                        let execution = match session.eval(value.to_string(), None, false, false) {
                             Ok(res) => res,
                             Err(_e) => {
                                 let _ = deployment_event_tx.send(DeploymentEvent::Interrupted(

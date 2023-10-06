@@ -159,6 +159,13 @@ describe("simnet can call contracts function", async () => {
     const { result } = simnet.callPublicFn("counter", "call-multiply", [trait], address1);
     expect(result).toStrictEqual(Cl.ok(Cl.uint(4)));
   });
+
+  it.only("call private function", async () => {
+    const simnet = await initSimnet(manifestPath);
+    console.dir(simnet.getContractsInterfaces(), { depth: null });
+    const { result } = simnet.callPrivateFn("counter", "reset-count", [], address1);
+    console.log("result", result);
+  });
 });
 
 describe("simnet can read contracts data vars and maps", async () => {
@@ -189,7 +196,7 @@ describe("simnet can get contracts info and deploy contracts", async () => {
 
     const counterInterface = contractInterfaces.get(`${deployerAddr}.counter`);
     expect(counterInterface).not.toBeNull();
-    expect(counterInterface?.functions).toHaveLength(6);
+    expect(counterInterface?.functions).toHaveLength(7);
     expect(counterInterface?.variables).toHaveLength(2);
     expect(counterInterface?.maps).toHaveLength(1);
   });
@@ -212,7 +219,7 @@ describe("simnet can get contracts info and deploy contracts", async () => {
 
     const counterAst = simnet.getContractAST(`${deployerAddr}.counter`);
     expect(counterAst).toBeDefined();
-    expect(counterAst.expressions).toHaveLength(10);
+    expect(counterAst.expressions).toHaveLength(11);
 
     const getWithShortAddr = simnet.getContractAST("counter");
     expect(getWithShortAddr).toBeDefined();

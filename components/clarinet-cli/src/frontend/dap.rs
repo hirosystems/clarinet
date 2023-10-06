@@ -41,7 +41,7 @@ pub fn run_dap() -> Result<(), String> {
             }
 
             // Begin execution of the expression in debug mode
-            match session.eval(expression.clone(), Some(vec![&mut dap]), false) {
+            match session.eval(expression.clone(), Some(vec![&mut dap]), false, false) {
                 Ok(_result) => Ok(()),
                 Err(_diagnostics) => Err("unable to interpret expression".to_string()),
             }

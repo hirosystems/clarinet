@@ -493,6 +493,7 @@ impl SDK {
     fn invoke_contract_call(
         &mut self,
         call_contract_args: &CallContractArgs,
+        allow_private: bool,
         test_name: &str,
     ) -> Result<TransactionRes, String> {
         let CallContractArgs {
@@ -510,6 +511,7 @@ impl SDK {
             method,
             &clarity_args,
             sender,
+            allow_private,
             test_name.into(),
         ) {
             Ok(res) => res,
@@ -538,16 +540,20 @@ impl SDK {
             return Err(format!("{} is not a read-only function", &args.method));
         }
 
-        self.invoke_contract_call(args, &self.current_test_name.clone())
+        self.invoke_contract_call(args, false, &self.current_test_name.clone())
     }
 
-    fn call_public_fn_private(
+    fn call_fn_internal(
         &mut self,
         args: &CallContractArgs,
+        allow_private: bool,
         advance_chain_tip: bool,
     ) -> Result<TransactionRes, String> {
         let interface = self.get_function_interface(&args.contract, &args.method)?;
-        if interface.access != ContractInterfaceFunctionAccess::public {
+        if allow_private && interface.access != ContractInterfaceFunctionAccess::private {
+            return Err(format!("{} is not a private function", &args.method));
+        }
+        if !allow_private && interface.access != ContractInterfaceFunctionAccess::public {
             return Err(format!("{} is not a public function", &args.method));
         }
 
@@ -555,11 +561,11 @@ impl SDK {
         if advance_chain_tip {
             session.advance_chain_tip(1);
         }
-
-        self.invoke_contract_call(args, &self.current_test_name.clone())
+        log!("allow private {}", allow_private);
+        self.invoke_contract_call(args, allow_private, &self.current_test_name.clone())
     }
 
-    fn transfer_stx_private(
+    fn transfer_stx_internal(
         &mut self,
         args: &TransferSTXArgs,
         advance_chain_tip: bool,
@@ -586,7 +592,7 @@ impl SDK {
         Ok(execution_result_to_transaction_res(&execution))
     }
 
-    fn deploy_contract_private(
+    fn deploy_contract_internal(
         &mut self,
         args: &DeployContractArgs,
         advance_chain_tip: bool,
@@ -631,17 +637,22 @@ impl SDK {
 
     #[wasm_bindgen(js_name=deployContract)]
     pub fn deploy_contract(&mut self, args: &DeployContractArgs) -> Result<TransactionRes, String> {
-        self.deploy_contract_private(args, true)
+        self.deploy_contract_internal(args, true)
     }
 
     #[wasm_bindgen(js_name = "transferSTX")]
     pub fn transfer_stx(&mut self, args: &TransferSTXArgs) -> Result<TransactionRes, String> {
-        self.transfer_stx_private(args, true)
+        self.transfer_stx_internal(args, true)
     }
 
     #[wasm_bindgen(js_name = "callPublicFn")]
     pub fn call_public_fn(&mut self, args: &CallContractArgs) -> Result<TransactionRes, String> {
-        self.call_public_fn_private(args, true)
+        self.call_fn_internal(args, false, true)
+    }
+
+    #[wasm_bindgen(js_name = "callPrivateFn")]
+    pub fn call_private_fn(&mut self, args: &CallContractArgs) -> Result<TransactionRes, String> {
+        self.call_fn_internal(args, true, true)
     }
 
     #[wasm_bindgen(js_name=mineBlock)]
@@ -654,11 +665,11 @@ impl SDK {
 
         for tx in txs {
             let result = if let Some(args) = tx.call_public_fn {
-                self.call_public_fn_private(&CallContractArgs::from_json_args(args), false)
+                self.call_fn_internal(&CallContractArgs::from_json_args(args), false, false)
             } else if let Some(transfer_stx) = tx.transfer_stx {
-                self.transfer_stx_private(&transfer_stx, false)
+                self.transfer_stx_internal(&transfer_stx, false)
             } else if let Some(deploy_contract) = tx.deploy_contract {
-                self.deploy_contract_private(&deploy_contract, false)
+                self.deploy_contract_internal(&deploy_contract, false)
             } else {
                 return Err("Invalid tx arguments".into());
             }?;

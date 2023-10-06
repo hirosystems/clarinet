@@ -48,3 +48,8 @@
 (define-public (transfer-100 (to principal))
   (stx-transfer? u100 tx-sender to)
 )
+
+
+(define-private (reset-count)
+  (var-set count u0)
+)

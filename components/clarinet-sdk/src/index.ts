@@ -105,7 +105,7 @@ type GetContractsInterfaces = () => Map<string, ContractInterface>;
 
 // because the session is wrapped in a proxy the types need to be hardcoded
 export type Simnet = {
-  [K in keyof SDK]: K extends "callReadOnlyFn" | "callPublicFn"
+  [K in keyof SDK]: K extends "callReadOnlyFn" | "callPublicFn" | "callPrivateFn"
     ? CallFn
     : K extends "deployContract"
     ? DeployContract
@@ -156,7 +156,7 @@ const getSessionProxy = () => ({
     // - serialize clarity values input argument
     // - deserialize output into clarity values
 
-    if (prop === "callReadOnlyFn" || prop === "callPublicFn") {
+    if (prop === "callReadOnlyFn" || prop === "callPublicFn" || prop === "callPrivateFn") {
       const callFn: CallFn = (contract, method, args, sender) => {
         const response = session[prop](
           new CallContractArgs(

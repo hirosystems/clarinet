@@ -188,6 +188,7 @@ pub fn update_session_with_contracts_executions(
                         &tx.method.to_string(),
                         &tx.parameters,
                         &tx.emulated_sender.to_string(),
+                        false,
                         "deployment".to_string(),
                     );
                 }

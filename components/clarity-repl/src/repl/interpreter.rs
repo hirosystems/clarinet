@@ -133,6 +133,7 @@ impl ClarityInterpreter {
         &mut self,
         contract: &ClarityContract,
         cost_track: bool,
+        allow_private: bool,
         eval_hooks: Option<Vec<&mut dyn EvalHook>>,
     ) -> Result<ExecutionResult, Vec<Diagnostic>> {
         let (mut ast, mut diagnostics, success) = self.build_ast(contract);
@@ -156,7 +157,14 @@ impl ClarityInterpreter {
             return Err(diagnostics);
         }
 
-        let mut result = match self.execute(&contract, &mut ast, analysis, cost_track, eval_hooks) {
+        let mut result = match self.execute(
+            &contract,
+            &mut ast,
+            analysis,
+            cost_track,
+            allow_private,
+            eval_hooks,
+        ) {
             Ok(result) => result,
             Err((_, Some(diagnostic), _)) => {
                 diagnostics.push(diagnostic);
@@ -203,7 +211,8 @@ impl ClarityInterpreter {
             };
         diagnostics.append(&mut analysis_diagnostics);
 
-        let mut result = match self.execute(contract, ast, analysis, cost_track, eval_hooks) {
+        let mut result = match self.execute(contract, ast, analysis, cost_track, false, eval_hooks)
+        {
             Ok(result) => result,
             Err((_, Some(diagnostic), _)) => {
                 diagnostics.push(diagnostic);
@@ -448,6 +457,7 @@ impl ClarityInterpreter {
         contract_ast: &mut ContractAST,
         contract_analysis: ContractAnalysis,
         cost_track: bool,
+        allow_private: bool,
         eval_hooks: Option<Vec<&mut dyn EvalHook>>,
     ) -> Result<ExecutionResult, (String, Option<Diagnostic>, Option<Error>)> {
         let mut cost = None;
@@ -529,12 +539,21 @@ impl ClarityInterpreter {
                                     let evaluated_arg = eval(arg, &mut env, &context)?;
                                     args.push(SymbolicExpression::atom_value(evaluated_arg));
                                 }
-                                let res = env.execute_contract(
-                                    &contract_identifier,
-                                    &method,
-                                    &args,
-                                    false,
-                                )?;
+                                let res = if allow_private {
+                                    env.execute_contract_allow_private(
+                                        &contract_identifier,
+                                        &method,
+                                        &args,
+                                        false,
+                                    )?
+                                } else {
+                                    env.execute_contract(
+                                        &contract_identifier,
+                                        &method,
+                                        &args,
+                                        false,
+                                    )?
+                                };
                                 Ok(Some(res))
                             }
                             _ => eval(&contract_ast.expressions[0], &mut env, &context)
