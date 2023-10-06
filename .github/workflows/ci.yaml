@@ -344,20 +344,22 @@ jobs:
         if: matrix.target != 'aarch64-apple-darwin'
         run: cargo test --release --locked --target ${{ matrix.target }}
 
-      - name: Functional Tests (Linux)
-        # can't easily run mac-arm64 tests in GH without native runners for that arch
-        if: matrix.os != 'windows-latest' && matrix.target != 'aarch64-apple-darwin'
-        run: |
-          for testdir in $(ls components/clarinet-cli/examples); do
-            ./target/${{ matrix.target }}/release/clarinet test --manifest-path components/clarinet-cli/examples/${testdir}/Clarinet.toml
-          done
+      # Todo(@hugocaillard): npm test
+      # - name: Functional Tests (Linux)
+      #   # can't easily run mac-arm64 tests in GH without native runners for that arch
+      #   if: matrix.os != 'windows-latest' && matrix.target != 'aarch64-apple-darwin'
+      #   run: |
+      #     for testdir in $(ls components/clarinet-cli/examples); do
+      #       ./target/${{ matrix.target }}/release/clarinet test --manifest-path components/clarinet-cli/examples/${testdir}/Clarinet.toml
+      #     done
 
-      - name: Functional Tests (Windows)
-        if: matrix.os == 'windows-latest'
-        run: |
-          foreach($testdir in Get-ChildItem components/clarinet-cli/examples) {
-            ./target/${{ matrix.target }}/release/clarinet test --manifest-path ${testdir}/Clarinet.toml
-          }
+      # Todo(@hugocaillard): npm test
+      # - name: Functional Tests (Windows)
+      #   if: matrix.os == 'windows-latest'
+      #   run: |
+      #     foreach($testdir in Get-ChildItem components/clarinet-cli/examples) {
+      #       ./target/${{ matrix.target }}/release/clarinet test --manifest-path ${testdir}/Clarinet.toml
+      #     }
 
   dist_stacks_devnet_js:
     name: Build Stacks Devnet JS Distributions
