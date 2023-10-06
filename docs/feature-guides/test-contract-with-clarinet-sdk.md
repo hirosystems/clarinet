@@ -1,5 +1,5 @@
 ---
-title: Test Contract with clarinet-sdk
+title: Unit tests with the Clarinet SDK
 ---
 
 The [Clarinet SDK](https://www.npmjs.com/package/@hirosystems/clarinet-sdk) allows to write unit tests for your Clarity smart contract.  
