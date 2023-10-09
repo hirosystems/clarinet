@@ -1,9 +1,8 @@
 ---
-title: Unit tests with the Clarinet SDK
+title: Unit Tests With the Clarinet SDK
 ---
 
-The [Clarinet SDK](https://www.npmjs.com/package/@hirosystems/clarinet-sdk) allows to write unit tests for your Clarity smart contract.  
-You can theoritically use any JavaScript test framework, but the SDK supports [Vitest](https://vitest.dev/) out of the box.
+The [Clarinet SDK](https://www.npmjs.com/package/@hirosystems/clarinet-sdk) allows you to write unit tests for your Clarity smart contracts. You can theoritically use any JavaScript test framework, but the SDK supports [Vitest](https://vitest.dev/) out of the box.
 
 > Make sure you are using the latest version of Clarinet to follow this guide. See the [getting started](../getting-started.md) guide to know more.
 
@@ -15,11 +14,11 @@ The SDK requires Node.js >= 18.0 and NPM to be installed. [Volta](https://volta.
 
 To follow this tutorial, you must have the Clarinet CLI installed as well.
 
-## Set up the Clarity contract and unit tests
+## Set Up the Clarity Contract and Unit Tests
 
 Let us consider a `counter` smart contract to understand how to write unit tests for our application requirements.
 
-Create a new Clarinet project with a `counter` contract.
+First, create a new Clarinet project with a `counter` contract.
 
 ```console
 clarinet new counter
@@ -27,7 +26,7 @@ cd counter
 clarinet contract new counter
 ```
 
-And this will be the content of our smart contract.
+Below will be the content of our smart contract.
 It keeps track of an initialized value, allows for incrementing and decrementing, and prints actions as a log.
 
 ```clarity
@@ -55,25 +54,25 @@ It keeps track of an initialized value, allows for incrementing and decrementing
 )
 ```
 
-### Migrating between Clarinet 1 and Clarinet 2
+### Migrating Between Clarinet v1 and Clarinet v2
 
-> Note: Clarinet 2 will be released in October 2023, and will create the right boilerplate files. But if a project has been created with Clarinet 1, the following script prepares the project to run the SDK and Vitest.
+> Note: Clarinet v2 will be released in October 2023, and will create the right boilerplate files. But if a project has been created with Clarinet v1, the following script prepares the project to run the SDK and Vitest.
 
-Executing this script in a Clarinet 1 project will initialise NPM and Vitest. It will also create a sample test file.
+Executing this script in a Clarinet v1 project will initialise NPM and Vitest. It will also create a sample test file.
 
 ```console
 npx @hirosystems/clarinet-sdk@latest
 ```
 
-This script will ask you if you want to run npm install now, you can press enter to do so.
-It can take a few seconds.
+This script will ask you if you want to run npm install now; you can press enter to do so.
+This can take a few seconds.
 
 The file `tests/counter_test.ts` that was created by `clarinet contract new counter` can be deleted.
 
-You can have a look at `tests/contract.test.ts`, it's a sample file showing how to use the SDK with Vitest.
+You can also have a look at `tests/contract.test.ts`. It's a sample file showing how to use the SDK with Vitest.
 It can safely be deleted.
 
-### Unit tests for `counter` example
+### Unit Tests for `counter` Example
 
 Create a file `tests/counter.test.ts` with the following content:
 
@@ -123,22 +122,22 @@ describe("test `increment` public function", () => {
 });
 ```
 
-To run the test, go back to your console and run the `npm test` command. It should display a report telling that tests succeeded.
+To run the test, go back to your console and run the `npm test` command. It should display a report telling you that tests succeeded.
 
 ```sh
 npm test
 ```
 
-There is a very important thing happening under the hood. The `simnet` object is available globally in the tests, and is automatically initialized before each test.
+There is a very important thing happening under the hood here. The `simnet` object is available globally in the tests, and is automatically initialized before each test.
 
-> You don't need to know much more about that, but if you want to know in details how it works, you can have a look at the `vitest.config.js` file at the root of you project.
+> You don't need to know much more about that, but if you want to know in detail how it works, you can have a look at the `vitest.config.js` file at the root of you project.
 
-We just implement two tests:
+Getting back to the tests, we just implemented two of them:
 
-- The first one checks that the `increment` function returns the new value and saves it to the `count` variable.
-- The second one checks that an `print_event` is emitted when the increment function is called.
+- The first test checks that the `increment` function returns the new value and saves it to the `count` variable.
+- The second test checks that an `print_event` is emitted when the increment function is called.
 
-> You can use `Cl.prettyPrint(value: ClarityValue)` to format any Clarity value into readable Clarity code. It can be useful to debug functions results or events values.
+> You can use `Cl.prettyPrint(value: ClarityValue)` to format any Clarity value into readable Clarity code. It can be useful to debug function results or event values.
 
 Note that we are importing `describe`, `expect` and `it` from Vitest.
 
@@ -150,7 +149,7 @@ You can learn more about Vitest on their [website](https://vitest.dev).
 We also implemented some custom matchers to make assertions on Clarity variables (like `toBeUint`).
 The [full list of custom matchers](#custom-vitest-matchers) is available at the end of this guide.
 
-### Comprehensive unit tests for `counter`
+### Comprehensive Unit Tests for `counter`
 
 Let us now write a higher coverage test suite by testing the `decrement` and `get-counter` functions.
 
@@ -211,9 +210,9 @@ describe("test `get-count` read only function", () => {
 });
 ```
 
-## Measure and increase code coverage
+## Measure and Increase Code Coverage
 
-To help developers maximizing their test coverage, the test framework can produce a `lcov` report, using `--coverage` flag. You can set it in the scripts in the project `package.json`:
+To help developers maximize their test coverage, the test framework can produce a `lcov` report, using `--coverage` flag. You can set it in the scripts in the project `package.json`:
 
 ```json
   "scripts": {
@@ -222,7 +221,7 @@ To help developers maximizing their test coverage, the test framework can produc
   },
 ```
 
-And run the script with the following command. It will produce a file named `./lcov.info`.
+Then run the script with the following command. It will produce a file named `./lcov.info`.
 
 ```sh
 npm run test:coverage
@@ -236,11 +235,11 @@ genhtml --branch-coverage -o coverage lcov.info
 open coverage/index.html
 ```
 
-## Costs optimization
+## Costs Optimization
 
-The test framework can also be used to optimize costs. When you execute a test suite, Clarinet keeps track of all costs being computed when executing the `contract-call`, and display the most expensive ones in a table:
+The test framework can also be used to optimize costs. When you execute a test suite, Clarinet keeps track of all costs being computed when executing the `contract-call`, and displays the most expensive ones in a table.
 
-To help developers maximizing their test coverage, the test framework can produce a `lcov` report, using `--coverage` flag. You can set it in the scripts in the project `package.json`:
+To help developers maximize their test coverage, the test framework can produce a `lcov` report, using `--coverage` flag. You can set it in the scripts in the project `package.json`:
 
 ```json
   "scripts": {
@@ -255,9 +254,9 @@ And run the script with the following command. It will produce a file named `./c
 npm run test:costs
 ```
 
-For now, there isn't much you can do out of the box with costs reports. But in future version of the clarinet sdk, we will implement features to help keep track on your costs, such as checking that function calls do not go above a certain threshold.
+For now, there isn't much you can do out of the box with a costs report. But in future versions of the clarinet sdk, we will implement features to help keep track of your costs, such as checking that function calls do not go above a certain threshold.
 
-## Produce both coverage and costs reports.
+## Produce Both Coverage and Costs Reports
 
 In your package.json, you should already have a script called `test:reports` like so:
 
@@ -274,11 +273,11 @@ Run it to produce both the coverage and the costs reports:
 npm run test:reports
 ```
 
-## Run tests in CI
+## Run Tests in CI
 
-Because the tests only require Node.js and NPM run, it can be ran in GitHub actions and CIs just like any other Node tests.
+Because the tests only require Node.js and NPM run, they can also be run in GitHub actions and CIs just like any other Node test.
 
-In GitHub, you can directly set up a Node.js workflow like this one
+In GitHub, you can directly set up a Node.js workflow like this one:
 
 ```yml
 name: Test counter contract
@@ -307,16 +306,16 @@ jobs:
       - run: npm run test:reports
 ```
 
-## Custom Vitest matchers
+## Custom Vitest Matchers
 
 A set of Vitest matchers can be used to make assertions on Clarity values.
-It makes it to check the return values of contracts, ensure that the value is actually a Clarity value, and providing nice error messages.
+They can check the return values of contracts, ensure that the value is actually a Clarity value, and provide nice error messages.
 
-### Check clarity type
+### Check Clarity Type
 
 #### `toHaveClarityType(expectedType: ClarityType)` <!-- omit from toc -->
 
-This matcher can be used to make sure that the value has the right Clarity Type, without checking it's value.
+This matcher can be used to make sure that the value has the right Clarity Type, without checking its value.
 
 ```ts
 import { ClarityType } from "@stacks/transactions";
@@ -332,7 +331,7 @@ it("ensures <increment> adds 1", () => {
 });
 ```
 
-It can be used to check any type
+It can also be used to check any type:
 
 ```ts
 // uint
@@ -344,7 +343,7 @@ expect(result).toHaveClarityType(ClarityType.Tuple);
 // and so one
 ```
 
-### Response type
+### Response Type
 
 The response type is noted `(response <ok-type> <error-type>)` in Clarity.
 It can be `(ok <ok-type>)` or `(err <error-type>)`.
@@ -385,7 +384,7 @@ const increment = simnet.callPublicFn(
 expect(increment.result).toBeErr(Cl.uint(500));
 ```
 
-### Optional type
+### Optional Type
 
 The option type is noted `(optional <some-type>)` in Clarity.
 It can be `(some <some-type>)` or `none`.
@@ -423,7 +422,7 @@ const getMessage = simnet.callPublicFn(
 expect(getMessage.result).toBeNone();
 ```
 
-### Simple clarity types
+### Simple Clarity Types
 
 Custom assertion matchers are available for all types of Clarity values. They will check that the value has the right type and value.
 
@@ -510,7 +509,7 @@ it.only("can assert buffer values", () => {
 });
 ```
 
-### Other composite types
+### Other Composite Types
 
 `list` and `tuple` are composite types, like `ok`, `err`, and `some`. Meanning that they contain another Clarity value.
 
@@ -536,9 +535,8 @@ it("can assert list values", () => {
 
 #### `toBeTuple(expected: Record<string, ClarityValue>)` <!-- omit from toc -->
 
-Check that the value is a `tuple`, it takes a JavaScript object to check the values.  
-It's used in the [tutorial above](#unit-tests-for-counter-example) to check the value of the print event.
-It can also be used to check function call result.
+Check that the value is a `tuple`, it takes a JavaScript object to check the values. It's used in the [tutorial above](#unit-tests-for-counter-example) to check the value of the print event. It can also be used to check function call result.
+
 The snippet below shows that composite types can be nested:
 
 ```ts
