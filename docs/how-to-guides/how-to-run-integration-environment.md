@@ -8,12 +8,6 @@ DevNet allows you to perform frontend development and integration testing withou
 
 The services launched by DevNet represent a full instance of the Stacks blockchain with the Proof of Transfer consensus mechanism running against a locally running Bitcoin testnet. DevNet allows you to control block times, PoX transactions, and contract deployments. Because DevNet is running locally, it can be reset or reconfigured anytime. This allows for rapid frontend development without interacting with the public blockchain.
 
-*Topics covered in this guide*:
-
-* [Launch Clarinet with Devnet](#launching-devnet)
-* [Configure accounts](#accounts-configuration)
-* [Configure blockchain](#blockchain-configuration)
-* [Stacking on Devnet](#stacking-orders)
 
 ## Prerequisites
 
@@ -79,7 +73,7 @@ the latest development images for each of the Stacks and Bitcoin nodes. These pa
 > The default value is used if any of the parameters are not supplied in the configuration file.
 
 
-- `pox_stacking_orders`: defined by [stacking orders](../../smart-contracts/devnet.md#stacking-orders) headings later in the file
+- `pox_stacking_orders`: defined by stacking orders headings later in the file
 - `orchestrator_port`: the port number for the Bitcoin orchestrator service
 - `bitcoin_node_p2p_port`: the port number for Bitcoin P2P network traffic
 - `bitcoin_node_rpc_port`: the port number for Bitcoin RPC network traffic
@@ -115,7 +109,7 @@ the latest development images for each of the Stacks and Bitcoin nodes. These pa
 
 You can configure any of the wallets in the DevNet to participate in stacking to exercise the PoX contract within DevNet. This can be useful if you are developing a contract that interacts with the PoX contract and you need to set specific test conditions.
 
-Each [stacking order](../../smart-contracts/devnet.md#stacking-orders) is defined under the heading `[devnet.pox_stacking_orders]`. This heading is repeated for as many stacking orders that are necessary for your configuration.
+Each stacking order is defined under the heading `[devnet.pox_stacking_orders]`. This heading is repeated for as many stacking orders that are necessary for your configuration.
 
 - `start_at_cycle`: the stacking cycle that the wallet should start participating in. The wallet's stacking order occurs at the block preceding the beginning of that cycle.
 - `duration`: the stacking duration for the stacking cycle
@@ -125,6 +119,6 @@ Each [stacking order](../../smart-contracts/devnet.md#stacking-orders) is define
 
 For more information, you can refer to the following links:
 
-- [clarinet installed](/smart-contracts/clarinet#installing-clarinet)
+- [clarinet installed](../getting-started.md)
 - [docker documentation](https://docs.docker.com/get-docker/)
 
