@@ -9,24 +9,6 @@ You can theoritically use any JavaScript test framework, but the SDK supports [V
 
 > Take a look at the [API reference guide](../feature-guides/clarinet-js-sdk.md) for more information about the methods and elements of the clarinet-sdk.
 
-_Topics covered in this guide_:
-
-- [Requirements](#requirements)
-- [Set up the Clarity contract and unit tests](#set-up-the-clarity-contract-and-unit-tests)
-  - [Migrating between Clarinet 1 and Clarinet 2](#migrating-between-clarinet-1-and-clarinet-2)
-  - [Unit tests for `counter` example](#unit-tests-for-counter-example)
-  - [Comprehensive unit tests for `counter`](#comprehensive-unit-tests-for-counter)
-- [Measure and increase code coverage](#measure-and-increase-code-coverage)
-- [Costs optimization](#costs-optimization)
-- [Produce both coverage and costs reports.](#produce-both-coverage-and-costs-reports)
-- [Run tests in CI](#run-tests-in-ci)
-- [Custom Vitest matchers](#custom-vitest-matchers)
-  - [Check clarity type](#check-clarity-type)
-  - [Response type](#response-type)
-  - [Optional type](#optional-type)
-  - [Simple clarity types](#simple-clarity-types)
-  - [Other composite types](#other-composite-types)
-
 ## Requirements
 
 The SDK requires Node.js >= 18.0 and NPM to be installed. [Volta](https://volta.sh/) is a great tool to install and manage JS tooling.
@@ -53,7 +35,7 @@ It keeps track of an initialized value, allows for incrementing and decrementing
 (define-data-var count uint u1)
 
 (define-public (increment (step uint))
-  (let ((new-val (+ step (var-get count))))
+  (let ((new-val (+ (var-get count) step)))
     (var-set count new-val)
     (print { object: "count", action: "incremented", value: new-val })
     (ok new-val)
@@ -61,7 +43,7 @@ It keeps track of an initialized value, allows for incrementing and decrementing
 )
 
 (define-public (decrement (step uint))
-  (let ((new-val (- step (var-get count))))
+  (let ((new-val (- (var-get count) step)))
     (var-set count new-val)
     (print { object: "count", action: "decremented", value: new-val })
     (ok new-val)
