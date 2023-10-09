@@ -132,7 +132,7 @@ There is a very important thing happening under the hood here. The `simnet` obje
 
 > You don't need to know much more about that, but if you want to know in detail how it works, you can have a look at the `vitest.config.js` file at the root of you project.
 
-Getting back to the tests, we just implement two of them:
+Getting back to the tests, we just implemented two of them:
 
 - The first test checks that the `increment` function returns the new value and saves it to the `count` variable.
 - The second test checks that an `print_event` is emitted when the increment function is called.
