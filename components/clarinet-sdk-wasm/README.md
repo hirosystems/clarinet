@@ -3,7 +3,10 @@
 This package is built with wasm-pack.  
 It powers [@hirosystems/clarinet-sdk](https://www.npmjs.com/package/@hirosystems/clarinet-sdk).
 
-## Build
+
+## Contributing
+
+### Build package
 
 Install [wasm-pack](https://rustwasm.github.io/wasm-pack/installer/).
 
