@@ -58,7 +58,8 @@ const simnet = await initSimnet("./path/to/Clarinet.toml");
 initSimnet(manifestPath?: string): Promise<Simnet>
 ```
 
-The `initSimnet` function takes the manifest path (`Clarinet.toml`) as an optional argument. By default, it'll look for a manifest in the current working directory. It will often be the first function to call when using the SDK.
+The `initSimnet` function takes the manifest path (`Clarinet.toml`) as an optional argument. By default, it'll look for a manifest in the current working directory.
+It will often be the first function to call when using the SDK.
 
 ```ts
 import { initSimnet } from "@hirosystems/clarinet-sdk";
