@@ -1,21 +1,21 @@
 # Clarinet SDK
 
-The Clarinet SDK is a JavaScript library to spawn and interact with a simulated Clarinet environment, also known as simnet.
+The Clarinet SDK is a JavaScript library that spawns and interacts with a simulated Clarinet environment, also known as "simnet."
 
-A Simnet is a simulated network that simulates the Stacks blockchain and runs the Clarity VM, without the need for actual Stacks and Bitcoin nodes (unlike Devnet, Testnet and Mainnet).
+A Simnet is a simulated network that mimics the Stacks blockchain and runs the Clarity VM, without the need for actual Stacks and Bitcoin nodes (unlike Devnet, Testnet and Mainnet).
 
-Here is a non-exhaustive list of some of the use-cass:
+Here is a non-exhaustive list of some of simnet's use-cases:
 
 - Call public and read-only functions from smart contracts
 - Get clarity maps or data-var values
 - Get contract interfaces (available functions and data)
 - [Write unit tests for Clarity smart contracts](../feature-guides/test-contract-with-clarinet-sdk.md)
 
-## Getting started with the SDK
+## Getting Started With the SDK
 
 > The SDK requires Node.js >= 18.0 and NPM to be installed. [Volta](https://volta.sh/) is a great tool to install and manage JS tooling.
 
-The SDK can be installed with NPM. It works in pair with Stacks.js so let's install it as well.
+The SDK can be installed with NPM. It works in pair with Stacks.js, so let's install it as well.
 
 ```sh
 npm install @hirosystems/clarinet-sdk @stacks/transactions
@@ -43,14 +43,14 @@ async function main() {
 main();
 ```
 
-By default, the SDK will look for a Clarinet.toml file in the current working directory.  
+By default, the SDK will look for a Clarinet.toml file in the current working directory.
 It's also possible to provide the path to the manifest like so:
 
 ```ts
 const simnet = await initSimnet("./path/to/Clarinet.toml");
 ```
 
-## API references
+## API References
 
 ### `initSimnet`
 
@@ -58,7 +58,7 @@ const simnet = await initSimnet("./path/to/Clarinet.toml");
 initSimnet(manifestPath?: string): Promise<Simnet>
 ```
 
-The `initSimnet` function takes the manifest path (`Clarinet.toml`) as an optional argument. By default, it'll look for a manifest in the current working directory.  
+The `initSimnet` function takes the manifest path (`Clarinet.toml`) as an optional argument. By default, it'll look for a manifest in the current working directory.
 It will often be the first function to call when using the SDK.
 
 ```ts
@@ -69,7 +69,7 @@ const simnet = await initSimnet();
 const simnet = await initSimnet("./clarity/Clarinet.toml");
 ```
 
-### Simnet properties
+### Simnet Properties
 
 #### `Simnet.blockHeight`
 
@@ -93,7 +93,7 @@ const simnet = await initSimnet();
 console.log(simnet.deployer); // ST1P...GZGM
 ```
 
-### Simnet methods
+### Simnet Methods
 
 #### `Simnet.getAccounts()`
 
@@ -118,7 +118,7 @@ console.log(address1); // ST1S...YPD5
 getAssetsMap(): Map<string, Map<string, bigint>>
 ```
 
-Get a list of assets balances by Stacks addresses. It returns STX balances as well as FTs and NFTs.
+Get a list of asset balances by Stacks addresses. This method returns STX balances as well as FT and NFT balances.
 
 ```ts
 import { initSimnet } from "@hirosystems/clarinet-sdk";
@@ -165,7 +165,7 @@ const counter = simnet.getDataVar("counter", "count");
 getMapEntry(contract: string, mapName: string, mapKey: ClarityValue): ClarityValue
 ```
 
-Get the value of a map entry by its key.  
+Get the value of a map entry by its key.
 Note that it will always return an optional value (`(some <value>)` or `none`). Just like Clarity `map-get?`.
 
 Given a contract with the following definition:
@@ -202,7 +202,7 @@ callReadOnlyFn(
 ): ParsedTransactionRes
 ```
 
-Call read-only functions exposed by a contract. Returns an object with the result of the function call as a Clarity Value.  
+Call read-only functions exposed by a contract. This method returns an object with the result of the function call as a Clarity Value.
 It takes function arguments in the form in Clarity Values, available in the package `@stacks/transactions`.
 
 ```ts
@@ -230,7 +230,7 @@ const callPOX = simnet.callReadOnlyFn(
 );
 ```
 
-As in many methods of the SDK, the contract address can be just the contract name if deployed by the default deployer.
+As in many methods of the SDK, the contract address can be just the contract name, if deployed by the default deployer.
 
 ```ts
 simnet.callReadOnlyFn("counter", "get-counter", [], address1);
@@ -254,10 +254,7 @@ callPublicFn(
 ): ParsedTransactionRes
 ```
 
-Call read-only functions exposed by a contract.
-Returns an object with the result of the function call as a Clarity Value and the events fired during the function execution.  
-It takes function arguments in the form in Clarity Values, available in the package `@stacks/transactions`.  
-It will simulate a block being mined and increase the block height by one.
+Call read-only functions exposed by a contract. This method returns an object with the result of the function call as a Clarity Value and the events fired during the function execution. It takes function arguments in the form in Clarity Values, available in the package `@stacks/transactions`. It will simulate a block being mined and increase the block height by one.
 
 ```ts
 import { initSimnet } from "@hirosystems/clarinet-sdk";
@@ -278,8 +275,7 @@ console.log(callAdd.events); // and array of events (such as print event, stx st
 transferSTX(amount: number | bigint, recipient: string, sender: string): ParsedTransactionRes
 ```
 
-Transfer STX from an address to an other. The amount is in uSTX.  
-It will simulate a block being mined and increase the block height by one.
+Transfer STX from an address to an other. The amount is in uSTX. It will simulate a block being mined and increase the block height by one.
 
 ```ts
 import { initSimnet } from "@hirosystems/clarinet-sdk";
@@ -322,8 +318,7 @@ deployContract(
 ): ParsedTransactionRes
 ```
 
-Deploy a contract to the Simnet.  
-It will simulate a block being mined and increase the block height by one.
+Deploy a contract to the Simnet. It will simulate a block being mined and increase the block height by one.
 
 ```ts
 import { initSimnet } from "@hirosystems/clarinet-sdk";
@@ -356,8 +351,7 @@ mineBlock(txs: Tx[]): ParsedTransactionRes[]
 
 The `.callPublicFn()`, `.transferSTX()`, and `.deployContract()` methods all mine one block with only one transaction. It can also be useful to mine a block with multiple transactions. This is what `.mineBlock()` is for.
 
-It take an array of transaction objects.  
-The transactions can be built with the `tx` helper exported by the SDK.
+It take an array of transaction objects. The transactions can be built with the `tx` helper exported by the SDK.
 It has three methods `.callPublicFn()`, `.transferSTX()`, and `.deployContract()`, which have the same interface as the `Simnet` methods but instead of performing a transaction, it will build a transaction object than can be passed to the `mineBlock()` function.
 
 ```ts
@@ -423,8 +417,7 @@ console.log(simnet.blockHeight); // 10
 getContractsInterfaces(): Map<string, ContractInterface>
 ```
 
-Returns the interfaces of the project contracts.
-It returns a Map of Contracts, the keys are the contract addresses.
+Returns the interfaces of the project contracts. This method returns a Map of Contracts; the keys are the contract addresses.
 The interfaces contain information such as the available functions, data-vars and maps, NFTs, and the FTs defined in the contract.
 It can be used to get the list of the contracts and iterate of it.
 
