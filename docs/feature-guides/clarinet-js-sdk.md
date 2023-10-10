@@ -43,7 +43,8 @@ async function main() {
 main();
 ```
 
-By default, the SDK will look for a Clarinet.toml file in the current working directory. It's also possible to provide the path to the manifest like so:
+By default, the SDK will look for a Clarinet.toml file in the current working directory.
+It's also possible to provide the path to the manifest like so:
 
 ```ts
 const simnet = await initSimnet("./path/to/Clarinet.toml");
