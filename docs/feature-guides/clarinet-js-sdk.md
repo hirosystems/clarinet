@@ -165,7 +165,8 @@ const counter = simnet.getDataVar("counter", "count");
 getMapEntry(contract: string, mapName: string, mapKey: ClarityValue): ClarityValue
 ```
 
-Get the value of a map entry by its key. Note that it will always return an optional value (`(some <value>)` or `none`). Just like Clarity `map-get?`.
+Get the value of a map entry by its key.
+Note that it will always return an optional value (`(some <value>)` or `none`). Just like Clarity `map-get?`.
 
 Given a contract with the following definition:
 
@@ -201,7 +202,8 @@ callReadOnlyFn(
 ): ParsedTransactionRes
 ```
 
-Call read-only functions exposed by a contract. This method returns an object with the result of the function call as a Clarity Value. It takes function arguments in the form in Clarity Values, available in the package `@stacks/transactions`.
+Call read-only functions exposed by a contract. This method returns an object with the result of the function call as a Clarity Value.
+It takes function arguments in the form in Clarity Values, available in the package `@stacks/transactions`.
 
 ```ts
 import { initSimnet } from "@hirosystems/clarinet-sdk";
