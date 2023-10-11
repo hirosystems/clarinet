@@ -26,7 +26,7 @@ serde_json = { version = "1.0.79", features = ["preserve_order"] }
 serde_derive = "1"
 log = { version = "=0.4.17", features = ["serde"] }
 signal-hook-registry = "1.4.0"
-secure_tempfile = { version = "=3.3.0", package = "tempfile" }
+secure_tempfile = { version = "3.8.0", package = "tempfile" }
 tokio-util = { version = "0.7.1", features = ["io"], optional = true }
 clarity_repl = { package = "clarity-repl", path = "../clarity-repl", features = [
     "cli",
@@ -70,7 +70,7 @@ num_cpus = "1.13.1"
 mio = "0.8"
 similar = "2.1.0"
 crossbeam-channel = "0.5.6"
-chrono = "0.4.20"
+chrono = "0.4.31"
 sha2 = "0.10.0"
 
 [dependencies.tui]

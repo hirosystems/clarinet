@@ -22,7 +22,7 @@ categories = [
 
 [dependencies]
 ansi_term = "0.12.1"
-chrono = "0.4.24"
+chrono = "0.4.31"
 lazy_static = "1.4.0"
 regex = "1.7"
 serde = { version = "1.0", features = ["derive"] }
