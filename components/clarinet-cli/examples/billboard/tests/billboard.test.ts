@@ -9,34 +9,6 @@ describe("The billboard works as expected", () => {
   it("can get message", () => {
     const { result } = simnet.callReadOnlyFn("billboard", "get-message", [], address1);
     expect(result).toBeUtf8("Hello World!");
-
-    // let assetMaps = chain.getAssetsMaps();
-    // const balance = assetMaps.assets["STX"][wallet_1.address];
-
-    // const block = chain.mineBlock([
-
-    //   Tx.contractCall("billboard", "set-message", [types.utf8("testing")], wallet_1.address),
-    //   Tx.contractCall("billboard", "get-message", [], wallet_1.address),
-    //   Tx.contractCall("billboard", "set-message", [types.utf8("testing...")], wallet_1.address),
-    //   Tx.contractCall("billboard", "get-message", [], wallet_1.address),
-    // ]);
-
-    // assertEquals(block.receipts.length, 4);
-    // assertEquals(block.height, 2);
-
-    // block.receipts[1].result.expectUtf8("testing");
-
-    // block.receipts[3].result.expectUtf8("testing...");
-
-    // // deno-lint-ignore no-explicit-any
-    // const event = block.receipts[0].events[0] as { [key: string]: any };
-    // const { sender, recipient, amount } = event.stx_transfer_event;
-    // sender.expectPrincipal(wallet_1.address);
-    // recipient.expectPrincipal(`${deployer.address}.billboard`);
-    // amount.expectInt(100);
-
-    // assetMaps = chain.getAssetsMaps();
-    // assertEquals(assetMaps.assets["STX"][wallet_1.address], balance - 210);
   });
 
   it("can set message", () => {
