@@ -28,7 +28,7 @@ reqwest = { version = "0.11", default-features = false, features = [
 tui = { version = "0.18.0", default-features = false, features = ["crossterm"] }
 crossbeam-channel = "0.5.6"
 
-chrono = "0.4.20"
+chrono = "0.4.31"
 futures = "0.3.12"
 base58 = "0.2.0"
 
@@ -43,7 +43,7 @@ clarinet-utils = { path = "../clarinet-utils" }
 hiro-system-kit = { path = "../hiro-system-kit", features = ["log"] }
 clarity-repl = { path = "../clarity-repl", features = ["cli"] }
 dirs = { version = "4.0.0" }
-clap = {version = "4.2.7", features = [ "derive" ] }
+clap = { version = "4.2.7", features = ["derive"] }
 serde_yaml = "0.8.23"
 
 [lib]
