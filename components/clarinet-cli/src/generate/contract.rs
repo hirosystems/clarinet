@@ -20,7 +20,7 @@ impl GetChangesForNewContract {
     ) -> Self {
         Self {
             manifest_location,
-            contract_name,
+            contract_name: contract_name.replace(".", "_"),
             source,
             changes: vec![],
         }
