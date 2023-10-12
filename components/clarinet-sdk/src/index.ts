@@ -242,8 +242,6 @@ function memoizedInit() {
   return async (manifestPath = "./Clarinet.toml") => {
     if (!simnet) {
       const module = await wasmModule;
-
-      console.log("init stacks simnet");
       simnet = new Proxy(new module.SDK(vfs), getSessionProxy()) as unknown as Simnet;
     }
 
