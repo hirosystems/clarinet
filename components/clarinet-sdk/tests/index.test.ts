@@ -4,6 +4,7 @@ import { describe, expect, it, beforeEach, beforeAll } from "vitest";
 // test the built package and not the source code
 // makes it simpler to handle wasm build
 import { Simnet, initSimnet, tx } from "../";
+import path from "node:path";
 
 const deployerAddr = "ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM";
 const address1 = "ST1SJ3DTE5DN7X54YDH5D64R3BCB6A2AG2ZQ8YPD5";
@@ -280,8 +281,8 @@ describe("simnet can get session reports", async () => {
 
 describe("the sdk handles multiple manifests project", () => {
   it("handle invalid project", () => {
-    const expectedErr =
-      "error: unexpected ')'\n--> /Users/hugo/Sites/hiro/clarinet/components/clarinet-sdk/tests/fixtures/contracts/invalid.clar:5:2\n)) ;; extra `)`\n";
+    const filePath = path.join(process.cwd(), "tests/fixtures/contracts/invalid.clar");
+    const expectedErr = `error: unexpected ')'\n--> ${filePath}:5:2\n)) ;; extra \`)\`\n`;
 
     expect(async () => {
       await initSimnet("tests/fixtures/InvalidManifest.toml");
