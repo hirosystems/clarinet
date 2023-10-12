@@ -14,7 +14,7 @@ use clarity::types::chainstate::StacksAddress;
 use clarity::types::StacksEpochId;
 use clarity::vm::analysis::ContractAnalysis;
 use clarity::vm::ast::ContractAST;
-use clarity::vm::diagnostic::Diagnostic;
+use clarity::vm::diagnostic::{Diagnostic, Level};
 use clarity::vm::docs::{make_api_reference, make_define_reference, make_keyword_reference};
 use clarity::vm::errors::Error;
 use clarity::vm::functions::define::DefineFunctions;
@@ -551,6 +551,15 @@ impl Session {
         test_name: Option<String>,
         ast: &mut Option<ContractAST>,
     ) -> Result<ExecutionResult, Vec<Diagnostic>> {
+        if contract.epoch == StacksEpochId::Epoch20 && contract.clarity_version == ClarityVersion::Clarity2 {
+            let diagnostic = Diagnostic {
+                    level: Level::Error,
+                    message: "Mismatched contract epoch (2.0) and clarity version".to_string(),
+                    spans: vec![],
+                    suggestion: None,
+                };
+            return Err(vec![diagnostic]);
+        }
         let mut hooks: Vec<&mut dyn EvalHook> = Vec::new();
         let mut coverage = if let Some(test_name) = test_name {
             Some(TestCoverageReport::new(test_name.into()))
