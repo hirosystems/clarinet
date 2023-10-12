@@ -1404,6 +1404,24 @@ mod tests {
     }
 
     #[test]
+    fn clarity_epoch_mismatch() {
+        let settings = SessionSettings::default();
+        let mut session = Session::new(settings);
+        session.start().expect("session could not start");
+        let snippet = "(define-data-var x uint u0)";
+        let contract = ClarityContract {
+            code_source: ClarityCodeSource::ContractInMemory(snippet.to_string()),
+            name: "should_error".to_string(),
+            deployer: ContractDeployer::Address("ST000000000000000000002AMW42H".into()),
+            clarity_version: ClarityVersion::Clarity2,
+            epoch: StacksEpochId::Epoch20,
+        };
+
+        let result = session.deploy_contract(&contract, None, false, None, &mut None);
+        assert!(result.is_err(), "Expected error for clarity mismatch");
+    }
+
+    #[test]
     fn evaluate_at_block() {
         let mut settings = SessionSettings::default();
         settings.include_boot_contracts = vec!["costs".into(), "costs-2".into(), "costs-3".into()];
