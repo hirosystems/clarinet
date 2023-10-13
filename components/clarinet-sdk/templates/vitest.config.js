@@ -4,7 +4,7 @@ import { defineConfig } from "vite";
 import { vitestSetupFilePath, getClarinetVitestsArgv } from "@hirosystems/clarinet-sdk/vitest";
 
 /*
-  In this file, we configure Vitest so that it works well with Clarinet and the Simnet.
+  In this file, Vitest is configured so that it works seamlessly with Clarinet and the Simnet.
 
   The `vitest-environment-clarinet` will initialise the clarinet-sdk
   and make the `simnet` object available globally in the test files.
