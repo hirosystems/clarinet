@@ -11,6 +11,7 @@ use crate::generate::{
 use crate::integrate;
 use crate::lsp::run_lsp;
 
+use clarinet_deployments::diagnostic_digest::DiagnosticsDigest;
 use clarinet_deployments::onchain::{
     apply_on_chain_deployment, get_initial_transactions_trackers, update_deployment_costs,
     DeploymentCommand, DeploymentEvent,
@@ -29,10 +30,9 @@ use clarity_repl::analysis::call_checker::ContractAnalysis;
 use clarity_repl::analysis::coverage::parse_coverage_str;
 use clarity_repl::clarity::vm::analysis::AnalysisDatabase;
 use clarity_repl::clarity::vm::costs::LimitedCostTracker;
-use clarity_repl::clarity::vm::diagnostic::{Diagnostic, Level};
 use clarity_repl::clarity::vm::types::QualifiedContractIdentifier;
 use clarity_repl::clarity::ClarityVersion;
-use clarity_repl::repl::diagnostic::{output_code, output_diagnostic};
+use clarity_repl::repl::diagnostic::output_diagnostic;
 use clarity_repl::repl::{ClarityCodeSource, ClarityContract, ContractDeployer, DEFAULT_EPOCH};
 use clarity_repl::{analysis, repl, Terminal};
 use stacks_network::{self, check_chainhooks, DevnetOrchestrator};
@@ -46,16 +46,6 @@ use clap::builder::ValueParser;
 use clap::{IntoApp, Parser, Subcommand};
 use clap_generate::{Generator, Shell};
 use toml;
-
-macro_rules! pluralize {
-    ($value:expr, $word:expr) => {
-        if $value > 1 {
-            format!("{} {}s", $value, $word)
-        } else {
-            format!("{} {}", $value, $word)
-        }
-    };
-}
 
 #[cfg(feature = "telemetry")]
 use super::telemetry::{telemetry_report_event, DeveloperUsageDigest, DeveloperUsageEvent};
@@ -1760,100 +1750,6 @@ fn execute_changes(changes: Vec<Changes>) -> bool {
     }
 
     true
-}
-
-#[allow(dead_code)]
-struct DiagnosticsDigest {
-    message: String,
-    errors: usize,
-    warnings: usize,
-    contracts_checked: usize,
-    full_success: usize,
-    total: usize,
-}
-
-impl DiagnosticsDigest {
-    fn new(
-        contracts_diags: &HashMap<QualifiedContractIdentifier, Vec<Diagnostic>>,
-        deployment: &DeploymentSpecification,
-    ) -> DiagnosticsDigest {
-        let mut full_success = 0;
-        let mut warnings = 0;
-        let mut errors = 0;
-        let mut contracts_checked = 0;
-        let mut outputs = vec![];
-        let total = deployment.contracts.len();
-
-        for (contract_id, diags) in contracts_diags.into_iter() {
-            let (source, contract_location) = match deployment.contracts.get(&contract_id) {
-                Some(entry) => {
-                    contracts_checked += 1;
-                    entry
-                }
-                None => {
-                    // `deployment.contracts` only includes contracts from the project, requirements should be ignored
-                    continue;
-                }
-            };
-            if diags.is_empty() {
-                full_success += 1;
-                continue;
-            }
-
-            let lines = source.lines();
-            let formatted_lines: Vec<String> = lines.map(|l| l.to_string()).collect();
-
-            for diagnostic in diags {
-                match diagnostic.level {
-                    Level::Error => {
-                        errors += 1;
-                        outputs.push(format_err!(diagnostic.message));
-                    }
-                    Level::Warning => {
-                        warnings += 1;
-                        outputs.push(format!("{} {}", yellow!("warning:"), diagnostic.message));
-                    }
-                    Level::Note => {
-                        outputs.push(format!("{}: {}", green!("note:"), diagnostic.message));
-                        outputs.append(&mut output_code(&diagnostic, &formatted_lines));
-                        continue;
-                    }
-                }
-                let contract_path = match contract_location.get_relative_location() {
-                    Ok(contract_path) => contract_path,
-                    _ => contract_location.to_string(),
-                };
-
-                if let Some(span) = diagnostic.spans.first() {
-                    outputs.push(format!(
-                        "{} {}:{}:{}",
-                        blue!("-->"),
-                        contract_path,
-                        span.start_line,
-                        span.start_column
-                    ));
-                }
-                outputs.append(&mut output_code(&diagnostic, &formatted_lines));
-
-                if let Some(ref suggestion) = diagnostic.suggestion {
-                    outputs.push(format!("{}", suggestion));
-                }
-            }
-        }
-
-        DiagnosticsDigest {
-            full_success,
-            errors,
-            warnings,
-            total,
-            contracts_checked,
-            message: outputs.join("\n").to_string(),
-        }
-    }
-
-    pub fn has_feedbacks(&self) -> bool {
-        self.errors > 0 || self.warnings > 0
-    }
 }
 
 fn display_separator() {

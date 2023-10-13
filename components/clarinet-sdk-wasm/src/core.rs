@@ -1,3 +1,4 @@
+use clarinet_deployments::diagnostic_digest::DiagnosticsDigest;
 use clarinet_deployments::types::{DeploymentGenerationArtifacts, DeploymentSpecification};
 use clarinet_deployments::{
     generate_default_deployment, initiate_session_from_deployment,
@@ -250,7 +251,7 @@ pub struct SDK {
     contracts_locations: HashMap<QualifiedContractIdentifier, FileLocation>,
     contracts_interfaces: HashMap<QualifiedContractIdentifier, ContractInterface>,
     parsed_contracts: HashMap<QualifiedContractIdentifier, ParsedContract>,
-    cache: Option<(DeploymentSpecification, DeploymentGenerationArtifacts)>,
+    cache: HashMap<FileLocation, (DeploymentSpecification, DeploymentGenerationArtifacts)>,
     current_test_name: String,
 }
 
@@ -269,7 +270,7 @@ impl SDK {
             contracts_locations: HashMap::new(),
             contracts_interfaces: HashMap::new(),
             parsed_contracts: HashMap::new(),
-            cache: None,
+            cache: HashMap::new(),
             current_test_name: String::new(),
         }
     }
@@ -298,7 +299,7 @@ impl SDK {
         let manifest =
             ProjectManifest::from_file_accessor(&manifest_location, &self.file_accessor).await?;
 
-        let (deployment, artifacts) = match &self.cache {
+        let (deployment, artifacts) = match self.cache.get(&manifest_location) {
             Some(cache) => cache.clone(),
             None => {
                 let cache = generate_default_deployment(
@@ -309,10 +310,17 @@ impl SDK {
                     Some(DEFAULT_EPOCH),
                 )
                 .await?;
-                self.cache = Some(cache.clone());
+                self.cache.insert(manifest_location, cache.clone());
                 cache
             }
         };
+
+        if !artifacts.success {
+            let diags_digest = DiagnosticsDigest::new(&artifacts.diags, &deployment);
+            if diags_digest.errors > 0 {
+                return Err(diags_digest.message);
+            }
+        }
 
         let mut session = initiate_session_from_deployment(&manifest);
 

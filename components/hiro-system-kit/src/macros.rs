@@ -136,6 +136,17 @@ macro_rules! black {
     )
 }
 
+#[macro_export]
+macro_rules! pluralize {
+    ($value:expr, $word:expr) => {
+        if $value > 1 {
+            format!("{} {}s", $value, $word)
+        } else {
+            format!("{} {}", $value, $word)
+        }
+    };
+}
+
 #[allow(unused_macros)]
 #[macro_export]
 macro_rules! format_err {

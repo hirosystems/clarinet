@@ -714,6 +714,7 @@ dependencies = [
  "clarinet-files",
  "clarinet-utils 1.0.0",
  "clarity-repl 1.8.0",
+ "colored 2.0.4",
  "libsecp256k1 0.7.1",
  "reqwest",
  "serde",
@@ -748,7 +749,7 @@ dependencies = [
 
 [[package]]
 name = "clarinet-sdk-wasm"
-version = "1.0.2"
+version = "1.0.3"
 dependencies = [
  "clarinet-deployments",
  "clarinet-files",
@@ -804,7 +805,7 @@ version = "1.0.0"
 dependencies = [
  "chrono",
  "clarity-repl 1.8.0",
- "colored",
+ "colored 1.9.3",
  "dirs",
  "failure",
  "hex 0.3.2",
@@ -976,6 +977,17 @@ dependencies = [
  "atty",
  "lazy_static",
  "winapi",
+]
+
+[[package]]
+name = "colored"
+version = "2.0.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2674ec482fbc38012cf31e6c42ba0177b431a0cb6f15fe40efa5aab1bda516f6"
+dependencies = [
+ "is-terminal",
+ "lazy_static",
+ "windows-sys 0.48.0",
 ]
 
 [[package]]
