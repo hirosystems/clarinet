@@ -667,6 +667,20 @@ impl<'a> ASTVisitor<'a> for ASTDependencyDetector<'a> {
         );
         true
     }
+
+    fn visit_define_constant(
+        &mut self,
+        expr: &'a SymbolicExpression,
+        name: &'a ClarityName,
+        value: &'a SymbolicExpression,
+    ) -> bool {
+        if let Some(Value::Principal(PrincipalData::Contract(contract_principal))) =
+            value.match_literal_value()
+        {
+            self.add_dependency(self.current_contract.unwrap(), contract_principal);
+        }
+        true
+    }
 }
 
 // Traverses the preloaded contracts and saves function signatures only
@@ -1268,6 +1282,38 @@ mod tests {
         };
 
         let snippet = "(contract-call? .foo hello 4)".to_string();
+        let test_identifier = match build_ast(&session, &snippet, Some("test")) {
+            Ok((contract_identifier, ast, _)) => {
+                contracts.insert(contract_identifier.clone(), (DEFAULT_CLARITY_VERSION, ast));
+                contract_identifier
+            }
+            Err(_) => panic!("expected success"),
+        };
+
+        let dependencies =
+            ASTDependencyDetector::detect_dependencies(&contracts, &BTreeMap::new()).unwrap();
+        assert_eq!(dependencies[&test_identifier].len(), 1);
+        assert!(dependencies[&test_identifier].has_dependency(&foo).unwrap());
+    }
+
+    #[test]
+    fn contract_stored_in_constant() {
+        let session = Session::new(SessionSettings::default());
+        let mut contracts = BTreeMap::new();
+        let snippet1 = "
+(define-public (hello (a int))
+    (ok u0)
+)"
+        .to_string();
+        let foo = match build_ast(&session, &snippet1, Some("foo")) {
+            Ok((contract_identifier, ast, _)) => {
+                contracts.insert(contract_identifier.clone(), (DEFAULT_CLARITY_VERSION, ast));
+                contract_identifier
+            }
+            Err(_) => panic!("expected success"),
+        };
+
+        let snippet = "(define-constant foo-contract .foo)".to_string();
         let test_identifier = match build_ast(&session, &snippet, Some("test")) {
             Ok((contract_identifier, ast, _)) => {
                 contracts.insert(contract_identifier.clone(), (DEFAULT_CLARITY_VERSION, ast));
