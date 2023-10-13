@@ -307,7 +307,7 @@ impl SDK {
                     &StacksNetwork::Simnet,
                     false,
                     Some(&self.file_accessor),
-                    Some(DEFAULT_EPOCH),
+                    Some(StacksEpochId::Epoch21),
                 )
                 .await?;
                 self.cache.insert(manifest_location, cache.clone());
