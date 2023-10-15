@@ -37,6 +37,7 @@ lazy_static = "1.4.0"
 atty = "0.2.14"
 termcolor = "1.1.2"
 regex = "1.7"
+dirs = { version = "4.0.0" }
 libc = "0.2.86"
 encoding_rs = "0.8.31"
 percent-encoding = "2.1.0"

@@ -550,6 +550,11 @@ struct Check {
     pub use_computed_deployment_plan: bool,
 }
 
+#[derive(Serialize, Deserialize)]
+struct GlobalSettings {
+    disable_hints: bool,
+    enable_telemetry: Option<bool>,
+}
 #[derive(Parser, PartialEq, Clone, Debug)]
 struct Completions {
     /// Specify which shell to generation completions script for
@@ -579,7 +584,28 @@ pub fn main() {
         }
     };
 
-    let hints_enabled = if env::var("CLARINET_DISABLE_HINTS") == Ok("1".into()) {
+    let mut global_settings = String::new();
+    let global_settings_default = GlobalSettings {
+        disable_hints: false,
+        enable_telemetry: None
+    };
+
+    let home_dir = dirs::home_dir().expect("Unable to get home directory");
+    let path = home_dir.join(".clarinet/Settings.toml");
+
+    let global_settings: GlobalSettings =
+        if path.exists() {
+            let mut file = File::open(&path).expect("Unable to open the file");
+            file.read_to_string(&mut global_settings).expect("Unable to read the file");
+
+            let result = toml::from_str(&global_settings).expect("Unable to parse the TOML file");
+            result
+        } else {
+            global_settings_default
+        };
+
+    // This is backwards compatible with ENV var setting as well as the new ~/.clarinet/Settings.toml
+    let hints_enabled = if !global_settings.disable_hints || env::var("CLARINET_DISABLE_HINTS") == Ok("1".into()) {
         false
     } else {
         true
@@ -602,15 +628,23 @@ pub fn main() {
                 if project_opts.disable_telemetry {
                     false
                 } else {
-                    println!("{}", yellow!("Send usage data to Hiro."));
-                    println!("{}", yellow!("Help Hiro improve its products and services by automatically sending diagnostics and usage data."));
-                    println!("{}", yellow!("Only high level usage information, and no information identifying you or your project are collected."));
-                    // TODO(lgalabru): once we have a privacy policy available, add a link
-                    // println!("{}", yellow!("Visit http://hiro.so/clarinet-privacy for details."));
-                    println!("{}", yellow!("Enable [Y/n]?"));
-                    let mut buffer = String::new();
-                    std::io::stdin().read_line(&mut buffer).unwrap();
-                    !buffer.starts_with("n")
+                    let enabled = match global_settings.enable_telemetry {
+                        Some(true) => true,
+                        _ => env::var("CLARINET_TELEMETRY") == Ok("1".into()),
+                    };
+                    if enabled {
+                        true
+                    } else {
+                        println!("{}", yellow!("Send usage data to Hiro."));
+                        println!("{}", yellow!("Help Hiro improve its products and services by automatically sending diagnostics and usage data."));
+                        println!("{}", yellow!("Only high level usage information, and no information identifying you or your project are collected."));
+                        // TODO(lgalabru): once we have a privacy policy available, add a link
+                        // println!("{}", yellow!("Visit http://hiro.so/clarinet-privacy for details."));
+                        println!("{}", yellow!("Enable [Y/n]?"));
+                        let mut buffer = String::new();
+                        std::io::stdin().read_line(&mut buffer).unwrap();
+                        !buffer.starts_with("n")
+                    }
                 }
             } else {
                 false
