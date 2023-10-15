@@ -602,15 +602,19 @@ pub fn main() {
                 if project_opts.disable_telemetry {
                     false
                 } else {
-                    println!("{}", yellow!("Send usage data to Hiro."));
-                    println!("{}", yellow!("Help Hiro improve its products and services by automatically sending diagnostics and usage data."));
-                    println!("{}", yellow!("Only high level usage information, and no information identifying you or your project are collected."));
-                    // TODO(lgalabru): once we have a privacy policy available, add a link
-                    // println!("{}", yellow!("Visit http://hiro.so/clarinet-privacy for details."));
-                    println!("{}", yellow!("Enable [Y/n]?"));
-                    let mut buffer = String::new();
-                    std::io::stdin().read_line(&mut buffer).unwrap();
-                    !buffer.starts_with("n")
+                    if env::var("CLARINET_TELEMETRY") == Ok("1".into()) {
+                        true
+                    } else {
+                        println!("{}", yellow!("Send usage data to Hiro."));
+                        println!("{}", yellow!("Help Hiro improve its products and services by automatically sending diagnostics and usage data."));
+                        println!("{}", yellow!("Only high level usage information, and no information identifying you or your project are collected."));
+                        // TODO(lgalabru): once we have a privacy policy available, add a link
+                        // println!("{}", yellow!("Visit http://hiro.so/clarinet-privacy for details."));
+                        println!("{}", yellow!("Enable [Y/n]?"));
+                        let mut buffer = String::new();
+                        std::io::stdin().read_line(&mut buffer).unwrap();
+                        !buffer.starts_with("n")
+                    }
                 }
             } else {
                 false

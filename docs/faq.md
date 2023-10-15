@@ -7,8 +7,8 @@ title: FAQs
 - First, restart your shell/VSCode to ensure they have the updated Path (the installer should have added the directory to the path).
 - If that does not work, manually add the directory to your Path by following the steps below:
 
-    -  Open "System Properties", select "Environment Variables" button, under "System variables", select "Path" and hit "Edit". 
-    - Press the "New" button and add "C:\Program Files\clarinet\bin", then press Ok, Ok, Ok. 
+    -  Open "System Properties", select "Environment Variables" button, under "System variables", select "Path" and hit "Edit".
+    - Press the "New" button and add "C:\Program Files\clarinet\bin", then press Ok, Ok, Ok.
     - Finally, restart your shell or VSCode.
     - If you did not install to the default directory, modify the path accordingly.
 
@@ -33,3 +33,8 @@ If you're using Docker desktop, you can open the UI and select `stacks-node` con
 If you are not using the Docker desktop, use the following command in your terminal:
 
 `docker logs -f stacks-node.<project-name>.devnet`.
+
+
+#### **How can I accept Clarinet telemetry for every project I create?**
+
+If you have CLARINET_TELEMETRY=1 set in your environment, the usage data prompt will be accepted by default
