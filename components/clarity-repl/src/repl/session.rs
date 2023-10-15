@@ -551,13 +551,16 @@ impl Session {
         test_name: Option<String>,
         ast: &mut Option<ContractAST>,
     ) -> Result<ExecutionResult, Vec<Diagnostic>> {
-        if contract.epoch == StacksEpochId::Epoch20 && contract.clarity_version == ClarityVersion::Clarity2 {
+        if contract.clarity_version > ClarityVersion::default_for_epoch(contract.epoch) {
             let diagnostic = Diagnostic {
-                    level: Level::Error,
-                    message: "Mismatched contract epoch (2.0) and clarity version".to_string(),
-                    spans: vec![],
-                    suggestion: None,
-                };
+                level: Level::Error,
+                message: format!(
+                    "{} can not be used with {}",
+                    contract.clarity_version, contract.epoch
+                ),
+                spans: vec![],
+                suggestion: None,
+            };
             return Err(vec![diagnostic]);
         }
         let mut hooks: Vec<&mut dyn EvalHook> = Vec::new();
