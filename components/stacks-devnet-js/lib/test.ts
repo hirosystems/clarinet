@@ -1,7 +1,7 @@
 import { DevnetNetworkOrchestrator } from "./index";
 
 const devnet = new DevnetNetworkOrchestrator({
-    clarinetManifestPath: "../../clarinet-cli/examples/counter/Clarinet.toml",
+    clarinetManifestPath: "../clarinet-cli/examples/counter/Clarinet.toml",
     logs: true,
     accounts: [
         {
