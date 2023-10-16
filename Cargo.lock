@@ -483,7 +483,9 @@ checksum = "baf1de4339761588bc0619e3cbc0120ee582ebb74b53b4efbf79117bd2da40fd"
 
 [[package]]
 name = "chainhook-sdk"
-version = "0.10.1"
+version = "0.10.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5f6a82c920f4017b3b88cc34074a318714fb2a29725c1f455fc8f375bbd01c86"
 dependencies = [
  "base58 0.2.0",
  "base64 0.13.1",
@@ -516,6 +518,8 @@ dependencies = [
 [[package]]
 name = "chainhook-types"
 version = "1.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "447fdec877811ce9af82b000ef8f1a754ba30dc75b57ba5a04d7d2a92a601040"
 dependencies = [
  "hex 0.4.3",
  "schemars",
@@ -3527,8 +3531,9 @@ checksum = "7b4b9743ed687d4b4bcedf9ff5eaa7398495ae14e61cba0a295704edbc7decde"
 
 [[package]]
 name = "schemars"
-version = "0.8.12"
-source = "git+https://github.com/hirosystems/schemars.git?branch=feat-chainhook-fixes#15fdd4711700114d57c090aad62516593bd4ca6d"
+version = "0.8.15"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1f7b0ce13155372a76ee2e1c5ffba1fe61ede73fbea5630d61eee6fac4929c0c"
 dependencies = [
  "dyn-clone",
  "schemars_derive",
@@ -3538,8 +3543,9 @@ dependencies = [
 
 [[package]]
 name = "schemars_derive"
-version = "0.8.12"
-source = "git+https://github.com/hirosystems/schemars.git?branch=feat-chainhook-fixes#15fdd4711700114d57c090aad62516593bd4ca6d"
+version = "0.8.15"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e85e2a16b12bdb763244c69ab79363d71db2b4b918a2def53f80b02e0574b13c"
 dependencies = [
  "proc-macro2",
  "quote",
