@@ -1,8 +1,10 @@
 {
   "rust-analyzer.check.overrideCommand": [
     "cargo",
-    "check",
+    "clippy",
     "--package=clarinet-cli",
-    "--message-format=json"
+    "--message-format=json",
+    "--",
+    "--no-deps"
   ]
 }

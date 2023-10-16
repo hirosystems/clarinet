@@ -39,6 +39,7 @@ impl GetChangesForNewProject {
         self.create_vscode_settings_json();
         self.create_vscode_tasks_json();
         self.create_gitignore();
+        self.create_nodejs_files();
         Ok(self.changes.clone())
     }
 
@@ -55,51 +56,49 @@ impl GetChangesForNewProject {
     #[allow(dead_code)]
     fn create_clients_directory(&mut self) {
         self.changes
-            .push(self.get_changes_for_new_root_dir(format!("clients")));
+            .push(self.get_changes_for_new_root_dir("clients".into()));
     }
 
     fn create_contracts_directory(&mut self) {
         self.changes
-            .push(self.get_changes_for_new_root_dir(format!("contracts")));
+            .push(self.get_changes_for_new_root_dir("contracts".into()));
     }
 
     #[allow(dead_code)]
     fn create_notebooks_directory(&mut self) {
         self.changes
-            .push(self.get_changes_for_new_root_dir(format!("notebooks")));
+            .push(self.get_changes_for_new_root_dir("notebooks".into()));
     }
 
     #[allow(dead_code)]
     fn create_scripts_directory(&mut self) {
         self.changes
-            .push(self.get_changes_for_new_root_dir(format!("scripts")));
+            .push(self.get_changes_for_new_root_dir("scripts".into()));
     }
 
     fn create_settings_directory(&mut self) {
         self.changes
-            .push(self.get_changes_for_new_root_dir(format!("settings")));
+            .push(self.get_changes_for_new_root_dir("settings".into()));
     }
 
     fn create_tests_directory(&mut self) {
         self.changes
-            .push(self.get_changes_for_new_root_dir(format!("tests")));
+            .push(self.get_changes_for_new_root_dir("tests".into()));
     }
 
     fn create_vscode_directory(&mut self) {
         self.changes
-            .push(self.get_changes_for_new_root_dir(format!(".vscode")));
+            .push(self.get_changes_for_new_root_dir(".vscode".into()));
     }
 
     fn create_vscode_settings_json(&mut self) {
-        let content = format!(
-            r#"
-{{
-    "deno.enable": true,
+        let content = r#"
+{
     "files.eol": "\n"
-}}
+}
 "#
-        );
-        let name = format!("settings.json");
+        .into();
+        let name = "settings.json".into();
         let path = format!(
             "{}/{}/.vscode/{}",
             self.project_path, self.project_name, name
@@ -119,28 +118,28 @@ impl GetChangesForNewProject {
     }
 
     fn create_vscode_tasks_json(&mut self) {
-        let content = format!(
-            r#"
-{{
-    "version": "2.0.0",
-    "tasks": [
-        {{
-            "label": "check contracts",
-            "group": "test",
-            "type": "shell",
-            "command": "clarinet check"
-        }},
-        {{
-            "label": "test contracts",
-            "group": "test",
-            "type": "shell",
-            "command": "clarinet test"
-        }}
-    ]
-}}
+        let content = r#"
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "check contracts",
+      "group": "test",
+      "type": "shell",
+      "command": "clarinet check"
+    },
+    {{
+      "type": "npm",
+      "script": "test",
+      "group": "test",
+      "problemMatcher": [],
+      "label": "npm test"
+    }
+  ]
+}
 "#
-        );
-        let name = format!("tasks.json");
+        .into();
+        let name = "tasks.json".into();
         let path = format!(
             "{}/{}/.vscode/{}",
             self.project_path, self.project_name, name
@@ -160,15 +159,22 @@ impl GetChangesForNewProject {
     }
 
     fn create_gitignore(&mut self) {
-        let content = format!(
-            r#"
+        let content = r#"
 **/settings/Mainnet.toml
 **/settings/Testnet.toml
 .cache/**
 history.txt
-"#,
-        );
-        let name = format!(".gitignore");
+
+logs
+*.log
+npm-debug.log*
+coverage
+*.info
+costs-reports.json
+node_modules
+"#
+        .into();
+        let name = ".gitignore".into();
         let path = format!("{}/{}/{}", self.project_path, self.project_name, name);
         let change = FileCreation {
             comment: format!("{} {}/{}", green!("Created file"), self.project_name, name),
@@ -206,7 +212,7 @@ check_checker = {{ trusted_sender = false, trusted_caller = false, callee_filter
 "#,
             self.project_name, self.telemetry_enabled
         );
-        let name = format!("Clarinet.toml");
+        let name = "Clarinet.toml".into();
         let path = format!("{}/{}/{}", self.project_path, self.project_name, name);
         let change = FileCreation {
             comment: format!("{} {}/{}", green!("Created file"), self.project_name, name),
@@ -218,8 +224,7 @@ check_checker = {{ trusted_sender = false, trusted_caller = false, callee_filter
     }
 
     fn create_environment_testnet_toml(&mut self) {
-        let content = format!(
-            r#"[network]
+        let content = r#"[network]
 name = "testnet"
 stacks_node_rpc_address = "https://api.testnet.hiro.so"
 deployment_fee_rate = 10
@@ -227,8 +232,8 @@ deployment_fee_rate = 10
 [accounts.deployer]
 mnemonic = "<YOUR PRIVATE TESTNET MNEMONIC HERE>"
 "#
-        );
-        let name = format!("Testnet.toml");
+        .into();
+        let name = "Testnet.toml".into();
         let path = format!(
             "{}/{}/settings/{}",
             self.project_path, self.project_name, name
@@ -248,8 +253,7 @@ mnemonic = "<YOUR PRIVATE TESTNET MNEMONIC HERE>"
     }
 
     fn create_environment_mainnet_toml(&mut self) {
-        let content = format!(
-            r#"[network]
+        let content = r#"[network]
 name = "mainnet"
 stacks_node_rpc_address = "https://api.hiro.so"
 deployment_fee_rate = 10
@@ -257,8 +261,8 @@ deployment_fee_rate = 10
 [accounts.deployer]
 mnemonic = "<YOUR PRIVATE MAINNET MNEMONIC HERE>"
 "#
-        );
-        let name = format!("Mainnet.toml");
+        .into();
+        let name = "Mainnet.toml".into();
         let path = format!(
             "{}/{}/settings/{}",
             self.project_path, self.project_name, name
@@ -451,7 +455,7 @@ btc_address = "mvZtbibDAAA3WLpY7zXXFqRa3T4XSknBX7"
             default_epoch_2_3 = DEFAULT_EPOCH_2_3,
             default_epoch_2_4 = DEFAULT_EPOCH_2_4,
         );
-        let name = format!("Devnet.toml");
+        let name = "Devnet.toml".into();
         let path = format!(
             "{}/{}/settings/{}",
             self.project_path, self.project_name, name
@@ -463,6 +467,142 @@ btc_address = "mvZtbibDAAA3WLpY7zXXFqRa3T4XSknBX7"
                 self.project_name,
                 name
             ),
+            name,
+            content,
+            path,
+        };
+        self.changes.push(Changes::AddFile(change));
+    }
+
+    fn create_nodejs_files(&mut self) {
+        self.create_package_json();
+        self.create_ts_config();
+        self.create_vitest_config();
+    }
+
+    fn create_package_json(&mut self) {
+        let content = format!(
+            r#"
+{{
+  "name": "{}-tests",
+  "version": "1.0.0",
+  "description": "Run unit tests on this project.",
+  "private": true,
+  "scripts": {{
+    "test": "vitest run",
+    "test:report": "vitest run -- --coverage --costs",
+    "test:watch": "chokidar \"unit-tests/**/*.ts\" \"contracts/**/*.clar\" -c \"npm t\""
+  }},
+  "author": "",
+  "license": "ISC",
+  "dependencies": {{
+    "@hirosystems/clarinet-sdk": "^1.0.0",
+    "@stacks/transactions": "^6.9.0",
+    "chokidar-cli": "^3.0.0",
+    "typescript": "^5.2.2",
+    "vite": "^4.4.9",
+    "vitest": "^0.34.4",
+    "vitest-environment-clarinet": "^1.0.0"
+  }}
+}}
+"#,
+            self.project_name
+        );
+        let name = "package.json".into();
+        let path = format!("{}/{}/{}", self.project_path, self.project_name, name);
+        let change = FileCreation {
+            comment: format!("{} {}/{}", green!("Created file"), self.project_name, name),
+            name,
+            content,
+            path,
+        };
+        self.changes.push(Changes::AddFile(change));
+    }
+
+    fn create_ts_config(&mut self) {
+        let content = r#"
+{
+  "compilerOptions": {
+    "target": "ESNext",
+    "useDefineForClassFields": true,
+    "module": "ESNext",
+    "lib": ["ESNext"],
+    "skipLibCheck": true,
+
+    "moduleResolution": "bundler",
+    "allowImportingTsExtensions": true,
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "noEmit": true,
+
+    "strict": true,
+    "noImplicitAny": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "noFallthroughCasesInSwitch": true
+  },
+  "include": [
+    "node_modules/@hirosystems/clarinet-sdk/vitest-helpers/src",
+    "tests"
+  ]
+}
+"#
+        .into();
+        let name = "tsconfig.json".into();
+        let path = format!("{}/{}/{}", self.project_path, self.project_name, name);
+        let change = FileCreation {
+            comment: format!("{} {}/{}", green!("Created file"), self.project_name, name),
+            name,
+            content,
+            path,
+        };
+        self.changes.push(Changes::AddFile(change));
+    }
+
+    fn create_vitest_config(&mut self) {
+        let content =
+            r#"
+/// <reference types="vitest" />
+
+import { defineConfig } from "vite";
+import { vitestSetupFilePath, getClarinetVitestsArgv } from "@hirosystems/clarinet-sdk/vitest";
+
+/*
+  In this file, Vitest is configured so that it works seamlessly with Clarinet and the Simnet.
+
+  The `vitest-environment-clarinet` will initialise the clarinet-sdk
+  and make the `simnet` object available globally in the test files.
+
+  `vitestSetupFilePath` points to a file in the `@hirosystems/clarinet-sdk` package that does two things:
+    - run `before` hooks to initialize the simnet and `after` hooks to collect costs and coverage reports.
+    - load custom vitest matchers to work with Clarity values (such as `expect(...).toBeUint()`)
+
+  The `getClarinetVitestsArgv()` will parse options passed to the command `vitest run --`
+    - vitest run -- --manifest ./Clarinet.toml  # pass a custom path
+    - vitest run -- --coverage --costs          # collect coverage and cost reports
+*/
+
+export default defineConfig({
+  test: {
+    environment: "clarinet", // use vitest-environment-clarinet
+    singleThread: true,
+    setupFiles: [
+      vitestSetupFilePath,
+      // custom setup files can be added here
+    ],
+    environmentOptions: {
+      clarinet: {
+        ...getClarinetVitestsArgv(),
+        // add or override options
+      },
+    },
+  },
+});
+"#.into();
+        let name = "vitest.config.js".into();
+        let path = format!("{}/{}/{}", self.project_path, self.project_name, name);
+        let change = FileCreation {
+            comment: format!("{} {}/{}", green!("Created file"), self.project_name, name),
             name,
             content,
             path,
