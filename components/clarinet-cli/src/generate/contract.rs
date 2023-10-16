@@ -20,7 +20,7 @@ impl GetChangesForNewContract {
     ) -> Self {
         Self {
             manifest_location,
-            contract_name: contract_name.replace(".", "_"),
+            contract_name: contract_name.replace('.', "_"),
             source,
             changes: vec![],
         }
@@ -50,7 +50,7 @@ impl GetChangesForNewContract {
 ;;
 
 ;; token definitions
-;; 
+;;
 
 ;; constants
 ;;
@@ -92,38 +92,31 @@ impl GetChangesForNewContract {
     }
 
     fn create_template_test(&mut self) -> Result<(), String> {
-        let content = format!(
-            r#"
-import {{ Clarinet, Tx, Chain, Account, types }} from 'https://deno.land/x/clarinet@v{}/index.ts';
-import {{ assertEquals }} from 'https://deno.land/std@0.170.0/testing/asserts.ts';
+        let content = r#"
+import { describe, expect, it } from "vitest";
 
-Clarinet.test({{
-    name: "Ensure that <...>",
-    async fn(chain: Chain, accounts: Map<string, Account>) {{
-        // arrange: set up the chain, state, and other required elements
-        let wallet_1 = accounts.get("wallet_1")!;
+const accounts = simnet.getAccounts();
+const address1 = accounts.get("wallet_1")!;
 
-        // act: perform actions related to the current test
-        let block = chain.mineBlock([
-            /*
-             * Add transactions with:
-             * Tx.contractCall(...)
-            */
-        ]);
+/*
+  The test below is an example. To learn more, read the testing documentation here:
+  https://docs.hiro.so/clarinet/feature-guides/test-contract-with-clarinet-sdk
+*/
 
-        // assert: review returned data, contract state, and other requirements
-        assertEquals(block.receipts.length, 0);
-        assertEquals(block.height, 2);
+describe("example tests", () => {
+  it("ensures simnet is well initalised", () => {
+    expect(simnet.blockHeight).toBeDefined();
+  });
 
-        // TODO
-        assertEquals("TODO", "a complete test");
-    }},
-}});
-"#,
-            env!("CARGO_PKG_VERSION")
-        );
+  // it("shows an example", () => {
+  //   const { result } = simnet.callReadOnlyFn("counter", "get-counter", [], address1);
+  //   expect(result).toBeUint(0);
+  // });
+});
+"#
+        .into();
 
-        let name = format!("{}_test.ts", self.contract_name);
+        let name = format!("{}.test.ts", self.contract_name);
         let mut new_file = self.manifest_location.get_project_root_location().unwrap();
         new_file.append_path("tests")?;
         new_file.append_path(&name)?;

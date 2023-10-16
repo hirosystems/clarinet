@@ -38,8 +38,7 @@ impl<'a> GetChangesForNewChainhook<'a> {
     }
 
     fn create_template_bitcoin_chainhook(&mut self) -> Result<(), String> {
-        let content = format!(
-            r#"
+        let content = r#"
 ---
 name: "Bitcoin hook"
 version: 1
@@ -52,12 +51,11 @@ networks:
                 p2pkh:                                          # support hex, p2pkh, p2sh, p2wpkh, p2wsh.
                     equals: muYdXKmX9bByAueDe6KFfHd5Ff1gdN9ErG  # support equals, starts-with, ends-with
         action:
-            http: 
+            http:
                 url: http://localhost:3000/api/v1/<path>
                 method: POST
                 authorization-header: "Bearer cn389ncoiwuencr"
-"#
-        );
+"#.into();
 
         let name = format!("{}.chainhook.yaml", self.chainhook_name);
         let mut new_file = self
@@ -80,8 +78,7 @@ networks:
     }
 
     fn create_template_stacks_chainhook(&mut self) -> Result<(), String> {
-        let content = format!(
-            r#"
+        let content = r#"
 ---
 name: "Stacks hook"
 version: 1
@@ -106,12 +103,12 @@ networks:
             #     contract-identifier: ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM.cbtc-token
             #     method: mint
         action:
-            http: 
+            http:
                 url: http://localhost:3000/api/v1/<path>
                 method: POST
                 authorization-header: "Bearer cn389ncoiwuencr"
 "#
-        );
+        .into();
 
         let name = format!("{}.chainhook.yaml", self.chainhook_name);
         let mut project_path = self
