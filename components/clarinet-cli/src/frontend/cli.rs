@@ -587,29 +587,30 @@ pub fn main() {
     let mut global_settings = String::new();
     let global_settings_default = GlobalSettings {
         disable_hints: false,
-        enable_telemetry: None
+        enable_telemetry: None,
     };
 
     let home_dir = dirs::home_dir().expect("Unable to get home directory");
     let path = home_dir.join(".clarinet/Settings.toml");
 
-    let global_settings: GlobalSettings =
-        if path.exists() {
-            let mut file = File::open(&path).expect("Unable to open the file");
-            file.read_to_string(&mut global_settings).expect("Unable to read the file");
+    let global_settings: GlobalSettings = if path.exists() {
+        let mut file = File::open(&path).expect("Unable to open the file");
+        file.read_to_string(&mut global_settings)
+            .expect("Unable to read the file");
 
-            let result = toml::from_str(&global_settings).expect("Unable to parse the TOML file");
-            result
-        } else {
-            global_settings_default
-        };
+        let result = toml::from_str(&global_settings).expect("Unable to parse the TOML file");
+        result
+    } else {
+        global_settings_default
+    };
 
     // This is backwards compatible with ENV var setting as well as the new ~/.clarinet/Settings.toml
-    let hints_enabled = if !global_settings.disable_hints || env::var("CLARINET_DISABLE_HINTS") == Ok("1".into()) {
-        false
-    } else {
-        true
-    };
+    let hints_enabled =
+        if !global_settings.disable_hints || env::var("CLARINET_DISABLE_HINTS") == Ok("1".into()) {
+            false
+        } else {
+            true
+        };
 
     match opts.command {
         Command::New(project_opts) => {
