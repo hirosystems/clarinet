@@ -589,8 +589,8 @@ pub fn main() {
         disable_hints: false,
         enable_telemetry: None,
     };
+    // This is backwards compatible with ENV var setting as well as the new ~/.clarinet/Settings.toml
     let hints_enabled = env::var("CLARINET_DISABLE_HINTS") != Ok("1".into());
-
     let home_dir = dirs::home_dir().expect("Unable to get home directory");
     let path = home_dir.join(".clarinet/Settings.toml");
 
@@ -604,14 +604,6 @@ pub fn main() {
     } else {
         global_settings_default
     };
-
-    // This is backwards compatible with ENV var setting as well as the new ~/.clarinet/Settings.toml
-    let hints_enabled =
-        if !global_settings.disable_hints || env::var("CLARINET_DISABLE_HINTS") == Ok("1".into()) {
-            false
-        } else {
-            true
-        };
 
     match opts.command {
         Command::New(project_opts) => {
