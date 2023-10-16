@@ -589,6 +589,7 @@ pub fn main() {
         disable_hints: false,
         enable_telemetry: None,
     };
+    let hints_enabled = env::var("CLARINET_DISABLE_HINTS") != Ok("1".into());
 
     let home_dir = dirs::home_dir().expect("Unable to get home directory");
     let path = home_dir.join(".clarinet/Settings.toml");
@@ -704,11 +705,11 @@ pub fn main() {
             Deployments::GenerateDeployment(cmd) => {
                 let manifest = load_manifest_or_exit(cmd.manifest_path);
 
-                let network = if cmd.devnet == true {
+                let network = if cmd.devnet {
                     StacksNetwork::Devnet
-                } else if cmd.testnet == true {
+                } else if cmd.testnet {
                     StacksNetwork::Testnet
-                } else if cmd.mainnet == true {
+                } else if cmd.mainnet {
                     StacksNetwork::Mainnet
                 } else {
                     StacksNetwork::Simnet
@@ -785,11 +786,11 @@ pub fn main() {
             Deployments::ApplyDeployment(cmd) => {
                 let manifest = load_manifest_or_exit(cmd.manifest_path);
 
-                let network = if cmd.devnet == true {
+                let network = if cmd.devnet {
                     Some(StacksNetwork::Devnet)
-                } else if cmd.testnet == true {
+                } else if cmd.testnet {
                     Some(StacksNetwork::Testnet)
-                } else if cmd.mainnet == true {
+                } else if cmd.mainnet {
                     Some(StacksNetwork::Mainnet)
                 } else {
                     None
@@ -800,7 +801,7 @@ pub fn main() {
                         Err(format!("{}: a flag `--devnet`, `--testnet`, `--mainnet` or `--deployment-plan-path=path/to/yaml` should be provided.", yellow!("Command usage")))
                     }
                     (Some(network), None) => {
-                        let res = load_deployment_if_exists(&manifest, &network, cmd.use_on_disk_deployment_plan, cmd.use_computed_deployment_plan);
+                        let res = load_deployment_if_exists(&manifest, network, cmd.use_on_disk_deployment_plan, cmd.use_computed_deployment_plan);
                         match res {
                             Some(Ok(deployment)) => {
                                 println!(
@@ -812,8 +813,8 @@ pub fn main() {
                             }
                             Some(Err(e)) => Err(e),
                             None => {
-                                let default_deployment_path = get_default_deployment_path(&manifest, &network).unwrap();
-                                let (deployment, _) = match generate_default_deployment(&manifest, &network, false) {
+                                let default_deployment_path = get_default_deployment_path(&manifest, network).unwrap();
+                                let (deployment, _) = match generate_default_deployment(&manifest, network, false) {
                                     Ok(deployment) => deployment,
                                     Err(message) => {
                                         println!("{}", red!(message));
@@ -1177,7 +1178,7 @@ pub fn main() {
             }
 
             if success {
-                println!("{} Syntax of contract successfully checked", green!("✔"),);
+                println!("{} Syntax of contract successfully checked", green!("✔"));
                 return;
             } else {
                 std::process::exit(1);
@@ -1335,7 +1336,7 @@ pub fn main() {
             }
         },
         Command::Completions(cmd) => {
-            let mut app = Opts::command();
+            let app = Opts::command();
             let file_name = cmd.shell.file_name("clarinet");
             let mut file = match File::create(file_name.clone()) {
                 Ok(file) => file,
@@ -1349,7 +1350,7 @@ pub fn main() {
                     std::process::exit(1);
                 }
             };
-            cmd.shell.generate(&mut app, &mut file);
+            cmd.shell.generate(&app, &mut file);
             println!("{} {}", green!("Created file"), file_name.clone());
             println!("Check your shell's documentation for details about using this file to enable completions for clarinet");
         }
@@ -1401,7 +1402,7 @@ fn get_manifest_location_or_warn(path: Option<String>) -> Option<FileLocation> {
 
 fn load_manifest_or_exit(path: Option<String>) -> ProjectManifest {
     let manifest_location = get_manifest_location_or_exit(path);
-    let manifest = match ProjectManifest::from_location(&manifest_location) {
+    match ProjectManifest::from_location(&manifest_location) {
         Ok(manifest) => manifest,
         Err(message) => {
             println!(
@@ -1411,8 +1412,7 @@ fn load_manifest_or_exit(path: Option<String>) -> ProjectManifest {
             );
             process::exit(1);
         }
-    };
-    manifest
+    }
 }
 
 fn load_manifest_or_warn(path: Option<String>) -> Option<ProjectManifest> {
@@ -1448,7 +1448,7 @@ fn load_deployment_and_artifacts_or_exit(
     let result = match deployment_plan_path {
         None => {
             let res = load_deployment_if_exists(
-                &manifest,
+                manifest,
                 &StacksNetwork::Simnet,
                 force_on_disk,
                 force_computed,
@@ -1459,41 +1459,42 @@ fn load_deployment_and_artifacts_or_exit(
                         "{} using deployments/default.simnet-plan.yaml",
                         yellow!("note:")
                     );
-                    let artifacts = setup_session_with_deployment(&manifest, &deployment, None);
+                    let artifacts = setup_session_with_deployment(manifest, &deployment, None);
                     Ok((deployment, None, artifacts))
                 }
                 Some(Err(e)) => Err(format!(
                     "loading deployments/default.simnet-plan.yaml failed with error: {}",
                     e
                 )),
-                None => match generate_default_deployment(&manifest, &StacksNetwork::Simnet, false)
-                {
-                    Ok((deployment, ast_artifacts)) if ast_artifacts.success => {
-                        let mut artifacts = setup_session_with_deployment(
-                            &manifest,
-                            &deployment,
-                            Some(&ast_artifacts.asts),
-                        );
-                        for (contract_id, mut parser_diags) in ast_artifacts.diags.into_iter() {
-                            // Merge parser's diags with analysis' diags.
-                            if let Some(ref mut diags) = artifacts.diags.remove(&contract_id) {
-                                parser_diags.append(diags);
+                None => {
+                    match generate_default_deployment(manifest, &StacksNetwork::Simnet, false) {
+                        Ok((deployment, ast_artifacts)) if ast_artifacts.success => {
+                            let mut artifacts = setup_session_with_deployment(
+                                manifest,
+                                &deployment,
+                                Some(&ast_artifacts.asts),
+                            );
+                            for (contract_id, mut parser_diags) in ast_artifacts.diags.into_iter() {
+                                // Merge parser's diags with analysis' diags.
+                                if let Some(ref mut diags) = artifacts.diags.remove(&contract_id) {
+                                    parser_diags.append(diags);
+                                }
+                                artifacts.diags.insert(contract_id, parser_diags);
                             }
-                            artifacts.diags.insert(contract_id, parser_diags);
+                            Ok((deployment, None, artifacts))
                         }
-                        Ok((deployment, None, artifacts))
+                        Ok((deployment, ast_artifacts)) => Ok((deployment, None, ast_artifacts)),
+                        Err(e) => Err(e),
                     }
-                    Ok((deployment, ast_artifacts)) => Ok((deployment, None, ast_artifacts)),
-                    Err(e) => Err(e),
-                },
+                }
             }
         }
         Some(path) => {
-            let deployment_location = get_absolute_deployment_path(&manifest, &path)
+            let deployment_location = get_absolute_deployment_path(manifest, path)
                 .expect("unable to retrieve deployment");
-            match load_deployment(&manifest, &deployment_location) {
+            match load_deployment(manifest, &deployment_location) {
                 Ok(deployment) => {
-                    let artifacts = setup_session_with_deployment(&manifest, &deployment, None);
+                    let artifacts = setup_session_with_deployment(manifest, &deployment, None);
                     Ok((deployment, Some(deployment_location.to_string()), artifacts))
                 }
                 Err(e) => Err(format!("loading {} failed with error: {}", path, e)),
@@ -1545,11 +1546,7 @@ pub fn should_existing_plan_be_replaced(
     let mut buffer = String::new();
     std::io::stdin().read_line(&mut buffer).unwrap();
 
-    if buffer.starts_with("n") {
-        return false;
-    } else {
-        return true;
-    }
+    !buffer.starts_with('n')
 }
 
 pub fn load_deployment_if_exists(
@@ -1805,7 +1802,7 @@ fn display_hint_footer() {
 }
 
 fn display_post_check_hint() {
-    println!("");
+    println!();
     display_hint_header();
     println!(
         "{}",
@@ -1821,7 +1818,7 @@ fn display_post_check_hint() {
 }
 
 fn display_post_console_hint() {
-    println!("");
+    println!();
     display_hint_header();
     println!(
         "{}",
@@ -1844,7 +1841,7 @@ fn display_post_console_hint() {
 }
 
 fn display_deploy_hint() {
-    println!("");
+    println!();
     display_hint_header();
     println!(
         "{}",

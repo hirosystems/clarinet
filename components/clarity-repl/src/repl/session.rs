@@ -14,7 +14,7 @@ use clarity::types::chainstate::StacksAddress;
 use clarity::types::StacksEpochId;
 use clarity::vm::analysis::ContractAnalysis;
 use clarity::vm::ast::ContractAST;
-use clarity::vm::diagnostic::Diagnostic;
+use clarity::vm::diagnostic::{Diagnostic, Level};
 use clarity::vm::docs::{make_api_reference, make_define_reference, make_keyword_reference};
 use clarity::vm::errors::Error;
 use clarity::vm::functions::define::DefineFunctions;
@@ -551,6 +551,18 @@ impl Session {
         test_name: Option<String>,
         ast: &mut Option<ContractAST>,
     ) -> Result<ExecutionResult, Vec<Diagnostic>> {
+        if contract.clarity_version > ClarityVersion::default_for_epoch(contract.epoch) {
+            let diagnostic = Diagnostic {
+                level: Level::Error,
+                message: format!(
+                    "{} can not be used with {}",
+                    contract.clarity_version, contract.epoch
+                ),
+                spans: vec![],
+                suggestion: None,
+            };
+            return Err(vec![diagnostic]);
+        }
         let mut hooks: Vec<&mut dyn EvalHook> = Vec::new();
         let mut coverage = if let Some(test_name) = test_name {
             Some(TestCoverageReport::new(test_name.into()))
@@ -1392,6 +1404,24 @@ mod tests {
             output[1],
             red!("Parsing error: invalid digit found in string")
         );
+    }
+
+    #[test]
+    fn clarity_epoch_mismatch() {
+        let settings = SessionSettings::default();
+        let mut session = Session::new(settings);
+        session.start().expect("session could not start");
+        let snippet = "(define-data-var x uint u0)";
+        let contract = ClarityContract {
+            code_source: ClarityCodeSource::ContractInMemory(snippet.to_string()),
+            name: "should_error".to_string(),
+            deployer: ContractDeployer::Address("ST000000000000000000002AMW42H".into()),
+            clarity_version: ClarityVersion::Clarity2,
+            epoch: StacksEpochId::Epoch20,
+        };
+
+        let result = session.deploy_contract(&contract, None, false, None, &mut None);
+        assert!(result.is_err(), "Expected error for clarity mismatch");
     }
 
     #[test]

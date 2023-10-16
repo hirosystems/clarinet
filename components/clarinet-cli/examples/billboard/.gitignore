@@ -1,0 +1,9 @@
+.cache
+
+logs
+*.log
+npm-debug.log*
+coverage
+*.info
+costs-reports.json
+node_modules

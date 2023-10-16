@@ -1,18 +1,11 @@
-
 {
-    "version": "2.0.0",
-    "tasks": [
-        {
-            "label": "check contracts",
-            "group": "test",
-            "type": "shell",
-            "command": "clarinet check"
-        },
-        {
-            "label": "test contracts",
-            "group": "test",
-            "type": "shell",
-            "command": "clarinet test"
-        }
-    ]
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "check contracts",
+      "group": "test",
+      "type": "shell",
+      "command": "clarinet check"
+    }
+  ]
 }
