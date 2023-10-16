@@ -9,7 +9,7 @@ use clarinet_deployments::types::DeploymentSpecification;
 use hiro_system_kit::Drain;
 use hiro_system_kit::{slog, slog_async, slog_term};
 use stacks_network::{
-    chainhook_sdk::chainhook_types::{BitcoinNetwork, StacksNetwork},
+    chainhook_sdk::types::{BitcoinNetwork, StacksNetwork},
     chainhook_sdk::utils::Context,
     do_run_local_devnet, load_chainhooks, ChainsCoordinatorCommand, DevnetEvent,
     DevnetOrchestrator, LogData,

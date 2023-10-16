@@ -4,9 +4,13 @@ use crate::event::ServiceStatusData;
 use crate::event::Status;
 use crate::orchestrator::ServicesMapHosts;
 use base58::FromBase58;
-use chainhook_sdk::chainhook_types::BitcoinBlockSignaling;
-use chainhook_sdk::chainhook_types::BitcoinNetwork;
 use chainhook_sdk::chainhooks::types::ChainhookConfig;
+use chainhook_sdk::types::BitcoinBlockSignaling;
+use chainhook_sdk::types::BitcoinChainEvent;
+use chainhook_sdk::types::BitcoinNetwork;
+use chainhook_sdk::types::StacksChainEvent;
+use chainhook_sdk::types::StacksNetwork;
+use chainhook_sdk::types::StacksNodeConfig;
 use chainhook_sdk::utils::Context;
 use clarinet_deployments::onchain::TransactionStatus;
 use clarinet_deployments::onchain::{
@@ -17,12 +21,10 @@ use clarinet_files::{self, AccountConfig, DevnetConfig, NetworkManifest, Project
 use hiro_system_kit;
 use hiro_system_kit::slog;
 
-use chainhook_sdk::chainhook_types::{BitcoinChainEvent, StacksChainEvent};
 use chainhook_sdk::observer::{
     start_event_observer, EventObserverConfig, ObserverCommand, ObserverEvent,
     StacksChainMempoolEvent,
 };
-use clarinet_files::chainhook_types::StacksNetwork;
 
 use clarity_repl::clarity::address::AddressHashMode;
 use clarity_repl::clarity::util::hash::{hex_bytes, Hash160};
@@ -111,18 +113,21 @@ impl DevnetEventObserverConfig {
         };
         let event_observer_config = EventObserverConfig {
             bitcoin_rpc_proxy_enabled: true,
-            event_handlers: vec![],
             chainhook_config: Some(chainhooks),
             ingestion_port: devnet_config.orchestrator_ingestion_port,
             bitcoind_rpc_username: devnet_config.bitcoin_node_username.clone(),
             bitcoind_rpc_password: devnet_config.bitcoin_node_password.clone(),
             bitcoind_rpc_url: format!("http://{}", services_map_hosts.bitcoin_node_host),
-            bitcoin_block_signaling: BitcoinBlockSignaling::Stacks("http://0.0.0.0:20443".into()),
-            stacks_node_rpc_url: format!("http://{}", services_map_hosts.stacks_node_host),
+            bitcoin_block_signaling: BitcoinBlockSignaling::Stacks(StacksNodeConfig {
+                rpc_url: format!("http://{}", services_map_hosts.stacks_node_host),
+                ingestion_port: 20445, // todo: confirm
+            }),
+
             display_logs: true,
             cache_path: devnet_config.working_dir.to_string(),
             bitcoin_network: BitcoinNetwork::Regtest,
-            stacks_network: chainhook_sdk::chainhook_types::StacksNetwork::Devnet,
+            stacks_network: StacksNetwork::Devnet,
+            data_handler_tx: None,
         };
 
         DevnetEventObserverConfig {
@@ -200,14 +205,14 @@ pub async fn start_chains_coordinator(
     let observer_command_tx_moved = observer_command_tx.clone();
     let ctx_moved = ctx.clone();
     let _ = hiro_system_kit::thread_named("Event observer").spawn(move || {
-        let future = start_event_observer(
+        let _ = start_event_observer(
             event_observer_config,
             observer_command_tx_moved,
             observer_command_rx,
             Some(observer_event_tx_moved),
+            None,
             ctx_moved,
         );
-        let _ = hiro_system_kit::nestable_block_on(future);
     });
 
     // Spawn bitcoin miner controller
@@ -417,7 +422,7 @@ pub async fn start_chains_coordinator(
                 }
             }
             ObserverEvent::PredicateRegistered(hook) => {
-                let message = format!("New hook \"{}\" registered", hook.name());
+                let message = format!("New hook \"{}\" registered", hook.key());
                 let _ = devnet_event_tx.send(DevnetEvent::info(message));
             }
             ObserverEvent::PredicateDeregistered(_hook) => {}
