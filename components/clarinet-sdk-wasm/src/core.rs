@@ -323,6 +323,15 @@ impl SDK {
         }
 
         let mut session = initiate_session_from_deployment(&manifest);
+        update_session_with_genesis_accounts(&mut session, &deployment);
+        log!("> asts: {:?}", &artifacts.asts.keys());
+        let results = update_session_with_contracts_executions(
+            &mut session,
+            &deployment,
+            Some(&artifacts.asts),
+            false,
+            Some(DEFAULT_EPOCH),
+        );
 
         if let Some(ref spec) = deployment.genesis {
             for wallet in spec.wallets.iter() {
@@ -333,15 +342,6 @@ impl SDK {
                     .insert(wallet.name.clone(), wallet.address.to_string());
             }
         }
-
-        update_session_with_genesis_accounts(&mut session, &deployment);
-        let results = update_session_with_contracts_executions(
-            &mut session,
-            &deployment,
-            Some(&artifacts.asts),
-            false,
-            Some(DEFAULT_EPOCH),
-        );
 
         for (contract_id, (_, location)) in deployment.contracts {
             self.contracts_locations
