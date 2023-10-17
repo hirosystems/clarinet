@@ -621,12 +621,12 @@ impl<'a> ASTVisitor<'a> for ASTDependencyDetector<'a> {
     fn visit_dynamic_contract_call(
         &mut self,
         expr: &'a SymbolicExpression,
-        trait_ref: &'a SymbolicExpression,
+        callable_expr: &'a SymbolicExpression,
         function_name: &'a ClarityName,
         args: &'a [SymbolicExpression],
     ) -> bool {
-        let trait_instance = trait_ref.match_atom().unwrap_or(&DEFAULT_NAME);
-        if let Some(trait_identifier) = self.get_param_trait(trait_instance) {
+        let callable = callable_expr.match_atom().unwrap_or(&DEFAULT_NAME);
+        if let Some(trait_identifier) = self.get_param_trait(callable) {
             let dependencies = if let Some(trait_definition) = self.defined_traits.get(&(
                 &trait_identifier.contract_identifier,
                 &trait_identifier.name,
@@ -645,7 +645,7 @@ impl<'a> ASTVisitor<'a> for ASTDependencyDetector<'a> {
             for dependency in dependencies {
                 self.add_dependency(self.current_contract.unwrap(), &dependency);
             }
-        } else if let Some(contract_constant) = self.get_contract_constant(trait_instance) {
+        } else if let Some(contract_constant) = self.get_contract_constant(callable) {
             self.add_dependency(self.current_contract.unwrap(), contract_constant);
         }
         true
