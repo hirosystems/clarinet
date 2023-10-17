@@ -1,11 +1,16 @@
 use super::ChainsCoordinatorCommand;
-use super::DevnetEvent;
+use crate::event::DevnetEvent;
+use crate::event::ServiceStatusData;
+use crate::event::Status;
 use crate::orchestrator::ServicesMapHosts;
-use crate::{ServiceStatusData, Status};
 use base58::FromBase58;
-use chainhook_sdk::chainhook_types::BitcoinBlockSignaling;
-use chainhook_sdk::chainhook_types::BitcoinNetwork;
 use chainhook_sdk::chainhooks::types::ChainhookConfig;
+use chainhook_sdk::types::BitcoinBlockSignaling;
+use chainhook_sdk::types::BitcoinChainEvent;
+use chainhook_sdk::types::BitcoinNetwork;
+use chainhook_sdk::types::StacksChainEvent;
+use chainhook_sdk::types::StacksNetwork;
+use chainhook_sdk::types::StacksNodeConfig;
 use chainhook_sdk::utils::Context;
 use clarinet_deployments::onchain::TransactionStatus;
 use clarinet_deployments::onchain::{
@@ -16,12 +21,10 @@ use clarinet_files::{self, AccountConfig, DevnetConfig, NetworkManifest, Project
 use hiro_system_kit;
 use hiro_system_kit::slog;
 
-use chainhook_sdk::chainhook_types::{BitcoinChainEvent, StacksChainEvent};
 use chainhook_sdk::observer::{
     start_event_observer, EventObserverConfig, ObserverCommand, ObserverEvent,
     StacksChainMempoolEvent,
 };
-use clarinet_files::chainhook_types::StacksNetwork;
 
 use clarity_repl::clarity::address::AddressHashMode;
 use clarity_repl::clarity::util::hash::{hex_bytes, Hash160};
@@ -55,6 +58,7 @@ pub struct DevnetEventObserverConfig {
     pub manifest: ProjectManifest,
     pub deployment_fee_rate: u64,
     pub services_map_hosts: ServicesMapHosts,
+    pub network_manifest: NetworkManifest,
 }
 
 impl DevnetEventObserverConfig {
@@ -90,44 +94,55 @@ impl DevnetEventObserverConfig {
     pub fn new(
         devnet_config: DevnetConfig,
         manifest: ProjectManifest,
+        network_manifest: Option<NetworkManifest>,
         deployment: DeploymentSpecification,
         chainhooks: ChainhookConfig,
         ctx: &Context,
         services_map_hosts: ServicesMapHosts,
     ) -> Self {
         ctx.try_log(|logger| slog::info!(logger, "Checking contracts"));
-        let network_manifest = NetworkManifest::from_project_manifest_location(
-            &manifest.location,
-            &StacksNetwork::Devnet.get_networks(),
-            Some(&manifest.project.cache_location),
-            None,
-        )
-        .expect("unable to load network manifest");
-
+        let network_manifest = match network_manifest {
+            Some(n) => n,
+            None => NetworkManifest::from_project_manifest_location(
+                &manifest.location,
+                &StacksNetwork::Devnet.get_networks(),
+                Some(&manifest.project.cache_location),
+                None,
+            )
+            .expect("unable to load network manifest"),
+        };
         let event_observer_config = EventObserverConfig {
             bitcoin_rpc_proxy_enabled: true,
-            event_handlers: vec![],
             chainhook_config: Some(chainhooks),
             ingestion_port: devnet_config.orchestrator_ingestion_port,
             bitcoind_rpc_username: devnet_config.bitcoin_node_username.clone(),
             bitcoind_rpc_password: devnet_config.bitcoin_node_password.clone(),
             bitcoind_rpc_url: format!("http://{}", services_map_hosts.bitcoin_node_host),
-            bitcoin_block_signaling: BitcoinBlockSignaling::Stacks("http://0.0.0.0:20443".into()),
-            stacks_node_rpc_url: format!("http://{}", services_map_hosts.stacks_node_host),
+            bitcoin_block_signaling: BitcoinBlockSignaling::Stacks(StacksNodeConfig {
+                rpc_url: format!("http://{}", services_map_hosts.stacks_node_host),
+                ingestion_port: devnet_config.orchestrator_ingestion_port,
+            }),
+
             display_logs: true,
             cache_path: devnet_config.working_dir.to_string(),
             bitcoin_network: BitcoinNetwork::Regtest,
-            stacks_network: chainhook_sdk::chainhook_types::StacksNetwork::Devnet,
+            stacks_network: StacksNetwork::Devnet,
+            data_handler_tx: None,
         };
 
         DevnetEventObserverConfig {
             devnet_config,
             event_observer_config,
-            accounts: network_manifest.accounts.into_values().collect::<Vec<_>>(),
+            accounts: network_manifest
+                .accounts
+                .clone()
+                .into_values()
+                .collect::<Vec<_>>(),
             manifest,
             deployment,
             deployment_fee_rate: network_manifest.network.deployment_fee_rate,
             services_map_hosts,
+            network_manifest,
         }
     }
 }
@@ -155,7 +170,7 @@ pub async fn start_chains_coordinator(
     // This thread becomes dormant once the encoding is done, and proceed to the actual deployment once
     // the event DeploymentCommand::Start is received.
     perform_protocol_deployment(
-        &config.manifest,
+        &config.network_manifest,
         &config.deployment,
         deployment_events_tx,
         deployments_command_rx,
@@ -190,14 +205,14 @@ pub async fn start_chains_coordinator(
     let observer_command_tx_moved = observer_command_tx.clone();
     let ctx_moved = ctx.clone();
     let _ = hiro_system_kit::thread_named("Event observer").spawn(move || {
-        let future = start_event_observer(
+        let _ = start_event_observer(
             event_observer_config,
             observer_command_tx_moved,
             observer_command_rx,
             Some(observer_event_tx_moved),
+            None,
             ctx_moved,
         );
-        let _ = hiro_system_kit::nestable_block_on(future);
     });
 
     // Spawn bitcoin miner controller
@@ -378,6 +393,7 @@ pub async fn start_chains_coordinator(
                     let res = publish_stacking_orders(
                         &config.devnet_config,
                         &config.accounts,
+                        &config.services_map_hosts,
                         config.deployment_fee_rate,
                         bitcoin_block_height as u32,
                     )
@@ -406,7 +422,7 @@ pub async fn start_chains_coordinator(
                 }
             }
             ObserverEvent::PredicateRegistered(hook) => {
-                let message = format!("New hook \"{}\" registered", hook.name());
+                let message = format!("New hook \"{}\" registered", hook.key());
                 let _ = devnet_event_tx.send(DevnetEvent::info(message));
             }
             ObserverEvent::PredicateDeregistered(_hook) => {}
@@ -453,19 +469,18 @@ pub async fn start_chains_coordinator(
 }
 
 pub fn perform_protocol_deployment(
-    manifest: &ProjectManifest,
+    network_manifest: &NetworkManifest,
     deployment: &DeploymentSpecification,
     deployment_event_tx: Sender<DeploymentEvent>,
     deployment_command_rx: Receiver<DeploymentCommand>,
     override_bitcoin_rpc_url: Option<String>,
     override_stacks_rpc_url: Option<String>,
 ) {
-    let manifest = manifest.clone();
     let deployment = deployment.clone();
-
+    let network_manifest = network_manifest.clone();
     let _ = hiro_system_kit::thread_named("Deployment execution").spawn(move || {
         apply_on_chain_deployment(
-            &manifest,
+            network_manifest,
             deployment,
             deployment_event_tx,
             deployment_command_rx,
@@ -516,6 +531,7 @@ pub fn relay_devnet_protocol_deployment(
 pub async fn publish_stacking_orders(
     devnet_config: &DevnetConfig,
     accounts: &Vec<AccountConfig>,
+    services_map_hosts: &ServicesMapHosts,
     fee_rate: u64,
     bitcoin_block_height: u32,
 ) -> Option<usize> {
@@ -523,7 +539,7 @@ pub async fn publish_stacking_orders(
         return None;
     }
 
-    let stacks_node_rpc_url = format!("http://localhost:{}", devnet_config.stacks_node_rpc_port);
+    let stacks_node_rpc_url = format!("http://{}", &services_map_hosts.stacks_node_host);
 
     let mut transactions = 0;
     let pox_info: PoxInfo = reqwest::get(format!("{}/v2/pox", stacks_node_rpc_url))

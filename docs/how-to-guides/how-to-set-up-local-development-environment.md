@@ -6,12 +6,13 @@ title: Set up local Development Environment
 
 This article helps you with creating a new project and develop a clarity smart contract.
 
-*Topics covered in this guide*:
+_Topics covered in this guide_:
 
-* [Develop a clarity smart contract](#develop-a-smart-contract)
-* [Test and interact with smart contracts](#testing-with-clarinet)
+- [Develop a clarity smart contract](#develop-a-smart-contract)
+- [Test and interact with smart contracts](#testing-with-clarinet)
 
 ## Develop a smart contract
+
 Once you have installed Clarinet, you can begin a new Clarinet project with the command:
 
 ```sh
@@ -56,18 +57,20 @@ path = "contracts/my-contract.clar"
 
 You can specify the clarity version of your contract in the `Clarinet.toml` configuration file by updating it as shown below.
 
-```
+```toml
 [contracts.cbtc-token]
 path = "contracts/cbtc-token.clar"
 clarity_version = 1
 ```
-```
+
+```toml
 [contracts.cbtc-token]
 path = "contracts/cbtc-token.clar"
 clarity_version = 2
 ```
 
 At this point, you can begin editing your smart contract in the `contracts` directory. At any point, while you are developing, you can use the command `clarinet check` to check the syntax of your smart contract.
+If you are using VSCode, the [Clarity extension](https://marketplace.visualstudio.com/items?itemName=HiroSystems.clarity-lsp) does the check for you.
 
 Review this comprehensive walkthrough video for a more in-depth overview of developing with Clarinet.
 
@@ -113,16 +116,26 @@ You can use the `::help` command for valid console commands.
 
 ```
 >> ::help
-::help                            Display help
-::list_functions                  Display all the native functions available in Clarity
-::describe_function <function>    Display documentation for a given native function fn-name
-::mint_stx <principal> <amount>   Mint STX balance for a given principal
-::set_tx_sender <principal>       Set tx-sender variable to principal
-::get_assets_maps                 Get assets maps for active accounts
-::get_costs <expr>                Display the cost analysis
-::get_contracts                   Get contracts
-::get_block_height                Get current block height
-::advance_chain_tip <count>       Simulate mining of <count> blocks
+::help                                  Display help
+::functions                             Display all the native functions available in clarity
+::keywords                              Display all the native keywords available in clarity
+::describe <function> | <keyword>       Display documentation for a given native function or keyword
+::mint_stx <principal> <amount>         Mint STX balance for a given principal
+::set_tx_sender <principal>             Set tx-sender variable to principal
+::get_assets_maps                       Get assets maps for active accounts
+::get_costs <expr>                      Display the cost analysis
+::get_contracts                         Get contracts
+::get_block_height                      Get current block height
+::advance_chain_tip <count>             Simulate mining of <count> blocks
+::set_epoch <2.0> | <2.05> | <2.1>      Update the current epoch
+::get_epoch                             Get current epoch
+::toggle_costs                          Display cost analysis after every expression
+::debug <expr>                          Start an interactive debug session executing <expr>
+::trace <expr>                          Generate an execution trace for <expr>
+::reload                                Reload the existing contract(s) in the session
+::read <filename>                       Read expressions from a file
+::encode <expr>                         Encode an expression to a Clarity Value bytes representation
+::decode <bytes>                        Decode a Clarity Value bytes representation
 ```
 
 The console commands control the REPL chain's state, letting you get information about it and advance the chain
@@ -142,51 +155,16 @@ Note that by default, commands are always executed as the `deployer` address, wh
 
 You can refer to the [Clarity language reference](https://docs.stacks.co/docs/clarity/language-functions) for a complete overview of all Clarity functions.
 
-### Testing with the test harness
+### Testing smart contracts
 
-The test harness is a Deno testing library that can simulate the blockchain, exercise functions of the contract, and
-make testing assertions about the state of the contract or chain.
+Smart contracts can best tested with Node.js and Vitest thanks to the clarinet-sdk. See the [testing guide](../feature-guides/test-contract-with-clarinet-sdk.md) to learn more.
 
-You can run any tests configured in the `tests` directory with the command:
-
-```sh
-clarinet test
-```
-
-When you create a new contract, a test suite is automatically created for it. You can populate the test suite with
-unit tests as you develop the contract.
-
-An example unit test for the `echo-number` function is provided below:
-
-```ts
-...
-Clarinet.test({
-  name: 'the echo-number function returns the input value ok',
-  async fn(chain: Chain, accounts: Map<string, Account>) {
-    const testNum = '42';
-    let deployerWallet = accounts.get('deployer')!;
-    let block = chain.mineBlock([
-      Tx.contractCall(
-        `${deployerWallet.address}.my-contract`,
-        'echo-number',
-        [testNum],
-        deployerWallet.address,
-      ),
-    ]);
-    assertEquals(block.receipts.length, 1); // assert that the block received a single tx
-    assertEquals(block.receipts[0].result, `(ok ${testNum})`); // assert that the result of the tx was ok and the input number
-    assertEquals(block.height, 2); // assert that only a single block was mined
-  },
-});
-```
-
-For more information on assertions, review [asserts](https://deno.land/std@0.90.0/testing/asserts.ts) in the Deno standard library. For more information on the available Clarity calls in Deno, review the [Deno Clarinet library](https://github.com/hirosystems/clarinet/blob/develop/components/clarinet-deno/index.ts). For more information on testing Clarity contracts, review the [Test Contract How-to Guide](how-to-test-contract.md).
+> `clarinet test` is now depracated and the recommended way is to use the JS SDK.
 
 ## Additional reading
 
 - [Clarinet README](https://github.com/hirosystems/clarinet#clarinet)
 - [clarinet repository](https://github.com/hirosystems/clarinet)
 - [Clarity language reference](https://docs.stacks.co/references/language-functions)
-- [Deno standard library - asserts](https://deno.land/std@0.90.0/testing/asserts.ts)
-- [Clarity visual studio code plugin](https://marketplace.visualstudio.com/items?itemName=HiroSystems.clarity-lsp)
-
+- [Clarinet SDK](https://www.npmjs.com/package/@hirosystems/clarinet-sdk)
+- [Clarity VSCode extension](https://marketplace.visualstudio.com/items?itemName=HiroSystems.clarity-lsp)

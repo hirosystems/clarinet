@@ -7,6 +7,7 @@ extern crate serde;
 #[macro_use]
 extern crate serde_derive;
 
+pub mod diagnostic_digest;
 #[cfg(feature = "onchain")]
 pub mod onchain;
 pub mod requirements;

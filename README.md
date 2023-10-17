@@ -348,6 +348,8 @@ This annotation tells the check-checker to consider the specified variables to b
 
 ### Execute a test suite
 
+> Warning: `clarinet test` will soon be deprecated in favor of a new way of testing smart contracts. The new documentation is under construction. In the meantime, learn more [in the clarinet-sdk Readme](https://github.com/hirosystems/clarinet/blob/01da3550670f321a2f19fd3b0f8df0fb4b769b08/components/clarinet-sdk/README.md).
+
 Clarinet provides a testing harness based on Deno that can enable you to create automated unit tests or pseudo-integration tests using Typescript.
 
 ```bash
@@ -393,10 +395,10 @@ open coverage/index.html
 Clarinet can also be used to optimize costs. When executing a test suite, Clarinet will keep track of all the costs being computed when executing the `contract-call`, and display the most expensive ones in a table:
 
 ```bash
-clarinet test --cost
+clarinet test --costs
 ```
 
-The `--cost` option can be used in conjunction with `--watch` and filters to maximize productivity, as illustrated here:
+The `--costs` option can be used in conjunction with `--watch` and filters to maximize productivity, as illustrated here:
 
 ![costs](docs/images/costs.gif)
 
@@ -448,6 +450,19 @@ or with the command:
 ```bash
 clarinet requirements add SP2KAF9RF86PVX3NEE27DFV1CQX0T4WGR41X3S45C.bitcoin-whales
 ```
+
+When adding a contract requirement to your project, the epoch of your contracts listed in the Clarinet.toml must be _greater than or equal_ to the epoch of the required contract. 
+For example, if the contract `SP3K8BC0PPEVCV7NZ6QSRWPQ2JE9E5B6N3PA0KBR9.amm-swap-pool-v1-1` is added as a requirement, the contracts using this requirement would need to have an epoch of at least 2.3 in the Clarinet.toml:
+```toml
+[[project.requirements]]
+contract_id = 'SP3K8BC0PPEVCV7NZ6QSRWPQ2JE9E5B6N3PA0KBR9.amm-swap-pool-v1-1'
+
+[contracts.test]
+path = 'contracts/test.clar'
+clarity_version = 2
+epoch = 2.3
+```
+
 
 Clarinet will be able to resolve the `contract-call?` statements invoking requirements present in your local contracts by downloading and caching a copy of these contracts and using them during the execution of your test suites. All of the different features are available in `clarinet`.
 
@@ -597,27 +612,6 @@ jobs:
 You may also add the steps above in your existing workflows. The generated code coverage output can then be used as is with GitHub Apps like https://codecov.io.
 
 For more information on how you can use GitHub Actions with Clarinet, please see the [A Simple CI With Clarinet and GitHub](https://www.youtube.com/watch?v=cEv6Mi4EcKQ&list=PL5Ujm489LoJaAz9kUJm8lYUWdGJ2AnQTb&index=8) YouTube video
-
-### Extensions
-
-Clarinet can easily be extended by community members: open source contributions to Clarinet are welcome, but you may also write your own Clarinet extensions if you want to integrate Clarity contracts with your own tooling and workflow.
-
-| Name                      | wallet access | disk write | disk read | Deployment                                                            | Description                                                                                                                                       |
-| ------------------------- | ------------- | ---------- | --------- | --------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
-| stacksjs-helper-generator | no            | yes        | no        | https://deno.land/x/clarinet@v1.0.2/ext/stacksjs-helper-generator.ts | Facilitates contract integration by generating some typescript constants that can be used with stacks.js. Never hard code a stacks address again! |
-|                           |               |            |           |                                                                       |
-
-#### How to use extensions
-
-Extensions are run with the following syntax:
-
-```
-clarinet run --allow-write https://deno.land/x/clarinet@v0.29.0/ext/stacksjs-helper-generator.ts
-```
-
-An extension can be deployed as a standalone plugin on Deno, or may also be a local file if it includes sensitive / private setup informations.
-
-As illustrated in the example above, permissions (wallet / disk read / disk write) are declared using command flags. If at runtime, the Clarinet extension is trying to write to disk, read disk, or access wallets without permission, the script will fail.
 
 ### Debug your contracts
 

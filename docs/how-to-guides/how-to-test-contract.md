@@ -2,16 +2,22 @@
 title: Test Contract
 ---
 
-Clarinet supports automatic testing, where your blockchain application requirements can be converted to test cases. Clarinet comes with a testing harness based on Deno that applies the unit tests you write in TypeScript to your smart contracts.
+> Warning: **`clarinet test` will soon be deprecated in favor of a new way of testing smart contracts.**
+> Follow [this guide](../feature-guides/test-contract-with-clarinet-sdk.md) to learn how to test smart contract with Vitest and the Clarinet SDK.
+
+---
+
+Clarinet 1 supports automatic testing, where your blockchain application requirements can be converted to test cases. Clarinet comes with a testing harness based on Deno that applies the unit tests you write in TypeScript to your smart contracts.
 
 *Topics covered in this guide*:
 
-* [Instructions to write unit tests](#clarity-contracts-and-unit-tests)
-* [Increase test coverage](#measure-and-increase-code-coverage)
-* [Clarinet usage to optimize costs](#cost-optimization)
-* [Clarity REPL console](#load-contracts-in-a-console)
-* [Interact with contracts on mainnet](#interacting-with-contracts-deployed-on-mainnet)
-* [Clarinet usage in Github actions](#use-clarinet-in-your-ci-workflow-as-a-github-action)
+- [Clarity contracts and unit tests](#clarity-contracts-and-unit-tests)
+- [Measure and increase code coverage](#measure-and-increase-code-coverage)
+- [Cost optimization](#cost-optimization)
+- [Load contracts in a console](#load-contracts-in-a-console)
+- [Spawn a local Devnet](#spawn-a-local-devnet)
+- [Interacting with contracts](#interacting-with-contracts)
+- [Use Clarinet in your CI workflow as a GitHub Action](#use-clarinet-in-your-ci-workflow-as-a-github-action)
 
 ## Clarity contracts and unit tests
 
@@ -39,7 +45,7 @@ Let us consider a `counter` smart contract to understand how to write unit tests
 
 Our `counter` application keeps track of an initialized value, allows for incrementing and decrementing, and prints actions as a log. Let us turn these requirements into unit tests.
 
-### Unit tests for `counter` example
+### Unit tests for `counter` example  <!-- omit from toc -->
 
 When you created your Clarity contract with `clarinet contract new <my-project>`, Clarinet automatically created a test file for the contract within the tests directory:  `tests/my-projects_test.ts`. Other files under the `tests/` directory following the Deno test naming convention will also be included:
 
@@ -51,9 +57,15 @@ Within these tests, developers can simulate mining a block containing transactio
 
 >  **_NOTE:_**
 >
-> If you see an error in Visual Studio Code (VS Code) on the imports in the generated test file(s) that says, "An import path cannot end with a '.ts' extension" (example below), installing the [Deno extension](https://marketplace.visualstudio.com/items?itemName=denoland.vscode-deno) will resolve this error.
+> If you see an error in Visual Studio Code (VS Code) on the imports in the generated test file(s) that says, "An import path cannot end with a '.ts' extension" (example below), follow the below steps to resolve the error:
+![VS Code deno error](../images/deno-error.png) 
+> - Install the [Deno extension](https://marketplace.visualstudio.com/items?itemName=denoland.vscode-deno) in VS Code
+> - [Install Deno](https://deno.land/manual@v1.35.3/getting_started/installation) on your computer
+> - In VS Code, open the command palette (`Ctrl+Shift+P` in `Windows`; `Cmd+Shift+P` on `Mac`) and run the `Deno: Initialize Workspace Configuration` and `Deno: Cache Dependencies` commands
+> - Open Command Prompt (Terminal on a Mac); navigate to the tests folder in your project and run `deno run test-file-name.ts` (Make sure to replace `test-file-name` with the actual name of the test file, `counter_test.ts` in the current example )
+> - Quit and restart VS Code
 
-![VS Code deno error](../images/deno-error.png)
+
 
 Clarinet allows you to instantly initialize wallets and populate them with tokens, which helps to interactively or programmatically test the behavior of the smart contract. Blocks are mined instantly, so you can control the number of blocks that are mined between testing transactions.
 
@@ -92,7 +104,7 @@ For a complete list of classes, objects, and interfaces available, see [Deno's C
 You can watch a step-by-step walkthrough of using `clarinet test` and watch [Executing Tests and Checking Code Coverage](https://www.youtube.com/watch?v=j2TZ560xEPA&list=PL5Ujm489LoJaAz9kUJm8lYUWdGJ2AnQTb&index=10).
 
 
-### Comprehensive unit tests for `counter`
+### Comprehensive unit tests for `counter`  <!-- omit from toc -->
 
 Let us now write a higher coverage test suite.
 
@@ -186,10 +198,10 @@ open coverage/index.html
 Clarinet can also be used for optimizing costs. When you execute a test suite, Clarinet keeps track of all costs being computed when executing the `contract-call`, and display the most expensive ones in a table:
 
 ```bash
-clarinet test --cost
+clarinet test --costs
 ```
 
-The `--cost` option can be used in conjunction with `--watch` and filters to maximize productivity, as illustrated here:
+The `--costs` option can be used in conjunction with `--watch` and filters to maximize productivity, as illustrated here:
 
 ![costs](../images//costs.gif)
 
@@ -221,7 +233,9 @@ clarinet integrate
 
 Make sure that you have a working installation of Docker running locally.
 
-## Interacting with contracts deployed on Mainnet
+## Interacting with contracts
+
+### Deployed on Mainnet <!-- omit from toc -->
 
 Composition and interactions between protocols and contracts are one of the key innovations in blockchains. 
 Clarinet was designed to handle these types of interactions.
@@ -249,9 +263,9 @@ As a step-by-step example, we use here the following contract, [**bitcoin-whales
 
 If you examine this contract, you will see that there are 3 different dependencies: two from the **same** project (included in the same `Clarinet.toml` file), and one referring to a contract deployed outside of the current project.
 
-## Same Project
+### Same Project <!-- omit from toc -->
 
-In the contract snippet below *(line:260-265)*, there are dependencies on the contracts conversion and conversion-v2 which are included in the same `Clarinet.toml` file.
+In the contract snippet below, there are dependencies on the contracts conversion and conversion-v2 which are included in the same `Clarinet.toml` file.
 
 ```clarity
 (define-read-only (get-token-uri (token-id uint))
@@ -262,9 +276,9 @@ In the contract snippet below *(line:260-265)*, there are dependencies on the co
 )
 ```
 
-## External Deployer 
+### External Deployer <!-- omit from toc -->
 
-In this snippet, there is a dependency on the `nft-trait` *(line:001)* deployed by `'SP2PABAF9FTAJYNFZH93XENAJ8FVY99RRM50D2JG9`.
+In this snippet, there is a dependency on the `nft-trait` deployed by `'SP2PABAF9FTAJYNFZH93XENAJ8FVY99RRM50D2JG9`.
 
 ```clarity
 (impl-trait 'SP2PABAF9FTAJYNFZH93XENAJ8FVY99RRM50D2JG9.nft-trait.nft-trait)

@@ -1,112 +1,84 @@
-import {
-  Clarinet,
-  Tx,
-  Chain,
-  Account,
-  types,
-} from "https://deno.land/x/clarinet@v1.5.4/index.ts";
+import { Cl } from "@stacks/transactions";
+import { describe, expect, it } from "vitest";
 
-Clarinet.test({
-  name: "Ensure that nft can be transferred form one account to another",
-  fn(chain: Chain, accounts: Map<string, Account>) {
-    const deployer = accounts.get("deployer")!;
-    const wallet_1 = accounts.get("wallet_1")!;
-    const wallet_2 = accounts.get("wallet_2")!;
+const accounts = simnet.getAccounts();
+const address1 = accounts.get("wallet_1")!;
+const address2 = accounts.get("wallet_2")!;
 
-    let block = chain.mineBlock([
-      Tx.contractCall(
-        "simple-nft",
-        "test-mint",
-        [types.principal(wallet_1.address)],
-        wallet_1.address
-      ),
-    ]);
+/*
+  The test below is an example. Learn more in the clarinet-sdk readme:
+  https://github.com/hirosystems/clarinet/blob/develop/components/clarinet-sdk/README.md
+*/
 
-    block.receipts[0].result.expectOk().expectBool(true);
-
-    block = chain.mineBlock([
-      Tx.contractCall(
-        "simple-nft",
-        "transfer",
-        [
-          types.uint(1),
-          types.principal(wallet_1.address),
-          types.principal(wallet_2.address),
-        ],
-        wallet_1.address
-      ),
-    ]);
-
-    block.receipts[0].result.expectOk().expectBool(true);
-
-    block.receipts[0].events.expectNonFungibleTokenTransferEvent(
-      types.uint(1),
-      wallet_1.address,
-      wallet_2.address,
-      `${deployer.address}.simple-nft`,
-      "nft"
+describe("nft basic features", () => {
+  it("Ensure that nft can be minted", () => {
+    const { result, events } = simnet.callPublicFn(
+      "simple-nft",
+      "test-mint",
+      [Cl.standardPrincipal(address1)],
+      address1
     );
-  },
-});
 
-Clarinet.test({
-  name: "Ensure that nft can be minted",
-  fn(chain: Chain, accounts: Map<string, Account>) {
-    const deployer = accounts.get("deployer")!;
-    const wallet_1 = accounts.get("wallet_1")!;
+    expect(result).toBeOk(Cl.bool(true));
 
-    const block = chain.mineBlock([
-      Tx.contractCall(
-        "simple-nft",
-        "test-mint",
-        [types.principal(wallet_1.address)],
-        wallet_1.address
-      ),
-    ]);
+    expect(events).toContainEqual({
+      event: "nft_mint_event",
+      data: {
+        asset_identifier: `${simnet.deployer}.simple-nft::nft`,
+        raw_value: `0x${Buffer.from(Cl.serialize(Cl.uint(1))).toString("hex")}`,
+        recipient: address1,
+        // we can use asymetric for clarity values
+        value: expect.toBeUint(1),
+      },
+    });
+  });
 
-    block.receipts[0].result.expectOk().expectBool(true);
+  it("Ensure that nft can be transferred form one account to another", () => {
+    simnet.callPublicFn("simple-nft", "test-mint", [Cl.standardPrincipal(address1)], address1);
 
-    block.receipts[0].events.expectNonFungibleTokenMintEvent(
-      types.uint(1),
-      wallet_1.address,
-      `${deployer.address}.simple-nft`,
-      "nft"
+    const { result, events } = simnet.callPublicFn(
+      "simple-nft",
+      "transfer",
+      [Cl.uint(1), Cl.standardPrincipal(address1), Cl.standardPrincipal(address2)],
+      address1
     );
-  },
-});
 
-Clarinet.test({
-  name: "Ensure that nft can be burned",
-  fn(chain: Chain, accounts: Map<string, Account>) {
-    const deployer = accounts.get("deployer")!;
-    const wallet_1 = accounts.get("wallet_1")!;
+    expect(result).toBeOk(Cl.bool(true));
+    expect(events).toHaveLength(1);
 
-    let block = chain.mineBlock([
-      Tx.contractCall(
-        "simple-nft",
-        "test-mint",
-        [types.principal(wallet_1.address)],
-        wallet_1.address
-      ),
-    ]);
+    // if we know the index of the event
+    // it can be used instead of `expect(events).toContainEqual(...)`
+    const transferEvent = events[0];
 
-    block.receipts[0].result.expectOk().expectBool(true);
+    expect(transferEvent.event).toBe("nft_transfer_event");
+    expect(transferEvent.data).toStrictEqual({
+      asset_identifier: `${simnet.deployer}.simple-nft::nft`,
+      raw_value: `0x${Buffer.from(Cl.serialize(Cl.uint(1))).toString("hex")}`,
+      recipient: address2,
+      sender: address1,
+      value: expect.toBeUint(1),
+    });
+  });
 
-    block = chain.mineBlock([
-      Tx.contractCall(
-        "simple-nft",
-        "test-burn",
-        [types.uint(1), types.principal(wallet_1.address)],
-        wallet_1.address
-      ),
-    ]);
-    block.receipts[0].result.expectOk().expectBool(true);
+  it("Ensures that nft can be burned", () => {
+    simnet.callPublicFn("simple-nft", "test-mint", [Cl.standardPrincipal(address1)], address1);
 
-    block.receipts[0].events.expectNonFungibleTokenBurnEvent(
-      types.uint(1),
-      wallet_1.address,
-      `${deployer.address}.simple-nft`,
-      "nft"
+    const { result, events } = simnet.callPublicFn(
+      "simple-nft",
+      "test-burn",
+      [Cl.uint(1), Cl.standardPrincipal(address1)],
+      address1
     );
-  },
+    expect(result).toBeOk(Cl.bool(true));
+
+    expect(events).toContainEqual({
+      event: "nft_burn_event",
+      data: {
+        asset_identifier: `${simnet.deployer}.simple-nft::nft`,
+        raw_value: `0x${Buffer.from(Cl.serialize(Cl.uint(1))).toString("hex")}`,
+        sender: address1,
+        value: expect.toBeUint(1),
+      },
+    });
+  });
 });

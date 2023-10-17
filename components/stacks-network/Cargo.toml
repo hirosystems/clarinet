@@ -1,11 +1,13 @@
 [package]
 name = "stacks-network"
-version = "1.7.1"
+version = "1.8.0"
 edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+atty = "0.2.14"
+ansi_term = "0.12.1"
 bollard = "0.11.0"
 bytes = "1.4.0"
 crossterm = { version = "0.22.1", optional = true }
@@ -26,14 +28,12 @@ reqwest = { version = "0.11", default-features = false, features = [
 tui = { version = "0.18.0", default-features = false, features = ["crossterm"] }
 crossbeam-channel = "0.5.6"
 
-chrono = "0.4.20"
+chrono = "0.4.31"
 futures = "0.3.12"
 base58 = "0.2.0"
 
-# chainhook-sdk = { version = "=0.4.0", default-features = false, features = ["log"], path = "../../../chainhook/components/chainhook-sdk" }
-chainhook-sdk = { version = "=0.4.0", default-features = false, features = [
-    "log",
-] }
+# chainhook-sdk = { version = "=0.10.2", default-features = true, path = "../../../chainhook/components/chainhook-sdk" }
+chainhook-sdk = { version = "=0.10.2", default-features = true }
 stacks-rpc-client = { path = "../stacks-rpc-client" }
 clarinet-files = { path = "../clarinet-files", features = ["cli"] }
 clarinet-deployments = { path = "../clarinet-deployments", features = ["cli"] }
@@ -41,6 +41,20 @@ clarinet-utils = { path = "../clarinet-utils" }
 hiro-system-kit = { path = "../hiro-system-kit", features = ["log"] }
 clarity-repl = { path = "../clarity-repl", features = ["cli"] }
 dirs = { version = "4.0.0" }
+clap = { version = "4.2.7", features = ["derive"] }
+serde_yaml = "0.8.23"
+
+[lib]
+name = "stacks_network"
+path = "src/lib.rs"
+# Default type
+# crate-type = ["lib"]
+# Use this instead for WASM builds
+crate-type = ["cdylib", "rlib"]
+
+[[bin]]
+name = "stacks-network"
+path = "src/main.rs"
 
 [features]
 default = ["crossterm"]

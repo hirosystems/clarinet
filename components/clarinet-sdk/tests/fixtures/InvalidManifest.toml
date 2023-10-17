@@ -1,0 +1,11 @@
+[project]
+name = 'invalid'
+description = 'invalid project to test clarinet-sdk'
+telemetry = false
+cache_dir = './.cache'
+requirements = []
+
+[contracts.invalid]
+path = 'contracts/invalid.clar'
+clarity_version = 2
+epoch = 2.4

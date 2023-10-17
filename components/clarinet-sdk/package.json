@@ -1,0 +1,77 @@
+{
+  "name": "@hirosystems/clarinet-sdk",
+  "version": "1.0.2",
+  "description": "A SDK to interact with Clarity Smart Contracts",
+  "homepage": "https://docs.hiro.so/clarinet/feature-guides/clarinet-js-sdk",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/hirosystems/clarinet"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "files": [
+    "dist",
+    "templates",
+    "vitest-helpers/src"
+  ],
+  "main": "dist/cjs/index.js",
+  "module": "dist/esm/index.js",
+  "types": "./dist/esm/index.d.ts",
+  "exports": {
+    ".": {
+      "import": {
+        "types": "./dist/esm/index.d.ts",
+        "default": "./dist/esm/index.js"
+      },
+      "require": {
+        "types": "./dist/cjs/index.d.ts",
+        "default": "./dist/cjs/index.js"
+      }
+    },
+    "./vitest": {
+      "import": {
+        "types": "./dist/esm/vitest/index.d.ts",
+        "default": "./dist/esm/vitest/index.js"
+      },
+      "require": {
+        "types": "./dist/cjs/vitest/index.d.ts",
+        "default": "./dist/cjs/vitest/index.js"
+      }
+    }
+  },
+  "bin": "./dist/cjs/bin/index.js",
+  "scripts": {
+    "clean": "rimraf dist",
+    "compile": "tsc -b ./tsconfig.json ./tsconfig.cjs.json",
+    "build": "npm run clean; npm run compile; node ./scripts/prepare-esm-package.js",
+    "prepare": "npm run build",
+    "test": "vitest run"
+  },
+  "keywords": [
+    "stacks",
+    "clarity",
+    "clarinet",
+    "tests"
+  ],
+  "author": "hirosystems",
+  "license": "GPL-3.0",
+  "readme": "./README.md",
+  "dependencies": {
+    "@hirosystems/clarinet-sdk-wasm": "^1.0.4",
+    "@stacks/transactions": "^6.9.0",
+    "kolorist": "^1.8.0",
+    "prompts": "^2.4.2",
+    "vitest": "^0.34.5",
+    "yargs": "^17.7.2"
+  },
+  "devDependencies": {
+    "@types/node": "^20.4.5",
+    "@types/prompts": "^2.4.5",
+    "@types/yargs": "^17.0.24",
+    "prettier": "^3.0.3",
+    "rimraf": "^5.0.1",
+    "ts-loader": "^9.4.4",
+    "typescript": "^5.1.6"
+  }
+}

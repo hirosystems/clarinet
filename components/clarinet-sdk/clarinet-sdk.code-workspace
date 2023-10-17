@@ -1,0 +1,15 @@
+{
+  "folders": [{ "path": "../../" }],
+  "settings": {
+    "rust-analyzer.check.overrideCommand": [
+      "cargo",
+      "clippy",
+      "--no-default-features",
+      "--package=clarinet-sdk-wasm",
+      "--features=wasm",
+      "--message-format=json",
+      "--",
+      "--no-deps"
+    ]
+  }
+}

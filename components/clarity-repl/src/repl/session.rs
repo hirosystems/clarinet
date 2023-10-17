@@ -14,7 +14,7 @@ use clarity::types::chainstate::StacksAddress;
 use clarity::types::StacksEpochId;
 use clarity::vm::analysis::ContractAnalysis;
 use clarity::vm::ast::ContractAST;
-use clarity::vm::diagnostic::Diagnostic;
+use clarity::vm::diagnostic::{Diagnostic, Level};
 use clarity::vm::docs::{make_api_reference, make_define_reference, make_keyword_reference};
 use clarity::vm::errors::Error;
 use clarity::vm::functions::define::DefineFunctions;
@@ -28,6 +28,7 @@ use clarity::vm::{
     StacksEpoch,
 };
 use reqwest;
+use serde::Serialize;
 use std::collections::{BTreeMap, BTreeSet, HashMap, VecDeque};
 use std::convert::TryFrom;
 use std::fmt;
@@ -126,7 +127,6 @@ pub struct Session {
     api_reference: HashMap<String, String>,
     pub coverage_reports: Vec<TestCoverageReport>,
     pub costs_reports: Vec<CostsReport>,
-    pub initial_contracts_analysis: Vec<(ContractAnalysis, String, String)>,
     pub show_costs: bool,
     pub executed: Vec<String>,
     pub current_epoch: StacksEpochId,
@@ -154,7 +154,6 @@ impl Session {
             api_reference: build_api_reference(),
             coverage_reports: vec![],
             costs_reports: vec![],
-            initial_contracts_analysis: vec![],
             show_costs: false,
             settings,
             executed: Vec::new(),
@@ -552,6 +551,18 @@ impl Session {
         test_name: Option<String>,
         ast: &mut Option<ContractAST>,
     ) -> Result<ExecutionResult, Vec<Diagnostic>> {
+        if contract.clarity_version > ClarityVersion::default_for_epoch(contract.epoch) {
+            let diagnostic = Diagnostic {
+                level: Level::Error,
+                message: format!(
+                    "{} can not be used with {}",
+                    contract.clarity_version, contract.epoch
+                ),
+                spans: vec![],
+                suggestion: None,
+            };
+            return Err(vec![diagnostic]);
+        }
         let mut hooks: Vec<&mut dyn EvalHook> = Vec::new();
         let mut coverage = if let Some(test_name) = test_name {
             Some(TestCoverageReport::new(test_name.into()))
@@ -609,9 +620,8 @@ impl Session {
         test_name: String,
     ) -> Result<(ExecutionResult, QualifiedContractIdentifier), Vec<Diagnostic>> {
         let initial_tx_sender = self.get_tx_sender();
-        // Kludge for handling fully qualified contract_id vs sugared syntax
-        let first_char = contract.chars().next().unwrap();
-        let contract_id = if first_char.to_string() == "S" {
+        // Handle fully qualified contract_id and sugared syntax
+        let contract_id = if contract.starts_with("S") {
             contract.to_string()
         } else {
             format!("{}.{}", initial_tx_sender, contract,)
@@ -659,40 +669,6 @@ impl Session {
 
         Ok((execution, contract_identifier))
     }
-
-    // pub fn build_ast(
-    //     &mut self,
-    //     snippet: &str,
-    //     name: Option<&str>,
-    // ) -> Result<(QualifiedContractIdentifier, ContractAST, Vec<String>), Vec<String>> {
-    //     let (contract_name, is_tx) = match name {
-    //         Some(name) => (name.to_string(), false),
-    //         None => (format!("contract-{}", self.contracts.len()), true),
-    //     };
-    //     let tx_sender = self.interpreter.get_tx_sender().to_address();
-    //     let id = format!("{}.{}", tx_sender, contract_name);
-    //     let contract_identifier = QualifiedContractIdentifier::parse(&id).unwrap();
-
-    //     let (ast, diagnostics, success) = self
-    //         .interpreter
-    //         .build_ast(contract_identifier.clone(), snippet.to_string());
-
-    //     let mut output = Vec::<String>::new();
-    //     let lines = snippet.lines();
-    //     let formatted_lines: Vec<String> = lines.map(|l| l.to_string()).collect();
-    //     for diagnostic in &diagnostics {
-    //         output.append(&mut output_diagnostic(
-    //             &diagnostic,
-    //             &contract_name,
-    //             &formatted_lines,
-    //         ));
-    //     }
-    //     if success {
-    //         Ok((contract_identifier, ast, output))
-    //     } else {
-    //         Err(output)
-    //     }
-    // }
 
     pub fn eval<'a>(
         &'a mut self,
@@ -1032,13 +1008,13 @@ impl Session {
 
     pub fn get_costs(&mut self, output: &mut Vec<String>, cmd: &str) {
         let command: String = cmd.to_owned();
-        let v: Vec<&str> = command.split_whitespace().collect();
 
-        if v.len() != 2 {
-            output.push(red!(format!("::get_costs command needs an argument")));
-        } else {
-            self.run_snippet(output, true, &v[1].to_string());
-        }
+        let expr = match cmd.split_once(" ") {
+            Some((_, expr)) => expr,
+            _ => return output.push(red!("Usage: ::get_costs <expr>")),
+        };
+
+        self.run_snippet(output, true, expr);
     }
 
     #[cfg(feature = "cli")]
@@ -1428,6 +1404,24 @@ mod tests {
             output[1],
             red!("Parsing error: invalid digit found in string")
         );
+    }
+
+    #[test]
+    fn clarity_epoch_mismatch() {
+        let settings = SessionSettings::default();
+        let mut session = Session::new(settings);
+        session.start().expect("session could not start");
+        let snippet = "(define-data-var x uint u0)";
+        let contract = ClarityContract {
+            code_source: ClarityCodeSource::ContractInMemory(snippet.to_string()),
+            name: "should_error".to_string(),
+            deployer: ContractDeployer::Address("ST000000000000000000002AMW42H".into()),
+            clarity_version: ClarityVersion::Clarity2,
+            epoch: StacksEpochId::Epoch20,
+        };
+
+        let result = session.deploy_contract(&contract, None, false, None, &mut None);
+        assert!(result.is_err(), "Expected error for clarity mismatch");
     }
 
     #[test]

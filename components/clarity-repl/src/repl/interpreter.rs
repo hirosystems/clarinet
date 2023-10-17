@@ -23,7 +23,7 @@ use clarity::vm::contexts::{CallStack, ContractContext, Environment, GlobalConte
 use clarity::vm::contracts::Contract;
 use clarity::vm::costs::cost_functions::ClarityCostFunction;
 use clarity::vm::costs::{runtime_cost, ExecutionCost, LimitedCostTracker};
-use clarity::vm::database::ClarityDatabase;
+use clarity::vm::database::{ClarityDatabase, StoreType};
 use clarity::vm::diagnostic::{Diagnostic, Level};
 use clarity::vm::errors::Error;
 use clarity::vm::representations::SymbolicExpressionType::{Atom, List};
@@ -418,6 +418,27 @@ impl ClarityInterpreter {
             .insert_contract(&contract_id, &contract_analysis)
             .unwrap();
         analysis_db.commit();
+    }
+
+    pub fn get_data_var(
+        &mut self,
+        contract_id: &QualifiedContractIdentifier,
+        var_name: &str,
+    ) -> Option<String> {
+        let key = ClarityDatabase::make_key_for_trip(contract_id, StoreType::Variable, var_name);
+        let value_hex = self.datastore.get(&key)?;
+        Some(format!("0x{value_hex}"))
+    }
+
+    pub fn get_map_entry(
+        &mut self,
+        contract_id: &QualifiedContractIdentifier,
+        map_name: &str,
+        map_key: &Value,
+    ) -> Option<String> {
+        let key = ClarityDatabase::make_key_for_data_map_entry(contract_id, map_name, map_key);
+        let value_hex = self.datastore.get(&key)?;
+        Some(format!("0x{value_hex}"))
     }
 
     #[allow(unused_assignments)]

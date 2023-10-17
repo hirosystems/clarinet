@@ -6,14 +6,13 @@ mod serde;
 
 use clarinet_deployments::{get_default_deployment_path, load_deployment};
 use clarinet_files::bip39::{Language, Mnemonic};
-use clarinet_files::chainhook_types::StacksNetwork;
 use clarinet_files::{
     compute_addresses, AccountConfig, DevnetConfigFile, FileLocation, PoxStackingOrder,
     ProjectManifest, DEFAULT_DERIVATION_PATH,
 };
-use stacks_network::chainhook_sdk::chainhook_types::{
+use stacks_network::chainhook_sdk::types::{
     BitcoinChainEvent, BitcoinChainUpdatedWithBlocksData, StacksChainEvent,
-    StacksChainUpdatedWithBlocksData,
+    StacksChainUpdatedWithBlocksData, StacksNetwork,
 };
 use stacks_network::chains_coordinator::BitcoinMiningCommand;
 use stacks_network::{self, DevnetEvent, DevnetOrchestrator};
@@ -29,7 +28,7 @@ use std::{env, process};
 type DevnetCallback = Box<dyn FnOnce(&Channel) + Send>;
 
 use clarinet_deployments::types::{DeploymentGenerationArtifacts, DeploymentSpecification};
-use stacks_network::{do_run_devnet, ChainsCoordinatorCommand};
+use stacks_network::{do_run_local_devnet, ChainsCoordinatorCommand};
 
 pub fn read_deployment_or_generate_default(
     manifest: &ProjectManifest,
@@ -111,7 +110,7 @@ impl StacksDevnet {
         let (deployment, _) =
             read_deployment_or_generate_default(&manifest, &StacksNetwork::Devnet)
                 .expect("Unable to generate deployment");
-        let devnet = match DevnetOrchestrator::new(manifest, Some(devnet_overrides)) {
+        let devnet = match DevnetOrchestrator::new(manifest, None, Some(devnet_overrides), true) {
             Ok(devnet) => devnet,
             Err(message) => {
                 if logs_enabled {
@@ -147,7 +146,7 @@ impl StacksDevnet {
                 match rx.recv() {
                     Ok(DevnetCommand::Start(callback)) => {
                         // Start devnet
-                        let res = hiro_system_kit::nestable_block_on(do_run_devnet(
+                        let res = hiro_system_kit::nestable_block_on(do_run_local_devnet(
                             devnet,
                             deployment,
                             &mut None,

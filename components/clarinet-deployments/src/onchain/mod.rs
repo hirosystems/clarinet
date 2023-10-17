@@ -1,6 +1,6 @@
 use bitcoincore_rpc::{Auth, Client};
 use clarinet_files::chainhook_types::StacksNetwork;
-use clarinet_files::{AccountConfig, NetworkManifest, ProjectManifest};
+use clarinet_files::{AccountConfig, NetworkManifest};
 use clarinet_utils::get_bip39_seed_from_mnemonic;
 use clarity_repl::clarity::codec::StacksMessageCodec;
 use clarity_repl::clarity::stacks_common::types::chainstate::StacksAddress;
@@ -326,7 +326,7 @@ pub fn update_deployment_costs(
 }
 
 pub fn apply_on_chain_deployment(
-    manifest: &ProjectManifest,
+    network_manifest: NetworkManifest,
     deployment: DeploymentSpecification,
     deployment_event_tx: Sender<DeploymentEvent>,
     deployment_command_rx: Receiver<DeploymentCommand>,
@@ -335,9 +335,6 @@ pub fn apply_on_chain_deployment(
     override_stacks_rpc_url: Option<String>,
 ) {
     let network = deployment.network.get_networks();
-    let network_manifest =
-        NetworkManifest::from_project_manifest_location(&manifest.location, &network, None, None)
-            .expect("unable to load network manifest");
     let delay_between_checks: u64 = if network.1.is_devnet() { 1 } else { 10 };
     // Load deployers, deployment_fee_rate
     // Check fee, balances and deployers

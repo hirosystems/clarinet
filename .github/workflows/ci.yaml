@@ -1,14 +1,21 @@
 name: CI
 on:
   pull_request:
+    branches:
+      - main
+      - develop
+      - rc/next
+    paths-ignore:
+      - "**/CHANGELOG.md"
+      - "docs/**"
   push:
     branches:
       - main
       - develop
       - rc/next
     paths-ignore:
-      - '**/CHANGELOG.md'
-      - 'docs/**'
+      - "**/CHANGELOG.md"
+      - "docs/**"
 
   workflow_dispatch:
 
@@ -88,7 +95,7 @@ jobs:
         run: cargo install cargo-audit
 
       - name: Run audit
-        run: cargo audit --ignore RUSTSEC-2021-0076 --ignore RUSTSEC-2022-0028 --ignore RUSTSEC-2020-0071 --ignore RUSTSEC-2022-0090 --ignore RUSTSEC-2023-0018
+        run: cargo audit --ignore RUSTSEC-2022-0093 --ignore RUSTSEC-2021-0076 --ignore RUSTSEC-2022-0090 --ignore RUSTSEC-2022-0028
 
       - name: Run rustfmt
         run: cargo fmt --all -- --check
@@ -337,20 +344,22 @@ jobs:
         if: matrix.target != 'aarch64-apple-darwin'
         run: cargo test --release --locked --target ${{ matrix.target }}
 
-      - name: Functional Tests (Linux)
-        # can't easily run mac-arm64 tests in GH without native runners for that arch
-        if: matrix.os != 'windows-latest' && matrix.target != 'aarch64-apple-darwin'
-        run: |
-          for testdir in $(ls components/clarinet-cli/examples); do
-            ./target/${{ matrix.target }}/release/clarinet test --manifest-path components/clarinet-cli/examples/${testdir}/Clarinet.toml
-          done
+      # Todo(@hugocaillard): npm test
+      # - name: Functional Tests (Linux)
+      #   # can't easily run mac-arm64 tests in GH without native runners for that arch
+      #   if: matrix.os != 'windows-latest' && matrix.target != 'aarch64-apple-darwin'
+      #   run: |
+      #     for testdir in $(ls components/clarinet-cli/examples); do
+      #       ./target/${{ matrix.target }}/release/clarinet test --manifest-path components/clarinet-cli/examples/${testdir}/Clarinet.toml
+      #     done
 
-      - name: Functional Tests (Windows)
-        if: matrix.os == 'windows-latest'
-        run: |
-          foreach($testdir in Get-ChildItem components/clarinet-cli/examples) {
-            ./target/${{ matrix.target }}/release/clarinet test --manifest-path ${testdir}/Clarinet.toml
-          }
+      # Todo(@hugocaillard): npm test
+      # - name: Functional Tests (Windows)
+      #   if: matrix.os == 'windows-latest'
+      #   run: |
+      #     foreach($testdir in Get-ChildItem components/clarinet-cli/examples) {
+      #       ./target/${{ matrix.target }}/release/clarinet test --manifest-path ${testdir}/Clarinet.toml
+      #     }
 
   dist_stacks_devnet_js:
     name: Build Stacks Devnet JS Distributions
@@ -591,7 +600,7 @@ jobs:
             description: Clarinet is a simple, modern and opinionated runtime for testing, integrating and deploying Clarity smart contracts.
             image: ${{ github.repository }}
             artifact: clarinet-linux-x64-glibc
-            dockerfile: dockerfiles/components/clarinet.dockerfile
+            dockerfile: dockerfiles/components/clarinet-dev.dockerfile
     steps:
       - name: Checkout
         uses: actions/checkout@v3

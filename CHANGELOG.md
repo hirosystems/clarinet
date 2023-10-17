@@ -1,3 +1,21 @@
+#### [1.8.0](https://github.com/hirosystems/clarinet/compare/v1.7.1...v1.8.0) (2023-09-12)
+
+##### Continuous Integration
+
+*  Use rust toolchain v1.71.0 (#1146) (b8cedf61)
+*  Clarinet cli revamp (#1104) (5b4dfe84)
+
+##### New Features
+
+*  Allow stacks-network to be run as standalone chain coordinator (#1064) (55b03bbb)
+*  Add `clarinet devnet package` command(#1116)(0dbf1aa)
+
+##### Bug Fixes
+
+*  Project manifest (de)serialization tag (#1150) (ce0881c9)
+*  Clarinet-deployments wasm build (#1144) (1ab57028)
+*  Command splits once and picks everything after as the expression to get costs from (#1112) (6b35ed75)
+
 #### [1.7.1](https://github.com/hirosystems/clarinet/compare/v1.7.0...v1.7.1) (2023-07-19)
 
 ##### Chores
