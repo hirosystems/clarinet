@@ -704,7 +704,7 @@ dependencies = [
 
 [[package]]
 name = "clarinet-deployments"
-version = "1.0.1"
+version = "1.0.3"
 dependencies = [
  "base58 0.2.0",
  "base64 0.21.3",
@@ -727,7 +727,7 @@ dependencies = [
 
 [[package]]
 name = "clarinet-files"
-version = "1.0.0"
+version = "1.0.3"
 dependencies = [
  "bip39",
  "bitcoin",
