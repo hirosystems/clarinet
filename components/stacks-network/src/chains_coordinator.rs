@@ -120,7 +120,7 @@ impl DevnetEventObserverConfig {
             bitcoind_rpc_url: format!("http://{}", services_map_hosts.bitcoin_node_host),
             bitcoin_block_signaling: BitcoinBlockSignaling::Stacks(StacksNodeConfig {
                 rpc_url: format!("http://{}", services_map_hosts.stacks_node_host),
-                ingestion_port: 20445, // todo: confirm
+                ingestion_port: devnet_config.orchestrator_ingestion_port,
             }),
 
             display_logs: true,
