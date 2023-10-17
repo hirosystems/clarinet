@@ -13,10 +13,7 @@ Clarity is a **decidable** smart contract language that optimizes for predictabi
 
 ### Clarinet 101
 
-Hiro has created an introductory video tutorial series that guides you through some of the fundamentals of Clarinet, and how it can help develop, test, and deploy Clarity smart contracts.
-
-Please review and watch the YouTube playlist on [Hiro's Youtube](https://www.youtube.com/c/HiroSystems):
-[<img src="docs/images/clarinet101.png">](https://youtube.com/playlist?list=PL5Ujm489LoJaAz9kUJm8lYUWdGJ2AnQTb) channel for information on how to use Clarinet for smart contracts.
+Hiro has created an introductory video tutorial series that guides you through some of the fundamentals of Clarinet, and how it can help develop, test, and deploy Clarity smart contracts. [You can watch the series here.](https://youtube.com/playlist?list=PL5Ujm489LoJaAz9kUJm8lYUWdGJ2AnQTb)
 
 ## Installation
 
