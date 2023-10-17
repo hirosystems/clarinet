@@ -1,8 +1,8 @@
 use std::sync::mpsc::Sender;
 
 use chainhook_sdk::{
-    chainhook_types::{BitcoinChainEvent, StacksChainEvent},
     observer::MempoolAdmissionData,
+    types::{BitcoinChainEvent, StacksChainEvent},
 };
 
 use crate::{

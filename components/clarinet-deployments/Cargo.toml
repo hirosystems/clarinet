@@ -1,6 +1,6 @@
 [package]
 name = "clarinet-deployments"
-version = "1.0.1"
+version = "1.0.3"
 edition = "2021"
 
 [dependencies]
