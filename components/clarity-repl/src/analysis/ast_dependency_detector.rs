@@ -37,6 +37,10 @@ pub struct ASTDependencyDetector<'a> {
         (&'a QualifiedContractIdentifier, &'a ClarityName),
         BTreeMap<ClarityName, FunctionSignature>,
     >,
+    defined_contract_constants: BTreeMap<
+        (&'a QualifiedContractIdentifier, &'a ClarityName),
+        &'a QualifiedContractIdentifier,
+    >,
     pending_function_checks: BTreeMap<
         // function identifier whose type is not yet defined
         (&'a QualifiedContractIdentifier, &'a ClarityName),
@@ -160,6 +164,7 @@ impl<'a> ASTDependencyDetector<'a> {
             current_contract: None,
             defined_functions: BTreeMap::new(),
             defined_traits: BTreeMap::new(),
+            defined_contract_constants: BTreeMap::new(),
             pending_function_checks: BTreeMap::new(),
             pending_trait_checks: BTreeMap::new(),
             params: None,
@@ -353,6 +358,16 @@ impl<'a> ASTDependencyDetector<'a> {
             .insert((contract_identifier, name), trait_definition);
     }
 
+    fn add_defined_contract_constant(
+        &mut self,
+        contract_identifier: &'a QualifiedContractIdentifier,
+        name: &'a ClarityName,
+        target_contrat_identifier: &'a QualifiedContractIdentifier,
+    ) {
+        self.defined_contract_constants
+            .insert((contract_identifier, name), target_contrat_identifier);
+    }
+
     fn add_pending_trait_check(
         &mut self,
         caller: &'a QualifiedContractIdentifier,
@@ -427,6 +442,15 @@ impl<'a> ASTDependencyDetector<'a> {
             }
         }
         None
+    }
+
+    fn get_contract_constant(
+        &self,
+        name: &'a ClarityName,
+    ) -> Option<&'a QualifiedContractIdentifier> {
+        self.defined_contract_constants
+            .get(&(self.current_contract.unwrap(), name))
+            .copied()
     }
 }
 
@@ -597,12 +621,12 @@ impl<'a> ASTVisitor<'a> for ASTDependencyDetector<'a> {
     fn visit_dynamic_contract_call(
         &mut self,
         expr: &'a SymbolicExpression,
-        trait_ref: &'a SymbolicExpression,
+        callable_expr: &'a SymbolicExpression,
         function_name: &'a ClarityName,
         args: &'a [SymbolicExpression],
     ) -> bool {
-        let trait_instance = trait_ref.match_atom().unwrap_or(&DEFAULT_NAME);
-        if let Some(trait_identifier) = self.get_param_trait(trait_instance) {
+        let callable = callable_expr.match_atom().unwrap_or(&DEFAULT_NAME);
+        if let Some(trait_identifier) = self.get_param_trait(callable) {
             let dependencies = if let Some(trait_definition) = self.defined_traits.get(&(
                 &trait_identifier.contract_identifier,
                 &trait_identifier.name,
@@ -621,6 +645,8 @@ impl<'a> ASTVisitor<'a> for ASTDependencyDetector<'a> {
             for dependency in dependencies {
                 self.add_dependency(self.current_contract.unwrap(), &dependency);
             }
+        } else if let Some(contract_constant) = self.get_contract_constant(callable) {
+            self.add_dependency(self.current_contract.unwrap(), contract_constant);
         }
         true
     }
@@ -665,6 +691,24 @@ impl<'a> ASTVisitor<'a> for ASTDependencyDetector<'a> {
             self.current_contract.unwrap(),
             &trait_identifier.contract_identifier,
         );
+        true
+    }
+
+    fn visit_define_constant(
+        &mut self,
+        expr: &'a SymbolicExpression,
+        name: &'a ClarityName,
+        value: &'a SymbolicExpression,
+    ) -> bool {
+        if let Some(Value::Principal(PrincipalData::Contract(contract_principal))) =
+            value.match_literal_value()
+        {
+            self.add_defined_contract_constant(
+                self.current_contract.unwrap(),
+                name,
+                contract_principal,
+            );
+        }
         true
     }
 }
@@ -1268,6 +1312,42 @@ mod tests {
         };
 
         let snippet = "(contract-call? .foo hello 4)".to_string();
+        let test_identifier = match build_ast(&session, &snippet, Some("test")) {
+            Ok((contract_identifier, ast, _)) => {
+                contracts.insert(contract_identifier.clone(), (DEFAULT_CLARITY_VERSION, ast));
+                contract_identifier
+            }
+            Err(_) => panic!("expected success"),
+        };
+
+        let dependencies =
+            ASTDependencyDetector::detect_dependencies(&contracts, &BTreeMap::new()).unwrap();
+        assert_eq!(dependencies[&test_identifier].len(), 1);
+        assert!(dependencies[&test_identifier].has_dependency(&foo).unwrap());
+    }
+
+    #[test]
+    fn contract_stored_in_constant() {
+        let session = Session::new(SessionSettings::default());
+        let mut contracts = BTreeMap::new();
+        let snippet1 = "
+(define-public (hello (a int))
+    (ok u0)
+)"
+        .to_string();
+        let foo = match build_ast(&session, &snippet1, Some("foo")) {
+            Ok((contract_identifier, ast, _)) => {
+                contracts.insert(contract_identifier.clone(), (DEFAULT_CLARITY_VERSION, ast));
+                contract_identifier
+            }
+            Err(_) => panic!("expected success"),
+        };
+
+        let snippet = "
+(define-constant foo-contract .foo)
+(contract-call? foo-contract .test)
+"
+        .to_string();
         let test_identifier = match build_ast(&session, &snippet, Some("test")) {
             Ok((contract_identifier, ast, _)) => {
                 contracts.insert(contract_identifier.clone(), (DEFAULT_CLARITY_VERSION, ast));
