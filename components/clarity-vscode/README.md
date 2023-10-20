@@ -29,7 +29,7 @@ When you select a function, the extension adds the necessary parentheses around 
 
 Easily find functions, constants and variables declarations in the same contract or in contract calls.
 
-![go-to definition screenshot](https://raw.githubusercontent.com/hirosystems/clarinet/develop/components/clarity-vscode/docs/images/documentation.png)
+![go-to definition screenshot](https://raw.githubusercontent.com/hirosystems/clarinet/develop/components/clarity-vscode/docs/images/go-to-definition.png)
 
 ### Resolve contract-call targeting local contracts
 
