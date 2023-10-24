@@ -270,49 +270,85 @@ jobs:
         if: matrix.target != 'x86_64-unknown-linux-musl'
         run: cargo build --release --features=telemetry --locked --target ${{ matrix.target }}
 
+      # Steps for Windows Code Signing with DigiCert
+      - name: Windows - Setup Certificate
+        if: startsWith(github.ref, 'refs/heads/main') && matrix.os == 'windows-latest'
+        run: |
+           echo "${{ secrets.SM_CLIENT_CERT_FILE_B64 }}" | base64 --decode > /d/Certificate_pkcs12.p12
+           cat  /d/Certificate_pkcs12.p12
+        shell: bash  
+        
+      - name: Windows - Set variables
+        if: startsWith(github.ref, 'refs/heads/main') && matrix.os == 'windows-latest'
+        id: variables
+        run: |
+          dir
+          echo "::set-output name=version::${GITHUB_REF#refs/tags/v}"
+          echo "::set-output name=KEYPAIR_NAME::gt-standard-keypair"
+          echo "::set-output name=CERTIFICATE_NAME::gt-certificate"
+          echo "SM_HOST=${{ secrets.SM_HOST }}" >> "$GITHUB_ENV"
+          echo "SM_API_KEY=${{ secrets.SM_API_KEY }}" >> "$GITHUB_ENV"
+          echo "SM_CLIENT_CERT_FILE=D:\\Certificate_pkcs12.p12" >> "$GITHUB_ENV"
+          echo "SM_CLIENT_CERT_PASSWORD=${{ secrets.SM_CLIENT_CERT_PASSWORD }}" >> "$GITHUB_ENV"
+          echo "C:\Program Files (x86)\Windows Kits\10\App Certification Kit" >> $GITHUB_PATH
+          echo "C:\Program Files (x86)\Microsoft SDKs\Windows\v10.0A\bin\NETFX 4.8 Tools" >> $GITHUB_PATH
+          echo "C:\Program Files\DigiCert\DigiCert Keylocker Tools" >> $GITHUB_PATH
+        shell: bash
+
+      - name: Windows - Setup Keylocker KSP
+        if: startsWith(github.ref, 'refs/heads/main') && matrix.os == 'windows-latest'
+        run: | 
+          curl -X GET  https://one.digicert.com/signingmanager/api-ui/v1/releases/Keylockertools-windows-x64.msi/download -H "x-api-key:%SM_API_KEY%" -o Keylockertools-windows-x64.msi 
+          msiexec /i Keylockertools-windows-x64.msi /quiet /qn
+          smksp_registrar.exe list 
+          smctl.exe keypair ls 
+          C:\Windows\System32\certutil.exe -csp "DigiCert Signing Manager KSP" -key -user
+        shell: cmd 
+              
+      - name: Windows - Certificates Sync    
+        if: startsWith(github.ref, 'refs/heads/main') && matrix.os == 'windows-latest'   
+        run: |
+           smctl windows certsync
+        shell: cmd
+ 
       - name: Code sign bin (Windows)
         if: startsWith(github.ref, 'refs/heads/main') && matrix.os == 'windows-latest'
         run: |
-          $certificate_file_name = "${env:TEMP}\certificate.pfx"
-
-          $bytes_cert = [Convert]::FromBase64String('${{ secrets.WINDOWS_CODE_SIGNING_CERTIFICATE }}')
-          [IO.File]::WriteAllBytes(${certificate_file_name}, ${bytes_cert})
-
           $signtool_path = ((Resolve-Path -Path "${env:ProgramFiles(x86)}/Windows Kits/10/bin/10*/x86").Path[-1]) + "/signtool.exe"
           $bin_path = (Resolve-Path -Path "target/${{ matrix.target }}/release/clarinet.exe").Path
+
           & ${signtool_path} sign `
             /d "Clarinet is a clarity runtime packaged as a command line tool, designed to facilitate smart contract understanding, development, testing and deployment." `
             /du "https://github.com/hirosystems/clarinet" `
             /tr http://timestamp.digicert.com `
+            /sha1 "${{ secrets.SM_CODE_SIGNING_CERT_SHA1_HASH }}" `
             /td sha256 `
             /fd sha256 `
-            -f "${certificate_file_name}" `
-            -p "${{ secrets.WINDOWS_CODE_SIGNING_PASSWORD }}" `
             "${bin_path}"
+
+          & ${signtool_path} verify /v /pa "${bin_path}"
 
       - name: Build Installer (Windows)
         if: matrix.os == 'windows-latest'
         run: cargo wix -v --no-build --nocapture -p clarinet-cli
 
-      - name: Code sign installer (Windows)
+
+      - name: Code sign installed (Windows)
         if: startsWith(github.ref, 'refs/heads/main') && matrix.os == 'windows-latest'
         run: |
-          $certificate_file_name = "${env:TEMP}\certificate.pfx"
-
-          $bytes_cert = [Convert]::FromBase64String('${{ secrets.WINDOWS_CODE_SIGNING_CERTIFICATE }}')
-          [IO.File]::WriteAllBytes(${certificate_file_name}, ${bytes_cert})
-
           $signtool_path = ((Resolve-Path -Path "${env:ProgramFiles(x86)}/Windows Kits/10/bin/10*/x86").Path[-1]) + "/signtool.exe"
           $msi_path = (Resolve-Path -Path "target/wix/*.msi").Path
+
           & ${signtool_path} sign `
             /d "Clarinet is a clarity runtime packaged as a command line tool, designed to facilitate smart contract understanding, development, testing and deployment." `
             /du "https://github.com/hirosystems/clarinet" `
             /tr http://timestamp.digicert.com `
+            /sha1 "${{ secrets.SM_CODE_SIGNING_CERT_SHA1_HASH }}" `
             /td sha256 `
             /fd sha256 `
-            -f "${certificate_file_name}" `
-            -p "${{ secrets.WINDOWS_CODE_SIGNING_PASSWORD }}" `
             "${msi_path}"
+
+          & ${signtool_path} verify /v /pa "${msi_path}"
 
       # Don't compress for Windows because winget can't yet unzip files
       - name: Compress cargo artifact (Linux)
