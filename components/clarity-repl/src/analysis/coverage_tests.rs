@@ -548,3 +548,117 @@ fn match_res_oneline() {
 
     assert_eq!(cov, expect);
 }
+
+#[test]
+fn fold_iterator() {
+    let contract = vec![
+        "(define-private (inner-sum (a int) (b int)) (+ a b))",
+        "(define-public (sum)",
+        "  (ok",
+        "    (fold",
+        "      inner-sum",
+        "      (list 0 1 2)",
+        "      0",
+        "    )",
+        "  )",
+        ")",
+    ]
+    .join("\n");
+
+    let snippets: Vec<String> = vec!["(contract-call? .contract-0 sum)".into()];
+    let (report, cov) = get_coverage_report(&contract, snippets);
+
+    let expect = get_expected_report(
+        vec![
+            "FN:1,inner-sum",
+            "FN:2,sum",
+            "FNDA:1,inner-sum",
+            "FNDA:1,sum",
+            "FNF:2",
+            "FNH:2",
+            "DA:1,3", // the list has 3 items
+            "DA:3,1",
+            "DA:4,1",
+            "DA:5,1", // inner-sum func call
+            "DA:6,1",
+            "DA:7,1",
+            "BRF:0",
+            "BRH:0",
+        ]
+        .join("\n"),
+    );
+    assert_eq!(cov, expect);
+}
+
+#[test]
+fn map_iterator() {
+    let contract = vec![
+        "(define-private (inner-square (n int)) (* n n))",
+        "(define-public (square (ns (list 10 int)))",
+        "  (ok (map",
+        "    inner-square",
+        "    ns",
+        "  ))",
+        ")",
+    ]
+    .join("\n");
+
+    let snippets: Vec<String> = vec!["(contract-call? .contract-0 square (list 1 2 3))".into()];
+    let (report, cov) = get_coverage_report(&contract, snippets);
+
+    let expect = get_expected_report(
+        vec![
+            "FN:1,inner-square",
+            "FN:2,square",
+            "FNDA:1,inner-square",
+            "FNDA:1,square",
+            "FNF:2",
+            "FNH:2",
+            "DA:1,3",
+            "DA:3,1",
+            "DA:4,1",
+            "DA:5,1",
+            "BRF:0",
+            "BRH:0",
+        ]
+        .join("\n"),
+    );
+    assert_eq!(cov, expect);
+}
+
+#[test]
+fn filter_iterator() {
+    let contract = vec![
+        "(define-private (is-positive (n int)) (>= n 0))",
+        "(define-public (get-positive (ns (list 10 int)))",
+        "  (ok (filter",
+        "    is-positive",
+        "    ns",
+        "  ))",
+        ")",
+    ]
+    .join("\n");
+
+    let snippets: Vec<String> =
+        vec!["(contract-call? .contract-0 get-positive (list -1 2 3))".into()];
+    let (report, cov) = get_coverage_report(&contract, snippets);
+
+    let expect = get_expected_report(
+        vec![
+            "FN:1,is-positive",
+            "FN:2,get-positive",
+            "FNDA:1,get-positive",
+            "FNDA:1,is-positive",
+            "FNF:2",
+            "FNH:2",
+            "DA:1,3",
+            "DA:3,1",
+            "DA:4,1",
+            "DA:5,1",
+            "BRF:0",
+            "BRH:0",
+        ]
+        .join("\n"),
+    );
+    assert_eq!(cov, expect);
+}
