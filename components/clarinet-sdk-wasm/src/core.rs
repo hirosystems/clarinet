@@ -324,7 +324,6 @@ impl SDK {
 
         let mut session = initiate_session_from_deployment(&manifest);
         update_session_with_genesis_accounts(&mut session, &deployment);
-        log!("> asts: {:?}", &artifacts.asts.keys());
         let results = update_session_with_contracts_executions(
             &mut session,
             &deployment,
