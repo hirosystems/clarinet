@@ -591,18 +591,32 @@ pub fn main() {
     };
     // This is backwards compatible with ENV var setting as well as the new ~/.clarinet/Settings.toml
     let hints_enabled = env::var("CLARINET_DISABLE_HINTS") != Ok("1".into());
-    let home_dir = dirs::home_dir().expect("Unable to get home directory");
-    let path = home_dir.join(".clarinet/Settings.toml");
-
-    let global_settings: GlobalSettings = if path.exists() {
-        let mut file = File::open(&path).expect("Unable to open the file");
-        file.read_to_string(&mut global_settings)
-            .expect("Unable to read the file");
-
-        let result = toml::from_str(&global_settings).expect("Unable to parse the TOML file");
-        result
-    } else {
-        global_settings_default
+    let home_dir = dirs::home_dir();
+    let mpath: Option<PathBuf> = home_dir.map(|home_dir| home_dir.join(".clarinet/Settings.toml"));
+    let settings_file = "~/.clarinet/Settings.toml";
+    let global_settings: GlobalSettings = match mpath {
+        Some(path) => {
+            if path.exists() {
+                let mut file = File::open(&path).expect("Unable to open the file");
+                let result = file.read_to_string(&mut global_settings);
+                match result {
+                    Ok(_) => match toml::from_str(&global_settings) {
+                        Ok(res) => res,
+                        Err(_) => {
+                            println!("{}{}", format_warn!("unable to parse "), settings_file);
+                            global_settings_default
+                        }
+                    },
+                    Err(_) => {
+                        println!("{}{}", format_warn!("unable to read file "), settings_file);
+                        global_settings_default
+                    }
+                }
+            } else {
+                global_settings_default
+            }
+        }
+        None => global_settings_default,
     };
 
     match opts.command {
