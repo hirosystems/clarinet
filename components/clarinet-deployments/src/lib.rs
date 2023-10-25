@@ -447,6 +447,9 @@ pub async fn generate_default_deployment(
             // Extract the known / unknown dependencies
             match dependencies {
                 Ok(inferable_dependencies) => {
+                    if inferable_dependencies.len() > 1 {
+                        println!("warning: inferable_dependencies contains more than one entry");
+                    }
                     // We submitted a HashMap with one contract, so we have at most one result in the `inferable_dependencies` map.
                     // We will extract and keep the associated data (source, ast, deps).
                     if let Some((contract_id, dependencies)) =

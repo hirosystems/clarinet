@@ -16,7 +16,7 @@ pub struct Tracer {
     stack: Vec<u64>,
     pending_call_string: Vec<String>,
     pending_args: Vec<Vec<u64>>,
-    emitted_events: usize,
+    nb_of_emitted_events: usize,
 }
 
 impl Tracer {
@@ -27,7 +27,7 @@ impl Tracer {
             stack: vec![u64::MAX],
             pending_call_string: Vec::new(),
             pending_args: Vec::new(),
-            emitted_events: 0,
+            nb_of_emitted_events: 0,
         }
     }
 }
@@ -155,9 +155,8 @@ impl EvalHook for Tracer {
             .iter()
             .flat_map(|b| &b.events)
             .collect::<Vec<_>>();
-        if emitted_events.len() > self.emitted_events {
-            for event in emitted_events.iter().skip(self.emitted_events) {
-                // let event = emitted_events[i];
+        if emitted_events.len() > self.nb_of_emitted_events {
+            for event in emitted_events.iter().skip(self.nb_of_emitted_events) {
                 println!(
                     "{}│ {}",
                     "│   ".repeat(self.stack.len() - self.pending_call_string.len() - 1),
@@ -167,7 +166,7 @@ impl EvalHook for Tracer {
                     )),
                 )
             }
-            self.emitted_events = emitted_events.len();
+            self.nb_of_emitted_events = emitted_events.len();
         }
 
         if let Some(last) = self.stack.last() {

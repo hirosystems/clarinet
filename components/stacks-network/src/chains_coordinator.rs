@@ -32,6 +32,7 @@ use clarity_repl::clarity::vm::types::{BuffData, SequenceData, TupleData};
 use clarity_repl::clarity::vm::ClarityName;
 use clarity_repl::clarity::vm::Value as ClarityValue;
 use clarity_repl::codec;
+use hiro_system_kit::yellow;
 use stacks_rpc_client::{PoxInfo, StacksRpc};
 use std::convert::TryFrom;
 
@@ -679,7 +680,14 @@ async fn handle_bitcoin_mining(
     devnet_event_tx: &Sender<DevnetEvent>,
 ) {
     let stop_miner = Arc::new(AtomicBool::new(false));
-    while let Ok(command) = mining_command_rx.recv() {
+    loop {
+        let command = match mining_command_rx.recv() {
+            Ok(cmd) => cmd,
+            Err(e) => {
+                print!("{} {}", yellow!("unexpected error:"), e);
+                break;
+            }
+        };
         match command {
             BitcoinMiningCommand::Start => {
                 stop_miner.store(false, Ordering::SeqCst);

@@ -912,9 +912,6 @@ impl NetworkManifest {
                     .docker_platform
                     .unwrap_or(DEFAULT_DOCKER_PLATFORM.to_string()),
             };
-            // if !config.disable_stacks_api && config.disable_stacks_api {
-            //     config.disable_stacks_api = false;
-            // }
             Some(config)
         } else {
             None
