@@ -2,14 +2,14 @@
 name = "clarinet-files"
 description = "Clarinet manifests files helpers"
 license = "GPL-3.0"
-version = "1.0.0"
+version = "1.0.3"
 edition = "2021"
 
 [dependencies]
 serde = "1"
 serde_derive = "1"
-chainhook-types = "=1.0.6"
-# chainhook-types = { version = "=1.0.6", path = "../../../chainhook/components/chainhook-types-rs" }
+chainhook-types = "=1.1.0"
+# chainhook-types = { version = "=1.1.0", path = "../../../chainhook/components/chainhook-types-rs" }
 clarinet-utils = { version = "1", path = "../clarinet-utils" }
 clarity-repl = { version = "1", path = "../clarity-repl", default-features = false, optional = true }
 bip39 = { version = "1.0.1", default-features = false }

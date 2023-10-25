@@ -81,3 +81,11 @@ A series of short tutorials is available as a playlist of screencasts on Youtube
 - [Introduction to smart contract integration with Clarinet](https://youtu.be/pucJ_tOC3pk)
 - [Setup a React project interacting with Clarinet](https://youtu.be/b7iipqzTUH8)
 - [Setup an integration test environment with stacks-devnet-js](https://youtu.be/BqeL17m1dZk)
+
+### Contributing
+To test the `stacks-devnet-js` package from the clarinet repo, run:
+```console
+cd components/stacks-devnet-js
+npm run build-release
+node dist/test.js
+```

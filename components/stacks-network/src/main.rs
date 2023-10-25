@@ -1,4 +1,4 @@
-use chainhook_sdk::chainhook_types::{BitcoinNetwork, StacksNetwork};
+use chainhook_sdk::types::{BitcoinNetwork, StacksNetwork};
 
 use clap::Parser;
 use clarinet_files::{FileLocation, NetworkManifest, ProjectManifest};
