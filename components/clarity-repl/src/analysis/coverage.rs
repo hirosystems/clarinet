@@ -9,9 +9,12 @@ use std::{
 
 use clarity::vm::{
     ast::ContractAST,
-    functions::{define::DefineFunctionsParsed, NativeFunctions},
+    functions::{
+        define::DefineFunctionsParsed,
+        NativeFunctions::{self, Filter, Fold, Map},
+    },
     types::QualifiedContractIdentifier,
-    EvalHook, SymbolicExpression,
+    ClarityName, EvalHook, SymbolicExpression,
 };
 use serde_json::Value as JsonValue;
 
@@ -382,12 +385,18 @@ fn try_parse_native_func(
 
 fn report_eval(expr_coverage: &mut ExprCoverage, expr: &SymbolicExpression) {
     if let Some(children) = expr.match_list() {
-        if let Some((function_variable, rest)) = children.split_first() {
-            report_eval(expr_coverage, function_variable);
+        if let Some((func, args)) = try_parse_native_func(children) {
+            if [Fold, Map, Filter].contains(&func) {
+                if let Some(iterator_func) = args.first() {
+                    report_eval(expr_coverage, iterator_func);
+                }
+            }
+        }
+        if let Some(func_expr) = children.first() {
+            report_eval(expr_coverage, func_expr);
         }
         return;
     }
-
     let count = expr_coverage.entry(expr.id).or_insert(0);
     *count += 1;
 }
