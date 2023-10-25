@@ -550,6 +550,11 @@ struct Check {
     pub use_computed_deployment_plan: bool,
 }
 
+#[derive(Serialize, Deserialize)]
+struct GlobalSettings {
+    disable_hints: bool,
+    enable_telemetry: Option<bool>,
+}
 #[derive(Parser, PartialEq, Clone, Debug)]
 struct Completions {
     /// Specify which shell to generation completions script for
@@ -579,7 +584,40 @@ pub fn main() {
         }
     };
 
+    let mut global_settings = String::new();
+    let global_settings_default = GlobalSettings {
+        disable_hints: false,
+        enable_telemetry: None,
+    };
+    // This is backwards compatible with ENV var setting as well as the new ~/.clarinet/Settings.toml
     let hints_enabled = env::var("CLARINET_DISABLE_HINTS") != Ok("1".into());
+    let home_dir = dirs::home_dir();
+    let mpath: Option<PathBuf> = home_dir.map(|home_dir| home_dir.join(".clarinet/Settings.toml"));
+    let settings_file = "~/.clarinet/Settings.toml";
+    let global_settings: GlobalSettings = match mpath {
+        Some(path) => {
+            if path.exists() {
+                let mut file = File::open(&path).expect("Unable to open the file");
+                let result = file.read_to_string(&mut global_settings);
+                match result {
+                    Ok(_) => match toml::from_str(&global_settings) {
+                        Ok(res) => res,
+                        Err(_) => {
+                            println!("{}{}", format_warn!("unable to parse "), settings_file);
+                            global_settings_default
+                        }
+                    },
+                    Err(_) => {
+                        println!("{}{}", format_warn!("unable to read file "), settings_file);
+                        global_settings_default
+                    }
+                }
+            } else {
+                global_settings_default
+            }
+        }
+        None => global_settings_default,
+    };
 
     match opts.command {
         Command::New(project_opts) => {
@@ -598,15 +636,23 @@ pub fn main() {
                 if project_opts.disable_telemetry {
                     false
                 } else {
-                    println!("{}", yellow!("Send usage data to Hiro."));
-                    println!("{}", yellow!("Help Hiro improve its products and services by automatically sending diagnostics and usage data."));
-                    println!("{}", yellow!("Only high level usage information, and no information identifying you or your project are collected."));
-                    // TODO(lgalabru): once we have a privacy policy available, add a link
-                    // println!("{}", yellow!("Visit http://hiro.so/clarinet-privacy for details."));
-                    println!("{}", yellow!("Enable [Y/n]?"));
-                    let mut buffer = String::new();
-                    std::io::stdin().read_line(&mut buffer).unwrap();
-                    !buffer.starts_with("n")
+                    let enabled = match global_settings.enable_telemetry {
+                        Some(true) => true,
+                        _ => env::var("CLARINET_TELEMETRY") == Ok("1".into()),
+                    };
+                    if enabled {
+                        true
+                    } else {
+                        println!("{}", yellow!("Send usage data to Hiro."));
+                        println!("{}", yellow!("Help Hiro improve its products and services by automatically sending diagnostics and usage data."));
+                        println!("{}", yellow!("Only high level usage information, and no information identifying you or your project are collected."));
+                        // TODO(lgalabru): once we have a privacy policy available, add a link
+                        // println!("{}", yellow!("Visit http://hiro.so/clarinet-privacy for details."));
+                        println!("{}", yellow!("Enable [Y/n]?"));
+                        let mut buffer = String::new();
+                        std::io::stdin().read_line(&mut buffer).unwrap();
+                        !buffer.starts_with("n")
+                    }
                 }
             } else {
                 false

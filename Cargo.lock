@@ -662,6 +662,7 @@ dependencies = [
  "crossbeam-channel",
  "crossterm 0.22.1",
  "ctrlc",
+ "dirs",
  "encoding_rs",
  "futures",
  "fwdansi",
