@@ -1,21 +1,13 @@
 pub mod types;
 mod ui;
 
+use std::fs::{self};
+use std::path::PathBuf;
 pub use ui::start_ui;
 
-use hiro_system_kit;
-
 use clarinet_deployments::types::{DeploymentGenerationArtifacts, DeploymentSpecification};
-
-use clarinet_files::{FileLocation, ProjectManifest};
-
 use clarinet_files::chainhook_types::StacksNetwork;
-
-use serde_yaml;
-
-use std::fs::{self};
-
-use std::path::PathBuf;
+use clarinet_files::{FileLocation, ProjectManifest};
 
 #[derive(Deserialize, Debug)]
 pub struct Balance {
@@ -79,7 +71,7 @@ fn get_deployments_files(
         let is_extension_valid = file
             .extension()
             .and_then(|ext| ext.to_str())
-            .and_then(|ext| Some(ext == "yml" || ext == "yaml"));
+            .map(|ext| ext == "yml" || ext == "yaml");
 
         if let Some(true) = is_extension_valid {
             let relative_path = file.clone();
@@ -99,13 +91,13 @@ pub fn write_deployment(
     if target_location.exists() && prompt_override {
         println!(
             "Deployment {} already exists.\n{}?",
-            target_location.to_string(),
+            target_location,
             yellow!("Overwrite [Y/n]")
         );
         let mut buffer = String::new();
         std::io::stdin().read_line(&mut buffer).unwrap();
-        if buffer.starts_with("n") {
-            return Err(format!("deployment update aborted"));
+        if buffer.starts_with('n') {
+            return Err("deployment update aborted".to_string());
         }
     }
 

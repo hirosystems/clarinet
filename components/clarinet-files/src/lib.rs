@@ -32,7 +32,9 @@ pub use project_manifest::{
 };
 use serde::ser::{Serialize, SerializeMap, Serializer};
 use std::collections::HashMap;
+use std::fmt;
 use std::future::Future;
+use std::path::Path;
 use std::pin::Pin;
 use std::{borrow::BorrowMut, path::PathBuf, str::FromStr};
 use url::Url;
@@ -54,6 +56,15 @@ pub trait FileAccessor {
 pub enum FileLocation {
     FileSystem { path: PathBuf },
     Url { url: Url },
+}
+
+impl fmt::Display for FileLocation {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            FileLocation::FileSystem { path } => write!(f, "{}", path.display()),
+            FileLocation::Url { url } => write!(f, "{}", url),
+        }
+    }
 }
 
 impl FileLocation {
@@ -119,7 +130,7 @@ impl FileLocation {
             FileLocation::Url { url } => {
                 let mut paths_segments = url
                     .path_segments_mut()
-                    .map_err(|_| format!("unable to mutate url"))?;
+                    .map_err(|_| "unable to mutate url".to_string())?;
                 for component in path_to_append.components() {
                     let segment = component
                         .as_os_str()
@@ -134,20 +145,15 @@ impl FileLocation {
 
     pub fn read_content_as_utf8(&self) -> Result<String, String> {
         let content = self.read_content()?;
-        let contract_as_utf8 = String::from_utf8(content).map_err(|e| {
-            format!(
-                "unable to read content as utf8 {}\n{:?}",
-                self.to_string(),
-                e
-            )
-        })?;
+        let contract_as_utf8 = String::from_utf8(content)
+            .map_err(|e| format!("unable to read content as utf8 {}\n{:?}", self, e))?;
         Ok(contract_as_utf8)
     }
 
-    fn fs_read_content(path: &PathBuf) -> Result<Vec<u8>, String> {
+    fn fs_read_content(path: &Path) -> Result<Vec<u8>, String> {
         use std::fs::File;
         use std::io::{BufReader, Read};
-        let file = File::open(path.clone())
+        let file = File::open(path)
             .map_err(|e| format!("unable to read file {}\n{:?}", path.display(), e))?;
         let mut file_reader = BufReader::new(file);
         let mut file_buffer = vec![];
@@ -157,7 +163,7 @@ impl FileLocation {
         Ok(file_buffer)
     }
 
-    fn fs_exists(path: &PathBuf) -> bool {
+    fn fs_exists(path: &Path) -> bool {
         path.exists()
     }
 
@@ -173,7 +179,7 @@ impl FileLocation {
                 e
             )
         })?;
-        let mut file = File::create(&file_path)
+        let mut file = File::create(file_path)
             .map_err(|e| format!("unable to open file {}\n{}", file_path.display(), e))?;
         file.write_all(content)
             .map_err(|e| format!("unable to write file {}\n{}", file_path.display(), e))?;
@@ -182,7 +188,7 @@ impl FileLocation {
 
     pub async fn get_project_manifest_location(
         &self,
-        file_accessor: Option<&Box<dyn FileAccessor>>,
+        file_accessor: Option<&dyn FileAccessor>,
     ) -> Result<FileLocation, String> {
         match file_accessor {
             None => {
@@ -236,10 +242,7 @@ impl FileLocation {
 
                 match manifest_found {
                     true => Ok(project_root_location),
-                    false => Err(format!(
-                        "unable to find root location from {}",
-                        self.to_string()
-                    )),
+                    false => Err(format!("unable to find root location from {}", self)),
                 }
             }
             _ => {
@@ -262,7 +265,7 @@ impl FileLocation {
             FileLocation::Url { url } => {
                 let mut segments = url
                     .path_segments_mut()
-                    .map_err(|_| format!("unable to mutate url"))?;
+                    .map_err(|_| "unable to mutate url".to_string())?;
                 segments.pop();
             }
         }
@@ -292,9 +295,7 @@ impl FileLocation {
     }
 
     pub fn get_relative_location(&self) -> Result<String, String> {
-        let base = self
-            .get_project_root_location()
-            .and_then(|l| Ok(l.to_string()))?;
+        let base = self.get_project_root_location().map(|l| l.to_string())?;
         let file = self.to_string();
         Ok(file[(base.len() + 1)..].to_string())
     }
@@ -314,7 +315,7 @@ impl FileLocation {
 impl FileLocation {
     pub fn read_content(&self) -> Result<Vec<u8>, String> {
         let bytes = match &self {
-            FileLocation::FileSystem { path } => FileLocation::fs_read_content(&path),
+            FileLocation::FileSystem { path } => FileLocation::fs_read_content(path),
             FileLocation::Url { url } => match url.scheme() {
                 #[cfg(not(feature = "wasm"))]
                 "file" => {
@@ -360,15 +361,6 @@ impl FileLocation {
             FileLocation::Url { url } => Ok(url.to_string()),
             #[allow(unreachable_patterns)]
             _ => unreachable!(),
-        }
-    }
-
-    pub fn to_string(&self) -> String {
-        match self {
-            FileLocation::FileSystem { path } => {
-                format!("{}", path.display())
-            }
-            FileLocation::Url { url } => url.to_string(),
         }
     }
 }

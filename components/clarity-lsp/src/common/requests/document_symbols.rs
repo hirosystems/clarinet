@@ -11,12 +11,10 @@ use super::helpers::span_to_range;
 
 fn symbolic_expression_to_name(symbolic_expr: &SymbolicExpression) -> String {
     match &symbolic_expr.expr {
-        SymbolicExpressionType::Atom(name) => return name.to_string(),
-        SymbolicExpressionType::List(list) => {
-            return symbolic_expression_to_name(&(*list).to_vec()[0])
-        }
-        _ => return "".to_string(),
-    };
+        SymbolicExpressionType::Atom(name) => name.to_string(),
+        SymbolicExpressionType::List(list) => symbolic_expression_to_name(&(*list).to_vec()[0]),
+        _ => "".to_string(),
+    }
 }
 
 #[derive(Eq, PartialEq, Copy, Clone, Serialize, Deserialize)]
@@ -55,7 +53,7 @@ fn build_symbol(
         detail,
         tags: None,
         deprecated: None,
-        selection_range: range.clone(),
+        selection_range: range,
         range,
         children,
     }
@@ -75,8 +73,8 @@ impl<'a> ASTSymbols {
         }
     }
 
-    pub fn get_symbols(mut self, expressions: &'a Vec<SymbolicExpression>) -> Vec<DocumentSymbol> {
-        traverse(&mut self, &expressions);
+    pub fn get_symbols(mut self, expressions: &'a [SymbolicExpression]) -> Vec<DocumentSymbol> {
+        traverse(&mut self, expressions);
         self.symbols
     }
 }
@@ -88,7 +86,7 @@ impl<'a> ASTVisitor<'a> for ASTSymbols {
         trait_identifier: &clarity_repl::clarity::vm::types::TraitIdentifier,
     ) -> bool {
         self.symbols.push(build_symbol(
-            &"impl-trait",
+            "impl-trait",
             Some(trait_identifier.name.to_string()),
             ClaritySymbolKind::IMPL_TRAIT,
             &expr.span,
@@ -104,7 +102,7 @@ impl<'a> ASTVisitor<'a> for ASTSymbols {
         data_type: &'a SymbolicExpression,
         initial: &'a SymbolicExpression,
     ) -> bool {
-        let symbol_type = symbolic_expression_to_name(&data_type);
+        let symbol_type = symbolic_expression_to_name(data_type);
         self.symbols.push(build_symbol(
             &name.to_owned(),
             Some(symbol_type),
@@ -123,19 +121,14 @@ impl<'a> ASTVisitor<'a> for ASTSymbols {
     ) -> bool {
         let mut symbols: Vec<DocumentSymbol> = Vec::new();
         for (name, expr) in values.iter() {
-            match name {
-                Some(name) => {
-                    symbols.push(build_symbol(
-                        name.as_str(),
-                        None,
-                        ClaritySymbolKind::VALUE,
-                        &expr.span,
-                        self.children_map.remove(&expr.id),
-                    ));
-                }
-                None => {
-                    ();
-                }
+            if let Some(name) = name {
+                symbols.push(build_symbol(
+                    name.as_str(),
+                    None,
+                    ClaritySymbolKind::VALUE,
+                    &expr.span,
+                    self.children_map.remove(&expr.id),
+                ));
             }
         }
         self.children_map.insert(expr.id, symbols);
@@ -165,21 +158,22 @@ impl<'a> ASTVisitor<'a> for ASTSymbols {
         key_type: &'a SymbolicExpression,
         value_type: &'a SymbolicExpression,
     ) -> bool {
-        let mut children = Vec::new();
-        children.push(build_symbol(
-            "key",
-            Some(symbolic_expression_to_name(&key_type)),
-            ClaritySymbolKind::KEY,
-            &key_type.span,
-            None,
-        ));
-        children.push(build_symbol(
-            "value",
-            Some(symbolic_expression_to_name(&value_type)),
-            ClaritySymbolKind::VALUE,
-            &value_type.span,
-            None,
-        ));
+        let children = vec![
+            build_symbol(
+                "key",
+                Some(symbolic_expression_to_name(key_type)),
+                ClaritySymbolKind::KEY,
+                &key_type.span,
+                None,
+            ),
+            build_symbol(
+                "value",
+                Some(symbolic_expression_to_name(value_type)),
+                ClaritySymbolKind::VALUE,
+                &value_type.span,
+                None,
+            ),
+        ];
 
         self.symbols.push(build_symbol(
             &name.to_owned(),
@@ -317,11 +311,8 @@ impl<'a> ASTVisitor<'a> for ASTSymbols {
     ) -> bool {
         let mut children = Vec::new();
         for statement in statements.iter() {
-            match self.children_map.remove(&statement.id) {
-                Some(mut child) => {
-                    children.append(&mut child);
-                }
-                None => (),
+            if let Some(mut child) = self.children_map.remove(&statement.id) {
+                children.append(&mut child);
             }
         }
 
@@ -347,7 +338,7 @@ impl<'a> ASTVisitor<'a> for ASTSymbols {
         let mut children: Vec<DocumentSymbol> = Vec::new();
 
         let mut bindings_children: Vec<DocumentSymbol> = Vec::new();
-        for (name, expr) in bindings.into_iter() {
+        for (name, expr) in bindings.iter() {
             bindings_children.push(build_symbol(
                 name.as_str(),
                 None,
@@ -356,7 +347,7 @@ impl<'a> ASTVisitor<'a> for ASTSymbols {
                 self.children_map.remove(&expr.id),
             ))
         }
-        if bindings_children.len() > 0 {
+        if !bindings_children.is_empty() {
             let start = bindings_children.first().unwrap().range.start;
             let end = bindings_children.last().unwrap().range.start;
             let bindings_span = Span {
@@ -376,16 +367,13 @@ impl<'a> ASTVisitor<'a> for ASTSymbols {
 
         let mut body_children = Vec::new();
         for statement in body.iter() {
-            match self.children_map.remove(&statement.id) {
-                Some(children) => {
-                    for child in children {
-                        body_children.push(child);
-                    }
+            if let Some(children) = self.children_map.remove(&statement.id) {
+                for child in children {
+                    body_children.push(child);
                 }
-                None => (),
             }
         }
-        if body_children.len() > 0 {
+        if !body_children.is_empty() {
             let start = body_children.first().unwrap().range.start;
             let end = body_children.last().unwrap().range.start;
             let body_span = Span {

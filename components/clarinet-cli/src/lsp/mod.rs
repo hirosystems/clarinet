@@ -7,14 +7,12 @@ use clarity_repl::clarity::vm::diagnostic::{
 };
 use crossbeam_channel::unbounded;
 use std::sync::mpsc;
-use tokio;
 use tower_lsp::lsp_types::{Diagnostic, DiagnosticSeverity, Position, Range};
 use tower_lsp::{LspService, Server};
 
 pub fn run_lsp() {
-    match block_on(do_run_lsp()) {
-        Err(_e) => std::process::exit(1),
-        _ => {}
+    if let Err(_e) = block_on(do_run_lsp()) {
+        std::process::exit(1)
     };
 }
 
@@ -49,7 +47,7 @@ async fn do_run_lsp() -> Result<(), String> {
 }
 
 pub fn clarity_diagnostics_to_tower_lsp_type(
-    diagnostics: &mut Vec<ClarityDiagnostic>,
+    diagnostics: &mut [ClarityDiagnostic],
 ) -> Vec<tower_lsp::lsp_types::Diagnostic> {
     let mut dst = vec![];
     for d in diagnostics.iter_mut() {

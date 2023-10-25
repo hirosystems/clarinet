@@ -1,3 +1,5 @@
+use std::str::FromStr;
+
 use crate::clarity::codec::*;
 use crate::clarity::stacks_common::codec::StacksMessageCodec;
 use crate::clarity::stacks_common::types::chainstate::StacksAddress;
@@ -24,7 +26,7 @@ pub struct Wallet {
 
 impl Wallet {
     pub fn compute_stacks_address(&self) -> StacksAddress {
-        let keypair = compute_keypair(&self);
+        let keypair = compute_keypair(self);
         compute_stacks_address(&keypair.public_key, self.mainnet)
     }
 }
@@ -38,7 +40,7 @@ pub fn compute_stacks_address(public_key: &PublicKey, mainnet: bool) -> StacksAd
     let wrapped_public_key =
         Secp256k1PublicKey::from_slice(&public_key.serialize_compressed()).unwrap();
 
-    let signer_addr = StacksAddress::from_public_keys(
+    StacksAddress::from_public_keys(
         match mainnet {
             true => C32_ADDRESS_VERSION_MAINNET_SINGLESIG,
             false => C32_ADDRESS_VERSION_TESTNET_SINGLESIG,
@@ -47,9 +49,7 @@ pub fn compute_stacks_address(public_key: &PublicKey, mainnet: bool) -> StacksAd
         1,
         &vec![wrapped_public_key],
     )
-    .unwrap();
-
-    signer_addr
+    .unwrap()
 }
 
 pub fn compute_keypair(wallet: &Wallet) -> Keypair {
@@ -78,9 +78,9 @@ pub fn sign_transaction_payload(
     let signer_addr = compute_stacks_address(&keypair.public_key, wallet.mainnet);
 
     let spending_condition = TransactionSpendingCondition::Singlesig(SinglesigSpendingCondition {
-        signer: signer_addr.bytes.clone(),
-        nonce: nonce,
-        tx_fee: tx_fee,
+        signer: signer_addr.bytes,
+        nonce,
+        tx_fee,
         hash_mode: SinglesigHashMode::P2PKH,
         key_encoding: TransactionPublicKeyEncoding::Compressed,
         signature: MessageSignature::empty(),
@@ -96,11 +96,11 @@ pub fn sign_transaction_payload(
             true => 0x00000001,
             false => 0x80000000,
         },
-        auth: auth,
-        anchor_mode: anchor_mode,
+        auth,
+        anchor_mode,
         post_condition_mode: TransactionPostConditionMode::Allow,
         post_conditions: vec![],
-        payload: payload,
+        payload,
     };
 
     let mut unsigned_tx_bytes = vec![];

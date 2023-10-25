@@ -86,12 +86,12 @@ pub fn value_to_string(value: &Value) -> String {
             out
         }
         Value::Optional(opt_data) => match opt_data.data {
-            Some(ref x) => format!("(some {})", value_to_string(&**x)),
+            Some(ref x) => format!("(some {})", value_to_string(x)),
             None => "none".to_string(),
         },
         Value::Response(res_data) => match res_data.committed {
-            true => format!("(ok {})", value_to_string(&*res_data.data)),
-            false => format!("(err {})", value_to_string(&*res_data.data)),
+            true => format!("(ok {})", value_to_string(&res_data.data)),
+            false => format!("(err {})", value_to_string(&res_data.data)),
         },
         Value::Sequence(SequenceData::String(CharType::ASCII(data))) => {
             format!("\"{}\"", String::from_utf8(data.data.clone()).unwrap())

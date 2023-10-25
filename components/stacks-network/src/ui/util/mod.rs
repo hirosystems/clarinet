@@ -18,13 +18,13 @@ impl<'a> TabsState<'a> {
         }
     }
     pub fn next(&mut self) {
-        if self.titles.len() > 0 {
+        if !self.titles.is_empty() {
             self.index = (self.index + 1) % self.titles.len();
         }
     }
 
     pub fn previous(&mut self) {
-        if self.titles.len() > 0 {
+        if !self.titles.is_empty() {
             if self.index > 0 {
                 self.index -= 1;
             } else {
@@ -57,9 +57,7 @@ impl<T> StatefulList<T> {
     pub fn next(&mut self) {
         let i = match self.state.selected() {
             Some(i) => {
-                if self.items.len() == 0 {
-                    0
-                } else if i >= self.items.len() - 1 {
+                if self.items.is_empty() || i >= self.items.len() - 1 {
                     0
                 } else {
                     i + 1
@@ -73,7 +71,7 @@ impl<T> StatefulList<T> {
     pub fn previous(&mut self) {
         let i = match self.state.selected() {
             Some(i) => {
-                if self.items.len() == 0 {
+                if self.items.is_empty() {
                     0
                 } else if i == 0 {
                     self.items.len() - 1

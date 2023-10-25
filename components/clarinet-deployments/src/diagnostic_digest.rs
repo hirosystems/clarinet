@@ -33,8 +33,8 @@ impl DiagnosticsDigest {
         let mut outputs = vec![];
         let total = deployment.contracts.len();
 
-        for (contract_id, diags) in contracts_diags.into_iter() {
-            let (source, contract_location) = match deployment.contracts.get(&contract_id) {
+        for (contract_id, diags) in contracts_diags.iter() {
+            let (source, contract_location) = match deployment.contracts.get(contract_id) {
                 Some(entry) => {
                     contracts_checked += 1;
                     entry
@@ -68,7 +68,7 @@ impl DiagnosticsDigest {
                     }
                     Level::Note => {
                         outputs.push(format!("{}: {}", "note:".blue().bold(), diagnostic.message));
-                        outputs.append(&mut output_code(&diagnostic, &formatted_lines));
+                        outputs.append(&mut output_code(diagnostic, &formatted_lines));
                         continue;
                     }
                 }
@@ -86,10 +86,10 @@ impl DiagnosticsDigest {
                         span.start_column
                     ));
                 }
-                outputs.append(&mut output_code(&diagnostic, &formatted_lines));
+                outputs.append(&mut output_code(diagnostic, &formatted_lines));
 
                 if let Some(ref suggestion) = diagnostic.suggestion {
-                    outputs.push(format!("{}", suggestion));
+                    outputs.push(suggestion.to_string());
                 }
             }
         }

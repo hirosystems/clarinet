@@ -113,7 +113,7 @@ pub fn sign_transaction(
                 Message::from_slice(&sig_hash_bytes[..]).expect("Unable to create Message");
             let secp = Secp256k1::new();
             let signature = secp.sign_ecdsa_recoverable(&message, signer);
-            let public_key = PublicKey::from_secret_key(&secp, &signer);
+            let public_key = PublicKey::from_secret_key(&secp, signer);
             let sig_der = signature.to_standard().serialize_der();
             (sig_der, public_key)
         };

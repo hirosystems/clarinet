@@ -79,7 +79,7 @@ impl GetChangesForNewContract {
         new_file.append_path("contracts")?;
         new_file.append_path(&name)?;
         if new_file.exists() {
-            return Err(format!("{} already exists", new_file.to_string()));
+            return Err(format!("{} already exists", new_file));
         }
         let change = FileCreation {
             comment: format!("{} contracts/{}", green!("Created file"), name),
@@ -121,7 +121,7 @@ describe("example tests", () => {
         new_file.append_path("tests")?;
         new_file.append_path(&name)?;
         if new_file.exists() {
-            return Err(format!("{} already exists", new_file.to_string()));
+            return Err(format!("{} already exists", new_file));
         }
         let change = FileCreation {
             comment: format!("{} tests/{}", green!("Created file"), name),

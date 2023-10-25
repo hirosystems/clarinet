@@ -1,6 +1,7 @@
 #[allow(dead_code)]
 mod app;
-#[allow(dead_code)]
+
+#[allow(clippy::module_inception)]
 mod ui;
 
 use app::App;

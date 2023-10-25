@@ -88,22 +88,22 @@ fn height_to_block(height: u32, genesis_time: Option<u64>) -> BlockInfo {
     let genesis_time = genesis_time.unwrap_or(0);
 
     let block_header_hash = {
-        let mut buffer = bytes.clone();
+        let mut buffer = bytes;
         buffer[0] = 1;
         BlockHeaderHash(buffer)
     };
     let burn_block_header_hash = {
-        let mut buffer = bytes.clone();
+        let mut buffer = bytes;
         buffer[0] = 2;
         BurnchainHeaderHash(buffer)
     };
     let consensus_hash = {
-        let mut buffer = bytes.clone();
+        let mut buffer = bytes;
         buffer[0] = 3;
         ConsensusHash::from_bytes(&buffer[0..20]).unwrap()
     };
     let vrf_seed = {
-        let mut buffer = bytes.clone();
+        let mut buffer = bytes;
         buffer[0] = 4;
         VRFSeed(buffer)
     };
@@ -131,8 +131,14 @@ fn height_to_block(height: u32, genesis_time: Option<u64>) -> BlockInfo {
     }
 }
 
+impl Default for Datastore {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl Datastore {
-    pub fn new() -> Datastore {
+    pub fn new() -> Self {
         let id = height_to_id(0);
 
         let mut store = HashMap::new();
@@ -144,7 +150,7 @@ impl Datastore {
         let mut id_height_map = HashMap::new();
         id_height_map.insert(id, 0);
 
-        Datastore {
+        Self {
             store,
             block_id_lookup,
             metadata: HashMap::new(),
@@ -157,11 +163,10 @@ impl Datastore {
 
     pub fn advance_chain_tip(&mut self, count: u32) -> u32 {
         let cur_height = self.chain_height;
-        let current_lookup_id = self
+        let current_lookup_id = *self
             .block_id_lookup
             .get(&self.open_chain_tip)
-            .expect("Open chain tip missing in block id lookup table")
-            .clone();
+            .expect("Open chain tip missing in block id lookup table");
 
         for i in 1..=count {
             let height = cur_height + i;
@@ -171,7 +176,7 @@ impl Datastore {
             self.height_at_chain_tip.insert(id, height);
         }
 
-        self.chain_height = self.chain_height + count;
+        self.chain_height += count;
         self.open_chain_tip = height_to_id(self.chain_height);
         self.current_chain_tip = self.open_chain_tip;
         self.chain_height
@@ -193,7 +198,7 @@ impl ClarityBackingStore for Datastore {
             .expect("Could not find current chain tip in block_id_lookup map");
 
         if let Some(map) = self.store.get(lookup_id) {
-            map.get(key).map(|v| v.clone())
+            map.get(key).cloned()
         } else {
             panic!("Block does not exist for current chain tip");
         }
@@ -220,18 +225,18 @@ impl ClarityBackingStore for Datastore {
     ///  i.e., it changes on time-shifted evaluation. the open_chain_tip functions always
     ///   return data about the chain tip that is currently open for writing.
     fn get_current_block_height(&mut self) -> u32 {
-        self.height_at_chain_tip
+        *self
+            .height_at_chain_tip
             .get(self.get_chain_tip())
             .unwrap_or(&u32::MAX)
-            .clone()
     }
 
     fn get_open_chain_tip_height(&mut self) -> u32 {
-        self.chain_height.clone()
+        self.chain_height
     }
 
     fn get_open_chain_tip(&mut self) -> StacksBlockId {
-        self.open_chain_tip.clone()
+        self.open_chain_tip
     }
 
     /// The contract commitment is the hash of the contract, plus the block height in
@@ -263,7 +268,7 @@ impl ClarityBackingStore for Datastore {
     }
 
     fn get_with_proof(&mut self, key: &str) -> Option<(String, Vec<u8>)> {
-        return None;
+        None
     }
 
     fn get_contract_hash(
@@ -291,7 +296,7 @@ impl ClarityBackingStore for Datastore {
 impl BurnDatastore {
     pub fn new(constants: StacksConstants) -> BurnDatastore {
         let bytes = height_to_hashed_bytes(0);
-        let id = StacksBlockId(bytes.clone());
+        let id = StacksBlockId(bytes);
         let sortition_id = SortitionId(bytes);
         let genesis_time = chrono::Utc::now().timestamp() as u64;
 
@@ -316,7 +321,7 @@ impl BurnDatastore {
         sortition_lookup.insert(sortition_id, id);
 
         let mut consensus_hash_lookup = HashMap::new();
-        consensus_hash_lookup.insert(genesis_block.consensus_hash.clone(), sortition_id);
+        consensus_hash_lookup.insert(genesis_block.consensus_hash, sortition_id);
 
         let mut store = HashMap::new();
         store.insert(id, genesis_block);
@@ -343,28 +348,27 @@ impl BurnDatastore {
 
     pub fn advance_chain_tip(&mut self, count: u32) {
         let cur_height = self.chain_height;
-        let current_lookup_id = self
+        let current_lookup_id = *self
             .block_id_lookup
             .get(&self.open_chain_tip)
-            .expect("Open chain tip missing in block id lookup table")
-            .clone();
+            .expect("Open chain tip missing in block id lookup table");
         let genesis_time = self.genesis_time;
 
         for i in 1..=count {
             let height = cur_height + i;
             let bytes = height_to_hashed_bytes(height);
-            let id = StacksBlockId(bytes.clone());
-            let sortition_id = SortitionId(bytes.clone());
+            let id = StacksBlockId(bytes);
+            let sortition_id = SortitionId(bytes);
             let block_info = height_to_block(height, Some(genesis_time));
             self.block_id_lookup.insert(id, current_lookup_id);
             self.height_at_chain_tip.insert(id, height);
             self.sortition_lookup.insert(sortition_id, id);
             self.consensus_hash_lookup
-                .insert(block_info.consensus_hash.clone(), sortition_id);
+                .insert(block_info.consensus_hash, sortition_id);
             self.store.insert(id, block_info);
         }
 
-        self.chain_height = self.chain_height + count;
+        self.chain_height += count;
         self.open_chain_tip = height_to_id(self.chain_height);
         self.current_chain_tip = self.open_chain_tip;
     }
@@ -388,55 +392,43 @@ impl HeadersDB for BurnDatastore {
         &self,
         id_bhh: &StacksBlockId,
     ) -> Option<BlockHeaderHash> {
-        self.store
-            .get(id_bhh)
-            .and_then(|id| Some(id.block_header_hash))
+        self.store.get(id_bhh).map(|id| id.block_header_hash)
     }
 
     fn get_burn_header_hash_for_block(
         &self,
         id_bhh: &StacksBlockId,
     ) -> Option<BurnchainHeaderHash> {
-        self.store
-            .get(id_bhh)
-            .and_then(|id| Some(id.burn_block_header_hash))
+        self.store.get(id_bhh).map(|id| id.burn_block_header_hash)
     }
 
     fn get_consensus_hash_for_block(&self, id_bhh: &StacksBlockId) -> Option<ConsensusHash> {
-        self.store
-            .get(id_bhh)
-            .and_then(|id| Some(id.consensus_hash))
+        self.store.get(id_bhh).map(|id| id.consensus_hash)
     }
     fn get_vrf_seed_for_block(&self, id_bhh: &StacksBlockId) -> Option<VRFSeed> {
-        self.store.get(id_bhh).and_then(|id| Some(id.vrf_seed))
+        self.store.get(id_bhh).map(|id| id.vrf_seed)
     }
     fn get_burn_block_time_for_block(&self, id_bhh: &StacksBlockId) -> Option<u64> {
-        self.store
-            .get(id_bhh)
-            .and_then(|id| Some(id.burn_block_time))
+        self.store.get(id_bhh).map(|id| id.burn_block_time)
     }
     fn get_burn_block_height_for_block(&self, id_bhh: &StacksBlockId) -> Option<u32> {
-        self.store
-            .get(id_bhh)
-            .and_then(|id| Some(id.burn_block_height))
+        self.store.get(id_bhh).map(|id| id.burn_block_height)
     }
     fn get_miner_address(&self, id_bhh: &StacksBlockId) -> Option<StacksAddress> {
-        self.store.get(id_bhh).and_then(|id| Some(id.miner))
+        self.store.get(id_bhh).map(|id| id.miner)
     }
     fn get_burnchain_tokens_spent_for_block(&self, id_bhh: &StacksBlockId) -> Option<u128> {
         self.store
             .get(id_bhh)
-            .and_then(|id| Some(id.burnchain_tokens_spent_for_block))
+            .map(|id| id.burnchain_tokens_spent_for_block)
     }
     fn get_burnchain_tokens_spent_for_winning_block(&self, id_bhh: &StacksBlockId) -> Option<u128> {
         self.store
             .get(id_bhh)
-            .and_then(|id| Some(id.get_burnchain_tokens_spent_for_winning_block))
+            .map(|id| id.get_burnchain_tokens_spent_for_winning_block)
     }
     fn get_tokens_earned_for_block(&self, id_bhh: &StacksBlockId) -> Option<u128> {
-        self.store
-            .get(id_bhh)
-            .and_then(|id| Some(id.tokens_earned_for_block))
+        self.store.get(id_bhh).map(|id| id.tokens_earned_for_block)
     }
 }
 
@@ -458,7 +450,7 @@ impl BurnStateDB for BurnDatastore {
         self.sortition_lookup
             .get(sortition_id)
             .and_then(|id| self.store.get(id))
-            .and_then(|block_info| Some(block_info.burn_block_height))
+            .map(|block_info| block_info.burn_block_height)
     }
 
     /// Returns the height of the burnchain when the Stacks chain started running.
@@ -489,7 +481,7 @@ impl BurnStateDB for BurnDatastore {
         self.sortition_lookup
             .get(sortition_id)
             .and_then(|id| self.store.get(id))
-            .and_then(|block_info| Some(block_info.burn_block_header_hash))
+            .map(|block_info| block_info.burn_block_header_hash)
     }
 
     /// Lookup a `SortitionId` keyed to a `ConsensusHash`.
@@ -499,9 +491,7 @@ impl BurnStateDB for BurnDatastore {
         &self,
         consensus_hash: &ConsensusHash,
     ) -> Option<SortitionId> {
-        self.consensus_hash_lookup
-            .get(consensus_hash)
-            .and_then(|id| Some(id.clone()))
+        self.consensus_hash_lookup.get(consensus_hash).copied()
     }
 
     /// The epoch is defined as by a start and end height. This returns
@@ -523,7 +513,7 @@ impl BurnStateDB for BurnDatastore {
         self.sortition_lookup
             .get(sortition_id)
             .and_then(|id| self.store.get(id))
-            .and_then(|block_info| Some(block_info.pox_payout_addrs.clone()))
+            .map(|block_info| block_info.pox_payout_addrs.clone())
     }
 
     fn get_ast_rules(&self, height: u32) -> clarity::vm::ast::ASTRules {
@@ -536,7 +526,7 @@ impl Datastore {
         Ok(Datastore::new())
     }
 
-    pub fn as_analysis_db<'a>(&'a mut self) -> AnalysisDatabase<'a> {
+    pub fn as_analysis_db(&mut self) -> AnalysisDatabase<'_> {
         AnalysisDatabase::new(self)
     }
 
@@ -587,7 +577,7 @@ impl Datastore {
     }
 
     pub fn set_chain_tip(&mut self, bhh: &StacksBlockId) {
-        self.current_chain_tip = bhh.clone();
+        self.current_chain_tip = *bhh;
     }
 
     pub fn put(&mut self, key: &str, value: &str) {
@@ -603,7 +593,7 @@ impl Datastore {
                 self.open_chain_tip,
                 self.store
                     .get(lookup_id)
-                    .expect(format!("Block with ID {:?} does not exist", lookup_id).as_str())
+                    .unwrap_or_else(|| panic!("Block with ID {:?} does not exist", lookup_id))
                     .clone(),
             );
 

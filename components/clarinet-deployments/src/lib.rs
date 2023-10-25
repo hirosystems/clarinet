@@ -42,7 +42,7 @@ pub fn setup_session_with_deployment(
     deployment: &DeploymentSpecification,
     contracts_asts: Option<&BTreeMap<QualifiedContractIdentifier, ContractAST>>,
 ) -> DeploymentGenerationArtifacts {
-    let mut session = initiate_session_from_deployment(&manifest);
+    let mut session = initiate_session_from_deployment(manifest);
     update_session_with_genesis_accounts(&mut session, deployment);
     let results = update_session_with_contracts_executions(
         &mut session,
@@ -61,12 +61,9 @@ pub fn setup_session_with_deployment(
         match res {
             Ok(execution_result) => {
                 diags.insert(contract_id.clone(), execution_result.diagnostics);
-                match execution_result.result {
-                    EvaluationResult::Contract(contract_result) => {
-                        asts.insert(contract_id.clone(), contract_result.contract.ast);
-                        contracts_analysis.insert(contract_id, contract_result.contract.analysis);
-                    }
-                    _ => (),
+                if let EvaluationResult::Contract(contract_result) = execution_result.result {
+                    asts.insert(contract_id.clone(), contract_result.contract.ast);
+                    contracts_analysis.insert(contract_id, contract_result.contract.analysis);
                 }
             }
             Err(errors) => {
@@ -76,23 +73,23 @@ pub fn setup_session_with_deployment(
         }
     }
 
-    let artifacts = DeploymentGenerationArtifacts {
+    DeploymentGenerationArtifacts {
         asts,
         deps,
         diags,
         success,
         session,
         analysis: contracts_analysis,
-    };
-    artifacts
+    }
 }
 
 pub fn initiate_session_from_deployment(manifest: &ProjectManifest) -> Session {
-    let mut settings = SessionSettings::default();
-    settings.repl_settings = manifest.repl_settings.clone();
-    settings.disk_cache_enabled = true;
-    let session = Session::new(settings);
-    session
+    let settings = SessionSettings {
+        repl_settings: manifest.repl_settings.clone(),
+        disk_cache_enabled: true,
+        ..Default::default()
+    };
+    Session::new(settings)
 }
 
 pub fn update_session_with_genesis_accounts(
@@ -135,7 +132,7 @@ pub fn update_session_with_contracts_executions(
             (None, Some(min_epoch)) => std::cmp::max(min_epoch, DEFAULT_EPOCH),
             _ => DEFAULT_EPOCH,
         };
-        session.update_epoch(epoch.clone());
+        session.update_epoch(epoch);
         for transaction in batch.transactions.iter() {
             match transaction {
                 TransactionSpecification::RequirementPublish(_)
@@ -161,7 +158,7 @@ pub fn update_session_with_contracts_executions(
                     let mut contract_ast = contracts_asts
                         .as_ref()
                         .and_then(|m| m.get(&contract_id))
-                        .and_then(|c| Some(c.clone()));
+                        .cloned();
                     let contract = ClarityContract {
                         code_source: ClarityCodeSource::ContractInMemory(tx.source.clone()),
                         deployer: ContractDeployer::Address(tx.emulated_sender.to_string()),
@@ -203,7 +200,7 @@ pub async fn generate_default_deployment(
     manifest: &ProjectManifest,
     network: &StacksNetwork,
     no_batch: bool,
-    file_accessor: Option<&Box<dyn FileAccessor>>,
+    file_accessor: Option<&dyn FileAccessor>,
     forced_min_epoch: Option<StacksEpochId>,
 ) -> Result<(DeploymentSpecification, DeploymentGenerationArtifacts), String> {
     let network_manifest = match file_accessor {
@@ -238,8 +235,8 @@ pub async fn generate_default_deployment(
                     (stacks_node, bitcoin_node)
                 }
                 None => {
-                    let stacks_node = format!("http://localhost:20443");
-                    let bitcoin_node = format!("http://devnet:devnet@localhost:18443");
+                    let stacks_node = "http://localhost:20443".to_string();
+                    let bitcoin_node = "http://devnet:devnet@localhost:18443".to_string();
                     (stacks_node, bitcoin_node)
                 }
             };
@@ -250,13 +247,9 @@ pub async fn generate_default_deployment(
                 .network
                 .stacks_node_rpc_address
                 .unwrap_or("https://api.testnet.hiro.so".to_string());
-            let bitcoin_node =
-                network_manifest
-                    .network
-                    .bitcoin_node_rpc_address
-                    .unwrap_or(format!(
-                        "http://blockstack:blockstacksystem@bitcoind.testnet.stacks.co:18332"
-                    ));
+            let bitcoin_node = network_manifest.network.bitcoin_node_rpc_address.unwrap_or(
+                "http://blockstack:blockstacksystem@bitcoind.testnet.stacks.co:18332".to_string(),
+            );
             (Some(stacks_node), Some(bitcoin_node))
         }
         StacksNetwork::Mainnet => {
@@ -276,7 +269,7 @@ pub async fn generate_default_deployment(
     let default_deployer = match network_manifest.accounts.get("deployer") {
         Some(deployer) => deployer,
         None => {
-            return Err(format!("unable to retrieve default deployer account"));
+            return Err("unable to retrieve default deployer account".to_string());
         }
     };
     let default_deployer_address =
@@ -295,8 +288,10 @@ pub async fn generate_default_deployment(
     let mut requirements_data = BTreeMap::new();
     let mut requirements_deps = BTreeMap::new();
 
-    let mut settings = SessionSettings::default();
-    settings.repl_settings = manifest.repl_settings.clone();
+    let settings = SessionSettings {
+        repl_settings: manifest.repl_settings.clone(),
+        ..Default::default()
+    };
 
     let session = Session::new(settings.clone());
 
@@ -362,7 +357,7 @@ pub async fn generate_default_deployment(
                     let (source, epoch, clarity_version, contract_location) =
                         requirements::retrieve_contract(
                             &contract_id,
-                            &cache_location,
+                            cache_location,
                             &file_accessor,
                         )
                         .await?;
@@ -372,7 +367,7 @@ pub async fn generate_default_deployment(
                         None => epoch,
                     };
 
-                    contract_epochs.insert(contract_id.clone(), epoch.clone());
+                    contract_epochs.insert(contract_id.clone(), epoch);
 
                     // Build the struct representing the requirement in the deployment
                     if network.is_simnet() {
@@ -381,7 +376,7 @@ pub async fn generate_default_deployment(
                             emulated_sender: contract_id.issuer.clone(),
                             source: source.clone(),
                             location: contract_location,
-                            clarity_version: clarity_version.clone(),
+                            clarity_version,
                         };
                         emulated_contracts_publish.insert(contract_id.clone(), data);
                     } else if network.either_devnet_or_testnet() {
@@ -435,7 +430,7 @@ pub async fn generate_default_deployment(
                 None => {
                     let (_, _, clarity_version, _) = requirements::retrieve_contract(
                         &contract_id,
-                        &cache_location,
+                        cache_location,
                         &file_accessor,
                     )
                     .await?;
@@ -452,15 +447,16 @@ pub async fn generate_default_deployment(
             // Extract the known / unknown dependencies
             match dependencies {
                 Ok(inferable_dependencies) => {
-                    // Looping could be confusing - in this case, we submitted a HashMap with one contract, so we have at most one
-                    // result in the `inferable_dependencies` map. We will just extract and keep the associated data (source, ast, deps).
-                    for (contract_id, dependencies) in inferable_dependencies.into_iter() {
+                    // We submitted a HashMap with one contract, so we have at most one result in the `inferable_dependencies` map.
+                    // We will extract and keep the associated data (source, ast, deps).
+                    if let Some((contract_id, dependencies)) =
+                        inferable_dependencies.into_iter().next()
+                    {
                         for dependency in dependencies.iter() {
                             queue.push_back((dependency.contract_id.clone(), None));
                         }
                         requirements_deps.insert(contract_id.clone(), dependencies);
                         requirements_data.insert(contract_id.clone(), (clarity_version, ast));
-                        break;
                     }
                 }
                 Err((inferable_dependencies, non_inferable_dependencies)) => {
@@ -534,7 +530,7 @@ pub async fn generate_default_deployment(
             for (_, contract_config) in manifest.contracts.iter() {
                 let mut contract_location = base_location.clone();
                 contract_location
-                    .append_path(&contract_config.expect_contract_path_as_str())
+                    .append_path(contract_config.expect_contract_path_as_str())
                     .map_err(|_| {
                         format!(
                             "unable to build path for contract {}",
@@ -542,12 +538,9 @@ pub async fn generate_default_deployment(
                         )
                     })?;
 
-                let source = contract_location.read_content_as_utf8().map_err(|_| {
-                    format!(
-                        "unable to find contract at {}",
-                        contract_location.to_string()
-                    )
-                })?;
+                let source = contract_location
+                    .read_content_as_utf8()
+                    .map_err(|_| format!("unable to find contract at {}", contract_location))?;
                 sources.insert(contract_location.to_string(), source);
             }
             sources
@@ -555,11 +548,11 @@ pub async fn generate_default_deployment(
         Some(file_accessor) => {
             let contracts_location = manifest
                 .contracts
-                .iter()
-                .map(|(_, contract_config)| {
+                .values()
+                .map(|contract_config| {
                     let mut contract_location = base_location.clone();
                     contract_location
-                        .append_path(&contract_config.expect_contract_path_as_str())
+                        .append_path(contract_config.expect_contract_path_as_str())
                         .unwrap();
                     contract_location.to_string()
                 })
@@ -601,7 +594,7 @@ pub async fn generate_default_deployment(
         };
 
         let mut contract_location = base_location.clone();
-        contract_location.append_path(&contract_config.expect_contract_path_as_str())?;
+        contract_location.append_path(contract_config.expect_contract_path_as_str())?;
         let source = sources
             .get(&contract_location.to_string())
             .ok_or(format!(
@@ -698,11 +691,11 @@ pub async fn generate_default_deployment(
     // Track the latest epoch that a contract is deployed in, so that we can
     // ensure that all contracts are deployed after their dependencies.
     for contract_id in ordered_contracts_ids.into_iter() {
-        if requirements_data.contains_key(&contract_id) {
+        if requirements_data.contains_key(contract_id) {
             continue;
         }
         let tx = contracts
-            .remove(&contract_id)
+            .remove(contract_id)
             .expect("unable to retrieve contract");
 
         match tx {
@@ -763,7 +756,7 @@ pub async fn generate_default_deployment(
     }
 
     let name = match network {
-        StacksNetwork::Simnet => format!("Simulated deployment, used as a default for `clarinet console`, `clarinet test` and `clarinet check`"),
+        StacksNetwork::Simnet => "Simulated deployment, used as a default for `clarinet console`, `clarinet test` and `clarinet check`".to_string(),
         _ => format!("{:?} deployment", network)
     };
 
@@ -833,15 +826,14 @@ pub fn load_deployment(
 ) -> Result<DeploymentSpecification, String> {
     let project_root_location = manifest.location.get_project_root_location()?;
     let spec = match DeploymentSpecification::from_config_file(
-        &deployment_plan_location,
+        deployment_plan_location,
         &project_root_location,
     ) {
         Ok(spec) => spec,
         Err(msg) => {
             return Err(format!(
                 "error: {} syntax incorrect\n{}",
-                deployment_plan_location.to_string(),
-                msg
+                deployment_plan_location, msg
             ));
         }
     };

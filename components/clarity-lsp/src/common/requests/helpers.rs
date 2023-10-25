@@ -1,3 +1,5 @@
+use std::cmp::Ordering;
+
 use clarity_repl::clarity::{representations::Span, ClarityName, SymbolicExpression};
 use lsp_types::{Position, Range};
 
@@ -26,7 +28,7 @@ pub fn is_position_within_span(position: &Position, span: &Span, end_offset: u32
         return false;
     }
 
-    return true;
+    true
 }
 
 pub fn get_expression_name_at_position(
@@ -59,21 +61,23 @@ pub fn get_function_at_position(
 
     let mut position_in_parameters: i32 = -1;
     for parameter in expressions {
-        if position.line == parameter.span.end_line {
-            if position.character > parameter.span.end_column + 1 {
-                position_in_parameters += 1
+        match position.line.cmp(&parameter.span.end_line) {
+            Ordering::Equal => {
+                if position.character > parameter.span.end_column + 1 {
+                    position_in_parameters += 1
+                }
             }
-        } else if position.line > parameter.span.end_line {
-            position_in_parameters += 1
+            Ordering::Greater => position_in_parameters += 1,
+            _ => {}
         }
     }
 
     let (function_name, _) = expressions.split_first()?;
 
-    return Some((
+    Some((
         function_name.match_atom()?.to_owned(),
         position_in_parameters.try_into().ok(),
-    ));
+    ))
 }
 
 pub fn get_atom_start_at_position(

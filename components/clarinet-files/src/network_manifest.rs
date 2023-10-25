@@ -184,7 +184,7 @@ pub mod accounts_serde {
         S: Serializer,
     {
         let mut seq = serializer.serialize_seq(Some(target.len()))?;
-        for (_, account) in target {
+        for account in target.values() {
             seq.serialize_element(account)?;
         }
         seq.end()
@@ -338,7 +338,7 @@ impl NetworkManifest {
     pub async fn from_project_manifest_location_using_file_accessor(
         location: &FileLocation,
         networks: &(BitcoinNetwork, StacksNetwork),
-        file_accessor: &Box<dyn FileAccessor>,
+        file_accessor: &dyn FileAccessor,
     ) -> Result<NetworkManifest, String> {
         let mut network_manifest_location = location.get_parent_location()?;
         network_manifest_location.append_path("settings/Devnet.toml")?;
@@ -347,7 +347,7 @@ impl NetworkManifest {
             .await?;
 
         let mut network_manifest_file: NetworkManifestFile =
-            toml::from_slice(&content.as_bytes()).unwrap();
+            toml::from_slice(content.as_bytes()).unwrap();
         NetworkManifest::from_network_manifest_file(
             &mut network_manifest_file,
             networks,
@@ -388,7 +388,7 @@ impl NetworkManifest {
         };
         let network = NetworkConfig {
             name: network_manifest_file.network.name.clone(),
-            stacks_node_rpc_address: stacks_node_rpc_address,
+            stacks_node_rpc_address,
             bitcoin_node_rpc_address: network_manifest_file
                 .network
                 .bitcoin_node_rpc_address
@@ -403,64 +403,57 @@ impl NetworkManifest {
         let mut accounts = BTreeMap::new();
         let is_mainnet = networks.1.is_mainnet();
 
-        match &network_manifest_file.accounts {
-            Some(Value::Table(entries)) => {
-                for (account_name, account_settings) in entries.iter() {
-                    match account_settings {
-                        Value::Table(account_settings) => {
-                            let balance = match account_settings.get("balance") {
-                                Some(Value::Integer(balance)) => *balance as u64,
-                                _ => 0,
-                            };
+        if let Some(Value::Table(entries)) = &network_manifest_file.accounts {
+            for (account_name, account_settings) in entries.iter() {
+                if let Value::Table(account_settings) = account_settings {
+                    let balance = match account_settings.get("balance") {
+                        Some(Value::Integer(balance)) => *balance as u64,
+                        _ => 0,
+                    };
 
-                            let mnemonic = match account_settings.get("mnemonic") {
-                                Some(Value::String(words)) => {
-                                    match Mnemonic::parse_in_normalized(Language::English, words) {
-                                        Ok(result) => result.to_string(),
-                                        Err(e) => {
-                                            return Err(format!(
-                                                "mnemonic for wallet '{}' invalid: {}",
-                                                account_name,
-                                                e.to_string()
-                                            ));
-                                        }
-                                    }
+                    let mnemonic = match account_settings.get("mnemonic") {
+                        Some(Value::String(words)) => {
+                            match Mnemonic::parse_in_normalized(Language::English, words) {
+                                Ok(result) => result.to_string(),
+                                Err(e) => {
+                                    return Err(format!(
+                                        "mnemonic for wallet '{}' invalid: {}",
+                                        account_name, e
+                                    ));
                                 }
-                                _ => {
-                                    let entropy = &[
-                                        0x33, 0xE4, 0x6B, 0xB1, 0x3A, 0x74, 0x6E, 0xA4, 0x1C, 0xDD,
-                                        0xE4, 0x5C, 0x90, 0x84, 0x6A, 0x79,
-                                    ]; // TODO(lgalabru): rand
-                                    Mnemonic::from_entropy(entropy).unwrap().to_string()
-                                }
-                            };
-
-                            let derivation = match account_settings.get("derivation") {
-                                Some(Value::String(derivation)) => derivation.to_string(),
-                                _ => DEFAULT_DERIVATION_PATH.to_string(),
-                            };
-
-                            let (stx_address, btc_address, _) =
-                                compute_addresses(&mnemonic, &derivation, networks);
-
-                            accounts.insert(
-                                account_name.to_string(),
-                                AccountConfig {
-                                    label: account_name.to_string(),
-                                    mnemonic: mnemonic.to_string(),
-                                    derivation,
-                                    balance,
-                                    stx_address,
-                                    btc_address,
-                                    is_mainnet,
-                                },
-                            );
+                            }
                         }
-                        _ => {}
-                    }
+                        _ => {
+                            let entropy = &[
+                                0x33, 0xE4, 0x6B, 0xB1, 0x3A, 0x74, 0x6E, 0xA4, 0x1C, 0xDD, 0xE4,
+                                0x5C, 0x90, 0x84, 0x6A, 0x79,
+                            ]; // TODO(lgalabru): rand
+                            Mnemonic::from_entropy(entropy).unwrap().to_string()
+                        }
+                    };
+
+                    let derivation = match account_settings.get("derivation") {
+                        Some(Value::String(derivation)) => derivation.to_string(),
+                        _ => DEFAULT_DERIVATION_PATH.to_string(),
+                    };
+
+                    let (stx_address, btc_address, _) =
+                        compute_addresses(&mnemonic, &derivation, networks);
+
+                    accounts.insert(
+                        account_name.to_string(),
+                        AccountConfig {
+                            label: account_name.to_string(),
+                            mnemonic: mnemonic.to_string(),
+                            derivation,
+                            balance,
+                            stx_address,
+                            btc_address,
+                            is_mainnet,
+                        },
+                    );
                 }
             }
-            _ => {}
         };
 
         let devnet = if networks.1.is_devnet() {
@@ -647,31 +640,31 @@ impl NetworkManifest {
                 }
 
                 if let Some(ref val) = devnet_override.epoch_2_0 {
-                    devnet_config.epoch_2_0 = Some(val.clone());
+                    devnet_config.epoch_2_0 = Some(*val);
                 }
 
                 if let Some(ref val) = devnet_override.epoch_2_05 {
-                    devnet_config.epoch_2_05 = Some(val.clone());
+                    devnet_config.epoch_2_05 = Some(*val);
                 }
 
                 if let Some(ref val) = devnet_override.epoch_2_1 {
-                    devnet_config.epoch_2_1 = Some(val.clone());
+                    devnet_config.epoch_2_1 = Some(*val);
                 }
 
                 if let Some(ref val) = devnet_override.epoch_2_2 {
-                    devnet_config.epoch_2_2 = Some(val.clone());
+                    devnet_config.epoch_2_2 = Some(*val);
                 }
 
                 if let Some(ref val) = devnet_override.epoch_2_3 {
-                    devnet_config.epoch_2_3 = Some(val.clone());
+                    devnet_config.epoch_2_3 = Some(*val);
                 }
 
                 if let Some(ref val) = devnet_override.epoch_2_4 {
-                    devnet_config.epoch_2_4 = Some(val.clone());
+                    devnet_config.epoch_2_4 = Some(*val);
                 }
 
                 if let Some(ref val) = devnet_override.pox_2_activation {
-                    devnet_config.pox_2_activation = Some(val.clone());
+                    devnet_config.pox_2_activation = Some(*val);
                 }
 
                 if let Some(val) = devnet_override.network_id {
@@ -762,7 +755,7 @@ impl NetworkManifest {
             let remapped_subnet_contract_id =
                 format!("{}.{}", default_deployer.stx_address, contract_id.name);
 
-            let mut config = DevnetConfig {
+            let config = DevnetConfig {
                 name: devnet_config.name.take().unwrap_or("devnet".into()),
                 network_id: devnet_config.network_id,
                 orchestrator_ingestion_port: devnet_config.orchestrator_port.unwrap_or(20445),
@@ -919,9 +912,9 @@ impl NetworkManifest {
                     .docker_platform
                     .unwrap_or(DEFAULT_DOCKER_PLATFORM.to_string()),
             };
-            if !config.disable_stacks_api && config.disable_stacks_api {
-                config.disable_stacks_api = false;
-            }
+            // if !config.disable_stacks_api && config.disable_stacks_api {
+            //     config.disable_stacks_api = false;
+            // }
             Some(config)
         } else {
             None
@@ -941,7 +934,7 @@ pub fn compute_addresses(
     derivation_path: &str,
     networks: &(BitcoinNetwork, StacksNetwork),
 ) -> (String, String, String) {
-    let bip39_seed = match get_bip39_seed_from_mnemonic(&mnemonic, "") {
+    let bip39_seed = match get_bip39_seed_from_mnemonic(mnemonic, "") {
         Ok(bip39_seed) => bip39_seed,
         Err(_) => panic!(),
     };
@@ -977,9 +970,6 @@ pub fn compute_addresses(
 }
 
 #[cfg(not(feature = "wasm"))]
-use bitcoin;
-
-#[cfg(not(feature = "wasm"))]
 fn compute_btc_address(public_key: &PublicKey, network: &BitcoinNetwork) -> String {
     let public_key = bitcoin::PublicKey::from_slice(&public_key.serialize_compressed())
         .expect("Unable to recreate public key");
@@ -996,5 +986,5 @@ fn compute_btc_address(public_key: &PublicKey, network: &BitcoinNetwork) -> Stri
 
 #[cfg(feature = "wasm")]
 fn compute_btc_address(_public_key: &PublicKey, _network: &BitcoinNetwork) -> String {
-    format!("__not_implemented__")
+    "__not_implemented__".to_string()
 }

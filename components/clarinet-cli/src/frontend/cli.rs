@@ -55,12 +55,13 @@ use super::telemetry::{telemetry_report_event, DeveloperUsageDigest, DeveloperUs
 /// For Clarinet documentation, refer to https://docs.hiro.so/clarinet/introduction.
 /// Report any issues here https://github.com/hirosystems/clarinet/issues/new.
 #[derive(Parser, PartialEq, Clone, Debug)]
-#[clap(version = option_env!("CARGO_PKG_VERSION").expect("Unable to detect version"), name = "clarinet", bin_name = "clarinet")]
+#[clap(version = env!("CARGO_PKG_VERSION"), name = "clarinet", bin_name = "clarinet")]
 struct Opts {
     #[clap(subcommand)]
     command: Command,
 }
 
+#[allow(clippy::upper_case_acronyms)]
 #[derive(Subcommand, PartialEq, Clone, Debug)]
 enum Command {
     /// Create and scaffold a new project
@@ -123,6 +124,7 @@ enum Requirements {
     AddRequirement(AddRequirement),
 }
 
+#[allow(clippy::enum_variant_names)]
 #[derive(Subcommand, PartialEq, Clone, Debug)]
 #[clap(bin_name = "deployment", aliases = &["deployment"])]
 enum Deployments {
@@ -137,6 +139,7 @@ enum Deployments {
     ApplyDeployment(ApplyDeployment),
 }
 
+#[allow(clippy::enum_variant_names)]
 #[derive(Subcommand, PartialEq, Clone, Debug)]
 #[clap(bin_name = "chainhook", aliases = &["chainhook"])]
 enum Chainhooks {
@@ -663,7 +666,7 @@ pub fn main() {
                 #[cfg(feature = "telemetry")]
                 telemetry_report_event(DeveloperUsageEvent::NewProject(DeveloperUsageDigest::new(
                     &project_opts.name,
-                    &vec![],
+                    &[],
                 )));
             }
         }
@@ -834,9 +837,9 @@ pub fn main() {
                     println!("{}", yellow!("Continue [Y/n]?"));
                     let mut buffer = String::new();
                     std::io::stdin().read_line(&mut buffer).unwrap();
-                    if !buffer.starts_with("Y")
-                        && !buffer.starts_with("y")
-                        && !buffer.starts_with("\n")
+                    if !buffer.starts_with('Y')
+                        && !buffer.starts_with('y')
+                        && !buffer.starts_with('\n')
                     {
                         println!("Deployment aborted");
                         std::process::exit(1);
@@ -1154,8 +1157,7 @@ pub fn main() {
             }
 
             if success {
-                println!("{} Syntax of contract successfully checked", green!("✔"));
-                return;
+                println!("{} Syntax of contract successfully checked", green!("✔"))
             } else {
                 std::process::exit(1);
             }
@@ -1394,9 +1396,8 @@ fn load_manifest_or_exit(path: Option<String>) -> ProjectManifest {
 }
 
 fn load_manifest_or_warn(path: Option<String>) -> Option<ProjectManifest> {
-    let manifest_location = get_manifest_location_or_warn(path);
-    if manifest_location.is_some() {
-        let manifest = match ProjectManifest::from_location(&manifest_location.unwrap()) {
+    if let Some(manifest_location) = get_manifest_location_or_warn(path) {
+        let manifest = match ProjectManifest::from_location(&manifest_location) {
             Ok(manifest) => manifest,
             Err(message) => {
                 println!(
@@ -1584,7 +1585,7 @@ pub fn load_deployment_if_exists(
                     println!("{}", yellow!("Overwrite? [Y/n]"));
                     let mut buffer = String::new();
                     std::io::stdin().read_line(&mut buffer).unwrap();
-                    if buffer.starts_with("n") {
+                    if buffer.starts_with('n') {
                         Some(load_deployment(manifest, &default_deployment_location))
                     } else {
                         default_deployment_location

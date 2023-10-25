@@ -19,7 +19,6 @@ pub use event::DevnetEvent;
 pub use log::{LogData, LogLevel};
 pub use orchestrator::DevnetOrchestrator;
 use orchestrator::ServicesMapHosts;
-
 use std::{
     sync::{
         atomic::{AtomicBool, Ordering},
@@ -33,9 +32,7 @@ use std::{
 use chainhook_sdk::chainhooks::types::ChainhookConfig;
 use chains_coordinator::start_chains_coordinator;
 use clarinet_deployments::types::DeploymentSpecification;
-use hiro_system_kit;
 use hiro_system_kit::slog;
-use tracing_appender;
 
 use self::chains_coordinator::DevnetEventObserverConfig;
 #[allow(dead_code)]
@@ -178,7 +175,7 @@ async fn do_run_devnet(
     if display_dashboard {
         ctx.try_log(|logger| slog::info!(logger, "Starting Devnet"));
         let moved_chains_coordinator_commands_tx = chains_coordinator_commands_tx.clone();
-        let _ = ui::start_ui(
+        ui::start_ui(
             devnet_events_tx,
             devnet_events_rx,
             moved_chains_coordinator_commands_tx,

@@ -136,7 +136,7 @@ impl CoverageReporter {
                                     let mut counts = vec![];
                                     for id in expr_ids {
                                         if let Some(c) = coverage.get(id) {
-                                            counts.push(c.clone());
+                                            counts.push(*c);
                                         }
                                     }
                                     let count = counts.iter().max().unwrap_or(&0);
@@ -213,7 +213,7 @@ impl CoverageReporter {
         file_content
     }
 
-    fn retrieve_functions(&self, exprs: &Vec<SymbolicExpression>) -> Vec<(String, u32, u32)> {
+    fn retrieve_functions(&self, exprs: &[SymbolicExpression]) -> Vec<(String, u32, u32)> {
         let mut functions = vec![];
         for cur_expr in exprs.iter() {
             if let Some(define_expr) = DefineFunctionsParsed::try_parse(cur_expr).ok().flatten() {
@@ -240,7 +240,7 @@ impl CoverageReporter {
 
     fn retrieve_executable_lines_and_branches(
         &self,
-        exprs: &Vec<SymbolicExpression>,
+        exprs: &[SymbolicExpression],
     ) -> (ExecutableLines, ExecutableBranches) {
         let mut lines: ExecutableLines = HashMap::new();
         let mut branches: ExecutableBranches = HashMap::new();
@@ -407,5 +407,5 @@ fn extract_expr_from_list(expr: &SymbolicExpression) -> SymbolicExpression {
     if let Some(first) = expr.match_list().and_then(|l| l.first()) {
         return extract_expr_from_list(first);
     }
-    return expr.to_owned();
+    expr.to_owned()
 }

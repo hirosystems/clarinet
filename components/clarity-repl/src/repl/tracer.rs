@@ -81,7 +81,7 @@ impl EvalHook for Tracer {
                                 ));
                             }
 
-                            if args.len() > 0 {
+                            if !args.is_empty() {
                                 lines.push(format!(
                                     "{}│ {}",
                                     "│   "
@@ -124,7 +124,7 @@ impl EvalHook for Tracer {
                         )
                         .as_str(),
                     );
-                    if args.len() > 0 {
+                    if !args.is_empty() {
                         self.pending_call_string.push(call);
                         self.pending_args
                             .push(args.iter().map(|arg| arg.id).collect());
@@ -156,8 +156,8 @@ impl EvalHook for Tracer {
             .flat_map(|b| &b.events)
             .collect::<Vec<_>>();
         if emitted_events.len() > self.emitted_events {
-            for i in self.emitted_events..emitted_events.len() {
-                let event = emitted_events[i];
+            for event in emitted_events.iter().skip(self.emitted_events) {
+                // let event = emitted_events[i];
                 println!(
                     "{}│ {}",
                     "│   ".repeat(self.stack.len() - self.pending_call_string.len() - 1),

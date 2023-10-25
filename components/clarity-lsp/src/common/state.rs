@@ -110,7 +110,7 @@ impl ActiveContractData {
 
     pub fn update_definitions(&mut self) {
         if let Some(expressions) = &self.expressions {
-            self.definitions = Some(get_definitions(&expressions, self.issuer.clone()));
+            self.definitions = Some(get_definitions(expressions, self.issuer.clone()));
         }
     }
 
@@ -283,7 +283,7 @@ impl EditorState {
         &mut self,
         contract_location: &FileLocation,
     ) -> Option<FileLocation> {
-        match self.contracts_lookup.get(&contract_location) {
+        match self.contracts_lookup.get(contract_location) {
             Some(contract_metadata) => {
                 let manifest_location = contract_metadata.manifest_location.clone();
                 self.clear_protocol(&manifest_location);
@@ -298,7 +298,7 @@ impl EditorState {
         contract_location: &FileLocation,
         position: &Position,
     ) -> Vec<lsp_types::CompletionItem> {
-        let active_contract = match self.active_contracts.get(&contract_location) {
+        let active_contract = match self.active_contracts.get(contract_location) {
             Some(contract) => contract,
             None => return vec![],
         };
@@ -307,7 +307,7 @@ impl EditorState {
             .contracts_lookup
             .get(contract_location)
             .and_then(|d| self.protocols.get(&d.manifest_location))
-            .and_then(|p| Some(p.get_contract_calls_for_contract(contract_location)))
+            .map(|p| p.get_contract_calls_for_contract(contract_location))
             .unwrap_or_default();
 
         let expressions = active_contract.expressions.as_ref();
@@ -320,7 +320,7 @@ impl EditorState {
 
         build_completion_item_list(
             &active_contract.clarity_version,
-            &expressions.unwrap_or(&vec![]),
+            expressions.unwrap_or(&vec![]),
             &Position {
                 line: position.line + 1,
                 character: position.character + 1,
@@ -336,7 +336,7 @@ impl EditorState {
         &self,
         contract_location: &FileLocation,
     ) -> Vec<DocumentSymbol> {
-        let active_contract = match self.active_contracts.get(&contract_location) {
+        let active_contract = match self.active_contracts.get(contract_location) {
             Some(contract) => contract,
             None => return vec![],
         };
@@ -347,7 +347,7 @@ impl EditorState {
         };
 
         let ast_symbols = ASTSymbols::new();
-        ast_symbols.get_symbols(&expressions)
+        ast_symbols.get_symbols(expressions)
     }
 
     pub fn get_definition_location(
@@ -355,7 +355,7 @@ impl EditorState {
         contract_location: &FileLocation,
         position: &Position,
     ) -> Option<lsp_types::Location> {
-        let contract = self.active_contracts.get(&contract_location)?;
+        let contract = self.active_contracts.get(contract_location)?;
         let position = Position {
             line: position.line + 1,
             character: position.character + 1,
@@ -368,12 +368,10 @@ impl EditorState {
         };
 
         match definitions.get(&position_hash)? {
-            DefinitionLocation::Internal(range) => {
-                return Some(Location {
-                    uri: Url::parse(&contract_location.to_string()).ok()?,
-                    range: range.clone(),
-                });
-            }
+            DefinitionLocation::Internal(range) => Some(Location {
+                uri: Url::parse(&contract_location.to_string()).ok()?,
+                range: *range,
+            }),
             DefinitionLocation::External(contract_identifier, function_name) => {
                 let metadata = self.contracts_lookup.get(contract_location)?;
                 let protocol = self.protocols.get(&metadata.manifest_location)?;
@@ -387,23 +385,23 @@ impl EditorState {
                     .get(definition_contract_location)
                     .and_then(|c| c.expressions.as_ref())
                 {
-                    let public_definitions = get_public_function_definitions(&expressions);
+                    let public_definitions = get_public_function_definitions(expressions);
                     return Some(Location {
                         range: *public_definitions.get(function_name)?,
                         uri: Url::parse(&definition_contract_location.to_string()).ok()?,
                     });
                 };
 
-                return Some(Location {
+                Some(Location {
                     range: *protocol
                         .contracts
                         .get(definition_contract_location)?
                         .definitions
                         .get(function_name)?,
                     uri: Url::parse(&definition_contract_location.to_string()).ok()?,
-                });
+                })
             }
-        };
+        }
     }
 
     pub fn get_hover_data(
@@ -411,7 +409,7 @@ impl EditorState {
         contract_location: &FileLocation,
         position: &lsp_types::Position,
     ) -> Option<Hover> {
-        let contract = self.active_contracts.get(&contract_location)?;
+        let contract = self.active_contracts.get(contract_location)?;
         let position = Position {
             line: position.line + 1,
             character: position.character + 1,
@@ -437,7 +435,7 @@ impl EditorState {
         position: &lsp_types::Position,
         active_signature: Option<u32>,
     ) -> Option<SignatureHelp> {
-        let contract = self.active_contracts.get(&contract_location)?;
+        let contract = self.active_contracts.get(contract_location)?;
         let position = Position {
             line: position.line + 1,
             character: position.character + 1,
@@ -576,7 +574,7 @@ impl ProtocolState {
 
         // Add / Replace new paths
         for (contract_id, contract_location) in locations.iter() {
-            let (contract_id, ast) = match asts.remove_entry(&contract_id) {
+            let (contract_id, ast) = match asts.remove_entry(contract_id) {
                 Some(ast) => ast,
                 None => continue,
             };
@@ -636,7 +634,7 @@ impl ProtocolState {
 pub async fn build_state(
     manifest_location: &FileLocation,
     protocol_state: &mut ProtocolState,
-    file_accessor: Option<&Box<dyn FileAccessor>>,
+    file_accessor: Option<&dyn FileAccessor>,
 ) -> Result<(), String> {
     let mut locations = HashMap::new();
     let mut analyses = HashMap::new();
@@ -688,18 +686,14 @@ pub async fn build_state(
                     entry.append(&mut execution_result.diagnostics);
                 }
 
-                match execution_result.result {
-                    EvaluationResult::Contract(contract_result) => {
-                        if let Some(ast) = artifacts.asts.get(&contract_id) {
-                            definitions.insert(
-                                contract_id.clone(),
-                                get_public_function_definitions(&ast.expressions),
-                            );
-                        }
-                        analyses
-                            .insert(contract_id.clone(), Some(contract_result.contract.analysis));
+                if let EvaluationResult::Contract(contract_result) = execution_result.result {
+                    if let Some(ast) = artifacts.asts.get(&contract_id) {
+                        definitions.insert(
+                            contract_id.clone(),
+                            get_public_function_definitions(&ast.expressions),
+                        );
                     }
-                    _ => (),
+                    analyses.insert(contract_id.clone(), Some(contract_result.contract.analysis));
                 };
             }
             Err(ref mut diags) => {

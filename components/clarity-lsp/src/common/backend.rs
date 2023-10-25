@@ -26,7 +26,7 @@ impl EditorStateInput {
         F: FnOnce(&EditorState) -> R,
     {
         match self {
-            EditorStateInput::Owned(editor_state) => Ok(closure(&editor_state)),
+            EditorStateInput::Owned(editor_state) => Ok(closure(editor_state)),
             EditorStateInput::RwLock(editor_state_lock) => match editor_state_lock.try_read() {
                 Ok(editor_state) => Ok(closure(&editor_state)),
                 Err(_) => Err("failed to read editor_state".to_string()),
@@ -58,20 +58,13 @@ pub enum LspNotification {
     ContractClosed(FileLocation),
 }
 
-#[derive(Debug, PartialEq, Deserialize, Serialize)]
+#[derive(Debug, Default, PartialEq, Deserialize, Serialize)]
 pub struct LspNotificationResponse {
     pub aggregated_diagnostics: Vec<(FileLocation, Vec<Diagnostic>)>,
     pub notification: Option<(MessageType, String)>,
 }
 
 impl LspNotificationResponse {
-    pub fn default() -> LspNotificationResponse {
-        LspNotificationResponse {
-            aggregated_diagnostics: vec![],
-            notification: None,
-        }
-    }
-
     pub fn error(message: &str) -> LspNotificationResponse {
         LspNotificationResponse {
             aggregated_diagnostics: vec![],
@@ -83,7 +76,7 @@ impl LspNotificationResponse {
 pub async fn process_notification(
     command: LspNotification,
     editor_state: &mut EditorStateInput,
-    file_accessor: Option<&Box<dyn FileAccessor>>,
+    file_accessor: Option<&dyn FileAccessor>,
 ) -> Result<LspNotificationResponse, String> {
     match command {
         LspNotification::ManifestOpened(manifest_location) => {
@@ -100,13 +93,13 @@ pub async fn process_notification(
                         .try_write(|es| es.index_protocol(manifest_location, protocol_state))?;
                     let (aggregated_diagnostics, notification) =
                         editor_state.try_read(|es| es.get_aggregated_diagnostics())?;
-                    return Ok(LspNotificationResponse {
+                    Ok(LspNotificationResponse {
                         aggregated_diagnostics,
                         notification,
-                    });
+                    })
                 }
-                Err(e) => return Ok(LspNotificationResponse::error(&e)),
-            };
+                Err(e) => Ok(LspNotificationResponse::error(&e)),
+            }
         }
 
         LspNotification::ManifestSaved(manifest_location) => {
@@ -118,13 +111,13 @@ pub async fn process_notification(
                         .try_write(|es| es.index_protocol(manifest_location, protocol_state))?;
                     let (aggregated_diagnostics, notification) =
                         editor_state.try_read(|es| es.get_aggregated_diagnostics())?;
-                    return Ok(LspNotificationResponse {
+                    Ok(LspNotificationResponse {
                         aggregated_diagnostics,
                         notification,
-                    });
+                    })
                 }
-                Err(e) => return Ok(LspNotificationResponse::error(&e)),
-            };
+                Err(e) => Ok(LspNotificationResponse::error(&e)),
+            }
         }
 
         LspNotification::ContractOpened(contract_location) => {
@@ -142,12 +135,9 @@ pub async fn process_notification(
                 }?;
 
                 let metadata = editor_state.try_read(|es| {
-                    match es.contracts_lookup.get(&contract_location) {
-                        Some(metadata) => {
-                            Some((metadata.clarity_version, metadata.deployer.clone()))
-                        }
-                        None => None,
-                    }
+                    es.contracts_lookup
+                        .get(&contract_location)
+                        .map(|metadata| (metadata.clarity_version, metadata.deployer.clone()))
                 })?;
 
                 // if the contract isn't in lookup yet, fallback on manifest, to be improved in #668
@@ -202,13 +192,13 @@ pub async fn process_notification(
                         .try_write(|es| es.index_protocol(manifest_location, protocol_state))?;
                     let (aggregated_diagnostics, notification) =
                         editor_state.try_read(|es| es.get_aggregated_diagnostics())?;
-                    return Ok(LspNotificationResponse {
+                    Ok(LspNotificationResponse {
                         aggregated_diagnostics,
                         notification,
-                    });
+                    })
                 }
-                Err(e) => return Ok(LspNotificationResponse::error(&e)),
-            };
+                Err(e) => Ok(LspNotificationResponse::error(&e)),
+            }
         }
 
         LspNotification::ContractSaved(contract_location) => {
@@ -236,13 +226,13 @@ pub async fn process_notification(
 
                     let (aggregated_diagnostics, notification) =
                         editor_state.try_read(|es| es.get_aggregated_diagnostics())?;
-                    return Ok(LspNotificationResponse {
+                    Ok(LspNotificationResponse {
                         aggregated_diagnostics,
                         notification,
-                    });
+                    })
                 }
-                Err(e) => return Ok(LspNotificationResponse::error(&e)),
-            };
+                Err(e) => Ok(LspNotificationResponse::error(&e)),
+            }
         }
 
         LspNotification::ContractChanged(contract_location, contract_source) => {
