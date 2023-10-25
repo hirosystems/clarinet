@@ -554,7 +554,7 @@ fn print_help_breakpoint() {
         r#"Set a breakpoint using 'b' or 'break' and one of these formats
   b <principal?>.<contract>:<linenum>:<colnum>
     SP000000000000000000002Q6VF78.bns:604:9
-        Break at line 604, column 9 of the bns contract deployed by 
+        Break at line 604, column 9 of the bns contract deployed by
           SP000000000000000000002Q6VF78
 
   b <principal?>.<contract>:<linenum>
