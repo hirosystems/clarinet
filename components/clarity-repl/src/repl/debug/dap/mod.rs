@@ -81,6 +81,12 @@ pub struct DAPDebugger {
     variables: HashMap<i32, Vec<Variable>>,
 }
 
+impl Default for DAPDebugger {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl DAPDebugger {
     pub fn new() -> Self {
         let stdin = tokio::io::stdin();
@@ -199,7 +205,8 @@ impl DAPDebugger {
         command: RequestCommand,
     ) -> bool {
         use debug_types::requests::RequestCommand::*;
-        let proceed = match command {
+
+        match command {
             Initialize(arguments) => self.initialize(seq, arguments),
             Launch(arguments) => self.launch(seq, arguments),
             ConfigurationDone => self.configuration_done(seq),
@@ -225,9 +232,7 @@ impl DAPDebugger {
                 });
                 false
             }
-        };
-
-        proceed
+        }
     }
 
     pub fn handle_event(&mut self, seq: i64, event: Event) {
@@ -403,66 +408,60 @@ impl DAPDebugger {
 
     fn set_breakpoints(&mut self, seq: i64, arguments: SetBreakpointsArguments) -> bool {
         let mut results = vec![];
-        match arguments.breakpoints {
-            Some(breakpoints) => {
-                let contract_id = match self
-                    .path_to_contract_id
-                    .get(&PathBuf::from(arguments.source.path.as_ref().unwrap()))
-                {
-                    Some(contract_id) => contract_id,
-                    None => {
-                        self.send_response(Response {
-                            request_seq: seq,
-                            success: false,
-                            message: Some(format!(
-                                "contract not found for path {}\nmap: {:?}",
-                                arguments.source.path.clone().unwrap(),
-                                self.path_to_contract_id
-                            )),
-                            body: None,
-                        });
-                        return false;
-                    }
-                };
-                let source = super::Source {
-                    name: contract_id.clone(),
-                };
-                for breakpoint in breakpoints {
-                    let column = match breakpoint.column {
-                        Some(column) => column,
-                        None => 0,
-                    };
-                    let source_breakpoint = super::Breakpoint {
-                        id: 0,
-                        verified: true,
-                        data: super::BreakpointData::Source(super::SourceBreakpoint {
-                            line: breakpoint.line,
-                            column: breakpoint.column,
-                        }),
-                        source: source.clone(),
-                        span: Some(Span {
-                            start_line: breakpoint.line,
-                            start_column: column,
-                            end_line: breakpoint.line,
-                            end_column: column,
-                        }),
-                    };
-                    let id = self.get_state().add_breakpoint(source_breakpoint);
-                    results.push(Breakpoint {
-                        id: Some(id),
-                        verified: true,
-                        message: breakpoint.log_message,
-                        source: Some(arguments.source.clone()),
-                        line: Some(breakpoint.line),
-                        column: breakpoint.column,
-                        end_line: Some(breakpoint.line),
-                        end_column: breakpoint.column,
-                        instruction_reference: None,
-                        offset: None,
+        if let Some(breakpoints) = arguments.breakpoints {
+            let contract_id = match self
+                .path_to_contract_id
+                .get(&PathBuf::from(arguments.source.path.as_ref().unwrap()))
+            {
+                Some(contract_id) => contract_id,
+                None => {
+                    self.send_response(Response {
+                        request_seq: seq,
+                        success: false,
+                        message: Some(format!(
+                            "contract not found for path {}\nmap: {:?}",
+                            arguments.source.path.clone().unwrap(),
+                            self.path_to_contract_id
+                        )),
+                        body: None,
                     });
+                    return false;
                 }
+            };
+            let source = super::Source {
+                name: contract_id.clone(),
+            };
+            for breakpoint in breakpoints {
+                let column = breakpoint.column.unwrap_or(0);
+                let source_breakpoint = super::Breakpoint {
+                    id: 0,
+                    verified: true,
+                    data: super::BreakpointData::Source(super::SourceBreakpoint {
+                        line: breakpoint.line,
+                        column: breakpoint.column,
+                    }),
+                    source: source.clone(),
+                    span: Some(Span {
+                        start_line: breakpoint.line,
+                        start_column: column,
+                        end_line: breakpoint.line,
+                        end_column: column,
+                    }),
+                };
+                let id = self.get_state().add_breakpoint(source_breakpoint);
+                results.push(Breakpoint {
+                    id: Some(id),
+                    verified: true,
+                    message: breakpoint.log_message,
+                    source: Some(arguments.source.clone()),
+                    line: Some(breakpoint.line),
+                    column: breakpoint.column,
+                    end_line: Some(breakpoint.line),
+                    end_column: breakpoint.column,
+                    instruction_reference: None,
+                    offset: None,
+                });
             }
-            None => (),
         };
 
         self.send_response(Response {
@@ -689,11 +688,7 @@ impl DAPDebugger {
                             .watch_variables
                             .get(&(contract_id.clone(), name.to_string()))
                         {
-                            if set.is_empty() {
-                                false
-                            } else {
-                                true
-                            }
+                            !set.is_empty()
                         } else {
                             false
                         };
@@ -707,7 +702,7 @@ impl DAPDebugger {
                             let value = env
                                 .global_context
                                 .database
-                                .lookup_variable(contract_id, &name, data_types)
+                                .lookup_variable(contract_id, name, data_types)
                                 .unwrap();
                             Response {
                                 request_seq: seq,
@@ -1008,8 +1003,8 @@ impl EvalHook for DAPDebugger {
                 self.save_scopes_for_frame(
                     &stack_top,
                     context,
-                    &env.contract_context,
-                    &mut env.global_context,
+                    env.contract_context,
+                    env.global_context,
                 );
                 self.stack_frames
                     .insert(current_function.clone(), stack_top);
@@ -1030,8 +1025,8 @@ impl EvalHook for DAPDebugger {
                 self.save_scopes_for_frame(
                     &stack_frame,
                     context,
-                    &env.contract_context,
-                    &mut env.global_context,
+                    env.contract_context,
+                    env.global_context,
                 );
 
                 self.stack_frames

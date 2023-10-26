@@ -76,6 +76,7 @@ impl PartialEq for Dependency {
     }
 }
 
+#[allow(clippy::incorrect_partial_ord_impl_on_ord_type)]
 impl PartialOrd for Dependency {
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
         self.contract_id.partial_cmp(&other.contract_id)
@@ -88,16 +89,14 @@ impl Ord for Dependency {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct DependencySet {
     pub set: BTreeSet<Dependency>,
 }
 
 impl DependencySet {
-    pub fn new() -> DependencySet {
-        DependencySet {
-            set: BTreeSet::new(),
-        }
+    pub fn new() -> Self {
+        Self::default()
     }
 
     pub fn add_dependency(
@@ -120,14 +119,12 @@ impl DependencySet {
     }
 
     pub fn has_dependency(&self, contract_id: &QualifiedContractIdentifier) -> Option<bool> {
-        if let Some(dep) = self.set.get(&Dependency {
-            contract_id: contract_id.clone(),
-            required_before_publish: false,
-        }) {
-            Some(dep.required_before_publish)
-        } else {
-            None
-        }
+        self.set
+            .get(&Dependency {
+                contract_id: contract_id.clone(),
+                required_before_publish: false,
+            })
+            .map(|dep| dep.required_before_publish)
     }
 }
 
@@ -220,16 +217,13 @@ impl<'a> ASTDependencyDetector<'a> {
         let mut lookup = BTreeMap::new();
         let mut reverse_lookup = Vec::new();
 
-        let mut index: usize = 0;
-
         if dependencies.is_empty() {
             return Ok(vec![]);
         }
 
-        for (contract, _) in dependencies {
+        for (index, (contract, _)) in dependencies.iter().enumerate() {
             lookup.insert(contract, index);
             reverse_lookup.push(contract);
-            index += 1;
         }
 
         let mut graph = Graph::new();
@@ -385,20 +379,19 @@ impl<'a> ASTDependencyDetector<'a> {
 
     fn check_callee_type(
         &self,
-        arg_types: &Vec<TypeSignature>,
+        arg_types: &[TypeSignature],
         args: &'a [SymbolicExpression],
     ) -> Vec<QualifiedContractIdentifier> {
         let mut dependencies = Vec::new();
         for (i, arg) in arg_types.iter().enumerate() {
             if matches!(arg, TypeSignature::CallableType(CallableSubtype::Trait(_)))
                 | matches!(arg, TypeSignature::TraitReferenceType(_))
+                && args.len() > i
             {
-                if args.len() > i {
-                    if let Some(Value::Principal(PrincipalData::Contract(contract))) =
-                        args[i].match_literal_value()
-                    {
-                        dependencies.push(contract.clone());
-                    }
+                if let Some(Value::Principal(PrincipalData::Contract(contract))) =
+                    args[i].match_literal_value()
+                {
+                    dependencies.push(contract.clone());
                 }
             }
         }
@@ -634,7 +627,7 @@ impl<'a> ASTVisitor<'a> for ASTDependencyDetector<'a> {
                 self.check_trait_dependencies(trait_definition, function_name, args)
             } else {
                 self.add_pending_trait_check(
-                    &self.current_contract.unwrap(),
+                    self.current_contract.unwrap(),
                     trait_identifier,
                     function_name,
                     args,
@@ -811,7 +804,7 @@ impl Graph {
     }
 
     fn has_node_descendants(&self, expr_index: usize) -> bool {
-        self.adjacency_list[expr_index].len() > 0
+        !self.adjacency_list[expr_index].is_empty()
     }
 
     fn nodes_count(&self) -> usize {
@@ -853,7 +846,7 @@ impl GraphWalker {
         self.seen.insert(tle_index);
         if let Some(list) = graph.adjacency_list.get(tle_index) {
             for neighbor in list.iter() {
-                self.sort_dependencies_recursion(neighbor.clone(), graph, branch);
+                self.sort_dependencies_recursion(*neighbor, graph, branch);
             }
         }
         branch.push(tle_index);
@@ -885,7 +878,7 @@ impl GraphWalker {
         }
 
         let nodes = HashSet::from_iter(sorted_indexes.iter().cloned());
-        let deps = nodes.difference(&tainted).map(|i| *i).collect();
+        let deps = nodes.difference(&tainted).copied().collect();
         Some(deps)
     }
 }

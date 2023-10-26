@@ -32,6 +32,7 @@ use clarity_repl::clarity::vm::types::{BuffData, SequenceData, TupleData};
 use clarity_repl::clarity::vm::ClarityName;
 use clarity_repl::clarity::vm::Value as ClarityValue;
 use clarity_repl::codec;
+use hiro_system_kit::yellow;
 use stacks_rpc_client::{PoxInfo, StacksRpc};
 use std::convert::TryFrom;
 
@@ -221,7 +222,7 @@ pub async fn start_chains_coordinator(
     let _ = hiro_system_kit::thread_named("Bitcoin mining").spawn(move || {
         let future =
             handle_bitcoin_mining(mining_command_rx, &devnet_config, &devnet_event_tx_moved);
-        let _ = hiro_system_kit::nestable_block_on(future);
+        hiro_system_kit::nestable_block_on(future);
     });
 
     // Loop over events being received from Bitcoin and Stacks,
@@ -349,7 +350,7 @@ pub async fn start_chains_coordinator(
                 let _ = devnet_event_tx.send(DevnetEvent::ServiceStatus(ServiceStatusData {
                     order: 1,
                     status: Status::Green,
-                    name: format!("stacks-node 2.1",),
+                    name: "stacks-node 2.1".to_string(),
                     comment: format!(
                         "mining blocks (chaintip = #{})",
                         known_tip.block.block_identifier.index
@@ -412,8 +413,8 @@ pub async fn start_chains_coordinator(
                     let res = mine_bitcoin_block(
                         &config.services_map_hosts.bitcoin_node_host,
                         config.devnet_config.bitcoin_node_username.as_str(),
-                        &config.devnet_config.bitcoin_node_password.as_str(),
-                        &config.devnet_config.miner_btc_address.as_str(),
+                        config.devnet_config.bitcoin_node_password.as_str(),
+                        config.devnet_config.miner_btc_address.as_str(),
                     )
                     .await;
                     if let Err(e) = res {
@@ -446,7 +447,7 @@ pub async fn start_chains_coordinator(
                                         order: 5,
                                         status: Status::Green,
                                         name: "subnet-node".into(),
-                                        comment: format!("⚡️"),
+                                        comment: "⚡️".to_string(),
                                     },
                                 ));
                                 subnet_initialized = true;
@@ -530,12 +531,12 @@ pub fn relay_devnet_protocol_deployment(
 
 pub async fn publish_stacking_orders(
     devnet_config: &DevnetConfig,
-    accounts: &Vec<AccountConfig>,
+    accounts: &[AccountConfig],
     services_map_hosts: &ServicesMapHosts,
     fee_rate: u64,
     bitcoin_block_height: u32,
 ) -> Option<usize> {
-    if devnet_config.pox_stacking_orders.len() == 0 {
+    if devnet_config.pox_stacking_orders.is_empty() {
         return None;
     }
 
@@ -552,8 +553,8 @@ pub async fn publish_stacking_orders(
     for pox_stacking_order in devnet_config.pox_stacking_orders.iter() {
         if pox_stacking_order.start_at_cycle - 1 == pox_info.reward_cycle_id {
             let mut account = None;
-            let mut accounts_iter = accounts.iter();
-            while let Some(e) = accounts_iter.next() {
+            let accounts_iter = accounts.iter();
+            for e in accounts_iter {
                 if e.label == pox_stacking_order.wallet {
                     account = Some(e.clone());
                     break;
@@ -669,7 +670,7 @@ pub async fn mine_bitcoin_block(
         .map_err(|e| format!("unable to send request ({})", e))?
         .json::<bitcoincore_rpc::jsonrpc::Response>()
         .await
-        .map_err(|e| format!("unable to generate bitcoin block: ({})", e.to_string()))?;
+        .map_err(|e| format!("unable to generate bitcoin block: ({})", e))?;
     Ok(())
 }
 
@@ -682,8 +683,8 @@ async fn handle_bitcoin_mining(
     loop {
         let command = match mining_command_rx.recv() {
             Ok(cmd) => cmd,
-            Err(_e) => {
-                // TODO(lgalabru): cascade termination
+            Err(e) => {
+                print!("{} {}", yellow!("unexpected error:"), e);
                 break;
             }
         };
@@ -723,8 +724,8 @@ async fn handle_bitcoin_mining(
                 let res = mine_bitcoin_block(
                     &config.services_map_hosts.bitcoin_node_host,
                     config.devnet_config.bitcoin_node_username.as_str(),
-                    &config.devnet_config.bitcoin_node_password.as_str(),
-                    &config.devnet_config.miner_btc_address.as_str(),
+                    config.devnet_config.bitcoin_node_password.as_str(),
+                    config.devnet_config.miner_btc_address.as_str(),
                 )
                 .await;
                 if let Err(e) = res {
@@ -734,8 +735,8 @@ async fn handle_bitcoin_mining(
             BitcoinMiningCommand::InvalidateChainTip => {
                 invalidate_bitcoin_chain_tip(
                     &config.services_map_hosts.bitcoin_node_host,
-                    &config.devnet_config.bitcoin_node_username.as_str(),
-                    &config.devnet_config.bitcoin_node_password.as_str(),
+                    config.devnet_config.bitcoin_node_username.as_str(),
+                    config.devnet_config.bitcoin_node_password.as_str(),
                 );
             }
         }

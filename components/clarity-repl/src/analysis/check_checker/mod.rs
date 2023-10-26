@@ -15,7 +15,7 @@ use std::collections::{HashMap, HashSet};
 use std::convert::TryFrom;
 use std::hash::{Hash, Hasher};
 
-#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+#[derive(Debug, Default, Clone, Copy, Serialize, Deserialize)]
 pub struct Settings {
     // Strict mode sets all other options to false
     strict: bool,
@@ -37,17 +37,6 @@ pub struct SettingsFile {
     trusted_caller: Option<bool>,
     // Allow filters in callee to filter caller
     callee_filter: Option<bool>,
-}
-
-impl Default for Settings {
-    fn default() -> Self {
-        Self {
-            strict: false,
-            trusted_sender: false,
-            trusted_caller: false,
-            callee_filter: false,
-        }
-    }
 }
 
 impl From<SettingsFile> for Settings {
@@ -162,7 +151,7 @@ impl<'a, 'b> CheckChecker<'a, 'b> {
         let source_node = self.taint_sources.insert(
             node,
             TaintSource {
-                span: span,
+                span,
                 children: HashSet::new(),
             },
         );
@@ -208,24 +197,24 @@ impl<'a, 'b> CheckChecker<'a, 'b> {
 
     fn filter_source(&mut self, source_node: &Node<'a>, rollback: bool) {
         if let Some(source) = self.taint_sources.remove(source_node) {
-            self.tainted_nodes.remove(&source_node);
+            self.tainted_nodes.remove(source_node);
             // Remove each taint source from its children
             for child in &source.children {
                 if let Some(mut child_node) = self.tainted_nodes.remove(child) {
-                    child_node.sources.remove(&source_node);
+                    child_node.sources.remove(source_node);
                     // If the child is still tainted (by another source), add it back to the set
-                    if child_node.sources.len() > 0 {
-                        self.tainted_nodes.insert(child.clone(), child_node);
+                    if !child_node.sources.is_empty() {
+                        self.tainted_nodes.insert(*child, child_node);
                     } else if rollback {
                         if let Node::Expr(id) = child {
                             // Remove any prior diagnostics for this node
-                            self.diagnostics.remove(&id);
+                            self.diagnostics.remove(id);
                         }
                     }
                 } else if rollback {
                     if let Node::Expr(id) = child {
                         // Remove any prior diagnostics for this node
-                        self.diagnostics.remove(&id);
+                        self.diagnostics.remove(id);
                     }
                 }
             }
@@ -268,10 +257,10 @@ impl<'a, 'b> CheckChecker<'a, 'b> {
     fn allow_unchecked_data(&self) -> bool {
         if let Some(idx) = self.active_annotation {
             let annotation = &self.annotations[idx];
-            return match annotation.kind {
-                AnnotationKind::Allow(WarningKind::UncheckedData) => true,
-                _ => false,
-            };
+            return matches!(
+                annotation.kind,
+                AnnotationKind::Allow(WarningKind::UncheckedData)
+            );
         }
         false
     }
@@ -280,10 +269,10 @@ impl<'a, 'b> CheckChecker<'a, 'b> {
     fn allow_unchecked_params(&self) -> bool {
         if let Some(idx) = self.active_annotation {
             let annotation = &self.annotations[idx];
-            return match annotation.kind {
-                AnnotationKind::Allow(WarningKind::UncheckedParams) => true,
-                _ => false,
-            };
+            return matches!(
+                annotation.kind,
+                AnnotationKind::Allow(WarningKind::UncheckedParams)
+            );
         }
         false
     }
@@ -347,7 +336,7 @@ impl<'a> ASTVisitor<'a> for CheckChecker<'a, '_> {
         let result = match &expr.expr {
             AtomValue(value) => self.visit_atom_value(expr, value),
             Atom(name) => self.visit_atom(expr, name),
-            List(exprs) => self.traverse_list(expr, &exprs),
+            List(exprs) => self.traverse_list(expr, exprs),
             LiteralValue(value) => self.visit_literal_value(expr, value),
             Field(field) => self.visit_field(expr, field),
             TraitReference(name, trait_def) => self.visit_trait_reference(expr, name, trait_def),
@@ -414,10 +403,10 @@ impl<'a> ASTVisitor<'a> for CheckChecker<'a, '_> {
             let mut unchecked_params = vec![false; params.len()];
             for (i, param) in params.iter().enumerate() {
                 unchecked_params[i] = allow;
-                if allow || self.settings.callee_filter {
-                    if !is_param_type_excluded_from_checked_requirement(param) {
-                        self.add_taint_source(Node::Symbol(param.name), param.decl_span.clone());
-                    }
+                if (allow || self.settings.callee_filter)
+                    && !is_param_type_excluded_from_checked_requirement(param)
+                {
+                    self.add_taint_source(Node::Symbol(param.name), param.decl_span.clone());
                 }
             }
             info.unchecked_params = unchecked_params;
@@ -592,7 +581,7 @@ impl<'a> ASTVisitor<'a> for CheckChecker<'a, '_> {
                 sources.extend(tainted.sources.clone());
             }
         }
-        if sources.len() > 0 {
+        if !sources.is_empty() {
             self.add_tainted_expr(expr, sources);
         }
         true
@@ -746,10 +735,10 @@ impl<'a> ASTVisitor<'a> for CheckChecker<'a, '_> {
         key: &HashMap<Option<&'a ClarityName>, &'a SymbolicExpression>,
         value: &HashMap<Option<&'a ClarityName>, &'a SymbolicExpression>,
     ) -> bool {
-        for (_, key_val) in key {
+        for key_val in key.values() {
             self.taint_check(key_val);
         }
-        for (_, val_val) in value {
+        for val_val in value.values() {
             self.taint_check(val_val);
         }
         true
@@ -762,10 +751,10 @@ impl<'a> ASTVisitor<'a> for CheckChecker<'a, '_> {
         key: &HashMap<Option<&'a ClarityName>, &'a SymbolicExpression>,
         value: &HashMap<Option<&'a ClarityName>, &'a SymbolicExpression>,
     ) -> bool {
-        for (_, key_val) in key {
+        for key_val in key.values() {
             self.taint_check(key_val);
         }
-        for (_, val_val) in value {
+        for val_val in value.values() {
             self.taint_check(val_val);
         }
         true
@@ -777,7 +766,7 @@ impl<'a> ASTVisitor<'a> for CheckChecker<'a, '_> {
         name: &'a ClarityName,
         key: &HashMap<Option<&'a ClarityName>, &'a SymbolicExpression>,
     ) -> bool {
-        for (_, val) in key {
+        for val in key.values() {
             self.taint_check(val);
         }
         true
@@ -800,7 +789,7 @@ impl<'a> ASTVisitor<'a> for CheckChecker<'a, '_> {
         name: &'a ClarityName,
         args: &'a [SymbolicExpression],
     ) -> bool {
-        if args.len() > 0 {
+        if !args.is_empty() {
             let default = vec![false; args.len()];
             if let Some(info) = self.user_funcs.get(name) {
                 let unchecked_args = &info.unchecked_params.clone();
@@ -854,10 +843,10 @@ impl<'a> ASTVisitor<'a> for CheckChecker<'a, '_> {
 }
 
 fn is_param_type_excluded_from_checked_requirement(param: &TypedVar) -> bool {
-    match TypeSignature::parse_type_repr(DEFAULT_EPOCH, param.type_expr, &mut ()) {
-        Ok(TypeSignature::BoolType) => true,
-        _ => false,
-    }
+    matches!(
+        TypeSignature::parse_type_repr(DEFAULT_EPOCH, param.type_expr, &mut ()),
+        Ok(TypeSignature::BoolType)
+    )
 }
 
 fn is_tx_sender(expr: &SymbolicExpression) -> bool {

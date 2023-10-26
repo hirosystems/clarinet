@@ -27,6 +27,7 @@ use clarity_repl::repl::{Session, SessionSettings};
 use reqwest::Url;
 use stacks_rpc_client::StacksRpc;
 use std::collections::{BTreeMap, HashSet, VecDeque};
+use std::str::FromStr;
 use std::sync::mpsc::{Receiver, Sender};
 use tiny_hderive::bip32::ExtendedPrivKey;
 
@@ -73,7 +74,7 @@ fn get_stacks_address(public_key: &PublicKey, network: &StacksNetwork) -> Stacks
     let wrapped_public_key =
         Secp256k1PublicKey::from_slice(&public_key.serialize_compressed()).unwrap();
 
-    let signer_addr = StacksAddress::from_public_keys(
+    StacksAddress::from_public_keys(
         match network {
             StacksNetwork::Mainnet => C32_ADDRESS_VERSION_MAINNET_SINGLESIG,
             _ => C32_ADDRESS_VERSION_TESTNET_SINGLESIG,
@@ -82,9 +83,7 @@ fn get_stacks_address(public_key: &PublicKey, network: &StacksNetwork) -> Stacks
         1,
         &vec![wrapped_public_key],
     )
-    .unwrap();
-
-    signer_addr
+    .unwrap()
 }
 
 fn sign_transaction_payload(
@@ -99,9 +98,9 @@ fn sign_transaction_payload(
     let signer_addr = get_stacks_address(&public_key, network);
 
     let spending_condition = TransactionSpendingCondition::Singlesig(SinglesigSpendingCondition {
-        signer: signer_addr.bytes.clone(),
-        nonce: nonce,
-        tx_fee: tx_fee,
+        signer: signer_addr.bytes,
+        nonce,
+        tx_fee,
         hash_mode: SinglesigHashMode::P2PKH,
         key_encoding: TransactionPublicKeyEncoding::Compressed,
         signature: MessageSignature::empty(),
@@ -117,11 +116,11 @@ fn sign_transaction_payload(
             StacksNetwork::Mainnet => 0x00000001,
             _ => 0x80000000,
         },
-        auth: auth,
-        anchor_mode: anchor_mode,
+        auth,
+        anchor_mode,
         post_condition_mode: TransactionPostConditionMode::Allow,
         post_conditions: vec![],
-        payload: payload,
+        payload,
     };
 
     let mut unsigned_tx_bytes = vec![];
@@ -242,7 +241,7 @@ pub fn update_deployment_costs(
         .stacks_node
         .as_ref()
         .expect("unable to get stacks node rcp address");
-    let stacks_rpc = StacksRpc::new(&stacks_node_url);
+    let stacks_rpc = StacksRpc::new(stacks_node_url);
     let mut session = Session::new(SessionSettings::default());
 
     for batch_spec in deployment.plan.batches.iter_mut() {
@@ -252,7 +251,7 @@ pub fn update_deployment_costs(
                     let transaction_payload = TransactionPayload::TokenTransfer(
                         tx.recipient.clone(),
                         tx.mstx_amount,
-                        TokenTransferMemo(tx.memo.clone()),
+                        TokenTransferMemo(tx.memo),
                     );
 
                     match stacks_rpc.estimate_transaction_fee(&transaction_payload, priority) {
@@ -260,7 +259,7 @@ pub fn update_deployment_costs(
                             tx.cost = fee;
                         }
                         Err(e) => {
-                            println!("unable to estimate fee for transaction: {}", e.to_string());
+                            println!("unable to estimate fee for transaction: {}", e);
                             continue;
                         }
                     };
@@ -283,7 +282,7 @@ pub fn update_deployment_costs(
                             contract_name: tx.contract_id.name.clone(),
                             address: StacksAddress::from(tx.contract_id.issuer.clone()),
                             function_name: tx.method.clone(),
-                            function_args: function_args,
+                            function_args,
                         });
 
                     match stacks_rpc.estimate_transaction_fee(&transaction_payload, priority) {
@@ -291,7 +290,7 @@ pub fn update_deployment_costs(
                             tx.cost = fee;
                         }
                         Err(e) => {
-                            println!("unable to estimate fee for transaction: {}", e.to_string());
+                            println!("unable to estimate fee for transaction: {}", e);
                             continue;
                         }
                     };
@@ -310,7 +309,7 @@ pub fn update_deployment_costs(
                             tx.cost = fee;
                         }
                         Err(e) => {
-                            println!("unable to estimate fee for transaction: {}", e.to_string());
+                            println!("unable to estimate fee for transaction: {}", e);
                             continue;
                         }
                     };
@@ -419,7 +418,7 @@ pub fn apply_on_chain_deployment(
                 TransactionSpecification::StxTransfer(tx) => {
                     let issuer_address = tx.expected_sender.to_address();
                     let nonce = match accounts_cached_nonces.get(&issuer_address) {
-                        Some(cached_nonce) => cached_nonce.clone(),
+                        Some(cached_nonce) => *cached_nonce,
                         None => stacks_rpc
                             .get_nonce(&issuer_address)
                             .expect("Unable to retrieve account"),
@@ -435,7 +434,7 @@ pub fn apply_on_chain_deployment(
                         tx.recipient.clone(),
                         tx.mstx_amount,
                         tx.memo,
-                        *account,
+                        account,
                         nonce,
                         tx.cost,
                         anchor_mode,
@@ -453,9 +452,7 @@ pub fn apply_on_chain_deployment(
                     accounts_cached_nonces.insert(issuer_address.clone(), nonce + 1);
                     let name = format!(
                         "STX transfer ({}µSTX from {} to {})",
-                        tx.mstx_amount,
-                        issuer_address,
-                        tx.recipient.to_string(),
+                        tx.mstx_amount, issuer_address, tx.recipient,
                     );
                     let check = TransactionCheck::NonceCheck(tx.expected_sender.clone(), nonce);
                     TransactionTracker {
@@ -502,7 +499,7 @@ pub fn apply_on_chain_deployment(
                 TransactionSpecification::ContractCall(tx) => {
                     let issuer_address = tx.expected_sender.to_address();
                     let nonce = match accounts_cached_nonces.get(&issuer_address) {
-                        Some(cached_nonce) => cached_nonce.clone(),
+                        Some(cached_nonce) => *cached_nonce,
                         None => stacks_rpc
                             .get_nonce(&issuer_address)
                             .expect("Unable to retrieve account"),
@@ -538,7 +535,7 @@ pub fn apply_on_chain_deployment(
                         &tx.contract_id,
                         tx.method.clone(),
                         function_args,
-                        *account,
+                        account,
                         nonce,
                         tx.cost,
                         anchor_mode,
@@ -575,7 +572,7 @@ pub fn apply_on_chain_deployment(
                     // Retrieve nonce for issuer
                     let issuer_address = tx.expected_sender.to_address();
                     let nonce = match accounts_cached_nonces.get(&issuer_address) {
-                        Some(cached_nonce) => cached_nonce.clone(),
+                        Some(cached_nonce) => *cached_nonce,
                         None => stacks_rpc
                             .get_nonce(&issuer_address)
                             .expect("Unable to retrieve account"),
@@ -608,7 +605,7 @@ pub fn apply_on_chain_deployment(
                     };
 
                     let clarity_version = if epoch >= EpochSpec::Epoch2_1 {
-                        Some(tx.clarity_version.clone())
+                        Some(tx.clarity_version)
                     } else {
                         None
                     };
@@ -617,7 +614,7 @@ pub fn apply_on_chain_deployment(
                         &tx.contract_name,
                         &source,
                         clarity_version,
-                        *account,
+                        account,
                         nonce,
                         tx.cost,
                         anchor_mode,
@@ -635,11 +632,7 @@ pub fn apply_on_chain_deployment(
                     };
 
                     accounts_cached_nonces.insert(issuer_address.clone(), nonce + 1);
-                    let name = format!(
-                        "Publish {}.{}",
-                        tx.expected_sender.to_string(),
-                        tx.contract_name
-                    );
+                    let name = format!("Publish {}.{}", tx.expected_sender, tx.contract_name);
                     let check = TransactionCheck::ContractPublish(
                         tx.expected_sender.clone(),
                         tx.contract_name.clone(),
@@ -676,7 +669,7 @@ pub fn apply_on_chain_deployment(
                     // Retrieve nonce for issuer
                     let issuer_address = tx.remap_sender.to_address();
                     let nonce = match accounts_cached_nonces.get(&issuer_address) {
-                        Some(cached_nonce) => cached_nonce.clone(),
+                        Some(cached_nonce) => *cached_nonce,
                         None => stacks_rpc
                             .get_nonce(&issuer_address)
                             .expect("Unable to retrieve account"),
@@ -713,7 +706,7 @@ pub fn apply_on_chain_deployment(
                         &tx.contract_id.name,
                         &source,
                         None,
-                        *account,
+                        account,
                         nonce,
                         tx.cost,
                         anchor_mode,
@@ -727,11 +720,7 @@ pub fn apply_on_chain_deployment(
                     };
 
                     accounts_cached_nonces.insert(issuer_address.clone(), nonce + 1);
-                    let name = format!(
-                        "Publish {}.{}",
-                        tx.remap_sender.to_string(),
-                        tx.contract_id.name
-                    );
+                    let name = format!("Publish {}.{}", tx.remap_sender, tx.contract_id.name);
                     let check = TransactionCheck::ContractPublish(
                         tx.remap_sender.clone(),
                         tx.contract_id.name.clone(),
@@ -788,16 +777,14 @@ pub fn apply_on_chain_deployment(
                         if info.stacks_tip_height == 0 {
                             // Always loop if we have not yet seen the genesis block.
                             std::thread::sleep(std::time::Duration::from_secs(
-                                delay_between_checks.into(),
+                                delay_between_checks,
                             ));
                             continue;
                         }
                         (info.burn_block_height, info.stacks_tip_height)
                     }
                     Err(_e) => {
-                        std::thread::sleep(std::time::Duration::from_secs(
-                            delay_between_checks.into(),
-                        ));
+                        std::thread::sleep(std::time::Duration::from_secs(delay_between_checks));
                         continue;
                     }
                 };
@@ -805,7 +792,7 @@ pub fn apply_on_chain_deployment(
                 // If no bitcoin block has been mined since `delay_between_checks`,
                 // avoid flooding the stacks-node with status update requests.
                 if bitcoin_block_tip <= current_bitcoin_block_height {
-                    std::thread::sleep(std::time::Duration::from_secs(delay_between_checks.into()));
+                    std::thread::sleep(std::time::Duration::from_secs(delay_between_checks));
                     continue;
                 }
 
@@ -814,7 +801,7 @@ pub fn apply_on_chain_deployment(
                 // If no stacks block has been mined despite the new bitcoin block,
                 // avoid flooding the stacks-node with status update requests.
                 if stacks_block_tip <= current_block_height {
-                    std::thread::sleep(std::time::Duration::from_secs(delay_between_checks.into()));
+                    std::thread::sleep(std::time::Duration::from_secs(delay_between_checks));
                     continue;
                 }
 
@@ -823,7 +810,7 @@ pub fn apply_on_chain_deployment(
                 if current_bitcoin_block_height > after_bitcoin_block {
                     epoch_transition_successful = true;
                 } else {
-                    std::thread::sleep(std::time::Duration::from_secs(delay_between_checks.into()));
+                    std::thread::sleep(std::time::Duration::from_secs(delay_between_checks));
                 }
             }
         }
@@ -834,7 +821,7 @@ pub fn apply_on_chain_deployment(
                 TransactionStatus::Encoded(transaction, check) => (transaction, check),
                 _ => unreachable!(),
             };
-            let _ = match stacks_rpc.post_transaction(&transaction) {
+            match stacks_rpc.post_transaction(&transaction) {
                 Ok(res) => {
                     tracker.status = TransactionStatus::Broadcasted(check);
 
@@ -843,7 +830,7 @@ pub fn apply_on_chain_deployment(
                     ongoing_batch.insert(res.txid, tracker);
                 }
                 Err(e) => {
-                    let message = format!("unable to post transaction\n{}", e.to_string());
+                    let message = format!("unable to post transaction\n{}", e);
                     tracker.status = TransactionStatus::Error(message.clone());
 
                     let _ = deployment_event_tx
@@ -858,7 +845,7 @@ pub fn apply_on_chain_deployment(
             let (burn_block_height, stacks_tip_height) = match stacks_rpc.get_info() {
                 Ok(info) => (info.burn_block_height, info.stacks_tip_height),
                 _ => {
-                    std::thread::sleep(std::time::Duration::from_secs(delay_between_checks.into()));
+                    std::thread::sleep(std::time::Duration::from_secs(delay_between_checks));
                     continue;
                 }
             };
@@ -866,7 +853,7 @@ pub fn apply_on_chain_deployment(
             // If no block has been mined since `delay_between_checks`,
             // avoid flooding the stacks-node with status update requests.
             if burn_block_height <= current_bitcoin_block_height {
-                std::thread::sleep(std::time::Duration::from_secs(delay_between_checks.into()));
+                std::thread::sleep(std::time::Duration::from_secs(delay_between_checks));
                 continue;
             }
 
@@ -882,7 +869,7 @@ pub fn apply_on_chain_deployment(
                         contract_name,
                     )) => {
                         let deployer_address = deployer.to_address();
-                        let res = stacks_rpc.get_contract_source(&deployer_address, &contract_name);
+                        let res = stacks_rpc.get_contract_source(&deployer_address, contract_name);
                         match res {
                             Ok(_contract) => {
                                 tracker.status = TransactionStatus::Confirmed;
@@ -974,7 +961,7 @@ pub fn get_initial_transactions_trackers(
                         "STX transfer {} send {} µSTC to {}",
                         tx.expected_sender.to_address(),
                         tx.mstx_amount,
-                        tx.recipient.to_string()
+                        tx.recipient,
                     ),
                     status: TransactionStatus::Queued,
                 },

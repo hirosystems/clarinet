@@ -12,7 +12,7 @@
     "rust-analyzer.cargo.features": ["clarity-lsp/wasm"],
     "rust-analyzer.check.overrideCommand": [
       "cargo",
-      "check",
+      "clippy",
       "--no-default-features",
       "--package=clarity-lsp",
       "--features=wasm",

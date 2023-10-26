@@ -81,12 +81,12 @@ pub struct ContractDefinedData {
 }
 
 impl<'a> ContractDefinedData {
-    pub fn new(expressions: &Vec<SymbolicExpression>, position: &Position) -> Self {
+    pub fn new(expressions: &[SymbolicExpression], position: &Position) -> Self {
         let mut defined_data = ContractDefinedData {
-            position: position.clone(),
+            position: *position,
             ..Default::default()
         };
-        traverse(&mut defined_data, &expressions);
+        traverse(&mut defined_data, expressions);
         defined_data
     }
 
@@ -97,7 +97,7 @@ impl<'a> ContractDefinedData {
         &mut self,
         expr: &SymbolicExpression,
         name: &ClarityName,
-        parameters: &Vec<TypedVar<'a>>,
+        parameters: &[TypedVar<'a>],
     ) {
         let mut completion_args: Vec<String> = vec![];
         for (i, typed_var) in parameters.iter().enumerate() {
@@ -131,32 +131,32 @@ impl<'a> ContractDefinedData {
         &self,
         version: &ClarityVersion,
         name: &String,
-        snippet: &String,
+        snippet: &str,
     ) -> Option<String> {
-        if VAR_FUNCTIONS.contains(name) && self.vars.len() > 0 {
+        if VAR_FUNCTIONS.contains(name) && !self.vars.is_empty() {
             let choices = self.vars.join(",");
             return Some(snippet.replace("${1:var}", &format!("${{1|{}|}}", choices)));
         }
-        if MAP_FUNCTIONS.contains(name) && self.maps.len() > 0 {
+        if MAP_FUNCTIONS.contains(name) && !self.maps.is_empty() {
             let choices = self.maps.join(",");
             return Some(snippet.replace("${1:map-name}", &format!("${{1|{}|}}", choices)));
         }
-        if FT_FUNCTIONS.contains(name) && self.fts.len() > 0 {
+        if FT_FUNCTIONS.contains(name) && !self.fts.is_empty() {
             let choices = self.fts.join(",");
             return Some(snippet.replace("${1:token-name}", &format!("${{1|{}|}}", choices)));
         }
-        if NFT_FUNCTIONS.contains(name) && self.nfts.len() > 0 {
+        if NFT_FUNCTIONS.contains(name) && !self.nfts.is_empty() {
             let choices = self.nfts.join(",");
             return Some(snippet.replace("${1:asset-name}", &format!("${{1|{}|}}", choices)));
         }
-        if ITERATOR_FUNCTIONS.contains(name) && self.functions_completion_items.len() > 0 {
+        if ITERATOR_FUNCTIONS.contains(name) && !self.functions_completion_items.is_empty() {
             let mut choices = self
                 .functions_completion_items
                 .iter()
                 .map(|f| f.label.to_string())
                 .collect::<Vec<String>>()
                 .join(",");
-            choices.push_str(",");
+            choices.push(',');
             choices.push_str(
                 &get_iterator_cb_completion_item(version, name)
                     .iter()
@@ -240,7 +240,7 @@ impl<'a> ASTVisitor<'a> for ContractDefinedData {
         parameters: Option<Vec<clarity_repl::analysis::ast_visitor::TypedVar<'a>>>,
         _body: &'a SymbolicExpression,
     ) -> bool {
-        self.set_function_completion_with_bindings(expr, name, &parameters.unwrap_or(vec![]));
+        self.set_function_completion_with_bindings(expr, name, &parameters.unwrap_or_default());
         true
     }
 
@@ -251,7 +251,7 @@ impl<'a> ASTVisitor<'a> for ContractDefinedData {
         parameters: Option<Vec<clarity_repl::analysis::ast_visitor::TypedVar<'a>>>,
         _body: &'a SymbolicExpression,
     ) -> bool {
-        self.set_function_completion_with_bindings(expr, name, &parameters.unwrap_or(vec![]));
+        self.set_function_completion_with_bindings(expr, name, &parameters.unwrap_or_default());
         true
     }
 
@@ -262,7 +262,7 @@ impl<'a> ASTVisitor<'a> for ContractDefinedData {
         parameters: Option<Vec<clarity_repl::analysis::ast_visitor::TypedVar<'a>>>,
         _body: &'a SymbolicExpression,
     ) -> bool {
-        self.set_function_completion_with_bindings(expr, name, &parameters.unwrap_or(vec![]));
+        self.set_function_completion_with_bindings(expr, name, &parameters.unwrap_or_default());
         true
     }
 
@@ -303,8 +303,7 @@ pub fn get_contract_calls(analysis: &ContractAnalysis) -> Vec<CompletionItem> {
         let (snippet_args, doc_args) = build_contract_calls_args(signature);
         let label = format!(
             "contract-call? .{} {}",
-            analysis.contract_identifier.name.to_string(),
-            name.to_string()
+            analysis.contract_identifier.name, name,
         );
         let documentation = MarkupContent {
             kind: MarkupKind::Markdown,
@@ -314,9 +313,9 @@ pub fn get_contract_calls(analysis: &ContractAnalysis) -> Vec<CompletionItem> {
         };
         let insert_text = format!(
             "contract-call? .{} {} {}",
-            analysis.contract_identifier.name.to_string(),
-            name.to_string(),
-            snippet_args.join(" ")
+            analysis.contract_identifier.name,
+            name,
+            snippet_args.join(" "),
         );
 
         inter_contract.push(CompletionItem {
@@ -341,7 +340,7 @@ pub fn build_completion_item_list(
     should_wrap: bool,
     include_native_placeholders: bool,
 ) -> Vec<CompletionItem> {
-    if let Some((function_name, param)) = get_function_at_position(position, expressions.as_ref()) {
+    if let Some((function_name, param)) = get_function_at_position(position, expressions) {
         // - for var-*, map-*, ft-* or nft-* methods, return the corresponding data names
         let mut completion_strings: Option<Vec<String>> = None;
         if VAR_FUNCTIONS.contains(&function_name.to_string()) && param == Some(0) {
@@ -368,9 +367,7 @@ pub fn build_completion_item_list(
                 &mut active_contract_defined_data
                     .functions_completion_items
                     .iter()
-                    .map(|f| {
-                        CompletionItem::new_simple(String::from(f.label.clone()), String::from(""))
-                    })
+                    .map(|f| CompletionItem::new_simple(f.label.clone(), String::from("")))
                     .collect::<Vec<CompletionItem>>(),
             );
             completion_items.append(&mut get_iterator_cb_completion_item(
@@ -508,7 +505,7 @@ pub fn build_default_native_keywords_list(version: ClarityVersion) -> Vec<Comple
     let native_functions: Vec<CompletionItem> = NativeFunctions::ALL
         .iter()
         .filter_map(|func| {
-            let mut api = make_api_reference(&func);
+            let mut api = make_api_reference(func);
             if api.version > version {
                 return None;
             }
@@ -517,7 +514,7 @@ pub fn build_default_native_keywords_list(version: ClarityVersion) -> Vec<Comple
                     return None;
                 } else if api.version == ClarityVersion::Clarity1 {
                     // only for element-at? and index-of?
-                    api.snippet = api.snippet.replace("?", "");
+                    api.snippet = api.snippet.replace('?', "");
                 }
             }
 
@@ -540,7 +537,7 @@ pub fn build_default_native_keywords_list(version: ClarityVersion) -> Vec<Comple
     let define_functions: Vec<CompletionItem> = DefineFunctions::ALL
         .iter()
         .filter_map(|func| {
-            let api = make_define_reference(&func);
+            let api = make_define_reference(func);
             if api.version > version {
                 return None;
             }
@@ -563,7 +560,7 @@ pub fn build_default_native_keywords_list(version: ClarityVersion) -> Vec<Comple
     let native_variables: Vec<CompletionItem> = NativeVariables::ALL
         .iter()
         .filter_map(|var| {
-            if let Some(api) = make_keyword_reference(&var) {
+            if let Some(api) = make_keyword_reference(var) {
                 if api.version > version {
                     return None;
                 }
@@ -601,7 +598,7 @@ pub fn build_default_native_keywords_list(version: ClarityVersion) -> Vec<Comple
         })
         .collect();
 
-    let types = vec![
+    let types = [
         "uint",
         "int",
         "bool",
@@ -637,7 +634,7 @@ pub fn build_default_native_keywords_list(version: ClarityVersion) -> Vec<Comple
 }
 
 pub fn build_map_valid_cb_completion_items(version: ClarityVersion) -> Vec<CompletionItem> {
-    vec![
+    [
         NativeFunctions::Add,
         NativeFunctions::Subtract,
         NativeFunctions::Multiply,
@@ -685,7 +682,7 @@ pub fn build_map_valid_cb_completion_items(version: ClarityVersion) -> Vec<Compl
 }
 
 pub fn build_filter_valid_cb_completion_items(version: ClarityVersion) -> Vec<CompletionItem> {
-    vec![
+    [
         NativeFunctions::And,
         NativeFunctions::Or,
         NativeFunctions::Not,
@@ -696,7 +693,7 @@ pub fn build_filter_valid_cb_completion_items(version: ClarityVersion) -> Vec<Co
 }
 
 pub fn build_fold_valid_cb_completion_items(version: ClarityVersion) -> Vec<CompletionItem> {
-    vec![
+    [
         NativeFunctions::Add,
         NativeFunctions::Subtract,
         NativeFunctions::Multiply,
@@ -732,7 +729,7 @@ fn build_iterator_cb_completion_item(
     func: &NativeFunctions,
     version: ClarityVersion,
 ) -> Option<CompletionItem> {
-    let api = make_api_reference(&func);
+    let api = make_api_reference(func);
     if api.version > version {
         return None;
     }
@@ -766,10 +763,10 @@ fn get_iterator_cb_completion_item(version: &ClarityVersion, func: &str) -> Vec<
             ClarityVersion::Clarity2 => VALID_FILTER_FUNCTIONS_CLARITY_1.to_vec(),
         };
     }
-    return match version {
+    match version {
         ClarityVersion::Clarity1 => VALID_FOLD_FUNCTIONS_CLARITY_1.to_vec(),
         ClarityVersion::Clarity2 => VALID_FOLD_FUNCTIONS_CLARITY_1.to_vec(),
-    };
+    }
 }
 
 #[cfg(test)]

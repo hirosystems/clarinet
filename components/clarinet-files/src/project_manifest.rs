@@ -233,18 +233,18 @@ pub struct RequirementConfig {
 impl ProjectManifest {
     pub async fn from_file_accessor(
         location: &FileLocation,
-        file_accessor: &Box<dyn FileAccessor>,
+        file_accessor: &dyn FileAccessor,
     ) -> Result<ProjectManifest, String> {
         let content = file_accessor.read_file(location.to_string()).await?;
 
-        let project_manifest_file: ProjectManifestFile = match toml::from_slice(&content.as_bytes())
+        let project_manifest_file: ProjectManifestFile = match toml::from_slice(content.as_bytes())
         {
             Ok(s) => s,
             Err(e) => {
                 return Err(format!("Clarinet.toml file malformatted {:?}", e));
             }
         };
-        ProjectManifest::from_project_manifest_file(project_manifest_file, &location)
+        ProjectManifest::from_project_manifest_file(project_manifest_file, location)
     }
 
     pub fn from_location(location: &FileLocation) -> Result<ProjectManifest, String> {
@@ -294,7 +294,7 @@ impl ProjectManifest {
                 .project
                 .description
                 .unwrap_or("".into()),
-            authors: project_manifest_file.project.authors.unwrap_or(vec![]),
+            authors: project_manifest_file.project.authors.unwrap_or_default(),
             telemetry: project_manifest_file.project.telemetry.unwrap_or(false),
             cache_location,
             boot_contracts: vec![
@@ -321,81 +321,66 @@ impl ProjectManifest {
         let mut contracts_settings = HashMap::new();
         let mut config_requirements: Vec<RequirementConfig> = Vec::new();
 
-        match project_manifest_file.project.requirements {
-            Some(Value::Array(requirements)) => {
-                for link_settings in requirements.iter() {
-                    match link_settings {
-                        Value::Table(link_settings) => {
-                            let contract_id = match link_settings.get("contract_id") {
-                                Some(Value::String(contract_id)) => contract_id.to_string(),
-                                _ => continue,
-                            };
-                            config_requirements.push(RequirementConfig { contract_id });
-                        }
-                        _ => {}
-                    }
+        if let Some(Value::Array(requirements)) = project_manifest_file.project.requirements {
+            for link_settings in requirements.iter() {
+                if let Value::Table(link_settings) = link_settings {
+                    let contract_id = match link_settings.get("contract_id") {
+                        Some(Value::String(contract_id)) => contract_id.to_string(),
+                        _ => continue,
+                    };
+                    config_requirements.push(RequirementConfig { contract_id });
                 }
             }
-            _ => {}
         };
-        match project_manifest_file.contracts {
-            Some(Value::Table(contracts)) => {
-                for (contract_name, contract_settings) in contracts.iter() {
-                    match contract_settings {
-                        Value::Table(contract_settings) => {
-                            let contract_path = match contract_settings.get("path") {
-                                Some(Value::String(path)) => path,
-                                _ => continue,
-                            };
-                            let code_source = match PathBuf::from_str(contract_path) {
-                                Ok(path) => ClarityCodeSource::ContractOnDisk(path),
-                                Err(e) => {
-                                    return Err(format!(
-                                        "unable to parse path {} ({})",
-                                        contract_path, e
-                                    ))
-                                }
-                            };
-                            let deployer = match contract_settings.get("deployer") {
-                                Some(Value::String(path)) => {
-                                    ContractDeployer::LabeledDeployer(path.clone())
-                                }
-                                _ => ContractDeployer::DefaultDeployer,
-                            };
-
-                            let (epoch, clarity_version) = get_epoch_and_clarity_version(
-                                contract_settings.get("epoch"),
-                                contract_settings.get("clarity_version"),
-                            )?;
-
-                            config_contracts.insert(
-                                contract_name.to_string(),
-                                ClarityContract {
-                                    name: contract_name.to_string(),
-                                    deployer: deployer.clone(),
-                                    code_source,
-                                    clarity_version,
-                                    epoch,
-                                },
-                            );
-
-                            let mut contract_location = project_root_location.clone();
-                            contract_location.append_path(contract_path)?;
-                            contracts_settings.insert(
-                                contract_location,
-                                ClarityContractMetadata {
-                                    name: contract_name.to_string(),
-                                    deployer,
-                                    clarity_version,
-                                    epoch,
-                                },
-                            );
+        if let Some(Value::Table(contracts)) = project_manifest_file.contracts {
+            for (contract_name, contract_settings) in contracts.iter() {
+                if let Value::Table(contract_settings) = contract_settings {
+                    let contract_path = match contract_settings.get("path") {
+                        Some(Value::String(path)) => path,
+                        _ => continue,
+                    };
+                    let code_source = match PathBuf::from_str(contract_path) {
+                        Ok(path) => ClarityCodeSource::ContractOnDisk(path),
+                        Err(e) => {
+                            return Err(format!("unable to parse path {} ({})", contract_path, e))
                         }
-                        _ => {}
-                    }
+                    };
+                    let deployer = match contract_settings.get("deployer") {
+                        Some(Value::String(path)) => {
+                            ContractDeployer::LabeledDeployer(path.clone())
+                        }
+                        _ => ContractDeployer::DefaultDeployer,
+                    };
+
+                    let (epoch, clarity_version) = get_epoch_and_clarity_version(
+                        contract_settings.get("epoch"),
+                        contract_settings.get("clarity_version"),
+                    )?;
+
+                    config_contracts.insert(
+                        contract_name.to_string(),
+                        ClarityContract {
+                            name: contract_name.to_string(),
+                            deployer: deployer.clone(),
+                            code_source,
+                            clarity_version,
+                            epoch,
+                        },
+                    );
+
+                    let mut contract_location = project_root_location.clone();
+                    contract_location.append_path(contract_path)?;
+                    contracts_settings.insert(
+                        contract_location,
+                        ClarityContractMetadata {
+                            name: contract_name.to_string(),
+                            deployer,
+                            clarity_version,
+                            epoch,
+                        },
+                    );
                 }
             }
-            _ => {}
         };
         config.contracts = config_contracts;
         config.contracts_settings = contracts_settings;

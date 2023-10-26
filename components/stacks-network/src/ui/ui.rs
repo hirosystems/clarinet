@@ -155,7 +155,7 @@ where
         .constraints([Constraint::Length(1), Constraint::Min(1)].as_ref())
         .split(area);
 
-    let titles = app.tabs.titles.iter().map(|s| s.clone()).collect();
+    let titles = app.tabs.titles.iter().cloned().collect();
     let blocks = Tabs::new(titles)
         .divider("")
         .style(Style::default().fg(Color::White))
@@ -177,15 +177,15 @@ where
     }
     let transactions = match &app.blocks[(app.tabs.titles.len() - 1) - app.tabs.index] {
         BlockData::Block(selected_block) => {
-            draw_block_details(f, block_details_components[0], &selected_block);
+            draw_block_details(f, block_details_components[0], selected_block);
             &selected_block.transactions
         }
         BlockData::Microblock(selected_microblock) => {
-            draw_microblock_details(f, block_details_components[0], &selected_microblock);
+            draw_microblock_details(f, block_details_components[0], selected_microblock);
             &selected_microblock.transactions
         }
     };
-    draw_transactions(f, block_details_components[1], &transactions);
+    draw_transactions(f, block_details_components[1], transactions);
 }
 
 fn draw_block_details<B>(f: &mut Frame<B>, area: Rect, block: &StacksBlockData)
@@ -238,7 +238,7 @@ where
         .block(Block::default().borders(Borders::NONE));
     f.render_widget(paragraph, labels[3]);
 
-    let value = format!("{}", block.block_identifier.hash);
+    let value = block.block_identifier.hash.to_string();
     let paragraph = Paragraph::new(value)
         .style(Style::default().fg(Color::White))
         .block(Block::default().borders(Borders::NONE));
@@ -262,7 +262,11 @@ where
         .block(Block::default().borders(Borders::NONE));
     f.render_widget(paragraph, labels[7]);
 
-    let value = format!("{}", block.metadata.bitcoin_anchor_block_identifier.hash);
+    let value = block
+        .metadata
+        .bitcoin_anchor_block_identifier
+        .hash
+        .to_string();
     let paragraph = Paragraph::new(value)
         .style(Style::default().fg(Color::White))
         .block(Block::default().borders(Borders::NONE));
@@ -334,7 +338,7 @@ where
         .block(Block::default().borders(Borders::NONE));
     f.render_widget(paragraph, labels[3]);
 
-    let value = format!("{}", microblock.block_identifier.hash);
+    let value = microblock.block_identifier.hash.to_string();
     let paragraph = Paragraph::new(value)
         .style(Style::default().fg(Color::White))
         .block(Block::default().borders(Borders::NONE));
@@ -358,14 +362,14 @@ where
         .block(Block::default().borders(Borders::NONE));
     f.render_widget(paragraph, labels[7]);
 
-    let value = format!("{}", microblock.metadata.anchor_block_identifier.hash);
+    let value = microblock.metadata.anchor_block_identifier.hash.to_string();
     let paragraph = Paragraph::new(value)
         .style(Style::default().fg(Color::White))
         .block(Block::default().borders(Borders::NONE));
     f.render_widget(paragraph, labels[8]);
 }
 
-fn draw_transactions<B>(f: &mut Frame<B>, area: Rect, transactions: &Vec<StacksTransactionData>)
+fn draw_transactions<B>(f: &mut Frame<B>, area: Rect, transactions: &[StacksTransactionData])
 where
     B: Backend,
 {
@@ -405,7 +409,7 @@ where
                 .add_modifier(Modifier::BOLD),
         )
         .highlight_symbol("* ");
-    let mut inner_area = area.clone();
+    let mut inner_area = area;
     inner_area.height = inner_area.height.saturating_sub(1);
     f.render_widget(list, inner_area);
 }

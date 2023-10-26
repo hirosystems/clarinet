@@ -105,6 +105,7 @@ impl From<SettingsFile> for Settings {
 }
 
 pub trait AnalysisPass {
+    #[allow(clippy::ptr_arg)]
     fn run_pass(
         contract_analysis: &mut ContractAnalysis,
         analysis_db: &mut AnalysisDatabase,
@@ -138,7 +139,7 @@ pub fn run_analysis(
     analysis_db.execute(|db| {
         for pass in passes {
             // Collect warnings and continue, or if there is an error, return.
-            match pass(contract_analysis, db, annotations, &settings) {
+            match pass(contract_analysis, db, annotations, settings) {
                 Ok(mut w) => errors.append(&mut w),
                 Err(mut e) => {
                     errors.append(&mut e);

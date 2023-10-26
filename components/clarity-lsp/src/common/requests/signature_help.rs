@@ -48,7 +48,7 @@ pub fn get_signatures(
             signature_without_parenthesis.next_back();
             let signature_without_parenthesis = signature_without_parenthesis.as_str();
             let parameters = signature_without_parenthesis
-                .split(" ")
+                .split(' ')
                 .collect::<Vec<&str>>();
             let (_, parameters) = parameters.split_first().expect("invalid signature format");
 

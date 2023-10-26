@@ -6,17 +6,17 @@ use std::fmt;
 
 fn level_to_string(level: &Level) -> String {
     match level {
-        Level::Note => format!("{}", blue!("note:")),
-        Level::Warning => format!("{}", yellow!("warning:")),
-        Level::Error => format!("{}", red!("error:")),
+        Level::Note => blue!("note:").to_string(),
+        Level::Warning => yellow!("warning:").to_string(),
+        Level::Error => red!("error:").to_string(),
     }
 }
 
 // Generate the formatted output for this diagnostic, given the source code.
 // TODO: Preferably a filename would be saved in the Span, but for now, pass a name here.
-pub fn output_diagnostic(diagnostic: &Diagnostic, name: &str, lines: &Vec<String>) -> Vec<String> {
+pub fn output_diagnostic(diagnostic: &Diagnostic, name: &str, lines: &[String]) -> Vec<String> {
     let mut output = Vec::new();
-    if diagnostic.spans.len() > 0 {
+    if !diagnostic.spans.is_empty() {
         output.push(format!(
             "{}:{}:{}: {} {}",
             name, // diagnostic.spans[0].filename,
@@ -36,7 +36,7 @@ pub fn output_diagnostic(diagnostic: &Diagnostic, name: &str, lines: &Vec<String
     output
 }
 
-pub fn output_code(diagnostic: &Diagnostic, lines: &Vec<String>) -> Vec<String> {
+pub fn output_code(diagnostic: &Diagnostic, lines: &[String]) -> Vec<String> {
     let mut output = Vec::new();
     if diagnostic.spans.is_empty() {
         return output;
@@ -59,7 +59,7 @@ pub fn output_code(diagnostic: &Diagnostic, lines: &Vec<String>) -> Vec<String> 
             (span.end_column - span.start_column) as usize
         );
     }
-    pointer = format!("{}", pointer);
+    pointer = pointer.to_string();
     output.push(pointer);
 
     for span in diagnostic.spans.iter().skip(1) {
@@ -80,6 +80,7 @@ pub fn output_code(diagnostic: &Diagnostic, lines: &Vec<String>) -> Vec<String> 
                 (span.end_column - span.start_column) as usize
             );
         } else {
+            #[allow(clippy::needless_range_loop)]
             for line_num in (first_line + 1)..last_line {
                 output.push(lines[line_num].clone());
             }

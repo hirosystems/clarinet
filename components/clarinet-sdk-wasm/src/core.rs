@@ -297,7 +297,7 @@ impl SDK {
         let manifest_location = FileLocation::try_parse(&manifest_path, Some(&project_root))
             .ok_or("Failed to parse manifest location")?;
         let manifest =
-            ProjectManifest::from_file_accessor(&manifest_location, &self.file_accessor).await?;
+            ProjectManifest::from_file_accessor(&manifest_location, &*self.file_accessor).await?;
 
         let (deployment, artifacts) = match self.cache.get(&manifest_location) {
             Some(cache) => cache.clone(),
@@ -306,7 +306,7 @@ impl SDK {
                     &manifest,
                     &StacksNetwork::Simnet,
                     false,
-                    Some(&self.file_accessor),
+                    Some(&*self.file_accessor),
                     Some(StacksEpochId::Epoch21),
                 )
                 .await?;

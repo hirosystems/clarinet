@@ -353,7 +353,7 @@ impl DebugState {
             return Err(errors);
         }
 
-        match eval(&ast.expressions[0], env, &context) {
+        match eval(&ast.expressions[0], env, context) {
             Ok(value) => Ok(value),
             Err(e) => Err(vec![format_err!(e)]),
         }
@@ -507,12 +507,7 @@ impl DebugState {
         match self.state {
             State::Continue | State::Quit | State::Finish(_) => return true,
             State::StepOver(step_over_id) => {
-                if self
-                    .stack
-                    .iter()
-                    .find(|&state| state.id == step_over_id)
-                    .is_some()
-                {
+                if self.stack.iter().any(|state| state.id == step_over_id) {
                     // We're still inside the expression which should be stepped over,
                     // so return to execution.
                     return true;
@@ -569,7 +564,7 @@ pub fn extract_watch_variable<'a>(
     let (contract_id, name) = match parts.len() {
         1 => {
             if default_sender.is_some() {
-                return Err(format!("must use qualified name"));
+                return Err("must use qualified name".to_string());
             } else {
                 (env.contract_context.contract_identifier.clone(), parts[0])
             }

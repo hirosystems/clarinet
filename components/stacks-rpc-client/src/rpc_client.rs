@@ -14,12 +14,12 @@ pub enum RpcError {
     Message(String),
 }
 
-impl RpcError {
-    pub fn to_string(&self) -> String {
+impl std::fmt::Display for RpcError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match &self {
-            RpcError::Message(e) => e.clone(),
-            RpcError::StatusCode(e) => format!("error status code {}", e),
-            RpcError::Generic => "unknown error".into(),
+            RpcError::Message(e) => write!(f, "{}", e),
+            RpcError::StatusCode(e) => write!(f, "error status code {}", e),
+            RpcError::Generic => write!(f, "unknown error"),
         }
     }
 }
@@ -161,7 +161,7 @@ impl StacksRpc {
         let path = format!("{}/v2/fees/transaction", self.url);
         let res: FeeEstimationReport = self
             .client
-            .post(&path)
+            .post(path)
             .json(&payload)
             .send()
             .map_err(|e| RpcError::Message(e.to_string()))?
@@ -179,7 +179,7 @@ impl StacksRpc {
         let path = format!("{}/v2/transactions", self.url);
         let res = self
             .client
-            .post(&path)
+            .post(path)
             .header("Content-Type", "application/octet-stream")
             .body(tx)
             .send()
@@ -203,7 +203,7 @@ impl StacksRpc {
 
         let res: Balance = self
             .client
-            .get(&request_url)
+            .get(request_url)
             .send()
             .map_err(|e| RpcError::Message(e.to_string()))?
             .json()
@@ -217,7 +217,7 @@ impl StacksRpc {
 
         let res: PoxInfo = self
             .client
-            .get(&request_url)
+            .get(request_url)
             .send()
             .map_err(|e| RpcError::Message(e.to_string()))?
             .json()
@@ -230,7 +230,7 @@ impl StacksRpc {
 
         let res: NodeInfo = self
             .client
-            .get(&request_url)
+            .get(request_url)
             .send()
             .map_err(|e| RpcError::Message(e.to_string()))?
             .json()
@@ -248,14 +248,14 @@ impl StacksRpc {
             self.url, principal, contract_name
         );
 
-        let res = self.client.get(&request_url).send();
+        let res = self.client.get(request_url).send();
 
         match res {
             Ok(response) => match response.json() {
                 Ok(value) => Ok(value),
-                Err(e) => Err(RpcError::Message(format!("{}", e.to_string()))),
+                Err(e) => Err(RpcError::Message(e.to_string())),
             },
-            Err(e) => Err(RpcError::Message(format!("{}", e.to_string()))),
+            Err(e) => Err(RpcError::Message(e.to_string())),
         }
     }
 
@@ -278,7 +278,7 @@ impl StacksRpc {
             .collect::<Vec<_>>();
         let res = self
             .client
-            .post(&path)
+            .post(path)
             .json(&json!({
                 "sender": sender,
                 "arguments": arguments,
@@ -307,7 +307,7 @@ impl StacksRpc {
                 Some(raw_value) => raw_value,
                 _ => panic!(),
             };
-            let bytes = hex_bytes(&raw_value).unwrap();
+            let bytes = hex_bytes(raw_value).unwrap();
             let mut cursor = Cursor::new(&bytes);
             let value = Value::consensus_deserialize(&mut cursor).unwrap();
             Ok(value)

@@ -35,7 +35,7 @@ impl std::str::FromStr for AnnotationKind {
                             .filter(|s| !s.is_empty())
                             .map(|s| ClarityName::try_from(s.trim()).unwrap())
                             .collect();
-                        if params.len() == 0 {
+                        if params.is_empty() {
                             Err("missing value for 'filter' annotation".to_string())
                         } else {
                             Ok(AnnotationKind::Filter(params))

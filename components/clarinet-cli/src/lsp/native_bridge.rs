@@ -106,7 +106,7 @@ impl LanguageServer for LspNativeBridge {
         };
 
         let response_rx = self.response_rx.lock().expect("failed to lock response_rx");
-        let ref response = response_rx.recv().expect("failed to get value from recv");
+        let response = &response_rx.recv().expect("failed to get value from recv");
         if let LspResponse::Request(LspRequestResponse::Initialize(initialize)) = response {
             return Ok(initialize.to_owned());
         }
@@ -130,7 +130,7 @@ impl LanguageServer for LspNativeBridge {
         };
 
         let response_rx = self.response_rx.lock().expect("failed to lock response_rx");
-        let ref response = response_rx.recv().expect("failed to get value from recv");
+        let response = &response_rx.recv().expect("failed to get value from recv");
         if let LspResponse::Request(LspRequestResponse::CompletionItems(items)) = response {
             return Ok(Some(CompletionResponse::from(items.to_vec())));
         }
@@ -148,7 +148,7 @@ impl LanguageServer for LspNativeBridge {
         };
 
         let response_rx = self.response_rx.lock().expect("failed to lock response_rx");
-        let ref response = response_rx.recv().expect("failed to get value from recv");
+        let response = &response_rx.recv().expect("failed to get value from recv");
         if let LspResponse::Request(LspRequestResponse::Definition(Some(data))) = response {
             return Ok(Some(GotoDefinitionResponse::Scalar(data.to_owned())));
         }
@@ -166,7 +166,7 @@ impl LanguageServer for LspNativeBridge {
         };
 
         let response_rx = self.response_rx.lock().expect("failed to lock response_rx");
-        let ref response = response_rx.recv().expect("failed to get value from recv");
+        let response = &response_rx.recv().expect("failed to get value from recv");
         if let LspResponse::Request(LspRequestResponse::DocumentSymbol(symbols)) = response {
             return Ok(Some(DocumentSymbolResponse::Nested(symbols.to_vec())));
         }
@@ -181,7 +181,7 @@ impl LanguageServer for LspNativeBridge {
         };
 
         let response_rx = self.response_rx.lock().expect("failed to lock response_rx");
-        let ref response = response_rx.recv().expect("failed to get value from recv");
+        let response = &response_rx.recv().expect("failed to get value from recv");
         if let LspResponse::Request(LspRequestResponse::Hover(data)) = response {
             return Ok(data.to_owned());
         }
@@ -196,7 +196,7 @@ impl LanguageServer for LspNativeBridge {
         };
 
         let response_rx = self.response_rx.lock().expect("failed to lock response_rx");
-        let ref response = response_rx.recv().expect("failed to get value from recv");
+        let response = &response_rx.recv().expect("failed to get value from recv");
         if let LspResponse::Request(LspRequestResponse::SignatureHelp(data)) = response {
             return Ok(data.to_owned());
         }
@@ -233,12 +233,10 @@ impl LanguageServer for LspNativeBridge {
         let mut aggregated_diagnostics = vec![];
         let mut notification = None;
         if let Ok(response_rx) = self.response_rx.lock() {
-            if let Ok(ref mut response) = response_rx.recv() {
-                if let LspResponse::Notification(notification_response) = response {
-                    aggregated_diagnostics
-                        .append(&mut notification_response.aggregated_diagnostics);
-                    notification = notification_response.notification.take();
-                }
+            if let Ok(LspResponse::Notification(ref mut notification_response)) = response_rx.recv()
+            {
+                aggregated_diagnostics.append(&mut notification_response.aggregated_diagnostics);
+                notification = notification_response.notification.take();
             }
         }
         for (location, mut diags) in aggregated_diagnostics.drain(..) {
@@ -253,9 +251,7 @@ impl LanguageServer for LspNativeBridge {
             }
         }
         if let Some((level, message)) = notification {
-            self.client
-                .show_message(message_level_type_to_tower_lsp_type(&level), message)
-                .await;
+            self.client.show_message(level, message).await;
         }
     }
 
@@ -279,12 +275,10 @@ impl LanguageServer for LspNativeBridge {
         let mut aggregated_diagnostics = vec![];
         let mut notification = None;
         if let Ok(response_rx) = self.response_rx.lock() {
-            if let Ok(ref mut response) = response_rx.recv() {
-                if let LspResponse::Notification(notification_response) = response {
-                    aggregated_diagnostics
-                        .append(&mut notification_response.aggregated_diagnostics);
-                    notification = notification_response.notification.take();
-                }
+            if let Ok(LspResponse::Notification(ref mut notification_response)) = response_rx.recv()
+            {
+                aggregated_diagnostics.append(&mut notification_response.aggregated_diagnostics);
+                notification = notification_response.notification.take();
             }
         }
 
@@ -300,9 +294,7 @@ impl LanguageServer for LspNativeBridge {
             }
         }
         if let Some((level, message)) = notification {
-            self.client
-                .show_message(message_level_type_to_tower_lsp_type(&level), message)
-                .await;
+            self.client.show_message(level, message).await;
         }
     }
 
@@ -323,16 +315,5 @@ impl LanguageServer for LspNativeBridge {
                 let _ = tx.send(LspNotification::ContractClosed(contract_location));
             };
         }
-    }
-}
-
-pub fn message_level_type_to_tower_lsp_type(
-    level: &clarity_lsp::lsp_types::MessageType,
-) -> tower_lsp::lsp_types::MessageType {
-    match level {
-        &clarity_lsp::lsp_types::MessageType::ERROR => tower_lsp::lsp_types::MessageType::ERROR,
-        &clarity_lsp::lsp_types::MessageType::WARNING => tower_lsp::lsp_types::MessageType::WARNING,
-        &clarity_lsp::lsp_types::MessageType::INFO => tower_lsp::lsp_types::MessageType::INFO,
-        _ => tower_lsp::lsp_types::MessageType::LOG,
     }
 }

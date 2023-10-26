@@ -20,13 +20,10 @@ pub struct InitialContract {
 
 impl InitialContract {
     pub fn get_contract_identifier(&self, is_mainnet: bool) -> Option<QualifiedContractIdentifier> {
-        match self.name {
-            Some(ref name) => Some(QualifiedContractIdentifier {
-                issuer: self.get_deployer_principal(is_mainnet).into(),
-                name: name.to_string().try_into().unwrap(),
-            }),
-            _ => None,
-        }
+        self.name.as_ref().map(|name| QualifiedContractIdentifier {
+            issuer: self.get_deployer_principal(is_mainnet),
+            name: name.to_string().try_into().unwrap(),
+        })
     }
 
     pub fn get_deployer_principal(&self, is_mainnet: bool) -> StandardPrincipalData {
@@ -60,17 +57,9 @@ pub struct SessionSettings {
     pub repl_settings: Settings,
 }
 
-#[derive(Debug, Clone, Deserialize, Serialize)]
+#[derive(Debug, Default, Clone, Deserialize, Serialize)]
 pub struct Settings {
     pub analysis: analysis::Settings,
-}
-
-impl Default for Settings {
-    fn default() -> Self {
-        Self {
-            analysis: analysis::Settings::default(),
-        }
-    }
 }
 
 #[derive(Debug, Default, Clone, Deserialize, Serialize)]

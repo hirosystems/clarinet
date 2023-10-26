@@ -33,7 +33,7 @@ pub mod repl;
 pub mod utils;
 
 pub mod clarity {
-    #[allow(ambiguous_glob_reexports)]
+    #![allow(ambiguous_glob_reexports)]
     pub use ::clarity::stacks_common::*;
     pub use ::clarity::vm::*;
     pub use ::clarity::*;
@@ -60,9 +60,14 @@ pub async fn init_session() -> String {
         match WASM_GLOBAL_CONTEXT.session.take() {
             Some(session) => (session, "".to_string()),
             None => {
-                let mut settings = SessionSettings::default();
-                settings.include_boot_contracts =
-                    vec!["costs".into(), "costs-2".into(), "costs-3".into()];
+                let settings = SessionSettings {
+                    include_boot_contracts: vec![
+                        "costs".into(),
+                        "costs-2".into(),
+                        "costs-3".into(),
+                    ],
+                    ..Default::default()
+                };
                 let mut session = Session::new(settings);
                 let output = session.start_wasm().await;
                 (session, output)
