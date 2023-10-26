@@ -999,7 +999,7 @@ events_keys = ["*"]
                 r#"
 # Add stacks-api as an event observer
 [[events_observer]]
-endpoint = stacks-api.{}:{}
+endpoint = "stacks-api.{}:{}"
 retry_count = 255
 include_data_events = false
 events_keys = ["*"]
@@ -1013,7 +1013,7 @@ events_keys = ["*"]
                 r#"
 # Add subnet-node as an event observer
 [[events_observer]]
-endpoint = subnet-node.{}:{}
+endpoint = "subnet-node.{}:{}"
 retry_count = 255
 events_keys = ["*"]
 "#,
@@ -1331,7 +1331,7 @@ events_keys = ["*"]
                 r#"
 # Add subnet-api as an event observer
 [[events_observer]]
-endpoint = subnet-api.{}:{}
+endpoint = "subnet-api.{}:{}"
 retry_count = 255
 include_data_events = false
 events_keys = ["*"]
