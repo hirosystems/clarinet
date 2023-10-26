@@ -660,7 +660,7 @@ pub fn main() {
                 std::process::exit(1);
             }
             if global_settings.enable_hints.unwrap_or(true) {
-                display_post_check_hint();
+                display_contract_new_hint(Some(project_opts.name.as_str()));
             }
             if telemetry_enabled {
                 #[cfg(feature = "telemetry")]
@@ -1096,7 +1096,7 @@ pub fn main() {
             }
 
             if global_settings.enable_hints.unwrap_or(true) {
-                display_post_console_hint();
+                display_contract_new_hint(None);
             }
         }
         Command::Check(cmd) if cmd.file.is_some() => {
@@ -1344,13 +1344,16 @@ pub fn main() {
         },
 
         Command::Test(_) => {
-            println!("{} `clarinet test` has been deprecated. Please check this blog post to see learn more:", yellow!("warning:"));
+            println!("{} `clarinet test` has been deprecated. Please check this blog post to learn more:", yellow!("warning:"));
             println!("https://hiro.so/blog/announcing-the-clarinet-sdk-a-javascript-programming-model-for-easy-smart-contract-testing");
             std::process::exit(1);
         }
 
         Command::Run(_) => {
-            println!("{} `clarinet run` has been deprecated. Please check this blog post to see learn more:", yellow!("warning:"));
+            println!(
+                "{} `clarinet run` has been deprecated. Please check this blog post to learn more:",
+                yellow!("warning:")
+            );
             println!("https://hiro.so/blog/announcing-the-clarinet-sdk-a-javascript-programming-model-for-easy-smart-contract-testing");
             std::process::exit(1);
         }
@@ -1807,9 +1810,16 @@ fn display_post_check_hint() {
     display_hint_footer();
 }
 
-fn display_post_console_hint() {
+fn display_contract_new_hint(project_name: Option<&str>) {
     println!();
     display_hint_header();
+    if let Some(project_name) = project_name {
+        println!(
+            "{}",
+            yellow!("Switch to the newly created directory with:\n")
+        );
+        println!("{}", blue!(format!("  $ cd {}\n", project_name)));
+    }
     println!(
         "{}",
         yellow!("Once your are ready to write your contracts, run the following commands:\n")
