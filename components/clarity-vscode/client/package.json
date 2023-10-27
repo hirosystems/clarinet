@@ -16,7 +16,7 @@
     "@types/vscode": "^1.68.0"
   },
   "dependencies": {
-    "@vscode/test-web": "^0.0.44",
-    "vscode-languageclient": "^8.0.1"
+    "@vscode/test-web": "^0.0.47",
+    "vscode-languageclient": "^9.0.1"
   }
 }
