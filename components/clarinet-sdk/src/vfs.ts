@@ -1,4 +1,5 @@
 import * as fs from "node:fs/promises";
+import path from "node:path";
 
 function fileArrayToString(bufferArray: Uint8Array) {
   return Array.from(bufferArray)
@@ -58,6 +59,8 @@ async function readFiles(event: any) {
 
 async function writeFile(event: unknown) {
   if (!isValidWriteEvent(event)) throw new Error("invalid write event");
+  const dir = path.dirname(event.path);
+  if (dir !== ".") await fs.mkdir(dir, { recursive: true });
   return fs.writeFile(event.path, Uint8Array.from(event.content));
 }
 
