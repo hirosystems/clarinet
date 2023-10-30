@@ -11,7 +11,7 @@ use clarity::vm::representations::{SymbolicExpression, TraitDefinition};
 use clarity::vm::types::signatures::CallableSubtype;
 use clarity::vm::types::{
     FixedFunction, FunctionSignature, FunctionType, PrincipalData, QualifiedContractIdentifier,
-    TraitIdentifier, TypeSignature, Value,
+    SequenceSubtype, TraitIdentifier, TypeSignature, Value,
 };
 use clarity::vm::{ClarityName, ClarityVersion, SymbolicExpressionType};
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
@@ -86,6 +86,58 @@ impl PartialOrd for Dependency {
 impl Ord for Dependency {
     fn cmp(&self, other: &Self) -> std::cmp::Ordering {
         self.contract_id.cmp(&other.contract_id)
+    }
+}
+
+fn deep_check_callee_type(
+    arg_type: &TypeSignature,
+    expr: &SymbolicExpression,
+    dependencies: &mut BTreeSet<QualifiedContractIdentifier>,
+) {
+    match arg_type {
+        TypeSignature::CallableType(CallableSubtype::Trait(_))
+        | TypeSignature::TraitReferenceType(_) => {
+            if let Some(Value::Principal(PrincipalData::Contract(contract))) =
+                expr.match_literal_value()
+            {
+                dependencies.insert(contract.clone());
+            }
+        }
+        TypeSignature::OptionalType(inner_type) => {
+            if let Some(expr) = expr.match_list().and_then(|l| l.get(1)) {
+                deep_check_callee_type(inner_type, expr, dependencies);
+            }
+        }
+        TypeSignature::ResponseType(inner_type) => {
+            if let Some(expr) = expr.match_list().and_then(|l| l.get(1)) {
+                deep_check_callee_type(&inner_type.0, expr, dependencies);
+            }
+            if let Some(expr) = expr.match_list().and_then(|l| l.get(2)) {
+                deep_check_callee_type(&inner_type.1, expr, dependencies);
+            }
+        }
+        TypeSignature::TupleType(inner_type) => {
+            let type_map = inner_type.get_type_map();
+            if let Some(tuple) = expr.match_list() {
+                for (i, key_value) in tuple.iter().skip(1).enumerate() {
+                    if let Some((arg_type, expr)) = key_value
+                        .match_list()
+                        .and_then(|kv| Some((type_map.get(kv.get(0)?.match_atom()?)?, kv.get(1)?)))
+                    {
+                        deep_check_callee_type(arg_type, expr, dependencies);
+                    }
+                }
+            }
+        }
+        TypeSignature::SequenceType(SequenceSubtype::ListType(inner_type)) => {
+            let item_type = inner_type.get_list_item_type();
+            if let Some(list) = expr.match_list() {
+                for item in list.iter().skip(1) {
+                    deep_check_callee_type(item_type, item, dependencies);
+                }
+            }
+        }
+        _ => (),
     }
 }
 
@@ -381,18 +433,11 @@ impl<'a> ASTDependencyDetector<'a> {
         &self,
         arg_types: &[TypeSignature],
         args: &'a [SymbolicExpression],
-    ) -> Vec<QualifiedContractIdentifier> {
-        let mut dependencies = Vec::new();
-        for (i, arg) in arg_types.iter().enumerate() {
-            if matches!(arg, TypeSignature::CallableType(CallableSubtype::Trait(_)))
-                | matches!(arg, TypeSignature::TraitReferenceType(_))
-                && args.len() > i
-            {
-                if let Some(Value::Principal(PrincipalData::Contract(contract))) =
-                    args[i].match_literal_value()
-                {
-                    dependencies.push(contract.clone());
-                }
+    ) -> BTreeSet<QualifiedContractIdentifier> {
+        let mut dependencies = BTreeSet::new();
+        for (i, arg_type) in arg_types.iter().enumerate() {
+            if let Some(expr) = args.get(i) {
+                deep_check_callee_type(arg_type, expr, &mut dependencies);
             }
         }
         dependencies
@@ -403,13 +448,13 @@ impl<'a> ASTDependencyDetector<'a> {
         trait_definition: &BTreeMap<ClarityName, FunctionSignature>,
         function_name: &ClarityName,
         args: &'a [SymbolicExpression],
-    ) -> Vec<QualifiedContractIdentifier> {
+    ) -> BTreeSet<QualifiedContractIdentifier> {
         // Since this may run before checkers, the function may not be valid.
         // If the key does not exist, just return an empty set and the error
         // will be reported elsewhere.
         let function_signature = match trait_definition.get(function_name) {
             Some(signature) => signature,
-            None => return Vec::new(),
+            None => return BTreeSet::new(),
         };
         self.check_callee_type(&function_signature.args, args)
     }
@@ -913,6 +958,21 @@ mod tests {
         ))
     }
 
+    fn deploy_snippet(
+        session: &Session,
+        snippet: &str,
+        name: Option<&str>,
+        contracts: &mut BTreeMap<QualifiedContractIdentifier, (ClarityVersion, ContractAST)>,
+    ) -> QualifiedContractIdentifier {
+        match build_ast(&session, &snippet, name) {
+            Ok((contract_identifier, ast, _)) => {
+                contracts.insert(contract_identifier.clone(), (DEFAULT_CLARITY_VERSION, ast));
+                contract_identifier
+            }
+            Err(_) => panic!("expected success"),
+        }
+    }
+
     #[test]
     fn no_deps() {
         let session = Session::new(SessionSettings::default());
@@ -1059,7 +1119,6 @@ mod tests {
         let dependencies =
             ASTDependencyDetector::detect_dependencies(&contracts, &BTreeMap::new()).unwrap();
         assert_eq!(dependencies[&test_identifier].len(), 1);
-        println!("{:?}", dependencies[&test_identifier]);
         assert!(dependencies[&test_identifier].has_dependency(&bar).unwrap());
     }
 
@@ -1126,6 +1185,138 @@ mod tests {
     }
 
     #[test]
+    fn nested_trait_in_optional_type() {
+        let session = Session::new(SessionSettings::default());
+        let mut contracts = BTreeMap::new();
+        let trait_snippet = "(define-trait my-trait ((hello () (response bool uint))))
+(define-public (hello) (ok true))"
+            .to_string();
+        let my_trait = deploy_snippet(&session, &trait_snippet, Some("my_trait"), &mut contracts);
+
+        let callee_snippet = "
+(use-trait my-trait .my_trait.my-trait)
+(define-public (call-mt (mt (optional <my-trait>))) (ok true))"
+            .to_string();
+        let callee = deploy_snippet(&session, &callee_snippet, Some("callee"), &mut contracts);
+
+        let caller_snippet =
+            "(define-public (call) (contract-call? .callee call-mt (some .my_trait)))".to_string();
+        let caller = deploy_snippet(&session, &caller_snippet, Some("caller"), &mut contracts);
+
+        let dependencies =
+            ASTDependencyDetector::detect_dependencies(&contracts, &BTreeMap::new()).unwrap();
+
+        assert_eq!(dependencies[&caller].len(), 2);
+        assert_eq!(dependencies[&caller].has_dependency(&my_trait), Some(false));
+    }
+
+    #[test]
+    fn nested_trait_in_response_type() {
+        let session = Session::new(SessionSettings::default());
+        let mut contracts = BTreeMap::new();
+        let trait_snippet = "(define-trait my-trait ((hello () (response bool uint))))
+(define-public (hello) (ok true))"
+            .to_string();
+        let my_trait = deploy_snippet(&session, &trait_snippet, Some("my_trait"), &mut contracts);
+
+        let callee_snippet = "
+(use-trait my-trait .my_trait.my-trait)
+(define-public (call-mt (mt (response <my-trait> uint))) (ok true))"
+            .to_string();
+        let callee = deploy_snippet(&session, &callee_snippet, Some("callee"), &mut contracts);
+
+        let caller_snippet =
+            "(define-public (call) (contract-call? .callee call-mt (ok .my_trait)))".to_string();
+        let caller = deploy_snippet(&session, &caller_snippet, Some("caller"), &mut contracts);
+
+        let dependencies =
+            ASTDependencyDetector::detect_dependencies(&contracts, &BTreeMap::new()).unwrap();
+
+        assert_eq!(dependencies[&caller].len(), 2);
+        assert_eq!(dependencies[&caller].has_dependency(&my_trait), Some(false));
+    }
+
+    #[test]
+    fn nested_trait_in_tuple_type() {
+        let session = Session::new(SessionSettings::default());
+        let mut contracts = BTreeMap::new();
+        let trait_snippet = "(define-trait my-trait ((hello () (response bool uint))))
+(define-public (hello) (ok true))"
+            .to_string();
+        let my_trait = deploy_snippet(&session, &trait_snippet, Some("my_trait"), &mut contracts);
+
+        let callee_snippet = "
+(use-trait my-trait .my_trait.my-trait)
+(define-public (call-mt (mt { t: <my-trait> })) (ok true))"
+            .to_string();
+        let callee = deploy_snippet(&session, &callee_snippet, Some("callee"), &mut contracts);
+
+        let caller_snippet =
+            "(define-public (call) (contract-call? .callee call-mt { t: .my_trait }))".to_string();
+        let caller = deploy_snippet(&session, &caller_snippet, Some("caller"), &mut contracts);
+
+        let dependencies =
+            ASTDependencyDetector::detect_dependencies(&contracts, &BTreeMap::new()).unwrap();
+
+        assert_eq!(dependencies[&caller].len(), 2);
+        assert_eq!(dependencies[&caller].has_dependency(&my_trait), Some(false));
+    }
+
+    #[test]
+    fn nested_trait_in_list_type() {
+        let session = Session::new(SessionSettings::default());
+        let mut contracts = BTreeMap::new();
+        let trait_snippet = "(define-trait my-trait ((hello () (response bool uint))))
+(define-public (hello) (ok true))"
+            .to_string();
+        let my_trait = deploy_snippet(&session, &trait_snippet, Some("my_trait"), &mut contracts);
+
+        let callee_snippet = "
+(use-trait my-trait .my_trait.my-trait)
+(define-public (call-mt (mt (list 4 <my-trait>))) (ok true))"
+            .to_string();
+        let callee = deploy_snippet(&session, &callee_snippet, Some("callee"), &mut contracts);
+
+        let caller_snippet =
+            "(define-public (call) (contract-call? .callee call-mt (list .my_trait .my_trait)))"
+                .to_string();
+        let caller = deploy_snippet(&session, &caller_snippet, Some("caller"), &mut contracts);
+
+        let dependencies =
+            ASTDependencyDetector::detect_dependencies(&contracts, &BTreeMap::new()).unwrap();
+
+        assert_eq!(dependencies[&caller].len(), 2);
+        assert_eq!(dependencies[&caller].has_dependency(&my_trait), Some(false));
+    }
+
+    #[test]
+    fn nested_trait_in_composite_type() {
+        let session = Session::new(SessionSettings::default());
+        let mut contracts = BTreeMap::new();
+        let trait_snippet = "(define-trait my-trait ((hello () (response bool uint))))
+(define-public (hello) (ok true))"
+            .to_string();
+        let my_trait = deploy_snippet(&session, &trait_snippet, Some("my_trait"), &mut contracts);
+
+        let callee_snippet = "
+(use-trait my-trait .my_trait.my-trait)
+(define-public (call-mt (mt (response { t: (optional <my-trait>) } uint))) (ok true))"
+            .to_string();
+        let callee = deploy_snippet(&session, &callee_snippet, Some("callee"), &mut contracts);
+
+        let caller_snippet =
+            "(define-public (call) (contract-call? .callee call-mt (ok { t: (some .my_trait) })))"
+                .to_string();
+        let caller = deploy_snippet(&session, &caller_snippet, Some("caller"), &mut contracts);
+
+        let dependencies =
+            ASTDependencyDetector::detect_dependencies(&contracts, &BTreeMap::new()).unwrap();
+
+        assert_eq!(dependencies[&caller].len(), 2);
+        assert_eq!(dependencies[&caller].has_dependency(&my_trait), Some(false));
+    }
+
+    #[test]
     fn impl_trait() {
         let session = Session::new(SessionSettings::default());
         let mut contracts = BTreeMap::new();
@@ -1184,9 +1375,6 @@ mod tests {
 
         let snippet = "
 (use-trait my-trait .other.something)
-;; FIXME: If there is not a second line here, the interpreter will fail.
-;; See https://github.com/hirosystems/clarity-repl/issues/109.
-(define-public (foo) (ok true))
 "
         .to_string();
         let test_identifier = match build_ast(&session, &snippet, Some("test")) {
