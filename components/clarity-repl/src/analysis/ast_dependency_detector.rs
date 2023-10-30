@@ -11,7 +11,7 @@ use clarity::vm::representations::{SymbolicExpression, TraitDefinition};
 use clarity::vm::types::signatures::CallableSubtype;
 use clarity::vm::types::{
     FixedFunction, FunctionSignature, FunctionType, PrincipalData, QualifiedContractIdentifier,
-    TraitIdentifier, TypeSignature, Value,
+    SequenceSubtype, TraitIdentifier, TypeSignature, Value,
 };
 use clarity::vm::{ClarityName, ClarityVersion, SymbolicExpressionType};
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
@@ -86,6 +86,62 @@ impl PartialOrd for Dependency {
 impl Ord for Dependency {
     fn cmp(&self, other: &Self) -> std::cmp::Ordering {
         self.contract_id.cmp(&other.contract_id)
+    }
+}
+
+fn deep_check_callee_type(
+    arg_type: &TypeSignature,
+    expr: &SymbolicExpression,
+    dependencies: &mut Vec<QualifiedContractIdentifier>,
+) {
+    if matches!(
+        arg_type,
+        TypeSignature::CallableType(CallableSubtype::Trait(_))
+            | TypeSignature::TraitReferenceType(_)
+    ) {
+        if let Some(Value::Principal(PrincipalData::Contract(contract))) =
+            expr.match_literal_value()
+        {
+            dependencies.push(contract.clone());
+        }
+    }
+
+    match arg_type {
+        TypeSignature::OptionalType(inner_type) => {
+            if let Some(expr) = expr.match_list().and_then(|l| l.get(1)) {
+                deep_check_callee_type(inner_type, expr, dependencies);
+            }
+        }
+        TypeSignature::ResponseType(inner_type) => {
+            if let Some(expr) = expr.match_list().and_then(|l| l.get(1)) {
+                deep_check_callee_type(&inner_type.0, expr, dependencies);
+            }
+            if let Some(expr) = expr.match_list().and_then(|l| l.get(2)) {
+                deep_check_callee_type(&inner_type.1, expr, dependencies);
+            }
+        }
+        TypeSignature::TupleType(inner_type) => {
+            let type_map = inner_type.get_type_map();
+            if let Some(tuple) = expr.match_list() {
+                for (i, key_value) in tuple.iter().skip(1).enumerate() {
+                    if let Some((arg_type, expr)) = key_value
+                        .match_list()
+                        .and_then(|kv| Some((type_map.get(kv.get(0)?.match_atom()?)?, kv.get(1)?)))
+                    {
+                        deep_check_callee_type(arg_type, expr, dependencies);
+                    }
+                }
+            }
+        }
+        TypeSignature::SequenceType(SequenceSubtype::ListType(inner_type)) => {
+            let item_type = inner_type.get_list_item_type();
+            if let Some(list) = expr.match_list() {
+                for item in list.iter().skip(1) {
+                    deep_check_callee_type(item_type, item, dependencies);
+                }
+            }
+        }
+        _ => (),
     }
 }
 
@@ -383,16 +439,9 @@ impl<'a> ASTDependencyDetector<'a> {
         args: &'a [SymbolicExpression],
     ) -> Vec<QualifiedContractIdentifier> {
         let mut dependencies = Vec::new();
-        for (i, arg) in arg_types.iter().enumerate() {
-            if matches!(arg, TypeSignature::CallableType(CallableSubtype::Trait(_)))
-                | matches!(arg, TypeSignature::TraitReferenceType(_))
-                && args.len() > i
-            {
-                if let Some(Value::Principal(PrincipalData::Contract(contract))) =
-                    args[i].match_literal_value()
-                {
-                    dependencies.push(contract.clone());
-                }
+        for (i, arg_type) in arg_types.iter().enumerate() {
+            if let Some(expr) = args.get(i) {
+                deep_check_callee_type(arg_type, expr, &mut dependencies);
             }
         }
         dependencies
@@ -1059,7 +1108,6 @@ mod tests {
         let dependencies =
             ASTDependencyDetector::detect_dependencies(&contracts, &BTreeMap::new()).unwrap();
         assert_eq!(dependencies[&test_identifier].len(), 1);
-        println!("{:?}", dependencies[&test_identifier]);
         assert!(dependencies[&test_identifier].has_dependency(&bar).unwrap());
     }
 
@@ -1126,6 +1174,55 @@ mod tests {
     }
 
     #[test]
+    fn trait_in_composite_type() {
+        let session = Session::new(SessionSettings::default());
+        let mut contracts = BTreeMap::new();
+        let trait_snippet = "
+(define-trait my-trait ((hello () (response bool uint))))
+(define-public (hello) (ok true))"
+            .to_string();
+
+        let my_trait = match build_ast(&session, &trait_snippet, Some("my_trait")) {
+            Ok((contract_identifier, ast, _)) => {
+                contracts.insert(contract_identifier.clone(), (DEFAULT_CLARITY_VERSION, ast));
+                contract_identifier
+            }
+            Err(_) => panic!("expected success"),
+        };
+
+        let callee_snippet = "
+(use-trait my-trait .my_trait.my-trait)
+(define-public (call-mt (mt (response { t: (optional <my-trait>) } uint))) (ok true))"
+            .to_string();
+
+        let callee = match build_ast(&session, &callee_snippet, Some("callee")) {
+            Ok((contract_identifier, ast, _)) => {
+                contracts.insert(contract_identifier.clone(), (DEFAULT_CLARITY_VERSION, ast));
+                contract_identifier
+            }
+            Err(_) => panic!("expected success"),
+        };
+
+        let caller_snippet =
+            "(define-public (call) (contract-call? .callee call-mt (ok { t: (some .my_trait) })))"
+                .to_string();
+
+        let caller = match build_ast(&session, &caller_snippet, Some("caller")) {
+            Ok((contract_identifier, ast, _)) => {
+                contracts.insert(contract_identifier.clone(), (DEFAULT_CLARITY_VERSION, ast));
+                contract_identifier
+            }
+            Err(_) => panic!("expected success"),
+        };
+
+        let dependencies =
+            ASTDependencyDetector::detect_dependencies(&contracts, &BTreeMap::new()).unwrap();
+
+        assert_eq!(dependencies[&caller].len(), 2);
+        assert_eq!(dependencies[&caller].has_dependency(&my_trait), Some(false));
+    }
+
+    #[test]
     fn impl_trait() {
         let session = Session::new(SessionSettings::default());
         let mut contracts = BTreeMap::new();
@@ -1184,9 +1281,6 @@ mod tests {
 
         let snippet = "
 (use-trait my-trait .other.something)
-;; FIXME: If there is not a second line here, the interpreter will fail.
-;; See https://github.com/hirosystems/clarity-repl/issues/109.
-(define-public (foo) (ok true))
 "
         .to_string();
         let test_identifier = match build_ast(&session, &snippet, Some("test")) {
