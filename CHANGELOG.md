@@ -10,6 +10,7 @@
 
 ##### Bug Fixes
 
+*  Detect trait dependencies in composite types (#1236) (2b385454)
 *  Detect dependencies defined in const (#1205) (6e8b69ab)
 *  Replace . with _ for contract names (#1202) (165bfb93)
 *  Avoid pulling undesired dependencies in stacks-rpc crate (#1115) (17d20584)
