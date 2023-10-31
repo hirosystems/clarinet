@@ -1,3 +1,38 @@
+#### [2.0.0](https://github.com/hirosystems/clarinet/compare/v1.8.0...v2.0.0) (2023-10-26)
+
+##### New Features
+
+*  Introduce global ~/.clarinet/clarinetrc.toml (#1208) (bbe26ccf)
+*  Update clarinet generated template to use the sdk (#1209) (27f9bce0)
+*  Create clarinet-sdk testing boilerplate (#1158) (6f2e990d)
+*  Deployment apply -use-on-disk-deployment-plan (2cba2335)
+*  Allow stacks-network to be run as standalone chain coordinator (#1064) (55b03bbb)
+
+##### Bug Fixes
+
+*  Detect trait dependencies in composite types (#1236) (2b385454)
+*  Detect dependencies defined in const (#1205) (6e8b69ab)
+*  Replace . with _ for contract names (#1202) (165bfb93)
+*  Avoid pulling undesired dependencies in stacks-rpc crate (#1115) (17d20584)
+*  Project manifest (de)serialization tag (#1150) (ce0881c9)
+*  Clarinet-deployments wasm build (#1144) (1ab57028)
+*  Command splits once and picks everything after as the expression to get costs from (#1112) (6b35ed75)
+
+##### Refactors
+
+*  Clippy (#1223) (faa5a3eb)
+
+##### Chores
+
+*  Use clarinet sdk in examples (#1204) (f88be03c)
+*  Remove deno (#1186) (dd905708)
+*  Update service names for k8s devnet assets (#1161) (e03b9416)
+
+##### Documentation Changes
+
+*  Udpate hints (#1227) (763b4b64)
+*  Deprecation warnings for clarinet test and clarinet run (#1157) (edf98aa3)
+
 #### [1.8.0](https://github.com/hirosystems/clarinet/compare/v1.7.1...v1.8.0) (2023-09-12)
 
 ##### Continuous Integration
