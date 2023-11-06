@@ -7,7 +7,6 @@ on:
       - rc/next
     paths-ignore:
       - "**/CHANGELOG.md"
-      - "docs/**"
   push:
     branches:
       - main
@@ -15,7 +14,6 @@ on:
       - rc/next
     paths-ignore:
       - "**/CHANGELOG.md"
-      - "docs/**"
 
   workflow_dispatch:
 
@@ -274,10 +272,10 @@ jobs:
       - name: Windows - Setup Certificate
         if: startsWith(github.ref, 'refs/heads/main') && matrix.os == 'windows-latest'
         run: |
-           echo "${{ secrets.SM_CLIENT_CERT_FILE_B64 }}" | base64 --decode > /d/Certificate_pkcs12.p12
-           cat  /d/Certificate_pkcs12.p12
-        shell: bash  
-        
+          echo "${{ secrets.SM_CLIENT_CERT_FILE_B64 }}" | base64 --decode > /d/Certificate_pkcs12.p12
+          cat  /d/Certificate_pkcs12.p12
+        shell: bash
+
       - name: Windows - Set variables
         if: startsWith(github.ref, 'refs/heads/main') && matrix.os == 'windows-latest'
         id: variables
@@ -297,20 +295,20 @@ jobs:
 
       - name: Windows - Setup Keylocker KSP
         if: startsWith(github.ref, 'refs/heads/main') && matrix.os == 'windows-latest'
-        run: | 
-          curl -X GET  https://one.digicert.com/signingmanager/api-ui/v1/releases/Keylockertools-windows-x64.msi/download -H "x-api-key:%SM_API_KEY%" -o Keylockertools-windows-x64.msi 
-          msiexec /i Keylockertools-windows-x64.msi /quiet /qn
-          smksp_registrar.exe list 
-          smctl.exe keypair ls 
-          C:\Windows\System32\certutil.exe -csp "DigiCert Signing Manager KSP" -key -user
-        shell: cmd 
-              
-      - name: Windows - Certificates Sync    
-        if: startsWith(github.ref, 'refs/heads/main') && matrix.os == 'windows-latest'   
         run: |
-           smctl windows certsync
+          curl -X GET  https://one.digicert.com/signingmanager/api-ui/v1/releases/Keylockertools-windows-x64.msi/download -H "x-api-key:%SM_API_KEY%" -o Keylockertools-windows-x64.msi
+          msiexec /i Keylockertools-windows-x64.msi /quiet /qn
+          smksp_registrar.exe list
+          smctl.exe keypair ls
+          C:\Windows\System32\certutil.exe -csp "DigiCert Signing Manager KSP" -key -user
         shell: cmd
- 
+
+      - name: Windows - Certificates Sync
+        if: startsWith(github.ref, 'refs/heads/main') && matrix.os == 'windows-latest'
+        run: |
+          smctl windows certsync
+        shell: cmd
+
       - name: Code sign bin (Windows)
         if: startsWith(github.ref, 'refs/heads/main') && matrix.os == 'windows-latest'
         run: |
@@ -331,7 +329,6 @@ jobs:
       - name: Build Installer (Windows)
         if: matrix.os == 'windows-latest'
         run: cargo wix -v --no-build --nocapture -p clarinet-cli
-
 
       - name: Code sign installed (Windows)
         if: startsWith(github.ref, 'refs/heads/main') && matrix.os == 'windows-latest'
