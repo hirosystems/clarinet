@@ -102,7 +102,7 @@ impl Display for ClarityContract {
 impl ClarityContract {
     pub fn expect_in_memory_code_source(&self) -> &str {
         match self.code_source {
-            ClarityCodeSource::ContractInMemory(ref code_source) => code_source.as_str(),
+            ClarityCodeSource::ContractInMemory(ref code_source) => code_source,
             _ => panic!("source code expected to be in memory"),
         }
     }

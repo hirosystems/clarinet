@@ -1,5 +1,6 @@
 use super::boot::{STACKS_BOOT_CODE_MAINNET, STACKS_BOOT_CODE_TESTNET};
 use super::diagnostic::output_diagnostic;
+use super::interpreter::BLOCK_LIMIT_MAINNET;
 use super::{
     ClarityCodeSource, ClarityContract, ClarityInterpreter, ContractDeployer, DEFAULT_EPOCH,
 };
@@ -10,10 +11,12 @@ use crate::repl::Settings;
 use crate::utils;
 use ansi_term::{Colour, Style};
 use clarity::codec::StacksMessageCodec;
+use clarity::consts::CHAIN_ID_TESTNET;
 use clarity::types::chainstate::StacksAddress;
 use clarity::types::StacksEpochId;
 use clarity::vm::analysis::ContractAnalysis;
 use clarity::vm::ast::ContractAST;
+use clarity::vm::costs::LimitedCostTracker;
 use clarity::vm::diagnostic::{Diagnostic, Level};
 use clarity::vm::docs::{make_api_reference, make_define_reference, make_keyword_reference};
 use clarity::vm::errors::Error;
@@ -24,8 +27,8 @@ use clarity::vm::types::{
 };
 use clarity::vm::variables::NativeVariables;
 use clarity::vm::{
-    ClarityVersion, ContractName, CostSynthesis, EvalHook, EvaluationResult, ExecutionResult,
-    StacksEpoch,
+    clarity_wasm, ClarityVersion, ContractName, CostSynthesis, EvalHook, EvaluationResult,
+    ExecutionResult, StacksEpoch,
 };
 use reqwest;
 use serde::Serialize;
@@ -568,11 +571,12 @@ impl Session {
                 hooks.push(hook);
             }
         }
-
         let contract_id =
             contract.expect_resolved_contract_identifier(Some(&self.interpreter.get_tx_sender()));
 
-        let result = if let Some(mut ast) = ast.take() {
+        let result = if contract.epoch >= StacksEpochId::Epoch24 {
+            self.interpreter.run_wasm(contract, cost_track, None)
+        } else if let Some(mut ast) = ast.take() {
             self.interpreter
                 .run_ast(contract, &mut ast, cost_track, Some(hooks))
         } else {
@@ -663,17 +667,22 @@ impl Session {
         eval_hooks: Option<Vec<&mut dyn EvalHook>>,
         cost_track: bool,
     ) -> Result<ExecutionResult, Vec<Diagnostic>> {
+        let epoch = self.current_epoch;
         let contract = ClarityContract {
             code_source: ClarityCodeSource::ContractInMemory(snippet),
             name: format!("contract-{}", self.contracts.len()),
             deployer: ContractDeployer::DefaultDeployer,
-            clarity_version: ClarityVersion::default_for_epoch(self.current_epoch),
-            epoch: self.current_epoch,
+            clarity_version: ClarityVersion::default_for_epoch(epoch),
+            epoch,
         };
         let contract_identifier =
             contract.expect_resolved_contract_identifier(Some(&self.interpreter.get_tx_sender()));
 
-        let result = self.interpreter.run(&contract, cost_track, eval_hooks);
+        let result = if epoch >= StacksEpochId::Epoch24 {
+            self.interpreter.run_wasm(&contract, cost_track, eval_hooks)
+        } else {
+            self.interpreter.run(&contract, cost_track, eval_hooks)
+        };
 
         match result {
             Ok(result) => {
@@ -1472,6 +1481,91 @@ mod tests {
             green!("u2")
         );
         assert_eq!(session.handle_command("(at-block (unwrap-panic (get-block-info? id-header-hash u10000)) (contract-call? .contract get-x))").1[0], green!("u1"));
+    }
+}
+
+#[cfg(test)]
+mod tests_wasm {
+    use clarity::vm::SnippetEvaluationResult;
+
+    use super::*;
+
+    #[test]
+    fn deploy_wasm_contract() {
+        let settings = SessionSettings::default();
+        let mut session = Session::new(settings);
+        session.start().expect("session could not start");
+
+        let snippet = "
+            (define-data-var x uint u0)
+            (define-read-only (get-x) (var-get x))
+            (define-public (incr) (begin (var-set x (+ (var-get x) u1)) (ok (var-get x))))";
+
+        let contract = ClarityContract {
+            code_source: ClarityCodeSource::ContractInMemory(snippet.to_string()),
+            name: "contract".to_string(),
+            deployer: ContractDeployer::Address("ST000000000000000000002AMW42H".into()),
+            clarity_version: ClarityVersion::Clarity2,
+            epoch: StacksEpochId::Epoch24,
+        };
+
+        let deploy = session.deploy_contract(&contract, None, false, None, &mut None);
+        assert!(deploy.is_ok());
+    }
+
+    #[test]
+    fn call_wasm_contract() {
+        let settings = SessionSettings::default();
+        let mut session = Session::new(settings);
+        session.start().expect("session could not start");
+        session.update_epoch(StacksEpochId::Epoch24);
+
+        let snippet = "
+            (define-data-var x uint u0)
+            (define-read-only (get-x) (var-get x))
+            (define-public (incr) (begin (var-set x (+ (var-get x) u1)) (ok (var-get x))))";
+
+        let contract1 = ClarityContract {
+            code_source: ClarityCodeSource::ContractInMemory(snippet.to_string()),
+            name: "contract1".to_string(),
+            deployer: ContractDeployer::Address("ST000000000000000000002AMW42H".into()),
+            clarity_version: ClarityVersion::Clarity2,
+            epoch: StacksEpochId::Epoch21, // TODO(hugo): update to 24 once 3 is out
+        };
+
+        let snippet_wasm = "
+            (define-data-var x uint u0)
+            (define-read-only (get-x) (var-get x))
+            (define-public (incr) (begin (var-set x (+ (var-get x) u1)) (ok (var-get x))))";
+
+        let contract2 = ClarityContract {
+            code_source: ClarityCodeSource::ContractInMemory(snippet_wasm.to_string()),
+            name: "contract2".to_string(),
+            deployer: ContractDeployer::Address("ST000000000000000000002AMW42H".into()),
+            clarity_version: ClarityVersion::Clarity2,
+            epoch: StacksEpochId::Epoch24, // TODO(hugo): update to 3 once it's available
+        };
+
+        let deploy1 = session.deploy_contract(&contract1, None, false, None, &mut None);
+        assert!(deploy1.is_ok());
+        let deploy2 = session.deploy_contract(&contract2, None, false, None, &mut None);
+        assert!(deploy2.is_ok());
+
+        let call1 = session.eval("(contract-call? .contract1 get-x)".to_owned(), None, false);
+        // calling a normal contract from a wasm contract doesn't work
+        // assert!(call1.is_ok());
+
+        let call2 = session.eval("(contract-call? .contract2 get-x)".to_owned(), None, false);
+        assert!(call2.is_ok());
+        let ExecutionResult { result, .. } = call2.unwrap();
+        match result {
+            EvaluationResult::Snippet(SnippetEvaluationResult { result }) => {
+                assert_eq!(result, Value::UInt(0));
+            }
+            _ => {
+                panic!("Unexpected evaluation result");
+            }
+        };
     }
 }
 

@@ -9,6 +9,7 @@ use crate::repl::datastore::BurnDatastore;
 use crate::repl::datastore::Datastore;
 use crate::repl::Settings;
 use crate::utils;
+use clar2wasm::{CompileError, CompileResult, Module};
 use clarity::consts::CHAIN_ID_TESTNET;
 use clarity::types::chainstate::StacksAddress;
 use clarity::types::StacksEpochId;
@@ -19,12 +20,13 @@ use clarity::vm::ast::stack_depth_checker::StackDepthChecker;
 use clarity::vm::ast::sugar_expander::SugarExpander;
 use clarity::vm::ast::traits_resolver::TraitsResolver;
 use clarity::vm::ast::{build_ast_with_diagnostics, ContractAST};
+use clarity::vm::clarity_wasm::{self, initialize_contract};
 use clarity::vm::contexts::{CallStack, ContractContext, Environment, GlobalContext, LocalContext};
 use clarity::vm::contracts::Contract;
 use clarity::vm::costs::cost_functions::ClarityCostFunction;
 use clarity::vm::costs::{runtime_cost, ExecutionCost, LimitedCostTracker};
 use clarity::vm::database::{ClarityDatabase, StoreType};
-use clarity::vm::diagnostic::{Diagnostic, Level};
+use clarity::vm::diagnostic::{self, Diagnostic, Level};
 use clarity::vm::errors::Error;
 use clarity::vm::representations::SymbolicExpressionType::{Atom, List};
 use clarity::vm::representations::{Span, SymbolicExpression};
@@ -155,8 +157,55 @@ impl ClarityInterpreter {
         if !success {
             return Err(diagnostics);
         }
+        let mut result =
+            match self.execute(contract, &mut ast, analysis, None, cost_track, eval_hooks) {
+                Ok(result) => result,
+                Err((_, Some(diagnostic), _)) => {
+                    diagnostics.push(diagnostic);
+                    return Err(diagnostics);
+                }
+                Err((e, _, _)) => {
+                    diagnostics.push(Diagnostic {
+                        level: Level::Error,
+                        message: format!("Runtime Error: {}", e),
+                        spans: vec![],
+                        suggestion: None,
+                    });
+                    return Err(diagnostics);
+                }
+            };
 
-        let mut result = match self.execute(contract, &mut ast, analysis, cost_track, eval_hooks) {
+        result.diagnostics = diagnostics;
+
+        // todo: instead of just returning the value, we should be returning:
+        // - value
+        // - execution cost
+        // - events emitted
+        Ok(result)
+    }
+
+    pub fn run_ast(
+        &mut self,
+        contract: &ClarityContract,
+        ast: &mut ContractAST,
+        cost_track: bool,
+        eval_hooks: Option<Vec<&mut dyn EvalHook>>,
+    ) -> Result<ExecutionResult, Vec<Diagnostic>> {
+        let (annotations, mut diagnostics) =
+            self.collect_annotations(ast, contract.expect_in_memory_code_source());
+
+        let (analysis, mut analysis_diagnostics) =
+            match self.run_analysis(contract, ast, &annotations) {
+                Ok((analysis, diagnostics)) => (analysis, diagnostics),
+                Err((_, Some(diagnostic), _)) => {
+                    diagnostics.push(diagnostic);
+                    return Err(diagnostics);
+                }
+                Err(_) => return Err(diagnostics),
+            };
+        diagnostics.append(&mut analysis_diagnostics);
+
+        let mut result = match self.execute(contract, ast, analysis, None, cost_track, eval_hooks) {
             Ok(result) => result,
             Err((_, Some(diagnostic), _)) => {
                 diagnostics.push(diagnostic);
@@ -182,18 +231,39 @@ impl ClarityInterpreter {
         Ok(result)
     }
 
-    pub fn run_ast(
+    pub fn run_wasm(
         &mut self,
         contract: &ClarityContract,
-        ast: &mut ContractAST,
         cost_track: bool,
         eval_hooks: Option<Vec<&mut dyn EvalHook>>,
     ) -> Result<ExecutionResult, Vec<Diagnostic>> {
-        let code_source = contract.expect_in_memory_code_source();
-        let (annotations, mut diagnostics) = self.collect_annotations(ast, code_source);
+        let contract_id = contract.expect_resolved_contract_identifier(Some(&self.tx_sender));
+        let source = contract.expect_in_memory_code_source();
+        let mut analysis_db = AnalysisDatabase::new(&mut self.datastore);
+
+        let CompileResult {
+            mut diagnostics,
+            mut ast,
+            module,
+            contract_analysis,
+        } = match clar2wasm::compile(
+            source,
+            &contract_id,
+            LimitedCostTracker::new_free(),
+            contract.clarity_version,
+            contract.epoch,
+            &mut analysis_db,
+        ) {
+            Ok(res) => res,
+            Err(CompileError::Generic { diagnostics, .. }) => return Err(diagnostics),
+        };
+
+        let (annotations, mut annotation_diagnostics) =
+            self.collect_annotations(&ast, contract.expect_in_memory_code_source());
+        diagnostics.append(&mut annotation_diagnostics);
 
         let (analysis, mut analysis_diagnostics) =
-            match self.run_analysis(contract, ast, &annotations) {
+            match self.run_analysis(contract, &mut ast, &annotations) {
                 Ok((analysis, diagnostics)) => (analysis, diagnostics),
                 Err((_, Some(diagnostic), _)) => {
                     diagnostics.push(diagnostic);
@@ -203,7 +273,14 @@ impl ClarityInterpreter {
             };
         diagnostics.append(&mut analysis_diagnostics);
 
-        let mut result = match self.execute(contract, ast, analysis, cost_track, eval_hooks) {
+        let mut result = match self.execute(
+            contract,
+            &mut ast,
+            analysis,
+            Some(module),
+            cost_track,
+            eval_hooks,
+        ) {
             Ok(result) => result,
             Err((_, Some(diagnostic), _)) => {
                 diagnostics.push(diagnostic);
@@ -447,19 +524,19 @@ impl ClarityInterpreter {
         contract: &ClarityContract,
         contract_ast: &mut ContractAST,
         contract_analysis: ContractAnalysis,
+        wasm_module: Option<Module>,
         cost_track: bool,
         eval_hooks: Option<Vec<&mut dyn EvalHook>>,
     ) -> Result<ExecutionResult, (String, Option<Diagnostic>, Option<Error>)> {
         let mut cost = None;
-        let contract_identifier =
-            contract.expect_resolved_contract_identifier(Some(&self.tx_sender));
-        let snippet = contract.expect_in_memory_code_source();
+        let contract_id = contract.expect_resolved_contract_identifier(Some(&self.tx_sender));
+        let source = contract.expect_in_memory_code_source();
         let mut contract_saved = false;
         let mut events = vec![];
         let mut accounts_to_debit = vec![];
         let mut accounts_to_credit = vec![];
         let mut contract_context =
-            ContractContext::new(contract_identifier.clone(), contract.clarity_version);
+            ContractContext::new(contract_id.clone(), contract.clarity_version);
 
         let (eval_result, eval_hooks) = {
             let mut conn = ClarityDatabase::new(
@@ -497,7 +574,7 @@ impl ClarityInterpreter {
 
             let result = global_context.execute(|g| {
                 // If we have more than one instruction
-                if contract_ast.expressions.len() == 1 && !snippet.contains("(define-") {
+                if contract_ast.expressions.len() == 1 && !source.contains("(define-") {
                     let context = LocalContext::new();
                     let mut call_stack = CallStack::new();
                     let mut env = Environment::new(
@@ -512,48 +589,81 @@ impl ClarityInterpreter {
                     let result = match contract_ast.expressions[0].expr {
                         List(ref expression) => match expression[0].expr {
                             Atom(ref name) if name.to_string() == "contract-call?" => {
-                                let contract_identifier = match expression[1]
+                                let contract_id = match expression[1]
                                     .match_literal_value()
                                     .unwrap()
                                     .clone()
                                     .expect_principal()
                                 {
-                                    PrincipalData::Contract(contract_identifier) => {
-                                        contract_identifier
-                                    }
+                                    PrincipalData::Contract(contract_id) => contract_id,
                                     _ => unreachable!(),
                                 };
                                 let method = expression[2].match_atom().unwrap().to_string();
                                 let mut args = vec![];
                                 for arg in expression[3..].iter() {
                                     let evaluated_arg = eval(arg, &mut env, &context)?;
-                                    args.push(SymbolicExpression::atom_value(evaluated_arg));
+                                    args.push(evaluated_arg);
                                 }
-                                let res = env.execute_contract(
-                                    &contract_identifier,
-                                    &method,
-                                    &args,
-                                    false,
-                                )?;
-                                Ok(Some(res))
+
+                                let called_contract =
+                                    env.global_context.database.get_contract(&contract_id)?;
+
+                                if called_contract.contract_context.wasm_module.is_some() {
+                                    contract_context
+                                        .set_wasm_module(wasm_module.unwrap().emit_wasm());
+
+                                    let res = match clarity_wasm::call_function(
+                                        &method,
+                                        &args,
+                                        g,
+                                        &called_contract.contract_context,
+                                        &mut call_stack,
+                                        Some(StandardPrincipalData::transient().into()),
+                                        Some(StandardPrincipalData::transient().into()),
+                                        None,
+                                    ) {
+                                        Ok(res) => res,
+                                        Err(e) => {
+                                            println!("⚠️ Error while calling function: {:?}", e);
+                                            return Err(e);
+                                        }
+                                    };
+                                    Ok(res)
+                                } else {
+                                    let args: Vec<SymbolicExpression> = args
+                                        .iter()
+                                        .map(|a| SymbolicExpression::atom_value(a.clone()))
+                                        .collect();
+                                    let res =
+                                        env.execute_contract(&contract_id, &method, &args, false)?;
+                                    Ok(res)
+                                }
                             }
-                            _ => eval(&contract_ast.expressions[0], &mut env, &context).map(Some),
+                            _ => eval(&contract_ast.expressions[0], &mut env, &context),
                         },
-                        _ => eval(&contract_ast.expressions[0], &mut env, &context).map(Some),
+                        _ => eval(&contract_ast.expressions[0], &mut env, &context),
                     };
-                    result
+                    result.map(Some)
                 } else {
-                    eval_all(&contract_ast.expressions, &mut contract_context, g, None)
+                    println!(
+                        "INITIALIZE CONTRACT: {}",
+                        contract_context.contract_identifier
+                    );
+                    // @TODO(hugo): handle epoch 3
+                    #[allow(clippy::collapsible_else_if)]
+                    if contract.epoch >= StacksEpochId::Epoch24 && contract.name != "pox-3" {
+                        contract_context.set_wasm_module(wasm_module.unwrap().emit_wasm());
+                        initialize_contract(g, &mut contract_context, None, &contract_analysis)
+                    } else {
+                        eval_all(&contract_ast.expressions, &mut contract_context, g, None)
+                    }
                 }
             });
 
             let value = match result {
                 Ok(value) => value,
                 Err(e) => {
-                    let err = format!(
-                        "Runtime error while interpreting {}: {:?}",
-                        contract_identifier, e
-                    );
+                    let err = format!("Runtime error while interpreting {}: {:?}", contract_id, e);
                     if let Some(mut eval_hooks) = global_context.eval_hooks.take() {
                         for hook in eval_hooks.iter_mut() {
                             hook.did_complete(Err(err.clone()));
@@ -695,8 +805,8 @@ impl ClarityInterpreter {
                     functions.insert(name.to_string(), args);
                 }
                 let parsed_contract = ParsedContract {
-                    contract_identifier: contract_identifier.to_string(),
-                    code: snippet.to_string(),
+                    contract_identifier: contract_id.to_string(),
+                    code: source.to_string(),
                     function_args: functions,
                     ast: contract_ast.clone(),
                     analysis: contract_analysis.clone(),
@@ -704,15 +814,15 @@ impl ClarityInterpreter {
 
                 global_context
                     .database
-                    .insert_contract_hash(&contract_identifier, snippet)
+                    .insert_contract_hash(&contract_id, source)
                     .unwrap();
                 let contract = Contract { contract_context };
                 global_context
                     .database
-                    .insert_contract(&contract_identifier, contract);
+                    .insert_contract(&contract_id, contract);
                 global_context
                     .database
-                    .set_contract_data_size(&contract_identifier, 0)
+                    .set_contract_data_size(&contract_id, 0)
                     .unwrap();
 
                 EvaluationResult::Contract(ContractEvaluationResult {
@@ -754,7 +864,7 @@ impl ClarityInterpreter {
         if contract_saved {
             let mut analysis_db = AnalysisDatabase::new(&mut self.datastore);
             analysis_db
-                .execute(|db| db.insert_contract(&contract_identifier, &contract_analysis))
+                .execute(|db| db.insert_contract(&contract_id, &contract_analysis))
                 .expect("Unable to save data");
         }
 
