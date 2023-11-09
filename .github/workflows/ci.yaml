@@ -98,79 +98,51 @@ jobs:
       - name: Run rustfmt
         run: cargo fmt --all -- --check
 
-  # test_coverage_cargo:
-  #   name: Generate test coverage
-  #   runs-on: ubuntu-latest
-  #   needs: pre_run
-  #   strategy:
-  #     fail-fast: false
-  #     matrix:
-  #       include:
-  #         - name: clarinet
-  #           working-directory: components/clarinet-cli
-  #         - name: clarity-repl
-  #           working-directory: components/clarity-repl
-  #   steps:
-  #     - name: Checkout repository
-  #       uses: actions/checkout@v3
-  #       with:
-  #         submodules: recursive
+  test_coverage_cargo:
+    name: Generate test coverage
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
 
-  #     - name: Install Rust toolchain stable
-  #       uses: actions-rs/toolchain@v1
-  #       with:
-  #         toolchain: stable
-  #         profile: minimal
-  #         override: true
+      - name: Install Rust toolchain
+        run: |
+          rustup set profile minimal
+          rustup toolchain install stable --component llvm-tools-preview
+          rustup override set stable
 
-  #     - name: Cache cargo
-  #       uses: actions/cache@v2
-  #       id: cache-cargo
-  #       with:
-  #         path: |
-  #           ~/.cargo/bin/
-  #           ~/.cargo/registry/index/
-  #           ~/.cargo/registry/cache/
-  #           ~/.cargo/git/db/
-  #           target/
-  #         key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+      - name: Cache cargo
+        id: cache-cargo
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            target/
+          key: ${{ runner.os }}-cargo-grcov-${{ env.COMPONENT }}-${{ hashFiles(env.COMPONENT_CARGO_LOCK_FILE) }}
 
-  #     - name: Install dependencies
-  #       if: steps.cache-cargo.outputs.cache-hit != 'true'
-  #       run: RUSTC_BOOTSTRAP=1 cargo install grcov
+      - name: Install dependencies
+        if: steps.cache-cargo.outputs.cache-hit != 'true'
+        run: RUSTC_BOOTSTRAP=1 cargo install grcov
 
-  #     - name: Install Rust toolchain
-  #       uses: actions-rs/toolchain@v1
-  #       with:
-  #         toolchain: stable
-  #         profile: minimal
-  #         components: llvm-tools-preview
-  #         override: true
+      - name: Build & Unit Test
+        env:
+          RUSTFLAGS: "-C instrument-coverage"
+          LLVM_PROFILE_FILE: "${{ env.COMPONENT }}-%p-%m.profraw"
+        run: cargo build && cargo test
 
-  #     - name: Unit Tests
-  #       env:
-  #         RUSTFLAGS: "-C instrument-coverage"
-  #         LLVM_PROFILE_FILE: "${{ matrix.name }}-%p-%m.profraw"
-  #       run: cargo build --package=clarinet-cli --locked && cargo test --package=clarinet-cli
+      - name: Generate coverage
+        run: grcov . --binary-path target/debug/ -s . -t lcov --branch --ignore-not-existing --ignore "/*" -o lcov.info
 
-  #     - name: Generate coverage
-  #       run: grcov . --binary-path ./target/debug/ -s . -t lcov --branch --ignore-not-existing --ignore "/*" -o lcov.info
-
-  #       # Run functional tests here in addition to the other jobs so we can fail fast
-  #       # Since these tests are reached much earlier in the pipeline
-  #     - name: Functional Tests
-  #       if: matrix.name == 'clarinet'
-  #       run: |
-  #         for testdir in $(ls components/clarinet-cli/examples); do
-  #           ./target/debug/clarinet test --manifest-path components/clarinet-cli/examples/${testdir}/Clarinet.toml
-  #         done
-
-  #     - name: Upload coverage report
-  #       uses: codecov/codecov-action@v1
-  #       with:
-  #         flags: unittests
-  #         name: ${{ matrix.name }}
-  #         verbose: true
+      - name: Upload coverage report
+        uses: codecov/codecov-action@v3
+        with:
+          flags: unittests
+          name: ${{ env.COMPONENT }}
+          files: ./lcov.info
+          verbose: true
 
   dist_clarinet:
     name: Build Clarinet Distributions

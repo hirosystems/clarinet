@@ -118,20 +118,12 @@ jobs:
       - name: Generate coverage
         run: grcov . --binary-path target/debug/ -s . -t lcov --branch --ignore-not-existing --ignore "/*" -o lcov.info
 
-      # TODO(@hugocaillard): npm test
-      # Run functional tests here in addition to the other jobs so we can fail fast
-      # Since these tests are reached much earlier in the pipeline
-      # - name: Functional Tests
-      #   run: |
-      #     for testdir in $(ls examples); do
-      #       target/debug/clarinet test --manifest-path examples/${testdir}/Clarinet.toml
-      #     done
-
       - name: Upload coverage report
         uses: codecov/codecov-action@v3
         with:
           flags: unittests
           name: ${{ env.COMPONENT }}
+          files: ./lcov.info
           verbose: true
 
   matrix_prep:
