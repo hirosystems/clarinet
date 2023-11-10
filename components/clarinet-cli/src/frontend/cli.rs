@@ -422,6 +422,11 @@ struct DevnetStart {
         conflicts_with = "use-on-disk-deployment-plan"
     )]
     pub use_computed_deployment_plan: bool,
+    /// Path to Package.json
+    #[clap(
+        long = "package",
+    )]
+    pub package: Option<String>,
 }
 
 #[derive(Parser, PartialEq, Clone, Debug)]
@@ -1753,6 +1758,13 @@ fn devnet_start(cmd: DevnetStart, hints_enabled: bool) -> () {
     println!("Computing deployment plan");
     let result = match cmd.deployment_plan_path {
         None => {
+            if let Some(package) = cmd.package {
+                println!("{}", package);
+                // file_location = FileLocation::from_path(package);
+                // return serde_json::from_str(file_location.)
+                return
+            }
+            // use package.json instead of deploymentspec if it exists
             let res = load_deployment_if_exists(
                 &manifest,
                 &StacksNetwork::Devnet,
