@@ -494,12 +494,103 @@ impl ClarityInterpreter {
             cost = Some(CostSynthesis::from_cost_tracker(&global_context.cost_track));
         }
 
+        let contract_saved =
+            !contract_context.functions.is_empty() || !contract_context.defined_traits.is_empty();
+
+        let eval_result = if contract_saved {
+            let mut functions = BTreeMap::new();
+            for (name, defined_func) in contract_context.functions.iter() {
+                if !defined_func.is_public() {
+                    continue;
+                }
+
+                let args: Vec<_> = defined_func
+                    .get_arguments()
+                    .iter()
+                    .zip(defined_func.get_arg_types().iter())
+                    .map(|(n, t)| format!("({} {})", n.as_str(), t))
+                    .collect();
+
+                functions.insert(name.to_string(), args);
+            }
+            let parsed_contract = ParsedContract {
+                contract_identifier: contract_id.to_string(),
+                code: snippet.to_string(),
+                function_args: functions,
+                ast: contract_ast.clone(),
+                analysis: contract_analysis.clone(),
+            };
+
+            global_context
+                .database
+                .insert_contract_hash(&contract_id, snippet)
+                .unwrap();
+            let contract = Contract { contract_context };
+            global_context
+                .database
+                .insert_contract(&contract_id, contract);
+            global_context
+                .database
+                .set_contract_data_size(&contract_id, 0)
+                .unwrap();
+
+            EvaluationResult::Contract(ContractEvaluationResult {
+                result: value,
+                contract: parsed_contract,
+            })
+        } else {
+            let result = value.unwrap_or(Value::none());
+            EvaluationResult::Snippet(SnippetEvaluationResult { result })
+        };
+        global_context.commit().unwrap();
+
         let mut emitted_events = global_context
             .event_batches
             .iter()
             .flat_map(|b| b.events.clone())
             .collect::<Vec<_>>();
 
+        let (events, mut accounts_to_credit, mut accounts_to_debit) =
+            Self::handle_events(&mut emitted_events);
+
+        let mut execution_result = ExecutionResult {
+            result: eval_result,
+            events,
+            cost,
+            diagnostics: Vec::new(),
+        };
+
+        if let Some(mut eval_hooks) = global_context.eval_hooks {
+            for hook in eval_hooks.iter_mut() {
+                hook.did_complete(Ok(&mut execution_result));
+            }
+        }
+
+        for (account, token, value) in accounts_to_credit.drain(..) {
+            self.credit_token(account, token, value);
+        }
+
+        for (account, token, value) in accounts_to_debit.drain(..) {
+            self.debit_token(account, token, value);
+        }
+
+        if contract_saved {
+            let mut analysis_db = AnalysisDatabase::new(&mut self.datastore);
+            analysis_db
+                .execute(|db| db.insert_contract(&contract_id, &contract_analysis))
+                .expect("Unable to save data");
+        }
+
+        Ok(execution_result)
+    }
+
+    fn handle_events(
+        emitted_events: &mut Vec<StacksTransactionEvent>,
+    ) -> (
+        Vec<StacksTransactionEvent>,
+        Vec<(String, String, u128)>,
+        Vec<(String, String, u128)>,
+    ) {
         let mut events = vec![];
         let mut accounts_to_debit = vec![];
         let mut accounts_to_credit = vec![];
@@ -591,86 +682,7 @@ impl ClarityInterpreter {
             };
             events.push(event);
         }
-
-        let contract_saved =
-            !contract_context.functions.is_empty() || !contract_context.defined_traits.is_empty();
-
-        let eval_result = if contract_saved {
-            let mut functions = BTreeMap::new();
-            for (name, defined_func) in contract_context.functions.iter() {
-                if !defined_func.is_public() {
-                    continue;
-                }
-
-                let args: Vec<_> = defined_func
-                    .get_arguments()
-                    .iter()
-                    .zip(defined_func.get_arg_types().iter())
-                    .map(|(n, t)| format!("({} {})", n.as_str(), t))
-                    .collect();
-
-                functions.insert(name.to_string(), args);
-            }
-            let parsed_contract = ParsedContract {
-                contract_identifier: contract_id.to_string(),
-                code: snippet.to_string(),
-                function_args: functions,
-                ast: contract_ast.clone(),
-                analysis: contract_analysis.clone(),
-            };
-
-            global_context
-                .database
-                .insert_contract_hash(&contract_id, snippet)
-                .unwrap();
-            let contract = Contract { contract_context };
-            global_context
-                .database
-                .insert_contract(&contract_id, contract);
-            global_context
-                .database
-                .set_contract_data_size(&contract_id, 0)
-                .unwrap();
-
-            EvaluationResult::Contract(ContractEvaluationResult {
-                result: value,
-                contract: parsed_contract,
-            })
-        } else {
-            let result = value.unwrap_or(Value::none());
-            EvaluationResult::Snippet(SnippetEvaluationResult { result })
-        };
-        global_context.commit().unwrap();
-
-        let mut execution_result = ExecutionResult {
-            result: eval_result,
-            events,
-            cost,
-            diagnostics: Vec::new(),
-        };
-
-        if let Some(mut eval_hooks) = global_context.eval_hooks {
-            for hook in eval_hooks.iter_mut() {
-                hook.did_complete(Ok(&mut execution_result));
-            }
-        }
-
-        for (account, token, value) in accounts_to_credit.drain(..) {
-            self.credit_token(account, token, value);
-        }
-
-        for (account, token, value) in accounts_to_debit.drain(..) {
-            self.debit_token(account, token, value);
-        }
-
-        if contract_saved {
-            let mut analysis_db = AnalysisDatabase::new(&mut self.datastore);
-            analysis_db
-                .execute(|db| db.insert_contract(&contract_id, &contract_analysis))
-                .expect("Unable to save data");
-        }
-
-        Ok(execution_result)
+        (events, accounts_to_credit, accounts_to_debit)
     }
 
     pub fn mint_stx_balance(
@@ -813,5 +825,34 @@ mod tests {
         assert!(result.is_err());
         let diagnostics = result.unwrap_err();
         assert_eq!(diagnostics.len(), 1);
+    }
+
+    #[test]
+    fn test_build_ast() {
+        let interpreter =
+            ClarityInterpreter::new(StandardPrincipalData::transient(), Settings::default());
+        let contract = ClarityContract::fixture();
+        let (_ast, diagnostics, success) = interpreter.build_ast(&contract);
+        assert!(success);
+        assert!(diagnostics.is_empty());
+    }
+
+    #[test]
+    fn test_execute() {
+        let mut interpreter =
+            ClarityInterpreter::new(StandardPrincipalData::transient(), Settings::default());
+
+        let contract = ClarityContract::fixture();
+        let source = contract.expect_in_memory_code_source();
+        let (mut ast, ..) = interpreter.build_ast(&contract);
+        let (annotations, _) = interpreter.collect_annotations(source);
+
+        let (analysis, _) = interpreter
+            .run_analysis(&contract, &mut ast, &annotations)
+            .unwrap();
+
+        let result = interpreter.execute(&contract, &mut ast, analysis, false, None);
+        assert!(result.is_ok());
+        assert!(result.unwrap().diagnostics.is_empty());
     }
 }
