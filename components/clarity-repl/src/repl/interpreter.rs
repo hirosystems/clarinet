@@ -853,6 +853,46 @@ mod tests {
 
         let result = interpreter.execute(&contract, &mut ast, analysis, false, None);
         assert!(result.is_ok());
-        assert!(result.unwrap().diagnostics.is_empty());
+        let ExecutionResult {
+            diagnostics,
+            events,
+            ..
+        } = result.unwrap();
+        assert!(diagnostics.is_empty());
+        assert!(events.is_empty());
+    }
+
+    #[test]
+    fn test_execute_events() {
+        let mut interpreter =
+            ClarityInterpreter::new(StandardPrincipalData::transient(), Settings::default());
+
+        let contract = ClarityContractBuilder::default()
+            .code_source(
+                [
+                    "(define-fungible-token ctb)",
+                    "(ft-mint? ctb u100 tx-sender)",
+                ]
+                .join("\n"),
+            )
+            .build();
+        let source = contract.expect_in_memory_code_source();
+        let (mut ast, ..) = interpreter.build_ast(&contract);
+        let (annotations, _) = interpreter.collect_annotations(source);
+
+        let (analysis, _) = interpreter
+            .run_analysis(&contract, &mut ast, &annotations)
+            .unwrap();
+
+        let result = interpreter.execute(&contract, &mut ast, analysis, false, None);
+        assert!(result.is_ok());
+        let ExecutionResult {
+            diagnostics,
+            events,
+            ..
+        } = result.unwrap();
+        assert!(diagnostics.is_empty());
+        println!("events {:#?}", events);
+        // assert!(events.is_empty());
     }
 }
