@@ -13,7 +13,6 @@ mod deployments;
 mod devnet;
 mod frontend;
 mod generate;
-pub mod integrate;
 mod lsp;
 
 use frontend::cli;

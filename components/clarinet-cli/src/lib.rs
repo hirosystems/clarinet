@@ -15,7 +15,6 @@ pub extern crate clarity_repl;
 
 pub mod deployments;
 pub mod generate;
-pub mod integrate;
 
 pub mod devnet;
 #[cfg(feature = "cli")]

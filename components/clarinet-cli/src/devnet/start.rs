@@ -16,7 +16,7 @@ use stacks_network::{
 };
 use std::fs::OpenOptions;
 
-pub fn run_devnet(
+pub fn start(
     devnet: DevnetOrchestrator,
     deployment: DeploymentSpecification,
     log_tx: Option<Sender<LogData>>,
