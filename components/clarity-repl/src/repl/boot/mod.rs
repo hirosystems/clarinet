@@ -32,8 +32,6 @@ pub const POX_1_NAME: &str = "pox";
 pub const POX_2_NAME: &str = "pox-2";
 pub const POX_3_NAME: &str = "pox-3";
 
-const POX_2_TESTNET_CONSTS: &str = std::include_str!("pox-testnet.clar");
-const POX_2_MAINNET_CONSTS: &str = std::include_str!("pox-mainnet.clar");
 const POX_2_BODY: &str = std::include_str!("pox-2.clar");
 const POX_3_BODY: &str = std::include_str!("pox-3.clar");
 
@@ -54,28 +52,26 @@ lazy_static! {
     pub static ref POX_3_TESTNET_CODE: String =
         format!("{}\n{}", BOOT_CODE_POX_TESTNET_CONSTS, POX_3_BODY);
     pub static ref BOOT_CODE_COST_VOTING_TESTNET: String = make_testnet_cost_voting();
-    pub static ref STACKS_BOOT_CODE_MAINNET: [(&'static str, &'static str); 11] = [
+    pub static ref STACKS_BOOT_CODE_MAINNET: [(&'static str, &'static str); 10] = [
         ("pox", &BOOT_CODE_POX_MAINNET),
-        ("lockup", BOOT_CODE_LOCKUP),
-        ("costs", BOOT_CODE_COSTS),
-        ("cost-voting", BOOT_CODE_COST_VOTING_MAINNET),
+        ("lockup", &BOOT_CODE_LOCKUP),
+        ("costs", &BOOT_CODE_COSTS),
+        ("cost-voting", &BOOT_CODE_COST_VOTING_MAINNET),
         ("bns", &BOOT_CODE_BNS),
         ("genesis", &BOOT_CODE_GENESIS),
         ("costs-2", &BOOT_CODE_COSTS_2),
-        ("costs-v2", &BOOT_CODE_COSTS_2), // for backwards compatibility with old Clarinet.toml files
         ("pox-2", &POX_2_MAINNET_CODE),
         ("costs-3", &BOOT_CODE_COSTS_3),
         ("pox-3", &POX_3_MAINNET_CODE),
     ];
-    pub static ref STACKS_BOOT_CODE_TESTNET: [(&'static str, &'static str); 11] = [
+    pub static ref STACKS_BOOT_CODE_TESTNET: [(&'static str, &'static str); 10] = [
         ("pox", &BOOT_CODE_POX_TESTNET),
-        ("lockup", BOOT_CODE_LOCKUP),
-        ("costs", BOOT_CODE_COSTS),
+        ("lockup", &BOOT_CODE_LOCKUP),
+        ("costs", &BOOT_CODE_COSTS),
         ("cost-voting", &BOOT_CODE_COST_VOTING_TESTNET),
         ("bns", &BOOT_CODE_BNS),
         ("genesis", &BOOT_CODE_GENESIS),
         ("costs-2", &BOOT_CODE_COSTS_2_TESTNET),
-        ("costs-v2", &BOOT_CODE_COSTS_2_TESTNET), // for backwards compatibility with old Clarinet.toml files
         ("pox-2", &POX_2_TESTNET_CODE),
         ("costs-3", &BOOT_CODE_COSTS_3_TESTNET),
         ("pox-3", &POX_3_TESTNET_CODE),

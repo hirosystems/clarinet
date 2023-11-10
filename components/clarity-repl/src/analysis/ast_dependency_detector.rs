@@ -1,25 +1,22 @@
-use crate::analysis::annotation::Annotation;
+#![allow(unused_variables)]
+
 use crate::analysis::ast_visitor::{traverse, ASTVisitor};
-use crate::analysis::{AnalysisPass, AnalysisResult, Settings};
 use crate::repl::DEFAULT_EPOCH;
 use clarity::types::StacksEpochId;
-use clarity::vm::analysis::analysis_db::AnalysisDatabase;
 pub use clarity::vm::analysis::types::ContractAnalysis;
 use clarity::vm::analysis::{CheckErrors, CheckResult};
 use clarity::vm::ast::ContractAST;
 use clarity::vm::representations::{SymbolicExpression, TraitDefinition};
 use clarity::vm::types::signatures::CallableSubtype;
 use clarity::vm::types::{
-    FixedFunction, FunctionSignature, FunctionType, PrincipalData, QualifiedContractIdentifier,
-    SequenceSubtype, TraitIdentifier, TypeSignature, Value,
+    FunctionSignature, PrincipalData, QualifiedContractIdentifier, SequenceSubtype,
+    TraitIdentifier, TypeSignature, Value,
 };
 use clarity::vm::{ClarityName, ClarityVersion, SymbolicExpressionType};
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 use std::convert::TryFrom;
-use std::hash::{Hash, Hasher};
 use std::iter::FromIterator;
 use std::ops::{Deref, DerefMut};
-use std::process;
 
 use super::ast_visitor::TypedVar;
 
@@ -119,7 +116,7 @@ fn deep_check_callee_type(
         TypeSignature::TupleType(inner_type) => {
             let type_map = inner_type.get_type_map();
             if let Some(tuple) = expr.match_list() {
-                for (i, key_value) in tuple.iter().skip(1).enumerate() {
+                for key_value in tuple.iter().skip(1) {
                     if let Some((arg_type, expr)) = key_value
                         .match_list()
                         .and_then(|kv| Some((type_map.get(kv.get(0)?.match_atom()?)?, kv.get(1)?)))
@@ -246,7 +243,7 @@ impl<'a> ASTDependencyDetector<'a> {
         let mut unresolved: Vec<QualifiedContractIdentifier> = detector
             .pending_function_checks
             .into_keys()
-            .map(|(contract_id, name)| contract_id.clone())
+            .map(|(contract_id, _)| contract_id.clone())
             .collect();
         unresolved.append(
             &mut detector
@@ -255,10 +252,10 @@ impl<'a> ASTDependencyDetector<'a> {
                 .map(|trait_id| trait_id.contract_identifier.clone())
                 .collect(),
         );
-        if !unresolved.is_empty() {
-            Err((detector.dependencies, unresolved))
-        } else {
+        if unresolved.is_empty() {
             Ok(detector.dependencies)
+        } else {
+            Err((detector.dependencies, unresolved))
         }
     }
 
@@ -964,7 +961,7 @@ mod tests {
         name: Option<&str>,
         contracts: &mut BTreeMap<QualifiedContractIdentifier, (ClarityVersion, ContractAST)>,
     ) -> QualifiedContractIdentifier {
-        match build_ast(&session, &snippet, name) {
+        match build_ast(session, snippet, name) {
             Ok((contract_identifier, ast, _)) => {
                 contracts.insert(contract_identifier.clone(), (DEFAULT_CLARITY_VERSION, ast));
                 contract_identifier
@@ -1032,10 +1029,7 @@ mod tests {
         assert!(!dependencies[&test_identifier].has_dependency(&foo).unwrap());
     }
 
-    // This test is disabled because it is currently not possible to refer to a
-    // trait defined in the same contract. An issue has been opened to discuss
-    // whether this will be fixed or documented.
-    // #[test]
+    #[test]
     fn dynamic_contract_call_local_trait() {
         let session = Session::new(SessionSettings::default());
         let mut contracts = BTreeMap::new();
@@ -1197,7 +1191,7 @@ mod tests {
 (use-trait my-trait .my_trait.my-trait)
 (define-public (call-mt (mt (optional <my-trait>))) (ok true))"
             .to_string();
-        let callee = deploy_snippet(&session, &callee_snippet, Some("callee"), &mut contracts);
+        let _ = deploy_snippet(&session, &callee_snippet, Some("callee"), &mut contracts);
 
         let caller_snippet =
             "(define-public (call) (contract-call? .callee call-mt (some .my_trait)))".to_string();
@@ -1223,7 +1217,7 @@ mod tests {
 (use-trait my-trait .my_trait.my-trait)
 (define-public (call-mt (mt (response <my-trait> uint))) (ok true))"
             .to_string();
-        let callee = deploy_snippet(&session, &callee_snippet, Some("callee"), &mut contracts);
+        let _ = deploy_snippet(&session, &callee_snippet, Some("callee"), &mut contracts);
 
         let caller_snippet =
             "(define-public (call) (contract-call? .callee call-mt (ok .my_trait)))".to_string();
@@ -1249,7 +1243,7 @@ mod tests {
 (use-trait my-trait .my_trait.my-trait)
 (define-public (call-mt (mt { t: <my-trait> })) (ok true))"
             .to_string();
-        let callee = deploy_snippet(&session, &callee_snippet, Some("callee"), &mut contracts);
+        let _ = deploy_snippet(&session, &callee_snippet, Some("callee"), &mut contracts);
 
         let caller_snippet =
             "(define-public (call) (contract-call? .callee call-mt { t: .my_trait }))".to_string();
@@ -1275,7 +1269,7 @@ mod tests {
 (use-trait my-trait .my_trait.my-trait)
 (define-public (call-mt (mt (list 4 <my-trait>))) (ok true))"
             .to_string();
-        let callee = deploy_snippet(&session, &callee_snippet, Some("callee"), &mut contracts);
+        let _ = deploy_snippet(&session, &callee_snippet, Some("callee"), &mut contracts);
 
         let caller_snippet =
             "(define-public (call) (contract-call? .callee call-mt (list .my_trait .my_trait)))"
@@ -1302,7 +1296,7 @@ mod tests {
 (use-trait my-trait .my_trait.my-trait)
 (define-public (call-mt (mt (response { t: (optional <my-trait>) } uint))) (ok true))"
             .to_string();
-        let callee = deploy_snippet(&session, &callee_snippet, Some("callee"), &mut contracts);
+        let _ = deploy_snippet(&session, &callee_snippet, Some("callee"), &mut contracts);
 
         let caller_snippet =
             "(define-public (call) (contract-call? .callee call-mt (ok { t: (some .my_trait) })))"
@@ -1403,7 +1397,7 @@ mod tests {
 )
 "
         .to_string();
-        let test_identifier = match build_ast(&session, &snippet, Some("test")) {
+        let _ = match build_ast(&session, &snippet, Some("test")) {
             Ok((contract_identifier, ast, _)) => {
                 contracts.insert(contract_identifier.clone(), (DEFAULT_CLARITY_VERSION, ast));
                 contract_identifier
@@ -1429,7 +1423,7 @@ mod tests {
 )
 "
         .to_string();
-        let test_identifier = match build_ast(&session, &snippet, Some("test")) {
+        let _ = match build_ast(&session, &snippet, Some("test")) {
             Ok((contract_identifier, ast, _)) => {
                 contracts.insert(contract_identifier.clone(), (DEFAULT_CLARITY_VERSION, ast));
                 contract_identifier

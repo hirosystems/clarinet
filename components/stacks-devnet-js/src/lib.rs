@@ -130,18 +130,19 @@ impl StacksDevnet {
             .network_config
             .as_ref()
             .and_then(|config| config.devnet.as_ref())
-            .and_then(|devnet| {
-                Some((
+            .map(|devnet| {
+                (
                     format!("http://localhost:{}", devnet.bitcoin_node_p2p_port),
                     format!("http://localhost:{}", devnet.stacks_node_rpc_port),
                     format!("http://localhost:{}", devnet.stacks_api_port),
                     format!("http://localhost:{}", devnet.stacks_explorer_port),
                     format!("http://localhost:{}", devnet.bitcoin_explorer_port),
-                ))
+                )
             })
             .expect("unable to read config");
 
         thread::spawn(move || {
+            #[allow(clippy::never_loop)]
             let chains_coordinator_command_tx = loop {
                 match rx.recv() {
                     Ok(DevnetCommand::Start(callback)) => {
@@ -188,7 +189,7 @@ impl StacksDevnet {
                     }
                     Err(e) => {
                         if logs_enabled {
-                            println!("Fatal error: {}", e.to_string());
+                            println!("Fatal error: {}", e);
                         }
                         return;
                     }

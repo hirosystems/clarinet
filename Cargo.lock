@@ -861,7 +861,7 @@ dependencies = [
  "lazy_static",
  "log",
  "memchr",
- "pico-args",
+ "pico-args 0.4.2",
  "prettytable-rs",
  "rand 0.7.3",
  "regex",
@@ -894,7 +894,7 @@ dependencies = [
  "lazy_static",
  "log",
  "memchr",
- "pico-args",
+ "pico-args 0.5.0",
  "prettytable-rs",
  "regex",
  "reqwest",
@@ -903,11 +903,9 @@ dependencies = [
  "serde_derive",
  "serde_json",
  "sha2 0.10.6",
- "sha3 0.9.1",
+ "sha3 0.10.8",
  "tokio",
  "tokio-util 0.7.7",
- "wasm-bindgen",
- "wasm-bindgen-futures",
 ]
 
 [[package]]
@@ -2172,9 +2170,9 @@ dependencies = [
 
 [[package]]
 name = "keccak"
-version = "0.1.3"
+version = "0.1.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3afef3b6eff9ce9d8ff9b3601125eec7f0c8cbac7abd14f355d053fa56c98768"
+checksum = "8f6d5ed8676d904364de097082f4e7d240b571b67989ced0240f08b7f966f940"
 dependencies = [
  "cpufeatures",
 ]
@@ -2874,6 +2872,12 @@ name = "pico-args"
 version = "0.4.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "db8bcd96cb740d03149cbad5518db9fd87126a10ab519c011893b1754134c468"
+
+[[package]]
+name = "pico-args"
+version = "0.5.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5be167a7af36ee22fe3115051bc51f6e6c7054c9348e28deb4f49bd6f705a315"
 
 [[package]]
 name = "pin-project"
@@ -3853,9 +3857,9 @@ dependencies = [
 
 [[package]]
 name = "sha3"
-version = "0.10.6"
+version = "0.10.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "bdf0c33fae925bdc080598b84bc15c55e7b9a4a43b3c704da051f977469691c9"
+checksum = "75872d278a8f37ef87fa0ddbda7802605cb18344497949862c0d4dcb291eba60"
 dependencies = [
  "digest 0.10.6",
  "keccak",
@@ -4060,7 +4064,7 @@ dependencies = [
  "serde_derive",
  "serde_json",
  "sha2 0.10.6",
- "sha3 0.10.6",
+ "sha3 0.10.8",
  "time 0.2.27",
 ]
 

@@ -1,9 +1,7 @@
 use std::{
     collections::{BTreeMap, BTreeSet, HashMap, HashSet},
-    convert::{TryFrom, TryInto},
     fs::{create_dir_all, File},
     io::{Error, ErrorKind, Write},
-    mem,
     path::{Path, PathBuf},
 };
 
@@ -14,9 +12,8 @@ use clarity::vm::{
         NativeFunctions::{self, Filter, Fold, Map},
     },
     types::QualifiedContractIdentifier,
-    ClarityName, EvalHook, SymbolicExpression,
+    EvalHook, SymbolicExpression,
 };
-use serde_json::Value as JsonValue;
 
 #[derive(Serialize, Deserialize, Debug, Default, Clone)]
 pub struct CoverageReporter {
@@ -106,14 +103,14 @@ impl CoverageReporter {
             test_names.insert(report.test_name.to_string());
         }
 
-        for (index, test_name) in test_names.iter().enumerate() {
+        for test_name in test_names.iter() {
             for (contract_name, contract_path) in self.contract_paths.iter() {
                 file_content.push_str(&format!("TN:{}\n", test_name));
                 file_content.push_str(&format!("SF:{}\n", contract_path));
 
                 if let Some((contract_id, functions, executable)) = filtered_asts.get(contract_name)
                 {
-                    for (function, line_start, line_end) in functions.iter() {
+                    for (function, line_start, _) in functions.iter() {
                         file_content.push_str(&format!("FN:{},{}\n", line_start, function));
                     }
                     let (executable_lines, executables_branches) = executable;
@@ -218,9 +215,9 @@ impl CoverageReporter {
         for cur_expr in exprs.iter() {
             if let Some(define_expr) = DefineFunctionsParsed::try_parse(cur_expr).ok().flatten() {
                 match define_expr {
-                    DefineFunctionsParsed::PrivateFunction { signature, body }
-                    | DefineFunctionsParsed::PublicFunction { signature, body }
-                    | DefineFunctionsParsed::ReadOnlyFunction { signature, body } => {
+                    DefineFunctionsParsed::PrivateFunction { signature, body: _ }
+                    | DefineFunctionsParsed::PublicFunction { signature, body: _ }
+                    | DefineFunctionsParsed::ReadOnlyFunction { signature, body: _ } => {
                         let expr = signature.get(0).expect("Invalid function signature");
                         let function_name = expr.match_atom().expect("Invalid function signature");
 
@@ -349,7 +346,7 @@ impl EvalHook for TestCoverageReport {
     fn will_begin_eval(
         &mut self,
         env: &mut clarity::vm::Environment,
-        context: &clarity::vm::LocalContext,
+        _context: &clarity::vm::LocalContext,
         expr: &SymbolicExpression,
     ) {
         let contract = &env.contract_context.contract_identifier;

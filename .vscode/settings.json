@@ -3,6 +3,8 @@
     "cargo",
     "clippy",
     "--package=clarinet-cli",
+    "--package=clarity-repl@2.0.0",
+    "--tests",
     "--message-format=json"
   ]
 }

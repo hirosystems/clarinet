@@ -1,6 +1,4 @@
 use std::collections::HashMap;
-use std::hash::Hash;
-use std::io::Write;
 use std::path::PathBuf;
 
 use super::{extract_watch_variable, AccessType, State};
@@ -8,16 +6,13 @@ use clarity::vm::callables::FunctionIdentifier;
 use clarity::vm::contexts::{ContractContext, GlobalContext};
 use clarity::vm::errors::Error;
 use clarity::vm::representations::Span;
-use clarity::vm::types::{CallableData, PrincipalData, SequenceData, StandardPrincipalData, Value};
-use clarity::vm::SymbolicExpressionType::List;
+use clarity::vm::types::{PrincipalData, SequenceData, StandardPrincipalData, Value};
 use clarity::vm::{
     contexts::{Environment, LocalContext},
     types::QualifiedContractIdentifier,
     EvalHook, SymbolicExpression,
 };
-use clarity::vm::{
-    ContractEvaluationResult, EvaluationResult, ExecutionResult, SnippetEvaluationResult,
-};
+use clarity::vm::{EvaluationResult, ExecutionResult};
 use debug_types::events::*;
 use debug_types::requests::*;
 use debug_types::responses::*;
@@ -56,8 +51,6 @@ pub mod codec;
  */
 
 struct Current {
-    source: Source,
-    span: Span,
     expr_id: u64,
     stack: Vec<FunctionIdentifier>,
 }
@@ -162,7 +155,6 @@ impl DAPDebugger {
     }
 
     fn send_response(&mut self, response: Response) {
-        let response_json = serde_json::to_string(&response).unwrap();
         let message = ProtocolMessage {
             seq: self.send_seq,
             message: MessageKind::Response(response),
@@ -180,7 +172,6 @@ impl DAPDebugger {
     }
 
     fn send_event(&mut self, body: EventBody) {
-        let event_json = serde_json::to_string(&body).unwrap();
         let message = ProtocolMessage {
             seq: self.send_seq,
             message: MessageKind::Event(Event { body: Some(body) }),
@@ -235,7 +226,7 @@ impl DAPDebugger {
         }
     }
 
-    pub fn handle_event(&mut self, seq: i64, event: Event) {
+    pub fn handle_event(&mut self, seq: i64, _event: Event) {
         let response = Response {
             request_seq: seq,
             success: true,
@@ -245,7 +236,7 @@ impl DAPDebugger {
         self.send_response(response);
     }
 
-    pub fn handle_response(&mut self, seq: i64, response: Response) {
+    pub fn handle_response(&mut self, seq: i64, _response: Response) {
         let response = Response {
             request_seq: seq,
             success: true,
@@ -257,7 +248,7 @@ impl DAPDebugger {
 
     // Request handlers
 
-    fn initialize(&mut self, seq: i64, arguments: InitializeRequestArguments) -> bool {
+    fn initialize(&mut self, seq: i64, _arguments: InitializeRequestArguments) -> bool {
         let capabilities = Capabilities {
             supports_configuration_done_request: Some(true),
             supports_function_breakpoints: Some(true),
@@ -435,7 +426,6 @@ impl DAPDebugger {
                 let column = breakpoint.column.unwrap_or(0);
                 let source_breakpoint = super::Breakpoint {
                     id: 0,
-                    verified: true,
                     data: super::BreakpointData::Source(super::SourceBreakpoint {
                         line: breakpoint.line,
                         column: breakpoint.column,
@@ -479,7 +469,7 @@ impl DAPDebugger {
     fn set_exception_breakpoints(
         &mut self,
         seq: i64,
-        arguments: SetExceptionBreakpointsArguments,
+        _arguments: SetExceptionBreakpointsArguments,
     ) -> bool {
         self.send_response(Response {
             request_seq: seq,
@@ -535,7 +525,7 @@ impl DAPDebugger {
         false
     }
 
-    fn stack_trace(&mut self, seq: i64, arguments: StackTraceArguments) -> bool {
+    fn stack_trace(&mut self, seq: i64, _arguments: StackTraceArguments) -> bool {
         let current = self.current.as_ref().unwrap();
         let frames: Vec<_> = current
             .stack
@@ -588,7 +578,7 @@ impl DAPDebugger {
         false
     }
 
-    fn step_in(&mut self, seq: i64, arguments: StepInArguments) -> bool {
+    fn step_in(&mut self, seq: i64, _arguments: StepInArguments) -> bool {
         self.get_state().step_in();
 
         self.send_response(Response {
@@ -600,7 +590,7 @@ impl DAPDebugger {
         true
     }
 
-    fn step_out(&mut self, seq: i64, arguments: StepOutArguments) -> bool {
+    fn step_out(&mut self, seq: i64, _arguments: StepOutArguments) -> bool {
         self.get_state().finish();
 
         self.send_response(Response {
@@ -612,7 +602,7 @@ impl DAPDebugger {
         true
     }
 
-    fn next(&mut self, seq: i64, arguments: NextArguments) -> bool {
+    fn next(&mut self, seq: i64, _arguments: NextArguments) -> bool {
         let expr_id = self.current.as_ref().unwrap().expr_id;
         self.get_state().step_over(expr_id);
 
@@ -625,7 +615,7 @@ impl DAPDebugger {
         true
     }
 
-    fn continue_(&mut self, seq: i64, arguments: ContinueArguments) -> bool {
+    fn continue_(&mut self, seq: i64, _arguments: ContinueArguments) -> bool {
         self.get_state().continue_execution();
 
         self.send_response(Response {
@@ -639,7 +629,7 @@ impl DAPDebugger {
         true
     }
 
-    fn pause(&mut self, seq: i64, arguments: PauseArguments) -> bool {
+    fn pause(&mut self, seq: i64, _arguments: PauseArguments) -> bool {
         self.get_state().pause();
 
         self.send_response(Response {
@@ -799,7 +789,7 @@ impl DAPDebugger {
         false
     }
 
-    fn quit(&mut self, seq: i64, arguments: DisconnectArguments) -> bool {
+    fn quit(&mut self, seq: i64, _arguments: DisconnectArguments) -> bool {
         self.get_state().quit();
 
         self.send_response(Response {
@@ -1059,7 +1049,6 @@ impl EvalHook for DAPDebugger {
                     hit_breakpoint_ids: None,
                 };
 
-                let state = self.get_state().state.clone();
                 match self.get_state().state {
                     State::Start => {
                         stopped.reason = StoppedReason::Entry;
@@ -1068,7 +1057,7 @@ impl EvalHook for DAPDebugger {
                         stopped.reason = StoppedReason::Breakpoint;
                         stopped.hit_breakpoint_ids = Some(vec![breakpoint]);
                     }
-                    State::DataBreak(breakpoint, access_type) => {
+                    State::DataBreak(breakpoint, _access_type) => {
                         stopped.reason = StoppedReason::DataBreakpoint;
                         stopped.hit_breakpoint_ids = Some(vec![breakpoint]);
                     }
@@ -1085,8 +1074,6 @@ impl EvalHook for DAPDebugger {
 
             // Save the current state, which may be needed to respond to incoming requests
             self.current = Some(Current {
-                source,
-                span: expr.span.clone(),
                 expr_id: expr.id,
                 stack: stack_trace,
             });
@@ -1151,16 +1138,16 @@ impl EvalHook for DAPDebugger {
 
 fn type_for_value(value: &Value) -> String {
     match value {
-        Value::Int(int) => "int".to_string(),
-        Value::UInt(int) => "uint".to_string(),
-        Value::Bool(boolean) => "bool".to_string(),
+        Value::Int(_) => "int".to_string(),
+        Value::UInt(_) => "uint".to_string(),
+        Value::Bool(_) => "bool".to_string(),
         Value::Tuple(data) => format!("{}", data.type_signature),
-        Value::Principal(principal_data) => "principal".to_string(),
+        Value::Principal(_) => "principal".to_string(),
         Value::Optional(opt_data) => format!("{}", opt_data.type_signature()),
         Value::Response(res_data) => format!("{}", res_data.type_signature()),
-        Value::Sequence(SequenceData::Buffer(vec_bytes)) => "buff".to_string(),
-        Value::Sequence(SequenceData::String(string)) => "string".to_string(),
-        Value::Sequence(SequenceData::List(list_data)) => "list".to_string(),
+        Value::Sequence(SequenceData::Buffer(_)) => "buff".to_string(),
+        Value::Sequence(SequenceData::String(_)) => "string".to_string(),
+        Value::Sequence(SequenceData::List(_)) => "list".to_string(),
         Value::CallableContract(callable) => {
             if let Some(trait_id) = &callable.trait_identifier {
                 format!("<{}>", trait_id)

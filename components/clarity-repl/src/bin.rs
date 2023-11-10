@@ -6,6 +6,9 @@
 #![allow(non_upper_case_globals)]
 // todo(ludo): would love to eliminate these directives at some point.
 
+#[cfg(test)]
+pub mod test_fixtures;
+
 #[macro_use]
 extern crate serde_json;
 #[macro_use]
@@ -35,8 +38,10 @@ fn main() {
     let subcommand = args.subcommand().unwrap().unwrap_or_default();
     let code = args.subcommand().unwrap();
 
-    let mut settings = SessionSettings::default();
-    settings.include_boot_contracts = vec!["costs".into(), "costs-2".into(), "costs-3".into()];
+    let settings = SessionSettings {
+        include_boot_contracts: vec!["costs".into(), "costs-2".into(), "costs-3".into()],
+        ..Default::default()
+    };
 
     match code {
         Some(code_str) => {

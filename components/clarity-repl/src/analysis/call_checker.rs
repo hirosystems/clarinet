@@ -1,15 +1,16 @@
+use std::collections::HashMap;
+
 use crate::analysis::annotation::Annotation;
 use crate::analysis::ast_visitor::{traverse, ASTVisitor, TypedVar};
 use crate::analysis::{AnalysisPass, AnalysisResult, Settings};
+
 use clarity::vm::analysis::analysis_db::AnalysisDatabase;
-pub use clarity::vm::analysis::types::ContractAnalysis;
-use clarity::vm::ast::ContractAST;
-use clarity::vm::diagnostic::{DiagnosableError, Diagnostic, Level};
+use clarity::vm::diagnostic::{Diagnostic, Level};
 use clarity::vm::representations::SymbolicExpression;
-use clarity::vm::types::{PrincipalData, QualifiedContractIdentifier, Value};
 use clarity::vm::ClarityName;
 use clarity::vm::SymbolicExpressionType::List;
-use std::collections::{BTreeSet, HashMap};
+
+pub use clarity::vm::analysis::types::ContractAnalysis;
 
 pub struct CallChecker<'a> {
     diagnostics: Vec<Diagnostic>,
@@ -92,10 +93,10 @@ impl<'a> CallChecker<'a> {
 impl<'a> ASTVisitor<'a> for CallChecker<'a> {
     fn visit_define_private(
         &mut self,
-        expr: &'a SymbolicExpression,
+        _expr: &'a SymbolicExpression,
         name: &'a ClarityName,
         parameters: Option<Vec<TypedVar<'a>>>,
-        body: &'a SymbolicExpression,
+        _body: &'a SymbolicExpression,
     ) -> bool {
         let num_params = match parameters {
             Some(parameters) => parameters.len(),
@@ -107,10 +108,10 @@ impl<'a> ASTVisitor<'a> for CallChecker<'a> {
 
     fn visit_define_public(
         &mut self,
-        expr: &'a SymbolicExpression,
+        _expr: &'a SymbolicExpression,
         name: &'a ClarityName,
         parameters: Option<Vec<TypedVar<'a>>>,
-        body: &'a SymbolicExpression,
+        _body: &'a SymbolicExpression,
     ) -> bool {
         let num_params = match parameters {
             Some(parameters) => parameters.len(),
@@ -122,10 +123,10 @@ impl<'a> ASTVisitor<'a> for CallChecker<'a> {
 
     fn visit_define_read_only(
         &mut self,
-        expr: &'a SymbolicExpression,
+        _expr: &'a SymbolicExpression,
         name: &'a ClarityName,
         parameters: Option<Vec<TypedVar<'a>>>,
-        body: &'a SymbolicExpression,
+        _body: &'a SymbolicExpression,
     ) -> bool {
         let num_params = match parameters {
             Some(parameters) => parameters.len(),
@@ -160,9 +161,9 @@ impl<'a> ASTVisitor<'a> for CallChecker<'a> {
     fn visit_map_set(
         &mut self,
         expr: &'a SymbolicExpression,
-        name: &'a ClarityName,
-        key: &HashMap<Option<&'a ClarityName>, &'a SymbolicExpression>,
-        value: &HashMap<Option<&'a ClarityName>, &'a SymbolicExpression>,
+        _name: &'a ClarityName,
+        _key: &HashMap<Option<&'a ClarityName>, &'a SymbolicExpression>,
+        _value: &HashMap<Option<&'a ClarityName>, &'a SymbolicExpression>,
     ) -> bool {
         self.check_builtin_arg_count(expr, "map-set", 3);
         true
@@ -171,9 +172,9 @@ impl<'a> ASTVisitor<'a> for CallChecker<'a> {
     fn visit_map_insert(
         &mut self,
         expr: &'a SymbolicExpression,
-        name: &'a ClarityName,
-        key: &HashMap<Option<&'a ClarityName>, &'a SymbolicExpression>,
-        value: &HashMap<Option<&'a ClarityName>, &'a SymbolicExpression>,
+        _name: &'a ClarityName,
+        _key: &HashMap<Option<&'a ClarityName>, &'a SymbolicExpression>,
+        _value: &HashMap<Option<&'a ClarityName>, &'a SymbolicExpression>,
     ) -> bool {
         self.check_builtin_arg_count(expr, "map-insert", 3);
         true
@@ -182,8 +183,8 @@ impl<'a> ASTVisitor<'a> for CallChecker<'a> {
     fn visit_map_delete(
         &mut self,
         expr: &'a SymbolicExpression,
-        name: &'a ClarityName,
-        key: &HashMap<Option<&'a ClarityName>, &'a SymbolicExpression>,
+        _name: &'a ClarityName,
+        _key: &HashMap<Option<&'a ClarityName>, &'a SymbolicExpression>,
     ) -> bool {
         self.check_builtin_arg_count(expr, "map-delete", 2);
         true
@@ -193,9 +194,9 @@ impl<'a> ASTVisitor<'a> for CallChecker<'a> {
 impl AnalysisPass for CallChecker<'_> {
     fn run_pass(
         contract_analysis: &mut ContractAnalysis,
-        analysis_db: &mut AnalysisDatabase,
-        annotations: &Vec<Annotation>,
-        settings: &Settings,
+        _analysis_db: &mut AnalysisDatabase,
+        _annotations: &Vec<Annotation>,
+        _settings: &Settings,
     ) -> AnalysisResult {
         let tc = CallChecker::new();
         tc.run(contract_analysis)
@@ -204,7 +205,6 @@ impl AnalysisPass for CallChecker<'_> {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use crate::repl::session::Session;
     use crate::repl::SessionSettings;
 
