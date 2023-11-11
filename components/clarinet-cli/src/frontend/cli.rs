@@ -1219,7 +1219,13 @@ pub fn main() {
             }
             std::process::exit(exit_code);
         }
-        Command::Integrate(cmd) => devnet_start(cmd, global_settings),
+        Command::Integrate(cmd) => { 
+            println!(
+                "{}",
+                format_warn!("This command is deprecated. Use 'clarinet devnet start' instead"),
+            );
+            devnet_start(cmd, global_settings)
+        }
         Command::LSP => run_lsp(),
         Command::DAP => match super::dap::run_dap() {
             Ok(_) => (),
