@@ -423,9 +423,7 @@ struct DevnetStart {
     )]
     pub use_computed_deployment_plan: bool,
     /// Path to Package.json
-    #[clap(
-        long = "package",
-    )]
+    #[clap(long = "package")]
     pub package: Option<String>,
 }
 
@@ -1203,9 +1201,7 @@ pub fn main() {
             }
             std::process::exit(exit_code);
         }
-        Command::Integrate(cmd) => {
-            devnet_start(cmd, hints_enabled)
-        }
+        Command::Integrate(cmd) => devnet_start(cmd, hints_enabled),
         Command::LSP => run_lsp(),
         Command::DAP => match super::dap::run_dap() {
             Ok(_) => (),
@@ -1242,9 +1238,7 @@ pub fn main() {
                     process::exit(1);
                 }
             }
-            Devnet::DevnetStart(cmd) => {
-                devnet_start(cmd, hints_enabled)
-            }
+            Devnet::DevnetStart(cmd) => devnet_start(cmd, hints_enabled),
         },
 
         Command::Test(_) => {
@@ -1758,19 +1752,25 @@ fn devnet_start(cmd: DevnetStart, hints_enabled: bool) -> () {
     println!("Computing deployment plan");
     let result = match cmd.deployment_plan_path {
         None => {
-            if let Some(package) = cmd.package {
-                println!("{}", package);
-                // file_location = FileLocation::from_path(package);
-                // return serde_json::from_str(file_location.)
-                return
-            }
-            // use package.json instead of deploymentspec if it exists
-            let res = load_deployment_if_exists(
-                &manifest,
-                &StacksNetwork::Devnet,
-                cmd.use_on_disk_deployment_plan,
-                cmd.use_computed_deployment_plan,
-            );
+            let res = if let Some(package) = cmd.package {
+                let package_file = match File::open(&package) {
+                    Ok(file) => file,
+                    Err(_) => {
+                        println!("{} package file not found", red!("error:"));
+                        std::process::exit(1);
+                    }
+                };
+                let deployment: DeploymentSpecification = serde_json::from_reader(package_file)
+                    .expect("error while reading deployment specification");
+                Some(Ok(deployment))
+            } else {
+                load_deployment_if_exists(
+                    &manifest,
+                    &StacksNetwork::Devnet,
+                    cmd.use_on_disk_deployment_plan,
+                    cmd.use_computed_deployment_plan,
+                )
+            };
             match res {
                 Some(Ok(deployment)) => {
                     println!(
@@ -1784,19 +1784,16 @@ fn devnet_start(cmd: DevnetStart, hints_enabled: bool) -> () {
                 Some(Err(e)) => Err(e),
                 None => {
                     let default_deployment_path =
-                        get_default_deployment_path(&manifest, &StacksNetwork::Devnet)
-                            .unwrap();
-                    let (deployment, _) = match generate_default_deployment(
-                        &manifest,
-                        &StacksNetwork::Devnet,
-                        false,
-                    ) {
-                        Ok(deployment) => deployment,
-                        Err(message) => {
-                            println!("{}", red!(message));
-                            std::process::exit(1);
-                        }
-                    };
+                        get_default_deployment_path(&manifest, &StacksNetwork::Devnet).unwrap();
+                    let (deployment, _) =
+                        match generate_default_deployment(&manifest, &StacksNetwork::Devnet, false)
+                        {
+                            Ok(deployment) => deployment,
+                            Err(message) => {
+                                println!("{}", red!(message));
+                                std::process::exit(1);
+                            }
+                        };
                     let res = write_deployment(&deployment, &default_deployment_path, true);
                     if let Err(message) = res {
                         Err(message)
@@ -1812,9 +1809,8 @@ fn devnet_start(cmd: DevnetStart, hints_enabled: bool) -> () {
             }
         }
         Some(deployment_plan_path) => {
-            let deployment_path =
-                get_absolute_deployment_path(&manifest, &deployment_plan_path)
-                    .expect("unable to retrieve deployment");
+            let deployment_path = get_absolute_deployment_path(&manifest, &deployment_plan_path)
+                .expect("unable to retrieve deployment");
             load_deployment(&manifest, &deployment_path)
         }
     };
@@ -1844,8 +1840,7 @@ fn devnet_start(cmd: DevnetStart, hints_enabled: bool) -> () {
             ),
         ));
     }
-    if let Err(e) = start(orchestrator, deployment, None, !cmd.no_dashboard)
-    {
+    if let Err(e) = start(orchestrator, deployment, None, !cmd.no_dashboard) {
         println!("{}", format_err!(e));
         process::exit(1);
     }
