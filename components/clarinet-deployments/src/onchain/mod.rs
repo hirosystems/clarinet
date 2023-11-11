@@ -406,7 +406,7 @@ pub fn apply_on_chain_deployment(
         let epoch = match batch_spec.epoch {
             Some(epoch) => {
                 if network != StacksNetwork::Devnet {
-                    println!("warning: 'epoch' specified for a deployment batch is ignored when applying a deployment plan. This field should only be specified for deployments plans used to launch a devnet with 'clarinet integrate'.");
+                    println!("warning: 'epoch' specified for a deployment batch is ignored when applying a deployment plan. This field should only be specified for deployments plans used to launch a devnet with 'clarinet devnet start'.");
                 }
                 epoch
             }
