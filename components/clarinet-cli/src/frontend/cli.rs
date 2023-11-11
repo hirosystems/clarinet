@@ -1219,7 +1219,7 @@ pub fn main() {
             }
             std::process::exit(exit_code);
         }
-        Command::Integrate(cmd) => { 
+        Command::Integrate(cmd) => {
             println!(
                 "{}",
                 format_warn!("This command is deprecated. Use 'clarinet devnet start' instead"),
@@ -1793,7 +1793,6 @@ fn display_deploy_hint() {
     display_hint_footer();
 }
 
-
 fn devnet_start(cmd: DevnetStart, global_settings: GlobalSettings) -> () {
     let manifest = load_manifest_or_exit(cmd.manifest_path);
     println!("Computing deployment plan");
@@ -1831,19 +1830,16 @@ fn devnet_start(cmd: DevnetStart, global_settings: GlobalSettings) -> () {
                 Some(Err(e)) => Err(e),
                 None => {
                     let default_deployment_path =
-                        get_default_deployment_path(&manifest, &StacksNetwork::Devnet)
-                            .unwrap();
-                    let (deployment, _) = match generate_default_deployment(
-                        &manifest,
-                        &StacksNetwork::Devnet,
-                        false,
-                    ) {
-                        Ok(deployment) => deployment,
-                        Err(message) => {
-                            println!("{}", red!(message));
-                            std::process::exit(1);
-                        }
-                    };
+                        get_default_deployment_path(&manifest, &StacksNetwork::Devnet).unwrap();
+                    let (deployment, _) =
+                        match generate_default_deployment(&manifest, &StacksNetwork::Devnet, false)
+                        {
+                            Ok(deployment) => deployment,
+                            Err(message) => {
+                                println!("{}", red!(message));
+                                std::process::exit(1);
+                            }
+                        };
                     let res = write_deployment(&deployment, &default_deployment_path, true);
                     if let Err(message) = res {
                         Err(message)
@@ -1859,9 +1855,8 @@ fn devnet_start(cmd: DevnetStart, global_settings: GlobalSettings) -> () {
             }
         }
         Some(deployment_plan_path) => {
-            let deployment_path =
-                get_absolute_deployment_path(&manifest, &deployment_plan_path)
-                    .expect("unable to retrieve deployment");
+            let deployment_path = get_absolute_deployment_path(&manifest, &deployment_plan_path)
+                .expect("unable to retrieve deployment");
             load_deployment(&manifest, &deployment_path)
         }
     };
@@ -1891,8 +1886,7 @@ fn devnet_start(cmd: DevnetStart, global_settings: GlobalSettings) -> () {
             ),
         ));
     }
-    if let Err(e) = start(orchestrator, deployment, None, !cmd.no_dashboard)
-    {
+    if let Err(e) = start(orchestrator, deployment, None, !cmd.no_dashboard) {
         println!("{}", format_err!(e));
         process::exit(1);
     }
