@@ -33,7 +33,7 @@ impl<'a> CallChecker<'a> {
         traverse(&mut self, &contract_analysis.expressions);
         self.check_user_calls();
 
-        if self.diagnostics.len() > 0 {
+        if !self.diagnostics.is_empty() {
             Err(self.diagnostics)
         } else {
             Ok(vec![])

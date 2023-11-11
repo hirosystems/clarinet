@@ -9,7 +9,6 @@ edition = "2021"
 serde = "1"
 serde_json = "1"
 serde_derive = "1"
-clarity_repl = { version = "1", package = "clarity-repl", path = "../clarity-repl", default-features = false, features = ["sdk"] }
 reqwest = { version = "0.11", default-features = false, features = [
     "blocking",
     "json",
@@ -20,3 +19,7 @@ pbkdf2 = { version = "0.11.0", features = ["simple"], default-features = false }
 sha2 = "0.10.0"
 tiny-hderive = { version = "0.3.0" }
 libsecp256k1 = { version = "0.7.0" }
+
+clarity_repl = { version = "2", package = "clarity-repl", path = "../clarity-repl", default-features = false, features = [
+    "sdk",
+] }

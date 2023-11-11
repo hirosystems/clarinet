@@ -8,7 +8,7 @@ use lazy_static::lazy_static;
 use std::collections::HashMap;
 
 fn code(code: &str) -> String {
-    vec!["```clarity", code.trim(), "```"].join("\n")
+    ["```clarity", code.trim(), "```"].join("\n")
 }
 
 lazy_static! {
@@ -62,7 +62,7 @@ lazy_static! {
                     &reference.description,
                     separator,
                     "**Example**",
-                    &code(&reference.example),
+                    &code(reference.example),
                     separator,
                     &format!("**Introduced in:** {}", &reference.version),
                 ])

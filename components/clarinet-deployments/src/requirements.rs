@@ -21,7 +21,7 @@ impl Default for ContractMetadata {
 pub async fn retrieve_contract(
     contract_id: &QualifiedContractIdentifier,
     cache_location: &FileLocation,
-    file_accessor: &Option<&Box<dyn FileAccessor>>,
+    file_accessor: &Option<&dyn FileAccessor>,
 ) -> Result<(String, StacksEpochId, ClarityVersion, FileLocation), String> {
     let contract_deployer = contract_id.issuer.to_address();
     let contract_name = contract_id.name.to_string();
@@ -43,21 +43,16 @@ pub async fn retrieve_contract(
         ),
     };
 
-    match (contract_source, metadata_json) {
-        // If both files are present in the cache, return the contract source and metadata.
-        (Ok(contract_source), Ok(metadata_json)) => {
-            let metadata: ContractMetadata = serde_json::from_str(&metadata_json)
-                .map_err(|e| format!("Unable to parse metadata file: {}", e))?;
+    if let (Ok(contract_source), Ok(metadata_json)) = (contract_source, metadata_json) {
+        let metadata: ContractMetadata = serde_json::from_str(&metadata_json)
+            .map_err(|e| format!("Unable to parse metadata file: {}", e))?;
 
-            return Ok((
-                contract_source,
-                metadata.epoch,
-                metadata.clarity_version,
-                contract_location,
-            ));
-        }
-        // Else, we'll fetch the contract source from the Stacks node.
-        _ => {}
+        return Ok((
+            contract_source,
+            metadata.epoch,
+            metadata.clarity_version,
+            contract_location,
+        ));
     }
 
     let is_mainnet = contract_deployer.starts_with("SP");
@@ -80,9 +75,7 @@ pub async fn retrieve_contract(
         Some(1) => ClarityVersion::Clarity1,
         Some(2) => ClarityVersion::Clarity2,
         Some(_) => {
-            return Err(format!(
-                "unable to parse clarity_version (can either be '1' or '2'",
-            ))
+            return Err("unable to parse clarity_version (can either be '1' or '2'".to_string())
         }
         None => ClarityVersion::default_for_epoch(epoch),
     };

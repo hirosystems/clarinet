@@ -21,7 +21,7 @@ pub fn parse_chainhook_full_specification(
     let mut hook_spec_file_reader = BufReader::new(path);
     let specification: ChainhookFullSpecification =
         serde_json::from_reader(&mut hook_spec_file_reader)
-            .map_err(|e| format!("unable to parse chainhook spec: {}", e.to_string()))?;
+            .map_err(|e| format!("unable to parse chainhook spec: {}", e))?;
 
     Ok(specification)
 }
@@ -91,7 +91,7 @@ fn get_chainhooks_files(
         let is_extension_valid = file
             .extension()
             .and_then(|ext| ext.to_str())
-            .and_then(|ext| Some(ext == "json"));
+            .map(|ext| ext == "json");
 
         if let Some(true) = is_extension_valid {
             let relative_path = file.clone();

@@ -58,11 +58,8 @@ impl<'a> App<'a> {
     }
 
     pub fn on_key(&mut self, c: char) {
-        match c {
-            'q' => {
-                self.should_quit = true;
-            }
-            _ => {}
+        if c == 'q' {
+            self.should_quit = true;
         }
     }
 
@@ -136,7 +133,7 @@ impl<'a> App<'a> {
 
     pub fn display_microblock(&mut self, block: StacksMicroblockData) {
         self.tabs.titles.push_front(Spans::from(Span::styled(
-            format!("[·]"),
+            "[·]".to_string(),
             Style::default().fg(Color::White),
         )));
         self.blocks.push(BlockData::Microblock(block));

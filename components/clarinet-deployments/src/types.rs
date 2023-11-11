@@ -47,9 +47,9 @@ impl From<StacksEpochId> for EpochSpec {
     }
 }
 
-impl Into<StacksEpochId> for EpochSpec {
-    fn into(self) -> StacksEpochId {
-        match self {
+impl From<EpochSpec> for StacksEpochId {
+    fn from(val: EpochSpec) -> Self {
+        match val {
             EpochSpec::Epoch2_0 => StacksEpochId::Epoch20,
             EpochSpec::Epoch2_05 => StacksEpochId::Epoch2_05,
             EpochSpec::Epoch2_1 => StacksEpochId::Epoch21,
@@ -263,7 +263,7 @@ pub mod memo_serde {
         match hex_bytes(&hex_memo[2..]) {
             Ok(ref mut bytes) => {
                 bytes.resize(34, 0);
-                memo.copy_from_slice(&bytes);
+                memo.copy_from_slice(bytes);
             }
             Err(_) => {
                 return Err(serde::de::Error::custom(
@@ -322,16 +322,14 @@ impl StxTransferSpecification {
         let mut memo = [0u8; 34];
         if let Some(ref hex_memo) = specs.memo {
             if !hex_memo.is_empty() && !hex_memo.starts_with("0x") {
-                return Err(format!(
-                    "unable to parse memo (up to 34 bytes, starting with '0x')",
-                ));
+                return Err("unable to parse memo (up to 34 bytes, starting with '0x')".to_string());
             }
             match hex_bytes(&hex_memo[2..]) {
                 Ok(ref mut bytes) => {
                     bytes.resize(34, 0);
-                    memo.copy_from_slice(&bytes);
+                    memo.copy_from_slice(bytes);
                 }
-                Err(_) => return Err(format!("unable to parse memo (up to 34 bytes)",)),
+                Err(_) => return Err("unable to parse memo (up to 34 bytes)".to_string()),
             }
         }
 
@@ -472,9 +470,7 @@ impl ContractPublishSpecification {
             }
             _ => None,
         }
-        .ok_or(format!(
-            "unable to parse file location (can either be 'path' or 'url'",
-        ))?;
+        .ok_or("unable to parse file location (can either be 'path' or 'url'".to_string())?;
 
         let source = location.read_content_as_utf8()?;
 
@@ -485,9 +481,7 @@ impl ContractPublishSpecification {
                 } else if clarity_version.eq(&2) {
                     Ok(ClarityVersion::Clarity2)
                 } else {
-                    Err(format!(
-                        "unable to parse clarity_version (can either be '1' or '2'",
-                    ))
+                    Err("unable to parse clarity_version (can either be '1' or '2'".to_string())
                 }
             }
             _ => Ok(DEFAULT_CLARITY_VERSION),
@@ -497,7 +491,7 @@ impl ContractPublishSpecification {
             contract_name,
             expected_sender,
             source,
-            location: location,
+            location,
             cost: specs.cost,
             anchor_block_only: specs.anchor_block_only.unwrap_or(true),
             clarity_version,
@@ -530,7 +524,7 @@ pub mod source_serde {
     where
         S: Serializer,
     {
-        let enc = b64.encode(&x);
+        let enc = b64.encode(x);
         s.serialize_str(&enc)
     }
 
@@ -544,12 +538,12 @@ pub mod source_serde {
 
     pub fn base64_decode(encoded: &str) -> Result<String, String> {
         let bytes = b64
-            .decode(&encoded)
-            .map_err(|e| format!("unable to decode contract source: {}", e.to_string()))?;
+            .decode(encoded)
+            .map_err(|e| format!("unable to decode contract source: {}", e))?;
         let decoded = from_utf8(&bytes).map_err(|e| {
             format!(
                 "invalid UTF-8 sequence when decoding contract source: {}",
-                e.to_string()
+                e
             )
         })?;
         Ok(decoded.to_owned())
@@ -580,7 +574,7 @@ pub mod qualified_contract_identifier_serde {
     use clarity_repl::clarity::vm::types::QualifiedContractIdentifier;
     use serde::{Deserializer, Serializer};
 
-    pub fn serialize<'ser, S>(x: &'ser QualifiedContractIdentifier, s: S) -> Result<S::Ok, S::Error>
+    pub fn serialize<S>(x: &QualifiedContractIdentifier, s: S) -> Result<S::Ok, S::Error>
     where
         S: Serializer,
     {
@@ -602,8 +596,8 @@ pub mod remap_principals_serde {
     use serde::{ser::SerializeMap, Deserializer, Serializer};
     use std::collections::{BTreeMap, HashMap};
 
-    pub fn serialize<'ser, S>(
-        target: &'ser BTreeMap<StandardPrincipalData, StandardPrincipalData>,
+    pub fn serialize<S>(
+        target: &BTreeMap<StandardPrincipalData, StandardPrincipalData>,
         serializer: S,
     ) -> Result<S::Ok, S::Error>
     where
@@ -690,7 +684,7 @@ impl RequirementPublishSpecification {
         let mut remap_principals = BTreeMap::new();
         if let Some(ref remap_principals_spec) = specs.remap_principals {
             for (src_spec, dst_spec) in remap_principals_spec {
-                let src = match PrincipalData::parse_standard_principal(&src_spec) {
+                let src = match PrincipalData::parse_standard_principal(src_spec) {
                     Ok(res) => res,
                     Err(_) => {
                         return Err(format!(
@@ -699,7 +693,7 @@ impl RequirementPublishSpecification {
                         ))
                     }
                 };
-                let dst = match PrincipalData::parse_standard_principal(&dst_spec) {
+                let dst = match PrincipalData::parse_standard_principal(dst_spec) {
                     Ok(res) => res,
                     Err(_) => {
                         return Err(format!(
@@ -718,9 +712,7 @@ impl RequirementPublishSpecification {
             }
             _ => None,
         }
-        .ok_or(format!(
-            "unable to parse file location (can either be 'path' or 'url'",
-        ))?;
+        .ok_or("unable to parse file location (can either be 'path' or 'url'".to_string())?;
 
         let source = location.read_content_as_utf8()?;
 
@@ -731,9 +723,7 @@ impl RequirementPublishSpecification {
                 } else if clarity_version.eq(&2) {
                     Ok(ClarityVersion::Clarity2)
                 } else {
-                    Err(format!(
-                        "unable to parse clarity_version (can either be '1' or '2'",
-                    ))
+                    Err("unable to parse clarity_version (can either be '1' or '2'".to_string())
                 }
             }
             _ => Ok(DEFAULT_CLARITY_VERSION),
@@ -745,7 +735,7 @@ impl RequirementPublishSpecification {
             remap_principals,
             source,
             clarity_version,
-            location: location,
+            location,
             cost: specs.cost,
         })
     }
@@ -847,9 +837,7 @@ impl EmulatedContractPublishSpecification {
             }
             _ => None,
         }
-        .ok_or(format!(
-            "unable to parse file location (can either be 'path' or 'url'",
-        ))?;
+        .ok_or("unable to parse file location (can either be 'path' or 'url'".to_string())?;
 
         let clarity_version = match specs.clarity_version {
             Some(clarity_version) => {
@@ -858,9 +846,7 @@ impl EmulatedContractPublishSpecification {
                 } else if clarity_version.eq(&2) {
                     Ok(ClarityVersion::Clarity2)
                 } else {
-                    Err(format!(
-                        "unable to parse clarity_version (can either be '1' or '2'",
-                    ))
+                    Err("unable to parse clarity_version (can either be '1' or '2'".to_string())
                 }
             }
             _ => Ok(DEFAULT_CLARITY_VERSION),
@@ -902,8 +888,8 @@ pub mod contracts_serde {
 
     use super::source_serde;
 
-    pub fn serialize<'ser, S>(
-        target: &'ser BTreeMap<QualifiedContractIdentifier, (String, FileLocation)>,
+    pub fn serialize<S>(
+        target: &BTreeMap<QualifiedContractIdentifier, (String, FileLocation)>,
         serializer: S,
     ) -> Result<S::Ok, S::Error>
     where
@@ -911,7 +897,7 @@ pub mod contracts_serde {
     {
         let mut out = serializer.serialize_seq(Some(target.len()))?;
         for (contract_id, (source, file_location)) in target {
-            let encoded = b64.encode(&source);
+            let encoded = b64.encode(source);
             let mut map = BTreeMap::new();
             map.insert("contract_id", contract_id.to_string());
             map.insert("source", encoded);
@@ -938,11 +924,9 @@ pub mod contracts_serde {
 
         for entry in container {
             let contract_id = match entry.get("contract_id") {
-                Some(contract_id) => {
-                    QualifiedContractIdentifier::parse(&contract_id).map_err(|e| {
-                        serde::de::Error::custom(format!("failed to parse contract id: {}", e))
-                    })
-                }
+                Some(contract_id) => QualifiedContractIdentifier::parse(contract_id).map_err(|e| {
+                    serde::de::Error::custom(format!("failed to parse contract id: {}", e))
+                }),
                 None => Err(serde::de::Error::custom(
                     "Contract entry must have `contract_id` field",
                 )),
@@ -959,7 +943,7 @@ pub mod contracts_serde {
 
             let source = match entry.get("source") {
                 Some(source) => {
-                    source_serde::base64_decode(&source).map_err(serde::de::Error::custom)
+                    source_serde::base64_decode(source).map_err(serde::de::Error::custom)
                 }
                 None => Err(serde::de::Error::custom(
                     "Contract entry must have `source` field",
@@ -1137,10 +1121,7 @@ impl DeploymentSpecification {
             stacks_node: self.stacks_node.clone(),
             bitcoin_node: self.bitcoin_node.clone(),
             node: None,
-            genesis: match self.genesis {
-                Some(ref g) => Some(g.to_specification_file()),
-                None => None,
-            },
+            genesis: self.genesis.as_ref().map(|g| g.to_specification_file()),
             plan: Some(self.plan.to_specification_file()),
         }
     }
@@ -1238,7 +1219,7 @@ impl WalletSpecification {
             }
         };
 
-        let balance = match u128::from_str_radix(&specs.balance, 10) {
+        let balance = match specs.balance.parse::<u128>() {
             Ok(res) => res,
             Err(_) => {
                 return Err(format!(

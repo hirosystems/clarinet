@@ -124,7 +124,7 @@ impl ClarityContract {
             }
             ContractDeployer::Transient => StandardPrincipalData::transient(),
             ContractDeployer::Address(address) => {
-                PrincipalData::parse_standard_principal(&address).expect("unable to parse address")
+                PrincipalData::parse_standard_principal(address).expect("unable to parse address")
             }
             ContractDeployer::DefaultDeployer => default_deployer
                 .expect("default provider should have been provided")

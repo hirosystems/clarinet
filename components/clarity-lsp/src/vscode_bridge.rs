@@ -140,7 +140,7 @@ impl LspVscodeBridge {
 
         future_to_promise(async move {
             let mut result =
-                process_notification(command, &mut editor_state_lock, Some(&file_accessor)).await;
+                process_notification(command, &mut editor_state_lock, Some(&*file_accessor)).await;
 
             let mut aggregated_diagnostics = vec![];
             if let Err(err) = result {
@@ -161,13 +161,13 @@ impl LspVscodeBridge {
                 aggregated_diagnostics.append(&mut response.aggregated_diagnostics);
             }
 
-            for (location, mut diags) in aggregated_diagnostics.into_iter() {
+            for (location, diags) in aggregated_diagnostics.into_iter() {
                 if let Ok(uri) = Url::parse(&location.to_string()) {
                     send_diagnostic.call1(
                         &JsValue::NULL,
                         &encode_to_js(&PublishDiagnosticsParams {
                             uri,
-                            diagnostics: clarity_diagnostics_to_lsp_type(&mut diags),
+                            diagnostics: clarity_diagnostics_to_lsp_type(&diags),
                             version: None,
                         })?,
                     )?;
@@ -198,7 +198,7 @@ impl LspVscodeBridge {
             Completion::METHOD => {
                 let lsp_response = process_request(
                     LspRequest::Completion(decode_from_js(js_params)?),
-                    &mut EditorStateInput::RwLock(self.editor_state_lock.clone()),
+                    &EditorStateInput::RwLock(self.editor_state_lock.clone()),
                 );
                 if let Ok(LspRequestResponse::CompletionItems(response)) = lsp_response {
                     return response.serialize(&serializer).map_err(|_| JsValue::NULL);
@@ -208,7 +208,7 @@ impl LspVscodeBridge {
             SignatureHelpRequest::METHOD => {
                 let lsp_response = process_request(
                     LspRequest::SignatureHelp(decode_from_js(js_params)?),
-                    &mut EditorStateInput::RwLock(self.editor_state_lock.clone()),
+                    &EditorStateInput::RwLock(self.editor_state_lock.clone()),
                 );
                 if let Ok(LspRequestResponse::SignatureHelp(response)) = lsp_response {
                     return response.serialize(&serializer).map_err(|_| JsValue::NULL);
@@ -218,7 +218,7 @@ impl LspVscodeBridge {
             GotoDefinition::METHOD => {
                 let lsp_response = process_request(
                     LspRequest::Definition(decode_from_js(js_params)?),
-                    &mut EditorStateInput::RwLock(self.editor_state_lock.clone()),
+                    &EditorStateInput::RwLock(self.editor_state_lock.clone()),
                 );
                 if let Ok(LspRequestResponse::Definition(response)) = lsp_response {
                     return response.serialize(&serializer).map_err(|_| JsValue::NULL);
@@ -228,7 +228,7 @@ impl LspVscodeBridge {
             DocumentSymbolRequest::METHOD => {
                 let lsp_response = process_request(
                     LspRequest::DocumentSymbol(decode_from_js(js_params)?),
-                    &mut EditorStateInput::RwLock(self.editor_state_lock.clone()),
+                    &EditorStateInput::RwLock(self.editor_state_lock.clone()),
                 );
                 if let Ok(LspRequestResponse::DocumentSymbol(response)) = lsp_response {
                     return response.serialize(&serializer).map_err(|_| JsValue::NULL);
@@ -238,7 +238,7 @@ impl LspVscodeBridge {
             HoverRequest::METHOD => {
                 let lsp_response = process_request(
                     LspRequest::Hover(decode_from_js(js_params)?),
-                    &mut EditorStateInput::RwLock(self.editor_state_lock.clone()),
+                    &EditorStateInput::RwLock(self.editor_state_lock.clone()),
                 );
                 if let Ok(LspRequestResponse::Hover(response)) = lsp_response {
                     return response.serialize(&serializer).map_err(|_| JsValue::NULL);
@@ -252,6 +252,6 @@ impl LspVscodeBridge {
         };
 
         // expect for Initialize, the failing requests can be ignored
-        return Ok(JsValue::NULL);
+        Ok(JsValue::NULL)
     }
 }

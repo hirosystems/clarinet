@@ -62,7 +62,7 @@ impl FileAccessor for WASMFileSystemAccessor {
         Box::pin(async move {
             file_exists_request
                 .await
-                .and_then(|r| Ok(decode_from_js(r).map_err(|err| err.to_string())?))
+                .and_then(|r| decode_from_js(r).map_err(|err| err.to_string()))
         })
     }
 
@@ -73,7 +73,7 @@ impl FileAccessor for WASMFileSystemAccessor {
         Box::pin(async move {
             read_file_promise
                 .await
-                .and_then(|r| Ok(decode_from_js(r).map_err(|err| err.to_string())?))
+                .and_then(|r| decode_from_js(r).map_err(|err| err.to_string()))
         })
     }
 
@@ -91,7 +91,7 @@ impl FileAccessor for WASMFileSystemAccessor {
         Box::pin(async move {
             read_contract_promise
                 .await
-                .and_then(|r| Ok(decode_from_js(r).map_err(|err| err.to_string())?))
+                .and_then(|r| decode_from_js(r).map_err(|err| err.to_string()))
         })
     }
 
@@ -104,6 +104,6 @@ impl FileAccessor for WASMFileSystemAccessor {
             },
         );
 
-        Box::pin(async move { write_file_promise.await.and_then(|_| Ok(())) })
+        Box::pin(async move { write_file_promise.await.map(|_| ()) })
     }
 }

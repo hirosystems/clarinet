@@ -1,5 +1,4 @@
 use std::future::Future;
-use tokio;
 
 pub fn create_basic_runtime() -> tokio::runtime::Runtime {
     tokio::runtime::Builder::new_current_thread()
@@ -18,8 +17,7 @@ pub fn nestable_block_on<F: Future>(future: F) -> F::Output {
             (rt.handle().clone(), Some(rt))
         }
     };
-    let response = handle.block_on(async { future.await });
-    response
+    handle.block_on(future)
 }
 
 // pub fn spawn_async_thread_named<F: Future>(name: &str, f: F) -> io::Result<JoinHandle<F::Output>> {

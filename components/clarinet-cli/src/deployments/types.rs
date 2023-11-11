@@ -34,11 +34,11 @@ impl DeploymentSynthesis {
             Ok(res) => res,
             Err(err) => panic!("unable to serialize deployment {}", err),
         };
-        return DeploymentSynthesis {
+        DeploymentSynthesis {
             total_cost,
             blocks_count,
             content,
-        };
+        }
     }
 }
 

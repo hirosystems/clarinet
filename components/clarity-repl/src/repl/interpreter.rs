@@ -129,7 +129,7 @@ impl ClarityInterpreter {
         }
     }
 
-    pub fn run<'hooks>(
+    pub fn run(
         &mut self,
         contract: &ClarityContract,
         cost_track: bool,
@@ -141,7 +141,7 @@ impl ClarityInterpreter {
             self.collect_annotations(&ast, contract.expect_in_memory_code_source());
         diagnostics.append(&mut annotation_diagnostics);
         let (analysis, mut analysis_diagnostics) =
-            match self.run_analysis(&contract, &mut ast, &annotations) {
+            match self.run_analysis(contract, &mut ast, &annotations) {
                 Ok((analysis, diagnostics)) => (analysis, diagnostics),
                 Err((_, Some(diagnostic), _)) => {
                     diagnostics.push(diagnostic);
@@ -156,7 +156,7 @@ impl ClarityInterpreter {
             return Err(diagnostics);
         }
 
-        let mut result = match self.execute(&contract, &mut ast, analysis, cost_track, eval_hooks) {
+        let mut result = match self.execute(contract, &mut ast, analysis, cost_track, eval_hooks) {
             Ok(result) => result,
             Err((_, Some(diagnostic), _)) => {
                 diagnostics.push(diagnostic);
@@ -182,15 +182,15 @@ impl ClarityInterpreter {
         Ok(result)
     }
 
-    pub fn run_ast<'a, 'hooks>(
-        &'a mut self,
+    pub fn run_ast(
+        &mut self,
         contract: &ClarityContract,
         ast: &mut ContractAST,
         cost_track: bool,
         eval_hooks: Option<Vec<&mut dyn EvalHook>>,
     ) -> Result<ExecutionResult, Vec<Diagnostic>> {
         let code_source = contract.expect_in_memory_code_source();
-        let (annotations, mut diagnostics) = self.collect_annotations(&ast, &code_source);
+        let (annotations, mut diagnostics) = self.collect_annotations(ast, code_source);
 
         let (analysis, mut analysis_diagnostics) =
             match self.run_analysis(contract, ast, &annotations) {
@@ -270,10 +270,10 @@ impl ClarityInterpreter {
             contract.expect_resolved_contract_identifier(Some(&self.tx_sender));
         build_ast_with_diagnostics(
             &contract_identifier,
-            &source_code,
+            source_code,
             &mut (),
-            contract.clarity_version.clone(),
-            contract.epoch.clone(),
+            contract.clarity_version,
+            contract.epoch,
         )
     }
 
@@ -294,13 +294,13 @@ impl ClarityInterpreter {
                         end_line: (n + 1) as u32,
                         end_column: line.len() as u32,
                     };
-                    if let Some(annotation_string) = annotation_string.strip_suffix("]") {
+                    if let Some(annotation_string) = annotation_string.strip_suffix(']') {
                         let kind: AnnotationKind = match annotation_string.trim().parse() {
                             Ok(kind) => kind,
                             Err(e) => {
                                 diagnostics.push(Diagnostic {
                                     level: Level::Warning,
-                                    message: format!("{}", e),
+                                    message: e.to_string(),
                                     spans: vec![span.clone()],
                                     suggestion: None,
                                 });
@@ -338,8 +338,8 @@ impl ClarityInterpreter {
             &mut analysis_db,
             false,
             LimitedCostTracker::new_free(),
-            contract.epoch.clone(),
-            contract.clarity_version.clone(),
+            contract.epoch,
+            contract.clarity_version,
         ) {
             Ok(res) => res,
             Err((error, cost_tracker)) => {
@@ -442,8 +442,8 @@ impl ClarityInterpreter {
     }
 
     #[allow(unused_assignments)]
-    pub fn execute<'a, 'hooks>(
-        &'a mut self,
+    pub fn execute(
+        &mut self,
         contract: &ClarityContract,
         contract_ast: &mut ContractAST,
         contract_analysis: ContractAnalysis,
@@ -502,7 +502,7 @@ impl ClarityInterpreter {
                     let mut call_stack = CallStack::new();
                     let mut env = Environment::new(
                         g,
-                        &mut contract_context,
+                        &contract_context,
                         &mut call_stack,
                         Some(tx_sender.clone()),
                         Some(tx_sender.clone()),
@@ -537,11 +537,9 @@ impl ClarityInterpreter {
                                 )?;
                                 Ok(Some(res))
                             }
-                            _ => eval(&contract_ast.expressions[0], &mut env, &context)
-                                .and_then(|r| Ok(Some(r))),
+                            _ => eval(&contract_ast.expressions[0], &mut env, &context).map(Some),
                         },
-                        _ => eval(&contract_ast.expressions[0], &mut env, &context)
-                            .and_then(|r| Ok(Some(r))),
+                        _ => eval(&contract_ast.expressions[0], &mut env, &context).map(Some),
                     };
                     result
                 } else {
@@ -584,12 +582,12 @@ impl ClarityInterpreter {
                         accounts_to_debit.push((
                             event_data.sender.to_string(),
                             "STX".to_string(),
-                            event_data.amount.clone(),
+                            event_data.amount,
                         ));
                         accounts_to_credit.push((
                             event_data.recipient.to_string(),
                             "STX".to_string(),
-                            event_data.amount.clone(),
+                            event_data.amount,
                         ));
                     }
                     StacksTransactionEvent::STXEvent(STXEventType::STXMintEvent(
@@ -598,7 +596,7 @@ impl ClarityInterpreter {
                         accounts_to_credit.push((
                             event_data.recipient.to_string(),
                             "STX".to_string(),
-                            event_data.amount.clone(),
+                            event_data.amount,
                         ));
                     }
                     StacksTransactionEvent::STXEvent(STXEventType::STXBurnEvent(
@@ -607,7 +605,7 @@ impl ClarityInterpreter {
                         accounts_to_debit.push((
                             event_data.sender.to_string(),
                             "STX".to_string(),
-                            event_data.amount.clone(),
+                            event_data.amount,
                         ));
                     }
                     StacksTransactionEvent::FTEvent(FTEventType::FTTransferEvent(
@@ -616,26 +614,26 @@ impl ClarityInterpreter {
                         accounts_to_credit.push((
                             event_data.recipient.to_string(),
                             event_data.asset_identifier.sugared(),
-                            event_data.amount.clone(),
+                            event_data.amount,
                         ));
                         accounts_to_debit.push((
                             event_data.sender.to_string(),
                             event_data.asset_identifier.sugared(),
-                            event_data.amount.clone(),
+                            event_data.amount,
                         ));
                     }
                     StacksTransactionEvent::FTEvent(FTEventType::FTMintEvent(ref event_data)) => {
                         accounts_to_credit.push((
                             event_data.recipient.to_string(),
                             event_data.asset_identifier.sugared(),
-                            event_data.amount.clone(),
+                            event_data.amount,
                         ));
                     }
                     StacksTransactionEvent::FTEvent(FTEventType::FTBurnEvent(ref event_data)) => {
                         accounts_to_debit.push((
                             event_data.sender.to_string(),
                             event_data.asset_identifier.sugared(),
-                            event_data.amount.clone(),
+                            event_data.amount,
                         ));
                     }
                     StacksTransactionEvent::NFTEvent(NFTEventType::NFTTransferEvent(
@@ -677,8 +675,8 @@ impl ClarityInterpreter {
                 events.push(event);
             }
 
-            contract_saved =
-                contract_context.functions.len() > 0 || contract_context.defined_traits.len() > 0;
+            contract_saved = !contract_context.functions.is_empty()
+                || !contract_context.defined_traits.is_empty();
 
             let eval_result = if contract_saved {
                 let mut functions = BTreeMap::new();
@@ -706,7 +704,7 @@ impl ClarityInterpreter {
 
                 global_context
                     .database
-                    .insert_contract_hash(&contract_identifier, &snippet)
+                    .insert_contract_hash(&contract_identifier, snippet)
                     .unwrap();
                 let contract = Contract { contract_context };
                 global_context
@@ -755,7 +753,7 @@ impl ClarityInterpreter {
 
         if contract_saved {
             let mut analysis_db = AnalysisDatabase::new(&mut self.datastore);
-            let _ = analysis_db
+            analysis_db
                 .execute(|db| db.insert_contract(&contract_identifier, &contract_analysis))
                 .expect("Unable to save data");
         }
@@ -866,7 +864,7 @@ impl ClarityInterpreter {
     pub fn get_balance_for_account(&self, account: &str, token: &str) -> u128 {
         match self.tokens.get(token) {
             Some(balances) => match balances.get(account) {
-                Some(value) => value.clone(),
+                Some(value) => *value,
                 _ => 0,
             },
             _ => 0,

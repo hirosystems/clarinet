@@ -65,7 +65,7 @@ networks:
             .expect("unable to retrieve project root");
         new_file.append_path(&format!("chainhooks/{}", name))?;
         if new_file.exists() {
-            return Err(format!("{} already exists", new_file.to_string()));
+            return Err(format!("{} already exists", new_file));
         }
         let change = FileCreation {
             comment: format!("{} chainhooks/{}", green!("Created file"), name),

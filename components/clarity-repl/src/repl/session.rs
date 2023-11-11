@@ -52,9 +52,9 @@ pub static V3_BOOT_CONTRACTS: &[&str] = &["pox-3"];
 
 lazy_static! {
     static ref BOOT_TESTNET_PRINCIPAL: StandardPrincipalData =
-        PrincipalData::parse_standard_principal(&BOOT_TESTNET_ADDRESS).unwrap();
+        PrincipalData::parse_standard_principal(BOOT_TESTNET_ADDRESS).unwrap();
     static ref BOOT_MAINNET_PRINCIPAL: StandardPrincipalData =
-        PrincipalData::parse_standard_principal(&BOOT_MAINNET_ADDRESS).unwrap();
+        PrincipalData::parse_standard_principal(BOOT_MAINNET_ADDRESS).unwrap();
 }
 
 lazy_static! {
@@ -219,13 +219,13 @@ impl Session {
             let default_tx_sender = self.interpreter.get_tx_sender();
 
             let boot_testnet_deployer =
-                PrincipalData::parse_standard_principal(&BOOT_TESTNET_ADDRESS)
+                PrincipalData::parse_standard_principal(BOOT_TESTNET_ADDRESS)
                     .expect("Unable to parse deployer's address");
             self.interpreter.set_tx_sender(boot_testnet_deployer);
             self.include_boot_contracts(false);
 
             let boot_mainnet_deployer =
-                PrincipalData::parse_standard_principal(&BOOT_MAINNET_ADDRESS)
+                PrincipalData::parse_standard_principal(BOOT_MAINNET_ADDRESS)
                     .expect("Unable to parse deployer's address");
             self.interpreter.set_tx_sender(boot_mainnet_deployer);
             self.include_boot_contracts(true);
@@ -297,12 +297,9 @@ impl Session {
             None,
         ) {
             Ok((mut output, result)) => {
-                match result.result {
-                    EvaluationResult::Contract(contract_result) => {
-                        let snippet = format!("→ .{} contract successfully stored. Use (contract-call? ...) for invoking the public functions:", contract_result.contract.contract_identifier.clone());
-                        output.push(green!(snippet));
-                    }
-                    _ => (),
+                if let EvaluationResult::Contract(contract_result) = result.result {
+                    let snippet = format!("→ .{} contract successfully stored. Use (contract-call? ...) for invoking the public functions:", contract_result.contract.contract_identifier.clone());
+                    output.push(green!(snippet));
                 };
                 (output, result.cost.clone())
             }
@@ -318,7 +315,7 @@ impl Session {
             ];
             let mut headers_cells = vec![];
             for header in headers.iter() {
-                headers_cells.push(Cell::new(&header));
+                headers_cells.push(Cell::new(header));
             }
             let mut table = Table::new();
             table.add_row(Row::new(headers_cells));
@@ -374,8 +371,8 @@ impl Session {
         format!("{calc:.2} %")
     }
 
-    pub fn formatted_interpretation<'a, 'hooks>(
-        &'a mut self,
+    pub fn formatted_interpretation(
+        &mut self,
         snippet: String,
         name: Option<String>,
         cost_track: bool,
@@ -399,7 +396,7 @@ impl Session {
                         &formatted_lines,
                     ));
                 }
-                if result.events.len() > 0 {
+                if !result.events.is_empty() {
                     output.push(black!("Events emitted"));
                     for event in result.events.iter() {
                         output.push(black!(format!("{}", utils::serialize_event(event))));
@@ -430,7 +427,7 @@ impl Session {
     pub fn debug(&mut self, output: &mut Vec<String>, cmd: &str) {
         use crate::repl::debug::cli::CLIDebugger;
 
-        let snippet = match cmd.split_once(" ") {
+        let snippet = match cmd.split_once(' ') {
             Some((_, snippet)) => snippet,
             _ => return output.push(red!("Usage: ::debug <expr>")),
         };
@@ -445,12 +442,9 @@ impl Session {
             None,
         ) {
             Ok((mut output, result)) => {
-                match result.result {
-                    EvaluationResult::Contract(contract_result) => {
-                        let snippet = format!("→ .{} contract successfully stored. Use (contract-call? ...) for invoking the public functions:", contract_result.contract.contract_identifier.clone());
-                        output.push(green!(snippet));
-                    }
-                    _ => (),
+                if let EvaluationResult::Contract(contract_result) = result.result {
+                    let snippet = format!("→ .{} contract successfully stored. Use (contract-call? ...) for invoking the public functions:", contract_result.contract.contract_identifier.clone());
+                    output.push(green!(snippet));
                 };
                 output
             }
@@ -463,7 +457,7 @@ impl Session {
     pub fn trace(&mut self, output: &mut Vec<String>, cmd: &str) {
         use super::tracer::Tracer;
 
-        let snippet = match cmd.split_once(" ") {
+        let snippet = match cmd.split_once(' ') {
             Some((_, snippet)) => snippet,
             _ => return output.push(red!("Usage: ::trace <expr>")),
         };
@@ -492,7 +486,7 @@ impl Session {
             self.load_boot_contracts();
         }
 
-        if self.settings.initial_accounts.len() > 0 {
+        if !self.settings.initial_accounts.is_empty() {
             let mut initial_accounts = self.settings.initial_accounts.clone();
             for account in initial_accounts.drain(..) {
                 let recipient = match PrincipalData::parse(&account.address) {
@@ -521,7 +515,7 @@ impl Session {
 
     #[cfg(feature = "cli")]
     pub fn read(&mut self, output: &mut Vec<String>, cmd: &str) {
-        let filename = match cmd.split_once(" ") {
+        let filename = match cmd.split_once(' ') {
             Some((_, filename)) => filename,
             _ => return output.push(red!("Usage: ::read <filename>")),
         };
@@ -564,11 +558,7 @@ impl Session {
             return Err(vec![diagnostic]);
         }
         let mut hooks: Vec<&mut dyn EvalHook> = Vec::new();
-        let mut coverage = if let Some(test_name) = test_name {
-            Some(TestCoverageReport::new(test_name.into()))
-        } else {
-            None
-        };
+        let mut coverage = test_name.map(TestCoverageReport::new);
         if let Some(coverage) = &mut coverage {
             hooks.push(coverage);
         };
@@ -594,16 +584,13 @@ impl Session {
                 if let Some(ref coverage) = coverage {
                     self.coverage_reports.push(coverage.clone());
                 }
-                match &result.result {
-                    EvaluationResult::Contract(contract_result) => {
-                        self.asts
-                            .insert(contract_id.clone(), contract_result.contract.ast.clone());
-                        self.contracts.insert(
-                            contract_id.to_string(),
-                            contract_result.contract.function_args.clone(),
-                        );
-                    }
-                    _ => (),
+                if let EvaluationResult::Contract(contract_result) = &result.result {
+                    self.asts
+                        .insert(contract_id.clone(), contract_result.contract.ast.clone());
+                    self.contracts.insert(
+                        contract_id.to_string(),
+                        contract_result.contract.function_args.clone(),
+                    );
                 };
                 Ok(result)
             }
@@ -615,13 +602,13 @@ impl Session {
         &mut self,
         contract: &str,
         method: &str,
-        args: &Vec<String>,
+        args: &[String],
         sender: &str,
         test_name: String,
     ) -> Result<(ExecutionResult, QualifiedContractIdentifier), Vec<Diagnostic>> {
         let initial_tx_sender = self.get_tx_sender();
         // Handle fully qualified contract_id and sugared syntax
-        let contract_id = if contract.starts_with("S") {
+        let contract_id = if contract.starts_with('S') {
             contract.to_string()
         } else {
             format!("{}.{}", initial_tx_sender, contract,)
@@ -641,7 +628,7 @@ impl Session {
             code_source: ClarityCodeSource::ContractInMemory(contract_call),
             name: "contract-call".to_string(),
             deployer: ContractDeployer::Address(sender.to_string()),
-            epoch: self.current_epoch.clone(),
+            epoch: self.current_epoch,
             clarity_version: ClarityVersion::default_for_epoch(self.current_epoch),
         };
 
@@ -670,8 +657,8 @@ impl Session {
         Ok((execution, contract_identifier))
     }
 
-    pub fn eval<'a>(
-        &'a mut self,
+    pub fn eval(
+        &mut self,
         snippet: String,
         eval_hooks: Option<Vec<&mut dyn EvalHook>>,
         cost_track: bool,
@@ -690,18 +677,15 @@ impl Session {
 
         match result {
             Ok(result) => {
-                match &result.result {
-                    EvaluationResult::Contract(contract_result) => {
-                        self.asts.insert(
-                            contract_identifier.clone(),
-                            contract_result.contract.ast.clone(),
-                        );
-                        self.contracts.insert(
-                            contract_result.contract.contract_identifier.clone(),
-                            contract_result.contract.function_args.clone(),
-                        );
-                    }
-                    _ => (),
+                if let EvaluationResult::Contract(contract_result) = &result.result {
+                    self.asts.insert(
+                        contract_identifier.clone(),
+                        contract_result.contract.ast.clone(),
+                    );
+                    self.contracts.insert(
+                        contract_result.contract.contract_identifier.clone(),
+                        contract_result.contract.function_args.clone(),
+                    );
                 };
                 Ok(result)
             }
@@ -724,8 +708,8 @@ impl Session {
     pub fn get_api_reference_index(&self) -> Vec<String> {
         let mut keys = self
             .api_reference
-            .iter()
-            .map(|(k, _)| k.to_string())
+            .keys()
+            .map(|k| k.to_string())
             .collect::<Vec<String>>();
         keys.sort();
         keys
@@ -734,8 +718,8 @@ impl Session {
     pub fn get_clarity_keywords(&self) -> Vec<String> {
         let mut keys = self
             .keywords_reference
-            .iter()
-            .map(|(k, _)| k.to_string())
+            .keys()
+            .map(|k| k.to_string())
             .collect::<Vec<String>>();
         keys.sort();
         keys
@@ -833,14 +817,14 @@ impl Session {
     }
 
     #[cfg(not(feature = "wasm"))]
-    fn easter_egg(&self, output: &mut Vec<String>) {
+    fn easter_egg(&self, output: &mut [String]) {
         let result = hiro_system_kit::nestable_block_on(fetch_message());
         let message = result.unwrap_or("You found it!".to_string());
         println!("{}", message);
     }
 
     #[cfg(feature = "wasm")]
-    fn easter_egg(&self, output: &mut Vec<String>) {}
+    fn easter_egg(&self, output: &mut [String]) {}
 
     fn parse_and_advance_chain_tip(&mut self, output: &mut Vec<String>, command: &str) {
         let args: Vec<_> = command.split(' ').collect();
@@ -877,7 +861,7 @@ impl Session {
             return;
         }
 
-        let tx_sender = match PrincipalData::parse_standard_principal(&args[1]) {
+        let tx_sender = match PrincipalData::parse_standard_principal(args[1]) {
             Ok(address) => address,
             _ => {
                 output.push(red!("Unable to parse the address"));
@@ -927,7 +911,7 @@ impl Session {
     }
 
     pub fn set_epoch(&mut self, output: &mut Vec<String>, cmd: &str) {
-        let epoch = match cmd.split_once(" ") {
+        let epoch = match cmd.split_once(' ') {
             Some((_, epoch)) if epoch.eq("2.0") => StacksEpochId::Epoch20,
             Some((_, epoch)) if epoch.eq("2.05") => StacksEpochId::Epoch2_05,
             Some((_, epoch)) if epoch.eq("2.1") => StacksEpochId::Epoch21,
@@ -949,7 +933,7 @@ impl Session {
     }
 
     pub fn encode(&mut self, output: &mut Vec<String>, cmd: &str) {
-        let snippet = match cmd.split_once(" ") {
+        let snippet = match cmd.split_once(' ') {
             Some((_, snippet)) => snippet,
             _ => return output.push(red!("Usage: ::encode <expr>")),
         };
@@ -968,9 +952,8 @@ impl Session {
                     }
                     EvaluationResult::Snippet(snippet_result) => snippet_result.result,
                 };
-                match value.consensus_serialize(&mut tx_bytes) {
-                    Err(e) => return output.push(red!(format!("{}", e))),
-                    _ => (),
+                if let Err(e) = value.consensus_serialize(&mut tx_bytes) {
+                    return output.push(red!(format!("{}", e)));
                 };
                 let mut s = String::with_capacity(2 * tx_bytes.len());
                 for byte in tx_bytes {
@@ -981,7 +964,7 @@ impl Session {
             Err(diagnostics) => {
                 let lines: Vec<String> = snippet.split('\n').map(|s| s.to_string()).collect();
                 for d in diagnostics {
-                    output.append(&mut output_diagnostic(&d, &"encode".to_string(), &lines));
+                    output.append(&mut output_diagnostic(&d, "encode", &lines));
                 }
                 red!("encoding failed")
             }
@@ -990,7 +973,7 @@ impl Session {
     }
 
     pub fn decode(&mut self, output: &mut Vec<String>, cmd: &str) {
-        let byteString = match cmd.split_once(" ") {
+        let byteString = match cmd.split_once(' ') {
             Some((_, bytes)) => bytes,
             _ => return output.push(red!("Usage: ::decode <hex-bytes>")),
         };
@@ -1009,7 +992,7 @@ impl Session {
     pub fn get_costs(&mut self, output: &mut Vec<String>, cmd: &str) {
         let command: String = cmd.to_owned();
 
-        let expr = match cmd.split_once(" ") {
+        let expr = match cmd.split_once(' ') {
             Some((_, expr)) => expr,
             _ => return output.push(red!("Usage: ::get_costs <expr>")),
         };
@@ -1020,7 +1003,7 @@ impl Session {
     #[cfg(feature = "cli")]
     fn get_accounts(&self, output: &mut Vec<String>) {
         let accounts = self.interpreter.get_accounts();
-        if accounts.len() > 0 {
+        if !accounts.is_empty() {
             let tokens = self.interpreter.get_tokens();
             let mut headers = vec!["Address".to_string()];
             for token in tokens.iter() {
@@ -1033,7 +1016,7 @@ impl Session {
 
             let mut headers_cells = vec![];
             for header in headers.iter() {
-                headers_cells.push(Cell::new(&header));
+                headers_cells.push(Cell::new(header));
             }
             let mut table = Table::new();
             table.add_row(Row::new(headers_cells));
@@ -1058,18 +1041,18 @@ impl Session {
 
     #[cfg(feature = "cli")]
     fn get_contracts(&self, output: &mut Vec<String>) {
-        if self.contracts.len() > 0 {
+        if !self.contracts.is_empty() {
             let mut table = Table::new();
             table.add_row(row!["Contract identifier", "Public functions"]);
             let contracts = self.contracts.clone();
             for (contract_id, methods) in contracts.iter() {
-                if !contract_id.starts_with(&BOOT_TESTNET_ADDRESS)
-                    && !contract_id.starts_with(&BOOT_MAINNET_ADDRESS)
+                if !contract_id.starts_with(BOOT_TESTNET_ADDRESS)
+                    && !contract_id.starts_with(BOOT_MAINNET_ADDRESS)
                 {
                     let mut formatted_methods = vec![];
                     for (method_name, method_args) in methods.iter() {
-                        let formatted_args = if method_args.len() == 0 {
-                            format!("")
+                        let formatted_args = if method_args.is_empty() {
+                            String::new()
                         } else if method_args.len() == 1 {
                             format!(" {}", method_args.join(" "))
                         } else {
@@ -1077,9 +1060,9 @@ impl Session {
                         };
                         formatted_methods.push(format!("({}{})", method_name, formatted_args));
                     }
-                    let formatted_spec = format!("{}", formatted_methods.join("\n"));
+                    let formatted_spec = formatted_methods.join("\n").to_string();
                     table.add_row(Row::new(vec![
-                        Cell::new(&contract_id),
+                        Cell::new(contract_id),
                         Cell::new(&formatted_spec),
                     ]));
                 }
@@ -1107,7 +1090,7 @@ impl Session {
 
     #[cfg(not(feature = "cli"))]
     fn get_accounts(&self, output: &mut Vec<String>) {
-        if self.settings.initial_accounts.len() > 0 {
+        if !self.settings.initial_accounts.is_empty() {
             let mut initial_accounts = self.settings.initial_accounts.clone();
             for account in initial_accounts.drain(..) {
                 output.push(format!(
@@ -1125,7 +1108,7 @@ impl Session {
                 && !contract_id.ends_with(".bns")
                 && !contract_id.ends_with(".costs")
             {
-                output.push(format!("{}", contract_id));
+                output.push(contract_id.to_string());
             }
         }
     }
@@ -1138,7 +1121,7 @@ impl Session {
             return;
         }
 
-        let recipient = match PrincipalData::parse(&args[1]) {
+        let recipient = match PrincipalData::parse(args[1]) {
             Ok(address) => address,
             _ => {
                 output.push(red!("Unable to parse the address"));
@@ -1175,7 +1158,7 @@ impl Session {
         let keyword = {
             let mut s = command.to_string();
             s = s.replace("::describe", "");
-            s = s.replace(" ", "");
+            s = s.replace(' ', "");
             s
         };
 
@@ -1247,10 +1230,10 @@ fn decode_hex(byteString: &str) -> Result<Vec<u8>, DecodeHexError> {
 fn build_api_reference() -> HashMap<String, String> {
     let mut api_reference = HashMap::new();
     for func in NativeFunctions::ALL.iter() {
-        let api = make_api_reference(&func);
+        let api = make_api_reference(func);
         let description = {
             let mut s = api.description.to_string();
-            s = s.replace("\n", " ");
+            s = s.replace('\n', " ");
             s
         };
         let doc = format!(
@@ -1261,10 +1244,10 @@ fn build_api_reference() -> HashMap<String, String> {
     }
 
     for func in DefineFunctions::ALL.iter() {
-        let api = make_define_reference(&func);
+        let api = make_define_reference(func);
         let description = {
             let mut s = api.description.to_string();
-            s = s.replace("\n", " ");
+            s = s.replace('\n', " ");
             s
         };
         let doc = format!(
@@ -1281,10 +1264,10 @@ fn clarity_keywords() -> HashMap<String, String> {
     let mut keywords = HashMap::new();
 
     for func in NativeVariables::ALL.iter() {
-        if let Some(key) = make_keyword_reference(&func) {
+        if let Some(key) = make_keyword_reference(func) {
             let description = {
                 let mut s = key.description.to_string();
-                s = s.replace("\n", " ");
+                s = s.replace('\n', " ");
                 s
             };
             let doc = format!("Description\n{}\n\nExamples\n{}", description, key.example);

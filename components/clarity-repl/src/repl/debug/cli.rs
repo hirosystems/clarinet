@@ -44,9 +44,8 @@ impl CLIDebugger {
             let resume = match readline {
                 Ok(mut command) => {
                     if command.is_empty() {
-                        match self.editor.history().last() {
-                            Some(prev) => command = prev.clone(),
-                            None => (),
+                        if let Some(prev) = self.editor.history().last() {
+                            command = prev.clone()
                         }
                     }
                     self.editor.add_history_entry(&command);
@@ -82,6 +81,7 @@ impl CLIDebugger {
             let lines: Vec<&str> = contract_source.lines().collect();
             let first_line = (span.start_line - 1).saturating_sub(3) as usize;
             let last_line = std::cmp::min(lines.len(), span.start_line as usize + 3);
+            #[allow(clippy::needless_range_loop)]
             for line in first_line..last_line {
                 if line == (span.start_line as usize - 1) {
                     print!("{}", blue!("-> "));
@@ -129,7 +129,6 @@ impl CLIDebugger {
                         "{}:{}:{}",
                         contract_id, expr.span.start_line, expr.span.start_column
                     );
-                    return;
                 }
             }
         }
@@ -144,7 +143,7 @@ impl CLIDebugger {
         context: &LocalContext,
         expr: &SymbolicExpression,
     ) -> bool {
-        let (cmd, args) = match command.split_once(" ") {
+        let (cmd, args) = match command.split_once(' ') {
             None => (command, ""),
             Some((cmd, args)) => (cmd, args),
         };
@@ -223,7 +222,7 @@ impl CLIDebugger {
                 if self.state.breakpoints.is_empty() {
                     println!("No breakpoints set.")
                 } else {
-                    for (_, breakpoint) in &self.state.breakpoints {
+                    for breakpoint in self.state.breakpoints.values() {
                         println!("{}", breakpoint);
                     }
                 }
@@ -418,7 +417,7 @@ impl CLIDebugger {
                 if self.state.watchpoints.is_empty() {
                     println!("No watchpoints set.")
                 } else {
-                    for (_, watchpoint) in &self.state.watchpoints {
+                    for watchpoint in self.state.watchpoints.values() {
                         println!("{}", watchpoint);
                     }
                 }
@@ -462,7 +461,6 @@ impl CLIDebugger {
                     Err(e) => {
                         println!("{}", format_err!(e));
                         print_help_watchpoint();
-                        return;
                     }
                 };
             }
@@ -554,7 +552,7 @@ fn print_help_breakpoint() {
         r#"Set a breakpoint using 'b' or 'break' and one of these formats
   b <principal?>.<contract>:<linenum>:<colnum>
     SP000000000000000000002Q6VF78.bns:604:9
-        Break at line 604, column 9 of the bns contract deployed by 
+        Break at line 604, column 9 of the bns contract deployed by
           SP000000000000000000002Q6VF78
 
   b <principal?>.<contract>:<linenum>

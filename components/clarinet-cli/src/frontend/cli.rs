@@ -11,6 +11,9 @@ use crate::generate::{
 };
 use crate::lsp::run_lsp;
 
+use clap::builder::ValueParser;
+use clap::{IntoApp, Parser, Subcommand};
+use clap_generate::{Generator, Shell};
 use clarinet_deployments::diagnostic_digest::DiagnosticsDigest;
 use clarinet_deployments::onchain::{
     apply_on_chain_deployment, get_initial_transactions_trackers, update_deployment_costs,
@@ -41,11 +44,9 @@ use std::fs::{self, File};
 use std::io::prelude::*;
 use std::path::PathBuf;
 use std::{env, process};
-
-use clap::builder::ValueParser;
-use clap::{IntoApp, Parser, Subcommand};
-use clap_generate::{Generator, Shell};
 use toml;
+
+use super::clarinetrc::GlobalSettings;
 
 #[cfg(feature = "telemetry")]
 use super::telemetry::{telemetry_report_event, DeveloperUsageDigest, DeveloperUsageEvent};
@@ -54,12 +55,13 @@ use super::telemetry::{telemetry_report_event, DeveloperUsageDigest, DeveloperUs
 /// For Clarinet documentation, refer to https://docs.hiro.so/clarinet/introduction.
 /// Report any issues here https://github.com/hirosystems/clarinet/issues/new.
 #[derive(Parser, PartialEq, Clone, Debug)]
-#[clap(version = option_env!("CARGO_PKG_VERSION").expect("Unable to detect version"), name = "clarinet", bin_name = "clarinet")]
+#[clap(version = env!("CARGO_PKG_VERSION"), name = "clarinet", bin_name = "clarinet")]
 struct Opts {
     #[clap(subcommand)]
     command: Command,
 }
 
+#[allow(clippy::upper_case_acronyms)]
 #[derive(Subcommand, PartialEq, Clone, Debug)]
 enum Command {
     /// Create and scaffold a new project
@@ -122,6 +124,7 @@ enum Requirements {
     AddRequirement(AddRequirement),
 }
 
+#[allow(clippy::enum_variant_names)]
 #[derive(Subcommand, PartialEq, Clone, Debug)]
 #[clap(bin_name = "deployment", aliases = &["deployment"])]
 enum Deployments {
@@ -136,6 +139,7 @@ enum Deployments {
     ApplyDeployment(ApplyDeployment),
 }
 
+#[allow(clippy::enum_variant_names)]
 #[derive(Subcommand, PartialEq, Clone, Debug)]
 #[clap(bin_name = "chainhook", aliases = &["chainhook"])]
 enum Chainhooks {
@@ -493,7 +497,7 @@ struct Test {
 #[derive(Parser, PartialEq, Clone, Debug)]
 struct Run {
     /// Script to run
-    pub script: String,
+    pub script: Option<String>,
     /// Path to Clarinet.toml
     #[clap(long = "manifest-path", short = 'm')]
     pub manifest_path: Option<String>,
@@ -586,7 +590,7 @@ pub fn main() {
         }
     };
 
-    let hints_enabled = env::var("CLARINET_DISABLE_HINTS") != Ok("1".into());
+    let global_settings = GlobalSettings::from_global_file();
 
     match opts.command {
         Command::New(project_opts) => {
@@ -605,15 +609,30 @@ pub fn main() {
                 if project_opts.disable_telemetry {
                     false
                 } else {
-                    println!("{}", yellow!("Send usage data to Hiro."));
-                    println!("{}", yellow!("Help Hiro improve its products and services by automatically sending diagnostics and usage data."));
-                    println!("{}", yellow!("Only high level usage information, and no information identifying you or your project are collected."));
-                    // TODO(lgalabru): once we have a privacy policy available, add a link
-                    // println!("{}", yellow!("Visit http://hiro.so/clarinet-privacy for details."));
-                    println!("{}", yellow!("Enable [Y/n]?"));
-                    let mut buffer = String::new();
-                    std::io::stdin().read_line(&mut buffer).unwrap();
-                    !buffer.starts_with("n")
+                    match global_settings.enable_telemetry {
+                        Some(enable) => enable,
+                        _ => {
+                            println!("{}", yellow!("Send usage data to Hiro."));
+                            println!("{}", yellow!("Help Hiro improve its products and services by automatically sending diagnostics and usage data."));
+                            println!("{}", yellow!("Only high level usage information, and no information identifying you or your project are collected."));
+                            println!("{}",
+                                yellow!("Enable or disable clarinet telemetry globally with this command:")
+                            );
+                            println!(
+                                "{}",
+                                blue!(format!(
+                                    "  $ mkdir -p ~/.clarinet; echo \"enable_telemetry = true\" >> {}",
+                                    GlobalSettings::get_settings_file_path()
+                                ))
+                            );
+                            // TODO(lgalabru): once we have a privacy policy available, add a link
+                            // println!("{}", yellow!("Visit http://hiro.so/clarinet-privacy for details."));
+                            println!("{}", yellow!("Enable [Y/n]?"));
+                            let mut buffer = String::new();
+                            std::io::stdin().read_line(&mut buffer).unwrap();
+                            !buffer.starts_with('n')
+                        }
+                    }
                 }
             } else {
                 false
@@ -647,14 +666,14 @@ pub fn main() {
             if !execute_changes(changes) {
                 std::process::exit(1);
             }
-            if hints_enabled {
-                display_post_check_hint();
+            if global_settings.enable_hints.unwrap_or(true) {
+                display_contract_new_hint(Some(project_opts.name.as_str()));
             }
             if telemetry_enabled {
                 #[cfg(feature = "telemetry")]
                 telemetry_report_event(DeveloperUsageEvent::NewProject(DeveloperUsageDigest::new(
                     &project_opts.name,
-                    &vec![],
+                    &[],
                 )));
             }
         }
@@ -825,9 +844,9 @@ pub fn main() {
                     println!("{}", yellow!("Continue [Y/n]?"));
                     let mut buffer = String::new();
                     std::io::stdin().read_line(&mut buffer).unwrap();
-                    if !buffer.starts_with("Y")
-                        && !buffer.starts_with("y")
-                        && !buffer.starts_with("\n")
+                    if !buffer.starts_with('Y')
+                        && !buffer.starts_with('y')
+                        && !buffer.starts_with('\n')
                     {
                         println!("Deployment aborted");
                         std::process::exit(1);
@@ -948,7 +967,7 @@ pub fn main() {
                 if !execute_changes(changes) {
                     std::process::exit(1);
                 }
-                if hints_enabled {
+                if global_settings.enable_hints.unwrap_or(true) {
                     display_post_check_hint();
                 }
             }
@@ -983,7 +1002,7 @@ pub fn main() {
                 if !execute_changes(changes) {
                     std::process::exit(1);
                 }
-                if hints_enabled {
+                if global_settings.enable_hints.unwrap_or(true) {
                     display_post_check_hint();
                 }
             }
@@ -1007,7 +1026,7 @@ pub fn main() {
                 if !execute_changes(vec![Changes::EditTOML(change)]) {
                     std::process::exit(1);
                 }
-                if hints_enabled {
+                if global_settings.enable_hints.unwrap_or(true) {
                     display_post_check_hint();
                 }
             }
@@ -1083,8 +1102,8 @@ pub fn main() {
                 }
             }
 
-            if hints_enabled {
-                display_post_console_hint();
+            if global_settings.enable_hints.unwrap_or(true) {
+                display_contract_new_hint(None);
             }
         }
         Command::Check(cmd) if cmd.file.is_some() => {
@@ -1145,8 +1164,7 @@ pub fn main() {
             }
 
             if success {
-                println!("{} Syntax of contract successfully checked", green!("✔"));
-                return;
+                println!("{} Syntax of contract successfully checked", green!("✔"))
             } else {
                 std::process::exit(1);
             }
@@ -1190,7 +1208,7 @@ pub fn main() {
                 false => 1,
             };
 
-            if hints_enabled {
+            if global_settings.enable_hints.unwrap_or(true) {
                 display_post_check_hint();
             }
             if manifest.project.telemetry {
@@ -1201,7 +1219,7 @@ pub fn main() {
             }
             std::process::exit(exit_code);
         }
-        Command::Integrate(cmd) => devnet_start(cmd, hints_enabled),
+        Command::Integrate(cmd) => devnet_start(cmd, global_settings),
         Command::LSP => run_lsp(),
         Command::DAP => match super::dap::run_dap() {
             Ok(_) => (),
@@ -1238,16 +1256,21 @@ pub fn main() {
                     process::exit(1);
                 }
             }
-            Devnet::DevnetStart(cmd) => devnet_start(cmd, hints_enabled),
+            Devnet::DevnetStart(cmd) => devnet_start(cmd, global_settings),
         },
 
         Command::Test(_) => {
-            println!("{} `clarinet test` has been deprecated. Please check this blog post to see learn more <link>", yellow!("warning:"));
+            println!("{} `clarinet test` has been deprecated. Please check this blog post to learn more:", yellow!("warning:"));
+            println!("https://hiro.so/blog/announcing-the-clarinet-sdk-a-javascript-programming-model-for-easy-smart-contract-testing");
             std::process::exit(1);
         }
 
         Command::Run(_) => {
-            println!("{} `clarinet run` has been deprecated. Please check this blog post to see learn more <link>", yellow!("warning:"));
+            println!(
+                "{} `clarinet run` has been deprecated. Please check this blog post to learn more:",
+                yellow!("warning:")
+            );
+            println!("https://hiro.so/blog/announcing-the-clarinet-sdk-a-javascript-programming-model-for-easy-smart-contract-testing");
             std::process::exit(1);
         }
     };
@@ -1292,9 +1315,8 @@ fn load_manifest_or_exit(path: Option<String>) -> ProjectManifest {
 }
 
 fn load_manifest_or_warn(path: Option<String>) -> Option<ProjectManifest> {
-    let manifest_location = get_manifest_location_or_warn(path);
-    if manifest_location.is_some() {
-        let manifest = match ProjectManifest::from_location(&manifest_location.unwrap()) {
+    if let Some(manifest_location) = get_manifest_location_or_warn(path) {
+        let manifest = match ProjectManifest::from_location(&manifest_location) {
             Ok(manifest) => manifest,
             Err(message) => {
                 println!(
@@ -1482,7 +1504,7 @@ pub fn load_deployment_if_exists(
                     println!("{}", yellow!("Overwrite? [Y/n]"));
                     let mut buffer = String::new();
                     std::io::stdin().read_line(&mut buffer).unwrap();
-                    if buffer.starts_with("n") {
+                    if buffer.starts_with('n') {
                         Some(load_deployment(manifest, &default_deployment_location))
                     } else {
                         default_deployment_location
@@ -1672,7 +1694,17 @@ fn display_hint_header() {
 fn display_hint_footer() {
     println!(
         "{}",
-        yellow!("Disable these hints with the env var CLARINET_DISABLE_HINTS=1")
+        yellow!(format!(
+            "These hints can be disabled in the {} file.",
+            GlobalSettings::get_settings_file_path()
+        ))
+    );
+    println!(
+        "{}",
+        blue!(format!(
+            "  $ mkdir -p ~/.clarinet; echo \"enable_hints = false\" >> {}",
+            GlobalSettings::get_settings_file_path()
+        ))
     );
     display_separator();
 }
@@ -1684,18 +1716,26 @@ fn display_post_check_hint() {
         "{}",
         yellow!("Once you are ready to write TypeScript unit tests for your contract, run the following command:\n")
     );
-    println!("{}", blue!("  $ clarinet test"));
+    println!("{}", blue!("  $ npm install"));
+    println!("{}", blue!("  $ npm test"));
     println!(
         "{}",
         yellow!("    Run all run tests in the ./tests folder.\n")
     );
-    println!("{}", yellow!("Find more information on testing with Clarinet here: https://docs.hiro.so/clarinet/how-to-guides/how-to-set-up-local-development-environment#testing-with-the-test-harness"));
+    println!("{}", yellow!("Find more information on testing with Clarinet here: https://docs.hiro.so/clarinet/feature-guides/test-contract-with-clarinet-sdk"));
     display_hint_footer();
 }
 
-fn display_post_console_hint() {
+fn display_contract_new_hint(project_name: Option<&str>) {
     println!();
     display_hint_header();
+    if let Some(project_name) = project_name {
+        println!(
+            "{}",
+            yellow!("Switch to the newly created directory with:\n")
+        );
+        println!("{}", blue!(format!("  $ cd {}\n", project_name)));
+    }
     println!(
         "{}",
         yellow!("Once your are ready to write your contracts, run the following commands:\n")
@@ -1747,7 +1787,8 @@ fn display_deploy_hint() {
     display_hint_footer();
 }
 
-fn devnet_start(cmd: DevnetStart, hints_enabled: bool) -> () {
+
+fn devnet_start(cmd: DevnetStart, global_settings: GlobalSettings) -> () {
     let manifest = load_manifest_or_exit(cmd.manifest_path);
     println!("Computing deployment plan");
     let result = match cmd.deployment_plan_path {
@@ -1784,16 +1825,19 @@ fn devnet_start(cmd: DevnetStart, hints_enabled: bool) -> () {
                 Some(Err(e)) => Err(e),
                 None => {
                     let default_deployment_path =
-                        get_default_deployment_path(&manifest, &StacksNetwork::Devnet).unwrap();
-                    let (deployment, _) =
-                        match generate_default_deployment(&manifest, &StacksNetwork::Devnet, false)
-                        {
-                            Ok(deployment) => deployment,
-                            Err(message) => {
-                                println!("{}", red!(message));
-                                std::process::exit(1);
-                            }
-                        };
+                        get_default_deployment_path(&manifest, &StacksNetwork::Devnet)
+                            .unwrap();
+                    let (deployment, _) = match generate_default_deployment(
+                        &manifest,
+                        &StacksNetwork::Devnet,
+                        false,
+                    ) {
+                        Ok(deployment) => deployment,
+                        Err(message) => {
+                            println!("{}", red!(message));
+                            std::process::exit(1);
+                        }
+                    };
                     let res = write_deployment(&deployment, &default_deployment_path, true);
                     if let Err(message) = res {
                         Err(message)
@@ -1809,8 +1853,9 @@ fn devnet_start(cmd: DevnetStart, hints_enabled: bool) -> () {
             }
         }
         Some(deployment_plan_path) => {
-            let deployment_path = get_absolute_deployment_path(&manifest, &deployment_plan_path)
-                .expect("unable to retrieve deployment");
+            let deployment_path =
+                get_absolute_deployment_path(&manifest, &deployment_plan_path)
+                    .expect("unable to retrieve deployment");
             load_deployment(&manifest, &deployment_path)
         }
     };
@@ -1840,11 +1885,12 @@ fn devnet_start(cmd: DevnetStart, hints_enabled: bool) -> () {
             ),
         ));
     }
-    if let Err(e) = start(orchestrator, deployment, None, !cmd.no_dashboard) {
+    if let Err(e) = start(orchestrator, deployment, None, !cmd.no_dashboard)
+    {
         println!("{}", format_err!(e));
         process::exit(1);
     }
-    if hints_enabled {
+    if global_settings.enable_hints.unwrap_or(true) {
         display_deploy_hint();
     }
 }

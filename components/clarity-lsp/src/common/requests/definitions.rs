@@ -37,8 +37,8 @@ impl<'a> Definitions {
         }
     }
 
-    pub fn run(&mut self, expressions: &'a Vec<SymbolicExpression>) {
-        traverse(self, &expressions);
+    pub fn run(&mut self, expressions: &'a [SymbolicExpression]) {
+        traverse(self, expressions);
     }
 
     fn set_function_parameters_scope(&mut self, expr: &SymbolicExpression) -> Option<()> {
@@ -82,7 +82,7 @@ impl<'a> ASTVisitor<'a> for Definitions {
             AtomValue(value) => self.visit_atom_value(expr, value),
             Atom(name) => self.visit_atom(expr, name),
             List(exprs) => {
-                let result = self.traverse_list(expr, &exprs);
+                let result = self.traverse_list(expr, exprs);
                 // clear local scope after traversing it
                 self.local.remove(&expr.id);
                 result
@@ -490,8 +490,8 @@ impl<'a> ASTVisitor<'a> for Definitions {
             self.local.insert(expr.id, local_scope);
         }
 
-        for (_, val) in bindings {
-            if !self.traverse_expr(val) {
+        for binding in bindings.values() {
+            if !self.traverse_expr(binding) {
                 return false;
             }
         }
@@ -546,7 +546,7 @@ impl<'a> ASTVisitor<'a> for Definitions {
 }
 
 pub fn get_definitions(
-    expressions: &Vec<SymbolicExpression>,
+    expressions: &[SymbolicExpression],
     issuer: Option<StandardPrincipalData>,
 ) -> HashMap<(u32, u32), DefinitionLocation> {
     let mut definitions_visitor = Definitions::new(issuer);
@@ -565,18 +565,16 @@ pub fn get_public_function_definitions(
             .and_then(|l| l.split_first())
             .and_then(|(function_name, args)| Some((function_name.match_atom()?, args)))
         {
-            match DefineFunctions::lookup_by_name(function_name) {
-                Some(DefineFunctions::PublicFunction | DefineFunctions::ReadOnlyFunction) => {
-                    if let Some(function_name) = args
-                        .split_first()
-                        .and_then(|(args_list, _)| args_list.match_list()?.split_first())
-                        .and_then(|(function_name, _)| function_name.match_atom())
-                    {
-                        definitions
-                            .insert(function_name.to_owned(), span_to_range(&expression.span));
-                    }
+            if let Some(DefineFunctions::PublicFunction | DefineFunctions::ReadOnlyFunction) =
+                DefineFunctions::lookup_by_name(function_name)
+            {
+                if let Some(function_name) = args
+                    .split_first()
+                    .and_then(|(args_list, _)| args_list.match_list()?.split_first())
+                    .and_then(|(function_name, _)| function_name.match_atom())
+                {
+                    definitions.insert(function_name.to_owned(), span_to_range(&expression.span));
                 }
-                _ => (),
             }
         }
     }

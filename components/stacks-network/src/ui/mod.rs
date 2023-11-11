@@ -1,6 +1,6 @@
 #[allow(dead_code)]
 mod app;
-#[allow(dead_code)]
+#[allow(clippy::module_inception)]
 mod ui;
 #[allow(dead_code)]
 mod util;
@@ -59,16 +59,16 @@ pub fn do_start_ui(
     automining_enabled: bool,
     ctx: &Context,
 ) -> Result<(), String> {
-    enable_raw_mode().map_err(|e| format!("unable to start terminal ui: {}", e.to_string()))?;
+    enable_raw_mode().map_err(|e| format!("unable to start terminal ui: {}", e))?;
 
     let mut stdout = stdout();
     execute!(stdout, EnterAlternateScreen)
-        .map_err(|e| format!("unable to start terminal ui: {}", e.to_string()))?;
+        .map_err(|e| format!("unable to start terminal ui: {}", e))?;
 
     let backend = CrosstermBackend::new(stdout);
 
-    let mut terminal = Terminal::new(backend)
-        .map_err(|e| format!("unable to start terminal ui: {}", e.to_string()))?;
+    let mut terminal =
+        Terminal::new(backend).map_err(|e| format!("unable to start terminal ui: {}", e))?;
 
     // Setup input handling
     let tick_rate = Duration::from_millis(500);
@@ -85,7 +85,7 @@ pub fn do_start_ui(
                 }
             }
             if last_tick.elapsed() >= tick_rate {
-                if let Err(_) = devnet_events_tx.send(DevnetEvent::Tick) {
+                if devnet_events_tx.send(DevnetEvent::Tick).is_err() {
                     break;
                 }
                 last_tick = Instant::now();
@@ -97,14 +97,14 @@ pub fn do_start_ui(
 
     terminal
         .clear()
-        .map_err(|e| format!("unable to start terminal ui: {}", e.to_string()))?;
+        .map_err(|e| format!("unable to start terminal ui: {}", e))?;
 
     let mut mining_command_tx: Option<Sender<BitcoinMiningCommand>> = None;
 
     loop {
         terminal
             .draw(|f| ui::draw(f, &mut app))
-            .map_err(|e| format!("unable to update ui: {}", e.to_string()))?;
+            .map_err(|e| format!("unable to update ui: {}", e))?;
         let event = match devnet_events_rx.recv() {
             Ok(event) => event,
             Err(_e) => {
@@ -130,9 +130,9 @@ pub fn do_start_ui(
                 (KeyModifiers::NONE, KeyCode::Char('n')) => {
                     if let Some(ref tx) = mining_command_tx {
                         let _ = tx.send(BitcoinMiningCommand::Mine);
-                        app.display_log(DevnetEvent::log_success(format!("Bitcoin block mining triggered manually")), ctx);
+                        app.display_log(DevnetEvent::log_success("Bitcoin block mining triggered manually".to_string()), ctx);
                     } else {
-                        app.display_log(DevnetEvent::log_error(format!("Manual block mining not ready")), ctx);
+                        app.display_log(DevnetEvent::log_error("Manual block mining not ready".to_string()), ctx);
                     }
                 }
                 (KeyModifiers::NONE, KeyCode::Left) => app.on_left(),

@@ -24,12 +24,12 @@ pub struct DeveloperUsageDigest {
 }
 
 impl DeveloperUsageDigest {
-    pub fn new(project_id: &str, team_id: &Vec<String>) -> Self {
+    pub fn new(project_id: &str, team_id: &[String]) -> Self {
         let hashed_project_id = Hash160::from_data(project_id.as_bytes());
         let hashed_team_id = Hash160::from_data(team_id.join(",").as_bytes());
         Self {
-            project_id: format!("0x{}", bytes_to_hex(&hashed_project_id.to_bytes().to_vec())),
-            team_id: format!("0x{}", bytes_to_hex(&hashed_team_id.to_bytes().to_vec())),
+            project_id: format!("0x{}", bytes_to_hex(hashed_project_id.to_bytes().as_ref())),
+            team_id: format!("0x{}", bytes_to_hex(hashed_team_id.to_bytes().as_ref())),
         }
     }
 }
@@ -48,9 +48,7 @@ pub fn telemetry_report_event(event: DeveloperUsageEvent) {
 async fn send_event(event: DeveloperUsageEvent) {
     let segment_api_key = "Q3xpmFRvy0psXnwBEXErtMBIeabOVjbC";
 
-    let clarinet_version = option_env!("CARGO_PKG_VERSION")
-        .expect("Unable to detect version")
-        .to_string();
+    let clarinet_version = env!("CARGO_PKG_VERSION").to_string();
     let ci_mode = option_env!("CLARINET_MODE_CI").unwrap_or("0").to_string();
     let os = std::env::consts::OS;
 
@@ -153,10 +151,10 @@ async fn send_event(event: DeveloperUsageEvent) {
             segment_api_key.to_string(),
             Message::from(Track {
                 user: User::UserId {
-                    user_id: format!("0x{}", bytes_to_hex(&user_id.to_bytes().to_vec())),
+                    user_id: format!("0x{}", bytes_to_hex(user_id.to_bytes().as_ref())),
                 },
                 event: event_name.into(),
-                properties: properties,
+                properties,
                 ..Default::default()
             }),
         )

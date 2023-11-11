@@ -3,8 +3,6 @@
     "cargo",
     "clippy",
     "--package=clarinet-cli",
-    "--message-format=json",
-    "--",
-    "--no-deps"
+    "--message-format=json"
   ]
 }
