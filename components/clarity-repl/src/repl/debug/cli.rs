@@ -1,19 +1,17 @@
 use std::convert::TryFrom;
-use std::thread::AccessError;
 
 use crate::repl::debug::extract_watch_variable;
 use clarity::vm::contexts::{Environment, LocalContext};
-use clarity::vm::diagnostic::Level;
 use clarity::vm::errors::Error;
 use clarity::vm::representations::Span;
 use clarity::vm::types::QualifiedContractIdentifier;
 use clarity::vm::types::Value;
-use clarity::vm::{eval, ContractName, EvalHook, SymbolicExpression};
+use clarity::vm::{ContractName, EvalHook, SymbolicExpression};
 use rustyline::error::ReadlineError;
 use rustyline::Editor;
 
 use super::{
-    AccessType, Breakpoint, BreakpointData, DataBreakpoint, DebugState, FunctionBreakpoint, Source,
+    AccessType, Breakpoint, BreakpointData, DebugState, FunctionBreakpoint, Source,
     SourceBreakpoint, State,
 };
 
@@ -301,7 +299,7 @@ impl CLIDebugger {
 
                     let line = match parts[1].parse::<u32>() {
                         Ok(line) => line,
-                        Err(e) => {
+                        Err(_) => {
                             println!("{}", format_err!("invalid breakpoint format"),);
                             print_help_breakpoint();
                             return;
@@ -311,7 +309,7 @@ impl CLIDebugger {
                     let column = if parts.len() == 3 {
                         match parts[2].parse::<u32>() {
                             Ok(column) => column,
-                            Err(e) => {
+                            Err(_) => {
                                 println!("{}", format_err!("invalid breakpoint format"),);
                                 print_help_breakpoint();
                                 return;
@@ -323,7 +321,6 @@ impl CLIDebugger {
 
                     self.state.add_breakpoint(Breakpoint {
                         id: 0,
-                        verified: true,
                         data: BreakpointData::Source(SourceBreakpoint {
                             line,
                             column: if column == 0 { None } else { Some(column) },
@@ -392,7 +389,6 @@ impl CLIDebugger {
 
                     self.state.add_breakpoint(Breakpoint {
                         id: 0,
-                        verified: true,
                         data: BreakpointData::Function(FunctionBreakpoint {
                             name: function_name.to_string(),
                         }),

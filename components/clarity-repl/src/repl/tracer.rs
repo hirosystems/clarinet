@@ -3,7 +3,6 @@ use crate::repl::tracer::SymbolicExpressionType::List;
 use clarity::vm::errors::Error;
 use clarity::vm::functions::define::DefineFunctions;
 use clarity::vm::functions::NativeFunctions;
-use clarity::vm::types::PrincipalData;
 use clarity::vm::{
     contexts::{Environment, LocalContext},
     types::Value,
@@ -12,7 +11,6 @@ use clarity::vm::{
 use clarity::vm::{eval, ClarityVersion, EvaluationResult};
 
 pub struct Tracer {
-    snippet: String,
     stack: Vec<u64>,
     pending_call_string: Vec<String>,
     pending_args: Vec<Vec<u64>>,
@@ -23,7 +21,6 @@ impl Tracer {
     pub fn new(snippet: String) -> Tracer {
         println!("{}  {}", snippet, black!("<console>"));
         Tracer {
-            snippet,
             stack: vec![u64::MAX],
             pending_call_string: Vec::new(),
             pending_args: Vec::new(),
@@ -144,7 +141,7 @@ impl EvalHook for Tracer {
     fn did_finish_eval(
         &mut self,
         env: &mut Environment,
-        context: &LocalContext,
+        _context: &LocalContext,
         expr: &SymbolicExpression,
         res: &Result<Value, Error>,
     ) {

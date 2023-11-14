@@ -2,7 +2,9 @@
   "rust-analyzer.check.overrideCommand": [
     "cargo",
     "clippy",
-    "--package=clarinet-cli",
+    "--workspace",
+    "--exclude=clarinet-sdk-wasm",
+    "--exclude=clarity-jupyter-kernel",
     "--message-format=json"
   ]
 }

@@ -1,3 +1,5 @@
+#![allow(unused_variables)]
+
 use clarity::vm::functions::define::DefineFunctions;
 use clarity::vm::functions::NativeFunctions;
 use clarity::vm::representations::SymbolicExpressionType::*;
