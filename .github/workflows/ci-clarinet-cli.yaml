@@ -113,7 +113,7 @@ jobs:
         env:
           RUSTFLAGS: "-C instrument-coverage"
           LLVM_PROFILE_FILE: "${{ env.COMPONENT }}-%p-%m.profraw"
-        run: cargo test --workspace --locked --exclude clarinet-sdk-wasm --exclude clarity-jupyter-kernel
+        run: cargo build && cargo test --workspace --locked --exclude clarinet-sdk-wasm --exclude clarity-jupyter-kernel
 
       - name: Generate coverage
         run: grcov . --binary-path target/debug/ -s . -t lcov --branch --ignore-not-existing --ignore "/*" -o lcov.info
