@@ -134,7 +134,7 @@ jobs:
         run: cargo build && cargo test --workspace --locked --exclude clarinet-sdk-wasm --exclude clarity-jupyter-kernel
 
       - name: Generate coverage
-        run: grcov . --binary-path target/debug/ -s . -t lcov --branch -o lcov.info
+        run: grcov --llvm . --binary-path target/debug/ -s . -t lcov --branch -o lcov.info
 
       - name: Upload coverage report
         uses: codecov/codecov-action@v3
