@@ -131,7 +131,7 @@ jobs:
         env:
           RUSTFLAGS: "-C instrument-coverage"
           LLVM_PROFILE_FILE: "${{ env.COMPONENT }}-%p-%m.profraw"
-        run: cargo build && cargo test
+        run: cargo test --workspace --locked --exclude clarinet-sdk-wasm --exclude clarity-jupyter-kernel
 
       - name: Generate coverage
         run: grcov . --binary-path target/debug/ -s . -t lcov --branch --ignore-not-existing --ignore "/*" -o lcov.info
@@ -347,24 +347,7 @@ jobs:
       - name: Unit Tests - Cargo
         # can't easily run mac-arm64 tests in GH without native runners for that arch
         if: matrix.target != 'aarch64-apple-darwin'
-        run: cargo test --release --locked --target ${{ matrix.target }}
-
-      # Todo(@hugocaillard): npm test
-      # - name: Functional Tests (Linux)
-      #   # can't easily run mac-arm64 tests in GH without native runners for that arch
-      #   if: matrix.os != 'windows-latest' && matrix.target != 'aarch64-apple-darwin'
-      #   run: |
-      #     for testdir in $(ls components/clarinet-cli/examples); do
-      #       ./target/${{ matrix.target }}/release/clarinet test --manifest-path components/clarinet-cli/examples/${testdir}/Clarinet.toml
-      #     done
-
-      # Todo(@hugocaillard): npm test
-      # - name: Functional Tests (Windows)
-      #   if: matrix.os == 'windows-latest'
-      #   run: |
-      #     foreach($testdir in Get-ChildItem components/clarinet-cli/examples) {
-      #       ./target/${{ matrix.target }}/release/clarinet test --manifest-path ${testdir}/Clarinet.toml
-      #     }
+        run: cargo test --workspace --release --locked --exclude clarinet-sdk-wasm --exclude clarity-jupyter-kernel --target ${{ matrix.target }}
 
   dist_stacks_devnet_js:
     name: Build Stacks Devnet JS Distributions
@@ -557,16 +540,9 @@ jobs:
       - name: Build - Cargo
         run: cargo build --release --locked --target x86_64-unknown-linux-gnu
 
-      # - name: Build - WASM
-      #   run: wasm-pack build --target web --release -- --no-default-features --features wasm
-
       - name: Compress cargo artifact
         working-directory: "."
         run: tar -C target/x86_64-unknown-linux-gnu/release -zcvf clarity-repl-${{ env.SHORT_TARGET_NAME }}.tar.gz clarity-repl
-
-      # - name: Compress wasm artifact
-      #   working-directory: "."
-      #   run: tar -C target/wasm32-unknown-unknown/release -zcvf clarity-repl-wasm.tar.gz clarity_repl.wasm
 
       - name: Upload cargo artifact
         uses: actions/upload-artifact@v2
@@ -574,14 +550,8 @@ jobs:
           name: clarity-repl-${{ env.SHORT_TARGET_NAME }}
           path: clarity-repl-${{ env.SHORT_TARGET_NAME }}.tar.gz
 
-      # - name: Upload wasm artifact
-      #   uses: actions/upload-artifact@v2
-      #   with:
-      #     name: clarity-repl-wasm
-      #     path: clarity-repl-wasm.tar.gz
-
       - name: Unit Tests - Cargo
-        run: cargo test --release --locked --target x86_64-unknown-linux-gnu
+        run: cargo test --workspace --release --locked --exclude clarinet-sdk-wasm --exclude clarity-jupyter-kernel --target x86_64-unknown-linux-gnu
 
       - name: Publish clarity-repl to crates.io
         if: startsWith(github.ref, 'refs/heads/main') && needs.get_release_info.outputs.tag != ''
