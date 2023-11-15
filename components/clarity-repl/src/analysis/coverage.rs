@@ -16,7 +16,6 @@ use clarity::vm::{
     types::QualifiedContractIdentifier,
     ClarityName, EvalHook, SymbolicExpression,
 };
-use serde_json::Value as JsonValue;
 
 #[derive(Serialize, Deserialize, Debug, Default, Clone)]
 pub struct CoverageReporter {
