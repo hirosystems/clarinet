@@ -517,9 +517,9 @@ dependencies = [
 
 [[package]]
 name = "chainhook-types"
-version = "1.1.0"
+version = "1.1.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "447fdec877811ce9af82b000ef8f1a754ba30dc75b57ba5a04d7d2a92a601040"
+checksum = "ecabe3781a1f5584a5bf4b348870f756eee685bd4882e752cc9cbdea123386ce"
 dependencies = [
  "hex 0.4.3",
  "schemars",
@@ -728,7 +728,7 @@ dependencies = [
 
 [[package]]
 name = "clarinet-files"
-version = "1.0.3"
+version = "2.0.0"
 dependencies = [
  "bip39",
  "bitcoin",
