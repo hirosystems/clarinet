@@ -30,7 +30,7 @@ secure_tempfile = { version = "3.8.0", package = "tempfile" }
 tokio-util = { version = "0.7.1", features = ["io"], optional = true }
 libsecp256k1 = "0.7.0"
 hmac = "0.12.0"
-pbkdf2 = { version = "0.11.0", features = ["simple"], default-features = false }
+pbkdf2 = { version = "0.12.2", features = ["simple"], default-features = false }
 futures = "0.3.12"
 tokio = { version = "1.24", features = ["full"] }
 lazy_static = "1.4.0"
