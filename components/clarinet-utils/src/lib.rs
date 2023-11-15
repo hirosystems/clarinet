@@ -13,6 +13,7 @@ pub fn get_bip39_seed_from_mnemonic(mnemonic: &str, password: &str) -> Result<Ve
         salt.as_bytes(),
         PBKDF2_ROUNDS,
         &mut seed,
-    );
+    )
+    .map_err(|e| e.to_string())?;
     Ok(seed)
 }

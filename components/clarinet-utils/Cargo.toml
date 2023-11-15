@@ -7,7 +7,7 @@ edition = "2021"
 
 [dependencies]
 hmac = "0.12.0"
-pbkdf2 = { version = "0.11.0", features = ["simple"], default-features = false }
+pbkdf2 = { version = "0.12.2", features = ["simple"], default-features = false }
 sha2 = "0.10.0"
 
 [lib]
