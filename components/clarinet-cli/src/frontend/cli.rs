@@ -94,6 +94,9 @@ enum Command {
     /// Start a local Devnet network for interacting with your contracts from your browser
     #[clap(name = "integrate", bin_name = "integrate")]
     Integrate(DevnetStart),
+    /// Subcommands for Devnet usage
+    #[clap(subcommand, name = "devnet")]
+    Devnet(Devnet),
     /// Get Clarity autocompletion and inline errors from your code editor (VSCode, vim, emacs, etc)
     #[clap(name = "lsp", bin_name = "lsp")]
     LSP,
@@ -103,9 +106,18 @@ enum Command {
     /// Generate shell completions scripts
     #[clap(name = "completions", bin_name = "completions")]
     Completions(Completions),
-    /// Subcommands for Devnet usage
-    #[clap(subcommand, name = "devnet")]
-    Devnet(Devnet),
+}
+
+#[derive(Subcommand, PartialEq, Clone, Debug)]
+#[clap(bin_name = "devnet")]
+enum Devnet {
+    /// Generate package of all required devnet artifacts
+    #[clap(name = "package", bin_name = "package")]
+    Package(DevnetPackage),
+
+    /// Start a local Devnet network for interacting with your contracts from your browser
+    #[clap(name = "start", bin_name = "start")]
+    DevnetStart(DevnetStart),
 }
 
 #[derive(Subcommand, PartialEq, Clone, Debug)]
@@ -152,18 +164,6 @@ enum Chainhooks {
     /// Publish contracts on chain
     #[clap(name = "deploy", bin_name = "deploy")]
     DeployChainhook(DeployChainhook),
-}
-
-#[derive(Subcommand, PartialEq, Clone, Debug)]
-#[clap(bin_name = "devnet")]
-enum Devnet {
-    /// Generate package of all required devnet artifacts
-    #[clap(name = "package", bin_name = "package")]
-    Package(DevnetPackage),
-
-    /// Start a local Devnet network for interacting with your contracts from your browser
-    #[clap(name = "start", bin_name = "start")]
-    DevnetStart(DevnetStart),
 }
 
 #[derive(Parser, PartialEq, Clone, Debug)]
