@@ -120,21 +120,14 @@ jobs:
             ~/.cargo/registry/index/
             ~/.cargo/registry/cache/
             ~/.cargo/git/db/
-            target/
           key: ${{ runner.os }}-cargo-grcov-${{ env.COMPONENT }}-${{ hashFiles(env.COMPONENT_CARGO_LOCK_FILE) }}
 
       - name: Install dependencies
         if: steps.cache-cargo.outputs.cache-hit != 'true'
         run: RUSTC_BOOTSTRAP=1 cargo install grcov
 
-      - name: Build & Unit Test
-        env:
-          RUSTFLAGS: "-C instrument-coverage"
-          LLVM_PROFILE_FILE: "${{ env.COMPONENT }}-%p-%m.profraw"
-        run: cargo test --workspace --locked --exclude clarinet-sdk-wasm --exclude clarity-jupyter-kernel
-
-      - name: Generate coverage
-        run: grcov . --binary-path target/debug/ -s . -t lcov --branch --ignore-not-existing --ignore "/*" -o lcov.info
+      - name: Unit Tests
+        run: cargo xtask coverage
 
       - name: Upload coverage report
         uses: codecov/codecov-action@v3

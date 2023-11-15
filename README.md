@@ -753,13 +753,13 @@ To start contributing:
 
 5. After making your changes, ensure the following:
    -  `cargo build` runs successfully.
-   -  `cargo test` runs successfully.
+   -  `cargo xtask coverage` runs successfully.
    -  You have formatted your code with `cargo fmt --all --`
    -  All functional tests in the `examples` directory pass.
       ```bash
       for testdir in $(ls examples); do
           pushd examples/${testdir}
-              ../../target/debug/clarinet test .
+              ../../target/debug/clarinet check .
           popd
       done
       ```

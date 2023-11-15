@@ -14,6 +14,7 @@ members = [
     "components/stacks-devnet-js",
     "components/stacks-network",
     "components/stacks-rpc-client",
+    "xtask",
 ]
 default-members = ["components/clarinet-cli"]
 
