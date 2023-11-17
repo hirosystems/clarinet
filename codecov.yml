@@ -3,8 +3,7 @@ coverage:
     patch: false
     project:
       default:
-        # threshold: 0.005  # 0.5 %
-        threshold: 15%
+        threshold: 5%
         if_not_found: failure
 
 github_checks:

@@ -36,9 +36,7 @@ jobs:
       tag: ${{ steps.new_release_tag.outputs.TAG }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v3
-        with:
-          submodules: recursive
+        uses: actions/checkout@v4
 
       - name: Get latest release
         if: startsWith(github.ref, 'refs/heads/main')
@@ -68,26 +66,16 @@ jobs:
     needs: pre_run
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v3
-        with:
-          submodules: recursive
+        uses: actions/checkout@v4
 
       - name: Install Rust toolchain
-        uses: actions-rs/toolchain@v1
-        with:
-          toolchain: stable
-          profile: minimal
-          components: rustfmt
-          override: true
+        run: rustup toolchain install stable --profile minimal --component rustfmt
 
       - name: Set Cargo file permissions
         run: sudo chown -R $(whoami):$(id -ng) ~/.cargo/
 
       - name: Cache cargo
-        uses: actions/cache@v2
-        with:
-          path: ~/.cargo/
-          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+        uses: Swatinem/rust-cache@v2
 
       - name: Install dependencies
         run: cargo install cargo-audit
@@ -103,46 +91,26 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Install Rust toolchain
-        run: |
-          rustup set profile minimal
-          rustup toolchain install stable --component llvm-tools-preview
-          rustup override set stable
+        run: rustup toolchain install stable --profile minimal --component llvm-tools-preview
 
       - name: Cache cargo
-        id: cache-cargo
-        uses: actions/cache@v3
+        uses: Swatinem/rust-cache@v2
+
+      - name: install dependencies
+        uses: taiki-e/install-action@v2
         with:
-          path: |
-            ~/.cargo/bin/
-            ~/.cargo/registry/index/
-            ~/.cargo/registry/cache/
-            ~/.cargo/git/db/
-            target/
-          key: ${{ runner.os }}-cargo-grcov-${{ env.COMPONENT }}-${{ hashFiles(env.COMPONENT_CARGO_LOCK_FILE) }}
+          tool: cargo-llvm-cov,nextest
 
-      - name: Install dependencies
-        if: steps.cache-cargo.outputs.cache-hit != 'true'
-        run: RUSTC_BOOTSTRAP=1 cargo install grcov
+      - name: Run unit test with coverage
+        run: cargo cov
 
-      - name: Build & Unit Test
-        env:
-          RUSTFLAGS: "-C instrument-coverage"
-          LLVM_PROFILE_FILE: "${{ env.COMPONENT }}-%p-%m.profraw"
-        run: cargo test --workspace --locked --exclude clarinet-sdk-wasm --exclude clarity-jupyter-kernel
-
-      - name: Generate coverage
-        run: grcov . --binary-path target/debug/ -s . -t lcov --branch --ignore-not-existing --ignore "/*" -o lcov.info
-
-      - name: Upload coverage report
+      - name: Upload coverage data to codecov
         uses: codecov/codecov-action@v3
         with:
-          flags: unittests
-          name: ${{ env.COMPONENT }}
-          files: ./lcov.info
-          verbose: true
+          files: lcov.info
 
   dist_clarinet:
     name: Build Clarinet Distributions
@@ -184,7 +152,7 @@ jobs:
           git config --global core.eol lf
 
       - name: Checkout repository
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           submodules: recursive
 
@@ -205,13 +173,10 @@ jobs:
         run: sudo chown -R $(whoami):$(id -ng) ~/.cargo/
 
       - name: Cache cargo
-        uses: actions/cache@v2
+        uses: actions/cache@v3
         with:
           path: |
-            ~/.cargo/bin/
-            ~/.cargo/registry/index/
-            ~/.cargo/registry/cache/
-            ~/.cargo/git/db/
+            ~/.cargo/
             target/${{ matrix.target }}/release/
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
 
@@ -392,7 +357,7 @@ jobs:
 
       - name: Checkout repository
         if: github.event_name != 'pull_request' || matrix.target == 'x86_64-unknown-linux-gnu'
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
         with:
           submodules: recursive
 
@@ -419,13 +384,10 @@ jobs:
 
       - name: Cache cargo
         if: github.event_name != 'pull_request' || matrix.target == 'x86_64-unknown-linux-gnu'
-        uses: actions/cache@v2
+        uses: actions/cache@v3
         with:
           path: |
-            ~/.cargo/bin/
-            ~/.cargo/registry/index/
-            ~/.cargo/registry/cache/
-            ~/.cargo/git/db/
+            ~/.cargo/
             target/${{ matrix.target }}/release/
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
 
@@ -505,7 +467,7 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           submodules: recursive
 
@@ -519,13 +481,10 @@ jobs:
           override: true
 
       - name: Cache cargo
-        uses: actions/cache@v2
+        uses: actions/cache@v3
         with:
           path: |
-            ~/.cargo/bin/
-            ~/.cargo/registry/index/
-            ~/.cargo/registry/cache/
-            ~/.cargo/git/db/
+            ~/.cargo/
             target/x86_64-unknown-linux-gnu/release/
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
 
@@ -578,7 +537,7 @@ jobs:
             dockerfile: dockerfiles/components/clarinet-dev.dockerfile
     steps:
       - name: Checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           submodules: recursive
 
@@ -627,7 +586,7 @@ jobs:
     needs:
       - get_release_info
       - audit
-      # - test_coverage_cargo
+      - test_coverage_cargo
       - dist_stacks_devnet_js
       - dist_clarity_repl
       - docker_images
@@ -636,7 +595,7 @@ jobs:
       contents: write
     steps:
       - name: Checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           submodules: recursive
 
