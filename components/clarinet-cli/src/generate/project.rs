@@ -128,7 +128,7 @@ impl GetChangesForNewProject {
       "type": "shell",
       "command": "clarinet check"
     },
-    {{
+    {
       "type": "npm",
       "script": "test",
       "group": "test",
