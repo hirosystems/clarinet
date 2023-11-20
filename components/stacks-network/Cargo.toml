@@ -32,8 +32,8 @@ chrono = "0.4.31"
 futures = "0.3.12"
 base58 = "0.2.0"
 
-# chainhook-sdk = { version = "=0.10.2", default-features = true, path = "../../../chainhook/components/chainhook-sdk" }
-chainhook-sdk = { version = "=0.10.2", default-features = true }
+# chainhook-sdk = { version = "=0.11", default-features = true, path = "../../../chainhook/components/chainhook-sdk" }
+chainhook-sdk = { version = "=0.11", default-features = true }
 stacks-rpc-client = { path = "../stacks-rpc-client" }
 clarinet-files = { path = "../clarinet-files", features = ["cli"] }
 clarinet-deployments = { path = "../clarinet-deployments", features = ["cli"] }
