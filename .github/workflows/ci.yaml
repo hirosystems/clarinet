@@ -163,18 +163,9 @@ jobs:
       - name: Install Rust toolchain
         run: rustup toolchain install stable --profile minimal --target ${{ matrix.target }}
 
-      - name: "Get Rust version (ubuntu)"
-        if: matrix.os == 'ubuntu-latest'
-        run: echo "RUST_VERSION_HASH=$(rustc --version | sha256sum | awk '{print $1}')" >> $GITHUB_ENV
-
-      - name: "Get Rust version (macos)"
-        if: matrix.os == 'macos-latest'
-        run: echo "RUST_VERSION_HASH=$(rustc --version | shasum -a 256 | awk '{print $1}')" >> $GITHUB_ENV
-
-      - name: "Get Rust version (windows)"
-        if: matrix.os == 'windows-latest'
+      - name: "Get Rust version"
         shell: bash
-        run: echo "RUST_VERSION_HASH=$(rustc --version | sha256sum | awk '{print $1}')" >> $GITHUB_ENV
+        run: echo "RUST_VERSION_HASH=$(rustc --version | shasum -a 256 | awk '{print $1}')" >> $GITHUB_ENV
 
       - if: matrix.os != 'windows-latest'
         run: sudo chown -R $(whoami):$(id -ng) ~/.cargo/
