@@ -973,6 +973,7 @@ fn compute_btc_address(public_key: &PublicKey, network: &BitcoinNetwork) -> Stri
     let btc_address = bitcoin::Address::p2pkh(
         &public_key,
         match network {
+            BitcoinNetwork::Signet => bitcoin::Network::Signet,
             BitcoinNetwork::Regtest => bitcoin::Network::Regtest,
             BitcoinNetwork::Testnet => bitcoin::Network::Testnet,
             BitcoinNetwork::Mainnet => bitcoin::Network::Bitcoin,

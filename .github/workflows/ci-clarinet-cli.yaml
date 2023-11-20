@@ -52,7 +52,7 @@ jobs:
       tag: ${{ steps.new_release_tag.outputs.TAG }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Get latest release
         uses: cardinalby/git-get-release-action@v1
@@ -85,40 +85,33 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Install Rust toolchain
         run: |
-          rustup set profile minimal
-          rustup toolchain install stable --component llvm-tools-preview
-          rustup override set stable
+          rustup toolchain install stable --profile minimal
+          echo "RUST_VERSION_HASH=$(rustc --version | sha256sum | awk '{print $1}')" >> $GITHUB_ENV
 
       - name: Cache cargo
-        id: cache-cargo
         uses: actions/cache@v3
         with:
           path: |
-            ~/.cargo/bin/
-            ~/.cargo/registry/index/
-            ~/.cargo/registry/cache/
-            ~/.cargo/git/db/
-            target/
-          key: ${{ runner.os }}-cargo-grcov-${{ env.COMPONENT }}-${{ hashFiles(env.COMPONENT_CARGO_LOCK_FILE) }}
+            ~/.cargo/
+            ./target/debug/build/
+          key: ${{ runner.os }}-rust-${{ env.RUST_VERSION_HASH }}-${{ hashFiles('./Cargo.lock') }}
 
-      - name: Install dependencies
-        if: steps.cache-cargo.outputs.cache-hit != 'true'
-        run: RUSTC_BOOTSTRAP=1 cargo install grcov
+      - name: install dependencies
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-llvm-cov,nextest
 
-      - name: Unit Tests
+      - name: Run unit test with coverage
         run: cargo cov
 
-      - name: Upload coverage report
+      - name: Upload coverage data to codecov
         uses: codecov/codecov-action@v3
         with:
-          flags: unittests
-          name: ${{ env.COMPONENT }}
-          files: ./lcov.info
-          verbose: true
+          files: lcov.info
 
   matrix_prep:
     name: Prepare Dist and Docker Matrices
@@ -128,7 +121,7 @@ jobs:
       docker_matrix: ${{ steps.set-matrix.outputs.docker_matrix }}
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
       - name: Determine dist build matrix
         id: set-matrix
         run: |
@@ -160,26 +153,27 @@ jobs:
           git config --global core.eol lf
 
       - name: Checkout repository
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Install Rust toolchain
-        run: |
-          rustup set profile minimal
-          rustup toolchain install stable --component llvm-tools-preview
-          rustup override set stable
-          rustup target add --toolchain stable ${{ matrix.target }}
+        run: rustup toolchain install stable --profile minimal --target ${{ matrix.target }}
+
+      - name: "Get Rust version (unix)"
+        if: matrix.os != 'windows-latest'
+        run: echo "RUST_VERSION_HASH=$(rustc --version | shasum -a 256 | awk '{print $1}')" >> $GITHUB_ENV
+
+      - name: "Get Rust version (windows)"
+        if: matrix.os == 'windows-latest'
+        shell: bash
+        run: echo "RUST_VERSION_HASH=$(rustc --version | sha256sum | awk '{print $1}')" >> $GITHUB_ENV
 
       - name: Cache cargo
-        id: cache-cargo
         uses: actions/cache@v3
         with:
           path: |
-            ~/.cargo/bin/
-            ~/.cargo/registry/index/
-            ~/.cargo/registry/cache/
-            ~/.cargo/git/db/
-            target/
-          key: ${{ runner.os }}-cargo-dist-${{ env.COMPONENT }}-${{ hashFiles(env.COMPONENT_CARGO_LOCK_FILE) }}
+            ~/.cargo/
+            ./target/${{ matrix.target }}/release/
+          key: ${{ runner.os }}-rust-${{ env.RUST_VERSION_HASH }}-cargo-${{ hashFiles('./Cargo.lock') }}
 
       - name: Install wix (Windows)
         if: matrix.os == 'windows-latest' && steps.cache-cargo.outputs.cache-hit != 'true'
@@ -297,7 +291,7 @@ jobs:
       matrix: ${{fromJson(needs.matrix_prep.outputs.docker_matrix)}}
     steps:
       - name: Checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Set up QEMU
         if: matrix.platform == 'linux/arm64'
@@ -359,7 +353,7 @@ jobs:
       contents: write
     steps:
       - name: Checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Download pre-built dists
         uses: actions/download-artifact@v3
