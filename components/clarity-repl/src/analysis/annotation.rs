@@ -24,7 +24,7 @@ impl std::str::FromStr for AnnotationKind {
             match base {
                 "allow" => match value.parse() {
                     Ok(value) => Ok(AnnotationKind::Allow(value)),
-                    Err(e) => Err("missing value for 'allow' annotation".to_string()),
+                    Err(_) => Err("missing value for 'allow' annotation".to_string()),
                 },
                 "filter" => {
                     if value == "*" {

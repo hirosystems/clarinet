@@ -1035,7 +1035,7 @@ pub fn main() {
             let (ast, mut diagnostics, mut success) = session.interpreter.build_ast(&contract);
             let (annotations, mut annotation_diagnostics) = session
                 .interpreter
-                .collect_annotations(&ast, contract.expect_in_memory_code_source());
+                .collect_annotations(contract.expect_in_memory_code_source());
             diagnostics.append(&mut annotation_diagnostics);
 
             let mut contract_analysis = ContractAnalysis::new(

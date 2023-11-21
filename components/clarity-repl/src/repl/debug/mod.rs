@@ -6,14 +6,12 @@ use crate::repl::diagnostic::output_diagnostic;
 use clarity::vm::ast::build_ast_with_diagnostics;
 use clarity::vm::contexts::{Environment, LocalContext};
 use clarity::vm::contracts::Contract;
-use clarity::vm::database::ClarityDatabase;
 use clarity::vm::diagnostic::Level;
 use clarity::vm::errors::Error;
 use clarity::vm::functions::NativeFunctions;
 use clarity::vm::representations::Span;
 use clarity::vm::representations::SymbolicExpression;
 use clarity::vm::types::{QualifiedContractIdentifier, StandardPrincipalData, Value};
-use clarity::vm::EvalHook;
 use clarity::vm::{eval, ClarityVersion};
 use clarity::vm::{ContractName, SymbolicExpressionType};
 
@@ -35,7 +33,6 @@ impl Display for Source {
 
 pub struct Breakpoint {
     id: usize,
-    verified: bool,
     data: BreakpointData,
     source: Source,
     span: Option<Span>,
@@ -228,7 +225,7 @@ impl DebugState {
     }
 
     fn delete_all_breakpoints(&mut self) {
-        for (id, breakpoint) in &self.breakpoints {
+        for breakpoint in self.breakpoints.values() {
             let set = self
                 .break_locations
                 .get_mut(&breakpoint.source.name)
@@ -259,7 +256,6 @@ impl DebugState {
     ) {
         let breakpoint = Breakpoint {
             id: self.get_unique_id(),
-            verified: true,
             data: BreakpointData::Data(DataBreakpoint {
                 name: name.to_string(),
                 access_type,
@@ -287,7 +283,7 @@ impl DebugState {
     }
 
     fn delete_all_watchpoints(&mut self) {
-        for (id, breakpoint) in &self.watchpoints {
+        for breakpoint in self.watchpoints.values() {
             let name = match &breakpoint.data {
                 BreakpointData::Data(data) => data.name.clone(),
                 _ => continue,
@@ -471,7 +467,7 @@ impl DebugState {
     fn will_begin_eval(
         &mut self,
         env: &mut Environment,
-        context: &LocalContext,
+        _context: &LocalContext,
         expr: &SymbolicExpression,
     ) -> bool {
         self.stack.push(ExprState::new(expr.id));
@@ -527,10 +523,10 @@ impl DebugState {
     // Returns a bool which indicates if the result should be printed (finish)
     fn did_finish_eval(
         &mut self,
-        env: &mut Environment,
-        context: &LocalContext,
+        _env: &mut Environment,
+        _context: &LocalContext,
         expr: &SymbolicExpression,
-        res: &Result<Value, Error>,
+        _res: &Result<Value, Error>,
     ) -> bool {
         let state = self.stack.pop().unwrap();
         assert_eq!(state.id, expr.id);

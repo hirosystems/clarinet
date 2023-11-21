@@ -1,6 +1,6 @@
 coverage:
   status:
-    patch: false
+    path: false
     project:
       default:
         threshold: 5%

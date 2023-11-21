@@ -6,7 +6,6 @@ use super::errors::Error;
 use super::errors::ErrorKind;
 use super::errors::Result as LibResult;
 use neon::prelude::*;
-use num;
 use serde::ser::{self, Serialize};
 use std::marker::PhantomData;
 
@@ -538,7 +537,7 @@ where
         let outer_object = JsObject::new(cx);
         outer_object.set(cx, key, inner_object)?;
         Ok(StructVariantSerializer {
-            outer_object: outer_object,
+            outer_object,
             inner: StructSerializer {
                 cx,
                 object: inner_object,

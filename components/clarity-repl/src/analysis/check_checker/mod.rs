@@ -1,3 +1,5 @@
+#![allow(unused_variables)]
+
 use crate::analysis::annotation::{Annotation, AnnotationKind, WarningKind};
 use crate::analysis::ast_visitor::{traverse, ASTVisitor, TypedVar};
 use crate::analysis::{self, AnalysisPass, AnalysisResult};
@@ -7,13 +9,12 @@ use clarity::vm::analysis::types::ContractAnalysis;
 use clarity::vm::diagnostic::{DiagnosableError, Diagnostic, Level};
 use clarity::vm::functions::define::DefineFunctions;
 use clarity::vm::functions::NativeFunctions;
+use clarity::vm::representations::Span;
 use clarity::vm::representations::SymbolicExpressionType::*;
-use clarity::vm::representations::{Span, TraitDefinition};
-use clarity::vm::types::{TraitIdentifier, TypeSignature, Value};
+use clarity::vm::types::TypeSignature;
 use clarity::vm::{ClarityName, ClarityVersion, SymbolicExpression};
 use std::collections::{HashMap, HashSet};
-use std::convert::TryFrom;
-use std::hash::{Hash, Hasher};
+use std::hash::Hash;
 
 #[derive(Debug, Default, Clone, Copy, Serialize, Deserialize)]
 pub struct Settings {
@@ -97,8 +98,7 @@ struct FunctionInfo {
     filtered_params: Vec<bool>,
 }
 
-pub struct CheckChecker<'a, 'b> {
-    db: &'a mut AnalysisDatabase<'b>,
+pub struct CheckChecker<'a> {
     settings: Settings,
     taint_sources: HashMap<Node<'a>, TaintSource<'a>>,
     tainted_nodes: HashMap<Node<'a>, TaintedNode<'a>>,
@@ -115,14 +115,9 @@ pub struct CheckChecker<'a, 'b> {
     in_as_contract: bool,
 }
 
-impl<'a, 'b> CheckChecker<'a, 'b> {
-    fn new(
-        db: &'a mut AnalysisDatabase<'b>,
-        annotations: &'a Vec<Annotation>,
-        settings: Settings,
-    ) -> CheckChecker<'a, 'b> {
+impl<'a> CheckChecker<'a> {
+    fn new(annotations: &'a Vec<Annotation>, settings: Settings) -> CheckChecker<'a> {
         Self {
-            db,
             settings,
             taint_sources: HashMap::new(),
             tainted_nodes: HashMap::new(),
@@ -158,10 +153,6 @@ impl<'a, 'b> CheckChecker<'a, 'b> {
         let mut sources = HashSet::new();
         sources.insert(node);
         self.tainted_nodes.insert(node, TaintedNode { sources });
-    }
-
-    fn add_taint_source_expr(&mut self, expr: &SymbolicExpression) {
-        self.add_taint_source(Node::Expr(expr.id), expr.span.clone());
     }
 
     fn add_taint_source_symbol(&mut self, name: &'a ClarityName, span: Span) {
@@ -325,7 +316,7 @@ impl<'a, 'b> CheckChecker<'a, 'b> {
     }
 }
 
-impl<'a> ASTVisitor<'a> for CheckChecker<'a, '_> {
+impl<'a> ASTVisitor<'a> for CheckChecker<'a> {
     fn traverse_expr(&mut self, expr: &'a SymbolicExpression) -> bool {
         self.process_annotations(&expr.span);
         // If this expression is annotated to allow unchecked data, no need to
@@ -849,22 +840,14 @@ fn is_param_type_excluded_from_checked_requirement(param: &TypedVar) -> bool {
     )
 }
 
-fn is_tx_sender(expr: &SymbolicExpression) -> bool {
-    if let Some(name) = expr.match_atom() {
-        name.as_str() == "tx_sender"
-    } else {
-        false
-    }
-}
-
-impl AnalysisPass for CheckChecker<'_, '_> {
+impl AnalysisPass for CheckChecker<'_> {
     fn run_pass(
         contract_analysis: &mut ContractAnalysis,
         analysis_db: &mut AnalysisDatabase,
         annotations: &Vec<Annotation>,
         settings: &analysis::Settings,
     ) -> AnalysisResult {
-        let checker = CheckChecker::new(analysis_db, annotations, settings.check_checker);
+        let checker = CheckChecker::new(annotations, settings.check_checker);
         checker.run(contract_analysis)
     }
 }
@@ -889,7 +872,6 @@ fn match_contract_caller(expr: &SymbolicExpression) -> bool {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use crate::analysis::Pass;
     use crate::repl::session::Session;
     use crate::repl::SessionSettings;

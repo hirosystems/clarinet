@@ -14,13 +14,8 @@ use serde::{Serialize, Serializer};
 use serde_json::Value as JsonValue;
 use std::collections::{BTreeMap, HashMap};
 
+#[derive(Default)]
 pub struct Settings {}
-
-impl Settings {
-    pub fn default() -> Settings {
-        Settings {}
-    }
-}
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum StacksTransactionEvent {
@@ -41,23 +36,20 @@ impl Serialize for StacksTransactionEvent {
                 map.serialize_entry("event_type", "print")?;
                 map.serialize_entry("print", data)?;
             }
-            StacksTransactionEvent::STXEvent(data) => {
-                match &data {
-                    STXEventType::STXBurnEvent(sub_data) => {
-                        map.serialize_entry("event_type", "burn_stx_event")?;
-                        // map.serialize_entry("burn_stx_event", sub_data)?;
-                    }
-                    STXEventType::STXLockEvent(sub_data) => {
-                        map.serialize_entry("event_type", "lock_stx_event")?;
-                    }
-                    STXEventType::STXMintEvent(sub_data) => {
-                        map.serialize_entry("event_type", "mint_stx_event")?;
-                    }
-                    STXEventType::STXTransferEvent(sub_data) => {
-                        map.serialize_entry("event_type", "transfer_stx_event")?;
-                    }
+            StacksTransactionEvent::STXEvent(data) => match &data {
+                STXEventType::STXBurnEvent(_sub_data) => {
+                    map.serialize_entry("event_type", "burn_stx_event")?;
                 }
-            }
+                STXEventType::STXLockEvent(_sub_data) => {
+                    map.serialize_entry("event_type", "lock_stx_event")?;
+                }
+                STXEventType::STXMintEvent(_sub_data) => {
+                    map.serialize_entry("event_type", "mint_stx_event")?;
+                }
+                STXEventType::STXTransferEvent(_sub_data) => {
+                    map.serialize_entry("event_type", "transfer_stx_event")?;
+                }
+            },
             StacksTransactionEvent::NFTEvent(data) => match &data {
                 NFTEventType::NFTBurnEvent(sub_data) => {
                     map.serialize_entry("event_type", "burn_nft_event")?;
@@ -648,7 +640,7 @@ impl ASTVisitor<'_> for EventCollector<'_, '_> {
             .expect("unable to infer value's type shape");
 
         let data = SmartContractEventData {
-            data_type: serialize_type_signature(&value_type_shape, value),
+            data_type: serialize_type_signature(value_type_shape, value),
         };
         self.add_event(StacksTransactionEvent::SmartContractEvent(data));
         true
@@ -687,7 +679,7 @@ impl ASTVisitor<'_> for EventCollector<'_, '_> {
         amount: &SymbolicExpression,
         sender: &SymbolicExpression,
         recipient: &SymbolicExpression,
-        memo: Option<&SymbolicExpression>,
+        _memo: Option<&SymbolicExpression>,
     ) -> bool {
         let mut data = STXTransferEventData::default();
         match &amount.expr {
@@ -819,13 +811,13 @@ impl ASTVisitor<'_> for EventCollector<'_, '_> {
         let type_signature = self
             .type_checker
             .type_map
-            .get_type(&identifier)
+            .get_type(identifier)
             .expect("unable to infer value's type shape");
 
         let mut data = NFTBurnEventData::default(self.create_asset_identifier(token.clone()));
         match &identifier.expr {
-            SymbolicExpressionType::AtomValue(value)
-            | SymbolicExpressionType::LiteralValue(value) => {
+            SymbolicExpressionType::AtomValue(_value)
+            | SymbolicExpressionType::LiteralValue(_value) => {
                 data.value = Some(serialize_type_signature(type_signature, identifier));
             }
             _ => {}
@@ -855,13 +847,13 @@ impl ASTVisitor<'_> for EventCollector<'_, '_> {
         let type_signature = self
             .type_checker
             .type_map
-            .get_type(&identifier)
+            .get_type(identifier)
             .expect("unable to infer value's type shape");
 
         let mut data = NFTTransferEventData::default(self.create_asset_identifier(token.clone()));
         match &identifier.expr {
-            SymbolicExpressionType::AtomValue(value)
-            | SymbolicExpressionType::LiteralValue(value) => {
+            SymbolicExpressionType::AtomValue(_value)
+            | SymbolicExpressionType::LiteralValue(_value) => {
                 data.value = Some(serialize_type_signature(type_signature, identifier));
             }
             _ => {}
@@ -897,13 +889,13 @@ impl ASTVisitor<'_> for EventCollector<'_, '_> {
         let type_signature = self
             .type_checker
             .type_map
-            .get_type(&identifier)
+            .get_type(identifier)
             .expect("unable to infer value's type shape");
 
         let mut data = NFTTransferEventData::default(self.create_asset_identifier(token.clone()));
         match &identifier.expr {
-            SymbolicExpressionType::AtomValue(value)
-            | SymbolicExpressionType::LiteralValue(value) => {
+            SymbolicExpressionType::AtomValue(_value)
+            | SymbolicExpressionType::LiteralValue(_value) => {
                 data.value = Some(serialize_type_signature(type_signature, identifier));
             }
             _ => {}
