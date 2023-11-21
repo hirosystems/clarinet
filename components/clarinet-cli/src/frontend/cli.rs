@@ -1574,7 +1574,7 @@ fn execute_changes(changes: Vec<Changes>) -> bool {
                     }
                 }
                 match fs::remove_file(&options.path) {
-                    Ok(_) => println!("successfully removed {}", options.path),
+                    Ok(_) => println!("{}", options.comment),
                     Err(e) => println!("error {}", e),
                 }
             }
