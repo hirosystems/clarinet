@@ -1,9 +1,80 @@
-use super::changes::{Changes, FileCreation, TOMLEdition};
+use super::changes::{Changes, FileCreation, FileDeletion, TOMLEdition};
 use clarinet_files::FileLocation;
 use clarity_repl::repl::{
     ClarityCodeSource, ClarityContract, ContractDeployer, DEFAULT_CLARITY_VERSION, DEFAULT_EPOCH,
 };
 use std::{collections::HashMap, path::PathBuf, str::FromStr};
+
+pub struct GetChangesForRmContract {
+    manifest_location: FileLocation,
+    contract_name: String,
+    changes: Vec<Changes>,
+}
+
+impl GetChangesForRmContract {
+    pub fn new(manifest_location: FileLocation, contract_name: String) -> Self {
+        Self {
+            manifest_location,
+            contract_name: contract_name.replace('.', "_"),
+            changes: vec![],
+        }
+    }
+    pub fn run(&mut self) -> Result<Vec<Changes>, String> {
+        self.rm_template_contract()?;
+        self.unindex_contract_in_clarinet_toml();
+        self.rm_test()?;
+        Ok(self.changes.clone())
+    }
+    fn rm_test(&mut self) -> Result<(), String> {
+        let name = format!("{}.test.ts", self.contract_name);
+        let mut f = self.manifest_location.get_project_root_location().unwrap();
+        f.append_path("tests")?;
+        f.append_path(&name)?;
+        if !f.exists() {
+            return Err(format!("{} doesn't exist", f));
+        }
+        let change = FileDeletion {
+            comment: format!("{} tests/{}", red!("Deleted file"), name),
+            name,
+            path: f.to_string(),
+        };
+        self.changes.push(Changes::RemoveFile(change));
+        Ok(())
+    }
+    fn rm_template_contract(&mut self) -> Result<(), String> {
+        let name = format!("{}.clar", self.contract_name);
+        let mut f = self.manifest_location.get_project_root_location().unwrap();
+        f.append_path("contracts")?;
+        f.append_path(&name)?;
+        if !f.exists() {
+            return Err(format!("{} doesn't exist", f));
+        }
+        let change = FileDeletion {
+            comment: format!("{} contracts/{}", red!("Deleted file"), name),
+            name,
+            path: f.to_string(),
+        };
+        self.changes.push(Changes::RemoveFile(change));
+        Ok(())
+    }
+    fn unindex_contract_in_clarinet_toml(&mut self) {
+        let manifest_location = self.manifest_location.clone();
+        let contracts_to_rm = vec![self.contract_name.clone()];
+
+        let change = TOMLEdition {
+            comment: format!(
+                "{}, removed contract {}",
+                yellow!("Updated Clarinet.toml"),
+                self.contract_name
+            ),
+            manifest_location,
+            contracts_to_rm,
+            contracts_to_add: HashMap::new(),
+            requirements_to_add: vec![],
+        };
+        self.changes.push(Changes::EditTOML(change));
+    }
+}
 
 pub struct GetChangesForNewContract {
     manifest_location: FileLocation,
@@ -157,6 +228,7 @@ describe("example tests", () => {
                 self.contract_name
             ),
             manifest_location,
+            contracts_to_rm: vec![],
             contracts_to_add,
             requirements_to_add: vec![],
         };
