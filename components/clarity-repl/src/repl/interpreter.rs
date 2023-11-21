@@ -800,8 +800,127 @@ impl ClarityInterpreter {
 
 #[cfg(test)]
 mod tests {
+    use clarity::types::{chainstate::StacksAddress, Address};
+
     use super::*;
     use crate::test_fixtures::clarity_contract::ClarityContractBuilder;
+
+    #[test]
+    fn test_get_tx_sender() {
+        let mut interpreter =
+            ClarityInterpreter::new(StandardPrincipalData::transient(), Settings::default());
+        let tx_sender = StandardPrincipalData::transient();
+        interpreter.set_tx_sender(tx_sender.clone());
+        assert_eq!(interpreter.get_tx_sender(), tx_sender);
+    }
+
+    #[test]
+    fn test_set_tx_sender() {
+        let mut interpreter =
+            ClarityInterpreter::new(StandardPrincipalData::transient(), Settings::default());
+
+        let addr = StacksAddress::from_string("ST1SJ3DTE5DN7X54YDH5D64R3BCB6A2AG2ZQ8YPD5").unwrap();
+        let tx_sender = StandardPrincipalData::from(addr);
+        interpreter.set_tx_sender(tx_sender.clone());
+        assert_eq!(interpreter.get_tx_sender(), tx_sender);
+    }
+
+    #[test]
+    fn test_get_block_height() {
+        let mut interpreter =
+            ClarityInterpreter::new(StandardPrincipalData::transient(), Settings::default());
+        assert_eq!(interpreter.get_block_height(), 0);
+    }
+
+    #[test]
+    fn test_advance_chain_tip() {
+        let mut interpreter =
+            ClarityInterpreter::new(StandardPrincipalData::transient(), Settings::default());
+        let count = 5;
+        let initial_block_height = interpreter.get_block_height();
+        interpreter.advance_chain_tip(count);
+        assert_eq!(interpreter.get_block_height(), initial_block_height + count);
+    }
+
+    #[test]
+    fn test_get_assets_maps() {
+        let mut interpreter =
+            ClarityInterpreter::new(StandardPrincipalData::transient(), Settings::default());
+        let addr = "ST1SJ3DTE5DN7X54YDH5D64R3BCB6A2AG2ZQ8YPD5";
+        let amount = 1000;
+        interpreter.credit_token(addr.into(), "STX".into(), amount);
+
+        let assets = interpreter.get_assets_maps();
+        assert!(assets.contains_key("STX"));
+
+        let stx = assets.get("STX").unwrap();
+        assert!(stx.contains_key(addr));
+
+        let balance = stx.get(addr).unwrap();
+        assert_eq!(balance, &amount)
+    }
+
+    #[test]
+    fn test_get_tokens() {
+        let mut interpreter =
+            ClarityInterpreter::new(StandardPrincipalData::transient(), Settings::default());
+        let addr = "ST1SJ3DTE5DN7X54YDH5D64R3BCB6A2AG2ZQ8YPD5";
+        interpreter.credit_token(addr.into(), "STX".into(), 1000);
+
+        let tokens = interpreter.get_tokens();
+        assert_eq!(tokens, ["STX"]);
+    }
+
+    #[test]
+    fn test_get_accounts() {
+        let mut interpreter =
+            ClarityInterpreter::new(StandardPrincipalData::transient(), Settings::default());
+        let addr = "ST1SJ3DTE5DN7X54YDH5D64R3BCB6A2AG2ZQ8YPD5";
+        interpreter.credit_token(addr.into(), "STX".into(), 1000);
+
+        let accounts = interpreter.get_accounts();
+        assert_eq!(accounts, ["ST1SJ3DTE5DN7X54YDH5D64R3BCB6A2AG2ZQ8YPD5"]);
+    }
+
+    #[test]
+    fn test_get_balance_for_account() {
+        let mut interpreter =
+            ClarityInterpreter::new(StandardPrincipalData::transient(), Settings::default());
+
+        let addr = "ST1SJ3DTE5DN7X54YDH5D64R3BCB6A2AG2ZQ8YPD5";
+        let amount = 1000;
+        interpreter.credit_token(addr.into(), "STX".into(), amount);
+
+        let balance = interpreter.get_balance_for_account(addr, "STX");
+        assert_eq!(balance, amount);
+    }
+
+    #[test]
+    fn test_credit_any_token() {
+        let mut interpreter =
+            ClarityInterpreter::new(StandardPrincipalData::transient(), Settings::default());
+
+        let addr = "ST1SJ3DTE5DN7X54YDH5D64R3BCB6A2AG2ZQ8YPD5";
+        let amount = 1000;
+        interpreter.credit_token(addr.into(), "MIA".into(), amount);
+
+        let balance = interpreter.get_balance_for_account(addr, "MIA");
+        assert_eq!(balance, amount);
+    }
+
+    #[test]
+    fn test_mint_stx_balance() {
+        let mut interpreter =
+            ClarityInterpreter::new(StandardPrincipalData::transient(), Settings::default());
+        let recipient = PrincipalData::Standard(StandardPrincipalData::transient());
+        let amount = 1000;
+
+        let result = interpreter.mint_stx_balance(recipient.clone(), amount);
+        assert!(result.is_ok());
+
+        let balance = interpreter.get_balance_for_account(&recipient.to_string(), "STX");
+        assert_eq!(balance, amount.into());
+    }
 
     #[test]
     fn test_run_valid_contract() {
@@ -865,7 +984,7 @@ mod tests {
     }
 
     #[test]
-    fn test_execute_events() {
+    fn test_execute_ft_events() {
         let mut interpreter =
             ClarityInterpreter::new(StandardPrincipalData::transient(), Settings::default());
 
@@ -914,6 +1033,62 @@ mod tests {
         assert!(matches!(
             events[2],
             StacksTransactionEvent::FTEvent(FTEventType::FTTransferEvent(_))
+        ));
+    }
+
+    #[test]
+    fn test_execute_nft_events() {
+        let mut interpreter =
+            ClarityInterpreter::new(StandardPrincipalData::transient(), Settings::default());
+
+        let contract = ClarityContractBuilder::default()
+            .code_source(
+                [
+                    "(define-non-fungible-token nftest uint)",
+                    "(nft-mint? nftest u1 tx-sender)",
+                    "(nft-mint? nftest u2 tx-sender)",
+                    "(define-private (test-burn)",
+                    "  (nft-burn? nftest u1 tx-sender))",
+                    "(define-private (test-transfer)",
+                    "  (nft-transfer? nftest u2 tx-sender (as-contract  tx-sender)))",
+                    "(test-burn)",
+                    "(test-transfer)",
+                ]
+                .join("\n"),
+            )
+            .build();
+        let source = contract.expect_in_memory_code_source();
+        let (mut ast, ..) = interpreter.build_ast(&contract);
+        let (annotations, _) = interpreter.collect_annotations(source);
+
+        let (analysis, _) = interpreter
+            .run_analysis(&contract, &mut ast, &annotations)
+            .unwrap();
+
+        let result = interpreter.execute(&contract, &mut ast, analysis, false, None);
+        assert!(result.is_ok());
+        let ExecutionResult {
+            diagnostics,
+            events,
+            ..
+        } = result.unwrap();
+        assert!(diagnostics.is_empty());
+        assert_eq!(events.len(), 4);
+        assert!(matches!(
+            events[0],
+            StacksTransactionEvent::NFTEvent(NFTEventType::NFTMintEvent(_))
+        ));
+        assert!(matches!(
+            events[1],
+            StacksTransactionEvent::NFTEvent(NFTEventType::NFTMintEvent(_))
+        ));
+        assert!(matches!(
+            events[2],
+            StacksTransactionEvent::NFTEvent(NFTEventType::NFTBurnEvent(_))
+        ));
+        assert!(matches!(
+            events[3],
+            StacksTransactionEvent::NFTEvent(NFTEventType::NFTTransferEvent(_))
         ));
     }
 }
