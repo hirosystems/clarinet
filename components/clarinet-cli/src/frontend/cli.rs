@@ -115,6 +115,7 @@ enum Contracts {
     /// Generate files and settings for a new contract
     #[clap(name = "new", bin_name = "new")]
     NewContract(NewContract),
+    /// Remove files and settings for a contract
     #[clap(name = "rm", bin_name = "rm")]
     RemoveContract(RemoveContract),
 }
