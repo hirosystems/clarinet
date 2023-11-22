@@ -36,9 +36,7 @@ jobs:
       tag: ${{ steps.new_release_tag.outputs.TAG }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v3
-        with:
-          submodules: recursive
+        uses: actions/checkout@v4
 
       - name: Get latest release
         if: startsWith(github.ref, 'refs/heads/main')
@@ -68,26 +66,20 @@ jobs:
     needs: pre_run
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v3
-        with:
-          submodules: recursive
+        uses: actions/checkout@v4
 
       - name: Install Rust toolchain
-        uses: actions-rs/toolchain@v1
-        with:
-          toolchain: stable
-          profile: minimal
-          components: rustfmt
-          override: true
-
-      - name: Set Cargo file permissions
-        run: sudo chown -R $(whoami):$(id -ng) ~/.cargo/
+        run: |
+          rustup toolchain install stable --profile minimal --component rustfmt
+          echo "RUST_VERSION_HASH=$(rustc --version | sha256sum | awk '{print $1}')" >> $GITHUB_ENV
 
       - name: Cache cargo
-        uses: actions/cache@v2
+        uses: actions/cache@v3
         with:
-          path: ~/.cargo/
-          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+          path: |
+            ~/.cargo/
+            ./target/debug/build/
+          key: ${{ runner.os }}-rust-${{ env.RUST_VERSION_HASH }}-${{ hashFiles('./Cargo.lock') }}
 
       - name: Install dependencies
         run: cargo install cargo-audit
@@ -103,56 +95,38 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Install Rust toolchain
         run: |
-          rustup set profile minimal
-          rustup toolchain install stable --component llvm-tools-preview
-          rustup override set stable
+          rustup toolchain install stable --profile minimal
+          echo "RUST_VERSION_HASH=$(rustc --version | sha256sum | awk '{print $1}')" >> $GITHUB_ENV
 
       - name: Cache cargo
-        id: cache-cargo
         uses: actions/cache@v3
         with:
           path: |
-            ~/.cargo/bin/
-            ~/.cargo/registry/index/
-            ~/.cargo/registry/cache/
-            ~/.cargo/git/db/
-            target/
-          key: ${{ runner.os }}-cargo-grcov-${{ env.COMPONENT }}-${{ hashFiles(env.COMPONENT_CARGO_LOCK_FILE) }}
+            ~/.cargo/
+            ./target/debug/build/
+          key: ${{ runner.os }}-rust-${{ env.RUST_VERSION_HASH }}-${{ hashFiles('./Cargo.lock') }}
 
-      - name: Install dependencies
-        if: steps.cache-cargo.outputs.cache-hit != 'true'
-        run: RUSTC_BOOTSTRAP=1 cargo install grcov
+      - name: install dependencies
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-llvm-cov,nextest
 
-      - name: Build & Unit Test
-        env:
-          RUSTFLAGS: "-C instrument-coverage"
-          LLVM_PROFILE_FILE: "${{ env.COMPONENT }}-%p-%m.profraw"
-        run: cargo test --workspace --locked --exclude clarinet-sdk-wasm --exclude clarity-jupyter-kernel
+      - name: Run unit test with coverage
+        run: cargo cov
 
-      - name: Generate coverage
-        run: grcov . --binary-path target/debug/ -s . -t lcov --branch --ignore-not-existing --ignore "/*" -o lcov.info
-
-      - name: Upload coverage report
+      - name: Upload coverage data to codecov
         uses: codecov/codecov-action@v3
         with:
-          flags: unittests
-          name: ${{ env.COMPONENT }}
-          files: ./lcov.info
-          verbose: true
+          files: lcov.info
 
   dist_clarinet:
     name: Build Clarinet Distributions
     runs-on: ${{ matrix.os }}
     needs: pre_run
-    # Related upstream issue:
-    # https://github.com/nagisa/rust_libloading/issues/61#issuecomment-607941377
-    #
-    # env:
-    #  CC: deny_c
 
     strategy:
       fail-fast: false
@@ -184,36 +158,31 @@ jobs:
           git config --global core.eol lf
 
       - name: Checkout repository
-        uses: actions/checkout@v3
-        with:
-          submodules: recursive
+        uses: actions/checkout@v4
 
       - name: Install Rust toolchain
-        uses: actions-rs/toolchain@v1
-        with:
-          toolchain: stable
-          target: ${{ matrix.target }}
-          profile: minimal
-          components: llvm-tools-preview
-          override: true
+        run: rustup toolchain install stable --profile minimal --target ${{ matrix.target }}
 
-      - name: Install wix (Windows)
+      - name: "Get Rust version (unix)"
+        if: matrix.os != 'windows-latest'
+        run: echo "RUST_VERSION_HASH=$(rustc --version | shasum -a 256 | awk '{print $1}')" >> $GITHUB_ENV
+
+      - name: "Get Rust version (windows)"
         if: matrix.os == 'windows-latest'
-        run: cargo install cargo-wix
-
-      - if: matrix.os != 'windows-latest'
-        run: sudo chown -R $(whoami):$(id -ng) ~/.cargo/
+        shell: bash
+        run: echo "RUST_VERSION_HASH=$(rustc --version | sha256sum | awk '{print $1}')" >> $GITHUB_ENV
 
       - name: Cache cargo
-        uses: actions/cache@v2
+        uses: actions/cache@v3
         with:
           path: |
-            ~/.cargo/bin/
-            ~/.cargo/registry/index/
-            ~/.cargo/registry/cache/
-            ~/.cargo/git/db/
-            target/${{ matrix.target }}/release/
-          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+            ~/.cargo/
+            ./target/${{ matrix.target }}/release/
+          key: ${{ runner.os }}-rust-${{ env.RUST_VERSION_HASH }}-cargo-${{ hashFiles('./Cargo.lock') }}
+
+      - name: Install wix (Windows)
+        if: matrix.os == 'windows-latest' && steps.cache-cargo.outputs.cache-hit != 'true'
+        run: cargo install cargo-wix
 
       # Set environment variables required from cross compiling from macos-x86_64 to macos-arm64
       - name: Configure macos-arm64 cross compile config
@@ -392,25 +361,19 @@ jobs:
 
       - name: Checkout repository
         if: github.event_name != 'pull_request' || matrix.target == 'x86_64-unknown-linux-gnu'
-        uses: actions/checkout@v2
-        with:
-          submodules: recursive
+        uses: actions/checkout@v4
 
       - name: Install Rust toolchain
         if: github.event_name != 'pull_request' || matrix.target == 'x86_64-unknown-linux-gnu'
-        uses: actions-rs/toolchain@v1
-        with:
-          toolchain: stable
-          target: ${{ matrix.target }}
-          profile: minimal
-          components: llvm-tools-preview
-          override: true
+        run: |
+          rustup toolchain install stable --profile minimal
+          echo "RUST_VERSION_HASH=$(rustc --version | sha256sum | awk '{print $1}')" >> $GITHUB_ENV‡
 
       - name: Install and cache Node
         if: github.event_name != 'pull_request' && matrix.target != 'x86_64-unknown-linux-musl'
-        uses: actions/setup-node@v3
+        uses: actions/setup-node@v4
         with:
-          node-version: "14"
+          node-version: "18"
           # Host nodejs arch does not matter in our usecase for compiling cross-platform npm packages,
           # if enabled, this will fail after installing an arm64 nodejs runtime for an x86_64 arch macos system
           # architecture: ${{ matrix.architecture }}
@@ -419,15 +382,12 @@ jobs:
 
       - name: Cache cargo
         if: github.event_name != 'pull_request' || matrix.target == 'x86_64-unknown-linux-gnu'
-        uses: actions/cache@v2
+        uses: actions/cache@v3
         with:
           path: |
-            ~/.cargo/bin/
-            ~/.cargo/registry/index/
-            ~/.cargo/registry/cache/
-            ~/.cargo/git/db/
-            target/${{ matrix.target }}/release/
-          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+            ~/.cargo/
+            ./target/${{ matrix.target }}/release/
+          key: ${{ runner.os }}-rust-${{ env.RUST_VERSION_HASH }}-cargo-${{ hashFiles('./Cargo.lock') }}
 
       # Set environment variables required from cross compiling from macos-x86_64 to macos-arm64
       - name: Configure macos-arm64 cross compile config
@@ -505,40 +465,31 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v3
-        with:
-          submodules: recursive
+        uses: actions/checkout@v4
 
       - name: Install Rust toolchain
-        uses: actions-rs/toolchain@v1
-        with:
-          toolchain: stable
-          target: x86_64-unknown-linux-gnu
-          profile: minimal
-          components: llvm-tools-preview
-          override: true
+        run: |
+          rustup toolchain install stable --profile minimal
+          echo "RUST_VERSION_HASH=$(rustc --version | sha256sum | awk '{print $1}')" >> $GITHUB_ENV
 
       - name: Cache cargo
-        uses: actions/cache@v2
+        uses: actions/cache@v3
         with:
           path: |
-            ~/.cargo/bin/
-            ~/.cargo/registry/index/
-            ~/.cargo/registry/cache/
-            ~/.cargo/git/db/
-            target/x86_64-unknown-linux-gnu/release/
-          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+            ~/.cargo/
+            ./target/x86_64-unknown-linux-gnu/release/
+          key: ${{ runner.os }}-rust-${{ env.RUST_VERSION_HASH }}-cargo-${{ hashFiles('./Cargo.lock') }}
 
       - name: Configure artifact names
         run: |
           echo "SHORT_TARGET_NAME=linux-x64-glibc" >> $GITHUB_ENV
           echo "PRE_GYP_TARGET_NAME=linux-x64-glibc" >> $GITHUB_ENV
 
-      - name: Install dependencies
-        run: cargo install --force wasm-pack
-
       - name: Build - Cargo
         run: cargo build --release --locked --target x86_64-unknown-linux-gnu
+
+      - name: Unit Tests - Cargo
+        run: cargo test --workspace --release --locked --exclude clarinet-sdk-wasm --exclude clarity-jupyter-kernel --target x86_64-unknown-linux-gnu
 
       - name: Compress cargo artifact
         working-directory: "."
@@ -549,9 +500,6 @@ jobs:
         with:
           name: clarity-repl-${{ env.SHORT_TARGET_NAME }}
           path: clarity-repl-${{ env.SHORT_TARGET_NAME }}.tar.gz
-
-      - name: Unit Tests - Cargo
-        run: cargo test --workspace --release --locked --exclude clarinet-sdk-wasm --exclude clarity-jupyter-kernel --target x86_64-unknown-linux-gnu
 
       - name: Publish clarity-repl to crates.io
         if: startsWith(github.ref, 'refs/heads/main') && needs.get_release_info.outputs.tag != ''
@@ -578,9 +526,7 @@ jobs:
             dockerfile: dockerfiles/components/clarinet-dev.dockerfile
     steps:
       - name: Checkout
-        uses: actions/checkout@v3
-        with:
-          submodules: recursive
+        uses: actions/checkout@v4
 
       - name: Generate Docker tags/labels
         id: docker_meta
@@ -627,7 +573,7 @@ jobs:
     needs:
       - get_release_info
       - audit
-      # - test_coverage_cargo
+      - test_coverage_cargo
       - dist_stacks_devnet_js
       - dist_clarity_repl
       - docker_images
@@ -636,9 +582,7 @@ jobs:
       contents: write
     steps:
       - name: Checkout
-        uses: actions/checkout@v3
-        with:
-          submodules: recursive
+        uses: actions/checkout@v4
 
       - name: Download pre-built dists
         uses: actions/download-artifact@v3
