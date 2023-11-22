@@ -8,7 +8,6 @@ use ansi_term::Colour;
 use clarity::codec::StacksMessageCodec;
 use clarity::types::chainstate::StacksAddress;
 use clarity::types::StacksEpochId;
-use clarity::vm::analysis::ContractAnalysis;
 use clarity::vm::ast::ContractAST;
 use clarity::vm::diagnostic::{Diagnostic, Level};
 use clarity::vm::docs::{make_api_reference, make_define_reference, make_keyword_reference};
@@ -19,14 +18,16 @@ use clarity::vm::types::{
 };
 use clarity::vm::variables::NativeVariables;
 use clarity::vm::{ClarityVersion, CostSynthesis, EvalHook, EvaluationResult, ExecutionResult};
-use reqwest;
 use std::collections::{BTreeMap, HashMap};
 use std::fmt;
-use std::fs::{self};
 use std::num::ParseIntError;
 
 #[cfg(feature = "cli")]
+use clarity::vm::analysis::ContractAnalysis;
+#[cfg(feature = "cli")]
 use prettytable::{Cell, Row, Table};
+#[cfg(feature = "cli")]
+use reqwest;
 
 use super::SessionSettings;
 
@@ -185,6 +186,7 @@ impl Session {
     pub fn handle_command(&mut self, command: &str) -> (bool, Vec<String>) {
         let mut output = Vec::<String>::new();
 
+        #[allow(unused_mut)]
         let mut reload = false;
         match command {
             "::help" => self.display_help(&mut output),
@@ -207,6 +209,7 @@ impl Session {
             cmd if cmd.starts_with("::set_epoch") => self.set_epoch(&mut output, cmd),
             cmd if cmd.starts_with("::encode") => self.encode(&mut output, cmd),
             cmd if cmd.starts_with("::decode") => self.decode(&mut output, cmd),
+
             #[cfg(feature = "cli")]
             cmd if cmd.starts_with("::debug") => self.debug(&mut output, cmd),
             #[cfg(feature = "cli")]
@@ -301,6 +304,7 @@ impl Session {
         output.append(&mut result);
     }
 
+    #[cfg(feature = "cli")]
     fn get_costs_percentage(consumed: &u64, limit: &u64) -> String {
         let calc = (*consumed as f64 / *limit as f64) * 100_f64;
 
@@ -454,7 +458,7 @@ impl Session {
             _ => return output.push(red!("Usage: ::read <filename>")),
         };
 
-        match fs::read_to_string(filename) {
+        match std::fs::read_to_string(filename) {
             Ok(snippet) => self.run_snippet(output, self.show_costs, &snippet),
             Err(err) => output.push(red!(format!("unable to read {}: {}", filename, err))),
         };
@@ -757,7 +761,7 @@ impl Session {
     }
 
     #[cfg(feature = "wasm")]
-    fn easter_egg(&self, output: &mut [String]) {}
+    fn easter_egg(&self, _output: &mut [String]) {}
 
     fn parse_and_advance_chain_tip(&mut self, output: &mut Vec<String>, command: &str) {
         let args: Vec<_> = command.split(' ').collect();
@@ -821,6 +825,7 @@ impl Session {
         output.push(green!(format!("Current height: {}", height)));
     }
 
+    #[cfg(feature = "cli")]
     fn get_account_name(&self, address: &String) -> Option<&String> {
         for account in self.settings.initial_accounts.iter() {
             if &account.address == address {
@@ -1034,7 +1039,7 @@ impl Session {
 
     #[cfg(not(feature = "cli"))]
     fn get_contracts(&self, output: &mut Vec<String>) {
-        for (contract_id, methods) in self.contracts.iter() {
+        for (contract_id, _methods) in self.contracts.iter() {
             if !contract_id.ends_with(".pox")
                 && !contract_id.ends_with(".bns")
                 && !contract_id.ends_with(".costs")
@@ -1409,6 +1414,7 @@ mod tests {
     }
 }
 
+#[cfg(not(feature = "wasm"))]
 async fn fetch_message() -> Result<String, reqwest::Error> {
     let gist: &str = "https://storage.googleapis.com/hiro-public/assets/clarinet-egg.txt";
     let response = reqwest::get(gist).await?;

@@ -1,5 +1,3 @@
-pub mod test_fixtures;
-
 #[cfg(feature = "cli")]
 #[macro_use]
 pub extern crate prettytable;
@@ -20,6 +18,9 @@ pub mod analysis;
 pub mod codec;
 pub mod repl;
 pub mod utils;
+
+#[cfg(test)]
+pub mod test_fixtures;
 
 pub mod clarity {
     #![allow(ambiguous_glob_reexports)]

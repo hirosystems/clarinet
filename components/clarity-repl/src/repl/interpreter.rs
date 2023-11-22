@@ -165,11 +165,7 @@ impl ClarityInterpreter {
 
         let mut result = match self.execute(contract, ast, analysis, cost_track, eval_hooks) {
             Ok(result) => result,
-            Err((_, Some(diagnostic), _)) => {
-                diagnostics.push(diagnostic);
-                return Err(diagnostics.to_vec());
-            }
-            Err((e, _, _)) => {
+            Err(e) => {
                 diagnostics.push(Diagnostic {
                     level: Level::Error,
                     message: format!("Runtime Error: {}", e),
@@ -395,7 +391,7 @@ impl ClarityInterpreter {
         contract_analysis: ContractAnalysis,
         cost_track: bool,
         eval_hooks: Option<Vec<&mut dyn EvalHook>>,
-    ) -> Result<ExecutionResult, (String, Option<Diagnostic>, Option<Error>)> {
+    ) -> Result<ExecutionResult, String> {
         let contract_id = contract.expect_resolved_contract_identifier(Some(&self.tx_sender));
         let snippet = contract.expect_in_memory_code_source();
         let mut contract_context =
@@ -487,7 +483,7 @@ impl ClarityInterpreter {
                 }
                 global_context.eval_hooks = Some(eval_hooks);
             }
-            (err, None, None)
+            err
         })?;
 
         let mut cost = None;
@@ -800,10 +796,12 @@ impl ClarityInterpreter {
 
 #[cfg(test)]
 mod tests {
-    use clarity::types::{chainstate::StacksAddress, Address};
-
     use super::*;
     use crate::test_fixtures::clarity_contract::ClarityContractBuilder;
+    use clarity::{
+        types::{chainstate::StacksAddress, Address},
+        vm,
+    };
 
     #[test]
     fn test_get_tx_sender() {
@@ -937,15 +935,42 @@ mod tests {
         let mut interpreter =
             ClarityInterpreter::new(StandardPrincipalData::transient(), Settings::default());
 
-        let snippet = ["(define-public (add) (ok (+ u1 1)))"].join("\n");
-        //                                             ^ should be uint
+        let snippet = "(define-public (add) (ok (+ u1 1)))";
+        //                                            ^ should be uint
         let contract = ClarityContractBuilder::default()
-            .code_source(snippet)
+            .code_source(snippet.into())
             .build();
         let result = interpreter.run(&contract, false, vec![].into());
         assert!(result.is_err());
         let diagnostics = result.unwrap_err();
         assert_eq!(diagnostics.len(), 1);
+    }
+
+    #[test]
+    fn test_run_runtime_error() {
+        let mut interpreter =
+            ClarityInterpreter::new(StandardPrincipalData::transient(), Settings::default());
+
+        let snippet = "(/ u1 u0)";
+        let contract = ClarityContractBuilder::default()
+            .code_source(snippet.into())
+            .build();
+        let result = interpreter.run(&contract, false, vec![].into());
+        assert!(result.is_err());
+
+        let diagnostics = result.unwrap_err();
+        assert_eq!(diagnostics.len(), 1);
+
+        let message = format!("Runtime Error: Runtime error while interpreting {}.{}: Runtime(DivisionByZero, Some([FunctionIdentifier {{ identifier: \"_native_:native_div\" }}]))", StandardPrincipalData::transient().to_string(), contract.name);
+        assert_eq!(
+            diagnostics[0],
+            Diagnostic {
+                level: vm::diagnostic::Level::Error,
+                message,
+                spans: vec![],
+                suggestion: None
+            }
+        );
     }
 
     #[test]
