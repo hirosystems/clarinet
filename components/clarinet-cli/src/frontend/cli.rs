@@ -426,7 +426,7 @@ struct DevnetStart {
         conflicts_with = "use-on-disk-deployment-plan"
     )]
     pub use_computed_deployment_plan: bool,
-    /// Path to Package.json
+    /// Path to Package.json produced by 'clarinet devnet package'
     #[clap(
         long = "package",
         conflicts_with = "use-computed-deployment-plan",
