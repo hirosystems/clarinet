@@ -427,7 +427,11 @@ struct DevnetStart {
     )]
     pub use_computed_deployment_plan: bool,
     /// Path to Package.json
-    #[clap(long = "package")]
+    #[clap(
+        long = "package",
+        conflicts_with = "use-computed-deployment-plan",
+        conflicts_with = "manifest-path"
+    )]
     pub package: Option<String>,
 }
 
