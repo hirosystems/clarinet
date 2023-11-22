@@ -3,7 +3,7 @@ use crate::deployments::{
     self, check_deployments, generate_default_deployment, get_absolute_deployment_path,
     write_deployment,
 };
-use crate::devnet::package as Package;
+use crate::devnet::package::{self as Package, ConfigurationPackage};
 use crate::devnet::start::start;
 use crate::generate::{
     self,
@@ -1810,9 +1810,9 @@ fn devnet_start(cmd: DevnetStart, global_settings: GlobalSettings) -> () {
                         std::process::exit(1);
                     }
                 };
-                let deployment: DeploymentSpecification = serde_json::from_reader(package_file)
+                let deployment: ConfigurationPackage = serde_json::from_reader(package_file)
                     .expect("error while reading deployment specification");
-                Some(Ok(deployment))
+                Some(Ok(deployment.deployment_plan))
             } else {
                 load_deployment_if_exists(
                     &manifest,

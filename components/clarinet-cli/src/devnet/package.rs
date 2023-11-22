@@ -8,8 +8,8 @@ use clarinet_files::chainhook_types::StacksNetwork;
 use clarinet_files::{NetworkManifest, ProjectManifest};
 
 #[derive(Serialize, Deserialize, Debug)]
-struct ConfigurationPackage {
-    deployment_plan: DeploymentSpecification,
+pub struct ConfigurationPackage {
+    pub deployment_plan: DeploymentSpecification,
     network_manifest: NetworkManifest,
     project_manifest: ProjectManifest,
 }
