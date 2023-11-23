@@ -365,9 +365,16 @@ jobs:
 
       - name: Install Rust toolchain
         if: github.event_name != 'pull_request' || matrix.target == 'x86_64-unknown-linux-gnu'
-        run: |
-          rustup toolchain install stable --profile minimal
-          echo "RUST_VERSION_HASH=$(rustc --version | sha256sum | awk '{print $1}')" >> $GITHUB_ENV‡
+        run: rustup toolchain install stable --profile minimal
+
+      - name: "Get Rust version (unix)"
+        if: matrix.os != 'windows-latest'
+        run: echo "RUST_VERSION_HASH=$(rustc --version | shasum -a 256 | awk '{print $1}')" >> $GITHUB_ENV
+
+      - name: "Get Rust version (windows)"
+        if: matrix.os == 'windows-latest'
+        shell: bash
+        run: echo "RUST_VERSION_HASH=$(rustc --version | sha256sum | awk '{print $1}')" >> $GITHUB_ENV
 
       - name: Install and cache Node
         if: github.event_name != 'pull_request' && matrix.target != 'x86_64-unknown-linux-musl'
@@ -457,6 +464,7 @@ jobs:
 
   dist_clarity_repl:
     name: Build Clarity REPL Distribution
+    if: startsWith(github.ref, 'refs/heads/main') && needs.get_release_info.outputs.tag != ''
     runs-on: ubuntu-latest
     needs: pre_run
     defaults:
@@ -488,9 +496,6 @@ jobs:
       - name: Build - Cargo
         run: cargo build --release --locked --target x86_64-unknown-linux-gnu
 
-      - name: Unit Tests - Cargo
-        run: cargo test --workspace --release --locked --exclude clarinet-sdk-wasm --exclude clarity-jupyter-kernel --target x86_64-unknown-linux-gnu
-
       - name: Compress cargo artifact
         working-directory: "."
         run: tar -C target/x86_64-unknown-linux-gnu/release -zcvf clarity-repl-${{ env.SHORT_TARGET_NAME }}.tar.gz clarity-repl
@@ -502,7 +507,6 @@ jobs:
           path: clarity-repl-${{ env.SHORT_TARGET_NAME }}.tar.gz
 
       - name: Publish clarity-repl to crates.io
-        if: startsWith(github.ref, 'refs/heads/main') && needs.get_release_info.outputs.tag != ''
         run: |
           cargo login ${{ secrets.CARGO_CRATES_IO_API_KEY }}
           cargo publish
