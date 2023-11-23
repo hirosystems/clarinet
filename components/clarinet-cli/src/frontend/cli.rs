@@ -3,12 +3,12 @@ use crate::deployments::{
     self, check_deployments, generate_default_deployment, get_absolute_deployment_path,
     write_deployment,
 };
-use crate::devnet::package as Package;
+use crate::devnet::package::{self as Package, ConfigurationPackage};
+use crate::devnet::start::start;
 use crate::generate::{
     self,
     changes::{Changes, TOMLEdition},
 };
-use crate::integrate;
 use crate::lsp::run_lsp;
 
 use clap::builder::ValueParser;
@@ -93,7 +93,10 @@ enum Command {
     Run(Run),
     /// Start a local Devnet network for interacting with your contracts from your browser
     #[clap(name = "integrate", bin_name = "integrate")]
-    Integrate(Integrate),
+    Integrate(DevnetStart),
+    /// Subcommands for Devnet usage
+    #[clap(subcommand, name = "devnet")]
+    Devnet(Devnet),
     /// Get Clarity autocompletion and inline errors from your code editor (VSCode, vim, emacs, etc)
     #[clap(name = "lsp", bin_name = "lsp")]
     LSP,
@@ -103,9 +106,18 @@ enum Command {
     /// Generate shell completions scripts
     #[clap(name = "completions", bin_name = "completions")]
     Completions(Completions),
-    /// Subcommands for Devnet usage
-    #[clap(subcommand, name = "devnet")]
-    Devnet(Devnet),
+}
+
+#[derive(Subcommand, PartialEq, Clone, Debug)]
+#[clap(bin_name = "devnet")]
+enum Devnet {
+    /// Generate package of all required devnet artifacts
+    #[clap(name = "package", bin_name = "package")]
+    Package(DevnetPackage),
+
+    /// Start a local Devnet network for interacting with your contracts from your browser
+    #[clap(name = "start", bin_name = "start")]
+    DevnetStart(DevnetStart),
 }
 
 #[derive(Subcommand, PartialEq, Clone, Debug)]
@@ -152,14 +164,6 @@ enum Chainhooks {
     /// Publish contracts on chain
     #[clap(name = "deploy", bin_name = "deploy")]
     DeployChainhook(DeployChainhook),
-}
-
-#[derive(Subcommand, PartialEq, Clone, Debug)]
-#[clap(bin_name = "devnet")]
-enum Devnet {
-    /// Generate package of all required devnet artifacts
-    #[clap(name = "package", bin_name = "package")]
-    Package(DevnetPackage),
 }
 
 #[derive(Parser, PartialEq, Clone, Debug)]
@@ -398,7 +402,7 @@ struct Console {
 }
 
 #[derive(Parser, PartialEq, Clone, Debug)]
-struct Integrate {
+struct DevnetStart {
     /// Path to Clarinet.toml
     #[clap(long = "manifest-path", short = 'm')]
     pub manifest_path: Option<String>,
@@ -422,6 +426,13 @@ struct Integrate {
         conflicts_with = "use-on-disk-deployment-plan"
     )]
     pub use_computed_deployment_plan: bool,
+    /// Path to Package.json produced by 'clarinet devnet package'
+    #[clap(
+        long = "package",
+        conflicts_with = "use-computed-deployment-plan",
+        conflicts_with = "manifest-path"
+    )]
+    pub package: Option<String>,
 }
 
 #[derive(Parser, PartialEq, Clone, Debug)]
@@ -1213,97 +1224,11 @@ pub fn main() {
             std::process::exit(exit_code);
         }
         Command::Integrate(cmd) => {
-            let manifest = load_manifest_or_exit(cmd.manifest_path);
-            println!("Computing deployment plan");
-            let result = match cmd.deployment_plan_path {
-                None => {
-                    let res = load_deployment_if_exists(
-                        &manifest,
-                        &StacksNetwork::Devnet,
-                        cmd.use_on_disk_deployment_plan,
-                        cmd.use_computed_deployment_plan,
-                    );
-                    match res {
-                        Some(Ok(deployment)) => {
-                            println!(
-                                "{} using existing deployments/default.devnet-plan.yaml",
-                                yellow!("note:")
-                            );
-                            // TODO(lgalabru): Think more about the desired DX.
-                            // Compute the latest version, display differences and propose overwrite?
-                            Ok(deployment)
-                        }
-                        Some(Err(e)) => Err(e),
-                        None => {
-                            let default_deployment_path =
-                                get_default_deployment_path(&manifest, &StacksNetwork::Devnet)
-                                    .unwrap();
-                            let (deployment, _) = match generate_default_deployment(
-                                &manifest,
-                                &StacksNetwork::Devnet,
-                                false,
-                            ) {
-                                Ok(deployment) => deployment,
-                                Err(message) => {
-                                    println!("{}", red!(message));
-                                    std::process::exit(1);
-                                }
-                            };
-                            let res = write_deployment(&deployment, &default_deployment_path, true);
-                            if let Err(message) = res {
-                                Err(message)
-                            } else {
-                                println!(
-                                    "{} {}",
-                                    green!("Generated file"),
-                                    default_deployment_path.get_relative_location().unwrap()
-                                );
-                                Ok(deployment)
-                            }
-                        }
-                    }
-                }
-                Some(deployment_plan_path) => {
-                    let deployment_path =
-                        get_absolute_deployment_path(&manifest, &deployment_plan_path)
-                            .expect("unable to retrieve deployment");
-                    load_deployment(&manifest, &deployment_path)
-                }
-            };
-
-            let deployment = match result {
-                Ok(deployment) => deployment,
-                Err(e) => {
-                    println!("{}", format_err!(e));
-                    std::process::exit(1);
-                }
-            };
-
-            let orchestrator = match DevnetOrchestrator::new(manifest, None, None, true) {
-                Ok(orchestrator) => orchestrator,
-                Err(e) => {
-                    println!("{}", format_err!(e));
-                    process::exit(1);
-                }
-            };
-
-            if orchestrator.manifest.project.telemetry {
-                #[cfg(feature = "telemetry")]
-                telemetry_report_event(DeveloperUsageEvent::DevnetExecuted(
-                    DeveloperUsageDigest::new(
-                        &orchestrator.manifest.project.name,
-                        &orchestrator.manifest.project.authors,
-                    ),
-                ));
-            }
-            if let Err(e) = integrate::run_devnet(orchestrator, deployment, None, !cmd.no_dashboard)
-            {
-                println!("{}", format_err!(e));
-                process::exit(1);
-            }
-            if global_settings.enable_hints.unwrap_or(true) {
-                display_deploy_hint();
-            }
+            println!(
+                "{}",
+                format_warn!("This command is deprecated. Use 'clarinet devnet start' instead"),
+            );
+            devnet_start(cmd, global_settings)
         }
         Command::LSP => run_lsp(),
         Command::DAP => match super::dap::run_dap() {
@@ -1341,6 +1266,7 @@ pub fn main() {
                     process::exit(1);
                 }
             }
+            Devnet::DevnetStart(cmd) => devnet_start(cmd, global_settings),
         },
 
         Command::Test(_) => {
@@ -1869,4 +1795,106 @@ fn display_deploy_hint() {
         yellow!("Find more information on the DevNet here: https://docs.hiro.so/clarinet/how-to-guides/how-to-run-integration-environment")
     );
     display_hint_footer();
+}
+
+fn devnet_start(cmd: DevnetStart, global_settings: GlobalSettings) -> () {
+    let manifest = load_manifest_or_exit(cmd.manifest_path);
+    println!("Computing deployment plan");
+    let result = match cmd.deployment_plan_path {
+        None => {
+            let res = if let Some(package) = cmd.package {
+                let package_file = match File::open(&package) {
+                    Ok(file) => file,
+                    Err(_) => {
+                        println!("{} package file not found", red!("error:"));
+                        std::process::exit(1);
+                    }
+                };
+                let deployment: ConfigurationPackage = serde_json::from_reader(package_file)
+                    .expect("error while reading deployment specification");
+                Some(Ok(deployment.deployment_plan))
+            } else {
+                load_deployment_if_exists(
+                    &manifest,
+                    &StacksNetwork::Devnet,
+                    cmd.use_on_disk_deployment_plan,
+                    cmd.use_computed_deployment_plan,
+                )
+            };
+            match res {
+                Some(Ok(deployment)) => {
+                    println!(
+                        "{} using existing deployments/default.devnet-plan.yaml",
+                        yellow!("note:")
+                    );
+                    // TODO(lgalabru): Think more about the desired DX.
+                    // Compute the latest version, display differences and propose overwrite?
+                    Ok(deployment)
+                }
+                Some(Err(e)) => Err(e),
+                None => {
+                    let default_deployment_path =
+                        get_default_deployment_path(&manifest, &StacksNetwork::Devnet).unwrap();
+                    let (deployment, _) =
+                        match generate_default_deployment(&manifest, &StacksNetwork::Devnet, false)
+                        {
+                            Ok(deployment) => deployment,
+                            Err(message) => {
+                                println!("{}", red!(message));
+                                std::process::exit(1);
+                            }
+                        };
+                    let res = write_deployment(&deployment, &default_deployment_path, true);
+                    if let Err(message) = res {
+                        Err(message)
+                    } else {
+                        println!(
+                            "{} {}",
+                            green!("Generated file"),
+                            default_deployment_path.get_relative_location().unwrap()
+                        );
+                        Ok(deployment)
+                    }
+                }
+            }
+        }
+        Some(deployment_plan_path) => {
+            let deployment_path = get_absolute_deployment_path(&manifest, &deployment_plan_path)
+                .expect("unable to retrieve deployment");
+            load_deployment(&manifest, &deployment_path)
+        }
+    };
+
+    let deployment = match result {
+        Ok(deployment) => deployment,
+        Err(e) => {
+            println!("{}", format_err!(e));
+            std::process::exit(1);
+        }
+    };
+
+    let orchestrator = match DevnetOrchestrator::new(manifest, None, None, true) {
+        Ok(orchestrator) => orchestrator,
+        Err(e) => {
+            println!("{}", format_err!(e));
+            process::exit(1);
+        }
+    };
+
+    if orchestrator.manifest.project.telemetry {
+        #[cfg(feature = "telemetry")]
+        telemetry_report_event(DeveloperUsageEvent::DevnetExecuted(
+            DeveloperUsageDigest::new(
+                &orchestrator.manifest.project.name,
+                &orchestrator.manifest.project.authors,
+            ),
+        ));
+    }
+    if let Err(e) = start(orchestrator, deployment, None, !cmd.no_dashboard) {
+        println!("{}", format_err!(e));
+        process::exit(1);
+    }
+    if global_settings.enable_hints.unwrap_or(true) {
+        display_deploy_hint();
+    }
 }

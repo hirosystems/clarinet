@@ -13,7 +13,7 @@ This protocol was meant to illustrate possible interactions between Bitcoin and 
 Start a local Devnet with the command:
 
 ```bash
-clarinet integrate
+clarinet devnet start
 ```
 
 In another console, change the directory to `./serverless/`. After running
