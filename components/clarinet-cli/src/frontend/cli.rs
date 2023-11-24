@@ -11,9 +11,8 @@ use crate::generate::{
 };
 use crate::lsp::run_lsp;
 
-use clap::builder::ValueParser;
-use clap::{IntoApp, Parser, Subcommand};
-use clap_generate::{Generator, Shell};
+use clap::{CommandFactory, Parser, Subcommand};
+use clap_complete::{Generator, Shell};
 use clarinet_deployments::diagnostic_digest::DiagnosticsDigest;
 use clarinet_deployments::onchain::{
     apply_on_chain_deployment, get_initial_transactions_trackers, update_deployment_costs,
@@ -30,7 +29,6 @@ use clarinet_files::{
     RequirementConfig,
 };
 use clarity_repl::analysis::call_checker::ContractAnalysis;
-use clarity_repl::analysis::coverage::parse_coverage_str;
 use clarity_repl::clarity::vm::analysis::AnalysisDatabase;
 use clarity_repl::clarity::vm::costs::LimitedCostTracker;
 use clarity_repl::clarity::vm::types::QualifiedContractIdentifier;
@@ -42,7 +40,6 @@ use stacks_network::{self, check_chainhooks, DevnetOrchestrator};
 use std::collections::HashMap;
 use std::fs::{self, File};
 use std::io::prelude::*;
-use std::path::PathBuf;
 use std::{env, process};
 use toml;
 
@@ -64,33 +61,30 @@ struct Opts {
 #[allow(clippy::upper_case_acronyms)]
 #[derive(Subcommand, PartialEq, Clone, Debug)]
 enum Command {
+    /// Generate shell completions scripts
+    #[clap(name = "completions", bin_name = "completions", aliases = &["completion"])]
+    Completions(Completions),
     /// Create and scaffold a new project
     #[clap(name = "new", bin_name = "new")]
     New(GenerateProject),
     /// Subcommands for working with contracts
-    #[clap(subcommand, name = "contracts")]
+    #[clap(subcommand, name = "contracts", aliases = &["contract"])]
     Contracts(Contracts),
     /// Interact with contracts deployed on Mainnet
-    #[clap(subcommand, name = "requirements")]
+    #[clap(subcommand, name = "requirements", aliases = &["requirement"])]
     Requirements(Requirements),
     /// Subcommands for working with chainhooks
-    #[clap(subcommand, name = "chainhooks")]
+    #[clap(subcommand, name = "chainhooks", aliases = &["chainhook"])]
     Chainhooks(Chainhooks),
     /// Manage contracts deployments on Simnet/Devnet/Testnet/Mainnet
-    #[clap(subcommand, name = "deployments")]
+    #[clap(subcommand, name = "deployments", aliases = &["deployment"])]
     Deployments(Deployments),
     /// Load contracts in a REPL for an interactive session
     #[clap(name = "console", aliases = &["poke"], bin_name = "console")]
     Console(Console),
-    /// Execute test suite
-    #[clap(name = "test", bin_name = "test")]
-    Test(Test),
     /// Check contracts syntax
     #[clap(name = "check", bin_name = "check")]
     Check(Check),
-    /// Execute Clarinet extension
-    #[clap(name = "run", bin_name = "run")]
-    Run(Run),
     /// Start a local Devnet network for interacting with your contracts from your browser
     #[clap(name = "integrate", bin_name = "integrate")]
     Integrate(DevnetStart),
@@ -103,13 +97,9 @@ enum Command {
     /// Step by step debugging and breakpoints from your code editor (VSCode, vim, emacs, etc)
     #[clap(name = "dap", bin_name = "dap")]
     DAP,
-    /// Generate shell completions scripts
-    #[clap(name = "completions", bin_name = "completions")]
-    Completions(Completions),
 }
 
 #[derive(Subcommand, PartialEq, Clone, Debug)]
-#[clap(bin_name = "devnet")]
 enum Devnet {
     /// Generate package of all required devnet artifacts
     #[clap(name = "package", bin_name = "package")]
@@ -121,7 +111,6 @@ enum Devnet {
 }
 
 #[derive(Subcommand, PartialEq, Clone, Debug)]
-#[clap(bin_name = "contract", aliases = &["contract"])]
 enum Contracts {
     /// Generate files and settings for a new contract
     #[clap(name = "new", bin_name = "new")]
@@ -129,7 +118,6 @@ enum Contracts {
 }
 
 #[derive(Subcommand, PartialEq, Clone, Debug)]
-#[clap(bin_name = "req", aliases = &["requirement"])]
 enum Requirements {
     /// Interact with contracts published on Mainnet
     #[clap(name = "add", bin_name = "add")]
@@ -138,7 +126,6 @@ enum Requirements {
 
 #[allow(clippy::enum_variant_names)]
 #[derive(Subcommand, PartialEq, Clone, Debug)]
-#[clap(bin_name = "deployment", aliases = &["deployment"])]
 enum Deployments {
     /// Check deployments format
     #[clap(name = "check", bin_name = "check")]
@@ -153,7 +140,6 @@ enum Deployments {
 
 #[allow(clippy::enum_variant_names)]
 #[derive(Subcommand, PartialEq, Clone, Debug)]
-#[clap(bin_name = "chainhook", aliases = &["chainhook"])]
 enum Chainhooks {
     /// Generate files and settings for a new hook
     #[clap(name = "new", bin_name = "new")]
@@ -180,7 +166,7 @@ struct GenerateProject {
     /// Project's name
     pub name: String,
     /// Do not provide developer usage telemetry for this project
-    #[clap(long = "disable-telemetry", takes_value = false)]
+    #[clap(long = "disable-telemetry")]
     pub disable_telemetry: bool,
 }
 
@@ -257,32 +243,32 @@ struct GenerateDeployment {
     /// Compute and set cost, using low priority (network connection required)
     #[clap(
         long = "low-cost",
-        conflicts_with = "medium-cost",
-        conflicts_with = "high-cost",
-        conflicts_with = "manual-cost"
+        conflicts_with = "medium_cost",
+        conflicts_with = "high_cost",
+        conflicts_with = "manual_cost"
     )]
     pub low_cost: bool,
     /// Compute and set cost, using medium priority (network connection required)
     #[clap(
-        conflicts_with = "low-cost",
+        conflicts_with = "low_cost",
         long = "medium-cost",
-        conflicts_with = "high-cost",
-        conflicts_with = "manual-cost"
+        conflicts_with = "high_cost",
+        conflicts_with = "manual_cost"
     )]
     pub medium_cost: bool,
     /// Compute and set cost, using high priority (network connection required)
     #[clap(
-        conflicts_with = "low-cost",
-        conflicts_with = "medium-cost",
+        conflicts_with = "low_cost",
+        conflicts_with = "medium_cost",
         long = "high-cost",
-        conflicts_with = "manual-cost"
+        conflicts_with = "manual_cost"
     )]
     pub high_cost: bool,
     /// Leave cost estimation manual
     #[clap(
-        conflicts_with = "low-cost",
-        conflicts_with = "medium-cost",
-        conflicts_with = "high-cost",
+        conflicts_with = "low_cost",
+        conflicts_with = "medium_cost",
+        conflicts_with = "high_cost",
         long = "manual-cost"
     )]
     pub manual_cost: bool,
@@ -325,7 +311,7 @@ struct ApplyDeployment {
     /// Apply default deployment settings/default.devnet-plan.toml
     #[clap(
         long = "devnet",
-        conflicts_with = "deployment-plan-path",
+        conflicts_with = "deployment_plan_path",
         conflicts_with = "testnet",
         conflicts_with = "mainnet"
     )]
@@ -333,7 +319,7 @@ struct ApplyDeployment {
     /// Apply default deployment settings/default.testnet-plan.toml
     #[clap(
         long = "testnet",
-        conflicts_with = "deployment-plan-path",
+        conflicts_with = "deployment_plan_path",
         conflicts_with = "devnet",
         conflicts_with = "mainnet"
     )]
@@ -341,7 +327,7 @@ struct ApplyDeployment {
     /// Apply default deployment settings/default.mainnet-plan.toml
     #[clap(
         long = "mainnet",
-        conflicts_with = "deployment-plan-path",
+        conflicts_with = "deployment_plan_path",
         conflicts_with = "testnet",
         conflicts_with = "devnet"
     )]
@@ -365,14 +351,14 @@ struct ApplyDeployment {
     #[clap(
         long = "use-on-disk-deployment-plan",
         short = 'd',
-        conflicts_with = "use-computed-deployment-plan"
+        conflicts_with = "use_computed_deployment_plan"
     )]
     pub use_on_disk_deployment_plan: bool,
     /// Use computed deployment plan (will overwrite on disk version if any update)
     #[clap(
         long = "use-computed-deployment-plan",
         short = 'c',
-        conflicts_with = "use-on-disk-deployment-plan"
+        conflicts_with = "use_on_disk_deployment_plan"
     )]
     pub use_computed_deployment_plan: bool,
 }
@@ -389,14 +375,14 @@ struct Console {
     #[clap(
         long = "use-on-disk-deployment-plan",
         short = 'd',
-        conflicts_with = "use-computed-deployment-plan"
+        conflicts_with = "use_computed_deployment_plan"
     )]
     pub use_on_disk_deployment_plan: bool,
     /// Use computed deployment plan (will overwrite on disk version if any update)
     #[clap(
         long = "use-computed-deployment-plan",
         short = 'c',
-        conflicts_with = "use-on-disk-deployment-plan"
+        conflicts_with = "use_on_disk_deployment_plan"
     )]
     pub use_computed_deployment_plan: bool,
 }
@@ -416,127 +402,23 @@ struct DevnetStart {
     #[clap(
         long = "use-on-disk-deployment-plan",
         short = 'd',
-        conflicts_with = "use-computed-deployment-plan"
+        conflicts_with = "use_computed_deployment_plan"
     )]
     pub use_on_disk_deployment_plan: bool,
     /// Use computed deployment plan (will overwrite on disk version if any update)
     #[clap(
         long = "use-computed-deployment-plan",
         short = 'c',
-        conflicts_with = "use-on-disk-deployment-plan"
+        conflicts_with = "use_on_disk_deployment_plan"
     )]
     pub use_computed_deployment_plan: bool,
     /// Path to Package.json produced by 'clarinet devnet package'
     #[clap(
         long = "package",
-        conflicts_with = "use-computed-deployment-plan",
-        conflicts_with = "manifest-path"
+        conflicts_with = "use_computed_deployment_plan",
+        conflicts_with = "manifest_path"
     )]
     pub package: Option<String>,
-}
-
-#[derive(Parser, PartialEq, Clone, Debug)]
-struct Test {
-    /// Generate coverage file, and optionally provide name of generated file (defaults to "coverage.lcov")
-    #[clap(
-        long = "coverage",
-        default_missing_value("coverage.lcov"),
-        value_parser(ValueParser::new(parse_coverage_str))
-    )]
-    pub coverage: Option<PathBuf>,
-    /// Generate costs report
-    #[clap(long = "costs")]
-    pub costs_report: bool,
-    /// Path to Clarinet.toml
-    #[clap(long = "manifest-path", short = 'm')]
-    pub manifest_path: Option<String>,
-    /// Relaunch tests upon updates to contracts
-    #[clap(long = "watch")]
-    pub watch: bool,
-    /// Test files to be included (defaults to all tests found under tests/)
-    pub files: Vec<String>,
-    /// If specified, use this deployment file
-    #[clap(long = "deployment-plan-path", short = 'p')]
-    pub deployment_plan_path: Option<String>,
-    /// Use on disk deployment plan (prevent updates computing)
-    #[clap(
-        long = "use-on-disk-deployment-plan",
-        short = 'd',
-        conflicts_with = "use-computed-deployment-plan"
-    )]
-    pub use_on_disk_deployment_plan: bool,
-    /// Use computed deployment plan (will overwrite on disk version if any update)
-    #[clap(
-        long = "use-computed-deployment-plan",
-        short = 'c',
-        conflicts_with = "use-on-disk-deployment-plan"
-    )]
-    pub use_computed_deployment_plan: bool,
-    /// Stop after N errors. Defaults to stopping after first failure
-    #[clap(long = "fail-fast")]
-    pub fail_fast: Option<u16>,
-    /// Run tests with this string or pattern in the test name
-    #[clap(long = "filter")]
-    pub filter: Option<String>,
-    /// Load import map file from local file or remote URL
-    #[clap(long = "import-map")]
-    pub import_map: Option<String>,
-    /// Allow network access
-    #[clap(long = "allow-net")]
-    pub allow_net: bool,
-    /// Allow read access to project directory
-    #[clap(long = "allow-read")]
-    pub allow_disk_read: bool,
-    /// Specify optional Typescript config file
-    #[clap(long = "ts-config")]
-    pub ts_config: Option<String>,
-    /// Specify relative path of the chainhooks (yaml format) to evaluate
-    #[clap(long = "chainhooks")]
-    pub chainhooks: Vec<String>,
-    /// Add artificial delay (in seconds) when calling `chain.mineBlock(...)`. Useful when testing chainhooks
-    #[clap(long = "mine-block-delay")]
-    pub mine_block_delay: Option<u16>,
-}
-
-#[derive(Parser, PartialEq, Clone, Debug)]
-struct Run {
-    /// Script to run
-    pub script: Option<String>,
-    /// Path to Clarinet.toml
-    #[clap(long = "manifest-path", short = 'm')]
-    pub manifest_path: Option<String>,
-    /// Allow access to wallets
-    #[clap(long = "allow-wallets")]
-    pub allow_wallets: bool,
-    /// Allow write access to project directory
-    #[clap(long = "allow-write")]
-    pub allow_disk_write: bool,
-    /// Allow read access to project directory
-    #[clap(long = "allow-read")]
-    pub allow_disk_read: bool,
-    /// Allows running a specified list of subprocesses. Use the flag multiple times to allow multiple subprocesses
-    #[clap(long = "allow-run")]
-    pub allow_run: Option<Vec<String>>,
-    /// Allows access to a specified list of environment variables. Use the flag multiple times to allow access to multiple variables
-    #[clap(long = "allow-env")]
-    pub allow_env: Option<Vec<String>>,
-    /// If specified, use this deployment file
-    #[clap(long = "deployment-plan-path", short = 'p')]
-    pub deployment_plan_path: Option<String>,
-    /// Use on disk deployment plan (prevent updates computing)
-    #[clap(
-        long = "use-on-disk-deployment-plan",
-        short = 'd',
-        conflicts_with = "use-computed-deployment-plan"
-    )]
-    pub use_on_disk_deployment_plan: bool,
-    /// Use computed deployment plan (will overwrite on disk version if any update)
-    #[clap(
-        long = "use-computed-deployment-plan",
-        short = 'c',
-        conflicts_with = "use-on-disk-deployment-plan"
-    )]
-    pub use_computed_deployment_plan: bool,
 }
 
 #[derive(Parser, PartialEq, Clone, Debug)]
@@ -553,14 +435,14 @@ struct Check {
     #[clap(
         long = "use-on-disk-deployment-plan",
         short = 'd',
-        conflicts_with = "use-computed-deployment-plan"
+        conflicts_with = "use_computed_deployment_plan"
     )]
     pub use_on_disk_deployment_plan: bool,
     /// Use computed deployment plan (will overwrite on disk version if any update)
     #[clap(
         long = "use-computed-deployment-plan",
         short = 'c',
-        conflicts_with = "use-on-disk-deployment-plan"
+        conflicts_with = "use_on_disk_deployment_plan"
     )]
     pub use_computed_deployment_plan: bool,
 }
@@ -568,7 +450,7 @@ struct Check {
 #[derive(Parser, PartialEq, Clone, Debug)]
 struct Completions {
     /// Specify which shell to generation completions script for
-    #[clap(arg_enum, ignore_case = true)]
+    #[clap(ignore_case = true)]
     pub shell: Shell,
 }
 
@@ -576,7 +458,7 @@ pub fn main() {
     let opts: Opts = match Opts::try_parse() {
         Ok(opts) => opts,
         Err(e) => {
-            if e.kind() == clap::ErrorKind::UnknownArgument {
+            if e.kind() == clap::error::ErrorKind::UnknownArgument {
                 let manifest = load_manifest_or_exit(None);
                 if manifest.project.telemetry {
                     #[cfg(feature = "telemetry")]
@@ -597,6 +479,25 @@ pub fn main() {
     let global_settings = GlobalSettings::from_global_file();
 
     match opts.command {
+        Command::Completions(cmd) => {
+            let mut app = Opts::command();
+            let file_name = cmd.shell.file_name("clarinet");
+            let mut file = match File::create(file_name.clone()) {
+                Ok(file) => file,
+                Err(e) => {
+                    println!(
+                        "{} Unable to create file {}: {}",
+                        red!("error:"),
+                        file_name,
+                        e
+                    );
+                    std::process::exit(1);
+                }
+            };
+            clap_complete::generate(cmd.shell, &mut app, "clarinet", &mut file);
+            println!("{} {}", green!("Created file"), file_name.clone());
+            println!("Check your shell's documentation for details about using this file to enable completions for clarinet");
+        }
         Command::New(project_opts) => {
             let current_path = {
                 let current_dir = match env::current_dir() {
@@ -1238,26 +1139,6 @@ pub fn main() {
                 process::exit(1);
             }
         },
-        Command::Completions(cmd) => {
-            let app = Opts::command();
-            let file_name = cmd.shell.file_name("clarinet");
-            let mut file = match File::create(file_name.clone()) {
-                Ok(file) => file,
-                Err(e) => {
-                    println!(
-                        "{} Unable to create file {}: {}",
-                        red!("error:"),
-                        file_name,
-                        e
-                    );
-                    std::process::exit(1);
-                }
-            };
-            cmd.shell.generate(&app, &mut file);
-            println!("{} {}", green!("Created file"), file_name.clone());
-            println!("Check your shell's documentation for details about using this file to enable completions for clarinet");
-        }
-
         Command::Devnet(subcommand) => match subcommand {
             Devnet::Package(cmd) => {
                 let manifest = load_manifest_or_exit(cmd.manifest_path);
@@ -1268,21 +1149,6 @@ pub fn main() {
             }
             Devnet::DevnetStart(cmd) => devnet_start(cmd, global_settings),
         },
-
-        Command::Test(_) => {
-            println!("{} `clarinet test` has been deprecated. Please check this blog post to learn more:", yellow!("warning:"));
-            println!("https://hiro.so/blog/announcing-the-clarinet-sdk-a-javascript-programming-model-for-easy-smart-contract-testing");
-            std::process::exit(1);
-        }
-
-        Command::Run(_) => {
-            println!(
-                "{} `clarinet run` has been deprecated. Please check this blog post to learn more:",
-                yellow!("warning:")
-            );
-            println!("https://hiro.so/blog/announcing-the-clarinet-sdk-a-javascript-programming-model-for-easy-smart-contract-testing");
-            std::process::exit(1);
-        }
     };
 }
 
@@ -1797,13 +1663,13 @@ fn display_deploy_hint() {
     display_hint_footer();
 }
 
-fn devnet_start(cmd: DevnetStart, global_settings: GlobalSettings) -> () {
+fn devnet_start(cmd: DevnetStart, global_settings: GlobalSettings) {
     let manifest = load_manifest_or_exit(cmd.manifest_path);
     println!("Computing deployment plan");
     let result = match cmd.deployment_plan_path {
         None => {
             let res = if let Some(package) = cmd.package {
-                let package_file = match File::open(&package) {
+                let package_file = match File::open(package) {
                     Ok(file) => file,
                     Err(_) => {
                         println!("{} package file not found", red!("error:"));
@@ -1896,5 +1762,39 @@ fn devnet_start(cmd: DevnetStart, global_settings: GlobalSettings) -> () {
     }
     if global_settings.enable_hints.unwrap_or(true) {
         display_deploy_hint();
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use clap_complete::generate;
+
+    use super::*;
+
+    #[test]
+    fn test_completion_for_shells() {
+        for shell in [
+            Shell::Bash,
+            Shell::Elvish,
+            Shell::Fish,
+            Shell::PowerShell,
+            Shell::Zsh,
+        ] {
+            let result = std::panic::catch_unwind(move || {
+                let mut output_buffer = Vec::new();
+                let mut cmd = Opts::command();
+                generate(shell, &mut cmd, "clarinet", &mut output_buffer);
+                assert!(
+                    output_buffer.len() > 0,
+                    "failed to generate completion for {}",
+                    shell.to_string()
+                );
+            });
+            assert!(
+                result.is_ok(),
+                "failed to generate completion for {}",
+                shell.to_string()
+            );
+        }
     }
 }

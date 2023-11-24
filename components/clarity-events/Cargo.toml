@@ -6,7 +6,7 @@ version = "1.0.0"
 [dependencies]
 clarinet-files = { path = "../clarinet-files", default-features = false, optional = true }
 clarity-repl = { path = "../clarity-repl", default-features = false }
-clap = { version = "3.2.23", features = ["derive"], optional = true }
+clap = { version = "4.4.8", features = ["derive"], optional = true }
 toml = { version = "0.5.6", features = ["preserve_order"], optional = true }
 serde = { version = "1.0.136", features = ["derive"] }
 serde_json = { version = "1.0.79", features = ["preserve_order"] }
