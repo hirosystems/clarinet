@@ -1215,9 +1215,25 @@ fn clarity_keywords() -> HashMap<String, String> {
 
 #[cfg(test)]
 mod tests {
-    use crate::repl;
+    use crate::repl::{self, settings::Account};
 
     use super::*;
+
+    #[test]
+    fn initial_accounts() {
+        let address = "ST1SJ3DTE5DN7X54YDH5D64R3BCB6A2AG2ZQ8YPD5";
+        let mut session = Session::new(SessionSettings {
+            initial_accounts: vec![Account {
+                address: address.to_owned(),
+                balance: 1000000,
+                name: "wallet_1".to_owned(),
+            }],
+            ..Default::default()
+        });
+        let _ = session.start();
+        let balance = session.interpreter.get_balance_for_account(address, "STX");
+        assert_eq!(balance, 1000000);
+    }
 
     #[test]
     fn encode_simple() {
