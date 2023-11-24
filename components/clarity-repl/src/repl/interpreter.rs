@@ -800,7 +800,7 @@ mod tests {
     use crate::test_fixtures::clarity_contract::ClarityContractBuilder;
     use clarity::{
         types::{chainstate::StacksAddress, Address},
-        vm,
+        vm::{self},
     };
 
     #[test]
@@ -1006,6 +1006,124 @@ mod tests {
         } = result.unwrap();
         assert!(diagnostics.is_empty());
         assert!(events.is_empty());
+    }
+
+    #[test]
+    fn test_get_data_var() {
+        let mut interpreter =
+            ClarityInterpreter::new(StandardPrincipalData::transient(), Settings::default());
+        let contract = ClarityContractBuilder::default()
+            .code_source(["(define-data-var count uint u9)"].join("\n"))
+            .build();
+        let source = contract.expect_in_memory_code_source();
+        let (mut ast, ..) = interpreter.build_ast(&contract);
+        let (annotations, _) = interpreter.collect_annotations(source);
+        let (analysis, _) = interpreter
+            .run_analysis(&contract, &mut ast, &annotations)
+            .unwrap();
+
+        interpreter.save_contract(&contract, &mut ast, analysis, false);
+
+        let contract_id = QualifiedContractIdentifier {
+            issuer: StandardPrincipalData::transient(),
+            name: "contract".into(),
+        };
+        let count = interpreter.get_data_var(&contract_id, &"count");
+
+        assert_eq!(
+            count,
+            Some("0x0100000000000000000000000000000009".to_owned())
+        )
+    }
+
+    #[test]
+    fn test_get_map_entry() {
+        let mut interpreter =
+            ClarityInterpreter::new(StandardPrincipalData::transient(), Settings::default());
+        let contract = ClarityContractBuilder::default()
+            .code_source(
+                [
+                    "(define-map people uint (string-ascii 10))",
+                    "(map-insert people u0 \"satoshi\")",
+                ]
+                .join("\n"),
+            )
+            .build();
+        let source = contract.expect_in_memory_code_source();
+        let (mut ast, ..) = interpreter.build_ast(&contract);
+        let (annotations, _) = interpreter.collect_annotations(source);
+        let (analysis, _) = interpreter
+            .run_analysis(&contract, &mut ast, &annotations)
+            .unwrap();
+
+        interpreter.save_contract(&contract, &mut ast, analysis, false);
+
+        let contract_id = QualifiedContractIdentifier {
+            issuer: StandardPrincipalData::transient(),
+            name: "contract".into(),
+        };
+        let name = interpreter.get_map_entry(&contract_id, &"people", &Value::UInt(0));
+        assert_eq!(name, Some("0x0a0d000000077361746f736869".to_owned()));
+        let no_name = interpreter.get_map_entry(&contract_id, &"people", &Value::UInt(404));
+        assert_eq!(no_name, None);
+    }
+
+    #[test]
+    fn test_execute_stx_events() {
+        let mut interpreter =
+            ClarityInterpreter::new(StandardPrincipalData::transient(), Settings::default());
+        let account = PrincipalData::parse("S1G2081040G2081040G2081040G208105NK8PE5").unwrap();
+        let _ = interpreter.mint_stx_balance(account, 100000);
+
+        let contract = ClarityContractBuilder::default()
+            .code_source(
+                [
+                    "(define-public (test-transfer)",
+                    "  (ok (stx-transfer? u10 tx-sender (as-contract tx-sender))))",
+                    "(define-public (test-burn)",
+                    "  (ok (stx-burn? u10 tx-sender)))",
+                    "(test-transfer)",
+                    "(test-burn)",
+                ]
+                .join("\n"),
+            )
+            .build();
+        let source = contract.expect_in_memory_code_source();
+        let (mut ast, ..) = interpreter.build_ast(&contract);
+        let (annotations, _) = interpreter.collect_annotations(source);
+
+        let (analysis, _) = interpreter
+            .run_analysis(&contract, &mut ast, &annotations)
+            .unwrap();
+
+        let account =
+            PrincipalData::parse_standard_principal("S1G2081040G2081040G2081040G208105NK8PE5")
+                .unwrap();
+        let balance = interpreter.get_balance_for_account(&account.to_string(), "STX");
+        assert_eq!(balance, 100000);
+
+        let result = interpreter.execute(&contract, &mut ast, analysis, false, None);
+        assert!(result.is_ok());
+
+        let ExecutionResult {
+            diagnostics,
+            events,
+            ..
+        } = result.unwrap();
+        assert!(diagnostics.is_empty());
+        assert_eq!(events.len(), 2);
+
+        let balance = interpreter.get_balance_for_account(&account.to_string(), "STX");
+        assert_eq!(balance, 99980);
+
+        assert!(matches!(
+            events[0],
+            StacksTransactionEvent::STXEvent(STXEventType::STXTransferEvent(_))
+        ));
+        assert!(matches!(
+            events[1],
+            StacksTransactionEvent::STXEvent(STXEventType::STXBurnEvent(_))
+        ));
     }
 
     #[test]

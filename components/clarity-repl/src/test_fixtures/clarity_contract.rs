@@ -49,13 +49,13 @@ impl ClarityContractBuilder {
         self
     }
 
-    pub fn name(mut self, name: String) -> Self {
-        self.contract.name = name;
+    pub fn name(mut self, name: &str) -> Self {
+        self.contract.name = name.to_owned();
         self
     }
 
-    pub fn deployer(mut self, deployer: ContractDeployer) -> Self {
-        self.contract.deployer = deployer;
+    pub fn deployer(mut self, address: &str) -> Self {
+        self.contract.deployer = ContractDeployer::Address(address.to_owned());
         self
     }
 

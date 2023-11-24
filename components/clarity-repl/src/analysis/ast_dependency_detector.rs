@@ -73,7 +73,7 @@ impl PartialEq for Dependency {
     }
 }
 
-#[allow(clippy::incorrect_partial_ord_impl_on_ord_type)]
+#[allow(clippy::non_canonical_partial_ord_impl)]
 impl PartialOrd for Dependency {
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
         self.contract_id.partial_cmp(&other.contract_id)
