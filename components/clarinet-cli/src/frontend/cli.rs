@@ -74,7 +74,7 @@ enum Command {
     #[clap(subcommand, name = "requirements", aliases = &["requirement"])]
     Requirements(Requirements),
     /// Subcommands for working with chainhooks
-    #[clap(subcommand, name = "chainhooks", aliases = &["chainkhook"])]
+    #[clap(subcommand, name = "chainhooks", aliases = &["chainhook"])]
     Chainhooks(Chainhooks),
     /// Manage contracts deployments on Simnet/Devnet/Testnet/Mainnet
     #[clap(subcommand, name = "deployments", aliases = &["deployment"])]
