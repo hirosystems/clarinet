@@ -931,7 +931,7 @@ pub fn main() {
             }
             Contracts::RemoveContract(cmd) => {
                 let manifest = load_manifest_or_exit(cmd.manifest_path);
-
+                let contract_name = cmd.name.clone();
                 let changes =
                     match generate::get_changes_for_rm_contract(&manifest.location, cmd.name) {
                         Ok(changes) => changes,
@@ -941,6 +941,18 @@ pub fn main() {
                         }
                     };
 
+                let mut answer = String::new();
+                println!(
+                    "{} This command will delete the files {}.test.ts, {}.clar, and remove the contract from the manifest. Do you confirm? [y/N]",
+                    yellow!("warning:"),
+                    &contract_name,
+                    &contract_name
+                );
+                std::io::stdin().read_line(&mut answer).unwrap();
+                if !answer.trim().eq_ignore_ascii_case("y") {
+                    println!("{} Not deleting contract files", yellow!("warning:"));
+                    std::process::exit(0);
+                }
                 if !execute_changes(changes) {
                     std::process::exit(1);
                 }
