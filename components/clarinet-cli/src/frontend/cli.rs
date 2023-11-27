@@ -471,8 +471,14 @@ pub fn main() {
                     ));
                 }
             }
-            println!("{}", e);
-            process::exit(1);
+
+            // handle --version, --help, etc
+            // see how to safely print clap errors here:
+            // https://github.com/clap-rs/clap/blob/21b671f689bc0b8d790dc8c42902c22822bf6f82/clap_builder/src/error/mod.rs#L233
+            let _ = e.print();
+            let _ = std::io::stdout().lock().flush();
+            let _ = std::io::stderr().lock().flush();
+            std::process::exit(e.exit_code());
         }
     };
 
