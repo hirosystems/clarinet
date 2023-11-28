@@ -40,7 +40,7 @@ pub fn read_deployment_or_generate_default(
     ),
     String,
 > {
-    let default_deployment_file_path = get_default_deployment_path(&manifest, network)?;
+    let default_deployment_file_path = get_default_deployment_path(manifest, network)?;
     let (deployment, artifacts) = if default_deployment_file_path.exists() {
         (
             load_deployment(manifest, &default_deployment_file_path)?,
@@ -89,7 +89,7 @@ impl StacksDevnet {
     where
         C: Context<'a>,
     {
-        let network_id = devnet_overrides.network_id.clone();
+        let network_id = devnet_overrides.network_id;
         let (tx, rx) = mpsc::channel::<DevnetCommand>();
         let (devnet_ready_tx, devnet_ready_rx) = mpsc::channel::<_>();
         let (meta_devnet_command_tx, meta_devnet_command_rx) = mpsc::channel();
@@ -104,7 +104,7 @@ impl StacksDevnet {
 
         let channel = cx.channel();
 
-        let manifest_location = get_manifest_location_or_exit(Some(manifest_location.into()));
+        let manifest_location = get_manifest_location_or_exit(Some(manifest_location));
         let manifest = ProjectManifest::from_location(&manifest_location)
             .expect("Syntax error in Clarinet.toml.");
         let (deployment, _) =
@@ -130,18 +130,19 @@ impl StacksDevnet {
             .network_config
             .as_ref()
             .and_then(|config| config.devnet.as_ref())
-            .and_then(|devnet| {
-                Some((
+            .map(|devnet| {
+                (
                     format!("http://localhost:{}", devnet.bitcoin_node_p2p_port),
                     format!("http://localhost:{}", devnet.stacks_node_rpc_port),
                     format!("http://localhost:{}", devnet.stacks_api_port),
                     format!("http://localhost:{}", devnet.stacks_explorer_port),
                     format!("http://localhost:{}", devnet.bitcoin_explorer_port),
-                ))
+                )
             })
             .expect("unable to read config");
 
         thread::spawn(move || {
+            #[allow(clippy::never_loop)]
             let chains_coordinator_command_tx = loop {
                 match rx.recv() {
                     Ok(DevnetCommand::Start(callback)) => {
@@ -188,7 +189,7 @@ impl StacksDevnet {
                     }
                     Err(e) => {
                         if logs_enabled {
-                            println!("Fatal error: {}", e.to_string());
+                            println!("Fatal error: {}", e);
                         }
                         return;
                     }
@@ -210,7 +211,7 @@ impl StacksDevnet {
                     Ok(DevnetCommand::Start(_)) => {}
                     Err(e) => {
                         if logs_enabled {
-                            println!("Fatal error: {}", e.to_string());
+                            println!("Fatal error: {}", e);
                         }
                         return;
                     }
@@ -297,10 +298,9 @@ impl StacksDevnet {
 
     fn start(&self, timeout: u64, _empty_buffer: bool) -> Result<bool, String> {
         let _ = self.tx.send(DevnetCommand::Start(None));
-        let _ = self
-            .devnet_ready_rx
+        self.devnet_ready_rx
             .recv_timeout(std::time::Duration::from_secs(timeout))
-            .map_err(|e| format!("broken channel: {}", e.to_string()))??;
+            .map_err(|e| format!("broken channel: {}", e))??;
         Ok(true)
     }
 }
@@ -761,7 +761,7 @@ impl StacksDevnet {
         cx.this()
             .downcast_or_throw::<JsBox<StacksDevnet>, _>(&mut cx)?
             .start(timeout, empty_buffer)
-            .or_else(|err| cx.throw_error(err.to_string()))?;
+            .or_else(|err| cx.throw_error(err))?;
 
         Ok(cx.undefined())
     }
@@ -775,10 +775,7 @@ impl StacksDevnet {
             panic!("{}", err.to_string());
         };
 
-        let gratecefully_terminated = match devnet.termination_rx.recv() {
-            Ok(res) => res,
-            Err(_) => false,
-        };
+        let gratecefully_terminated = devnet.termination_rx.recv().unwrap_or(false);
         Ok(cx.boolean(gratecefully_terminated))
     }
 
@@ -787,7 +784,7 @@ impl StacksDevnet {
             .this()
             .downcast_or_throw::<JsBox<StacksDevnet>, _>(&mut cx)?;
         let timeout = cx.argument::<JsNumber>(0)?.value(&mut cx) as u64;
-        let empty_queued_blocks = cx.argument::<JsBoolean>(1)?.value(&mut cx) as bool;
+        let empty_queued_blocks = cx.argument::<JsBoolean>(1)?.value(&mut cx);
 
         if empty_queued_blocks {
             loop {
@@ -837,7 +834,7 @@ impl StacksDevnet {
             .this()
             .downcast_or_throw::<JsBox<StacksDevnet>, _>(&mut cx)?;
 
-        let val = JsString::new(&mut cx, devnet.bitcoin_node_url.to_string());
+        let val = JsString::new(&mut cx, &devnet.bitcoin_node_url);
         Ok(val)
     }
 
@@ -846,7 +843,7 @@ impl StacksDevnet {
             .this()
             .downcast_or_throw::<JsBox<StacksDevnet>, _>(&mut cx)?;
 
-        let val = JsString::new(&mut cx, devnet.stacks_node_url.to_string());
+        let val = JsString::new(&mut cx, &devnet.stacks_node_url);
         Ok(val)
     }
 
@@ -855,7 +852,7 @@ impl StacksDevnet {
             .this()
             .downcast_or_throw::<JsBox<StacksDevnet>, _>(&mut cx)?;
 
-        let val = JsString::new(&mut cx, devnet.bitcoin_explorer_url.to_string());
+        let val = JsString::new(&mut cx, &devnet.bitcoin_explorer_url);
         Ok(val)
     }
 
@@ -864,7 +861,7 @@ impl StacksDevnet {
             .this()
             .downcast_or_throw::<JsBox<StacksDevnet>, _>(&mut cx)?;
 
-        let val = JsString::new(&mut cx, devnet.stacks_explorer_url.to_string());
+        let val = JsString::new(&mut cx, &devnet.stacks_explorer_url);
         Ok(val)
     }
 
@@ -873,7 +870,7 @@ impl StacksDevnet {
             .this()
             .downcast_or_throw::<JsBox<StacksDevnet>, _>(&mut cx)?;
 
-        let val = JsString::new(&mut cx, devnet.stacks_api_url.to_string());
+        let val = JsString::new(&mut cx, &devnet.stacks_api_url);
         Ok(val)
     }
 }

@@ -118,10 +118,11 @@ pub fn update_session_with_contracts_executions(
     forced_min_epoch: Option<StacksEpochId>,
 ) -> BTreeMap<QualifiedContractIdentifier, Result<ExecutionResult, Vec<Diagnostic>>> {
     let boot_contracts_data = BOOT_CONTRACTS_DATA.clone();
+
     for (_, (boot_contract, mut ast)) in boot_contracts_data {
         session
             .interpreter
-            .run_ast(&boot_contract, &mut ast, false, None)
+            .run_ast(&boot_contract, &mut ast, &mut vec![], true, false, None)
             .expect("failed to interprete boot contract");
     }
 

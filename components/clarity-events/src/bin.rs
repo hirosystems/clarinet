@@ -1,6 +1,5 @@
 extern crate serde;
 
-#[macro_use]
 extern crate serde_derive;
 
 #[macro_use]
@@ -77,7 +76,7 @@ pub fn main() {
                         continue;
                     }
                     if let Some(method) = key {
-                        println!("{}", method.to_string());
+                        println!("{method}");
                         for event in events.iter() {
                             println!("- {}", json!(event));
                             // println!("- {:?}", event);

@@ -10,17 +10,15 @@ use clarity::stacks_common::types::chainstate::{
     BlockHeaderHash, BurnchainHeaderHash, ConsensusHash, StacksWorkScore, TrieHash,
 };
 use clarity::stacks_common::types::chainstate::{StacksAddress, StacksPublicKey};
-use clarity::stacks_common::types::PrivateKey;
 use clarity::util::hash::{Hash160, Sha512Trunc256Sum};
 use clarity::util::retry::BoundReader;
 use clarity::util::secp256k1::{
     MessageSignature, Secp256k1PrivateKey, Secp256k1PublicKey, MESSAGE_SIGNATURE_ENCODED_SIZE,
 };
-use clarity::vm::ClarityVersion;
-// use clarity::util::vrf::VRFProof;
 use clarity::vm::types::{
     PrincipalData, QualifiedContractIdentifier, StandardPrincipalData, Value,
 };
+use clarity::vm::ClarityVersion;
 use clarity::vm::{ClarityName, ContractName};
 use clarity::{
     impl_array_hexstring_fmt, impl_array_newtype, impl_byte_array_message_codec,
@@ -34,6 +32,9 @@ use std::io::{Read, Write};
 use std::ops::Deref;
 use std::ops::DerefMut;
 use std::str::FromStr;
+
+#[cfg(not(feature = "wasm"))]
+use clarity::stacks_common::types::PrivateKey;
 
 pub const MAX_BLOCK_LEN: u32 = 2 * 1024 * 1024;
 pub const MAX_TRANSACTION_LEN: u32 = MAX_BLOCK_LEN;
@@ -2351,7 +2352,7 @@ impl StacksMessageCodec for TransactionSmartContract {
     }
 }
 
-fn ClarityVersion_consensus_serialize<W: Write>(
+fn clarity_version_consensus_serialize<W: Write>(
     version: &ClarityVersion,
     fd: &mut W,
 ) -> Result<(), CodecError> {
@@ -2362,7 +2363,9 @@ fn ClarityVersion_consensus_serialize<W: Write>(
     Ok(())
 }
 
-fn ClarityVersion_consensus_deserialize<R: Read>(fd: &mut R) -> Result<ClarityVersion, CodecError> {
+fn clarity_version_consensus_deserialize<R: Read>(
+    fd: &mut R,
+) -> Result<ClarityVersion, CodecError> {
     let version_byte: u8 = read_next(fd)?;
     match version_byte {
         1u8 => Ok(ClarityVersion::Clarity1),
@@ -2391,7 +2394,7 @@ impl StacksMessageCodec for TransactionPayload {
                 if let Some(version) = version_opt {
                     // caller requests a specific Clarity version
                     write_next(fd, &(TransactionPayloadID::VersionedSmartContract as u8))?;
-                    ClarityVersion_consensus_serialize(version, fd)?;
+                    clarity_version_consensus_serialize(version, fd)?;
                     sc.consensus_serialize(fd)?;
                 } else {
                     // caller requests to use whatever the current clarity version is
@@ -2424,7 +2427,7 @@ impl StacksMessageCodec for TransactionPayload {
                 TransactionPayload::SmartContract(payload, None)
             }
             x if x == TransactionPayloadID::VersionedSmartContract as u8 => {
-                let version = ClarityVersion_consensus_deserialize(fd)?;
+                let version = clarity_version_consensus_deserialize(fd)?;
                 let payload: TransactionSmartContract = read_next(fd)?;
                 TransactionPayload::SmartContract(payload, Some(version))
             }
@@ -2600,13 +2603,16 @@ impl StacksMessageCodec for TransactionPostCondition {
                 let condition_u8: u8 = read_next(fd)?;
 
                 let condition_code = NonfungibleConditionCode::from_u8(condition_u8)
-                    .ok_or(CodecError::DeserializeError(format!("Failed to parse transaction: Failed to parse NonfungibleAsset condition code {}", condition_u8)))?;
+                    .ok_or(CodecError::DeserializeError(format!(
+                        "Failed to parse transaction: Failed to parse NonfungibleAsset condition code {}",
+                        condition_u8
+                    )))?;
 
                 TransactionPostCondition::Nonfungible(principal, asset, asset_value, condition_code)
             }
             _ => {
                 return Err(CodecError::DeserializeError(format!(
-                    "Failed to aprse transaction: unknown asset info ID {}",
+                    "Failed to parse transaction: unknown asset info ID {}",
                     asset_info_id
                 )));
             }

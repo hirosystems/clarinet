@@ -1,7 +1,6 @@
 //! Defines error handling types used by the create
 //! uses the `error-chain` create for generation
 
-use neon;
 use serde::ser;
 use std::convert::From;
 use std::fmt::Display;
