@@ -1,15 +1,19 @@
 use crate::impl_byte_array_newtype;
+
+pub use clarity::codec::StacksMessageCodec;
+
 use clarity::address::AddressHashMode;
 use clarity::address::{
     C32_ADDRESS_VERSION_MAINNET_MULTISIG, C32_ADDRESS_VERSION_MAINNET_SINGLESIG,
     C32_ADDRESS_VERSION_TESTNET_MULTISIG, C32_ADDRESS_VERSION_TESTNET_SINGLESIG,
 };
 use clarity::codec::MAX_MESSAGE_LEN;
-use clarity::codec::{read_next, write_next, Error as CodecError, StacksMessageCodec};
-use clarity::stacks_common::types::chainstate::{
+use clarity::codec::{read_next, write_next, Error as CodecError};
+use clarity::types::chainstate::{
     BlockHeaderHash, BurnchainHeaderHash, ConsensusHash, StacksWorkScore, TrieHash,
 };
-use clarity::stacks_common::types::chainstate::{StacksAddress, StacksPublicKey};
+use clarity::types::chainstate::{StacksAddress, StacksPublicKey};
+use clarity::types::PrivateKey;
 use clarity::util::hash::{Hash160, Sha512Trunc256Sum};
 use clarity::util::retry::BoundReader;
 use clarity::util::secp256k1::{
@@ -32,9 +36,6 @@ use std::io::{Read, Write};
 use std::ops::Deref;
 use std::ops::DerefMut;
 use std::str::FromStr;
-
-#[cfg(not(feature = "wasm"))]
-use clarity::stacks_common::types::PrivateKey;
 
 pub const MAX_BLOCK_LEN: u32 = 2 * 1024 * 1024;
 pub const MAX_TRANSACTION_LEN: u32 = MAX_BLOCK_LEN;

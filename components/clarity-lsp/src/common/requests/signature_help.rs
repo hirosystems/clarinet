@@ -85,10 +85,8 @@ pub fn get_signatures(
 
 #[cfg(test)]
 mod definitions_visitor_tests {
-    use clarity_repl::clarity::ClarityVersion::Clarity2;
-    use clarity_repl::clarity::{
-        functions::NativeFunctions, stacks_common::types::StacksEpochId::Epoch21,
-    };
+    use clarity_repl::clarity::functions::NativeFunctions;
+    use clarity_repl::clarity::{ClarityVersion::Clarity2, StacksEpochId::Epoch21};
     use lsp_types::{ParameterInformation, ParameterLabel::Simple, Position, SignatureInformation};
 
     use crate::state::ActiveContractData;
