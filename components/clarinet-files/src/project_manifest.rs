@@ -418,6 +418,10 @@ fn get_epoch_and_clarity_version(
                 StacksEpochId::Epoch23
             } else if epoch.eq("2.4") {
                 StacksEpochId::Epoch24
+            } else if epoch.eq("2.5") {
+                StacksEpochId::Epoch25
+            } else if epoch.eq("3.0") {
+                StacksEpochId::Epoch30
             } else {
                 return Err(INVALID_EPOCH.into());
             }
@@ -435,6 +439,10 @@ fn get_epoch_and_clarity_version(
                 StacksEpochId::Epoch23
             } else if epoch.eq(&2.4) {
                 StacksEpochId::Epoch24
+            } else if epoch.eq(&2.5) {
+                StacksEpochId::Epoch25
+            } else if epoch.eq(&3.0) {
+                StacksEpochId::Epoch30
             } else {
                 return Err(INVALID_EPOCH.into());
             }

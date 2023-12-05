@@ -856,9 +856,11 @@ impl Session {
             Some("2.2") => StacksEpochId::Epoch22,
             Some("2.3") => StacksEpochId::Epoch23,
             Some("2.4") => StacksEpochId::Epoch24,
+            Some("2.5") => StacksEpochId::Epoch25,
+            Some("3.0") => StacksEpochId::Epoch30,
             _ => {
                 return output.push(red!(
-                    "Usage: ::set_epoch 2.0 | 2.05 | 2.1 | 2.2 | 2.3 | 2.4"
+                    "Usage: ::set_epoch 2.0 | 2.05 | 2.1 | 2.2 | 2.3 | 2.4 | 2.5 | 3.0"
                 ))
             }
         };
