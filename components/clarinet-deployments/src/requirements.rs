@@ -121,6 +121,9 @@ pub const MAINNET_21_START_HEIGHT: u32 = 99_113;
 pub const MAINNET_22_START_HEIGHT: u32 = 103_900;
 pub const MAINNET_23_START_HEIGHT: u32 = 104_359;
 pub const MAINNET_24_START_HEIGHT: u32 = 107_055;
+// @TODO: set right heights once epochs are live on mainnet
+pub const MAINNET_25_START_HEIGHT: u32 = 200_000;
+pub const MAINNET_30_START_HEIGHT: u32 = 300_000;
 
 pub const TESTNET_20_START_HEIGHT: u32 = 1;
 pub const TESTNET_2_05_START_HEIGHT: u32 = 20_216;
@@ -128,6 +131,9 @@ pub const TESTNET_21_START_HEIGHT: u32 = 99_113;
 pub const TESTNET_22_START_HEIGHT: u32 = 105_923;
 pub const TESTNET_23_START_HEIGHT: u32 = 106_196;
 pub const TESTNET_24_START_HEIGHT: u32 = 106_979;
+// @TODO: set right heights once epochs are live on testnet
+pub const TESTNET_25_START_HEIGHT: u32 = 200_000;
+pub const TESTNET_30_START_HEIGHT: u32 = 300_000;
 
 fn epoch_for_height(is_mainnet: bool, height: u32) -> StacksEpochId {
     if is_mainnet {
@@ -148,8 +154,12 @@ fn epoch_for_mainnet_height(height: u32) -> StacksEpochId {
         StacksEpochId::Epoch22
     } else if height < MAINNET_24_START_HEIGHT {
         StacksEpochId::Epoch23
-    } else {
+    } else if height < MAINNET_25_START_HEIGHT {
         StacksEpochId::Epoch24
+    } else if height < MAINNET_30_START_HEIGHT {
+        StacksEpochId::Epoch25
+    } else {
+        StacksEpochId::Epoch30
     }
 }
 
@@ -164,8 +174,12 @@ fn epoch_for_testnet_height(height: u32) -> StacksEpochId {
         StacksEpochId::Epoch22
     } else if height < TESTNET_24_START_HEIGHT {
         StacksEpochId::Epoch23
-    } else {
+    } else if height < TESTNET_25_START_HEIGHT {
         StacksEpochId::Epoch24
+    } else if height < TESTNET_30_START_HEIGHT {
+        StacksEpochId::Epoch25
+    } else {
+        StacksEpochId::Epoch30
     }
 }
 

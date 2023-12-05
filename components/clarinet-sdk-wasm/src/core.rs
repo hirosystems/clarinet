@@ -410,6 +410,8 @@ impl SDK {
             "2.2" => StacksEpochId::Epoch22,
             "2.3" => StacksEpochId::Epoch23,
             "2.4" => StacksEpochId::Epoch24,
+            "2.5" => StacksEpochId::Epoch25,
+            "3.0" => StacksEpochId::Epoch30,
             _ => {
                 log!("Invalid epoch {epoch}. Using default epoch");
                 DEFAULT_EPOCH
