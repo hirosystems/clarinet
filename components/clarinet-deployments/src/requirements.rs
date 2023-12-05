@@ -1,6 +1,8 @@
 use clarinet_files::{FileAccessor, FileLocation};
-use clarity_repl::clarity::stacks_common::types::StacksEpochId;
-use clarity_repl::clarity::{vm::types::QualifiedContractIdentifier, ClarityVersion};
+use clarity_repl::{
+    clarity::{vm::types::QualifiedContractIdentifier, ClarityVersion, StacksEpochId},
+    repl::{DEFAULT_CLARITY_VERSION, DEFAULT_EPOCH},
+};
 use reqwest;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -12,8 +14,8 @@ pub struct ContractMetadata {
 impl Default for ContractMetadata {
     fn default() -> Self {
         ContractMetadata {
-            epoch: StacksEpochId::latest(),
-            clarity_version: ClarityVersion::latest(),
+            epoch: DEFAULT_EPOCH,
+            clarity_version: DEFAULT_CLARITY_VERSION,
         }
     }
 }

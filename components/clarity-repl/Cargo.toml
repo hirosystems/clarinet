@@ -1,6 +1,6 @@
 [package]
 name = "clarity-repl"
-version = "2.0.0"
+version = "2.1.0"
 description = "Clarity REPL"
 authors = [
     "Ludo Galabru <ludo@hiro.so>",
@@ -32,7 +32,9 @@ serde_derive = "1.0"
 integer-sqrt = "0.1.3"
 getrandom = { version = "0.2.3", features = ["js"] }
 atty = "0.2.14"
-clarity-vm = { version = "2", default-features = false, optional = true }
+# clarity-vm = "2"
+clarity = { version = "2", default-features = false, optional = true, git = "https://github.com/stacks-network/stacks-core.git", branch = "feat/clarity-wasm-next", package ="clarity" }
+# clarity = { version = "2", default-features = false, optional = true, path ="../../../clarity-wasm/stacks-blockchain/clarity" }
 
 # DAP Debugger
 tokio = { version = "1.24", features = ["full"], optional = true }
@@ -76,13 +78,15 @@ cli = [
     "pico-args",
     "rustyline",
     "prettytable-rs",
-    "clarity-vm/canonical",
-    "clarity-vm/developer-mode",
+    "clarity/canonical",
+    "clarity/developer-mode",
+    "clarity/log",
     "hiro_system_kit/tokio_helpers",
 ]
 sdk = [
-    "clarity-vm/canonical",
-    "clarity-vm/developer-mode",
+    "clarity/canonical",
+    "clarity/developer-mode",
+    "clarity/log",
     "hiro_system_kit/tokio_helpers",
 ]
 dap = [
@@ -95,7 +99,7 @@ dap = [
     "memchr",
     "log",
 ]
-wasm = ["wasm-bindgen", "wasm-bindgen-futures", "clarity-vm/wasm"]
+wasm = ["wasm-bindgen", "wasm-bindgen-futures", "clarity/wasm"]
 
 [package.metadata.wasm-pack.profile.release.wasm-bindgen]
 debug-js-glue = false

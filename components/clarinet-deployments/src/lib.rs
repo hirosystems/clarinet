@@ -1,4 +1,4 @@
-use clarity_repl::clarity::stacks_common::types::StacksEpochId;
+use clarity_repl::clarity::StacksEpochId;
 use clarity_repl::repl::{ClarityCodeSource, ClarityContract, ContractDeployer};
 use clarity_repl::repl::{DEFAULT_CLARITY_VERSION, DEFAULT_EPOCH};
 
