@@ -99,6 +99,7 @@ export const tx = {
 
 type MineBlock = (txs: Array<Tx>) => ParsedTransactionResult[];
 type GetDataVar = (contract: string, dataVar: string) => ClarityValue;
+type GetBlockTime = () => ClarityValue;
 type GetMapEntry = (contract: string, mapName: string, mapKey: ClarityValue) => ClarityValue;
 type GetContractAST = (contractId: string) => ContractAST;
 type GetContractsInterfaces = () => Map<string, ContractInterface>;
@@ -115,6 +116,8 @@ export type Simnet = {
     ? MineBlock
     : K extends "getDataVar"
     ? GetDataVar
+    : K extends "getBlockTime"
+    ? GetBlockTime
     : K extends "getMapEntry"
     ? GetMapEntry
     : K extends "getContractAST"
@@ -220,6 +223,15 @@ const getSessionProxy = () => ({
         return result;
       };
       return getDataVar;
+    }
+
+    if (prop === "getBlockTime") {
+      const getBlockTime: GetBlockTime = () => {
+        const response = session.getBlockTime();
+        const result = Cl.deserialize(response);
+        return result;
+      };
+      return getBlockTime;
     }
 
     if (prop === "getMapEntry") {

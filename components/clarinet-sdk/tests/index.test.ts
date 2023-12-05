@@ -152,6 +152,10 @@ describe("simnet can read contracts data vars and maps", async () => {
     const counter = simnet.getDataVar("counter", "count");
     expect(counter).toStrictEqual(Cl.uint(0));
   });
+  it("can get block time", async () => {
+    const bt = simnet.getBlockTime();
+    expect(bt).toBeDefined();
+  });
 
   it("can get map entry", async () => {
     // add a participant in the map

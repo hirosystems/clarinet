@@ -363,6 +363,16 @@ impl ClarityInterpreter {
         analysis_db.commit();
     }
 
+    pub fn get_block_time(&mut self) -> u64 {
+        let block_height = self.get_block_height();
+        let mut conn = ClarityDatabase::new(
+            &mut self.datastore,
+            &self.burn_datastore,
+            &self.burn_datastore,
+        );
+        conn.get_block_time(block_height)
+    }
+
     pub fn get_data_var(
         &mut self,
         contract_id: &QualifiedContractIdentifier,
