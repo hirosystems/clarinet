@@ -1,13 +1,14 @@
 use std::str::FromStr;
 
 use crate::clarity::codec::*;
-use crate::clarity::stacks_common::codec::StacksMessageCodec;
-use crate::clarity::stacks_common::types::chainstate::StacksAddress;
+
 use crate::clarity::vm::types::{PrincipalData, QualifiedContractIdentifier, Value};
 use crate::clarity::vm::{ClarityName, ClarityVersion, ContractName};
 use clarity_repl::clarity::address::{
     AddressHashMode, C32_ADDRESS_VERSION_MAINNET_SINGLESIG, C32_ADDRESS_VERSION_TESTNET_SINGLESIG,
 };
+use clarity_repl::clarity::chainstate::StacksAddress;
+use clarity_repl::clarity::codec::StacksMessageCodec;
 use clarity_repl::clarity::util::secp256k1::{
     MessageSignature, Secp256k1PrivateKey, Secp256k1PublicKey,
 };

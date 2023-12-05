@@ -1,6 +1,8 @@
 use std::collections::HashMap;
 use std::path::PathBuf;
 
+use crate::repl::DEFAULT_EPOCH;
+
 use super::{extract_watch_variable, AccessType, State};
 use clarity::vm::callables::FunctionIdentifier;
 use clarity::vm::contexts::{ContractContext, GlobalContext};
@@ -692,7 +694,7 @@ impl DAPDebugger {
                             let value = env
                                 .global_context
                                 .database
-                                .lookup_variable(contract_id, name, data_types)
+                                .lookup_variable(contract_id, name, data_types, &DEFAULT_EPOCH)
                                 .unwrap();
                             Response {
                                 request_seq: seq,
@@ -910,6 +912,7 @@ impl DAPDebugger {
                     &contract_context.contract_identifier,
                     name.as_str(),
                     data_types,
+                    &DEFAULT_EPOCH,
                 )
                 .unwrap();
             variables.push(Variable {

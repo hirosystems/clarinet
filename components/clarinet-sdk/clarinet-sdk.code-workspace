@@ -9,6 +9,7 @@
       "--no-default-features",
       "--package=clarinet-sdk-wasm",
       "--features=wasm",
+      "--target=wasm32-unknown-unknown",
       "--message-format=json"
     ]
   }
