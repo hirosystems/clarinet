@@ -85,10 +85,8 @@ pub fn get_signatures(
 
 #[cfg(test)]
 mod definitions_visitor_tests {
+    use clarity_repl::clarity::functions::NativeFunctions;
     use clarity_repl::clarity::ClarityVersion::Clarity2;
-    use clarity_repl::clarity::{
-        functions::NativeFunctions, stacks_common::types::StacksEpochId::Epoch21,
-    };
     use lsp_types::{ParameterInformation, ParameterLabel::Simple, Position, SignatureInformation};
 
     use crate::state::ActiveContractData;
@@ -99,7 +97,12 @@ mod definitions_visitor_tests {
         source: &str,
         position: &Position,
     ) -> Option<Vec<lsp_types::SignatureInformation>> {
-        let contract = &ActiveContractData::new(Clarity2, Epoch21, None, source);
+        let contract = &ActiveContractData::new(
+            Clarity2,
+            clarity_repl::clarity::StacksEpochId::Epoch21,
+            None,
+            source,
+        );
         get_signatures(&contract, position)
     }
 

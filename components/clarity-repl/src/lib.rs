@@ -24,7 +24,7 @@ pub mod test_fixtures;
 
 pub mod clarity {
     #![allow(ambiguous_glob_reexports)]
-    pub use ::clarity::stacks_common::*;
+    pub use ::clarity::types::*;
     pub use ::clarity::vm::*;
     pub use ::clarity::*;
 }

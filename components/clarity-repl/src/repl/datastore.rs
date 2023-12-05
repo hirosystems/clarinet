@@ -283,7 +283,7 @@ impl ClarityBackingStore for Datastore {
         panic!("Datastore cannot get_metadata_manual")
     }
 
-    #[cfg(not(feature = "wasm"))]
+    #[cfg(not(target_family = "wasm"))]
     fn get_side_store(&mut self) -> &::clarity::rusqlite::Connection {
         panic!("Datastore cannot get_side_store")
     }
@@ -437,7 +437,15 @@ impl BurnStateDB for BurnDatastore {
         0
     }
 
+    fn get_v3_unlock_height(&self) -> u32 {
+        0
+    }
+
     fn get_pox_3_activation_height(&self) -> u32 {
+        0
+    }
+
+    fn get_pox_4_activation_height(&self) -> u32 {
         0
     }
 
