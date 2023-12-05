@@ -508,18 +508,11 @@ impl Session {
         let contract_id =
             contract.expect_resolved_contract_identifier(Some(&self.interpreter.get_tx_sender()));
 
-        let result = if let Some(mut ast) = ast.take() {
-            self.interpreter.run_ast(
-                contract,
-                &mut ast,
-                &mut vec![],
-                true,
-                cost_track,
-                Some(hooks),
-            )
-        } else {
-            self.interpreter.run(contract, cost_track, Some(hooks))
-        };
+        // run interpreter
+        println!("Deploying contract: {}", contract.name);
+        let result = self
+            .interpreter
+            .run_both(contract, ast, cost_track, Some(hooks));
 
         match result {
             Ok(result) => {
@@ -575,13 +568,17 @@ impl Session {
         };
 
         self.set_tx_sender(sender.into());
-        let execution = match self.interpreter.run(&contract_call, true, Some(hooks)) {
-            Ok(result) => result,
-            Err(e) => {
-                self.set_tx_sender(initial_tx_sender);
-                return Err(e);
-            }
-        };
+        let execution =
+            match self
+                .interpreter
+                .run_both(&contract_call, &mut None, true, Some(hooks))
+            {
+                Ok(result) => result,
+                Err(e) => {
+                    self.set_tx_sender(initial_tx_sender);
+                    return Err(e);
+                }
+            };
         self.set_tx_sender(initial_tx_sender);
         self.coverage_reports.push(coverage);
 
@@ -615,7 +612,9 @@ impl Session {
         let contract_identifier =
             contract.expect_resolved_contract_identifier(Some(&self.interpreter.get_tx_sender()));
 
-        let result = self.interpreter.run(&contract, cost_track, eval_hooks);
+        let result = self
+            .interpreter
+            .run_both(&contract, &mut None, cost_track, eval_hooks);
 
         match result {
             Ok(result) => {
@@ -1217,7 +1216,10 @@ fn clarity_keywords() -> HashMap<String, String> {
 
 #[cfg(test)]
 mod tests {
-    use crate::repl::{self, settings::Account};
+    use crate::{
+        repl::{self, settings::Account},
+        test_fixtures::clarity_contract::ClarityContractBuilder,
+    };
 
     use super::*;
 
@@ -1342,6 +1344,17 @@ mod tests {
             output[1],
             red!("Parsing error: invalid digit found in string")
         );
+    }
+
+    #[test]
+    fn deploy_contract() {
+        let settings = SessionSettings::default();
+        let mut session = Session::new(settings);
+        session.start().expect("session could not start");
+        let contract = &ClarityContractBuilder::default().build();
+
+        let result = session.deploy_contract(contract, None, false, None, &mut None);
+        println!("{:#?}", result);
     }
 
     #[test]

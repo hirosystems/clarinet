@@ -16,7 +16,7 @@ reqwest = { version = "0.11", default-features = false, features = [
 ] }
 hmac = "0.12.0"
 pbkdf2 = { version = "0.12.2", features = ["simple"], default-features = false }
-sha2 = "0.10.0"
+sha2 = "0.10"
 tiny-hderive = { version = "0.3.0" }
 libsecp256k1 = { version = "0.7.0" }
 
