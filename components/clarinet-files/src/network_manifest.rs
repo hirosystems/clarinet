@@ -4,11 +4,10 @@ use super::{FileAccessor, FileLocation};
 use bip39::{Language, Mnemonic};
 use chainhook_types::{BitcoinNetwork, StacksNetwork};
 use clarinet_utils::get_bip39_seed_from_mnemonic;
-use clarity_repl::clarity::address::AddressHashMode;
-use clarity_repl::clarity::stacks_common::types::chainstate::StacksAddress;
 use clarity_repl::clarity::util::hash::bytes_to_hex;
 use clarity_repl::clarity::util::secp256k1::Secp256k1PublicKey;
 use clarity_repl::clarity::vm::types::QualifiedContractIdentifier;
+use clarity_repl::clarity::{address::AddressHashMode, chainstate::StacksAddress};
 use libsecp256k1::{PublicKey, SecretKey};
 use tiny_hderive::bip32::ExtendedPrivKey;
 use toml::value::Value;
@@ -42,6 +41,8 @@ pub const DEFAULT_POX2_ACTIVATION: u64 = 102;
 pub const DEFAULT_EPOCH_2_2: u64 = 103;
 pub const DEFAULT_EPOCH_2_3: u64 = 104;
 pub const DEFAULT_EPOCH_2_4: u64 = 105;
+pub const DEFAULT_EPOCH_2_5: u64 = 106;
+pub const DEFAULT_EPOCH_3_0: u64 = 107;
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct NetworkManifestFile {
@@ -131,6 +132,8 @@ pub struct DevnetConfigFile {
     pub epoch_2_2: Option<u64>,
     pub epoch_2_3: Option<u64>,
     pub epoch_2_4: Option<u64>,
+    pub epoch_2_5: Option<u64>,
+    pub epoch_3_0: Option<u64>,
     pub pox_2_activation: Option<u64>,
     pub use_docker_gateway_routing: Option<bool>,
     pub docker_platform: Option<String>,
@@ -293,6 +296,8 @@ pub struct DevnetConfig {
     pub epoch_2_2: u64,
     pub epoch_2_3: u64,
     pub epoch_2_4: u64,
+    pub epoch_2_5: u64,
+    pub epoch_3_0: u64,
     pub pox_2_activation: u64,
     pub use_docker_gateway_routing: bool,
     pub docker_platform: String,
@@ -894,6 +899,8 @@ impl NetworkManifest {
                 epoch_2_2: devnet_config.epoch_2_2.unwrap_or(DEFAULT_EPOCH_2_2),
                 epoch_2_3: devnet_config.epoch_2_3.unwrap_or(DEFAULT_EPOCH_2_3),
                 epoch_2_4: devnet_config.epoch_2_4.unwrap_or(DEFAULT_EPOCH_2_4),
+                epoch_2_5: devnet_config.epoch_2_5.unwrap_or(DEFAULT_EPOCH_2_5),
+                epoch_3_0: devnet_config.epoch_3_0.unwrap_or(DEFAULT_EPOCH_3_0),
                 pox_2_activation: devnet_config
                     .pox_2_activation
                     .unwrap_or(DEFAULT_POX2_ACTIVATION),

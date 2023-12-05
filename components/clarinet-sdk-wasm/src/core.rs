@@ -10,9 +10,10 @@ use clarity_repl::analysis::coverage::CoverageReporter;
 use clarity_repl::clarity::analysis::contract_interface_builder::{
     ContractInterface, ContractInterfaceFunction, ContractInterfaceFunctionAccess,
 };
-use clarity_repl::clarity::stacks_common::types::StacksEpochId;
 use clarity_repl::clarity::vm::types::QualifiedContractIdentifier;
-use clarity_repl::clarity::{ClarityVersion, EvaluationResult, ExecutionResult, ParsedContract};
+use clarity_repl::clarity::{
+    ClarityVersion, EvaluationResult, ExecutionResult, ParsedContract, StacksEpochId,
+};
 use clarity_repl::repl::{
     ClarityCodeSource, ClarityContract, ContractDeployer, Session, DEFAULT_CLARITY_VERSION,
     DEFAULT_EPOCH,
@@ -409,6 +410,8 @@ impl SDK {
             "2.2" => StacksEpochId::Epoch22,
             "2.3" => StacksEpochId::Epoch23,
             "2.4" => StacksEpochId::Epoch24,
+            "2.5" => StacksEpochId::Epoch25,
+            "3.0" => StacksEpochId::Epoch30,
             _ => {
                 log!("Invalid epoch {epoch}. Using default epoch");
                 DEFAULT_EPOCH

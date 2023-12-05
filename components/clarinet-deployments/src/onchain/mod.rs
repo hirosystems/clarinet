@@ -2,8 +2,8 @@ use bitcoincore_rpc::{Auth, Client};
 use clarinet_files::chainhook_types::StacksNetwork;
 use clarinet_files::{AccountConfig, NetworkManifest};
 use clarinet_utils::get_bip39_seed_from_mnemonic;
+use clarity_repl::clarity::chainstate::StacksAddress;
 use clarity_repl::clarity::codec::StacksMessageCodec;
-use clarity_repl::clarity::stacks_common::types::chainstate::StacksAddress;
 use clarity_repl::clarity::util::secp256k1::{
     MessageSignature, Secp256k1PrivateKey, Secp256k1PublicKey,
 };
@@ -537,9 +537,7 @@ pub fn apply_on_chain_deployment(
                             let _ =
                                 deployment_event_tx.send(DeploymentEvent::Interrupted(format!(
                                     "unable to encode contract_call {}::{} ({})",
-                                    tx.contract_id.to_string(),
-                                    tx.method,
-                                    e
+                                    tx.contract_id, tx.method, e
                                 )));
                             return;
                         }
@@ -548,7 +546,7 @@ pub fn apply_on_chain_deployment(
                     accounts_cached_nonces.insert(issuer_address.clone(), nonce + 1);
                     let name = format!(
                         "Call ({} {} {})",
-                        tx.contract_id.to_string(),
+                        tx.contract_id,
                         tx.method,
                         tx.parameters.join(" ")
                     );
@@ -758,6 +756,8 @@ pub fn apply_on_chain_deployment(
                 EpochSpec::Epoch2_2 => network_manifest.devnet.as_ref().unwrap().epoch_2_2,
                 EpochSpec::Epoch2_3 => network_manifest.devnet.as_ref().unwrap().epoch_2_3,
                 EpochSpec::Epoch2_4 => network_manifest.devnet.as_ref().unwrap().epoch_2_4,
+                EpochSpec::Epoch2_5 => network_manifest.devnet.as_ref().unwrap().epoch_2_5,
+                EpochSpec::Epoch3_0 => network_manifest.devnet.as_ref().unwrap().epoch_3_0,
             };
             let mut epoch_transition_successful =
                 current_bitcoin_block_height > after_bitcoin_block;
