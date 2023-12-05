@@ -508,18 +508,23 @@ impl Session {
         let contract_id =
             contract.expect_resolved_contract_identifier(Some(&self.interpreter.get_tx_sender()));
 
-        let result = if let Some(mut ast) = ast.take() {
-            self.interpreter.run_ast(
-                contract,
-                &mut ast,
-                &mut vec![],
-                true,
-                cost_track,
-                Some(hooks),
-            )
-        } else {
-            self.interpreter.run(contract, cost_track, Some(hooks))
-        };
+        // run interpreter
+        // let result = if let Some(mut ast) = ast.take() {
+        //     self.interpreter.run_ast(
+        //         contract,
+        //         &mut ast,
+        //         &mut vec![],
+        //         true,
+        //         cost_track,
+        //         Some(hooks),
+        //     )
+        // } else {
+        //     self.interpreter.run(contract, cost_track, Some(hooks))
+        // };
+        // run wasm
+        let result = self
+            .interpreter
+            .run_wasm(contract, false, None, ast.clone());
 
         match result {
             Ok(result) => {
@@ -615,7 +620,9 @@ impl Session {
         let contract_identifier =
             contract.expect_resolved_contract_identifier(Some(&self.interpreter.get_tx_sender()));
 
-        let result = self.interpreter.run(&contract, cost_track, eval_hooks);
+        let result = self
+            .interpreter
+            .run_wasm(&contract, cost_track, eval_hooks, None);
 
         match result {
             Ok(result) => {

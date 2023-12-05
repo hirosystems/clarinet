@@ -35,6 +35,7 @@ atty = "0.2.14"
 # clarity-vm = "2"
 clarity = { version = "2", default-features = false, optional = true, git = "https://github.com/stacks-network/stacks-core.git", branch = "feat/clarity-wasm-next", package ="clarity" }
 # clarity = { version = "2", default-features = false, optional = true, path ="../../../clarity-wasm/stacks-blockchain/clarity" }
+clar2wasm = { git = "https://github.com/stacks-network/clarity-wasm.git", optional = true }
 
 # DAP Debugger
 tokio = { version = "1.24", features = ["full"], optional = true }
@@ -81,6 +82,7 @@ cli = [
     "clarity/canonical",
     "clarity/developer-mode",
     "clarity/log",
+    "clar2wasm",
     "hiro_system_kit/tokio_helpers",
 ]
 sdk = [
