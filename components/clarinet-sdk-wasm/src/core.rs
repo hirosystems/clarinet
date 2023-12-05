@@ -10,9 +10,10 @@ use clarity_repl::analysis::coverage::CoverageReporter;
 use clarity_repl::clarity::analysis::contract_interface_builder::{
     ContractInterface, ContractInterfaceFunction, ContractInterfaceFunctionAccess,
 };
-use clarity_repl::clarity::stacks_common::types::StacksEpochId;
 use clarity_repl::clarity::vm::types::QualifiedContractIdentifier;
-use clarity_repl::clarity::{ClarityVersion, EvaluationResult, ExecutionResult, ParsedContract};
+use clarity_repl::clarity::{
+    ClarityVersion, EvaluationResult, ExecutionResult, ParsedContract, StacksEpochId,
+};
 use clarity_repl::repl::{
     ClarityCodeSource, ClarityContract, ContractDeployer, Session, DEFAULT_CLARITY_VERSION,
     DEFAULT_EPOCH,

@@ -1,6 +1,6 @@
 [package]
 name = "stacks-rpc-client"
-version = "2.0.0"
+version = "2.0.1"
 description = "HTTP Client for the Stacks blockchain"
 license = "GPL-3.0"
 edition = "2021"

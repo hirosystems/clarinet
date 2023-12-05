@@ -1,5 +1,5 @@
+use clarinet_files::chainhook_types::StacksNetwork;
 use clarinet_files::FileLocation;
-use clarity_repl::clarity::stacks_common::types::StacksEpochId;
 use clarity_repl::clarity::util::hash::{hex_bytes, to_hex};
 use clarity_repl::clarity::vm::analysis::ContractAnalysis;
 use clarity_repl::clarity::vm::ast::ContractAST;
@@ -8,9 +8,8 @@ use clarity_repl::clarity::vm::types::{
     PrincipalData, QualifiedContractIdentifier, StandardPrincipalData,
 };
 
-use clarinet_files::chainhook_types::StacksNetwork;
 use clarity_repl::analysis::ast_dependency_detector::DependencySet;
-use clarity_repl::clarity::{ClarityName, ClarityVersion, ContractName};
+use clarity_repl::clarity::{ClarityName, ClarityVersion, ContractName, StacksEpochId};
 use clarity_repl::repl::{Session, DEFAULT_CLARITY_VERSION};
 use serde::{Deserialize, Serialize};
 use serde_yaml;
@@ -31,6 +30,10 @@ pub enum EpochSpec {
     Epoch2_3,
     #[serde(rename = "2.4")]
     Epoch2_4,
+    #[serde(rename = "2.5")]
+    Epoch2_5,
+    #[serde(rename = "3.0")]
+    Epoch3_0,
 }
 
 impl From<StacksEpochId> for EpochSpec {
@@ -42,6 +45,8 @@ impl From<StacksEpochId> for EpochSpec {
             StacksEpochId::Epoch22 => EpochSpec::Epoch2_2,
             StacksEpochId::Epoch23 => EpochSpec::Epoch2_3,
             StacksEpochId::Epoch24 => EpochSpec::Epoch2_4,
+            StacksEpochId::Epoch25 => EpochSpec::Epoch2_5,
+            StacksEpochId::Epoch30 => EpochSpec::Epoch3_0,
             StacksEpochId::Epoch10 => unreachable!("epoch 1.0 is not supported"),
         }
     }
@@ -56,6 +61,8 @@ impl From<EpochSpec> for StacksEpochId {
             EpochSpec::Epoch2_2 => StacksEpochId::Epoch22,
             EpochSpec::Epoch2_3 => StacksEpochId::Epoch23,
             EpochSpec::Epoch2_4 => StacksEpochId::Epoch24,
+            EpochSpec::Epoch2_5 => StacksEpochId::Epoch25,
+            EpochSpec::Epoch3_0 => StacksEpochId::Epoch30,
         }
     }
 }
