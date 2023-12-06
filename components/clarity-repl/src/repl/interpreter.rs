@@ -806,6 +806,7 @@ impl ClarityInterpreter {
 
 #[cfg(test)]
 mod tests {
+
     use super::*;
     use crate::test_fixtures::clarity_contract::ClarityContractBuilder;
     use clarity::{
@@ -820,6 +821,14 @@ mod tests {
         let tx_sender = StandardPrincipalData::transient();
         interpreter.set_tx_sender(tx_sender.clone());
         assert_eq!(interpreter.get_tx_sender(), tx_sender);
+    }
+
+    #[test]
+    fn test_get_block_time() {
+        let mut interpreter =
+            ClarityInterpreter::new(StandardPrincipalData::transient(), Settings::default());
+        let bt = interpreter.get_block_time();
+        assert_ne!(bt, 0); // TODO placeholder
     }
 
     #[test]
