@@ -115,6 +115,9 @@ enum Contracts {
     /// Generate files and settings for a new contract
     #[clap(name = "new", bin_name = "new")]
     NewContract(NewContract),
+    /// Remove files and settings for a contract
+    #[clap(name = "rm", bin_name = "rm")]
+    RemoveContract(RemoveContract),
 }
 
 #[derive(Subcommand, PartialEq, Clone, Debug)]
@@ -172,6 +175,15 @@ struct GenerateProject {
 
 #[derive(Parser, PartialEq, Clone, Debug)]
 struct NewContract {
+    /// Contract's name
+    pub name: String,
+    /// Path to Clarinet.toml
+    #[clap(long = "manifest-path", short = 'm')]
+    pub manifest_path: Option<String>,
+}
+
+#[derive(Parser, PartialEq, Clone, Debug)]
+struct RemoveContract {
     /// Contract's name
     pub name: String,
     /// Path to Clarinet.toml
@@ -917,6 +929,37 @@ pub fn main() {
                     display_post_check_hint();
                 }
             }
+            Contracts::RemoveContract(cmd) => {
+                let manifest = load_manifest_or_exit(cmd.manifest_path);
+                let contract_name = cmd.name.clone();
+                let changes =
+                    match generate::get_changes_for_rm_contract(&manifest.location, cmd.name) {
+                        Ok(changes) => changes,
+                        Err(message) => {
+                            println!("{}", format_err!(message));
+                            std::process::exit(1);
+                        }
+                    };
+
+                let mut answer = String::new();
+                println!(
+                    "{} This command will delete the files {}.test.ts, {}.clar, and remove the contract from the manifest. Do you confirm? [y/N]",
+                    yellow!("warning:"),
+                    &contract_name,
+                    &contract_name
+                );
+                std::io::stdin().read_line(&mut answer).unwrap();
+                if !answer.trim().eq_ignore_ascii_case("y") {
+                    println!("{} Not deleting contract files", yellow!("warning:"));
+                    std::process::exit(0);
+                }
+                if !execute_changes(changes) {
+                    std::process::exit(1);
+                }
+                if global_settings.enable_hints.unwrap_or(true) {
+                    display_post_check_hint();
+                }
+            }
         },
         Command::Requirements(subcommand) => match subcommand {
             Requirements::AddRequirement(cmd) => {
@@ -929,6 +972,7 @@ pub fn main() {
                         green!(format!("{}", cmd.contract_id))
                     ),
                     manifest_location: manifest.location.clone(),
+                    contracts_to_rm: vec![],
                     contracts_to_add: HashMap::new(),
                     requirements_to_add: vec![RequirementConfig {
                         contract_id: cmd.contract_id.clone(),
@@ -1524,9 +1568,28 @@ fn execute_changes(changes: Vec<Changes>) -> bool {
                 for (contract_name, contract_config) in options.contracts_to_add.drain() {
                     config.contracts.insert(contract_name, contract_config);
                 }
+                for contract_name in options.contracts_to_rm.iter() {
+                    config.contracts.remove(contract_name);
+                }
 
                 shared_config = Some(config);
                 println!("{}", options.comment);
+            }
+            Changes::RemoveFile(options) => {
+                if let Ok(entry) = fs::metadata(&options.path) {
+                    if !entry.is_file() {
+                        println!(
+                            "{} file doesn't exist at path {}",
+                            yellow!("warning:"),
+                            options.path
+                        );
+                        continue;
+                    }
+                }
+                match fs::remove_file(&options.path) {
+                    Ok(_) => println!("{}", options.comment),
+                    Err(e) => println!("error {}", e),
+                }
             }
         }
     }
