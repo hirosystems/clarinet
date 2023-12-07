@@ -825,7 +825,7 @@ dependencies = [
 [[package]]
 name = "clarity"
 version = "2.2.0"
-source = "git+https://github.com/stacks-network/stacks-core.git?branch=feat/clarity-wasm-next#db71709bee2b1e13624c7761b4e56250a337b0a4"
+source = "git+https://github.com/stacks-network/stacks-core.git?branch=feat/clarity-wasm-next#87940b9a9b9a0fd2d6f8990db0a7aecf0d524857"
 dependencies = [
  "integer-sqrt",
  "lazy_static",
@@ -4446,7 +4446,7 @@ dependencies = [
 [[package]]
 name = "stacks-common"
 version = "0.0.2"
-source = "git+https://github.com/stacks-network/stacks-core.git?branch=feat/clarity-wasm-next#db71709bee2b1e13624c7761b4e56250a337b0a4"
+source = "git+https://github.com/stacks-network/stacks-core.git?branch=feat/clarity-wasm-next#87940b9a9b9a0fd2d6f8990db0a7aecf0d524857"
 dependencies = [
  "chrono",
  "curve25519-dalek",

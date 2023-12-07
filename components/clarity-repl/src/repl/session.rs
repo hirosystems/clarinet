@@ -510,7 +510,9 @@ impl Session {
 
         // run interpreter
         println!("Deploying contract: {}", contract.name);
-        let result = self.interpreter.run_both(contract, ast, cost_track, Some(hooks));
+        let result = self
+            .interpreter
+            .run_both(contract, ast, cost_track, Some(hooks));
 
         match result {
             Ok(result) => {
@@ -566,16 +568,17 @@ impl Session {
         };
 
         self.set_tx_sender(sender.into());
-        let execution = match self
-            .interpreter
-            .run_both(&contract_call, &mut None, true, Some(hooks))
-        {
-            Ok(result) => result,
-            Err(e) => {
-                self.set_tx_sender(initial_tx_sender);
-                return Err(e);
-            }
-        };
+        let execution =
+            match self
+                .interpreter
+                .run_both(&contract_call, &mut None, true, Some(hooks))
+            {
+                Ok(result) => result,
+                Err(e) => {
+                    self.set_tx_sender(initial_tx_sender);
+                    return Err(e);
+                }
+            };
         self.set_tx_sender(initial_tx_sender);
         self.coverage_reports.push(coverage);
 
@@ -1215,7 +1218,7 @@ fn clarity_keywords() -> HashMap<String, String> {
 mod tests {
     use crate::{
         repl::{self, settings::Account},
-        test_fixtures::{self, clarity_contract::ClarityContractBuilder},
+        test_fixtures::clarity_contract::ClarityContractBuilder,
     };
 
     use super::*;

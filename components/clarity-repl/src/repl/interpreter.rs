@@ -130,21 +130,23 @@ impl ClarityInterpreter {
 
         let start_run = std::time::Instant::now();
         let result = self.run(contract, ast, cost_track, eval_hooks);
+        #[allow(unused_variables)]
         let time_run = start_run.elapsed();
 
         let start_run_wasm = std::time::Instant::now();
         let result_wasm = self.run_wasm(&contract_wasm, ast, cost_track, None);
+        #[allow(unused_variables)]
         let time_run_wasm = start_run_wasm.elapsed();
 
-        println!("time taken for run_wasm: {:?}", time_run_wasm);
-        println!("time taken for run: {:?}", time_run);
+        // println!("time taken for run_wasm: {:?}", time_run_wasm);
+        // println!("time taken for run: {:?}", time_run);
 
-        let ratio = time_run_wasm.as_nanos() / time_run.as_nanos();
-        if time_run_wasm < time_run {
-            println!("run_wasm {:?}x times faster", ratio);
-        } else {
-            println!("run_wasm {:?}x times slowser", ratio);
-        }
+        // let ratio = time_run_wasm.as_nanos() / time_run.as_nanos();
+        // if time_run_wasm < time_run {
+        //     println!("run_wasm {:?}x times faster", ratio);
+        // } else {
+        //     println!("run_wasm {:?}x times slower", ratio);
+        // }
 
         #[allow(clippy::single_match)]
         match (result.clone(), result_wasm) {
@@ -269,6 +271,8 @@ impl ClarityInterpreter {
                 (ast, diagnostics, analysis, module)
             }
             None => {
+                // counter.clar
+                // contract2.clar
                 let CompileResult {
                     mut ast,
                     mut diagnostics,
@@ -606,9 +610,9 @@ impl ClarityInterpreter {
                             let called_contract =
                                 env.global_context.database.get_contract(&contract_id)?;
                             match wasm_module {
-                                Some(mut wasm_module) => {
+                                Some(_) => {
+                                    // CLAR2WASM
                                     let start = std::time::Instant::now();
-                                    contract_context.set_wasm_module(wasm_module.emit_wasm());
 
                                     let res = match call_function(
                                         &method,
@@ -630,6 +634,7 @@ impl ClarityInterpreter {
                                     Ok(res)
                                 }
                                 None => {
+                                    // INTERPRETER
                                     let start = std::time::Instant::now();
                                     let args: Vec<SymbolicExpression> = args
                                         .iter()
@@ -1189,6 +1194,20 @@ mod tests {
         } = result.unwrap();
         assert!(diagnostics.is_empty());
         assert!(events.is_empty());
+    }
+
+    #[test]
+    fn test_run_both() {
+        let mut interpreter =
+            ClarityInterpreter::new(StandardPrincipalData::transient(), Settings::default());
+
+        let contract = ClarityContract::fixture();
+        let _ = interpreter.run_both(&contract, &mut None, false, None);
+
+        let call_contract = ClarityContractBuilder::default()
+            .code_source("(contract-call? .contract incr)".to_owned())
+            .build();
+        let _ = interpreter.run_both(&call_contract, &mut None, false, None);
     }
 
     #[test]
