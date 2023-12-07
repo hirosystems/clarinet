@@ -29,7 +29,7 @@ use clarity::vm::{ContractEvaluationResult, EvalHook};
 use clarity::vm::{CostSynthesis, ExecutionResult, ParsedContract};
 
 use super::datastore::StacksConstants;
-use super::{ClarityContract, DEFAULT_EPOCH};
+use super::{ClarityContract, ContractDeployer, DEFAULT_EPOCH};
 
 pub const BLOCK_LIMIT_MAINNET: ExecutionCost = ExecutionCost {
     write_length: 15_000_000,
@@ -117,40 +117,78 @@ impl ClarityInterpreter {
         }
     }
 
+    pub fn run_both(
+        &mut self,
+        contract: &ClarityContract,
+        ast: &mut Option<ContractAST>,
+        cost_track: bool,
+        eval_hooks: Option<Vec<&mut dyn EvalHook>>,
+    ) -> Result<ExecutionResult, Vec<Diagnostic>> {
+        let mut contract_wasm = contract.clone();
+        contract_wasm.deployer =
+            ContractDeployer::Address("ST3NBRSFKX28FQ2ZJ1MAKX58HKHSDGNV5N7R21XCP".into());
+
+        let start_run = std::time::Instant::now();
+        let result = self.run(contract, ast, cost_track, eval_hooks);
+        let time_run = start_run.elapsed();
+
+        let start_run_wasm = std::time::Instant::now();
+        let result_wasm = self.run_wasm(&contract_wasm, ast, cost_track, None);
+        let time_run_wasm = start_run_wasm.elapsed();
+
+        println!("time taken for run_wasm: {:?}", time_run_wasm);
+        println!("time taken for run: {:?}", time_run);
+
+        let ratio = time_run_wasm.as_nanos() / time_run.as_nanos();
+        if time_run_wasm < time_run {
+            println!("run_wasm {:?}x times faster", ratio);
+        } else {
+            println!("run_wasm {:?}x times slowser", ratio);
+        }
+
+        #[allow(clippy::single_match)]
+        match (result.clone(), result_wasm) {
+            (Ok(result), Ok(result_wasm)) => {
+                let value = match result.result {
+                    EvaluationResult::Contract(contract_result) => contract_result.result,
+                    EvaluationResult::Snippet(snippet_result) => Some(snippet_result.result),
+                };
+                let value_wasm = match result_wasm.result {
+                    EvaluationResult::Contract(contract_result) => contract_result.result,
+                    EvaluationResult::Snippet(snippet_result) => Some(snippet_result.result),
+                };
+                if value != value_wasm {
+                    println!("values do not match");
+                    println!("value: {:?}", value);
+                    println!("value_wasm: {:?}", value_wasm);
+                };
+            }
+            // @TODO: handle other cases
+            _ => (),
+        };
+
+        result
+    }
+
     pub fn run(
         &mut self,
         contract: &ClarityContract,
+        ast: &mut Option<ContractAST>,
         cost_track: bool,
         eval_hooks: Option<Vec<&mut dyn EvalHook>>,
     ) -> Result<ExecutionResult, Vec<Diagnostic>> {
-        let (mut ast, mut diagnostics, success) = self.build_ast(contract);
+        let (mut ast, mut diagnostics, success) = match ast {
+            Some(ast) => (ast.clone(), vec![], true),
+            None => self.build_ast(contract),
+        };
 
-        self.run_ast(
-            contract,
-            &mut ast,
-            &mut diagnostics,
-            success,
-            cost_track,
-            eval_hooks,
-        )
-    }
-
-    pub fn run_ast(
-        &mut self,
-        contract: &ClarityContract,
-        ast: &mut ContractAST,
-        diagnostics: &mut Vec<Diagnostic>,
-        success: bool,
-        cost_track: bool,
-        eval_hooks: Option<Vec<&mut dyn EvalHook>>,
-    ) -> Result<ExecutionResult, Vec<Diagnostic>> {
         let code_source = contract.expect_in_memory_code_source();
 
         let (annotations, mut annotation_diagnostics) = self.collect_annotations(code_source);
         diagnostics.append(&mut annotation_diagnostics);
 
         let (analysis, mut analysis_diagnostics) =
-            match self.run_analysis(contract, ast, &annotations) {
+            match self.run_analysis(contract, &mut ast, &annotations) {
                 Ok((analysis, diagnostics)) => (analysis, diagnostics),
                 Err(diagnostic) => {
                     diagnostics.push(diagnostic);
@@ -163,18 +201,19 @@ impl ClarityInterpreter {
             return Err(diagnostics.to_vec());
         }
 
-        let mut result = match self.execute(contract, ast, analysis, None, cost_track, eval_hooks) {
-            Ok(result) => result,
-            Err(e) => {
-                diagnostics.push(Diagnostic {
-                    level: Level::Error,
-                    message: format!("Runtime Error: {}", e),
-                    spans: vec![],
-                    suggestion: None,
-                });
-                return Err(diagnostics.to_vec());
-            }
-        };
+        let mut result =
+            match self.execute(contract, &mut ast, analysis, None, cost_track, eval_hooks) {
+                Ok(result) => result,
+                Err(e) => {
+                    diagnostics.push(Diagnostic {
+                        level: Level::Error,
+                        message: format!("Runtime Error: {}", e),
+                        spans: vec![],
+                        suggestion: None,
+                    });
+                    return Err(diagnostics.to_vec());
+                }
+            };
 
         result.diagnostics = diagnostics.to_vec();
 
@@ -188,9 +227,9 @@ impl ClarityInterpreter {
     pub fn run_wasm(
         &mut self,
         contract: &ClarityContract,
+        ast: &mut Option<ContractAST>,
         cost_track: bool,
         eval_hooks: Option<Vec<&mut dyn EvalHook>>,
-        ast: Option<ContractAST>,
     ) -> Result<ExecutionResult, Vec<Diagnostic>> {
         use clar2wasm::{compile, compile_contract, CompileError, CompileResult};
 
@@ -198,7 +237,7 @@ impl ClarityInterpreter {
         let source = contract.expect_in_memory_code_source();
         let mut analysis_db = AnalysisDatabase::new(&mut self.datastore);
 
-        let (mut ast, mut diagnostics, analysis, module) = match ast {
+        let (mut ast, mut diagnostics, analysis, module) = match ast.take() {
             Some(mut ast) => {
                 let mut diagnostics = vec![];
                 let (annotations, annotation_diagnostics) =
@@ -566,35 +605,41 @@ impl ClarityInterpreter {
 
                             let called_contract =
                                 env.global_context.database.get_contract(&contract_id)?;
+                            match wasm_module {
+                                Some(mut wasm_module) => {
+                                    let start = std::time::Instant::now();
+                                    contract_context.set_wasm_module(wasm_module.emit_wasm());
 
-                            if called_contract.contract_context.wasm_module.is_some() {
-                                contract_context.set_wasm_module(wasm_module.unwrap().emit_wasm());
-
-                                let res = match call_function(
-                                    &method,
-                                    &args,
-                                    g,
-                                    &called_contract.contract_context,
-                                    &mut call_stack,
-                                    Some(StandardPrincipalData::transient().into()),
-                                    Some(StandardPrincipalData::transient().into()),
-                                    None,
-                                ) {
-                                    Ok(res) => res,
-                                    Err(e) => {
-                                        println!("Error while calling function: {:?}", e);
-                                        return Err(e);
-                                    }
-                                };
-                                Ok(res)
-                            } else {
-                                let args: Vec<SymbolicExpression> = args
-                                    .iter()
-                                    .map(|a| SymbolicExpression::atom_value(a.clone()))
-                                    .collect();
-                                let res =
-                                    env.execute_contract(&contract_id, &method, &args, false)?;
-                                Ok(res)
+                                    let res = match call_function(
+                                        &method,
+                                        &args,
+                                        g,
+                                        &called_contract.contract_context,
+                                        &mut call_stack,
+                                        Some(StandardPrincipalData::transient().into()),
+                                        Some(StandardPrincipalData::transient().into()),
+                                        None,
+                                    ) {
+                                        Ok(res) => res,
+                                        Err(e) => {
+                                            println!("Error while calling function: {:?}", e);
+                                            return Err(e);
+                                        }
+                                    };
+                                    println!("execute wasm: {:?}", start.elapsed());
+                                    Ok(res)
+                                }
+                                None => {
+                                    let start = std::time::Instant::now();
+                                    let args: Vec<SymbolicExpression> = args
+                                        .iter()
+                                        .map(|a| SymbolicExpression::atom_value(a.clone()))
+                                        .collect();
+                                    let res =
+                                        env.execute_contract(&contract_id, &method, &args, false)?;
+                                    println!("execute intr: {:?}", start.elapsed());
+                                    Ok(res)
+                                }
                             }
                         }
                         _ => eval(&contract_ast.expressions[0], &mut env, &context),
@@ -1063,7 +1108,7 @@ mod tests {
         let mut interpreter =
             ClarityInterpreter::new(StandardPrincipalData::transient(), Settings::default());
         let contract = ClarityContract::fixture();
-        let result = interpreter.run(&contract, false, vec![].into());
+        let result = interpreter.run(&contract, &mut None, false, None);
         assert!(result.is_ok());
         assert!(result.unwrap().diagnostics.is_empty());
     }
@@ -1078,7 +1123,7 @@ mod tests {
         let contract = ClarityContractBuilder::default()
             .code_source(snippet.into())
             .build();
-        let result = interpreter.run(&contract, false, vec![].into());
+        let result = interpreter.run(&contract, &mut None, false, None);
         assert!(result.is_err());
         let diagnostics = result.unwrap_err();
         assert_eq!(diagnostics.len(), 1);
@@ -1093,7 +1138,7 @@ mod tests {
         let contract = ClarityContractBuilder::default()
             .code_source(snippet.into())
             .build();
-        let result = interpreter.run(&contract, false, vec![].into());
+        let result = interpreter.run(&contract, &mut None, false, None);
         assert!(result.is_err());
 
         let diagnostics = result.unwrap_err();

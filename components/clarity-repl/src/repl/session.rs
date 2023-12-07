@@ -509,22 +509,8 @@ impl Session {
             contract.expect_resolved_contract_identifier(Some(&self.interpreter.get_tx_sender()));
 
         // run interpreter
-        // let result = if let Some(mut ast) = ast.take() {
-        //     self.interpreter.run_ast(
-        //         contract,
-        //         &mut ast,
-        //         &mut vec![],
-        //         true,
-        //         cost_track,
-        //         Some(hooks),
-        //     )
-        // } else {
-        //     self.interpreter.run(contract, cost_track, Some(hooks))
-        // };
-        // run wasm
-        let result = self
-            .interpreter
-            .run_wasm(contract, false, None, ast.clone());
+        println!("Deploying contract: {}", contract.name);
+        let result = self.interpreter.run_both(contract, ast, cost_track, Some(hooks));
 
         match result {
             Ok(result) => {
@@ -580,7 +566,10 @@ impl Session {
         };
 
         self.set_tx_sender(sender.into());
-        let execution = match self.interpreter.run(&contract_call, true, Some(hooks)) {
+        let execution = match self
+            .interpreter
+            .run_both(&contract_call, &mut None, true, Some(hooks))
+        {
             Ok(result) => result,
             Err(e) => {
                 self.set_tx_sender(initial_tx_sender);
@@ -622,7 +611,7 @@ impl Session {
 
         let result = self
             .interpreter
-            .run_wasm(&contract, cost_track, eval_hooks, None);
+            .run_both(&contract, &mut None, cost_track, eval_hooks);
 
         match result {
             Ok(result) => {
@@ -1224,7 +1213,10 @@ fn clarity_keywords() -> HashMap<String, String> {
 
 #[cfg(test)]
 mod tests {
-    use crate::repl::{self, settings::Account};
+    use crate::{
+        repl::{self, settings::Account},
+        test_fixtures::{self, clarity_contract::ClarityContractBuilder},
+    };
 
     use super::*;
 
@@ -1349,6 +1341,17 @@ mod tests {
             output[1],
             red!("Parsing error: invalid digit found in string")
         );
+    }
+
+    #[test]
+    fn deploy_contract() {
+        let settings = SessionSettings::default();
+        let mut session = Session::new(settings);
+        session.start().expect("session could not start");
+        let contract = &ClarityContractBuilder::default().build();
+
+        let result = session.deploy_contract(contract, None, false, None, &mut None);
+        println!("{:#?}", result);
     }
 
     #[test]
