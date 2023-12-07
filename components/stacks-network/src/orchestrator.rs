@@ -1042,7 +1042,7 @@ poll_time_secs = 1
 timeout = 30
 peer_host = "host.docker.internal"
 rpc_ssl = false
-wallet_name = "devnet"
+wallet_name = "{miner_wallet_name}"
 username = "{bitcoin_node_username}"
 password = "{bitcoin_node_password}"
 rpc_port = {orchestrator_ingestion_port}
@@ -1052,6 +1052,7 @@ peer_port = {bitcoin_node_p2p_port}
             bitcoin_node_password = devnet_config.bitcoin_node_password,
             bitcoin_node_p2p_port = devnet_config.bitcoin_node_p2p_port,
             orchestrator_ingestion_port = devnet_config.orchestrator_ingestion_port,
+            miner_wallet_name = devnet_config.miner_wallet_name,
         ));
 
         stacks_conf.push_str(&format!(
@@ -2551,7 +2552,7 @@ events_keys = ["*"]
                 "jsonrpc": "1.0",
                 "id": "stacks-network",
                 "method": "createwallet",
-                "params": json!({ "wallet_name": "", "disable_private_keys": true })
+                "params": json!({ "wallet_name": devnet_config.miner_wallet_name, "disable_private_keys": true })
             }))
             .send()
             .await

@@ -88,6 +88,7 @@ pub struct DevnetConfigFile {
     pub miner_mnemonic: Option<String>,
     pub miner_derivation_path: Option<String>,
     pub miner_coinbase_recipient: Option<String>,
+    pub miner_wallet_name: Option<String>,
     pub faucet_mnemonic: Option<String>,
     pub faucet_derivation_path: Option<String>,
     pub bitcoin_controller_block_time: Option<u32>,
@@ -246,6 +247,7 @@ pub struct DevnetConfig {
     pub miner_mnemonic: String,
     pub miner_derivation_path: String,
     pub miner_coinbase_recipient: String,
+    pub miner_wallet_name: String,
     pub faucet_stx_address: String,
     pub faucet_secret_key_hex: String,
     pub faucet_btc_address: String,
@@ -805,6 +807,9 @@ impl NetworkManifest {
                 miner_coinbase_recipient: devnet_config
                     .miner_coinbase_recipient
                     .unwrap_or(miner_stx_address),
+                miner_wallet_name: devnet_config
+                    .miner_wallet_name
+                    .unwrap_or("".to_string()),
                 faucet_btc_address,
                 faucet_stx_address,
                 faucet_mnemonic,
