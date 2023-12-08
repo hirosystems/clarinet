@@ -8,12 +8,12 @@ use crate::repl::datastore::Datastore;
 use crate::repl::Settings;
 use clar2wasm::Module;
 use clarity::consts::CHAIN_ID_TESTNET;
+use clarity::rusqlite::Result;
 use clarity::vm::analysis::ContractAnalysis;
 use clarity::vm::ast::{build_ast_with_diagnostics, ContractAST};
 use clarity::vm::clarity_wasm::{call_function, initialize_contract};
 use clarity::vm::contexts::{CallStack, ContractContext, Environment, GlobalContext, LocalContext};
 use clarity::vm::contracts::Contract;
-
 use clarity::vm::costs::{ExecutionCost, LimitedCostTracker};
 use clarity::vm::database::{ClarityDatabase, StoreType};
 use clarity::vm::diagnostic::{Diagnostic, Level};
@@ -128,27 +128,9 @@ impl ClarityInterpreter {
         contract_wasm.deployer =
             ContractDeployer::Address("ST3NBRSFKX28FQ2ZJ1MAKX58HKHSDGNV5N7R21XCP".into());
 
-        let start_run = std::time::Instant::now();
         let result = self.run(contract, ast, cost_track, eval_hooks);
-        #[allow(unused_variables)]
-        let time_run = start_run.elapsed();
-
-        let start_run_wasm = std::time::Instant::now();
         let result_wasm = self.run_wasm(&contract_wasm, ast, cost_track, None);
-        #[allow(unused_variables)]
-        let time_run_wasm = start_run_wasm.elapsed();
 
-        // println!("time taken for run_wasm: {:?}", time_run_wasm);
-        // println!("time taken for run: {:?}", time_run);
-
-        // let ratio = time_run_wasm.as_nanos() / time_run.as_nanos();
-        // if time_run_wasm < time_run {
-        //     println!("run_wasm {:?}x times faster", ratio);
-        // } else {
-        //     println!("run_wasm {:?}x times slower", ratio);
-        // }
-
-        #[allow(clippy::single_match)]
         match (result.clone(), result_wasm) {
             (Ok(result), Ok(result_wasm)) => {
                 let value = match result.result {
@@ -165,8 +147,23 @@ impl ClarityInterpreter {
                     println!("value_wasm: {:?}", value_wasm);
                 };
             }
-            // @TODO: handle other cases
-            _ => (),
+            (Ok(result), Err(error_wasm)) => {
+                println!("values do not match");
+                println!("wasm error: {:?}", error_wasm);
+                println!("result: {:?}", result);
+            }
+            (Err(error), Ok(result_wasm)) => {
+                println!("values do not match");
+                println!("result error: {:?}", error);
+                println!("result_wasm: {:?}", result_wasm);
+            }
+            (Err(error), Err(error_wasm)) => {
+                if error != error_wasm {
+                    println!("values do not match");
+                    println!("result error: {:?}", error);
+                    println!("wasm error: {:?}", error_wasm);
+                }
+            }
         };
 
         result
@@ -218,11 +215,6 @@ impl ClarityInterpreter {
             };
 
         result.diagnostics = diagnostics.to_vec();
-
-        // todo: instead of just returning the value, we should be returning:
-        // - value
-        // - execution cost
-        // - events emitted
         Ok(result)
     }
 
@@ -271,8 +263,6 @@ impl ClarityInterpreter {
                 (ast, diagnostics, analysis, module)
             }
             None => {
-                // counter.clar
-                // contract2.clar
                 let CompileResult {
                     mut ast,
                     mut diagnostics,
@@ -327,9 +317,6 @@ impl ClarityInterpreter {
         };
 
         result.diagnostics = diagnostics;
-
-        // todo: instead of just returning the value, we should be returning:
-        // - value, execution cost, events emitted
         Ok(result)
     }
 
@@ -588,9 +575,10 @@ impl ClarityInterpreter {
                     None,
                 );
 
-                let result = match contract_ast.expressions[0].expr {
-                    List(ref expression) => match expression[0].expr {
-                        Atom(ref name) if name.to_string() == "contract-call?" => {
+                // call a function
+                if let List(expression) = &contract_ast.expressions[0].expr {
+                    if let Atom(name) = &expression[0].expr {
+                        if name.to_string() == "contract-call?" {
                             let contract_id = match expression[1]
                                 .match_literal_value()
                                 .unwrap()
@@ -631,7 +619,7 @@ impl ClarityInterpreter {
                                         }
                                     };
                                     println!("execute wasm: {:?}", start.elapsed());
-                                    Ok(res)
+                                    return Ok(Some(res));
                                 }
                                 None => {
                                     // INTERPRETER
@@ -643,13 +631,35 @@ impl ClarityInterpreter {
                                     let res =
                                         env.execute_contract(&contract_id, &method, &args, false)?;
                                     println!("execute intr: {:?}", start.elapsed());
-                                    Ok(res)
+                                    return Ok(Some(res));
                                 }
                             }
                         }
-                        _ => eval(&contract_ast.expressions[0], &mut env, &context),
-                    },
-                    _ => eval(&contract_ast.expressions[0], &mut env, &context),
+                    }
+                };
+
+                // execute code
+                let result = match wasm_module {
+                    Some(_) => {
+                        // WASM
+                        let start = std::time::Instant::now();
+                        let mut env = clar2wasm::tools::TestEnvironment::new(
+                            contract.epoch,
+                            contract.clarity_version,
+                        );
+                        let result = env
+                            .init_contract_with_snippet("snippet", snippet)
+                            .map(|v| v.unwrap_or(Value::none()));
+                        println!("execute wasm: {:?}", start.elapsed());
+                        result
+                    }
+                    None => {
+                        // INTERPRETER
+                        let start = std::time::Instant::now();
+                        let result = eval(&contract_ast.expressions[0], &mut env, &context);
+                        println!("execute intr: {:?}", start.elapsed());
+                        result
+                    }
                 };
                 result.map(Some)
             } else {
