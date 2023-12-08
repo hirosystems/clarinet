@@ -2589,12 +2589,7 @@ impl StacksMessageCodec for TransactionPayload {
                 } else {
                     return Err(CodecError::DeserializeError("Failed to parse nakamoto coinbase transaction -- did not receive an optional recipient principal value".to_string()));
                 };
-                let vrf_proof_bytes: Vec<u8> = read_next(fd)?;
-                let Some(vrf_proof) = VRFProof::from_bytes(&vrf_proof_bytes) else {
-                    return Err(CodecError::DeserializeError(
-                        "Failed to decode coinbase VRF proof".to_string(),
-                    ));
-                };
+                let vrf_proof: VRFProof = read_next(fd)?;
                 TransactionPayload::Coinbase(payload, recipient_opt, Some(vrf_proof))
             }
             x if x == TransactionPayloadID::TenureChange as u8 => {
