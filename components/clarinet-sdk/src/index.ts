@@ -20,7 +20,7 @@ BigInt.prototype.toJSON = function () {
   return this.toString();
 };
 
-type ClarityEvent = {
+export type ClarityEvent = {
   event: string;
   data: { raw_value?: string; value?: ClarityValue; [key: string]: any };
 };
@@ -30,30 +30,30 @@ export type ParsedTransactionResult = {
   events: ClarityEvent[];
 };
 
-type CallFn = (
+export type CallFn = (
   contract: string,
   method: string,
   args: ClarityValue[],
   sender: string,
 ) => ParsedTransactionResult;
 
-type DeployContractOptions = {
+export type DeployContractOptions = {
   clarityVersion: 1 | 2;
 };
-type DeployContract = (
+export type DeployContract = (
   name: string,
   content: string,
   options: DeployContractOptions | null,
   sender: string,
 ) => ParsedTransactionResult;
 
-type TransferSTX = (
+export type TransferSTX = (
   amount: number | bigint,
   recipient: string,
   sender: string,
 ) => ParsedTransactionResult;
 
-type Tx =
+export type Tx =
   | {
       callPublicFn: {
         contract: string;
@@ -97,12 +97,12 @@ export const tx = {
   }),
 };
 
-type MineBlock = (txs: Array<Tx>) => ParsedTransactionResult[];
-type GetDataVar = (contract: string, dataVar: string) => ClarityValue;
-type GetBlockTime = () => ClarityValue;
-type GetMapEntry = (contract: string, mapName: string, mapKey: ClarityValue) => ClarityValue;
-type GetContractAST = (contractId: string) => ContractAST;
-type GetContractsInterfaces = () => Map<string, ContractInterface>;
+export type MineBlock = (txs: Array<Tx>) => ParsedTransactionResult[];
+export type GetDataVar = (contract: string, dataVar: string) => ClarityValue;
+export type GetMapEntry = (contract: string, mapName: string, mapKey: ClarityValue) => ClarityValue;
+export type GetContractAST = (contractId: string) => ContractAST;
+export type GetContractsInterfaces = () => Map<string, ContractInterface>;
+export type GetBlockTime = () => ClarityValue;
 
 // because the session is wrapped in a proxy the types need to be hardcoded
 export type Simnet = {
