@@ -124,47 +124,50 @@ impl ClarityInterpreter {
         cost_track: bool,
         eval_hooks: Option<Vec<&mut dyn EvalHook>>,
     ) -> Result<ExecutionResult, Vec<Diagnostic>> {
-        let mut contract_wasm = contract.clone();
-        contract_wasm.deployer =
-            ContractDeployer::Address("ST3NBRSFKX28FQ2ZJ1MAKX58HKHSDGNV5N7R21XCP".into());
-
         let result = self.run(contract, ast, cost_track, eval_hooks);
-        let result_wasm = self.run_wasm(&contract_wasm, ast, cost_track, None);
 
-        match (result.clone(), result_wasm) {
-            (Ok(result), Ok(result_wasm)) => {
-                let value = match result.result {
-                    EvaluationResult::Contract(contract_result) => contract_result.result,
-                    EvaluationResult::Snippet(snippet_result) => Some(snippet_result.result),
-                };
-                let value_wasm = match result_wasm.result {
-                    EvaluationResult::Contract(contract_result) => contract_result.result,
-                    EvaluationResult::Snippet(snippet_result) => Some(snippet_result.result),
-                };
-                if value != value_wasm {
+        // when running clarity-repl/wasm (ie. not natively), we can't run clar2wasm
+        #[cfg(not(feature = "wasm"))]
+        {
+            let mut contract_wasm = contract.clone();
+            contract_wasm.deployer =
+                ContractDeployer::Address("ST3NBRSFKX28FQ2ZJ1MAKX58HKHSDGNV5N7R21XCP".into());
+            let result_wasm = self.run_wasm(&contract_wasm, ast, cost_track, None);
+            match (result.clone(), result_wasm) {
+                (Ok(result), Ok(result_wasm)) => {
+                    let value = match result.result {
+                        EvaluationResult::Contract(contract_result) => contract_result.result,
+                        EvaluationResult::Snippet(snippet_result) => Some(snippet_result.result),
+                    };
+                    let value_wasm = match result_wasm.result {
+                        EvaluationResult::Contract(contract_result) => contract_result.result,
+                        EvaluationResult::Snippet(snippet_result) => Some(snippet_result.result),
+                    };
+                    if value != value_wasm {
+                        println!("values do not match");
+                        println!("value: {:?}", value);
+                        println!("value_wasm: {:?}", value_wasm);
+                    };
+                }
+                (Ok(result), Err(error_wasm)) => {
                     println!("values do not match");
-                    println!("value: {:?}", value);
-                    println!("value_wasm: {:?}", value_wasm);
-                };
-            }
-            (Ok(result), Err(error_wasm)) => {
-                println!("values do not match");
-                println!("wasm error: {:?}", error_wasm);
-                println!("result: {:?}", result);
-            }
-            (Err(error), Ok(result_wasm)) => {
-                println!("values do not match");
-                println!("result error: {:?}", error);
-                println!("result_wasm: {:?}", result_wasm);
-            }
-            (Err(error), Err(error_wasm)) => {
-                if error != error_wasm {
+                    println!("wasm error: {:?}", error_wasm);
+                    println!("result: {:?}", result);
+                }
+                (Err(error), Ok(result_wasm)) => {
                     println!("values do not match");
                     println!("result error: {:?}", error);
-                    println!("wasm error: {:?}", error_wasm);
+                    println!("result_wasm: {:?}", result_wasm);
                 }
-            }
-        };
+                (Err(error), Err(error_wasm)) => {
+                    if error != error_wasm {
+                        println!("values do not match");
+                        println!("result error: {:?}", error);
+                        println!("wasm error: {:?}", error_wasm);
+                    }
+                }
+            };
+        }
 
         result
     }
@@ -514,11 +517,11 @@ impl ClarityInterpreter {
         Some(format!("0x{value_hex}"))
     }
 
-    pub fn execute(
+    fn execute(
         &mut self,
         contract: &ClarityContract,
         contract_ast: &mut ContractAST,
-        contract_analysis: ContractAnalysis,
+        analysis: ContractAnalysis,
         wasm_module: Option<Module>,
         cost_track: bool,
         eval_hooks: Option<Vec<&mut dyn EvalHook>>,
@@ -630,7 +633,7 @@ impl ClarityInterpreter {
                                         .collect();
                                     let res =
                                         env.execute_contract(&contract_id, &method, &args, false)?;
-                                    println!("execute intr: {:?}", start.elapsed());
+                                    println!("execute intr: {:?}μs", start.elapsed().as_micros());
                                     return Ok(Some(res));
                                 }
                             }
@@ -640,36 +643,34 @@ impl ClarityInterpreter {
 
                 // execute code
                 let result = match wasm_module {
-                    Some(_) => {
+                    Some(mut wasm_module) => {
                         // WASM
+                        // let start = std::time::Instant::now();
                         let start = std::time::Instant::now();
-                        let mut env = clar2wasm::tools::TestEnvironment::new(
-                            contract.epoch,
-                            contract.clarity_version,
-                        );
-                        let result = env
-                            .init_contract_with_snippet("snippet", snippet)
+                        contract_context.set_wasm_module(wasm_module.emit_wasm());
+                        let result = initialize_contract(g, &mut contract_context, None, &analysis)
                             .map(|v| v.unwrap_or(Value::none()));
-                        println!("execute wasm: {:?}", start.elapsed());
+                        println!("execute wasm: {:?}μs", start.elapsed().as_micros());
                         result
                     }
                     None => {
                         // INTERPRETER
                         let start = std::time::Instant::now();
                         let result = eval(&contract_ast.expressions[0], &mut env, &context);
-                        println!("execute intr: {:?}", start.elapsed());
+                        println!("execute intr: {:?}μs", start.elapsed().as_micros());
                         result
                     }
                 };
-                result.map(Some)
-            } else {
-                match wasm_module {
-                    Some(mut wasm_module) => {
-                        contract_context.set_wasm_module(wasm_module.emit_wasm());
-                        initialize_contract(g, &mut contract_context, None, &contract_analysis)
-                    }
-                    None => eval_all(&contract_ast.expressions, &mut contract_context, g, None),
+                return result.map(Some);
+            }
+
+            // deploy a contract
+            match wasm_module {
+                Some(mut wasm_module) => {
+                    contract_context.set_wasm_module(wasm_module.emit_wasm());
+                    initialize_contract(g, &mut contract_context, None, &analysis)
                 }
+                None => eval_all(&contract_ast.expressions, &mut contract_context, g, None),
             }
         });
 
@@ -719,7 +720,7 @@ impl ClarityInterpreter {
                 code: snippet.to_string(),
                 function_args: functions,
                 ast: contract_ast.clone(),
-                analysis: contract_analysis.clone(),
+                analysis: analysis.clone(),
             };
 
             global_context
@@ -773,7 +774,7 @@ impl ClarityInterpreter {
         if contract_saved {
             let mut analysis_db = AnalysisDatabase::new(&mut self.datastore);
             analysis_db
-                .execute(|db| db.insert_contract(&contract_id, &contract_analysis))
+                .execute(|db| db.insert_contract(&contract_id, &analysis))
                 .expect("Unable to save data");
         }
 
