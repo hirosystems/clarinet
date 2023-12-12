@@ -283,7 +283,7 @@ impl ClarityBackingStore for Datastore {
         panic!("Datastore cannot get_metadata_manual")
     }
 
-    #[cfg(not(target_family = "wasm"))]
+    #[cfg(not(feature = "wasm"))]
     fn get_side_store(&mut self) -> &::clarity::rusqlite::Connection {
         panic!("Datastore cannot get_side_store")
     }
