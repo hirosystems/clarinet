@@ -23,7 +23,9 @@ where
             TransactionStatus::Encoded(_, _) => {
                 ("🟦", "Transaction encoded and queued".to_string())
             }
-            TransactionStatus::Broadcasted(_) => ("🟨", "Transaction broadcasted".to_string()),
+            TransactionStatus::Broadcasted(_, txid) => {
+                ("🟨", format!("Transaction broadcasted (txid: {})", txid))
+            }
             TransactionStatus::Confirmed => ("🟩", "Transaction confirmed".to_string()),
             TransactionStatus::Error(message) => ("🟥", message.to_string()),
         };
@@ -42,8 +44,8 @@ where
         .style(Style::default().fg(Color::White))
         .widths(&[
             Constraint::Length(3),
-            Constraint::Length(80),
-            Constraint::Length(120),
+            Constraint::Length(90),
+            Constraint::Length(110),
         ]);
     f.render_widget(t, area);
 }
