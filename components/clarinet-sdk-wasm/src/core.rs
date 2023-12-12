@@ -464,6 +464,10 @@ impl SDK {
             .get_data_var(&contract_id, var_name)
             .ok_or("value not found".into())
     }
+    #[wasm_bindgen(js_name=getBlockTime)]
+    pub fn get_block_time(&mut self) -> u64 {
+        self.get_session_mut().interpreter.get_block_time()
+    }
 
     #[wasm_bindgen(js_name=getMapEntry)]
     pub fn get_map_entry(

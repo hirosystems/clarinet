@@ -363,6 +363,16 @@ impl ClarityInterpreter {
         analysis_db.commit();
     }
 
+    pub fn get_block_time(&mut self) -> u64 {
+        let block_height = self.get_block_height();
+        let mut conn = ClarityDatabase::new(
+            &mut self.datastore,
+            &self.burn_datastore,
+            &self.burn_datastore,
+        );
+        conn.get_block_time(block_height)
+    }
+
     pub fn get_data_var(
         &mut self,
         contract_id: &QualifiedContractIdentifier,
@@ -796,6 +806,7 @@ impl ClarityInterpreter {
 
 #[cfg(test)]
 mod tests {
+
     use super::*;
     use crate::test_fixtures::clarity_contract::ClarityContractBuilder;
     use clarity::{
@@ -810,6 +821,14 @@ mod tests {
         let tx_sender = StandardPrincipalData::transient();
         interpreter.set_tx_sender(tx_sender.clone());
         assert_eq!(interpreter.get_tx_sender(), tx_sender);
+    }
+
+    #[test]
+    fn test_get_block_time() {
+        let mut interpreter =
+            ClarityInterpreter::new(StandardPrincipalData::transient(), Settings::default());
+        let bt = interpreter.get_block_time();
+        assert_ne!(bt, 0); // TODO placeholder
     }
 
     #[test]
