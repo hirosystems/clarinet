@@ -218,7 +218,6 @@ pub struct TransactionTracker {
 pub enum TransactionCheck {
     NonceCheck(StandardPrincipalData, u64),
     ContractPublish(StandardPrincipalData, ContractName),
-    // TODO(lgalabru): Handle Bitcoin checks
     BtcTransfer,
 }
 
@@ -403,10 +402,7 @@ pub fn apply_on_chain_deployment(
     }
 
     for batch_spec in deployment.plan.batches.iter() {
-        let epoch = match batch_spec.epoch {
-            Some(epoch) => epoch,
-            None => default_epoch,
-        };
+        let epoch = batch_spec.epoch.unwrap_or(default_epoch);
         let mut batch = Vec::new();
         for transaction in batch_spec.transactions.iter() {
             let tracker = match transaction {

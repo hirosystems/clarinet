@@ -834,7 +834,7 @@ pub fn main() {
                         match cmd {
                             DeploymentEvent::Interrupted(message) => {
                                 println!(
-                                    "{} Error publishing transactions (x): {}",
+                                    "{} Error publishing transactions: {}",
                                     red!("x"),
                                     message
                                 );
