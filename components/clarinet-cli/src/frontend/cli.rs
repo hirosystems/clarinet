@@ -799,13 +799,19 @@ pub fn main() {
                 let network_moved = network.clone();
                 std::thread::spawn(move || {
                     let manifest = manifest_moved;
-                    let network_manifest = NetworkManifest::from_project_manifest_location(
+                    let res = NetworkManifest::from_project_manifest_location(
                         &manifest.location,
                         &network_moved.get_networks(),
                         Some(&manifest.project.cache_location),
                         None,
-                    )
-                    .expect("unable to load network manifest");
+                    );
+                    let network_manifest = match res {
+                        Ok(network_manifest) => network_manifest,
+                        Err(e) => {
+                            let _ = event_tx.send(DeploymentEvent::Interrupted(e));
+                            return;
+                        }
+                    };
                     apply_on_chain_deployment(
                         network_manifest,
                         deployment,
@@ -828,7 +834,7 @@ pub fn main() {
                         match cmd {
                             DeploymentEvent::Interrupted(message) => {
                                 println!(
-                                    "{} Error publishing transactions: {}",
+                                    "{} Error publishing transactions (x): {}",
                                     red!("x"),
                                     message
                                 );

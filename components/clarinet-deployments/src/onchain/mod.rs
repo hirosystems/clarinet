@@ -851,7 +851,7 @@ pub fn apply_on_chain_deployment(
 
             // Handle Stacks releated checks
             if stacks_tip_height > last_stacks_chain_check_at_height {
-                for (txid, tracker) in ongoing_batch.iter_mut() {
+                for (_, tracker) in ongoing_batch.iter_mut() {
                     let TransactionStatus::Broadcasted(brodcasting_status, _) = &tracker.status
                     else {
                         continue;
@@ -898,7 +898,7 @@ pub fn apply_on_chain_deployment(
 
             // Handle Bitcoin releated checks
             if bitcoin_tip_height > last_bitcoin_chain_check_at_height {
-                for (txid, tracker) in ongoing_batch.iter_mut() {
+                for (_, tracker) in ongoing_batch.iter_mut() {
                     let TransactionStatus::Broadcasted(brodcasting_status, _) = &tracker.status
                     else {
                         continue;
