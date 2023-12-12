@@ -102,7 +102,6 @@ export type GetDataVar = (contract: string, dataVar: string) => ClarityValue;
 export type GetMapEntry = (contract: string, mapName: string, mapKey: ClarityValue) => ClarityValue;
 export type GetContractAST = (contractId: string) => ContractAST;
 export type GetContractsInterfaces = () => Map<string, ContractInterface>;
-export type GetBlockTime = () => ClarityValue;
 
 // because the session is wrapped in a proxy the types need to be hardcoded
 export type Simnet = {
@@ -116,8 +115,6 @@ export type Simnet = {
     ? MineBlock
     : K extends "getDataVar"
     ? GetDataVar
-    : K extends "getBlockTime"
-    ? GetBlockTime
     : K extends "getMapEntry"
     ? GetMapEntry
     : K extends "getContractAST"
