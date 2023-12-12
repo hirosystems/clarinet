@@ -417,8 +417,8 @@ impl NetworkManifest {
                                 Ok(result) => result.to_string(),
                                 Err(e) => {
                                     return Err(format!(
-                                        "mnemonic for wallet '{}' invalid: {}",
-                                        account_name, e
+                                        "mnemonic (located in ./settings/{:?}.toml) for deploying address is invalid: {}",
+                                        networks.1 , e
                                     ));
                                 }
                             }
