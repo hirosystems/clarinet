@@ -225,15 +225,6 @@ const getSessionProxy = () => ({
       return getDataVar;
     }
 
-    if (prop === "getBlockTime") {
-      const getBlockTime: GetBlockTime = () => {
-        const response = session.getBlockTime();
-        const result = Cl.deserialize(response);
-        return result;
-      };
-      return getBlockTime;
-    }
-
     if (prop === "getMapEntry") {
       const getMapEntry: GetMapEntry = (contract, mapName, mapKey) => {
         const response = session.getMapEntry(contract, mapName, Cl.serialize(mapKey));
