@@ -1709,13 +1709,13 @@ fn display_deploy_hint() {
         yellow!("Once your contracts are ready to be deployed, you can run the following:")
     );
 
-    println!("{}", blue!("  $ clarinet contract publish --testnet"));
+    println!("{}", blue!("  $ clarinet deployments apply --testnet"));
     println!(
         "{}",
         yellow!("    Deploy all contracts to the testnet network.\n")
     );
 
-    println!("{}", blue!("  $ clarinet contract publish --mainnet"));
+    println!("{}", blue!("  $ clarinet deployments apply --mainnet"));
     println!(
         "{}",
         yellow!("    Deploy all contracts to the mainnet network.\n")
