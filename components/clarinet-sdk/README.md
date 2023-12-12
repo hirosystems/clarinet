@@ -130,7 +130,7 @@ rebuilt with wasm-pack and npm will use it.
 Built the TS project:
 ```console
 cd ../../clarinet-sdk
-npm link @hirosystems/clarinet-sdk
+npm link @hirosystems/clarinet-sdk-wasm
 ```
 
 You can now run `npm test`, it wil be using the local version of `clarinet-sdk-wasm`
