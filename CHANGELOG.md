@@ -2,13 +2,13 @@
 
 ##### Documentation Changes
 
-*  Change contract publish -> deployments apply (#1287) (f9a55262)
-*  Improve clarinet-sdk contributin section (#1281) (3c85bd85)
+*  Change `contract publish` -> `deployments apply` (#1287) (f9a55262)
+*  Improve clarinet-sdk contributing section (#1281) (3c85bd85)
 
 ##### New Features
 
 *  Add `clarinet contract rm <name>` (#1261) (98f9d4d8)
-*  Upgrade clarinet-sdk templates (#1280) (9e9f7706)
+*  Upgrade clarinet-sdk templates (#1280) (#1287) (#1289) (9e9f7706)
 *  Alias `clarinet integrate` to `clarinet devnet start` (#1244) (28ae908c)
 
 ##### Bug Fixes
